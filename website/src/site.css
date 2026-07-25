@@ -67,10 +67,14 @@ a { color: inherit; text-decoration: none; }
   position: sticky;
   top: 0;
   z-index: 100;
-  background: rgba(14, 15, 20, 0.62);
+  /* The base fill must stand alone: backdrop-filter can silently fail to
+     composite even where it is supported, and page content collides with
+     the links when the bar leans on blur for legibility. The blur only
+     softens the remaining sliver of translucency. */
+  background: rgba(14, 15, 20, 0.94);
   backdrop-filter: saturate(140%) blur(20px);
   -webkit-backdrop-filter: saturate(140%) blur(20px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
 }
 
 .nav-inner {

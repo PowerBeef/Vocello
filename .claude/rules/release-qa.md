@@ -296,6 +296,7 @@ scripts/clean_build_caches.sh --compact-profile-failure <run-id> --dry-run
   development-publishing prerequisite.
 - Committing raw `.jsonl` telemetry to `benchmarks/`.
 - Editing `benchmarks/HISTORY.md` by hand or treating a failed/incomplete run as publishable.
-- Forgetting to validate current dSYM UUIDs under `build/artifacts/symbols/{macos,ios}` after a
-  product rebuild.
+- Assuming preserved-dSYM drift needs a manual rebuild: the build-output policy check re-syncs
+  `build/artifacts/symbols/{macos,ios}` from the dSYM beside the current product when its UUIDs
+  prove identity, and fails only when no matching local dSYM exists.
 - Changing signing/notarization env vars without updating the workflow secret docs.

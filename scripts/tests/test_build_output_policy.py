@@ -288,6 +288,56 @@ class BuildOutputPolicyTests(unittest.TestCase):
         ):
             self.assertEqual(POLICY._symbol_identity_violations(policy), [])
 
+    def test_symbol_identity_self_heals_from_the_products_dsym(self) -> None:
+        policy = POLICY.load_policy(self.root, self.manifest)
+        products = (
+            self.root / "build/cache/xcode/ios-device/Build/Products/Release-iphoneos"
+        )
+        binary = products / "Vocello.app/Vocello"
+        binary.parent.mkdir(parents=True)
+        binary.write_bytes(b"mach-o fixture")
+        sibling = products / "Vocello.app.dSYM"
+        (sibling / "Contents").mkdir(parents=True)
+        (sibling / "Contents/marker").write_text("rebuilt", encoding="utf-8")
+        preserved = self.root / "build/artifacts/symbols/ios/Vocello.app.dSYM"
+        preserved.mkdir(parents=True)
+
+        current = {"AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA"}
+        with mock.patch.object(
+            POLICY,
+            "_macho_uuids",
+            side_effect=lambda path: (
+                ({"BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB"}, None)
+                if path == preserved
+                else (current, None)
+            ),
+        ):
+            self.assertEqual(POLICY._symbol_identity_violations(policy), [])
+
+        # The stale preserved tree was replaced by a copy of the products dSYM.
+        self.assertTrue((preserved / "Contents/marker").is_file())
+        self.assertFalse(
+            (preserved.with_name("repair-staging-" + preserved.name)).exists()
+        )
+
+        # Without a rebuilt sibling the check stays fail-closed.
+        import shutil as _shutil
+
+        _shutil.rmtree(sibling)
+        _shutil.rmtree(preserved)
+        preserved.mkdir(parents=True)
+        with mock.patch.object(
+            POLICY,
+            "_macho_uuids",
+            side_effect=lambda path: (
+                ({"BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB"}, None)
+                if path == preserved
+                else (current, None)
+            ),
+        ):
+            failures = POLICY._symbol_identity_violations(policy)
+        self.assertTrue(any("no rebuilt dSYM beside the product" in item for item in failures))
+
     def test_status_markdown_is_deterministic_and_manifest_owned(self) -> None:
         policy = POLICY.load_policy(self.root, self.manifest)
         expected = POLICY.render_policy_markdown_table(policy) + "\n"

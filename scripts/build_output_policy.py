@@ -1200,34 +1200,92 @@ def _macho_uuids(path: Path) -> tuple[set[str], str | None]:
     return uuids, None
 
 
+def _repair_preserved_dsym(
+    label: str,
+    binary_uuids: set[str],
+    source_dsym: Path,
+    target_dsym: Path,
+    repo_root: Path,
+) -> str | None:
+    """Re-preserve the products-directory dSYM when it proves identity.
+
+    Every build writes a fresh dSYM beside its product, so a stale preserved
+    copy is repairable from local ground truth: adopt the sibling dSYM only
+    after its Mach-O UUIDs cover the current binary, staging the copy and
+    re-validating before it replaces the preserved tree. Returns None on a
+    successful repair, otherwise the reason the local source cannot be
+    trusted (which keeps the check fail-closed).
+    """
+
+    if not source_dsym.is_dir():
+        return f"no rebuilt dSYM beside the product at {source_dsym.relative_to(repo_root)}"
+    source_uuids, source_error = _macho_uuids(source_dsym)
+    if source_error:
+        return f"cannot inspect the rebuilt dSYM beside the product: {source_error}"
+    missing = sorted(binary_uuids.difference(source_uuids))
+    if missing:
+        return (
+            "the rebuilt dSYM beside the product does not cover current UUID(s): "
+            + ", ".join(missing)
+        )
+    staging = target_dsym.with_name("repair-staging-" + target_dsym.name)
+    if staging.exists():
+        shutil.rmtree(staging)
+    target_dsym.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(source_dsym, staging)
+    staged_uuids, staged_error = _macho_uuids(staging)
+    if staged_error or binary_uuids.difference(staged_uuids):
+        shutil.rmtree(staging, ignore_errors=True)
+        return "the re-preserved dSYM copy failed UUID validation"
+    if target_dsym.exists():
+        shutil.rmtree(target_dsym)
+    staging.rename(target_dsym)
+    print(
+        f"note: {label}: preserved dSYM re-synced from "
+        f"{source_dsym.relative_to(repo_root)}",
+        file=sys.stderr,
+    )
+    return None
+
+
 def _symbol_identity_violations(policy: LoadedPolicy) -> list[str]:
-    """Validate retained symbols whenever their canonical product exists."""
+    """Validate retained symbols whenever their canonical product exists.
+
+    A stale preserved dSYM self-heals from the dSYM sitting beside the
+    current product (see _repair_preserved_dsym); the check fails only when
+    no local dSYM can prove identity for the current binary.
+    """
 
     macos_cache = policy.repo_root / policy.entries_by_id["xcode-macos-derived-data"]["path"]
     ios_cache = policy.repo_root / policy.entries_by_id["xcode-ios-device-derived-data"]["path"]
     macos_symbols = policy.repo_root / policy.entries_by_id["symbols-macos"]["path"]
     ios_symbols = policy.repo_root / policy.entries_by_id["symbols-ios"]["path"]
+    macos_products = macos_cache / "Build/Products/Release"
+    ios_products = ios_cache / "Build/Products/Release-iphoneos"
     checks = (
         (
             "macOS Vocello",
-            macos_cache / "Build/Products/Release/Vocello.app/Contents/MacOS/Vocello",
+            macos_products / "Vocello.app/Contents/MacOS/Vocello",
             macos_symbols / "Vocello.app.dSYM",
+            macos_products / "Vocello.app.dSYM",
         ),
         (
             "macOS QwenVoiceEngineService",
-            macos_cache
-            / "Build/Products/Release/Vocello.app/Contents/XPCServices/"
+            macos_products
+            / "Vocello.app/Contents/XPCServices/"
             "QwenVoiceEngineService.xpc/Contents/MacOS/QwenVoiceEngineService",
             macos_symbols / "QwenVoiceEngineService.xpc.dSYM",
+            macos_products / "QwenVoiceEngineService.xpc.dSYM",
         ),
         (
             "iOS Vocello",
-            ios_cache / "Build/Products/Release-iphoneos/Vocello.app/Vocello",
+            ios_products / "Vocello.app/Vocello",
             ios_symbols / "Vocello.app.dSYM",
+            ios_products / "Vocello.app.dSYM",
         ),
     )
     violations: list[str] = []
-    for label, binary, dsym in checks:
+    for label, binary, dsym, sibling in checks:
         if not binary.is_file():
             continue
         binary_uuids, binary_error = _macho_uuids(binary)
@@ -1235,10 +1293,14 @@ def _symbol_identity_violations(policy: LoadedPolicy) -> list[str]:
             violations.append(f"{label}: cannot inspect current binary UUID: {binary_error}")
             continue
         if not dsym.is_dir():
-            violations.append(
-                f"{label}: current product exists but preserved dSYM is missing at "
-                f"{dsym.relative_to(policy.repo_root)}"
+            repair_failure = _repair_preserved_dsym(
+                label, binary_uuids, sibling, dsym, policy.repo_root
             )
+            if repair_failure:
+                violations.append(
+                    f"{label}: current product exists but preserved dSYM is missing at "
+                    f"{dsym.relative_to(policy.repo_root)}; {repair_failure}"
+                )
             continue
         dsym_uuids, dsym_error = _macho_uuids(dsym)
         if dsym_error:
@@ -1246,10 +1308,15 @@ def _symbol_identity_violations(policy: LoadedPolicy) -> list[str]:
             continue
         missing = sorted(binary_uuids.difference(dsym_uuids))
         if missing:
-            violations.append(
-                f"{label}: preserved dSYM does not match current product UUID(s): "
-                + ", ".join(missing)
+            repair_failure = _repair_preserved_dsym(
+                label, binary_uuids, sibling, dsym, policy.repo_root
             )
+            if repair_failure:
+                violations.append(
+                    f"{label}: preserved dSYM does not match current product UUID(s): "
+                    + ", ".join(missing)
+                    + f"; {repair_failure}"
+                )
     return violations
 
 

@@ -7,7 +7,7 @@
     "dev": "vite",
     "lint": "node scripts/site-contract.mjs",
     "test": "node --test tests/*.test.mjs && node scripts/rendered-contract.mjs",
-    "build": "vite build",
+    "build": "vite build && vite build --ssr src/entry-ssr.jsx --outDir dist-ssr && node scripts/prerender.mjs",
     "preview": "vite preview",
     "check": "npm run lint && npm test && npm run build"
   },

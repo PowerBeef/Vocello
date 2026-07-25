@@ -19,7 +19,7 @@ const LIMITATIONS = [
   },
   {
     k: "Cloning varies",
-    v: "Use voices you own or have permission to use. For offline voice cloning Mac workflows, reference quality matters, and subjective similarity can vary by clip and model behavior.",
+    v: "Use voices you own or have permission to use. For local voice cloning workflows, reference quality matters, and subjective similarity can vary by clip and model behavior.",
   },
 ];
 

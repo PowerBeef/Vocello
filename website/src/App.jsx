@@ -7,6 +7,7 @@ import { Capabilities } from "./sections/Capabilities.jsx";
 import { WhyCloud } from "./sections/WhyCloud.jsx";
 import { TryIt } from "./sections/TryIt.jsx";
 import { HowItRuns } from "./sections/HowItRuns.jsx";
+import { Performance } from "./sections/Performance.jsx";
 import { Limitations } from "./sections/Limitations.jsx";
 import { FinalCTA } from "./sections/FinalCTA.jsx";
 import { Footer } from "./sections/Footer.jsx";
@@ -65,6 +66,7 @@ const App = () => {
       <WhyCloud />
       <TryIt />
       <HowItRuns />
+      <Performance />
       <Limitations />
       <FinalCTA />
     </main>

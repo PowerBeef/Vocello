@@ -1,7 +1,7 @@
 import React, { useRef, useState } from "react";
 import { Icon } from "../components/Icon.jsx";
 import { Waveform } from "../components/Waveform.jsx";
-import { SAMPLES } from "../data/samples.js";
+import { SAMPLES, DELIVERIES } from "../data/samples.js";
 
 export const Listen = () => {
   const [playing, setPlaying] = useState(null);
@@ -77,6 +77,34 @@ export const Listen = () => {
             );
           })}
         </ul>
+
+        <div className="listen-deliveries">
+          <div className="vc-label" id="delivery-vocab-label">Delivery presets</div>
+          <p className="listen-deliveries-sub">
+            Custom Voice and Voice Design shape a take with one of ten delivery
+            presets, each at subtle, normal, or strong intensity.
+          </p>
+          <div className="try-chips" role="list" aria-labelledby="delivery-vocab-label">
+            {DELIVERIES.map((d) => (
+              <span key={d.label} role="listitem" className="chip" style={{ "--chip-color": d.color }}>
+                <span className="swatch" aria-hidden="true" />
+                {d.label}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        <figure className="try-shot">
+          <div className="window">
+            <img
+              src="assets/screens/delivery-presets.png"
+              alt="The Vocello delivery menu open, listing all ten presets from Neutral to Excited"
+            />
+          </div>
+          <figcaption className="try-shot-caption">
+            All ten presets, each with subtle, normal, and strong intensity, live in the app.
+          </figcaption>
+        </figure>
       </div>
     </section>
   );

@@ -5,7 +5,6 @@ import { WorkflowBand } from "./sections/WorkflowBand.jsx";
 import { Listen } from "./sections/Listen.jsx";
 import { Capabilities } from "./sections/Capabilities.jsx";
 import { WhyCloud } from "./sections/WhyCloud.jsx";
-import { TryIt } from "./sections/TryIt.jsx";
 import { HowItRuns } from "./sections/HowItRuns.jsx";
 import { Performance } from "./sections/Performance.jsx";
 import { Limitations } from "./sections/Limitations.jsx";
@@ -25,7 +24,7 @@ const useScrollReveal = () => {
 
     const targets = document.querySelectorAll(
       ".workflow-band, .listen-section, .caps-section, .cloud-section, " +
-        ".try-section, .runs-section, .limitations-section, .final-cta-section",
+        ".runs-section, .limitations-section, .final-cta-section",
     );
     if (!targets.length) return;
 
@@ -64,7 +63,6 @@ const App = () => {
       <Listen />
       <Capabilities />
       <WhyCloud />
-      <TryIt />
       <HowItRuns />
       <Performance />
       <Limitations />

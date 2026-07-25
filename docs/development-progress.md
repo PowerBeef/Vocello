@@ -127,7 +127,26 @@ Historical checklist (all done):
 
 Phases 7, 8, and 14 all closed 2026-07-23 (UI-context gap via the generation performance gate,
 live all-artifact shared-component validation, and full mechanical retirement including 14b SPI
-evaporation). Remaining work, choose by goal:
+evaporation).
+
+**2026-07-25 — optimization report counter-verified; staged plan adopted.** The external
+2026-07-24 launch-bound optimization report was imported
+([`docs/research/launch-bound-optimization-report-2026-07-24.md`](research/launch-bound-optimization-report-2026-07-24.md))
+and counter-verified claim-by-claim (three parallel code audits + independent re-verification
+of every external source). Its launch-bound thesis matches §H P0 verbatim; six of its
+recommendations were already shipped, its cross-variant backbone-sharing premise is
+inapplicable (three distinct checkpoints, one resident), and two of its migration flags are
+wrong (the 2.30.6 pin already carries `maybeQuantizeKVCache(quantizedKVStart:)` and
+`WiredMemoryTicket`). The superseding staged plan — Stage 0 near-free quality wins (clone
+reference silence append, boundary gate, duration-directive guardrail, repetition-penalty
+A/B), Stage 1 launch-bound attack on current pins (host-sync collapse + pipelining,
+code-predictor compile, codec-stream overlap, gated talker static-shape experiment), Stage 2
+memory program folding phase 9 (speech-tokenizer runtime reuse, text-embedding quantization,
+codec bf16, clone prompt release), Stage 3 quality harness folding phases 12→13, Stage 4
+gated pin-bump/carryover/parked bets — lives in
+[`docs/reference/optimization-report-review-2026-07-25.md`](reference/optimization-report-review-2026-07-25.md).
+
+Remaining work, choose by goal:
 
 1. **Phase 9** — runtime component reuse: optional isolated decoder/immutable-weight A/B, newly
    unblocked by the live disk-component proof.

@@ -10,6 +10,7 @@ CI fail-closes on stale generated inventories. Refresh them in the **same change
 | `config/project-health-contract.json`, evidence/benchmarks that feed health | `python3 scripts/project_health.py rebuild-summary` |
 | `config/documentation-contract.json`, docs group membership | `python3 scripts/documentation_contract.py rebuild-index` |
 | Model catalog sources / receipts | `python3 scripts/model_catalog_contract.py rebuild` |
+| Benchmark records named in `scripts/generate_readme_charts.py`, or the generator itself | `python3 scripts/generate_readme_charts.py` (README `docs/charts/*.svg`) |
 | `config/runtime-refactor-contract.json` phase/status tokens | Manually sync `docs/development-progress.md`, ADR, status-report in the same change |
 
 ## Preferred one-shot

@@ -25,16 +25,37 @@
   <a href="https://github.com/PowerBeef/Vocello/releases/tag/v2.2.0">Release details</a> · <a href="docs/releases/v2.2.0.md">What is new</a> · <a href="https://github.com/PowerBeef/Vocello/releases">All releases</a>
 </p>
 
+<p align="center">
+  <em>Write a script, pick or shape a voice, and listen — a native Swift + MLX engine, faster than realtime on an 8&nbsp;GB M2, with nothing leaving your Mac.</em>
+</p>
+
+![Vocello Studio with a script, a chosen speaker, and a generated take ready to play](docs/screenshots/vocello-custom-voice.png)
+
 ## What Vocello does
 
 - **Custom Voice:** choose one of nine built-in Qwen3 speakers, then set language and delivery.
 - **Voice Design:** describe a voice in plain language and generate it from that brief.
-- **Voice Cloning:** record or import a reference you have permission to use, optionally transcribe
-  it locally, affirm consent, and save it to your voice library. A clip without a transcript uses
-  the genuine audio-only x-vector conditioning path.
-- **Private generation:** after model installation, scripts, reference clips, history, and generated audio stay in local app storage unless you export them.
-- **Ten languages:** Chinese, English, Japanese, Korean, German, French, Russian, Portuguese, Spanish, and Italian, with automatic detection or an explicit language choice.
-- **Local history and playback:** replay, search, export, or delete past generations without an account or a per-line subscription meter.
+- **Voice Cloning:** record or import a reference you have permission to use, affirm consent, and save it to your voice library.
+
+Scripts past 900 characters become **long-form projects**: planned segments stream one after another while you listen along, then join into a single finished file with a per-segment map in History. Ten languages are supported (Chinese, English, Japanese, Korean, German, French, Russian, Portuguese, Spanish, and Italian) with automatic detection, and everything — scripts, references, history, audio — stays in local app storage unless you export it.
+
+## Performance, measured
+
+Every number below comes from a tracked, privacy-safe benchmark record in this repository — canonical evidence is produced on the support-floor tier, a Mac mini M2 with 8 GB.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/charts/rtf-by-mode-dark.svg">
+  <img alt="Grouped bar chart: warm real-time factors for Custom Voice (1.68 to 1.83), Voice Design (1.78 to 1.94), and Voice Cloning (1.49 to 1.84), all beyond the realtime line at 1.0" src="docs/charts/rtf-by-mode-light.svg">
+</picture>
+
+Vocello 2.2 also changed how the app behaves *while* it generates: translucent interface surfaces temporarily render as solid fills so the compositor stops competing with the engine. Same machine, same take — about a third faster:
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/charts/gate-delta-dark.svg">
+  <img alt="Paired bar chart: the same warm Custom take at real-time factor 1.37 before the generation performance gate and 1.83 with it, a 33 percent improvement" src="docs/charts/gate-delta-light.svg">
+</picture>
+
+The full methodology, hardware profiles, and every published record live in [`benchmarks/HISTORY.md`](benchmarks/HISTORY.md) and [`docs/reference/benchmarking-procedure.md`](docs/reference/benchmarking-procedure.md); the charts above regenerate deterministically from the named records via `scripts/generate_readme_charts.py`.
 
 ## Voice workflows
 
@@ -72,7 +93,7 @@ With the 2.2.0 release the repository moved from `PowerBeef/QwenVoice` to `Power
 
 Speed is the recommended default and uses less memory. Quality is a Mac-only option for machines with more headroom. The three recommended Mac Speed packages total about 7 GB.
 
-Support floors and benchmark machines are different facts. Canonical evidence is produced on a Mac mini M2 with 8 GB and an iPhone 17 Pro. In the current canonical Mac record, every Custom, Design, and Clone aggregate cell generated faster than playback (warm real-time factors 1.49–1.94), roughly a third faster than the 2.1 line in identical conditions after the generation performance gate landed. The record is `passedWithWarnings` because accepted memory soft trims and audio-QC warnings remain visible rather than being hidden. See the [tracked benchmark record](benchmarks/runs/ui-generation/macos-xcui-benchmark-20260723-083313-d02005ae.json) for the exact matrix and conditions.
+Support floors and benchmark machines are different facts: the floor is any Apple Silicon Mac with 8 GB, and canonical evidence is produced on a Mac mini M2 with 8 GB and an iPhone 17 Pro — see [Performance, measured](#performance-measured) above. The canonical record is `passedWithWarnings` because accepted memory soft trims and audio-QC warnings remain visible rather than being hidden; the [tracked record](benchmarks/runs/ui-generation/macos-xcui-benchmark-20260723-083313-d02005ae.json) has the exact matrix and conditions.
 
 Macs on macOS 15 can use the legacy [QwenVoice 1.2.3 release](https://github.com/PowerBeef/Vocello/releases/tag/v1.2.3). No Vocello 2.x backport is planned.
 
@@ -99,6 +120,34 @@ Storage locations and deletion behavior are documented in [`docs/reference/priva
 | ![Vocello Studio running on iPhone](docs/screenshots/vocello-ios-studio.png) | The iPhone app uses the same local Qwen3-TTS and MLX foundation with an iPhone-specific in-process runtime. It provides Custom Voice, Voice Design, Voice Cloning, recording and Files import, local history, and the memory-conscious Speed models. On-device generation, physical-iPhone XCUITest, and an optional signed archive/TestFlight lane are implemented. A fresh full multilingual physical-iPhone run passed all 19 hint/QC and 18 output gates with policy-accepted warnings; its exploratory record is excluded from clean performance trends. Public distribution still requires the maintainer-owned App Store Connect release process. |
 
 Current implementation and acceptance status: [`docs/development-progress.md`](docs/development-progress.md).
+
+## Under the hood
+
+Vocello is not a wrapper around a Python server. Generation runs through a first-party Swift runtime, [`VocelloQwen3Core`](Packages/VocelloQwen3Core/README.md) — derived from `mlx-audio-swift` and specialized for Qwen3-TTS and the Mimi codec, with a fused code-predictor RoPE, per-generation sampler state, and a streaming audio decoder that overlaps the token loop.
+
+```mermaid
+flowchart LR
+    App["SwiftUI app"] -->|"XPC · one envelope command"| Service["Engine service process"]
+    Service --> Engine["VocelloQwen3Engine<br/>(actor-owned sessions)"]
+    subgraph Owned["VocelloQwen3Core — owned runtime"]
+        Engine --> Talker["Qwen3-TTS talker<br/>+ code predictor"]
+        Talker --> Mimi["Mimi streaming decoder"]
+    end
+    Mimi -->|"PCM chunks stream back"| App
+    Talker --- MLX["MLX · Metal"]
+    Mimi --- MLX
+```
+
+On the Mac, model work lives in a separate XPC service process that retires when idle; on iPhone the same engine runs in-process. Either way the architecture is streaming end to end: audio crosses an actor-owned lossless channel chunk by chunk, every request carries its own seed and sampler state (takes are reproducible by construction), and cancellation is a typed, awaited operation — a cancelled take can never land in History.
+
+That streaming design is why memory does not grow with output length. A long-form project generates each planned segment as an ordinary streaming take and then assembles the joined file in bounded blocks:
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/charts/longform-memory-dark.svg">
+  <img alt="Line chart of engine physical footprint across a 12-segment long-form project: end-of-segment values oscillate in a flat band around 2.4 GB and peaks stay near 3.0 GB, with a first-to-last change of minus 1.1 percent across 10.4 minutes of audio" src="docs/charts/longform-memory-light.svg">
+</picture>
+
+Engine invariants, the request lifecycle, and the model-delivery contract are documented in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md); benchmark publication is PASS-only and privacy-allowlisted by design.
 
 ## Build from source
 

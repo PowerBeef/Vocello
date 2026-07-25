@@ -65,6 +65,13 @@ ARTIFACTS: tuple[DerivedArtifact, ...] = (
         rebuild=("python3", "scripts/model_catalog_contract.py", "rebuild"),
         stale_markers=("is stale; run model_catalog_contract.py rebuild",),
     ),
+    DerivedArtifact(
+        artifact_id="readme-charts",
+        description="docs/charts/*.svg (README performance charts)",
+        check=("python3", "scripts/generate_readme_charts.py", "--check"),
+        rebuild=("python3", "scripts/generate_readme_charts.py"),
+        stale_markers=("README charts are stale",),
+    ),
 )
 
 

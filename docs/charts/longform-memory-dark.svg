@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="340" viewBox="0 0 720 340" role="img">
+<g font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif">
+<text x="16.0" y="28.0" fill="#e6edf3" font-size="16" font-weight="600" text-anchor="start">Memory stays flat at audiobook scale</text>
+<text x="16.0" y="47.0" fill="#9198a1" font-size="12" font-weight="normal" text-anchor="start">Engine physical footprint across a 12-segment long-form project (10.4 min of audio)</text>
+<line x1="64.0" y1="216.4" x2="676.0" y2="216.4" stroke="#30363d" stroke-width="1" stroke-dasharray="3 3"/>
+<text x="56.0" y="220.4" fill="#9198a1" font-size="11" font-weight="normal" text-anchor="end">1 GB</text>
+<line x1="64.0" y1="150.8" x2="676.0" y2="150.8" stroke="#30363d" stroke-width="1" stroke-dasharray="3 3"/>
+<text x="56.0" y="154.8" fill="#9198a1" font-size="11" font-weight="normal" text-anchor="end">2 GB</text>
+<line x1="64.0" y1="85.1" x2="676.0" y2="85.1" stroke="#30363d" stroke-width="1" stroke-dasharray="3 3"/>
+<text x="56.0" y="89.1" fill="#9198a1" font-size="11" font-weight="normal" text-anchor="end">3 GB</text>
+<line x1="64.0" y1="282.0" x2="676.0" y2="282.0" stroke="#30363d" stroke-width="1"/>
+<polyline points="64.0,82.7 119.6,85.4 175.3,82.5 230.9,82.5 286.5,82.4 342.2,82.5 397.8,82.4 453.5,82.3 509.1,82.4 564.7,82.4 620.4,82.4 676.0,88.3" fill="none" stroke="#E26034" stroke-width="2" stroke-linejoin="round"/>
+<circle cx="64.0" cy="82.7" r="3" fill="#E26034"/>
+<circle cx="119.6" cy="85.4" r="3" fill="#E26034"/>
+<circle cx="175.3" cy="82.5" r="3" fill="#E26034"/>
+<circle cx="230.9" cy="82.5" r="3" fill="#E26034"/>
+<circle cx="286.5" cy="82.4" r="3" fill="#E26034"/>
+<circle cx="342.2" cy="82.5" r="3" fill="#E26034"/>
+<circle cx="397.8" cy="82.4" r="3" fill="#E26034"/>
+<circle cx="453.5" cy="82.3" r="3" fill="#E26034"/>
+<circle cx="509.1" cy="82.4" r="3" fill="#E26034"/>
+<circle cx="564.7" cy="82.4" r="3" fill="#E26034"/>
+<circle cx="620.4" cy="82.4" r="3" fill="#E26034"/>
+<circle cx="676.0" cy="88.3" r="3" fill="#E26034"/>
+<polyline points="64.0,120.9 119.6,119.3 175.3,117.5 230.9,118.8 286.5,117.6 342.2,131.0 397.8,119.5 453.5,118.6 509.1,130.9 564.7,119.2 620.4,117.6 676.0,122.7" fill="none" stroke="#9070E6" stroke-width="2" stroke-linejoin="round"/>
+<circle cx="64.0" cy="120.9" r="3" fill="#9070E6"/>
+<circle cx="119.6" cy="119.3" r="3" fill="#9070E6"/>
+<circle cx="175.3" cy="117.5" r="3" fill="#9070E6"/>
+<circle cx="230.9" cy="118.8" r="3" fill="#9070E6"/>
+<circle cx="286.5" cy="117.6" r="3" fill="#9070E6"/>
+<circle cx="342.2" cy="131.0" r="3" fill="#9070E6"/>
+<circle cx="397.8" cy="119.5" r="3" fill="#9070E6"/>
+<circle cx="453.5" cy="118.6" r="3" fill="#9070E6"/>
+<circle cx="509.1" cy="130.9" r="3" fill="#9070E6"/>
+<circle cx="564.7" cy="119.2" r="3" fill="#9070E6"/>
+<circle cx="620.4" cy="117.6" r="3" fill="#9070E6"/>
+<circle cx="676.0" cy="122.7" r="3" fill="#9070E6"/>
+<rect x="506.0" y="12.0" width="10" height="10" rx="2" fill="#E26034"/>
+<text x="522.0" y="21.0" fill="#9198a1" font-size="11" font-weight="normal" text-anchor="start">peak while generating</text>
+<rect x="506.0" y="28.0" width="10" height="10" rx="2" fill="#9070E6"/>
+<text x="522.0" y="37.0" fill="#9198a1" font-size="11" font-weight="normal" text-anchor="start">after each segment</text>
+<text x="676.0" y="142.7" fill="#e6edf3" font-size="11" font-weight="600" text-anchor="end">first→last -1.1%</text>
+<text x="64.0" y="298.0" fill="#9198a1" font-size="11" font-weight="normal" text-anchor="start">seg 0</text>
+<text x="64.0" y="312.0" fill="#9198a1" font-size="10" font-weight="normal" text-anchor="start">50s audio</text>
+<text x="342.2" y="298.0" fill="#9198a1" font-size="11" font-weight="normal" text-anchor="middle">seg 5</text>
+<text x="342.2" y="312.0" fill="#9198a1" font-size="10" font-weight="normal" text-anchor="middle">328s audio</text>
+<text x="676.0" y="298.0" fill="#9198a1" font-size="11" font-weight="normal" text-anchor="end">seg 11</text>
+<text x="676.0" y="312.0" fill="#9198a1" font-size="10" font-weight="normal" text-anchor="end">626s audio</text>
+<text x="704.0" y="334.0" fill="#9198a1" font-size="10" font-weight="normal" text-anchor="end">smoke run 8f15c1fd · --long-form-segments 10</text>
+</g>
+</svg>

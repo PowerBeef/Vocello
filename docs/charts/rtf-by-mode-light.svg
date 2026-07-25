@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="428" viewBox="0 0 720 428" role="img">
+<g font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif">
+<text x="16.0" y="28.0" fill="#1f2328" font-size="16" font-weight="600" text-anchor="start">Faster than playback in every mode</text>
+<text x="16.0" y="47.0" fill="#656d76" font-size="12" font-weight="normal" text-anchor="start">Warm real-time factor (RTF, higher is better) · Mac mini M2, 8 GB</text>
+<line x1="241.5" y1="64.0" x2="241.5" y2="388" stroke="#d1d9e0" stroke-width="1" stroke-dasharray="3 3"/>
+<text x="241.5" y="406.0" fill="#656d76" font-size="11" font-weight="normal" text-anchor="middle">0.5</text>
+<line x1="373.0" y1="64.0" x2="373.0" y2="388" stroke="#656d76" stroke-width="1"/>
+<text x="373.0" y="406.0" fill="#656d76" font-size="11" font-weight="normal" text-anchor="middle">1.0 · realtime</text>
+<line x1="504.5" y1="64.0" x2="504.5" y2="388" stroke="#d1d9e0" stroke-width="1" stroke-dasharray="3 3"/>
+<text x="504.5" y="406.0" fill="#656d76" font-size="11" font-weight="normal" text-anchor="middle">1.5</text>
+<circle cx="22" cy="80.0" r="5" fill="#8A6410"/>
+<text x="32.0" y="84.0" fill="#1f2328" font-size="13" font-weight="600" text-anchor="start">Custom Voice</text>
+<text x="102.0" y="106.0" fill="#656d76" font-size="11" font-weight="normal" text-anchor="end">short</text>
+<path d="M110.0 94.0 h438.9 a4 4 0 0 1 4 4 v8.0 a4 4 0 0 1 -4 4 h-438.9 z" fill="#8A6410"/>
+<text x="558.9" y="106.0" fill="#1f2328" font-size="11" font-weight="normal" text-anchor="start">1.68</text>
+<text x="102.0" y="128.0" fill="#656d76" font-size="11" font-weight="normal" text-anchor="end">medium</text>
+<path d="M110.0 116.0 h473.6 a4 4 0 0 1 4 4 v8.0 a4 4 0 0 1 -4 4 h-473.6 z" fill="#8A6410"/>
+<text x="593.6" y="128.0" fill="#1f2328" font-size="11" font-weight="normal" text-anchor="start">1.82</text>
+<text x="102.0" y="150.0" fill="#656d76" font-size="11" font-weight="normal" text-anchor="end">long</text>
+<path d="M110.0 138.0 h477.1 a4 4 0 0 1 4 4 v8.0 a4 4 0 0 1 -4 4 h-477.1 z" fill="#8A6410"/>
+<text x="597.1" y="150.0" fill="#1f2328" font-size="11" font-weight="normal" text-anchor="start">1.83</text>
+<circle cx="22" cy="182.0" r="5" fill="#6C47C8"/>
+<text x="32.0" y="186.0" fill="#1f2328" font-size="13" font-weight="600" text-anchor="start">Voice Design</text>
+<text x="102.0" y="208.0" fill="#656d76" font-size="11" font-weight="normal" text-anchor="end">short</text>
+<path d="M110.0 196.0 h465.2 a4 4 0 0 1 4 4 v8.0 a4 4 0 0 1 -4 4 h-465.2 z" fill="#6C47C8"/>
+<text x="585.2" y="208.0" fill="#1f2328" font-size="11" font-weight="normal" text-anchor="start">1.78</text>
+<text x="102.0" y="230.0" fill="#656d76" font-size="11" font-weight="normal" text-anchor="end">medium</text>
+<path d="M110.0 218.0 h497.1 a4 4 0 0 1 4 4 v8.0 a4 4 0 0 1 -4 4 h-497.1 z" fill="#6C47C8"/>
+<text x="617.1" y="230.0" fill="#1f2328" font-size="11" font-weight="normal" text-anchor="start">1.91</text>
+<text x="102.0" y="252.0" fill="#656d76" font-size="11" font-weight="normal" text-anchor="end">long</text>
+<path d="M110.0 240.0 h505.3 a4 4 0 0 1 4 4 v8.0 a4 4 0 0 1 -4 4 h-505.3 z" fill="#6C47C8"/>
+<text x="625.3" y="252.0" fill="#1f2328" font-size="11" font-weight="normal" text-anchor="start">1.94</text>
+<circle cx="22" cy="284.0" r="5" fill="#B4471B"/>
+<text x="32.0" y="288.0" fill="#1f2328" font-size="13" font-weight="600" text-anchor="start">Voice Cloning</text>
+<text x="102.0" y="310.0" fill="#656d76" font-size="11" font-weight="normal" text-anchor="end">short</text>
+<path d="M110.0 298.0 h387.5 a4 4 0 0 1 4 4 v8.0 a4 4 0 0 1 -4 4 h-387.5 z" fill="#B4471B"/>
+<text x="507.5" y="310.0" fill="#1f2328" font-size="11" font-weight="normal" text-anchor="start">1.49</text>
+<text x="102.0" y="332.0" fill="#656d76" font-size="11" font-weight="normal" text-anchor="end">medium</text>
+<path d="M110.0 320.0 h439.7 a4 4 0 0 1 4 4 v8.0 a4 4 0 0 1 -4 4 h-439.7 z" fill="#B4471B"/>
+<text x="559.7" y="332.0" fill="#1f2328" font-size="11" font-weight="normal" text-anchor="start">1.69</text>
+<text x="102.0" y="354.0" fill="#656d76" font-size="11" font-weight="normal" text-anchor="end">long</text>
+<path d="M110.0 342.0 h478.8 a4 4 0 0 1 4 4 v8.0 a4 4 0 0 1 -4 4 h-478.8 z" fill="#B4471B"/>
+<text x="598.8" y="354.0" fill="#1f2328" font-size="11" font-weight="normal" text-anchor="start">1.84</text>
+<text x="704.0" y="422.0" fill="#656d76" font-size="10" font-weight="normal" text-anchor="end">record d02005ae · benchmarks/HISTORY.md</text>
+</g>
+</svg>

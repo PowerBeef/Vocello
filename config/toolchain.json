@@ -24,7 +24,7 @@
     }
   },
   "release": {
-    "gh": {"version": "2.95.0", "versionCommand": ["gh", "--version"]}
+    "gh": {"version": "2.96.0", "versionCommand": ["gh", "--version"]}
   },
   "website": {
     "node": {"version": "24.15.0", "versionCommand": ["node", "--version"]},

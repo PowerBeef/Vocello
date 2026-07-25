@@ -143,7 +143,12 @@ jobs:
 
       - name: Install and validate pinned release tooling
         run: |
-          brew install xcodegen xcbeautify ripgrep shellcheck numpy
+          brew install xcbeautify shellcheck numpy
+          # xcodegen + ripgrep are SHA-pinned release artifacts (mixed runner
+          # image pools make brew's formula index nondeterministic mid-roll,
+          # and `brew install` never upgrades an image-preinstalled formula).
+          ./scripts/install_pinned_tools.sh
+          export PATH="$HOME/.qwenvoice-pinned-tools/bin:$PATH"
           xcodegen --version
           xcbeautify --version
           rg --version
@@ -481,7 +486,12 @@ jobs:
 
       - name: Install and validate pinned tooling
         run: |
-          brew install xcodegen xcbeautify ripgrep shellcheck numpy
+          brew install xcbeautify shellcheck numpy
+          # xcodegen + ripgrep are SHA-pinned release artifacts (mixed runner
+          # image pools make brew's formula index nondeterministic mid-roll,
+          # and `brew install` never upgrades an image-preinstalled formula).
+          ./scripts/install_pinned_tools.sh
+          export PATH="$HOME/.qwenvoice-pinned-tools/bin:$PATH"
           xcodegen --version
           xcbeautify --version
           rg --version
@@ -563,7 +573,12 @@ jobs:
 
       - name: Install and validate pinned tooling
         run: |
-          brew install xcodegen xcbeautify ripgrep shellcheck numpy
+          brew install xcbeautify shellcheck numpy
+          # xcodegen + ripgrep are SHA-pinned release artifacts (mixed runner
+          # image pools make brew's formula index nondeterministic mid-roll,
+          # and `brew install` never upgrades an image-preinstalled formula).
+          ./scripts/install_pinned_tools.sh
+          export PATH="$HOME/.qwenvoice-pinned-tools/bin:$PATH"
           python3 -c 'import numpy; print(numpy.__version__)'
           python3 scripts/supply_chain_contract.py --installed native
 

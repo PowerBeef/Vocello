@@ -14,6 +14,15 @@ options:
 configs:
   Release: release
 
+# One version identity for every generated target. The app targets used to pin
+# these per-target; framework targets with GENERATE_INFOPLIST_FILE then inherited
+# nothing, so their generated Info.plists carried an empty CFBundleShortVersionString
+# and App Store Connect rejected the embedded frameworks (upload error 90057).
+settings:
+  base:
+    MARKETING_VERSION: "2.2.1"
+    CURRENT_PROJECT_VERSION: "20"
+
 packages:
   GRDB:
     url: https://github.com/groue/GRDB.swift
@@ -159,8 +168,6 @@ targets:
         # Keep the Swift module name as QwenVoice so sibling modules that assume
         # the QwenVoice namespace still resolve after the on-disk rename to Vocello.app.
         PRODUCT_MODULE_NAME: QwenVoice
-        MARKETING_VERSION: "2.2.0"
-        CURRENT_PROJECT_VERSION: "19"
         SWIFT_VERSION: "6"
         MACOSX_DEPLOYMENT_TARGET: "26.0"
         INFOPLIST_FILE: Sources/Info.plist
@@ -392,8 +399,6 @@ targets:
         INFOPLIST_KEY_QVoiceModelCatalogURL: $(QVOICE_IOS_DEFAULT_MODEL_CATALOG_URL)
         INFOPLIST_KEY_QVoiceSharedAppGroupIdentifier: $(QVOICE_IOS_APP_GROUP_IDENTIFIER)
         INFOPLIST_KEY_CFBundleDisplayName: Vocello
-        MARKETING_VERSION: "2.2.0"
-        CURRENT_PROJECT_VERSION: "19"
         SWIFT_VERSION: "6"
         IPHONEOS_DEPLOYMENT_TARGET: "26.0"
         GENERATE_INFOPLIST_FILE: NO

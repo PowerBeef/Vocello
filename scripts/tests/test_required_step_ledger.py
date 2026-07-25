@@ -310,9 +310,14 @@ required_steps_finalize {ledger!s}
                 release_workflow,
             )
             self.assertIsNotNone(match, f"release workflow command body is missing for {step}")
-            command_bodies[step] = match.group(1)
+            # The workflow embeds the body in a single-quoted YAML run-script, so a
+            # literal quote inside it is spelled with the POSIX '\'' splice. The
+            # runner's shell collapses that before the ledger ever sees the argv;
+            # emulate the same collapse so this test binds what CI actually binds.
+            body = match.group(1).replace("'\\''", "'")
+            command_bodies[step] = body
             binding = ledger_module.bind_command(
-                ios, step, ["bash", "-euo", "pipefail", "-c", match.group(1)]
+                ios, step, ["bash", "-euo", "pipefail", "-c", body]
             )
             self.assertIsNotNone(binding)
         self.assertEqual(
@@ -326,7 +331,16 @@ required_steps_finalize {ledger!s}
             )["commandTemplateID"],
             "ios-platform-readiness-v1",
         )
-        self.assertIn('echo "IOS_PROFILE_UUID=$UUID"', release_workflow)
+        # The archive override must stay per-target: IOS_PROFILE_UUID carries a
+        # build-setting macro that only the app target resolves (defined in the
+        # runner-temp xcconfig the signing-import step writes), because a plain
+        # global PROVISIONING_PROFILE_SPECIFIER makes every SPM/framework target
+        # abort with "does not support provisioning profiles".
+        self.assertIn(
+            "echo 'IOS_PROFILE_UUID=$(QVOICE_PROFILE_$(TARGET_NAME))'", release_workflow
+        )
+        self.assertIn("QVOICE_PROFILE_VocelloiOS = %s", release_workflow)
+        self.assertIn('echo "XCODE_XCCONFIG_FILE=$XCONF"', release_workflow)
         self.assertIn("CODE_SIGN_STYLE=Manual", command_bodies["archive"])
         self.assertIn('CODE_SIGN_IDENTITY="Apple Distribution"', command_bodies["archive"])
         self.assertIn('PROVISIONING_PROFILE_SPECIFIER="$IOS_PROFILE_UUID"', command_bodies["archive"])

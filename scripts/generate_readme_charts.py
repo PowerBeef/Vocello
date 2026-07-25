@@ -67,6 +67,7 @@ THEMES = {
         "modes": {"custom": "#BE8A24", "design": "#9070E6", "clone": "#E26034"},
         "series": ("#9070E6", "#E26034"),
         "pre_bar": "#484f58",
+        "box_fill": "#161b22",
     },
     "light": {
         "ink": "#1f2328",
@@ -75,6 +76,7 @@ THEMES = {
         "modes": {"custom": "#8A6410", "design": "#6C47C8", "clone": "#B4471B"},
         "series": ("#6C47C8", "#B4471B"),
         "pre_bar": "#afb8c1",
+        "box_fill": "#f6f8fa",
     },
 }
 
@@ -272,7 +274,73 @@ def memory_chart(theme_name: str) -> str:
     return "\n".join(parts) + "\n"
 
 
+def architecture_chart(theme_name: str) -> str:
+    theme = THEMES[theme_name]
+    width, height = 720, 252
+    violet = theme["modes"]["design"]
+    parts = svg_open(width, height)
+
+    def box(x: float, y: float, w: float, h: float, lines: tuple[str, ...], *,
+            stroke: str, title: bool = False) -> None:
+        parts.append(
+            f'<rect x="{x:.1f}" y="{y:.1f}" width="{w:.1f}" height="{h:.1f}" rx="8" '
+            f'fill="{theme["box_fill"]}" stroke="{stroke}" stroke-width="1.5"/>'
+        )
+        line_height = 16.0
+        start = y + h / 2 - line_height * (len(lines) - 1) / 2 + 4.5
+        for index, label in enumerate(lines):
+            weight = "600" if title and index == 0 else "normal"
+            fill = theme["ink"] if index == 0 else theme["muted"]
+            parts.append(text(x + w / 2, start + index * line_height, label,
+                              fill=fill, size=12, weight=weight, anchor="middle"))
+
+    def arrow(x1: float, y1: float, x2: float, y2: float) -> None:
+        parts.append(f'<line x1="{x1:.1f}" y1="{y1:.1f}" x2="{x2:.1f}" y2="{y2:.1f}" '
+                     f'stroke="{theme["muted"]}" stroke-width="1.5"/>')
+        if x2 > x1:  # rightward head
+            parts.append(f'<path d="M{x2:.1f} {y2:.1f} l-7 -4 v8 z" fill="{theme["muted"]}"/>')
+        elif y2 > y1:  # downward head
+            parts.append(f'<path d="M{x2:.1f} {y2:.1f} l-4 -7 h8 z" fill="{theme["muted"]}"/>')
+        else:  # upward head
+            parts.append(f'<path d="M{x2:.1f} {y2:.1f} l-4 7 h8 z" fill="{theme["muted"]}"/>')
+
+    # Owned-runtime group.
+    parts.append(
+        f'<rect x="356" y="30" width="348" height="164" rx="10" fill="{violet}" '
+        f'fill-opacity="0.07" stroke="{violet}" stroke-width="1.5"/>'
+    )
+    parts.append(text(372, 50, "VocelloQwen3Core", fill=violet, size=12, weight="600"))
+    parts.append(text(496, 50, "· the owned runtime", fill=theme["muted"], size=11))
+
+    box(16, 84, 116, 44, ("SwiftUI app",), stroke=theme["grid"], title=True)
+    box(180, 84, 132, 44, ("Engine service", "separate process"), stroke=theme["grid"], title=True)
+    box(372, 62, 128, 52, ("Engine actor", "owns each session"), stroke=theme["grid"], title=True)
+    box(532, 62, 156, 52, ("Qwen3-TTS talker", "+ code predictor"), stroke=theme["grid"], title=True)
+    box(532, 128, 156, 48, ("Mimi decoder", "streams audio"), stroke=theme["grid"], title=True)
+    box(372, 128, 128, 48, ("MLX · Metal", "unified memory"), stroke=theme["grid"], title=True)
+
+    arrow(132, 106, 176, 106)
+    parts.append(text(154, 76, "XPC", fill=theme["muted"], size=11, anchor="middle"))
+    arrow(312, 106, 368, 106)
+    arrow(500, 88, 528, 88)
+    arrow(610, 114, 610, 124)
+    # Talker and decoder execute on MLX (plain connector, no direction).
+    parts.append(f'<line x1="500" y1="152" x2="528" y2="152" '
+                 f'stroke="{theme["muted"]}" stroke-width="1.5" stroke-dasharray="3 3"/>')
+
+    # Streaming return path: decoder → app, chunk by chunk.
+    parts.append(
+        f'<path d="M610 176 v46 h-536 v-83" fill="none" stroke="{violet}" stroke-width="1.5"/>'
+    )
+    parts.append(f'<path d="M74 132 l-4 7 h8 z" fill="{violet}"/>')
+    parts.append(text(360, 240, "PCM audio streams back chunk by chunk — playback starts before generation finishes",
+                      fill=theme["muted"], size=11, anchor="middle"))
+    parts.extend(("</g>", "</svg>"))
+    return "\n".join(parts) + "\n"
+
+
 CHARTS = {
+    "architecture": architecture_chart,
     "rtf-by-mode": rtf_chart,
     "gate-delta": gate_chart,
     "longform-memory": memory_chart,

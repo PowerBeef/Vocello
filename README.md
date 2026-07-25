@@ -125,18 +125,10 @@ Current implementation and acceptance status: [`docs/development-progress.md`](d
 
 Vocello is not a wrapper around a Python server. Generation runs through a first-party Swift runtime, [`VocelloQwen3Core`](Packages/VocelloQwen3Core/README.md) — derived from `mlx-audio-swift` and specialized for Qwen3-TTS and the Mimi codec, with a fused code-predictor RoPE, per-generation sampler state, and a streaming audio decoder that overlaps the token loop.
 
-```mermaid
-flowchart LR
-    App["SwiftUI app"] -->|"XPC · one envelope command"| Service["Engine service process"]
-    Service --> Engine["VocelloQwen3Engine<br/>(actor-owned sessions)"]
-    subgraph Owned["VocelloQwen3Core — owned runtime"]
-        Engine --> Talker["Qwen3-TTS talker<br/>+ code predictor"]
-        Talker --> Mimi["Mimi streaming decoder"]
-    end
-    Mimi -->|"PCM chunks stream back"| App
-    Talker --- MLX["MLX · Metal"]
-    Mimi --- MLX
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/charts/architecture-dark.svg">
+  <img alt="Architecture diagram: the SwiftUI app talks over XPC to a separate engine service process, which drives the owned VocelloQwen3Core runtime — an engine actor owning each session, the Qwen3-TTS talker and code predictor, and the Mimi decoder on MLX and Metal — while PCM audio streams back to the app chunk by chunk" src="docs/charts/architecture-light.svg">
+</picture>
 
 On the Mac, model work lives in a separate XPC service process that retires when idle; on iPhone the same engine runs in-process. Either way the architecture is streaming end to end: audio crosses an actor-owned lossless channel chunk by chunk, every request carries its own seed and sampler state (takes are reproducible by construction), and cancellation is a typed, awaited operation — a cancelled take can never land in History.
 

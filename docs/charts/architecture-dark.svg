@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="252" viewBox="0 0 720 252" role="img">
+<g font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif">
+<rect x="356" y="30" width="348" height="164" rx="10" fill="#9070E6" fill-opacity="0.07" stroke="#9070E6" stroke-width="1.5"/>
+<text x="372.0" y="50.0" fill="#9070E6" font-size="12" font-weight="600" text-anchor="start">VocelloQwen3Core</text>
+<text x="496.0" y="50.0" fill="#9198a1" font-size="11" font-weight="normal" text-anchor="start">· the owned runtime</text>
+<rect x="16.0" y="84.0" width="116.0" height="44.0" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+<text x="74.0" y="110.5" fill="#e6edf3" font-size="12" font-weight="600" text-anchor="middle">SwiftUI app</text>
+<rect x="180.0" y="84.0" width="132.0" height="44.0" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+<text x="246.0" y="102.5" fill="#e6edf3" font-size="12" font-weight="600" text-anchor="middle">Engine service</text>
+<text x="246.0" y="118.5" fill="#9198a1" font-size="12" font-weight="normal" text-anchor="middle">separate process</text>
+<rect x="372.0" y="62.0" width="128.0" height="52.0" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+<text x="436.0" y="84.5" fill="#e6edf3" font-size="12" font-weight="600" text-anchor="middle">Engine actor</text>
+<text x="436.0" y="100.5" fill="#9198a1" font-size="12" font-weight="normal" text-anchor="middle">owns each session</text>
+<rect x="532.0" y="62.0" width="156.0" height="52.0" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+<text x="610.0" y="84.5" fill="#e6edf3" font-size="12" font-weight="600" text-anchor="middle">Qwen3-TTS talker</text>
+<text x="610.0" y="100.5" fill="#9198a1" font-size="12" font-weight="normal" text-anchor="middle">+ code predictor</text>
+<rect x="532.0" y="128.0" width="156.0" height="48.0" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+<text x="610.0" y="148.5" fill="#e6edf3" font-size="12" font-weight="600" text-anchor="middle">Mimi decoder</text>
+<text x="610.0" y="164.5" fill="#9198a1" font-size="12" font-weight="normal" text-anchor="middle">streams audio</text>
+<rect x="372.0" y="128.0" width="128.0" height="48.0" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+<text x="436.0" y="148.5" fill="#e6edf3" font-size="12" font-weight="600" text-anchor="middle">MLX · Metal</text>
+<text x="436.0" y="164.5" fill="#9198a1" font-size="12" font-weight="normal" text-anchor="middle">unified memory</text>
+<line x1="132.0" y1="106.0" x2="176.0" y2="106.0" stroke="#9198a1" stroke-width="1.5"/>
+<path d="M176.0 106.0 l-7 -4 v8 z" fill="#9198a1"/>
+<text x="154.0" y="76.0" fill="#9198a1" font-size="11" font-weight="normal" text-anchor="middle">XPC</text>
+<line x1="312.0" y1="106.0" x2="368.0" y2="106.0" stroke="#9198a1" stroke-width="1.5"/>
+<path d="M368.0 106.0 l-7 -4 v8 z" fill="#9198a1"/>
+<line x1="500.0" y1="88.0" x2="528.0" y2="88.0" stroke="#9198a1" stroke-width="1.5"/>
+<path d="M528.0 88.0 l-7 -4 v8 z" fill="#9198a1"/>
+<line x1="610.0" y1="114.0" x2="610.0" y2="124.0" stroke="#9198a1" stroke-width="1.5"/>
+<path d="M610.0 124.0 l-4 -7 h8 z" fill="#9198a1"/>
+<line x1="500" y1="152" x2="528" y2="152" stroke="#9198a1" stroke-width="1.5" stroke-dasharray="3 3"/>
+<path d="M610 176 v46 h-536 v-83" fill="none" stroke="#9070E6" stroke-width="1.5"/>
+<path d="M74 132 l-4 7 h8 z" fill="#9070E6"/>
+<text x="360.0" y="240.0" fill="#9198a1" font-size="11" font-weight="normal" text-anchor="middle">PCM audio streams back chunk by chunk — playback starts before generation finishes</text>
+</g>
+</svg>

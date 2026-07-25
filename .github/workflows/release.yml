@@ -663,7 +663,18 @@ jobs:
           cp "$RUNNER_TEMP/profile.mobileprovision" ~/Library/MobileDevice/Provisioning\ Profiles/"$UUID".mobileprovision
           echo "IOS_KEYCHAIN_PATH=$KEYCHAIN" >> "$GITHUB_ENV"
           echo "IOS_PROFILE_PATH=$HOME/Library/MobileDevice/Provisioning Profiles/$UUID.mobileprovision" >> "$GITHUB_ENV"
-          echo "IOS_PROFILE_UUID=$UUID" >> "$GITHUB_ENV"
+
+          # The contract-bound archive command passes PROVISIONING_PROFILE_SPECIFIER
+          # as a global xcodebuild override, and Xcode applies global overrides to every
+          # target — SPM/framework targets then abort with "does not support provisioning
+          # profiles". The command text is frozen by the tag's orchestration contract, so
+          # the scoping happens in the value instead: the override resolves through a
+          # per-target macro that an xcconfig (honored via XCODE_XCCONFIG_FILE) defines
+          # only for the app target; every other target expands it to empty (= unset).
+          XCONF="$RUNNER_TEMP/ios-target-signing.xcconfig"
+          printf 'QVOICE_PROFILE_VocelloiOS = %s\n' "$UUID" > "$XCONF"
+          echo "XCODE_XCCONFIG_FILE=$XCONF" >> "$GITHUB_ENV"
+          echo 'IOS_PROFILE_UUID=$(QVOICE_PROFILE_$(TARGET_NAME))' >> "$GITHUB_ENV"
 
           # App Store Connect API key for -allowProvisioningUpdates (xcodebuild reads it
           # by explicit path) + the optional altool TestFlight upload (which discovers it

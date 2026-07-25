@@ -679,6 +679,8 @@ jobs:
           # App Store Connect API key for -allowProvisioningUpdates (xcodebuild reads it
           # by explicit path) + the optional altool TestFlight upload (which discovers it
           # in ~/.appstoreconnect/private_keys).
+          echo "IOS_PROFILE_REAL_UUID=$UUID" >> "$GITHUB_ENV"
+
           mkdir -p "$RUNNER_TEMP/asc" ~/.appstoreconnect/private_keys
           echo "$ASC_API_KEY_P8" | base64 --decode > "$RUNNER_TEMP/asc/AuthKey_${ASC_API_KEY_ID}.p8"
           chmod 600 "$RUNNER_TEMP/asc/AuthKey_${ASC_API_KEY_ID}.p8"
@@ -694,6 +696,19 @@ jobs:
           cp ExportOptions-appstore.plist "$export_options"
           /usr/libexec/PlistBuddy -c "Add :teamID string $QWENVOICE_DEVELOPMENT_TEAM" "$export_options" || \
           /usr/libexec/PlistBuddy -c "Set :teamID $QWENVOICE_DEVELOPMENT_TEAM" "$export_options"
+          # The tracked template says signingStyle=automatic, which on CI depends on
+          # cloud-managed signing — an Admin-only App Store Connect permission the CI
+          # API key (App Manager) does not hold ("Cloud signing permission error").
+          # The runner already has the Apple Distribution certificate and the App
+          # Store profile locally, so the CI export signs manually with an explicit
+          # bundle-id → profile mapping instead. Local maintainer exports keep the
+          # template's automatic style.
+          /usr/libexec/PlistBuddy -c "Set :signingStyle manual" "$export_options"
+          /usr/libexec/PlistBuddy -c "Add :signingCertificate string Apple Distribution" "$export_options" || \
+          /usr/libexec/PlistBuddy -c "Set :signingCertificate Apple Distribution" "$export_options"
+          /usr/libexec/PlistBuddy -c "Add :provisioningProfiles dict" "$export_options" || true
+          /usr/libexec/PlistBuddy -c "Add :provisioningProfiles:com.patricedery.vocello string $IOS_PROFILE_REAL_UUID" "$export_options" || \
+          /usr/libexec/PlistBuddy -c "Set :provisioningProfiles:com.patricedery.vocello $IOS_PROFILE_REAL_UUID" "$export_options"
           echo "IOS_EXPORT_OPTIONS_PLIST=$export_options" >> "$GITHUB_ENV"
 
       - name: Archive VocelloiOS

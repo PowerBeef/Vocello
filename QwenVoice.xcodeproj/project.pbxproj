@@ -1549,7 +1549,6 @@
 				92FF0E17E3E0EDA5848B5201 /* Services */,
 				34E05C71AB0AC2B84F615AB1 /* Telemetry */,
 				5D7BBCF884C7E74F80E46D67 /* ViewModels */,
-				D60DD2E7E088F85A9224EF53 /* Views */,
 			);
 			path = SharedSupport;
 			sourceTree = "<group>";
@@ -1689,13 +1688,6 @@
 				637866C95AC607A5E0509956 /* SidebarView.swift */,
 			);
 			path = Sidebar;
-			sourceTree = "<group>";
-		};
-		D60DD2E7E088F85A9224EF53 /* Views */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = Views;
 			sourceTree = "<group>";
 		};
 		E9B1AA0CCD8C83E6BE9AC1AC /* App */ = {

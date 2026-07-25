@@ -182,7 +182,7 @@ def _input_group_digest(entries: list[dict[str, Any]]) -> str:
     return canonical_digest(entries)
 
 
-def _source_tree_dirty(root: Path) -> bool:
+def _source_tree_status(root: Path) -> str:
     completed = subprocess.run(
         ["git", "-C", str(root), "status", "--porcelain=v1", "--untracked-files=all"],
         text=True,
@@ -191,7 +191,15 @@ def _source_tree_dirty(root: Path) -> bool:
     )
     if completed.returncode != 0:
         raise ValueError("cannot determine complete Git source-tree state")
-    return bool(completed.stdout.strip())
+    return completed.stdout.strip()
+
+
+def _dirty_tree_detail(status: str, limit: int = 20) -> str:
+    lines = status.splitlines()
+    shown = "; ".join(lines[:limit])
+    if len(lines) > limit:
+        shown += f"; … {len(lines) - limit} more"
+    return shown
 
 
 def _identity_digest(payload: dict[str, Any]) -> str:
@@ -205,8 +213,12 @@ def capture_source_identity(root: Path, commit: str, output: Path) -> dict[str, 
     head = subprocess.check_output(["git", "-C", str(root), "rev-parse", "HEAD"], text=True).strip()
     if commit != head or not re.fullmatch(r"[0-9a-f]{40}", commit):
         raise ValueError("source identity commit must exactly match checkout HEAD")
-    if _source_tree_dirty(root):
-        raise ValueError("release source identity requires a clean tracked and untracked source tree")
+    status = _source_tree_status(root)
+    if status:
+        raise ValueError(
+            "release source identity requires a clean tracked and untracked source tree: "
+            + _dirty_tree_detail(status)
+        )
     inputs: dict[str, list[dict[str, Any]]] = {}
     digests: dict[str, str] = {}
     for field, raw_paths in sorted(contract["sourceIdentityInputs"].items()):
@@ -278,8 +290,12 @@ def validate_source_identity(
             ):
                 raise ValueError(f"source identity input entry is malformed: {field}")
     if root is not None:
-        if _source_tree_dirty(root):
-            raise ValueError("source tree changed after source identity capture")
+        status = _source_tree_status(root)
+        if status:
+            raise ValueError(
+                "source tree changed after source identity capture: "
+                + _dirty_tree_detail(status)
+            )
         head = subprocess.check_output(["git", "-C", str(root), "rev-parse", "HEAD"], text=True).strip()
         if head != payload["gitCommit"]:
             raise ValueError("checkout commit changed after source identity capture")

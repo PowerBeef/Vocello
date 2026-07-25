@@ -530,6 +530,33 @@ public func stableFacadeEntryPoint() -> Bool { true }
             self.assertEqual(MODULE.expanded(runtime, [reference]), [])
         self.assertTrue(MODULE.safe_contract_reference("Sources/**/*.swift"))
 
+    def test_trailing_recursive_glob_expands_to_files_on_every_runtime(self) -> None:
+        # Issue #69: on Python <= 3.12 a trailing "**" matches directories only,
+        # so contract scopes like "Tests/**" resolved to zero files. expanded()
+        # must normalize the pattern before glob so every runtime sees files.
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            nested = root / "Tests" / "Suite"
+            nested.mkdir(parents=True)
+            (nested / "CaseA.swift").write_text("// a\n", encoding="utf-8")
+            (root / "Tests" / "Top.swift").write_text("// b\n", encoding="utf-8")
+
+            observed: list[str] = []
+            original_glob = Path.glob
+
+            def recording_glob(self: Path, pattern: str, *args: object, **kwargs: object):
+                observed.append(pattern)
+                return original_glob(self, pattern, *args, **kwargs)
+
+            with unittest.mock.patch.object(Path, "glob", recording_glob):
+                resolved = MODULE.expanded(root, ["Tests/**"])
+
+            self.assertEqual(observed, ["Tests/**/*"])
+            self.assertEqual(
+                [path.name for path in resolved],
+                ["CaseA.swift", "Top.swift"],
+            )
+
     def test_patch_state_and_upstream_disposition_combinations_are_controlled(self) -> None:
         self.assertTrue(MODULE.patch_state_disposition_valid("active", "local-only"))
         self.assertTrue(MODULE.patch_state_disposition_valid("shared", "upstreamed"))

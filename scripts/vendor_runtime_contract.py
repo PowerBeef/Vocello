@@ -474,6 +474,10 @@ def expanded(root: Path, patterns: list[str]) -> list[Path]:
         if not safe_contract_reference(pattern):
             continue
         if any(character in pattern for character in "*?["):
+            # A trailing "**" matches files only on Python 3.13+; "**/*" resolves
+            # to the same file set on every supported runtime (issue #69).
+            if pattern.endswith("**"):
+                pattern += "/*"
             found.update(path for path in root.glob(pattern) if path.is_file())
         else:
             path = root / pattern

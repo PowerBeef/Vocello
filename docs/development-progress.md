@@ -542,13 +542,19 @@ UI-context gap.
   fixes land as workflow-text/env changes on `main`: literal destination quoting, per-target
   provisioning-profile scoping via an `XCODE_XCCONFIG_FILE` macro, then a manual-signing CI
   export because cloud-managed automatic signing needs an Admin-role App Store Connect key).
-  The third dispatch reached Apple's servers end-to-end (archive, export, IPA verification,
-  evidence, attestation all green); App Store Connect then rejected the binary content —
-  transparent iOS icons (90717) and framework Info.plists missing `CFBundleShortVersionString`
-  (90057) — which the tag freezes, so **v2.2.1** packages those two fixes (full-bleed opaque
-  iOS icon set; project-scope `MARKETING_VERSION`/`CURRENT_PROJECT_VERSION` inheritance) as a
-  same-day patch release. Public App Store distribution beyond TestFlight still requires
-  metadata, screenshots, and submission.
+  The third dispatch reached Apple's servers end-to-end; App Store Connect then rejected the
+  binary content — transparent iOS icons (90717) and framework Info.plists missing
+  `CFBundleShortVersionString` (90057) — which the tag freezes, so **v2.2.1** packaged those
+  two fixes (full-bleed opaque iOS icon set; project-scope
+  `MARKETING_VERSION`/`CURRENT_PROJECT_VERSION` inheritance) and **v2.2.2** followed the same
+  day when the tag-frozen artifact verifier turned out to read version identity only from the
+  target block (it now resolves with Xcode-style inheritance, regression-tested against the
+  live `project.yml`). **The v2.2.2 dispatch (run `30177386286`) went green end-to-end on
+  2026-07-25 — archive, export, IPA verification, schema-v2 evidence, provenance attestation,
+  and the TestFlight upload — so Vocello 2.2.2 (build 21) is the first uploaded TestFlight
+  build.** Remaining distribution work is App Store Connect-side: beta Test Information, the
+  external group with a capped public link, and Beta App Review. Public App Store
+  distribution beyond TestFlight still requires metadata, screenshots, and submission.
 - The 2026-07-16 Speech-asset verification resolved the requested locales to installed `de_DE`,
   `es_ES` (for `es_419`), `ja_JP`, and `zh_CN` DictationTranscriber modules; fresh
   `SFSpeechRecognizer` instances also passed Vocello's legacy on-device gate. This is prerequisite

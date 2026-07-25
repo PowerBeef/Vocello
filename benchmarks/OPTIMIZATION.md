@@ -808,5 +808,6 @@ delivery-accuracy work is recorded in §I. For UI smoothness (G), compare the ty
 playback metrics in compatible records indexed by generated `HISTORY.md`; the former
 `uiMaxStall ms` column remains historical context in `LEGACY_HISTORY.md`. The §J observer-effect
 correction (2026-07-23) re-baselines UI-lane expectations; §K attributes the residual UI-context
-gap to generating-state window compositing (XPC ≈3%); §H P0's GPU-busy re-measurement remains
-open follow-up work.
+gap to generating-state window compositing (XPC ≈3%); §H P0's GPU-busy re-measurement was
+completed 2026-07-24 on the shipping runtime (whole-generation GPU busy 31–37% → ~47%,
+eval-flush window → ~55%; structure unchanged, launch/CPU-bound).

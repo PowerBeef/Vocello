@@ -159,8 +159,8 @@ targets:
         # Keep the Swift module name as QwenVoice so sibling modules that assume
         # the QwenVoice namespace still resolve after the on-disk rename to Vocello.app.
         PRODUCT_MODULE_NAME: QwenVoice
-        MARKETING_VERSION: "2.1.0"
-        CURRENT_PROJECT_VERSION: "18"
+        MARKETING_VERSION: "2.2.0"
+        CURRENT_PROJECT_VERSION: "19"
         SWIFT_VERSION: "6"
         MACOSX_DEPLOYMENT_TARGET: "26.0"
         INFOPLIST_FILE: Sources/Info.plist
@@ -392,8 +392,8 @@ targets:
         INFOPLIST_KEY_QVoiceModelCatalogURL: $(QVOICE_IOS_DEFAULT_MODEL_CATALOG_URL)
         INFOPLIST_KEY_QVoiceSharedAppGroupIdentifier: $(QVOICE_IOS_APP_GROUP_IDENTIFIER)
         INFOPLIST_KEY_CFBundleDisplayName: Vocello
-        MARKETING_VERSION: "2.1.0"
-        CURRENT_PROJECT_VERSION: "18"
+        MARKETING_VERSION: "2.2.0"
+        CURRENT_PROJECT_VERSION: "19"
         SWIFT_VERSION: "6"
         IPHONEOS_DEPLOYMENT_TARGET: "26.0"
         GENERATE_INFOPLIST_FILE: NO

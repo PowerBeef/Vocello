@@ -3,9 +3,9 @@ import test from "node:test";
 import { validateRepository, validateText } from "../scripts/site-contract.mjs";
 
 const fixture = (source) => validateText({
-  indexHTML: '<html lang="en"><head><meta name="description"><meta name="viewport"><meta name="robots"><meta property="og:title"><meta property="og:url"><meta property="og:image:alt"><meta name="twitter:card"><link rel="canonical"><title>Vocello 2.1</title></head></html>',
+  indexHTML: '<html lang="en"><head><meta name="description"><meta name="viewport"><meta name="robots"><meta property="og:title"><meta property="og:url"><meta property="og:image:alt"><meta name="twitter:card"><link rel="canonical"><title>Vocello 2.2</title></head></html>',
   sources: [{ name: "fixture.jsx", text: source }],
-  publicFacts: { stableMacRelease: { version: "2.1.0" } },
+  publicFacts: { stableMacRelease: { version: "2.2.0" } },
   publicRoot: "/definitely/missing",
 });
 

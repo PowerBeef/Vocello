@@ -12,7 +12,7 @@ export const Footer = () => (
           </div>
           <p>
             A local, private AI voice studio for Apple Silicon Macs.
-            Vocello is the 2.1 line of QwenVoice, signed for macOS 26.
+            Vocello is the 2.2 line of QwenVoice, signed for macOS 26.
           </p>
         </div>
 

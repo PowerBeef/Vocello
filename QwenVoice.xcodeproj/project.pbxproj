@@ -2746,7 +2746,7 @@
 				CODE_SIGN_ENTITLEMENTS = "$(QVOICE_IOS_APP_ENTITLEMENTS)";
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 18;
+				CURRENT_PROJECT_VERSION = 19;
 				DEVELOPMENT_TEAM = "$(QWENVOICE_DEVELOPMENT_TEAM)";
 				EXECUTABLE_NAME = Vocello;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -2760,7 +2760,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2.1.0;
+				MARKETING_VERSION = 2.2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.patricedery.vocello;
 				PRODUCT_MODULE_NAME = QVoiceiOS;
 				PRODUCT_NAME = Vocello;
@@ -2907,7 +2907,7 @@
 				CODE_SIGN_ENTITLEMENTS = Sources/QwenVoice.entitlements;
 				CODE_SIGN_IDENTITY = "-";
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 18;
+				CURRENT_PROJECT_VERSION = 19;
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = Sources/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Vocello;
@@ -2917,7 +2917,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 2.1.0;
+				MARKETING_VERSION = 2.2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.qwenvoice.app;
 				PRODUCT_MODULE_NAME = QwenVoice;
 				PRODUCT_NAME = Vocello;

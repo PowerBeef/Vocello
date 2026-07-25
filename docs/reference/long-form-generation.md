@@ -61,6 +61,16 @@ summarizes each long-form run (`long-form-project-summary.txt`). Registry public
 long-form project records would need a benchmark-pipeline schema review first; current evidence is
 local/lane-level only.
 
+Scaled memory evidence (2026-07-25, same hardware, smoke run
+`macos-xcui-smoke-20260725-062451-8f15c1fd` with `--long-form-segments 10`): a ~9,900-character
+script planned twelve segments, streamed and joined 627.5 s of audio in 348.7 s wall (project RTF
+1.80). Engine end-of-segment physical footprint oscillated within a flat 2,300–2,510 MB band with
+per-segment peaks steady near 3,040 MB and a first→last delta of −1.13% — steady-state memory does
+not scale with total audio duration at this size. The scaled journey is available to any
+acceptance run via `scripts/ui_test.sh macos smoke --long-form-segments N` (2–12; the lane then
+emits a per-segment footprint table and retains the compact per-generation diagnostics beside the
+run artifacts).
+
 ## iOS path (since 2026-07-24)
 
 iOS runs the same design in-process — `IOSGenerationTextLimitPolicy` routes scripts above the
@@ -88,8 +98,8 @@ disclosure. The iOS smoke lane now runs both journeys (standard + long-form).
 
 - **iOS single-segment regeneration** — expose the shared replacement-lineage machinery on
   device (macOS-only today).
-- **Segment-count scaling evidence** — clean 1-, 10-, and 100-segment macOS memory evidence
-  proving steady-state memory does not scale with total audio duration (live acceptance covered a
-  three-segment project).
+- **Segment-count scaling evidence at audiobook scale** — the 12-segment run above proves flat
+  steady-state memory through ~10 minutes of joined audio; a ~100-segment (multi-hour) proof
+  remains open, and the scaled smoke journey currently caps at 12 segments per run.
 - **Single-take spoken-text normalization** — single takes do not yet consume the spoken-text
   plan; it drives long-form only.

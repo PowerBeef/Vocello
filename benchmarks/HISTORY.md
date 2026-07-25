@@ -89,6 +89,12 @@ from schema-v2 memory trends.
 |---|---|---|---|---|---|---:|---|---|---|---|
 | 2026-07-23 | [`macos-engine-20260723-130812-478fed38`](runs/engine-generation/macos-engine-20260723-130812-478fed38.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 9 | `9ceaf0b9238b` dirty | `excluded` | baseline | phase14a-qc-soak |
 
+## engine-generation / macos / mac-mini-m2-8gb / config `b8dd7beed55a`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---|---|---|---|
+| 2026-07-25 | [`macos-engine-20260725-061018-431c7482`](runs/engine-generation/macos-engine-20260725-061018-431c7482.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 29 | `723f7fe8fee4` dirty | `excluded` | baseline | release-QA-2.2.0 |
+
 ## engine-generation / macos / mac-mini-m2-8gb / config `e61461740953`
 
 | completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |

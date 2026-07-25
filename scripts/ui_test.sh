@@ -34,7 +34,7 @@ validate_benchmark_label() {
 usage() {
   cat >&2 <<'EOF'
 Usage:
-  scripts/ui_test.sh macos smoke
+  scripts/ui_test.sh macos smoke [--long-form-segments N]
   scripts/ui_test.sh macos benchmark [--modes custom,design,clone] [--lengths short,medium,long] [--warm 3] [--label RUN_ID]
   scripts/ui_test.sh ios smoke
   scripts/ui_test.sh ios benchmark [--modes custom,design,clone] [--lengths short,medium,long] [--warm 3] [--label RUN_ID]
@@ -60,6 +60,7 @@ modes="custom,design,clone"
 lengths="short,medium,long"
 warm=3
 label=""
+long_form_segments=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --modes) modes="${2:?--modes requires a value}"; shift 2 ;;
@@ -70,6 +71,8 @@ while [[ $# -gt 0 ]]; do
     --warm=*) warm="${1#*=}"; shift ;;
     --label) label="${2:?--label requires a value}"; shift 2 ;;
     --label=*) label="${1#*=}"; shift ;;
+    --long-form-segments) long_form_segments="${2:?--long-form-segments requires a value}"; shift 2 ;;
+    --long-form-segments=*) long_form_segments="${1#*=}"; shift ;;
     -h|--help|help) usage ;;
     *) die "unknown flag: $1" ;;
   esac
@@ -78,6 +81,17 @@ validate_benchmark_label "$label"
 
 if [[ "$lane" != "benchmark" && ( "$modes" != "custom,design,clone" || "$lengths" != "short,medium,long" || "$warm" != 3 || -n "$label" ) ]]; then
   die "benchmark flags are accepted only by the benchmark lane"
+fi
+
+# Optional macOS-smoke-only scaling of the long-form journey. Local evidence
+# only: it changes the planned segment count of the existing journey, never
+# what publishes.
+if [[ -n "$long_form_segments" ]]; then
+  [[ "$platform" == "macos" && "$lane" == "smoke" ]] \
+    || die "--long-form-segments applies to the macOS smoke lane only"
+  [[ "$long_form_segments" =~ ^[0-9]+$ ]] \
+    && (( long_form_segments >= 2 && long_form_segments <= 12 )) \
+    || die "--long-form-segments must be an integer between 2 and 12"
 fi
 
 python3 - "$modes" "$lengths" "$warm" <<'PY' || exit $?
@@ -512,10 +526,11 @@ summarize_long_form_project_if_present() {
   local wall
   wall=$(grep -oE 'LONGFORM_WALL_SECONDS=[0-9.]+' "$out_dir/xcodebuild.log" 2>/dev/null | tail -1 | cut -d= -f2)
   [[ -n "$wall" ]] || return 0
-  python3 - "$wall" "$out_dir/long-form-project-summary.txt" <<'PY'
-import glob, json, os, sys
+  python3 - "$wall" "$out_dir/long-form-project-summary.txt" "$out_dir" <<'PY'
+import glob, json, os, shutil, sys
 
 wall = float(sys.argv[1])
+out_dir = sys.argv[3]
 outputs = os.path.expanduser(
     "~/Library/Application Support/QwenVoice-Debug/outputs/CustomVoice"
 )
@@ -530,15 +545,103 @@ assembly = manifest.get("assembly") or {}
 frames = assembly.get("outputFrameCount") or 0
 sample_rate = assembly.get("sampleRate") or 24_000
 audio = frames / sample_rate if sample_rate else 0
-segments = len((manifest.get("execution") or {}).get("segments", []))
+segment_rows = (manifest.get("execution") or {}).get("segments", [])
+segments = len(segment_rows)
 rtf = audio / wall if wall else 0
-summary = (
+lines = [
     f"long-form project: {segments} segments, audio {audio:.1f}s, "
     f"wall {wall:.1f}s (plan+stream+QC+assembly), project RTF {rtf:.2f}"
-)
+]
+
+# Per-segment memory trend (local evidence only). The engine telemetry rows
+# already carry physical-footprint summaries; segments have no generationID
+# in the manifest, so match the contiguous run of engine rows whose audio
+# durations best fit the manifest's per-segment durations.
+def flat(obj, found):
+    if isinstance(obj, dict):
+        for key, value in obj.items():
+            if isinstance(value, (dict, list)):
+                flat(value, found)
+            elif isinstance(value, (int, float)) and key not in found:
+                found[key] = value
+    elif isinstance(obj, list):
+        for value in obj:
+            flat(value, found)
+    return found
+
+diag = os.path.expanduser("~/Library/Application Support/QwenVoice-Debug/diagnostics")
+engine_log = os.path.join(diag, "engine", "generations.jsonl")
+durations = [s.get("audioDurationSeconds") or 0 for s in segment_rows]
+if segments >= 2 and durations and os.path.isfile(engine_log):
+    rows = []
+    with open(engine_log) as handle:
+        for raw in handle:
+            raw = raw.strip()
+            if not raw:
+                continue
+            try:
+                rows.append(flat(json.loads(raw), {}))
+            except json.JSONDecodeError:
+                continue
+    audio_key = "audioSeconds"
+    usable = [r for r in rows if audio_key in r]
+    best = None
+    for start in range(0, max(0, len(usable) - segments) + 1):
+        window = usable[start:start + segments]
+        if len(window) < segments:
+            break
+        cost = sum(abs(w[audio_key] - d) for w, d in zip(window, durations))
+        if best is None or cost < best[0]:
+            best = (cost, window)
+    # Accept the match only when durations genuinely line up (<0.75 s mean
+    # error) so a stale log cannot masquerade as this run's segments.
+    if best and best[0] / segments < 0.75:
+        lines.append(
+            "per-segment memory (engine physical footprint, MB; matched by "
+            "audio duration):"
+        )
+        cumulative = 0.0
+        ends = []
+        for index, row in enumerate(best[1]):
+            cumulative += row.get(audio_key, 0)
+            end_mb = row.get("physFootprintEndMB")
+            ends.append(end_mb)
+            lines.append(
+                f"  segment {index:>2}: audio={row.get(audio_key, 0):6.1f}s "
+                f"cumulative={cumulative:7.1f}s "
+                f"start={row.get('physFootprintStartMB', float('nan')):7.1f} "
+                f"end={end_mb if end_mb is not None else float('nan'):7.1f} "
+                f"peak={row.get('physFootprintPeakMB', float('nan')):7.1f}"
+            )
+        known_ends = [e for e in ends if e is not None]
+        if len(known_ends) >= 2:
+            growth = known_ends[-1] - known_ends[0]
+            lines.append(
+                f"  end-footprint growth first→last: {growth:+.1f} MB "
+                f"({100 * growth / known_ends[0]:+.2f}% of first segment end)"
+            )
+    else:
+        lines.append(
+            "per-segment memory: no contiguous engine-row window matched the "
+            "manifest durations; inspect diagnostics manually"
+        )
+
+# Retain the compact per-generation logs beside the run artifacts (sample
+# sidecars stay in the app support tree; they are bounded but large).
+kept = os.path.join(out_dir, "diagnostics")
+os.makedirs(kept, exist_ok=True)
+for layer in ("app", "engine", "engine-service"):
+    source = os.path.join(diag, layer, "generations.jsonl")
+    if os.path.isfile(source):
+        shutil.copy2(source, os.path.join(kept, f"{layer}-generations.jsonl"))
+merged = os.path.join(diag, "generations-merged.jsonl")
+if os.path.isfile(merged):
+    shutil.copy2(merged, os.path.join(kept, "generations-merged.jsonl"))
+
 with open(sys.argv[2], "w") as f:
-    f.write(summary + "\n")
-print(f"==> {summary}")
+    f.write("\n".join(lines) + "\n")
+for line in lines:
+    print(f"==> {line}")
 PY
 }
 
@@ -655,6 +758,9 @@ if [[ "$platform" == "macos" ]]; then
     # recording, library surfaces, long-form project, line batch) in
     # method-name order.
     only_test="VocelloMacUITests/VocelloMacSmokeUITests"
+    if [[ -n "$long_form_segments" ]]; then
+      export TEST_RUNNER_QVOICE_MAC_LONGFORM_SEGMENTS="$long_form_segments"
+    fi
   else
     only_test="VocelloMacUITests/VocelloMacBenchmarkUITests/testOrderedConfigurableMatrix"
     rm -f "$MAC_TAKE_MANIFEST" "$MAC_TAKE_MANIFEST.next"

@@ -478,7 +478,13 @@ UI-context gap.
 
 ## Open release work
 
-- macOS 2.1.0 is released.
+- macOS 2.2.0 is the current release candidate (2026-07-25): version bumped to 2.2.0/19,
+  release notes at `docs/releases/v2.2.0.md` with the first recorded Evidence section (smoke run
+  `macos-xcui-smoke-20260725-062451-8f15c1fd` PASS including the scaled 12-segment long-form
+  memory proof; bench label `release-QA-2.2.0` within noise of comparable records). The GitHub
+  repository was renamed `PowerBeef/QwenVoice` → `PowerBeef/Vocello` the same day, before
+  tagging; old URLs redirect, stars/forks/issues intact, and the old name must never be
+  re-occupied. macOS 2.1.0 was released 2026-06-12.
 - Future macOS releases now start from a protected version tag or explicit existing tag. The
   workflow verifies source/version identity, signs and notarizes, emits SPDX/CycloneDX inventories,
   checksums, release evidence, and provenance, then verifies downloaded draft assets before the

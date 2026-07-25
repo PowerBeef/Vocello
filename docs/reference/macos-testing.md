@@ -24,11 +24,13 @@ scripts/ui_test.sh macos smoke
 scripts/ui_test.sh macos benchmark
 # Filtered benchmark example:
 scripts/ui_test.sh macos benchmark --modes custom --lengths short --warm 1 --label "focused"
+# Scaled long-form memory evidence (local only, 2–12 segments; default 2):
+scripts/ui_test.sh macos smoke --long-form-segments 10
 ```
 
 | Lane | Scope |
 | --- | --- |
-| Smoke | Seven ordered focused journeys, each in a fresh app session with no persisted state left behind: (1) navigation + visible model/clone readiness, (2) one real Custom generation with the completed take asserted exactly once in History, (3) mid-generation cancellation — clean reset, no error badge, no History row, (4) the virtual-microphone recording flow through capture and review (registered `QWENVOICE_FAKE_MIC_WAV` knob, `/tmp` fixture; cancels before the permission-sensitive accept), (5) library surfaces, (6) a three-segment long-form project (~2,280-character script → sequential streaming segments, joined WAV, one History project row with a working segment map; the lane prints the project wall clock and writes `long-form-project-summary.txt`), (7) a two-line batch (two streamed takes → two History rows) |
+| Smoke | Seven ordered focused journeys, each in a fresh app session with no persisted state left behind: (1) navigation + visible model/clone readiness, (2) one real Custom generation with the completed take asserted exactly once in History, (3) mid-generation cancellation — clean reset, no error badge, no History row, (4) the virtual-microphone recording flow through capture and review (registered `QWENVOICE_FAKE_MIC_WAV` knob, `/tmp` fixture; cancels before the permission-sensitive accept), (5) library surfaces, (6) a long-form project (default ~1,900-character script → two sequential streaming segments; `--long-form-segments N` scales the same journey up to 12 planned segments for local memory-scaling evidence — the summary then adds a per-segment engine physical-footprint table and retains the compact per-generation diagnostics beside the run artifacts; joined WAV, one History project row with a working segment map; the lane prints the project wall clock and writes `long-form-project-summary.txt`), (7) a two-line batch (two streamed takes → two History rows) |
 | Benchmark | Ordered, configurable Custom/Design/Clone matrix with cold/warm classification and per-take deterministic proof; the default is exactly 29 takes |
 
 The runner targets the configured native Vocello test host. Before launch it resolves every matching

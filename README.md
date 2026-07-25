@@ -7,7 +7,7 @@
 
 <p align="center">
   <a href="https://vocello.vercel.app/"><img src="https://img.shields.io/badge/Website-vocello.vercel.app-7b61ff?style=flat-square&logo=vercel" alt="Website"></a>
-  <a href="https://github.com/PowerBeef/Vocello/releases/tag/v2.1.0"><img src="https://img.shields.io/badge/Vocello-2.1.0-7b61ff?style=flat-square" alt="Vocello 2.1.0"></a>
+  <a href="https://github.com/PowerBeef/Vocello/releases/tag/v2.2.0"><img src="https://img.shields.io/badge/Vocello-2.2.0-7b61ff?style=flat-square" alt="Vocello 2.2.0"></a>
   <img src="https://img.shields.io/badge/macOS-26%2B-111827?style=flat-square&logo=apple" alt="macOS 26 or newer">
   <img src="https://img.shields.io/badge/iPhone-distribution%20pending-7b61ff?style=flat-square&logo=apple" alt="iPhone distribution pending">
   <img src="https://img.shields.io/badge/Apple%20Silicon-required-111827?style=flat-square&logo=apple" alt="Apple Silicon required">
@@ -21,8 +21,8 @@
 </div>
 
 <p align="center">
-  <a href="https://github.com/PowerBeef/Vocello/releases/download/v2.1.0/Vocello-macos26.dmg"><strong>Download Vocello 2.1.0 for macOS 26+</strong></a><br>
-  <a href="https://github.com/PowerBeef/Vocello/releases/tag/v2.1.0">Release details</a> · <a href="docs/releases/v2.1.0.md">What is new</a> · <a href="https://github.com/PowerBeef/Vocello/releases">All releases</a>
+  <a href="https://github.com/PowerBeef/Vocello/releases/download/v2.2.0/Vocello-macos26.dmg"><strong>Download Vocello 2.2.0 for macOS 26+</strong></a><br>
+  <a href="https://github.com/PowerBeef/Vocello/releases/tag/v2.2.0">Release details</a> · <a href="docs/releases/v2.2.0.md">What is new</a> · <a href="https://github.com/PowerBeef/Vocello/releases">All releases</a>
 </p>
 
 ## What Vocello does
@@ -52,25 +52,27 @@ Custom Voice and Voice Design support ten delivery styles at subtle, normal, or 
 
 ## Install on Mac
 
-1. Download [`Vocello-macos26.dmg`](https://github.com/PowerBeef/Vocello/releases/download/v2.1.0/Vocello-macos26.dmg).
+1. Download [`Vocello-macos26.dmg`](https://github.com/PowerBeef/Vocello/releases/download/v2.2.0/Vocello-macos26.dmg).
 2. Open the DMG and drag `Vocello.app` to `/Applications`.
 3. Open Vocello, then install models from **Settings > Model downloads**.
 4. Generate from Custom Voice, Voice Design, or Voice Cloning.
 
-The current DMG is signed with an Apple Developer ID certificate, notarized, and stapled. No Python runtime or local server is required. The attached [`release-metadata.txt`](https://github.com/PowerBeef/Vocello/releases/download/v2.1.0/release-metadata.txt) records source and toolchain provenance.
+The current DMG is signed with an Apple Developer ID certificate, notarized, and stapled. No Python runtime or local server is required. The attached [`release-metadata.txt`](https://github.com/PowerBeef/Vocello/releases/download/v2.2.0/release-metadata.txt) records source and toolchain provenance.
 
-Upgrading from Vocello 2.0 does not require reinstalling models. Application data remains under `~/Library/Application Support/QwenVoice/`.
+Upgrading from Vocello 2.0 or 2.1 does not require reinstalling models. Application data remains under `~/Library/Application Support/QwenVoice/`.
+
+With the 2.2.0 release the repository moved from `PowerBeef/QwenVoice` to `PowerBeef/Vocello`; every old link and clone URL redirects to the new name.
 
 ## System requirements and model variants
 
 | Platform | Support | Model variants | Public status |
 | --- | --- | --- | --- |
-| Mac | macOS 26.0 or newer, Apple Silicon, 8 GB RAM minimum | Speed (4-bit) and Quality (8-bit) | Vocello 2.1.0 is available now |
+| Mac | macOS 26.0 or newer, Apple Silicon, 8 GB RAM minimum | Speed (4-bit) and Quality (8-bit) | Vocello 2.2.0 is available now |
 | iPhone | iPhone 15 Pro or newer, iOS 26.0 or newer | Speed (4-bit) | App implemented; public distribution pending |
 
 Speed is the recommended default and uses less memory. Quality is a Mac-only option for machines with more headroom. The three recommended Mac Speed packages total about 7 GB.
 
-Support floors and benchmark machines are different facts. Canonical evidence is produced on a Mac mini M2 with 8 GB and an iPhone 17 Pro. In the current clean owned-core Mac record, every Custom and Design aggregate cell generated at or faster than playback; Clone medium and long were approximately realtime or faster, while Clone short remained below realtime. The record is `passedWithWarnings` because accepted memory soft trims and long-cell audio-QC warnings remain visible rather than being hidden. See the [tracked benchmark record](benchmarks/runs/ui-generation/macos-xcui-benchmark-20260716-181853-b4c2e299.json) for the exact matrix and conditions.
+Support floors and benchmark machines are different facts. Canonical evidence is produced on a Mac mini M2 with 8 GB and an iPhone 17 Pro. In the current canonical Mac record, every Custom, Design, and Clone aggregate cell generated faster than playback (warm real-time factors 1.49–1.94), roughly a third faster than the 2.1 line in identical conditions after the generation performance gate landed. The record is `passedWithWarnings` because accepted memory soft trims and audio-QC warnings remain visible rather than being hidden. See the [tracked benchmark record](benchmarks/runs/ui-generation/macos-xcui-benchmark-20260723-083313-d02005ae.json) for the exact matrix and conditions.
 
 Macs on macOS 15 can use the legacy [QwenVoice 1.2.3 release](https://github.com/PowerBeef/Vocello/releases/tag/v1.2.3). No Vocello 2.x backport is planned.
 

@@ -245,7 +245,29 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
             "Evening settled in without ceremony, and the lamps along the seafront warmed to their work one by one.",
             "The narrator let the last image stand on its own: a small boat turning for home, its wake folding back into the dark water.",
         ]
-        let script = paragraphs.joined(separator: " ")
+        // QVOICE_MAC_LONGFORM_SEGMENTS (runner env, exported by
+        // scripts/ui_test.sh --long-form-segments) scales this same journey to
+        // a larger project for explicit local memory-scaling evidence. The
+        // default keeps today's two-segment smoke behavior; the extension pool
+        // stays distinct prose for the same anti-repetition reason and covers
+        // roughly twelve segments.
+        let targetSegments = max(
+            2,
+            Int(ProcessInfo.processInfo.environment["QVOICE_MAC_LONGFORM_SEGMENTS"] ?? "") ?? 2
+        )
+        var script = paragraphs.joined(separator: " ")
+        if targetSegments > 2 {
+            var extensionIndex = 0
+            while script.count < targetSegments * 950,
+                  extensionIndex < Self.longFormExtensionParagraphs.count {
+                script += " " + Self.longFormExtensionParagraphs[extensionIndex]
+                extensionIndex += 1
+            }
+            XCTAssertGreaterThan(
+                script.count, (targetSegments - 1) * 900,
+                "extension corpus is too small to plan \(targetSegments) segments"
+            )
+        }
         XCTAssertGreaterThan(script.count, 1_300)
 
         prepare(mode: .custom)
@@ -259,11 +281,15 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: generateAll, timeout: 20))
 
         // Completion: the long-form outcome exposes per-segment regeneration
-        // and, on a clean run, no resume affordance.
+        // and, on a clean run, no resume affordance. The timeout scales with
+        // the planned project size.
+        let outcomeTimeout: TimeInterval = targetSegments <= 2
+            ? 900
+            : TimeInterval(targetSegments) * 300
         let firstRegenerate = button("batch_regenerateSegment_0")
         let resume = button("batch_resumeLongFormButton")
         XCTAssertTrue(
-            VocelloUIWait.condition("long-form outcome to settle", timeout: 900) {
+            VocelloUIWait.condition("long-form outcome to settle", timeout: outcomeTimeout) {
                 firstRegenerate.exists || resume.exists
             },
             "long-form generation must reach a terminal project outcome"
@@ -303,6 +329,82 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
         // plus the first segment row).
         assertHistoryRows(matching: nonce, expected: 2)
     }
+
+    /// Distinct continuation prose for scaled long-form runs
+    /// (QVOICE_MAC_LONGFORM_SEGMENTS > 2). Kept varied for the same
+    /// anti-repetition reason as the base corpus; roughly enough for a
+    /// twelve-segment project.
+    private static let longFormExtensionParagraphs: [String] = [
+        "Further inland, the river widened into a slow brown reach where herons stood like patient punctuation marks.",
+        "A ferryman worked the crossing on a chain older than his grandfather, and he trusted it more than any engine.",
+        "On the far bank, orchards climbed the hillside in careful terraces, each row holding its own weather.",
+        "The narrator paused there to describe the light, which arrived late in the valley and left early, as if on loan.",
+        "A schoolhouse bell rang twice for no reason anyone remembered, and the sound carried clear across the water.",
+        "Two brothers argued cheerfully about the best way to stack firewood, a debate their family had hosted for decades.",
+        "In the churchyard, moss had softened every name, and the yew tree kept its own counsel about all of them.",
+        "The road out of the valley turned to gravel, then to habit, then to a pair of ruts remembering a road.",
+        "At the summit, wind moved through the grass in long silver strokes, combing the hillside toward evening.",
+        "A shepherd's hut leaned into the slope, its tin roof pinned down by stones the size of sleeping cats.",
+        "From that height, the sea returned to the story, a pale line stitched along the edge of the world.",
+        "The narrator let the silence stretch, because some views ask for fewer words rather than better ones.",
+        "Descending, the path crossed a stream five times, and each crossing had its own opinion about wet boots.",
+        "A painter had set up her easel by the third crossing, chasing a green she swore existed only on Tuesdays.",
+        "They spoke briefly about pigments and patience, and she gave the narrator a plum from her coat pocket.",
+        "The plum was sour and perfect, and it earned itself this sentence in the record of the day.",
+        "By late afternoon, the trail delivered its walkers to a village that smelled of bread and diesel and rain.",
+        "The inn had four rooms, three keys, and one rule, which was that the kitchen closed when the cook said so.",
+        "Dinner arrived without a menu: soup, then fish, then a pudding that ended all conversation for a while.",
+        "In the snug, an old radio played weather reports for shipping lanes nobody present would ever sail.",
+        "A dartboard hung in retirement, its wire long healed over by a decade of quieter evenings.",
+        "The narrator wrote three postcards and posted none of them, which is one honest way to keep a diary.",
+        "Morning brought a market bus, its driver steering with the confidence of a man who owned both hills.",
+        "Passengers boarded with baskets, opinions, and a rooster that had clearly made this trip before.",
+        "The bus took corners the way rumors take dinner parties, quickly and with total commitment.",
+        "At the terminus, a brass band rehearsed in the square, perfecting a march at a strictly walking pace.",
+        "The tuba player nodded at strangers between phrases, conducting hospitality with his eyebrows.",
+        "A library occupied the old customs house, its shelves ballasted with atlases of countries since renamed.",
+        "The librarian stamped return dates with the gravity of a magistrate and the kindness of a grandmother.",
+        "Upstairs, a reading room kept one window open for the swallows, an arrangement both parties respected.",
+        "The narrator copied a line from a sailor's memoir: every harbor is a promise the sea only sometimes keeps.",
+        "Outside, the afternoon had turned bright and businesslike, drying laundry and settling old puddles.",
+        "A locksmith's van idled by the fountain while its owner fed crumbs to pigeons he pretended to dislike.",
+        "Children raced paper boats in the gutter stream, cheering for vessels with the lifespans of mayflies.",
+        "The story followed the coast road north, where cliffs kept their shoulders squared against the weather.",
+        "Lighthouse keepers had left decades ago, but the lamp still turned, faithful as a habit nobody broke.",
+        "In a cove below, seals hauled out on warm rocks and regarded the mainland with mild, whiskered skepticism.",
+        "A fisherman mended nets with a needle worn to his hand, each knot a small argument won against the sea.",
+        "He spoke of winters that sorted neighbors into legends, and summers that apologized for them.",
+        "The narrator asked about the oldest boat in the harbor, and received three different true answers.",
+        "Toward dusk, the road bent inland through pines, and the air changed its mind about being maritime.",
+        "Resin and woodsmoke replaced salt, and the light came down in narrow ladders between the trunks.",
+        "A forester's cottage kept bees at its gable end, their traffic ruled by an etiquette older than fences.",
+        "Supper was bread and honey and a broth improved by everything the garden could spare that week.",
+        "Night arrived early under the trees, and with it the small economies of lamplight and low voices.",
+        "The narrator read one chapter aloud to no one, because some rooms deserve to be read to.",
+        "Sleep came the way the tide comes, without negotiation and exactly on its own schedule.",
+        "The next morning opened with frost on the meadow, brief and bright as a coin flipped into the grass.",
+        "A postwoman cycled the forest road with letters for four houses and gossip calibrated for each.",
+        "She rang her bell at the blind corner out of respect for a deer that had once disrespected it.",
+        "Where the pines thinned, the story found a railway halt with a bench, a clock, and no further ambitions.",
+        "The narrator waited there among nettles and timetables, listening for the rail's first faint conversation.",
+        "The train that came was two carriages of good intentions, warm and slow and smelling of coffee.",
+        "Across the aisle, a chess set travelled in a walnut box, its owner seeking opponents with great optimism.",
+        "They played to a draw agreed more out of friendship than position, and shook hands over the border of it.",
+        "Stations passed like chapters with excellent titles: Millbrook, Harefield, Saint Osyth of the Ledge.",
+        "At each stop, someone's whole day either began or ended, and the train witnessed both without comment.",
+        "The narrator noted how landscapes rehearse their transitions, hedgerow to fen, fen to town, town to yard.",
+        "By noon, the carriages emptied into a city that wore its river like a favorite scarf, loosely and often.",
+        "Bridges repeated themselves upstream in diminishing arches, a stone echo fading into the haze.",
+        "A tour guide herded umbrellas past the mint, promising secrets and delivering dates, as guides do.",
+        "The narrator chose the quieter bank, where anglers and philosophers practiced their related arts.",
+        "A café with six tables served one soup and defended it like a thesis, correctly, as it turned out.",
+        "The afternoon spent itself on small change: a gallery, an argument about clouds, a repaired shoelace.",
+        "When evening came, the city lit its windows in no particular order, an orchestra tuning rather than playing.",
+        "The last ferry crossed with its cargo of tired bicycles and unfinished conversations.",
+        "From midstream, both banks looked equally like home, which the narrator recorded as the day's finding.",
+        "The story kept one final image for the ledger: streetlamps doubling themselves in the black water.",
+        "And there the long account rested, not because the road ended, but because the page did.",
+    ]
 
     /// Writes a mono 24 kHz speech-like PCM WAV: a two-tone "voice" under a
     /// syllable-rate envelope with phrase pauses, so the live level meter

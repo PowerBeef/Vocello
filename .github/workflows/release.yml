@@ -352,14 +352,20 @@ jobs:
               raise SystemExit("error: refusing to replace assets on an already-published Release")
           PY
           else
+            # macOS runners ship bash 3.2, where expanding an empty array
+            # under `set -u` still raises "unbound variable" (fixed only in
+            # bash 4.4) — guard the expansion and keep the append in an `if`
+            # so a stable tag cannot trip `set -e` either.
             release_flags=()
-            [[ "$RELEASE_TAG" == *-* ]] && release_flags+=(--prerelease)
+            if [[ "$RELEASE_TAG" == *-* ]]; then
+              release_flags+=(--prerelease)
+            fi
             gh release create "$RELEASE_TAG" \
               --draft \
               --verify-tag \
               --title "Vocello ${RELEASE_TAG#v}" \
               --generate-notes \
-              "${release_flags[@]}"
+              ${release_flags[@]+"${release_flags[@]}"}
           fi
 
       - name: Reset draft Release assets

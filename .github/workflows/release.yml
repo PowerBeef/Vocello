@@ -700,7 +700,7 @@ jobs:
             -project QwenVoice.xcodeproj \
             -scheme VocelloiOS \
             -configuration Release \
-            -destination 'generic/platform=iOS' \
+            -destination '\''generic/platform=iOS'\'' \
             -derivedDataPath build/scratch/derived-data/ci/ios-archive \
             -clonedSourcePackagesDirPath build/cache/xcode/source-packages \
             -disableAutomaticPackageResolution \

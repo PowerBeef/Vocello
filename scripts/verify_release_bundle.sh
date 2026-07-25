@@ -129,6 +129,14 @@ if [ "$EXPECT_SIGNED_RELEASE" = "1" ]; then
     XPC_SIGNATURE_TEAM_ID="$(codesign_team_identifier "$XPC_SERVICE_PATH")"
     [ "$APP_SIGNATURE_TEAM_ID" = "$APP_TEAM_ID" ] || fail "App signature Team ID mismatch: Info.plist=$APP_TEAM_ID signature=${APP_SIGNATURE_TEAM_ID:-missing}"
     [ "$XPC_SIGNATURE_TEAM_ID" = "$XPC_TEAM_ID" ] || fail "XPC signature Team ID mismatch: Info.plist=$XPC_TEAM_ID signature=${XPC_SIGNATURE_TEAM_ID:-missing}"
+    # Every nested framework must carry the release team identity too —
+    # notarization rejects any ad-hoc Mach-O, and build-time signing
+    # leaves frameworks ad-hoc until release re-signing covers them.
+    while IFS= read -r -d '' framework_path; do
+        FRAMEWORK_SIGNATURE_TEAM_ID="$(codesign_team_identifier "$framework_path")"
+        [ "$FRAMEWORK_SIGNATURE_TEAM_ID" = "$APP_TEAM_ID" ] \
+            || fail "Nested framework $(basename "$framework_path") signature Team ID mismatch: expected $APP_TEAM_ID, got ${FRAMEWORK_SIGNATURE_TEAM_ID:-missing (ad-hoc?)}"
+    done < <(find "$APP_PATH/Contents/Frameworks" -maxdepth 1 -type d -name '*.framework' -print0 2>/dev/null)
     echo "[2/4] Signed release checks OK"
 else
     echo "[2/4] Signature checks skipped (set QWENVOICE_EXPECT_SIGNED_RELEASE=1 for release verification)"

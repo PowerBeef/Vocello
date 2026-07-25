@@ -332,12 +332,15 @@ echo ""
 
 STEP_START="$(date +%s)"
 echo "[5/7] Signing and verifying the final app bundle..."
-# Re-sign every embedded XPC service first so its hardened-runtime
-# metadata matches the outer app. Xcode's build-time signing uses the
-# project's default ad-hoc identity ("-") which lacks the runtime
-# flag, and `verify_release_bundle.sh` rejects that for signed
-# releases. Sign nested code before the outer wrapper so the wrapper's
-# signature seal is valid.
+# Re-sign nested code inside-out so every seal is valid and every
+# Mach-O carries the release identity. Xcode's build-time signing uses
+# the project's default ad-hoc identity ("-"), which notarization
+# rejects ("not signed with a valid Developer ID certificate") — the
+# 2.2.0 candidate failed exactly there on its embedded frameworks.
+# Frameworks first (no entitlements), then XPC services, then the app.
+while IFS= read -r -d '' framework_path; do
+    run_codesign "$framework_path" --options runtime
+done < <(find "$APP_PATH/Contents/Frameworks" -maxdepth 1 -type d -name '*.framework' -print0 2>/dev/null)
 while IFS= read -r -d '' xpc_path; do
     run_codesign "$xpc_path" \
         --options runtime \
@@ -367,21 +370,31 @@ codesign --verify --verbose=4 "$DMG_PATH"
 
 if [ "$NOTARIZE" = "1" ]; then
     echo "  Submitting $(basename "$DMG_PATH") to Apple notarization via API key (typically 1-5 min)..."
-    # `notarytool submit --wait` blocks until the submission resolves;
-    # exit code is non-zero on Invalid/Rejected so `set -e` aborts the
-    # release on a failed notarization. On failure, fetch the per-issue
-    # log from Apple with `xcrun notarytool log <submission-id> --key ... --key-id ...`.
-    notarytool_args=(submit "$DMG_PATH" --key "$APPLE_API_KEY_PATH" --key-id "$APPLE_API_KEY_ID" --wait)
+    # `notarytool submit --wait` exits 0 whenever processing completes,
+    # including an Invalid verdict, so the verdict must be checked
+    # explicitly; on any non-Accepted status fetch Apple's per-issue log
+    # before failing so the reject reasons land in the release log.
+    notary_key_args=(--key "$APPLE_API_KEY_PATH" --key-id "$APPLE_API_KEY_ID")
     # Pass --issuer only when APPLE_API_ISSUER_ID looks like a real
     # UUID. Required for Team API keys; MUST be omitted for Individual
     # API keys (notarytool rejects --issuer with anything-non-UUID).
     if [ -n "${APPLE_API_ISSUER_ID:-}" ] && [[ "$APPLE_API_ISSUER_ID" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]]; then
-        notarytool_args+=(--issuer "$APPLE_API_ISSUER_ID")
+        notary_key_args+=(--issuer "$APPLE_API_ISSUER_ID")
         echo "  Using Team API key (issuer present)."
     else
         echo "  Using Individual API key (no issuer)."
     fi
-    xcrun notarytool "${notarytool_args[@]}"
+    notary_output="$(xcrun notarytool submit "$DMG_PATH" "${notary_key_args[@]}" --wait 2>&1 | tee /dev/stderr)" \
+        || release_fail "notarytool submission failed"
+    notary_id="$(printf '%s\n' "$notary_output" | awk '/^[[:space:]]*id: /{print $2; exit}')"
+    notary_status="$(printf '%s\n' "$notary_output" | awk '/^[[:space:]]*status: /{print $2}' | tail -1)"
+    if [ "$notary_status" != "Accepted" ]; then
+        if [ -n "$notary_id" ]; then
+            echo "  Notarization verdict: ${notary_status:-unknown}; fetching Apple's issue log..."
+            xcrun notarytool log "$notary_id" "${notary_key_args[@]}" || true
+        fi
+        release_fail "notarization verdict: ${notary_status:-unknown} (submission ${notary_id:-unknown})"
+    fi
     echo "  Stapling notarization ticket to DMG..."
     xcrun stapler staple "$DMG_PATH"
     xcrun stapler validate "$DMG_PATH"

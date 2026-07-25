@@ -29,8 +29,8 @@ export const WhyCloud = () => (
         </h2>
         <p className="section-sub">
           If you arrived looking for an ElevenLabs local alternative for Mac,
-          Vocello's answer is narrower and quieter: a private text to speech Apple Silicon
-          workflow that runs locally after setup.
+          Vocello's answer is narrower and quieter: your scripts become speech
+          on your own Mac, and nothing you write or generate leaves it.
         </p>
       </div>
 

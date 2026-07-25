@@ -67,7 +67,7 @@ export const Listen = () => {
                     <Icon name={isPlaying ? "pause" : "play"} size={14} />
                   </button>
                   <div className="listen-row-wave" aria-hidden="true">
-                    <Waveform playing={isPlaying} color={s.color} seed={s.seed} bars={40} />
+                    <Waveform playing={isPlaying} color={s.color} wave={s.wave} bars={40} />
                   </div>
                   <span className="listen-row-stats">
                     {s.delivery}<span className="listen-sep" aria-hidden="true">·</span>{s.duration}

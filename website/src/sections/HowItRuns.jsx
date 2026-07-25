@@ -15,8 +15,8 @@ const ROWS = [
   },
   {
     k: "Pricing",
-    v: "Free, open-source",
-    note: "Download the Speed or Quality model from Hugging Face once. Generate as many lines as your Mac can hold. No subscription, no per-character meter, no queue.",
+    v: "Free on Mac",
+    note: "The Mac app is free and open-source. Download the Speed or Quality model from Hugging Face once and generate as many lines as your Mac can hold. No subscription, no per-character meter, no queue.",
     tone: "var(--terracotta-300)",
   },
   {

@@ -3,7 +3,7 @@
 > Current maintainer checkpoint. Confirm this summary against the checkout before acting; source,
 > `project.yml`, and repository scripts remain authoritative.
 
-## Runtime convergence status — reviewed 2026-07-23
+## Runtime convergence status — reviewed 2026-07-25
 
 This checkpoint tracks the staged runtime convergence program. Focused Phase 4 acceptance landed
 at `00c9eea637259cfce858d1fc7d43a1a2c52ff86d` (delivered by [PR #78](https://github.com/PowerBeef/Vocello/pull/78)
@@ -146,19 +146,38 @@ codec bf16, clone prompt release), Stage 3 quality harness folding phases 12→1
 gated pin-bump/carryover/parked bets — lives in
 [`docs/reference/optimization-report-review-2026-07-25.md`](reference/optimization-report-review-2026-07-25.md).
 
-Remaining work, choose by goal:
+Remaining work now follows the staged roadmap (details and falsifiability criteria in the
+review doc):
 
-1. **Phase 9** — runtime component reuse: optional isolated decoder/immutable-weight A/B, newly
-   unblocked by the live disk-component proof.
-2. ~~**Phase 11 live acceptance**~~ — passed 2026-07-23; phase 11 is complete for macOS, and
-   iOS long-form shipped 2026-07-24 (see the phase 11 row). Phases 12–13 (quality
-   consolidation, history v3) remain later work; history schema v2 still ships. iOS
-   single-segment regeneration is the remaining long-form parity item.
-3. **Smaller open threads** — ~~§H P0 GPU-busy re-capture~~ (done 2026-07-24: whole-generation
+1. **Stage 0 — near-free quality wins**: clone reference 0.5 s trailing-silence append
+   (versioned clone-prompt identity + fixed-seed evidence), gate the already-computed
+   long-form `maximumSegmentBoundaryJump` (warn-first), duration-directive guardrail for
+   custom delivery text, repetition-penalty 1.05→~1.10 bench A/B against dropout counts.
+2. **Stage 1 — launch-bound attack on current pins** (§H P0 successor program): collapse the
+   two per-token `.item()` host syncs and pipeline with `asyncEval` (double-buffered chunk
+   materialization preserving the lossless channel), compile the code-predictor step (its
+   per-frame cache reset gives a bounded 16-shape cycle), overlap codec decode on a second
+   MLX stream, and a branch-only talker static-shape compile experiment. Every engine-loop
+   change carries the §K fixed-seed QC soak.
+3. **Stage 2 — memory program (folds phase 9)**: speech-tokenizer runtime reuse across mode
+   switches (the RAM analog of the shipped disk hard-linking), text-embedding quantization
+   experiment (622 MB BF16 today inside the "4-bit" artifact), codec bf16 experiment
+   (fp32 today; keep final decoder layers full precision), clone-prompt release after the
+   conditioning prefix is built.
+4. **Stage 3 — quality harness (folds phase 12, then 13)**: wire the typed
+   `GenerationQualityReport` registry producers and persisted-WAV consolidation, add a
+   dev-lane speaker-similarity gate for clone fidelity, optional advisory MOS-proxy column;
+   then benchmark/history v3 once identities stabilize.
+5. **Stage 4 — gated migrations/research**: mlx pin bump 2.31.3/0.31.3 on a throwaway branch
+   (contract invariant), long-form carryover (history-aware text context first), with
+   speculative/PCG, CFG, and KV quantization parked.
+6. **Smaller open threads** — ~~§H P0 GPU-busy re-capture~~ (done 2026-07-24: whole-generation
    GPU busy 31–37% → ~47% on the shipping runtime, still launch-bound; OPTIMIZATION.md §H P0
-   addendum), the iPhone-15-Pro memory-profile diagnostic, and a 60 Hz-device measurement of the
-   iOS fixed-refresh glass gate if such hardware becomes available.
-4. ~~**iOS 900-character single-take limit**~~ — shipped 2026-07-24.
+   addendum), iOS single-segment regeneration parity, the iPhone-15-Pro memory-profile
+   diagnostic, a 60 Hz-device measurement of the iOS fixed-refresh glass gate if such
+   hardware becomes available, and single-take spoken-text normalization (phase 10
+   remainder).
+7. ~~**iOS 900-character single-take limit**~~ — shipped 2026-07-24.
    `IOSGenerationTextLimitPolicy.sharedScriptLimit` 150 → 900, aligned with the macOS long-form
    router threshold, gated on an on-device memory-qualified proof: headless 888-character
    custom/speed take on the canonical iPhone 17 Pro (`ios-engine-20260724-060000-1cc8ef23`,
@@ -515,9 +534,14 @@ UI-context gap.
   and deterministic website checks are repository contracts; GitHub administrative settings still
   require maintainer authorization and API verification.
 - The optional CI `archive-ios` lane is implemented with process-bound deterministic readiness,
-  signed-artifact verification, and release evidence. Public iOS distribution still requires
-  maintainer-owned distribution credentials, the App Store Connect record and metadata, screenshots,
-  and submission.
+  signed-artifact verification, and release evidence. As of 2026-07-25 the maintainer-owned
+  prerequisites exist: Apple Distribution certificate, App Store provisioning profile carrying
+  `increased-memory-limit`, the App Store Connect app record, an App Store Connect API key, and
+  all seven repository secrets. The first TestFlight dispatch on `v2.2.0` is iterating through
+  lane hardening (the tag's orchestration contract freezes the managed archive command, so
+  fixes land as workflow-text/env changes on `main`: literal destination quoting, then
+  per-target provisioning-profile scoping via an `XCODE_XCCONFIG_FILE` macro). Public App
+  Store distribution beyond TestFlight still requires metadata, screenshots, and submission.
 - The 2026-07-16 Speech-asset verification resolved the requested locales to installed `de_DE`,
   `es_ES` (for `es_419`), `ja_JP`, and `zh_CN` DictationTranscriber modules; fresh
   `SFSpeechRecognizer` instances also passed Vocello's legacy on-device gate. This is prerequisite

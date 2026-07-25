@@ -4,7 +4,9 @@
 > Apple Metal/MLX guidance. Protects the low-RAM + streaming-preview “secret sauce”
 > that makes the product feel fast on 8 GB Mac and physical iPhone.
 >
-> Reviewed 2026-07-19; position sync 2026-07-20 after `overallPromotion: passed`.
+> Reviewed 2026-07-19; position sync 2026-07-20 after `overallPromotion: passed`; roadmap
+> sync 2026-07-25 after the launch-bound optimization report counter-verification
+> ([`optimization-report-review-2026-07-25.md`](optimization-report-review-2026-07-25.md)).
 > Code and machine-readable contracts win over this prose.
 
 ## Secret sauce (do not trade for roadmap convenience)
@@ -52,7 +54,11 @@ cache limits + soft/hard trim / `fullUnload` align with Apple and MLX guidance. 
 - **MLX-only** during convergence (no Core ML / MPS Graph / custom Metal second path).
 - **Pin lockstep** for `mlx-swift` + `mlx-swift-lm` through remaining convergence (Phases 7–14).
 - Tighter cache-limit A/B only after Phase 5 packaging (closed 2026-07-20), evidence-gated.
-- Quantized KV and `compile()` remain diagnostic unless new evidence overturns prior −RTF findings.
+- Quantized KV remains diagnostic (standing do-NOT). `compile()` stays diagnostic for the
+  talker, but the 2026-07-25 review sanctions two gated re-tests: the code-predictor step is
+  compile-stable today (per-frame cache reset → bounded 16-shape cycle), and a talker
+  static-shape compile experiment is branch-only with recompile-free proof plus ≥10% warm RTF
+  required — the prior −5% measurement was a different variant (quantized-param marshalling).
 
 For “lightning fast” claims, prefer `playbackScheduled` / first-chunk materialization until a true
 first-render player callback exists. Nested v9 may still mark some preview domains unavailable.
@@ -83,8 +89,13 @@ Both platforms ran exploratory full 29-take UI matrices on a dirty worktree
    canonical matrices; keep `scripts/check_secret_sauce_cells.py` fail-closed for later Phase 7+.
 3. Do not target A100 97 ms; use Vocello clean-control regression bounds.
 4. Defer Metal 4 / Neural Accelerator work until pins and hardware matrix expand further.
-5. Next convergence work is a fork: Phase 14 retirement, Phase 7 chunk/preview A/B, or Phase 8
-   live artifact validation — see `docs/development-progress.md`.
+5. ~~Next convergence work is a fork: Phase 14 retirement, Phase 7 chunk/preview A/B, or
+   Phase 8 live artifact validation~~ — all three closed 2026-07-23. The active route is now
+   the 2026-07-25 staged optimization plan (Stage 0 near-free quality wins → Stage 1
+   launch-bound attack on current pins → Stage 2 memory program folding phase 9 → Stage 3
+   quality harness folding phases 12→13 → Stage 4 gated pin-bump/research bets):
+   [`optimization-report-review-2026-07-25.md`](optimization-report-review-2026-07-25.md)
+   and `docs/development-progress.md`.
 
 Related: [`docs/decisions/runtime-streaming-quality-convergence.md`](../decisions/runtime-streaming-quality-convergence.md),
 [`docs/development-progress.md`](../development-progress.md),

@@ -176,7 +176,7 @@ def gate_chart(theme_name: str) -> str:
 
     parts = svg_open(width, height)
     parts.append(text(16, 28, "The generation performance gate", fill=theme["ink"], size=16, weight="600"))
-    parts.append(text(16, 47, "Same Mac, same take (Custom, long, warm): the UI now steps aside while generating",
+    parts.append(text(16, 47, "Same Mac, same take (Custom, long, warm): heavy visual effects now pause while generating",
                       fill=theme["muted"], size=12))
     parts.append(text(width - 16, 40, f"+{delta:.0f}%", fill=theme["modes"]["custom"], size=30,
                       weight="700", anchor="end"))

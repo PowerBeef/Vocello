@@ -142,8 +142,9 @@ export const Performance = () => (
         <aside className="perf-gate">
           <p className="perf-gate-figure" aria-hidden="true">+33%</p>
           <p className="perf-gate-copy">
-            In 2.2 the interface steps aside while generating, so the machine
-            belongs to the voice. Same Mac, same take.
+            An interface optimization in 2.2: heavy visual effects pause during
+            generation, leaving the whole machine to the voice. Same Mac, same
+            take.
           </p>
           <GateBars />
         </aside>

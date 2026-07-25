@@ -85,6 +85,17 @@ class IOSReleaseArtifactVerificationTests(unittest.TestCase):
         arguments.update(overrides)
         return module.validate_bundle_contract(**arguments)
 
+    def test_expected_identity_resolves_from_the_live_project(self) -> None:
+        # Regression: version identity moved to project-scope settings in 2.2.1 and
+        # the release-lane verifier (which regex-parses project.yml rather than
+        # xcodebuild output) only looked at the target block, failing the v2.2.1
+        # ipa-verification step on CI. Bind the verifier to the real tree so a
+        # settings-layout change breaks here, before a tag freezes it.
+        identity = module.load_expected_identity()
+        self.assertEqual(identity.bundle_identifier, "com.patricedery.vocello")
+        self.assertRegex(identity.marketing_version, r"^\d+\.\d+\.\d+$")
+        self.assertRegex(identity.build_number, r"^\d+$")
+
     def test_valid_distribution_bundle_passes_without_exposing_team(self) -> None:
         snapshot = self.snapshot(
             label="export",

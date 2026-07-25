@@ -3,7 +3,7 @@ import React from "react";
 const LIMITATIONS = [
   {
     k: "macOS 26+",
-    v: "Vocello 2.2.1 targets macOS 26. QwenVoice 1.2.3 remains the macOS 15 fallback.",
+    v: "Vocello 2.2.2 targets macOS 26. QwenVoice 1.2.3 remains the macOS 15 fallback.",
   },
   {
     k: "Apple Silicon only",

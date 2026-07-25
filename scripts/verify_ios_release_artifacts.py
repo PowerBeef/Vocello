@@ -189,16 +189,34 @@ def _target_block(project_text: str, target: str) -> str:
     return match.group("body")
 
 
-def _setting(block: str, key: str) -> str:
-    match = re.search(rf"(?m)^\s{{8}}{re.escape(key)}:\s*(?:\"([^\"]+)\"|'([^']+)'|([^#\n]+))", block)
+def _project_base_settings_block(project_text: str) -> str:
+    match = re.search(r"(?ms)^settings:\n  base:\n(?P<body>(?:^    \S.*\n)+)", project_text)
+    return match.group("body") if match else ""
+
+
+def _setting(block: str, key: str, *, indent: int = 8) -> str:
+    match = re.search(
+        rf"(?m)^\s{{{indent}}}{re.escape(key)}:\s*(?:\"([^\"]+)\"|'([^']+)'|([^#\n]+))", block
+    )
     if not match:
         raise VerificationError(f"project setting is missing: {key}")
     return next(group.strip() for group in match.groups() if group is not None)
 
 
+def _inherited_setting(target_block: str, project_settings: str, key: str) -> str:
+    """Resolve a build setting the way Xcode does: target scope first, then the
+    project-level settings block. Version identity moved to project scope in 2.2.1
+    so generated framework Info.plists inherit CFBundleShortVersionString."""
+    try:
+        return _setting(target_block, key)
+    except VerificationError:
+        return _setting(project_settings, key, indent=4)
+
+
 def load_expected_identity(root: Path = ROOT) -> ExpectedIOSIdentity:
     project_text = (root / "project.yml").read_text(encoding="utf-8")
     target = _target_block(project_text, "VocelloiOS")
+    project_settings = _project_base_settings_block(project_text)
     matrix = json.loads((root / "config/apple-platform-capability-matrix.json").read_text(encoding="utf-8"))
     app = matrix["iOS"]["app"]
     project_bundle = _setting(target, "PRODUCT_BUNDLE_IDENTIFIER")
@@ -208,8 +226,8 @@ def load_expected_identity(root: Path = ROOT) -> ExpectedIOSIdentity:
     privacy_manifest = _read_plist(root / "Sources/PrivacyInfo.xcprivacy")
     return ExpectedIOSIdentity(
         bundle_identifier=project_bundle,
-        marketing_version=_setting(target, "MARKETING_VERSION"),
-        build_number=_setting(target, "CURRENT_PROJECT_VERSION"),
+        marketing_version=_inherited_setting(target, project_settings, "MARKETING_VERSION"),
+        build_number=_inherited_setting(target, project_settings, "CURRENT_PROJECT_VERSION"),
         application_groups=groups,
         increased_memory_limit=bool(
             app["booleanEntitlements"]["com.apple.developer.kernel.increased-memory-limit"]

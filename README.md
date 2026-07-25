@@ -7,7 +7,7 @@
 
 <p align="center">
   <a href="https://vocello.vercel.app/"><img src="https://img.shields.io/badge/Website-vocello.vercel.app-7b61ff?style=flat-square&logo=vercel" alt="Website"></a>
-  <a href="https://github.com/PowerBeef/QwenVoice/releases/tag/v2.1.0"><img src="https://img.shields.io/badge/Vocello-2.1.0-7b61ff?style=flat-square" alt="Vocello 2.1.0"></a>
+  <a href="https://github.com/PowerBeef/Vocello/releases/tag/v2.1.0"><img src="https://img.shields.io/badge/Vocello-2.1.0-7b61ff?style=flat-square" alt="Vocello 2.1.0"></a>
   <img src="https://img.shields.io/badge/macOS-26%2B-111827?style=flat-square&logo=apple" alt="macOS 26 or newer">
   <img src="https://img.shields.io/badge/iPhone-distribution%20pending-7b61ff?style=flat-square&logo=apple" alt="iPhone distribution pending">
   <img src="https://img.shields.io/badge/Apple%20Silicon-required-111827?style=flat-square&logo=apple" alt="Apple Silicon required">
@@ -21,8 +21,8 @@
 </div>
 
 <p align="center">
-  <a href="https://github.com/PowerBeef/QwenVoice/releases/download/v2.1.0/Vocello-macos26.dmg"><strong>Download Vocello 2.1.0 for macOS 26+</strong></a><br>
-  <a href="https://github.com/PowerBeef/QwenVoice/releases/tag/v2.1.0">Release details</a> · <a href="docs/releases/v2.1.0.md">What is new</a> · <a href="https://github.com/PowerBeef/QwenVoice/releases">All releases</a>
+  <a href="https://github.com/PowerBeef/Vocello/releases/download/v2.1.0/Vocello-macos26.dmg"><strong>Download Vocello 2.1.0 for macOS 26+</strong></a><br>
+  <a href="https://github.com/PowerBeef/Vocello/releases/tag/v2.1.0">Release details</a> · <a href="docs/releases/v2.1.0.md">What is new</a> · <a href="https://github.com/PowerBeef/Vocello/releases">All releases</a>
 </p>
 
 ## What Vocello does
@@ -52,12 +52,12 @@ Custom Voice and Voice Design support ten delivery styles at subtle, normal, or 
 
 ## Install on Mac
 
-1. Download [`Vocello-macos26.dmg`](https://github.com/PowerBeef/QwenVoice/releases/download/v2.1.0/Vocello-macos26.dmg).
+1. Download [`Vocello-macos26.dmg`](https://github.com/PowerBeef/Vocello/releases/download/v2.1.0/Vocello-macos26.dmg).
 2. Open the DMG and drag `Vocello.app` to `/Applications`.
 3. Open Vocello, then install models from **Settings > Model downloads**.
 4. Generate from Custom Voice, Voice Design, or Voice Cloning.
 
-The current DMG is signed with an Apple Developer ID certificate, notarized, and stapled. No Python runtime or local server is required. The attached [`release-metadata.txt`](https://github.com/PowerBeef/QwenVoice/releases/download/v2.1.0/release-metadata.txt) records source and toolchain provenance.
+The current DMG is signed with an Apple Developer ID certificate, notarized, and stapled. No Python runtime or local server is required. The attached [`release-metadata.txt`](https://github.com/PowerBeef/Vocello/releases/download/v2.1.0/release-metadata.txt) records source and toolchain provenance.
 
 Upgrading from Vocello 2.0 does not require reinstalling models. Application data remains under `~/Library/Application Support/QwenVoice/`.
 
@@ -72,7 +72,7 @@ Speed is the recommended default and uses less memory. Quality is a Mac-only opt
 
 Support floors and benchmark machines are different facts. Canonical evidence is produced on a Mac mini M2 with 8 GB and an iPhone 17 Pro. In the current clean owned-core Mac record, every Custom and Design aggregate cell generated at or faster than playback; Clone medium and long were approximately realtime or faster, while Clone short remained below realtime. The record is `passedWithWarnings` because accepted memory soft trims and long-cell audio-QC warnings remain visible rather than being hidden. See the [tracked benchmark record](benchmarks/runs/ui-generation/macos-xcui-benchmark-20260716-181853-b4c2e299.json) for the exact matrix and conditions.
 
-Macs on macOS 15 can use the legacy [QwenVoice 1.2.3 release](https://github.com/PowerBeef/QwenVoice/releases/tag/v1.2.3). No Vocello 2.x backport is planned.
+Macs on macOS 15 can use the legacy [QwenVoice 1.2.3 release](https://github.com/PowerBeef/Vocello/releases/tag/v1.2.3). No Vocello 2.x backport is planned.
 
 ## Variation and reproducibility
 
@@ -100,11 +100,16 @@ Current implementation and acceptance status: [`docs/development-progress.md`](d
 
 ## Build from source
 
-Building requires Xcode 26 on an Apple Silicon Mac running macOS 26 or newer.
+Building requires **full Xcode 26** on an Apple Silicon Mac running macOS 26 or newer — the
+Command Line Tools alone are not enough, even for the CLI, because every product (app and
+`vocello`) is a target of the generated Xcode project. If `xcodebuild` reports the active
+developer directory is a Command Line Tools instance, point it at Xcode:
+`sudo xcode-select -s /Applications/Xcode.app/Contents/Developer`. Validation scripts run with
+the system `python3` (any currently supported Python version).
 
 ```sh
-git clone https://github.com/PowerBeef/QwenVoice.git
-cd QwenVoice
+git clone https://github.com/PowerBeef/Vocello.git
+cd Vocello
 ./scripts/regenerate_project.sh
 ./scripts/build.sh build
 ```
@@ -170,8 +175,8 @@ The CLI supports single generation, mode shortcuts, batches, saved voices, speak
 ## Contributing
 
 - Read [`CONTRIBUTING.md`](CONTRIBUTING.md) before opening a change.
-- Report bugs and request features through [GitHub Issues](https://github.com/PowerBeef/QwenVoice/issues).
-- Security-sensitive reports should use GitHub's [private security advisory form](https://github.com/PowerBeef/QwenVoice/security/advisories/new).
+- Report bugs and request features through [GitHub Issues](https://github.com/PowerBeef/Vocello/issues).
+- Security-sensitive reports should use GitHub's [private security advisory form](https://github.com/PowerBeef/Vocello/security/advisories/new).
 
 ## License and acknowledgements
 

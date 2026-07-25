@@ -12,9 +12,9 @@
 
 ## Memory Reduction, Streaming Preview, Latency Decomposition and Future Optimization Roadmap
 
-**Repository:** `PowerBeef/QwenVoice`
+**Repository:** `PowerBeef/Vocello`
  **Reviewed branch:** `main`
- **Exact source:** [`079757abc3524ad5c0308bb1d914a9ff151c0de6`](https://github.com/PowerBeef/QwenVoice/commit/079757abc3524ad5c0308bb1d914a9ff151c0de6)
+ **Exact source:** [`079757abc3524ad5c0308bb1d914a9ff151c0de6`](https://github.com/PowerBeef/Vocello/commit/079757abc3524ad5c0308bb1d914a9ff151c0de6)
  **Review date:** July 17, 2026
  **Primary benchmark machine:** Mac mini M2, 8 GB unified memory
  **Secondary hardware:** physical iPhone acceptance platform
@@ -1662,21 +1662,21 @@ until the preview and shared-component gains are exhausted.
 
 ### Current repository
 
-- [Current README and performance statement](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/README.md)
-- [Historical optimization ledger](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/benchmarks/OPTIMIZATION.md)
-- [Current benchmark history](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/benchmarks/HISTORY.md)
-- [Current canonical Mac record](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/benchmarks/runs/ui-generation/macos-xcui-benchmark-20260716-181853-b4c2e299.json)
-- [Current project health](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/docs/project-health.md)
-- [Current development checkpoint](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/docs/development-progress.md)
-- [Native memory policy](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/QwenVoiceCore/NativeMemoryPolicyResolver.swift)
-- [Native streaming session](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/QwenVoiceCore/NativeStreamingSynthesisSession.swift)
-- [Audio player/live preview](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/SharedSupport/ViewModels/AudioPlayerViewModel.swift)
-- [Mac warmup coordinator](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/Services/MacGenerationWarmupCoordinator.swift)
-- [Native engine runtime](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/QwenVoiceCore/NativeEngineRuntime.swift)
-- [Qwen generation implementation](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift)
-- [Code Predictor implementation](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSCodePredictor.swift)
-- [Production model catalog](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/Resources/qwenvoice_production_model_catalog.json)
-- [Owned package pins](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Packages/VocelloQwen3Core/Package.swift)
+- [Current README and performance statement](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/README.md)
+- [Historical optimization ledger](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/benchmarks/OPTIMIZATION.md)
+- [Current benchmark history](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/benchmarks/HISTORY.md)
+- [Current canonical Mac record](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/benchmarks/runs/ui-generation/macos-xcui-benchmark-20260716-181853-b4c2e299.json)
+- [Current project health](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/docs/project-health.md)
+- [Current development checkpoint](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/docs/development-progress.md)
+- [Native memory policy](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/QwenVoiceCore/NativeMemoryPolicyResolver.swift)
+- [Native streaming session](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/QwenVoiceCore/NativeStreamingSynthesisSession.swift)
+- [Audio player/live preview](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/SharedSupport/ViewModels/AudioPlayerViewModel.swift)
+- [Mac warmup coordinator](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/Services/MacGenerationWarmupCoordinator.swift)
+- [Native engine runtime](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/QwenVoiceCore/NativeEngineRuntime.swift)
+- [Qwen generation implementation](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift)
+- [Code Predictor implementation](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSCodePredictor.swift)
+- [Production model catalog](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/Resources/qwenvoice_production_model_catalog.json)
+- [Owned package pins](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Packages/VocelloQwen3Core/Package.swift)
 
 ### Primary external sources
 

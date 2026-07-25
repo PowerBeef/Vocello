@@ -89,7 +89,7 @@ let package = Package(
             ref="refs/heads/main",
             job_id="12345-1",
             scanned="2026-07-16T20:00:00-04:00",
-            job_url="https://github.com/PowerBeef/QwenVoice/actions/runs/12345",
+            job_url="https://github.com/PowerBeef/Vocello/actions/runs/12345",
         )
 
     def test_snapshot_is_deterministic_and_keeps_manifests_independent(self) -> None:
@@ -163,7 +163,7 @@ let package = Package(
                 ref="refs/heads/main",
                 job_id="12345-1",
                 scanned="2026-07-17T00:00:00Z",
-                job_url="https://github.com/PowerBeef/QwenVoice/actions/runs/12345?token=secret",
+                job_url="https://github.com/PowerBeef/Vocello/actions/runs/12345?token=secret",
             )
 
     def test_duplicate_package_identity_fails_closed(self) -> None:

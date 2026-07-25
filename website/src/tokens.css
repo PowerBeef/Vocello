@@ -1,7 +1,7 @@
 /* =========================================================================
    VOCELLO — Color & Type tokens
    Source of truth: Sources/Views/Components/AppTheme.swift +
-   Sources/Views/Components/LayoutConstants.swift in PowerBeef/QwenVoice.
+   Sources/Views/Components/LayoutConstants.swift in PowerBeef/Vocello.
 
    Vocello is an Apple-native macOS app (Liquid Glass on macOS 26). The
    primary canvas is DARK. Light values are present for the macOS light-mode

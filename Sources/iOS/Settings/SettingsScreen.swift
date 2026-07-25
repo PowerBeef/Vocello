@@ -157,7 +157,7 @@ struct SettingsScreen: View {
                             accessibilityIdentifier: "iosSettings_openSourceRow",
                             value: "",
                             showsChevron: true,
-                            action: { open("https://github.com/PowerBeef/QwenVoice") }
+                            action: { open("https://github.com/PowerBeef/Vocello") }
                         )
 
                         IOSSettingsReferenceDivider()

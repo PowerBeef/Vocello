@@ -29,7 +29,7 @@ The dominant memory win comes from the streaming architecture, not talker-KV win
 
 ### 1. Flat streaming retention
 
-The local loop separates `generatedCodes` for full-result mode from `pendingStreamCodes` for streaming. Pending codes are emitted and cleared, whereas the reviewed upstream loop retains all generated code arrays. See [`third_party_patches/mlx-audio-swift/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift`](https://github.com/PowerBeef/QwenVoice/blob/05bd2b6d24b3f43351f3b388622a72d8f0d6ecce/third_party_patches/mlx-audio-swift/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift) versus [`Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift`](https://github.com/Blaizzy/mlx-audio-swift/blob/d302a5c6080d2bb97bae38c7418f82abb76013b6/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift).
+The local loop separates `generatedCodes` for full-result mode from `pendingStreamCodes` for streaming. Pending codes are emitted and cleared, whereas the reviewed upstream loop retains all generated code arrays. See [`third_party_patches/mlx-audio-swift/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift`](https://github.com/PowerBeef/Vocello/blob/05bd2b6d24b3f43351f3b388622a72d8f0d6ecce/third_party_patches/mlx-audio-swift/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift) versus [`Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift`](https://github.com/Blaizzy/mlx-audio-swift/blob/d302a5c6080d2bb97bae38c7418f82abb76013b6/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift).
 
 The committed benchmark record reports:
 
@@ -50,11 +50,11 @@ The local sampler reuses:
 - incremental repetition-token IDs;
 - a separately sized Code Predictor scratch object.
 
-Upstream's reviewed sampler constructs many of those values per call and rebuilds uniqueness through `Array(Set(tokens))`. See [`third_party_patches/mlx-audio-swift/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift`](https://github.com/PowerBeef/QwenVoice/blob/05bd2b6d24b3f43351f3b388622a72d8f0d6ecce/third_party_patches/mlx-audio-swift/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift) and [`Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift`](https://github.com/Blaizzy/mlx-audio-swift/blob/d302a5c6080d2bb97bae38c7418f82abb76013b6/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift).
+Upstream's reviewed sampler constructs many of those values per call and rebuilds uniqueness through `Array(Set(tokens))`. See [`third_party_patches/mlx-audio-swift/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift`](https://github.com/PowerBeef/Vocello/blob/05bd2b6d24b3f43351f3b388622a72d8f0d6ecce/third_party_patches/mlx-audio-swift/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift) and [`Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift`](https://github.com/Blaizzy/mlx-audio-swift/blob/d302a5c6080d2bb97bae38c7418f82abb76013b6/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift).
 
 ### 3. Fused Code Predictor RoPE
 
-The local Code Predictor passes contiguous cache offsets to `MLXFast.RoPE`. Upstream constructs rotary tables and applies manual rotate-half math. Because the Code Predictor runs for the remaining codebooks on every generated frame, even small graph-launch savings multiply. See [`third_party_patches/mlx-audio-swift/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSCodePredictor.swift`](https://github.com/PowerBeef/QwenVoice/blob/05bd2b6d24b3f43351f3b388622a72d8f0d6ecce/third_party_patches/mlx-audio-swift/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSCodePredictor.swift) and [`Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSCodePredictor.swift`](https://github.com/Blaizzy/mlx-audio-swift/blob/d302a5c6080d2bb97bae38c7418f82abb76013b6/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSCodePredictor.swift).
+The local Code Predictor passes contiguous cache offsets to `MLXFast.RoPE`. Upstream constructs rotary tables and applies manual rotate-half math. Because the Code Predictor runs for the remaining codebooks on every generated frame, even small graph-launch savings multiply. See [`third_party_patches/mlx-audio-swift/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSCodePredictor.swift`](https://github.com/PowerBeef/Vocello/blob/05bd2b6d24b3f43351f3b388622a72d8f0d6ecce/third_party_patches/mlx-audio-swift/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSCodePredictor.swift) and [`Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSCodePredictor.swift`](https://github.com/Blaizzy/mlx-audio-swift/blob/d302a5c6080d2bb97bae38c7418f82abb76013b6/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSCodePredictor.swift).
 
 ### 4. Per-generation Code Predictor constants
 
@@ -66,7 +66,7 @@ Both local and current upstream implementations compile the elementwise SwiGLU i
 
 ### 6. Decoder chunk-size invariance
 
-Local `DecoderBlockUpsample.step` uses one trailing input frame as context, recomputes a composed convolution result, and discards the repeated output prefix. Upstream accumulates an output overflow tail and adds it to the next chunk. The local method avoids repeated floating-point overlap additions and keeps output stable across partition choices. See [`third_party_patches/mlx-audio-swift/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSSpeechTokenizer.swift`](https://github.com/PowerBeef/QwenVoice/blob/05bd2b6d24b3f43351f3b388622a72d8f0d6ecce/third_party_patches/mlx-audio-swift/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSSpeechTokenizer.swift) versus [`Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSSpeechTokenizer.swift`](https://github.com/Blaizzy/mlx-audio-swift/blob/d302a5c6080d2bb97bae38c7418f82abb76013b6/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSSpeechTokenizer.swift).
+Local `DecoderBlockUpsample.step` uses one trailing input frame as context, recomputes a composed convolution result, and discards the repeated output prefix. Upstream accumulates an output overflow tail and adds it to the next chunk. The local method avoids repeated floating-point overlap additions and keeps output stable across partition choices. See [`third_party_patches/mlx-audio-swift/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSSpeechTokenizer.swift`](https://github.com/PowerBeef/Vocello/blob/05bd2b6d24b3f43351f3b388622a72d8f0d6ecce/third_party_patches/mlx-audio-swift/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSSpeechTokenizer.swift) versus [`Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSSpeechTokenizer.swift`](https://github.com/Blaizzy/mlx-audio-swift/blob/d302a5c6080d2bb97bae38c7418f82abb76013b6/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSSpeechTokenizer.swift).
 
 This is primarily a **numerical correctness optimization**. Its performance value is indirect: it allows smaller early chunks and larger later chunks without accepting partition-dependent drift.
 
@@ -127,4 +127,4 @@ Every claimed optimization should carry:
 - audioQC plus listening result;
 - token trace or waveform comparison when correctness is expected to be invariant.
 
-The durable benchmark source is [`benchmarks/OPTIMIZATION.md`](https://github.com/PowerBeef/QwenVoice/blob/05bd2b6d24b3f43351f3b388622a72d8f0d6ecce/benchmarks/OPTIMIZATION.md); historical rows belong in `benchmarks/HISTORY.md`.
+The durable benchmark source is [`benchmarks/OPTIMIZATION.md`](https://github.com/PowerBeef/Vocello/blob/05bd2b6d24b3f43351f3b388622a72d8f0d6ecce/benchmarks/OPTIMIZATION.md); historical rows belong in `benchmarks/HISTORY.md`.

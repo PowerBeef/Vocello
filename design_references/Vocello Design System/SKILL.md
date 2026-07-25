@@ -18,7 +18,7 @@ aesthetics — those are explicitly anti-brand for Vocello.
 
 If you are working on production code (the Swift app, or a derivative web
 surface), trust the live repo at
-[`PowerBeef/QwenVoice`](https://github.com/PowerBeef/QwenVoice) over anything
+[`PowerBeef/Vocello`](https://github.com/PowerBeef/Vocello) over anything
 in this skill — Vocello's source of truth is the SwiftUI codebase, and this
 skill compresses that into web-friendly tokens.
 

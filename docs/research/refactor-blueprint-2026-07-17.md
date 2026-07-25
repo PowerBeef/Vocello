@@ -12,9 +12,9 @@
 
 ## Contract-First Major Refactor for Qwen3-TTS Performance, Streaming, Memory, Quality and Long-Form
 
-**Repository:** `PowerBeef/QwenVoice`
+**Repository:** `PowerBeef/Vocello`
  **Branch:** `main`
- **Exact source reviewed:** [`079757abc3524ad5c0308bb1d914a9ff151c0de6`](https://github.com/PowerBeef/QwenVoice/commit/079757abc3524ad5c0308bb1d914a9ff151c0de6)
+ **Exact source reviewed:** [`079757abc3524ad5c0308bb1d914a9ff151c0de6`](https://github.com/PowerBeef/Vocello/commit/079757abc3524ad5c0308bb1d914a9ff151c0de6)
  **Report date:** July 17, 2026
  **Primary floor hardware:** Mac mini M2 with 8 GB unified memory
  **Mobile acceptance:** physical iPhone, in-process MLX runtime
@@ -1641,37 +1641,37 @@ That would increase performance risk and make later debugging harder.
 
 ### Current repository
 
-- [Project health](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/docs/project-health.md)
-- [Development checkpoint](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/docs/development-progress.md)
-- [Architecture](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/docs/ARCHITECTURE.md)
-- [MLXTTSEngine](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/QwenVoiceCore/MLXTTSEngine.swift)
-- [ActiveGenerationCoordinator](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/QwenVoiceCore/ActiveGenerationCoordinator.swift)
-- [NativeEngineRuntime](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/QwenVoiceCore/NativeEngineRuntime.swift)
-- [NativeStreamingSynthesisSession](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/QwenVoiceCore/NativeStreamingSynthesisSession.swift)
-- [NativeMemoryPressureMonitor](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/QwenVoiceCore/NativeMemoryPressureMonitor.swift)
-- [GenerationEventDeliveryProbe](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/QwenVoiceCore/GenerationEventDeliveryProbe.swift)
-- [UnsafeSpeechGenerationModel](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/QwenVoiceCore/UnsafeSpeechGenerationModel.swift)
-- [NativeCloneSupport](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/QwenVoiceCore/NativeCloneSupport.swift)
-- [GenerationSemantics](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/QwenVoiceCore/GenerationSemantics.swift)
-- [SemanticTypes](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/QwenVoiceCore/SemanticTypes.swift)
-- [PromptLanguageDetector](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/QwenVoiceCore/PromptLanguageDetector.swift)
-- [NativeMemoryPolicyResolver](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/QwenVoiceCore/NativeMemoryPolicyResolver.swift)
-- [EngineServiceHost](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/QwenVoiceEngineService/EngineServiceHost.swift)
-- [AudioPlayerViewModel](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/SharedSupport/ViewModels/AudioPlayerViewModel.swift)
-- [BatchGenerationRunner](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/Services/BatchGenerationRunner.swift)
-- [AudioQualityGate](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/Services/AudioQualityGate.swift)
-- [GenerationOutputVerifier](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/SharedSupport/Services/GenerationOutputVerifier.swift)
-- [Owned core contracts](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Packages/VocelloQwen3Core/Sources/VocelloQwen3Core/Contracts.swift)
-- [Owned core runtime](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Packages/VocelloQwen3Core/Sources/VocelloQwen3Core/Runtime.swift)
-- [Owned loaded model](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Packages/VocelloQwen3Core/Sources/VocelloQwen3Core/LoadedModel.swift)
-- [Owned generation session](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Packages/VocelloQwen3Core/Sources/VocelloQwen3Core/GenerationSession.swift)
-- [Qwen3 implementation](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift)
-- [Code Predictor](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSCodePredictor.swift)
-- [Production model catalog](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/Resources/qwenvoice_production_model_catalog.json)
-- [Prosody analyzer](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/scripts/analyze_prosody.py)
-- [Prosody profile](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/scripts/prosody_profile.py)
-- [Prosody gate](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/scripts/prosody_quality_gate.py)
-- [Delivery adherence](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/scripts/delivery_adherence.py)
+- [Project health](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/docs/project-health.md)
+- [Development checkpoint](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/docs/development-progress.md)
+- [Architecture](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/docs/ARCHITECTURE.md)
+- [MLXTTSEngine](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/QwenVoiceCore/MLXTTSEngine.swift)
+- [ActiveGenerationCoordinator](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/QwenVoiceCore/ActiveGenerationCoordinator.swift)
+- [NativeEngineRuntime](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/QwenVoiceCore/NativeEngineRuntime.swift)
+- [NativeStreamingSynthesisSession](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/QwenVoiceCore/NativeStreamingSynthesisSession.swift)
+- [NativeMemoryPressureMonitor](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/QwenVoiceCore/NativeMemoryPressureMonitor.swift)
+- [GenerationEventDeliveryProbe](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/QwenVoiceCore/GenerationEventDeliveryProbe.swift)
+- [UnsafeSpeechGenerationModel](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/QwenVoiceCore/UnsafeSpeechGenerationModel.swift)
+- [NativeCloneSupport](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/QwenVoiceCore/NativeCloneSupport.swift)
+- [GenerationSemantics](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/QwenVoiceCore/GenerationSemantics.swift)
+- [SemanticTypes](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/QwenVoiceCore/SemanticTypes.swift)
+- [PromptLanguageDetector](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/QwenVoiceCore/PromptLanguageDetector.swift)
+- [NativeMemoryPolicyResolver](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/QwenVoiceCore/NativeMemoryPolicyResolver.swift)
+- [EngineServiceHost](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/QwenVoiceEngineService/EngineServiceHost.swift)
+- [AudioPlayerViewModel](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/SharedSupport/ViewModels/AudioPlayerViewModel.swift)
+- [BatchGenerationRunner](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/Services/BatchGenerationRunner.swift)
+- [AudioQualityGate](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/Services/AudioQualityGate.swift)
+- [GenerationOutputVerifier](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/SharedSupport/Services/GenerationOutputVerifier.swift)
+- [Owned core contracts](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Packages/VocelloQwen3Core/Sources/VocelloQwen3Core/Contracts.swift)
+- [Owned core runtime](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Packages/VocelloQwen3Core/Sources/VocelloQwen3Core/Runtime.swift)
+- [Owned loaded model](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Packages/VocelloQwen3Core/Sources/VocelloQwen3Core/LoadedModel.swift)
+- [Owned generation session](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Packages/VocelloQwen3Core/Sources/VocelloQwen3Core/GenerationSession.swift)
+- [Qwen3 implementation](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift)
+- [Code Predictor](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSCodePredictor.swift)
+- [Production model catalog](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/Resources/qwenvoice_production_model_catalog.json)
+- [Prosody analyzer](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/scripts/analyze_prosody.py)
+- [Prosody profile](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/scripts/prosody_profile.py)
+- [Prosody gate](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/scripts/prosody_quality_gate.py)
+- [Delivery adherence](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/scripts/delivery_adherence.py)
 
 ## Appendix A — Runtime state machine and failure semantics
 

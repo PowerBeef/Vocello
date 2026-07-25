@@ -2,7 +2,7 @@
    Vocello — Colors & Type
    ----------------------------------------------------------------------------
    Lifted directly from Sources/Views/Components/AppTheme.swift in the
-   PowerBeef/QwenVoice repo (the shipping macOS 26 app). All hex values are
+   PowerBeef/Vocello repo (the shipping macOS 26 app). All hex values are
    round-trips of the SwiftUI Color(red:green:blue:) decimals.
 
    Vocello is a native macOS app first; the canonical type is San Francisco

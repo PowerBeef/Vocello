@@ -6,7 +6,7 @@
 ## Runtime convergence status — reviewed 2026-07-23
 
 This checkpoint tracks the staged runtime convergence program. Focused Phase 4 acceptance landed
-at `00c9eea637259cfce858d1fc7d43a1a2c52ff86d` (delivered by [PR #78](https://github.com/PowerBeef/QwenVoice/pull/78)
+at `00c9eea637259cfce858d1fc7d43a1a2c52ff86d` (delivered by [PR #78](https://github.com/PowerBeef/Vocello/pull/78)
 as `d39b9a6…`). On 2026-07-20, Phase 0/5/6 closed and Phase 4 **`overallPromotion: passed`**
 (`a4bb483`). That closed the cutover gate. On 2026-07-23, Phases 7 (UI-context gap), 8 (shared-component
 live validation), and 14 (mechanical retirement, 14a + 14b SPI evaporation) also closed; Phases

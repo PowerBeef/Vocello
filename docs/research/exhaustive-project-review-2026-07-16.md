@@ -10,12 +10,12 @@
 > for current phase status.
 
 
-**Repository:** `PowerBeef/QwenVoice`
+**Repository:** `PowerBeef/Vocello`
  **Reviewed branch:** `main`
- **Exact reviewed head:** [`bb006acc78faa741e6c2d2622ce9a507c5e95026`](https://github.com/PowerBeef/QwenVoice/commit/bb006acc78faa741e6c2d2622ce9a507c5e95026)
- **Tested PR head:** [`6e2060f5cf06ea94234eaf750db1cd662e625d69`](https://github.com/PowerBeef/QwenVoice/commit/6e2060f5cf06ea94234eaf750db1cd662e625d69) — tree-identical to the merge commit
- **Previous report head:** [`dbf51a5d01384b4a0b1a0f999b731b5a57a62b1c`](https://github.com/PowerBeef/QwenVoice/commit/dbf51a5d01384b4a0b1a0f999b731b5a57a62b1c)
- **Overhaul merge:** [PR #70 — Complete owned Qwen3 core overhaul and acceptance](https://github.com/PowerBeef/QwenVoice/pull/70)
+ **Exact reviewed head:** [`bb006acc78faa741e6c2d2622ce9a507c5e95026`](https://github.com/PowerBeef/Vocello/commit/bb006acc78faa741e6c2d2622ce9a507c5e95026)
+ **Tested PR head:** [`6e2060f5cf06ea94234eaf750db1cd662e625d69`](https://github.com/PowerBeef/Vocello/commit/6e2060f5cf06ea94234eaf750db1cd662e625d69) — tree-identical to the merge commit
+ **Previous report head:** [`dbf51a5d01384b4a0b1a0f999b731b5a57a62b1c`](https://github.com/PowerBeef/Vocello/commit/dbf51a5d01384b4a0b1a0f999b731b5a57a62b1c)
+ **Overhaul merge:** [PR #70 — Complete owned Qwen3 core overhaul and acceptance](https://github.com/PowerBeef/Vocello/pull/70)
  **Review date:** July 16, 2026
  **Review type:** exhaustive static repository, architecture, runtime, model, product, security, release, evidence, developer-experience, and continuity review
  **Public product:** Vocello
@@ -70,7 +70,7 @@ The other concern is authority duplication. The repository now owns a stable ses
 ### Exact source state
 
 ```
-repository:        PowerBeef/QwenVoice
+repository:        PowerBeef/Vocello
 default branch:    main
 reviewed commit:   bb006acc78faa741e6c2d2622ce9a507c5e95026
 tested PR head:    6e2060f5cf06ea94234eaf750db1cd662e625d69
@@ -712,13 +712,13 @@ The service records request timing, cancels the existing generation-scoped event
 
 -
 
-[Service coordinator rejects when a generation is active](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/QwenVoiceEngineService/EngineServiceHost.swift#L17-L60)
+[Service coordinator rejects when a generation is active](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/QwenVoiceEngineService/EngineServiceHost.swift#L17-L60)
 -
 
-[Generate mutates timing and forwarding before admission](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/QwenVoiceEngineService/EngineServiceHost.swift#L349-L388)
+[Generate mutates timing and forwarding before admission](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/QwenVoiceEngineService/EngineServiceHost.swift#L349-L388)
 -
 
-[Generation-scoped engine event API](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/QwenVoiceCore/TTSEngine.swift#L130-L138)
+[Generation-scoped engine event API](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/QwenVoiceCore/TTSEngine.swift#L130-L138)
 
 **Impact**
 
@@ -771,13 +771,13 @@ currentLevel is a plain mutable stored property. The private dispatch queue writ
 
 -
 
-[Unsynchronized property and queue-owned writer](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/QwenVoiceCore/NativeMemoryPressureMonitor.swift#L117-L200)
+[Unsynchronized property and queue-owned writer](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/QwenVoiceCore/NativeMemoryPressureMonitor.swift#L117-L200)
 -
 
-[Monitor is included in the concurrency registry](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/config/concurrency-safety.json#L120-L125)
+[Monitor is included in the concurrency registry](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/config/concurrency-safety.json#L120-L125)
 -
 
-[Memory-pressure runtime wiring](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/QwenVoiceCore/MLXTTSEngine.swift#L556-L590)
+[Memory-pressure runtime wiring](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/QwenVoiceCore/MLXTTSEngine.swift#L556-L590)
 
 **Impact**
 
@@ -830,25 +830,25 @@ Open issue #69 reports that the latest source fails in project-input validation 
 
 -
 
-[Open CLI build failure](https://github.com/PowerBeef/QwenVoice/issues/69)
+[Open CLI build failure](https://github.com/PowerBeef/Vocello/issues/69)
 -
 
-[Semantic ledger uses Tests/Qwen3RuntimeTests/** patterns](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Packages/VocelloQwen3Core/PATCHES.json#L38-L90)
+[Semantic ledger uses Tests/Qwen3RuntimeTests/** patterns](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Packages/VocelloQwen3Core/PATCHES.json#L38-L90)
 -
 
-[Validator delegates globs to pathlib and filters files](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/scripts/vendor_runtime_contract.py#L210-L230)
+[Validator delegates globs to pathlib and filters files](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/scripts/vendor_runtime_contract.py#L210-L230)
 -
 
-[Live entries fail when expanded test references are empty](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/scripts/vendor_runtime_contract.py#L850-L876)
+[Live entries fail when expanded test references are empty](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/scripts/vendor_runtime_contract.py#L850-L876)
 -
 
-[Toolchain contract does not pin Python](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/config/toolchain.json#L1-L29)
+[Toolchain contract does not pin Python](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/config/toolchain.json#L1-L29)
 -
 
-[CLI build invokes regeneration before Xcode compilation](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/scripts/build.sh#L207-L222)
+[CLI build invokes regeneration before Xcode compilation](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/scripts/build.sh#L207-L222)
 -
 
-[README requires full Xcode 26](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/README.md#L103-L114)
+[README requires full Xcode 26](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/README.md#L103-L114)
 
 **Impact**
 
@@ -901,16 +901,16 @@ The package describes a stable first-party session with ordered events, typed ca
 
 -
 
-[Stable facade session contract](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Packages/VocelloQwen3Core/Sources/VocelloQwen3Core/GenerationSession.swift#L97-L117)
+[Stable facade session contract](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Packages/VocelloQwen3Core/Sources/VocelloQwen3Core/GenerationSession.swift#L97-L117)
 -
 
-[Concrete facade session](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Packages/VocelloQwen3Core/Sources/VocelloQwen3Core/GenerationSession.swift#L228-L360)
+[Concrete facade session](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Packages/VocelloQwen3Core/Sources/VocelloQwen3Core/GenerationSession.swift#L228-L360)
 -
 
-[Product builds direct model streams](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/QwenVoiceCore/NativeStreamingSynthesisSession.swift#L350-L404)
+[Product builds direct model streams](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/QwenVoiceCore/NativeStreamingSynthesisSession.swift#L350-L404)
 -
 
-[Architecture still names NativeStreamingSynthesisSession as the product executor](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/docs/ARCHITECTURE.md#L254-L266)
+[Architecture still names NativeStreamingSynthesisSession as the product executor](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/docs/ARCHITECTURE.md#L254-L266)
 
 **Impact**
 
@@ -963,16 +963,16 @@ VocelloQwen3LoadedModel publicly exposes prewarm, stream, full-generate, prompt,
 
 -
 
-[Public loaded-model operations](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Packages/VocelloQwen3Core/Sources/VocelloQwen3Core/LoadedModel.swift#L318-L599)
+[Public loaded-model operations](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Packages/VocelloQwen3Core/Sources/VocelloQwen3Core/LoadedModel.swift#L318-L599)
 -
 
-[Process-wide memory application and duplicate trust inputs](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Packages/VocelloQwen3Core/Sources/VocelloQwen3Core/Runtime.swift#L49-L118)
+[Process-wide memory application and duplicate trust inputs](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Packages/VocelloQwen3Core/Sources/VocelloQwen3Core/Runtime.swift#L49-L118)
 -
 
-[String-derived typed diagnostic mapping](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Packages/VocelloQwen3Core/Sources/VocelloQwen3Core/Runtime.swift#L121-L158)
+[String-derived typed diagnostic mapping](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Packages/VocelloQwen3Core/Sources/VocelloQwen3Core/Runtime.swift#L121-L158)
 -
 
-[Ownership contract prevents reverse dependencies but not operation overlap](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Packages/VocelloQwen3Core/OWNERSHIP.json#L1-L41)
+[Ownership contract prevents reverse dependencies but not operation overlap](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Packages/VocelloQwen3Core/OWNERSHIP.json#L1-L41)
 
 **Impact**
 
@@ -1025,13 +1025,13 @@ The core session uses a bounded non-suspending channel and offers a progress eve
 
 -
 
-[Non-suspending bounded channel](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Packages/VocelloQwen3Core/Sources/VocelloQwen3Core/GenerationSession.swift#L119-L198)
+[Non-suspending bounded channel](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Packages/VocelloQwen3Core/Sources/VocelloQwen3Core/GenerationSession.swift#L119-L198)
 -
 
-[Audio plus progress offers on every signal](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Packages/VocelloQwen3Core/Sources/VocelloQwen3Core/GenerationSession.swift#L257-L338)
+[Audio plus progress offers on every signal](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Packages/VocelloQwen3Core/Sources/VocelloQwen3Core/GenerationSession.swift#L257-L338)
 -
 
-[Overflow is converted to failure](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Packages/VocelloQwen3Core/Sources/VocelloQwen3Core/GenerationSession.swift#L328-L348)
+[Overflow is converted to failure](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Packages/VocelloQwen3Core/Sources/VocelloQwen3Core/GenerationSession.swift#L328-L348)
 
 **Impact**
 
@@ -1084,13 +1084,13 @@ MLXTTSEngine creates per-generation streams with bufferingNewest(256) on macOS a
 
 -
 
-[Platform capacities](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/QwenVoiceCore/MLXTTSEngine.swift#L637-L645)
+[Platform capacities](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/QwenVoiceCore/MLXTTSEngine.swift#L637-L645)
 -
 
-[bufferingNewest creation and drop accounting](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/QwenVoiceCore/GenerationEventDeliveryProbe.swift#L33-L82)
+[bufferingNewest creation and drop accounting](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/QwenVoiceCore/GenerationEventDeliveryProbe.swift#L33-L82)
 -
 
-[Dropped chunks are explicitly counted](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/QwenVoiceCore/GenerationEventDeliveryProbe.swift#L181-L207)
+[Dropped chunks are explicitly counted](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/QwenVoiceCore/GenerationEventDeliveryProbe.swift#L181-L207)
 
 **Impact**
 
@@ -1140,16 +1140,16 @@ Product-side clone prompt caching is now impressively bound to reference, model 
 
 -
 
-[Request carries a string reference ID](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Packages/VocelloQwen3Core/Sources/VocelloQwen3Core/Contracts.swift#L167-L223)
+[Request carries a string reference ID](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Packages/VocelloQwen3Core/Sources/VocelloQwen3Core/Contracts.swift#L167-L223)
 -
 
-[Session only checks prompt presence](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Packages/VocelloQwen3Core/Sources/VocelloQwen3Core/GenerationSession.swift#L377-L414)
+[Session only checks prompt presence](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Packages/VocelloQwen3Core/Sources/VocelloQwen3Core/GenerationSession.swift#L377-L414)
 -
 
-[Product prompt identity is strongly bound](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/QwenVoiceCore/GenerationSemantics.swift#L134-L261)
+[Product prompt identity is strongly bound](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/QwenVoiceCore/GenerationSemantics.swift#L134-L261)
 -
 
-[Product prompt resolution validates expected metadata](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/QwenVoiceCore/NativeCloneSupport.swift#L276-L369)
+[Product prompt resolution validates expected metadata](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/QwenVoiceCore/NativeCloneSupport.swift#L276-L369)
 
 **Impact**
 
@@ -1199,13 +1199,13 @@ RecoverableStoreCoordinator enters failed state only when its initialization clo
 
 -
 
-[Coordinator has only available/failed initial states](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/QwenVoiceCore/RecoverableStoreCoordinator.swift#L5-L64)
+[Coordinator has only available/failed initial states](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/QwenVoiceCore/RecoverableStoreCoordinator.swift#L5-L64)
 -
 
-[Database CRUD classifies errors without invalidating store](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/Services/DatabaseService.swift#L57-L134)
+[Database CRUD classifies errors without invalidating store](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/Services/DatabaseService.swift#L57-L134)
 -
 
-[Typed persistence classifications](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/SharedSupport/Database/HistoryPersistenceError.swift#L1-L112)
+[Typed persistence classifications](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/SharedSupport/Database/HistoryPersistenceError.swift#L1-L112)
 
 **Impact**
 
@@ -1255,16 +1255,16 @@ The owned-core README says there are no checked-in STT, speech-to-speech, VAD, d
 
 -
 
-[Owned-core surface declaration](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Packages/VocelloQwen3Core/README.md#L1-L21)
+[Owned-core surface declaration](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Packages/VocelloQwen3Core/README.md#L1-L21)
 -
 
-[VoicesApp references MLXAudioSTT](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Packages/VocelloQwen3Core/Examples/VoicesApp/Package.swift#L1-L30)
+[VoicesApp references MLXAudioSTT](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Packages/VocelloQwen3Core/Examples/VoicesApp/Package.swift#L1-L30)
 -
 
-[SimpleChat references MLXAudioVAD](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Packages/VocelloQwen3Core/Examples/SimpleChat/Package.swift#L1-L30)
+[SimpleChat references MLXAudioVAD](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Packages/VocelloQwen3Core/Examples/SimpleChat/Package.swift#L1-L30)
 -
 
-[Examples are governed as active PKG-001 files](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Packages/VocelloQwen3Core/PATCHES.json#L38-L52)
+[Examples are governed as active PKG-001 files](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Packages/VocelloQwen3Core/PATCHES.json#L38-L52)
 
 **Impact**
 
@@ -1314,16 +1314,16 @@ README presents genuine audio-only cloning and links users to Vocello 2.1.0 as t
 
 -
 
-[README audio-only claim and current 2.1.0 download](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/README.md#L25-L46)
+[README audio-only claim and current 2.1.0 download](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/README.md#L25-L46)
 -
 
-[README public release status](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/README.md#L55-L75)
+[README public release status](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/README.md#L55-L75)
 -
 
-[Issue #61](https://github.com/PowerBeef/QwenVoice/issues/61)
+[Issue #61](https://github.com/PowerBeef/Vocello/issues/61)
 -
 
-[Development checkpoint says 2.1.0 remains released](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/docs/development-progress.md#L196-L208)
+[Development checkpoint says 2.1.0 remains released](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/docs/development-progress.md#L196-L208)
 
 **Impact**
 
@@ -1373,13 +1373,13 @@ The new bundle provides valuable iOS-specific policy coverage, but CI only compi
 
 -
 
-[Development checkpoint describes compile-only behavior](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/docs/development-progress.md#L8-L18)
+[Development checkpoint describes compile-only behavior](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/docs/development-progress.md#L8-L18)
 -
 
-[CI compiles app and logic-test bundle](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/.github/workflows/ci.yml#L20-L112)
+[CI compiles app and logic-test bundle](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/.github/workflows/ci.yml#L20-L112)
 -
 
-[README makes the limitation explicit](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/README.md#L118-L133)
+[README makes the limitation explicit](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/README.md#L118-L133)
 
 **Impact**
 
@@ -1429,13 +1429,13 @@ The Mac composer includes consent in the disabled predicate and silently guards 
 
 -
 
-[Readiness omits consent](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/Views/Generate/VoiceCloningView.swift#L121-L130)
+[Readiness omits consent](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/Views/Generate/VoiceCloningView.swift#L121-L130)
 -
 
-[Generate is consent-gated](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/Views/Generate/VoiceCloningView.swift#L379-L419)
+[Generate is consent-gated](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/Views/Generate/VoiceCloningView.swift#L379-L419)
 -
 
-[Consent is owned in Settings](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/Views/Settings/SettingsView.swift#L30-L75)
+[Consent is owned in Settings](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/Views/Settings/SettingsView.swift#L30-L75)
 
 **Impact**
 
@@ -1485,16 +1485,16 @@ The exact merged tree passed hosted CI and dependency review, and the release wo
 
 -
 
-[Project health marks release-supply-chain stale](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/docs/project-health.md#L21-L40)
+[Project health marks release-supply-chain stale](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/docs/project-health.md#L21-L40)
 -
 
-[Toolchain split and exact versions](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/config/toolchain.json#L1-L29)
+[Toolchain split and exact versions](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/config/toolchain.json#L1-L29)
 -
 
-[Release evidence contract](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/config/release-evidence-contract.json#L1-L77)
+[Release evidence contract](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/config/release-evidence-contract.json#L1-L77)
 -
 
-[Open release work](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/docs/development-progress.md#L196-L208)
+[Open release work](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/docs/development-progress.md#L196-L208)
 
 **Impact**
 
@@ -1547,16 +1547,16 @@ NativeMemoryPressureResponseExecutor serializes pressure responses and waits for
 
 -
 
-[Pressure executor sequences cancel then trim](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/QwenVoiceCore/NativeMemoryPressureMonitor.swift#L1-L97)
+[Pressure executor sequences cancel then trim](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/QwenVoiceCore/NativeMemoryPressureMonitor.swift#L1-L97)
 -
 
-[Engine wires cancelCurrent and runtime trim as separate callbacks](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/QwenVoiceCore/MLXTTSEngine.swift#L556-L590)
+[Engine wires cancelCurrent and runtime trim as separate callbacks](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/QwenVoiceCore/MLXTTSEngine.swift#L556-L590)
 -
 
-[Runtime trim owns a separate prewarm slot](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/QwenVoiceCore/NativeEngineRuntime.swift#L343-L392)
+[Runtime trim owns a separate prewarm slot](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/QwenVoiceCore/NativeEngineRuntime.swift#L343-L392)
 -
 
-[Physical iPhone pressure acceptance passed](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/docs/development-progress.md#L19-L33)
+[Physical iPhone pressure acceptance passed](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/docs/development-progress.md#L19-L33)
 
 **Impact**
 
@@ -1606,22 +1606,22 @@ Qwen3TTS.swift now exceeds 5,400 lines and continues to accumulate loading, samp
 
 -
 
-[Qwen3 implementation](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift)
+[Qwen3 implementation](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift)
 -
 
-[Engine runtime](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/QwenVoiceCore/NativeEngineRuntime.swift)
+[Engine runtime](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/QwenVoiceCore/NativeEngineRuntime.swift)
 -
 
-[Downloader](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/QwenVoiceCore/HuggingFaceDownloader.swift)
+[Downloader](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/QwenVoiceCore/HuggingFaceDownloader.swift)
 -
 
-[macOS database](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/Services/DatabaseService.swift)
+[macOS database](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/Services/DatabaseService.swift)
 -
 
-[iOS database](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/iOSSupport/Services/DatabaseService.swift)
+[iOS database](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/iOSSupport/Services/DatabaseService.swift)
 -
 
-[ADR explicitly defers decomposition](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/docs/decisions/owned-qwen3-runtime-monorepo.md#L38-L46)
+[ADR explicitly defers decomposition](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/docs/decisions/owned-qwen3-runtime-monorepo.md#L38-L46)
 
 **Impact**
 
@@ -1671,16 +1671,16 @@ PR #70 contained 21 commits, 326 changed files, 26,689 additions, and 3,271 dele
 
 -
 
-[PR #70 metadata and scope](https://github.com/PowerBeef/QwenVoice/pull/70)
+[PR #70 metadata and scope](https://github.com/PowerBeef/Vocello/pull/70)
 -
 
-[PR verification and acceptance body](https://github.com/PowerBeef/QwenVoice/pull/70)
+[PR verification and acceptance body](https://github.com/PowerBeef/Vocello/pull/70)
 -
 
-[CODEOWNERS](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/.github/CODEOWNERS)
+[CODEOWNERS](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/.github/CODEOWNERS)
 -
 
-[Sensitive-path ownership map](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/docs/ARCHITECTURE.md)
+[Sensitive-path ownership map](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/docs/ARCHITECTURE.md)
 
 **Impact**
 
@@ -1730,10 +1730,10 @@ After terminal delivery the router archives only a snapshot and removes the acti
 
 -
 
-[Stream creation ignores completed state](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/QwenVoiceCore/GenerationEventDeliveryProbe.swift#L53-L83)
+[Stream creation ignores completed state](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/QwenVoiceCore/GenerationEventDeliveryProbe.swift#L53-L83)
 -
 
-[Terminal archives snapshot and removes active stream](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/QwenVoiceCore/GenerationEventDeliveryProbe.swift#L107-L167)
+[Terminal archives snapshot and removes active stream](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/QwenVoiceCore/GenerationEventDeliveryProbe.swift#L107-L167)
 
 **Impact**
 
@@ -1766,10 +1766,10 @@ Request timing is normally consumed by the first forwarded chunk and discarded o
 
 -
 
-[Timing registry semantics](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/QwenVoiceEngineService/EngineServiceHost.swift#L93-L122)
+[Timing registry semantics](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/QwenVoiceEngineService/EngineServiceHost.swift#L93-L122)
 -
 
-[Generate success does not discard timing](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/QwenVoiceEngineService/EngineServiceHost.swift#L349-L388)
+[Generate success does not discard timing](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/QwenVoiceEngineService/EngineServiceHost.swift#L349-L388)
 
 **Impact**
 
@@ -1802,10 +1802,10 @@ VocelloQwen3SamplingConfiguration publicly carries topK and seed. validatedForCo
 
 -
 
-[Public fields and rejection](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Packages/VocelloQwen3Core/Sources/VocelloQwen3Core/Contracts.swift#L88-L138)
+[Public fields and rejection](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Packages/VocelloQwen3Core/Sources/VocelloQwen3Core/Contracts.swift#L88-L138)
 -
 
-[Loaded-model adapter uses compatibility validation](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Packages/VocelloQwen3Core/Sources/VocelloQwen3Core/LoadedModel.swift#L370-L379)
+[Loaded-model adapter uses compatibility validation](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Packages/VocelloQwen3Core/Sources/VocelloQwen3Core/LoadedModel.swift#L370-L379)
 
 **Impact**
 
@@ -1838,16 +1838,16 @@ The architecture reference describes TTSEngineEventStreaming as a single events 
 
 -
 
-[Stale architecture wording](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/docs/ARCHITECTURE.md#L238-L266)
+[Stale architecture wording](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/docs/ARCHITECTURE.md#L238-L266)
 -
 
-[Current generation-scoped API](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/QwenVoiceCore/TTSEngine.swift#L130-L138)
+[Current generation-scoped API](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/QwenVoiceCore/TTSEngine.swift#L130-L138)
 -
 
-[Build comment mentions hidden toggle](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/scripts/build.sh#L1-L10)
+[Build comment mentions hidden toggle](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/scripts/build.sh#L1-L10)
 -
 
-[Current DebugMode uses environment gate only](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/Services/DebugMode.swift#L1-L11)
+[Current DebugMode uses environment gate only](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/Services/DebugMode.swift#L1-L11)
 
 **Impact**
 
@@ -1880,13 +1880,13 @@ Variation control (#47) and clear-history-without-file-deletion (#48) appear imp
 
 -
 
-[Issue #47](https://github.com/PowerBeef/QwenVoice/issues/47)
+[Issue #47](https://github.com/PowerBeef/Vocello/issues/47)
 -
 
-[Issue #48](https://github.com/PowerBeef/QwenVoice/issues/48)
+[Issue #48](https://github.com/PowerBeef/Vocello/issues/48)
 -
 
-[Issue #61](https://github.com/PowerBeef/QwenVoice/issues/61)
+[Issue #61](https://github.com/PowerBeef/Vocello/issues/61)
 
 **Impact**
 
@@ -1914,13 +1914,13 @@ The one-hash receipt design is an excellent performance optimization and strong 
 
 -
 
-[Receipt contracts](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/QwenVoiceCore/ModelDownloadContracts.swift)
+[Receipt contracts](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/QwenVoiceCore/ModelDownloadContracts.swift)
 -
 
-[Downloader finalization](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/QwenVoiceCore/HuggingFaceDownloader.swift)
+[Downloader finalization](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/QwenVoiceCore/HuggingFaceDownloader.swift)
 -
 
-[Runtime hardening ADR](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/docs/decisions/runtime-hardening-and-trust-boundary.md#L23-L68)
+[Runtime hardening ADR](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/docs/decisions/runtime-hardening-and-trust-boundary.md#L23-L68)
 
 **Impact**
 
@@ -1953,13 +1953,13 @@ The repaired clone contract intentionally rejects schema-2 artifacts and rebuild
 
 -
 
-[Clone artifact format schema-3 requirements](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Packages/VocelloQwen3Core/CLONE_ARTIFACT_FORMAT.md)
+[Clone artifact format schema-3 requirements](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Packages/VocelloQwen3Core/CLONE_ARTIFACT_FORMAT.md)
 -
 
-[Clone repair commit](https://github.com/PowerBeef/QwenVoice/commit/2047d48556e8656ff805f493a535ed7b21d2bf9e)
+[Clone repair commit](https://github.com/PowerBeef/Vocello/commit/2047d48556e8656ff805f493a535ed7b21d2bf9e)
 -
 
-[2.1.0 remains current release](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/README.md#L55-L75)
+[2.1.0 remains current release](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/README.md#L55-L75)
 
 **Impact**
 
@@ -2266,43 +2266,43 @@ python3 scripts/evidence_impact.py report --base <last-release-tag> --head HEAD
 
 | Area | Exact source |
 | --- | --- |
-| Reviewed main commit | [main at `bb006acc78faa741e6c2d2622ce9a507c5e95026`](https://github.com/PowerBeef/QwenVoice/commit/bb006acc78faa741e6c2d2622ce9a507c5e95026) |
-| Tested PR head | [`6e2060f5cf06ea94234eaf750db1cd662e625d69`](https://github.com/PowerBeef/QwenVoice/commit/6e2060f5cf06ea94234eaf750db1cd662e625d69) |
-| Overhaul PR | [PR #70](https://github.com/PowerBeef/QwenVoice/pull/70) |
-| Delta from previous review | [compare previous head to current main](https://github.com/PowerBeef/QwenVoice/compare/dbf51a5d01384b4a0b1a0f999b731b5a57a62b1c...bb006acc78faa741e6c2d2622ce9a507c5e95026) |
-| Product claims | [README](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/README.md) |
-| Current checkpoint | [development progress](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/docs/development-progress.md) |
-| Project health | [project health](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/docs/project-health.md) |
-| Architecture | [architecture reference](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/docs/ARCHITECTURE.md) |
-| Owned-runtime ADR | [ADR](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/docs/decisions/owned-qwen3-runtime-monorepo.md) |
-| Runtime lineage | [LINEAGE.json](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Packages/VocelloQwen3Core/LINEAGE.json) |
-| Runtime ownership | [OWNERSHIP.json](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Packages/VocelloQwen3Core/OWNERSHIP.json) |
-| Runtime capabilities | [RUNTIME_CAPABILITIES.json](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Packages/VocelloQwen3Core/RUNTIME_CAPABILITIES.json) |
-| Semantic deltas | [PATCHES.json](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Packages/VocelloQwen3Core/PATCHES.json) |
-| Clone artifact format | [CLONE_ARTIFACT_FORMAT.md](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Packages/VocelloQwen3Core/CLONE_ARTIFACT_FORMAT.md) |
-| Qwen speaker frontend | [Qwen3TTSSpeakerMelFrontend.swift](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSSpeakerMelFrontend.swift) |
-| Facade contracts | [Contracts.swift](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Packages/VocelloQwen3Core/Sources/VocelloQwen3Core/Contracts.swift) |
-| Facade session | [GenerationSession.swift](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Packages/VocelloQwen3Core/Sources/VocelloQwen3Core/GenerationSession.swift) |
-| Loaded-model facade | [LoadedModel.swift](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Packages/VocelloQwen3Core/Sources/VocelloQwen3Core/LoadedModel.swift) |
-| Product engine | [MLXTTSEngine.swift](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/QwenVoiceCore/MLXTTSEngine.swift) |
-| Product runtime | [NativeEngineRuntime.swift](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/QwenVoiceCore/NativeEngineRuntime.swift) |
-| Product stream session | [NativeStreamingSynthesisSession.swift](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/QwenVoiceCore/NativeStreamingSynthesisSession.swift) |
-| XPC host | [EngineServiceHost.swift](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/QwenVoiceEngineService/EngineServiceHost.swift) |
-| Memory pressure | [NativeMemoryPressureMonitor.swift](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/QwenVoiceCore/NativeMemoryPressureMonitor.swift) |
-| Event delivery | [GenerationEventDeliveryProbe.swift](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/QwenVoiceCore/GenerationEventDeliveryProbe.swift) |
-| Clone product support | [NativeCloneSupport.swift](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/QwenVoiceCore/NativeCloneSupport.swift) |
-| Model catalog | [ProductionModelCatalog.swift](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/QwenVoiceCore/ProductionModelCatalog.swift) |
-| Downloader | [HuggingFaceDownloader.swift](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/QwenVoiceCore/HuggingFaceDownloader.swift) |
-| Persistence | [RecoverableStoreCoordinator.swift](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/QwenVoiceCore/RecoverableStoreCoordinator.swift) |
-| Concurrency contract | [concurrency-safety.json](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/config/concurrency-safety.json) |
-| Evidence impact | [evidence-impact.json](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/config/evidence-impact.json) |
-| Toolchain | [toolchain.json](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/config/toolchain.json) |
-| CI | [ci.yml](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/.github/workflows/ci.yml) |
-| Security | [security.yml](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/.github/workflows/security.yml) |
-| Release workflow | [release.yml](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/.github/workflows/release.yml) |
-| Release evidence | [release-evidence-contract.json](https://github.com/PowerBeef/QwenVoice/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/config/release-evidence-contract.json) |
-| Current CLI failure | [Issue #69](https://github.com/PowerBeef/QwenVoice/issues/69) |
-| Released clone bug | [Issue #61](https://github.com/PowerBeef/QwenVoice/issues/61) |
+| Reviewed main commit | [main at `bb006acc78faa741e6c2d2622ce9a507c5e95026`](https://github.com/PowerBeef/Vocello/commit/bb006acc78faa741e6c2d2622ce9a507c5e95026) |
+| Tested PR head | [`6e2060f5cf06ea94234eaf750db1cd662e625d69`](https://github.com/PowerBeef/Vocello/commit/6e2060f5cf06ea94234eaf750db1cd662e625d69) |
+| Overhaul PR | [PR #70](https://github.com/PowerBeef/Vocello/pull/70) |
+| Delta from previous review | [compare previous head to current main](https://github.com/PowerBeef/Vocello/compare/dbf51a5d01384b4a0b1a0f999b731b5a57a62b1c...bb006acc78faa741e6c2d2622ce9a507c5e95026) |
+| Product claims | [README](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/README.md) |
+| Current checkpoint | [development progress](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/docs/development-progress.md) |
+| Project health | [project health](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/docs/project-health.md) |
+| Architecture | [architecture reference](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/docs/ARCHITECTURE.md) |
+| Owned-runtime ADR | [ADR](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/docs/decisions/owned-qwen3-runtime-monorepo.md) |
+| Runtime lineage | [LINEAGE.json](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Packages/VocelloQwen3Core/LINEAGE.json) |
+| Runtime ownership | [OWNERSHIP.json](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Packages/VocelloQwen3Core/OWNERSHIP.json) |
+| Runtime capabilities | [RUNTIME_CAPABILITIES.json](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Packages/VocelloQwen3Core/RUNTIME_CAPABILITIES.json) |
+| Semantic deltas | [PATCHES.json](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Packages/VocelloQwen3Core/PATCHES.json) |
+| Clone artifact format | [CLONE_ARTIFACT_FORMAT.md](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Packages/VocelloQwen3Core/CLONE_ARTIFACT_FORMAT.md) |
+| Qwen speaker frontend | [Qwen3TTSSpeakerMelFrontend.swift](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSSpeakerMelFrontend.swift) |
+| Facade contracts | [Contracts.swift](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Packages/VocelloQwen3Core/Sources/VocelloQwen3Core/Contracts.swift) |
+| Facade session | [GenerationSession.swift](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Packages/VocelloQwen3Core/Sources/VocelloQwen3Core/GenerationSession.swift) |
+| Loaded-model facade | [LoadedModel.swift](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Packages/VocelloQwen3Core/Sources/VocelloQwen3Core/LoadedModel.swift) |
+| Product engine | [MLXTTSEngine.swift](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/QwenVoiceCore/MLXTTSEngine.swift) |
+| Product runtime | [NativeEngineRuntime.swift](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/QwenVoiceCore/NativeEngineRuntime.swift) |
+| Product stream session | [NativeStreamingSynthesisSession.swift](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/QwenVoiceCore/NativeStreamingSynthesisSession.swift) |
+| XPC host | [EngineServiceHost.swift](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/QwenVoiceEngineService/EngineServiceHost.swift) |
+| Memory pressure | [NativeMemoryPressureMonitor.swift](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/QwenVoiceCore/NativeMemoryPressureMonitor.swift) |
+| Event delivery | [GenerationEventDeliveryProbe.swift](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/QwenVoiceCore/GenerationEventDeliveryProbe.swift) |
+| Clone product support | [NativeCloneSupport.swift](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/QwenVoiceCore/NativeCloneSupport.swift) |
+| Model catalog | [ProductionModelCatalog.swift](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/QwenVoiceCore/ProductionModelCatalog.swift) |
+| Downloader | [HuggingFaceDownloader.swift](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/QwenVoiceCore/HuggingFaceDownloader.swift) |
+| Persistence | [RecoverableStoreCoordinator.swift](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/Sources/QwenVoiceCore/RecoverableStoreCoordinator.swift) |
+| Concurrency contract | [concurrency-safety.json](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/config/concurrency-safety.json) |
+| Evidence impact | [evidence-impact.json](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/config/evidence-impact.json) |
+| Toolchain | [toolchain.json](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/config/toolchain.json) |
+| CI | [ci.yml](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/.github/workflows/ci.yml) |
+| Security | [security.yml](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/.github/workflows/security.yml) |
+| Release workflow | [release.yml](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/.github/workflows/release.yml) |
+| Release evidence | [release-evidence-contract.json](https://github.com/PowerBeef/Vocello/blob/bb006acc78faa741e6c2d2622ce9a507c5e95026/config/release-evidence-contract.json) |
+| Current CLI failure | [Issue #69](https://github.com/PowerBeef/Vocello/issues/69) |
+| Released clone bug | [Issue #61](https://github.com/PowerBeef/Vocello/issues/61) |
 
 ## 23. Final assessment
 

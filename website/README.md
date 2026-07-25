@@ -22,7 +22,7 @@ When working from this directory, the same commands can be run without `--prefix
 
 Vercel should be configured with:
 
-- Repository: `PowerBeef/QwenVoice`
+- Repository: `PowerBeef/Vocello`
 - Root directory: `website`
 - Install command: `npm ci`
 - Build command: `npm run build`

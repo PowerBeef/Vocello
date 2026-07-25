@@ -9,7 +9,7 @@
 
 ## TL;DR
 
-**Vocello** (repo *QwenVoice*; macOS app module `QwenVoice`, iOS app module
+**Vocello** (repo *Vocello*, formerly *QwenVoice*; macOS app module `QwenVoice`, iOS app module
 `QVoiceiOS`) is a local-first, private text-to-speech app for Apple Silicon. It
 synthesizes speech **on-device** with **Qwen3-TTS** models accelerated through
 **MLX** — native Swift packages, no Python runtime, no bundled weights, no cloud

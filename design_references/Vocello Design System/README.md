@@ -19,13 +19,13 @@ sidebar — no separate web app, no marketing dashboard inside the app.
 
 This system was built by reading:
 
-- **GitHub:** [`PowerBeef/QwenVoice`](https://github.com/PowerBeef/QwenVoice) — the live Swift codebase (Apple Silicon, MLX backend). Specifically:
-  - [`Sources/Views/Components/AppTheme.swift`](https://github.com/PowerBeef/QwenVoice/blob/main/Sources/Views/Components/AppTheme.swift) — every color, glass tint, and surface treatment in this system traces back here.
-  - [`Sources/Views/Components/LayoutConstants.swift`](https://github.com/PowerBeef/QwenVoice/blob/main/Sources/Views/Components/LayoutConstants.swift) — spacing, radii, content widths.
-  - [`Sources/Views/Sidebar/SidebarView.swift`](https://github.com/PowerBeef/QwenVoice/blob/main/Sources/Views/Sidebar/SidebarView.swift) — sidebar lockup + row treatment.
-  - [`Sources/Views/Generate/`](https://github.com/PowerBeef/QwenVoice/tree/main/Sources/Views/Generate) — the three generation screens.
-  - [`PRODUCT.md`](https://github.com/PowerBeef/QwenVoice/blob/main/PRODUCT.md) — brand personality and anti-references.
-  - [`docs/qwen_tone.md`](https://github.com/PowerBeef/QwenVoice/blob/main/docs/qwen_tone.md) — prompt-writing tone (for product voice and microcopy).
+- **GitHub:** [`PowerBeef/Vocello`](https://github.com/PowerBeef/Vocello) — the live Swift codebase (Apple Silicon, MLX backend). Specifically:
+  - [`Sources/Views/Components/AppTheme.swift`](https://github.com/PowerBeef/Vocello/blob/main/Sources/Views/Components/AppTheme.swift) — every color, glass tint, and surface treatment in this system traces back here.
+  - [`Sources/Views/Components/LayoutConstants.swift`](https://github.com/PowerBeef/Vocello/blob/main/Sources/Views/Components/LayoutConstants.swift) — spacing, radii, content widths.
+  - [`Sources/Views/Sidebar/SidebarView.swift`](https://github.com/PowerBeef/Vocello/blob/main/Sources/Views/Sidebar/SidebarView.swift) — sidebar lockup + row treatment.
+  - [`Sources/Views/Generate/`](https://github.com/PowerBeef/Vocello/tree/main/Sources/Views/Generate) — the three generation screens.
+  - [`PRODUCT.md`](https://github.com/PowerBeef/Vocello/blob/main/PRODUCT.md) — brand personality and anti-references.
+  - [`docs/qwen_tone.md`](https://github.com/PowerBeef/Vocello/blob/main/docs/qwen_tone.md) — prompt-writing tone (for product voice and microcopy).
 - **Uploaded brand assets:** the 1024 app icon, the sidebar header mark, the launch logo, and the README banner are all in `assets/`.
 - **Live screenshots** of the four core surfaces (Custom Voice, Voice Design, Voice Cloning, Settings → Model Downloads), in `assets/screens/`.
 

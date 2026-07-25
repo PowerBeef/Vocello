@@ -8,7 +8,7 @@
 
 ## What this is
 
-**Vocello** (`QwenVoice` repo): local-first TTS on Apple Silicon — **Qwen3-TTS + MLX**, Swift 6, macOS/iOS 26+. No bundled weights; models download from Hugging Face. Also ships the `vocello` CLI, `scripts/`, benchmarks, and `website/`.
+**Vocello** (`Vocello` repo, formerly `QwenVoice`; the local checkout directory and Xcode project keep the old name): local-first TTS on Apple Silicon — **Qwen3-TTS + MLX**, Swift 6, macOS/iOS 26+. No bundled weights; models download from Hugging Face. Also ships the `vocello` CLI, `scripts/`, benchmarks, and `website/`.
 
 macOS **2.1.0** released; iOS is on-device-capable on `main`, not publicly distributed yet.
 Minimum support is Apple Silicon Mac with 8 GB or iPhone 15 Pro or newer. Canonical benchmark

@@ -12,7 +12,7 @@
 
 **Document class:** Authoritative design and implementation reference
  **Recommended repository path:** `docs/reference/audio-quality-review-system.md`
- **Reviewed source:** [`main` at `079757abc3524ad5c0308bb1d914a9ff151c0de6`](https://github.com/PowerBeef/QwenVoice/commit/079757abc3524ad5c0308bb1d914a9ff151c0de6)
+ **Reviewed source:** [`main` at `079757abc3524ad5c0308bb1d914a9ff151c0de6`](https://github.com/PowerBeef/Vocello/commit/079757abc3524ad5c0308bb1d914a9ff151c0de6)
  **Reference date:** July 16, 2026
  **Target development hardware:** Mac mini M2, 8 GB unified memory
  **Applies to:** Qwen3-TTS 12Hz 1.7B Speed/Quality; Custom Voice, Voice Design and Voice Cloning
@@ -145,16 +145,16 @@ Live preview is a product feature. Quality review operates on the persisted fina
 
 | Capability | Current implementation | Reference |
 | --- | --- | --- |
-| Persisted-WAV signal QC | Readability, duration, peak, clipped/hot/non-finite samples, clicks, longest silence, RMS and DC offset | [AudioQualityGate.swift](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/Services/AudioQualityGate.swift#L6-L87) |
-| Canonical ASR verification | Three repetitions of one immutable WAV, exact consensus, language score and WER/CER | [GenerationOutputVerifier.swift](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/SharedSupport/Services/GenerationOutputVerifier.swift#L6-L166) |
-| Language-specific edit metric | CER for Chinese/Japanese; WER for remaining supported languages | [metric selection](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/SharedSupport/Services/GenerationOutputVerifier.swift#L208-L214) |
-| Low-memory prosody | NumPy/stdlib F0, rate, pause and energy features; one WAV at a time; no model | [analyze_prosody.py](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/scripts/analyze_prosody.py#L3-L17) |
-| Reference-free prosody gate | Monotone, rushed, flat and pause anomalies | [prosody_quality_gate.py](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/scripts/prosody_quality_gate.py#L3-L76) |
-| Versioned prosody profile | Conservative threshold and delivery-weight schema | [prosody_profile.py](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/scripts/prosody_profile.py#L3-L53) |
-| Paired delivery adherence | Neutral and instructed takes use the same seed, speaker and text | [delivery_adherence.py](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/scripts/delivery_adherence.py#L4-L20) |
-| Detailed Qwen runtime metrics | EOS, token cap, code count, hot-loop timing, codec and cache diagnostics | [Qwen3TTS.swift](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift#L2820-L3030) |
-| Long-form manifest | Segment text, path, stats, QC and completion state | [BatchGenerationRunner.swift](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/Services/BatchGenerationRunner.swift#L124-L155) |
-| Current evidence governance | Critical-domain freshness, direct tests and canonical Mac/iPhone runs | [project-health.md](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/docs/project-health.md#L3-L42) |
+| Persisted-WAV signal QC | Readability, duration, peak, clipped/hot/non-finite samples, clicks, longest silence, RMS and DC offset | [AudioQualityGate.swift](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/Services/AudioQualityGate.swift#L6-L87) |
+| Canonical ASR verification | Three repetitions of one immutable WAV, exact consensus, language score and WER/CER | [GenerationOutputVerifier.swift](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/SharedSupport/Services/GenerationOutputVerifier.swift#L6-L166) |
+| Language-specific edit metric | CER for Chinese/Japanese; WER for remaining supported languages | [metric selection](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/SharedSupport/Services/GenerationOutputVerifier.swift#L208-L214) |
+| Low-memory prosody | NumPy/stdlib F0, rate, pause and energy features; one WAV at a time; no model | [analyze_prosody.py](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/scripts/analyze_prosody.py#L3-L17) |
+| Reference-free prosody gate | Monotone, rushed, flat and pause anomalies | [prosody_quality_gate.py](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/scripts/prosody_quality_gate.py#L3-L76) |
+| Versioned prosody profile | Conservative threshold and delivery-weight schema | [prosody_profile.py](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/scripts/prosody_profile.py#L3-L53) |
+| Paired delivery adherence | Neutral and instructed takes use the same seed, speaker and text | [delivery_adherence.py](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/scripts/delivery_adherence.py#L4-L20) |
+| Detailed Qwen runtime metrics | EOS, token cap, code count, hot-loop timing, codec and cache diagnostics | [Qwen3TTS.swift](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift#L2820-L3030) |
+| Long-form manifest | Segment text, path, stats, QC and completion state | [BatchGenerationRunner.swift](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/Services/BatchGenerationRunner.swift#L124-L155) |
+| Current evidence governance | Critical-domain freshness, direct tests and canonical Mac/iPhone runs | [project-health.md](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/docs/project-health.md#L3-L42) |
 
 ### Gap summary
 
@@ -1222,19 +1222,19 @@ The first complete implementation is accepted when:
 
 | Subject | Current source |
 | --- | --- |
-| Reviewed source | [commit `079757abc3524ad5c0308bb1d914a9ff151c0de6`](https://github.com/PowerBeef/QwenVoice/commit/079757abc3524ad5c0308bb1d914a9ff151c0de6) |
-| Persisted-WAV signal QC | [AudioQualityGate.swift](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/Services/AudioQualityGate.swift) |
-| ASR accuracy and language | [GenerationOutputVerifier.swift](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/SharedSupport/Services/GenerationOutputVerifier.swift) |
-| Low-memory prosody analyzer | [analyze_prosody.py](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/scripts/analyze_prosody.py) |
-| Prosody gate | [prosody_quality_gate.py](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/scripts/prosody_quality_gate.py) |
-| Prosody profiles | [prosody_profile.py](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/scripts/prosody_profile.py) |
-| Delivery adherence | [delivery_adherence.py](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/scripts/delivery_adherence.py) |
-| Prosody research | [prosody-qa-research.md](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/docs/reference/prosody-qa-research.md) |
-| Qwen token loop | [Qwen3TTS.swift](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift) |
-| Product generation semantics | [GenerationSemantics.swift](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/QwenVoiceCore/GenerationSemantics.swift) |
-| Long-form batch | [BatchGenerationRunner.swift](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/Services/BatchGenerationRunner.swift) |
-| Project health | [project-health.md](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/docs/project-health.md) |
-| Current implementation status | [development-progress.md](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/docs/development-progress.md) |
+| Reviewed source | [commit `079757abc3524ad5c0308bb1d914a9ff151c0de6`](https://github.com/PowerBeef/Vocello/commit/079757abc3524ad5c0308bb1d914a9ff151c0de6) |
+| Persisted-WAV signal QC | [AudioQualityGate.swift](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/Services/AudioQualityGate.swift) |
+| ASR accuracy and language | [GenerationOutputVerifier.swift](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/SharedSupport/Services/GenerationOutputVerifier.swift) |
+| Low-memory prosody analyzer | [analyze_prosody.py](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/scripts/analyze_prosody.py) |
+| Prosody gate | [prosody_quality_gate.py](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/scripts/prosody_quality_gate.py) |
+| Prosody profiles | [prosody_profile.py](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/scripts/prosody_profile.py) |
+| Delivery adherence | [delivery_adherence.py](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/scripts/delivery_adherence.py) |
+| Prosody research | [prosody-qa-research.md](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/docs/reference/prosody-qa-research.md) |
+| Qwen token loop | [Qwen3TTS.swift](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift) |
+| Product generation semantics | [GenerationSemantics.swift](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/QwenVoiceCore/GenerationSemantics.swift) |
+| Long-form batch | [BatchGenerationRunner.swift](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/Services/BatchGenerationRunner.swift) |
+| Project health | [project-health.md](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/docs/project-health.md) |
+| Current implementation status | [development-progress.md](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/docs/development-progress.md) |
 
 ## Appendix A — Example report
 

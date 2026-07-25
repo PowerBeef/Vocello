@@ -9,7 +9,7 @@ automation and coding agents use the additional durable instructions in [`CLAUDE
   Support and a compatible iOS runtime component for the no-phone `generic/platform=iOS` compile;
   this toolchain prerequisite does not authorize Simulator testing.
 - Read the current checkpoint in [`docs/development-progress.md`](docs/development-progress.md).
-- Check existing [issues](https://github.com/PowerBeef/QwenVoice/issues) and pull requests before starting overlapping work.
+- Check existing [issues](https://github.com/PowerBeef/Vocello/issues) and pull requests before starting overlapping work.
 - Keep changes focused. Do not mix unrelated refactors into a bug fix or feature.
 
 Models, a physical iPhone, and UI automation are not required for ordinary source changes. They are needed only for the explicit model or frontend acceptance lane being exercised.
@@ -67,4 +67,4 @@ See [`docs/reference/testing-runbook.md`](docs/reference/testing-runbook.md) for
 - [ ] No generated build output or private evidence is tracked.
 - [ ] The pull request explains test coverage and any intentionally deferred device, model, or UI acceptance.
 
-For architecture and ownership, use [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and the [domain rules](.claude/rules/). Security-sensitive reports should use GitHub's [private security advisory form](https://github.com/PowerBeef/QwenVoice/security/advisories/new).
+For architecture and ownership, use [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and the [domain rules](.claude/rules/). Security-sensitive reports should use GitHub's [private security advisory form](https://github.com/PowerBeef/Vocello/security/advisories/new).

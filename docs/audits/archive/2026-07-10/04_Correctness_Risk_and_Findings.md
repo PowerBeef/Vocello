@@ -28,7 +28,7 @@ The actor resumes a queued waiter while retaining the logical held state. The re
 
 **Impact:** later prewarm/generation calls can wait indefinitely.
 
-**Evidence:** [`third_party_patches/mlx-audio-swift/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift`](https://github.com/PowerBeef/QwenVoice/blob/05bd2b6d24b3f43351f3b388622a72d8f0d6ecce/third_party_patches/mlx-audio-swift/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift) — `Qwen3TTSGenerationGate.acquire`, `release`, and `withGenerationGate`.
+**Evidence:** [`third_party_patches/mlx-audio-swift/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift`](https://github.com/PowerBeef/Vocello/blob/05bd2b6d24b3f43351f3b388622a72d8f0d6ecce/third_party_patches/mlx-audio-swift/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift) — `Qwen3TTSGenerationGate.acquire`, `release`, and `withGenerationGate`.
 
 **Repair:** make ownership an explicit permit/lease or perform the post-transfer cancellation check inside a scope that releases on every throw. Test with a deterministic hook immediately after continuation resume.
 
@@ -40,7 +40,7 @@ The vendor package has no test target, while the fork adds concurrency, persiste
 
 **Impact:** high-risk paths depend on platform/system tests and benchmark runs rather than fast deterministic regression tests.
 
-**Evidence:** [`third_party_patches/mlx-audio-swift/Package.swift`](https://github.com/PowerBeef/QwenVoice/blob/05bd2b6d24b3f43351f3b388622a72d8f0d6ecce/third_party_patches/mlx-audio-swift/Package.swift) versus [`Tests/MLXAudioTTSTests.swift`](https://github.com/Blaizzy/mlx-audio-swift/blob/d302a5c6080d2bb97bae38c7418f82abb76013b6/Tests/MLXAudioTTSTests.swift).
+**Evidence:** [`third_party_patches/mlx-audio-swift/Package.swift`](https://github.com/PowerBeef/Vocello/blob/05bd2b6d24b3f43351f3b388622a72d8f0d6ecce/third_party_patches/mlx-audio-swift/Package.swift) versus [`Tests/MLXAudioTTSTests.swift`](https://github.com/Blaizzy/mlx-audio-swift/blob/d302a5c6080d2bb97bae38c7418f82abb76013b6/Tests/MLXAudioTTSTests.swift).
 
 ## Medium-High
 
@@ -52,7 +52,7 @@ When requested speaker-encoder weights are empty, a constructed encoder can rema
 
 **Repair:** require a nonempty, verified parameter set for every requested learned component; otherwise throw a typed artifact error or return nil when the capability is optional.
 
-**Evidence:** [`third_party_patches/mlx-audio-swift/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift`](https://github.com/PowerBeef/QwenVoice/blob/05bd2b6d24b3f43351f3b388622a72d8f0d6ecce/third_party_patches/mlx-audio-swift/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift) — `loadTalkerComponents` and `loadSpeechTokenizer`.
+**Evidence:** [`third_party_patches/mlx-audio-swift/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift`](https://github.com/PowerBeef/Vocello/blob/05bd2b6d24b3f43351f3b388622a72d8f0d6ecce/third_party_patches/mlx-audio-swift/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift) — `loadTalkerComponents` and `loadSpeechTokenizer`.
 
 ### MH2 — Clone prompt tensors lack structural and cryptographic validation
 
@@ -62,7 +62,7 @@ Production publication is atomic, but load validates only manifest schema/metada
 
 **Repair:** add per-file and per-tensor descriptors to the manifest; reject extras, missing required tensors, wrong shapes/dtypes, or digest mismatch.
 
-**Evidence:** [`third_party_patches/mlx-audio-swift/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift`](https://github.com/PowerBeef/QwenVoice/blob/05bd2b6d24b3f43351f3b388622a72d8f0d6ecce/third_party_patches/mlx-audio-swift/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift) and atomic wrapper [`Sources/QwenVoiceCore/NativeCloneSupport.swift`](https://github.com/PowerBeef/QwenVoice/blob/05bd2b6d24b3f43351f3b388622a72d8f0d6ecce/Sources/QwenVoiceCore/NativeCloneSupport.swift).
+**Evidence:** [`third_party_patches/mlx-audio-swift/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift`](https://github.com/PowerBeef/Vocello/blob/05bd2b6d24b3f43351f3b388622a72d8f0d6ecce/third_party_patches/mlx-audio-swift/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift) and atomic wrapper [`Sources/QwenVoiceCore/NativeCloneSupport.swift`](https://github.com/PowerBeef/Vocello/blob/05bd2b6d24b3f43351f3b388622a72d8f0d6ecce/Sources/QwenVoiceCore/NativeCloneSupport.swift).
 
 ## Medium
 

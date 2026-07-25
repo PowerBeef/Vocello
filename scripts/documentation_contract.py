@@ -454,7 +454,7 @@ def validate_readme_public_contract(root: Path) -> list[str]:
     version = public["stableMacRelease"]["version"]
     tag = public["stableMacRelease"]["tag"]
     direct_dmg = (
-        "https://github.com/PowerBeef/QwenVoice/releases/download/"
+        "https://github.com/PowerBeef/Vocello/releases/download/"
         f"{tag}/Vocello-macos26.dmg"
     )
     errors: list[str] = []

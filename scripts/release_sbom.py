@@ -166,7 +166,7 @@ def render(root: Path, commit: str, source_date_epoch: int) -> tuple[dict[str, A
         "dataLicense": "CC0-1.0",
         "SPDXID": "SPDXRef-DOCUMENT",
         "name": f"Vocello-{commit[:12]}",
-        "documentNamespace": f"https://github.com/PowerBeef/QwenVoice/sbom/{commit}/{identity}",
+        "documentNamespace": f"https://github.com/PowerBeef/Vocello/sbom/{commit}/{identity}",
         "creationInfo": {"created": created, "creators": ["Tool: Vocello-release-sbom/1"]},
         "packages": spdx_packages,
         "relationships": relationships,

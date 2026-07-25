@@ -1,8 +1,8 @@
 blank_issues_enabled: false
 contact_links:
   - name: Security vulnerability
-    url: https://github.com/PowerBeef/QwenVoice/security/advisories/new
+    url: https://github.com/PowerBeef/Vocello/security/advisories/new
     about: Report vulnerabilities privately. Do not put security details in a public issue.
   - name: Usage and troubleshooting
-    url: https://github.com/PowerBeef/QwenVoice/discussions
+    url: https://github.com/PowerBeef/Vocello/discussions
     about: Ask setup and usage questions without filing a product defect.

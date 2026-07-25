@@ -13,8 +13,8 @@
 ## Qwen3-TTS 12Hz 1.7B 4-bit Research Review
 
 **Research bundle date:** July 16, 2026
- **Vocello repository:** `PowerBeef/QwenVoice`
- **Reviewed source:** [`main` at `079757abc3524ad5c0308bb1d914a9ff151c0de6`](https://github.com/PowerBeef/QwenVoice/commit/079757abc3524ad5c0308bb1d914a9ff151c0de6)
+ **Vocello repository:** `PowerBeef/Vocello`
+ **Reviewed source:** [`main` at `079757abc3524ad5c0308bb1d914a9ff151c0de6`](https://github.com/PowerBeef/Vocello/commit/079757abc3524ad5c0308bb1d914a9ff151c0de6)
  **Assessment date:** July 16, 2026
  **Scope:** Qwen3-TTS 12Hz 1.7B 4-bit Base, CustomVoice, and VoiceDesign quality, accuracy, prosody, cloning, long-form, and quantization strategy  8.6/10leverage potential for Vocello **Executive verdict.** The research is valuable and should influence the Vocello backend, but not literally. The most useful findings are the evaluation protocol, deterministic multilingual text front end, acoustic-duration-aware segmentation, independent semantic/residual sampling experiments, selective candidate retry, and a model-native VoiceDesign-to-Base-clone identity lock for long-form work. The least justified immediate actions are replacing the canonical 4-bit weights, shipping the proposed sampler numbers, making non-streaming the product default, or generating four to six candidates for every interactive request. Vocello already implements many of the report’s presumed missing port fixes; the opportunity is to expose, measure, and integrate them correctly.   4initiatives worth starting now 5controlled experiments 3quantization/long-term items 10major findings already implemented 35bundle evidence entries 524current Python tests inventoried
 
@@ -490,10 +490,10 @@ The research’s strongest port-level recommendation is to decouple the main sem
 
 **Current-source references**
 
-- [Qwen sampler overrides](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift#L296-L356)
-- [Residual sampling use](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift#L3050-L3130)
-- [Product main variation](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/QwenVoiceCore/UnsafeSpeechGenerationModel.swift#L8-L50)
-- [Debug knob registry](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/config/runtime-debug-knobs.json#L11-L51)
+- [Qwen sampler overrides](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift#L296-L356)
+- [Residual sampling use](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift#L3050-L3130)
+- [Product main variation](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/QwenVoiceCore/UnsafeSpeechGenerationModel.swift#L8-L50)
+- [Debug knob registry](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/config/runtime-debug-knobs.json#L11-L51)
 
 ### A-02 — Multilingual spoken-text normalization is the clearest unfilled accuracy layer
 
@@ -505,9 +505,9 @@ Vocello detects language and normalizes language identifiers, but there is no ge
 
 **Current-source references**
 
-- [Language detector](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/QwenVoiceCore/PromptLanguageDetector.swift#L1-L36)
-- [Language resolution](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/QwenVoiceCore/GenerationSemantics.swift#L654-L676)
-- [Supported-language model](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/QwenVoiceCore/SemanticTypes.swift#L33-L108)
+- [Language detector](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/QwenVoiceCore/PromptLanguageDetector.swift#L1-L36)
+- [Language resolution](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/QwenVoiceCore/GenerationSemantics.swift#L654-L676)
+- [Supported-language model](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/QwenVoiceCore/SemanticTypes.swift#L33-L108)
 
 ### A-03 — The 900-character long-form chunker is not aligned with acoustic duration or the 12.5 Hz token budget
 
@@ -519,9 +519,9 @@ Long-form segmentation currently groups paragraphs and ASCII sentence punctuatio
 
 **Current-source references**
 
-- [Current segmenter](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/Services/BatchGenerationRunner.swift#L8-L122)
-- [Shared batch seed](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/Services/BatchGenerationRunner.swift#L275-L318)
-- [Issue #30](https://github.com/PowerBeef/QwenVoice/issues/30)
+- [Current segmenter](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/Services/BatchGenerationRunner.swift#L8-L122)
+- [Shared batch seed](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/Services/BatchGenerationRunner.swift#L275-L318)
+- [Issue #30](https://github.com/PowerBeef/Vocello/issues/30)
 
 ### A-04 — VoiceDesign-to-Base-clone locking may address long-form identity drift more directly than sampler tuning
 
@@ -533,7 +533,7 @@ The official Qwen workflow recommends synthesizing a short designed reference, b
 
 **Current-source references**
 
-- [Direct VoiceDesign batch requests](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/Services/BatchGenerationRunner.swift#L391-L406)
+- [Direct VoiceDesign batch requests](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/Services/BatchGenerationRunner.swift#L391-L406)
 - [Official Qwen repository](https://github.com/QwenLM/Qwen3-TTS)
 
 ### A-05 — N-best reranking should be selective, sequential, and initially Mac/offline only
@@ -546,9 +546,9 @@ Generating four to six candidates for every segment can multiply latency and ene
 
 **Current-source references**
 
-- [Batch runner](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/Services/BatchGenerationRunner.swift)
-- [Current evidence checkpoint](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/docs/development-progress.md)
-- [Project health](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/docs/project-health.md)
+- [Batch runner](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/Services/BatchGenerationRunner.swift)
+- [Current evidence checkpoint](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/docs/development-progress.md)
+- [Project health](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/docs/project-health.md)
 
 ### A-06 — Non-streaming is useful as a reference, not as a new production default
 
@@ -560,8 +560,8 @@ The bundle defaults its Python scaffold to non-streaming for quality comparison.
 
 **Current-source references**
 
-- [Streaming interval](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/QwenVoiceCore/GenerationSemantics.swift#L451-L455)
-- [Streaming memory evidence](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/benchmarks/OPTIMIZATION.md#L199-L232)
+- [Streaming interval](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/QwenVoiceCore/GenerationSemantics.swift#L451-L455)
+- [Streaming memory evidence](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/benchmarks/OPTIMIZATION.md#L199-L232)
 
 ### A-07 — Group-32 and protected-projection INT4 builds are rational experiments, not established improvements
 
@@ -573,9 +573,9 @@ The research estimates about 90 MiB extra storage for group size 32 and about 60
 
 **Current-source references**
 
-- [Production catalog](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/QwenVoiceCore/ProductionModelCatalog.swift)
-- [Runtime capabilities](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Packages/VocelloQwen3Core/RUNTIME_CAPABILITIES.json)
-- [Benchmark history](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/benchmarks/HISTORY.md)
+- [Production catalog](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/QwenVoiceCore/ProductionModelCatalog.swift)
+- [Runtime capabilities](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Packages/VocelloQwen3Core/RUNTIME_CAPABILITIES.json)
+- [Benchmark history](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/benchmarks/HISTORY.md)
 
 ### A-08 — The implementation notes describe a different port than current Vocello
 
@@ -587,9 +587,9 @@ The notes target Blaizzy/mlx-audio 0.4.5 and conclude that the MLX paths share o
 
 **Current-source references**
 
-- [Owned-runtime ADR](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/docs/decisions/owned-qwen3-runtime-monorepo.md)
-- [Semantic delta ledger](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Packages/VocelloQwen3Core/PATCHES.json)
-- [Current Qwen source](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift)
+- [Owned-runtime ADR](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/docs/decisions/owned-qwen3-runtime-monorepo.md)
+- [Semantic delta ledger](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Packages/VocelloQwen3Core/PATCHES.json)
+- [Current Qwen source](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift)
 
 ### A-09 — The proposed sampler numbers are test points, not production defaults
 
@@ -601,9 +601,9 @@ The bundle is candid that its content-safe, balanced, and expressive profiles ar
 
 **Current-source references**
 
-- [Variation semantics](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/QwenVoiceCore/SemanticTypes.swift#L1337-L1375)
-- [Product mapping](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/QwenVoiceCore/UnsafeSpeechGenerationModel.swift#L27-L50)
-- [Historical quality decision](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/benchmarks/OPTIMIZATION.md#L63-L78)
+- [Variation semantics](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/QwenVoiceCore/SemanticTypes.swift#L1337-L1375)
+- [Product mapping](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/QwenVoiceCore/UnsafeSpeechGenerationModel.swift#L27-L50)
+- [Historical quality decision](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/benchmarks/OPTIMIZATION.md#L63-L78)
 
 ### A-10 — The Python scaffold is a useful shape, but its scorers and assembly are not production-grade
 
@@ -615,8 +615,8 @@ The scaffold has excellent strict request validation and manifest discipline. It
 
 **Current-source references**
 
-- [Language benchmark guide](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/docs/reference/language-bench.md)
-- [Current streaming/QC implementation](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/QwenVoiceCore/NativeStreamingSynthesisSession.swift)
+- [Language benchmark guide](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/docs/reference/language-bench.md)
+- [Current streaming/QC implementation](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/QwenVoiceCore/NativeStreamingSynthesisSession.swift)
 
 ## 17. Recommended first experiment package
 
@@ -704,22 +704,22 @@ The archive checksums were verified before analysis.
 
 | Subject | Source |
 | --- | --- |
-| Current Vocello source | [commit `079757abc3524ad5c0308bb1d914a9ff151c0de6`](https://github.com/PowerBeef/QwenVoice/commit/079757abc3524ad5c0308bb1d914a9ff151c0de6) |
+| Current Vocello source | [commit `079757abc3524ad5c0308bb1d914a9ff151c0de6`](https://github.com/PowerBeef/Vocello/commit/079757abc3524ad5c0308bb1d914a9ff151c0de6) |
 | Official Qwen3-TTS | [Qwen3-TTS repository](https://github.com/QwenLM/Qwen3-TTS) |
-| Project health | [docs/project-health.md](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/docs/project-health.md) |
-| Development evidence | [docs/development-progress.md](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/docs/development-progress.md) |
-| Qwen hot loop | [Qwen3TTS.swift](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift) |
-| Qwen speaker frontend | [Qwen3TTSSpeakerMelFrontend.swift](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSSpeakerMelFrontend.swift) |
-| Facade contracts | [Contracts.swift](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Packages/VocelloQwen3Core/Sources/VocelloQwen3Core/Contracts.swift) |
-| Product sampler adapter | [UnsafeSpeechGenerationModel.swift](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/QwenVoiceCore/UnsafeSpeechGenerationModel.swift) |
-| Product semantics | [GenerationSemantics.swift](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/QwenVoiceCore/GenerationSemantics.swift) |
-| Language detection | [PromptLanguageDetector.swift](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/QwenVoiceCore/PromptLanguageDetector.swift) |
-| Long-form batch | [BatchGenerationRunner.swift](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/Services/BatchGenerationRunner.swift) |
-| Clone conditioning | [NativeCloneSupport.swift](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/QwenVoiceCore/NativeCloneSupport.swift) |
-| Optimization history | [benchmarks/OPTIMIZATION.md](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/benchmarks/OPTIMIZATION.md) |
-| Benchmark history | [benchmarks/HISTORY.md](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/benchmarks/HISTORY.md) |
-| Long-form consistency issue | [Issue #30](https://github.com/PowerBeef/QwenVoice/issues/30) |
-| Debug controls | [runtime-debug-knobs.json](https://github.com/PowerBeef/QwenVoice/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/config/runtime-debug-knobs.json) |
+| Project health | [docs/project-health.md](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/docs/project-health.md) |
+| Development evidence | [docs/development-progress.md](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/docs/development-progress.md) |
+| Qwen hot loop | [Qwen3TTS.swift](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift) |
+| Qwen speaker frontend | [Qwen3TTSSpeakerMelFrontend.swift](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSSpeakerMelFrontend.swift) |
+| Facade contracts | [Contracts.swift](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Packages/VocelloQwen3Core/Sources/VocelloQwen3Core/Contracts.swift) |
+| Product sampler adapter | [UnsafeSpeechGenerationModel.swift](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/QwenVoiceCore/UnsafeSpeechGenerationModel.swift) |
+| Product semantics | [GenerationSemantics.swift](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/QwenVoiceCore/GenerationSemantics.swift) |
+| Language detection | [PromptLanguageDetector.swift](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/QwenVoiceCore/PromptLanguageDetector.swift) |
+| Long-form batch | [BatchGenerationRunner.swift](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/Services/BatchGenerationRunner.swift) |
+| Clone conditioning | [NativeCloneSupport.swift](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/Sources/QwenVoiceCore/NativeCloneSupport.swift) |
+| Optimization history | [benchmarks/OPTIMIZATION.md](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/benchmarks/OPTIMIZATION.md) |
+| Benchmark history | [benchmarks/HISTORY.md](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/benchmarks/HISTORY.md) |
+| Long-form consistency issue | [Issue #30](https://github.com/PowerBeef/Vocello/issues/30) |
+| Debug controls | [runtime-debug-knobs.json](https://github.com/PowerBeef/Vocello/blob/079757abc3524ad5c0308bb1d914a9ff151c0de6/config/runtime-debug-knobs.json) |
 
 ## Appendix C — Confidence boundary
 

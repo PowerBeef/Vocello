@@ -250,7 +250,7 @@ class DocumentationContractTests(unittest.TestCase):
         ):
             self.write(relative, "fixture")
         stale.write_text(
-            "[Download](https://github.com/PowerBeef/QwenVoice/releases/download/v2.1.0/Vocello-macos26.dmg)\n\n"
+            "[Download](https://github.com/PowerBeef/Vocello/releases/download/v2.1.0/Vocello-macos26.dmg)\n\n"
             "| Platform | Support | Model variants | Status |\n"
             "| --- | --- | --- | --- |\n"
             "| Mac | supported | Speed (4-bit) and Quality (8-bit) | available |\n"

@@ -19,7 +19,7 @@ from urllib.parse import quote, urlsplit
 
 DETECTOR_NAME = "qwenvoice-swift-package-resolved"
 DETECTOR_VERSION = "1"
-DETECTOR_URL = "https://github.com/PowerBeef/QwenVoice/blob/main/scripts/swift_dependency_snapshot.py"
+DETECTOR_URL = "https://github.com/PowerBeef/Vocello/blob/main/scripts/swift_dependency_snapshot.py"
 JOB_CORRELATOR = "qwenvoice-swift-package-resolved-v1"
 
 

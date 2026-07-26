@@ -168,9 +168,12 @@ review doc):
    byte-identical shipping output — MLX compile's fp32 fusion rounding sits below bf16
    resolution. P5b (codec on a dedicated stream) measured as a second do-NOT (−0.4% to −4.3%
    on every cell) and is reverted with its record kept — the emerging law: remove host
-   graph-build work, never add command buffers. Remaining: the branch-only P1b talker
-   static-shape experiment and the stage-exit GPU-busy re-capture. Every engine-loop change
-   carries fixed-seed byte-identity plus the §K QC soak.
+   graph-build work, never add command buffers. The stage-exit GPU-busy re-capture
+   (2026-07-26, §M) reads **still launch-bound**: whole-span busy ~49% (≪85%), the fused
+   step eval now 72.8% of wall at ~60% busy, the CP loop's wall share down 15.4% → 9.7%.
+   Decision routing: keep attacking launches — the branch-only P1b talker static-shape
+   compile is the sanctioned next lever (P3's per-pass keying is the template). Every
+   engine-loop change carries fixed-seed byte-identity plus the §K QC soak.
 3. **Stage 2 — memory program (folds phase 9)**: speech-tokenizer runtime reuse across mode
    switches (the RAM analog of the shipped disk hard-linking), text-embedding quantization
    experiment (622 MB BF16 today inside the "4-bit" artifact), codec bf16 experiment

@@ -871,6 +871,16 @@ the §K 12-seed clone/long QC soak.
   The emerging Stage 1 law: **wins come from removing host graph-build work (P3) and from
   filling host-side gaps with already-queued work (P2a-i); anything that adds command
   buffers or splits the fused step loses.**
+- **Stage-exit GPU-busy re-capture (2026-07-26, post-P3).** Same §H P0 command
+  (Metal System Trace over `bench custom/speed/long --warm 2`; ~25% trace overhead;
+  fractions are the deliverable; whole-trace span including the cold gen, 856 frames):
+  Step Eval Flush **72.8% of wall at 59.8% busy** (was 58.9% at ~55%), Code Predictor Loop
+  **9.7% of wall** (was 15.4%) at 14.7% busy, Talker Forward 9.2% at 15.1%, whole-span GPU
+  busy **49.4%** (was ~47% warm-only). **Verdict: still launch-bound** (≪85%) — the loop is
+  now dominated by the fused step eval whose internal idle is the batch-1 launch-gap ceiling
+  §H P0 identified as addressable only by compiling the talker step. That makes **P1b (the
+  branch-only static-shape talker compile) the sanctioned next lever**, with P3's per-pass
+  keying pattern as the template. Raw trace summarized and discarded per policy.
 
 ## Status
 

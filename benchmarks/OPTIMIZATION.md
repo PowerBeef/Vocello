@@ -928,8 +928,18 @@ the §K 12-seed clone/long QC soak.
   interleaves the target text, so no request-independent "conditioning prefix" exists to
   retain instead. The report's M5b premise mischaracterized the retention cost; the iPhone
   clone peak band is weights + KV + codec activations. Nothing to reclaim; no change made.
-- Remaining: 2.3 codec bf16 experiment (same isolated methodology; promotion-quality
-  decision if it validates).
+- **2.3 Codec bf16 (experiment validated with a perf caveat; productization pending).**
+  Same isolated methodology: all 492 speech-tokenizer tensors cast fp32 → bf16 except the
+  final two decoder layers (`decoder.decoder.5` output snake, `.6` output conv, per T-Mimi).
+  Measured: shared component 682 → **341 MB on disk**, MLX active peak 2105.9 →
+  **1872 MB (−234 MB)**; 3/3 fixed-seed takes clean EOS with durations *identical* to the
+  fp32-codec baseline at every seed (the untouched talker produces the same token
+  sequences — only the decoded waveform changes in low bits). Caveat: CLI warm RTF read
+  ~2–4% lower (1.119–1.137 vs 1.159–1.167) — needs bench-grade confirmation before
+  promotion. Combined with 2.2, the two validated conversions total **−512 MB resident /
+  −633 MB installed** per Speed artifact chain at experiment grade; both are
+  numerics-affecting artifact decisions (new HF uploads, catalog re-pins, fresh fixture
+  identities, ASR/prosody promotion gates) awaiting the maintainer.
 
 ## Status
 

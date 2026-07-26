@@ -184,8 +184,12 @@ review doc):
    Speed artifact by 292 MB at RTF parity with clean QC; shipping it is a promotion-quality
    artifact decision (new HF uploads + catalog re-pins) awaiting the maintainer;
    ~~clone-prompt `refCodes` release~~ **declined** (retained tensors <100 KB and required
-   per generation — the report's M5b premise corrected). Remaining: the codec bf16
-   experiment (2.3).
+   per generation — the report's M5b premise corrected); ~~codec bf16 experiment~~
+   **validated with a perf caveat** (−234 MB active peak, −341 MB shared artifact,
+   identical durations at every seed, but ~2–4% lower CLI RTF pending bench-grade
+   confirmation). **Stage 2's implementation work is complete**; the two validated
+   conversions (combined −512 MB resident) are promotion-quality artifact decisions
+   awaiting the maintainer.
 4. **Stage 3 — quality harness (folds phase 12, then 13)**: wire the typed
    `GenerationQualityReport` registry producers and persisted-WAV consolidation, add a
    dev-lane speaker-similarity gate for clone fidelity, optional advisory MOS-proxy column;

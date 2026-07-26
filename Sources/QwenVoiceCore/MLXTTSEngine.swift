@@ -430,7 +430,8 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
                         loadBehavior: Self.qwenPreparedLoadBehavior(
                             for: resolvedProfile,
                             trustPreparedCheckpoint: preparedMetadata.trustedPreparedCheckpoint,
-                            preparedDirectoryAlreadyValidated: true
+                            preparedDirectoryAlreadyValidated: true,
+                            speechTokenizerContentIdentity: preparedMetadata.speechTokenizerContentIdentity
                         ),
                         verboseDiagnosticSink: { action, details in
                             await Self.recordDiagnosticEvent(
@@ -1762,13 +1763,15 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
     nonisolated static func qwenPreparedLoadBehavior(
         for profile: NativeQwenPreparedLoadProfile,
         trustPreparedCheckpoint: Bool,
-        preparedDirectoryAlreadyValidated: Bool = false
+        preparedDirectoryAlreadyValidated: Bool = false,
+        speechTokenizerContentIdentity: String? = nil
     ) -> VocelloQwen3LoadBehavior {
         switch profile {
         case .fullCapabilities:
             return VocelloQwen3LoadBehavior(
                 trustPreparedCheckpoint: trustPreparedCheckpoint,
-                preparedDirectoryAlreadyValidated: preparedDirectoryAlreadyValidated
+                preparedDirectoryAlreadyValidated: preparedDirectoryAlreadyValidated,
+                speechTokenizerContentIdentity: speechTokenizerContentIdentity
             )
         case .withoutCloneEncoders, .streamingOnly:
             return VocelloQwen3LoadBehavior(
@@ -1776,7 +1779,8 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
                 preparedDirectoryAlreadyValidated: preparedDirectoryAlreadyValidated,
                 loadSpeakerEncoder: false,
                 loadSpeechTokenizerEncoder: false,
-                skipSpeechTokenizerEval: true
+                skipSpeechTokenizerEval: true,
+                speechTokenizerContentIdentity: speechTokenizerContentIdentity
             )
         }
     }

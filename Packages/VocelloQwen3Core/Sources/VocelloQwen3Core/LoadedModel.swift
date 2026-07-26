@@ -12,19 +12,24 @@ public struct VocelloQwen3LoadBehavior: Codable, Hashable, Sendable {
     public let loadSpeakerEncoder: Bool?
     public let loadSpeechTokenizerEncoder: Bool?
     public let skipSpeechTokenizerEval: Bool
+    /// Host-attested content identity for the speech-tokenizer component;
+    /// enables phase 9 in-memory reuse across model switches (nil disables).
+    public let speechTokenizerContentIdentity: String?
 
     public init(
         trustPreparedCheckpoint: Bool = false,
         preparedDirectoryAlreadyValidated: Bool = false,
         loadSpeakerEncoder: Bool? = nil,
         loadSpeechTokenizerEncoder: Bool? = nil,
-        skipSpeechTokenizerEval: Bool = false
+        skipSpeechTokenizerEval: Bool = false,
+        speechTokenizerContentIdentity: String? = nil
     ) {
         self.trustPreparedCheckpoint = trustPreparedCheckpoint
         self.preparedDirectoryAlreadyValidated = preparedDirectoryAlreadyValidated
         self.loadSpeakerEncoder = loadSpeakerEncoder
         self.loadSpeechTokenizerEncoder = loadSpeechTokenizerEncoder
         self.skipSpeechTokenizerEval = skipSpeechTokenizerEval
+        self.speechTokenizerContentIdentity = speechTokenizerContentIdentity
     }
 
     var compatibilityValue: QwenPreparedLoadBehavior {
@@ -33,7 +38,8 @@ public struct VocelloQwen3LoadBehavior: Codable, Hashable, Sendable {
             preparedDirectoryAlreadyValidated: preparedDirectoryAlreadyValidated,
             loadSpeakerEncoder: loadSpeakerEncoder,
             loadSpeechTokenizerEncoder: loadSpeechTokenizerEncoder,
-            skipSpeechTokenizerEval: skipSpeechTokenizerEval
+            skipSpeechTokenizerEval: skipSpeechTokenizerEval,
+            speechTokenizerContentIdentity: speechTokenizerContentIdentity
         )
     }
 }

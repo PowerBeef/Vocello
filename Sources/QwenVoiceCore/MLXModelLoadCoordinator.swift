@@ -118,6 +118,19 @@ actor MLXModelLoadCoordinator: MLXModelCoordinating {
         private let marker: PreparedCacheMarker
         private let qwenPreparedCheckpointTrustToPersist: QwenPreparedCheckpointTrust?
 
+        /// Phase 9: content identity of the speech-tokenizer component from
+        /// the trusted-checkpoint marker (weights digest + config digest).
+        /// Only present for trusted checkpoints; enables in-memory tokenizer
+        /// reuse across model switches inside the runtime.
+        var speechTokenizerContentIdentity: String? {
+            guard trustedPreparedCheckpoint,
+                  let trust = qwenPreparedCheckpointTrustToPersist
+                      ?? marker.qwenPreparedCheckpointTrust else {
+                return nil
+            }
+            return "\(trust.speechTokenizerModelArtifact.contentDigest):\(trust.speechTokenizerConfigHash ?? "-")"
+        }
+
         fileprivate init(
             preparedDirectory: URL,
             sourceDirectory: URL? = nil,
@@ -727,7 +740,8 @@ actor MLXModelLoadCoordinator: MLXModelCoordinating {
             loadBehavior: MLXTTSEngine.qwenPreparedLoadBehavior(
                 for: NativeQwenPreparedLoadProfile(capabilityProfile: capabilityProfile),
                 trustPreparedCheckpoint: preparedMetadata.trustedPreparedCheckpoint,
-                preparedDirectoryAlreadyValidated: true
+                preparedDirectoryAlreadyValidated: true,
+                speechTokenizerContentIdentity: preparedMetadata.speechTokenizerContentIdentity
             )
         )
     }

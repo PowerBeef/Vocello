@@ -255,7 +255,8 @@
     "Sources/VocelloQwen3Core/LoadedModel.swift::public let loadSpeakerEncoder: Bool?",
     "Sources/VocelloQwen3Core/LoadedModel.swift::public let loadSpeechTokenizerEncoder: Bool?",
     "Sources/VocelloQwen3Core/LoadedModel.swift::public let skipSpeechTokenizerEval: Bool",
-    "Sources/VocelloQwen3Core/LoadedModel.swift::public init( trustPreparedCheckpoint: Bool = false, preparedDirectoryAlreadyValidated: Bool = false, loadSpeakerEncoder: Bool? = nil, loadSpeechTokenizerEncoder: Bool? = nil, skipSpeechTokenizerEval: Bool = false )",
+    "Sources/VocelloQwen3Core/LoadedModel.swift::public let speechTokenizerContentIdentity: String?",
+    "Sources/VocelloQwen3Core/LoadedModel.swift::public init( trustPreparedCheckpoint: Bool = false, preparedDirectoryAlreadyValidated: Bool = false, loadSpeakerEncoder: Bool? = nil, loadSpeechTokenizerEncoder: Bool? = nil, skipSpeechTokenizerEval: Bool = false, speechTokenizerContentIdentity: String? = nil )",
     "Sources/VocelloQwen3Core/LoadedModel.swift::public enum VocelloQwen3GenerationFinishReason: String, Codable, Hashable, Sendable",
     "Sources/VocelloQwen3Core/LoadedModel.swift::public struct VocelloQwen3GenerationInfo: Codable, Hashable, Sendable",
     "Sources/VocelloQwen3Core/LoadedModel.swift::public let promptTokenCount: Int",
@@ -395,7 +396,7 @@
     },
     {
       "path": "Sources/VocelloQwen3Core/LoadedModel.swift",
-      "sha256": "ea8add02de14a7303c2f5bd5906b967c1fb11cd03746d1cbb7e58db882b091d1"
+      "sha256": "20be89b064b173381162394ea2bd2a1d67d6802d6898c01e1e62d45b33cde587"
     },
     {
       "path": "Sources/VocelloQwen3Core/ProductOutputAdapter.swift",

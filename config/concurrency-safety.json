@@ -2,41 +2,57 @@
   "schemaVersion": 1,
   "owner": "backend-runtime",
   "policy": "Every unchecked Sendable declaration in owned production Swift requires a registry entry, an explicit owner, a synchronization invariant, and deterministic evidence.",
-  "sourceRoots": ["Sources", "Packages/VocelloQwen3Core/Sources"],
+  "sourceRoots": [
+    "Sources",
+    "Packages/VocelloQwen3Core/Sources"
+  ],
   "unsafeDeclarations": [
     {
       "source": "Sources/QwenVoiceCore/HuggingFaceDownloader.swift",
-      "names": ["session"],
+      "names": [
+        "session"
+      ],
       "owner": "downloader initializer and terminal invalidation",
       "invariant": "The URLSession reference is assigned once after delegate construction and invalidated only after terminal processing."
     },
     {
       "source": "Sources/QwenVoiceCore/TelemetryGate.swift",
-      "names": ["handshakeOverride", "handshakeMode"],
+      "names": [
+        "handshakeOverride",
+        "handshakeMode"
+      ],
       "owner": "TelemetryGate lock",
       "invariant": "All reads and writes occur while the process-local lock is held."
     },
     {
       "source": "Sources/QwenVoiceCore/NativeDeviceClassGate.swift",
-      "names": ["handshakeForcedClass"],
+      "names": [
+        "handshakeForcedClass"
+      ],
       "owner": "NativeDeviceClassGate lock",
       "invariant": "The handshake override is a lock-protected one-way latch."
     },
     {
       "source": "Sources/QwenVoiceCore/BenchForceColdPolicy.swift",
-      "names": ["consumed"],
+      "names": [
+        "consumed"
+      ],
       "owner": "BenchForceColdPolicy lock",
       "invariant": "The benchmark-only one-shot flag is read and written only while locked."
     },
     {
       "source": "Sources/VocelloCLI/Support.swift",
-      "names": ["_verbosity"],
+      "names": [
+        "_verbosity"
+      ],
       "owner": "CLIOutput lock",
       "invariant": "Verbosity is read and written only through the lock-protected property."
     },
     {
       "source": "Sources/iOS/TTSEngineStore.swift",
-      "names": ["thermalObserverToken"],
+      "names": [
+        "thermalObserverToken"
+      ],
       "owner": "TTSEngineStore MainActor lifetime",
       "invariant": "The observer token is assigned once during MainActor initialization and read only during deinitialization."
     }
@@ -45,106 +61,209 @@
     {
       "id": "mac-database",
       "source": "Sources/Services/DatabaseService.swift",
-      "types": ["DatabaseService"],
+      "types": [
+        "DatabaseService"
+      ],
       "owner": "RecoverableStoreCoordinator mutex and GRDB DatabaseQueue",
       "invariant": "Ordinary access fails closed after open or migration failure; only explicit Retry serially replaces the failed state after a complete successful reopen.",
-      "tests": ["Tests/VocelloCoreTests/HistoryPersistenceErrorTests.swift", "Tests/VocelloCoreTests/RecoverableStoreCoordinatorTests.swift"]
+      "tests": [
+        "Tests/VocelloCoreTests/HistoryPersistenceErrorTests.swift",
+        "Tests/VocelloCoreTests/RecoverableStoreCoordinatorTests.swift"
+      ]
     },
     {
       "id": "ios-database",
       "source": "Sources/iOSSupport/Services/DatabaseService.swift",
-      "types": ["DatabaseService"],
+      "types": [
+        "DatabaseService"
+      ],
       "owner": "RecoverableStoreCoordinator mutex and GRDB DatabaseQueue",
       "invariant": "Ordinary access fails closed after open or migration failure; only explicit Retry serially replaces the failed state after a complete successful reopen.",
-      "tests": ["Tests/VocelloCoreTests/HistoryPersistenceErrorTests.swift", "Tests/VocelloCoreTests/RecoverableStoreCoordinatorTests.swift"]
+      "tests": [
+        "Tests/VocelloCoreTests/HistoryPersistenceErrorTests.swift",
+        "Tests/VocelloCoreTests/RecoverableStoreCoordinatorTests.swift"
+      ]
     },
     {
       "id": "qwen3-model-caches",
       "source": "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
-      "types": ["CachedTokenizerBox", "LoadedTalkerComponents", "LoadedSpeechTokenizerComponent", "Qwen3TTSVoiceClonePrompt", "CachedConditioningPrefix", "CachedConditioningPrefixBox", "Qwen3TTSConditioningPrefixCache", "Qwen3TTSStreamingDecoderBucketCache", "Qwen3TTSModel"],
+      "types": [
+        "CachedTokenizerBox",
+        "LoadedTalkerComponents",
+        "CachedSpeechTokenizerBox",
+        "LoadedSpeechTokenizerComponent",
+        "Qwen3TTSVoiceClonePrompt",
+        "CachedConditioningPrefix",
+        "CachedConditioningPrefixBox",
+        "Qwen3TTSConditioningPrefixCache",
+        "Qwen3TTSStreamingDecoderBucketCache",
+        "Qwen3TTSModel"
+      ],
       "owner": "Qwen3 model generation gate and cache locks",
       "invariant": "Mutable MLX values are accessed only by the single generation owner or their documented lock-protected cache.",
-      "tests": ["Packages/VocelloQwen3Core/Tests/Qwen3RuntimeTests/Qwen3GenerationGateTests.swift"]
+      "tests": [
+        "Packages/VocelloQwen3Core/Tests/Qwen3RuntimeTests/Qwen3GenerationGateTests.swift"
+      ]
     },
     {
       "id": "audio-converter-provider",
       "source": "Packages/VocelloQwen3Core/Sources/MLXAudioCore/AudioUtils.swift",
-      "types": ["AudioConverterInputProvider"],
+      "types": [
+        "AudioConverterInputProvider"
+      ],
       "owner": "AudioConverter callback lifetime",
       "invariant": "The provider is retained for one converter invocation and callback mutation is serialized by AudioToolbox.",
-      "tests": ["Tests/VocelloCoreTests/AtomicWAVPublicationTests.swift"]
+      "tests": [
+        "Tests/VocelloCoreTests/AtomicWAVPublicationTests.swift"
+      ]
     },
     {
       "id": "engine-service-host",
       "source": "Sources/QwenVoiceEngineService/EngineServiceHost.swift",
-      "types": ["EngineReplyHandlerBox", "EngineServiceRequestTimingRegistry", "RuntimeContext", "EngineServiceHost"],
+      "types": [
+        "EngineReplyHandlerBox",
+        "EngineServiceRequestTimingRegistry",
+        "RuntimeContext",
+        "EngineServiceHost"
+      ],
       "owner": "EngineServiceHost actor and lock-protected request registries",
       "invariant": "XPC callback boxes are single-resume and runtime access is serialized by the service actor.",
-      "tests": ["Tests/VocelloEngineIntegrationTests/EngineServiceTransportAccumulatorTests.swift"]
+      "tests": [
+        "Tests/VocelloEngineIntegrationTests/EngineServiceTransportAccumulatorTests.swift"
+      ]
     },
     {
       "id": "clone-conditioning",
       "source": "Sources/QwenVoiceCore/NativeCloneSupport.swift",
-      "types": ["ResolvedCloneConditioning"],
+      "types": [
+        "ResolvedCloneConditioning"
+      ],
       "owner": "NativePreparedCloneConditioningCache actor",
       "invariant": "MLX arrays remain actor-confined and are never concurrently mutated outside the active generation owner.",
-      "tests": ["Tests/VocelloCoreTests/CloneConditioningContractTests.swift"]
+      "tests": [
+        "Tests/VocelloCoreTests/CloneConditioningContractTests.swift"
+      ]
     },
     {
       "id": "download-bridges",
       "source": "Sources/QwenVoiceCore/HuggingFaceDownloader.swift",
-      "types": ["FileManagerBox", "TaskCancellationBox"],
+      "types": [
+        "FileManagerBox",
+        "TaskCancellationBox"
+      ],
       "owner": "downloader ordered delegate bridge",
       "invariant": "File operations and cancellation callbacks cross sendable closures through immutable or lock-protected boxes only.",
-      "tests": ["Tests/VocelloCoreTests/ModelDownloadLifecycleTests.swift"]
+      "tests": [
+        "Tests/VocelloCoreTests/ModelDownloadLifecycleTests.swift"
+      ]
     },
     {
       "id": "owned-qwen3-facade-runtime",
-      "sources": ["Packages/VocelloQwen3Core/Sources/VocelloQwen3Core/LoadedModel.swift"],
-      "types": ["ModelBox", "VocelloQwen3ClonePrompt", "VocelloQwen3LoadedModel"],
+      "sources": [
+        "Packages/VocelloQwen3Core/Sources/VocelloQwen3Core/LoadedModel.swift"
+      ],
+      "types": [
+        "ModelBox",
+        "VocelloQwen3ClonePrompt",
+        "VocelloQwen3LoadedModel"
+      ],
       "owner": "VocelloQwen3 loaded-model generation gate",
       "invariant": "Opaque MLX model and clone tensors remain behind the package facade; one generation task owns mutation through the loaded-model generation gate.",
-      "tests": ["Packages/VocelloQwen3Core/Tests/Qwen3RuntimeTests/VocelloQwen3FacadeTests.swift", "Packages/VocelloQwen3Core/Tests/Qwen3RuntimeTests/Qwen3StreamingContractTests.swift"]
+      "tests": [
+        "Packages/VocelloQwen3Core/Tests/Qwen3RuntimeTests/VocelloQwen3FacadeTests.swift",
+        "Packages/VocelloQwen3Core/Tests/Qwen3RuntimeTests/Qwen3StreamingContractTests.swift"
+      ]
     },
     {
       "id": "qwen3-session-cancellation-ingress",
       "source": "Packages/VocelloQwen3Core/Sources/VocelloQwen3Core/ClassifiedGenerationSession.swift",
-      "types": ["VocelloQwen3CancellationController"],
+      "types": [
+        "VocelloQwen3CancellationController"
+      ],
       "owner": "OSAllocatedUnfairLock-protected cancellation ingress",
       "invariant": "The lock protects only the immutable first cancellation reason and one task-cancellation closure; it never guards MLX state, performs suspension, or remains held while invoking the closure.",
-      "tests": ["Packages/VocelloQwen3Core/Tests/Qwen3RuntimeTests/ClassifiedGenerationSessionTests.swift"]
+      "tests": [
+        "Packages/VocelloQwen3Core/Tests/Qwen3RuntimeTests/ClassifiedGenerationSessionTests.swift"
+      ]
     },
     {
       "id": "core-lock-protected-utilities",
-      "sources": ["Sources/QwenVoiceCore/NativeMemoryPressureMonitor.swift", "Sources/QwenVoiceCore/ModelAssets.swift", "Sources/QwenVoiceCore/LatestEventCoalescer.swift", "Sources/QwenVoiceCore/MLXTTSEngine.swift", "Sources/QwenVoiceCore/GenerationFailureDiagnosticLogger.swift", "Sources/QwenVoiceCore/GenerationEventDeliveryProbe.swift", "Sources/QwenVoiceCore/ModelDownloadDiagnosticsStore.swift"],
-      "types": ["NativeMemoryPressureMonitor", "IntegrityHashCache", "LatestEventCoalescer", "DiagnosticAppSupportBox", "GenerationFailureDiagnosticLogger", "GenerationScopedEventRouter", "ModelDownloadDiagnosticsStore"],
+      "sources": [
+        "Sources/QwenVoiceCore/NativeMemoryPressureMonitor.swift",
+        "Sources/QwenVoiceCore/ModelAssets.swift",
+        "Sources/QwenVoiceCore/LatestEventCoalescer.swift",
+        "Sources/QwenVoiceCore/MLXTTSEngine.swift",
+        "Sources/QwenVoiceCore/GenerationFailureDiagnosticLogger.swift",
+        "Sources/QwenVoiceCore/GenerationEventDeliveryProbe.swift",
+        "Sources/QwenVoiceCore/ModelDownloadDiagnosticsStore.swift"
+      ],
+      "types": [
+        "NativeMemoryPressureMonitor",
+        "IntegrityHashCache",
+        "LatestEventCoalescer",
+        "DiagnosticAppSupportBox",
+        "GenerationFailureDiagnosticLogger",
+        "GenerationScopedEventRouter",
+        "ModelDownloadDiagnosticsStore"
+      ],
       "owner": "per-type locks or immutable capture boxes",
       "invariant": "Each utility confines mutation to its documented lock, actor, queue, or immutable capture lifetime; the memory-pressure snapshot uses OSAllocatedUnfairLock for cross-domain reads while dispatch-source lifecycle stays queue-confined.",
-      "tests": ["Tests/VocelloCoreTests/GenerationEventDeliveryProbeTests.swift", "Tests/VocelloCoreTests/GenerationFailureDiagnosticLoggerTests.swift", "Tests/VocelloCoreTests/ActiveGenerationCoordinatorTests.swift"]
+      "tests": [
+        "Tests/VocelloCoreTests/GenerationEventDeliveryProbeTests.swift",
+        "Tests/VocelloCoreTests/GenerationFailureDiagnosticLoggerTests.swift",
+        "Tests/VocelloCoreTests/ActiveGenerationCoordinatorTests.swift"
+      ]
     },
     {
       "id": "generation-output-adapter",
       "source": "Sources/QwenVoiceCore/GenerationOutputAdapter.swift",
-      "types": ["GenerationOutputAdapter", "PCM16ScratchBuffer"],
+      "types": [
+        "GenerationOutputAdapter",
+        "PCM16ScratchBuffer"
+      ],
       "owner": "single active product output adapter and scratch-buffer lock",
       "invariant": "The adapter drains one classified-session consumer and holds product finalization through atomic output and Fast QC; reusable PCM storage never escapes concurrent mutable access.",
-      "tests": ["Tests/VocelloCoreTests/ActiveGenerationCoordinatorTests.swift"]
+      "tests": [
+        "Tests/VocelloCoreTests/ActiveGenerationCoordinatorTests.swift"
+      ]
     },
     {
       "id": "native-xpc-client",
-      "sources": ["Sources/QwenVoiceNative/TTSEngineStore.swift", "Sources/QwenVoiceNative/XPCNativeEngineClient.swift"],
-      "types": ["PendingRequestBox", "XPCServiceTransport", "XPCNativeEngineClient"],
+      "sources": [
+        "Sources/QwenVoiceNative/TTSEngineStore.swift",
+        "Sources/QwenVoiceNative/XPCNativeEngineClient.swift"
+      ],
+      "types": [
+        "PendingRequestBox",
+        "XPCServiceTransport",
+        "XPCNativeEngineClient"
+      ],
       "owner": "XPCNativeEngineClient main actor and single-resume pending request boxes",
       "invariant": "Mutable client state stays main-actor isolated; callback bridges are single-resume and lock-protected.",
-      "tests": ["Tests/VocelloEngineIntegrationTests/EngineServiceTransportAccumulatorTests.swift"]
+      "tests": [
+        "Tests/VocelloEngineIntegrationTests/EngineServiceTransportAccumulatorTests.swift"
+      ]
     },
     {
       "id": "platform-callback-bridges",
-      "sources": ["Sources/SharedSupport/Services/VoiceClipTranscriber.swift", "Sources/SharedSupport/Telemetry/MainThreadStallWatchdog.swift", "Sources/iOSSupport/Services/IOSCrashObserver.swift", "Sources/iOSSupport/Services/IOSMetricKitMemoryReporter.swift"],
-      "types": ["SpeechRecognitionTaskHandle", "MainThreadStallWatchdog", "IOSCrashObserver", "IOSMetricKitMemoryReporter"],
+      "sources": [
+        "Sources/SharedSupport/Services/VoiceClipTranscriber.swift",
+        "Sources/SharedSupport/Telemetry/MainThreadStallWatchdog.swift",
+        "Sources/iOSSupport/Services/IOSCrashObserver.swift",
+        "Sources/iOSSupport/Services/IOSMetricKitMemoryReporter.swift"
+      ],
+      "types": [
+        "SpeechRecognitionTaskHandle",
+        "MainThreadStallWatchdog",
+        "IOSCrashObserver",
+        "IOSMetricKitMemoryReporter"
+      ],
       "owner": "framework callback lifetime plus lock, actor, or main-queue isolation",
       "invariant": "Framework callbacks mutate only the registered synchronized state and are invalidated before owner teardown.",
-      "tests": ["Tests/VocelloCoreTests/MainThreadStallWatchdogTests.swift", "Tests/VocelloCoreTests/MemoryTelemetryV8Tests.swift"]
+      "tests": [
+        "Tests/VocelloCoreTests/MainThreadStallWatchdogTests.swift",
+        "Tests/VocelloCoreTests/MemoryTelemetryV8Tests.swift"
+      ]
     }
   ]
 }

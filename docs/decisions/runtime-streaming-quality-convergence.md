@@ -424,3 +424,26 @@ whole smoke class (it had pinned the single pre-long-form journey), and the
 expansion assertion counts nonce-bearing rows instead of a total-row delta
 (the lazy History list drops older rows out of the instantiated accessibility
 window as segment rows appear, so a total-count delta is not stable).
+
+## Amendment 2026-07-26 — Phase 9 speech-tokenizer residency (complete)
+
+Phase 9 closes with in-memory speech-tokenizer reuse across macOS model
+switches. The byte-identical 682 MB component is adopted from the previous
+model when the content identity matches: the host coordinator attests the
+trusted-checkpoint weights + config digests through the load behavior, with
+the shared-store hard-link inode identity as the in-package fallback, and an
+encoder-superset capability rule (an encoder-carrying resident may serve a
+decoder-only load, never the reverse). Ownership follows the registered
+lock-protected cache invariant — one logical user at a time with the cache
+holding the handoff between sequential loads — and the lifecycle is
+pressure-safe by construction: `Qwen3TTSMemoryCaches.clearAll` (memory relief
+and explicit/idle unload) clears the slot, so only an in-process switch
+preserves it. iOS remains disabled; its switch path deliberately pre-clears
+for Jetsam headroom, and enabling there requires its own device A/B. Promotion
+evidence per this ADR's constraint (isolated evidence + resource
+qualification on the 8 GB support floor): fixed-seed switch A/B byte-identical
+with residency on and off, live adoption (`speech_tokenizer_load` 503 → 0 ms,
+~260 ms better cold first-chunk latency), and retained-memory qualification
+PASS `mac-memory-qualification-20260726-115343-5a1c8a85`
+(Custom→Design→Clone, three retained takes per mode). The registered
+`QWENVOICE_TOKENIZER_RESIDENCY` knob is the gated diagnostic off-switch.

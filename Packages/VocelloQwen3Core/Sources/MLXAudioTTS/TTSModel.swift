@@ -26,19 +26,26 @@ public struct QwenPreparedLoadBehavior: Sendable, Equatable {
     public let loadSpeakerEncoder: Bool?
     public let loadSpeechTokenizerEncoder: Bool?
     public let skipSpeechTokenizerEval: Bool
+    /// Host-attested content identity for the speech-tokenizer component
+    /// (weights digest + config digest from the trusted-checkpoint marker).
+    /// Enables phase 9 in-memory reuse across model switches; nil disables
+    /// residency for this load.
+    public let speechTokenizerContentIdentity: String?
 
     public init(
         trustPreparedCheckpoint: Bool = false,
         preparedDirectoryAlreadyValidated: Bool = false,
         loadSpeakerEncoder: Bool? = nil,
         loadSpeechTokenizerEncoder: Bool? = nil,
-        skipSpeechTokenizerEval: Bool = false
+        skipSpeechTokenizerEval: Bool = false,
+        speechTokenizerContentIdentity: String? = nil
     ) {
         self.trustPreparedCheckpoint = trustPreparedCheckpoint
         self.preparedDirectoryAlreadyValidated = preparedDirectoryAlreadyValidated
         self.loadSpeakerEncoder = loadSpeakerEncoder
         self.loadSpeechTokenizerEncoder = loadSpeechTokenizerEncoder
         self.skipSpeechTokenizerEval = skipSpeechTokenizerEval
+        self.speechTokenizerContentIdentity = speechTokenizerContentIdentity
     }
 
     public static let fullCapabilities = QwenPreparedLoadBehavior()

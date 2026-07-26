@@ -185,6 +185,12 @@ from schema-v2 memory trends.
 |---|---|---|---|---|---|---:|---|---|---|---|
 | 2026-07-15 | [`mac-memory-qualification-20260715-142146-84663e70`](runs/memory-qualification/mac-memory-qualification-20260715-142146-84663e70.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 11 | `247b266b0f1c` | `0efe7c615c69` | baseline | owned-core-retained-247b266 |
 
+## memory-qualification / macos / mac-mini-m2-8gb / config `3ec69e66d20e`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---|---|---|---|
+| 2026-07-26 | [`mac-memory-qualification-20260726-115343-5a1c8a85`](runs/memory-qualification/mac-memory-qualification-20260726-115343-5a1c8a85.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 11 | `baad20e4d442` dirty | `excluded` | baseline | st-residency-check |
+
 ## memory-qualification / macos / mac-mini-m2-8gb / config `664a0267b9b5`
 
 | completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |

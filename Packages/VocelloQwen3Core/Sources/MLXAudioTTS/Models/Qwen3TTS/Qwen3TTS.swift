@@ -27,11 +27,35 @@ private func estimatedKVCacheFootprintMB(layers: Int, heads: Int, seq: Int, head
     return Double(bytes) / Double(1_024 * 1_024)
 }
 
-private final class CachedTokenizerBox: @unchecked Sendable {
+final class CachedTokenizerBox: @unchecked Sendable {
     let tokenizer: Tokenizer
 
     init(tokenizer: Tokenizer) {
         self.tokenizer = tokenizer
+    }
+}
+
+/// Phase 9 (runtime component reuse): the loaded 682 MB speech tokenizer is
+/// byte-identical across every catalog artifact, so a mode switch may adopt
+/// the previous model's tokenizer object instead of re-reading and
+/// re-materializing it. Content identity is grounded in the shared-component
+/// store's hard links (device/inode/size/mtime of the resolved weights file
+/// plus the tokenizer config digest); any stat or hash failure disables
+/// caching fail-safe. Ownership follows the registered lock-protected cache
+/// invariant: exactly one logical user at a time — the loaded model — with
+/// the cache holding the handoff reference between sequential loads.
+/// `Qwen3TTSMemoryCaches.clearAll` (memory relief and explicit unload) clears
+/// the slot, so pressure never retains it; only an in-process model switch
+/// preserves it.
+final class CachedSpeechTokenizerBox: @unchecked Sendable {
+    let identityKey: String
+    let includesEncoder: Bool
+    let speechTokenizer: Qwen3TTSSpeechTokenizer
+
+    init(identityKey: String, includesEncoder: Bool, speechTokenizer: Qwen3TTSSpeechTokenizer) {
+        self.identityKey = identityKey
+        self.includesEncoder = includesEncoder
+        self.speechTokenizer = speechTokenizer
     }
 }
 
@@ -58,6 +82,7 @@ private struct LoadedSpeechTokenizerComponent: @unchecked Sendable {
 }
 
 private struct QwenPreparedLoadOptions: Sendable {
+    var speechTokenizerContentIdentity: String? = nil
     let trustPreparedCheckpoint: Bool
     let preparedDirectoryAlreadyValidated: Bool
     let loadSpeakerEncoder: Bool?
@@ -371,19 +396,41 @@ private let speechTokenizerEvalBatchSize = 8
 /// Thread-safe cache for the immutable text tokenizer only. Speech tokenizers
 /// contain mutable decoder streaming state and remain owned by one loaded model;
 /// sharing them across engines would bypass each engine's operation lease.
-private final class Qwen3TTSPreparedComponentCache: Sendable {
+final class Qwen3TTSPreparedComponentCache: Sendable {
     private struct State {
         var tokenizersByPreparedKey: [String: CachedTokenizerBox] = [:]
         var tokenizerLRU: [String] = []
+        var residentSpeechTokenizer: CachedSpeechTokenizerBox?
     }
 
     static let shared = Qwen3TTSPreparedComponentCache()
 
 #if os(iOS)
     private let tokenizerLimit = 1
+    /// The iOS switch path deliberately pre-clears everything for Jetsam
+    /// headroom; speech-tokenizer residency stays macOS-only until a device
+    /// A/B qualifies it.
+    static let speechTokenizerResidencySupported = false
 #else
     private let tokenizerLimit = 3
+    static let speechTokenizerResidencySupported = true
 #endif
+
+    /// Registered diagnostic off-switch for the phase 9 residency A/B
+    /// (inert without the QWENVOICE_DEBUG master gate).
+    private static let speechTokenizerResidencyDisabled: Bool = {
+        let raw = VocelloQwen3ImplementationDebugGate.value(
+            for: "QWENVOICE_TOKENIZER_RESIDENCY"
+        )?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        return raw == "off" || raw == "false" || raw == "0" || raw == "no"
+    }()
+
+    static var speechTokenizerResidencyEnabled: Bool {
+        speechTokenizerResidencySupported && !speechTokenizerResidencyDisabled
+    }
+
     private let state = OSAllocatedUnfairLock(initialState: State())
 
     func cachedTokenizer(for preparedKey: String) -> CachedTokenizerBox? {
@@ -409,10 +456,46 @@ private final class Qwen3TTSPreparedComponentCache: Sendable {
         }
     }
 
+    /// Exact content identity, superset capability: a resident that carries
+    /// the encoder may serve a decoder-only load (custom/design switching
+    /// away from a clone model), but a decoder-only resident can never serve
+    /// an encoder-needing load — that one falls through to the disk load.
+    func residentSpeechTokenizer(
+        identityKey: String,
+        includeEncoder: Bool
+    ) -> CachedSpeechTokenizerBox? {
+        guard Self.speechTokenizerResidencyEnabled else { return nil }
+        return state.withLock { value in
+            guard let box = value.residentSpeechTokenizer,
+                  box.identityKey == identityKey,
+                  !includeEncoder || box.includesEncoder else {
+                return nil
+            }
+            return box
+        }
+    }
+
+    func storeResidentSpeechTokenizer(
+        _ speechTokenizer: Qwen3TTSSpeechTokenizer,
+        identityKey: String,
+        includesEncoder: Bool
+    ) {
+        guard Self.speechTokenizerResidencyEnabled else { return }
+        let box = CachedSpeechTokenizerBox(
+            identityKey: identityKey,
+            includesEncoder: includesEncoder,
+            speechTokenizer: speechTokenizer
+        )
+        state.withLock { value in
+            value.residentSpeechTokenizer = box
+        }
+    }
+
     func clear() {
         state.withLock { value in
             value.tokenizersByPreparedKey.removeAll()
             value.tokenizerLRU.removeAll()
+            value.residentSpeechTokenizer = nil
         }
     }
 
@@ -4706,6 +4789,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         return try await loadModelContents(
             modelDir: modelDir,
             loadOptions: QwenPreparedLoadOptions(
+                speechTokenizerContentIdentity: loadBehavior.speechTokenizerContentIdentity,
                 trustPreparedCheckpoint: loadBehavior.trustPreparedCheckpoint,
                 preparedDirectoryAlreadyValidated: loadBehavior.preparedDirectoryAlreadyValidated,
                 loadSpeakerEncoder: loadBehavior.loadSpeakerEncoder,
@@ -5312,9 +5396,46 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         let speechTokenizerLoadStartedAt = ContinuousClock.now
         let fileManager = FileManager.default
         var speechTokenizer: Qwen3TTSSpeechTokenizer?
+        var reusedResidentSpeechTokenizer = false
 
         if fileManager.fileExists(atPath: speechTokenizerPath.path, isDirectory: &isDirectory),
            isDirectory.boolValue {
+            // Phase 9: adopt the previous model's identical tokenizer object
+            // instead of re-materializing 682 MB. Exact content identity only;
+            // any identity failure falls through to the ordinary disk load.
+            // The host-attested trust identity (weights + config digests) is
+            // preferred; the hard-link inode identity is the fallback for
+            // loads without a trusted-checkpoint marker.
+            let residencyIdentity = loadOptions.speechTokenizerContentIdentity
+                .map { "trust:\($0)" }
+                ?? speechTokenizerComponentIdentity(
+                    at: speechTokenizerPath,
+                    includeEncoder: includeEncoder
+                )
+            if let residencyIdentity,
+               let residentBox = Qwen3TTSPreparedComponentCache.shared.residentSpeechTokenizer(
+                   identityKey: residencyIdentity,
+                   includeEncoder: includeEncoder
+               ) {
+                // Fresh-load parity: the encoder trims its cache per encode
+                // call; the decoder's streaming state resets here and again at
+                // every streaming generation start.
+                residentBox.speechTokenizer.decoder.resetStreamingState()
+                speechTokenizer = residentBox.speechTokenizer
+                reusedResidentSpeechTokenizer = true
+                await emitPreparedLoadDiagnostic(
+                    diagnosticEventSink,
+                    action: "qwen-speech-tokenizer-component-resident-reuse",
+                    details: diagnosticDetails(
+                        modelDir: modelDir,
+                        loadOptions: loadOptions,
+                        extra: [
+                            "preparedKey": preparedKey,
+                            "includeEncoder": includeEncoder ? "true" : "false",
+                        ]
+                    )
+                )
+            } else {
             do {
                 await emitPreparedLoadDiagnostic(
                     diagnosticEventSink,
@@ -5364,6 +5485,14 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                 )
                 throw error
             }
+            if let residencyIdentity, let loaded = speechTokenizer {
+                Qwen3TTSPreparedComponentCache.shared.storeResidentSpeechTokenizer(
+                    loaded,
+                    identityKey: residencyIdentity,
+                    includesEncoder: includeEncoder
+                )
+            }
+            }
         } else if fileManager.fileExists(atPath: speechTokenizerPath.path) {
             qwen3TTSLog("speech_tokenizer is not a directory (stale cache), clearing model cache...")
             try? fileManager.removeItem(at: modelDir)
@@ -5380,8 +5509,40 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
             booleanFlags: [
                 "speech_tokenizer_verify_relaxed": loadOptions.trustPreparedCheckpoint,
                 "speech_tokenizer_encoder_loaded": includeEncoder,
+                "speech_tokenizer_component_reused": reusedResidentSpeechTokenizer,
             ]
         )
+    }
+
+    /// Content identity for the on-disk speech tokenizer component, grounded
+    /// in the shared-component store's hard links: the resolved weights
+    /// file's device/inode/size/mtime plus the tokenizer config digest and
+    /// the encoder inclusion. Copies that bypass the store simply never
+    /// share an inode and miss the cache; any stat/read failure returns nil
+    /// and disables residency for this load (the disk load proceeds).
+    static func speechTokenizerComponentIdentity(
+        at speechTokenizerPath: URL,
+        includeEncoder: Bool
+    ) -> String? {
+        let weightsURL = speechTokenizerPath
+            .appendingPathComponent("model.safetensors")
+            .resolvingSymlinksInPath()
+        guard let attributes = try? FileManager.default.attributesOfItem(atPath: weightsURL.path),
+              let inode = (attributes[.systemFileNumber] as? NSNumber)?.uint64Value,
+              let device = (attributes[.systemNumber] as? NSNumber)?.int64Value,
+              let size = (attributes[.size] as? NSNumber)?.uint64Value,
+              let modified = attributes[.modificationDate] as? Date else {
+            return nil
+        }
+        let configURL = speechTokenizerPath.appendingPathComponent("config.json")
+        guard let configData = try? Data(contentsOf: configURL) else {
+            return nil
+        }
+        let configDigest = SHA256.hash(data: configData)
+            .map { String(format: "%02x", $0) }
+            .joined()
+        _ = includeEncoder // capability is matched by the cache's superset rule, not the key
+        return "st-v1:\(device):\(inode):\(size):\(modified.timeIntervalSince1970):\(configDigest)"
     }
 
     private func storeLoadTimingsMS(_ timings: [String: Int]) {

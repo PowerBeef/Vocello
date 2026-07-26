@@ -830,6 +830,33 @@ following measured outcomes on the canonical Mac mini M2 8 GB:
   published `macos-engine-20260726-054111-e95e1285` — the comparison record for post-change
   clone RTF against the `release-QA-2.2.0` band.
 
+## M — Stage 1 launch-bound program (2026-07-26, in progress)
+
+Successor to the §H P0 re-capture, executing the staged roadmap's Stage 1 on the current pins.
+All measurements are -Onone CLI bench cells on the canonical Mac mini M2 8 GB; every step is
+gated on fixed-seed byte-identity (scheduling-only changes must not move a single sample) plus
+the §K 12-seed clone/long QC soak.
+
+- **P2a-i — pipelined chunk materialization (landed, `549b884`).** The token loop's shipping
+  eval policy became `.pipelined`: the step graph is submitted with `asyncEval` and the
+  previous stream chunk's materialization + channel sends run before the token/EOS reads,
+  overlapping in-flight GPU compute with identical channel event order. Identity: 12/12
+  byte-identical WAVs vs the synchronous build; soak 12/12 clean. Records
+  `macos-engine-20260726-054111-e95e1285` (base) → `…-055949-8e3c8639` (pipelined): clone
+  warm short/medium/long **+1.6 / +3.3 / +0.5%** RTF. `.full` remains the synchronous
+  attribution diagnostic.
+- **P2a-ii — early talker submit (measured do-NOT, `7f01927`).** Submitting the
+  talker+sampling subgraph before the 15-pass code-predictor graph build (to overlap build
+  with compute) regressed warm RTF — custom/long **−3.9%**, clone/long −2.0% vs P2a-i
+  (record `…-060659-99b59f93`). The second command buffer plus the fusion break at the early
+  materialization boundary cost more launches than the overlap recovered. Reverted; a code
+  comment marks the do-NOT at the site.
+- **Next:** P3 — compile the code-predictor pass to eliminate its per-frame host graph
+  rebuild (15.4% of wall at <1% GPU busy). Design constraint discovered up front: `offset`
+  enters the fused RoPE as a trace-time constant and passes 1–14 share shapes while
+  differing in offset, so compiled functions must be keyed per pass index (15 stable
+  entries), never by shape alone.
+
 ## Status
 
 The optimization program tracked in this document is wrapped up. The §H P0–P6 work has been

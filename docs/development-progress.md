@@ -159,12 +159,14 @@ review doc):
    deterministic-QC win; the gated `QWENVOICE_TALKER_REPPEN` knob remains for diagnostics).
    Measurements and the pre-existing clone/long dropout-band finding:
    `benchmarks/OPTIMIZATION.md` §L.
-2. **Stage 1 — launch-bound attack on current pins** (§H P0 successor program): collapse the
-   two per-token `.item()` host syncs and pipeline with `asyncEval` (double-buffered chunk
-   materialization preserving the lossless channel), compile the code-predictor step (its
-   per-frame cache reset gives a bounded 16-shape cycle), overlap codec decode on a second
-   MLX stream, and a branch-only talker static-shape compile experiment. Every engine-loop
-   change carries the §K fixed-seed QC soak.
+2. **Stage 1 — launch-bound attack on current pins** (§H P0 successor program; **in progress
+   2026-07-26**, measurements in `benchmarks/OPTIMIZATION.md` §M): P2a-i (pipelined chunk
+   materialization) landed with byte-identical fixed-seed output and clone warm RTF
+   +1.6/+3.3/+0.5%; the P2a-ii early-submit variant measured as a do-NOT (custom/long −3.9%)
+   and is reverted with its record kept. Remaining: P3 compile the code-predictor step
+   (per-pass-index compiled functions — the RoPE offset is a trace-time constant), P5b codec
+   decode on a second MLX stream, and the branch-only P1b talker static-shape experiment.
+   Every engine-loop change carries fixed-seed byte-identity plus the §K QC soak.
 3. **Stage 2 — memory program (folds phase 9)**: speech-tokenizer runtime reuse across mode
    switches (the RAM analog of the shipped disk hard-linking), text-embedding quantization
    experiment (622 MB BF16 today inside the "4-bit" artifact), codec bf16 experiment

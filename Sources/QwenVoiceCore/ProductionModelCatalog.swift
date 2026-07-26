@@ -258,6 +258,27 @@ public struct ProductionModelCatalog: Decodable, Sendable {
         )
     }
 
+    /// Byte-count staleness probe for an installed artifact folder: the relative paths of
+    /// catalog files that exist on disk with a different exact size than the current catalog
+    /// identity. Detection only — a stale artifact is repaired through the ordinary
+    /// authenticated delivery plan, which re-verifies every digest before install. Missing
+    /// files are not reported here; path presence remains the availability check's domain.
+    public func installedFileSizeMismatches(
+        for artifact: Artifact,
+        modelsRoot: URL,
+        fileManager: FileManager = .default
+    ) -> [String] {
+        let folderURL = modelsRoot.appendingPathComponent(artifact.folder, isDirectory: true)
+        return artifact.files.compactMap { file -> String? in
+            let path = folderURL.appendingPathComponent(file.relativePath, isDirectory: false).path
+            guard let attributes = try? fileManager.attributesOfItem(atPath: path),
+                  let byteCount = (attributes[.size] as? NSNumber)?.int64Value else {
+                return nil
+            }
+            return byteCount == file.sizeBytes ? nil : file.relativePath
+        }.sorted()
+    }
+
     private func reconcileInstalledArtifact(
         _ artifact: Artifact,
         componentPlan: SharedComponentMigrationPlan,

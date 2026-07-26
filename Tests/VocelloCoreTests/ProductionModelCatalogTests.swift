@@ -173,6 +173,60 @@ final class ProductionModelCatalogTests: XCTestCase {
         XCTAssertFalse(corrupt.reusedVerifiedComponent)
     }
 
+    func testInstalledFileSizeMismatchProbeReportsOnlyPresentFilesWithWrongSize() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let source = root.appendingPathComponent("source", isDirectory: true)
+        let componentURL = source.appendingPathComponent("speech_tokenizer/model.safetensors")
+        try FileManager.default.createDirectory(
+            at: componentURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try Data(repeating: 0x4a, count: 64).write(to: componentURL)
+        let file = try SharedComponentFileIdentity.verify(
+            relativePath: "speech_tokenizer/model.safetensors",
+            fileURL: componentURL
+        )
+        let content = try SharedComponentContentIdentity(files: [file])
+        let compatibility = try SharedComponentCompatibilityIdentity(
+            contentDigest: content.digest,
+            componentSchemaVersion: 1,
+            loaderABI: "fixture-loader-v1",
+            runtimeProfileSignature: "fixture-runtime-v1",
+            encoderCapability: .encoderAndDecoder
+        )
+        let catalog = try ProductionModelCatalog(contentsOf: writeCatalog(makeV2Catalog(
+            content: content,
+            compatibility: compatibility
+        )))
+        let artifact = catalog.artifacts[0]
+        let models = root.appendingPathComponent("models", isDirectory: true)
+        let folder = models.appendingPathComponent(artifact.folder, isDirectory: true)
+
+        // Nothing installed: the probe reports no staleness (presence is availability's job).
+        XCTAssertEqual(catalog.installedFileSizeMismatches(for: artifact, modelsRoot: models), [])
+
+        let installedComponent = folder.appendingPathComponent("speech_tokenizer/model.safetensors")
+        try FileManager.default.createDirectory(
+            at: installedComponent.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try Data(repeating: 0x4a, count: 64).write(to: installedComponent)
+        let configURL = folder.appendingPathComponent("config.json")
+        try Data(repeating: 0x2f, count: 3).write(to: configURL)
+        XCTAssertEqual(catalog.installedFileSizeMismatches(for: artifact, modelsRoot: models), [])
+
+        // A present file whose byte count drifted from the pinned identity is reported;
+        // a missing file is not.
+        try Data(repeating: 0x2f, count: 5).write(to: configURL)
+        try FileManager.default.removeItem(at: installedComponent)
+        XCTAssertEqual(
+            catalog.installedFileSizeMismatches(for: artifact, modelsRoot: models),
+            ["config.json"]
+        )
+    }
+
     func testDeliveryPlanMigratesAuthenticatedLegacyInstallWithoutNetwork() throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)

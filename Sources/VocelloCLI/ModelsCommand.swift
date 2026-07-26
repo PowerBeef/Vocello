@@ -14,6 +14,30 @@ enum ModelsCommand {
         let missingPaths: [String]
         let installedBytes: Int64
         let estimatedDownloadBytes: Int64?
+        let updateAvailable: Bool
+        let stalePaths: [String]
+    }
+
+    /// Installed-but-stale probe against the production catalog: files whose on-disk byte
+    /// count no longer matches the current pinned identity. Best-effort — an unresolvable
+    /// catalog entry reports no staleness rather than failing the read-only inventory.
+    private static func stalePaths(
+        for descriptor: ModelDescriptor,
+        catalog: ProductionModelCatalog?,
+        modelsDirectory: URL
+    ) -> [String] {
+        guard let catalog,
+              let artifact = try? catalog.artifactMatchingMacOSDescriptor(
+                  folder: descriptor.folder,
+                  repo: descriptor.huggingFaceRepo,
+                  revision: descriptor.huggingFaceRevision,
+                  artifactVersion: descriptor.artifactVersion,
+                  estimatedDownloadBytes: descriptor.estimatedDownloadBytes,
+                  requiredRelativePaths: descriptor.requiredRelativePaths
+              ) else {
+            return []
+        }
+        return catalog.installedFileSizeMismatches(for: artifact, modelsRoot: modelsDirectory)
     }
 
     @MainActor
@@ -39,6 +63,7 @@ enum ModelsCommand {
             manifestOverride: args.string("manifest").map { URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath) })
 
         let onlyID = args.positionals.first  // optional `status <id>` / `list <id>` filter
+        let catalog = try? ProductionModelCatalog(contentsOf: CLIRuntime.locateProductionCatalogURL())
 
         var rows: [ModelJSON] = []
         for m in ctx.registry.models {
@@ -50,11 +75,16 @@ enum ModelsCommand {
             case .unavailable(_, let paths): installed = false; missing = paths
             case .unknown: installed = false; missing = []
             }
+            let stale = installed
+                ? stalePaths(for: m, catalog: catalog, modelsDirectory: ctx.modelsDirectory)
+                : []
             rows.append(ModelJSON(
                 id: m.id, mode: m.mode.rawValue, name: m.name,
                 installed: installed, missingPaths: missing,
                 installedBytes: directorySize(m.installDirectory(in: ctx.modelsDirectory)),
-                estimatedDownloadBytes: m.estimatedDownloadBytes))
+                estimatedDownloadBytes: m.estimatedDownloadBytes,
+                updateAvailable: !stale.isEmpty,
+                stalePaths: stale))
         }
         if let onlyID, rows.isEmpty { throw CLIError("no model '\(onlyID)' in the contract") }
 
@@ -62,13 +92,17 @@ enum ModelsCommand {
 
         guard !rows.isEmpty else { print("(no models in contract)"); return }
         for r in rows {
-            let mark = r.installed ? "✓" : (r.missingPaths.isEmpty ? "?" : "✗")
-            let size = r.installed
+            let mark = r.updateAvailable ? "↑" : (r.installed ? "✓" : (r.missingPaths.isEmpty ? "?" : "✗"))
+            var size = r.installed
                 ? humanBytes(r.installedBytes)
                 : (r.estimatedDownloadBytes.map { "~\(humanBytes($0)) to download" } ?? "not installed")
+            if r.updateAvailable {
+                size += " · update available (models install \(r.id))"
+            }
             print("\(mark) \(r.id)\t[\(r.mode)]\t\(size)")
             if detailed {
                 for p in r.missingPaths { print("    missing: \(p)") }
+                for p in r.stalePaths { print("    stale: \(p)") }
             }
         }
     }
@@ -93,11 +127,6 @@ enum ModelsCommand {
             throw CLIError("unknown model id '\(modelID)' (run `vocello models list` for valid ids)")
         }
 
-        if case .available = ctx.registry.availability(forModelID: modelID, in: ctx.modelsDirectory) {
-            note("Already installed: \(modelID)")
-            return
-        }
-
         let targetDir = descriptor.installDirectory(in: ctx.modelsDirectory)
         let catalog = try ProductionModelCatalog(
             contentsOf: CLIRuntime.locateProductionCatalogURL()
@@ -110,6 +139,17 @@ enum ModelsCommand {
             estimatedDownloadBytes: descriptor.estimatedDownloadBytes,
             requiredRelativePaths: descriptor.requiredRelativePaths
         )
+
+        var repairingStaleInstall = false
+        if case .available = ctx.registry.availability(forModelID: modelID, in: ctx.modelsDirectory) {
+            let stale = catalog.installedFileSizeMismatches(for: artifact, modelsRoot: ctx.modelsDirectory)
+            if stale.isEmpty {
+                note("Already installed: \(modelID)")
+                return
+            }
+            repairingStaleInstall = true
+            note("Updating \(modelID): \(stale.count) file(s) no longer match the pinned catalog identity")
+        }
         let modelsDirectory = ctx.modelsDirectory
         let delivery = try await Task.detached(priority: .utility) {
             try catalog.deliveryPlan(for: artifact, modelsRoot: modelsDirectory)
@@ -160,7 +200,7 @@ enum ModelsCommand {
             throw error
         }
 
-        print("✓ Installed \(modelID) (\(humanBytes(directorySize(targetDir))))")
+        print("✓ \(repairingStaleInstall ? "Updated" : "Installed") \(modelID) (\(humanBytes(directorySize(targetDir))))")
     }
 
     static func printHelp() {

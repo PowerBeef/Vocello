@@ -125,6 +125,14 @@ public struct LongFormSegmentOutputFrameMap: Codable, Equatable, Sendable {
 public struct LongFormAssemblyEvidence: Codable, Equatable, Sendable {
     public static let currentSchemaVersion = 1
 
+    /// Advisory ceiling for `maximumSegmentBoundaryJump`, in PCM16 amplitude
+    /// units (~12.5% of full scale). Edge-trimmed, fade-managed joins should
+    /// stay well below it; a larger adjacent-sample step at a boundary is an
+    /// audible click. Warn-first: a breach records `advisoryWarnings` in the
+    /// manifest and never fails a run, until a measured distribution across
+    /// real projects justifies a hard threshold.
+    public static let advisoryMaximumSegmentBoundaryJump = 4_096
+
     public let schemaVersion: Int
     public let algorithmVersion: Int
     public let sampleRate: Int
@@ -138,12 +146,27 @@ public struct LongFormAssemblyEvidence: Codable, Equatable, Sendable {
     public let outputDigest: String
     public let outputReadable: Bool
     public let maximumSegmentBoundaryJump: Int
+    /// Warn-first advisory verdicts recorded by the assembler (absent in
+    /// pre-advisory manifests and for clean joins). Currently the only token
+    /// is `boundary_jump:<value>` when the maximum boundary jump exceeds the
+    /// advisory ceiling.
+    public let advisoryWarnings: [String]?
     public let segments: [LongFormSegmentOutputFrameMap]
+
+    public var exceedsAdvisoryBoundaryJump: Bool {
+        maximumSegmentBoundaryJump > Self.advisoryMaximumSegmentBoundaryJump
+    }
+
+    static func advisoryWarnings(maximumSegmentBoundaryJump: Int) -> [String]? {
+        maximumSegmentBoundaryJump > advisoryMaximumSegmentBoundaryJump
+            ? ["boundary_jump:\(maximumSegmentBoundaryJump)"]
+            : nil
+    }
 }
 
-/// Foundation for manifest-v4 assembly. This is intentionally not wired into
-/// the shipping long-form coordinator yet. It performs two bounded passes per
-/// source segment: one for edge/RMS analysis and one for incremental output.
+/// Manifest-v4 assembly, consumed by both shipping long-form runners. It
+/// performs two bounded passes per source segment: one for edge/RMS analysis
+/// and one for incremental output.
 public enum BoundedLongFormAssembler {
     public static func assemble(
         segments: [LongFormAssemblySegmentSource],
@@ -267,6 +290,9 @@ public enum BoundedLongFormAssembler {
             outputDigest: try digestFile(at: outputURL, blockBytes: configuration.blockFrames * 2),
             outputReadable: true,
             maximumSegmentBoundaryJump: maximumSegmentBoundaryJump,
+            advisoryWarnings: LongFormAssemblyEvidence.advisoryWarnings(
+                maximumSegmentBoundaryJump: maximumSegmentBoundaryJump
+            ),
             segments: maps
         )
     }

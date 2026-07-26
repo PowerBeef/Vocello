@@ -246,6 +246,7 @@ final class LongFormPlanningTests: XCTestCase {
             outputDigest: String(repeating: "0", count: 64),
             outputReadable: true,
             maximumSegmentBoundaryJump: 0,
+            advisoryWarnings: nil,
             segments: plan.evidence.segments.map { segment in
                 LongFormSegmentOutputFrameMap(
                     segmentID: segment.segmentID,

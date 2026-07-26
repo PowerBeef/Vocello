@@ -62,6 +62,70 @@ final class LongFormAssemblyTests: XCTestCase {
         XCTAssertLessThan(evidence.maximumSegmentBoundaryJump, 4_000)
     }
 
+    func testStepDiscontinuityRecordsBoundaryJumpAdvisoryWarning() async throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanup() }
+        // Two loud square-wave segments joined with no pause: an even audible
+        // frame count ends the first segment at -amplitude while the next
+        // starts at +amplitude, so the join is a full-scale step.
+        let sources = try [1, 2].map { index in
+            LongFormAssemblySegmentSource(
+                segmentID: "segment-\(index)",
+                audioURL: try fixture.makeAudioFile(
+                    name: "segment-\(index)",
+                    audibleFrames: 2_000,
+                    edgeSilence: 0,
+                    amplitude: 20_000
+                ),
+                boundary: .safeClause,
+                intendedPauseMilliseconds: 0
+            )
+        }
+        let evidence = try await BoundedLongFormAssembler.assemble(
+            segments: sources,
+            outputURL: fixture.directory.appendingPathComponent("joined.wav"),
+            configuration: fixture.configuration
+        )
+
+        XCTAssertGreaterThan(
+            evidence.maximumSegmentBoundaryJump,
+            LongFormAssemblyEvidence.advisoryMaximumSegmentBoundaryJump
+        )
+        XCTAssertTrue(evidence.exceedsAdvisoryBoundaryJump)
+        XCTAssertEqual(
+            evidence.advisoryWarnings,
+            ["boundary_jump:\(evidence.maximumSegmentBoundaryJump)"]
+        )
+    }
+
+    func testSmoothJoinRecordsNoAdvisoryAndOldEvidenceDecodesWithoutTheField() async throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanup() }
+        let segments = try (1...2).map {
+            try fixture.makeSegment(index: $0, audibleFrames: 500, edgeSilence: 64)
+        }
+        let evidence = try await BoundedLongFormAssembler.assemble(
+            segments: segments,
+            outputURL: fixture.directory.appendingPathComponent("joined.wav"),
+            configuration: fixture.configuration
+        )
+        XCTAssertFalse(evidence.exceedsAdvisoryBoundaryJump)
+        XCTAssertNil(evidence.advisoryWarnings)
+
+        // Pre-advisory manifests carry no advisoryWarnings key; decoding them
+        // must keep working.
+        var payload = try XCTUnwrap(
+            try JSONSerialization.jsonObject(with: JSONEncoder().encode(evidence)) as? [String: Any]
+        )
+        payload.removeValue(forKey: "advisoryWarnings")
+        let decoded = try JSONDecoder().decode(
+            LongFormAssemblyEvidence.self,
+            from: JSONSerialization.data(withJSONObject: payload)
+        )
+        XCTAssertNil(decoded.advisoryWarnings)
+        XCTAssertEqual(decoded.maximumSegmentBoundaryJump, evidence.maximumSegmentBoundaryJump)
+    }
+
     func testDefaultPauseComesFromPlannerBoundarySemantics() async throws {
         let fixture = try Fixture()
         defer { fixture.cleanup() }

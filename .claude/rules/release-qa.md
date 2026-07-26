@@ -14,8 +14,8 @@
   `config/public-product-facts.json`, `config/toolchain.json`,
   `config/orchestration-contract.json`, `config/evidence-impact.json`,
   `config/project-health-contract.json`, and `config/release-evidence-contract.json`
-- `benchmarks/` schema-v1 compatibility/schema-v2 memory-qualified records, generated history,
-  and preserved reference baselines
+- `benchmarks/` schema-v1 compatibility, schema-v2 memory-qualified, and schema-v3
+  quality-identity records, generated history, and preserved reference baselines
 - `docs/releases/`
 - Release verification, evidence-impact, required-step, project-health, supply-chain, and packaging
   scripts (`scripts/verify_*.sh`, `scripts/release_evidence.py`, `scripts/required_step_ledger.py`,

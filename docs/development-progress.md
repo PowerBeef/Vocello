@@ -9,8 +9,10 @@ This checkpoint tracks the staged runtime convergence program. Focused Phase 4 a
 at `00c9eea637259cfce858d1fc7d43a1a2c52ff86d` (delivered by [PR #78](https://github.com/PowerBeef/Vocello/pull/78)
 as `d39b9a6…`). On 2026-07-20, Phase 0/5/6 closed and Phase 4 **`overallPromotion: passed`**
 (`a4bb483`). That closed the cutover gate. On 2026-07-23, Phases 7 (UI-context gap), 8 (shared-component
-live validation), and 14 (mechanical retirement, 14a + 14b SPI evaporation) also closed; Phases
-9–13 remain open. `config/runtime-refactor-contract.json` is the
+live validation), and 14 (mechanical retirement, 14a + 14b SPI evaporation) also closed. On
+2026-07-26, Phase 9 (runtime component reuse) closed, Phase 12 ships the fast-depth quality
+registry with the deep producer landed, and Phase 13 (history v3) is implemented with the first
+live record pending; phase 10–11 remainders stay open. `config/runtime-refactor-contract.json` is the
 machine-readable status record and wins over older prose that still says promotion is pending.
 
 | Plan phase | Current state |

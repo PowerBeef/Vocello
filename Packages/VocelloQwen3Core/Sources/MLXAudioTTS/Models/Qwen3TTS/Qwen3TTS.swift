@@ -3201,9 +3201,10 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         var trailingIdx = 0
         var inputEmbeds = inputEmbedsInit
         let eosTokenArray = MLXArray([Int32(eosTokenId)]).reshaped(1, 1)
-        let codeCache = talker.codePredictor.makeCache()
-        // Per-generation memo of the CP's per-pass RoPE tables + pass-0 mask
-        // (identical every frame — the cache is trimmed to 0 below).
+        // Per-generation CP execution state: the compiled per-pass plan and
+        // its baked pass-0 mask replace the eager per-frame graph rebuild
+        // (Stage 1 P3); the plan owns its K/V buffers, so no KVCacheSimple is
+        // allocated for the streaming CP.
         let codePredictorStepConstants = CodePredictorStepConstants()
 
         if isStreaming {
@@ -3315,12 +3316,17 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
             // saved. Record `stage1-p2aii-early-submit`
             // (macos-engine-20260726-060659-99b59f93).
 
-            // Generate remaining codebook tokens with code predictor
+            // Generate remaining codebook tokens with code predictor. Stage 1
+            // P3: the streaming path replays per-pass compiled functions (the
+            // per-frame position sequence is identical, so pass-indexed
+            // traces are exact); the compiled plan owns its K/V buffers, so
+            // the eager codeCache is neither written nor trimmed here.
             var codeTokens = [nextToken]
             let codeHidden = hidden[0..., (-1)..., 0...]
-            for layerCache in codeCache {
-                _ = layerCache.trim(layerCache.offset)
-            }
+            let codePredictorPlan = codePredictorStepConstants.compiledPlan(
+                for: talker.codePredictor,
+                dtype: codeHidden.dtype
+            )
 
             let codePredictorStartedAt = ContinuousClock.now
             let codePredictorSignpost = Qwen3Signposts.signposter.beginInterval("Code Predictor Loop")
@@ -3328,18 +3334,17 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                 let codePredictorStepStartedAt = ContinuousClock.now
                 let codePredictorStepSignpost =
                     Qwen3Signposts.signposter.beginInterval("Code Predictor Step")
-                let codeInput: MLXArray
+                let codeLogits: MLXArray
                 if codeIdx == 0 {
                     let code0Embed = talker.getInputEmbeddings()(nextToken)
-                    codeInput = concatenated([codeHidden, code0Embed], axis: 1)
+                    codeLogits = codePredictorPlan.run(
+                        pass: 0, codeHidden: codeHidden, code0Embed: code0Embed, token: nil
+                    )
                 } else {
-                    codeInput = talker.codePredictor.codecEmbedding[codeIdx - 1](codeTokens.last!)
+                    codeLogits = codePredictorPlan.run(
+                        pass: codeIdx, codeHidden: nil, code0Embed: nil, token: codeTokens.last!
+                    )
                 }
-
-                let (codeLogits, _, _) = talker.codePredictor(
-                    codeInput, cache: codeCache, generationStep: codeIdx,
-                    stepConstants: codePredictorStepConstants
-                )
                 Qwen3Signposts.signposter.endInterval(
                     "Code Predictor Step",
                     codePredictorStepSignpost

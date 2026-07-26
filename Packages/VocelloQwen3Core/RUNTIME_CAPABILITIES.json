@@ -1,9 +1,24 @@
 {
   "schemaVersion": 2,
   "componentID": "vocello-qwen3-core",
-  "allowedStates": ["production", "diagnostic", "internal", "retired"],
-  "allowedEvidenceClasses": ["static", "benchmark", "diagnostic", "historical", "unmeasured"],
-  "allowedBenchmarkEvidenceStatuses": ["verified", "diagnostic", "unverified"],
+  "allowedStates": [
+    "production",
+    "diagnostic",
+    "internal",
+    "retired"
+  ],
+  "allowedEvidenceClasses": [
+    "static",
+    "benchmark",
+    "diagnostic",
+    "historical",
+    "unmeasured"
+  ],
+  "allowedBenchmarkEvidenceStatuses": [
+    "verified",
+    "diagnostic",
+    "unverified"
+  ],
   "capabilities": [
     {
       "id": "owned-facade",
@@ -15,10 +30,18 @@
         "Sources/VocelloQwen3Core/LoadedModel.swift",
         "Sources/VocelloQwen3Core/Runtime.swift"
       ],
-      "testPatterns": ["Tests/Qwen3RuntimeTests/VocelloQwen3FacadeTests.swift"],
-      "documentation": ["README.md", "COMPATIBILITY.json", "OWNERSHIP.json"],
+      "testPatterns": [
+        "Tests/Qwen3RuntimeTests/VocelloQwen3FacadeTests.swift"
+      ],
+      "documentation": [
+        "README.md",
+        "COMPATIBILITY.json",
+        "OWNERSHIP.json"
+      ],
       "evidenceClass": "static",
-      "upstreamDeltaIDs": ["FACADE-001"]
+      "upstreamDeltaIDs": [
+        "FACADE-001"
+      ]
     },
     {
       "id": "actor-classified-generation",
@@ -34,47 +57,94 @@
         "Tests/Qwen3RuntimeTests/ClassifiedGenerationSessionTests.swift",
         "Tests/Qwen3RuntimeTests/VocelloQwen3FacadeTests.swift"
       ],
-      "documentation": ["README.md", "COMPATIBILITY.json", "OWNERSHIP.json"],
+      "documentation": [
+        "README.md",
+        "COMPATIBILITY.json",
+        "OWNERSHIP.json"
+      ],
       "evidenceClass": "static",
-      "upstreamDeltaIDs": ["FACADE-001"]
+      "upstreamDeltaIDs": [
+        "FACADE-001"
+      ]
     },
     {
       "id": "package-surface",
       "title": "Stable Qwen3-only Swift package surface",
       "state": "production",
-      "sourcePatterns": [".gitignore", "Package.swift", "Examples/**"],
-      "testPatterns": ["Tests/Qwen3RuntimeTests/**"],
-      "documentation": ["README.md", "COMPATIBILITY.json", "OWNERSHIP.json"],
+      "sourcePatterns": [
+        ".gitignore",
+        "Package.swift",
+        "Examples/**"
+      ],
+      "testPatterns": [
+        "Tests/Qwen3RuntimeTests/**"
+      ],
+      "documentation": [
+        "README.md",
+        "COMPATIBILITY.json",
+        "OWNERSHIP.json"
+      ],
       "evidenceClass": "static",
-      "upstreamDeltaIDs": ["PKG-001"]
+      "upstreamDeltaIDs": [
+        "PKG-001"
+      ]
     },
     {
       "id": "generation-contracts",
       "title": "Typed generation, completion, and output contracts",
       "state": "production",
-      "sourcePatterns": ["Sources/MLXAudioCore/**", "Sources/MLXAudioTTS/Generation.swift", "Sources/MLXAudioTTS/TTSModel.swift"],
-      "testPatterns": ["Tests/Qwen3RuntimeTests/**"],
-      "documentation": ["PERFORMANCE.md"],
+      "sourcePatterns": [
+        "Sources/MLXAudioCore/**",
+        "Sources/MLXAudioTTS/Generation.swift",
+        "Sources/MLXAudioTTS/TTSModel.swift"
+      ],
+      "testPatterns": [
+        "Tests/Qwen3RuntimeTests/**"
+      ],
+      "documentation": [
+        "PERFORMANCE.md"
+      ],
       "evidenceClass": "static",
-      "upstreamDeltaIDs": ["CORE-001"]
+      "upstreamDeltaIDs": [
+        "CORE-001"
+      ]
     },
     {
       "id": "mimi-codec",
       "title": "Mimi codec primitives and partition-invariant streaming decode",
       "state": "production",
-      "sourcePatterns": ["Sources/MLXAudioCodecs/**", "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSSpeechTokenizer.swift"],
-      "testPatterns": ["Tests/Qwen3RuntimeTests/Qwen3DecoderPartitionTests.swift"],
-      "documentation": ["PERFORMANCE.md"],
+      "sourcePatterns": [
+        "Sources/MLXAudioCodecs/**",
+        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSSpeechTokenizer.swift"
+      ],
+      "testPatterns": [
+        "Tests/Qwen3RuntimeTests/Qwen3DecoderPartitionTests.swift"
+      ],
+      "documentation": [
+        "PERFORMANCE.md"
+      ],
       "evidenceClass": "static",
-      "upstreamDeltaIDs": ["CODEC-001"]
+      "upstreamDeltaIDs": [
+        "CODEC-001"
+      ]
     },
     {
       "id": "qwen3-loading-and-sampling",
       "title": "Revision-aware Qwen3 loading, checkpoint compatibility, and sampling",
       "state": "production",
-      "sourcePatterns": ["Sources/MLXAudioCore/ModelUtils.swift", "Sources/MLXAudioTTS/ModelDiagnostics.swift", "Sources/MLXAudioTTS/TextProcessor.swift", "Sources/MLXAudioTTS/Models/Qwen3TTS/**"],
-      "testPatterns": ["Tests/Qwen3RuntimeTests/**"],
-      "documentation": ["PERFORMANCE.md", "UPSTREAM.md"],
+      "sourcePatterns": [
+        "Sources/MLXAudioCore/ModelUtils.swift",
+        "Sources/MLXAudioTTS/ModelDiagnostics.swift",
+        "Sources/MLXAudioTTS/TextProcessor.swift",
+        "Sources/MLXAudioTTS/Models/Qwen3TTS/**"
+      ],
+      "testPatterns": [
+        "Tests/Qwen3RuntimeTests/**"
+      ],
+      "documentation": [
+        "PERFORMANCE.md",
+        "UPSTREAM.md"
+      ],
       "evidenceClass": "diagnostic",
       "benchmarkRecordIDs": [
         "macos-xcui-benchmark-20260717-192747-0ae9d73c",
@@ -86,15 +156,31 @@
       ],
       "benchmarkEvidenceStatus": "diagnostic",
       "benchmarkEvidenceReason": "Focused macOS and physical-iPhone Custom, Design, and Clone runs exercised request-local sampling v2 on the exact dirty worktree fingerprints; clean fixed-seed repeat controls and full-matrix promotion remain pending.",
-      "upstreamDeltaIDs": ["LOAD-001", "SAMPLER-001", "SAMPLER-002", "COMPAT-001", "TEL-001"]
+      "upstreamDeltaIDs": [
+        "LOAD-001",
+        "SAMPLER-001",
+        "SAMPLER-002",
+        "COMPAT-001",
+        "TEL-001"
+      ]
     },
     {
       "id": "bounded-streaming",
       "title": "Bounded streaming, generation ownership, and final-audio barrier",
       "state": "production",
-      "sourcePatterns": ["Sources/MLXAudioTTS/RuntimeDebugGate.swift", "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3StreamingMemoryTuning.swift", "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift"],
-      "testPatterns": ["Tests/Qwen3RuntimeTests/Qwen3GenerationGateTests.swift", "Tests/Qwen3RuntimeTests/Qwen3StreamingContractTests.swift"],
-      "documentation": ["PERFORMANCE.md"],
+      "sourcePatterns": [
+        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3StreamingMemoryTuning.swift",
+        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
+        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSCodePredictorCompiled.swift",
+        "Sources/MLXAudioTTS/RuntimeDebugGate.swift"
+      ],
+      "testPatterns": [
+        "Tests/Qwen3RuntimeTests/Qwen3GenerationGateTests.swift",
+        "Tests/Qwen3RuntimeTests/Qwen3StreamingContractTests.swift"
+      ],
+      "documentation": [
+        "PERFORMANCE.md"
+      ],
       "evidenceClass": "diagnostic",
       "benchmarkRecordIDs": [
         "macos-xcui-benchmark-20260717-192747-0ae9d73c",
@@ -106,7 +192,11 @@
       ],
       "benchmarkEvidenceStatus": "diagnostic",
       "benchmarkEvidenceReason": "Focused macOS and physical-iPhone Custom, Design, and Clone classified-session runs passed on the exact dirty worktree fingerprints; clean repeated controls and full-matrix promotion remain pending.",
-      "upstreamDeltaIDs": ["CONC-001", "STREAM-001"]
+      "upstreamDeltaIDs": [
+        "CONC-001",
+        "STREAM-001",
+        "DECODE-001"
+      ]
     },
     {
       "id": "clone-artifacts",
@@ -120,19 +210,33 @@
         "Tests/Qwen3RuntimeTests/Qwen3CloneArtifactIntegrityTests.swift",
         "Tests/Qwen3RuntimeTests/Qwen3SpeakerMelFrontendTests.swift"
       ],
-      "documentation": ["CLONE_ARTIFACT_FORMAT.md", "PERFORMANCE.md"],
+      "documentation": [
+        "CLONE_ARTIFACT_FORMAT.md",
+        "PERFORMANCE.md"
+      ],
       "evidenceClass": "diagnostic",
-      "upstreamDeltaIDs": ["CLONE-001", "CLONE-002"]
+      "upstreamDeltaIDs": [
+        "CLONE-001",
+        "CLONE-002"
+      ]
     },
     {
       "id": "runtime-tests",
       "title": "Curated deterministic owned-runtime assurance",
       "state": "internal",
-      "sourcePatterns": ["Tests/Qwen3RuntimeTests/**"],
-      "testPatterns": ["Tests/Qwen3RuntimeTests/**"],
-      "documentation": ["README.md"],
+      "sourcePatterns": [
+        "Tests/Qwen3RuntimeTests/**"
+      ],
+      "testPatterns": [
+        "Tests/Qwen3RuntimeTests/**"
+      ],
+      "documentation": [
+        "README.md"
+      ],
       "evidenceClass": "static",
-      "upstreamDeltaIDs": ["PKG-001"]
+      "upstreamDeltaIDs": [
+        "PKG-001"
+      ]
     }
   ]
 }

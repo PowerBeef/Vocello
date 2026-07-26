@@ -39,9 +39,18 @@
       "title": "Qwen3-only package and deterministic product surface",
       "category": "package",
       "state": "active",
-      "files": [".gitignore", "Package.swift", "Examples/**"],
-      "tests": ["Tests/Qwen3RuntimeTests/**"],
-      "documentation": ["README.md", "UPSTREAM.md"],
+      "files": [
+        ".gitignore",
+        "Package.swift",
+        "Examples/**"
+      ],
+      "tests": [
+        "Tests/Qwen3RuntimeTests/**"
+      ],
+      "documentation": [
+        "README.md",
+        "UPSTREAM.md"
+      ],
       "evidenceClass": "static",
       "benchmarkRecordIDs": [],
       "upstreamDisposition": "local-only",
@@ -59,8 +68,12 @@
         "Sources/MLXAudioTTS/Generation.swift",
         "Sources/MLXAudioTTS/TTSModel.swift"
       ],
-      "tests": ["Tests/Qwen3RuntimeTests/**"],
-      "documentation": ["PERFORMANCE.md"],
+      "tests": [
+        "Tests/Qwen3RuntimeTests/**"
+      ],
+      "documentation": [
+        "PERFORMANCE.md"
+      ],
       "evidenceClass": "static",
       "benchmarkRecordIDs": [],
       "upstreamDisposition": "upstreamable",
@@ -77,10 +90,16 @@
         "Sources/MLXAudioTTS/TTSModel.swift",
         "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift"
       ],
-      "tests": ["Tests/Qwen3RuntimeTests/**"],
-      "documentation": ["PERFORMANCE.md"],
+      "tests": [
+        "Tests/Qwen3RuntimeTests/**"
+      ],
+      "documentation": [
+        "PERFORMANCE.md"
+      ],
       "evidenceClass": "benchmark",
-      "benchmarkRecordIDs": ["macos-xcui-benchmark-20260716-181853-b4c2e299"],
+      "benchmarkRecordIDs": [
+        "macos-xcui-benchmark-20260716-181853-b4c2e299"
+      ],
       "benchmarkEvidenceStatus": "diagnostic",
       "benchmarkEvidenceReason": "Runtime convergence changed the measured source identity; the historical record remains a control, not verification of the current runtime.",
       "upstreamDisposition": "local-only",
@@ -98,10 +117,16 @@
         "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSConfig.swift",
         "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSTalker.swift"
       ],
-      "tests": ["Tests/Qwen3RuntimeTests/**"],
-      "documentation": ["PERFORMANCE.md"],
+      "tests": [
+        "Tests/Qwen3RuntimeTests/**"
+      ],
+      "documentation": [
+        "PERFORMANCE.md"
+      ],
       "evidenceClass": "benchmark",
-      "benchmarkRecordIDs": ["macos-xcui-benchmark-20260716-181853-b4c2e299"],
+      "benchmarkRecordIDs": [
+        "macos-xcui-benchmark-20260716-181853-b4c2e299"
+      ],
       "benchmarkEvidenceStatus": "diagnostic",
       "benchmarkEvidenceReason": "Sampling algorithm v2 changes random-state ownership and requires fresh fixed-seed quality evidence.",
       "upstreamDisposition": "upstreamable",
@@ -125,7 +150,9 @@
         "Tests/Qwen3RuntimeTests/Qwen3RequestSamplingTests.swift",
         "Tests/Qwen3RuntimeTests/VocelloQwen3FacadeTests.swift"
       ],
-      "documentation": ["PERFORMANCE.md"],
+      "documentation": [
+        "PERFORMANCE.md"
+      ],
       "evidenceClass": "benchmark",
       "benchmarkRecordIDs": [
         "macos-xcui-benchmark-20260717-192747-0ae9d73c",
@@ -153,8 +180,12 @@
         "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
         "Tests/Qwen3RuntimeTests/Qwen3StreamingContractTests.swift"
       ],
-      "tests": ["Tests/Qwen3RuntimeTests/Qwen3StreamingContractTests.swift"],
-      "documentation": ["PERFORMANCE.md"],
+      "tests": [
+        "Tests/Qwen3RuntimeTests/Qwen3StreamingContractTests.swift"
+      ],
+      "documentation": [
+        "PERFORMANCE.md"
+      ],
       "evidenceClass": "benchmark",
       "benchmarkRecordIDs": [
         "macos-xcui-benchmark-20260717-192747-0ae9d73c",
@@ -179,8 +210,12 @@
         "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
         "Tests/Qwen3RuntimeTests/Qwen3CloneArtifactIntegrityTests.swift"
       ],
-      "tests": ["Tests/Qwen3RuntimeTests/Qwen3CloneArtifactIntegrityTests.swift"],
-      "documentation": ["CLONE_ARTIFACT_FORMAT.md"],
+      "tests": [
+        "Tests/Qwen3RuntimeTests/Qwen3CloneArtifactIntegrityTests.swift"
+      ],
+      "documentation": [
+        "CLONE_ARTIFACT_FORMAT.md"
+      ],
       "evidenceClass": "static",
       "benchmarkRecordIDs": [],
       "upstreamDisposition": "upstreamable",
@@ -201,7 +236,10 @@
         "Tests/Qwen3RuntimeTests/Qwen3CloneArtifactIntegrityTests.swift",
         "Tests/Qwen3RuntimeTests/Qwen3SpeakerMelFrontendTests.swift"
       ],
-      "documentation": ["CLONE_ARTIFACT_FORMAT.md", "PERFORMANCE.md"],
+      "documentation": [
+        "CLONE_ARTIFACT_FORMAT.md",
+        "PERFORMANCE.md"
+      ],
       "evidenceClass": "diagnostic",
       "benchmarkRecordIDs": [],
       "upstreamDisposition": "upstreamable",
@@ -217,8 +255,12 @@
         "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
         "Tests/Qwen3RuntimeTests/Qwen3GenerationGateTests.swift"
       ],
-      "tests": ["Tests/Qwen3RuntimeTests/Qwen3GenerationGateTests.swift"],
-      "documentation": ["PERFORMANCE.md"],
+      "tests": [
+        "Tests/Qwen3RuntimeTests/Qwen3GenerationGateTests.swift"
+      ],
+      "documentation": [
+        "PERFORMANCE.md"
+      ],
       "evidenceClass": "static",
       "benchmarkRecordIDs": [],
       "upstreamDisposition": "upstreamable",
@@ -234,8 +276,12 @@
         "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSSpeechTokenizer.swift",
         "Tests/Qwen3RuntimeTests/Qwen3DecoderPartitionTests.swift"
       ],
-      "tests": ["Tests/Qwen3RuntimeTests/Qwen3DecoderPartitionTests.swift"],
-      "documentation": ["PERFORMANCE.md"],
+      "tests": [
+        "Tests/Qwen3RuntimeTests/Qwen3DecoderPartitionTests.swift"
+      ],
+      "documentation": [
+        "PERFORMANCE.md"
+      ],
       "evidenceClass": "static",
       "benchmarkRecordIDs": [],
       "upstreamDisposition": "upstreamable",
@@ -252,8 +298,12 @@
         "Sources/MLXAudioTTS/ModelDiagnostics.swift",
         "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift"
       ],
-      "tests": ["Tests/Qwen3RuntimeTests/**"],
-      "documentation": ["PERFORMANCE.md"],
+      "tests": [
+        "Tests/Qwen3RuntimeTests/**"
+      ],
+      "documentation": [
+        "PERFORMANCE.md"
+      ],
       "evidenceClass": "diagnostic",
       "benchmarkRecordIDs": [],
       "upstreamDisposition": "local-only",
@@ -277,8 +327,16 @@
         "Tests/Qwen3RuntimeTests/ClassifiedGenerationSessionTests.swift",
         "Tests/Qwen3RuntimeTests/VocelloQwen3FacadeTests.swift"
       ],
-      "tests": ["Tests/Qwen3RuntimeTests/ClassifiedGenerationSessionTests.swift", "Tests/Qwen3RuntimeTests/VocelloQwen3FacadeTests.swift"],
-      "documentation": ["README.md", "COMPATIBILITY.json", "OWNERSHIP.json", "PERFORMANCE.md"],
+      "tests": [
+        "Tests/Qwen3RuntimeTests/ClassifiedGenerationSessionTests.swift",
+        "Tests/Qwen3RuntimeTests/VocelloQwen3FacadeTests.swift"
+      ],
+      "documentation": [
+        "README.md",
+        "COMPATIBILITY.json",
+        "OWNERSHIP.json",
+        "PERFORMANCE.md"
+      ],
       "evidenceClass": "static",
       "benchmarkRecordIDs": [],
       "upstreamDisposition": "local-only",
@@ -295,13 +353,44 @@
         "Sources/MLXAudioTTS/Models/Qwen3TTS/README.md",
         "Sources/MLXAudioTTS/TextProcessor.swift"
       ],
-      "tests": ["Tests/Qwen3RuntimeTests/**"],
-      "documentation": ["UPSTREAM.md"],
+      "tests": [
+        "Tests/Qwen3RuntimeTests/**"
+      ],
+      "documentation": [
+        "UPSTREAM.md"
+      ],
       "evidenceClass": "static",
       "benchmarkRecordIDs": [],
       "upstreamDisposition": "blocked",
       "upstreamEquivalentCommit": null,
       "removalCriteria": "Remove only when all pinned model artifacts adopt one verified upstream representation."
+    },
+    {
+      "id": "DECODE-001",
+      "title": "Per-pass compiled code-predictor execution for the streaming decode loop",
+      "category": "decoding",
+      "state": "active",
+      "files": [
+        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
+        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSCodePredictor.swift",
+        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSCodePredictorCompiled.swift"
+      ],
+      "tests": [
+        "Tests/Qwen3RuntimeTests/Qwen3CodePredictorCompiledTests.swift"
+      ],
+      "documentation": [
+        "PERFORMANCE.md"
+      ],
+      "evidenceClass": "benchmark",
+      "benchmarkRecordIDs": [
+        "macos-engine-20260726-055949-8e3c8639",
+        "macos-engine-20260726-063621-2378350e"
+      ],
+      "benchmarkEvidenceStatus": "diagnostic",
+      "benchmarkEvidenceReason": "Same-day A/B on the exact pre-commit worktree: +8.3% to +10.6% warm RTF on every custom/clone cell with 12/12 fixed-seed byte-identity and a clean 12-seed QC soak; a clean canonical matrix can upgrade this status.",
+      "upstreamDisposition": "local-only",
+      "upstreamEquivalentCommit": null,
+      "removalCriteria": "Remove only if the streaming loop stops replaying a fixed per-frame code-predictor position sequence (which the pass-indexed traces require) or an upstream compiled equivalent ships."
     }
   ]
 }

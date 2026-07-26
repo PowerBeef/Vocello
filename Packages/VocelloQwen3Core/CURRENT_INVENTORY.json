@@ -268,13 +268,18 @@
     },
     {
       "path": "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
-      "sha256": "a32afc13f929c07b43edac2b2997e7269dcf1b13dbca66890e78f4cb0fc766f8",
+      "sha256": "6392ced9047bed5fa6beae4617210501eec119ce02b9d4336020db0a13002fde",
       "upstreamStatus": "modified"
     },
     {
       "path": "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSCodePredictor.swift",
-      "sha256": "b4c3123aa88ee357724203fe2108bc045387fd650f420c9a068a8efde98b7c08",
+      "sha256": "6ed65641cd819155d98305b513fda4d12879b4665f3f945c12c7d7e828ef0c74",
       "upstreamStatus": "modified"
+    },
+    {
+      "path": "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSCodePredictorCompiled.swift",
+      "sha256": "9aa4e123719274ca5d684b0caa6bbcb8312a21283bb8c0e9a060ecf49606169a",
+      "upstreamStatus": "added"
     },
     {
       "path": "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSConfig.swift",
@@ -372,6 +377,11 @@
       "upstreamStatus": "added"
     },
     {
+      "path": "Tests/Qwen3RuntimeTests/Qwen3CodePredictorCompiledTests.swift",
+      "sha256": "89431934edb7ad94f70b3f9460968cb04468d2f157fe01cfb1bed095f45b747c",
+      "upstreamStatus": "added"
+    },
+    {
       "path": "Tests/Qwen3RuntimeTests/Qwen3DecoderPartitionTests.swift",
       "sha256": "c60609493e3743255e4aea8f7bf6713a89b7808204974602e8e51dfc37eb4e44",
       "upstreamStatus": "added"
@@ -412,11 +422,11 @@
     "Examples/**"
   ],
   "summary": {
-    "added": 22,
+    "added": 24,
     "identical": 37,
     "modified": 21,
     "removed": 0,
-    "retained": 80
+    "retained": 82
   },
   "upstreamBaselineSHA256": "08099111586a931f12b8d259938963ccdc8385d21009701779fea2ceb847c1c2"
 }

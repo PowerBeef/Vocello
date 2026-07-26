@@ -89,6 +89,7 @@ from schema-v2 memory trends.
 |---|---|---|---|---|---|---:|---|---|---|---|
 | 2026-07-26 | [`macos-engine-20260726-055949-8e3c8639`](runs/engine-generation/macos-engine-20260726-055949-8e3c8639.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 25 | `b14ad022be73` dirty | `excluded` | baseline | stage1-p2a-pipelined |
 | 2026-07-26 | [`macos-engine-20260726-060659-99b59f93`](runs/engine-generation/macos-engine-20260726-060659-99b59f93.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 25 | `549b884d2405` dirty | `excluded` | baseline | stage1-p2aii-early-submit |
+| 2026-07-26 | [`macos-engine-20260726-063621-2378350e`](runs/engine-generation/macos-engine-20260726-063621-2378350e.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 25 | `38f1eae583a8` dirty | `excluded` | baseline | stage1-p3-compiled-cp |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `9ccbb95f35b8`
 

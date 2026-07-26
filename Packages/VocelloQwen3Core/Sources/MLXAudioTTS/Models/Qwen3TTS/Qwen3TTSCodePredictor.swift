@@ -140,11 +140,24 @@ final class CodePredictorDecoderLayer: Module {
 /// (RoPE needs no tables here — it is fused into the attention kernel.)
 final class CodePredictorStepConstants {
     private var causalMasks: [Int: MLXArray] = [:]
+    private var compiledPlan: CodePredictorCompiledPlan?
 
     fileprivate func causalMask(seqLen: Int, compute: () -> MLXArray) -> MLXArray {
         if let cached = causalMasks[seqLen] { return cached }
         let fresh = compute()
         causalMasks[seqLen] = fresh
+        return fresh
+    }
+
+    /// Per-generation compiled CP plan (Stage 1 P3); traced lazily on the
+    /// first frame and replayed for the rest of the generation.
+    func compiledPlan(
+        for predictor: Qwen3TTSCodePredictor,
+        dtype: DType
+    ) -> CodePredictorCompiledPlan {
+        if let compiledPlan { return compiledPlan }
+        let fresh = CodePredictorCompiledPlan(predictor: predictor, dtype: dtype)
+        compiledPlan = fresh
         return fresh
     }
 }

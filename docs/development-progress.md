@@ -163,10 +163,12 @@ review doc):
    2026-07-26**, measurements in `benchmarks/OPTIMIZATION.md` §M): P2a-i (pipelined chunk
    materialization) landed with byte-identical fixed-seed output and clone warm RTF
    +1.6/+3.3/+0.5%; the P2a-ii early-submit variant measured as a do-NOT (custom/long −3.9%)
-   and is reverted with its record kept. Remaining: P3 compile the code-predictor step
-   (per-pass-index compiled functions — the RoPE offset is a trace-time constant), P5b codec
-   decode on a second MLX stream, and the branch-only P1b talker static-shape experiment.
-   Every engine-loop change carries fixed-seed byte-identity plus the §K QC soak.
+   and is reverted with its record kept. **P3 (compiled code-predictor) landed the program's
+   largest win: +8.3% to +10.6% warm RTF on every cell** (clone/long 1.128 → 1.243) with
+   byte-identical shipping output — MLX compile's fp32 fusion rounding sits below bf16
+   resolution. Remaining: P5b codec decode on a second MLX stream, the branch-only P1b talker
+   static-shape experiment, and the stage-exit GPU-busy re-capture. Every engine-loop change
+   carries fixed-seed byte-identity plus the §K QC soak.
 3. **Stage 2 — memory program (folds phase 9)**: speech-tokenizer runtime reuse across mode
    switches (the RAM analog of the shipped disk hard-linking), text-embedding quantization
    experiment (622 MB BF16 today inside the "4-bit" artifact), codec bf16 experiment

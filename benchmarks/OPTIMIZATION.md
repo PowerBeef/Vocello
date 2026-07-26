@@ -851,11 +851,18 @@ the §K 12-seed clone/long QC soak.
   (record `…-060659-99b59f93`). The second command buffer plus the fusion break at the early
   materialization boundary cost more launches than the overlap recovered. Reverted; a code
   comment marks the do-NOT at the site.
-- **Next:** P3 — compile the code-predictor pass to eliminate its per-frame host graph
-  rebuild (15.4% of wall at <1% GPU busy). Design constraint discovered up front: `offset`
-  enters the fused RoPE as a trace-time constant and passes 1–14 share shapes while
-  differing in offset, so compiled functions must be keyed per pass index (15 stable
-  entries), never by shape alone.
+- **P3 — compiled code-predictor pass (landed 2026-07-26).** The streaming loop replays 15
+  per-pass-index compiled functions (`CodePredictorCompiledPlan`, per generation) instead of
+  rebuilding ~15 op graphs on the host every frame. Two design constraints drove the shape:
+  the fused-RoPE `offset` is a trace-time constant while passes 1–14 share shapes (so
+  functions are keyed by pass index, never by shape), and `KVCacheSimple` advances host
+  state inside `update` (so the plan owns explicit K/V buffers with slices baked per pass;
+  the per-frame position replay makes them exact). **Result: +8.3% to +10.6% warm RTF on
+  every cell** (records `…-055949-8e3c8639` → `…-063621-2378350e`; clone/long 1.128 → 1.243,
+  custom/medium warm 1.103 → 1.220). Numerics: MLX compile's fusion reorders fp32 rounding
+  by ~1e-7 (unit test pins the tolerance), which sits below bf16 resolution — the shipping
+  model is **byte-identical** end-to-end (12/12 identity + 12/12 QC soak). The eager path
+  remains for the non-streaming loop and as the equivalence-test reference.
 
 ## Status
 

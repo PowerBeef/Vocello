@@ -647,6 +647,7 @@ python3 -m unittest \
   scripts.test_check_ios_speech_assets \
   scripts.test_check_language_hints \
   scripts.test_check_language_output \
+  scripts.test_clone_speaker_similarity \
   scripts.test_device_state_classifier \
   scripts.test_validate_backend_risk_spine
 fi

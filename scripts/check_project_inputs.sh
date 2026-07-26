@@ -59,6 +59,8 @@ REQUIRED_SURFACES=(
     "scripts/test_check_macos_xpc_bench.py"
     "scripts/test_check_ios_ui_benchmark.py"
     "scripts/test_check_language_output.py"
+    "scripts/clone_speaker_similarity.py"
+    "scripts/test_clone_speaker_similarity.py"
     "scripts/tests/test_build_output_policy.py"
     "scripts/tests/test_codex_session_storage.py"
     "scripts/tests/test_documentation_contract.py"

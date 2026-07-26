@@ -800,6 +800,36 @@ one-cell lanes (custom/long warm, identical `-O` engine code, same session):
   `custom:speed:` uses the default sentence; `custom:speed:long` speaks the word "long" and
   fails with zero emitted frames.)
 
+## L — Roadmap Stage 0 measurements (2026-07-26)
+
+Stage 0 of the adopted optimization roadmap
+(`docs/reference/optimization-report-review-2026-07-25.md`) landed as four commits with the
+following measured outcomes on the canonical Mac mini M2 8 GB:
+
+- **Clone reference trailing-silence append (`b16167d`).** ICL references now carry 0.5 s of
+  appended silence into codec encode; the persisted-artifact conditioning version moved to
+  `qwen-speaker-mel-v1+icl-ref-silence500ms-v2`. Live checks: same-seed takes byte-identical
+  on the new build; before/after WAVs differ at both probe seeds (conditioning genuinely
+  changed); the saved-voice artifact migrated fail-closed (old version rejected at adopt,
+  rebuilt, re-persisted) with no user-visible error.
+- **Clone/long intermittent dropout band (pre-existing).** One unseeded bench take hard-failed
+  Fast QC (`dropout:1337ms`) on the changed tree. Twelve fixed seeds (1001–1012, bench long
+  text) then passed 12/12 on **both** the pre-change build (`22e99d1`) and the changed build —
+  the band is low-rate, random-seed, and predates the silence append; engine Fast QC already
+  rejects such takes at generation time. Treat future single hard-fails on unseeded clone/long
+  runs as this band unless a fixed-seed soak reproduces them.
+- **Repetition-penalty A/B (`f97598a`).** New gated `QWENVOICE_TALKER_REPPEN` knob (talker
+  only). Same 12 seeds at 1.05 vs 1.10: both arms 12/12 QC pass; interior near-silence proxy
+  (50 ms RMS windows < −45 dBFS, interior only) mean 504 ms → 547 ms and over-400 ms count
+  8 → 9 at 1.10. No deterministic-QC win → the official 1.05 default ships unchanged.
+- **Long-form boundary advisory (`5fc0f3c`).** The assembler's `maximumSegmentBoundaryJump`
+  now records a warn-first `boundary_jump:<value>` advisory above 4 096 PCM16 units; no run
+  fails on it. Distribution data accumulates in manifests for a future hard threshold.
+- **Post-change clone matrix record.** The full clone Speed bench (3 lengths × warm 4, label
+  `stage0-clone-silence-bench`) passed 15/15 with clean QC on the silence-append runtime and
+  published `macos-engine-20260726-054111-e95e1285` — the comparison record for post-change
+  clone RTF against the `release-QA-2.2.0` band.
+
 ## Status
 
 The optimization program tracked in this document is wrapped up. The §H P0–P6 work has been

@@ -63,6 +63,12 @@ from schema-v2 memory trends.
 | 2026-07-23 | [`macos-engine-20260723-031416-ed258b6b`](runs/engine-generation/macos-engine-20260723-031416-ed258b6b.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 4 | `109559888e4d` dirty | `excluded` | baseline | p7-cli-O |
 | 2026-07-23 | [`macos-engine-20260723-031603-47801d81`](runs/engine-generation/macos-engine-20260723-031603-47801d81.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 4 | `109559888e4d` dirty | `excluded` | baseline | p7-cli-O-bg |
 
+## engine-generation / macos / mac-mini-m2-8gb / config `4a6ac27c9e60`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---|---|---|---|
+| 2026-07-26 | [`macos-engine-20260726-054111-e95e1285`](runs/engine-generation/macos-engine-20260726-054111-e95e1285.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 12 | `f97598a6c6a1` dirty | `excluded` | baseline | stage0-clone-silence-bench |
+
 ## engine-generation / macos / mac-mini-m2-8gb / config `817164bfb96c`
 
 | completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |

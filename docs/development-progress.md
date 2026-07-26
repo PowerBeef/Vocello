@@ -149,10 +149,16 @@ gated pin-bump/carryover/parked bets — lives in
 Remaining work now follows the staged roadmap (details and falsifiability criteria in the
 review doc):
 
-1. **Stage 0 — near-free quality wins**: clone reference 0.5 s trailing-silence append
-   (versioned clone-prompt identity + fixed-seed evidence), gate the already-computed
-   long-form `maximumSegmentBoundaryJump` (warn-first), duration-directive guardrail for
-   custom delivery text, repetition-penalty 1.05→~1.10 bench A/B against dropout counts.
+1. ~~**Stage 0 — near-free quality wins**~~ — **completed 2026-07-26** in four commits
+   (`b16167d`, `5fc0f3c`, Stage 0.3 delivery advisory, `f97598a`): the clone reference
+   silence append shipped with a versioned conditioning identity
+   (`qwen-speaker-mel-v1+icl-ref-silence500ms-v2`, fail-closed artifact migration verified
+   live), the long-form boundary jump gained a warn-first manifest advisory (>4096 PCM16
+   units), both apps advise on duration-style delivery directives (shared EN/FR detector,
+   never blocking), and the repetition-penalty A/B kept 1.05 (1.10 showed no
+   deterministic-QC win; the gated `QWENVOICE_TALKER_REPPEN` knob remains for diagnostics).
+   Measurements and the pre-existing clone/long dropout-band finding:
+   `benchmarks/OPTIMIZATION.md` §L.
 2. **Stage 1 — launch-bound attack on current pins** (§H P0 successor program): collapse the
    two per-token `.item()` host syncs and pipeline with `asyncEval` (double-buffered chunk
    materialization preserving the lossless channel), compile the code-predictor step (its

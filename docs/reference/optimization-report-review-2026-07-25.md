@@ -96,7 +96,12 @@ by expected value per unit risk; every engine-loop change carries the §K lesson
 fixed-seed QC soak (12/12 clean takes) before it may stay in-tree, because two prior
 diagnostic engine-loop edits produced intermittent Fast-QC hard failures.
 
-### Stage 0 — near-free wins (no engine-loop risk beyond QC soaks)
+### Stage 0 — near-free wins (no engine-loop risk beyond QC soaks) — **completed 2026-07-26**
+
+> All four items landed 2026-07-26 (commits `b16167d`, `5fc0f3c`, the delivery-advisory
+> commit, `f97598a`). Item 4's A/B kept the 1.05 default (no deterministic-QC win at 1.10).
+> Evidence and the pre-existing clone/long dropout-band finding: `benchmarks/OPTIMIZATION.md`
+> §L.
 
 1. **Clone reference trailing-silence append (Q4).** Append 0.5 s of silence to the
    reference audio before `speechTokenizer.encode` on the ICL path (upstream applies this by

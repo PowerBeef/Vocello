@@ -199,8 +199,8 @@ Stage-by-stage state (details and falsifiability criteria in the review doc):
    the 2.2 promotion** (measurements: `benchmarks/OPTIMIZATION.md` §N): ~~speech-tokenizer runtime reuse~~
    **shipped (phase 9 closed)**; ~~text-embedding quantization experiment~~ **validated in
    isolation** — 8-bit per-layer embedding cuts MLX active peak by 278 MB (−13.2%) and the
-   Speed artifact by 292 MB at RTF parity with clean QC; shipping it is a promotion-quality
-   artifact decision (new HF uploads + catalog re-pins) awaiting the maintainer;
+   Speed artifact by 292 MB at RTF parity with clean QC — then **promoted the same day**
+   (maintainer-approved; execution detailed below);
    ~~clone-prompt `refCodes` release~~ **declined** (retained tensors <100 KB and required
    per generation — the report's M5b premise corrected); ~~codec bf16 experiment~~
    measured and **parked**: the four-arm promotion battery (§N) confirmed a real,
@@ -354,7 +354,9 @@ identifiers differ. Restoring that component does not authorize Simulator execut
   manifest v3, persisted Fast QC, and the existing specialized gates remain operational truth.
   Focused physical-iPhone Phase 4 acceptance and the clean full-matrix promotion evidence both
   passed (2026-07-20 promotion, 2026-07-23 gated re-baseline); sequential streaming long-form,
-  complete v9 publication, and history v3 remain pending (Phases 11–13).
+  complete v9 publication, and history v3 were still pending at that checkpoint
+  (Phases 11–13; the phase table above is current — long-form and history v3 have since
+  shipped).
 - Clone conditioning is typed as transcript-backed or genuine audio-only x-vector. Both apps own
   the visible `voiceCloning_consentAcknowledgment` in Settings, persist the choice locally, and
   keep Clone Generate disabled until consent is acknowledged. Smoke and benchmark enable it through
@@ -580,7 +582,8 @@ required a UI-context cell in future promotion matrices, and pulled phase 14 ret
 The same day, GitHub's mixed macOS runner-image roll flapped the exact-version toolchain gate;
 xcodegen (2.46.0) and ripgrep (15.2.0) now install from SHA-pinned release artifacts via
 `scripts/install_pinned_tools.sh` in every native CI job. The §H P0 GPU-busy re-capture (a clean
-CLI-context Metal trace) remains open follow-up work alongside the phase 7 implementation.
+CLI-context Metal trace) remained open at that date and completed 2026-07-24 (§H P0 addendum:
+whole-generation GPU busy ~47%, still launch-bound).
 
 **2026-07-23 — Phase 7 characterization resolved the macOS decline as a benchmark observer
 effect** (`benchmarks/OPTIMIZATION.md` §J): XCUITest's default automatic screen recording

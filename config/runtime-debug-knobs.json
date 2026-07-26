@@ -43,6 +43,7 @@
         "QWENVOICE_SUBTALKER_TOPP",
         "QWENVOICE_SUPPRESS_WARMUP",
         "QWENVOICE_TALKER_MINP",
+        "QWENVOICE_TALKER_REPPEN",
         "QWENVOICE_TALKER_TEMP",
         "QWENVOICE_TALKER_TOPK",
         "QWENVOICE_TALKER_TOPP"
@@ -92,14 +93,18 @@
       "gateRequired": true,
       "releaseBehavior": "ignored-unless-master-gate-enabled",
       "purpose": "Deterministic reference-clip recording QA on machines without a usable microphone; replays a WAV through the genuine visible recording flow. Reclassified 2026-07-22 from the retired hidden-hook list by explicit maintainer decision.",
-      "keys": ["QWENVOICE_FAKE_MIC_WAV"]
+      "keys": [
+        "QWENVOICE_FAKE_MIC_WAV"
+      ]
     },
     {
       "id": "master-gate",
       "gateRequired": false,
       "releaseBehavior": "explicit-opt-in",
       "purpose": "Enables runtime diagnostic overrides in a Release-only build topology.",
-      "keys": ["QWENVOICE_DEBUG"]
+      "keys": [
+        "QWENVOICE_DEBUG"
+      ]
     }
   ]
 }

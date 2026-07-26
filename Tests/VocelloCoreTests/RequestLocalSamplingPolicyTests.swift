@@ -15,6 +15,9 @@ final class RequestLocalSamplingPolicyTests: XCTestCase {
         XCTAssertEqual(policy.talker.topP, 0.95, accuracy: 0.0001)
         XCTAssertEqual(policy.talker.topK, 50)
         XCTAssertEqual(policy.subtalker, policy.talker)
+        // Shipped default; a different value requires the Stage 0.4 bench A/B
+        // to win on deterministic QC first.
+        XCTAssertEqual(policy.repetitionPenalty, 1.05, accuracy: 0.0001)
         XCTAssertNoThrow(try policy.validated())
     }
 

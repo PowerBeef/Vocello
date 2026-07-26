@@ -14,6 +14,9 @@ enum Qwen3TalkerSamplingOverride {
     static let envSubtalkerTemperature: Float? = floatValue("QWENVOICE_SUBTALKER_TEMP")
     static let envSubtalkerTopP: Float? = floatValue("QWENVOICE_SUBTALKER_TOPP")
     static let envSubtalkerTopK: Int? = intValue("QWENVOICE_SUBTALKER_TOPK")
+    /// Talker-only repetition penalty for bench A/B against dropout counts
+    /// (Stage 0.4). The subtalker remains deliberately unpenalized.
+    static let envRepetitionPenalty: Float? = floatValue("QWENVOICE_TALKER_REPPEN")
 
     private static func floatValue(_ key: String) -> Float? {
         guard let raw = RuntimeDebugGate.value(for: key),
@@ -70,7 +73,7 @@ enum Qwen3TalkerSamplingOverride {
             effectiveSeed: effectiveSeed,
             talker: talker,
             subtalker: subtalker,
-            repetitionPenalty: official.repetitionPenalty,
+            repetitionPenalty: envRepetitionPenalty ?? official.repetitionPenalty,
             maxNewTokens: official.maxNewTokens,
             requestedSeed: requestedSeed
         )

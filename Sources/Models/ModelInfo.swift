@@ -14,6 +14,9 @@ struct ModelInfo: Identifiable, Codable, Equatable, Sendable {
     let complete: Bool
     let repairable: Bool
     let missingRequiredPaths: [String]
+    /// Catalog files present on disk whose byte count no longer matches the
+    /// current pinned production-catalog identity (empty when current).
+    let staleCatalogPaths: [String]
     let sizeBytes: Int
     let deepIntegrityStatus: String?
     let deepIntegrityMessage: String?
@@ -37,6 +40,7 @@ struct ModelInfo: Identifiable, Codable, Equatable, Sendable {
         case complete
         case repairable
         case missingRequiredPaths = "missing_required_paths"
+        case staleCatalogPaths = "stale_catalog_paths"
         case sizeBytes = "size_bytes"
         case deepIntegrityStatus = "deep_integrity_status"
         case deepIntegrityMessage = "deep_integrity_message"
@@ -53,5 +57,11 @@ struct ModelInfo: Identifiable, Codable, Equatable, Sendable {
 
     var requiresRepair: Bool {
         repairable && !complete
+    }
+
+    /// Installed and complete, but the pinned catalog identity moved on —
+    /// re-downloading through the authenticated delivery path updates it.
+    var updateAvailable: Bool {
+        complete && !staleCatalogPaths.isEmpty
     }
 }

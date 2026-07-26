@@ -75,7 +75,7 @@ final class IOSModelInstallerViewModel: ObservableObject {
         }
 
         switch modelManager.statuses[model.id] {
-        case .installed:
+        case .installed, .updateAvailable:
             return .idle
         case .checking:
             return .idle

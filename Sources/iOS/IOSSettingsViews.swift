@@ -572,6 +572,15 @@ struct IOSModelRow: View {
             switch status {
             case .installed:
                 installedControls
+            case .updateAvailable:
+                HStack(spacing: 8) {
+                    installButton(
+                        title: "Update",
+                        action: onInstall,
+                        accessibilityIdentifier: "iosModelUpdate_\(model.id)"
+                    )
+                    installedControls
+                }
             case .checking:
                 ProgressView()
             case .notInstalled:
@@ -734,6 +743,8 @@ struct IOSModelRow: View {
                 return nil
             case .installed:
                 return "Active"
+            case .updateAvailable:
+                return "Update available"
             case .incomplete:
                 return "Repair needed"
             case .error:

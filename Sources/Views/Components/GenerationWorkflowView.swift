@@ -744,6 +744,8 @@ struct GenerationVariantSelector: View {
             return "\(kind.bitDepthLabel), not installed"
         case .needsRepair:
             return "\(kind.bitDepthLabel), needs repair"
+        case .updateAvailable:
+            return "\(kind.bitDepthLabel), update available"
         case .checking, .downloading:
             return "\(kind.bitDepthLabel), \(status)"
         }

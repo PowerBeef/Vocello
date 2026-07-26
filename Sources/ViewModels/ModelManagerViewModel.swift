@@ -48,6 +48,7 @@ final class ModelManagerViewModel {
         case notDownloaded(message: String?)
         case downloading(progress: DownloadProgress)
         case repairAvailable(sizeBytes: Int, missingRequiredPaths: [String], message: String?)
+        case updateAvailable(sizeBytes: Int, stalePaths: [String])
         case downloaded(sizeBytes: Int)
     }
 
@@ -56,6 +57,7 @@ final class ModelManagerViewModel {
         case ready
         case notInstalled
         case needsRepair
+        case updateAvailable
         case downloading
     }
 
@@ -115,6 +117,17 @@ final class ModelManagerViewModel {
     }
 
     private nonisolated static let installMetadataFilename = ".qwenvoice-install-metadata.json"
+
+    /// Bundled production catalog, loaded once for the stale-artifact probe.
+    /// A missing/malformed catalog disables update detection only — the
+    /// authenticated delivery path still fail-closes any actual download.
+    private nonisolated static let productionCatalog: ProductionModelCatalog? = {
+        guard let url = Bundle.main.url(
+            forResource: "qwenvoice_production_model_catalog",
+            withExtension: "json"
+        ) else { return nil }
+        return try? ProductionModelCatalog(contentsOf: url)
+    }()
 
     private(set) var statuses: [String: ModelStatus] = [:]
     private(set) var modelInfoByID: [String: ModelInfo] = [:]
@@ -332,6 +345,12 @@ final class ModelManagerViewModel {
                 label: "Needs repair",
                 detail: message ?? repairDetail(missingRequiredPaths: missingRequiredPaths)
             )
+        case .updateAvailable:
+            return ModelPackagePresentation(
+                kind: .updateAvailable,
+                label: "Update available",
+                detail: "A newer model package is pinned. Update to download it."
+            )
         case .downloaded:
             return ModelPackagePresentation(
                 kind: .ready,
@@ -363,6 +382,8 @@ final class ModelManagerViewModel {
             return "Download"
         case .needsRepair:
             return "Repair"
+        case .updateAvailable:
+            return "Update"
         case .downloading:
             return presentation.label
         }
@@ -423,7 +444,9 @@ final class ModelManagerViewModel {
     /// elide the column instead of rendering an em-dash.
     func sizeText(for model: TTSModel) -> String? {
         switch statuses[model.id] {
-        case .downloaded(let sizeBytes), .repairAvailable(let sizeBytes, _, _):
+        case .downloaded(let sizeBytes),
+             .repairAvailable(let sizeBytes, _, _),
+             .updateAvailable(let sizeBytes, _):
             guard sizeBytes > 0 else { return nil }
             return Self.formattedFileSize(Int64(sizeBytes))
         case .notDownloaded:
@@ -864,6 +887,9 @@ final class ModelManagerViewModel {
     }
 
     private func status(for info: ModelInfo, failureMessage: String?) -> ModelStatus {
+        if info.updateAvailable {
+            return .updateAvailable(sizeBytes: info.sizeBytes, stalePaths: info.staleCatalogPaths)
+        }
         if info.complete {
             return .downloaded(sizeBytes: info.sizeBytes)
         }
@@ -966,6 +992,26 @@ final class ModelManagerViewModel {
         }
         let complete = presenceComplete && deepFailedRelativePaths.isEmpty
         let effectiveMissingRequiredPaths = (missingRequiredPaths + deepFailedRelativePaths).sorted()
+        // Update detection: a complete install may still predate the current
+        // catalog pin. Byte-count probe only — repair re-verifies every digest
+        // through the ordinary authenticated delivery plan.
+        var staleCatalogPaths: [String] = []
+        if complete,
+           let catalog = Self.productionCatalog,
+           let artifact = try? catalog.artifactMatchingMacOSDescriptor(
+               folder: model.folder,
+               repo: model.huggingFaceRepo,
+               revision: model.huggingFaceRevision,
+               artifactVersion: model.artifactVersion,
+               estimatedDownloadBytes: model.estimatedDownloadBytes,
+               requiredRelativePaths: model.requiredRelativePaths
+           ) {
+            staleCatalogPaths = catalog.installedFileSizeMismatches(
+                for: artifact,
+                modelsRoot: modelsDirectory,
+                fileManager: fileManager
+            )
+        }
         let metadata = rootExists ? readInstallMetadata(for: model, in: modelDirectory) : nil
         let sizeBytes: Int
         if presenceComplete,
@@ -990,6 +1036,7 @@ final class ModelManagerViewModel {
             complete: complete,
             repairable: rootExists && !complete,
             missingRequiredPaths: effectiveMissingRequiredPaths,
+            staleCatalogPaths: staleCatalogPaths,
             sizeBytes: sizeBytes,
             deepIntegrityStatus: deepStatus,
             deepIntegrityMessage: deepMessage,

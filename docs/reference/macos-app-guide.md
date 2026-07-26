@@ -104,7 +104,7 @@ Retry button.
 | Model summary | `settings_modelDownloadsSummary` |
 | Mode row | `settings_mode_<mode>` |
 | Package row | `settings_package_<modelID>` / `settings_packageStatus_<modelID>` |
-| Download / cancel / repair | `settings_download_<id>` / `settings_cancel_<id>` / `settings_repair_<id>` / `settings_manage_<id>` |
+| Download / cancel / repair / update | `settings_download_<id>` / `settings_cancel_<id>` / `settings_repair_<id>` / `settings_update_<id>` / `settings_manage_<id>` |
 | Auto-play | `preferences_autoPlayToggle` |
 | Variation | `settings_generationVariation` (segmented: Expressive/Balanced/Consistent) |
 | Clone consent | `voiceCloning_consentAcknowledgment`; persistent and required before Clone Generate |
@@ -140,7 +140,7 @@ them into one WAV, and lands a single project row in History.
 
 macOS has **both Speed (4-bit) and Quality (8-bit)** variants (unlike iOS Speed-only).
 Settings → Voice Models shows per-mode packages. Download via `settings_download_<id>`;
-cancel via `settings_cancel_<id>`; repair via `settings_repair_<id>`.
+cancel via `settings_cancel_<id>`; repair via `settings_repair_<id>`; a complete install whose files no longer match the pinned catalog identity shows **Update available** with `settings_update_<id>` (the same authenticated download path repairs it in place).
 
 The shared foreground downloader distinguishes queued, waiting for connectivity, downloading,
 retrying, verifying, installing, and cancelling. Active transfer shows bytes, smoothed speed, ETA,

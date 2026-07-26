@@ -156,6 +156,7 @@ comes from `qwenvoice_ios_model_catalog.json`.
 | Verifying / installing / cancelling | Progress indicator | Hash/receipt validation, atomic install, or the cancellation barrier is in progress |
 | Failed/incomplete | `iosModelRetry_<id>` ("Retry") / `iosModelRepair_<id>` ("Repair") | Retry preserves verified files; Repair revalidates an incomplete installed package |
 | Installed | `iosModelDelete_<id>` (trash) | Ready to generate |
+| Update available | `iosModelUpdate_<id>` ("Update") plus the installed controls | Installed and still usable, but the pinned catalog identity moved on; Update re-downloads the changed files through the authenticated delivery path |
 
 Cancel opens a confirmation dialog: `iosModelCancelDownloadConfirmButton` (cancel, deletes staged
 data). There is no paused state or Resume control. Waiting for connectivity comes from URLSession;

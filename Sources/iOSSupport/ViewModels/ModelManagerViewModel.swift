@@ -5,6 +5,9 @@ enum ModelInventoryStatus: Equatable {
     case checking
     case notInstalled
     case installed(sizeBytes: Int)
+    /// Installed and usable, but the pinned catalog identity moved on —
+    /// re-downloading through the authenticated delivery path updates it.
+    case updateAvailable(sizeBytes: Int, stalePaths: [String])
     case incomplete(message: String, sizeBytes: Int)
     case error(message: String)
 }
@@ -20,8 +23,38 @@ protocol ModelStatusProviding: AnyObject {
 final class LocalModelStatusProvider: ModelStatusProviding {
     private let modelAssetStore: any ModelAssetStore
 
+    /// Bundled production catalog for the stale-artifact probe. A missing or
+    /// malformed catalog disables update detection only; the authenticated
+    /// delivery path still fail-closes any actual download.
+    private static let productionCatalog: ProductionModelCatalog? = {
+        guard let url = Bundle.main.url(
+            forResource: "qwenvoice_production_model_catalog",
+            withExtension: "json"
+        ) else { return nil }
+        return try? ProductionModelCatalog(contentsOf: url)
+    }()
+
     init(modelAssetStore: any ModelAssetStore) {
         self.modelAssetStore = modelAssetStore
+    }
+
+    /// Byte-count staleness probe against the current catalog identity.
+    /// Detection only — repair re-verifies every digest during delivery.
+    private func staleCatalogPaths(for model: TTSModel) -> [String] {
+        guard let catalog = Self.productionCatalog,
+              let artifact = try? catalog.artifactMatchingDescriptor(
+                  platform: .iOS,
+                  folder: model.folder,
+                  repo: model.huggingFaceRepo,
+                  revision: model.huggingFaceRevision,
+                  artifactVersion: model.artifactVersion,
+                  estimatedDownloadBytes: model.estimatedDownloadBytes,
+                  requiredRelativePaths: model.requiredRelativePaths
+              ) else { return [] }
+        return catalog.installedFileSizeMismatches(
+            for: artifact,
+            modelsRoot: modelAssetStore.rootDirectory
+        )
     }
 
     func initialStatuses(for models: [TTSModel]) -> [String: ModelInventoryStatus] {
@@ -49,6 +82,12 @@ final class LocalModelStatusProvider: ModelStatusProviding {
                 return (model.id, status)
             }
             status = Self.status(from: modelAssetStore.state(for: descriptor))
+            if case .installed(let sizeBytes) = status {
+                let stale = staleCatalogPaths(for: model)
+                if !stale.isEmpty {
+                    return (model.id, .updateAvailable(sizeBytes: sizeBytes, stalePaths: stale))
+                }
+            }
             return (model.id, status)
         })
     }
@@ -142,7 +181,7 @@ final class ModelManagerViewModel: ObservableObject {
 
     func isAvailable(_ model: TTSModel) -> Bool {
         switch statuses[model.id] {
-        case .installed:
+        case .installed, .updateAvailable:
             return true
         case .checking:
             return statusProvider.isLikelyInstalled(model)

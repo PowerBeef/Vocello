@@ -84,6 +84,7 @@ struct IOSGenerateContainerView: View {
     private var hasAnyInstalledModel: Bool {
         modelManager.statuses.values.contains { status in
             if case .installed = status { return true }
+            if case .updateAvailable = status { return true }
             return false
         }
     }

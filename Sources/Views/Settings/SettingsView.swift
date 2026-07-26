@@ -237,11 +237,14 @@ struct SettingsView: View {
         let variant = viewModel.activeVariantLabel(for: model)
         let status = viewModel.statuses[model.id]
         let sizeText: String = {
-            if case .downloaded(let sizeBytes) = status, sizeBytes > 0 {
+            switch status {
+            case .downloaded(let sizeBytes), .updateAvailable(let sizeBytes, _):
+                guard sizeBytes > 0 else { return "" }
                 let size = ByteCountFormatter.string(fromByteCount: Int64(sizeBytes), countStyle: .file)
                 return " (\(size))"
+            default:
+                return ""
             }
-            return ""
         }()
         return "This will delete \(model.mode.displayName) \(variant)\(sizeText) from disk. You can download it again later."
     }
@@ -525,6 +528,10 @@ private struct ModelPackageLine: View {
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundStyle(.orange)
                 .imageScale(.small)
+        case .updateAvailable:
+            Image(systemName: "arrow.triangle.2.circlepath.circle.fill")
+                .foregroundStyle(Color.blue)
+                .imageScale(.small)
         }
     }
 
@@ -534,6 +541,8 @@ private struct ModelPackageLine: View {
             return .green
         case .needsRepair:
             return .orange
+        case .updateAvailable:
+            return .blue
         default:
             return .secondary
         }
@@ -595,6 +604,24 @@ private struct ActionButton: View {
                 Task { await viewModel.download(model) }
             }
             .accessibilityIdentifier("settings_repair_\(model.id)")
+
+        case .updateAvailable:
+            HStack(spacing: 6) {
+                HoverableActionButton(title: "Update", tint: .blue) {
+                    Task { await viewModel.download(model) }
+                }
+                .help("Download the updated model package")
+                .accessibilityIdentifier("settings_update_\(model.id)")
+                Button {
+                    presentManageMenu()
+                } label: {
+                    Text("Manage")
+                }
+                .background(NSViewHostAccessor(holder: manageHostHolder))
+                .help("Manage \(model.variantKind?.displayName ?? model.name) variant")
+                .controlSize(.small)
+                .accessibilityIdentifier("settings_manage_\(model.id)")
+            }
 
         case .downloaded:
             Button {

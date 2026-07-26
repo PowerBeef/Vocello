@@ -185,11 +185,12 @@ review doc):
    artifact decision (new HF uploads + catalog re-pins) awaiting the maintainer;
    ~~clone-prompt `refCodes` release~~ **declined** (retained tensors <100 KB and required
    per generation — the report's M5b premise corrected); ~~codec bf16 experiment~~
-   **validated with a perf caveat** (−234 MB active peak, −341 MB shared artifact,
-   identical durations at every seed, but ~2–4% lower CLI RTF pending bench-grade
-   confirmation). **Stage 2's implementation work is complete**; the two validated
-   conversions (combined −512 MB resident) are promotion-quality artifact decisions
-   awaiting the maintainer.
+   measured and **parked**: the four-arm promotion battery (§N) confirmed a real,
+   dtype-independent ~4–5% RTF regression (bf16 and fp16 alike, all QC-clean), so the
+   codec conversion waits for the 0.31.x pin-bump re-test or an iPhone device measurement.
+   **Stage 2's implementation work is complete**; the recommended promotion is **2.2
+   alone** (−278 MB resident, −292 MB per artifact, ≤1% RTF on medium/long) — an artifact
+   decision (own-namespace HF uploads + catalog re-pin) awaiting the maintainer.
 4. **Stage 3 — quality harness (folds phase 12, then 13)** — in progress 2026-07-26:
    ~~wire the typed `GenerationQualityReport` registry producer with persisted-WAV
    consolidation~~ **shipped at fast depth** (see the phase 12 row; live-verified on the

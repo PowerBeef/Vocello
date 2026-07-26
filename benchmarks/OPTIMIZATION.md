@@ -922,7 +922,24 @@ the §K 12-seed clone/long QC soak.
   durations. Fixed-seed output changes (quantization is numerics-affecting), so shipping is
   a promotion-quality artifact decision: new HF artifact uploads, catalog re-pins,
   full fail-closed delivery workflow, and fresh fixture identities — maintainer call.
-- **2.4 Clone `refCodes` release (declined — premise corrected).** The retained clone-prompt
+- **Promotion decision battery (2026-07-26, four-arm + fp16 probe).** Bench-grade custom
+  matrices (13 fixed-seed takes per arm, seed 19790615, all QC-clean, median warm
+  decode-wall RTF on the M2 8 GB floor):
+
+  | cell | control | 2.2 q8-embed | 2.3 bf16-codec | 2.3 fp16-codec | combined |
+  |---|---|---|---|---|---|
+  | short warm | 1.145 | 1.109 | 1.111 | 1.116 | 1.073 |
+  | medium warm | 1.237 | 1.223 | 1.174 | 1.186 | 1.174 |
+  | long warm | 1.262 | 1.252 | 1.203 | 1.210 | 1.203 |
+  | MLX active peak MB | 2105 | **1827** | 1872 | 1872 | **1593** |
+
+  **Verdicts:** 2.2 costs ≤1% on medium/long (−3% on the noisy 1.7 s short cell ≈ 40 ms
+  absolute) for −278 MB — promote. 2.3's ~4–5% regression is real and dtype-independent
+  (fp16 reproduces it at QC-clean 13/13), so it is not an M2 bf16-emulation artifact but
+  half-precision conv throughput in this size class — parked, with two revival paths: the
+  Stage-4 0.31.x pin-bump re-test, and an iPhone 17 Pro device measurement (A19-class
+  half-precision conv throughput may show parity, which would motivate a per-platform
+  artifact split only if the device data justifies it). The retained clone-prompt
   tensors total under ~100 KB (refCodes ≤ 16 codebooks × 750 frames × int32 ≈ 48 KB plus an
   8 KB x-vector), and `refCodes` is consumed by **every** clone generation — the ICL prefix
   interleaves the target text, so no request-independent "conditioning prefix" exists to

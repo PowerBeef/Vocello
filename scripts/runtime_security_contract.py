@@ -486,7 +486,7 @@ def runtime_refactor_contract_errors(
         "memory": 1,
         "telemetry": 9,
         "telemetryTransition": 9,
-        "benchmarkEvidence": 2,
+        "benchmarkEvidence": 3,
     }
     if versions != required_versions:
         errors.append("runtime-refactor-contract versions differ from shipping/shadow schemas")
@@ -776,6 +776,15 @@ def runtime_refactor_contract_errors(
             )
         if isinstance(versions, dict) and versions.get("benchmarkEvidence") == 2 and phases.get("historyV3") != "pending-stable-plan-session-quality-identities":
             errors.append("runtime-refactor-contract cannot claim history v3 while schema v2 ships")
+        if isinstance(versions, dict) and versions.get("benchmarkEvidence") == 3:
+            if str(phases.get("historyV3", "")).startswith("pending"):
+                errors.append(
+                    "runtime-refactor-contract benchmarkEvidence 3 requires a non-pending historyV3 status"
+                )
+            if not (ROOT / "benchmarks" / "schema-v3.json").is_file():
+                errors.append(
+                    "runtime-refactor-contract benchmarkEvidence 3 requires benchmarks/schema-v3.json"
+                )
     expected_actor = (
         PHASE2_ENGINE_ACTOR_STATUS_PASSED
         if isinstance(phase4, dict) and phase4.get("overallPromotion") == "passed"

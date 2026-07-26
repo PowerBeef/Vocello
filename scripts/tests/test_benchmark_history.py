@@ -560,6 +560,67 @@ class BenchmarkHistoryTests(unittest.TestCase):
             with self.subTest(name=name), self.assertRaises(history.HistoryError):
                 self.publish(candidate, f"language-memory-v2-{name}")
 
+    def test_schema_v3_generation_records_require_the_quality_identity(self) -> None:
+        valid = record_fixture(run_id="language-quality-v3", kind="language")
+        valid["schemaVersion"] = 3
+        valid["evidence"].update({
+            "telemetrySchemaVersion": 8,
+            "memoryContractVersion": 1,
+            "memoryQualified": True,
+            "sampleSidecarCount": 1,
+            "sampleSidecarsDigest": "a" * 64,
+        })
+        take = valid["takes"][0]
+        take["memoryStatus"] = "qualified"
+        take["sampleSidecarDigest"] = "b" * 64
+        take["metrics"].update({key: 0.0 for key in history.MEMORY_REQUIRED_METRICS})
+        take["metrics"].update({
+            "samplerCoverage": 1.0,
+            "samplerSampleCount": 10.0,
+            "samplerBoundarySampleCount": 8.0,
+            "samplerPeriodicSampleCount": 1.0,
+            "gpuRecommendedWorkingSetMB": 4096.0,
+            "mlxActivePeakMB": 100.0,
+            "mlxCachePeakMB": 10.0,
+            "mlxPeakMB": 110.0,
+        })
+        take["qualityRegistryOutcome"] = "pass"
+        take["qualityRegistryRequiredGates"] = sorted(history.QUALITY_FAST_GATES)
+        path = self.publish(valid, "language-quality-v3")
+        published = json.loads(path.read_text())
+        self.assertEqual(published["schemaVersion"], 3)
+        self.assertEqual(published["takes"][0]["qualityRegistryOutcome"], "pass")
+        history.validate_all()
+
+        def set_warning_without_issues(record: dict) -> None:
+            record["takes"][0]["qualityRegistryOutcome"] = "warning"
+
+        def set_pass_with_issues(record: dict) -> None:
+            record["takes"][0]["qualityRegistryIssues"] = ["quality_gate_warning.token_cap"]
+
+        def downgrade_keeping_fields(record: dict) -> None:
+            record["schemaVersion"] = 2
+
+        for name, mutate in (
+            ("missing-outcome", lambda record: record["takes"][0].pop("qualityRegistryOutcome")),
+            ("failing-outcome", lambda record: record["takes"][0].__setitem__(
+                "qualityRegistryOutcome", "fail")),
+            ("missing-fast-gate", lambda record: record["takes"][0].__setitem__(
+                "qualityRegistryRequiredGates",
+                sorted(history.QUALITY_FAST_GATES - {"persisted_wav"}))),
+            ("unsorted-gates", lambda record: record["takes"][0].__setitem__(
+                "qualityRegistryRequiredGates",
+                list(reversed(sorted(history.QUALITY_FAST_GATES))))),
+            ("warning-without-issues", set_warning_without_issues),
+            ("pass-with-issues", set_pass_with_issues),
+            ("v2-with-quality-keys", downgrade_keeping_fields),
+        ):
+            candidate = copy.deepcopy(valid)
+            candidate["run"]["id"] = f"language-quality-v3-{name}"
+            mutate(candidate)
+            with self.subTest(name=name), self.assertRaises(history.HistoryError):
+                self.publish(candidate, f"language-quality-v3-{name}")
+
     def test_schema_v2_macos_ui_requires_both_aligned_process_coverages(self) -> None:
         valid = record_fixture(run_id="macos-ui-memory-v2")
         valid["schemaVersion"] = 2

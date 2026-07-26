@@ -1,0 +1,1214 @@
+{
+  "$id": "https://vocello.local/schemas/benchmark-history-v3.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Benchmark history record, schema v3: v2 plus the typed quality-registry identity on every generation take (phase 13). The executable validator in scripts/benchmark_history.py remains the authority; this contract bounds structure and vocabulary.",
+  "properties": {
+    "cells": {
+      "items": {
+        "$ref": "#/$defs/cell"
+      },
+      "type": "array"
+    },
+    "comparison": {
+      "$ref": "#/$defs/comparison"
+    },
+    "digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "evidence": {
+      "$ref": "#/$defs/evidence"
+    },
+    "hardware": {
+      "$ref": "#/$defs/hardware"
+    },
+    "inputs": {
+      "$ref": "#/$defs/inputs"
+    },
+    "listening": {
+      "$ref": "#/$defs/listening"
+    },
+    "models": {
+      "items": {
+        "$ref": "#/$defs/model"
+      },
+      "type": "array"
+    },
+    "run": {
+      "$ref": "#/$defs/run"
+    },
+    "schemaVersion": {
+      "const": 3
+    },
+    "source": {
+      "$ref": "#/$defs/source"
+    },
+    "takes": {
+      "items": {
+        "$ref": "#/$defs/take"
+      },
+      "type": "array"
+    },
+    "toolchain": {
+      "$ref": "#/$defs/toolchain"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "run",
+    "hardware",
+    "source",
+    "toolchain",
+    "inputs",
+    "models",
+    "evidence",
+    "takes",
+    "cells",
+    "comparison",
+    "listening",
+    "digest"
+  ],
+  "title": "Vocello benchmark history record v3",
+  "type": "object",
+  "$defs": {
+    "cell": {
+      "additionalProperties": false,
+      "properties": {
+        "count": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "key": {
+          "type": "string"
+        },
+        "length": {
+          "type": "string"
+        },
+        "maximumTrimLevel": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "mode": {
+          "type": "string"
+        },
+        "modelID": {
+          "type": "string"
+        },
+        "statistics": {
+          "type": "object"
+        },
+        "status": {
+          "enum": [
+            "passed",
+            "passedWithWarnings"
+          ]
+        },
+        "variant": {
+          "type": "string"
+        },
+        "warningCount": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "warmState": {
+          "type": "string"
+        },
+        "worstQCVerdict": {
+          "enum": [
+            "pass",
+            "warn"
+          ]
+        },
+        "worstThermalState": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "key",
+        "mode",
+        "modelID",
+        "variant",
+        "warmState",
+        "length",
+        "count",
+        "status",
+        "statistics",
+        "worstQCVerdict",
+        "worstThermalState",
+        "maximumTrimLevel",
+        "warningCount"
+      ],
+      "type": "object"
+    },
+    "comparison": {
+      "additionalProperties": false,
+      "properties": {
+        "baselineRunID": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "comparable": {
+          "type": "boolean"
+        },
+        "deltas": {
+          "type": "object"
+        },
+        "key": {
+          "$ref": "#/$defs/digest"
+        }
+      },
+      "required": [
+        "key",
+        "comparable",
+        "baselineRunID",
+        "deltas"
+      ],
+      "type": "object"
+    },
+    "digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "evidence": {
+      "additionalProperties": false,
+      "properties": {
+        "actualTakeCount": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "crashCount": {
+          "const": 0
+        },
+        "crashDeltaPassed": {
+          "const": true
+        },
+        "expectedTakeCount": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "manifestDigest": {
+          "$ref": "#/$defs/digest"
+        },
+        "qcAlgorithmVersion": {
+          "type": [
+            "integer",
+            "string"
+          ]
+        },
+        "rawTelemetryDigest": {
+          "type": "string"
+        },
+        "resultBundleDigest": {
+          "type": "string"
+        },
+        "selectedEvidenceDigest": {
+          "$ref": "#/$defs/digest"
+        },
+        "screenshotDigests": {
+          "items": {
+            "$ref": "#/$defs/screenshotDigest"
+          },
+          "type": "array"
+        },
+        "telemetrySchemaVersion": {
+          "type": [
+            "integer",
+            "string"
+          ]
+        },
+        "languageVerification": {
+          "additionalProperties": false,
+          "properties": {
+            "accuracyMetricVersion": {
+              "const": "normalized-edit-rate-v1"
+            },
+            "outputAlgorithm": {
+              "const": "language-output-verifier-v3"
+            },
+            "outputSchemaVersion": {
+              "const": 3
+            },
+            "recognitionAlgorithm": {
+              "const": "apple-speech-file-consensus-v2"
+            },
+            "recognitionSchemaVersion": {
+              "const": 2
+            },
+            "requiredPassCount": {
+              "const": 3
+            }
+          },
+          "required": [
+            "outputSchemaVersion",
+            "outputAlgorithm",
+            "recognitionSchemaVersion",
+            "recognitionAlgorithm",
+            "accuracyMetricVersion",
+            "requiredPassCount"
+          ],
+          "type": "object"
+        },
+        "trace": {
+          "$ref": "#/$defs/trace"
+        },
+        "validatorPassed": {
+          "const": true
+        },
+        "validatorSchemaVersion": {
+          "type": [
+            "integer",
+            "string"
+          ]
+        },
+        "memoryContractVersion": {
+          "const": 1
+        },
+        "memoryQualified": {
+          "const": true
+        },
+        "sampleSidecarCount": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "sampleSidecarsDigest": {
+          "$ref": "#/$defs/digest"
+        },
+        "memoryPolicyID": {
+          "const": "retained-memory-v1"
+        },
+        "retentionMetric": {
+          "const": "withinModeRetainedPhysicalFootprintGrowth"
+        },
+        "retentionThresholdFraction": {
+          "minimum": 0,
+          "maximum": 1,
+          "type": "number"
+        },
+        "maximumRetainedGrowthMB": {
+          "minimum": 0,
+          "type": "number"
+        },
+        "maximumRetainedGrowthFraction": {
+          "minimum": 0,
+          "maximum": 1,
+          "type": "number"
+        },
+        "retentionPassed": {
+          "const": true
+        },
+        "streamingTelemetryV9SidecarCount": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "streamingTelemetryV9SidecarsDigest": {
+          "$ref": "#/$defs/digest"
+        },
+        "streamingTelemetryV9PublicationReadyCount": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "manifestDigest",
+        "validatorSchemaVersion",
+        "telemetrySchemaVersion",
+        "qcAlgorithmVersion",
+        "validatorPassed",
+        "crashDeltaPassed",
+        "crashCount",
+        "expectedTakeCount",
+        "actualTakeCount",
+        "resultBundleDigest",
+        "rawTelemetryDigest",
+        "selectedEvidenceDigest",
+        "screenshotDigests"
+      ],
+      "type": "object"
+    },
+    "hardware": {
+      "additionalProperties": false,
+      "properties": {
+        "chip": {
+          "type": "string"
+        },
+        "cpuCores": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "efficiencyCores": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "freeStorageBytes": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "loadAverage1M": {
+          "minimum": 0,
+          "type": "number"
+        },
+        "lowPowerMode": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "marketingName": {
+          "type": "string"
+        },
+        "memoryBytes": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "modelIdentifier": {
+          "type": "string"
+        },
+        "osBuild": {
+          "type": "string"
+        },
+        "osName": {
+          "type": "string"
+        },
+        "osVersion": {
+          "type": "string"
+        },
+        "performanceCores": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "profileID": {
+          "enum": [
+            "mac-mini-m2-8gb",
+            "iphone-17-pro"
+          ]
+        },
+        "thermalState": {
+          "type": "string"
+        },
+        "transport": {
+          "type": "string"
+        },
+        "uptimeSeconds": {
+          "minimum": 0,
+          "type": "number"
+        }
+      },
+      "required": [
+        "profileID",
+        "modelIdentifier",
+        "marketingName",
+        "chip",
+        "memoryBytes",
+        "cpuCores",
+        "performanceCores",
+        "efficiencyCores",
+        "osName",
+        "osVersion",
+        "osBuild",
+        "thermalState",
+        "lowPowerMode",
+        "transport",
+        "loadAverage1M",
+        "freeStorageBytes",
+        "uptimeSeconds"
+      ],
+      "type": "object"
+    },
+    "inputs": {
+      "additionalProperties": false,
+      "properties": {
+        "analysisProfileHash": {
+          "type": "string"
+        },
+        "contractHash": {
+          "type": "string"
+        },
+        "corpusHash": {
+          "type": "string"
+        },
+        "dependencyLockHash": {
+          "type": "string"
+        },
+        "harnessHash": {
+          "type": "string"
+        },
+        "matrixHash": {
+          "type": "string"
+        },
+        "projectInputHash": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "contractHash",
+        "dependencyLockHash",
+        "projectInputHash",
+        "harnessHash",
+        "matrixHash",
+        "corpusHash",
+        "analysisProfileHash"
+      ],
+      "type": "object"
+    },
+    "listening": {
+      "additionalProperties": false,
+      "properties": {
+        "annotatedAt": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "note": {
+          "maxLength": 500,
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "pass",
+            "fail",
+            "not-performed"
+          ]
+        }
+      },
+      "required": [
+        "status",
+        "note",
+        "annotatedAt"
+      ],
+      "type": "object"
+    },
+    "model": {
+      "additionalProperties": false,
+      "properties": {
+        "artifactVersion": {
+          "type": [
+            "integer",
+            "string"
+          ]
+        },
+        "fixtureDigest": {
+          "type": "string"
+        },
+        "integrityDigest": {
+          "type": "string"
+        },
+        "mode": {
+          "type": "string"
+        },
+        "modelID": {
+          "type": "string"
+        },
+        "quantization": {
+          "type": "string"
+        },
+        "revision": {
+          "type": "string"
+        },
+        "runtimeProfileSignature": {
+          "type": "string"
+        },
+        "variant": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "mode",
+        "modelID",
+        "variant",
+        "quantization",
+        "revision",
+        "artifactVersion",
+        "integrityDigest",
+        "runtimeProfileSignature",
+        "fixtureDigest"
+      ],
+      "type": "object"
+    },
+    "run": {
+      "additionalProperties": false,
+      "properties": {
+        "classification": {
+          "enum": [
+            "canonical",
+            "focused",
+            "exploratory",
+            "instrumented",
+            "partial"
+          ]
+        },
+        "durationSeconds": {
+          "minimum": 0,
+          "type": "number"
+        },
+        "finishedAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{2,127}$",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "ui-generation",
+            "engine-generation",
+            "language",
+            "instrument-profile",
+            "prosody-calibration",
+            "memory-qualification"
+          ]
+        },
+        "label": {
+          "maxLength": 96,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,95}$",
+          "type": "string"
+        },
+        "matrixScope": {
+          "enum": [
+            "canonical",
+            "focused",
+            "partial",
+            "instrumented"
+          ]
+        },
+        "platform": {
+          "enum": [
+            "macos",
+            "ios"
+          ]
+        },
+        "startedAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "passed",
+            "passedWithWarnings"
+          ]
+        },
+        "warnings": {
+          "items": {
+            "maxLength": 96,
+            "pattern": "^[a-z0-9][a-z0-9_.:-]{0,79}(?:\\([0-9]+/[0-9]+\\))?$",
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "platform",
+        "label",
+        "startedAt",
+        "finishedAt",
+        "durationSeconds",
+        "status",
+        "matrixScope",
+        "classification",
+        "warnings"
+      ],
+      "type": "object"
+    },
+    "source": {
+      "additionalProperties": false,
+      "properties": {
+        "changedPaths": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "commit": {
+          "pattern": "^[0-9a-f]{40}$",
+          "type": "string"
+        },
+        "dirty": {
+          "type": "boolean"
+        },
+        "fingerprintsMatch": {
+          "type": "boolean"
+        },
+        "postFingerprint": {
+          "$ref": "#/$defs/digest"
+        },
+        "preFingerprint": {
+          "$ref": "#/$defs/digest"
+        },
+        "workspaceFingerprint": {
+          "$ref": "#/$defs/digest"
+        }
+      },
+      "required": [
+        "commit",
+        "dirty",
+        "changedPaths",
+        "workspaceFingerprint",
+        "preFingerprint",
+        "postFingerprint",
+        "fingerprintsMatch"
+      ],
+      "type": "object"
+    },
+    "take": {
+      "additionalProperties": false,
+      "properties": {
+        "audioQC": {
+          "$ref": "#/$defs/audioQC"
+        },
+        "cell": {
+          "type": "string"
+        },
+        "durationSeconds": {
+          "minimum": 0,
+          "type": "number"
+        },
+        "finishReason": {
+          "type": "string"
+        },
+        "generationID": {
+          "type": "string"
+        },
+        "layerCompleteness": {
+          "type": "string"
+        },
+        "layers": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "length": {
+          "type": "string"
+        },
+        "metrics": {
+          "type": "object"
+        },
+        "mode": {
+          "type": "string"
+        },
+        "modelArtifactVersion": {
+          "type": "string"
+        },
+        "modelID": {
+          "type": "string"
+        },
+        "modelIntegrityDigest": {
+          "$ref": "#/$defs/digest"
+        },
+        "modelQuantization": {
+          "enum": [
+            "4-bit",
+            "8-bit",
+            "unquantized"
+          ]
+        },
+        "modelRepository": {
+          "type": "string"
+        },
+        "modelRevision": {
+          "pattern": "^[0-9a-f]{40}$",
+          "type": "string"
+        },
+        "output": {
+          "$ref": "#/$defs/output"
+        },
+        "playbackStartSource": {
+          "enum": [
+            "liveStream",
+            "finalFile"
+          ]
+        },
+        "runtimeProfileSignature": {
+          "type": "string"
+        },
+        "seed": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "accuracyMetric": {
+          "enum": [
+            "wordErrorRate",
+            "characterErrorRate"
+          ]
+        },
+        "accuracyThreshold": {
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number"
+        },
+        "fixtureDigest": {
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "passed",
+            "passedWithWarnings"
+          ]
+        },
+        "takeIndex": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "thermalState": {
+          "type": "string"
+        },
+        "variant": {
+          "type": "string"
+        },
+        "warmState": {
+          "type": "string"
+        },
+        "warnings": {
+          "items": {
+            "maxLength": 96,
+            "pattern": "^[a-z0-9][a-z0-9_.:-]{0,79}(?:\\([0-9]+/[0-9]+\\))?$",
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "memoryStatus": {
+          "enum": [
+            "qualified",
+            "qualifiedWithWarnings"
+          ]
+        },
+        "sampleSidecarDigest": {
+          "$ref": "#/$defs/digest"
+        },
+        "streamingTelemetryV9SidecarDigest": {
+          "$ref": "#/$defs/digest"
+        },
+        "samplingPromotionPackaged": {
+          "type": "boolean"
+        },
+        "samplingWAVDigest": {
+          "$ref": "#/$defs/digest"
+        },
+        "samplingSeedAgreement": {
+          "enum": [
+            "matched",
+            "mismatched",
+            "incomplete"
+          ]
+        },
+        "qualityRegistryOutcome": {
+          "enum": [
+            "pass",
+            "warning"
+          ],
+          "description": "Fail-closed QualityGateRegistry verdict for this take; a fail outcome is never publishable."
+        },
+        "qualityRegistryRequiredGates": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$"
+          },
+          "minItems": 1,
+          "description": "Registry-required gate identifiers the verdict covered, sorted."
+        },
+        "qualityRegistryIssues": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_.]*$"
+          },
+          "description": "Machine-readable warning codes from the registry verdict (absent when clean)."
+        }
+      },
+      "required": [
+        "takeIndex",
+        "generationID",
+        "cell",
+        "status",
+        "metrics",
+        "warnings"
+      ],
+      "type": "object"
+    },
+    "audioQC": {
+      "additionalProperties": false,
+      "properties": {
+        "algorithmVersion": {
+          "minimum": 2,
+          "type": "integer"
+        },
+        "instabilityVerdict": {
+          "enum": [
+            "pass",
+            "warn"
+          ]
+        },
+        "metrics": {
+          "type": "object"
+        },
+        "verdict": {
+          "enum": [
+            "pass",
+            "warn"
+          ]
+        },
+        "warningCodes": {
+          "items": {
+            "maxLength": 96,
+            "pattern": "^[a-z0-9][a-z0-9_.:-]{0,79}(?:\\([0-9]+/[0-9]+\\))?$",
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "writtenOutputVerdict": {
+          "enum": [
+            "pass",
+            "warn"
+          ]
+        }
+      },
+      "required": [
+        "algorithmVersion",
+        "verdict",
+        "instabilityVerdict",
+        "writtenOutputVerdict",
+        "warningCodes",
+        "metrics"
+      ],
+      "type": "object"
+    },
+    "output": {
+      "additionalProperties": false,
+      "properties": {
+        "atomicPublish": {
+          "type": "boolean"
+        },
+        "channels": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "durationSeconds": {
+          "minimum": 0,
+          "type": "number"
+        },
+        "fileDigest": {
+          "$ref": "#/$defs/digest"
+        },
+        "frames": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "readableWAV": {
+          "type": "boolean"
+        },
+        "sampleRate": {
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "readableWAV",
+        "atomicPublish"
+      ],
+      "type": "object"
+    },
+    "screenshotDigest": {
+      "additionalProperties": false,
+      "properties": {
+        "digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "digest"
+      ],
+      "type": "object"
+    },
+    "trace": {
+      "additionalProperties": false,
+      "properties": {
+        "captureSettings": {
+          "$ref": "#/$defs/traceCaptureSettings"
+        },
+        "captureSettingsDigest": {
+          "$ref": "#/$defs/digest"
+        },
+        "digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "durationSeconds": {
+          "minimum": 0,
+          "type": "number"
+        },
+        "summary": {
+          "$ref": "#/$defs/traceSummary"
+        },
+        "summaryArtifact": {
+          "$ref": "#/$defs/traceSummaryArtifact"
+        },
+        "template": {
+          "type": "string"
+        },
+        "originalEphemeralPath": {
+          "type": "string"
+        },
+        "rawTraceRetained": {
+          "type": "boolean"
+        },
+        "retentionPolicy": {
+          "enum": [
+            "summaryOnly",
+            "keptExplicitly"
+          ]
+        },
+        "validated": {
+          "const": true
+        }
+      },
+      "required": [
+        "digest",
+        "template",
+        "durationSeconds",
+        "validated",
+        "summary"
+      ],
+      "type": "object"
+    },
+    "traceCaptureSettings": {
+      "additionalProperties": false,
+      "properties": {
+        "exactPID": {
+          "const": true
+        },
+        "profileKind": {
+          "enum": [
+            "cpu",
+            "memory"
+          ]
+        },
+        "requestedDurationSeconds": {
+          "exclusiveMinimum": 0,
+          "type": "number"
+        },
+        "targetProcess": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,95}$",
+          "type": "string"
+        },
+        "template": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "profileKind",
+        "template",
+        "requestedDurationSeconds",
+        "targetProcess",
+        "exactPID"
+      ],
+      "type": "object"
+    },
+    "traceSummaryArtifact": {
+      "additionalProperties": false,
+      "properties": {
+        "digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "digest"
+      ],
+      "type": "object"
+    },
+    "traceSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "allocationTargetDataBytes": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "allocationDataExportStatus": {
+          "enum": [
+            "targetRows",
+            "notExportable"
+          ]
+        },
+        "allocationListPresent": {
+          "const": true
+        },
+        "allocationTargetRowCount": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "allocationTrackPresent": {
+          "const": true
+        },
+        "allocationTrackVerified": {
+          "const": true
+        },
+        "artifact": {
+          "type": "string"
+        },
+        "capturedDataRowCount": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "capturedRowsBySchema": {
+          "type": "object"
+        },
+        "correlatedSignpostEventCount": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "correlationFieldsVerified": {
+          "const": true
+        },
+        "cpuCycleWeight": {
+          "minimum": 1,
+          "type": "number"
+        },
+        "cpuSampleCount": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "cpuSampleSpanMS": {
+          "minimum": 0,
+          "type": "number"
+        },
+        "cpuSampleWeightMS": {
+          "minimum": 0,
+          "type": "number"
+        },
+        "processCount": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "schemaCount": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "signpostEventCount": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "signpostSchemaCount": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "tableCount": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "targetPIDVerified": {
+          "const": true
+        },
+        "targetProcess": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,95}$",
+          "type": "string"
+        },
+        "tocDigest": {
+          "$ref": "#/$defs/digest"
+        },
+        "memoryTraceEvidenceVersion": {
+          "const": 2
+        },
+        "vmTrackerDataExportStatus": {
+          "enum": [
+            "targetRows",
+            "notExportable"
+          ]
+        },
+        "vmTrackerRegionMapPresent": {
+          "const": true
+        },
+        "vmTrackerRegionMapVerified": {
+          "const": true
+        },
+        "vmTrackerTargetRowCount": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "vmTrackerTrackPresent": {
+          "const": true
+        },
+        "vmTrackerTrackVerified": {
+          "const": true
+        }
+      },
+      "required": [
+        "artifact",
+        "capturedDataRowCount",
+        "capturedRowsBySchema",
+        "correlatedSignpostEventCount",
+        "correlationFieldsVerified",
+        "cpuSampleCount",
+        "cpuSampleSpanMS",
+        "processCount",
+        "schemaCount",
+        "signpostEventCount",
+        "signpostSchemaCount",
+        "tableCount",
+        "targetPIDVerified",
+        "targetProcess",
+        "tocDigest"
+      ],
+      "type": "object"
+    },
+    "toolchain": {
+      "additionalProperties": false,
+      "properties": {
+        "appBuild": {
+          "type": "string"
+        },
+        "appVersion": {
+          "type": "string"
+        },
+        "executableHashes": {
+          "type": "object"
+        },
+        "executableUUIDs": {
+          "type": "object"
+        },
+        "optimization": {
+          "type": "string"
+        },
+        "sdkName": {
+          "type": "string"
+        },
+        "sdkVersion": {
+          "type": "string"
+        },
+        "swiftVersion": {
+          "type": "string"
+        },
+        "xcodeBuild": {
+          "type": "string"
+        },
+        "xcodeVersion": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "xcodeVersion",
+        "xcodeBuild",
+        "swiftVersion",
+        "sdkName",
+        "sdkVersion",
+        "optimization",
+        "appVersion",
+        "appBuild",
+        "executableUUIDs",
+        "executableHashes"
+      ],
+      "type": "object"
+    }
+  }
+}

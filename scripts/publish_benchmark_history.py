@@ -858,6 +858,39 @@ def telemetry_output(row: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
+def quality_identity_fields(row: dict[str, Any]) -> dict[str, Any]:
+    """Phase 13: typed quality-registry identity from the engine row's open
+    telemetry notes. Empty when the row predates the phase-12 registry —
+    the record then publishes at schema v2; a run mixing both is an error
+    resolved by the record-version chooser."""
+    notes = row.get("notes") if isinstance(row.get("notes"), dict) else {}
+    outcome = notes.get("quality_registry_outcome")
+    gates = notes.get("quality_registry_required_gates")
+    if not isinstance(outcome, str) or not isinstance(gates, str) or not gates:
+        return {}
+    fields: dict[str, Any] = {
+        "qualityRegistryOutcome": outcome,
+        "qualityRegistryRequiredGates": sorted(set(gates.split(","))),
+    }
+    issues = notes.get("quality_registry_issues")
+    if isinstance(issues, str) and issues:
+        fields["qualityRegistryIssues"] = sorted(set(issues.split(",")))
+    return fields
+
+
+def history_record_schema_version(takes: list[dict[str, Any]]) -> int:
+    """3 when every take carries the quality identity, 2 when none does.
+    A mix would publish a record silently missing evidence for some takes."""
+    carrying = sum(1 for take in takes if "qualityRegistryOutcome" in take)
+    if carrying == 0:
+        return 2
+    if carrying == len(takes):
+        return 3
+    raise PublicationError(
+        "takes mix quality-registry identity presence; refusing a partial schema-v3 record"
+    )
+
+
 def engine_take(
     index: int,
     take: dict[str, Any],
@@ -905,6 +938,7 @@ def engine_take(
         "thermalState": thermal_state(row),
         "warnings": list(qc["warningCodes"]),
         **identity,
+        **quality_identity_fields(row),
     }
     if duration is not None:
         result["durationSeconds"] = duration
@@ -1057,6 +1091,7 @@ def minimal_take(index: int, cell: str, row: dict[str, Any]) -> dict[str, Any]:
         "thermalState": thermal_state(row),
         "warnings": list(qc["warningCodes"]),
         **identity,
+        **quality_identity_fields(row),
     }
     return result
 
@@ -1122,7 +1157,10 @@ def record_shell(
     if memory_evidence is not None:
         evidence.update(memory_evidence)
     history_record: dict[str, Any] = {
-        "schemaVersion": 2,
+        # v3 when every take carries the phase-13 quality-registry identity;
+        # v2 for pre-registry evidence. The outer evidence manifest below
+        # keeps its own independent schema version.
+        "schemaVersion": history_record_schema_version(takes),
         "run": {
             "id": run_id,
             "kind": kind,

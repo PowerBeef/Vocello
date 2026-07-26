@@ -87,6 +87,7 @@ REQUIRED_SURFACES=(
     "benchmarks/hardware-profiles.json"
     "benchmarks/schema-v1.json"
     "benchmarks/schema-v2.json"
+    "benchmarks/schema-v3.json"
     "benchmarks/HISTORY.md"
     "benchmarks/LEGACY_HISTORY.md"
     "docs/project-health.md"

@@ -592,6 +592,41 @@ class PublisherTests(unittest.TestCase):
         with self.assertRaisesRegex(publisher.PublicationError, "benchRunID"):
             publisher.engine_take(1, take, wrong, None, run_id="run-one")
 
+    def test_quality_identity_folds_into_takes_and_selects_schema_v3(self) -> None:
+        take = {
+            "generationID": "selected",
+            "cell": "custom/speed/medium/warm#0",
+            "mode": "custom",
+            "modelID": "pro_custom_speed",
+            "variant": "speed",
+            "warmState": "warm",
+            "length": "medium",
+            "wallSeconds": 1.0,
+            "audioSeconds": 2.0,
+        }
+        row = engine_row("selected")
+        row["notes"].update({
+            "quality_registry_outcome": "warning",
+            "quality_registry_required_gates":
+                "codec_behavior,persisted_wav,streaming_continuity,terminal,token_cap",
+            "quality_registry_issues": "quality_gate_warning.token_cap",
+        })
+        built = publisher.engine_take(1, take, row, None, run_id="run-one")
+        self.assertEqual(built["qualityRegistryOutcome"], "warning")
+        self.assertEqual(
+            built["qualityRegistryRequiredGates"],
+            ["codec_behavior", "persisted_wav", "streaming_continuity", "terminal", "token_cap"],
+        )
+        self.assertEqual(built["qualityRegistryIssues"], ["quality_gate_warning.token_cap"])
+
+        # Pre-registry rows fold nothing and keep the record at schema v2.
+        legacy = publisher.engine_take(1, take, engine_row("selected"), None, run_id="run-one")
+        self.assertNotIn("qualityRegistryOutcome", legacy)
+        self.assertEqual(publisher.history_record_schema_version([legacy]), 2)
+        self.assertEqual(publisher.history_record_schema_version([built]), 3)
+        with self.assertRaisesRegex(publisher.PublicationError, "mix quality-registry"):
+            publisher.history_record_schema_version([built, legacy])
+
     def test_forced_memory_profile_is_exploratory(self) -> None:
         self.assertFalse(publisher.uses_forced_memory_profile([engine_row("native")]))
         forced = engine_row("forced")

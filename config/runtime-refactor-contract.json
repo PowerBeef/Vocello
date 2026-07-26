@@ -28,7 +28,7 @@
     "memory": 1,
     "telemetry": 9,
     "telemetryTransition": 9,
-    "benchmarkEvidence": 2
+    "benchmarkEvidence": 3
   },
   "currentShippingAuthorities": {
     "runtime": "VocelloQwen3Engine",
@@ -111,7 +111,7 @@
     "longFormV4": "stages-a-e-shipping-both-platforms-macos-acceptance-2026-07-23-ios-sequential-streaming-port-device-acceptance-2026-07-24-three-segment-project-regeneration-macos-only",
     "boundedAnalyzers": "prosody-v2-shipping-persisted-wav-consolidation-pending",
     "unifiedQuality": "fast-depth-registry-shipping-2026-07-26-persisted-wav-folded-standard-canonical-depths-pending",
-    "historyV3": "pending-stable-plan-session-quality-identities",
+    "historyV3": "implemented-2026-07-26-schema-v3-take-quality-identity-publisher-cutover-first-live-record-pending",
     "mechanicalRetirement": "phase14-complete-2026-07-23-spi-retired-actor-owned-loading-metadata-priming-and-clone-artifacts"
   },
   "phase14DeferredSurfaces": [],

@@ -53,6 +53,7 @@ HARDWARE_PROFILES_PATH = BENCHMARK_ROOT / "hardware-profiles.json"
 SCHEMA_PATHS = {
     1: BENCHMARK_ROOT / "schema-v1.json",
     2: BENCHMARK_ROOT / "schema-v2.json",
+    3: BENCHMARK_ROOT / "schema-v3.json",
 }
 # Compatibility alias retained for schema-v1 fixture callers. New publication
 # uses SCHEMA_PATHS[2]; historical v1 tests may safely patch this read-only path.
@@ -141,6 +142,7 @@ TAKE_KEYS = {
     "memoryStatus", "sampleSidecarDigest",
     "streamingTelemetryV9SidecarDigest", "samplingPromotionPackaged", "samplingWAVDigest",
     "samplingSeedAgreement",
+    "qualityRegistryOutcome", "qualityRegistryRequiredGates", "qualityRegistryIssues",
 }
 OUTPUT_KEYS = {
     "readableWAV", "atomicPublish", "durationSeconds", "sampleRate", "channels",
@@ -257,6 +259,11 @@ V2_ONLY_TAKE_KEYS = {
     "streamingTelemetryV9SidecarDigest", "samplingPromotionPackaged", "samplingWAVDigest",
     "samplingSeedAgreement",
 }
+# Phase 13: the typed quality-registry identity is a v3 addition; v1/v2
+# records must reject it as unknown so historical documents stay immutable.
+V3_ONLY_TAKE_KEYS = {
+    "qualityRegistryOutcome", "qualityRegistryRequiredGates", "qualityRegistryIssues",
+}
 V2_ONLY_TRACE_SUMMARY_KEYS = {
     *LEGACY_MEMORY_TRACE_SUMMARY_KEYS,
     *MEMORY_TRACE_V2_SUMMARY_KEYS,
@@ -268,10 +275,12 @@ def schema_property_keys(version: int) -> dict[str, set[str]]:
     properties = {name: set(keys) for name, keys in SCHEMA_PROPERTY_KEYS.items()}
     if version == 1:
         properties["evidence"] -= V2_ONLY_EVIDENCE_KEYS
-        properties["take"] -= V2_ONLY_TAKE_KEYS
+        properties["take"] -= V2_ONLY_TAKE_KEYS | V3_ONLY_TAKE_KEYS
         properties["trace"] -= V2_ONLY_TRACE_KEYS
         properties["traceSummary"] -= V2_ONLY_TRACE_SUMMARY_KEYS
     else:
+        if version == 2:
+            properties["take"] -= V3_ONLY_TAKE_KEYS
         properties["traceCaptureSettings"] = set(TRACE_CAPTURE_SETTINGS_KEYS)
         properties["traceSummaryArtifact"] = set(TRACE_SUMMARY_ARTIFACT_KEYS)
     return properties
@@ -540,7 +549,7 @@ def load_schema_contract(version: int | None = None) -> dict[str, Any]:
 
     run_properties = definitions["run"]["properties"]
     enum_contracts = {
-        "kind": V2_KINDS if version == 2 else V1_KINDS,
+        "kind": V2_KINDS if version >= 2 else V1_KINDS,
         "platform": PLATFORMS,
         "status": SUCCESS_STATUSES,
         "matrixScope": MATRIX_SCOPES,
@@ -1033,6 +1042,51 @@ def screenshot_digests(artifact_dir: Path) -> list[dict[str, str]]:
     return [{"name": name, "digest": digest} for name, digest in sorted(screenshots.items())]
 
 
+QUALITY_FAST_GATES = {
+    "terminal", "token_cap", "codec_behavior", "persisted_wav", "streaming_continuity",
+}
+QUALITY_GATE_RE = re.compile(r"^[a-z][a-z0-9_]*$")
+QUALITY_ISSUE_RE = re.compile(r"^[a-z][a-z0-9_.]*$")
+
+
+def validate_take_quality_identity(
+    take: dict[str, Any], position: int, *, generation_kind: bool
+) -> None:
+    """Phase 13 (schema v3): every generation take carries the fail-closed
+    quality-registry verdict it published with. A failing verdict is never
+    publishable (PASS-only history), the covered gate set must include the
+    five fast gates, and issue codes stay machine-readable."""
+    label = f"takes[{position - 1}]"
+    outcome = take.get("qualityRegistryOutcome")
+    gates = take.get("qualityRegistryRequiredGates")
+    if not generation_kind:
+        if any(key in take for key in V3_ONLY_TAKE_KEYS):
+            raise HistoryError(f"{label} quality identity applies only to generation takes")
+        return
+    if outcome not in {"pass", "warning"}:
+        raise HistoryError(f"{label} requires a publishable qualityRegistryOutcome")
+    if (
+        not isinstance(gates, list) or not gates
+        or any(not isinstance(gate, str) or not QUALITY_GATE_RE.fullmatch(gate) for gate in gates)
+        or len(set(gates)) != len(gates)
+        or gates != sorted(gates)
+    ):
+        raise HistoryError(f"{label} qualityRegistryRequiredGates must be sorted unique gate ids")
+    if not QUALITY_FAST_GATES.issubset(gates):
+        raise HistoryError(f"{label} quality identity must cover the five fast gates")
+    issues = take.get("qualityRegistryIssues")
+    if issues is not None:
+        if (
+            not isinstance(issues, list)
+            or any(not isinstance(issue, str) or not QUALITY_ISSUE_RE.fullmatch(issue) for issue in issues)
+        ):
+            raise HistoryError(f"{label} qualityRegistryIssues must be machine-readable codes")
+        if outcome == "pass" and issues:
+            raise HistoryError(f"{label} a pass verdict cannot carry registry issues")
+    if outcome == "warning" and not issues:
+        raise HistoryError(f"{label} a warning verdict must record its registry issues")
+
+
 def artifact_version_key(value: str) -> tuple[int, ...]:
     try:
         return tuple(int(part) for part in value.split("."))
@@ -1228,7 +1282,7 @@ def selected_evidence_digest(record: dict[str, Any]) -> str:
     }
     if evidence.get("languageVerification") is not None:
         payload["languageVerification"] = evidence["languageVerification"]
-    if record.get("schemaVersion") == 2:
+    if record.get("schemaVersion", 0) >= 2:
         for key in (
             "sampleSidecarsDigest", "memoryPolicyID", "retentionMetric",
             "retentionThresholdFraction", "maximumRetainedGrowthMB",
@@ -1837,7 +1891,7 @@ def validate_trace_summary(record: dict[str, Any]) -> None:
     if not any(rows.values()):
         raise HistoryError("trace summary contains no target-process schema rows")
     memory_profile = (
-        record.get("schemaVersion") == 2
+        record.get("schemaVersion", 0) >= 2
         and "allocations" in str(trace.get("template", "")).lower()
     )
     if memory_profile:
@@ -1975,7 +2029,7 @@ def validate_record(
         raise HistoryError("run.id is not filesystem-safe")
     if not isinstance(run["label"], str) or not SAFE_LABEL_RE.fullmatch(run["label"]):
         raise HistoryError("run.label must be a privacy-safe opaque identifier")
-    allowed_kinds = V2_KINDS if version == 2 else V1_KINDS
+    allowed_kinds = V2_KINDS if version >= 2 else V1_KINDS
     if run["kind"] not in allowed_kinds or run["platform"] not in PLATFORMS:
         raise HistoryError("run kind or platform is unsupported")
     if run["status"] not in SUCCESS_STATUSES:
@@ -2062,7 +2116,11 @@ def validate_record(
     for position, take in enumerate(takes, start=1):
         if not isinstance(take, dict):
             raise HistoryError(f"takes[{position - 1}] must be an object")
-        allowed_take_keys = TAKE_KEYS if version == 2 else TAKE_KEYS - V2_ONLY_TAKE_KEYS
+        allowed_take_keys = set(TAKE_KEYS)
+        if version < 2:
+            allowed_take_keys -= V2_ONLY_TAKE_KEYS
+        if version < 3:
+            allowed_take_keys -= V3_ONLY_TAKE_KEYS
         reject_unknown_keys(take, allowed_take_keys, f"takes[{position - 1}]")
         required = {"takeIndex", "generationID", "cell", "status", "metrics", "warnings"}
         if missing := sorted(required - set(take)):
@@ -2095,12 +2153,14 @@ def validate_record(
             raise HistoryError("take cell must be a privacy-safe machine identifier")
         if take["status"] not in SUCCESS_STATUSES:
             raise HistoryError("tracked takes must be successful")
+        if version >= 3:
+            validate_take_quality_identity(take, position, generation_kind=generation_kind)
         playback_source = take.get("playbackStartSource")
         if playback_source is not None and playback_source not in {"liveStream", "finalFile"}:
             raise HistoryError("take playbackStartSource is invalid")
-        if version == 2 and run["kind"] == "ui-generation" and playback_source is None:
+        if version >= 2 and run["kind"] == "ui-generation" and playback_source is None:
             raise HistoryError("schema-v2 UI take has no typed playback start source")
-        if version == 2 and run["kind"] in MEMORY_QUALIFIED_KINDS:
+        if version >= 2 and run["kind"] in MEMORY_QUALIFIED_KINDS:
             if take.get("memoryStatus") not in {"qualified", "qualifiedWithWarnings"}:
                 raise HistoryError("memory-qualified take has no qualification status")
             require_digest(
@@ -2112,7 +2172,7 @@ def validate_record(
         for metric, value in take["metrics"].items():
             if not isinstance(value, (int, float)) or isinstance(value, bool) or not math.isfinite(float(value)):
                 raise HistoryError(f"take metric {metric} must be finite numeric data")
-        if version == 2 and run["kind"] in MEMORY_QUALIFIED_KINDS:
+        if version >= 2 and run["kind"] in MEMORY_QUALIFIED_KINDS:
             required_memory = set(MEMORY_REQUIRED_METRICS)
             if run["platform"] == "ios":
                 required_memory |= IOS_MEMORY_REQUIRED_METRICS
@@ -2291,7 +2351,7 @@ def validate_record(
         require_digest(screenshot["digest"], "screenshot digest")
 
     kind = run["kind"]
-    memory_contract_applies = version == 2 and kind in MEMORY_QUALIFIED_KINDS
+    memory_contract_applies = version >= 2 and kind in MEMORY_QUALIFIED_KINDS
     if memory_contract_applies:
         if evidence.get("memoryContractVersion") != 1 or evidence.get("memoryQualified") is not True:
             raise HistoryError("record lacks the benchmark memory qualification contract")
@@ -2491,7 +2551,7 @@ def trend_summary(record: dict[str, Any]) -> str:
     if not baseline:
         return "baseline"
     collected: dict[str, list[float]] = {"rtf": [], "ttfcMS": []}
-    if record.get("schemaVersion") == 2 and memory_contract_status(record).startswith("qualified"):
+    if record.get("schemaVersion", 0) >= 2 and memory_contract_status(record).startswith("qualified"):
         collected["peakPhysicalFootprintMB"] = []
     for metrics in comparison.get("deltas", {}).values():
         if not isinstance(metrics, dict):

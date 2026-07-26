@@ -170,7 +170,10 @@ must not yet be treated as product authority. At this checkpoint:
 - Telemetry JSONL remains schema v8 with a nested transition projection. Publication-ready
   transitions with exact MLX chunk instants publish complete `*.streaming-telemetry-v9.json`
   sidecars; those sidecars are the history authority for streaming detail. Benchmark history
-  schema v2 remains authoritative until Phase 13. Non-blocking layer gaps (`notApplicable`,
+  schema v2 remained authoritative until Phase 13 shipped (2026-07-26): schema v3 adds the
+  typed quality-registry identity to every generation take, the publisher folds it from the
+  phase-12 telemetry notes (v3 only when every take carries it; mixed records refuse), and
+  v1/v2 records stay valid immutable history. Non-blocking layer gaps (`notApplicable`,
   aggregate-only transport list, missing player render callback) may remain listed.
 
 Overall Phase 4 promotion is closed. The broader convergence program remains open for Phases

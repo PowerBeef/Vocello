@@ -83,6 +83,12 @@ from schema-v2 memory trends.
 |---|---|---|---|---|---|---:|---|---|---|---|
 | 2026-07-23 | [`macos-engine-20260723-055840-a3dc8981`](runs/engine-generation/macos-engine-20260723-055840-a3dc8981.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 29 | `3a4378534195` | `91f82d33a19f` | baseline | o-capability-reference |
 
+## engine-generation / macos / mac-mini-m2-8gb / config `999f685075aa`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---|---|---|---|
+| 2026-07-26 | [`macos-engine-20260726-055949-8e3c8639`](runs/engine-generation/macos-engine-20260726-055949-8e3c8639.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 25 | `b14ad022be73` dirty | `excluded` | baseline | stage1-p2a-pipelined |
+
 ## engine-generation / macos / mac-mini-m2-8gb / config `9ccbb95f35b8`
 
 | completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |

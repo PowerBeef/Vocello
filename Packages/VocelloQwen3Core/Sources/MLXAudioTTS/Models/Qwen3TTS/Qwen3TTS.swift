@@ -330,11 +330,18 @@ fileprivate enum Qwen3TextConditioningMode: String, Sendable {
 
 private enum Qwen3StreamStepEvalPolicy: String, Sendable {
     case full
+    case pipelined
     case eosOnly = "eos-only"
     case deferred
 
-    /// SAMPLER-001: `.full` is the production default. Deferring the flush only
-    /// moves the same MLX synchronization to a later read and obscures attribution.
+    /// Stage 1 P2a: `.pipelined` is the production default. It submits the
+    /// step graph with `asyncEval` and performs the previous chunk's
+    /// materialization and channel sends before the token/EOS reads, so host
+    /// and channel work overlap the in-flight GPU step. Unlike the null
+    /// `.eosOnly`/`.deferred` variants (SAMPLER-001: moving the same sync to
+    /// a later read with nothing in between), real work fills the gap.
+    /// `.full` remains the synchronous diagnostic for exact per-stage
+    /// attribution.
     static func resolve(
         explicitPolicy: String? = nil
     ) -> Qwen3StreamStepEvalPolicy {
@@ -342,15 +349,16 @@ private enum Qwen3StreamStepEvalPolicy: String, Sendable {
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased(),
            !explicitPolicy.isEmpty {
-            return Qwen3StreamStepEvalPolicy(rawValue: explicitPolicy) ?? .full
+            return Qwen3StreamStepEvalPolicy(rawValue: explicitPolicy) ?? .pipelined
         }
 
-        return .full
+        return .pipelined
     }
 
     var booleanFlags: [String: Bool] {
         [
             "stream_step_eval_policy_full": self == .full,
+            "stream_step_eval_policy_pipelined": self == .pipelined,
             "stream_step_eval_policy_eos_only": self == .eosOnly,
             "stream_step_eval_policy_deferred": self == .deferred,
         ]
@@ -3220,6 +3228,47 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         // re-allocated 14× per frame). Sized lazily from the first CP logits.
         var codePredictorScratch: Qwen3SamplerScratch?
 
+        // Stage 1 P2a (`.pipelined` policy, materialized-sink path only): a
+        // stream chunk's compute is submitted with asyncEval at assembly and
+        // its materialization + channel sends run at the top of the NEXT token
+        // step, after that step's graph is submitted — so the host/channel
+        // work overlaps in-flight GPU compute. The flush point precedes the
+        // next `.token` read, so the event order on the channel is exactly the
+        // pre-pipelining order, and materialization still happens in this task
+        // before the awaited send (lossless-channel contract unchanged).
+        struct PendingMaterializedStreamChunk {
+            let audioChunk: MLXArray
+            let timings: ChunkSubstageTimings?
+        }
+        var pendingMaterializedChunk: PendingMaterializedStreamChunk?
+        func flushPendingMaterializedChunk() async throws {
+            guard let pending = pendingMaterializedChunk else { return }
+            pendingMaterializedChunk = nil
+            guard let materializedEventSink else { return }
+            let flushEvalStartedAt = ContinuousClock.now
+            eval(pending.audioChunk)
+            // Flush wait lands in the running audio-chunk-eval totals (its
+            // chunk's own delta closed at assembly; this shifts attribution by
+            // at most one chunk in the diagnostic breakdown).
+            let flushElapsed = flushEvalStartedAt.elapsedMilliseconds
+            audioChunkEvalTotalMS += flushElapsed
+            if isPureVoiceDesign {
+                designAudioChunkEvalTotalMS += flushElapsed
+            } else if isDedicatedCustomVoice {
+                customAudioChunkEvalTotalMS += flushElapsed
+            } else if isVoiceCloneGeneration {
+                cloneAudioChunkEvalTotalMS += flushElapsed
+            }
+            try Task.checkCancellation()
+            let materializedSamples = pending.audioChunk.asArray(Float.self)
+            if let timings = pending.timings {
+                try await materializedEventSink(.chunkTimings(timings))
+                try Task.checkCancellation()
+            }
+            try await materializedEventSink(.audio(materializedSamples))
+            try Task.checkCancellation()
+        }
+
         for _ in 0 ..< effectiveMaxTokens {
             try Task.checkCancellation()
             let tokenLoopStartedAt = ContinuousClock.now
@@ -3349,6 +3398,8 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
             switch streamStepEvalPolicy {
             case .full:
                 eval(inputEmbeds, isEOS)
+            case .pipelined:
+                asyncEval(inputEmbeds, isEOS)
             case .eosOnly:
                 eval(isEOS)
             case .deferred:
@@ -3367,6 +3418,11 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
             } else if isVoiceCloneGeneration {
                 cloneStreamStepEvalTotalMS += streamStepEvalElapsed
             }
+
+            // The previous chunk's materialization and sends run while this
+            // step's submitted graph computes; they precede this step's
+            // `.token` send, so channel event order is unchanged.
+            try await flushPendingMaterializedChunk()
 
             let tokenId = Int(nextToken[0, 0].item(Int32.self))
             if let materializedEventSink {
@@ -3457,14 +3513,22 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                     pendingStreamCodes.removeAll(keepingCapacity: true)
                     streamChunkSchedule.didEmit()
                     emittedCodecFrameCount = chunkCodecEnd
+                    // `.pipelined`: leave the chunk lazily submitted and flush
+                    // it at the top of the next token step. The flush point
+                    // runs before every assembly, so at most one chunk is ever
+                    // pending.
+                    let deferChunkMaterialization =
+                        streamStepEvalPolicy == .pipelined && materializedEventSink != nil
+                    assert(pendingMaterializedChunk == nil)
                     let materializedSamples: [Float]?
-                    if materializedEventSink != nil {
+                    if materializedEventSink != nil, !deferChunkMaterialization {
                         eval(audioChunk)
                         try Task.checkCancellation()
                         materializedSamples = audioChunk.asArray(Float.self)
                     } else {
                         materializedSamples = nil
                     }
+                    var deferredChunkTimings: ChunkSubstageTimings?
                     if onAudioChunkTimings != nil || emitMaterializedChunkTimings {
                         let kvDiagnostics = makeChunkKVCacheDiagnostics()
                         let chunkMimiBreakdown = mimiDecoderBreakdownTotal.subtracting(lastChunkMimiDecoderBreakdown)
@@ -3491,7 +3555,9 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                         lastChunkStreamStepEOSReadMS = streamStepEOSReadTotalMS
                         lastChunkAudioChunkEvalMS = audioChunkEvalTotalMS
                         lastChunkMimiDecoderBreakdown = mimiDecoderBreakdownTotal
-                        if let materializedEventSink {
+                        if deferChunkMaterialization {
+                            deferredChunkTimings = timings
+                        } else if let materializedEventSink {
                             try Task.checkCancellation()
                             try await materializedEventSink(.chunkTimings(timings))
                             try Task.checkCancellation()
@@ -3500,7 +3566,12 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                         }
                     }
                     try Task.checkCancellation()
-                    if let materializedEventSink, let materializedSamples {
+                    if deferChunkMaterialization {
+                        pendingMaterializedChunk = PendingMaterializedStreamChunk(
+                            audioChunk: audioChunk,
+                            timings: deferredChunkTimings
+                        )
+                    } else if let materializedEventSink, let materializedSamples {
                         try await materializedEventSink(.audio(materializedSamples))
                         try Task.checkCancellation()
                     } else {
@@ -3519,6 +3590,11 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
             }
 
         }
+
+        // A chunk stashed in the final token step (EOS or token cap) flushes
+        // here, before the info event and the tail chunk — the same relative
+        // audio/info order as the synchronous path.
+        try await flushPendingMaterializedChunk()
 
         guard generatedCodeCount > 0 else {
             generationEndReason = "failed"

@@ -3359,6 +3359,15 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
             try Task.checkCancellation()
         }
 
+        // Stage 1 P1b (branch experiment): static-shape compiled talker decode.
+        // Built lazily at the first step from the prefilled plain caches; the
+        // knob-gated quantized/rotating cache experiments keep the eager path
+        // (the plan initializer returns nil for them). While the plan is
+        // active the eager `cache` stays frozen at the prefill offset, so the
+        // chunk KV diagnostics report prefill-only footprints.
+        var talkerCompiledPlan: TalkerCompiledDecodePlan?
+        var talkerCompiledPlanAttempted = false
+
         for _ in 0 ..< effectiveMaxTokens {
             try Task.checkCancellation()
             let tokenLoopStartedAt = ContinuousClock.now
@@ -3369,7 +3378,18 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
             // Forward pass through talker
             let talkerForwardStartedAt = ContinuousClock.now
             let talkerSignpost = Qwen3Signposts.signposter.beginInterval("Talker Forward")
-            let (logits, hidden) = talker(inputEmbeds, cache: cache)
+            if !talkerCompiledPlanAttempted {
+                talkerCompiledPlanAttempted = true
+                talkerCompiledPlan = TalkerCompiledDecodePlan(
+                    talker: talker, prefillCache: cache, dtype: inputEmbeds.dtype
+                )
+            }
+            let (logits, hidden): (MLXArray, MLXArray)
+            if let talkerCompiledPlan {
+                (logits, hidden) = talkerCompiledPlan.step(inputEmbeds)
+            } else {
+                (logits, hidden) = talker(inputEmbeds, cache: cache)
+            }
             Qwen3Signposts.signposter.endInterval("Talker Forward", talkerSignpost)
             talkerForwardTotalMS += talkerForwardStartedAt.elapsedMilliseconds
 

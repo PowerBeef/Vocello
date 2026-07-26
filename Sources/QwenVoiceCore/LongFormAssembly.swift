@@ -162,6 +162,27 @@ public struct LongFormAssemblyEvidence: Codable, Equatable, Sendable {
             ? ["boundary_jump:\(maximumSegmentBoundaryJump)"]
             : nil
     }
+
+    /// Typed `longFormContinuity` gate for the quality registry (Stage 3),
+    /// derived deterministically from this assembly's recorded evidence.
+    /// Warn-first, matching the advisory contract above: a boundary-jump
+    /// breach is a `.warning`, never a `.fail`, until a measured distribution
+    /// across real projects justifies a hard threshold. The joined output's
+    /// digest is the gate evidence.
+    public func longFormContinuityGateResult() -> GenerationQualityGateResult {
+        GenerationQualityGateResult(
+            gate: .longFormContinuity,
+            outcome: exceedsAdvisoryBoundaryJump ? .warning : .pass,
+            algorithmVersion: algorithmVersion,
+            evidenceDigest: outputDigest,
+            measurements: [
+                GenerationQualityMeasurement(
+                    key: .boundaryDiscontinuity,
+                    value: Double(maximumSegmentBoundaryJump)
+                ),
+            ]
+        )
+    }
 }
 
 /// Manifest-v4 assembly, consumed by both shipping long-form runners. It

@@ -96,6 +96,17 @@ final class LongFormAssemblyTests: XCTestCase {
             evidence.advisoryWarnings,
             ["boundary_jump:\(evidence.maximumSegmentBoundaryJump)"]
         )
+
+        // The derived typed gate mirrors the warn-first advisory contract and
+        // carries the joined output digest plus the measured boundary jump.
+        let gate = evidence.longFormContinuityGateResult()
+        XCTAssertEqual(gate.gate, .longFormContinuity)
+        XCTAssertEqual(gate.outcome, .warning)
+        XCTAssertEqual(gate.evidenceDigest, evidence.outputDigest)
+        XCTAssertEqual(
+            gate.measurements.first { $0.key == .boundaryDiscontinuity }?.value,
+            Double(evidence.maximumSegmentBoundaryJump)
+        )
     }
 
     func testSmoothJoinRecordsNoAdvisoryAndOldEvidenceDecodesWithoutTheField() async throws {
@@ -111,6 +122,7 @@ final class LongFormAssemblyTests: XCTestCase {
         )
         XCTAssertFalse(evidence.exceedsAdvisoryBoundaryJump)
         XCTAssertNil(evidence.advisoryWarnings)
+        XCTAssertEqual(evidence.longFormContinuityGateResult().outcome, .pass)
 
         // Pre-advisory manifests carry no advisoryWarnings key; decoding them
         // must keep working.

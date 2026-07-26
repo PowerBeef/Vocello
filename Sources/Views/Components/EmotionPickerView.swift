@@ -232,6 +232,16 @@ struct EmotionPickerView: View {
                         applyCurrentSelection()
                     }
                 }
+
+            if isCustomMode, DeliveryInstructionAdvisor.hasDurationDirective(customText) {
+                Label(
+                    DeliveryInstructionAdvisor.advisoryMessage,
+                    systemImage: "exclamationmark.triangle"
+                )
+                .font(.caption2)
+                .foregroundStyle(.orange)
+                .accessibilityIdentifier("\(accessibilityPrefix)_durationAdvisory")
+            }
         }
     }
 

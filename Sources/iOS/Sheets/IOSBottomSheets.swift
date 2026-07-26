@@ -217,6 +217,10 @@ struct IOSDeliveryPickerSheet: View {
             VStack(alignment: .leading, spacing: 16) {
                 composedInstructionEditor
 
+                if DeliveryInstructionAdvisor.hasDurationDirective(customText) {
+                    durationDirectiveAdvisory
+                }
+
                 customToneGuidance
 
                 customToneExamples
@@ -257,6 +261,19 @@ struct IOSDeliveryPickerSheet: View {
             .font(.system(size: 13, weight: .regular))
             .foregroundStyle(IOSAppTheme.textSecondary)
             .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private var durationDirectiveAdvisory: some View {
+        HStack(alignment: .top, spacing: 6) {
+            Image(systemName: "exclamationmark.triangle")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.orange)
+            Text(DeliveryInstructionAdvisor.advisoryMessage)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(IOSAppTheme.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .accessibilityIdentifier("deliveryPickerSheet_customTone_durationAdvisory")
     }
 
     // MARK: - Composed instruction editor

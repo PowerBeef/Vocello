@@ -177,12 +177,15 @@ review doc):
    byte-identical output throughout; the residual step-eval launch-gap idle is a 0.30.6
    structural ceiling whose re-test rides the Stage 4 pin bump. The program proceeds to
    Stage 2 (memory).
-3. **Stage 2 — memory program (folds phase 9)** — in progress 2026-07-26: ~~speech-tokenizer
-   runtime reuse across mode switches~~ **shipped (phase 9 closed** — see the phase table;
-   byte-identical A/B, adoption verified live, memory-qualified on the 8 GB floor).
-   Remaining: text-embedding quantization experiment (622 MB BF16 today inside the "4-bit"
-   artifact), codec bf16 experiment (fp32 today; keep final decoder layers full precision),
-   clone-prompt release after the conditioning prefix is built.
+3. **Stage 2 — memory program (folds phase 9)** — in progress 2026-07-26
+   (measurements: `benchmarks/OPTIMIZATION.md` §N): ~~speech-tokenizer runtime reuse~~
+   **shipped (phase 9 closed)**; ~~text-embedding quantization experiment~~ **validated in
+   isolation** — 8-bit per-layer embedding cuts MLX active peak by 278 MB (−13.2%) and the
+   Speed artifact by 292 MB at RTF parity with clean QC; shipping it is a promotion-quality
+   artifact decision (new HF uploads + catalog re-pins) awaiting the maintainer;
+   ~~clone-prompt `refCodes` release~~ **declined** (retained tensors <100 KB and required
+   per generation — the report's M5b premise corrected). Remaining: the codec bf16
+   experiment (2.3).
 4. **Stage 3 — quality harness (folds phase 12, then 13)**: wire the typed
    `GenerationQualityReport` registry producers and persisted-WAV consolidation, add a
    dev-lane speaker-similarity gate for clone fidelity, optional advisory MOS-proxy column;

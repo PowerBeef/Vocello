@@ -899,6 +899,38 @@ the §K 12-seed clone/long QC soak.
   branch-only static-shape talker compile) the sanctioned next lever**, with P3's per-pass
   keying pattern as the template. Raw trace summarized and discarded per policy.
 
+## N — Stage 2 memory program (2026-07-26)
+
+- **2.1 Speech-tokenizer residency (landed; phase 9 closed).** macOS model switches adopt
+  the previous model's byte-identical 682 MB tokenizer object on content-identity match
+  (host-attested trust digests; hard-link inode fallback; encoder-superset rule). Evidence:
+  fixed-seed switch A/B byte-identical with residency on/off; adoption drops
+  `speech_tokenizer_load` 503 → 0 ms with ~260 ms better cold first-chunk latency after a
+  switch; retained-memory qualification PASS on the 8 GB floor
+  (`mac-memory-qualification-20260726-115343-5a1c8a85`). Registered off-switch:
+  `QWENVOICE_TOKENIZER_RESIDENCY`. Local-install note: this dev machine's six models predate
+  the shared-store migration (nlink=1 copies), which is why the trust-digest identity — not
+  the inode path — carries the hit here.
+- **2.2 Text-embedding 8-bit quantization (experiment validated; productization pending).**
+  Isolated APFS-cloned data dir; the CustomVoice-4bit talker's 622.3 MB BF16
+  `model.text_embedding` converted to affine 8-bit group-64 (packed 311 MB + 19 MB
+  scales/biases) with the per-layer entry nested in the config `quantization` dict — the
+  loader's existing `perLayerQuantization` path constructed the QuantizedEmbedding with no
+  code changes. Measured on the 8 GB floor: **MLX active peak 2105.9 → 1827.7 MB
+  (−278 MB, −13.2%)**, disk 1625 → 1334 MB (−292 MB per Speed artifact), warm RTF parity
+  (1.161–1.169 vs 1.159–1.170), 6/6 fixed-seed takes clean EOS with plausible parallel
+  durations. Fixed-seed output changes (quantization is numerics-affecting), so shipping is
+  a promotion-quality artifact decision: new HF artifact uploads, catalog re-pins,
+  full fail-closed delivery workflow, and fresh fixture identities — maintainer call.
+- **2.4 Clone `refCodes` release (declined — premise corrected).** The retained clone-prompt
+  tensors total under ~100 KB (refCodes ≤ 16 codebooks × 750 frames × int32 ≈ 48 KB plus an
+  8 KB x-vector), and `refCodes` is consumed by **every** clone generation — the ICL prefix
+  interleaves the target text, so no request-independent "conditioning prefix" exists to
+  retain instead. The report's M5b premise mischaracterized the retention cost; the iPhone
+  clone peak band is weights + KV + codec activations. Nothing to reclaim; no change made.
+- Remaining: 2.3 codec bf16 experiment (same isolated methodology; promotion-quality
+  decision if it validates).
+
 ## Status
 
 The optimization program tracked in this document is wrapped up. The §H P0–P6 work has been

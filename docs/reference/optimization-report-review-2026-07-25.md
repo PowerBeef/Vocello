@@ -148,7 +148,14 @@ Decision metric (adopted from the report, thresholds kept): if post-stage GPU-bu
 the loop has become compute-bound → quantization/speculative work gains priority; if it
 stays <55%, keep attacking launch count before anything else.
 
-### Stage 2 — memory program (folds phase 9)
+### Stage 2 — memory program (folds phase 9) — **in progress 2026-07-26**
+
+> 2.1 shipped (phase 9 closed: byte-identical switch A/B, memory-qualified on the 8 GB
+> floor). 2.2 validated in isolation (−278 MB MLX active peak, −292 MB artifact, RTF
+> parity, clean QC) — productization is a maintainer artifact/catalog decision. 2.4
+> declined: the retained clone tensors measure <100 KB and `refCodes` is a required
+> per-generation input (the ICL prefix interleaves the target text), correcting M5b's
+> premise. Measurements: `benchmarks/OPTIMIZATION.md` §N.
 
 1. **Phase 9: speech-tokenizer runtime reuse (M3 corrected).** Keep the verified,
    byte-identical 682 MB fp32 speech tokenizer resident across mode switches (the RAM

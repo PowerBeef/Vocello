@@ -151,6 +151,13 @@ class BenchDeliveryProsodyTests(unittest.TestCase):
             "rate_cv": 0.4 if instructed else 0.3,
             "pause_ratio": 0.1 if instructed else 0.2,
             "energy_roughness": 0.25 if instructed else 0.2,
+            # Full analyzer fields consumed by the per-take prosody gate.
+            "f0_turning_points_per_sec": 2.0,
+            "rate_syllable_rate_hz": 4.0,
+            "pauses_pause_speech_ratio": 0.1 if instructed else 0.2,
+            "energy_envelope_roughness": 0.25 if instructed else 0.2,
+            "rate_local_rate_cv": 0.4 if instructed else 0.3,
+            "pauses_max_pause_seconds": 0.4,
         }
 
     def test_analysis_ignores_stale_shared_outputs(self) -> None:
@@ -178,6 +185,35 @@ class BenchDeliveryProsodyTests(unittest.TestCase):
         self.assertEqual(results[0]["neutralWav"], neutral)
         analyzed_names = {Path(call.args[0]).name for call in analyzer.call_args_list}
         self.assertEqual(analyzed_names, {neutral, delivery})
+        # Per-take prosody gate verdict rides the sidecar row, computed from
+        # the same single analysis pass (no extra analyze calls).
+        gate = results[0]["qualityGate"]
+        self.assertIs(gate["passed"], True)
+        self.assertEqual(gate["flags"], [])
+        self.assertIn("f0_std_hz", gate["metrics"])
+        self.assertEqual(len(analyzer.call_args_list), 2)
+
+    def test_quality_gate_flags_ride_the_sidecar_row(self) -> None:
+        neutral = "custom_pro_custom_speed_medium_warm_0.wav"
+        delivery = "custom_pro_custom_speed_medium_warm_d-calm.normal_0.wav"
+        self.write_manifest(
+            [
+                self.take(1, "neutral-current", neutral, delivery=None),
+                self.take(2, "delivery-current", delivery, delivery="calm.normal"),
+            ]
+        )
+
+        def monotone_metrics(path: str) -> dict[str, float]:
+            metrics = dict(self.metrics(path))
+            metrics["f0_std_hz"] = 0.1
+            metrics["f0_turning_points_per_sec"] = 0.1
+            return metrics
+
+        with mock.patch.object(prosody, "analyze", side_effect=monotone_metrics):
+            results = prosody.analyze_run(self.diagnostics, self.manifest)
+        gate = results[0]["qualityGate"]
+        self.assertIs(gate["passed"], False)
+        self.assertIn("monotone", gate["flags"])
 
     def test_missing_current_run_neutral_fails(self) -> None:
         delivery = "custom_pro_custom_speed_medium_warm_d-happy.strong_0.wav"

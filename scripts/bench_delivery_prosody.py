@@ -30,6 +30,7 @@ from typing import Any
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from prosody_profile import builtin_profile, delivery_weight, load_profile
+from prosody_quality_gate import evaluate_metrics
 
 
 def analyze(path: str) -> dict[str, Any]:
@@ -225,6 +226,10 @@ def analyze_run(
                 ),
                 "deliveryMetrics": instructed_metrics,
                 "neutralMetrics": neutral_metrics,
+                # Per-take prosody gate verdict from the same analysis pass, so
+                # downstream typed quality reports can fold a real verdict
+                # instead of re-deriving thresholds.
+                "qualityGate": evaluate_metrics(instructed_metrics, resolved_profile),
             }
         )
     return results

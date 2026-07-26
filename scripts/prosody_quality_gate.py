@@ -36,6 +36,36 @@ def evaluate(path, profile=None):
             "metrics": {},
         }
 
+    return evaluate_metrics(pros, prof)
+
+
+def evaluate_metrics(pros, prof=None):
+    """Gate report from already-analyzed metrics (no re-analysis).
+
+    Lets a caller that has run ``analyze`` once (e.g. the bench delivery
+    sidecar) attach the per-take gate verdict without paying for a second
+    signal pass. Metrics missing any gate input are reported as a distinct
+    non-passing ``metrics_incomplete`` outcome rather than guessed around.
+    """
+    if prof is None:
+        prof = builtin_profile()
+    required = (
+        "f0_std_hz", "f0_turning_points_per_sec", "rate_syllable_rate_hz",
+        "pauses_pause_speech_ratio", "energy_envelope_roughness",
+        "rate_local_rate_cv", "pauses_max_pause_seconds",
+    )
+    if any(key not in pros for key in required):
+        return {
+            "clip": pros.get("clip", ""),
+            "analyzerAlgorithmVersion": pros.get(
+                "analyzerAlgorithmVersion", ANALYZER_ALGORITHM_VERSION
+            ),
+            "passed": False,
+            "flags": ["metrics_incomplete"],
+            "reason": "gate inputs missing from analyzed metrics",
+            "metrics": {},
+        }
+
     flags = []
 
     # Monotone: very little pitch movement
@@ -67,15 +97,21 @@ def evaluate(path, profile=None):
         "pause_ratio": pros["pauses_pause_speech_ratio"],
         "max_pause_sec": pros["pauses_max_pause_seconds"],
         "envelope_roughness": pros["energy_envelope_roughness"],
-        "pitch_std_semitones": pros["f0_std_semitones"],
-        "pitch_range_semitones": pros["f0_range_semitones"],
-        "boundary_discontinuity": pros["boundaries_max_sample_jump"],
-        "analyzer_peak_working_set_bytes": pros["analysisEstimatedPeakWorkingSetBytes"],
     }
+    for summary_key, source_key in (
+        ("pitch_std_semitones", "f0_std_semitones"),
+        ("pitch_range_semitones", "f0_range_semitones"),
+        ("boundary_discontinuity", "boundaries_max_sample_jump"),
+        ("analyzer_peak_working_set_bytes", "analysisEstimatedPeakWorkingSetBytes"),
+    ):
+        if source_key in pros:
+            summary_metrics[summary_key] = pros[source_key]
 
     return {
-        "clip": pros["clip"],
-        "analyzerAlgorithmVersion": pros["analyzerAlgorithmVersion"],
+        "clip": pros.get("clip", ""),
+        "analyzerAlgorithmVersion": pros.get(
+            "analyzerAlgorithmVersion", ANALYZER_ALGORITHM_VERSION
+        ),
         "passed": len(flags) == 0,
         "flags": flags,
         "reason": "; ".join(flags) if flags else "prosody gate passed",

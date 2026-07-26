@@ -426,6 +426,21 @@ private final class Qwen3TTSPreparedComponentCache: Sendable {
 }
 
 enum Qwen3TTSReferenceAudio {
+    /// Reference audio uses the codec's fixed 24 kHz contract.
+    static let sampleRate = 24_000
+
+    /// Trailing silence appended to the reference before codec encode on the
+    /// ICL path, matching upstream Qwen3-TTS reference preprocessing. The
+    /// padding gives the tokenizer a clean utterance boundary so clone takes
+    /// stop inheriting a truncated final phoneme from the reference.
+    static let codecEncodeTrailingSilenceSamples = sampleRate / 2
+
+    /// Version token for ICL reference-encode preprocessing. It participates
+    /// in the persisted clone-artifact conditioning version, so any change to
+    /// how the reference is prepared for `speechTokenizer.encode` must change
+    /// this string to force fail-closed artifact and cache rebuilds.
+    static let codecEncodeConditioningVersion = "icl-ref-silence500ms-v2"
+
     /// Accepts only the three mono layouts used by the Qwen clone contract and
     /// returns one canonical `[1, T]` batch. Never selects or truncates a batch
     /// or channel implicitly.
@@ -444,6 +459,17 @@ enum Qwen3TTSReferenceAudio {
             )
         }
         return canonical
+    }
+
+    /// Canonical `[1, 1, T + pad]` codec-encoder input with the trailing
+    /// silence applied. x-vector extraction keeps the unpadded reference.
+    static func encoderInputWithTrailingSilence(_ audio: MLXArray) throws -> MLXArray {
+        let monoBatch = try canonicalMonoBatch(audio)
+        let silence = MLXArray.zeros(
+            [1, codecEncodeTrailingSilenceSamples],
+            dtype: monoBatch.dtype
+        )
+        return concatenated([monoBatch, silence], axis: 1).expandedDimensions(axis: 1)
     }
 }
 
@@ -576,7 +602,13 @@ public struct Qwen3TTSVoiceClonePrompt: @unchecked Sendable {
     /// Schema 3 makes the speaker-feature algorithm part of every persisted
     /// artifact, including low-level loads without app-owned metadata.
     public static let schemaVersion = 3
-    public static let speakerFeatureVersion = Qwen3TTSSpeakerMelFrontend.featureVersion
+    /// Conditioning-pipeline identity persisted in the manifest's
+    /// speaker-feature field. It composes the speaker mel-frontend algorithm
+    /// version with the ICL reference-encode preprocessing version, so a
+    /// change to either rejects stale artifacts at load and the host rebuilds
+    /// them fail-closed from the source reference.
+    public static let speakerFeatureVersion =
+        "\(Qwen3TTSSpeakerMelFrontend.featureVersion)+\(Qwen3TTSReferenceAudio.codecEncodeConditioningVersion)"
     public static let integritySchemaVersion = 1
     public static let integrityFilename = "integrity.json"
     public let refCodes: MLXArray?
@@ -1927,8 +1959,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                     "Qwen3 clone prompt creation requires an initialized speech tokenizer encoder."
                 )
             }
-            let monoBatch = try Qwen3TTSReferenceAudio.canonicalMonoBatch(refAudio)
-            let refAudioForEncoder = monoBatch.expandedDimensions(axis: 1)
+            let refAudioForEncoder = try Qwen3TTSReferenceAudio.encoderInputWithTrailingSilence(refAudio)
             refCodes = try speechTokenizer.encode(refAudioForEncoder)
         } else {
             refCodes = nil
@@ -3771,8 +3802,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         refCodes: MLXArray,
         targetTokenCount: Int
     ) {
-        let monoBatch = try Qwen3TTSReferenceAudio.canonicalMonoBatch(refAudio)
-        let refAudioForEncoder = monoBatch.expandedDimensions(axis: 1)
+        let refAudioForEncoder = try Qwen3TTSReferenceAudio.encoderInputWithTrailingSilence(refAudio)
         guard let speechTokenizer else {
             throw AudioGenerationError.modelNotInitialized("Speech tokenizer not loaded")
         }

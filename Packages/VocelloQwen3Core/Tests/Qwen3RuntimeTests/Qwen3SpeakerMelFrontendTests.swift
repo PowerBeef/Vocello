@@ -104,6 +104,46 @@ final class Qwen3SpeakerMelFrontendTests: XCTestCase {
         }
     }
 
+    func testCodecEncoderInputAppendsExactTrailingSilence() throws {
+        let samples: [Float] = [0.25, -0.5, 0.75, -1]
+        let layouts = [
+            MLXArray(samples),
+            MLXArray(samples).reshaped(1, samples.count),
+            MLXArray(samples).reshaped(1, 1, samples.count),
+        ]
+
+        XCTAssertEqual(Qwen3TTSReferenceAudio.sampleRate, 24_000)
+        XCTAssertEqual(Qwen3TTSReferenceAudio.codecEncodeTrailingSilenceSamples, 12_000)
+
+        for audio in layouts {
+            let padded = try Qwen3TTSReferenceAudio.encoderInputWithTrailingSilence(audio)
+            XCTAssertEqual(padded.shape, [1, 1, samples.count + 12_000])
+            XCTAssertEqual(padded.dtype, audio.dtype)
+            let values = padded.asArray(Float.self)
+            XCTAssertEqual(Array(values.prefix(samples.count)), samples)
+            XCTAssertTrue(values.dropFirst(samples.count).allSatisfy { $0 == 0 })
+        }
+    }
+
+    func testCodecEncoderInputRejectsNonCanonicalLayouts() {
+        XCTAssertThrowsError(
+            try Qwen3TTSReferenceAudio.encoderInputWithTrailingSilence(MLXArray.zeros([2, 64]))
+        )
+    }
+
+    func testConditioningVersionBindsReferenceEncodePreprocessing() {
+        // Any change to the ICL reference-encode preprocessing must move this
+        // composite so persisted artifacts and prompt caches rebuild.
+        XCTAssertEqual(
+            Qwen3TTSVoiceClonePrompt.speakerFeatureVersion,
+            "qwen-speaker-mel-v1+icl-ref-silence500ms-v2"
+        )
+        XCTAssertTrue(
+            Qwen3TTSVoiceClonePrompt.speakerFeatureVersion
+                .hasSuffix(Qwen3TTSReferenceAudio.codecEncodeConditioningVersion)
+        )
+    }
+
     func testSpeakerEmbeddingValidationCanonicalizesOfficialVectorShape() throws {
         let vector = MLXArray([Float(0.25), -0.5, 0.75])
         let canonical = try Qwen3TTSVoiceClonePrompt.validateSpeakerEmbedding(

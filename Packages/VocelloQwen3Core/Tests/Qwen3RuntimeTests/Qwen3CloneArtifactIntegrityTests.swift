@@ -19,7 +19,7 @@ final class Qwen3CloneArtifactIntegrityTests: XCTestCase {
         )
 
         XCTAssertEqual(manifest.schemaVersion, 3)
-        XCTAssertEqual(manifest.speakerFeatureVersion, "qwen-speaker-mel-v1")
+        XCTAssertEqual(manifest.speakerFeatureVersion, "qwen-speaker-mel-v1+icl-ref-silence500ms-v2")
         XCTAssertEqual(loaded.refCodes?.shape, [1, 2, 2])
         XCTAssertEqual(loaded.refCodes?.dtype, .int32)
         XCTAssertEqual(loaded.refCodes?.asArray(Int32.self), [1, 2, 3, 4])
@@ -55,6 +55,45 @@ final class Qwen3CloneArtifactIntegrityTests: XCTestCase {
         XCTAssertEqual(try Qwen3TTSVoiceClonePrompt.load(from: directory).refText, "old")
         let siblings = try FileManager.default.contentsOfDirectory(atPath: directory.deletingLastPathComponent().path)
         XCTAssertFalse(siblings.contains { $0.hasPrefix(".\(directory.lastPathComponent).staging.") })
+    }
+
+    func testStaleConditioningVersionFailsClosedAtLoad() throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try tensorPrompt(refText: "fixture").write(to: directory)
+
+        // A pre-silence-append artifact carries the bare mel-frontend version.
+        // Rewrite the manifest to that stale identity with a re-signed
+        // integrity entry so the version gate (not digest validation) decides.
+        let manifestURL = directory.appendingPathComponent("manifest.json")
+        var manifestJSON = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: Data(contentsOf: manifestURL)) as? [String: Any]
+        )
+        manifestJSON["speakerFeatureVersion"] = "qwen-speaker-mel-v1"
+        let rewritten = try JSONSerialization.data(
+            withJSONObject: manifestJSON,
+            options: [.prettyPrinted, .sortedKeys]
+        )
+        try rewritten.write(to: manifestURL)
+
+        let integrityURL = directory.appendingPathComponent("integrity.json")
+        var integrityJSON = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: Data(contentsOf: integrityURL)) as? [String: Any]
+        )
+        var files = try XCTUnwrap(integrityJSON["files"] as? [String: [String: Any]])
+        files["manifest.json"]?["byteCount"] = rewritten.count
+        files["manifest.json"]?["sha256"] = SHA256.hash(data: rewritten)
+            .map { String(format: "%02x", $0) }
+            .joined()
+        integrityJSON["files"] = files
+        try JSONSerialization.data(withJSONObject: integrityJSON).write(to: integrityURL)
+
+        XCTAssertThrowsError(try Qwen3TTSVoiceClonePrompt.load(from: directory)) { error in
+            XCTAssertTrue(
+                "\(error)".contains("speaker-feature version"),
+                "expected the conditioning-version gate to reject the stale artifact, got: \(error)"
+            )
+        }
     }
 
     func testDigestCorruptionFailsClosed() throws {

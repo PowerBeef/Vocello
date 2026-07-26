@@ -3489,6 +3489,13 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                     }
                     let streamDecoderStartedAt = ContinuousClock.now
                     let decoderSignpost = Qwen3Signposts.signposter.beginInterval("Audio Decoder")
+                    // Measured do-NOT (2026-07-26): building this decode graph
+                    // on a dedicated stream (Stream.withNewDefaultStream)
+                    // regressed warm RTF on every cell (−0.4% to −4.3%) — the
+                    // per-chunk stream + cross-stream event sync cost more
+                    // than overlapping a ~5 ms decode buys on this
+                    // launch-bound loop. Record `stage1-p5b-codec-stream`
+                    // (macos-engine-20260726-070148-150cc5e8).
                     let decoded: MLXArray
                     if onAudioChunkTimings != nil || emitMaterializedChunkTimings {
                         let decodedWithTimings = speechTokenizer.decoder.streamingStepWithTimings(codesForDecoder)

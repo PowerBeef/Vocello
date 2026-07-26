@@ -166,8 +166,10 @@ review doc):
    and is reverted with its record kept. **P3 (compiled code-predictor) landed the program's
    largest win: +8.3% to +10.6% warm RTF on every cell** (clone/long 1.128 → 1.243) with
    byte-identical shipping output — MLX compile's fp32 fusion rounding sits below bf16
-   resolution. Remaining: P5b codec decode on a second MLX stream, the branch-only P1b talker
-   static-shape experiment, and the stage-exit GPU-busy re-capture. Every engine-loop change
+   resolution. P5b (codec on a dedicated stream) measured as a second do-NOT (−0.4% to −4.3%
+   on every cell) and is reverted with its record kept — the emerging law: remove host
+   graph-build work, never add command buffers. Remaining: the branch-only P1b talker
+   static-shape experiment and the stage-exit GPU-busy re-capture. Every engine-loop change
    carries fixed-seed byte-identity plus the §K QC soak.
 3. **Stage 2 — memory program (folds phase 9)**: speech-tokenizer runtime reuse across mode
    switches (the RAM analog of the shipped disk hard-linking), text-embedding quantization

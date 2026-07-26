@@ -863,6 +863,14 @@ the §K 12-seed clone/long QC soak.
   by ~1e-7 (unit test pins the tolerance), which sits below bf16 resolution — the shipping
   model is **byte-identical** end-to-end (12/12 identity + 12/12 QC soak). The eager path
   remains for the non-streaming loop and as the equivalence-test reference.
+- **P5b — codec decode on a dedicated stream (measured do-NOT).** Building the chunk-decode
+  graph under `Stream.withNewDefaultStream` regressed warm RTF on **every** cell (−0.4% to
+  −4.3% vs P3; record `…-070148-150cc5e8`, byte-identity still held). Same physics as
+  P2a-ii: on this launch-bound loop, an extra command queue plus cross-stream event sync
+  costs more than overlapping a ~5 ms/chunk decode buys. Reverted; comment marks the site.
+  The emerging Stage 1 law: **wins come from removing host graph-build work (P3) and from
+  filling host-side gaps with already-queued work (P2a-i); anything that adds command
+  buffers or splits the fused step loses.**
 
 ## Status
 

@@ -765,6 +765,29 @@ class BenchmarkHistoryTests(unittest.TestCase):
         history.validate_all()
         self.assertEqual(len(history.all_record_paths()), len(history.KINDS))
 
+    def test_superseded_model_pins_remain_valid_but_current_version_must_match(self) -> None:
+        contract = json.loads(
+            (history.REPO_ROOT / "Sources/Resources/qwenvoice_contract.json").read_text(encoding="utf-8")
+        )
+        current = next(model for model in contract["models"] if model["id"] == "pro_custom")
+        speed = next(variant for variant in current["variants"] if variant["id"] == "speed")
+        self.assertLess(
+            history.artifact_version_key("2026.04.05.2"),
+            history.artifact_version_key(speed["artifactVersion"]),
+        )
+        # Fixture records pin the strictly older artifact identity; immutable
+        # published history must stay valid after a contract re-pin.
+        self.publish(record_fixture(run_id="superseded-20260726-000001"), name="superseded")
+        history.validate_all()
+        # A record claiming the current artifactVersion must match the pinned
+        # identity exactly — supersession never excuses a same-version mismatch.
+        record = record_fixture(run_id="mismatch-20260726-000002")
+        for take in record["takes"]:
+            take["modelArtifactVersion"] = speed["artifactVersion"]
+        record["models"][0]["artifactVersion"] = speed["artifactVersion"]
+        with self.assertRaises(history.HistoryError):
+            self.publish(record, name="mismatch")
+
     def test_telemetry_overhead_requires_exact_rotations_and_context(self) -> None:
         takes = telemetry_overhead_takes()
         def break_parity(value: list[dict]) -> None:

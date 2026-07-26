@@ -52,9 +52,9 @@ def engine_row(generation_id: str, *, run_id: str = "run-one", cell: str = "cust
         "modelID": "pro_custom_speed",
         "modelRuntimeIdentity": {
             "resolvedModelID": "pro_custom_speed",
-            "modelRepository": "mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit",
-            "huggingFaceRevision": "f35faf19b0cc2160865af64ecf0f22f83d335135",
-            "artifactVersion": "2026.04.05.2",
+            "modelRepository": "PowerBeef02/Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit",
+            "huggingFaceRevision": "bf0c0514aada569f93881f032d9dd5bc56ebcb40",
+            "artifactVersion": "2026.07.26.1",
             "quantization": "4-bit",
             "integrityManifestDigest": "f" * 64,
             "runtimeProfileSignature": "pro_custom_speed:fixture-v1",
@@ -772,9 +772,9 @@ class PublisherTests(unittest.TestCase):
         row["modelID"] = "pro_design_speed"
         row["modelRuntimeIdentity"] = {
             "resolvedModelID": "pro_design_speed",
-            "modelRepository": "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-4bit",
-            "huggingFaceRevision": "5c390979e4b93af5f2932f90742ca99c7dd04687",
-            "artifactVersion": "2026.04.05.2",
+            "modelRepository": "PowerBeef02/Qwen3-TTS-12Hz-1.7B-VoiceDesign-4bit",
+            "huggingFaceRevision": "07569508ba5d184ec7acb0f503c61288f1782e5c",
+            "artifactVersion": "2026.07.26.1",
             "quantization": "4-bit",
             "integrityManifestDigest": "c" * 64,
             "runtimeProfileSignature": "pro_design_speed:profile-v2",
@@ -1549,9 +1549,9 @@ class PublisherTests(unittest.TestCase):
         self.assertEqual(models[0]["mode"], "custom")
         self.assertEqual(
             models[0]["modelID"],
-            "mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit",
+            "PowerBeef02/Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit",
         )
-        self.assertEqual(models[0]["revision"], "f35faf19b0cc2160865af64ecf0f22f83d335135")
+        self.assertEqual(models[0]["revision"], "bf0c0514aada569f93881f032d9dd5bc56ebcb40")
         invalid = json.loads(verdict.read_text())
         invalid["summary"]["results"]["off"]["pcmSHA256"]["r1-t1"] = (
             publisher.hashlib.sha256(b"").hexdigest()

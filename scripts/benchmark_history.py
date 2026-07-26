@@ -1033,7 +1033,14 @@ def screenshot_digests(artifact_dir: Path) -> list[dict[str, str]]:
     return [{"name": name, "digest": digest} for name, digest in sorted(screenshots.items())]
 
 
-def default_models(record: dict[str, Any]) -> list[dict[str, Any]]:
+def artifact_version_key(value: str) -> tuple[int, ...]:
+    try:
+        return tuple(int(part) for part in value.split("."))
+    except ValueError as error:
+        raise HistoryError(f"artifactVersion is not a dotted numeric version: {value!r}") from error
+
+
+def default_models(record: dict[str, Any], *, allow_superseded: bool = False) -> list[dict[str, Any]]:
     contract_path = REPO_ROOT / "Sources/Resources/qwenvoice_contract.json"
     contract = load_json(contract_path)
     definitions = {model["id"]: model for model in contract.get("models", [])}
@@ -1092,6 +1099,14 @@ def default_models(record: dict[str, Any]) -> list[dict[str, Any]]:
         }
         for field, expected_value in expected.items():
             if observed[field] != expected_value:
+                # Published records are immutable point-in-time evidence. After an
+                # artifact re-pin, existing records keep the identity they measured;
+                # they stay valid only when their pin is strictly older than the
+                # contract's current pin. New publications still fail closed.
+                if allow_superseded and artifact_version_key(observed["artifactVersion"]) < artifact_version_key(
+                    expected["artifactVersion"]
+                ):
+                    break
                 raise HistoryError(
                     f"typed {field} for {base_id}/{variant} does not match qwenvoice_contract.json"
                 )
@@ -2354,7 +2369,7 @@ def validate_record(
             if model.get("mode") in {"design", "clone"}:
                 require_digest(model.get("fixtureDigest"), f"models[{index}].fixtureDigest", allow_na=False)
     if generation_evidence_kind or kind == "telemetry-overhead":
-        if models != default_models(record):
+        if models != default_models(record, allow_superseded=True):
             raise HistoryError("tracked model identity does not match the pinned model contract")
     if kind == "prosody-calibration":
         validate_prosody_semantics(record)

@@ -957,6 +957,19 @@ the §K 12-seed clone/long QC soak.
   −633 MB installed** per Speed artifact chain at experiment grade; both are
   numerics-affecting artifact decisions (new HF uploads, catalog re-pins, fresh fixture
   identities, ASR/prosody promotion gates) awaiting the maintainer.
+- **2.2 promotion executed (2026-07-26, maintainer-approved).** After the four-arm battery,
+  the adopted call was: promote 2.2 alone; park 2.3 (dtype-independent conv regression, two
+  revival paths above). All six production artifacts (Speed + Quality × CustomVoice /
+  VoiceDesign / Base) were converted with the pinned deterministic tooling
+  (`scripts/convert_text_embedding_8bit.py`, python-mlx 0.32.0; output byte-matches the
+  validated experiment arm) and uploaded to six new public `PowerBeef02/<folder>` Hugging
+  Face repos with Apache-2.0 attribution to the exact `mlx-community` source revisions.
+  The contract, iOS catalog, and Quality receipts were re-pinned to the uploaded revisions
+  as artifactVersion **2026.07.26.1** (Speed talker 1625 → 1333/1357 MB on disk;
+  8-bit 2417 → 2102/2126 MB), the production catalog regenerated, and
+  `model_catalog_contract.py validate --require-complete` passed; pinned
+  `model.safetensors` URLs were spot-verified live with exact byte counts. Fresh fixture
+  identities, delivery proof, and memory re-qualification ride the release-QA battery.
 
 ## Status
 

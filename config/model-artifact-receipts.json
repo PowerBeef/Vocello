@@ -1,18 +1,18 @@
 {
   "artifacts": [
     {
-      "artifactVersion": "2026.04.05.2",
-      "baseURL": "https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-8bit/resolve/41d3337e8b7f2843a75841595fc14e4b9a7a4b96",
+      "artifactVersion": "2026.07.26.1",
+      "baseURL": "https://huggingface.co/PowerBeef02/Qwen3-TTS-12Hz-1.7B-CustomVoice-8bit/resolve/9d22cf576093ffa3ab00b40c7273b690715a4cd9",
       "files": [
         {
           "relativePath": "README.md",
-          "sha256": "50fe8f13fc95466beb50a96ae743e40573512754e80330373a043f4bd34d6212",
-          "sizeBytes": 1118
+          "sha256": "14cdb04c8d51d31146c416f9ab42ec75def21b242aac39c3f998945d11743e81",
+          "sizeBytes": 1291
         },
         {
           "relativePath": "config.json",
-          "sha256": "43f29f9ab55cf387bd2ce1d07e9d95a5ca8974fa2fda4e2b45c13ae64aad3bfa",
-          "sizeBytes": 6058
+          "sha256": "83ea9d24c50834fdeab36ca504569b4400e91d1d081cf6fc0b44ff306e778812",
+          "sizeBytes": 5158
         },
         {
           "relativePath": "generation_config.json",
@@ -26,13 +26,13 @@
         },
         {
           "relativePath": "model.safetensors",
-          "sha256": "b696f4bf45f54497b6de758981e76f1410bd68af05a657477dee466b0202df1a",
-          "sizeBytes": 2393308931
+          "sha256": "0b868d14a60879c27ed4403ded040ba521ca5256c31127cdfb1cd3c864036886",
+          "sizeBytes": 2101592453
         },
         {
           "relativePath": "model.safetensors.index.json",
-          "sha256": "2551ed02dc288b90cd6b7ec98652433f08ef2ae98fb3eda5248a4b9e5b47d08b",
-          "sizeBytes": 71786
+          "sha256": "cc5f12fc8acdc4f0db39ca7e21b8c987f047c7d5a19ed43fe5e08db665baefae",
+          "sizeBytes": 68245
         },
         {
           "relativePath": "preprocessor_config.json",
@@ -71,21 +71,21 @@
         }
       ],
       "modelID": "pro_custom",
-      "totalBytes": 3080140019
+      "totalBytes": 2788419273
     },
     {
-      "artifactVersion": "2026.04.05.2",
-      "baseURL": "https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-8bit/resolve/f90d617701d9f7f4ca499291e0b57f2b3c2fd2ee",
+      "artifactVersion": "2026.07.26.1",
+      "baseURL": "https://huggingface.co/PowerBeef02/Qwen3-TTS-12Hz-1.7B-VoiceDesign-8bit/resolve/3ddbe72c79e5a117afb9c0593304e450cbe2e427",
       "files": [
         {
           "relativePath": "README.md",
-          "sha256": "0d342ad28927ddd1a65c8ee936f513ab324b6f4442fe0b61750c264c767aa199",
-          "sizeBytes": 1068
+          "sha256": "39fd8023cf06da4c64c7c14bbf8da5110f96849f5f464088d7ba72b7feca4cff",
+          "sizeBytes": 1291
         },
         {
           "relativePath": "config.json",
-          "sha256": "b91c47798e77e259e6b86987e48d7a5eca8e703205e00afb63fe08ec5251f983",
-          "sizeBytes": 5437
+          "sha256": "93ac3b2fbbeec4abac72a4e5992cd06e47ae0b101ee003461d531a0be5b2f54b",
+          "sizeBytes": 4665
         },
         {
           "relativePath": "generation_config.json",
@@ -99,13 +99,13 @@
         },
         {
           "relativePath": "model.safetensors",
-          "sha256": "1a84179d87c972353ccdd9b48f3c4422509b3d1b11030d32358312fb0f3800d7",
-          "sizeBytes": 2393308931
+          "sha256": "288130d9912b07f7f76fd67587d5c39f3d62f19e309d9f667ffb76bddeb5f348",
+          "sizeBytes": 2101592453
         },
         {
           "relativePath": "model.safetensors.index.json",
-          "sha256": "2551ed02dc288b90cd6b7ec98652433f08ef2ae98fb3eda5248a4b9e5b47d08b",
-          "sizeBytes": 71786
+          "sha256": "cc5f12fc8acdc4f0db39ca7e21b8c987f047c7d5a19ed43fe5e08db665baefae",
+          "sizeBytes": 68245
         },
         {
           "relativePath": "preprocessor_config.json",
@@ -144,21 +144,21 @@
         }
       ],
       "modelID": "pro_design",
-      "totalBytes": 3080139348
+      "totalBytes": 2788418780
     },
     {
-      "artifactVersion": "2026.04.05.2",
-      "baseURL": "https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-1.7B-Base-8bit/resolve/e7dd0585652209fa0d7783659aad4e8a324de11c",
+      "artifactVersion": "2026.07.26.1",
+      "baseURL": "https://huggingface.co/PowerBeef02/Qwen3-TTS-12Hz-1.7B-Base-8bit/resolve/fb16e08d149905244bd1d006e303ddcac16ed933",
       "files": [
         {
           "relativePath": "README.md",
-          "sha256": "7e03a5e92d1cd6208630c228e0b2fbf9b5de2035ebe189a7fc812a3453422c8c",
-          "sizeBytes": 1026
+          "sha256": "6ea1eb3f0e547c0bce96cda87a453f7615866f964c3d8d97eab4ea6097d9a903",
+          "sizeBytes": 1263
         },
         {
           "relativePath": "config.json",
-          "sha256": "b14fba6bfd391968876248b843b095696b0188187a3d774a3bddc32544d15627",
-          "sizeBytes": 5522
+          "sha256": "f8c83f227b1d912dcbe78ae61f958c34ae0885c22be67ae1d2cc4bfbc26f6300",
+          "sizeBytes": 4738
         },
         {
           "relativePath": "generation_config.json",
@@ -172,13 +172,13 @@
         },
         {
           "relativePath": "model.safetensors",
-          "sha256": "b965c581ccf6aa852a4124feeb7a8a111542ee7b213139368b4cc7ba7fd4728b",
-          "sizeBytes": 2417320525
+          "sha256": "457a68428a26479f6f7370ae04947556f2a93cb0a5c2a9278d18f8d2b8c54d57",
+          "sizeBytes": 2125604061
         },
         {
           "relativePath": "model.safetensors.index.json",
-          "sha256": "9592a7c0ac3261a6211978416ef1796d3841225ac0ff0f9d6bfb5d1a6b49e5e9",
-          "sizeBytes": 78070
+          "sha256": "eb2d5305f02e9b0ab75f32236a0b4a3b11fa95b62003e1871d4cf5c8cd1ee761",
+          "sizeBytes": 74225
         },
         {
           "relativePath": "preprocessor_config.json",
@@ -217,7 +217,7 @@
         }
       ],
       "modelID": "pro_clone",
-      "totalBytes": 3104157269
+      "totalBytes": 2812436413
     }
   ],
   "schemaVersion": 1

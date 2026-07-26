@@ -169,11 +169,14 @@ review doc):
    resolution. P5b (codec on a dedicated stream) measured as a second do-NOT (−0.4% to −4.3%
    on every cell) and is reverted with its record kept — the emerging law: remove host
    graph-build work, never add command buffers. The stage-exit GPU-busy re-capture
-   (2026-07-26, §M) reads **still launch-bound**: whole-span busy ~49% (≪85%), the fused
-   step eval now 72.8% of wall at ~60% busy, the CP loop's wall share down 15.4% → 9.7%.
-   Decision routing: keep attacking launches — the branch-only P1b talker static-shape
-   compile is the sanctioned next lever (P3's per-pass keying is the template). Every
-   engine-loop change carries fixed-seed byte-identity plus the §K QC soak.
+   (2026-07-26, §M) read **still launch-bound** (~49% busy, ≪85%), and the P1b static-shape
+   talker compile ran as its branch experiment (`feat/p1b-static-talker-compile`,
+   delta `DECODE-002`): **correct — eager-equivalent and byte-identical — but flat** (±1%
+   decode-wall), the graph-build savings cancelling against the padded-attention tax.
+   **Stage 1 closed 2026-07-26** at a net landed +10.8% clone/long (1.122 → 1.243) with
+   byte-identical output throughout; the residual step-eval launch-gap idle is a 0.30.6
+   structural ceiling whose re-test rides the Stage 4 pin bump. The program proceeds to
+   Stage 2 (memory).
 3. **Stage 2 — memory program (folds phase 9)**: speech-tokenizer runtime reuse across mode
    switches (the RAM analog of the shipped disk hard-linking), text-embedding quantization
    experiment (622 MB BF16 today inside the "4-bit" artifact), codec bf16 experiment

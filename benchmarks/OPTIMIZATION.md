@@ -871,6 +871,23 @@ the §K 12-seed clone/long QC soak.
   The emerging Stage 1 law: **wins come from removing host graph-build work (P3) and from
   filling host-side gaps with already-queued work (P2a-i); anything that adds command
   buffers or splits the fused step loses.**
+- **P1b — static-shape compiled talker decode (branch experiment, null result).** On
+  `feat/p1b-static-talker-compile` (delta `DECODE-002`, diagnostic): a per-capacity-block
+  compiled talker step — static per-layer K/V buffers, `putAlong` writes with the position as
+  an input array, in-trace validity mask, cos/sin rotary inputs (the talker's MRoPE made a
+  single trace per 256-block possible, unlike the CP's offset-baked RoPE). **Correct** — a
+  258-step eager-equivalence test passes including the block re-trace, and the bf16 model is
+  byte-identical at fixed seed — but **flat**: decode-wall RTF ±1% on medium/long and −2% on
+  custom/short vs P3. The ~9%-of-wall talker graph-build savings cancel against the
+  padded-attention compute/bandwidth tax. Not landed (pre-registered keep-gate was +≥10%);
+  the branch is preserved for the sanctioned 0.31.x pin-bump re-test, where lower launch
+  overhead may shift the balance.
+- **Stage 1 closed 2026-07-26.** Net landed effect: clone/long 1.122 → 1.243 (+10.8%),
+  custom/medium warm 1.220, all byte-identical. Ledger: P2a-i and P3 landed; P2a-ii, P5b,
+  and P1b measured and declined. The loop remains launch-bound (~49% GPU busy) with the
+  residual idle concentrated in the fused step eval's batch-1 launch gaps — a structural
+  ceiling at the 0.30.6 pins; the sanctioned re-test rides the Stage 4 pin bump. The program
+  proceeds to Stage 2 (memory).
 - **Stage-exit GPU-busy re-capture (2026-07-26, post-P3).** Same §H P0 command
   (Metal System Trace over `bench custom/speed/long --warm 2`; ~25% trace overhead;
   fractions are the deliverable; whole-trace span including the cold gen, 856 frames):

@@ -268,7 +268,7 @@
     },
     {
       "path": "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
-      "sha256": "f5cf850735a05ce1f31ca04d397535639ffcba3bc6b46f6acaacdf33f1f5c3be",
+      "sha256": "a32afc13f929c07b43edac2b2997e7269dcf1b13dbca66890e78f4cb0fc766f8",
       "upstreamStatus": "modified"
     },
     {

@@ -3308,6 +3308,12 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
 
             // Defer sync to the eval boundary with inputEmbeds.
             let isEOS = nextToken .== eosTokenArray
+            // Measured do-NOT (2026-07-26): submitting the talker+sampling
+            // subgraph here with asyncEval to overlap the CP-loop graph build
+            // regressed warm RTF (custom/long −3.9%) — the extra command
+            // buffer + fusion break cost more launches than the overlap
+            // saved. Record `stage1-p2aii-early-submit`
+            // (macos-engine-20260726-060659-99b59f93).
 
             // Generate remaining codebook tokens with code predictor
             var codeTokens = [nextToken]

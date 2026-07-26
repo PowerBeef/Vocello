@@ -523,4 +523,57 @@ final class WordErrorRateTests: XCTestCase {
             transcript: transcript
         )
     }
+
+    func testLanguageASRGateResultMapsVerifierOutcomeAndConsensus() throws {
+        let script = "Hello world"
+        let matching = (1 ... 3).map { pass(index: $0, transcript: script) }
+        let consistent = evidence(
+            authorization: .authorized,
+            consensus: .consistent,
+            repetitions: matching,
+            transcript: script
+        )
+        var passing = GenerationOutputVerifier.evaluate(
+            recognition: consistent,
+            expectedScript: script,
+            expectedLanguage: .english
+        )
+        passing.pass = true
+        passing.skipReason = nil
+        passing.wordErrorRate = 0
+        let digest = String(repeating: "d", count: 64)
+        let gate = passing.languageASRGateResult(evidenceDigest: digest)
+        XCTAssertEqual(gate.gate, .languageASR)
+        XCTAssertEqual(gate.outcome, .pass)
+        XCTAssertEqual(gate.algorithmVersion, passing.schemaVersion)
+        XCTAssertEqual(gate.evidenceDigest, digest)
+        XCTAssertEqual(
+            gate.measurements.first { $0.key == .consensusPassCount }?.value,
+            3
+        )
+        XCTAssertEqual(
+            gate.measurements.first { $0.key == .wordErrorRate }?.value,
+            0
+        )
+
+        // Ran-but-did-not-verify is a plain fail.
+        var failing = passing
+        failing.pass = false
+        failing.skipReason = "speech_recognition_inconsistent"
+        failing.recognition.consensusStatus = .inconsistent
+        let failingGate = failing.languageASRGateResult()
+        XCTAssertEqual(failingGate.outcome, .fail)
+        XCTAssertEqual(
+            failingGate.measurements.first { $0.key == .consensusPassCount }?.value,
+            0
+        )
+
+        // Recognition that could not run at all maps to unavailable
+        // (registry still fails the required gate closed).
+        var unavailable = passing
+        unavailable.pass = false
+        unavailable.skipReason = "speech_recognition_unauthorized"
+        unavailable.recognition.consensusStatus = .failed
+        XCTAssertEqual(unavailable.languageASRGateResult().outcome, .unavailable)
+    }
 }

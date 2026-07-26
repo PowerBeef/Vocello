@@ -11,6 +11,56 @@ enum GenerationOutputVerifier {
     }
 
     struct Result: Codable, Sendable, Equatable {
+        /// Typed `languageASR` gate result for the quality registry (Stage 3).
+        /// `consensusPassCount` counts recognition passes only when the
+        /// three-pass consensus is `consistent`; the registry enforces the
+        /// three-pass rule on any passing gate. A skipped verification maps to
+        /// `.unavailable` so a required gate can never silently disappear.
+        /// The gate's integer algorithm version tracks this result's
+        /// `schemaVersion` (v3 ↔ `language-output-verifier-v3`).
+        func languageASRGateResult(evidenceDigest: String? = nil) -> GenerationQualityGateResult {
+            let consensusPasses = recognition.consensusStatus == .consistent
+                ? recognition.repetitions.count
+                : 0
+            var measurements: [GenerationQualityMeasurement] = [
+                GenerationQualityMeasurement(
+                    key: .consensusPassCount,
+                    value: Double(consensusPasses)
+                ),
+            ]
+            if let wordErrorRate, wordErrorRate.isFinite {
+                measurements.append(GenerationQualityMeasurement(
+                    key: .wordErrorRate,
+                    value: wordErrorRate
+                ))
+            }
+            // `skipReason` carries every non-passing reason. Only the reasons
+            // that mean "recognition could not run at all" map to
+            // `.unavailable`; a verification that ran and did not verify is a
+            // plain `.fail`. Both fail a required gate — the split is
+            // diagnostic.
+            let couldNotRunReasons: Set<String> = [
+                "speech_recognition_unavailable",
+                "speech_recognition_unauthorized",
+                "speech_authorization_timed_out",
+            ]
+            let outcome: GenerationQualityOutcome
+            if pass {
+                outcome = .pass
+            } else if let skipReason, couldNotRunReasons.contains(skipReason) {
+                outcome = .unavailable
+            } else {
+                outcome = .fail
+            }
+            return GenerationQualityGateResult(
+                gate: .languageASR,
+                outcome: outcome,
+                algorithmVersion: schemaVersion,
+                evidenceDigest: evidenceDigest,
+                measurements: measurements
+            )
+        }
+
         static let currentSchemaVersion = 3
         static let currentAlgorithmVersion = "language-output-verifier-v3"
         static let currentAccuracyMetricVersion = "normalized-edit-rate-v1"

@@ -555,6 +555,11 @@ enum IOSDeviceDiagnosticsRunner {
             let outputEvidence = try makeOutputEvidence(for: audioURL)
             try mirrorOutputToPullableDiagnostics(audioURL, runID: runID)
             record.outputEvidence = outputEvidence
+            if let verification = record.outputVerification {
+                record.languageASRGate = verification.languageASRGateResult(
+                    evidenceDigest: outputEvidence.sha256
+                )
+            }
         } catch is CancellationError {
             if appTimelineSubmitted {
                 await AppGenerationTimeline.shared.recordFailed(
@@ -2035,6 +2040,10 @@ enum IOSDeviceDiagnosticsRunner {
         var finishReason: String?
         var error: String?
         var outputVerification: GenerationOutputVerifier.Result?
+        /// Typed `languageASR` quality-registry gate derived from
+        /// `outputVerification` — per-take evidence for standard/canonical
+        /// depth composition (Stage 3), mirroring the prosody sidecar pattern.
+        var languageASRGate: GenerationQualityGateResult?
         /// Calls + lifecycle transitions observed during the run (see
         /// `IOSInterruptionRecorder`) — explains doomed runs. Omitted when clean.
         var interruptions: [IOSInterruptionRecorder.Event]?

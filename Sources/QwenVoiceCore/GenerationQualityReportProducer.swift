@@ -128,6 +128,111 @@ public enum GenerationQualityReportProducer {
         )
     }
 
+    // MARK: - Standard / canonical depths
+
+    /// Typed carrier for one deeper-depth gate produced by a lane analyzer.
+    /// Callers translate their evidence (prosody sidecar, ASR verifier result,
+    /// long-form assembly metrics) into this shape; the producer only composes.
+    public struct DeepGateEvidence: Sendable {
+        public let outcome: GenerationQualityOutcome
+        public let algorithmVersion: Int
+        public let evidenceDigest: String?
+        public let measurements: [GenerationQualityMeasurement]
+
+        public init(
+            outcome: GenerationQualityOutcome,
+            algorithmVersion: Int,
+            evidenceDigest: String? = nil,
+            measurements: [GenerationQualityMeasurement] = []
+        ) {
+            self.outcome = outcome
+            self.algorithmVersion = algorithmVersion
+            self.evidenceDigest = evidenceDigest
+            self.measurements = measurements
+        }
+    }
+
+    public static func standardPolicy(
+        requiresLanguageASR: Bool,
+        transformationRisks: [GenerationTransformationRiskCode] = []
+    ) -> QualityReviewPolicy {
+        QualityReviewPolicy(
+            depth: .standard,
+            requiresLanguageASR: requiresLanguageASR,
+            transformationRisks: transformationRisks
+        )
+    }
+
+    public static func canonicalPolicy(
+        requiresLanguageASR: Bool,
+        transformationRisks: [GenerationTransformationRiskCode] = [],
+        isLongForm: Bool = false,
+        requiresSpeakerOnset: Bool = false
+    ) -> QualityReviewPolicy {
+        QualityReviewPolicy(
+            depth: .canonical,
+            requiresLanguageASR: requiresLanguageASR,
+            transformationRisks: transformationRisks,
+            isLongForm: isLongForm,
+            requiresSpeakerOnset: requiresSpeakerOnset
+        )
+    }
+
+    /// Deeper-depth report: the five fast gates are produced from the same
+    /// finalization evidence as `fastReport`, then every additional gate the
+    /// policy requires is taken from `deepEvidence`. A required gate with no
+    /// supplied evidence maps to `.unavailable`, which the registry fails
+    /// closed — a lane cannot claim standard/canonical depth while silently
+    /// skipping an analyzer.
+    public static func deepReport(
+        generationID: UUID,
+        policy: QualityReviewPolicy,
+        finishReason: GenerationFinishReason,
+        hitTokenCap: Bool,
+        audioQC: AudioQCReport?,
+        wavDigest: String?,
+        usedStreaming: Bool,
+        chunkCount: Int,
+        audioChannel: AudioChannelSummaryV9?,
+        deepEvidence: [GenerationQualityGateID: DeepGateEvidence]
+    ) -> GenerationQualityReport {
+        let fast = fastReport(
+            generationID: generationID,
+            finishReason: finishReason,
+            hitTokenCap: hitTokenCap,
+            audioQC: audioQC,
+            wavDigest: wavDigest,
+            usedStreaming: usedStreaming,
+            chunkCount: chunkCount,
+            audioChannel: audioChannel
+        )
+        var results = fast.results
+        let fastGates = Set(results.map(\.gate))
+        for gate in QualityGateRegistry.requiredGates(for: policy)
+        where !fastGates.contains(gate) {
+            if let evidence = deepEvidence[gate] {
+                results.append(GenerationQualityGateResult(
+                    gate: gate,
+                    outcome: evidence.outcome,
+                    algorithmVersion: evidence.algorithmVersion,
+                    evidenceDigest: evidence.evidenceDigest,
+                    measurements: evidence.measurements
+                ))
+            } else {
+                results.append(GenerationQualityGateResult(
+                    gate: gate,
+                    outcome: .unavailable,
+                    algorithmVersion: mappingAlgorithmVersion
+                ))
+            }
+        }
+        return GenerationQualityReport(
+            generationID: generationID,
+            policy: policy,
+            results: results
+        )
+    }
+
     /// Evaluates the report and flattens the verdict into telemetry-note
     /// form. Registry validation errors are themselves a failed verdict —
     /// a malformed report must never read as silence.

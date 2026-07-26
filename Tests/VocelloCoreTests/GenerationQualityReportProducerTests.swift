@@ -45,6 +45,87 @@ final class GenerationQualityReportProducerTests: XCTestCase {
         )
     }
 
+    private func makeDeepReport(
+        policy: QualityReviewPolicy,
+        deepEvidence: [GenerationQualityGateID: GenerationQualityReportProducer.DeepGateEvidence]
+    ) -> GenerationQualityReport {
+        GenerationQualityReportProducer.deepReport(
+            generationID: UUID(),
+            policy: policy,
+            finishReason: .eos,
+            hitTokenCap: false,
+            audioQC: makeQC(verdict: .pass),
+            wavDigest: String(repeating: "a", count: 64),
+            usedStreaming: true,
+            chunkCount: 9,
+            audioChannel: nil,
+            deepEvidence: deepEvidence
+        )
+    }
+
+    func testCanonicalLongFormReportComposesDeepGatesAndPasses() throws {
+        let policy = GenerationQualityReportProducer.canonicalPolicy(
+            requiresLanguageASR: false,
+            isLongForm: true
+        )
+        let report = makeDeepReport(policy: policy, deepEvidence: [
+            .prosody: .init(
+                outcome: .pass,
+                algorithmVersion: 2,
+                measurements: [
+                    .init(key: .medianPitchSemitones, value: 3.1),
+                    .init(key: .pitchRangeSemitones, value: 7.4),
+                ]
+            ),
+            .delivery: .init(outcome: .pass, algorithmVersion: 2),
+            .longFormContinuity: .init(
+                outcome: .pass,
+                algorithmVersion: 1,
+                measurements: [.init(key: .boundaryDiscontinuity, value: 0.021)]
+            ),
+        ])
+        let verdict = try QualityGateRegistry.evaluate(report)
+        XCTAssertEqual(verdict.outcome, .pass)
+        XCTAssertTrue(verdict.requiredGates.contains(.longFormContinuity))
+        let continuity = report.results.first { $0.gate == .longFormContinuity }
+        XCTAssertEqual(
+            continuity?.measurements.first?.key,
+            .boundaryDiscontinuity
+        )
+    }
+
+    func testMissingDeepAnalyzerEvidenceFailsClosed() throws {
+        let policy = GenerationQualityReportProducer.standardPolicy(requiresLanguageASR: false)
+        let report = makeDeepReport(policy: policy, deepEvidence: [:])
+        let verdict = try QualityGateRegistry.evaluate(report)
+        XCTAssertEqual(verdict.outcome, .fail)
+        XCTAssertTrue(verdict.issues.contains("quality_gate_unavailable.prosody"))
+    }
+
+    func testLanguageASRGateEnforcesThreePassConsensus() throws {
+        let policy = GenerationQualityReportProducer.standardPolicy(requiresLanguageASR: true)
+        func report(passCount: Double) -> GenerationQualityReport {
+            makeDeepReport(policy: policy, deepEvidence: [
+                .prosody: .init(outcome: .pass, algorithmVersion: 2),
+                .languageASR: .init(
+                    outcome: .pass,
+                    algorithmVersion: 1,
+                    measurements: [
+                        .init(key: .consensusPassCount, value: passCount),
+                        .init(key: .wordErrorRate, value: 0.0),
+                    ]
+                ),
+            ])
+        }
+        XCTAssertEqual(try QualityGateRegistry.evaluate(report(passCount: 3)).outcome, .pass)
+        XCTAssertThrowsError(try QualityGateRegistry.evaluate(report(passCount: 2))) { error in
+            XCTAssertEqual(
+                error as? QualityGateRegistryIssue,
+                .insufficientASRConsensus
+            )
+        }
+    }
+
     func testCleanTakeSatisfiesTheRegistryWithAllFastGates() throws {
         let report = makeReport(qc: makeQC(verdict: .pass))
         let verdict = try QualityGateRegistry.evaluate(report)

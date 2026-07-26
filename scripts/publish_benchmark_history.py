@@ -858,6 +858,64 @@ def telemetry_output(row: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
+def fold_delivery_prosody(
+    result_takes: list[dict[str, Any]],
+    takes: list[dict[str, Any]],
+    prosody_rows: list[dict[str, Any]],
+) -> None:
+    """Fold the delivery sidecar's per-take metrics and prosody gate verdict
+    into the tracked takes. Stage 3: the gate verdict computed by the same
+    analysis pass must reach PASS-only history — advisory flags become
+    machine warnings; an absent or incomplete verdict cannot publish."""
+    for result_take, tracked_take in zip(result_takes, takes):
+        delivery = result_take.get("delivery")
+        if not delivery:
+            continue
+        matches = [
+            row for row in prosody_rows
+            if row.get("mode") == result_take.get("mode")
+            and row.get("model") == result_take.get("modelID")
+            and row.get("delivery") == delivery
+        ]
+        if len(matches) != 1:
+            raise PublicationError(
+                f"delivery take {tracked_take['generationID']} has {len(matches)} prosody rows"
+            )
+        metrics = matches[0].get("deliveryMetrics")
+        if not isinstance(metrics, dict) or "error" in metrics:
+            raise PublicationError("delivery prosody analysis is incomplete")
+        mapping = {
+            "f0_mean_hz": "f0MeanHz",
+            "f0_std_hz": "f0StdHz",
+            "f0_turning_points_per_sec": "f0TurningPointsPerSecond",
+            "rate_syllable_rate_hz": "syllableRateHz",
+            "rate_local_rate_cv": "localRateCV",
+            "pauses_max_pause_seconds": "maximumPauseSeconds",
+            "pauses_pause_speech_ratio": "pauseSpeechRatio",
+            "energy_envelope_roughness": "energyEnvelopeRoughness",
+        }
+        for source, target in mapping.items():
+            if (value := finite_number(metrics.get(source))) is not None:
+                tracked_take["metrics"][target] = value
+        gate = matches[0].get("qualityGate")
+        if not isinstance(gate, dict) or gate.get("passed") not in (True, False) \
+                or not isinstance(gate.get("flags"), list):
+            raise PublicationError(
+                f"delivery take {tracked_take['generationID']} lacks a prosody gate verdict"
+            )
+        gate_flags = [str(flag) for flag in gate["flags"]]
+        if {"metrics_incomplete", "analysis_failed"} & set(gate_flags):
+            raise PublicationError(
+                f"delivery take {tracked_take['generationID']} prosody gate analysis is incomplete"
+            )
+        if gate_flags:
+            tracked_take["warnings"] = sorted(
+                set(tracked_take.get("warnings", []))
+                | {f"prosody_gate:{flag}" for flag in gate_flags}
+            )
+            tracked_take["status"] = "passedWithWarnings"
+
+
 def quality_identity_fields(row: dict[str, Any]) -> dict[str, Any]:
     """Phase 13: typed quality-registry identity from the engine row's open
     telemetry notes. Empty when the row predates the phase-12 registry —
@@ -1318,36 +1376,7 @@ def engine_command(args: argparse.Namespace, *, kind: str = "engine-generation",
             or any(character not in "0123456789abcdef" for character in analysis_profile_digest)
         ):
             raise PublicationError("delivery prosody analysis profile digest is invalid")
-        for result_take, tracked_take in zip(result_takes, takes):
-            delivery = result_take.get("delivery")
-            if not delivery:
-                continue
-            matches = [
-                row for row in prosody_rows
-                if row.get("mode") == result_take.get("mode")
-                and row.get("model") == result_take.get("modelID")
-                and row.get("delivery") == delivery
-            ]
-            if len(matches) != 1:
-                raise PublicationError(
-                    f"delivery take {tracked_take['generationID']} has {len(matches)} prosody rows"
-                )
-            metrics = matches[0].get("deliveryMetrics")
-            if not isinstance(metrics, dict) or "error" in metrics:
-                raise PublicationError("delivery prosody analysis is incomplete")
-            mapping = {
-                "f0_mean_hz": "f0MeanHz",
-                "f0_std_hz": "f0StdHz",
-                "f0_turning_points_per_sec": "f0TurningPointsPerSecond",
-                "rate_syllable_rate_hz": "syllableRateHz",
-                "rate_local_rate_cv": "localRateCV",
-                "pauses_max_pause_seconds": "maximumPauseSeconds",
-                "pauses_pause_speech_ratio": "pauseSpeechRatio",
-                "energy_envelope_roughness": "energyEnvelopeRoughness",
-            }
-            for source, target in mapping.items():
-                if (value := finite_number(metrics.get(source))) is not None:
-                    tracked_take["metrics"][target] = value
+        fold_delivery_prosody(result_takes, takes, prosody_rows)
     telemetry_schema = max(
         int(row.get("schemaVersion", 0)) for row in [*selected, *selected_app]
     )

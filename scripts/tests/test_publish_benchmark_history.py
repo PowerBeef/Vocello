@@ -627,6 +627,51 @@ class PublisherTests(unittest.TestCase):
         with self.assertRaisesRegex(publisher.PublicationError, "mix quality-registry"):
             publisher.history_record_schema_version([built, legacy])
 
+    def test_delivery_prosody_gate_verdict_folds_into_published_warnings(self) -> None:
+        def fixture(gate: object) -> tuple[list[dict], list[dict], list[dict]]:
+            result_takes = [{
+                "delivery": "happy.strong",
+                "mode": "custom",
+                "modelID": "pro_custom_speed",
+            }]
+            takes = [{
+                "generationID": "delivery-current",
+                "metrics": {},
+                "warnings": [],
+                "status": "passed",
+            }]
+            row: dict = {
+                "mode": "custom",
+                "model": "pro_custom_speed",
+                "delivery": "happy.strong",
+                "deliveryMetrics": {"f0_std_hz": 31.5},
+            }
+            if gate is not None:
+                row["qualityGate"] = gate
+            return result_takes, takes, [row]
+
+        clean = fixture({"passed": True, "flags": []})
+        publisher.fold_delivery_prosody(*clean)
+        self.assertEqual(clean[1][0]["warnings"], [])
+        self.assertEqual(clean[1][0]["status"], "passed")
+        self.assertEqual(clean[1][0]["metrics"]["f0StdHz"], 31.5)
+
+        flagged = fixture({"passed": False, "flags": ["monotone", "long_pause"]})
+        publisher.fold_delivery_prosody(*flagged)
+        self.assertEqual(
+            flagged[1][0]["warnings"],
+            ["prosody_gate:long_pause", "prosody_gate:monotone"],
+        )
+        self.assertEqual(flagged[1][0]["status"], "passedWithWarnings")
+
+        for name, gate in (
+            ("missing", None),
+            ("malformed", {"passed": "yes"}),
+            ("incomplete", {"passed": False, "flags": ["metrics_incomplete"]}),
+        ):
+            with self.subTest(name=name), self.assertRaises(publisher.PublicationError):
+                publisher.fold_delivery_prosody(*fixture(gate))
+
     def test_forced_memory_profile_is_exploratory(self) -> None:
         self.assertFalse(publisher.uses_forced_memory_profile([engine_row("native")]))
         forced = engine_row("forced")

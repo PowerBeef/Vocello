@@ -198,10 +198,16 @@ review doc):
    were presence-checked only, the promotion also shipped **stale-artifact update
    detection**: `ProductionModelCatalog.installedFileSizeMismatches` (byte-count probe;
    repair re-verifies digests through the delivery plan) and `vocello models status/install`
-   now report `updateAvailable` and repair a stale install in place. Settings UI surfacing
-   (macOS/iOS "update available" + one-tap repair) and fresh fixture identities / memory
-   re-qualification on the new artifacts remain open; release staging waits for an explicit
-   maintainer call (releases are never implied by landed work).
+   now report `updateAvailable` and repair a stale install in place. The Settings surfaces
+   followed the same day: macOS shows a visible **Update available** state
+   (`settings_update_<id>`, Update + Manage side by side) and iOS shows the same state
+   (`iosModelUpdate_<id>` alongside the installed controls); a stale model stays fully
+   usable while the Update action repairs it through the authenticated delivery path. The
+   canonical Mac install itself was upgraded through that path (all six artifacts, exact
+   new identities, clean fixed-seed generation proof with `quality_registry_outcome=pass`).
+   Remaining: fresh fixture identities and memory re-qualification on the new artifacts
+   (idle Mac + paired iPhone); release staging waits for an explicit maintainer call
+   (releases are never implied by landed work).
 4. **Stage 3 — quality harness (folds phase 12, then 13)** — in progress 2026-07-26,
    prioritized by the maintainer ahead of any further optimization work:
    ~~wire the typed `GenerationQualityReport` registry producer with persisted-WAV
@@ -218,9 +224,13 @@ review doc):
    the iOS lang-bench sentinel (three-pass consensus mapping, could-not-run →
    unavailable). ~~Typed longFormContinuity gate~~ **shipped** as a pure derivation from
    v4 assembly evidence. ~~Benchmark/history v3~~ **implemented** (see the phase 13 row;
-   first live v3 record publishes with the next bench run). Remaining: lane emission of
-   composed standard/canonical reports where all evidence meets, and the optional advisory
-   MOS-proxy column.
+   first live v3 record publishes with the next bench run). ~~Prosody evidence in
+   history~~ **shipped** — the publisher requires each delivery take's sidecar prosody
+   gate verdict and folds its advisory flags into machine warnings
+   (`prosody_gate:<flag>`), refusing an absent or incomplete verdict. Remaining
+   (deliberately deferred): composed standard/canonical report emission at a lane call
+   site once a consumer needs the aggregate (all per-gate evidence already lands typed),
+   and the optional advisory MOS-proxy column.
 5. **Stage 4 — gated migrations/research**: mlx pin bump 2.31.3/0.31.3 on a throwaway branch
    (contract invariant), long-form carryover (history-aware text context first), with
    speculative/PCG, CFG, and KV quantization parked.

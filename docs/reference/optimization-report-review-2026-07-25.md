@@ -118,7 +118,13 @@ diagnostic engine-loop edits produced intermittent Fast-QC hard failures.
    (shipped default) vs ~1.10 against dropout-ms/continuity-failure counts at fixed seeds.
    Adopt only on a deterministic-QC win; subtalker stays unpenalized.
 
-### Stage 1 — the launch-bound attack (on current pins; the §H P0 successor program)
+### Stage 1 — the launch-bound attack (on current pins; the §H P0 successor program) — **completed 2026-07-26**
+
+> Closed at **net +11% warm RTF, byte-identical output**: P2a-i (fused host syncs +
+> pipelined materialization) and P3 (compiled code-predictor step) landed; P2a-ii, P5b,
+> and P1b were measured and declined with do-NOT records (§M). Stage-exit GPU-busy
+> re-capture: ~47% whole-generation — still launch-bound, so quant/speculative work stays
+> parked per the decision metric below.
 
 Instrument first, change second; every step falsifiable against the §H P0 methodology
 (Metal System Trace GPU-busy% + warm RTF matrix cells).
@@ -148,14 +154,18 @@ Decision metric (adopted from the report, thresholds kept): if post-stage GPU-bu
 the loop has become compute-bound → quantization/speculative work gains priority; if it
 stays <55%, keep attacking launch count before anything else.
 
-### Stage 2 — memory program (folds phase 9) — **in progress 2026-07-26**
+### Stage 2 — memory program (folds phase 9) — **completed 2026-07-26, including the 2.2 promotion**
 
 > 2.1 shipped (phase 9 closed: byte-identical switch A/B, memory-qualified on the 8 GB
-> floor). 2.2 validated in isolation (−278 MB MLX active peak, −292 MB artifact, RTF
-> parity, clean QC) — productization is a maintainer artifact/catalog decision. 2.4
-> declined: the retained clone tensors measure <100 KB and `refCodes` is a required
-> per-generation input (the ICL prefix interleaves the target text), correcting M5b's
-> premise. Measurements: `benchmarks/OPTIMIZATION.md` §N.
+> floor). 2.2 validated, then **promoted the same day** (maintainer-approved): all six
+> artifacts converted with the pinned tooling, uploaded to public `PowerBeef02/<folder>`
+> repos, catalog re-pinned as artifactVersion 2026.07.26.1 with fail-closed validation,
+> isolated Mac delivery proof, the canonical Mac install upgraded in place, and
+> stale-artifact update detection shipped end to end (CLI + macOS/iOS Settings). 2.3
+> parked (dtype-independent conv regression; revival via the Stage-4 pin-bump re-test or
+> an iPhone measurement). 2.4 declined: the retained clone tensors measure <100 KB and
+> `refCodes` is a required per-generation input (the ICL prefix interleaves the target
+> text), correcting M5b's premise. Measurements: `benchmarks/OPTIMIZATION.md` §N.
 
 1. **Phase 9: speech-tokenizer runtime reuse (M3 corrected).** Keep the verified,
    byte-identical 682 MB fp32 speech tokenizer resident across mode switches (the RAM
@@ -175,7 +185,18 @@ stays <55%, keep attacking launch count before anything else.
    conditioning prefix is built (rebuild path on handle miss), targeting the iPhone clone
    peak band. Respect the epoch-bound handle lifecycle contract.
 
-### Stage 3 — quality harness (folds phase 12, then 13)
+### Stage 3 — quality harness (folds phase 12, then 13) — **completed 2026-07-26 (two items deliberately deferred)**
+
+> Shipped: fast-depth registry on the shipping finalization path; the standard/canonical
+> `deepReport` producer (fail-closed on missing analyzer evidence); per-take prosody gate
+> verdicts on the bench sidecar and folded into PASS-only history as machine warnings;
+> the typed `languageASR` gate on the iOS lang-bench sentinel; the `longFormContinuity`
+> gate derived from v4 assembly evidence; the revision-pinned ECAPA speaker-similarity
+> dev-lane metric; and benchmark/history **schema v3** (typed quality identity on every
+> generation take; first live record publishes with the next bench run). Deferred with
+> rationale: composed standard/canonical report emission at a lane call site (all
+> per-gate evidence already lands typed; the aggregate waits for a consumer) and the
+> optional MOS-proxy advisory column.
 
 1. **Phase 12: wire the typed quality registry.** Emit and validate
    `GenerationQualityReport` from a real scheduler; fold persisted-WAV Fast QC into the

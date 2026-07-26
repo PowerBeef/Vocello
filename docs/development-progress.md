@@ -148,8 +148,24 @@ codec bf16, clone prompt release), Stage 3 quality harness folding phases 12→1
 gated pin-bump/carryover/parked bets — lives in
 [`docs/reference/optimization-report-review-2026-07-25.md`](reference/optimization-report-review-2026-07-25.md).
 
-Remaining work now follows the staged roadmap (details and falsifiability criteria in the
-review doc):
+**Resume here (2026-07-26).** Stages 0–3 are complete (the 2.2 artifact promotion included);
+Stage 4 stays gated. The concrete next actions, in order, are:
+
+1. **Evidence battery on the new 2026.07.26.1 artifacts** (needs an idle Mac and the paired
+   iPhone; the maintainer schedules the window): fresh fixture identities — characterization
+   controls + canonical matrices per `config/characterization-fixtures.json` — then memory
+   re-qualification (`scripts/macos_test.sh memory`, `scripts/ios_device.sh memory`), and a
+   first bench run, which also publishes the first schema-v3 history record.
+2. **Release staging only on an explicit maintainer call** — never implied by landed work.
+   When called, the combined 2.2-promotion + Stage 1 story is the headline (~10% faster,
+   ~280 MB less memory, ~13% smaller downloads); the standing per-candidate macOS smoke
+   lane and release-notes ledger apply.
+3. **Deferred with rationale, not blocked:** composed standard/canonical quality-report
+   emission at a lane call site; the optional MOS-proxy advisory column; iOS TestFlight
+   ASC-side distribution (build 21 uploaded, distribution deliberately parked); the
+   Stage 4 gated bets below.
+
+Stage-by-stage state (details and falsifiability criteria in the review doc):
 
 1. ~~**Stage 0 — near-free quality wins**~~ — **completed 2026-07-26** in four commits
    (`b16167d`, `5fc0f3c`, Stage 0.3 delivery advisory, `f97598a`): the clone reference
@@ -161,8 +177,8 @@ review doc):
    deterministic-QC win; the gated `QWENVOICE_TALKER_REPPEN` knob remains for diagnostics).
    Measurements and the pre-existing clone/long dropout-band finding:
    `benchmarks/OPTIMIZATION.md` §L.
-2. **Stage 1 — launch-bound attack on current pins** (§H P0 successor program; **in progress
-   2026-07-26**, measurements in `benchmarks/OPTIMIZATION.md` §M): P2a-i (pipelined chunk
+2. ~~**Stage 1 — launch-bound attack on current pins**~~ — **completed 2026-07-26** (§H P0
+   successor program, measurements in `benchmarks/OPTIMIZATION.md` §M): P2a-i (pipelined chunk
    materialization) landed with byte-identical fixed-seed output and clone warm RTF
    +1.6/+3.3/+0.5%; the P2a-ii early-submit variant measured as a do-NOT (custom/long −3.9%)
    and is reverted with its record kept. **P3 (compiled code-predictor) landed the program's
@@ -179,8 +195,8 @@ review doc):
    byte-identical output throughout; the residual step-eval launch-gap idle is a 0.30.6
    structural ceiling whose re-test rides the Stage 4 pin bump. The program proceeds to
    Stage 2 (memory).
-3. **Stage 2 — memory program (folds phase 9)** — in progress 2026-07-26
-   (measurements: `benchmarks/OPTIMIZATION.md` §N): ~~speech-tokenizer runtime reuse~~
+3. ~~**Stage 2 — memory program (folds phase 9)**~~ — **completed 2026-07-26, including
+   the 2.2 promotion** (measurements: `benchmarks/OPTIMIZATION.md` §N): ~~speech-tokenizer runtime reuse~~
    **shipped (phase 9 closed)**; ~~text-embedding quantization experiment~~ **validated in
    isolation** — 8-bit per-layer embedding cuts MLX active peak by 278 MB (−13.2%) and the
    Speed artifact by 292 MB at RTF parity with clean QC; shipping it is a promotion-quality
@@ -210,8 +226,9 @@ review doc):
    Remaining: fresh fixture identities and memory re-qualification on the new artifacts
    (idle Mac + paired iPhone); release staging waits for an explicit maintainer call
    (releases are never implied by landed work).
-4. **Stage 3 — quality harness (folds phase 12, then 13)** — in progress 2026-07-26,
-   prioritized by the maintainer ahead of any further optimization work:
+4. ~~**Stage 3 — quality harness (folds phase 12, then 13)**~~ — **completed 2026-07-26**
+   (prioritized by the maintainer ahead of any further optimization work; MOS-proxy and
+   composed lane emission deliberately deferred):
    ~~wire the typed `GenerationQualityReport` registry producer with persisted-WAV
    consolidation~~ **shipped at fast depth** (see the phase 12 row; live-verified on the
    shipping path). ~~Standard/canonical depth producer~~ **shipped** —

@@ -91,7 +91,9 @@
 		30A2AB9307AF6CB9257B937A /* qwenvoice_ios_model_catalog.json in Resources */ = {isa = PBXBuildFile; fileRef = 32A87AE8A3A91622FD9D8D5B /* qwenvoice_ios_model_catalog.json */; };
 		30BFDA12D196717AD4B54BFA /* AtomicWAVGenerationOutputSink.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47AAE4913A8F370AAEEE21BC /* AtomicWAVGenerationOutputSink.swift */; };
 		30FB7ACB9FAA05EA35B76940 /* QwenVoiceBackendCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 305B82987DE76A718A67DE36 /* QwenVoiceBackendCore.swift */; };
+		31B6ECD414EDD7D85FC80501 /* GenerationQualityReportProducer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 332F1AC060DDE9B0B7D2C993 /* GenerationQualityReportProducer.swift */; };
 		31C28194760FD4D9536AB639 /* VocelloMacUITestCase.swift in Sources */ = {isa = PBXBuildFile; fileRef = F79D394B54B00C0B451E1E96 /* VocelloMacUITestCase.swift */; };
+		31F6ACF48631991150FFC4DB /* GenerationQualityReportProducerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87E3AC164ACFAC2331CD778E /* GenerationQualityReportProducerTests.swift */; };
 		325EFF9597E749D7B54D8C9A /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 9B899A22B7619F15A40FC99C /* Assets.xcassets */; };
 		344EA1CECA3F8F8B111BC547 /* IOSRootNavigationModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4A51A054EBF03C0D4E010A6 /* IOSRootNavigationModels.swift */; };
 		34A1E9D71579187F947BD490 /* GenerationPlanShadowMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CB221265C49E3807301AB60 /* GenerationPlanShadowMapper.swift */; };
@@ -673,6 +675,7 @@
 		30C919DCC4F7D2AD285B5DCC /* IOSVoicePreviewPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSVoicePreviewPlayer.swift; sourceTree = "<group>"; };
 		328165994087B0FD137C081E /* ReferenceClipRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReferenceClipRecorder.swift; sourceTree = "<group>"; };
 		32A87AE8A3A91622FD9D8D5B /* qwenvoice_ios_model_catalog.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = qwenvoice_ios_model_catalog.json; sourceTree = "<group>"; };
+		332F1AC060DDE9B0B7D2C993 /* GenerationQualityReportProducer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GenerationQualityReportProducer.swift; sourceTree = "<group>"; };
 		3391463774A620DD7488F8FB /* SemanticTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SemanticTypes.swift; sourceTree = "<group>"; };
 		340E2BD754D44D2C17FF440C /* WordErrorRateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WordErrorRateTests.swift; sourceTree = "<group>"; };
 		346B6B3C35C9A393EB13CAEC /* ServiceActiveGenerationCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceActiveGenerationCoordinatorTests.swift; sourceTree = "<group>"; };
@@ -778,6 +781,7 @@
 		82A05DAF95ECD80C6A42AD1F /* TTSEngineStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TTSEngineStore.swift; sourceTree = "<group>"; };
 		8532D00EDC1F26A3483EC751 /* HistoryScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryScreen.swift; sourceTree = "<group>"; };
 		874E0767E61CDEEE88A9FACF /* GenerationTelemetryJSONLSink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GenerationTelemetryJSONLSink.swift; sourceTree = "<group>"; };
+		87E3AC164ACFAC2331CD778E /* GenerationQualityReportProducerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GenerationQualityReportProducerTests.swift; sourceTree = "<group>"; };
 		88B053E8CDEBE21AC420E4B5 /* GenerationQualityReport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GenerationQualityReport.swift; sourceTree = "<group>"; };
 		890E011F57EAC237416DDF0F /* AppTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppTheme.swift; sourceTree = "<group>"; };
 		89331D74C7D33B5E0DF54415 /* LivePreviewDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LivePreviewDiagnostics.swift; sourceTree = "<group>"; };
@@ -1111,6 +1115,7 @@
 				8A94C8A768AF3FE6E0CD51EC /* GenerationOutputAdapter.swift */,
 				1CB221265C49E3807301AB60 /* GenerationPlanShadowMapper.swift */,
 				88B053E8CDEBE21AC420E4B5 /* GenerationQualityReport.swift */,
+				332F1AC060DDE9B0B7D2C993 /* GenerationQualityReportProducer.swift */,
 				64B446ABFD75C0AE283E6D66 /* GenerationSemantics.swift */,
 				DFA0F8E883BE797762A33AE8 /* GenerationStreamingTelemetryV9.swift */,
 				954096CC19F2467A5543DC03 /* GenerationStreamingTelemetryV9Bridge.swift */,
@@ -1605,6 +1610,7 @@
 				1FB6146E31A25C9C8E0AC831 /* GenerationEventDeliveryProbeTests.swift */,
 				ECF8577E65C258F1081F57A2 /* GenerationFailureDiagnosticLoggerTests.swift */,
 				D9EF7430F4440DAB10C24D68 /* GenerationPlanShadowMapperTests.swift */,
+				87E3AC164ACFAC2331CD778E /* GenerationQualityReportProducerTests.swift */,
 				75868F469F63AFDD6DDEF29A /* GenerationQualityReportTests.swift */,
 				0F5D3ADAE3566B96C3337BAB /* GenerationSemanticsLanguageTests.swift */,
 				4CC94FB5FB664250517541EC /* GenerationStreamingTelemetryV9Tests.swift */,
@@ -2186,6 +2192,7 @@
 				AB19429622392340EF0B9F7D /* GenerationOutputAdapter.swift in Sources */,
 				34A1E9D71579187F947BD490 /* GenerationPlanShadowMapper.swift in Sources */,
 				C7EA4540816D2346C2B603B8 /* GenerationQualityReport.swift in Sources */,
+				31B6ECD414EDD7D85FC80501 /* GenerationQualityReportProducer.swift in Sources */,
 				CD601A69A8F0D1F41B8F2BDD /* GenerationSemantics.swift in Sources */,
 				1AC3370500D7E507EFDBA0BD /* GenerationStreamingTelemetryV9.swift in Sources */,
 				355E4469E0A31D267E908AF2 /* GenerationStreamingTelemetryV9Bridge.swift in Sources */,
@@ -2343,6 +2350,7 @@
 				0AF4FC23C9138278AEF0A609 /* GenerationFailureDiagnosticLoggerTests.swift in Sources */,
 				3B885A9409233451E01A6909 /* GenerationOutputVerifier.swift in Sources */,
 				21275A6B32471EE246F1FA2B /* GenerationPlanShadowMapperTests.swift in Sources */,
+				31F6ACF48631991150FFC4DB /* GenerationQualityReportProducerTests.swift in Sources */,
 				EC85720AB2D494DF6BB4EF61 /* GenerationQualityReportTests.swift in Sources */,
 				54629EA454BE4A228E48B874 /* GenerationSemanticsLanguageTests.swift in Sources */,
 				A3CCB0E2296E22C70DBAAD6D /* GenerationStreamingTelemetryV9Tests.swift in Sources */,

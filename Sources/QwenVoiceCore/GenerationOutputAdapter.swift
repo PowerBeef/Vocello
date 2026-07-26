@@ -1581,8 +1581,10 @@ struct StreamingExecutionContext: Sendable {
             "outputReadableWAV": "true",
             "outputAtomicallyPublished": "true",
         ]
-        if TelemetryGate.resolvedEnabled,
-           let wavDigest = try? SamplingTakeEvidence.sha256FileDigest(at: outputURL) {
+        let publishedWAVDigest: String? = TelemetryGate.resolvedEnabled
+            ? try? SamplingTakeEvidence.sha256FileDigest(at: outputURL)
+            : nil
+        if let wavDigest = publishedWAVDigest {
             let plannedSeed = request.seed
                 ?? stringFlags["sampling_effective_seed"].flatMap(UInt64.init)
             let observedSeed = stringFlags["sampling_effective_seed"].flatMap(UInt64.init)
@@ -1605,6 +1607,28 @@ struct StreamingExecutionContext: Sendable {
         successNotes.merge(GenerationStreamingTelemetryV9Publication.shippingIdentityNotes) {
             current, _ in current
         }
+
+        // Phase 12: the typed quality registry runs at fast depth on every
+        // shipping finalization; the persisted-WAV Fast QC verdict folds into
+        // the typed gate and the registry verdict travels in the open
+        // telemetry maps (no schema change).
+        let hitTokenCap = finalStringFlags.contains { key, value in
+            (key == "generation_end_reason" || key.hasSuffix("_generation_end_reason"))
+                && value == "token_cap"
+        }
+        let qualityReport = GenerationQualityReportProducer.fastReport(
+            generationID: generationID,
+            finishReason: resolvedFinishReason,
+            hitTokenCap: hitTokenCap,
+            audioQC: finalAudioQC,
+            wavDigest: publishedWAVDigest,
+            usedStreaming: request.shouldStream,
+            chunkCount: chunkIndex,
+            audioChannel: audioChannelSummary
+        )
+        successNotes.merge(
+            GenerationQualityReportProducer.telemetryNotes(for: qualityReport)
+        ) { _, quality in quality }
 
         let productTerminalAtNS = DispatchTime.now().uptimeNanoseconds
         await writeEngineTelemetryRecord(

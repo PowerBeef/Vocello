@@ -10,8 +10,8 @@ const LIMITATIONS = [
     v: "The app is built around Swift, MLX, and local model packages for Apple Silicon Macs.",
   },
   {
-    k: "iPhone not public yet",
-    v: "The iPhone app is maintained in the repository, but public distribution is not attached to this Mac release.",
+    k: "iPhone is in beta",
+    v: "The iPhone app ships as a public TestFlight beta, separate from this Mac release. It needs an iPhone 15 Pro or newer.",
   },
   {
     k: "Quality is heavier",

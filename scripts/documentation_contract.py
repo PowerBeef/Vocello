@@ -425,17 +425,27 @@ def validate_facts(root: Path) -> list[str]:
         errors.append("public stable Mac release is missing from README or website copy")
     if public["ios"]["minimumDevice"] not in readme:
         errors.append("README minimum iPhone support differs from public-product-facts")
-    pending_phrases = (
-        "arriving soon",
-        "distribution pending",
-        "not public yet",
-        "public distribution is not",
-        "awaiting public distribution",
-    )
-    readme_pending = any(phrase in readme.lower() for phrase in pending_phrases)
-    website_pending = any(phrase in website.lower() for phrase in pending_phrases)
-    if not readme_pending or not website_pending:
-        errors.append("public iPhone distribution-pending status is missing from README or website")
+    ios_status = public["ios"]["distributionStatus"]
+    if ios_status == "implemented-distribution-pending":
+        pending_phrases = (
+            "arriving soon",
+            "distribution pending",
+            "not public yet",
+            "public distribution is not",
+            "awaiting public distribution",
+        )
+        readme_pending = any(phrase in readme.lower() for phrase in pending_phrases)
+        website_pending = any(phrase in website.lower() for phrase in pending_phrases)
+        if not readme_pending or not website_pending:
+            errors.append("public iPhone distribution-pending status is missing from README or website")
+    elif ios_status == "public-testflight-beta":
+        beta_link = public["ios"].get("testflightPublicLink", "")
+        if not beta_link or beta_link not in readme:
+            errors.append("public TestFlight beta link is missing from README")
+        if "testflight" not in website.lower():
+            errors.append("public TestFlight beta status is missing from website copy")
+    else:
+        errors.append(f"public-product-facts: unknown iOS distributionStatus {ios_status}")
     progress = (root / "docs/development-progress.md").read_text(encoding="utf-8")
     if benchmark_baseline_status(root, "macos") and "clean canonical macOS schema-v2 baseline exists" not in progress:
         errors.append("docs/development-progress.md: tracked history has a clean canonical macOS baseline but the checkpoint does not")

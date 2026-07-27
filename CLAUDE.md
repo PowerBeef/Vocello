@@ -10,9 +10,10 @@
 
 **Vocello** (`Vocello` repo, formerly `QwenVoice`; the local checkout directory and Xcode project keep the old name): local-first TTS on Apple Silicon — **Qwen3-TTS + MLX**, Swift 6, macOS/iOS 26+. No bundled weights; models download from Hugging Face. Also ships the `vocello` CLI, `scripts/`, benchmarks, and `website/`.
 
-macOS **2.2.2** released; iOS is on-device-capable with a first TestFlight build uploaded on
-v2.2.2 (build 21), not yet distributed to testers. Releases are cut only on an explicit
-maintainer call — landed roadmap work never implies one.
+macOS **2.2.2** released; iOS build 21 (v2.2.2) is in TestFlight — internal group live, public
+external group submitted to Beta App Review 2026-07-27 with public link
+`https://testflight.apple.com/join/Cvp6yCv7` (linked from the README; activates on approval).
+Releases are cut only on an explicit maintainer call — landed roadmap work never implies one.
 Minimum support is Apple Silicon Mac with 8 GB or iPhone 15 Pro or newer. Canonical benchmark
 evidence uses Mac mini M2 8 GB and iPhone 17 Pro; support and evidence hardware are not synonyms.
 

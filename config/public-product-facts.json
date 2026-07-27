@@ -14,7 +14,8 @@
   "ios": {
     "minimumOS": "iOS 26.0",
     "minimumDevice": "iPhone 15 Pro",
-    "distributionStatus": "implemented-distribution-pending"
+    "distributionStatus": "public-testflight-beta",
+    "testflightPublicLink": "https://testflight.apple.com/join/Cvp6yCv7"
   },
   "minimumMac": {
     "processor": "Apple Silicon",

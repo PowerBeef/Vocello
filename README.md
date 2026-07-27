@@ -2,14 +2,14 @@
 
 <p align="center">
   A local, private voice studio for Apple Silicon. Write a script, choose or shape a voice, and generate speech on your device with native Swift and MLX.<br>
-  <strong>Available for Mac. The iPhone app is implemented and awaiting public distribution.</strong>
+  <strong>Available for Mac. The iPhone app is in public beta on TestFlight.</strong>
 </p>
 
 <p align="center">
   <a href="https://vocello.vercel.app/"><img src="https://img.shields.io/badge/Website-vocello.vercel.app-7b61ff?style=flat-square&logo=vercel" alt="Website"></a>
   <a href="https://github.com/PowerBeef/Vocello/releases/tag/v2.2.2"><img src="https://img.shields.io/badge/Vocello-2.2.2-7b61ff?style=flat-square" alt="Vocello 2.2.2"></a>
   <img src="https://img.shields.io/badge/macOS-26%2B-111827?style=flat-square&logo=apple" alt="macOS 26 or newer">
-  <img src="https://img.shields.io/badge/iPhone-distribution%20pending-7b61ff?style=flat-square&logo=apple" alt="iPhone distribution pending">
+  <a href="https://testflight.apple.com/join/Cvp6yCv7"><img src="https://img.shields.io/badge/iPhone-TestFlight%20beta-7b61ff?style=flat-square&logo=apple" alt="iPhone TestFlight beta"></a>
   <img src="https://img.shields.io/badge/Apple%20Silicon-required-111827?style=flat-square&logo=apple" alt="Apple Silicon required">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="MIT License"></a>
 </p>
@@ -22,6 +22,7 @@
 
 <p align="center">
   <a href="https://github.com/PowerBeef/Vocello/releases/download/v2.2.2/Vocello-macos26.dmg"><strong>Download Vocello 2.2.2 for macOS 26+</strong></a><br>
+  <a href="https://testflight.apple.com/join/Cvp6yCv7"><strong>Join the iPhone beta on TestFlight</strong></a><br>
   <a href="https://github.com/PowerBeef/Vocello/releases/tag/v2.2.2">Release details</a> · <a href="docs/releases/v2.2.2.md">What is new</a> · <a href="https://github.com/PowerBeef/Vocello/releases">All releases</a>
 </p>
 
@@ -89,7 +90,7 @@ With the 2.2.0 release the repository moved from `PowerBeef/QwenVoice` to `Power
 | Platform | Support | Model variants | Public status |
 | --- | --- | --- | --- |
 | Mac | macOS 26.0 or newer, Apple Silicon, 8 GB RAM minimum | Speed (4-bit) and Quality (8-bit) | Vocello 2.2.2 is available now |
-| iPhone | iPhone 15 Pro or newer, iOS 26.0 or newer | Speed (4-bit) | App implemented; public distribution pending |
+| iPhone | iPhone 15 Pro or newer, iOS 26.0 or newer | Speed (4-bit) | Public beta via [TestFlight](https://testflight.apple.com/join/Cvp6yCv7) |
 
 Speed is the recommended default and uses less memory. Quality is a Mac-only option for machines with more headroom. The three recommended Mac Speed packages total about 7 GB.
 
@@ -117,7 +118,7 @@ Storage locations and deletion behavior are documented in [`docs/reference/priva
 
 | | |
 | --- | --- |
-| ![Vocello Studio running on iPhone](docs/screenshots/vocello-ios-studio.png) | The iPhone app uses the same local Qwen3-TTS and MLX foundation with an iPhone-specific in-process runtime. It provides Custom Voice, Voice Design, Voice Cloning, recording and Files import, local history, and the memory-conscious Speed models. On-device generation, physical-iPhone XCUITest, and an optional signed archive/TestFlight lane are implemented. A fresh full multilingual physical-iPhone run passed all 19 hint/QC and 18 output gates with policy-accepted warnings; its exploratory record is excluded from clean performance trends. Public distribution still requires the maintainer-owned App Store Connect release process. |
+| ![Vocello Studio running on iPhone](docs/screenshots/vocello-ios-studio.png) | The iPhone app uses the same local Qwen3-TTS and MLX foundation with an iPhone-specific in-process runtime. It provides Custom Voice, Voice Design, Voice Cloning, recording and Files import, local history, and the memory-conscious Speed models. On-device generation, physical-iPhone XCUITest, and an optional signed archive/TestFlight lane are implemented. A fresh full multilingual physical-iPhone run passed all 19 hint/QC and 18 output gates with policy-accepted warnings; its exploratory record is excluded from clean performance trends. A public TestFlight beta is open — [join here](https://testflight.apple.com/join/Cvp6yCv7). App Store distribution remains a separate maintainer-owned release decision. |
 
 Current implementation and acceptance status: [`docs/development-progress.md`](docs/development-progress.md).
 

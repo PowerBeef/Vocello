@@ -54,8 +54,7 @@ Stage 4 stays gated. The concrete next actions, in order:
    ~280 MB less memory, ~13% smaller downloads); the standing per-candidate macOS smoke
    lane and release-notes ledger apply.
 3. **Deferred with rationale, not blocked:** composed standard/canonical quality-report
-   emission at a lane call site; the optional MOS-proxy advisory column; iOS TestFlight
-   ASC-side distribution (build 21 uploaded, distribution deliberately parked); the
+   emission at a lane call site; the optional MOS-proxy advisory column; the
    Stage 4 gated bets.
 
 ## Staged roadmap state
@@ -272,9 +271,12 @@ explicit macOS fixture repair/bootstrap step. XCUITest is the sole autonomous ap
   attestation, TestFlight upload — making Vocello 2.2.2 (build 21) the first uploaded build.
   2.2.1/2.2.2 packaged the two App Store Connect binary rejections (opaque iOS icons;
   framework `CFBundleShortVersionString` inheritance) and an artifact-verifier inheritance fix.
-  Remaining distribution work is App Store Connect-side (beta Test Information, external group,
-  Beta App Review) and is **deliberately parked by the maintainer**; public App Store
-  distribution additionally needs metadata, screenshots, and submission.
+  On 2026-07-27 the maintainer opened TestFlight distribution: beta Test Information completed,
+  an Internal group (maintainer) received build 21 immediately, and a **Public Beta external
+  group** was submitted to Beta App Review with the public link
+  `https://testflight.apple.com/join/Cvp6yCv7` (open to everyone, no tester cap; the link
+  activates when Apple approves the build — README links it). Public App Store distribution
+  additionally needs metadata, screenshots, and submission.
 - **Language-path acceptance state**: Speech assets for `de_DE`/`es_ES`/`ja_JP`/`zh_CN` verified
   2026-07-16; the corpus-v2/matrix arc closed with full run
   `ios-lang-bench-20260716-164248-1ecf8361` — 19/19 hint/QC, 18/18 output-gated, three-pass

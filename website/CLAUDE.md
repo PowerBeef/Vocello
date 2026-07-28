@@ -39,15 +39,14 @@ behavior; Vercel owns deployment for this directory.
 
 `src/App.jsx` is a **thin composer** (~73 lines). All UI is split across:
 
-- `src/sections/` — one file per page section, in render order: `Nav`, `Hero`, `WorkflowBand` (rendered 3× from data), `Listen`, `Capabilities`, `WhyCloud`, `TryIt`, `HowItRuns`, `Limitations`, `FinalCTA`, `Footer`.
-- `src/components/` — three shared primitives:
+- `src/sections/` — one file per page section, in render order: `Nav`, `Hero`, `WorkflowBand` (rendered 3× from data), `Listen`, `Capabilities`, `WhyCloud`, `HowItRuns`, `IphoneBeta`, `Performance`, `Limitations`, `FinalCTA`, `Footer`.
+- `src/components/` — two shared primitives:
   - `Icon.jsx` — single switch over an 18-case SVG vocabulary. Also exports `makeWaveBars` (deterministic bar-height generator).
   - `Waveform.jsx` — bar waveform for Listen rows.
-  - `TryCanvas.jsx` — canvas-driven animated waveform for the TryIt demo. Reads `DELIVERY_COLORS` from `data/samples.js` and a local `DELIVERY_SHAPES` table; hashed brief content + per-delivery shape parameters drive the rendering.
 - `src/data/` — **single sources of truth**:
   - `workflows.js` (`WORKFLOWS`): the three voice workflow bands' copy + screenshot paths.
-  - `samples.js` (`SAMPLES`, `DELIVERIES`, `DELIVERY_COLORS`): Listen samples (with `src` paths into `public/assets/voice-samples/`) + the TryIt delivery picker options.
-  - `credits.js` (`CREDITS`, `REPO`, `RELEASE_LATEST`, `RELEASE_V1`): "Built on" tech list + GitHub URLs. Used by `FinalCTA.jsx` for the closing credits roll.
+  - `samples.js` (`SAMPLES`, `DELIVERIES`, `DELIVERY_COLORS`): Listen samples (with `src` paths into `public/assets/voice-samples/`) + the delivery chip vocabulary.
+  - `credits.js` (`CREDITS`, `REPO`, `RELEASE_LATEST`, `RELEASE_V1`, `TESTFLIGHT`): "Built on" tech list + GitHub/TestFlight URLs. Used by `FinalCTA.jsx` for the closing credits roll and by `Hero`/`IphoneBeta` for the beta link.
 - `src/site.css` + `src/tokens.css` — single global stylesheet (tokens.css is imported from site.css). No CSS modules, no styled components.
 
 ### Responsive breakpoints
@@ -104,14 +103,14 @@ Mode colors are referenced via CSS custom properties: rows pass them through `--
 
 ## Assets
 
-- `public/assets/screens/` — six Mac app screenshots (`custom-voice.png`, `voice-design.png`, `voice-cloning.png`, `model-downloads.png`, `delivery-presets.png`, `history.png`).
-- `public/assets/voice-samples/` — three WAV clips for the Listen rows; filenames match the `SAMPLES[*].src` field in `data/samples.js`.
+- `public/assets/screens/` — six Mac app screenshots (`custom-voice.png`, `voice-design.png`, `voice-cloning.png`, `model-downloads.png`, `delivery-presets.png`, `history.png`) plus the iPhone shot `ios-studio.png` used by `IphoneBeta`.
+- `public/assets/voice-samples/` — five WAV clips for the Listen rows; filenames match the `SAMPLES[*].src` field in `data/samples.js`. Regenerate the `wave` arrays with `website/scripts/render-waveforms.mjs` whenever a WAV changes.
 - `public/assets/app-icon-1024.png`, `vocello-header-mark.png`, `social_preview.png` — brand artwork.
 
 When adding new audio/image assets, drop them under `public/assets/<category>/` and reference via the data layer, not from JSX directly.
 
 ## Conventions worth knowing
 
-- **No client-side router.** Internal links use hash anchors (`#workflows`, `#listen`, `#how-it-runs`, `#download`) on plain `<a>` tags. The nav scroll-progress hairline reads `scrollTop / scrollHeight`.
+- **No client-side router.** Internal links use hash anchors (`#workflows`, `#listen`, `#how-it-runs`, `#iphone`, `#download`) on plain `<a>` tags. The nav scroll-progress hairline reads `scrollTop / scrollHeight`.
 - **Animations** use the existing `panelSettle` keyframe and `cubic-bezier(0.32, 0.08, 0.24, 1)` ease. Only animate `opacity`, `transform`, `border-color`, and `box-shadow` — never layout properties. `prefers-reduced-motion: reduce` is honored in a single block at the end of `site.css`.
 - **Audio playback** in Listen uses one shared `<audio ref>` element with `preload="none"` and src-swap on click for mutual exclusion. See `Listen.jsx`.

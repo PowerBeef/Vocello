@@ -32,10 +32,11 @@ export const Listen = () => {
       <div className="container">
         <div className="section-head listen-head">
           <p className="section-note">Listen first</p>
-          <h2 className="section-title">Three voices.<br />Three ways to ask for them.</h2>
+          <h2 className="section-title">Five voices.<br />Three ways to ask for them.</h2>
           <p className="section-sub">
             Each row carries the brief or speaker, the script, the delivery setting that
-            produced it, and a waveform from the local render. Install Vocello to generate your own.
+            produced it, and a waveform from the local render. The set includes a Japanese
+            take and a 31 second narration. Install Vocello to generate your own.
           </p>
         </div>
 

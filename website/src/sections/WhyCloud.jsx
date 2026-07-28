@@ -1,21 +1,15 @@
 import React from "react";
 
-const POINTS = [
+const COMPARE = [
+  { k: "Price", vocello: "Free, MIT licensed", cloud: "Subscription or credit packs" },
+  { k: "Where speech is generated", vocello: "On your Mac", cloud: "On the provider's servers" },
+  { k: "Your script", vocello: "Stays in local app storage", cloud: "Uploaded to generate" },
+  { k: "Metering", vocello: "None", cloud: "Per character or per minute" },
+  { k: "Account", vocello: "None", cloud: "Required" },
   {
-    k: "No subscription meter",
-    body: "Install the app, download the model packages you want, and generate on your Mac without paying per line or per character.",
-  },
-  {
-    k: "No cloud queue",
-    body: "Generation runs on your Apple Silicon Mac after setup, so you are not waiting on a shared remote render queue.",
-  },
-  {
-    k: "Local storage",
-    body: "Scripts, history, saved voices, and generated audio stay in Vocello's local app storage until you export or reveal a file.",
-  },
-  {
-    k: "Setup is not air-gapped",
-    body: "Models download from Hugging Face during setup and updates. After that download, generation runs locally.",
+    k: "Raw English naturalness",
+    vocello: "Strong; judge the samples above",
+    cloud: "The best cloud voices still lead",
   },
 ];
 
@@ -34,13 +28,29 @@ export const WhyCloud = () => (
         </p>
       </div>
 
-      <div className="cloud-points" aria-label="Reasons to use local text to speech">
-        {POINTS.map((point) => (
-          <article className="cloud-point" key={point.k}>
-            <h3 className="cloud-k">{point.k}</h3>
-            <p className="cloud-body">{point.body}</p>
-          </article>
-        ))}
+      <div className="cloud-compare">
+        <table className="compare-table">
+          <thead>
+            <tr>
+              <td className="compare-corner" aria-hidden="true" />
+              <th scope="col">Vocello</th>
+              <th scope="col">Cloud TTS services</th>
+            </tr>
+          </thead>
+          <tbody>
+            {COMPARE.map((row) => (
+              <tr key={row.k}>
+                <th scope="row">{row.k}</th>
+                <td>{row.vocello}</td>
+                <td>{row.cloud}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <p className="compare-footnote">
+          Setup is not air-gapped: models download from Hugging Face during setup and
+          updates. After that download, generation runs locally.
+        </p>
       </div>
     </div>
   </section>

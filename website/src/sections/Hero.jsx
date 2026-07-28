@@ -1,6 +1,6 @@
 import React from "react";
 import { Icon } from "../components/Icon.jsx";
-import { RELEASE_LATEST } from "../data/credits.js";
+import { RELEASE_LATEST, TESTFLIGHT } from "../data/credits.js";
 
 export const Hero = () => (
   <section className="hero">
@@ -30,6 +30,12 @@ export const Hero = () => (
           </a>
         </div>
         <p className="hero-meta">Signed + notarized Mac download · MIT app code · Swift + MLX</p>
+        <p className="hero-meta">
+          Also on iPhone:{" "}
+          <a className="cta-meta-link" href={TESTFLIGHT} target="_blank" rel="noreferrer">
+            join the public beta on TestFlight
+          </a>
+        </p>
       </div>
       <div className="hero-stage">
         <div className="hero-stage-glow" aria-hidden="true" />

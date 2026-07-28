@@ -74,3 +74,4 @@ benchmarks/**/*.xcarchive/
 benchmarks/**/*.dSYM/
 samples-*.jsonl
 **/diagnostics/
+.pytest_cache/

@@ -1,4 +1,5 @@
 import React, { useEffect } from "react";
+import { Analytics } from "@vercel/analytics/react";
 import { Nav } from "./sections/Nav.jsx";
 import { Hero } from "./sections/Hero.jsx";
 import { WorkflowBand } from "./sections/WorkflowBand.jsx";
@@ -6,6 +7,7 @@ import { Listen } from "./sections/Listen.jsx";
 import { Capabilities } from "./sections/Capabilities.jsx";
 import { WhyCloud } from "./sections/WhyCloud.jsx";
 import { HowItRuns } from "./sections/HowItRuns.jsx";
+import { IphoneBeta } from "./sections/IphoneBeta.jsx";
 import { Performance } from "./sections/Performance.jsx";
 import { Limitations } from "./sections/Limitations.jsx";
 import { FinalCTA } from "./sections/FinalCTA.jsx";
@@ -24,7 +26,7 @@ const useScrollReveal = () => {
 
     const targets = document.querySelectorAll(
       ".workflow-band, .listen-section, .caps-section, .cloud-section, " +
-        ".runs-section, .limitations-section, .final-cta-section",
+        ".runs-section, .iphone-section, .perf-section, .limitations-section, .final-cta-section",
     );
     if (!targets.length) return;
 
@@ -43,7 +45,27 @@ const useScrollReveal = () => {
       { rootMargin: "0px 0px -8% 0px", threshold: 0.06 },
     );
     targets.forEach((el) => io.observe(el));
-    return () => io.disconnect();
+
+    // Anchor jumps land instantly; reveal the target section without the fade
+    // so in-page navigation never arrives on a still-transparent viewport.
+    const revealHashTarget = () => {
+      const { hash } = window.location;
+      if (!hash || hash.length < 2) return;
+      let target = null;
+      try {
+        target = document.querySelector(hash);
+      } catch {
+        return;
+      }
+      const section = target?.closest?.(".reveal") ?? target;
+      if (section?.classList?.contains("reveal")) section.classList.add("is-in");
+    };
+    revealHashTarget();
+    window.addEventListener("hashchange", revealHashTarget);
+    return () => {
+      window.removeEventListener("hashchange", revealHashTarget);
+      io.disconnect();
+    };
   }, []);
 };
 
@@ -64,11 +86,13 @@ const App = () => {
       <Capabilities />
       <WhyCloud />
       <HowItRuns />
+      <IphoneBeta />
       <Performance />
       <Limitations />
       <FinalCTA />
     </main>
     <Footer />
+    <Analytics />
   </>
   );
 };

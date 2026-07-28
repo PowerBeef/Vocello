@@ -2,6 +2,7 @@
 
 <p align="center">
   A local, private voice studio for Apple Silicon. Write a script, choose or shape a voice, and generate speech on your device with native Swift and MLX.<br>
+  No account. No credits. Nothing you write or record leaves your device.<br>
   <strong>Available for Mac. The iPhone app is in public beta on TestFlight.</strong>
 </p>
 
@@ -39,6 +40,16 @@
 - **Voice Cloning:** record or import a reference you have permission to use, affirm consent, and save it to your voice library.
 
 Scripts past 900 characters become **long-form projects**: planned segments stream one after another while you listen along, then join into a single finished file with a per-segment map in History. Ten languages are supported (Chinese, English, Japanese, Korean, German, French, Russian, Portuguese, Spanish, and Italian) with automatic detection, and everything — scripts, references, history, audio — stays in local app storage unless you export it.
+
+## Not a Python wrapper
+
+Most local TTS tools shell out to a Python reference implementation behind a local server. Vocello generates through a first-party Swift runtime on MLX, [`VocelloQwen3Core`](Packages/VocelloQwen3Core/README.md) — no Python, no local server, and the CLI links the same engine directly.
+
+- On the Mac the model runs in a separate XPC service that retires when idle, so engine memory pressure cannot take the app window down with it. On iPhone the same engine runs in-process.
+- Audio streams over an actor-owned lossless channel, so memory does not grow with output length — a 12-segment long-form run producing 10.4 minutes of audio ended about 1.1% below its starting footprint.
+- Every request carries its own seed and sampler state, so takes are reproducible by construction — and that determinism is the merge gate for performance work.
+
+[Architecture](docs/ARCHITECTURE.md) · [Benchmarks](benchmarks/HISTORY.md) · [More detail below](#under-the-hood)
 
 ## Performance, measured
 
@@ -79,7 +90,7 @@ Custom Voice and Voice Design support ten delivery styles at subtle, normal, or 
 3. Open Vocello, then install models from **Settings > Model downloads**.
 4. Generate from Custom Voice, Voice Design, or Voice Cloning.
 
-The current DMG is signed with an Apple Developer ID certificate, notarized, and stapled. No Python runtime or local server is required. The attached [`release-metadata.txt`](https://github.com/PowerBeef/Vocello/releases/download/v2.2.2/release-metadata.txt) records source and toolchain provenance.
+The current DMG is signed with an Apple Developer ID certificate, notarized, and stapled. The attached [`release-metadata.txt`](https://github.com/PowerBeef/Vocello/releases/download/v2.2.2/release-metadata.txt) records source and toolchain provenance.
 
 Upgrading from Vocello 2.0 or 2.1 does not require reinstalling models. Application data remains under `~/Library/Application Support/QwenVoice/`.
 
@@ -141,6 +152,8 @@ That streaming design is why memory does not grow with output length. A long-for
 </picture>
 
 Engine invariants, the request lifecycle, and the model-delivery contract are documented in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md); benchmark publication is PASS-only and privacy-allowlisted by design.
+
+Vocello is built by a solo developer with heavy use of coding agents. Every performance claim above is gated by deterministic, fixed-seed checks and the tracked benchmark records in this repository.
 
 ## Build from source
 
@@ -215,6 +228,8 @@ echo "Hello there." | build/vocello generate --variant speed --stream --json
 ```
 
 The CLI supports single generation, mode shortcuts, batches, saved voices, speaker and model discovery, model installation, and benchmark matrices. Standard output is machine-readable; progress is written to standard error. See [`docs/reference/cli.md`](docs/reference/cli.md).
+
+> **Reproducing the benchmark numbers:** `./scripts/build.sh cli` produces an unoptimized development build that lands around RTF 1.0. The published figures come from the optimized Release path, and the two build topologies are not comparable — see the like-for-like rules in [`docs/reference/benchmarking-procedure.md`](docs/reference/benchmarking-procedure.md).
 
 ## Contributing
 

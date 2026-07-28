@@ -9,3 +9,4 @@ export const CREDITS = [
 export const REPO = "https://github.com/PowerBeef/Vocello";
 export const RELEASE_LATEST = "https://github.com/PowerBeef/Vocello/releases/latest";
 export const RELEASE_V1 = "https://github.com/PowerBeef/Vocello/releases/tag/v1.2.3";
+export const TESTFLIGHT = "https://testflight.apple.com/join/Cvp6yCv7";

@@ -1,6 +1,6 @@
 import React from "react";
 import { Icon } from "../components/Icon.jsx";
-import { CREDITS, REPO, RELEASE_LATEST, RELEASE_V1 } from "../data/credits.js";
+import { CREDITS, REPO, RELEASE_LATEST, RELEASE_V1, TESTFLIGHT } from "../data/credits.js";
 
 export const FinalCTA = () => (
   <section id="download" className="final-cta-section">
@@ -25,6 +25,11 @@ export const FinalCTA = () => (
           macOS 26.0+
           <span className="cta-meta-sep" aria-hidden="true">·</span>
           Apple Silicon required
+          <span className="cta-meta-sep" aria-hidden="true">·</span>
+          iPhone beta on{" "}
+          <a href={TESTFLIGHT} target="_blank" rel="noreferrer" className="cta-meta-link">
+            TestFlight
+          </a>
           <span className="cta-meta-sep" aria-hidden="true">·</span>
           Stable build for macOS 15:{" "}
           <a href={RELEASE_V1} target="_blank" rel="noreferrer" className="cta-meta-link">

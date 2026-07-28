@@ -129,6 +129,18 @@ Status report: [`docs/reference/runtime-refactor-status-report.md`](reference/ru
 - **2026-07-26 — Stages 0–3 executed and closed**, including the 2.2 artifact promotion and
   the benchmark-registry supersession rule (immutable records with a strictly older
   artifactVersion stay valid; new publications fail closed on current pins).
+- **2026-07-28 — TestFlight public beta live; marketing surfaces grounded and refreshed.**
+  Apple approved the Public Beta group (build 21, v2.2.2) and the public link went live. A
+  commissioned promotion report was counter-verified against the tree and its repo-facing
+  items landed in one arc: current repo description, a curated `good first issue` on-ramp
+  (#86 CLI version fallback, #87 shell completion), README conversion pass (privacy hook,
+  "Not a Python wrapper" block, CLI debug-RTF reproducibility caveat, coding-agents
+  authorship line), website TestFlight front door (hero link, `#iphone` band with the
+  cleaned `ios-studio.png`, nav/FinalCTA links), a factual local-versus-cloud comparison
+  table in WhyCloud, two new Listen samples (Japanese preset take, 31 s calm narration),
+  cookieless Vercel Web Analytics with the privacy policy scoped to disclose it, the page
+  title retargeted to Mac + iPhone, and an instant-reveal fix for in-page anchor jumps.
+  Outreach and social items from the report stay maintainer-owned outside the repository.
 
 ## Current implementation
 
@@ -274,9 +286,10 @@ explicit macOS fixture repair/bootstrap step. XCUITest is the sole autonomous ap
   On 2026-07-27 the maintainer opened TestFlight distribution: beta Test Information completed,
   an Internal group (maintainer) received build 21 immediately, and a **Public Beta external
   group** was submitted to Beta App Review with the public link
-  `https://testflight.apple.com/join/Cvp6yCv7` (open to everyone, no tester cap; the link
-  activates when Apple approves the build — README links it). Public App Store distribution
-  additionally needs metadata, screenshots, and submission.
+  `https://testflight.apple.com/join/Cvp6yCv7` (open to everyone, no tester cap). Apple approved
+  the build and the **public link went live 2026-07-28** — the README, repo description, and
+  website all link it. Public App Store distribution additionally needs metadata, screenshots,
+  and submission.
 - **Language-path acceptance state**: Speech assets for `de_DE`/`es_ES`/`ja_JP`/`zh_CN` verified
   2026-07-16; the corpus-v2/matrix arc closed with full run
   `ios-lang-bench-20260716-164248-1ecf8361` — 19/19 hint/QC, 18/18 output-gated, three-pass

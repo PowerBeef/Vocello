@@ -659,31 +659,85 @@ a { color: inherit; text-decoration: none; }
   max-width: 520px;
 }
 
-.cloud-points {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 22px 28px;
+.cloud-compare {
+  min-width: 0;
+  overflow-x: auto;
 }
 
-.cloud-point {
-  padding-bottom: 22px;
+.compare-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.compare-table thead th {
+  text-align: left;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--fg-tertiary);
+  padding: 0 14px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.compare-table thead th:nth-child(2) { color: var(--gold-300); }
+
+.compare-corner { border-bottom: 1px solid rgba(255, 255, 255, 0.12); }
+
+.compare-table tbody th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--fg-primary);
+  padding: 13px 14px 13px 0;
+  line-height: 1.45;
+}
+
+.compare-table tbody td {
+  color: var(--fg-secondary);
+  padding: 13px 14px;
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+
+.compare-table tbody tr {
   border-bottom: 1px solid rgba(255, 255, 255, 0.07);
 }
 
-.cloud-k {
-  margin: 0 0 8px;
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--fg-primary);
-  letter-spacing: 0;
+.compare-table tbody tr:last-child { border-bottom: 0; }
+
+.compare-footnote {
+  margin: 16px 0 0;
+  font-size: 13px;
+  color: var(--fg-tertiary);
+  text-wrap: pretty;
 }
 
-.cloud-body {
+/* ============== IPHONE BETA ============== */
+
+.iphone-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+  gap: 44px 64px;
+  align-items: center;
+}
+
+.iphone-copy {
+  max-width: 560px;
+}
+
+.iphone-copy .hero-ctas { margin-top: 28px; }
+
+.iphone-stage {
   margin: 0;
-  color: var(--fg-secondary);
-  font-size: 14px;
-  line-height: 1.55;
-  text-wrap: pretty;
+  display: flex;
+  justify-content: center;
+}
+
+.iphone-shot {
+  display: block;
+  width: min(100%, 320px);
+  height: auto;
+  filter: drop-shadow(0 28px 60px rgba(0, 0, 0, 0.45));
 }
 
 /* ============== LISTEN EXTRAS ============== */
@@ -1225,13 +1279,13 @@ a { color: inherit; text-decoration: none; }
 }
 
 /* Definition rows and cards warm their hairline on hover. */
-.cloud-point,
+.compare-table tbody tr,
 .caps-row,
 .runs-row,
 .limits-row {
   transition: border-color var(--motion-base) var(--ease-standard);
 }
-.cloud-point:hover,
+.compare-table tbody tr:hover,
 .caps-row:hover,
 .runs-row:hover,
 .limits-row:hover {
@@ -1306,11 +1360,13 @@ a { color: inherit; text-decoration: none; }
   .hero-ctas { justify-content: center; }
 
   .cloud-layout,
+  .iphone-layout,
   .limits-layout {
     grid-template-columns: minmax(0, 1fr);
     gap: 32px;
   }
   .cloud-copy,
+  .iphone-copy,
   .limits-copy {
     text-align: center;
     margin-inline: auto;
@@ -1408,10 +1464,7 @@ a { color: inherit; text-decoration: none; }
   .workflow-band-title,
   .cta-title { font-size: 32px; }
 
-  .cloud-points {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 18px;
-  }
+  .compare-table { min-width: 440px; }
 
   .btn { min-width: min(100%, 312px); justify-content: center; }
 

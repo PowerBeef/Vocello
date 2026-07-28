@@ -48,6 +48,7 @@ behavior; Vercel owns deployment for this directory.
   - `samples.js` (`SAMPLES`, `DELIVERIES`, `DELIVERY_COLORS`): Listen samples (with `src` paths into `public/assets/voice-samples/`) + the delivery chip vocabulary.
   - `credits.js` (`CREDITS`, `REPO`, `RELEASE_LATEST`, `RELEASE_V1`, `TESTFLIGHT`): "Built on" tech list + GitHub/TestFlight URLs. Used by `FinalCTA.jsx` for the closing credits roll and by `Hero`/`IphoneBeta` for the beta link.
 - `src/site.css` + `src/tokens.css` — single global stylesheet (tokens.css is imported from site.css). No CSS modules, no styled components.
+- `App.jsx` also mounts the `@vercel/analytics` `<Analytics />` component (cookieless page views; the website section of `public/privacy/index.html` discloses it) and owns the scroll-reveal hook, including the instant reveal for in-page anchor jumps.
 
 ### Responsive breakpoints
 

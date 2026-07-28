@@ -4,7 +4,7 @@
 Brand
 
 ## Product Purpose
-Vocello is a local-first Mac voice studio for Apple Silicon. The website exists to help creators, indie developers, and Mac-native tool users understand the product quickly, trust the local generation model, hear the shape of the workflows, and download the current Vocello stable release.
+Vocello is a local-first Mac voice studio for Apple Silicon. The website exists to help creators, indie developers, and Mac-native tool users understand the product quickly, trust the local generation model, hear the shape of the workflows, download the current Vocello stable release, and join the iPhone TestFlight beta.
 
 ## Audience
 - Mac users who care about privacy, local software, and native craft.

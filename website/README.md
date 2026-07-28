@@ -28,6 +28,11 @@ Vercel should be configured with:
 - Build command: `npm run build`
 - Output directory: `dist`
 
+Vercel Web Analytics is enabled on the project (cookieless, aggregate page views; enabled
+2026-07-28). The page mounts the `@vercel/analytics` React component, and the privacy policy at
+`public/privacy/index.html` discloses the website-scoped analytics while the apps stay
+zero-telemetry. Keep those three in sync if the analytics posture ever changes.
+
 The former `PowerBeef/vocello-website` repository is historical after this migration.
 
 Pull requests run the deterministic website contract and production build in the repository CI.

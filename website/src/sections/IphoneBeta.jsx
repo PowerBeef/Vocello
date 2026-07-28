@@ -27,7 +27,7 @@ export const IphoneBeta = () => (
         <img
           className="iphone-shot"
           src="assets/screens/ios-studio.png"
-          alt="Vocello Studio running on an iPhone, with a script, a chosen speaker, and a generated take"
+          alt="Vocello Studio running on an iPhone, with a script ready to generate with a built-in voice"
         />
       </figure>
     </div>

@@ -290,6 +290,13 @@ explicit macOS fixture repair/bootstrap step. XCUITest is the sole autonomous ap
   the build and the **public link went live 2026-07-28** — the README, repo description, and
   website all link it. Public App Store distribution additionally needs metadata, screenshots,
   and submission.
+- **GitLab mirror exists** (2026-07-28, single-point-of-failure insurance): public project
+  `gitlab.com/VocelloApp/vocello`, imported with full history and all tags, plus a
+  `Vocello 2.2.2 (mirror)` release entry carrying the published SHA-256 digests, the release
+  identity, and a link to the canonical GitHub DMG. Canonical development stays on GitHub; the
+  mirror has no automatic sync yet (gitlab.com pull mirroring is a paid feature), so re-sync is
+  currently a manual push and the mirror may lag main. The DMG binary itself still needs a
+  one-time manual attach on the GitLab release.
 - **Language-path acceptance state**: Speech assets for `de_DE`/`es_ES`/`ja_JP`/`zh_CN` verified
   2026-07-16; the corpus-v2/matrix arc closed with full run
   `ios-lang-bench-20260716-164248-1ecf8361` — 19/19 hint/QC, 18/18 output-gated, three-pass

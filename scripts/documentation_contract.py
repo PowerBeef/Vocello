@@ -477,6 +477,8 @@ def validate_readme_public_contract(root: Path) -> list[str]:
             "README product screenshots must use repository-versioned assets",
         r"(?i)social preview \(maintainers\)":
             "repository administration instructions do not belong on the public product page",
+        "—":
+            "public product copy bans em dashes; use commas, colons, semicolons, periods, or parentheses",
     }
     for pattern, message in rejected.items():
         if re.search(pattern, readme):

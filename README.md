@@ -28,7 +28,7 @@
 </p>
 
 <p align="center">
-  <em>Write a script, pick or shape a voice, and listen — a native Swift + MLX engine, faster than realtime on an 8&nbsp;GB M2, with nothing leaving your Mac.</em>
+  <em>Write a script, pick or shape a voice, and listen: a native Swift + MLX engine, faster than realtime on an 8&nbsp;GB M2, with nothing leaving your Mac.</em>
 </p>
 
 ![Vocello Studio with a script, a chosen speaker, and a generated take ready to play](docs/screenshots/vocello-custom-voice.png)
@@ -39,28 +39,28 @@
 - **Voice Design:** describe a voice in plain language and generate it from that brief.
 - **Voice Cloning:** record or import a reference you have permission to use, affirm consent, and save it to your voice library.
 
-Scripts past 900 characters become **long-form projects**: planned segments stream one after another while you listen along, then join into a single finished file with a per-segment map in History. Ten languages are supported (Chinese, English, Japanese, Korean, German, French, Russian, Portuguese, Spanish, and Italian) with automatic detection, and everything — scripts, references, history, audio — stays in local app storage unless you export it.
+Scripts past 900 characters become **long-form projects**: planned segments stream one after another while you listen along, then join into a single finished file with a per-segment map in History. Ten languages are supported (Chinese, English, Japanese, Korean, German, French, Russian, Portuguese, Spanish, and Italian) with automatic detection, and everything (scripts, references, history, audio) stays in local app storage unless you export it.
 
 ## Not a Python wrapper
 
-Most local TTS tools shell out to a Python reference implementation behind a local server. Vocello generates through a first-party Swift runtime on MLX, [`VocelloQwen3Core`](Packages/VocelloQwen3Core/README.md) — no Python, no local server, and the CLI links the same engine directly.
+Most local TTS tools shell out to a Python reference implementation behind a local server. Vocello generates through a first-party Swift runtime on MLX, [`VocelloQwen3Core`](Packages/VocelloQwen3Core/README.md): no Python, no local server, and the CLI links the same engine directly.
 
 - On the Mac the model runs in a separate XPC service that retires when idle, so engine memory pressure cannot take the app window down with it. On iPhone the same engine runs in-process.
-- Audio streams over an actor-owned lossless channel, so memory does not grow with output length — a 12-segment long-form run producing 10.4 minutes of audio ended about 1.1% below its starting footprint.
-- Every request carries its own seed and sampler state, so takes are reproducible by construction — and that determinism is the merge gate for performance work.
+- Audio streams over an actor-owned lossless channel, so memory does not grow with output length; a 12-segment long-form run producing 10.4 minutes of audio ended about 1.1% below its starting footprint.
+- Every request carries its own seed and sampler state, so takes are reproducible by construction, and that determinism is the merge gate for performance work.
 
 [Architecture](docs/ARCHITECTURE.md) · [Benchmarks](benchmarks/HISTORY.md) · [More detail below](#under-the-hood)
 
 ## Performance, measured
 
-Every number below comes from a tracked, privacy-safe benchmark record in this repository — canonical evidence is produced on the support-floor tier, a Mac mini M2 with 8 GB.
+Every number below comes from a tracked, privacy-safe benchmark record in this repository; canonical evidence is produced on the support-floor tier, a Mac mini M2 with 8 GB.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/charts/rtf-by-mode-dark.svg">
   <img alt="Grouped bar chart: warm real-time factors for Custom Voice (1.68 to 1.83), Voice Design (1.78 to 1.94), and Voice Cloning (1.49 to 1.84), all beyond the realtime line at 1.0" src="docs/charts/rtf-by-mode-light.svg">
 </picture>
 
-Vocello 2.2 also changed how the app behaves *while* it generates: translucent interface surfaces temporarily render as solid fills so the compositor stops competing with the engine. Same machine, same take — about a third faster:
+Vocello 2.2 also changed how the app behaves *while* it generates: translucent interface surfaces temporarily render as solid fills so the compositor stops competing with the engine. Same machine, same take, about a third faster:
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/charts/gate-delta-dark.svg">
@@ -105,7 +105,7 @@ With the 2.2.0 release the repository moved from `PowerBeef/QwenVoice` to `Power
 
 Speed is the recommended default and uses less memory. Quality is a Mac-only option for machines with more headroom. The three recommended Mac Speed packages total about 7 GB.
 
-Support floors and benchmark machines are different facts: the floor is any Apple Silicon Mac with 8 GB, and canonical evidence is produced on a Mac mini M2 with 8 GB and an iPhone 17 Pro — see [Performance, measured](#performance-measured) above. The canonical record is `passedWithWarnings` because accepted memory soft trims and audio-QC warnings remain visible rather than being hidden; the [tracked record](benchmarks/runs/ui-generation/macos-xcui-benchmark-20260723-083313-d02005ae.json) has the exact matrix and conditions.
+Support floors and benchmark machines are different facts: the floor is any Apple Silicon Mac with 8 GB, and canonical evidence is produced on a Mac mini M2 with 8 GB and an iPhone 17 Pro; see [Performance, measured](#performance-measured) above. The canonical record is `passedWithWarnings` because accepted memory soft trims and audio-QC warnings remain visible rather than being hidden; the [tracked record](benchmarks/runs/ui-generation/macos-xcui-benchmark-20260723-083313-d02005ae.json) has the exact matrix and conditions.
 
 Macs on macOS 15 can use the legacy [QwenVoice 1.2.3 release](https://github.com/PowerBeef/Vocello/releases/tag/v1.2.3). No Vocello 2.x backport is planned.
 
@@ -129,20 +129,20 @@ Storage locations and deletion behavior are documented in [`docs/reference/priva
 
 | | |
 | --- | --- |
-| ![Vocello Studio running on iPhone](docs/screenshots/vocello-ios-studio.png) | The iPhone app uses the same local Qwen3-TTS and MLX foundation with an iPhone-specific in-process runtime. It provides Custom Voice, Voice Design, Voice Cloning, recording and Files import, local history, and the memory-conscious Speed models. On-device generation, physical-iPhone XCUITest, and an optional signed archive/TestFlight lane are implemented. A fresh full multilingual physical-iPhone run passed all 19 hint/QC and 18 output gates with policy-accepted warnings; its exploratory record is excluded from clean performance trends. A public TestFlight beta is open — [join here](https://testflight.apple.com/join/Cvp6yCv7). App Store distribution remains a separate maintainer-owned release decision. |
+| ![Vocello Studio running on iPhone](docs/screenshots/vocello-ios-studio.png) | The iPhone app uses the same local Qwen3-TTS and MLX foundation with an iPhone-specific in-process runtime. It provides Custom Voice, Voice Design, Voice Cloning, recording and Files import, local history, and the memory-conscious Speed models. On-device generation, physical-iPhone XCUITest, and an optional signed archive/TestFlight lane are implemented. A fresh full multilingual physical-iPhone run passed all 19 hint/QC and 18 output gates with policy-accepted warnings; its exploratory record is excluded from clean performance trends. A public TestFlight beta is open: [join here](https://testflight.apple.com/join/Cvp6yCv7). App Store distribution remains a separate maintainer-owned release decision. |
 
 Current implementation and acceptance status: [`docs/development-progress.md`](docs/development-progress.md).
 
 ## Under the hood
 
-Vocello is not a wrapper around a Python server. Generation runs through a first-party Swift runtime, [`VocelloQwen3Core`](Packages/VocelloQwen3Core/README.md) — derived from `mlx-audio-swift` and specialized for Qwen3-TTS and the Mimi codec, with a fused code-predictor RoPE, per-generation sampler state, and a streaming audio decoder that overlaps the token loop.
+Vocello is not a wrapper around a Python server. Generation runs through a first-party Swift runtime, [`VocelloQwen3Core`](Packages/VocelloQwen3Core/README.md), derived from `mlx-audio-swift` and specialized for Qwen3-TTS and the Mimi codec, with a fused code-predictor RoPE, per-generation sampler state, and a streaming audio decoder that overlaps the token loop.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/charts/architecture-dark.svg">
-  <img alt="Architecture diagram: the SwiftUI app talks over XPC to a separate engine service process, which drives the owned VocelloQwen3Core runtime — an engine actor owning each session, the Qwen3-TTS talker and code predictor, and the Mimi decoder on MLX and Metal — while PCM audio streams back to the app chunk by chunk" src="docs/charts/architecture-light.svg">
+  <img alt="Architecture diagram: the SwiftUI app talks over XPC to a separate engine service process, which drives the owned VocelloQwen3Core runtime (an engine actor owning each session, the Qwen3-TTS talker and code predictor, and the Mimi decoder on MLX and Metal) while PCM audio streams back to the app chunk by chunk" src="docs/charts/architecture-light.svg">
 </picture>
 
-On the Mac, model work lives in a separate XPC service process that retires when idle; on iPhone the same engine runs in-process. Either way the architecture is streaming end to end: audio crosses an actor-owned lossless channel chunk by chunk, every request carries its own seed and sampler state (takes are reproducible by construction), and cancellation is a typed, awaited operation — a cancelled take can never land in History.
+On the Mac, model work lives in a separate XPC service process that retires when idle; on iPhone the same engine runs in-process. Either way the architecture is streaming end to end: audio crosses an actor-owned lossless channel chunk by chunk, every request carries its own seed and sampler state (takes are reproducible by construction), and cancellation is a typed, awaited operation; a cancelled take can never land in History.
 
 That streaming design is why memory does not grow with output length. A long-form project generates each planned segment as an ordinary streaming take and then assembles the joined file in bounded blocks:
 
@@ -157,7 +157,7 @@ Vocello is built by a solo developer with heavy use of coding agents. Every perf
 
 ## Build from source
 
-Building requires **full Xcode 26** on an Apple Silicon Mac running macOS 26 or newer — the
+Building requires **full Xcode 26** on an Apple Silicon Mac running macOS 26 or newer; the
 Command Line Tools alone are not enough, even for the CLI, because every product (app and
 `vocello`) is a target of the generated Xcode project. If `xcodebuild` reports the active
 developer directory is a Command Line Tools instance, point it at Xcode:
@@ -229,7 +229,7 @@ echo "Hello there." | build/vocello generate --variant speed --stream --json
 
 The CLI supports single generation, mode shortcuts, batches, saved voices, speaker and model discovery, model installation, and benchmark matrices. Standard output is machine-readable; progress is written to standard error. See [`docs/reference/cli.md`](docs/reference/cli.md).
 
-> **Reproducing the benchmark numbers:** `./scripts/build.sh cli` produces an unoptimized development build that lands around RTF 1.0. The published figures come from the optimized Release path, and the two build topologies are not comparable — see the like-for-like rules in [`docs/reference/benchmarking-procedure.md`](docs/reference/benchmarking-procedure.md).
+> **Reproducing the benchmark numbers:** `./scripts/build.sh cli` produces an unoptimized development build that lands around RTF 1.0. The published figures come from the optimized Release path, and the two build topologies are not comparable; see the like-for-like rules in [`docs/reference/benchmarking-procedure.md`](docs/reference/benchmarking-procedure.md).
 
 ## Contributing
 

@@ -234,12 +234,14 @@ class DocumentationContractTests(unittest.TestCase):
             "README.md",
             "Every generation records its sampling seed.\n\n"
             "The iPhone works exactly like the Mac app.\n\n"
+            "Everything stays local — nothing uploads.\n\n"
             "![Screen](https://vocello.vercel.app/assets/screens/custom-voice.png)\n",
         )
         errors = DOCUMENTATION.validate_readme_public_contract(self.root)
-        self.assertGreaterEqual(len(errors), 8)
+        self.assertGreaterEqual(len(errors), 9)
         self.assertTrue(any("seed-replayable" in error for error in errors))
         self.assertTrue(any("repository-versioned" in error for error in errors))
+        self.assertTrue(any("em dash" in error for error in errors))
 
         for relative in (
             "docs/readme_banner_vocello.png",

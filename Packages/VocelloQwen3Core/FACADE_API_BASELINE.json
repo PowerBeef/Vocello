@@ -388,7 +388,7 @@
     },
     {
       "path": "Sources/VocelloQwen3Core/Engine.swift",
-      "sha256": "170260b974076af69422d666936b8429abb47a872167e2445f57282b4640c9cf"
+      "sha256": "a51dcf1801b9c2dc39418b21d7fd050dc7357014c9c70c8600acf77d3d46c7ee"
     },
     {
       "path": "Sources/VocelloQwen3Core/GenerationSession.swift",

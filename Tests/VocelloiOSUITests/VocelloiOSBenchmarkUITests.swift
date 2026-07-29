@@ -62,6 +62,10 @@ final class VocelloiOSBenchmarkUITests: VocelloiOSUITestCase {
                     "QVOICE_MAC_BENCH_RUN_ID": runID,
                     "QVOICE_IOS_BENCH_LABEL": label,
                     "QWENVOICE_BENCH_FORCE_COLD": take.warmState == .cold ? "1" : "0",
+                    // Enables the app's device-diagnostics action log (memory
+                    // contexts + proactive-warm gate decisions) so UI-lane
+                    // triage can read it from the pullable caches mirror.
+                    "QVOICE_IOS_DEVICE_RUN_ID": runID,
                 ])
                 preparedMode = nil
             }

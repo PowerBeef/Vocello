@@ -956,7 +956,15 @@ actor NativeEngineRuntime {
             capabilityProfile: .cloneOnly,
             preserveActiveClonePrimeToken: true
         )
-        let model = loadResult.model
+        // Priming must run under the same request-scoped memory configuration
+        // as a real generation. The unbound wrapper falls back to
+        // `.compatibilityDefault`, whose unbounded token-loop accumulation
+        // spiked an iPhone prime from ~2.0 GB to ~5.1 GB resident and tripped
+        // the memory-warning full unload of the just-loaded model.
+        let model = loadResult.model.bound(
+            to: loadResult.model.samplingConfiguration,
+            memory: NativeMemoryPolicyResolver.memoryConfiguration(for: memoryPolicy)
+        )
         try ensureActiveClonePrimeToken(token)
 
         let conditioning = try await resolveCloneConditioning(
@@ -1557,23 +1565,25 @@ actor NativeEngineRuntime {
                 message: "Clone priming needs optimized Qwen3 clone conditioning."
             )
         }
-        // Priming runs the actor-owned bounded completion generation; audio
-        // is discarded inside the actor. The warmup text is one syllable
-        // ("Hi."), so completing the take stays as cheap as the retired
-        // first-chunk-then-break stream loop it replaced in Phase 14a.
+        // Priming warms the clone path with the exact same actor prewarm the
+        // in-take warm path uses (`ensureWarmStateIfNeeded` → `prewarmVoiceClone`).
+        // Phase 14a's bounded completion generation (`primeVoiceClone`) was
+        // measured on iPhone spiking resident memory from ~2.0 GB to ~5.1 GB
+        // during the warmup — enough to trip the memory-warning full unload of
+        // the model it had just loaded — while the prewarm route stays within
+        // the ordinary generation envelope (~300 ms, no spike).
         try ensureActiveClonePrimeToken(token)
-        let primedFrameCount = try await model.primeVoiceClone(
+        try await model.prewarmVoiceClone(
             text: lightweightWarmupText,
             language: language,
             cloneHandle: cloneHandle
         )
         try ensureActiveClonePrimeToken(token)
-        guard primedFrameCount > 0 else {
-            throw NativeRuntimeError(
-                stage: .prewarm,
-                message: "Clone priming produced no audio."
-            )
-        }
+        await loadCoordinator.markPrewarmed(
+            identityKey: GenerationSemantics.PrewarmIdentity.clone(
+                conditioning.internalIdentity
+            ).cacheKey
+        )
 
         var timings = await model.latestPreparationTimingsMS()
         timings["prime_clone_reference"] = startedAt.elapsedMilliseconds

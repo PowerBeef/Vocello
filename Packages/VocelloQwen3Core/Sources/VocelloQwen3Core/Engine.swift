@@ -412,7 +412,14 @@ public actor VocelloQwen3Engine {
                 isolation: self
             )
             try revalidate(lease)
-            try Task.checkCancellation()
+            // Once the loader has returned, the multi-second load is complete
+            // and committing it is the only non-wasteful outcome. A late task
+            // cancellation (for example a SwiftUI priming task restarted by an
+            // identity change mid-load) must not discard the finished model;
+            // cancellation before or during the load still aborts through the
+            // loader's own cooperative checkpoints, and cancelled callers
+            // observe cancellation at their next checkpoint with the model
+            // committed. Only the lease revalidation above may veto commit.
             loadedModel = model
             modelEpoch &+= 1
             invalidateCloneHandles()

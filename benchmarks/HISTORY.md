@@ -298,6 +298,12 @@ from schema-v2 memory trends.
 |---|---|---|---|---|---|---:|---|---|---|---|
 | 2026-07-16 | [`ios-xcui-benchmark-20260716-152743-5ebdf4fd`](runs/ui-generation/ios-xcui-benchmark-20260716-152743-5ebdf4fd.json) | canonical | canonical | passedWithWarnings | qualified-with-warnings | 29 | `dbf51a5d0138` | `ba554734b5b9` | baseline | ios-xcui-benchmark-20260716-152743-5ebdf4fd |
 
+## ui-generation / ios / iphone-17-pro / config `d5e2f1e5e711`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---|---|---|---|
+| 2026-07-29 | [`ios-xcui-benchmark-20260729-160223-ed1d5a32`](runs/ui-generation/ios-xcui-benchmark-20260729-160223-ed1d5a32.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 2 | `c0e56715874c` dirty | `excluded` | baseline | clone-prime-probe-v3 |
+
 ## ui-generation / ios / iphone-17-pro / config `d7232052b902`
 
 | completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |

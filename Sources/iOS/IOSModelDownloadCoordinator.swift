@@ -163,11 +163,21 @@ final class IOSModelDownloadCoordinator {
         )
 
         var ledger = try ledgerStore.load()
+        let replacement = makeLedgerRequest(model: model, entry: entry, totalBytes: totalBytes)
         if let index = ledger.requests.firstIndex(where: { $0.modelID == model.id }) {
-            ledger.requests[index].status = .queued
-            ledger.requests[index].totalBytes = totalBytes
+            let existing = ledger.requests[index]
+            if existing.hasSameArtifactIdentity(as: replacement) {
+                ledger.requests[index].status = .queued
+                ledger.requests[index].totalBytes = totalBytes
+            } else {
+                // Artifact update: resume state from the superseded identity is
+                // meaningless and can even invalidate the ledger (an already
+                // fully received larger artifact leaves receivedBytes above the
+                // smaller replacement's totalBytes). Replace the request whole.
+                ledger.requests[index] = replacement
+            }
         } else {
-            ledger.requests.append(makeLedgerRequest(model: model, entry: entry, totalBytes: totalBytes))
+            ledger.requests.append(replacement)
         }
         try ledgerStore.save(ledger)
         cancellationBarriers.remove(model.id)

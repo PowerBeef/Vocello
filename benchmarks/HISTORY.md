@@ -212,6 +212,12 @@ from schema-v2 memory trends.
 |---|---|---|---|---|---|---:|---|---|---|---|
 | 2026-07-13 | [`mac-memory-qualification-20260713-085223-c1bc1bd2`](runs/memory-qualification/mac-memory-qualification-20260713-085223-c1bc1bd2.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 11 | `04083b15a4e2` dirty | `excluded` | baseline | memory-qualification |
 
+## memory-qualification / macos / mac-mini-m2-8gb / config `e04c74e62725`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---|---|---|---|
+| 2026-07-29 | [`mac-memory-qualification-20260729-024907-aec37fe2`](runs/memory-qualification/mac-memory-qualification-20260729-024907-aec37fe2.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 11 | `3331eecfdcdb` | `e04c74e62725` | baseline | retained-check |
+
 ## prosody-calibration / macos / mac-mini-m2-8gb / config `144146bbd7fa`
 
 | completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
@@ -333,6 +339,20 @@ from schema-v2 memory trends.
 | completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
 |---|---|---|---|---|---|---:|---|---|---|---|
 | 2026-07-14 | [`ios-xcui-benchmark-20260714-105423-4dddee2f`](runs/ui-generation/ios-xcui-benchmark-20260714-105423-4dddee2f.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 5 | `4b79bb497f1b` | `fc0fc2887412` | baseline | ios-v2-focused |
+
+## ui-generation / macos / mac-mini-m2-8gb / config `053bd44b7ee2`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---|---|---|---|
+| 2026-07-29 | [`macos-xcui-benchmark-20260729-023553-111d88c6`](runs/ui-generation/macos-xcui-benchmark-20260729-023553-111d88c6.json) | canonical | canonical | passedWithWarnings | qualified-with-warnings | 29 | `3331eecfdcdb` | `053bd44b7ee2` | baseline | macos-xcui-benchmark-20260729-023553-111d88c6 |
+
+## ui-generation / macos / mac-mini-m2-8gb / config `0c3160232d0e`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---|---|---|---|
+| 2026-07-29 | [`macos-xcui-benchmark-20260729-015937-cd85b2d5`](runs/ui-generation/macos-xcui-benchmark-20260729-015937-cd85b2d5.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | `3331eecfdcdb` | `0c3160232d0e` | baseline | phase0-ui-control-1 |
+| 2026-07-29 | [`macos-xcui-benchmark-20260729-020753-75d2ec7b`](runs/ui-generation/macos-xcui-benchmark-20260729-020753-75d2ec7b.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | `3331eecfdcdb` | `0c3160232d0e` | vs macos-xcui-benchmark-20260729-015937-cd85b2d5: RTF +0.8%, RAM -0.0% | phase0-ui-control-2 |
+| 2026-07-29 | [`macos-xcui-benchmark-20260729-021554-659b10be`](runs/ui-generation/macos-xcui-benchmark-20260729-021554-659b10be.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | `3331eecfdcdb` | `0c3160232d0e` | vs macos-xcui-benchmark-20260729-020753-75d2ec7b: RTF -0.9%, RAM -0.3% | phase0-ui-control-3 |
 
 ## ui-generation / macos / mac-mini-m2-8gb / config `126311b505ce`
 

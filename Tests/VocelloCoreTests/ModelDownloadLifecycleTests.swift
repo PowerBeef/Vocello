@@ -428,6 +428,70 @@ final class ModelDownloadLifecycleTests: XCTestCase {
         XCTAssertEqual(try store.load().requests.first?.receivedBytes, 20)
     }
 
+    func testArtifactUpdateMustReplaceSupersededLedgerRequestWholesale() throws {
+        // Regression: a fully received request for a superseded (larger)
+        // artifact cannot be resumed into a smaller replacement. Patching only
+        // status/totalBytes leaves receivedBytes above the new total, which
+        // fail-closes every subsequent ledger save ("ledger is invalid") and
+        // bricks the visible Update/Retry loop.
+        let installed = IOSModelDownloadLedger.Request(
+            logicalRequestID: "old-logical",
+            modelID: "pro_custom",
+            artifactVersion: "2026.04.05.2",
+            repo: "mlx-community/old-repo",
+            revision: String(repeating: "a", count: 40),
+            targetFolder: "pro_custom",
+            expectedFiles: ["model.safetensors"],
+            verifiedFiles: [
+                .init(
+                    relativePath: "model.safetensors",
+                    expectedSize: 2_300_000_000,
+                    sha256: String(repeating: "b", count: 64)
+                ),
+            ],
+            retryCount: 0,
+            receivedBytes: 2_300_000_000,
+            totalBytes: 2_300_000_000,
+            status: .installed
+        )
+        let replacement = IOSModelDownloadLedger.Request(
+            logicalRequestID: "new-logical",
+            modelID: "pro_custom",
+            artifactVersion: "2026.07.26.1",
+            repo: "PowerBeef02/new-repo",
+            revision: String(repeating: "c", count: 40),
+            targetFolder: "pro_custom",
+            expectedFiles: ["model.safetensors"],
+            verifiedFiles: [],
+            retryCount: 0,
+            receivedBytes: 0,
+            totalBytes: 2_020_000_000,
+            status: .queued
+        )
+
+        XCTAssertFalse(installed.hasSameArtifactIdentity(as: replacement))
+        XCTAssertTrue(installed.hasSameArtifactIdentity(as: installed))
+
+        // The trap: reusing the superseded entry with only status/totalBytes
+        // patched produces an invalid document.
+        var patched = installed
+        patched.status = .queued
+        patched.totalBytes = replacement.totalBytes
+        XCTAssertThrowsError(
+            try IOSModelDownloadLedger(requests: [patched]).validated()
+        ) { error in
+            XCTAssertEqual(error as? IOSModelDownloadLedgerError, .invalidDocument)
+        }
+
+        // The fix: wholesale replacement validates and round-trips.
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = IOSModelDownloadLedgerStore(fileURL: root.appendingPathComponent("ledger.json"))
+        try store.save(IOSModelDownloadLedger(requests: [replacement]))
+        XCTAssertEqual(try store.load().requests, [replacement])
+    }
+
     func testCorruptAndUnsupportedLedgerFailClosed() throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)

@@ -42,6 +42,19 @@ public struct IOSModelDownloadLedger: Codable, Equatable, Sendable {
         public var totalBytes: Int64
         public var status: Status
 
+        /// Whether `other` requests the exact same artifact delivery. A request
+        /// whose identity differs (an artifact update) must be replaced whole,
+        /// never resumed: carried-over `receivedBytes`/`verifiedFiles` from the
+        /// superseded artifact are meaningless and can invalidate the ledger
+        /// (a fully received larger artifact leaves `receivedBytes` above a
+        /// smaller replacement's `totalBytes`).
+        public func hasSameArtifactIdentity(as other: Request) -> Bool {
+            artifactVersion == other.artifactVersion
+                && repo == other.repo
+                && revision == other.revision
+                && expectedFiles == other.expectedFiles
+        }
+
         public init(
             logicalRequestID: String,
             modelID: String,

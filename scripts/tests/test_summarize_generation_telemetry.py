@@ -318,7 +318,7 @@ def test_non_ui_evidence_manifest_rejects_nested_schema_mismatch():
             ["engine-gen"],
             ["custom/speed/device"],
         )
-        manifest["historyRecord"]["schemaVersion"] = 3
+        manifest["historyRecord"]["schemaVersion"] = 4
         with open(path, "w", encoding="utf-8") as handle:
             json.dump(manifest, handle)
 
@@ -327,6 +327,24 @@ def test_non_ui_evidence_manifest_rejects_nested_schema_mismatch():
             "historyRecord has an unsupported schemaVersion",
         ):
             sgt.load_evidence_selection(path)
+
+
+def test_non_ui_evidence_manifest_accepts_schema_v3_history_record():
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "benchmark-evidence.json")
+        manifest = _engine_evidence_manifest(
+            "schema-v3-history",
+            ["engine-gen"],
+            ["custom/speed/device"],
+        )
+        manifest["historyRecord"]["schemaVersion"] = 3
+        with open(path, "w", encoding="utf-8") as handle:
+            json.dump(manifest, handle)
+
+        _, selected_run, generation_ids, _ = sgt.load_evidence_selection(path)
+
+        assert selected_run == "schema-v3-history"
+        assert generation_ids == ["engine-gen"]
 
 
 def test_non_ui_evidence_manifest_rejects_platform_mismatch():

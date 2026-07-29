@@ -229,7 +229,7 @@ def _load_non_ui_evidence_selection(payload, *, requested_run_id=""):
     history_record = payload.get("historyRecord")
     if not isinstance(history_record, dict):
         raise TelemetrySelectionError("non-UI evidence manifest has no historyRecord")
-    if history_record.get("schemaVersion") not in {1, 2}:
+    if history_record.get("schemaVersion") not in {1, 2, 3}:
         raise TelemetrySelectionError(
             "non-UI evidence historyRecord has an unsupported schemaVersion"
         )

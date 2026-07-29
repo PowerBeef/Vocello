@@ -1763,6 +1763,8 @@ struct IOSVoiceCloningView: View {
         }
         transcriptLoadError = pendingSavedVoiceHandoff.transcriptLoadError
         autoTranscribeReferenceIfNeeded()
+        // Covers the fallback branch above that bypasses applySavedVoice.
+        primeSelectedCloneVoiceProactively()
     }
 
     /// Best-effort on-device transcription when the reference sidecar / handoff
@@ -2018,6 +2020,34 @@ struct IOSVoiceCloningView: View {
             transcriptLoadError = "Couldn't load the saved transcript for \"\(voice.name)\". Cloning can still use the audio."
         }
         hydratedSavedVoiceID = voice.id
+        primeSelectedCloneVoiceProactively()
+    }
+
+    /// Explicit voice selection is a strong generate-intent signal: ensure the
+    /// clone model is resident and the reference prompt is primed while the
+    /// user is still looking at the screen, so the first take after a voice
+    /// handoff does not pay the model load in-take. Both store calls are
+    /// memory-band and thermal gated; the generate task's own
+    /// `ensureCloneReferencePrimed` remains the on-demand fallback.
+    private func primeSelectedCloneVoiceProactively() {
+        guard !ttsEngine.hasActiveGeneration else { return }
+        guard let model = TTSModel.model(for: .clone), modelManager.isAvailable(model) else { return }
+        let reference = draft.referenceAudioPath.map { path in
+            CloneReference(
+                audioPath: path,
+                transcript: draft.referenceTranscript.isEmpty ? nil : draft.referenceTranscript,
+                preparedVoiceID: draft.selectedSavedVoiceID
+            )
+        }
+        Task {
+            await ttsEngine.ensureModelLoadedIfNeeded(id: model.id)
+            if let reference {
+                try? await ttsEngine.ensureCloneReferencePrimed(
+                    modelID: model.id,
+                    reference: reference
+                )
+            }
+        }
     }
 
     private func ensureSelectedSavedVoiceHydratedIfNeeded() {

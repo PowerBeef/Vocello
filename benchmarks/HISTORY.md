@@ -109,6 +109,9 @@ from schema-v2 memory trends.
 | completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
 |---|---|---|---|---|---|---:|---|---|---|---|
 | 2026-07-29 | [`macos-engine-20260729-004519-0d30c659`](runs/engine-generation/macos-engine-20260729-004519-0d30c659.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 32 | `311c3d0be053` dirty | `excluded` | baseline | phase0-cli-control-3 |
+| 2026-07-29 | [`macos-engine-20260729-005023-933281cb`](runs/engine-generation/macos-engine-20260729-005023-933281cb.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | `39a7117d5b51` | `b7cc29f8a00b` | baseline | phase0-cli-control-1 |
+| 2026-07-29 | [`macos-engine-20260729-005146-c1c5642e`](runs/engine-generation/macos-engine-20260729-005146-c1c5642e.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | `39a7117d5b51` | `b7cc29f8a00b` | vs macos-engine-20260729-005023-933281cb: RTF -0.2%, TTFC +0.2%, RAM -3.4% | phase0-cli-control-2 |
+| 2026-07-29 | [`macos-engine-20260729-005310-2d7d3580`](runs/engine-generation/macos-engine-20260729-005310-2d7d3580.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | `39a7117d5b51` | `b7cc29f8a00b` | vs macos-engine-20260729-005146-c1c5642e: RTF +1.8%, TTFC -0.7%, RAM +3.2% | phase0-cli-control-3 |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `b8dd7beed55a`
 

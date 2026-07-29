@@ -524,7 +524,9 @@ PY
 summarize_long_form_project_if_present() {
   local out_dir="$1"
   local wall
-  wall=$(grep -oE 'LONGFORM_WALL_SECONDS=[0-9.]+' "$out_dir/xcodebuild.log" 2>/dev/null | tail -1 | cut -d= -f2)
+  # `|| true`: under `set -euo pipefail` a benchmark log without the long-form
+  # token makes grep fail the whole pipeline and silently kill the lane here.
+  wall=$(grep -oE 'LONGFORM_WALL_SECONDS=[0-9.]+' "$out_dir/xcodebuild.log" 2>/dev/null | tail -1 | cut -d= -f2 || true)
   [[ -n "$wall" ]] || return 0
   python3 - "$wall" "$out_dir/long-form-project-summary.txt" "$out_dir" <<'PY'
 import glob, json, os, shutil, sys

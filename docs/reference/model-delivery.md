@@ -29,6 +29,14 @@ models/
   .qwenvoice-components-v1/  # content-addressed shared-component blobs and publication state
 ```
 
+iPhone model downloads exclude cellular at the URLSession level (`allowsCellularAccess = false`):
+multi-gigabyte artifacts stay pinned to Wi-Fi even when Wi-Fi Assist would silently reroute a flaky
+connection over LTE, which collapsed observed throughput to sub-MB/s. The allowlisted
+`diagnostics/model-downloads/` records (per-transfer task metrics including the cellular/expensive/
+constrained path flags, phase transitions, and terminal summaries) are dual-written into the
+devicectl-pullable caches mirror (`Library/Caches/Vocello/diagnostics/model-downloads/`) so download
+behavior is triageable from the host; the App Group primary cannot be pulled.
+
 ### Cross-platform production catalog
 
 `Sources/Resources/qwenvoice_production_model_catalog.json` is the reproducible, bundled catalog
@@ -168,7 +176,16 @@ non-regressing adopted progress, and waits for exact verified installation of Cu
 retained in the isolated root it then delivers Design and Clone, whose plans must reuse the
 verified shared speech-tokenizer component — the pulled diagnostics validator requires each of the
 three newest successes to account for its full catalog bytes either entirely on the wire or with
-exactly the shared-component bytes reused, and at least two artifacts to show reuse. All three
+exactly the shared-component bytes reused, and at least two artifacts to show reuse. The same
+validator is the autonomous transfer-health verdict: every payload transfer must report
+`cellular=false` (proving the session-level Wi-Fi pin), and each artifact's payload throughput
+(wire bytes over its network window) must clear the crawl floor —
+`QVOICE_IOS_DOWNLOAD_MIN_MBPS`, default 2 MB/s, deliberately far below healthy Wi-Fi so only a
+genuine collapse fails — with per-artifact and per-transfer rates written into
+`validated-summary.json`. The lane's only precondition is a visibly quiescent canonical Settings
+surface: each production model installed or plainly downloadable with no active transfer, and the
+identical snapshot must be visible again after the isolated cleanup, so the proof also runs on a
+freshly restored device. All three
 isolated models are then deleted through the visible UI. It is not part of smoke, benchmark, CI, release, or packaging.
 Crash-delta snapshots retain hashes rather than duplicating the device's historical diagnostics;
 the lane pulls only its bounded model-download summaries into the local untracked result artifact.

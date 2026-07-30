@@ -100,6 +100,10 @@ public final class ModelDownloadDiagnosticsStore: @unchecked Sendable {
     }
 
     public let directory: URL
+    /// Optional second root receiving an identical copy of every record. iOS
+    /// passes its devicectl-pullable caches mirror here because the App Group
+    /// primary cannot be pulled for triage (see `IOSPullableDiagnosticsMirror`).
+    public let mirrorDirectory: URL?
     private let fileManager: FileManager
     private let lock = NSLock()
     private var runStartedAt: Date?
@@ -112,8 +116,13 @@ public final class ModelDownloadDiagnosticsStore: @unchecked Sendable {
     private var observedProtocols: Set<String> = []
     private var terminalRecorded = false
 
-    public init(directory: URL, fileManager: FileManager = .default) {
+    public init(
+        directory: URL,
+        mirrorDirectory: URL? = nil,
+        fileManager: FileManager = .default
+    ) {
         self.directory = directory
+        self.mirrorDirectory = mirrorDirectory
         self.fileManager = fileManager
     }
 
@@ -225,22 +234,25 @@ public final class ModelDownloadDiagnosticsStore: @unchecked Sendable {
     private func persist(_ record: Record) {
         lock.lock()
         defer { lock.unlock() }
-        do {
-            try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
-            let encoder = JSONEncoder()
-            encoder.outputFormatting = [.sortedKeys]
-            let data = try encoder.encode(record)
-            try data.write(
-                to: directory.appendingPathComponent("attempt-\(UUID().uuidString).json"),
-                options: [.atomic]
-            )
-            try prune()
-        } catch {
-            // Diagnostics must never interfere with model delivery.
+        let fileName = "attempt-\(UUID().uuidString).json"
+        for root in [directory, mirrorDirectory].compactMap({ $0 }) {
+            do {
+                try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
+                let encoder = JSONEncoder()
+                encoder.outputFormatting = [.sortedKeys]
+                let data = try encoder.encode(record)
+                try data.write(
+                    to: root.appendingPathComponent(fileName),
+                    options: [.atomic]
+                )
+                try prune(in: root)
+            } catch {
+                // Diagnostics must never interfere with model delivery.
+            }
         }
     }
 
-    private func prune() throws {
+    private func prune(in directory: URL) throws {
         let keys: Set<URLResourceKey> = [.contentModificationDateKey, .fileSizeKey]
         let files = try fileManager.contentsOfDirectory(
             at: directory,

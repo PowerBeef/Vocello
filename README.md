@@ -57,14 +57,14 @@ Every number below comes from a tracked, privacy-safe benchmark record in this r
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/charts/rtf-by-mode-dark.svg">
-  <img alt="Grouped bar chart: warm real-time factors for Custom Voice (1.68 to 1.83), Voice Design (1.78 to 1.94), and Voice Cloning (1.49 to 1.84), all beyond the realtime line at 1.0" src="docs/charts/rtf-by-mode-light.svg">
+  <img alt="Grouped bar chart: warm generation speed for Custom Voice (1.68× to 1.83× realtime), Voice Design (1.78× to 1.94×), and Voice Cloning (1.49× to 1.84×), all beyond the realtime line at 1.0×" src="docs/charts/rtf-by-mode-light.svg">
 </picture>
 
 Vocello 2.2 also changed how the app behaves *while* it generates: translucent interface surfaces temporarily render as solid fills so the compositor stops competing with the engine. Same machine, same take, about a third faster:
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/charts/gate-delta-dark.svg">
-  <img alt="Paired bar chart: the same warm Custom take at real-time factor 1.37 before the generation performance gate and 1.83 with it, a 33 percent improvement" src="docs/charts/gate-delta-light.svg">
+  <img alt="Paired bar chart: the same warm Custom take at 1.37× realtime before the generation performance gate and 1.83× with it, a 33 percent improvement" src="docs/charts/gate-delta-light.svg">
 </picture>
 
 The full methodology, hardware profiles, and every published record live in [`benchmarks/HISTORY.md`](benchmarks/HISTORY.md) and [`docs/reference/benchmarking-procedure.md`](docs/reference/benchmarking-procedure.md); the charts above regenerate deterministically from the named records via `scripts/generate_readme_charts.py`.
@@ -229,7 +229,7 @@ echo "Hello there." | build/vocello generate --variant speed --stream --json
 
 The CLI supports single generation, mode shortcuts, batches, saved voices, speaker and model discovery, model installation, and benchmark matrices. Standard output is machine-readable; progress is written to standard error. See [`docs/reference/cli.md`](docs/reference/cli.md).
 
-> **Reproducing the benchmark numbers:** `./scripts/build.sh cli` produces an unoptimized development build that lands around RTF 1.0. The published figures come from the optimized Release path, and the two build topologies are not comparable; see the like-for-like rules in [`docs/reference/benchmarking-procedure.md`](docs/reference/benchmarking-procedure.md).
+> **Reproducing the benchmark numbers:** `./scripts/build.sh cli` produces an unoptimized development build that lands around 1.0× realtime. The published figures come from the optimized Release path, and the two build topologies are not comparable; see the like-for-like rules in [`docs/reference/benchmarking-procedure.md`](docs/reference/benchmarking-procedure.md).
 
 ## Contributing
 

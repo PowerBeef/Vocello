@@ -7,10 +7,10 @@
 <text x="400.0" y="62.0" fill="#656d76" font-size="10" font-weight="normal" text-anchor="middle">realtime</text>
 <text x="202.0" y="91.0" fill="#656d76" font-size="11" font-weight="normal" text-anchor="end">before the gate (2.1 pipeline)</text>
 <path d="M210.0 78.0 h257.2 a4 4 0 0 1 4 4 v10.0 a4 4 0 0 1 -4 4 h-257.2 z" fill="#afb8c1"/>
-<text x="477.2" y="91.0" fill="#1f2328" font-size="11" font-weight="normal" text-anchor="start">1.37</text>
+<text x="477.2" y="91.0" fill="#1f2328" font-size="11" font-weight="normal" text-anchor="start">1.37×</text>
 <text x="202.0" y="123.0" fill="#656d76" font-size="11" font-weight="normal" text-anchor="end">with the gate (2.2)</text>
 <path d="M210.0 110.0 h343.6 a4 4 0 0 1 4 4 v10.0 a4 4 0 0 1 -4 4 h-343.6 z" fill="#8A6410"/>
-<text x="563.6" y="123.0" fill="#1f2328" font-size="11" font-weight="normal" text-anchor="start">1.83</text>
+<text x="563.6" y="123.0" fill="#1f2328" font-size="11" font-weight="normal" text-anchor="start">1.83×</text>
 <text x="704.0" y="182.0" fill="#656d76" font-size="10" font-weight="normal" text-anchor="end">records 9b6f267b → d02005ae</text>
 </g>
 </svg>

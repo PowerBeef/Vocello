@@ -47,7 +47,7 @@ const RtfChart = () => {
             d={`M${x0} ${y} h${bw - 4} a4 4 0 0 1 4 4 v${barH - 8} a4 4 0 0 1 -4 4 h-${bw - 4} z`}
             fill={mode.tone}
           />
-          <text x={x0 + bw + 7} y={y + barH - 3} className="perf-value">{value.toFixed(2)}</text>
+          <text x={x0 + bw + 7} y={y + barH - 3} className="perf-value">{`${value.toFixed(2)}×`}</text>
         </g>
       );
       y += barH + inGap;
@@ -64,7 +64,7 @@ const RtfChart = () => {
         strokeDasharray={v === 1.0 ? "" : "3 3"}
       />
       <text x={xFor(v)} y={plotBottom + 18} textAnchor="middle" className="perf-tick">
-        {v === 1.0 ? "1.0 · realtime" : v.toFixed(1)}
+        {v === 1.0 ? "1.0× · realtime" : `${v.toFixed(1)}×`}
       </text>
     </g>
   ));
@@ -73,7 +73,7 @@ const RtfChart = () => {
       className="perf-chart"
       viewBox={`0 0 ${width} ${plotBottom + 30}`}
       role="img"
-      aria-label="Warm real-time factors by mode and script length. Custom Voice 1.68 to 1.83, Voice Design 1.78 to 1.94, Voice Cloning 1.49 to 1.84. Every bar passes the realtime line at 1.0."
+      aria-label="Warm generation speed by mode and script length, as a multiple of realtime. Custom Voice 1.68× to 1.83×, Voice Design 1.78× to 1.94×, Voice Cloning 1.49× to 1.84×. Every bar passes the realtime line at 1.0×."
     >
       {gridlines}
       {rows}
@@ -96,7 +96,7 @@ const GateBars = () => {
       className="perf-chart perf-chart--gate"
       viewBox={`0 0 ${width} 96`}
       role="img"
-      aria-label="The same warm Custom take: real-time factor 1.37 on Vocello 2.1 and 1.83 on 2.2."
+      aria-label="The same warm Custom take: 1.37× realtime on Vocello 2.1 and 1.83× on 2.2."
     >
       <line x1={xFor(1.0)} y1={6} x2={xFor(1.0)} y2={78} stroke="var(--fg-tertiary)" strokeWidth="1" />
       <text x={xFor(1.0)} y={94} textAnchor="middle" className="perf-tick">realtime</text>
@@ -110,7 +110,7 @@ const GateBars = () => {
               d={`M${x0} ${y} h${bw - 4} a4 4 0 0 1 4 4 v${barH - 8} a4 4 0 0 1 -4 4 h-${bw - 4} z`}
               fill={row.tone}
             />
-            <text x={x0 + bw + 7} y={y + barH - 3} className="perf-value">{row.value.toFixed(2)}</text>
+            <text x={x0 + bw + 7} y={y + barH - 3} className="perf-value">{`${row.value.toFixed(2)}×`}</text>
           </g>
         );
       })}
@@ -126,8 +126,8 @@ export const Performance = () => (
         <h2 id="perf-title" className="section-title">Generation outpaces playback on the minimum Mac.</h2>
         <p className="section-sub">
           Vocello is benchmarked on its own support floor, a Mac mini M2 with 8 GB.
-          A real-time factor above 1.0 means audio generates faster than it plays,
-          and every number here traces to a tracked record in the open repository.
+          Speeds are multiples of realtime: past 1.0×, audio generates faster than
+          it plays, and every number here traces to a tracked record in the open repository.
         </p>
       </header>
 

@@ -121,6 +121,18 @@ upload depend on deterministic release-readiness and artifact checks.
    within the contract's six-hour freshness window. A manually written PASS file, stale ledger,
    missing step, changed untracked source file, or mixed invocation fails before publication.
 
+## Outward-facing performance terminology
+
+Public prose — release notes in `docs/releases/`, the GitHub Release body, the README, and the
+website — states generation throughput as a **speed multiple of realtime**: "1.8× realtime",
+"past 1.0× realtime", higher is faster. Do not present a bare "RTF" number on those surfaces.
+Much of the TTS ecosystem defines RTF as wall-clock time ÷ audio duration (lower is better),
+the inverse of this repository's `audioSecondsPerWallSecond`, so an unglossed "RTF 1.1" reads
+as slower than realtime to outside readers. If "RTF" must appear in public prose, define it
+inline as audio seconds per wall-clock second. Internal surfaces are unchanged: the telemetry
+key `audioSecondsPerWallSecond`, benchmark-record `rtf` fields, `benchmarks/HISTORY.md`, and
+baseline comparisons keep the higher-is-better metric and name.
+
 ## Known-cosmetic non-bugs (do not file)
 
 - Post-retirement readiness note briefly shows "Preparing Custom Voice" (§G residual; no connection

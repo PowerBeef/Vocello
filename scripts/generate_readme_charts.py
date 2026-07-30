@@ -121,7 +121,7 @@ def rtf_chart(theme_name: str) -> str:
 
     parts = svg_open(width, height)
     parts.append(text(16, 28, "Faster than playback in every mode", fill=theme["ink"], size=16, weight="600"))
-    parts.append(text(16, 47, "Warm real-time factor (RTF, higher is better) · Mac mini M2, 8 GB",
+    parts.append(text(16, 47, "Warm generation speed, multiples of realtime (higher is faster) · Mac mini M2, 8 GB",
                       fill=theme["muted"], size=12))
 
     bar_h, in_gap, group_gap = 16.0, 6.0, 26.0
@@ -135,7 +135,7 @@ def rtf_chart(theme_name: str) -> str:
             f'<line x1="{gx:.1f}" y1="{top:.1f}" x2="{gx:.1f}" y2="{height - 40}" '
             f'stroke="{stroke}" stroke-width="1"{dash}/>'
         )
-        label = "1.0 · realtime" if emphasized else f"{grid_value:.1f}"
+        label = "1.0× · realtime" if emphasized else f"{grid_value:.1f}×"
         parts.append(text(gx, height - 22, label, fill=theme["muted"], size=11, anchor="middle"))
 
     for mode in MODES:
@@ -151,7 +151,7 @@ def rtf_chart(theme_name: str) -> str:
                 f'<path d="M{x0:.1f} {y:.1f} h{bw - 4:.1f} a4 4 0 0 1 4 4 v{bar_h - 8:.1f} '
                 f'a4 4 0 0 1 -4 4 h-{bw - 4:.1f} z" fill="{color}"/>'
             )
-            parts.append(text(x0 + bw + 6, y + bar_h - 4, f"{value:.2f}", fill=theme["ink"], size=11))
+            parts.append(text(x0 + bw + 6, y + bar_h - 4, f"{value:.2f}×", fill=theme["ink"], size=11))
             y += bar_h + in_gap
         y += group_gap - in_gap
     parts.append(text(width - 16, height - 6,
@@ -198,7 +198,7 @@ def gate_chart(theme_name: str) -> str:
             f'<path d="M{x0:.1f} {y:.1f} h{bw - 4:.1f} a4 4 0 0 1 4 4 v{bar_h - 8:.1f} '
             f'a4 4 0 0 1 -4 4 h-{bw - 4:.1f} z" fill="{color}"/>'
         )
-        parts.append(text(x0 + bw + 6, y + bar_h - 5, f"{value:.2f}", fill=theme["ink"], size=11))
+        parts.append(text(x0 + bw + 6, y + bar_h - 5, f"{value:.2f}×", fill=theme["ink"], size=11))
         y += bar_h + 14.0
     parts.append(text(width - 16, height - 8,
                       f"records {RECORDS['pre'][-8:]} → {RECORDS['post'][-8:]}",

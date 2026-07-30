@@ -6,6 +6,10 @@ result bundles, and traces remain untracked. Earlier manual results are preserve
 [`LEGACY_HISTORY.md`](LEGACY_HISTORY.md) and are not treated as structured evidence.
 Schema-v1 records remain readable but are marked memory-contract-incomplete and are excluded
 from schema-v2 memory trends.
+RTF here is audio seconds ÷ wall-clock seconds (`audioSecondsPerWallSecond`): higher is
+faster, 1.1 ≈ 1.1× realtime, and a positive RTF trend is an improvement. Much of the TTS
+ecosystem defines RTF as the inverse (wall-clock ÷ audio, lower is better); convert before
+cross-project comparisons.
 
 ## engine-generation / ios / iphone-17-pro / config `3abbfd2f50ea`
 

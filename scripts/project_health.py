@@ -62,12 +62,19 @@ def git(*arguments: str, check: bool = True) -> str:
 
 
 def matching_paths(patterns: list[str]) -> list[str]:
+    # The summary describes the repository, so only git-tracked files may
+    # count. Filesystem globbing alone once picked up a stray untracked
+    # SwiftPM `.build` tree (538 dependency test files) and baked a
+    # machine-local test count into the committed summary, which then
+    # failed the freshness check on every clean checkout.
+    tracked = set(git("ls-files").splitlines())
     matches: set[str] = set()
     for pattern in patterns:
         matches.update(
-            path.relative_to(ROOT).as_posix()
+            relative
             for path in ROOT.glob(pattern)
             if path.is_file()
+            and (relative := path.relative_to(ROOT).as_posix()) in tracked
         )
     return sorted(matches)
 

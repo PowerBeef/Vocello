@@ -13,7 +13,7 @@ final class VocelloiOSModelDownloadUITests: VocelloiOSUITestCase {
         beginSession()
         defer { endSession() }
         select(tab: .settings)
-        assertCanonicalModelDeliveryIsIdle()
+        let canonicalSnapshot = snapshotQuiescentCanonicalDelivery()
 
         let environment = ["QVOICE_APP_SUPPORT_DIR": isolatedSupportRoot]
         launchApp(additionalEnvironment: environment)
@@ -81,29 +81,57 @@ final class VocelloiOSModelDownloadUITests: VocelloiOSUITestCase {
         VocelloUIScreenshot.attach(app, named: "ios-model-download-isolated-cleanup")
 
         // Leave the isolated root, then prove the user's canonical installation
-        // is still present through the same genuine Settings surface.
+        // state is exactly what it was through the same genuine Settings surface.
         launchApp()
         select(tab: .settings)
-        assertCanonicalModelDeliveryIsIdle()
+        assertCanonicalDeliveryMatches(canonicalSnapshot)
         VocelloUIScreenshot.attach(app, named: "ios-model-download-canonical-preserved")
     }
 
-    /// Switching to an isolated support root is safe only after the genuine
-    /// canonical Settings surface proves every production model is installed
-    /// and no canonical transfer control is active.
-    private func assertCanonicalModelDeliveryIsIdle() {
+    /// Switching to an isolated support root is safe only while no canonical
+    /// transfer is active. Each production model must be visibly quiescent
+    /// (installed, or not installed with no delivery operation); the returned
+    /// snapshot records which, so the end of the lane can prove the canonical
+    /// surface came back byte-for-byte untouched. Requiring full installation
+    /// here was stricter than the safety needs and made the lane unrunnable on
+    /// a freshly restored device.
+    private func snapshotQuiescentCanonicalDelivery() -> [String: Bool] {
+        var installedByModelID: [String: Bool] = [:]
         for canonicalModelID in ["pro_custom", "pro_design", "pro_clone"] {
             let installed = element("iosModelDelete_\(canonicalModelID)")
+            let downloadable = element("iosModelDownload_\(canonicalModelID)")
             XCTAssertTrue(
-                VocelloUIWait.exists(installed, timeout: 60),
-                "The isolated delivery proof requires canonical \(canonicalModelID) installed"
+                VocelloUIWait.condition(
+                    "canonical \(canonicalModelID) to be visibly quiescent",
+                    timeout: 60
+                ) {
+                    installed.exists || downloadable.exists
+                },
+                "The isolated delivery proof requires canonical \(canonicalModelID) installed or plainly downloadable"
             )
-            for activeControl in ["Download", "Cancel", "Retry", "Repair"] {
+            for activeControl in ["Cancel", "Retry", "Repair"] {
                 XCTAssertFalse(
                     element("iosModel\(activeControl)_\(canonicalModelID)").exists,
                     "Canonical \(canonicalModelID) must not have an active delivery operation"
                 )
             }
+            XCTAssertFalse(element("iosModelProgress_\(canonicalModelID)").exists)
+            installedByModelID[canonicalModelID] = installed.exists
+        }
+        return installedByModelID
+    }
+
+    private func assertCanonicalDeliveryMatches(_ snapshot: [String: Bool]) {
+        for (canonicalModelID, wasInstalled) in snapshot.sorted(by: { $0.key < $1.key }) {
+            let expected = element(
+                wasInstalled
+                    ? "iosModelDelete_\(canonicalModelID)"
+                    : "iosModelDownload_\(canonicalModelID)"
+            )
+            XCTAssertTrue(
+                VocelloUIWait.exists(expected, timeout: 60),
+                "Canonical \(canonicalModelID) must return \(wasInstalled ? "installed" : "downloadable") after the isolated run"
+            )
             XCTAssertFalse(element("iosModelProgress_\(canonicalModelID)").exists)
         }
     }

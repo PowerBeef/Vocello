@@ -416,7 +416,7 @@ pull_ios_model_download_diagnostics() {
     --destination "$destination" >"$out/model-download-diagnostics-pull.log" 2>&1 \
     || return 1
   python3 - "$destination" "$ROOT_DIR/Sources/Resources/qwenvoice_production_model_catalog.json" <<'PY'
-import json, pathlib, sys
+import json, os, pathlib, sys
 
 root = pathlib.Path(sys.argv[1])
 catalog = json.loads(pathlib.Path(sys.argv[2]).read_text(encoding="utf-8"))
@@ -472,6 +472,34 @@ for success in successes[-3:]:
     protocols = sorted({record.get("protocolName") for record in metrics if record.get("protocolName")})
     if expected <= 0 or not protocols:
         raise SystemExit("a selected success is missing complete transfer metrics")
+    # Model payload never rides cellular: the download session excludes it, so
+    # any cellular payload transfer means the Wi-Fi pin regressed (or Wi-Fi
+    # Assist found a new route around it).
+    cellular_payload = [record for record in metrics if record.get("cellular") is True]
+    if cellular_payload:
+        raise SystemExit(
+            f"{len(cellular_payload)} payload transfer(s) rode cellular; model "
+            "downloads must stay pinned to Wi-Fi"
+        )
+    # Crawl gate: sustained sub-floor payload throughput is the autonomous
+    # stand-in for the observed "download slows to a crawl" failure. The floor
+    # is deliberately far below healthy Wi-Fi (tens of MB/s) so only genuine
+    # collapse fails; override with QVOICE_IOS_DOWNLOAD_MIN_MBPS.
+    floor_mbps = float(os.environ.get("QVOICE_IOS_DOWNLOAD_MIN_MBPS", "2"))
+    network_seconds = success.get("networkSeconds") or 0
+    artifact_mbps = (wire / network_seconds / 1_000_000) if network_seconds > 0 else None
+    transfer_rates = sorted(
+        record.get("transferredBytes", 0) / record["durationSeconds"] / 1_000_000
+        for record in metrics
+        if record.get("durationSeconds", 0) > 0
+    )
+    if artifact_mbps is not None and artifact_mbps < floor_mbps:
+        raise SystemExit(
+            f"payload throughput collapsed: {artifact_mbps:.2f} MB/s over "
+            f"{network_seconds:.0f}s network window (floor {floor_mbps} MB/s); "
+            f"slowest transfer {transfer_rates[0]:.2f} MB/s" if transfer_rates
+            else f"payload throughput collapsed: {artifact_mbps:.2f} MB/s (floor {floor_mbps} MB/s)"
+        )
     # The shared-component store omits exactly the verified tokenizer bytes from a
     # later artifact's plan. A success must therefore account for its full catalog
     # bytes either entirely on the wire or with exactly the component reused; any
@@ -498,6 +526,10 @@ for success in successes[-3:]:
         "networkSeconds": success.get("networkSeconds"),
         "verificationSeconds": success.get("verificationSeconds"),
         "installationSeconds": success.get("installationSeconds"),
+        "payloadMBPerSecond": round(artifact_mbps, 3) if artifact_mbps is not None else None,
+        "slowestTransferMBPerSecond": round(transfer_rates[0], 3) if transfer_rates else None,
+        "medianTransferMBPerSecond": round(transfer_rates[len(transfer_rates) // 2], 3) if transfer_rates else None,
+        "throughputFloorMBPerSecond": floor_mbps,
     })
 
 if sum(1 for entry in validated if entry["reusedComponentBytes"] > 0) < 2:

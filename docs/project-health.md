@@ -26,7 +26,7 @@
 | memory-policy | backend-platform | 6 | 2 / 25 | macos: fresh, ios: stale |
 | model-delivery | backend-platform | 17 | 3 / 37 | macos: stale, ios: stale |
 | xpc-transport | macos | 3 | 3 / 15 | macos: fresh |
-| benchmark-validation | release-qa | 6 | 4 / 115 | macos: fresh, ios: stale |
+| benchmark-validation | release-qa | 6 | 4 / 115 | macos: stale, ios: stale |
 | orchestration-assurance | release-qa | 3 | 1 / 12 | not hardware-gated |
 | release-supply-chain | release-qa | 6 | 3 / 51 | macos: fresh |
 | persistence-privacy | platform-release-qa | 4 | 2 / 7 | not hardware-gated |

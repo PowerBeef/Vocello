@@ -136,6 +136,11 @@ final class IOSModelDownloadCoordinator {
         )
         self.diagnosticsStore = ModelDownloadDiagnosticsStore(
             directory: AppPaths.modelDownloadDiagnosticsDir,
+            // Dual-write into the devicectl-pullable caches mirror: the App
+            // Group primary cannot be pulled, which previously left download
+            // slowness untriageable from the host.
+            mirrorDirectory: IOSPullableDiagnosticsMirror.pullableRoot?
+                .appendingPathComponent("model-downloads", isDirectory: true),
             fileManager: fileManager
         )
     }
@@ -484,6 +489,12 @@ final class IOSModelDownloadCoordinator {
         sessionConfig.waitsForConnectivity = true
         sessionConfig.sessionSendsLaunchEvents = true
         sessionConfig.httpMaximumConnectionsPerHost = 6
+        // Multi-gigabyte model artifacts never ride cellular. Wi-Fi Assist
+        // silently reroutes flaky-Wi-Fi traffic over LTE and collapsed these
+        // downloads to sub-MB/s; excluding cellular at the session level keeps
+        // the transfer pinned to Wi-Fi regardless of OS-level assist settings
+        // (task metrics recorded per transfer prove the path taken).
+        sessionConfig.allowsCellularAccess = false
         let backgroundSessionIdentifier = configuration.backgroundSessionIdentifier
 
         return HuggingFaceDownloader(

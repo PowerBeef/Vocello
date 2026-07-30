@@ -17,8 +17,8 @@
 
 Phase 4 `overallPromotion: passed` closed the cutover gate on 2026-07-20 (with Phases 0/5/6).
 Phases 7, 8, and 14 closed 2026-07-23. Phase 9 closed 2026-07-26; Phase 12 ships the fast-depth
-quality registry with the deep producer landed; Phase 13 (history v3) is implemented with the
-first live record pending; phase 10–11 remainders stay open. The contract JSON is the
+quality registry with the deep producer landed; Phase 13 (history v3) went live 2026-07-29 with
+the first schema-v3 records committed; phase 10–11 remainders stay open. The contract JSON is the
 machine-readable status record and wins over any older prose.
 
 | Plan phase | Current state |
@@ -36,26 +36,50 @@ machine-readable status record and wins over any older prose.
 | 10 — Spoken-text planning | Shipping inside long-form v4 since 2026-07-23. Remainder: single-take generation does not yet consume spoken-text normalization. |
 | 11 — Long-form v4 | Stages A–E shipping on both platforms: planner-owned segmentation with per-segment sub-seeds, sequential streaming execution, bounded assembly, manifest v4, resume, grouped History projects. macOS acceptance 2026-07-23 (`macos-xcui-smoke-20260723-195700-ab46482a`); iPhone acceptance 2026-07-24 (`ios-xcui-smoke-20260724-183626-f9961535`). Single-segment regeneration remains macOS-only; line batch stays removed from iOS by design; legacy XPC `generateBatch` retired 2026-07-24. |
 | 12 — Bounded analysis and unified quality | Fast-depth registry shipping 2026-07-26 (typed `GenerationQualityReport` + fail-closed `QualityGateRegistry` verdict in telemetry notes on every finalization, live-verified). Same-day additions: the standard/canonical `deepReport` producer, per-take prosody gate verdicts on the bench sidecar (folded into history warnings), typed `languageASR` and `longFormContinuity` gates, and the advisory speaker-similarity dev metric. Open: composed standard/canonical emission at a lane call site; optional MOS-proxy. |
-| 13 — Benchmark/history v3 | Implemented 2026-07-26; first live v3 record publishes with the next bench run. `benchmarks/schema-v3.json` adds the typed quality identity to generation takes (pass/warning only, five fast gates required, machine-code issues); v1/v2 records stay valid immutable history; the publisher stamps v3 only when every take carries the identity. |
+| 13 — Benchmark/history v3 | Live 2026-07-29: the first schema-v3 records are committed (three clean `phase0-cli-control-*` engine records plus one exploratory run that also exposed and fixed the summarizer's v3 pin). `benchmarks/schema-v3.json` adds the typed quality identity to generation takes (pass/warning only, five fast gates required, machine-code issues); v1/v2 records stay valid immutable history; the publisher stamps v3 only when every take carries the identity. Remainder: UI-lane records still publish v2 until the UI benchmark checker folds the take quality identity. |
 | 14 — Organization and retirement | Closed 2026-07-23 (14a + 14b): compatibility SPI retired, actor-owned loading/metadata/priming/clone artifacts, clone conditioning epoch-bound end to end. |
 
-## Resume here (2026-07-26)
+## Resume here (2026-07-30)
 
 Stages 0–3 of the adopted roadmap are complete (the 2.2 artifact promotion included);
-Stage 4 stays gated. The concrete next actions, in order:
+Stage 4 stays gated. The evidence battery on the 2026.07.26.1 artifacts is roughly half
+banked, and its device lanes surfaced and shipped seven real fixes along the way:
 
-1. **Evidence battery on the new 2026.07.26.1 artifacts** (needs an idle Mac and the paired
-   iPhone; the maintainer schedules the window): fresh fixture identities — characterization
-   controls + canonical matrices per `config/characterization-fixtures.json` — then memory
-   re-qualification (`scripts/macos_test.sh memory`, `scripts/ios_device.sh memory`), and a
-   first bench run, which also publishes the first schema-v3 history record.
+- **Banked (committed, PASS):** three clean CLI engine controls (the first schema-v3
+  records), three macOS UI controls, the canonical 29-take macOS matrix
+  (`passedWithWarnings`, schema v2 pending the UI-checker quality-identity fold), and
+  retained-memory qualification on both canonical platforms.
+- **Fixes shipped by the battery:** the summarizer's v3 schema pin; the ui-lane long-form
+  probe silently killing non-long-form runs; the iOS download-ledger artifact-update brick;
+  clone priming on voice selection; a completed model load no longer discarded on late task
+  cancellation (`VocelloQwen3Core`); the clone prime rerouted from a memory-spiking bounded
+  completion (~2.0→5.1 GB resident on iPhone) to the ordinary prewarm; the project-health
+  inventory now counts only git-tracked files. Model delivery additionally gained
+  Wi-Fi-pinned downloads (`allowsCellularAccess=false`, retiring the Wi-Fi Assist LTE
+  reroute that collapsed downloads to sub-MB/s), a pullable download-diagnostics mirror,
+  and an autonomous transfer-health verdict in the opt-in
+  `scripts/ui_test.sh ios model-download` lane (live PASS: 6.6/6.3/5.7 MB/s, zero retries,
+  exact shared-component reuse).
+
+The concrete next actions, in order:
+
+1. **Finish the battery on the paired iPhone** (the phone was wiped and restored
+   2026-07-30; the benchmark clone voice `A_warm_elderly_woman` must be re-enrolled from
+   the pinned Voice Design reference before UI lanes run): three iOS UI control lanes
+   (`phase0-ios-control-1..3`), the canonical 29-take iOS matrix, then rebind
+   `config/characterization-fixtures.json` to the new record identities in the same change
+   as this file's next sync. Caveat for evaluators: the banked macOS controls ran before
+   the clone-prime route change; generation semantics, sampling, and seeds are untouched,
+   so cross-platform comparability holds, but prime-side timings differ.
 2. **Release staging only on an explicit maintainer call** — never implied by landed work.
    When called, the combined 2.2-promotion + Stage 1 story is the headline (~10% faster,
    ~280 MB less memory, ~13% smaller downloads); the standing per-candidate macOS smoke
-   lane and release-notes ledger apply.
-3. **Deferred with rationale, not blocked:** composed standard/canonical quality-report
-   emission at a lane call site; the optional MOS-proxy advisory column; the
-   Stage 4 gated bets.
+   lane and release-notes ledger apply. The clone-prime and Wi-Fi-pin fixes should ship in
+   the next iOS build: the current TestFlight build carries both the prime memory spike and
+   the reroute exposure.
+3. **Deferred with rationale, not blocked:** the UI-checker quality-identity fold (lets UI
+   matrices publish v3); composed standard/canonical quality-report emission at a lane call
+   site; the optional MOS-proxy advisory column; the Stage 4 gated bets.
 
 ## Staged roadmap state
 

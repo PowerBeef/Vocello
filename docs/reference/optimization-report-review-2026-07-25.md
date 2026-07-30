@@ -193,7 +193,7 @@ stays <55%, keep attacking launch count before anything else.
 > the typed `languageASR` gate on the iOS lang-bench sentinel; the `longFormContinuity`
 > gate derived from v4 assembly evidence; the revision-pinned ECAPA speaker-similarity
 > dev-lane metric; and benchmark/history **schema v3** (typed quality identity on every
-> generation take; first live record publishes with the next bench run). Deferred with
+> generation take; live since 2026-07-29 with the first records committed). Deferred with
 > rationale: composed standard/canonical report emission at a lane call site (all
 > per-gate evidence already lands typed; the aggregate waits for a consumer) and the
 > optional MOS-proxy advisory column.

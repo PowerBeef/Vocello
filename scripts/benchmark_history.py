@@ -2586,6 +2586,10 @@ def render_history(records: list[tuple[Path, dict[str, Any]]]) -> str:
         "[`LEGACY_HISTORY.md`](LEGACY_HISTORY.md) and are not treated as structured evidence.",
         "Schema-v1 records remain readable but are marked memory-contract-incomplete and are excluded",
         "from schema-v2 memory trends.",
+        "RTF here is audio seconds ÷ wall-clock seconds (`audioSecondsPerWallSecond`): higher is",
+        "faster, 1.1 ≈ 1.1× realtime, and a positive RTF trend is an improvement. Much of the TTS",
+        "ecosystem defines RTF as the inverse (wall-clock ÷ audio, lower is better); convert before",
+        "cross-project comparisons.",
         "",
     ]
     if not grouped:

@@ -53,6 +53,12 @@ cross-project comparisons.
 |---|---|---|---|---|---|---:|---|---|---|---|
 | 2026-07-23 | [`macos-engine-20260723-155000-b19a782f`](runs/engine-generation/macos-engine-20260723-155000-b19a782f.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 9 | `2c3d162164b0` dirty | `excluded` | baseline | phase14b-qc-soak |
 
+## engine-generation / macos / mac-mini-m2-8gb / config `2022a7a1e3e1`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---|---|---|---|
+| 2026-07-31 | [`macos-engine-20260731-192156-208e2873`](runs/engine-generation/macos-engine-20260731-192156-208e2873.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 29 | `9f12b8b2f44d` | `2022a7a1e3e1` | baseline | release-QA-2.3.0 |
+
 ## engine-generation / macos / mac-mini-m2-8gb / config `20c15ef8c709`
 
 | completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |

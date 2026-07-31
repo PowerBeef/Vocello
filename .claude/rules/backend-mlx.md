@@ -114,8 +114,9 @@ warning.
 - **Convergence authority is explicit.** `config/runtime-refactor-contract.json` records
   `VocelloQwen3Engine`, its classified session, and QwenVoiceCore's `GenerationOutputAdapter` as
   the shipping generation path for Custom, Design, and Clone. Phase 4 `overallPromotion` passed
-  2026-07-20 with clean Phase 0 controls and canonical matrices; the contract JSON is the status
-  authority. Phases 7, 8, and 14 closed 2026-07-23; phases 9–13 remain open. Prepared-model
+  2026-07-20 with clean Phase 0 controls and canonical matrices. The contract JSON's
+  `phaseStatus` block is the sole per-phase status authority (human summary: the phase table in
+  `docs/development-progress.md`); do not restate open/closed phase state here. Prepared-model
   loading, post-load metadata/facts, preparation diagnostics, priming, and schema-3 clone-artifact
   persistence/adoption are actor-owned public surfaces; the legacy compatibility SPI is retired
   and its symbols are internal to the package. Do not add a public mutation surface back to the

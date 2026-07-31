@@ -174,6 +174,14 @@ Status report: [`docs/reference/runtime-refactor-status-report.md`](reference/ru
   cookieless Vercel Web Analytics with the privacy policy scoped to disclose it, the page
   title retargeted to Mac + iPhone, and an instant-reveal fix for in-page anchor jumps.
   Outreach and social items from the report stay maintainer-owned outside the repository.
+- **2026-07-31 — v2.3.0 released (macOS DMG + iOS TestFlight build 22)** on an explicit
+  maintainer call, shipping the 2026.07.26.1 artifact generation, the Stage 1 warm-speed
+  wins, delivery hardening, and the clone-prime/Wi-Fi-pin fixes. The evidence battery was
+  deliberately paused mid-flight for the release window (deterministic publishing rule);
+  its banked lanes, the aborted iOS control 3, and the exact remainder are itemized in
+  Resume here. Same day: the public RTF wording was reframed as a realtime multiple
+  (PRs #89/#90) and the wiped phone's clone fixture was re-enrolled via the new opt-in
+  `enroll-clone-fixture` UI lane.
 
 ## Current implementation
 

@@ -86,6 +86,7 @@ HEAVY_LANE_IDS = {
     "ui-smoke",
     "ui-benchmark",
     "ui-model-download",
+    "ui-enroll-clone-fixture",
     "release",
 }
 

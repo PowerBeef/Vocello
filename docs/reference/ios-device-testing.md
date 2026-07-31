@@ -133,6 +133,15 @@ ensure/install path: repair missing models in visible Settings → Model Downloa
 UI lane. Device scripts retain headless engine diagnostics, but normal acceptance never substitutes
 a headless inventory for the visible Settings state.
 
+When a device wipe removes the benchmark clone voice, `scripts/ui_test.sh ios enroll-clone-fixture`
+re-enrolls it through the genuine visible Files-import flow. Stage the canonical reference first —
+copy both `A_warm_elderly_woman.wav` and its `.txt` transcript sidecar from the macOS fixture store
+(`~/Library/Application Support/QwenVoice-Debug/voices/`) into the app's Documents directory with
+`xcrun devicectl device copy to --domain-type appDataContainer`. The import picker opens in
+Documents, the naming sheet prefills the exact name and transcript from the staged files, and the
+test asserts the enrolled `voicesRow_saved_…` row. The lane is opt-in, idempotent, and never runs
+in smoke, benchmark, CI, or release.
+
 ## Deterministic evidence retained
 
 The benchmark result is joined with exact device/app identity, current-run engine and app telemetry,

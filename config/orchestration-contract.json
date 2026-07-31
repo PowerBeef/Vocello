@@ -201,6 +201,18 @@
         "result-retention"
       ]
     },
+    "ui-ios-enroll-clone-fixture": {
+      "producer": "scripts/ui_test.sh",
+      "requiredSteps": [
+        "source-provenance",
+        "crash-baseline",
+        "xcuitest",
+        "crash-delta"
+      ],
+      "optionalSteps": [
+        "result-retention"
+      ]
+    },
     "ui-ios-model-download": {
       "producer": "scripts/ui_test.sh",
       "requiredSteps": [

@@ -142,6 +142,28 @@ communication, written for both non-technical and technical readers:
   v2.3.0 auto-generated stub (caught and fixed post-publication 2026-07-31) is the
   failure mode this section exists to prevent.
 
+## Performance surfaces ship current numbers (standing per-release step)
+
+The README charts and the website Performance section publish measured numbers; a release
+must not ship while they describe a superseded build. In the same change set as the
+version bump:
+
+- Re-point `RTF_RECORD` in `scripts/generate_readme_charts.py` to the newest canonical
+  macOS UI matrix record and regenerate (`python3 scripts/generate_readme_charts.py`;
+  its `--check` already fail-closes on stale SVGs), then update the README `<img alt>`
+  ranges to match.
+- Update `website/src/sections/Performance.jsx`: the `MODES` medians, the aria-label
+  ranges, and the provenance record IDs, all from the same record.
+- `GATE_RECORDS` (the 2.1-pipeline vs 2.2-gate same-day A/B) is pinned history: never
+  re-point either side, and never substitute a different-build record — mixing builds
+  would corrupt the isolated gate comparison.
+- If no newer canonical record exists at release time (for example a docs-only patch
+  release), record that explicitly in the release notes Evidence section instead —
+  the same visible-skip discipline as the smoke lane.
+- Which record is "the newest canonical" is a judgment the registry supports
+  (clean-source, canonical classification, `passed`/`passedWithWarnings`); dirty-source
+  exploratory records never back public numbers.
+
 ## Outward-facing performance terminology
 
 Public prose — release notes in `docs/releases/`, the GitHub Release body, the README, and the

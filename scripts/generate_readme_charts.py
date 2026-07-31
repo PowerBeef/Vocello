@@ -8,8 +8,12 @@ derived artifacts. Python stdlib only — no plotting dependency joins the
 toolchain for this.
 
 Data provenance:
-  - RTF and gate-delta charts read the canonical ui-generation records named
-    in RECORDS below.
+  - The RTF chart reads the newest canonical ui-generation record (RTF_RECORD);
+    per release policy it moves to the new canonical record with every release
+    (docs/reference/macos-release-qa.md "Performance surfaces ship current
+    numbers"). The gate-delta chart reads the pinned same-day pre/post pair in
+    GATE_RECORDS — a historical A/B isolating the generation performance gate;
+    never re-point one side alone and never move it to a different-build record.
   - The long-form memory chart embeds the per-segment table from the local
     lane evidence run named in LONGFORM_RUN_ID (smoke lane
     `--long-form-segments 10`; lane evidence is never a registry record, so
@@ -30,7 +34,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT_DIR = ROOT / "docs" / "charts"
 
-RECORDS = {
+# Newest canonical macOS UI matrix — refresh with every release.
+RTF_RECORD = "macos-xcui-benchmark-20260729-023553-111d88c6"
+# Pinned 2.1-pipeline vs 2.2-gate same-day A/B; historical, never re-pointed.
+GATE_RECORDS = {
     "post": "macos-xcui-benchmark-20260723-083313-d02005ae",
     "pre": "macos-xcui-benchmark-20260723-054315-9b6f267b",
 }
@@ -110,11 +117,11 @@ def text(x: float, y: float, value: str, *, fill: str, size: int = 12,
 
 def rtf_chart(theme_name: str) -> str:
     theme = THEMES[theme_name]
-    medians = load_medians(RECORDS["post"])
+    medians = load_medians(RTF_RECORD)
     width, height = 720, 428
     left, right, top = 110.0, 84.0, 64.0
     x0, x1 = left, width - right
-    scale_max = 2.0
+    scale_max = 2.4
 
     def x_for(value: float) -> float:
         return x0 + (x1 - x0) * min(value, scale_max) / scale_max
@@ -126,7 +133,7 @@ def rtf_chart(theme_name: str) -> str:
 
     bar_h, in_gap, group_gap = 16.0, 6.0, 26.0
     y = top + 14.0
-    for grid_value in (0.5, 1.0, 1.5):
+    for grid_value in (0.5, 1.0, 1.5, 2.0):
         gx = x_for(grid_value)
         emphasized = grid_value == 1.0
         stroke = theme["muted"] if emphasized else theme["grid"]
@@ -155,7 +162,7 @@ def rtf_chart(theme_name: str) -> str:
             y += bar_h + in_gap
         y += group_gap - in_gap
     parts.append(text(width - 16, height - 6,
-                      f"record {RECORDS['post'][-8:]} · benchmarks/HISTORY.md",
+                      f"record {RTF_RECORD[-8:]} · benchmarks/HISTORY.md",
                       fill=theme["muted"], size=10, anchor="end"))
     parts.extend(("</g>", "</svg>"))
     return "\n".join(parts) + "\n"
@@ -163,8 +170,8 @@ def rtf_chart(theme_name: str) -> str:
 
 def gate_chart(theme_name: str) -> str:
     theme = THEMES[theme_name]
-    pre = load_medians(RECORDS["pre"])[GATE_CELL]
-    post = load_medians(RECORDS["post"])[GATE_CELL]
+    pre = load_medians(GATE_RECORDS["pre"])[GATE_CELL]
+    post = load_medians(GATE_RECORDS["post"])[GATE_CELL]
     delta = 100.0 * (post - pre) / pre
     width, height = 720, 190
     left = 210.0
@@ -201,7 +208,7 @@ def gate_chart(theme_name: str) -> str:
         parts.append(text(x0 + bw + 6, y + bar_h - 5, f"{value:.2f}×", fill=theme["ink"], size=11))
         y += bar_h + 14.0
     parts.append(text(width - 16, height - 8,
-                      f"records {RECORDS['pre'][-8:]} → {RECORDS['post'][-8:]}",
+                      f"records {GATE_RECORDS['pre'][-8:]} → {GATE_RECORDS['post'][-8:]}",
                       fill=theme["muted"], size=10, anchor="end"))
     parts.extend(("</g>", "</svg>"))
     return "\n".join(parts) + "\n"

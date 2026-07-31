@@ -2,17 +2,20 @@ import React from "react";
 
 /*
   Measured performance, from the repository's tracked benchmark records:
-  - RTF bars: benchmarks/runs/ui-generation/macos-xcui-benchmark-20260723-083313-d02005ae.json
-  - Gate pair: same cell (Custom, long, warm) in ...-20260723-054315-9b6f267b.json (before)
-    and d02005ae (after).
+  - RTF bars: benchmarks/runs/ui-generation/macos-xcui-benchmark-20260729-023553-111d88c6.json
+    (the newest canonical matrix; refresh with every release, see
+    docs/reference/macos-release-qa.md "Performance surfaces ship current numbers").
+  - Gate pair (pinned history, never re-pointed): same cell (Custom, long, warm) in
+    ...-20260723-054315-9b6f267b.json (before) and ...-20260723-083313-d02005ae (after).
   Values are warm-take medians on the canonical Mac mini M2 (8 GB).
 */
 const MODES = [
-  { name: "Custom Voice", tone: "var(--mode-custom)", takes: [1.68, 1.82, 1.83] },
-  { name: "Voice Design", tone: "var(--mode-design)", takes: [1.78, 1.91, 1.94] },
-  { name: "Voice Cloning", tone: "var(--mode-clone)", takes: [1.49, 1.69, 1.84] },
+  { name: "Custom Voice", tone: "var(--mode-custom)", takes: [1.85, 1.97, 2.02] },
+  { name: "Voice Design", tone: "var(--mode-design)", takes: [1.92, 2.05, 2.12] },
+  { name: "Voice Cloning", tone: "var(--mode-clone)", takes: [1.55, 1.89, 2.03] },
 ];
 const LENGTHS = ["short", "medium", "long"];
+const RTF_SCALE_MAX = 2.4;
 const SCALE_MAX = 2.0;
 
 const GATE = { before: 1.37, after: 1.83 };
@@ -23,7 +26,7 @@ const RtfChart = () => {
   const right = 64;
   const x0 = left;
   const x1 = width - right;
-  const xFor = (v) => x0 + ((x1 - x0) * Math.min(v, SCALE_MAX)) / SCALE_MAX;
+  const xFor = (v) => x0 + ((x1 - x0) * Math.min(v, RTF_SCALE_MAX)) / RTF_SCALE_MAX;
   const barH = 14;
   const inGap = 7;
   const groupGap = 24;
@@ -55,7 +58,7 @@ const RtfChart = () => {
     y += groupGap - inGap;
   });
   const plotBottom = y - groupGap + 8;
-  const gridlines = [0.5, 1.0, 1.5].map((v) => (
+  const gridlines = [0.5, 1.0, 1.5, 2.0].map((v) => (
     <g key={v}>
       <line
         x1={xFor(v)} y1={top - 4} x2={xFor(v)} y2={plotBottom}
@@ -73,7 +76,7 @@ const RtfChart = () => {
       className="perf-chart"
       viewBox={`0 0 ${width} ${plotBottom + 30}`}
       role="img"
-      aria-label="Warm generation speed by mode and script length, as a multiple of realtime. Custom Voice 1.68× to 1.83×, Voice Design 1.78× to 1.94×, Voice Cloning 1.49× to 1.84×. Every bar passes the realtime line at 1.0×."
+      aria-label="Warm generation speed by mode and script length, as a multiple of realtime. Custom Voice 1.85× to 2.02×, Voice Design 1.92× to 2.12×, Voice Cloning 1.55× to 2.03×. Every bar passes the realtime line at 1.0×."
     >
       {gridlines}
       {rows}
@@ -151,7 +154,8 @@ export const Performance = () => (
       </div>
 
       <p className="perf-provenance">
-        Records <span className="perf-mono">d02005ae</span> and <span className="perf-mono">9b6f267b</span> in{" "}
+        Records <span className="perf-mono">111d88c6</span> (modes), <span className="perf-mono">9b6f267b</span> and{" "}
+        <span className="perf-mono">d02005ae</span> (gate pair) in{" "}
         <a href="https://github.com/PowerBeef/Vocello/blob/main/benchmarks/HISTORY.md" target="_blank" rel="noreferrer">
           benchmarks/HISTORY.md
         </a>

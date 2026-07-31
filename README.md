@@ -57,7 +57,7 @@ Every number below comes from a tracked, privacy-safe benchmark record in this r
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/charts/rtf-by-mode-dark.svg">
-  <img alt="Grouped bar chart: warm generation speed for Custom Voice (1.68× to 1.83× realtime), Voice Design (1.78× to 1.94×), and Voice Cloning (1.49× to 1.84×), all beyond the realtime line at 1.0×" src="docs/charts/rtf-by-mode-light.svg">
+  <img alt="Grouped bar chart: warm generation speed for Custom Voice (1.85× to 2.02× realtime), Voice Design (1.92× to 2.12×), and Voice Cloning (1.55× to 2.03×), all beyond the realtime line at 1.0×" src="docs/charts/rtf-by-mode-light.svg">
 </picture>
 
 Vocello 2.2 also changed how the app behaves *while* it generates: translucent interface surfaces temporarily render as solid fills so the compositor stops competing with the engine. Same machine, same take, about a third faster:

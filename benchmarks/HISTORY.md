@@ -266,6 +266,12 @@ cross-project comparisons.
 |---|---|---|---|---|---|---:|---|---|---|---|
 | 2026-07-16 | [`ios-xcui-benchmark-20260716-184106-48e3a3a6`](runs/ui-generation/ios-xcui-benchmark-20260716-184106-48e3a3a6.json) | canonical | canonical | passedWithWarnings | qualified-with-warnings | 29 | `bcb5265a8c57` | `505604f090fd` | baseline | owned-core-final-bcb5265-ios |
 
+## ui-generation / ios / iphone-17-pro / config `6edf7d8d8975`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---|---|---|---|
+| 2026-07-31 | [`ios-xcui-benchmark-20260731-065816-cb5e674e`](runs/ui-generation/ios-xcui-benchmark-20260731-065816-cb5e674e.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 32 | `ffffa2aac134` dirty | `excluded` | baseline | phase0-ios-control-1 |
+
 ## ui-generation / ios / iphone-17-pro / config `79dc6d4371e7`
 
 | completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |

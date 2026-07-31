@@ -121,6 +121,27 @@ upload depend on deterministic release-readiness and artifact checks.
    within the contract's six-hour freshness window. A manually written PASS file, stale ledger,
    missing step, changed untracked source file, or mixed invocation fails before publication.
 
+## Release notes are a release artifact (both stores, fail-closed)
+
+`docs/releases/<tag>.md` is the single source of truth for user-facing release
+communication, written for both non-technical and technical readers:
+
+- The release workflow validates it **before any build work**
+  (`python3 scripts/check_release_notes.py <tag>`) and sources the GitHub Release body
+  from it verbatim on both draft creation and draft reuse — `--generate-notes` stubs
+  are banned. The gate requires real substance (a What's new/Headline section,
+  Requirements, Install, and a TestFlight What-to-Test section), rejects placeholder
+  tokens (PENDING/TBD/TODO/FIXME), and rejects relative markdown links: the file
+  renders on the release page too, so links must be absolute.
+- The file's `## TestFlight — What to Test (build N)` section is the paste source for
+  the build's Test Details in App Store Connect at distribution time. Automating that
+  through the ASC API after upload is a recorded enhancement; until it lands, the
+  paste is a required step of TestFlight distribution, not an optional nicety.
+- Write dual-audience: lead each item with the user-visible change in plain language,
+  then the technical grounding. The 2.2.0 notes are the reference standard; the
+  v2.3.0 auto-generated stub (caught and fixed post-publication 2026-07-31) is the
+  failure mode this section exists to prevent.
+
 ## Outward-facing performance terminology
 
 Public prose — release notes in `docs/releases/`, the GitHub Release body, the README, and the

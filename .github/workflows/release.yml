@@ -135,6 +135,13 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.event_name == 'push' && github.ref || inputs.tag }}
 
+      # Fail before any build work if the curated notes for this tag are
+      # missing or unfinished — the GitHub Release body is sourced verbatim
+      # from docs/releases/<tag>.md (never --generate-notes), and its
+      # TestFlight section is the paste source for ASC Test Details.
+      - name: Validate release notes quality gate
+        run: python3 scripts/check_release_notes.py "$RELEASE_TAG"
+
       - name: Select Xcode 26.6
         run: |
           sudo xcode-select -s /Applications/Xcode_26.6.app
@@ -351,6 +358,10 @@ jobs:
           if not json.load(open(sys.argv[1], encoding="utf-8")).get("isDraft"):
               raise SystemExit("error: refusing to replace assets on an already-published Release")
           PY
+            # A reused draft may carry an older attempt's body — re-source it
+            # from the curated notes so publication never ships a stub.
+            gh release edit "$RELEASE_TAG" \
+              --notes-file "docs/releases/${RELEASE_TAG}.md"
           else
             # macOS runners ship bash 3.2, where expanding an empty array
             # under `set -u` still raises "unbound variable" (fixed only in
@@ -364,7 +375,7 @@ jobs:
               --draft \
               --verify-tag \
               --title "Vocello ${RELEASE_TAG#v}" \
-              --generate-notes \
+              --notes-file "docs/releases/${RELEASE_TAG}.md" \
               ${release_flags[@]+"${release_flags[@]}"}
           fi
 

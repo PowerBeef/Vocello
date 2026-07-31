@@ -216,6 +216,14 @@ scripts/clean_build_caches.sh --compact-profile-failure <run-id> --dry-run
   existing diagnostics and XCUITest lanes. Missing matching iOS Platform Support/runtime
   availability is classified as a host-toolchain readiness failure before package resolution, not
   as a source, phone, model, or UI failure. Repository automation never downloads that component.
+- **Release notes are curated and fail-closed.** The GitHub Release body comes verbatim
+  from `docs/releases/<tag>.md`; `--generate-notes` is banned in release lanes.
+  `scripts/check_release_notes.py` gates the tag before build work: required
+  dual-audience sections (What's new/Headline, Requirements, Install, TestFlight
+  What-to-Test), no placeholder tokens, absolute links only. TestFlight Test Details
+  are pasted from the same file's TestFlight section when distributing the build
+  (ASC-API automation is a recorded enhancement). Details:
+  `docs/reference/macos-release-qa.md` "Release notes are a release artifact".
 - **Committed benchmark records ≤256 KB.** Records use a strict privacy allowlist; raw JSONL,
   WAVs, screenshots, result bundles, and traces are gitignored. `HISTORY.md` is generated, never
   manually appended.

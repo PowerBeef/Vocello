@@ -81,6 +81,8 @@ REQUIRED_SURFACES=(
     "scripts/tests/test_profile_trace_retention.py"
     "scripts/tests/test_storage_preflight.py"
     "scripts/tests/test_ios_platform_preflight.py"
+    "scripts/check_release_notes.py"
+    "scripts/tests/test_check_release_notes.py"
     "scripts/release.sh"
     "Sources/Resources/qwenvoice_contract.json"
     "Sources/Resources/qwenvoice_production_model_catalog.json"

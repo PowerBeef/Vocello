@@ -9,6 +9,7 @@
 <p align="center">
   <a href="https://vocello.vercel.app/"><img src="https://img.shields.io/badge/Website-vocello.vercel.app-7b61ff?style=flat-square&logo=vercel" alt="Website"></a>
   <a href="https://github.com/PowerBeef/Vocello/releases/tag/v2.2.2"><img src="https://img.shields.io/badge/Vocello-2.2.2-7b61ff?style=flat-square" alt="Vocello 2.2.2"></a>
+  <a href="https://github.com/PowerBeef/Vocello/releases"><img src="https://img.shields.io/github/downloads/PowerBeef/Vocello/total?style=flat-square&label=downloads&color=7b61ff&logo=github&logoColor=white" alt="Lifetime downloads across all GitHub releases"></a>
   <img src="https://img.shields.io/badge/macOS-26%2B-111827?style=flat-square&logo=apple" alt="macOS 26 or newer">
   <a href="https://testflight.apple.com/join/Cvp6yCv7"><img src="https://img.shields.io/badge/iPhone-TestFlight%20beta-7b61ff?style=flat-square&logo=apple" alt="iPhone TestFlight beta"></a>
   <img src="https://img.shields.io/badge/Apple%20Silicon-required-111827?style=flat-square&logo=apple" alt="Apple Silicon required">

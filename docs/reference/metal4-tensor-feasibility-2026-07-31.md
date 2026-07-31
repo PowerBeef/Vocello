@@ -147,6 +147,59 @@ gaps; fewer launches do. Candidate custom kernels, judged on that basis:
   Programming Guide PDF (v1, 2026-03-16, developer.apple.com/metal/resources/), WWDC26
   session 330, WWDC25 sessions 205/262, and Tech Talk 111432.
 
+### F7 — OS-floor policy: hold 26.0; the ladder is runtime, not the deployment target
+
+Maintainer question (2026-07-31): the 26-only requirement already fences out users — what
+do we lose by holding 26.0 versus raising the minimum?
+
+**Principle: the OS floor and the capability ladder are separable on this stack.** MLX
+compiles kernel source at runtime on the user's device with the OS's own compiler and SDK
+headers, so the app can declare 26.0 while richer kernel paths are selected per-device at
+runtime (OS version + `MTLDevice.supportsFamily`). MLX's own NAX gating
+(`is_nax_available()`: runtime OS ≥ 26.2 + M5/A19 arch) is the working precedent — our
+26.0 app already delivers neural-accelerator kernels to eligible devices today.
+
+**Held at 26.0, nothing currently sanctioned is lost.** Gate 0, P1b, the Stage-4 pin bump
+(current releases), and a floor-safe fp16 Candidate-A kernel with explicit dequant are all
+26.0-clean (F1/F2). Dual-path kernels (26.0 baseline + runtime-gated 26.3/26.4 variant)
+are mechanically possible; their real cost is QA surface — every numerics-distinct path
+needs its own fixed-seed evidence, so hold to one floor-safe path until a measured win
+justifies a second.
+
+**What each raise would buy, and its true user cost:**
+
+| Floor | Gains | Fences out |
+| --- | --- | --- |
+| 26.1 | bfloat tensors in MPP | ~nobody: free update, identical hardware |
+| 26.2 | NAX runtime threshold; newer MPP ABI entry points; **forward compatibility with mlx core ≥ 0.32.0's NAX build requirement** | ~nobody |
+| 26.3 | cooperative-tensor inputs (efficient in-kernel dequant of custom formats) | ~nobody |
+| 26.4 | int4/int8 tensor types (quantized weights ride MPP `matmul2d` directly) | ~nobody |
+| 27 | FP8/FP4, int2, MX block-scale planes, MSL 4.1, host multi-plane tensors | everyone not yet updated; release timing and hardware support not yet knowable |
+
+The asymmetry that decides this: the fence users feel today is the **hardware** fence
+(Apple Silicon; iPhone 15 Pro or newer) plus the paid-once macOS 15 → 26 jump. A raise
+*within* the 26 line touches neither — it asks only for a free software update on the same
+device, affecting update-refusers and managed fleets, not owners of fenced-out hardware.
+A point-release raise is therefore categorically cheaper than the fence already paid, and
+should never be conflated with it.
+
+**The one structural pressure point (pre-decided trigger).** mlx core 0.32.0 ties NAX
+kernel *compilation* to `MACOSX_DEPLOYMENT_TARGET=26.2` (upstream #3622). Our 0.30.6 pin
+is unaffected, but the first Stage-4 pin bump that lands on an mlx-swift release vendoring
+core ≥ 0.32.0 would, at a 26.0 deployment target, silently compile the neural-accelerator
+path out for everyone — including the M5/A19 users who get it free today. **Adopted
+policy: hold the floor at 26.0 now; the first pin bump that carries the 0.32.0-era NAX
+requirement triggers a floor raise to 26.2** (or directly to 26.4 if Gate 2 has by then
+justified the quantized-tensor path), bundled into a release whose visible wins justify
+the update ask. Verify the constraint against the actual vendored core at bump time
+rather than assuming it.
+
+**macOS/iOS 27 is a model-artifact question, not an OS-floor question.** The 27-cycle
+formats (FP8/FP4, MX block scales) matter only if the production models are ever
+re-quantized into those formats — that is a full artifact-promotion decision (new HF
+uploads, catalog re-pins, fresh fixtures, promotion battery) with its own merits, and no
+kernel-side convenience justifies raising the floor to 27 ahead of it.
+
 ## Pre-registered prototype scope (throwaway branch, in order, each gate blocking)
 
 1. **Gate 0 — floor micro-benchmark (cheap, decisive).** Standalone probe (no engine
@@ -174,3 +227,10 @@ gaps; fewer launches do. Candidate custom kernels, judged on that basis:
    P1b explicitly.
 3. Note the do-nothing NAX win (F3) wherever new-hardware performance is next discussed;
    canonical evidence hardware is unchanged.
+4. **OS-floor policy adopted (F7): hold macOS/iOS 26.0.** Runtime-gate richer kernel
+   paths instead of raising the deployment target. Pre-decided trigger: the first pin
+   bump vendoring mlx core ≥ 0.32.0 (NAX deployment-target 26.2 requirement) raises the
+   floor to 26.2 — or 26.4 if the quantized-tensor path has been justified by then — in a
+   release whose user-visible wins carry the update ask. No floor raise to 27 for
+   kernel-feature reasons; 27 formats become relevant only through a future
+   artifact-promotion decision.

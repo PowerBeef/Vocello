@@ -115,8 +115,10 @@ Stage-by-stage details, closure evidence, and falsifiability criteria live in th
 5. **Stage 4 — gated migrations/research**: mlx pin bump to the newest lockstep pair
    (mlx-swift 0.31.6-era; the old 0.31.3 target is stale — see the
    [Metal 4 tensor feasibility study](reference/metal4-tensor-feasibility-2026-07-31.md),
-   which also adds a cheap pre-registered MPP-on-M2 micro-benchmark rider and parks any
-   custom fused tensor kernel behind P1b) on a
+   which also adds a cheap pre-registered MPP-on-M2 micro-benchmark rider, parks any
+   custom fused tensor kernel behind P1b, and records the adopted OS-floor policy: hold
+   26.0 with runtime-gated capability ladders; the first pin bump vendoring mlx core
+   ≥ 0.32.0 triggers the 26.2 floor raise, per the study's F7) on a
    throwaway branch (contract invariant), long-form carryover (text context first), with
    speculative/PCG, CFG, and KV quantization parked.
 6. **Smaller open threads**: iOS single-segment regeneration parity, the iPhone-15-Pro

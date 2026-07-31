@@ -64,6 +64,7 @@ Review when: target or scheme changes; runtime topology; telemetry schema; test 
 - [`docs/reference/macos-release-qa.md`](../docs/reference/macos-release-qa.md)
 - [`docs/reference/macos-testing.md`](../docs/reference/macos-testing.md)
 - [`docs/reference/metal-guide.md`](../docs/reference/metal-guide.md)
+- [`docs/reference/metal4-tensor-feasibility-2026-07-31.md`](../docs/reference/metal4-tensor-feasibility-2026-07-31.md)
 - [`docs/reference/mimi-codec-guide.md`](../docs/reference/mimi-codec-guide.md)
 - [`docs/reference/mlx-audio-swift-patching.md`](../docs/reference/mlx-audio-swift-patching.md)
 - [`docs/reference/mlx-guide.md`](../docs/reference/mlx-guide.md)

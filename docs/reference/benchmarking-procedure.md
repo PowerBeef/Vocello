@@ -117,7 +117,7 @@ scripts/macos_test.sh models ensure
 
 This installs (or symlinks into debug context):
 
-- `pro_custom_speed`, `pro_design_speed`, `pro_clone_speed` (~6.9 GB one-time if none installed)
+- `pro_custom_speed`, `pro_design_speed`, `pro_clone_speed` (~6.0 GB one-time if none installed)
 - Clone voice `A_warm_elderly_woman`, enrolled from a 10–20 second, transcript-backed Voice
   Design reference with a distinctive mature feminine alto. `models ensure` replaces the retired
   Custom/Aiden-derived short fixture when it detects that stale transcript.

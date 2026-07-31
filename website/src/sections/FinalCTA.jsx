@@ -8,7 +8,7 @@ export const FinalCTA = () => (
       <div className="cta-block">
         <h2 className="cta-title">Local by design. Yours to keep.</h2>
         <p className="cta-body">
-          Vocello 2.2.2 for macOS 26 and Apple Silicon. Free, open-source,
+          Vocello 2.3.0 for macOS 26 and Apple Silicon. Free, open-source,
           ready to install in under a minute.
         </p>
         <div className="hero-ctas hero-ctas--center">

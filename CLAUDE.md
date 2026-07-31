@@ -10,7 +10,7 @@
 
 **Vocello** (`Vocello` repo, formerly `QwenVoice`; the local checkout directory and Xcode project keep the old name): local-first TTS on Apple Silicon — **Qwen3-TTS + MLX**, Swift 6, macOS/iOS 26+. No bundled weights; models download from Hugging Face. Also ships the `vocello` CLI, `scripts/`, benchmarks, and `website/`.
 
-macOS **2.2.2** released; iOS build 21 (v2.2.2) is in TestFlight — internal group live, and the
+macOS **2.3.0** released; iOS build 22 (v2.3.0) is the current TestFlight build — internal group live, and the
 **public beta link is live** (approved 2026-07-28): `https://testflight.apple.com/join/Cvp6yCv7`,
 linked from the README, the repo description, and the website.
 Releases are cut only on an explicit maintainer call — landed roadmap work never implies one.

@@ -356,7 +356,7 @@ ensure_mac_test_models() {
     fi
     if [[ "${QVOICE_TEST_MODELS_NO_NETWORK:-}" == "1" ]]; then
       if (( require == 1 )); then
-        _test_models_die "model $id not in $canonical and QVOICE_TEST_MODELS_NO_NETWORK=1 — run: scripts/macos_test.sh models ensure (one-time ~6.9 GB for all three Speed models)"
+        _test_models_die "model $id not in $canonical and QVOICE_TEST_MODELS_NO_NETWORK=1 — run: scripts/macos_test.sh models ensure (one-time ~6.0 GB for all three Speed models)"
       fi
       _test_models_warn "model $id missing; network install disabled (QVOICE_TEST_MODELS_NO_NETWORK=1)"
       return 1

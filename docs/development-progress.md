@@ -39,16 +39,22 @@ machine-readable status record and wins over any older prose.
 | 13 — Benchmark/history v3 | Live 2026-07-29: the first schema-v3 records are committed (three clean `phase0-cli-control-*` engine records plus one exploratory run that also exposed and fixed the summarizer's v3 pin). `benchmarks/schema-v3.json` adds the typed quality identity to generation takes (pass/warning only, five fast gates required, machine-code issues); v1/v2 records stay valid immutable history; the publisher stamps v3 only when every take carries the identity. Remainder: UI-lane records still publish v2 until the UI benchmark checker folds the take quality identity. |
 | 14 — Organization and retirement | Closed 2026-07-23 (14a + 14b): compatibility SPI retired, actor-owned loading/metadata/priming/clone artifacts, clone conditioning epoch-bound end to end. |
 
-## Resume here (2026-07-30)
+## Resume here (2026-07-31)
 
 Stages 0–3 of the adopted roadmap are complete (the 2.2 artifact promotion included);
-Stage 4 stays gated. The evidence battery on the 2026.07.26.1 artifacts is roughly half
-banked, and its device lanes surfaced and shipped seven real fixes along the way:
+Stage 4 stays gated. **v2.3.0 was cut 2026-07-31 on an explicit maintainer call** with the
+evidence battery deliberately mid-flight (deterministic publishing rule; deferral recorded
+below and in the release notes). The battery on the 2026.07.26.1 artifacts is more than
+half banked, and its device lanes surfaced and shipped real fixes along the way:
 
 - **Banked (committed, PASS):** three clean CLI engine controls (the first schema-v3
-  records), three macOS UI controls, the canonical 29-take macOS matrix
-  (`passedWithWarnings`, schema v2 pending the UI-checker quality-identity fold), and
-  retained-memory qualification on both canonical platforms.
+  records), three macOS UI controls, two clean iOS UI controls
+  (`phase0-ios-control-1..2`; the wiped phone's benchmark clone voice was re-enrolled with
+  the new opt-in `scripts/ui_test.sh ios enroll-clone-fixture` lane), the canonical
+  29-take macOS matrix (`passedWithWarnings`, schema v2 pending the UI-checker
+  quality-identity fold), and retained-memory qualification on both canonical platforms —
+  the memory re-qualification predates the artifact re-pin and rides the deferred
+  remainder below.
 - **Fixes shipped by the battery:** the summarizer's v3 schema pin; the ui-lane long-form
   probe silently killing non-long-form runs; the iOS download-ledger artifact-update brick;
   clone priming on voice selection; a completed model load no longer discarded on late task
@@ -63,20 +69,23 @@ banked, and its device lanes surfaced and shipped seven real fixes along the way
 
 The concrete next actions, in order:
 
-1. **Finish the battery on the paired iPhone** (the phone was wiped and restored
-   2026-07-30; the benchmark clone voice `A_warm_elderly_woman` must be re-enrolled from
-   the pinned Voice Design reference before UI lanes run): three iOS UI control lanes
-   (`phase0-ios-control-1..3`), the canonical 29-take iOS matrix, then rebind
+1. **Finish the deferred battery remainder on the paired iPhone** (phone unlocked,
+   Auto-Lock Never): re-run iOS control lane 3 (`phase0-ios-control-3`; the 2026-07-31
+   attempt was cleanly aborted mid-run for the release window — no publication), the
+   canonical 29-take iOS matrix, both control evaluators
+   (`check_characterization_controls.py`, `check_secret_sauce_cells.py`), memory
+   re-qualification on both platforms against the new artifacts, then rebind
    `config/characterization-fixtures.json` to the new record identities in the same change
-   as this file's next sync. Caveat for evaluators: the banked macOS controls ran before
-   the clone-prime route change; generation semantics, sampling, and seeds are untouched,
-   so cross-platform comparability holds, but prime-side timings differ.
-2. **Release staging only on an explicit maintainer call** — never implied by landed work.
-   When called, the combined 2.2-promotion + Stage 1 story is the headline (~10% faster,
-   ~280 MB less memory, ~13% smaller downloads); the standing per-candidate macOS smoke
-   lane and release-notes ledger apply. The clone-prime and Wi-Fi-pin fixes should ship in
-   the next iOS build: the current TestFlight build carries both the prime memory spike and
-   the reroute exposure.
+   as this file's next sync. Caveat for evaluators: the banked macOS/CLI controls ran
+   before the clone-prime route change; generation semantics, sampling, and seeds are
+   untouched, so cross-platform comparability holds, but prime-side timings differ.
+   Cleanup afterwards: `~/Desktop/vocello-clone-fixture/` and the two staged reference
+   files in the phone's app Documents.
+2. **v2.3.0 released 2026-07-31** (maintainer call): the combined 2.2-promotion + Stage 1
+   story is the headline (up to ~10% faster warm, ~280 MB less memory, ~1 GB smaller Speed
+   footprint); notes in [`docs/releases/v2.3.0.md`](releases/v2.3.0.md) with the standing
+   smoke-lane ledger. iOS build 22 ships the clone-prime and Wi-Fi-pin fixes that build 21
+   carried as exposures.
 3. **Deferred with rationale, not blocked:** the UI-checker quality-identity fold (lets UI
    matrices publish v3); composed standard/canonical quality-report emission at a lane call
    site; the optional MOS-proxy advisory column; the Stage 4 gated bets.
@@ -294,8 +303,12 @@ explicit macOS fixture repair/bootstrap step. XCUITest is the sole autonomous ap
 
 ## Open release work
 
-- **macOS 2.2.2 is the released version** (2026-07-25; 2.2.0 → 2.2.1 → 2.2.2 in one day —
-  notes under [`docs/releases/`](releases/)). The 2.2.0 arc hardened the pipeline (SHA-pinned
+- **macOS 2.3.0 is the released version** (2026-07-31; notes under
+  [`docs/releases/`](releases/)) — the 2026.07.26.1 artifact generation, Stage 1 warm-speed
+  wins, delivery hardening, and the clone-prime/Wi-Fi-pin fixes, cut with the evidence
+  battery deliberately mid-flight per the deterministic publishing rule. Before it,
+  2.2.0 → 2.2.1 → 2.2.2 landed in one day on 2026-07-25. The 2.2.0 arc hardened the
+  pipeline (SHA-pinned
   tooling in release jobs, nested-framework signing with an explicit notarization verdict check,
   self-diagnosing dirty-tree evidence errors) and renamed the repository
   `PowerBeef/QwenVoice` → `PowerBeef/Vocello` before tagging; old URLs redirect and the old name

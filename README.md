@@ -8,7 +8,7 @@
 
 <p align="center">
   <a href="https://vocello.vercel.app/"><img src="https://img.shields.io/badge/Website-vocello.vercel.app-7b61ff?style=flat-square&logo=vercel" alt="Website"></a>
-  <a href="https://github.com/PowerBeef/Vocello/releases/tag/v2.2.2"><img src="https://img.shields.io/badge/Vocello-2.2.2-7b61ff?style=flat-square" alt="Vocello 2.2.2"></a>
+  <a href="https://github.com/PowerBeef/Vocello/releases/tag/v2.3.0"><img src="https://img.shields.io/badge/Vocello-2.3.0-7b61ff?style=flat-square" alt="Vocello 2.3.0"></a>
   <img src="https://img.shields.io/badge/macOS-26%2B-111827?style=flat-square&logo=apple" alt="macOS 26 or newer">
   <a href="https://testflight.apple.com/join/Cvp6yCv7"><img src="https://img.shields.io/badge/iPhone-TestFlight%20beta-7b61ff?style=flat-square&logo=apple" alt="iPhone TestFlight beta"></a>
   <img src="https://img.shields.io/badge/Apple%20Silicon-required-111827?style=flat-square&logo=apple" alt="Apple Silicon required">
@@ -22,9 +22,9 @@
 </div>
 
 <p align="center">
-  <a href="https://github.com/PowerBeef/Vocello/releases/download/v2.2.2/Vocello-macos26.dmg"><strong>Download Vocello 2.2.2 for macOS 26+</strong></a><br>
+  <a href="https://github.com/PowerBeef/Vocello/releases/download/v2.3.0/Vocello-macos26.dmg"><strong>Download Vocello 2.3.0 for macOS 26+</strong></a><br>
   <a href="https://testflight.apple.com/join/Cvp6yCv7"><strong>Join the iPhone beta on TestFlight</strong></a><br>
-  <a href="https://github.com/PowerBeef/Vocello/releases/tag/v2.2.2">Release details</a> · <a href="docs/releases/v2.2.2.md">What is new</a> · <a href="https://github.com/PowerBeef/Vocello/releases">All releases</a>
+  <a href="https://github.com/PowerBeef/Vocello/releases/tag/v2.3.0">Release details</a> · <a href="docs/releases/v2.3.0.md">What is new</a> · <a href="https://github.com/PowerBeef/Vocello/releases">All releases</a>
 </p>
 
 <p align="center">
@@ -85,12 +85,12 @@ Custom Voice and Voice Design support ten delivery styles at subtle, normal, or 
 
 ## Install on Mac
 
-1. Download [`Vocello-macos26.dmg`](https://github.com/PowerBeef/Vocello/releases/download/v2.2.2/Vocello-macos26.dmg).
+1. Download [`Vocello-macos26.dmg`](https://github.com/PowerBeef/Vocello/releases/download/v2.3.0/Vocello-macos26.dmg).
 2. Open the DMG and drag `Vocello.app` to `/Applications`.
 3. Open Vocello, then install models from **Settings > Model downloads**.
 4. Generate from Custom Voice, Voice Design, or Voice Cloning.
 
-The current DMG is signed with an Apple Developer ID certificate, notarized, and stapled. The attached [`release-metadata.txt`](https://github.com/PowerBeef/Vocello/releases/download/v2.2.2/release-metadata.txt) records source and toolchain provenance.
+The current DMG is signed with an Apple Developer ID certificate, notarized, and stapled. The attached [`release-metadata.txt`](https://github.com/PowerBeef/Vocello/releases/download/v2.3.0/release-metadata.txt) records source and toolchain provenance.
 
 Upgrading from Vocello 2.0 or 2.1 does not require reinstalling models. Application data remains under `~/Library/Application Support/QwenVoice/`.
 
@@ -100,10 +100,10 @@ With the 2.2.0 release the repository moved from `PowerBeef/QwenVoice` to `Power
 
 | Platform | Support | Model variants | Public status |
 | --- | --- | --- | --- |
-| Mac | macOS 26.0 or newer, Apple Silicon, 8 GB RAM minimum | Speed (4-bit) and Quality (8-bit) | Vocello 2.2.2 is available now |
+| Mac | macOS 26.0 or newer, Apple Silicon, 8 GB RAM minimum | Speed (4-bit) and Quality (8-bit) | Vocello 2.3.0 is available now |
 | iPhone | iPhone 15 Pro or newer, iOS 26.0 or newer | Speed (4-bit) | Public beta via [TestFlight](https://testflight.apple.com/join/Cvp6yCv7) |
 
-Speed is the recommended default and uses less memory. Quality is a Mac-only option for machines with more headroom. The three recommended Mac Speed packages total about 7 GB.
+Speed is the recommended default and uses less memory. Quality is a Mac-only option for machines with more headroom. The three recommended Mac Speed packages total about 6 GB.
 
 Support floors and benchmark machines are different facts: the floor is any Apple Silicon Mac with 8 GB, and canonical evidence is produced on a Mac mini M2 with 8 GB and an iPhone 17 Pro; see [Performance, measured](#performance-measured) above. The canonical record is `passedWithWarnings` because accepted memory soft trims and audio-QC warnings remain visible rather than being hidden; the [tracked record](benchmarks/runs/ui-generation/macos-xcui-benchmark-20260723-083313-d02005ae.json) has the exact matrix and conditions.
 

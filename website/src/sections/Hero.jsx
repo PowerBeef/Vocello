@@ -8,7 +8,7 @@ export const Hero = () => (
       <div className="hero-copy">
         <div className="hero-eyebrow">
           <span className="dot" aria-hidden="true" />
-          Vocello 2.2.2 · macOS 26+ · Apple Silicon
+          Vocello 2.3.0 · macOS 26+ · Apple Silicon
         </div>
         <h1 className="hero-title">
           A voice studio that <span className="accent-gold">never leaves</span> your Mac.
@@ -22,7 +22,7 @@ export const Hero = () => (
           <a className="btn btn-primary" href={RELEASE_LATEST} target="_blank" rel="noreferrer">
             <Icon name="apple" size={16} />
             Download for macOS&nbsp;26
-            <span className="platform-mini">· 2.2.2</span>
+            <span className="platform-mini">· 2.3.0</span>
           </a>
           <a className="btn btn-secondary" href="#listen">
             <Icon name="play" size={14} />

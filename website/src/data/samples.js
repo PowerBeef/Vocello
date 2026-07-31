@@ -39,7 +39,7 @@ export const SAMPLES = [
     id: "documentary",
     mode: "Voice Cloning",
     color: "var(--terracotta-300)",
-    voice: "Cloned from internal-narration-v3.wav",
+    voice: "Cloned from a 12-second narration clip",
     quote: "Every measurement was logged, every observation written down. Only then could the model be trusted.",
     duration: "0:09",
     delivery: "Mirrors source clip",

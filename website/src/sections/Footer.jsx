@@ -21,8 +21,9 @@ export const Footer = () => (
             <h5>Product</h5>
             <ul>
               <li><a href="#workflows">Workflows</a></li>
-              <li><a href="#how-it-runs">How it runs</a></li>
               <li><a href="#listen">Listen</a></li>
+              <li><a href="#how-it-runs">How it runs</a></li>
+              <li><a href="#iphone">iPhone</a></li>
               <li><a href="#engineering">Engineering</a></li>
               <li><a href="#download">Download</a></li>
               <li><a href="privacy/">Privacy</a></li>

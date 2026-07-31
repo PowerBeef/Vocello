@@ -25,12 +25,12 @@ export const Nav = () => {
           <span className="brand-rebrand">formerly QwenVoice</span>
         </div>
         <div className="nav-links">
-          <a href="#workflows">Workflows</a>
+          <a className="nav-link--full" href="#workflows">Workflows</a>
           <a href="#listen">Listen</a>
-          <a href="#how-it-runs">How it runs</a>
-          <a href="#iphone">iPhone</a>
+          <a className="nav-link--full" href="#how-it-runs">How it runs</a>
+          <a className="nav-link--full" href="#iphone">iPhone</a>
           <a href="#engineering">Engineering</a>
-          <a href={REPO} target="_blank" rel="noreferrer">Open source</a>
+          <a className="nav-link--full" href={REPO} target="_blank" rel="noreferrer">Open source</a>
         </div>
         <a className="nav-cta" href="#download">
           <Icon name="apple" size={14} />

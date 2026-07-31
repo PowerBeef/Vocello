@@ -57,4 +57,81 @@ final class VocelloMacMarketingCaptureUITests: VocelloMacUITestCase {
         windowShot.lifetime = .keepAlways
         add(windowShot)
     }
+
+    /// Voice Cloning and History captures with authored content.
+    ///
+    /// Staging contract (operator-run before this test): the debug history
+    /// store starts empty (back up and remove
+    /// `QwenVoice-Debug/history.sqlite*`), and the human-named marketing clone
+    /// voice below is enrolled through the genuine CLI surface:
+    /// `QWENVOICE_DEBUG=1 build/vocello voices enroll --name "Warm storyteller"
+    /// --audio <reference wav> --transcript "<the reference's real transcript>"`.
+    /// The journey then generates real takes so History shows authored scripts,
+    /// never leftover QA fixtures.
+    func test02_CloneAndHistoryCapture() throws {
+        let marketingVoice = "Warm storyteller"
+        beginSession()
+        defer { endSession() }
+
+        ensureCloneConsentEnabled()
+
+        // Voice Cloning capture: the marketing voice active with an authored
+        // script, pre-take so the screen reads as a fresh session.
+        navigate(to: .voices)
+        let useButton = element("voicesRow_use_\(marketingVoice)")
+        XCTAssertTrue(
+            VocelloUIWait.exists(useButton, timeout: 20),
+            "marketing clone voice must be enrolled before capture (vocello voices enroll)"
+        )
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: useButton, timeout: 20))
+        XCTAssertTrue(VocelloUIWait.exists(element("screen_voiceCloning"), timeout: 20))
+        XCTAssertTrue(VocelloUIWait.exists(element("voiceCloning_activeReference"), timeout: 20))
+        let cloneScript = "Some stories are best told slowly, in a voice that remembers "
+            + "where it has been."
+        replaceScript(with: cloneScript)
+        assertReadyToGenerate(mode: .clone)
+
+        let window = app.windows.firstMatch
+        let cloneShot = XCTAttachment(screenshot: window.screenshot())
+        cloneShot.name = "marketing-voice-cloning"
+        cloneShot.lifetime = .keepAlways
+        add(cloneShot)
+
+        // Three genuine takes give History authored rows across all modes.
+        generateAndWaitForCompletion(mode: .clone, timeout: 360)
+
+        prepare(mode: .custom)
+        let customScript = "Welcome to Vocello. Every word you hear was generated "
+            + "right here on your Mac, private by design."
+        replaceScript(with: customScript)
+        generateAndWaitForCompletion(mode: .custom, timeout: 360)
+
+        prepare(mode: .design)
+        let designScript = "The harbor opens at first light, and the town wakes slowly "
+            + "to the sound of gulls."
+        replaceScript(with: designScript)
+        generateAndWaitForCompletion(mode: .design, timeout: 360)
+
+        navigate(to: .history)
+        // Capture the unfiltered list: assertHistoryRows drives the visible
+        // search field, which would leave the shot filtered to one row, so the
+        // capture happens first on a raw non-asserting wait for the newest row.
+        let newestRow = app.staticTexts.matching(
+            NSPredicate(format: "value CONTAINS %@ OR label CONTAINS %@",
+                        "The harbor opens", "The harbor opens")
+        ).firstMatch
+        XCTAssertTrue(
+            newestRow.waitForExistence(timeout: 30),
+            "the newest authored take must be visible in the unfiltered History list"
+        )
+        let historyShot = XCTAttachment(screenshot: window.screenshot())
+        historyShot.name = "marketing-history"
+        historyShot.lifetime = .keepAlways
+        add(historyShot)
+
+        // Verification after the capture; these drive the search field.
+        assertHistoryRows(matching: "Welcome to Vocello", expected: 1)
+        assertHistoryRows(matching: "The harbor opens", expected: 1)
+        assertHistoryRows(matching: "Some stories are best told", expected: 1)
+    }
 }

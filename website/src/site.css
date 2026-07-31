@@ -785,7 +785,6 @@ a { color: inherit; text-decoration: none; }
               border-color var(--motion-quick) var(--ease-standard),
               color var(--motion-quick) var(--ease-standard);
 }
-.chip:hover { color: var(--fg-primary); border-color: rgba(255, 255, 255, 0.18); }
 .chip[data-active="true"] {
   background: color-mix(in oklch, var(--chip-color) 18%, transparent);
   border-color: color-mix(in oklch, var(--chip-color) 46%, transparent);
@@ -1321,7 +1320,8 @@ a { color: inherit; text-decoration: none; }
     justify-content: space-between;
   }
   .nav-cta { justify-self: auto; }
-  .nav-links { display: none; }
+  .nav-links { gap: 16px; font-size: 13px; }
+  .nav-links .nav-link--full { display: none; }
   .workflow-band { padding: 80px 0; }
   .workflow-band-inner,
   .workflow-band--reverse .workflow-band-inner {

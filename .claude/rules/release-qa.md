@@ -225,11 +225,14 @@ scripts/clean_build_caches.sh --compact-profile-failure <run-id> --dry-run
   (ASC-API automation is a recorded enhancement). Details:
   `docs/reference/macos-release-qa.md` "Release notes are a release artifact".
 - **Performance surfaces refresh with each release.** The README chart generator's
-  `RTF_RECORD` and the website Performance numbers move to the newest canonical macOS UI
+  `RTF_RECORD` and the website Engineering numbers move to the newest canonical macOS UI
   record in the same change set as the version bump (or the release notes record the
-  deliberate skip); the `GATE_RECORDS` pre/post pair is pinned history and is never
-  re-pointed. Details: `docs/reference/macos-release-qa.md` "Performance surfaces ship
-  current numbers".
+  deliberate skip). Technical sections (README "Under the hood", website Engineering)
+  are maintained whole-package surfaces: a single release's optimization gets at most
+  one line, never a headline or standalone chart, and the retired gate chart's record
+  pair stays pinned history in prose. Details: `docs/reference/macos-release-qa.md`
+  "Performance surfaces ship current numbers" and "Technical sections are maintained
+  surfaces".
 - **Committed benchmark records ≤256 KB.** Records use a strict privacy allowlist; raw JSONL,
   WAVs, screenshots, result bundles, and traces are gitignored. `HISTORY.md` is generated, never
   manually appended.

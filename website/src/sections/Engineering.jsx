@@ -5,9 +5,13 @@ import React from "react";
   - RTF bars: benchmarks/runs/ui-generation/macos-xcui-benchmark-20260729-023553-111d88c6.json
     (the newest canonical matrix; refresh with every release, see
     docs/reference/macos-release-qa.md "Performance surfaces ship current numbers").
-  - Gate pair (pinned history, never re-pointed): same cell (Custom, long, warm) in
-    ...-20260723-054315-9b6f267b.json (before) and ...-20260723-083313-d02005ae (after).
+  - The retired gate chart's pinned A/B pair (…-9b6f267b / …-d02005ae) stays as history in
+    benchmarks/HISTORY.md and OPTIMIZATION.md §K; per policy it is never re-promoted to a
+    chart. The gate survives as one figcaption sentence below.
   Values are warm-take medians on the canonical Mac mini M2 (8 GB).
+  This section is a maintained whole-package surface (docs/reference/macos-release-qa.md
+  "Technical sections are maintained surfaces"): refresh facts each release, never a
+  single-release billboard.
 */
 const MODES = [
   { name: "Custom Voice", tone: "var(--mode-custom)", takes: [1.85, 1.97, 2.02] },
@@ -16,9 +20,29 @@ const MODES = [
 ];
 const LENGTHS = ["short", "medium", "long"];
 const RTF_SCALE_MAX = 2.4;
-const SCALE_MAX = 2.0;
 
-const GATE = { before: 1.37, after: 1.83 };
+const LEDGER = [
+  {
+    k: "Swift end to end",
+    v: "Generation runs through Vocello's own Swift runtime on MLX, derived from mlx-audio-swift and narrowed to the Qwen3 voice stack: about 36,000 of 49,000 upstream lines removed, no Python, no local server.",
+  },
+  {
+    k: "One engine, three hosts",
+    v: "On the Mac the engine lives in a separate service process that steps away when idle, so heavy engine memory can never take the app down. The iPhone app and the command-line tool run the same engine.",
+  },
+  {
+    k: "Streaming by design",
+    v: "Audio leaves the engine chunk by chunk, so memory stays flat however long the script runs: peak use fell from about 8 GB to about 3 GB, and a ten-minute project ends below its starting footprint.",
+  },
+  {
+    k: "Reproducible by construction",
+    v: "Every request carries its own seed and sampler state. Performance changes merge only when fixed-seed output stays byte-identical, so speed work can never quietly change the voice.",
+  },
+  {
+    k: "Honest benchmarks",
+    v: "Published records are pass-only with a strict privacy allowlist, and each take carries typed quality verdicts. The lane once caught its own measurement bias: disabling the harness's screen recording moved the same take by 55 percent.",
+  },
+];
 
 const RtfChart = () => {
   const width = 640;
@@ -84,53 +108,16 @@ const RtfChart = () => {
   );
 };
 
-const GateBars = () => {
-  const width = 400;
-  const x0 = 0;
-  const x1 = width - 48;
-  const xFor = (v) => x0 + ((x1 - x0) * Math.min(v, SCALE_MAX)) / SCALE_MAX;
-  const barH = 14;
-  const rows = [
-    { label: "Vocello 2.1", value: GATE.before, tone: "var(--fg-tertiary)" },
-    { label: "Vocello 2.2", value: GATE.after, tone: "var(--mode-custom)" },
-  ];
-  return (
-    <svg
-      className="perf-chart perf-chart--gate"
-      viewBox={`0 0 ${width} 96`}
-      role="img"
-      aria-label="The same warm Custom take: 1.37× realtime on Vocello 2.1 and 1.83× on 2.2."
-    >
-      <line x1={xFor(1.0)} y1={6} x2={xFor(1.0)} y2={78} stroke="var(--fg-tertiary)" strokeWidth="1" />
-      <text x={xFor(1.0)} y={94} textAnchor="middle" className="perf-tick">realtime</text>
-      {rows.map((row, i) => {
-        const y = 14 + i * (barH + 16);
-        const bw = xFor(row.value) - x0;
-        return (
-          <g key={row.label}>
-            <text x={x0} y={y - 4} className="perf-tick">{row.label}</text>
-            <path
-              d={`M${x0} ${y} h${bw - 4} a4 4 0 0 1 4 4 v${barH - 8} a4 4 0 0 1 -4 4 h-${bw - 4} z`}
-              fill={row.tone}
-            />
-            <text x={x0 + bw + 7} y={y + barH - 3} className="perf-value">{`${row.value.toFixed(2)}×`}</text>
-          </g>
-        );
-      })}
-    </svg>
-  );
-};
-
-export const Performance = () => (
-  <section className="section perf-section" id="performance" aria-labelledby="perf-title">
+export const Engineering = () => (
+  <section className="section engineering-section" id="engineering" aria-labelledby="eng-title">
     <div className="container">
       <header className="perf-head">
         <p className="section-note">Measured, not promised</p>
-        <h2 id="perf-title" className="section-title">Generation outpaces playback on the minimum Mac.</h2>
+        <h2 id="eng-title" className="section-title">A first-party engine, measured on the minimum Mac.</h2>
         <p className="section-sub">
           Vocello is benchmarked on its own support floor, a Mac mini M2 with 8 GB.
-          Speeds are multiples of realtime: past 1.0×, audio generates faster than
-          it plays, and every number here traces to a tracked record in the open repository.
+          Speeds are multiples of realtime: past 1.0×, audio generates ahead of
+          playback, and every number here traces to a tracked record in the open repository.
         </p>
       </header>
 
@@ -138,24 +125,24 @@ export const Performance = () => (
         <figure className="perf-panel">
           <RtfChart />
           <figcaption className="perf-caption">
-            Warm generation by mode and script length, take medians.
+            Warm generation by mode and script length, take medians. Since 2.2,
+            translucent app surfaces render solid while audio generates, which
+            improved speed on the same take by about a third.
           </figcaption>
         </figure>
 
-        <aside className="perf-gate">
-          <p className="perf-gate-figure" aria-hidden="true">+33%</p>
-          <p className="perf-gate-copy">
-            An interface optimization in 2.2: heavy visual effects pause during
-            generation, leaving the whole machine to the voice. Same Mac, same
-            take.
-          </p>
-          <GateBars />
-        </aside>
+        <dl className="eng-ledger" aria-label="How the Vocello engine is built">
+          {LEDGER.map((row) => (
+            <div className="eng-row" key={row.k}>
+              <dt className="eng-k">{row.k}</dt>
+              <dd className="eng-v">{row.v}</dd>
+            </div>
+          ))}
+        </dl>
       </div>
 
       <p className="perf-provenance">
-        Records <span className="perf-mono">111d88c6</span> (modes), <span className="perf-mono">9b6f267b</span> and{" "}
-        <span className="perf-mono">d02005ae</span> (gate pair) in{" "}
+        Record <span className="perf-mono">111d88c6</span> in{" "}
         <a href="https://github.com/PowerBeef/Vocello/blob/main/benchmarks/HISTORY.md" target="_blank" rel="noreferrer">
           benchmarks/HISTORY.md
         </a>

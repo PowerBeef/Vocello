@@ -11,9 +11,9 @@ Data provenance:
   - The RTF chart reads the newest canonical ui-generation record (RTF_RECORD);
     per release policy it moves to the new canonical record with every release
     (docs/reference/macos-release-qa.md "Performance surfaces ship current
-    numbers"). The gate-delta chart reads the pinned same-day pre/post pair in
-    GATE_RECORDS — a historical A/B isolating the generation performance gate;
-    never re-point one side alone and never move it to a different-build record.
+    numbers"). The retired gate-delta chart's pinned A/B pair remains history in
+    benchmarks/HISTORY.md and OPTIMIZATION.md §K; it is never re-promoted to a
+    chart (technical sections are maintained whole-package surfaces).
   - The long-form memory chart embeds the per-segment table from the local
     lane evidence run named in LONGFORM_RUN_ID (smoke lane
     `--long-form-segments 10`; lane evidence is never a registry record, so
@@ -36,13 +36,6 @@ OUTPUT_DIR = ROOT / "docs" / "charts"
 
 # Newest canonical macOS UI matrix — refresh with every release.
 RTF_RECORD = "macos-xcui-benchmark-20260729-023553-111d88c6"
-# Pinned 2.1-pipeline vs 2.2-gate same-day A/B; historical, never re-pointed.
-GATE_RECORDS = {
-    "post": "macos-xcui-benchmark-20260723-083313-d02005ae",
-    "pre": "macos-xcui-benchmark-20260723-054315-9b6f267b",
-}
-GATE_CELL = "custom/long/warm"
-
 LONGFORM_RUN_ID = "macos-xcui-smoke-20260725-062451-8f15c1fd"
 # (audio seconds, engine phys-footprint end MB, peak MB) per segment.
 LONGFORM_SEGMENTS = (
@@ -163,52 +156,6 @@ def rtf_chart(theme_name: str) -> str:
         y += group_gap - in_gap
     parts.append(text(width - 16, height - 6,
                       f"record {RTF_RECORD[-8:]} · benchmarks/HISTORY.md",
-                      fill=theme["muted"], size=10, anchor="end"))
-    parts.extend(("</g>", "</svg>"))
-    return "\n".join(parts) + "\n"
-
-
-def gate_chart(theme_name: str) -> str:
-    theme = THEMES[theme_name]
-    pre = load_medians(GATE_RECORDS["pre"])[GATE_CELL]
-    post = load_medians(GATE_RECORDS["post"])[GATE_CELL]
-    delta = 100.0 * (post - pre) / pre
-    width, height = 720, 190
-    left = 210.0
-    x0, x1 = left, width - 130.0
-    scale_max = 2.0
-
-    def x_for(value: float) -> float:
-        return x0 + (x1 - x0) * min(value, scale_max) / scale_max
-
-    parts = svg_open(width, height)
-    parts.append(text(16, 28, "The generation performance gate", fill=theme["ink"], size=16, weight="600"))
-    parts.append(text(16, 47, "Same Mac, same take (Custom, long, warm): heavy visual effects now pause while generating",
-                      fill=theme["muted"], size=12))
-    parts.append(text(width - 16, 40, f"+{delta:.0f}%", fill=theme["modes"]["custom"], size=30,
-                      weight="700", anchor="end"))
-
-    bar_h = 18.0
-    rows = (("before the gate (2.1 pipeline)", pre, theme["pre_bar"]),
-            ("with the gate (2.2)", post, theme["modes"]["custom"]))
-    y = 78.0
-    realtime_x = x_for(1.0)
-    parts.append(
-        f'<line x1="{realtime_x:.1f}" y1="{y - 10:.1f}" x2="{realtime_x:.1f}" y2="{y + 2 * bar_h + 20:.1f}" '
-        f'stroke="{theme["muted"]}" stroke-width="1"/>'
-    )
-    parts.append(text(realtime_x, y - 16, "realtime", fill=theme["muted"], size=10, anchor="middle"))
-    for label, value, color in rows:
-        bw = x_for(value) - x0
-        parts.append(text(x0 - 8, y + bar_h - 5, label, fill=theme["muted"], size=11, anchor="end"))
-        parts.append(
-            f'<path d="M{x0:.1f} {y:.1f} h{bw - 4:.1f} a4 4 0 0 1 4 4 v{bar_h - 8:.1f} '
-            f'a4 4 0 0 1 -4 4 h-{bw - 4:.1f} z" fill="{color}"/>'
-        )
-        parts.append(text(x0 + bw + 6, y + bar_h - 5, f"{value:.2f}×", fill=theme["ink"], size=11))
-        y += bar_h + 14.0
-    parts.append(text(width - 16, height - 8,
-                      f"records {GATE_RECORDS['pre'][-8:]} → {GATE_RECORDS['post'][-8:]}",
                       fill=theme["muted"], size=10, anchor="end"))
     parts.extend(("</g>", "</svg>"))
     return "\n".join(parts) + "\n"
@@ -349,7 +296,6 @@ def architecture_chart(theme_name: str) -> str:
 CHARTS = {
     "architecture": architecture_chart,
     "rtf-by-mode": rtf_chart,
-    "gate-delta": gate_chart,
     "longform-memory": memory_chart,
 }
 

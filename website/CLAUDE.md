@@ -39,7 +39,7 @@ behavior; Vercel owns deployment for this directory.
 
 `src/App.jsx` is a **thin composer** (~73 lines). All UI is split across:
 
-- `src/sections/` — one file per page section, in render order: `Nav`, `Hero`, `WorkflowBand` (rendered 3× from data), `Listen`, `Capabilities`, `WhyCloud`, `HowItRuns`, `IphoneBeta`, `Performance`, `Limitations`, `FinalCTA`, `Footer`.
+- `src/sections/` — one file per page section, in render order: `Nav`, `Hero`, `WorkflowBand` (rendered 3× from data), `Listen`, `Capabilities`, `WhyCloud`, `HowItRuns`, `IphoneBeta`, `Engineering`, `Limitations`, `FinalCTA`, `Footer`.
 - `src/components/` — two shared primitives:
   - `Icon.jsx` — single switch over an 18-case SVG vocabulary. Also exports `makeWaveBars` (deterministic bar-height generator).
   - `Waveform.jsx` — bar waveform for Listen rows.

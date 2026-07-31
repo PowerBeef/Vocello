@@ -152,17 +152,37 @@ version bump:
   macOS UI matrix record and regenerate (`python3 scripts/generate_readme_charts.py`;
   its `--check` already fail-closes on stale SVGs), then update the README `<img alt>`
   ranges to match.
-- Update `website/src/sections/Performance.jsx`: the `MODES` medians, the aria-label
-  ranges, and the provenance record IDs, all from the same record.
-- `GATE_RECORDS` (the 2.1-pipeline vs 2.2-gate same-day A/B) is pinned history: never
-  re-point either side, and never substitute a different-build record — mixing builds
-  would corrupt the isolated gate comparison.
+- Update `website/src/sections/Engineering.jsx`: the `MODES` medians, the aria-label
+  ranges, and the provenance record ID, all from the same record.
+- The retired gate chart's same-day A/B pair is pinned history (see "Technical sections
+  are maintained surfaces" below); it is never re-pointed, re-measured, or re-promoted
+  to a chart.
 - If no newer canonical record exists at release time (for example a docs-only patch
   release), record that explicitly in the release notes Evidence section instead —
   the same visible-skip discipline as the smoke lane.
 - Which record is "the newest canonical" is a judgment the registry supports
   (clean-source, canonical classification, `passed`/`passedWithWarnings`); dirty-source
   exploratory records never back public numbers.
+
+## Technical sections are maintained surfaces (standing per-release step)
+
+README "Under the hood" and the website Engineering section
+(`website/src/sections/Engineering.jsx`) are long-term whole-package surfaces: they
+present the owned-runtime derivation, the host architecture, the
+streaming/memory/determinism discipline, and the benchmark rigor as one curated story.
+
+- Each release folds durable new results from `benchmarks/OPTIMIZATION.md` and the
+  `Packages/VocelloQwen3Core/` ledgers into that story and retires superseded facts;
+  the sections are refreshed in the same change set as the version bump.
+- A single release's optimization gets **at most one line** inside the broader story:
+  never a headline, a standalone chart, or a stat panel. The 2.2 UI-transparency gate,
+  demoted on 2026-07-31 after briefly serving as a headline, is the recorded precedent.
+- The retired gate chart's A/B record pair (`…-9b6f267b` / `…-083313-d02005ae`) is
+  pinned history in prose and `benchmarks/HISTORY.md`; it is never re-measured or
+  re-promoted to a chart.
+- Every technical subsection and ledger row leads with the plain-language user
+  consequence before the technical grounding: the same dual-audience rule as release
+  notes.
 
 ## Outward-facing performance terminology
 

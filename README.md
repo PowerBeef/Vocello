@@ -41,33 +41,7 @@
 
 Scripts past 900 characters become **long-form projects**: planned segments stream one after another while you listen along, then join into a single finished file with a per-segment map in History. Ten languages are supported (Chinese, English, Japanese, Korean, German, French, Russian, Portuguese, Spanish, and Italian) with automatic detection, and everything (scripts, references, history, audio) stays in local app storage unless you export it.
 
-## Not a Python wrapper
-
-Most local TTS tools shell out to a Python reference implementation behind a local server. Vocello generates through a first-party Swift runtime on MLX, [`VocelloQwen3Core`](Packages/VocelloQwen3Core/README.md): no Python, no local server, and the CLI links the same engine directly.
-
-- On the Mac the model runs in a separate XPC service that retires when idle, so engine memory pressure cannot take the app window down with it. On iPhone the same engine runs in-process.
-- Audio streams over an actor-owned lossless channel, so memory does not grow with output length; a 12-segment long-form run producing 10.4 minutes of audio ended about 1.1% below its starting footprint.
-- Every request carries its own seed and sampler state, so takes are reproducible by construction, and that determinism is the merge gate for performance work.
-
-[Architecture](docs/ARCHITECTURE.md) · [Benchmarks](benchmarks/HISTORY.md) · [More detail below](#under-the-hood)
-
-## Performance, measured
-
-Every number below comes from a tracked, privacy-safe benchmark record in this repository; canonical evidence is produced on the support-floor tier, a Mac mini M2 with 8 GB.
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/charts/rtf-by-mode-dark.svg">
-  <img alt="Grouped bar chart: warm generation speed for Custom Voice (1.85× to 2.02× realtime), Voice Design (1.92× to 2.12×), and Voice Cloning (1.55× to 2.03×), all beyond the realtime line at 1.0×" src="docs/charts/rtf-by-mode-light.svg">
-</picture>
-
-Vocello 2.2 also changed how the app behaves *while* it generates: translucent interface surfaces temporarily render as solid fills so the compositor stops competing with the engine. Same machine, same take, about a third faster:
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/charts/gate-delta-dark.svg">
-  <img alt="Paired bar chart: the same warm Custom take at 1.37× realtime before the generation performance gate and 1.83× with it, a 33 percent improvement" src="docs/charts/gate-delta-light.svg">
-</picture>
-
-The full methodology, hardware profiles, and every published record live in [`benchmarks/HISTORY.md`](benchmarks/HISTORY.md) and [`docs/reference/benchmarking-procedure.md`](docs/reference/benchmarking-procedure.md); the charts above regenerate deterministically from the named records via `scripts/generate_readme_charts.py`.
+Vocello is not a wrapper around a Python server: generation runs through a first-party Swift runtime on MLX, and the full engineering story lives in [Under the hood](#under-the-hood).
 
 ## Voice workflows
 
@@ -82,6 +56,24 @@ Custom Voice and Voice Design support ten delivery styles at subtle, normal, or 
 | --- | --- |
 | ![Vocello model download settings](docs/screenshots/vocello-model-downloads.png) | ![Vocello History screen](docs/screenshots/vocello-history.png) |
 | Install and manage the available model package for each voice mode from Settings. | Generations remain local and can be replayed, searched, exported, or removed. |
+
+## Variation and reproducibility
+
+The Expressive, Balanced, and Consistent variation settings trade take-to-take variety against stability. Multi-line batches share one seed so their lines form a consistent performance. CLI and benchmark callers can provide an explicit seed for reproducible evidence. Ordinary interactive generations are not presented as seed-replayable takes.
+
+## Local-first privacy
+
+- Speech generation runs locally after models are installed.
+- Generated audio, recorded references, transcripts, saved voices, and history remain in local app storage unless you export them.
+- Model installation downloads pinned model artifacts from Hugging Face.
+- Reference recording requests microphone access. Transcript auto-fill requests Speech Recognition access and uses on-device recognition with the required system language assets.
+- Voice cloning should only be used with voices you own or have permission to use.
+- Clone generation remains disabled until its visible consent acknowledgment is enabled in
+  Settings; the choice is stored locally and can be changed there.
+
+Storage locations and deletion behavior are documented in [`docs/reference/privacy-storage.md`](docs/reference/privacy-storage.md).
+
+---
 
 ## Install on Mac
 
@@ -105,25 +97,9 @@ With the 2.2.0 release the repository moved from `PowerBeef/QwenVoice` to `Power
 
 Speed is the recommended default and uses less memory. Quality is a Mac-only option for machines with more headroom. The three recommended Mac Speed packages total about 6 GB.
 
-Support floors and benchmark machines are different facts: the floor is any Apple Silicon Mac with 8 GB, and canonical evidence is produced on a Mac mini M2 with 8 GB and an iPhone 17 Pro; see [Performance, measured](#performance-measured) above. The canonical record is `passedWithWarnings` because accepted memory soft trims and audio-QC warnings remain visible rather than being hidden; the [tracked record](benchmarks/runs/ui-generation/macos-xcui-benchmark-20260729-023553-111d88c6.json), produced on the current 2026.07.26.1 model packages, has the exact matrix and conditions.
+Support floors and benchmark machines are different facts: the floor is any Apple Silicon Mac with 8 GB, and canonical evidence is produced on a Mac mini M2 with 8 GB and an iPhone 17 Pro; see [Performance, measured](#performance-measured) below. The canonical record is `passedWithWarnings` because accepted memory soft trims and audio-QC warnings remain visible rather than being hidden; the [tracked record](benchmarks/runs/ui-generation/macos-xcui-benchmark-20260729-023553-111d88c6.json), produced on the current 2026.07.26.1 model packages, has the exact matrix and conditions.
 
 Macs on macOS 15 can use the legacy [QwenVoice 1.2.3 release](https://github.com/PowerBeef/Vocello/releases/tag/v1.2.3). No Vocello 2.x backport is planned.
-
-## Variation and reproducibility
-
-The Expressive, Balanced, and Consistent variation settings trade take-to-take variety against stability. Multi-line batches share one seed so their lines form a consistent performance. CLI and benchmark callers can provide an explicit seed for reproducible evidence. Ordinary interactive generations are not presented as seed-replayable takes.
-
-## Local-first privacy
-
-- Speech generation runs locally after models are installed.
-- Generated audio, recorded references, transcripts, saved voices, and history remain in local app storage unless you export them.
-- Model installation downloads pinned model artifacts from Hugging Face.
-- Reference recording requests microphone access. Transcript auto-fill requests Speech Recognition access and uses on-device recognition with the required system language assets.
-- Voice cloning should only be used with voices you own or have permission to use.
-- Clone generation remains disabled until its visible consent acknowledgment is enabled in
-  Settings; the choice is stored locally and can be changed there.
-
-Storage locations and deletion behavior are documented in [`docs/reference/privacy-storage.md`](docs/reference/privacy-storage.md).
 
 ## Vocello for iPhone
 
@@ -133,25 +109,60 @@ Storage locations and deletion behavior are documented in [`docs/reference/priva
 
 Current implementation and acceptance status: [`docs/development-progress.md`](docs/development-progress.md).
 
+---
+
 ## Under the hood
 
-Vocello is not a wrapper around a Python server. Generation runs through a first-party Swift runtime, [`VocelloQwen3Core`](Packages/VocelloQwen3Core/README.md), derived from `mlx-audio-swift` and specialized for Qwen3-TTS and the Mimi codec, with a fused code-predictor RoPE, per-generation sampler state, and a streaming audio decoder that overlaps the token loop.
+This is the maintained engineering record of the whole package, refreshed with each release. Every claim below traces to a tracked benchmark record, a machine-readable contract, or a documented measurement in this repository.
+
+### The owned runtime
+
+Most local TTS tools shell out to a Python reference implementation behind a local server. Vocello generates through a first-party Swift runtime on MLX, [`VocelloQwen3Core`](Packages/VocelloQwen3Core/README.md): no Python, no local server, no bundled weights. The runtime is derived from [`mlx-audio-swift`](https://github.com/Blaizzy/mlx-audio-swift) v0.1.2 and narrowed to exactly what Vocello ships, the Qwen3-TTS runtime and the Mimi codec primitives it needs: about 36,000 of roughly 49,000 upstream lines were removed in that specialization, and the 83 retained files (37 identical, 21 modified, 25 added) plus 14 named semantic changes are tracked under an immutable lineage ledger (`Packages/VocelloQwen3Core/PATCHES.json`). A facade contract rejects any public declaration that leaks raw MLX types, and benchmark-backed capability claims automatically demote when their evidence source drifts from the recorded run.
+
+One engine serves three hosts. On the Mac the engine lives in a separate XPC service process that retires when idle, so engine memory pressure can never take the app window down, and retiring the process returns memory that a model unload alone cannot. On iPhone the same engine runs in-process. The `vocello` command-line tool links the engine directly and reuses the models the app installed.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/charts/architecture-dark.svg">
   <img alt="Architecture diagram: the SwiftUI app talks over XPC to a separate engine service process, which drives the owned VocelloQwen3Core runtime (an engine actor owning each session, the Qwen3-TTS talker and code predictor, and the Mimi decoder on MLX and Metal) while PCM audio streams back to the app chunk by chunk" src="docs/charts/architecture-light.svg">
 </picture>
 
-On the Mac, model work lives in a separate XPC service process that retires when idle; on iPhone the same engine runs in-process. Either way the architecture is streaming end to end: audio crosses an actor-owned lossless channel chunk by chunk, every request carries its own seed and sampler state (takes are reproducible by construction), and cancellation is a typed, awaited operation; a cancelled take can never land in History.
+Every request moves through one synthesis pipeline from conditioning to a verified 24 kHz mono 16-bit WAV, owned end to end by an engine actor. The full request lifecycle and engine invariants are documented in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
-That streaming design is why memory does not grow with output length. A long-form project generates each planned segment as an ordinary streaming take and then assembles the joined file in bounded blocks:
+### Streaming, memory, and determinism
+
+Long scripts do not need a bigger Mac. Audio crosses an actor-owned, frame-bounded channel chunk by chunk: audio-bearing events are never dropped, backpressure suspends the producer instead of buffering, and cancelling a suspended producer is proven by test to wake it cleanly. Making streaming the default collapsed peak generation memory from about 8 GB to about 3 GB on the same take and made the peak flat with output length, a measurement that overturned the project's own earlier analysis (`benchmarks/OPTIMIZATION.md` §F.1). A 12-segment long-form project producing 10.4 minutes of audio ended about 1.1% below its starting footprint:
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/charts/longform-memory-dark.svg">
   <img alt="Line chart of engine physical footprint across a 12-segment long-form project: end-of-segment values oscillate in a flat band around 2.4 GB and peaks stay near 3.0 GB, with a first-to-last change of minus 1.1 percent across 10.4 minutes of audio" src="docs/charts/longform-memory-light.svg">
 </picture>
 
-Engine invariants, the request lifecycle, and the model-delivery contract are documented in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md); benchmark publication is PASS-only and privacy-allowlisted by design.
+Takes are reproducible by construction: every request carries its own seed and fresh sampler state, nothing samples from process-global state, and cancellation is a typed, awaited operation (user, memory pressure, superseded, or shutdown), so a cancelled take can never land in History. Memory policy is set per device tier, with no hard memory cap in production and no silent quality fallback.
+
+### Performance, measured
+
+Every number below comes from a tracked, privacy-safe benchmark record in this repository; canonical evidence is produced on the support-floor tier, a Mac mini M2 with 8 GB.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/charts/rtf-by-mode-dark.svg">
+  <img alt="Grouped bar chart: warm generation speed for Custom Voice (1.85× to 2.02× realtime), Voice Design (1.92× to 2.12×), and Voice Cloning (1.55× to 2.03×), all beyond the realtime line at 1.0×" src="docs/charts/rtf-by-mode-light.svg">
+</picture>
+
+That speed is the sum of an evergreen optimization ledger, not one trick. Section letters cite `benchmarks/OPTIMIZATION.md`:
+
+- The workload proved launch-bound, not compute-bound: whole-generation GPU busy rose from 31 to 37% up to about 49% as host-side graph building was removed, and that characterization has steered every optimization since (§H, §M).
+- A fused code-predictor rotary embedding removed about 600 kernel launches per frame, worth +26% warm; this is the change that took the 8 GB floor Mac past realtime (§H P3).
+- The per-frame code-predictor pass is compiled once and replayed, worth +8 to 11% warm on every cell with byte-identical output (§M P3).
+- Stream-chunk materialization is pipelined off the token hot path with identical event order, verified byte-identical across 12 of 12 fixed-seed takes (§M P2a-i).
+- Switching models reuses the byte-identical 682 MB speech tokenizer: its load cost drops from 503 ms to zero (§N 2.1).
+- The model packages carry 8-bit text embeddings, about 278 MB less resident memory and 292 MB less disk per Speed package, published across six public Hugging Face repositories at verified equal quality (§N 2.2).
+- The interface steps aside while the engine works: attribution put window compositing near 23% of the same warm take against about 3% for XPC transport, so translucent surfaces render as solid fills during generation (§K).
+
+The full methodology, hardware profiles, and every published record live in [`benchmarks/HISTORY.md`](benchmarks/HISTORY.md) and [`docs/reference/benchmarking-procedure.md`](docs/reference/benchmarking-procedure.md); the charts in this section regenerate deterministically from the named records via `scripts/generate_readme_charts.py`.
+
+### Honest measurement
+
+Performance work here merges only with proof. Fixed-seed byte-identity is the merge gate for scheduling changes (a change that moves a single sample is not a scheduling change), and the losses are recorded next to the wins: experiments that regressed are kept as measured do-NOTs with their numbers, and a whole conversion arm was parked when its regression reproduced across data types (`benchmarks/OPTIMIZATION.md` §M, §N 2.3). The benchmark lane once caught its own observer effect, a +55% swing traced to the test harness video-encoding the screen during UI benchmarks, and the affected records are marked non-comparable rather than quietly deleted (§J). Published benchmark records are PASS-only and privacy-allowlisted by design, and every take carries a typed quality identity (audio, prosody, transcription, and continuity gate verdicts) in the registry schema.
 
 Vocello is built by a solo developer with heavy use of coding agents. Every performance claim above is gated by deterministic, fixed-seed checks and the tracked benchmark records in this repository.
 

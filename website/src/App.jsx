@@ -8,7 +8,7 @@ import { Capabilities } from "./sections/Capabilities.jsx";
 import { WhyCloud } from "./sections/WhyCloud.jsx";
 import { HowItRuns } from "./sections/HowItRuns.jsx";
 import { IphoneBeta } from "./sections/IphoneBeta.jsx";
-import { Performance } from "./sections/Performance.jsx";
+import { Engineering } from "./sections/Engineering.jsx";
 import { Limitations } from "./sections/Limitations.jsx";
 import { FinalCTA } from "./sections/FinalCTA.jsx";
 import { Footer } from "./sections/Footer.jsx";
@@ -26,7 +26,7 @@ const useScrollReveal = () => {
 
     const targets = document.querySelectorAll(
       ".workflow-band, .listen-section, .caps-section, .cloud-section, " +
-        ".runs-section, .iphone-section, .perf-section, .limitations-section, .final-cta-section",
+        ".runs-section, .iphone-section, .engineering-section, .limitations-section, .final-cta-section",
     );
     if (!targets.length) return;
 
@@ -87,7 +87,7 @@ const App = () => {
       <WhyCloud />
       <HowItRuns />
       <IphoneBeta />
-      <Performance />
+      <Engineering />
       <Limitations />
       <FinalCTA />
     </main>

@@ -29,6 +29,7 @@ export const Nav = () => {
           <a href="#listen">Listen</a>
           <a href="#how-it-runs">How it runs</a>
           <a href="#iphone">iPhone</a>
+          <a href="#engineering">Engineering</a>
           <a href={REPO} target="_blank" rel="noreferrer">Open source</a>
         </div>
         <a className="nav-cta" href="#download">

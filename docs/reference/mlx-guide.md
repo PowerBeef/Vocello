@@ -2,7 +2,7 @@
 
 > **Living document.** A project-specific reference for the MLX runtime, the Qwen3-TTS backend, and the optimization decisions that shape Vocello's macOS/iOS engine. When this doc disagrees with the code, the code wins — fix this file.
 >
-> Last reviewed: 2026-06-15. Shipping pins: `mlx-swift` **0.30.6**, `mlx-swift-lm` **2.30.6**.
+> Last reviewed: 2026-08-01. Shipping pins: `mlx-swift` **0.31.6**, `mlx-swift-lm` **3.31.4**, `swift-transformers` **1.1.9** (direct since the lm 3.x Hub/Tokenizers externalization).
 
 ---
 
@@ -90,7 +90,7 @@ Vocello ships two weight variants:
 
 The quantization scheme is **affine weight-only quantization**. Each group of 64 weights is stored as 4-bit (or 8-bit) integers plus a per-group scale and bias. At runtime, the GPU dequantizes the weight group on demand inside the matrix-multiplication kernel. The activations stay in fp16/bf16.
 
-This matches MLX's `QuantizationMode.affine` (the default in `mlx-swift` 0.30.6). Newer MLX versions also support `nvfp4` and `mxfp8`, but those are not used by Vocello's Qwen3-TTS checkpoints.
+This matches MLX's `QuantizationMode.affine` (still the default in `mlx-swift` 0.31.6). Newer MLX versions also support `nvfp4` and `mxfp8`, but those are not used by Vocello's Qwen3-TTS checkpoints.
 
 ### 3.2 Swift API for quantization
 
@@ -101,7 +101,7 @@ import mlx.nn as nn
 nn.quantize(model, group_size=64, bits=4, mode="affine")
 ```
 
-In `mlx-swift` 0.30.6, a `Module` conforming to `Quantizable` exposes:
+In `mlx-swift` 0.31.6, a `Module` conforming to `Quantizable` exposes:
 
 ```swift
 func toQuantized(groupSize: Int, bits: Int, mode: QuantizationMode) -> Module
@@ -126,7 +126,7 @@ let mode: QuantizationMode
 - `quantize(model:groupSize:bits:)` moved to a top-level function with a `mode:` argument.
 - The `biases` result from `quantized()` became optional.
 
-Vocello Qwen3 Core was written against the 0.30.x API, and the project has no exhaustive proof for every subtle numeric shift from a core-MLX bump. For that reason the project **remains pinned at 0.30.6 / 2.30.6**. A future upgrade must be done on a throwaway branch, in lockstep across `project.yml` and `Packages/VocelloQwen3Core/Package.swift`, and validated with fixed-seed `vocello bench`, clean audioQC, and the applicable automated language/prosody gates.
+Vocello Qwen3 Core was written against the 0.30.x API. The 2026-08-01 sanctioned bump to **0.31.6 / 3.31.4** followed the required process — throwaway branch, lockstep across `project.yml` and `Packages/VocelloQwen3Core/Package.swift`, fixed-seed `vocello bench` A/B against a same-day 0.30.6 control, clean audioQC — and measured warm RTF inside the noise band with byte-equal clone durations (`benchmarks/OPTIMIZATION.md` §Q). Any future upgrade repeats that process; the quantization call sites compiled unchanged across the 0.31 API revision.
 
 ### 3.4 Loading weights
 
@@ -338,7 +338,7 @@ Cacheing dtype-keyed `-inf` rows, zero rows, EOS rows, and the code-predictor pa
 
 Compiling the quantized talker MLP with `compile(inputs: [gate, up, down], shapeless: true)` built and ran correctly, but it **regressed warm RTF by ~5%** (0.80 → 0.76). The reason: declaring quantized parameters as `inputs:` forces `compile` to marshal their packed state (weights, scales, biases) on every call, costing more than the Swift build overhead it removes. This cost scales with the compiled region, so compiling a larger region would regress more.
 
-**Lesson:** on MLX 0.30.6, `compile()` is not a free win for small, quantized, autoregressive graphs. It was not pursued further.
+**Lesson:** on MLX 0.30.6, `compile()` is not a free win for small, quantized, autoregressive graphs. Re-confirmed on 0.31.6 by the P1b re-test and its paired 6-seed soak (§Q: +0.74% slower on medium, 6/6 seeds).
 
 ### 7.5 KV cache options
 
@@ -415,17 +415,19 @@ See [`telemetry-and-benchmarking.md`](telemetry-and-benchmarking.md) for the ful
 
 ### 9.1 Current pins
 
-- `mlx-swift`: exact **0.30.6** in `project.yml`
-- `mlx-swift-lm`: exact **2.30.6** in `Packages/VocelloQwen3Core/Package.swift`
+- `mlx-swift`: exact **0.31.6** in `project.yml` and `Packages/VocelloQwen3Core/Package.swift`
+- `mlx-swift-lm`: exact **3.31.4** in `Packages/VocelloQwen3Core/Package.swift`
+- `swift-transformers`: exact **1.1.9** in `Packages/VocelloQwen3Core/Package.swift` — the app-supplied
+  Hub/Tokenizers implementation required since mlx-swift-lm 3.x
 
-Move both in lockstep. Do not float one without the other.
+Move the mlx pair in lockstep; review the swift-transformers pin in the same change. Do not float one without the others. mlx-swift ≥0.31 ships a `CudaBuild` build-tool plugin that cannot be fingerprint-approved headlessly; `xcb_run` (scripts/lib/build_cache.sh) passes `-skipPackagePluginValidation` unconditionally with the reviewed justification recorded in its header.
 
 ### 9.2 When to upgrade
 
 Only upgrade when:
 
 - A security or correctness fix requires it.
-- A new model variant requires an MLX feature not present in 0.30.6.
+- A new model variant requires an MLX feature not present in 0.31.6.
 - A measured performance win is proven on the Qwen3-TTS backend.
 
 ### 9.3 Upgrade procedure

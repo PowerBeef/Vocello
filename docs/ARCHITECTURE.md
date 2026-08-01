@@ -156,13 +156,14 @@ Resolved versions (`QwenVoice.xcodeproj/.../Package.resolved`):
 
 | Package | Version | Role |
 | --- | --- | --- |
-| **mlx-swift** | `0.30.6` | MLX runtime bindings (`MLX`, `MLXRandom`). |
-| **mlx-swift-lm** | `2.30.6` | LM utilities (transitive through the owned Qwen3 core package). |
+| **mlx-swift** | `0.31.6` | MLX runtime bindings (`MLX`, `MLXRandom`). Bumped 2026-08-01 (Tier 3.1, `benchmarks/OPTIMIZATION.md` §Q); vendors mlx core 0.31.1, so the 26.0 OS floors stand. |
+| **mlx-swift-lm** | `3.31.4` | LM utilities (through the owned Qwen3 core package). The 3.x major externalized the Hub/Tokenizers implementations, which is why swift-transformers is now a direct dependency. |
 | **VocelloQwen3Core** | owned package derived from `mlx-audio-swift` `v0.1.2` | Stable first-party `VocelloQwen3Core` facade for model-bundle, capability, sampling, memory, synthesis, terminal, cancellation, and diagnostic contracts. Compatibility-preserved `MLXAudioCore`, `MLXAudioCodecs`, and `MLXAudioTTS` modules remain implementation surfaces for Qwen3-TTS load, tokenize, and decode. |
 | **GRDB.swift** | `7.10.0` | SQLite for local `history.sqlite`. |
 | **SwiftHuggingFace** | `0.9.0` | Hugging Face model download / hub client. |
-| swift-transformers | `1.1.9` | Tokenizer (transitive). |
-| swift-jinja | `2.3.5` | Chat/template formatting (transitive). |
+| **swift-transformers** | `1.1.9` | Hub/Tokenizers implementation — a **direct** dependency of `MLXAudioTTS` since the mlx-swift-lm 3.x bump (pinned to the exact version the 2.x graph resolved). |
+| swift-jinja | `2.4.2` | Chat/template formatting (transitive via swift-transformers). |
+| yyjson | `0.12.0` | JSON parsing (transitive via swift-transformers). |
 | swift-nio | `2.100.0` | Networking primitives (transitive, via SwiftHuggingFace/EventSource); minimum security baseline includes the `ByteBuffer` bounds fix. |
 | swift-crypto | `4.4.0` | Hashing (transitive). |
 | swift-collections | `1.4.1` | Deque/OrderedSet (transitive). |

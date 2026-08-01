@@ -11,6 +11,13 @@
 > **Date:** 2026-06-16  
 > **Hardware:** Mac mini, Apple M2, 8 GB RAM (`floor_8gb_mac`)  
 > **Runtime:** MLX Swift 0.30.6 / mlx-swift-lm 2.30.6, `build/vocello` CLI, telemetry schema v5.
+>
+> **Editor's note (2026-08-01):** the pins have since moved to 0.31.6 / 3.31.4
+> (`benchmarks/OPTIMIZATION.md` §Q). The fp16 decoder-weight metallib load failure
+> recorded below was observed on 0.30.6 and has **not** been re-tested on 0.31.6; a
+> conv-stack micro-probe on 0.31.6 showed half-precision conv *faster* than fp32 at the
+> decoder's geometry on both pins, so a load re-test is the candidate next step if the
+> §N 2.3 codec-precision lever is ever revived.
 
 ## Executive summary
 

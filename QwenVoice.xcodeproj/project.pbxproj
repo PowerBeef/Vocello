@@ -3212,7 +3212,7 @@
 			repositoryURL = "https://github.com/ml-explore/mlx-swift.git";
 			requirement = {
 				kind = exactVersion;
-				version = 0.30.6;
+				version = 0.31.6;
 			};
 		};
 		50F552015729986D9C4DD1EE /* XCRemoteSwiftPackageReference "swift-huggingface" */ = {

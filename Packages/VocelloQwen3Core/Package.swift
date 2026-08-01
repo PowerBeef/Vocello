@@ -26,9 +26,13 @@ let package = Package(
         .library(name: "MLXAudioTTS", targets: ["MLXAudioTTS"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/ml-explore/mlx-swift.git", exact: "0.30.6"),
-        .package(url: "https://github.com/ml-explore/mlx-swift-lm.git", exact: "2.30.6"),
-        .package(url: "https://github.com/huggingface/swift-huggingface.git", exact: "0.9.0")
+        .package(url: "https://github.com/ml-explore/mlx-swift.git", exact: "0.31.6"),
+        .package(url: "https://github.com/ml-explore/mlx-swift-lm.git", exact: "3.31.4"),
+        .package(url: "https://github.com/huggingface/swift-huggingface.git", exact: "0.9.0"),
+        // mlx-swift-lm 3.x dropped its swift-transformers dependency; the app now brings the
+        // concrete Hub/Tokenizers implementation. Pinned to the exact version the 2.30.6 graph
+        // resolved so tokenizer behavior stays identical across the pin-bump A/B.
+        .package(url: "https://github.com/huggingface/swift-transformers.git", exact: "1.1.9")
     ],
     targets: [
         // MARK: - VocelloQwen3Core
@@ -84,6 +88,7 @@ let package = Package(
                 .product(name: "MLXNN", package: "mlx-swift"),
                 .product(name: "MLXLMCommon", package: "mlx-swift-lm"),
                 .product(name: "HuggingFace", package: "swift-huggingface"),
+                .product(name: "Transformers", package: "swift-transformers"),
             ],
             path: "Sources/MLXAudioTTS"
         ),

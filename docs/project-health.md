@@ -21,7 +21,7 @@
 | Domain | Owner | Production files | Direct test files / cases | Hardware evidence |
 | --- | --- | ---: | ---: | --- |
 | generation-terminal | backend | 4 | 2 / 16 | macos: fresh, ios: fresh |
-| clone-conditioning | backend | 31 | 2 / 32 | macos: stale, ios: fresh |
+| clone-conditioning | backend | 31 | 2 / 32 | macos: stale, ios: stale |
 | event-delivery | backend | 3 | 2 / 10 | macos: stale, ios: fresh |
 | memory-policy | backend-platform | 6 | 2 / 25 | macos: fresh, ios: fresh |
 | model-delivery | backend-platform | 17 | 3 / 37 | macos: stale, ios: fresh |

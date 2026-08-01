@@ -196,7 +196,9 @@ stays <55%, keep attacking launch count before anything else.
 > generation take; live since 2026-07-29 with the first records committed). Deferred with
 > rationale: composed standard/canonical report emission at a lane call site (all
 > per-gate evidence already lands typed; the aggregate waits for a consumer) and the
-> optional MOS-proxy advisory column.
+> optional MOS-proxy advisory column. **Update 2026-08-01:** composed standard-depth
+> emission landed on the delivery bench (`bench-quality-composed.json`); canonical
+> depth awaits a promoted delivery-adherence pass rule; MOS-proxy remains optional.
 
 1. **Phase 12: wire the typed quality registry.** Emit and validate
    `GenerationQualityReport` from a real scheduler; fold persisted-WAV Fast QC into the

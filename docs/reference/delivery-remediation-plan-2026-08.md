@@ -147,6 +147,32 @@ remaining product option — maintainer call, not auto-adopted.
 **Standing do-NOTs:** no process-global sampling override, no new public
 mutation surface, sampling changes ship only on deterministic-QC wins.
 
+**R3 OUTCOME (executed 2026-08-01) — keep-gate NOT met; nothing promoted.**
+The experiment needed no new code: the registered `QWENVOICE_TALKER_TEMP` /
+`QWENVOICE_TALKER_TOPP` knobs already provide request-local sampling
+overrides behind the debug gate. Four 8-seed Aiden neutral cohorts on the
+fixed medium sentence (baseline arms banked earlier the same day):
+
+| arm | pitch spread (st) | rate spread (Hz) | monotone/flat flags |
+| --- | --- | --- | --- |
+| shipping default (expressive) | 2.70 | 1.97 | 0 |
+| temp 0.5 / topP 0.8 | 2.15 | 1.20 | 0 |
+| temp 0.3 / topP 0.7 | 2.43 | 1.01 | 0 |
+| steadying instruction + temp 0.5/0.8 | 2.37 | **0.92** | 0 |
+
+Rate wander is fixable (−53% at best, comfortably under the 1.5 Hz bound,
+with zero over-stabilization flags). **Pitch-register wander is not**: it
+floors at ~2.1–2.4 st against the ≤1.8 st bound in every treatment arm, is
+non-monotone in temperature, and the levers do not stack — the cross-seed
+register is chosen by early-token mode structure that instruction text and
+sampling shaping both fail to constrain. Recorded do-NOT: do not ship a
+neutral sampling profile as a wander fix — it purchases rate stability only.
+A genuine fix would need a different mechanism (register/pitch-target
+conditioning), which is model-research territory beyond a sampling knob.
+Maintainer options if neutral variance should still shrink: accept the
+partial rate-only win as a default (quantified above), or park until a
+conditioning-level mechanism exists. Nothing auto-adopted.
+
 ## R4 — Process and tooling hardening (riders)
 
 1. **Promotion battery wiring (docs/policy):** add the delivery gate, neutral
@@ -158,6 +184,12 @@ mutation surface, sampling changes ship only on deterministic-QC wins.
    8 GB sequential-only rule in `docs/reference/testing-runbook.md`.
 3. **Optional:** an `--advisory` flag on the bench delivery lane that invokes
    the SER column automatically after generation exits; skip freely.
+
+**R4 OUTCOME (executed 2026-08-01):** items 1 and 2 landed
+(`benchmarking-procedure.md` §4.6b promotion fidelity lanes;
+`testing-runbook.md` ML-backed QA analyzers section with the 8 GB
+sequential rule and pinned model identities). Item 3 skipped per the plan's
+allowance.
 
 ## Sequencing and dependencies
 

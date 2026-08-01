@@ -94,6 +94,28 @@ validators own exact take counts/order plus matching telemetry, History/database
 audio-QC proof. The runner owns app/device identity and crash deltas. Smoke intentionally stops at
 its visible journey, History assertion, and crash check rather than claiming benchmark evidence.
 
+## ML-backed QA analyzers (operator-local)
+
+The advisory analyzers (`scripts/emotion_advisory.py` SER column,
+`scripts/clone_speaker_similarity.py` ECAPA identity, both consumed by
+`scripts/clone_fidelity_lane.py`) run under the repo `.venv` with a one-time
+operator install — never CI, never a packaging input:
+
+```sh
+python3 -m venv .venv
+.venv/bin/pip install torch transformers speechbrain
+```
+
+Model identities are revision-pinned in the scripts (SER:
+`firdhokk/speech-emotion-recognition-with-facebook-wav2vec2-large-xlsr-53`;
+ECAPA: `speechbrain/spkrec-ecapa-voxceleb`), download on first use, and fail
+closed on checkpoint drift or missing classifier weights. **8 GB rule** (dev
+machine = canonical Mac mini M2 8 GB): ML analyzers run strictly after the
+generation process exits — never concurrent with the resident engine — and
+each analyzer records its measured peak RSS in its report (SER ≈ 2.4 GB).
+Unit tests inject fake classifiers/embedders, so the deterministic suites
+never import torch.
+
 ## Fail-closed orchestration
 
 The macOS gate and release-readiness command, the iOS gate, and every XCUITest lane write an

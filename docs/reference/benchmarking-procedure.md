@@ -239,7 +239,33 @@ QWENVOICE_DEBUG=1 ./build/vocello bench \
 
 Adds instruct-bearing warm takes. The prosody analyzer reads the current run's immutable
 `bench-results.json` allowlist before the final summary, so older WAVs left by `--keep` cannot enter
-the delivery comparison; the summarizer then prints that current prosody block.
+the delivery comparison; the summarizer then prints that current prosody block. Every delivery take
+also receives the per-preset adherence verdict (`deliveryGate` beside `qualityGate` in
+`bench-prosody.json`) and the run composes canonical-depth registry verdicts across all seven gates
+(`bench-quality-composed.json`).
+
+### 4.6b Fidelity lanes (engine/artifact promotion battery)
+
+Every engine or artifact promotion runs the three fidelity lanes introduced with the
+2026-08-01 delivery-fidelity program (findings:
+[`delivery-fidelity-report-2026-08-01.md`](delivery-fidelity-report-2026-08-01.md);
+tracks: [`delivery-remediation-plan-2026-08.md`](delivery-remediation-plan-2026-08.md)):
+
+```sh
+# 1. Preset adherence — paired delivery matrix; canonical composed verdicts.
+QWENVOICE_DEBUG=1 ./build/vocello bench --modes custom --variants speed --lengths medium \
+  --warm 1 --delivery happy.strong,calm.normal,whisper.normal --seed <fixed> --label "promo-delivery"
+
+# 2. Neutral consistency — N same-preset fixed-seed takes through the cohort gate.
+python3 scripts/delivery_quality_gate.py --cohort take1.wav … takeN.wav
+
+# 3. Clone fidelity — identity + prosody + SER layers vs the fixture voice.
+.venv/bin/python3 scripts/clone_fidelity_lane.py --voice A_warm_elderly_woman
+```
+
+The delivery gate and cohort bounds are calibrated, digest-chained profile values
+(`scripts/prosody_profile.py`); adherence/cohort regressions beyond them are promotion
+findings, not waivable annotations. The clone lane and SER column stay advisory.
 
 ### 4.7 iOS on-device bench
 

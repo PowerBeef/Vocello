@@ -450,6 +450,12 @@ cross-project comparisons.
 |---|---|---|---|---|---|---:|---|---|---|---|
 | 2026-07-12 | [`telemetry-overhead-20260712-221616-d7b19334`](runs/telemetry-overhead/telemetry-overhead-20260712-221616-d7b19334.json) | focused | exploratory | passed | memory-contract-incomplete | 18 | `1ef1669326b5` dirty | `excluded` | baseline | telemetry-overhead-20260712-221616-d7b19334 |
 
+## ui-generation / ios / iphone-17-pro / config `12ff800e33d9`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---|---|---|---|
+| 2026-08-01 | [`ios-xcui-benchmark-20260801-130748-c3630f44`](runs/ui-generation/ios-xcui-benchmark-20260801-130748-c3630f44.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | `73cac34832cc` | `12ff800e33d9` | baseline | phase0-ios-control-3 |
+
 ## ui-generation / ios / iphone-17-pro / config `19005f052026`
 
 | completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |

@@ -72,12 +72,14 @@ against current-artifact baselines.
    iPhone 17 Pro measurement is the remaining path); (c) **F7 not triggered** — 0.31.6
    vendors mlx core 0.31.1 (< 0.32), floors stay 26.0. Full record:
    `benchmarks/OPTIMIZATION.md` §Q.
-2. **P1b static-shape talker compile — done 2026-08-01: null again on 0.31.6 (do-NOT).**
-   Cherry-picked onto the new pins: 258-step eager equivalence passes; warm decode RTF
-   −0.5…−2.1% vs the same-pin eager path — far from the pre-registered +≥10% keep-gate,
-   so no 12-seed soak was spent. Reverted from the pin-bump branch; the preserved
-   `feat/p1b-static-talker-compile` branch remains for a future pin generation
-   (DECODE-002 updated in `benchmarks/OPTIMIZATION.md` §Q).
+2. **P1b static-shape talker compile — done 2026-08-01: confirmed null on 0.31.6
+   (do-NOT, maintainer-ratified after a paired soak).** Cherry-picked onto the new pins:
+   258-step eager equivalence passes; the paired §K-style soak (6 seeds, both builds,
+   order-alternated) resolved the initial −0.5…−2.1% cross-run read to **+0.74% slower
+   on medium (6/6 seeds) and +0.16% on long** — noise-free confirmation that the
+   trace-build cost cancels the graph-build savings. Reverted from the pin-bump branch;
+   the preserved `feat/p1b-static-talker-compile` branch remains for a future pin
+   generation (DECODE-002 updated in `benchmarks/OPTIMIZATION.md` §Q).
 3. **Gate 2 — Candidate A fused code-predictor kernel: WITHDRAWN (2026-08-01).** Gate 0
    returned no-go (`benchmarks/OPTIMIZATION.md` §O): MPP offers no building-block
    advantage on the floor, so the fused-kernel bet fails its first hard precondition.

@@ -125,9 +125,10 @@ performance block after the fixture rebind, Tier 4 carryover). Immediate specifi
    became a direct dependency after the lm 2→3 Hub/Tokenizers
    externalization) and is the kept state; the codec-bf16 revival probe came
    back negative (conv µ-throughput unchanged across pins — §N 2.3 stays
-   parked with only the device-measurement path open); P1b re-tested null
-   (−0.5…−2.1%, keep-gate +≥10%) and remains a preserved do-NOT; F7 was not
-   triggered, so the 26.0 floors stand. Full record:
+   parked with only the device-measurement path open); P1b re-tested null —
+   a paired 6-seed soak resolved the initial cross-run read to +0.74% slower
+   on medium (6/6 seeds), maintainer-ratified do-NOT, branch preserved; F7
+   was not triggered, so the 26.0 floors stand. Full record:
    `benchmarks/OPTIMIZATION.md` §Q. With Gate 2 withdrawn by Gate 0, the
    2026-08 performance block is closed; Tier 4 (long-form text-context
    carryover, design pass first) is the next open roadmap work.

@@ -1101,16 +1101,23 @@ macOS/iOS 26.0 floors stand.
   sought elsewhere in the bf16 decode path (dtype boundaries, snake
   activations, or the decoder transformer). 2.3 stays parked; the remaining
   revival path is the iPhone 17 Pro device measurement.
-- **P1b re-test (DECODE-002): null again on 0.31.6.** The preserved
+- **P1b re-test (DECODE-002): confirmed null on 0.31.6 by a paired soak;
+  do-NOT stands (maintainer-ratified 2026-08-01).** The preserved
   `feat/p1b-static-talker-compile` experiment cherry-picked onto the new pins:
-  the 258-step eager-equivalence test passes unchanged, and warm decode RTF
-  improves only −0.5…−2.1% across custom/design × short/medium/long
-  (0.30.6 result: ±1%/−2%). Direction is mildly positive but far from the
-  pre-registered +≥10% keep-gate; the padded-attention tax still cancels the
-  graph-build savings. Reverted from the pin-bump branch; the P1b branch
-  stays preserved for a future pin generation. Its bench run
-  (`macos-engine-20260801-161901`, local-only) was removed from the registry
-  because its source commit is the reverted experiment.
+  the 258-step eager-equivalence test passes unchanged. An initial cross-run
+  read of −0.5…−2.1% prompted a §K-style paired soak (seeds 1001–1006 of the
+  planned 1001–1012, maintainer-stopped early once the answer was clear;
+  custom/speed medium+long, warm reps 1–2, per-seed build-order alternation,
+  both builds from the same pin tree): **P1b is +0.74% slower on medium
+  (95% CI [−0.41, +1.88], slower on 6/6 seeds) and +0.16% on long
+  (CI [−0.17, +0.49], 4/6)** — the apparent gain was cross-run noise; paired
+  same-seed measurement resolves to flat-to-negative. QC 84/84 pass across
+  both builds. The per-generation trace-build cost still cancels the
+  graph-build savings, exactly as on 0.30.6. Reverted from the pin-bump
+  branch; the P1b branch stays preserved for a future pin generation. Soak
+  CSV is session-scratch; its bench runs and the earlier P1b-build run
+  (`macos-engine-20260801-161901`) were removed from the registry because
+  their source states are the reverted experiment.
 
 ## Status
 

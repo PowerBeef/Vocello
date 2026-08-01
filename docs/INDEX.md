@@ -74,6 +74,7 @@ Review when: target or scheme changes; runtime topology; telemetry schema; test 
 - [`docs/reference/prosody-qa-research.md`](../docs/reference/prosody-qa-research.md)
 - [`docs/reference/qwen3-apple-silicon-roadmap-review.md`](../docs/reference/qwen3-apple-silicon-roadmap-review.md)
 - [`docs/reference/qwen3-tts-guide.md`](../docs/reference/qwen3-tts-guide.md)
+- [`docs/reference/roadmap-2026-08.md`](../docs/reference/roadmap-2026-08.md)
 - [`docs/reference/runtime-refactor-status-report.md`](../docs/reference/runtime-refactor-status-report.md)
 - [`docs/reference/swift-performance-guide.md`](../docs/reference/swift-performance-guide.md)
 - [`docs/reference/telemetry-and-benchmarking.md`](../docs/reference/telemetry-and-benchmarking.md)

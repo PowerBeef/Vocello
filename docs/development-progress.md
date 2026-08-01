@@ -67,7 +67,10 @@ half banked, and its device lanes surfaced and shipped real fixes along the way:
   `scripts/ui_test.sh ios model-download` lane (live PASS: 6.6/6.3/5.7 MB/s, zero retries,
   exact shared-component reuse).
 
-The concrete next actions, in order:
+The working order now lives in the adopted
+[2026-08 roadmap](reference/roadmap-2026-08.md) (interleave-by-cost: Tier 1 no-phone
+residuals plus the study's Gate 0 micro-benchmark, Tier 2 phone window, Tier 3 gated
+performance block after the fixture rebind, Tier 4 carryover). Immediate specifics:
 
 1. **Finish the deferred battery remainder on the paired iPhone** (phone unlocked,
    Auto-Lock Never): re-run iOS control lane 3 (`phase0-ios-control-3`; the 2026-07-31
@@ -86,9 +89,11 @@ The concrete next actions, in order:
    footprint); notes in [`docs/releases/v2.3.0.md`](releases/v2.3.0.md) with the standing
    smoke-lane ledger. iOS build 22 ships the clone-prime and Wi-Fi-pin fixes that build 21
    carried as exposures.
-3. **Deferred with rationale, not blocked:** the UI-checker quality-identity fold (lets UI
-   matrices publish v3); composed standard/canonical quality-report emission at a lane call
-   site; the optional MOS-proxy advisory column; the Stage 4 gated bets.
+3. **Everything else follows the roadmap's tiers:** the Tier-1 residuals (single-take
+   normalization, quality-report consolidation, the UI-checker v3 fold ideally before the
+   phone window, the iOS segment-regeneration implementation half, Gate 0), then the gated
+   performance block (pin bump → P1b → conditional fused-kernel Gate 2) once the fixture
+   rebind gives current baselines.
 
 ## Staged roadmap state
 
@@ -120,7 +125,8 @@ Stage-by-stage details, closure evidence, and falsifiability criteria live in th
    26.0 with runtime-gated capability ladders; the first pin bump vendoring mlx core
    ≥ 0.32.0 triggers the 26.2 floor raise, per the study's F7) on a
    throwaway branch (contract invariant), long-form carryover (text context first), with
-   speculative/PCG, CFG, and KV quantization parked.
+   speculative/PCG, CFG, and KV quantization parked. Working order and dependency rules:
+   [roadmap-2026-08](reference/roadmap-2026-08.md).
 6. **Smaller open threads**: iOS single-segment regeneration parity, the iPhone-15-Pro
    memory-profile diagnostic, a 60 Hz-device measurement of the iOS fixed-refresh glass
    gate if such hardware becomes available, and single-take spoken-text normalization

@@ -18,8 +18,6 @@ struct IOSVoicesView: View {
     let onSelectSavedVoice: (Voice) -> Void
     /// Surface the record → name → enroll flow (the call-site presents it + handles the handoff).
     let onRecordNewVoice: () -> Void
-    /// Continue an imported reference through the same name → enroll flow as a recording.
-    let onImportNewVoice: (ImportedReferenceAudio) -> Void
 
     @EnvironmentObject private var ttsEngine: TTSEngineStore
     @EnvironmentObject private var savedVoicesViewModel: SavedVoicesViewModel
@@ -27,8 +25,6 @@ struct IOSVoicesView: View {
 
     @State private var search: String = ""
     @State private var filter: VoiceFilter = .all
-    @State private var isAudioImporterPresented = false
-    @State private var importErrorMessage: String?
 
     // The built-in speaker list is a static constant — sort it once, not on
     // every body evaluation (iOS readiness audit, fix #25).
@@ -121,27 +117,6 @@ struct IOSVoicesView: View {
             }
         }
         .accessibilityIdentifier("screen_voices")
-        .fileImporter(
-            isPresented: $isAudioImporterPresented,
-            allowedContentTypes: [.wav, .mp3, .aiff, .mpeg4Audio],
-            allowsMultipleSelection: false
-        ) { result in
-            handleAudioImport(result)
-        }
-        .fileDialogDefaultDirectory(
-            FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
-        )
-        .alert(
-            "Couldn't import audio",
-            isPresented: Binding(
-                get: { importErrorMessage != nil },
-                set: { if !$0 { importErrorMessage = nil } }
-            )
-        ) {
-            Button("OK", role: .cancel) { importErrorMessage = nil }
-        } message: {
-            Text(importErrorMessage ?? "Choose another audio file and try again.")
-        }
     }
 
     private func voicesSectionHeading(_ title: String) -> some View {
@@ -173,20 +148,6 @@ struct IOSVoicesView: View {
             ) {
                 IOSHaptics.selection()
                 onRecordNewVoice()
-            }
-
-            Divider()
-                .overlay(Color.white.opacity(0.08))
-                .padding(.leading, 66)
-
-            newVoiceActionRow(
-                title: "Import audio file",
-                detail: "Choose a WAV, MP3, AIFF, or M4A file from Files.",
-                symbol: "folder.fill",
-                accessibilityIdentifier: "voices_importAudioFile"
-            ) {
-                IOSHaptics.selection()
-                isAudioImporterPresented = true
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -243,26 +204,6 @@ struct IOSVoicesView: View {
         .accessibilityIdentifier(accessibilityIdentifier)
         .accessibilityLabel(title)
         .accessibilityHint(detail)
-    }
-
-    private func handleAudioImport(_ result: Result<[URL], Error>) {
-        switch result {
-        case .success(let urls):
-            guard let sourceURL = urls.first else { return }
-            do {
-                // Keep the picker-provided URL intact so LocalDocumentIO can consume its
-                // security-scoped grant before materializing both audio and any .txt sidecar.
-                let imported = try ttsEngine.importReferenceAudio(from: sourceURL)
-                importErrorMessage = nil
-                onImportNewVoice(imported)
-            } catch {
-                importErrorMessage = error.localizedDescription
-            }
-        case .failure(let error):
-            if (error as? CocoaError)?.code != .userCancelled {
-                importErrorMessage = error.localizedDescription
-            }
-        }
     }
 
     // MARK: - Rows

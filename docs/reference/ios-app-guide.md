@@ -99,14 +99,11 @@ tone editor: `deliveryPickerSheet_customTone` (toggle in), `deliveryPickerSheet_
 
 Container `screen_voices`. Filter chips `voicesFilter_all|builtIn|saved`. Built-in rows
 `voicesRow_<speakerId>` (e.g. `voicesRow_aiden`); saved-voice rows `voicesRow_saved_<id>`.
-The Save a New Voice card has two visible actions: `voices_saveNewVoice` starts the recorder and
-`voices_importAudioFile` opens the native Files picker for WAV, MP3, AIFF, or M4A audio. An imported
-clip is materialized into app-owned storage before enrollment. A neighboring `.txt` sidecar, when
-present, prefills the transcript. The enrollment sheet exposes `saveVoice_nameField`,
+The Save a New Voice card has one visible action: `voices_saveNewVoice` starts the recorder
+(iPhone deliberately offers no file import; a saved Voice Design voice can also serve as the
+clone reference through the Studio handoff). The enrollment sheet exposes `saveVoice_nameField`,
 `saveVoice_transcriptEditor`, and `saveVoice_saveButton`; a successful save creates
-`voicesRow_saved_<id>` and hands the reference to Studio Clone. The app also declares itself as an
-alternate audio-file viewer, so opening supported audio from Files enters this same import and
-enrollment flow. Search is `voicesSearchField`.
+`voicesRow_saved_<id>` and hands the reference to Studio Clone. Search is `voicesSearchField`.
 
 ### History tab — `Sources/iOS/History/HistoryScreen.swift`
 
@@ -262,9 +259,6 @@ Canonical flows remain:
 - Design: select Design, enter a voice brief, compose, Generate, and verify telemetry.
 - Clone: enable consent through Settings, select Clone, choose a saved reference, compose,
   Generate, and verify telemetry.
-- Import: Voices → `voices_importAudioFile` → choose a supported file in the native picker → confirm
-  name/transcript through `saveVoice_*` → verify the saved row and Clone handoff. System-picker
-  interaction is explicit product acceptance, not part of the minimal smoke or benchmark lane.
 - History: open the History tab, find the generated take, and replay it.
 - Settings: review model and preference state; visibly enable persistent Clone consent for
   acceptance, and restore temporary reversible changes such as Auto-play.

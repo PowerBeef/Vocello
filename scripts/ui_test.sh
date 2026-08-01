@@ -39,13 +39,11 @@ Usage:
   scripts/ui_test.sh ios smoke
   scripts/ui_test.sh ios benchmark [--modes custom,design,clone] [--lengths short,medium,long] [--warm 3] [--label RUN_ID]
   scripts/ui_test.sh ios model-download
-  scripts/ui_test.sh ios enroll-clone-fixture
 
 The iOS destination is the paired physical iPhone only. Simulator destinations are unsupported.
 `model-download` is an opt-in isolated lifecycle proof and never runs in smoke, benchmark, CI, or release.
-`enroll-clone-fixture` is an opt-in helper that enrolls the benchmark clone voice through the genuine
-visible Files-import flow; stage the reference WAV and .txt sidecar in the app's Documents first
-(devicectl appDataContainer copy). It never runs in smoke, benchmark, CI, or release.
+Benchmark clone-fixture enrollment moved to the headless diagnostics runner:
+`scripts/ios_device.sh enroll-clone-fixture` (the iPhone app no longer ships a Files-import UI).
 No lane retries automatically. A failed run keeps its log, xcresult, screenshots, and diagnostics.
 RUN_ID is an opaque 1-96 character identifier using letters, digits, dot, underscore, or hyphen.
 EOF
@@ -57,9 +55,8 @@ platform="$1"
 lane="$2"
 shift 2
 [[ "$platform" == "macos" || "$platform" == "ios" ]] || usage
-[[ "$lane" == "smoke" || "$lane" == "benchmark" || "$lane" == "model-download" || "$lane" == "enroll-clone-fixture" ]] || usage
+[[ "$lane" == "smoke" || "$lane" == "benchmark" || "$lane" == "model-download" ]] || usage
 [[ "$lane" != "model-download" || "$platform" == "ios" ]] || usage
-[[ "$lane" != "enroll-clone-fixture" || "$platform" == "ios" ]] || usage
 
 modes="custom,design,clone"
 lengths="short,medium,long"
@@ -913,10 +910,8 @@ else
     export TEST_RUNNER_QVOICE_IOS_BENCH_LENGTHS="$lengths"
     export TEST_RUNNER_QVOICE_IOS_BENCH_WARM="$warm"
     export TEST_RUNNER_QVOICE_IOS_BENCH_LABEL="${label:-$run_id}"
-  elif [[ "$lane" == "model-download" ]]; then
-    only_test="VocelloiOSUITests/VocelloiOSModelDownloadUITests/testIsolatedBackgroundDownloadAdoptionAndCleanup"
   else
-    only_test="VocelloiOSUITests/VocelloiOSFixtureEnrollmentUITests/testEnrollBenchmarkCloneFixtureFromDocuments"
+    only_test="VocelloiOSUITests/VocelloiOSModelDownloadUITests/testIsolatedBackgroundDownloadAdoptionAndCleanup"
   fi
 
   note "physical-iPhone XCUITest $lane on $device → $out"

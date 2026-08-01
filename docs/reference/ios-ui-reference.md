@@ -65,12 +65,12 @@ path.
 ## Voices and History
 
 Voices exposes saved rows (`voicesRow_saved_*`), built-in speakers, separate row and preview
-actions, search, filters, and two visible Save a New Voice actions. `voices_saveNewVoice` records a
-reference; `voices_importAudioFile` opens the native Files picker. Imported audio is materialized
-into app-owned storage, an adjacent `.txt` sidecar can prefill `saveVoice_transcriptEditor`, and
-`saveVoice_nameField` plus `saveVoice_saveButton` complete enrollment. Opening a supported audio
-document from Files routes through the same sheet. A saved/imported voice hands off to Studio Clone;
-a built-in speaker hands off to Studio Custom.
+actions, search, filters, and one visible Save a New Voice action: `voices_saveNewVoice` records a
+reference with the microphone (there is deliberately no file-import control on iPhone).
+`saveVoice_nameField`, `saveVoice_transcriptEditor`, and `saveVoice_saveButton` complete
+enrollment. A saved voice hands off to Studio Clone; a built-in speaker hands off to Studio
+Custom. Benchmark-fixture enrollment is script-owned via
+`scripts/ios_device.sh enroll-clone-fixture`.
 
 History supports search, mode filtering, sorting, playback, export, saving a take as a voice, and
 deletion. Long-form projects group as one joined row plus a per-segment disclosure

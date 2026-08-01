@@ -1,7 +1,11 @@
 <h1 align="center">Vocello</h1>
 
 <p align="center">
-  A local, private voice studio for Apple Silicon. Write a script, choose or shape a voice, and generate speech on your device with native Swift and MLX.<br>
+  <strong>Premium voice studio. Proven performance. Private by design.</strong>
+</p>
+
+<p align="center">
+  Write a script, choose or shape a voice, and generate speech on your device with native Swift and MLX.<br>
   No account. No credits. Nothing you write or record leaves your device.<br>
   <strong>Available for Mac. The iPhone app is in public beta on TestFlight.</strong>
 </p>
@@ -37,7 +41,7 @@
 
 - **Custom Voice:** choose one of nine built-in Qwen3 speakers, then set language and delivery.
 - **Voice Design:** describe a voice in plain language and generate it from that brief.
-- **Voice Cloning:** record or import a reference you have permission to use, affirm consent, and save it to your voice library.
+- **Voice Cloning:** capture a reference you have permission to use, affirm consent, and save it to your voice library. On the Mac, record a clip or import an audio file; on iPhone, record with the microphone or reuse a saved Voice Design voice as the reference (the iPhone app deliberately has no file import).
 
 Scripts past 900 characters become **long-form projects**: planned segments stream one after another while you listen along, then join into a single finished file with a per-segment map in History. Ten languages are supported (Chinese, English, Japanese, Korean, German, French, Russian, Portuguese, Spanish, and Italian) with automatic detection, and everything (scripts, references, history, audio) stays in local app storage unless you export it.
 
@@ -48,7 +52,7 @@ Vocello is not a wrapper around a Python server: generation runs through a first
 | Voice Design | Voice Cloning |
 | --- | --- |
 | ![Vocello Voice Design screen](docs/screenshots/vocello-voice-design.png) | ![Vocello Voice Cloning screen](docs/screenshots/vocello-voice-cloning.png) |
-| Describe character, age, accent, texture, and delivery. Save a successful design as a reusable voice reference. | Record in the app or import WAV, MP3, AIFF, M4A, FLAC, OGG, or WebM. A transcript improves conditioning but is optional. Generation requires the visible consent acknowledgment in Settings; only clone voices you own or are authorized to use. |
+| Describe character, age, accent, texture, and delivery. Save a successful design as a reusable voice reference. | Record in the app; the Mac additionally imports WAV, MP3, AIFF, M4A, FLAC, OGG, or WebM files. A transcript improves conditioning but is optional. Generation requires the visible consent acknowledgment in Settings; only clone voices you own or are authorized to use. |
 
 Custom Voice and Voice Design support ten delivery styles at subtle, normal, or strong intensity, plus a free-text delivery description. Voice Cloning follows the reference voice and does not expose delivery controls.
 
@@ -105,7 +109,7 @@ Macs on macOS 15 can use the legacy [QwenVoice 1.2.3 release](https://github.com
 
 | | |
 | --- | --- |
-| ![Vocello Studio running on iPhone](docs/screenshots/vocello-ios-studio.png) | The iPhone app uses the same local Qwen3-TTS and MLX foundation with an iPhone-specific in-process runtime. It provides Custom Voice, Voice Design, Voice Cloning, recording and Files import, local history, and the memory-conscious Speed models. On-device generation, physical-iPhone XCUITest, and an optional signed archive/TestFlight lane are implemented. A fresh full multilingual physical-iPhone run passed all 19 hint/QC and 18 output gates with policy-accepted warnings; its exploratory record is excluded from clean performance trends. A public TestFlight beta is open: [join here](https://testflight.apple.com/join/Cvp6yCv7). App Store distribution remains a separate maintainer-owned release decision. |
+| ![Vocello Studio running on iPhone](docs/screenshots/vocello-ios-studio.png) | The iPhone app uses the same local Qwen3-TTS and MLX foundation with an iPhone-specific in-process runtime. It provides Custom Voice, Voice Design, Voice Cloning with microphone recording or a saved Voice Design reference, local history, and the memory-conscious Speed models. On-device generation, physical-iPhone XCUITest, and an optional signed archive/TestFlight lane are implemented. A fresh full multilingual physical-iPhone run passed all 19 hint/QC and 18 output gates with policy-accepted warnings; its exploratory record is excluded from clean performance trends. A public TestFlight beta is open: [join here](https://testflight.apple.com/join/Cvp6yCv7). App Store distribution remains a separate maintainer-owned release decision. |
 
 Current implementation and acceptance status: [`docs/development-progress.md`](docs/development-progress.md).
 

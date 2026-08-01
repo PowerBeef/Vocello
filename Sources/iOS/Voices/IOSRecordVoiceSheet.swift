@@ -1,16 +1,15 @@
 import QwenVoiceCore
 import SwiftUI
 
-/// Record or import → name → enroll a **permanent, reusable** saved voice from the Voices tab.
-/// Recordings are auto-transcribed; imported clips preserve a neighboring `.txt` sidecar when
-/// `LocalDocumentIO` materializes one. Both sources reuse `IOSSaveVoiceSheet` and
-/// `enrollPreparedVoice`, then hand the saved voice back to Clone mode through `onEnrolled`.
+/// Record → name → enroll a **permanent, reusable** saved voice from the Voices tab.
+/// Recordings are auto-transcribed, reuse `IOSSaveVoiceSheet` and `enrollPreparedVoice`,
+/// then hand the saved voice back to Clone mode through `onEnrolled`. iPhone deliberately
+/// offers no file-import path: the reference sources are the microphone or a saved
+/// Voice Design voice staged through the Clone handoff.
 ///
 /// Presented as a `.fullScreenCover`. Phase 1 renders the recorder inline; phase 2 shows a warm
 /// backdrop with the naming `.sheet` on top (so we never nest two full-screen covers).
 struct IOSRecordVoiceSheet: View {
-    /// A Files import already materialized inside the app sandbox. Nil starts the recorder.
-    let importedReference: ImportedReferenceAudio?
     /// Called once the voice is enrolled with the confirmed (possibly empty) `transcript` and the
     /// detected reference `language` (`.auto` if undetected) to pre-set the Clone language.
     var onEnrolled: (Voice, String, Qwen3SupportedLanguage) -> Void
@@ -31,25 +30,18 @@ struct IOSRecordVoiceSheet: View {
     private enum Phase { case recording, naming }
 
     init(
-        importedReference: ImportedReferenceAudio? = nil,
         onEnrolled: @escaping (Voice, String, Qwen3SupportedLanguage) -> Void,
         onDismiss: @escaping () -> Void
     ) {
-        self.importedReference = importedReference
         self.onEnrolled = onEnrolled
         self.onDismiss = onDismiss
 
-        let importedTranscript = Self.transcript(from: importedReference)
-        _phase = State(initialValue: importedReference == nil ? .recording : .naming)
-        _capturedURL = State(initialValue: importedReference?.materializedURL)
-        _suggestedName = State(initialValue: Self.suggestedName(from: importedReference))
-        _transcript = State(initialValue: importedTranscript)
-        _detectedLanguage = State(
-            initialValue: importedTranscript.isEmpty
-                ? .auto
-                : PromptLanguageDetector.detect(importedTranscript)
-        )
-        _isNamingPresented = State(initialValue: importedReference != nil)
+        _phase = State(initialValue: .recording)
+        _capturedURL = State(initialValue: nil)
+        _suggestedName = State(initialValue: "")
+        _transcript = State(initialValue: "")
+        _detectedLanguage = State(initialValue: .auto)
+        _isNamingPresented = State(initialValue: false)
         _enrollError = State(initialValue: nil)
         _pendingVoiceForReview = State(initialValue: nil)
     }
@@ -85,7 +77,7 @@ struct IOSRecordVoiceSheet: View {
         }
         .sheet(isPresented: $isNamingPresented) {
             IOSSaveVoiceSheet(
-                title: importedReference == nil ? "Save this voice" : "Import voice",
+                title: "Save this voice",
                 suggestedName: $suggestedName,
                 transcript: $transcript,
                 errorMessage: enrollError,
@@ -121,18 +113,14 @@ struct IOSRecordVoiceSheet: View {
                 }
                 .accessibilityIdentifier("recordVoice_keepDespiteWarning")
             }
-            Button(importedReference == nil ? "Discard and re-record" : "Discard imported voice", role: .destructive) {
+            Button("Discard and re-record", role: .destructive) {
                 let voiceID = voice.id
                 pendingVoiceForReview = nil
                 Task { try? await ttsEngine.deletePreparedVoice(id: voiceID) }
                 cleanupCapturedFile()
                 isNamingPresented = false
-                if importedReference == nil {
-                    // Back to the recorder for another take.
-                    phase = .recording
-                } else {
-                    onDismiss()
-                }
+                // Back to the recorder for another take.
+                phase = .recording
             }
             .accessibilityIdentifier("recordVoice_discardOnWarning")
             Button("Cancel", role: .cancel) { pendingVoiceForReview = nil }
@@ -186,28 +174,9 @@ struct IOSRecordVoiceSheet: View {
     }
 
     private func cleanupCapturedFile() {
-        // Imported references live in the shared cache and may also back an in-progress Clone
-        // draft. Enrollment copies them into Saved Voices, but this flow must not invalidate
-        // another consumer of the same fingerprinted cache entry.
-        guard importedReference == nil else {
-            capturedURL = nil
-            return
-        }
         if let url = capturedURL {
             try? FileManager.default.removeItem(at: url)
         }
         capturedURL = nil
-    }
-
-    private static func suggestedName(from importedReference: ImportedReferenceAudio?) -> String {
-        guard let importedReference else { return "" }
-        return importedReference.originalURL.deletingPathExtension().lastPathComponent
-    }
-
-    private static func transcript(from importedReference: ImportedReferenceAudio?) -> String {
-        guard let sidecarURL = importedReference?.transcriptSidecarURL,
-              let contents = try? String(contentsOf: sidecarURL, encoding: .utf8)
-        else { return "" }
-        return contents.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }

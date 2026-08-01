@@ -526,7 +526,7 @@ for root in roots:
         if path != Path("docs/reference/backend-optimization-research-report.md")
     )
 allowed = {
-    "ios_device.sh": {"doctor", "build", "install", "launch", "console", "pull", "bench", "lang-bench", "clone-conditioning", "speech-assets", "crashes", "debug", "logs", "profile", "memory", "memory-field-report", "preflight", "device-state", "gate", "help"},
+    "ios_device.sh": {"doctor", "build", "install", "launch", "console", "pull", "bench", "lang-bench", "clone-conditioning", "speech-assets", "enroll-clone-fixture", "crashes", "debug", "logs", "profile", "memory", "memory-field-report", "preflight", "device-state", "gate", "help"},
     "macos_test.sh": {"preflight", "core-test", "lang-bench", "test", "telemetry-overhead", "crashes", "debug", "logs", "profile", "memory", "gate", "release-readiness", "models", "help"},
     "ui_test.sh": {"macos", "ios"},
 }

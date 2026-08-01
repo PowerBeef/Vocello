@@ -133,6 +133,18 @@ performance block after the fixture rebind, Tier 4 carryover). Immediate specifi
    2026-08 performance block is closed; Tier 4 (long-form text-context
    carryover, design pass first) is the next open roadmap work.
 
+6. **Brand + iPhone clone-surface change (2026-08-01, post-2.4.0):** the public surfaces
+   (README, website hero) feature the slogan "Premium voice studio. Proven performance.
+   Private by design." The iPhone app deliberately dropped its Files-import and
+   open-from-Files clone-reference paths (App Store review-risk posture; microphone
+   recording and saved Voice Design references remain; the Mac app keeps file import).
+   Benchmark clone-fixture enrollment moved from the retired
+   `ui_test.sh ios enroll-clone-fixture` UI lane to the headless
+   `scripts/ios_device.sh enroll-clone-fixture` diagnostics command
+   (`QVOICE_IOS_DEVICE_ENROLL_VOICE_NAME`, registered knob; staged inputs are deleted
+   after a clean enrollment). Ships in build 24; build 23 in review still carries the
+   import UI.
+
 ## Staged roadmap state
 
 Stage-by-stage details, closure evidence, and falsifiability criteria live in the

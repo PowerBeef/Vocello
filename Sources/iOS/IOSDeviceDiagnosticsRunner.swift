@@ -56,6 +56,8 @@ enum IOSDeviceDiagnosticsRunner {
         "QVOICE_IOS_DEVICE_DIAGNOSTICS_EXPECTED_CLONE_TRANSCRIPT_SHA256"
     private static let speechAssetLocalesEnvironmentKey =
         "QVOICE_IOS_SPEECH_ASSET_LOCALES"
+    private static let enrollVoiceNameEnvironmentKey =
+        "QVOICE_IOS_DEVICE_ENROLL_VOICE_NAME"
     private static let runIDKey = "QVOICE_IOS_DEVICE_RUN_ID"
     private static let languageEnvKey = "QVOICE_IOS_DEVICE_DIAGNOSTICS_LANGUAGE"
     private static let verifyOutputEnvKey = "QVOICE_IOS_DEVICE_DIAGNOSTICS_VERIFY_OUTPUT"
@@ -118,6 +120,12 @@ enum IOSDeviceDiagnosticsRunner {
             return
         }
         #endif
+        if let enrollName = trimmedEnvironmentValue(enrollVoiceNameEnvironmentKey) {
+            Task { @MainActor in
+                await runVoiceEnrollment(name: enrollName, engine: engine)
+            }
+            return
+        }
         if let rawLocales = trimmedEnvironmentValue(speechAssetLocalesEnvironmentKey) {
             Task { @MainActor in
                 await runSpeechAssetBootstrap(rawLocales: rawLocales)
@@ -175,6 +183,127 @@ enum IOSDeviceDiagnosticsRunner {
     /// output gate. This path is independent from generation and never runs during a normal app
     /// launch. `AssetInventory` automatically reserves resolved locale assets when it creates the
     /// combined installation request; this code never releases unrelated reservations.
+    /// Headless benchmark-fixture voice enrollment — the script-owned replacement for the
+    /// retired Files-import UI path. `scripts/ios_device.sh enroll-clone-fixture` stages
+    /// `Documents/<name>.wav` plus the mandatory `Documents/<name>.txt` transcript sidecar
+    /// (exact bytes preserved, so the enrolled artifact identity is reproducible), launches
+    /// the app with `QVOICE_IOS_DEVICE_ENROLL_VOICE_NAME=<name>`, and polls the sentinel.
+    /// Enrollment runs the same `enrollPreparedVoice` path the visible recorder uses; the
+    /// staged inputs are deleted from Documents only after a clean enrollment.
+    private static func runVoiceEnrollment(name: String, engine: TTSEngineStore) async {
+        let runID = safeRunID(from: trimmedEnvironmentValue(runIDKey)) ?? "ios-enroll-voice"
+        var result = VoiceEnrollmentResult(
+            runID: runID,
+            requestedName: name,
+            startedAt: ISO8601DateFormatter().string(from: Date())
+        )
+        defer {
+            result.finishedAt = ISO8601DateFormatter().string(from: Date())
+            writeVoiceEnrollmentSentinel(result, runID: runID)
+        }
+
+        guard let documents = FileManager.default.urls(
+            for: .documentDirectory, in: .userDomainMask
+        ).first else {
+            result.status = "failed"
+            result.failureReason = "documents-directory-unavailable"
+            return
+        }
+        let wavURL = documents.appendingPathComponent("\(name).wav", isDirectory: false)
+        let transcriptURL = documents.appendingPathComponent("\(name).txt", isDirectory: false)
+        guard FileManager.default.fileExists(atPath: wavURL.path) else {
+            result.status = "failed"
+            result.failureReason = "staged-wav-missing"
+            return
+        }
+        guard let transcriptData = try? Data(contentsOf: transcriptURL),
+              let transcriptRaw = String(data: transcriptData, encoding: .utf8),
+              !transcriptRaw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        else {
+            // Transcript-backed conditioning is mandatory for fixture identity; an
+            // audio-only x-vector enrollment would silently change the benchmark voice.
+            result.status = "failed"
+            result.failureReason = "staged-transcript-missing-or-empty"
+            return
+        }
+        let transcript = transcriptRaw.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let audioData = try? Data(contentsOf: wavURL) {
+            result.stagedAudioSHA256 = SHA256.hash(data: audioData)
+                .map { String(format: "%02x", $0) }.joined()
+        }
+        result.stagedTranscriptSHA256 = SHA256.hash(data: Data(transcript.utf8))
+            .map { String(format: "%02x", $0) }.joined()
+
+        // Bounded wait for engine bring-up; enrollment needs the prepared backend.
+        let readinessDeadline = Date().addingTimeInterval(180)
+        while !engine.isReady, Date() < readinessDeadline {
+            try? await Task.sleep(nanoseconds: 500_000_000)
+        }
+        guard engine.isReady else {
+            result.status = "failed"
+            result.failureReason = "engine-not-ready-within-deadline"
+            return
+        }
+
+        do {
+            let voice = try await engine.enrollPreparedVoice(
+                name: name,
+                audioPath: wavURL.path,
+                transcript: transcript
+            )
+            result.voiceID = voice.id
+            result.qualityWarnings = voice.qualityWarnings
+            result.status = "pass"
+            try? FileManager.default.removeItem(at: wavURL)
+            try? FileManager.default.removeItem(at: transcriptURL)
+            result.stagedInputsDeleted = true
+        } catch {
+            result.status = "failed"
+            result.failureReason = "enrollment-error"
+            result.failureDescription = String(describing: error).prefix(300).description
+        }
+    }
+
+    private struct VoiceEnrollmentResult: Codable {
+        var runID: String
+        var requestedName: String
+        var startedAt: String
+        var finishedAt: String?
+        var status: String = "failed"
+        var failureReason: String?
+        var failureDescription: String?
+        var stagedAudioSHA256: String?
+        var stagedTranscriptSHA256: String?
+        var stagedInputsDeleted: Bool = false
+        var voiceID: String?
+        var qualityWarnings: [String]?
+    }
+
+    private static func writeVoiceEnrollmentSentinel(
+        _ record: VoiceEnrollmentResult,
+        runID: String
+    ) {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        guard let data = try? encoder.encode(record) else {
+            print("[enroll-voice] could not encode completion evidence")
+            return
+        }
+        let fileName = "enroll-voice-done.json"
+        let appGroupURL = AppPaths.appSupportDir
+            .appendingPathComponent("diagnostics", isDirectory: true)
+            .appendingPathComponent(runID, isDirectory: true)
+            .appendingPathComponent(fileName, isDirectory: false)
+        writeData(data, to: appGroupURL, label: "voice enrollment (app-group)")
+
+        guard let pullableRoot = IOSPullableDiagnosticsMirror.pullableRoot else { return }
+        let pullableURL = pullableRoot
+            .appendingPathComponent(runID, isDirectory: true)
+            .appendingPathComponent(fileName, isDirectory: false)
+        // This is the final write observed by the host poller.
+        writeData(data, to: pullableURL, label: "voice enrollment (pullable)")
+    }
+
     private static func runSpeechAssetBootstrap(rawLocales: String) async {
         let idleTimerWasDisabled = UIApplication.shared.isIdleTimerDisabled
         UIApplication.shared.isIdleTimerDisabled = true

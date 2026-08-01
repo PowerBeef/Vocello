@@ -42,12 +42,10 @@ struct VoicesScreen: View {
                 appModel.studioMode = .clone
                 appModel.tab = .studio
             },
-            onRecordNewVoice: { newVoiceFlow = .recording },
-            onImportNewVoice: { imported in newVoiceFlow = .imported(imported) }
+            onRecordNewVoice: { newVoiceFlow = .recording }
         )
-        .fullScreenCover(item: $newVoiceFlow) { flow in
+        .fullScreenCover(item: $newVoiceFlow) { _ in
             IOSRecordVoiceSheet(
-                importedReference: flow.importedReference,
                 onEnrolled: { voice, transcript, language in
                     newVoiceFlow = nil
                     // Same staging as tapping a saved voice → Clone mode, pre-loaded; carry the
@@ -70,19 +68,6 @@ struct VoicesScreen: View {
 
 private enum NewVoiceFlow: Identifiable {
     case recording
-    case imported(ImportedReferenceAudio)
 
-    var id: String {
-        switch self {
-        case .recording:
-            return "recording"
-        case .imported(let reference):
-            return "imported-\(reference.fingerprint)"
-        }
-    }
-
-    var importedReference: ImportedReferenceAudio? {
-        guard case .imported(let reference) = self else { return nil }
-        return reference
-    }
+    var id: String { "recording" }
 }

@@ -29,6 +29,7 @@
 #                                                 # headless language/output matrix; optional
 #                                                 # fixed-seed diagnostic cohort never publishes history
 #   scripts/ios_device.sh speech-assets           # resolve/install DE/ES/JA/ZH DictationTranscriber
+#   scripts/ios_device.sh enroll-clone-fixture --wav W.wav --transcript W.txt  # headless fixture voice enrollment
 #                                                 # assets and recheck Vocello's legacy Speech readiness
 #   scripts/ios_device.sh crashes [--test]         # pull + symbolicate on-device crash/hang diagnostics (MetricKit)
 #   scripts/ios_device.sh debug [spec]             # attached launch + LLDB attach guidance (get-task-allow build)
@@ -576,6 +577,101 @@ pull_speech_asset_run() {
 # Explicit, non-generation Speech bootstrap for the physical iPhone. AssetInventory's combined
 # request installs only the four language-output locales and automatically manages this app's
 # reservations. The result is local diagnostic evidence, never benchmark history.
+# Headless benchmark clone-fixture enrollment. Replaces the retired Files-import UI
+# path (the iPhone app deliberately ships no file import; users record with the
+# microphone or reuse a Voice Design voice). Stages the exact reference WAV plus the
+# mandatory transcript sidecar into the app's Documents, launches the app with
+# QVOICE_IOS_DEVICE_ENROLL_VOICE_NAME, polls the enrollment sentinel, and reports the
+# artifact identity. The runner deletes the staged inputs after a clean enrollment.
+enroll_voice_env_json() {
+  local run_id="$1" name="$2"
+  QV_RUNID="$run_id" QV_NAME="$name" python3 -c '
+import json, os
+print(json.dumps({
+    "QWENVOICE_DEBUG": "1",
+    "QVOICE_IOS_DEVICE_RUN_ID": os.environ["QV_RUNID"],
+    "QVOICE_IOS_DEVICE_ENROLL_VOICE_NAME": os.environ["QV_NAME"],
+}))'
+}
+
+cmd_enroll_clone_fixture() {
+  local wav="" transcript="" name=""
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --wav) wav="${2:?--wav requires a path}"; shift 2 ;;
+      --wav=*) wav="${1#*=}"; shift ;;
+      --transcript) transcript="${2:?--transcript requires a path}"; shift 2 ;;
+      --transcript=*) transcript="${1#*=}"; shift ;;
+      --name) name="${2:?--name requires a value}"; shift 2 ;;
+      --name=*) name="${1#*=}"; shift ;;
+      *) die "unknown flag: $1" ;;
+    esac
+  done
+  [[ -n "$wav" && -f "$wav" ]] || die "enroll-clone-fixture requires --wav <existing .wav>"
+  [[ -n "$transcript" && -f "$transcript" ]] \
+    || die "enroll-clone-fixture requires --transcript <existing .txt> (transcript-backed identity is mandatory)"
+  [[ -n "$name" ]] || name="$(basename "$wav" .wav)"
+
+  local run_id="ios-enroll-voice-$(date -u +%Y%m%d-%H%M%S)-$(benchmark_nonce)"
+  local artifacts="$QVOICE_ARTIFACTS_DIAGNOSTICS/ios/enroll-voice/$run_id"
+  local pulled="$artifacts/pulled"
+  local timeout="${QVOICE_IOS_ENROLL_TIMEOUT:-600}"
+  [[ "$timeout" =~ ^[1-9][0-9]*$ ]] || die "QVOICE_IOS_ENROLL_TIMEOUT must be a positive integer"
+
+  note "building and installing the exact Vocello app for fixture enrollment"
+  cmd_build
+  cmd_install >/dev/null
+
+  local dev
+  dev="$(resolve_device)"
+  note "staging $name.wav + $name.txt into the app's Documents"
+  xcrun devicectl device copy to --device "$dev" \
+    --domain-type appDataContainer --domain-identifier "$BUNDLE_ID" \
+    --source "$wav" --destination "Documents/$name.wav" >/dev/null
+  xcrun devicectl device copy to --device "$dev" \
+    --domain-type appDataContainer --domain-identifier "$BUNDLE_ID" \
+    --source "$transcript" --destination "Documents/$name.txt" >/dev/null
+
+  local env_json
+  env_json="$(enroll_voice_env_json "$run_id" "$name")"
+  note "enrolling '$name' through the headless diagnostics runner (runID=$run_id)"
+  xcrun devicectl device process launch --device "$dev" --terminate-existing \
+    -e "$env_json" "$BUNDLE_ID" >/dev/null
+
+  local waited=0 sentinel=""
+  while (( waited < timeout )); do
+    sleep 5
+    waited=$((waited + 5))
+    if pull_speech_asset_run "$dev" "$run_id" "$pulled"; then
+      sentinel="$(find "$pulled" -type f -name enroll-voice-done.json 2>/dev/null | head -1)"
+      [[ -z "$sentinel" ]] || break
+    fi
+    local state verdict
+    state="$(probe_device_state 2>/dev/null || true)"
+    verdict="${state%%|*}"
+    [[ "$verdict" != "DEVICE_UNREACHABLE" ]] \
+      || die "fixture enrollment stopped at ${waited}s: $(device_state_advice "$verdict")"
+  done
+  [[ -n "$sentinel" && -f "$sentinel" ]] \
+    || die "no enrollment completion evidence after ${timeout}s (runID=$run_id)"
+
+  python3 - "$sentinel" <<'PY'
+import json, sys
+record = json.load(open(sys.argv[1]))
+status = record.get("status")
+print(f"enrollment status: {status}")
+for key in ("requestedName", "voiceID", "stagedAudioSHA256", "stagedTranscriptSHA256",
+            "qualityWarnings", "stagedInputsDeleted", "failureReason", "failureDescription"):
+    value = record.get(key)
+    if value is not None:
+        print(f"  {key}: {value}")
+if status != "pass":
+    raise SystemExit(1)
+PY
+
+  note "enrollment evidence → $sentinel"
+}
+
 cmd_speech_assets() {
   [[ $# -eq 0 ]] || die "speech-assets accepts no arguments"
   local locales="de_DE,es_419,ja_JP,zh_CN"
@@ -1969,6 +2065,7 @@ main() {
       cmd_lang_bench "$@"
       ;;
     speech-assets) cmd_speech_assets "$@" ;;
+    enroll-clone-fixture) cmd_enroll_clone_fixture "$@" ;;
     crashes) cmd_crashes "$@" ;;
     debug)   cmd_debug "$@" ;;
     logs)    cmd_logs "$@" ;;
@@ -1989,7 +2086,7 @@ main() {
       ;;
     help|-h|--help)
       sed -n '2,/^$/p' "$0" | sed 's/^# \{0,1\}//' >&2 ;;
-    *) die "unknown subcommand '$sub' (try: doctor|build|install|launch|console|device-state|pull|bench|lang-bench|speech-assets|crashes|debug|logs|profile|memory|clone-conditioning|memory-field-report|preflight|gate|help)" ;;
+    *) die "unknown subcommand '$sub' (try: doctor|build|install|launch|console|device-state|pull|bench|lang-bench|speech-assets|enroll-clone-fixture|crashes|debug|logs|profile|memory|clone-conditioning|memory-field-report|preflight|gate|help)" ;;
   esac
 }
 

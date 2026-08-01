@@ -424,9 +424,13 @@ final class TTSEngineStore: ObservableObject, TTSEngine {
         syncFromBackend()
     }
 
+    // Protocol conformance only: the iPhone UI deliberately exposes no file-import
+    // control (references come from the microphone or a saved Voice Design voice);
+    // the headless fixture-enrollment diagnostics stage files directly instead.
     func importReferenceAudio(from sourceURL: URL) throws -> ImportedReferenceAudio {
         try backend.importReferenceAudio(from: sourceURL)
     }
+
 
     func exportGeneratedAudio(from sourceURL: URL, to destinationURL: URL) throws -> ExportedDocument {
         try backend.exportGeneratedAudio(from: sourceURL, to: destinationURL)
@@ -1014,8 +1018,8 @@ final class AnyTTSEngineBackend {
     private let listPreparedVoicesBlock: () async throws -> [PreparedVoice]
     private let enrollPreparedVoiceBlock: (String, String, String?) async throws -> PreparedVoice
     private let deletePreparedVoiceBlock: (String) async throws -> Void
-    private let importReferenceAudioBlock: (URL) throws -> ImportedReferenceAudio
     private let exportGeneratedAudioBlock: (URL, URL) throws -> ExportedDocument
+    private let importReferenceAudioBlock: (URL) throws -> ImportedReferenceAudio
     private let clearGenerationActivityBlock: () -> Void
     private let clearVisibleErrorBlock: () -> Void
     private let setVisibleErrorBlock: (String?) -> Void
@@ -1094,8 +1098,8 @@ final class AnyTTSEngineBackend {
         self.listPreparedVoicesBlock = { try await engine.listPreparedVoices() }
         self.enrollPreparedVoiceBlock = { try await engine.enrollPreparedVoice(name: $0, audioPath: $1, transcript: $2) }
         self.deletePreparedVoiceBlock = { try await engine.deletePreparedVoice(id: $0) }
-        self.importReferenceAudioBlock = { try engine.importReferenceAudio(from: $0) }
         self.exportGeneratedAudioBlock = { try engine.exportGeneratedAudio(from: $0, to: $1) }
+        self.importReferenceAudioBlock = { try engine.importReferenceAudio(from: $0) }
         self.clearGenerationActivityBlock = { engine.clearGenerationActivity() }
         self.clearVisibleErrorBlock = { engine.clearVisibleError() }
         if let engine = engine as? any TTSEngineRuntimeControlling {
@@ -1173,9 +1177,11 @@ final class AnyTTSEngineBackend {
         try await enrollPreparedVoiceBlock(name, audioPath, transcript)
     }
     func deletePreparedVoice(id: String) async throws { try await deletePreparedVoiceBlock(id) }
-    func importReferenceAudio(from sourceURL: URL) throws -> ImportedReferenceAudio { try importReferenceAudioBlock(sourceURL) }
     func exportGeneratedAudio(from sourceURL: URL, to destinationURL: URL) throws -> ExportedDocument {
         try exportGeneratedAudioBlock(sourceURL, destinationURL)
+    }
+    func importReferenceAudio(from sourceURL: URL) throws -> ImportedReferenceAudio {
+        try importReferenceAudioBlock(sourceURL)
     }
     func clearGenerationActivity() { clearGenerationActivityBlock() }
     func clearVisibleError() { clearVisibleErrorBlock() }

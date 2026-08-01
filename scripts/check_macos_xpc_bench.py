@@ -645,8 +645,10 @@ def build_manifest(
             "warnings": take_warnings,
             "memoryStatus": memory.status,
             "sampleSidecarDigest": memory.sidecar_digest,
+            **take_quality_identity(row),
         })
     history_record = {
+        "schemaVersion": history_record_schema_version(history_takes),
         "run": {
             "id": run_id,
             "kind": "ui-generation",
@@ -704,6 +706,40 @@ def build_manifest(
         "takes": takes,
         "historyRecord": history_record,
     }
+
+
+def take_quality_identity(row: dict) -> dict:
+    """Phase 13 fold: the typed quality-registry identity this engine row
+    published with, from its open telemetry notes (mirrors
+    publish_benchmark_history.quality_identity_fields; keep in lockstep).
+    Empty when the row predates the phase-12 registry; the record then
+    publishes at schema v2."""
+    notes = row.get("notes") if isinstance(row.get("notes"), dict) else {}
+    outcome = notes.get("quality_registry_outcome")
+    gates = notes.get("quality_registry_required_gates")
+    if not isinstance(outcome, str) or not isinstance(gates, str) or not gates:
+        return {}
+    fields = {
+        "qualityRegistryOutcome": outcome,
+        "qualityRegistryRequiredGates": sorted(set(gates.split(","))),
+    }
+    issues = notes.get("quality_registry_issues")
+    if isinstance(issues, str) and issues:
+        fields["qualityRegistryIssues"] = sorted(set(issues.split(",")))
+    return fields
+
+
+def history_record_schema_version(history_takes: list) -> int:
+    """3 when every take carries the quality identity, 2 when none does.
+    A mix would publish a record silently missing evidence for some takes."""
+    carrying = sum(1 for take in history_takes if "qualityRegistryOutcome" in take)
+    if carrying == 0:
+        return 2
+    if carrying == len(history_takes):
+        return 3
+    raise SystemExit(
+        "takes mix quality-registry identity presence; refusing a partial schema-v3 record"
+    )
 
 
 def write_json_atomic(path: Path, payload: dict) -> None:

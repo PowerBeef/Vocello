@@ -35,6 +35,8 @@ def make_engine_row(index: int, cell: str) -> dict:
             "benchRunID": RUN_ID,
             "benchTakeIndex": str(index),
             "benchCell": cell,
+            "quality_registry_outcome": "pass",
+            "quality_registry_required_gates": "terminal,token_cap,codec_behavior,persisted_wav,streaming_continuity",
         },
         "outputMetrics": {
             "readableWAV": True,
@@ -259,6 +261,39 @@ class CheckMacOSXPCBenchmarkTests(unittest.TestCase):
             if manifest_path.is_file():
                 self.last_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
             return result
+
+    def test_quality_identity_stamps_schema_v3(self) -> None:
+        result = self.run_checker(self.expected_order, evidence=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        record = self.last_manifest["historyRecord"]
+        self.assertEqual(record["schemaVersion"], 3)
+        for take in record["takes"]:
+            self.assertEqual(take["qualityRegistryOutcome"], "pass")
+            self.assertEqual(
+                take["qualityRegistryRequiredGates"],
+                ["codec_behavior", "persisted_wav", "streaming_continuity", "terminal", "token_cap"],
+            )
+
+    def test_rows_without_registry_notes_publish_schema_v2(self) -> None:
+        def strip(rows: list[dict]) -> None:
+            for row in rows:
+                row["notes"].pop("quality_registry_outcome")
+                row["notes"].pop("quality_registry_required_gates")
+
+        result = self.run_checker(self.expected_order, strip, evidence=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        record = self.last_manifest["historyRecord"]
+        self.assertEqual(record["schemaVersion"], 2)
+        self.assertTrue(all("qualityRegistryOutcome" not in take for take in record["takes"]))
+
+    def test_mixed_registry_identity_refuses_partial_v3(self) -> None:
+        def strip_first(rows: list[dict]) -> None:
+            rows[0]["notes"].pop("quality_registry_outcome")
+            rows[0]["notes"].pop("quality_registry_required_gates")
+
+        result = self.run_checker(self.expected_order, strip_first, evidence=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("refusing a partial schema-v3 record", result.stdout + result.stderr)
 
     def test_exact_order_and_pass_qc_pass(self) -> None:
         result = self.run_checker(self.expected_order)

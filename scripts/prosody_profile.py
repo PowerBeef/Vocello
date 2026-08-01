@@ -70,6 +70,10 @@ BUILTIN_PROFILE = {
     "delivery_expectations": {
         "intensity_scale": {"subtle": 0.0, "normal": 1.0, "strong": 1.15},
         "presets": {
+            "neutral": {
+                "arousal_score": {"direction": -1, "min_effect_normal": 0.0, "tier": "supporting"},
+                "pitch_variation_delta_hz": {"direction": -1, "min_effect_normal": 0.0, "tier": "supporting"},
+            },
             "happy": {
                 "pitch_variation_delta_hz": {"direction": 1, "min_effect_normal": 2.5, "tier": "required"},
                 "arousal_score": {"direction": 1, "min_effect_normal": 0.5, "tier": "required"},

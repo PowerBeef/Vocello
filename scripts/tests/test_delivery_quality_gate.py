@@ -39,13 +39,13 @@ def metrics(
 
 
 class DeliveryGateTests(unittest.TestCase):
-    def test_builtin_profile_covers_all_nine_expressive_presets(self):
+    def test_builtin_profile_covers_all_presets_including_neutral(self):
         profile = validate_profile(builtin_profile())
         presets = set(profile["delivery_expectations"]["presets"].keys())
         self.assertEqual(
             presets,
-            {"happy", "sad", "angry", "fearful", "surprised", "excited",
-             "calm", "whisper", "dramatic"},
+            {"neutral", "happy", "sad", "angry", "fearful", "surprised",
+             "excited", "calm", "whisper", "dramatic"},
         )
 
     def test_matching_excited_take_passes(self):

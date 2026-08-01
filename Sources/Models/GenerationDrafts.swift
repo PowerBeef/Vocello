@@ -9,7 +9,7 @@ struct CustomVoiceDraft: Equatable {
     // text falls back to english in qwenLanguageHint's custom branch — so the
     // old .english default's behavior is preserved for English scripts.
     var selectedLanguage = Qwen3SupportedLanguage.auto
-    var emotion = DeliveryProfile.neutralInstruction
+    var emotion = EmotionPreset.neutralPresetInstruction
     var text = ""
 
     var hasText: Bool {
@@ -34,7 +34,7 @@ struct CustomVoiceDraft: Equatable {
 struct VoiceDesignDraft: Equatable {
     var voiceDescription = ""
     var selectedLanguage = Qwen3SupportedLanguage.auto
-    var emotion = DeliveryProfile.neutralInstruction
+    var emotion = EmotionPreset.neutralPresetInstruction
     var text = ""
 
     var hasVoiceDescription: Bool {

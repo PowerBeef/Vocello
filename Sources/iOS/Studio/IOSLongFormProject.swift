@@ -127,7 +127,7 @@ struct IOSLongFormProjectRequest {
         case .design:
             payload = .design(
                 voiceDescription: voiceDescription ?? "",
-                deliveryStyle: emotion ?? DeliveryProfile.neutralInstruction
+                deliveryStyle: emotion ?? EmotionPreset.neutralPresetInstruction
             )
         case .clone:
             payload = .clone(

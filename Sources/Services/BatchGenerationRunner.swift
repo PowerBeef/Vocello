@@ -304,7 +304,7 @@ struct BatchGenerationRequest {
                 payload: .custom(
                     speakerID: voice ?? TTSModel.defaultSpeaker,
                     deliveryStyle: model.supportsInstructionControl
-                        ? (emotion ?? DeliveryProfile.neutralInstruction)
+                        ? (emotion ?? EmotionPreset.neutralPresetInstruction)
                         : nil
                 ),
                 seed: segmentSeed(batchIndex: rawBatchIndex, seedOverride: seedOverride),
@@ -321,7 +321,7 @@ struct BatchGenerationRequest {
                 languageHint: languageHint,
                 payload: .design(
                     voiceDescription: voiceDescription ?? "",
-                    deliveryStyle: emotion ?? DeliveryProfile.neutralInstruction
+                    deliveryStyle: emotion ?? EmotionPreset.neutralPresetInstruction
                 ),
                 seed: segmentSeed(batchIndex: rawBatchIndex, seedOverride: seedOverride),
                 variation: GenerationVariationPreference.requestValue()

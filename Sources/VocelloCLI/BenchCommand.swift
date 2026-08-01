@@ -102,9 +102,9 @@ enum BenchCommand {
                 let known = EmotionPreset.all.map(\.id).joined(separator: ", ")
                 throw CLIError("unknown delivery preset '\(token)' (use <preset>[.<intensity>]; presets: \(known))")
             }
-            guard preset.id != "neutral" else {
-                throw CLIError("delivery cell 'neutral' is redundant — the plain warm take already runs without an instruction")
-            }
+            // Neutral is a real instructed preset (2026-08-01): its cell
+            // measures the steadied delivery against the uninstructed plain
+            // warm take, exactly like every other preset.
             let intensity: EmotionIntensity
             if parts.count == 2 {
                 guard let resolved = EmotionIntensity.allCases.first(where: { $0.rpcValue == parts[1] }) else {

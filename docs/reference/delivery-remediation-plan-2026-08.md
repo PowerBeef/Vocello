@@ -191,6 +191,39 @@ conditioning-level mechanism exists. Nothing auto-adopted.
 sequential rule and pinned model identities). Item 3 skipped per the plan's
 allowance.
 
+## R5 — Neutral becomes a real preset (maintainer-directed, 2026-08-01)
+
+**Decision:** treat Neutral like every other preset — a slightly monotone,
+emotion-free delivery target — instead of the absence of an instruction
+(the root cause of finding F4's unconstrained wander). Adopted text
+(`EmotionPreset.neutralPresetInstruction`): "Speak in an even, level tone,
+slightly monotone, with steady measured pacing and no noticeable emotion;
+plain and matter-of-fact throughout."
+
+**Scope:** the preset catalog (all three neutral tiers, tier-less UI
+semantics preserved), the macOS draft defaults and both platforms'
+long-form nil-fallbacks now carry the instructed neutral; typed neutral
+synonyms in custom text still drop; **programmatic/CLI requests with no
+delivery style remain uninstructed** (bench plain takes keep historical
+fixed-seed comparability — proven byte-identical pre/post). The bench
+accepts `neutral` delivery cells as first-class paired measurements and the
+profile carries a neutral expectation (steadied direction, supporting).
+
+**Text selection (three candidates, 8-seed cohorts each):** stronger
+monotone phrasing flattens more but destabilizes the cross-seed register
+("flat, even monotone": f0-std −15% but 4.8 st spread, cohort flag), while
+soft steadying stabilizes register without flattening (+13% f0-std). The
+adopted text is the balanced middle: f0-std −5%, best rate spread of any
+arm (1.56 Hz vs 1.97 plain), zero prosody/cohort flags, register spread
+2.98 st inside the 4.5 bound. Cross-seed register spread itself remains the
+R3-documented limitation no instruction fixes.
+
+**Proof:** plain-path invariance byte-identical at fixed seed; the first
+neutral bench cell composes canonical depth and passes its delivery gate
+(arousal −1.21 vs plain, record `macos-engine-20260801-051412-c02b8396`).
+iOS device acceptance rides the Tier-2 window; the Neutral preset now
+counts as a meaningful delivery wherever `isMeaningful` gates behavior.
+
 ## Sequencing and dependencies
 
 R1 → R2a/R2b (any order, all phone-free) → R3. R2b's outcome can append to

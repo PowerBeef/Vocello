@@ -129,6 +129,17 @@ public struct EmotionPreset: Identifiable, Sendable {
         return all.first(where: { $0.id == id })
     }
 
+    /// The Neutral preset's real instruction (adopted 2026-08-01, maintainer
+    /// decision closing finding F4): Neutral is a preset like any other — a
+    /// slightly monotone, emotion-free delivery target — rather than the
+    /// absence of an instruction. The measured alternative (sending nothing)
+    /// left cross-seed delivery unconstrained (2.70 st pitch wander).
+    /// Programmatic requests with no delivery style remain uninstructed;
+    /// typed neutral synonyms ("neutral", "normal tone") still drop via
+    /// `DeliveryProfile.isNeutralInstruction`.
+    public static let neutralPresetInstruction =
+        "Speak in an even, level tone, slightly monotone, with steady measured pacing and no noticeable emotion; plain and matter-of-fact throughout."
+
     // Instruction-writing canon (Qwen3-TTS official guidance + measured adherence):
     // - Imperative verbs (Speak / Whisper / Narrate) are followed more reliably.
     // - Combine emotion + pace + pitch + timbre in concrete acoustic wording.
@@ -142,9 +153,9 @@ public struct EmotionPreset: Identifiable, Sendable {
             label: "Neutral",
             sfSymbol: "face.dashed",
             instructions: [
-                .subtle: DeliveryProfile.neutralInstruction,
-                .normal: DeliveryProfile.neutralInstruction,
-                .strong: DeliveryProfile.neutralInstruction,
+                .subtle: EmotionPreset.neutralPresetInstruction,
+                .normal: EmotionPreset.neutralPresetInstruction,
+                .strong: EmotionPreset.neutralPresetInstruction,
             ]
         ),
         EmotionPreset(

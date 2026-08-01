@@ -386,6 +386,125 @@ final class LongFormPlanningTests: XCTestCase {
         )
     }
 
+    // MARK: - Planner v2 (R-tail orphan rebalancing)
+    // docs/decisions/long-form-context-planning-v2.md — fixtures self-calibrate via
+    // single-segment plans so they stay robust to conservative-estimator changes.
+
+    private func measuredEstimate(_ text: String) throws -> Int {
+        let plan = try makePlan(text, tokenLimit: 100_000)
+        XCTAssertEqual(plan.segments.count, 1)
+        return plan.segments[0].evidence.conservativeTokenEstimate
+    }
+
+    func testPlanEvidenceCarriesPlannerVersion2() throws {
+        let plan = try makePlan("One sentence only.", tokenLimit: 50)
+        XCTAssertEqual(plan.evidence.plannerAlgorithmVersion, 2)
+        XCTAssertEqual(
+            LongFormPlanningConfiguration.currentPlannerAlgorithmVersion, 2
+        )
+    }
+
+    func testTailRebalanceAvoidsOrphanFinalSegment() throws {
+        let s1 = "The northern road climbs steadily through terraced fields and past low stone walls that farmers repaired every spring for generations without complaint."
+        let s2 = "Travelers usually rest beside the second bridge before the descent."
+        let s3 = "Few linger."
+        let text = "\(s1) \(s2) \(s3)"
+
+        let e3 = try measuredEstimate(s3)
+        let headPair = try measuredEstimate("\(s1) \(s2)")
+        let tailPair = try measuredEstimate("\(s2) \(s3)")
+        let whole = try measuredEstimate(text)
+        // Precondition shape: greedy fits S1+S2, orphans S3, and the rebalanced
+        // tail (S2+S3) fits a segment.
+        let limit = headPair + 2
+        XCTAssertGreaterThan(whole, limit, "fixture must not fit in one segment")
+        XCTAssertLessThan(Double(e3), 0.25 * Double(limit), "fixture must present an orphan tail")
+        XCTAssertLessThanOrEqual(tailPair, limit, "the rebalanced tail must fit")
+
+        let plan = try makePlan(text, tokenLimit: limit)
+
+        XCTAssertEqual(plan.segments.count, 2)
+        // R-tail moves the boundary to the sentence end after S1, keeping S2+S3 together.
+        XCTAssertEqual(plan.segments[0].spokenTextForGeneration, s1)
+        XCTAssertEqual(plan.segments[0].evidence.boundary, .sentence)
+        let tailEstimate = try XCTUnwrap(plan.segments.last).evidence.conservativeTokenEstimate
+        XCTAssertGreaterThanOrEqual(
+            Double(tailEstimate), 0.25 * Double(limit),
+            "the rebalanced tail must clear the orphan fraction"
+        )
+        XCTAssertLessThanOrEqual(tailEstimate, limit)
+    }
+
+    func testTailRebalanceNeverTradesParagraphForSentence() throws {
+        let p1a = "The archive room stayed cold in every season, and the caretakers preferred it that way for the sake of the paper."
+        let p1b = "Nobody argued with the caretakers."
+        let tiny = "End."
+        let text = "\(p1a) \(p1b)\n\n\(tiny)"
+
+        let eTiny = try measuredEstimate(tiny)
+        let paragraphOne = try measuredEstimate("\(p1a) \(p1b)")
+        let whole = try measuredEstimate(text)
+        let limit = paragraphOne
+        XCTAssertGreaterThan(whole, limit, "fixture must not fit in one segment")
+        XCTAssertLessThan(Double(eTiny), 0.25 * Double(limit))
+
+        let plan = try makePlan(text, tokenLimit: limit)
+
+        // The only paragraph candidate precedes the tiny paragraph; with no earlier
+        // paragraph candidate to rebalance to, the orphan stands rather than trading
+        // the 500 ms paragraph pause for a sentence boundary inside paragraph one.
+        XCTAssertEqual(plan.segments.count, 2)
+        XCTAssertEqual(plan.segments[0].evidence.boundary, .paragraph)
+        XCTAssertEqual(try XCTUnwrap(plan.segments.last).spokenTextForGeneration, tiny)
+    }
+
+    func testTailRebalancePrefersEarlierParagraphWhenAvailable() throws {
+        let p1 = "The first survey of the valley took three summers and produced maps that the council still consults when the river argues with its banks."
+        let p2 = "The second survey took one summer."
+        let p3 = "Nobody read it."
+        let text = "\(p1)\n\n\(p2)\n\n\(p3)"
+
+        let e3 = try measuredEstimate(p3)
+        let headPair = try measuredEstimate("\(p1)\n\n\(p2)")
+        let tailPair = try measuredEstimate("\(p2)\n\n\(p3)")
+        let whole = try measuredEstimate(text)
+        let limit = headPair + 2
+        XCTAssertGreaterThan(whole, limit, "fixture must not fit in one segment")
+        XCTAssertLessThan(Double(e3), 0.25 * Double(limit))
+        XCTAssertLessThanOrEqual(tailPair, limit, "the rebalanced tail must fit")
+
+        let plan = try makePlan(text, tokenLimit: limit)
+
+        // Greedy would take the last in-window paragraph break (after P2), orphaning
+        // P3; R-tail rebalances to the earlier paragraph break, and both boundaries
+        // keep paragraph precedence.
+        XCTAssertEqual(plan.segments.count, 2)
+        XCTAssertEqual(plan.segments[0].spokenTextForGeneration, p1)
+        XCTAssertEqual(plan.segments[0].evidence.boundary, .paragraph)
+        XCTAssertGreaterThanOrEqual(
+            Double(try XCTUnwrap(plan.segments.last).evidence.conservativeTokenEstimate),
+            0.25 * Double(limit)
+        )
+    }
+
+    func testNonCurrentPlannerVersionStaysRejectedForNewPlans() throws {
+        let spoken = try SpokenTextPlanner.plan(originalText: "Replay safety.")
+        XCTAssertThrowsError(
+            try LongFormPlanner.plan(
+                spokenTextPlan: spoken,
+                configuration: LongFormPlanningConfiguration(
+                    plannerAlgorithmVersion: 1,
+                    runtimeTokenLimit: 50,
+                    baseSeed: 1
+                )
+            )
+        ) { error in
+            XCTAssertEqual(
+                error as? LongFormPlanningError, .invalidAlgorithmVersion(1)
+            )
+        }
+    }
+
     private func utf8Range(of needle: String, in text: String) throws -> TextUTF8Range {
         let range = try XCTUnwrap(text.range(of: needle))
         return TextUTF8Range(

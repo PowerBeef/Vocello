@@ -64,7 +64,11 @@ public struct LongFormRevisionLineage: Codable, Equatable, Hashable, Sendable {
 }
 
 public struct LongFormPlanningConfiguration: Codable, Equatable, Hashable, Sendable {
-    public static let currentPlannerAlgorithmVersion = 1
+    // v2 (2026-08-01): R-tail orphan rebalancing
+    // (docs/decisions/long-form-context-planning-v2.md). The version participates in
+    // segment/plan identity serialization, so new plans re-derive IDs and sub-seeds;
+    // retained projects replay their recorded plans untouched.
+    public static let currentPlannerAlgorithmVersion = 2
     public static let currentTokenEstimatorVersion = 1
 
     public let plannerAlgorithmVersion: Int
@@ -211,7 +215,7 @@ public enum LongFormPlanner {
                 tokenLimit: configuration.runtimeTokenLimit,
                 protectedRanges: protectedRanges
             )
-            let selection: BoundaryCandidate
+            var selection: BoundaryCandidate
             if scan.maximumEnd == text.endIndex {
                 selection = BoundaryCandidate(index: text.endIndex, kind: .endOfText)
             } else if let selected = preferredBoundary(from: scan.candidates) {
@@ -224,6 +228,21 @@ public enum LongFormPlanner {
                 throw LongFormPlanningError.protectedSpanExceedsTokenLimit
             } else {
                 selection = BoundaryCandidate(index: scan.maximumEnd, kind: .grapheme)
+            }
+
+            // Planner v2 context repair (docs/decisions/long-form-context-planning-v2.md):
+            // R-tail keeps the final segment from becoming a pacing-visible orphan by
+            // rebalancing the last boundary. Pure text decision; boundary kinds never
+            // degrade and paragraph pauses are never crossed.
+            if selection.kind != .endOfText,
+               let rebalanced = rebalancedAgainstOrphanTail(
+                   text: text,
+                   start: start,
+                   selection: selection,
+                   candidates: scan.candidates,
+                   tokenLimit: configuration.runtimeTokenLimit
+               ) {
+                selection = rebalanced
             }
 
             let trimmedEnd = text.indexBeforeWhitespace(endingAt: selection.index, after: start)
@@ -455,6 +474,53 @@ public enum LongFormPlanner {
         )
         let digest = SpokenTextCanonical.digest(Data(serialization.utf8))
         return SegmentIdentity(segmentID: "lfseg_\(digest.prefix(24))", segmentDigest: digest)
+    }
+
+    // MARK: - Planner v2 context repairs
+
+    /// R-tail threshold: a final segment under this fraction of the token limit is an
+    /// orphan worth rebalancing.
+    private static let minimumTailFraction = 0.25
+
+    /// R-tail: when everything after `selection` would form a single under-fraction
+    /// orphan segment, move the boundary to the same-or-better-precedence candidate
+    /// that best balances the final two segments. Grapheme candidates are never used
+    /// for re-selection, and the original selection stands when no candidate improves
+    /// the balance while keeping both halves under the limit.
+    private static func rebalancedAgainstOrphanTail(
+        text: String,
+        start: String.Index,
+        selection: BoundaryCandidate,
+        candidates: [BoundaryCandidate],
+        tokenLimit: Int
+    ) -> BoundaryCandidate? {
+        let tailStart = text.indexAfterWhitespace(from: selection.index)
+        guard tailStart < text.endIndex else { return nil }
+        let tailEstimate = ConservativeTokenEstimator.estimate(String(text[tailStart...]))
+        guard tailEstimate <= tokenLimit,
+              Double(tailEstimate) < minimumTailFraction * Double(tokenLimit)
+        else { return nil }
+
+        let headEstimate = ConservativeTokenEstimator.estimate(String(text[start..<selection.index]))
+        var bestImbalance = abs(headEstimate - tailEstimate)
+        var best: BoundaryCandidate?
+        for candidate in candidates
+        where candidate.kind != .grapheme
+            && candidate.kind.precedence <= selection.kind.precedence
+            && candidate.index > start
+            && candidate.index < selection.index {
+            let head = ConservativeTokenEstimator.estimate(String(text[start..<candidate.index]))
+            let newTailStart = text.indexAfterWhitespace(from: candidate.index)
+            guard newTailStart < text.endIndex else { continue }
+            let tail = ConservativeTokenEstimator.estimate(String(text[newTailStart...]))
+            guard head <= tokenLimit, tail <= tokenLimit else { continue }
+            let imbalance = abs(head - tail)
+            if imbalance < bestImbalance {
+                bestImbalance = imbalance
+                best = candidate
+            }
+        }
+        return best
     }
 
     private static func deriveSubseed(baseSeed: UInt64, segmentID: String) -> UInt64 {

@@ -256,3 +256,17 @@ into custom text with identical instruction bytes (behavior preserved), the pros
 and delivery gate drop the zero-tier special case (retired IDs in historical sidecars judge
 at normal strength via the 1.0 fallback), and public copy states two tiers. Ships with
 build 24 / the next macOS release.
+
+## R3 rate-only option — parked (maintainer decision 2026-08-01)
+
+The recorded rate-only adoption closed as **parked, not adopted**. Rationale: the rate
+half changes the shipping neutral sound and forks sampling policy by delivery state while
+leaving the perceptually dominant register wander at its ~2.1-2.4 st floor; sampling
+changes ship only on deterministic-QC wins, and this gate failed on pitch. Unpark
+triggers, any one sufficient: (a) tester feedback naming pacing inconsistency on
+regenerations; (b) Tier-4 long-form assembly fixtures measuring segment-to-segment pacing
+spread as a real quality cost (adopt scoped to long-form execution with its own
+fixture-measured A/B); (c) a register/pitch-conditioning mechanism appearing upstream
+(fix pitch properly, bundle the rate profile in the same promotion). The registered
+QWENVOICE_TALKER_TEMP/TOPP knobs under QWENVOICE_DEBUG remain the zero-cost opt-in for
+local evaluation.

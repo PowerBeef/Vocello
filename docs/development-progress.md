@@ -149,6 +149,20 @@ performance block after the fixture rebind, Tier 4 carryover). Immediate specifi
    noise floor), an unverifiable control. Normal/strong remain (both ≥0.85 adherence,
    ~15% measured separation). Legacy subtle drafts degrade losslessly to custom text;
    decision record in `docs/reference/delivery-remediation-plan-2026-08.md`.
+8. **R3 rate-only option parked (2026-08-01, maintainer decision):** the neutral
+   sampling profile's rate half is not adopted standalone (register wander stays
+   floored; failed gates do not ship by halves). Three unpark triggers recorded in
+   the remediation plan; the Tier-4 long-form fixtures are the designated
+   re-evaluation point. Tier 4 (long-form text-context carryover, design pass
+   first) is now the active roadmap work.
+9. **Tier 4 text-first landed (2026-08-01):** long-form planner v2 — R-tail orphan
+   rebalancing keeps the final segment from becoming a pacing-visible orphan, never
+   degrades boundary kinds, and never trades a paragraph pause away. Version-bumped
+   identity (new plans re-derive segment IDs/sub-seeds; retained projects replay
+   recorded plans), fixtures-first with self-calibrating estimates; the design pass
+   removed one proposed rule (R-pull) as dead by construction before it shipped.
+   Design: `docs/decisions/long-form-context-planning-v2.md`. Q2's acoustic/KV
+   carryover experiment remains the open Tier-4 remainder.
 
 ## Staged roadmap state
 

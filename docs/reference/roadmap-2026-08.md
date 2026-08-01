@@ -88,10 +88,14 @@ against current-artifact baselines.
 
 ## Tier 4 — after the performance block
 
-- **Long-form text-context carryover (Q2, text first)**: adjacent-sentence text into
-  segment planning (no acoustic risk), long-form assembly fixtures + fixed-seed segment
-  comparison; the bounded acoustic/KV carryover experiment only after, assessed against
-  segment memory budgets first.
+- **Long-form text-context carryover (Q2, text first) — planner half done 2026-08-01:**
+  planner v2 ships R-tail orphan rebalancing (context-aware final-boundary repair;
+  identity re-versioned via the serialized algorithm version, retained projects replay
+  recorded plans untouched) with self-calibrating fixtures that also caught and removed
+  a dead rule pre-ship (`docs/decisions/long-form-context-planning-v2.md`). Remaining
+  in Q2: the bounded acoustic/KV carryover experiment, only after and assessed against
+  segment memory budgets first; the parked R3 rate profile re-evaluates on these
+  fixtures.
 - **Opportunistic**: MOS-proxy advisory column (UTMOSv2, dev-lane advisory only, never a
   gate); 60 Hz-device glass-gate measurement if hardware appears.
 

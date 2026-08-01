@@ -37,6 +37,7 @@ Review when: target or scheme changes; runtime topology; telemetry schema; test 
 
 - [`Sources/Resources/voice-previews/README.md`](../Sources/Resources/voice-previews/README.md)
 - [`docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md)
+- [`docs/decisions/long-form-context-planning-v2.md`](../docs/decisions/long-form-context-planning-v2.md)
 - [`docs/decisions/model-delivery-background-assets.md`](../docs/decisions/model-delivery-background-assets.md)
 - [`docs/decisions/owned-qwen3-runtime-monorepo.md`](../docs/decisions/owned-qwen3-runtime-monorepo.md)
 - [`docs/decisions/product-identity-compatibility.md`](../docs/decisions/product-identity-compatibility.md)

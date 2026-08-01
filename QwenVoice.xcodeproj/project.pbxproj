@@ -158,8 +158,10 @@
 		56DCC7FA33F0A181591B1C28 /* QwenVoiceNative.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 405DF32499EDF28E20D73FEA /* QwenVoiceNative.framework */; };
 		58393FAD6A4BB754BA439C61 /* PromptLanguageDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07AE10233002DBEBDDAF6007 /* PromptLanguageDetector.swift */; };
 		59EF7FDB9556E1860DC2FF67 /* ContinuousVoiceDescriptionField.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70E509E03D5758CB0D6C0388 /* ContinuousVoiceDescriptionField.swift */; };
+		5B5724CE5A6934149BB907D5 /* GenerationQualityComposition.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D2353974E930C0A9785C7F2 /* GenerationQualityComposition.swift */; };
 		5CEA95BA39656930F468D27B /* VocelloiOSBenchmarkUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBCE5DF7AD407A17AF522154 /* VocelloiOSBenchmarkUITests.swift */; };
 		5D23FDB4CC008D1E909414A8 /* SidebarStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16357673B0524D933999409E /* SidebarStatusView.swift */; };
+		5F53713D4A9BEDE02A972461 /* GenerationQualityCompositionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B6925284D75370993339F2 /* GenerationQualityCompositionTests.swift */; };
 		5FE8611FB168684BB5A832C1 /* VoiceCloningCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8BD934015DBE86EA1193A6B /* VoiceCloningCoordinator.swift */; };
 		603FCEB24230E8474ABC9C36 /* GenerationPersistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 220CFD2739290441DB6C2732 /* GenerationPersistence.swift */; };
 		6217C677B68BE8A7BFAD48E7 /* VocelloQwen3Core in Frameworks */ = {isa = PBXBuildFile; productRef = 4FD54CF5CE556DBC8EA81B00 /* VocelloQwen3Core */; };
@@ -696,6 +698,7 @@
 		3AC640F31070C11F3F6C432D /* GenerationVariationPreference.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GenerationVariationPreference.swift; sourceTree = "<group>"; };
 		3ADE213695C11F46205AE6DC /* QwenVoice.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = QwenVoice.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		3B9B756B0B79BA2E94926CD3 /* eric.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = eric.wav; sourceTree = "<group>"; };
+		3D2353974E930C0A9785C7F2 /* GenerationQualityComposition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GenerationQualityComposition.swift; sourceTree = "<group>"; };
 		3DDAA8C5ADE95EC61570A219 /* GenerationTelemetryRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GenerationTelemetryRecord.swift; sourceTree = "<group>"; };
 		3F056FE32E688786725FCC8D /* ModelAssets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelAssets.swift; sourceTree = "<group>"; };
 		3F2675499CA07A2901B0A6EA /* IOSSavedOutputsDestination.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSSavedOutputsDestination.swift; sourceTree = "<group>"; };
@@ -815,6 +818,7 @@
 		9E0FED1EF94E06A5363542F9 /* StudioScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioScreen.swift; sourceTree = "<group>"; };
 		A014ECB4F32BED1D8FE49B68 /* IOSAccessibilityIdentifiers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSAccessibilityIdentifiers.swift; sourceTree = "<group>"; };
 		A10C91DE69B8163804C5D553 /* DeliveryInstructionAdvisorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeliveryInstructionAdvisorTests.swift; sourceTree = "<group>"; };
+		A1B6925284D75370993339F2 /* GenerationQualityCompositionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GenerationQualityCompositionTests.swift; sourceTree = "<group>"; };
 		A3061038468019DAA046A8B6 /* LongFormAssembly.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LongFormAssembly.swift; sourceTree = "<group>"; };
 		A3976719BADE89B1685D214A /* VocelloCoreTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = VocelloCoreTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A55F5C185C7CAC960AAC9C80 /* MacGenerationWarmupCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacGenerationWarmupCoordinator.swift; sourceTree = "<group>"; };
@@ -1117,6 +1121,7 @@
 				B7453B77A9A1EAD14ED28711 /* GenerationFailureDiagnosticLogger.swift */,
 				8A94C8A768AF3FE6E0CD51EC /* GenerationOutputAdapter.swift */,
 				1CB221265C49E3807301AB60 /* GenerationPlanShadowMapper.swift */,
+				3D2353974E930C0A9785C7F2 /* GenerationQualityComposition.swift */,
 				88B053E8CDEBE21AC420E4B5 /* GenerationQualityReport.swift */,
 				332F1AC060DDE9B0B7D2C993 /* GenerationQualityReportProducer.swift */,
 				64B446ABFD75C0AE283E6D66 /* GenerationSemantics.swift */,
@@ -1613,6 +1618,7 @@
 				1FB6146E31A25C9C8E0AC831 /* GenerationEventDeliveryProbeTests.swift */,
 				ECF8577E65C258F1081F57A2 /* GenerationFailureDiagnosticLoggerTests.swift */,
 				D9EF7430F4440DAB10C24D68 /* GenerationPlanShadowMapperTests.swift */,
+				A1B6925284D75370993339F2 /* GenerationQualityCompositionTests.swift */,
 				87E3AC164ACFAC2331CD778E /* GenerationQualityReportProducerTests.swift */,
 				75868F469F63AFDD6DDEF29A /* GenerationQualityReportTests.swift */,
 				0F5D3ADAE3566B96C3337BAB /* GenerationSemanticsLanguageTests.swift */,
@@ -2194,6 +2200,7 @@
 				1E5C67C0EF563A8543BFABD3 /* GenerationFailureDiagnosticLogger.swift in Sources */,
 				AB19429622392340EF0B9F7D /* GenerationOutputAdapter.swift in Sources */,
 				34A1E9D71579187F947BD490 /* GenerationPlanShadowMapper.swift in Sources */,
+				5B5724CE5A6934149BB907D5 /* GenerationQualityComposition.swift in Sources */,
 				C7EA4540816D2346C2B603B8 /* GenerationQualityReport.swift in Sources */,
 				31B6ECD414EDD7D85FC80501 /* GenerationQualityReportProducer.swift in Sources */,
 				CD601A69A8F0D1F41B8F2BDD /* GenerationSemantics.swift in Sources */,
@@ -2353,6 +2360,7 @@
 				0AF4FC23C9138278AEF0A609 /* GenerationFailureDiagnosticLoggerTests.swift in Sources */,
 				3B885A9409233451E01A6909 /* GenerationOutputVerifier.swift in Sources */,
 				21275A6B32471EE246F1FA2B /* GenerationPlanShadowMapperTests.swift in Sources */,
+				5F53713D4A9BEDE02A972461 /* GenerationQualityCompositionTests.swift in Sources */,
 				31F6ACF48631991150FFC4DB /* GenerationQualityReportProducerTests.swift in Sources */,
 				EC85720AB2D494DF6BB4EF61 /* GenerationQualityReportTests.swift in Sources */,
 				54629EA454BE4A228E48B874 /* GenerationSemanticsLanguageTests.swift in Sources */,

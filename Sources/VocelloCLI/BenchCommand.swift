@@ -427,6 +427,13 @@ enum BenchCommand {
                     resultsManifest: historyArtifactDir.appendingPathComponent("bench-results.json"),
                     profilePath: prosodyProfilePath
                 )
+                // Phase 12 close-out: consolidate the persisted-WAV analyses
+                // (Fast QC + the sidecar prosody gate) into one composed
+                // standard-depth registry verdict per delivery take. A missing
+                // analyzer or a fail verdict fails the run (fail-closed).
+                try composeDeliveryStandardQuality(
+                    diagnostics: diagDir, outputs: outDir, runID: runID
+                )
             } else {
                 // A --keep run without delivery must not inherit an older sidecar.
                 try? FileManager.default.removeItem(
@@ -789,6 +796,161 @@ enum BenchCommand {
         if let published = String(data: outputPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)?
             .trimmingCharacters(in: .whitespacesAndNewlines), !published.isEmpty {
             note("benchmark history → \(published)")
+        }
+    }
+
+    /// Composed standard-depth verdicts for the delivery takes: the fast
+    /// finalization evidence is rebuilt from this run's typed engine telemetry
+    /// rows, the `.prosody` gate comes from the sidecar the analysis step just
+    /// wrote, and every verdict is checked against the take's stored fast
+    /// verdict (a composed verdict can never be better than the fast one it
+    /// finalized with). Fail-closed: a missing row, missing sidecar verdict,
+    /// or fail outcome fails the bench run.
+    private struct ComposeEngineRow: Decodable {
+        struct AnyObjectElement: Decodable {}
+        let generationID: String?
+        let finishReason: String?
+        let usedStreaming: Bool?
+        let notes: [String: String]?
+        let audioQC: AudioQCReport?
+        let chunkTimeline: [AnyObjectElement]?
+    }
+
+    private struct ComposedTakeVerdict: Codable {
+        let generationID: String
+        let deliveryWav: String
+        let outcome: String
+        let issues: [String]
+        let prosodyEvidenceDigest: String
+    }
+
+    private struct ComposedQualityFile: Codable {
+        let schemaVersion: Int
+        let runID: String
+        let depth: String
+        let requiredGates: [String]
+        let takes: [ComposedTakeVerdict]
+    }
+
+    private static func composeDeliveryStandardQuality(
+        diagnostics: URL, outputs: URL, runID: String
+    ) throws {
+        let sidecarURL = diagnostics.appendingPathComponent("bench-prosody.json")
+        struct SidecarEntry: Decodable {
+            let generationID: String
+            let deliveryWav: String
+            let qualityGate: GenerationQualityComposition.ProsodySidecarGate
+        }
+        let entries = try JSONDecoder().decode(
+            [SidecarEntry].self, from: Data(contentsOf: sidecarURL)
+        )
+        guard !entries.isEmpty else {
+            throw CLIError("composed quality: prosody sidecar has no delivery takes")
+        }
+
+        let rowsURL = diagnostics
+            .appendingPathComponent("engine", isDirectory: true)
+            .appendingPathComponent("generations.jsonl")
+        guard let rowData = try? Data(contentsOf: rowsURL),
+              let rowText = String(data: rowData, encoding: .utf8) else {
+            throw CLIError("composed quality: engine telemetry rows not found at \(rowsURL.path)")
+        }
+        let decoder = JSONDecoder()
+        var rowsByID: [String: ComposeEngineRow] = [:]
+        for line in rowText.split(separator: "\n") where !line.isEmpty {
+            guard let row = try? decoder.decode(ComposeEngineRow.self, from: Data(line.utf8)),
+                  row.notes?["benchRunID"] == runID,
+                  let id = row.generationID else { continue }
+            rowsByID[id] = row
+        }
+
+        let policy = GenerationQualityReportProducer.standardPolicy(requiresLanguageASR: false)
+        var verdicts: [ComposedTakeVerdict] = []
+        var failures: [String] = []
+        for entry in entries {
+            guard let row = rowsByID[entry.generationID] else {
+                throw CLIError("composed quality: no engine row for generation \(entry.generationID)")
+            }
+            guard let reasonRaw = row.finishReason,
+                  let finishReason = GenerationFinishReason(rawValue: reasonRaw) else {
+                throw CLIError("composed quality: row \(entry.generationID) has no typed finish reason")
+            }
+            guard let chunkCount = row.chunkTimeline?.count else {
+                throw CLIError("composed quality: row \(entry.generationID) has no chunk timeline")
+            }
+            let notes = row.notes ?? [:]
+            let hitTokenCap = finishReason == .maxTokens || notes.contains { key, value in
+                (key == "generation_end_reason" || key.hasSuffix("_generation_end_reason"))
+                    && value == "token_cap"
+            }
+            let wavURL = outputs.appendingPathComponent(entry.deliveryWav)
+            guard let wavData = try? Data(contentsOf: wavURL) else {
+                throw CLIError("composed quality: delivery output missing: \(entry.deliveryWav)")
+            }
+            let wavDigest = sha256(wavData)
+            guard let generationID = UUID(uuidString: entry.generationID) else {
+                throw CLIError("composed quality: invalid generation ID \(entry.generationID)")
+            }
+            let report = GenerationQualityReportProducer.deepReport(
+                generationID: generationID,
+                policy: policy,
+                finishReason: finishReason,
+                hitTokenCap: hitTokenCap,
+                audioQC: row.audioQC,
+                wavDigest: wavDigest,
+                usedStreaming: row.usedStreaming ?? true,
+                chunkCount: chunkCount,
+                audioChannel: nil,
+                deepEvidence: [
+                    .prosody: GenerationQualityComposition.prosodyEvidence(
+                        gate: entry.qualityGate, evidenceDigest: wavDigest
+                    ),
+                ]
+            )
+            let verdict: QualityGateRegistryVerdict
+            do { verdict = try QualityGateRegistry.evaluate(report) } catch {
+                throw CLIError("composed quality: registry rejected \(entry.generationID): \(error)")
+            }
+            // Fast-consistency guard: the row already carries the fast verdict
+            // this take finalized with; composing must never improve on it.
+            if let fastRaw = notes["quality_registry_outcome"],
+               let fastOutcome = GenerationQualityOutcome(rawValue: fastRaw),
+               GenerationQualityComposition.rank(of: verdict.outcome)
+                   < GenerationQualityComposition.rank(of: fastOutcome) {
+                throw CLIError(
+                    "composed quality: verdict for \(entry.generationID) (\(verdict.outcome.rawValue)) "
+                        + "is better than its stored fast verdict (\(fastRaw)); evidence reconstruction drifted"
+                )
+            }
+            if verdict.outcome == .fail {
+                failures.append("\(entry.deliveryWav): \(verdict.issues.joined(separator: ","))")
+            }
+            verdicts.append(ComposedTakeVerdict(
+                generationID: entry.generationID,
+                deliveryWav: entry.deliveryWav,
+                outcome: verdict.outcome.rawValue,
+                issues: verdict.issues,
+                prosodyEvidenceDigest: wavDigest
+            ))
+        }
+
+        let payload = ComposedQualityFile(
+            schemaVersion: 1,
+            runID: runID,
+            depth: "standard",
+            requiredGates: QualityGateRegistry.requiredGates(for: policy).map(\.rawValue),
+            takes: verdicts.sorted { $0.deliveryWav < $1.deliveryWav }
+        )
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        try encoder.encode(payload).write(
+            to: diagnostics.appendingPathComponent("bench-quality-composed.json"),
+            options: .atomic
+        )
+        let warned = verdicts.filter { $0.outcome == "warning" }.count
+        note("composed standard quality: \(verdicts.count) delivery take(s), \(warned) warning(s) → bench-quality-composed.json")
+        if !failures.isEmpty {
+            throw CLIError("composed standard quality FAILED: \(failures.joined(separator: "; "))")
         }
     }
 

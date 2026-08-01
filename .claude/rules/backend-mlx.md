@@ -132,7 +132,12 @@ warning.
 - **Decoder drift.** The owned `Qwen3TTSSpeechTokenizer` uses input-side overlap-and-discard.
   Do not "fix" drift by changing the output side.
 - **SPM pins move in lockstep.** `mlx-swift` and `mlx-swift-lm` are bumped together, never
-  alone, and only after a benchmark-gated review on a throwaway branch.
+  alone, and only after a benchmark-gated review on a throwaway branch. Since mlx-swift-lm
+  3.x, `swift-transformers` is the app-supplied Hub/Tokenizers implementation and a direct
+  dependency of `MLXAudioTTS` — review its pin in the same change as the mlx pair. mlx-swift
+  ≥0.31 ships a `CudaBuild` build-tool plugin that cannot be fingerprint-approved headlessly;
+  `xcb_run` passes `-skipPackagePluginValidation` unconditionally with the reviewed
+  justification in `scripts/lib/build_cache.sh`.
 - **MLX is the only backend.** Do not pivot to Core ML or another runtime.
 - **Telemetry semantics are typed.** Schema-v8 frontend latency stops at playback scheduling, not
   acoustic audibility; process memory belongs only to the process that measured it, and a macOS UI

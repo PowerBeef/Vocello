@@ -148,6 +148,7 @@ jobs:
             -clonedSourcePackagesDirPath build/cache/xcode/source-packages \
             -disableAutomaticPackageResolution \
             -onlyUsePackageVersionsFromResolvedFile \
+            -skipPackagePluginValidation \
             ARCHS=arm64 \
             ONLY_ACTIVE_ARCH=YES \
             CODE_SIGNING_ALLOWED=NO | xcbeautify
@@ -164,6 +165,7 @@ jobs:
             -clonedSourcePackagesDirPath build/cache/xcode/source-packages \
             -disableAutomaticPackageResolution \
             -onlyUsePackageVersionsFromResolvedFile \
+            -skipPackagePluginValidation \
             ARCHS=arm64 \
             ONLY_ACTIVE_ARCH=YES \
             CODE_SIGNING_ALLOWED=NO | xcbeautify

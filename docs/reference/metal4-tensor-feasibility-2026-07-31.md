@@ -11,6 +11,11 @@
 > the canonical Mac mini M2 class hardware (macOS 26.5). This document is research input,
 > not status authority; the roadmap and `config/runtime-refactor-contract.json` govern.
 
+> **Editor's note (2026-08-01):** point-in-time study at pin 0.30.6. The Tier-3.1 bump
+> landed 0.31.6 the next day; its vendored mlx core is 0.31.1 (< 0.32), so the F7
+> deployment-target trigger discussed below did **not** fire and the 26.0 floors stand
+> (`benchmarks/OPTIMIZATION.md` §Q). Gate 0's no-go verdict (§O) is unaffected.
+
 ## Verdict
 
 **Mechanically feasible today, on our exact stack — but the wrong first lever, and gated

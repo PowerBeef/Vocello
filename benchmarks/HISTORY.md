@@ -193,6 +193,12 @@ cross-project comparisons.
 |---|---|---|---|---|---|---:|---|---|---|---|
 | 2026-08-01 | [`macos-engine-20260801-043615-35444cb2`](runs/engine-generation/macos-engine-20260801-043615-35444cb2.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 3 | `3884622b632a` | `7849dd8ff18e` | baseline | r2a-sadstrong-20260825 |
 
+## engine-generation / macos / mac-mini-m2-8gb / config `7ebaa3bd337a`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---|---|---|---|
+| 2026-08-01 | [`macos-engine-20260801-155513-991ccaf6`](runs/engine-generation/macos-engine-20260801-155513-991ccaf6.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 19 | `49bd93a84893` dirty | `excluded` | baseline | pin-bump-control-0.30.6 |
+
 ## engine-generation / macos / mac-mini-m2-8gb / config `7f73a38f2a72`
 
 | completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
@@ -625,6 +631,12 @@ cross-project comparisons.
 | completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
 |---|---|---|---|---|---|---:|---|---|---|---|
 | 2026-07-16 | [`macos-xcui-benchmark-20260716-181853-b4c2e299`](runs/ui-generation/macos-xcui-benchmark-20260716-181853-b4c2e299.json) | canonical | canonical | passedWithWarnings | qualified-with-warnings | 29 | `9a8da8745939` | `161b2fa90d9f` | baseline | owned-core-final-9a8da87-macos |
+
+## ui-generation / macos / mac-mini-m2-8gb / config `172f44367db4`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---|---|---|---|
+| 2026-08-01 | [`macos-xcui-benchmark-20260801-162803-2dbdbcd1`](runs/ui-generation/macos-xcui-benchmark-20260801-162803-2dbdbcd1.json) | canonical | canonical | passedWithWarnings | qualified-with-warnings | 29 | `0be0300482aa` | `172f44367db4` | baseline | macos-xcui-benchmark-20260801-162803-2dbdbcd1 |
 
 ## ui-generation / macos / mac-mini-m2-8gb / config `2fa1bcbeb993`
 

@@ -36,10 +36,10 @@ machine-readable status record and wins over any older prose.
 | 10 — Spoken-text planning | Closed 2026-08-01: every take now speaks the conservatively normalized script at the engine entry (prompt assembly, language detection, QC pause budget, and telemetry evidence all see the same spoken text; transformed takes record `spokenTextTransformations` + digest). The fixed bench corpus is normalization-invariant by a standing core test, and the fixed-seed A/B on the medium corpus text was byte-identical across the change. Long-form/batch upstream planning passes through unchanged (idempotent). |
 | 11 — Long-form v4 | Stages A–E shipping on both platforms: planner-owned segmentation with per-segment sub-seeds, sequential streaming execution, bounded assembly, manifest v4, resume, grouped History projects. macOS acceptance 2026-07-23 (`macos-xcui-smoke-20260723-195700-ab46482a`); iPhone acceptance 2026-07-24 (`ios-xcui-smoke-20260724-183626-f9961535`). iOS single-segment regeneration device-accepted 2026-08-01 (smoke run `ios-xcui-smoke-20260801-142416-79615150`: the retained project's segments chip opens a confirmation dialog, segment 1 regenerates with a fresh recorded seed, the joined output reassembles, and History keeps the lineage searchable — longFormV4 residual closed); line batch stays removed from iOS by design; legacy XPC `generateBatch` retired 2026-07-24. |
 | 12 — Bounded analysis and unified quality | Fast-depth registry shipping 2026-07-26 (typed `GenerationQualityReport` + fail-closed `QualityGateRegistry` verdict in telemetry notes on every finalization, live-verified). Same-day additions: the standard/canonical `deepReport` producer, per-take prosody gate verdicts on the bench sidecar (folded into history warnings), typed `languageASR` and `longFormContinuity` gates, and the advisory speaker-similarity dev metric. Composed standard-depth verdicts went live on the delivery bench 2026-08-01 (`bench-quality-composed.json`, proof run `macos-engine-20260801-010135-6607009f`): the sidecar prosody gate folds into `deepReport` with a fast-consistency guard and fail-closed missing analyzers. Canonical depth followed the same day: the promoted delivery-adherence rule v1 (per-preset signed expectations + intensity scaling in prosody profile v2, warn-first) emits a real `.delivery` gate per delivery take, the publisher banks the paired neutral-vs-instructed deltas, and the first canonical proof run (`macos-engine-20260801-024556-e826c4ec`, 18 delivery cells, seed 20260801) composed 3 pass / 15 warning / 0 fail across all seven gates. Open: threshold recalibration from the banked seed matrix; optional MOS-proxy. |
-| 13 — Benchmark/history v3 | Live 2026-07-29: the first schema-v3 records are committed (three clean `phase0-cli-control-*` engine records plus one exploratory run that also exposed and fixed the summarizer's v3 pin). `benchmarks/schema-v3.json` adds the typed quality identity to generation takes (pass/warning only, five fast gates required, machine-code issues); v1/v2 records stay valid immutable history; the publisher stamps v3 only when every take carries the identity. The UI benchmark checkers folded the same identity 2026-08-01: ui-generation records now publish v3 (first: the focused `v3-fold-proof` record `macos-xcui-benchmark-20260801-003208-403989cf`); the canonical iOS matrix publishes v3 at the next phone window. |
+| 13 — Benchmark/history v3 | Live 2026-07-29: the first schema-v3 records are committed (three clean `phase0-cli-control-*` engine records plus one exploratory run that also exposed and fixed the summarizer's v3 pin). `benchmarks/schema-v3.json` adds the typed quality identity to generation takes (pass/warning only, five fast gates required, machine-code issues); v1/v2 records stay valid immutable history; the publisher stamps v3 only when every take carries the identity. The UI benchmark checkers folded the same identity 2026-08-01: ui-generation records now publish v3 (first: the focused `v3-fold-proof` record `macos-xcui-benchmark-20260801-003208-403989cf`); the canonical iOS matrix published its first v3 record 2026-08-01 (`ios-xcui-benchmark-20260801-132415-abbec96b`). |
 | 14 — Organization and retirement | Closed 2026-07-23 (14a + 14b): compatibility SPI retired, actor-owned loading/metadata/priming/clone artifacts, clone conditioning epoch-bound end to end. |
 
-## Resume here (2026-07-31)
+## Resume here (2026-08-01)
 
 Stages 0–3 of the adopted roadmap are complete (the 2.2 artifact promotion included);
 Stage 4 stays gated. **v2.3.0 was cut 2026-07-31 on an explicit maintainer call** with the
@@ -118,9 +118,20 @@ performance block after the fixture rebind, Tier 4 carryover). Immediate specifi
    evidence; Gate 0 ran and returned **no-go** (`benchmarks/OPTIMIZATION.md` §O — MPP
    never beats MLX on the floor and batch-1 is inexpressible at parallel scope), which
    withdraws the conditional fused-kernel Gate 2 from Tier 3. The optional delivery-chip
-   audio rider was skipped. What remains: the Tier-2 phone window (battery remainder +
-   riders, including 1.5's on-device acceptance), then the gated performance block, now
-   pin bump → P1b only, once the fixture rebind gives current baselines.
+   audio rider was skipped.
+5. **Tier 3 is complete (2026-08-01):** the sanctioned pin bump to
+   mlx-swift 0.31.6 + mlx-swift-lm 3.31.4 passed its same-day A/B (warm RTF
+   noise-band, QC identical, sampling byte-stable; swift-transformers 1.1.9
+   became a direct dependency after the lm 2→3 Hub/Tokenizers
+   externalization) and is the kept state; the codec-bf16 revival probe came
+   back negative (conv µ-throughput unchanged across pins — §N 2.3 stays
+   parked with only the device-measurement path open); P1b re-tested null —
+   a paired 6-seed soak resolved the initial cross-run read to +0.74% slower
+   on medium (6/6 seeds), maintainer-ratified do-NOT, branch preserved; F7
+   was not triggered, so the 26.0 floors stand. Full record:
+   `benchmarks/OPTIMIZATION.md` §Q. With Gate 2 withdrawn by Gate 0, the
+   2026-08 performance block is closed; Tier 4 (long-form text-context
+   carryover, design pass first) is the next open roadmap work.
 
 ## Staged roadmap state
 
@@ -387,18 +398,22 @@ explicit macOS fixture repair/bootstrap step. XCUITest is the sole autonomous ap
   locale-locked ASR, `passedWithWarnings` (accepted Spanish Custom warning + soft trims),
   tracked `exploratory` because the worktree was dirty. It proves its exact fingerprint and is
   excluded from clean trends. Earlier failed/interrupted attempts correctly published no history.
-- **Canonical UI evidence state**: a clean canonical macOS schema-v2 baseline exists
-  (`macos-xcui-benchmark-20260716-181853-b4c2e299`, source `9a8da874…`) and a clean canonical
-  iPhone schema-v2 baseline exists (`ios-xcui-benchmark-20260716-184106-48e3a3a6`, source
-  `bcb5265a…`) for the pre-convergence owned runtime, each bound to its recorded source
+- **Canonical UI evidence state**: the current clean canonical baselines are
+  `macos-xcui-benchmark-20260801-162803-2dbdbcd1` (schema v3, captured on the bumped
+  0.31.6 pin tree; also the vendor drift-test anchor) and
+  `ios-xcui-benchmark-20260801-132415-abbec96b` (the first canonical iOS schema-v3
+  record, 2026.07.26.1 artifacts). In immutable pre-convergence history a
+  clean canonical macOS schema-v2 baseline exists
+  (`macos-xcui-benchmark-20260716-181853-b4c2e299`) alongside its iPhone pair
+  (`ios-xcui-benchmark-20260716-184106-48e3a3a6`), each bound to its recorded source
   identity. Clean post-cutover matrices closed promotion 2026-07-20; the
   observer-effect correction re-baselined 2026-07-23 (fresh gated canonical matrices; macOS
   custom 1.68–1.83 / design 1.78–1.94 / clone 1.49–1.84, iOS 1.86–2.03). Physical-iPhone
   telemetry-v8/evidence-v2 acceptance is complete (canonical matrix, retained-memory
   qualification, exact-PID memory profile). Pre-2026-07-23 UI records are not baselines for
   post-change comparisons; every tracked record binds to its exact source/toolchain/model/
-  hardware identities, and the 2026.07.26.1 artifacts still need their fresh fixture identities
-  (see Resume here).
+  hardware identities; the 2026.07.26.1 fixture rebind completed 2026-08-01
+  (`config/characterization-fixtures.json` `rebindNotes`).
 
 ## Resume rule
 

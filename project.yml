@@ -31,7 +31,7 @@ packages:
     path: Packages/VocelloQwen3Core
   MLXSwift:
     url: https://github.com/ml-explore/mlx-swift.git
-    exactVersion: "0.30.6"
+    exactVersion: "0.31.6"
   SwiftHuggingFace:
     url: https://github.com/huggingface/swift-huggingface.git
     exactVersion: "0.9.0"

@@ -554,8 +554,10 @@ def canonical_record_digest(record: dict) -> str:
 def benchmark_record_is_eligible(record: dict) -> bool:
     run = record.get("run", {})
     evidence = record.get("evidence", {})
+    # Schema v3 (2026-08-01 UI records) keeps every field this check reads
+    # with identical shape and meaning; v1 records predate the evidence block.
     return (
-        record.get("schemaVersion") == 2
+        record.get("schemaVersion") in {2, 3}
         and record.get("digest") == canonical_record_digest(record)
         and run.get("status") in {"passed", "passedWithWarnings"}
         and run.get("classification") == "canonical"

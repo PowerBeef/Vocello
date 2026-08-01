@@ -1062,6 +1062,63 @@ lane with negative controls):
   loading after the first candidate checkpoint proved to initialize a random
   classifier head); peak RSS 2.4 GB inside the 8 GB envelope, sequential-only.
 
+## Q — Sanctioned pin bump: mlx-swift 0.31.6 + mlx-swift-lm 3.31.4 (2026-08-01)
+
+The roadmap Tier-3.1 experiment on `chore/pin-bump-mlx-0.31.6`. mlx-swift-lm's
+2→3 major externalized the Hub/Tokenizers implementations (swift-transformers
+left its graph), so the runtime now pins swift-transformers 1.1.9 — the exact
+version the 2.30.6 graph resolved — directly, keeping tokenization
+byte-comparable across the A/B; `Tokenizer`/`TokenizerError` are re-pinned to
+the Tokenizers module by module-scope typealiases against MLXLMCommon 3.x's
+new same-named protocols. mlx-swift 0.31.x's CudaBuild build-tool plugin
+cannot receive interactive fingerprint approval headlessly; `xcb_run` now
+passes `-skipPackagePluginValidation` unconditionally (justification in
+`scripts/lib/build_cache.sh` — exact-version pins and lockstep-checked
+resolved files carry supply-chain identity; the plugin is inert on Darwin).
+F7 was **not** triggered: 0.31.6 vendors mlx core 0.31.1 (< 0.32), so the
+macOS/iOS 26.0 floors stand.
+
+- **Keep verdict: PASS (same-day A/B at seed 19790615, canonical M2 floor).**
+  58-take full matrix under new pins vs a 20-take 0.30.6 control rebuilt the
+  same afternoon: warm RTF deltas +0.6…+2.0% (noise band); QC verdict
+  distributions identical — including the deterministic `design/speed/long`
+  warn (dropout + near_silent, all three reps, both pin sets: a property of
+  that prompt × seed, not a regression); clone audio durations byte-equal
+  across pins (identical token counts ⇒ the request-local sampling path is
+  behaviorally stable). The earlier ±20–46% swings vs
+  `benchmarks/baselines/full-matrix-speed.json` were staleness of that
+  baseline, not the pins. Control run published as clean-source 0.30.6 record
+  `macos-engine-20260801-155513-991ccaf6` (exploratory: stash-dirty tree).
+- **2.3 codec-bf16 revival probe: negative, with a mechanism correction.** A
+  scratch conv-stack probe at the codec decoder's exact geometry (initial
+  1024→1536 k7, convT [8,5,4,3] k=2r, k7 residuals, final →1; batch 1;
+  L0 ∈ {7, 13, 63}) measured fp32/f16/bf16 under both pins with era-matched
+  metallibs: half-precision conv is *faster* than fp32 on **both** 0.30.6 and
+  0.31.6 (f16 −14…−26%, bf16 −4…−17%), and the two pins are within ~1% of
+  each other. The pin bump changes nothing at the conv level, and §N 2.3's
+  "half-precision conv throughput" attribution does not reproduce in
+  isolation — if 2.3 is ever revived, the ~4–5% end-to-end regression must be
+  sought elsewhere in the bf16 decode path (dtype boundaries, snake
+  activations, or the decoder transformer). 2.3 stays parked; the remaining
+  revival path is the iPhone 17 Pro device measurement.
+- **P1b re-test (DECODE-002): confirmed null on 0.31.6 by a paired soak;
+  do-NOT stands (maintainer-ratified 2026-08-01).** The preserved
+  `feat/p1b-static-talker-compile` experiment cherry-picked onto the new pins:
+  the 258-step eager-equivalence test passes unchanged. An initial cross-run
+  read of −0.5…−2.1% prompted a §K-style paired soak (seeds 1001–1006 of the
+  planned 1001–1012, maintainer-stopped early once the answer was clear;
+  custom/speed medium+long, warm reps 1–2, per-seed build-order alternation,
+  both builds from the same pin tree): **P1b is +0.74% slower on medium
+  (95% CI [−0.41, +1.88], slower on 6/6 seeds) and +0.16% on long
+  (CI [−0.17, +0.49], 4/6)** — the apparent gain was cross-run noise; paired
+  same-seed measurement resolves to flat-to-negative. QC 84/84 pass across
+  both builds. The per-generation trace-build cost still cancels the
+  graph-build savings, exactly as on 0.30.6. Reverted from the pin-bump
+  branch; the P1b branch stays preserved for a future pin generation. Soak
+  CSV is session-scratch; its bench runs and the earlier P1b-build run
+  (`macos-engine-20260801-161901`) were removed from the registry because
+  their source states are the reverted experiment.
+
 ## Status
 
 The optimization program tracked in this document is wrapped up. The §H P0–P6 work has been

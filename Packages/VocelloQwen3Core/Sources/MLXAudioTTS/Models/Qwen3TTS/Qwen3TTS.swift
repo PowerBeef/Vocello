@@ -9,6 +9,12 @@ import MLXNN
 import os
 import Tokenizers
 
+// mlx-swift-lm 3.x declares its own `Tokenizer`/`TokenizerError` in MLXLMCommon; this runtime
+// keeps using the swift-transformers implementations, so module-scope aliases pin bare names to
+// the Tokenizers module and keep every reference unambiguous.
+typealias Tokenizer = Tokenizers.Tokenizer
+typealias TokenizerError = Tokenizers.TokenizerError
+
 /// TEL-001: stage signposts correlate the Qwen hot path with typed chunk timings.
 private enum Qwen3Signposts {
     static let signposter = OSSignposter(

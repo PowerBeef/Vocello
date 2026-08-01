@@ -14,19 +14,19 @@
 | Platform | Latest canonical run | Captured |
 | --- | --- | --- |
 | macos | `macos-xcui-benchmark-20260729-023553-111d88c6` | 2026-07-29T02:46:38Z |
-| ios | `ios-xcui-benchmark-20260723-061044-f986bf4d` | 2026-07-23T06:29:03Z |
+| ios | `ios-xcui-benchmark-20260801-132415-abbec96b` | 2026-08-01T13:38:28Z |
 
 ## Critical-domain coverage and freshness
 
 | Domain | Owner | Production files | Direct test files / cases | Hardware evidence |
 | --- | --- | ---: | ---: | --- |
-| generation-terminal | backend | 4 | 2 / 16 | macos: fresh, ios: stale |
-| clone-conditioning | backend | 31 | 2 / 32 | macos: stale, ios: stale |
-| event-delivery | backend | 3 | 2 / 10 | macos: stale, ios: stale |
-| memory-policy | backend-platform | 6 | 2 / 25 | macos: fresh, ios: stale |
-| model-delivery | backend-platform | 17 | 3 / 37 | macos: stale, ios: stale |
+| generation-terminal | backend | 4 | 2 / 16 | macos: fresh, ios: fresh |
+| clone-conditioning | backend | 31 | 2 / 32 | macos: stale, ios: fresh |
+| event-delivery | backend | 3 | 2 / 10 | macos: stale, ios: fresh |
+| memory-policy | backend-platform | 6 | 2 / 25 | macos: fresh, ios: fresh |
+| model-delivery | backend-platform | 17 | 3 / 37 | macos: stale, ios: fresh |
 | xpc-transport | macos | 3 | 3 / 15 | macos: fresh |
-| benchmark-validation | release-qa | 6 | 4 / 118 | macos: stale, ios: stale |
+| benchmark-validation | release-qa | 6 | 4 / 118 | macos: stale, ios: fresh |
 | orchestration-assurance | release-qa | 3 | 1 / 12 | not hardware-gated |
 | release-supply-chain | release-qa | 6 | 3 / 51 | macos: stale |
 | persistence-privacy | platform-release-qa | 4 | 2 / 7 | not hardware-gated |

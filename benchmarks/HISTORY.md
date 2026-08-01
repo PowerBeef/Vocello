@@ -470,6 +470,12 @@ cross-project comparisons.
 | 2026-07-20 | [`ios-xcui-benchmark-20260720-063420-e0258f45`](runs/ui-generation/ios-xcui-benchmark-20260720-063420-e0258f45.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | `0d4eac8b336b` | `35a3b94d3ba6` | vs ios-xcui-benchmark-20260720-061732-10df7fd1: RTF -0.2%, RAM -0.2% | phase0-ios-control-2 |
 | 2026-07-20 | [`ios-xcui-benchmark-20260720-164844-5f6e9240`](runs/ui-generation/ios-xcui-benchmark-20260720-164844-5f6e9240.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 32 | `0d4eac8b336b` dirty | `excluded` | baseline | phase0-ios-control-3 |
 
+## ui-generation / ios / iphone-17-pro / config `4b53e59b2bf6`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---|---|---|---|
+| 2026-08-01 | [`ios-xcui-benchmark-20260801-132415-abbec96b`](runs/ui-generation/ios-xcui-benchmark-20260801-132415-abbec96b.json) | canonical | canonical | passedWithWarnings | qualified-with-warnings | 29 | `994e3c1f1ca0` | `4b53e59b2bf6` | baseline | ios-xcui-benchmark-20260801-132415-abbec96b |
+
 ## ui-generation / ios / iphone-17-pro / config `4d75b5478cdc`
 
 | completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |

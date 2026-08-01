@@ -161,8 +161,13 @@ performance block after the fixture rebind, Tier 4 carryover). Immediate specifi
    identity (new plans re-derive segment IDs/sub-seeds; retained projects replay
    recorded plans), fixtures-first with self-calibrating estimates; the design pass
    removed one proposed rule (R-pull) as dead by construction before it shipped.
-   Design: `docs/decisions/long-form-context-planning-v2.md`. Q2's acoustic/KV
-   carryover experiment remains the open Tier-4 remainder.
+   Design: `docs/decisions/long-form-context-planning-v2.md`. The stage-2
+   acoustic-carryover probe closed the same day as a pre-registered do-NOT (join
+   pitch −16.4%, under gate; rate −54%; identity intact) — the second independent
+   experiment pointing at missing register conditioning as the sole blocker
+   (`docs/decisions/long-form-acoustic-carryover-experiment.md`). The 2026-08
+   roadmap's substantive tiers are now all closed; opportunistic riders (MOS-proxy
+   advisory, 60 Hz glass-gate measurement) and parked items remain.
 
 ## Staged roadmap state
 

@@ -92,10 +92,13 @@ against current-artifact baselines.
   planner v2 ships R-tail orphan rebalancing (context-aware final-boundary repair;
   identity re-versioned via the serialized algorithm version, retained projects replay
   recorded plans untouched) with self-calibrating fixtures that also caught and removed
-  a dead rule pre-ship (`docs/decisions/long-form-context-planning-v2.md`). Remaining
-  in Q2: the bounded acoustic/KV carryover experiment, only after and assessed against
-  segment memory budgets first; the parked R3 rate profile re-evaluates on these
-  fixtures.
+  a dead rule pre-ship (`docs/decisions/long-form-context-planning-v2.md`). The Q2
+  acoustic remainder closed the same day: the pre-registered clone-ICL continuation
+  probe measured join pitch −16.4% (under the ≥25% gate) with rate −54% and identity
+  intact — **do-NOT**, parked on the single unpark condition of a register/pitch
+  conditioning mechanism appearing upstream
+  (`docs/decisions/long-form-acoustic-carryover-experiment.md`). With that, Tier 4's
+  substantive work is complete; only the opportunistic riders below remain.
 - **Opportunistic**: MOS-proxy advisory column (UTMOSv2, dev-lane advisory only, never a
   gate); 60 Hz-device glass-gate measurement if hardware appears.
 

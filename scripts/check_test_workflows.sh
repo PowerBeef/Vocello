@@ -644,6 +644,9 @@ python3 -m unittest \
   scripts.tests.test_analyze_delivery \
   scripts.tests.test_prosody_quality_gate \
   scripts.tests.test_delivery_quality_gate \
+  scripts.tests.test_emotion_advisory \
+  scripts.tests.test_clone_prosody_fidelity \
+  scripts.tests.test_clone_fidelity_lane \
   scripts.tests.test_prosody_calibration \
   scripts.test_check_macos_xpc_bench \
   scripts.test_check_ios_ui_benchmark \

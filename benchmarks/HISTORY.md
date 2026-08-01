@@ -65,6 +65,12 @@ cross-project comparisons.
 |---|---|---|---|---|---|---:|---|---|---|---|
 | 2026-07-12 | [`macos-engine-20260712-204208-0cb5705c`](runs/engine-generation/macos-engine-20260712-204208-0cb5705c.json) | focused | exploratory | passed | memory-contract-incomplete | 2 | `1ef1669326b5` dirty | `excluded` | baseline | telemetry-v7-cli-focused |
 
+## engine-generation / macos / mac-mini-m2-8gb / config `32f2f6f86c82`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---|---|---|---|
+| 2026-08-01 | [`macos-engine-20260801-030101-0a150ea0`](runs/engine-generation/macos-engine-20260801-030101-0a150ea0.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 20 | `5a06ed321d6a` dirty | `excluded` | baseline | delivery-cal-s6 |
+
 ## engine-generation / macos / mac-mini-m2-8gb / config `3c41b6ebb9ad`
 
 | completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
@@ -73,11 +79,35 @@ cross-project comparisons.
 | 2026-07-23 | [`macos-engine-20260723-031416-ed258b6b`](runs/engine-generation/macos-engine-20260723-031416-ed258b6b.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 4 | `109559888e4d` dirty | `excluded` | baseline | p7-cli-O |
 | 2026-07-23 | [`macos-engine-20260723-031603-47801d81`](runs/engine-generation/macos-engine-20260723-031603-47801d81.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 4 | `109559888e4d` dirty | `excluded` | baseline | p7-cli-O-bg |
 
+## engine-generation / macos / mac-mini-m2-8gb / config `3c6031e6579a`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---|---|---|---|
+| 2026-08-01 | [`macos-engine-20260801-025435-a5bddf69`](runs/engine-generation/macos-engine-20260801-025435-a5bddf69.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 20 | `5a06ed321d6a` dirty | `excluded` | baseline | delivery-cal-s3 |
+
 ## engine-generation / macos / mac-mini-m2-8gb / config `4a6ac27c9e60`
 
 | completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
 |---|---|---|---|---|---|---:|---|---|---|---|
 | 2026-07-26 | [`macos-engine-20260726-054111-e95e1285`](runs/engine-generation/macos-engine-20260726-054111-e95e1285.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 12 | `f97598a6c6a1` dirty | `excluded` | baseline | stage0-clone-silence-bench |
+
+## engine-generation / macos / mac-mini-m2-8gb / config `4ee0618f15ed`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---|---|---|---|
+| 2026-08-01 | [`macos-engine-20260801-030511-fd13467e`](runs/engine-generation/macos-engine-20260801-030511-fd13467e.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 20 | `5a06ed321d6a` dirty | `excluded` | baseline | delivery-cal-s8 |
+
+## engine-generation / macos / mac-mini-m2-8gb / config `50de185fbd54`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---|---|---|---|
+| 2026-08-01 | [`macos-engine-20260801-025856-86923095`](runs/engine-generation/macos-engine-20260801-025856-86923095.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 20 | `5a06ed321d6a` dirty | `excluded` | baseline | delivery-cal-s5 |
+
+## engine-generation / macos / mac-mini-m2-8gb / config `7f73a38f2a72`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---|---|---|---|
+| 2026-08-01 | [`macos-engine-20260801-030304-f7aa595e`](runs/engine-generation/macos-engine-20260801-030304-f7aa595e.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 20 | `5a06ed321d6a` dirty | `excluded` | baseline | delivery-cal-s7 |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `817164bfb96c`
 
@@ -140,6 +170,12 @@ cross-project comparisons.
 | completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
 |---|---|---|---|---|---|---:|---|---|---|---|
 | 2026-08-01 | [`macos-engine-20260801-010135-6607009f`](runs/engine-generation/macos-engine-20260801-010135-6607009f.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 3 | `626d3b3fba35` | `beb5848d6e9f` | baseline | composed-quality-proof |
+
+## engine-generation / macos / mac-mini-m2-8gb / config `c8340ad4e716`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---|---|---|---|
+| 2026-08-01 | [`macos-engine-20260801-025646-3218e447`](runs/engine-generation/macos-engine-20260801-025646-3218e447.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 20 | `5a06ed321d6a` dirty | `excluded` | baseline | delivery-cal-s4 |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `e61461740953`
 

@@ -124,23 +124,41 @@ def analyze_takes(
 
 
 def ecapa_embedder() -> Callable[[str], list[float]]:
-    """Load the pinned ECAPA backend. Operator-local heavy dependency."""
+    """Load the pinned ECAPA backend. Operator-local heavy dependency.
+
+    The exact revision is materialized with ``snapshot_download`` and loaded
+    from the local path, so the pin holds regardless of whether the installed
+    speechbrain still forwards a ``revision`` argument (1.x dropped it).
+    """
+    import wave  # noqa: PLC0415
+
+    import numpy as np  # noqa: PLC0415
     import torch  # noqa: PLC0415
-    import torchaudio  # noqa: PLC0415
+    from huggingface_hub import snapshot_download  # noqa: PLC0415
     from speechbrain.inference.speaker import EncoderClassifier  # noqa: PLC0415
 
+    local_source = snapshot_download(repo_id=ECAPA_SOURCE, revision=ECAPA_REVISION)
     classifier = EncoderClassifier.from_hparams(
-        source=ECAPA_SOURCE,
-        revision=ECAPA_REVISION,
+        source=local_source,
         run_opts={"device": "cpu"},
     )
 
     def embed(path: str) -> list[float]:
-        waveform, sample_rate = torchaudio.load(path)
-        if waveform.shape[0] > 1:
-            waveform = waveform.mean(dim=0, keepdim=True)
-        if sample_rate != 16_000:
-            waveform = torchaudio.functional.resample(waveform, sample_rate, 16_000)
+        with wave.open(path, "rb") as reader:
+            if reader.getsampwidth() != 2:
+                raise ValueError(f"expected 16-bit PCM: {path}")
+            sample_rate = reader.getframerate()
+            channel_count = reader.getnchannels()
+            frames = reader.readframes(reader.getnframes())
+        pcm = np.frombuffer(frames, dtype="<i2").astype(np.float32) / 32768.0
+        if channel_count > 1:
+            pcm = pcm.reshape(-1, channel_count).mean(axis=1)
+        if sample_rate != 16_000 and len(pcm) > 1:
+            duration = len(pcm) / sample_rate
+            target_count = int(round(duration * 16_000))
+            positions = np.linspace(0.0, len(pcm) - 1, target_count)
+            pcm = np.interp(positions, np.arange(len(pcm)), pcm).astype(np.float32)
+        waveform = torch.from_numpy(pcm).unsqueeze(0)
         with torch.no_grad():
             embedding = classifier.encode_batch(waveform)
         return [float(x) for x in embedding.squeeze().tolist()]

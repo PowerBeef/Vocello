@@ -59,52 +59,58 @@ BUILTIN_PROFILE = {
             "energy_roughness_divisor": 0.05,
         },
     },
+    # Calibrated 2026-08-01 from the banked 7-seed × 18-cell paired matrix
+    # (records labeled delivery-cal-s1..s8; seed 20260802 excluded by its
+    # reproducible sad.strong Fast-QC failure). Required features have a
+    # measured ≥0.85 direction win-rate; supporting features 0.71–0.84;
+    # magnitudes sit near half the observed median effect. Dramatic and
+    # surprised measurably barely move prosody, so they carry direction-only
+    # supporting expectations — the honest reading of the data.
     "delivery_expectations": {
-        "intensity_scale": {"subtle": 0.0, "normal": 1.0, "strong": 1.3},
+        "intensity_scale": {"subtle": 0.0, "normal": 1.0, "strong": 1.15},
         "presets": {
             "happy": {
-                "pitch_shift_semitones": {"direction": 1, "min_effect_normal": 0.5, "tier": "required"},
-                "rate_delta_hz": {"direction": 1, "min_effect_normal": 0.15, "tier": "required"},
-                "arousal_score": {"direction": 1, "min_effect_normal": 0.0, "tier": "supporting"},
+                "pitch_variation_delta_hz": {"direction": 1, "min_effect_normal": 2.5, "tier": "required"},
+                "arousal_score": {"direction": 1, "min_effect_normal": 0.5, "tier": "required"},
+                "pitch_shift_semitones": {"direction": 1, "min_effect_normal": 0.0, "tier": "supporting"},
             },
             "excited": {
-                "pitch_shift_semitones": {"direction": 1, "min_effect_normal": 0.8, "tier": "required"},
-                "rate_delta_hz": {"direction": 1, "min_effect_normal": 0.3, "tier": "required"},
-                "roughness_delta": {"direction": 1, "min_effect_normal": 0.0, "tier": "supporting"},
+                "pitch_variation_delta_hz": {"direction": 1, "min_effect_normal": 3.0, "tier": "required"},
+                "arousal_score": {"direction": 1, "min_effect_normal": 0.5, "tier": "supporting"},
+                "pitch_shift_semitones": {"direction": 1, "min_effect_normal": 0.0, "tier": "supporting"},
             },
             "surprised": {
-                "pitch_range_delta_semitones": {"direction": 1, "min_effect_normal": 0.5, "tier": "required"},
-                "pitch_variation_delta_hz": {"direction": 1, "min_effect_normal": 2.0, "tier": "required"},
-                "rate_delta_hz": {"direction": 1, "min_effect_normal": 0.0, "tier": "supporting"},
+                "pitch_variation_delta_hz": {"direction": 1, "min_effect_normal": 0.0, "tier": "supporting"},
+                "pitch_shift_semitones": {"direction": 1, "min_effect_normal": 0.0, "tier": "supporting"},
             },
             "sad": {
-                "pitch_shift_semitones": {"direction": -1, "min_effect_normal": 0.4, "tier": "required"},
-                "rate_delta_hz": {"direction": -1, "min_effect_normal": 0.15, "tier": "required"},
-                "arousal_score": {"direction": -1, "min_effect_normal": 0.0, "tier": "supporting"},
-            },
-            "calm": {
-                "rate_delta_hz": {"direction": -1, "min_effect_normal": 0.15, "tier": "required"},
-                "pitch_variation_delta_hz": {"direction": -1, "min_effect_normal": 2.0, "tier": "required"},
+                "arousal_score": {"direction": -1, "min_effect_normal": 0.5, "tier": "required"},
+                "pitch_variation_delta_hz": {"direction": -1, "min_effect_normal": 0.0, "tier": "supporting"},
                 "pause_ratio_delta": {"direction": 1, "min_effect_normal": 0.0, "tier": "supporting"},
             },
+            "calm": {
+                "pitch_shift_semitones": {"direction": -1, "min_effect_normal": 0.6, "tier": "required"},
+                "arousal_score": {"direction": -1, "min_effect_normal": 0.5, "tier": "supporting"},
+            },
             "angry": {
-                "roughness_delta": {"direction": 1, "min_effect_normal": 0.01, "tier": "required"},
-                "rate_cv_delta": {"direction": 1, "min_effect_normal": 0.02, "tier": "required"},
-                "pitch_shift_semitones": {"direction": -1, "min_effect_normal": 0.0, "tier": "supporting"},
+                "pitch_shift_semitones": {"direction": 1, "min_effect_normal": 1.0, "tier": "required"},
+                "pitch_variation_delta_hz": {"direction": 1, "min_effect_normal": 3.0, "tier": "required"},
+                "arousal_score": {"direction": 1, "min_effect_normal": 0.5, "tier": "supporting"},
             },
             "fearful": {
-                "pitch_variation_delta_hz": {"direction": 1, "min_effect_normal": 2.0, "tier": "required"},
-                "rate_cv_delta": {"direction": 1, "min_effect_normal": 0.02, "tier": "required"},
-                "voiced_fraction_delta": {"direction": -1, "min_effect_normal": 0.0, "tier": "supporting"},
-            },
-            "whisper": {
-                "voiced_fraction_delta": {"direction": -1, "min_effect_normal": 0.05, "tier": "required"},
+                "pitch_shift_semitones": {"direction": 1, "min_effect_normal": 0.8, "tier": "required"},
+                "arousal_score": {"direction": -1, "min_effect_normal": 0.5, "tier": "required"},
+                "pause_ratio_delta": {"direction": 1, "min_effect_normal": 0.01, "tier": "required"},
                 "pitch_variation_delta_hz": {"direction": -1, "min_effect_normal": 0.0, "tier": "supporting"},
             },
+            "whisper": {
+                "pitch_variation_delta_hz": {"direction": -1, "min_effect_normal": 4.0, "tier": "required"},
+                "arousal_score": {"direction": -1, "min_effect_normal": 0.5, "tier": "required"},
+                "voiced_fraction_delta": {"direction": -1, "min_effect_normal": 0.0, "tier": "supporting"},
+            },
             "dramatic": {
-                "pitch_range_delta_semitones": {"direction": 1, "min_effect_normal": 0.5, "tier": "required"},
-                "pause_ratio_delta": {"direction": 1, "min_effect_normal": 0.01, "tier": "required"},
-                "rate_delta_hz": {"direction": -1, "min_effect_normal": 0.0, "tier": "supporting"},
+                "roughness_delta": {"direction": 1, "min_effect_normal": 0.0, "tier": "supporting"},
+                "pitch_shift_semitones": {"direction": 1, "min_effect_normal": 0.0, "tier": "supporting"},
             },
         },
     },
@@ -114,25 +120,39 @@ BUILTIN_PROFILE = {
         "max_rate_spread_hz": 1.0,
         "outlier_z_score": 2.5,
     },
+    # Warn-first reference-vs-output bounds for clone takes. Uncalibrated
+    # seeds pending the negative-control lane; a cloned voice should sit near
+    # the reference's pitch register, expressiveness band, and pacing.
+    "clone_fidelity": {
+        "max_abs_pitch_shift_semitones": 2.0,
+        "max_abs_range_delta_semitones": 4.0,
+        "max_rate_ratio_deviation": 0.30,
+        "max_abs_voiced_fraction_delta": 0.20,
+    },
 }
 
 
 _EXPECTATION_TIERS = ("required", "supporting")
 
 
-def migrate_profile(profile):
-    """Migrate an older-schema profile dict to the current schema in place.
+_ADDON_BLOCKS = ("delivery_expectations", "neutral_consistency", "clone_fidelity")
 
-    A v1 profile predates the delivery-expectation and neutral-consistency
-    blocks; migration fills them from the builtin defaults so a calibrated v1
-    threshold file keeps working while new consumers see complete data.
+
+def migrate_profile(profile):
+    """Migrate an older or partially populated profile dict to the current
+    schema.
+
+    A v1 profile predates the schema-v2 add-on blocks; a v2 profile saved
+    before a later add-on block existed simply lacks it. Migration fills any
+    missing add-on block from the builtin defaults so a calibrated threshold
+    file keeps working while new consumers see complete data.
     """
     if not isinstance(profile, dict):
         return profile
-    if profile.get("schema_version") == 1:
+    if profile.get("schema_version") in (1, SCHEMA_VERSION):
         profile = dict(profile)
         profile["schema_version"] = SCHEMA_VERSION
-        for key in ("delivery_expectations", "neutral_consistency"):
+        for key in _ADDON_BLOCKS:
             profile.setdefault(key, json.loads(json.dumps(BUILTIN_PROFILE[key])))
     return profile
 
@@ -166,6 +186,20 @@ def _validate_delivery_expectations(block):
                 raise ValueError(
                     f"expectation {preset_id}.{feature}.tier must be one of {_EXPECTATION_TIERS}"
                 )
+
+
+def _validate_clone_fidelity(block):
+    if not isinstance(block, dict):
+        raise ValueError("clone_fidelity must be an object")
+    required = set(BUILTIN_PROFILE["clone_fidelity"].keys())
+    present = set(block.keys())
+    if present != required:
+        raise ValueError(
+            f"clone_fidelity keys mismatch: missing {required - present}, extra {present - required}"
+        )
+    for key, value in block.items():
+        if not isinstance(value, (int, float)) or value <= 0:
+            raise ValueError(f"clone_fidelity.{key} must be a positive number")
 
 
 def _validate_neutral_consistency(block):
@@ -207,6 +241,7 @@ def validate_profile(profile):
         raise ValueError("delivery_weights must be an object")
     _validate_delivery_expectations(profile["delivery_expectations"])
     _validate_neutral_consistency(profile["neutral_consistency"])
+    _validate_clone_fidelity(profile["clone_fidelity"])
     analyzer_version = profile.get("analyzer_algorithm_version")
     if analyzer_version is not None and (
         not isinstance(analyzer_version, int) or analyzer_version < 1
@@ -266,4 +301,11 @@ def neutral_consistency(profile, key):
     """Read a neutral-consistency bound, with built-in fallback."""
     return profile.get("neutral_consistency", {}).get(
         key, BUILTIN_PROFILE["neutral_consistency"][key]
+    )
+
+
+def clone_fidelity_bound(profile, key):
+    """Read a clone-fidelity bound, with built-in fallback."""
+    return profile.get("clone_fidelity", {}).get(
+        key, BUILTIN_PROFILE["clone_fidelity"][key]
     )

@@ -398,6 +398,12 @@ cross-project comparisons.
 |---|---|---|---|---|---|---:|---|---|---|---|
 | 2026-07-16 | [`macos-xcui-benchmark-20260716-181853-b4c2e299`](runs/ui-generation/macos-xcui-benchmark-20260716-181853-b4c2e299.json) | canonical | canonical | passedWithWarnings | qualified-with-warnings | 29 | `9a8da8745939` | `161b2fa90d9f` | baseline | owned-core-final-9a8da87-macos |
 
+## ui-generation / macos / mac-mini-m2-8gb / config `2fa1bcbeb993`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---|---|---|---|
+| 2026-08-01 | [`macos-xcui-benchmark-20260801-003208-403989cf`](runs/ui-generation/macos-xcui-benchmark-20260801-003208-403989cf.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 3 | `4893c8eb8965` | `2fa1bcbeb993` | baseline | v3-fold-proof |
+
 ## ui-generation / macos / mac-mini-m2-8gb / config `36ccb3ec182f`
 
 | completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |

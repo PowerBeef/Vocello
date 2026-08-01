@@ -173,7 +173,9 @@ must not yet be treated as product authority. At this checkpoint:
   schema v2 remained authoritative until Phase 13 shipped (2026-07-26): schema v3 adds the
   typed quality-registry identity to every generation take, the publisher folds it from the
   phase-12 telemetry notes (v3 only when every take carries it; mixed records refuse), and
-  v1/v2 records stay valid immutable history. Non-blocking layer gaps (`notApplicable`,
+  v1/v2 records stay valid immutable history; the UI benchmark checkers folded the same
+  identity on 2026-08-01, so ui-generation records publish v3 under the same all-or-none
+  rule. Non-blocking layer gaps (`notApplicable`,
   aggregate-only transport list, missing player render callback) may remain listed.
 
 Overall Phase 4 promotion is closed. The broader convergence program remains open for Phases

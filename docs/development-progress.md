@@ -18,7 +18,7 @@
 Phase 4 `overallPromotion: passed` closed the cutover gate on 2026-07-20 (with Phases 0/5/6).
 Phases 7, 8, and 14 closed 2026-07-23. Phase 9 closed 2026-07-26; Phase 12 ships the fast-depth
 quality registry with the deep producer landed; Phase 13 (history v3) went live 2026-07-29 with
-the first schema-v3 records committed; phase 10–11 remainders stay open. The contract JSON is the
+the first schema-v3 records committed, and the UI-checker fold (2026-08-01) extended v3 to ui-generation records; phase 10–11 remainders stay open. The contract JSON is the
 machine-readable status record and wins over any older prose.
 
 | Plan phase | Current state |
@@ -36,7 +36,7 @@ machine-readable status record and wins over any older prose.
 | 10 — Spoken-text planning | Shipping inside long-form v4 since 2026-07-23. Remainder: single-take generation does not yet consume spoken-text normalization. |
 | 11 — Long-form v4 | Stages A–E shipping on both platforms: planner-owned segmentation with per-segment sub-seeds, sequential streaming execution, bounded assembly, manifest v4, resume, grouped History projects. macOS acceptance 2026-07-23 (`macos-xcui-smoke-20260723-195700-ab46482a`); iPhone acceptance 2026-07-24 (`ios-xcui-smoke-20260724-183626-f9961535`). Single-segment regeneration remains macOS-only; line batch stays removed from iOS by design; legacy XPC `generateBatch` retired 2026-07-24. |
 | 12 — Bounded analysis and unified quality | Fast-depth registry shipping 2026-07-26 (typed `GenerationQualityReport` + fail-closed `QualityGateRegistry` verdict in telemetry notes on every finalization, live-verified). Same-day additions: the standard/canonical `deepReport` producer, per-take prosody gate verdicts on the bench sidecar (folded into history warnings), typed `languageASR` and `longFormContinuity` gates, and the advisory speaker-similarity dev metric. Open: composed standard/canonical emission at a lane call site; optional MOS-proxy. |
-| 13 — Benchmark/history v3 | Live 2026-07-29: the first schema-v3 records are committed (three clean `phase0-cli-control-*` engine records plus one exploratory run that also exposed and fixed the summarizer's v3 pin). `benchmarks/schema-v3.json` adds the typed quality identity to generation takes (pass/warning only, five fast gates required, machine-code issues); v1/v2 records stay valid immutable history; the publisher stamps v3 only when every take carries the identity. Remainder: UI-lane records still publish v2 until the UI benchmark checker folds the take quality identity. |
+| 13 — Benchmark/history v3 | Live 2026-07-29: the first schema-v3 records are committed (three clean `phase0-cli-control-*` engine records plus one exploratory run that also exposed and fixed the summarizer's v3 pin). `benchmarks/schema-v3.json` adds the typed quality identity to generation takes (pass/warning only, five fast gates required, machine-code issues); v1/v2 records stay valid immutable history; the publisher stamps v3 only when every take carries the identity. The UI benchmark checkers folded the same identity 2026-08-01: ui-generation records now publish v3 (first: the focused `v3-fold-proof` record `macos-xcui-benchmark-20260801-003208-403989cf`); the canonical iOS matrix publishes v3 at the next phone window. |
 | 14 — Organization and retirement | Closed 2026-07-23 (14a + 14b): compatibility SPI retired, actor-owned loading/metadata/priming/clone artifacts, clone conditioning epoch-bound end to end. |
 
 ## Resume here (2026-07-31)

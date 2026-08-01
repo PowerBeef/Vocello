@@ -88,7 +88,7 @@ tap Confirm to commit + dismiss. Preview plays audio without selecting/closing.
 
 **Delivery picker** — confirm `deliveryPicker_confirm`; a 2-column preset grid over
 `EmotionPreset.all` (cells `deliveryPickerPreset_<presetID>`); an intensity row
-(Subtle/Normal/Strong → `deliveryPickerIntensity_<level>`, disabled for Neutral); and a custom
+(Normal/Strong → `deliveryPickerIntensity_<level>`, disabled for Neutral); and a custom
 tone editor: `deliveryPickerSheet_customTone` (toggle in), `deliveryPickerSheet_customTone_editor`
 (text, `/500` counter `deliveryPickerSheet_customTone_charCount`),
 `deliveryPickerSheet_customTone_examples`, `deliveryPickerSheet_customTone_back`.
@@ -224,7 +224,7 @@ delivery biases (e.g. Ryan is naturally expressive; start from Aiden/Serena for 
 
 10 presets: **Neutral** (no intensity tiers — treated as "no style instruction"), plus
 **Happy, Sad, Angry, Fearful, Surprised, Excited, Calm, Whisper, Dramatic**. Each non-Neutral
-preset has three **intensity** tiers — **Subtle / Normal / Strong** (`EmotionIntensity`,
+preset has two **intensity** tiers — **Normal / Strong** (`EmotionIntensity`,
 disabled for Neutral). Or write a **custom tone** (free text, 500-char cap) — see
 [`../qwen_tone.md`](../qwen_tone.md) for the prompt-writing rules (combine emotion + pace +
 pitch + timbre; negative constraints like "without laughing" work; write instructions in

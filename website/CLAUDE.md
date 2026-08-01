@@ -79,7 +79,7 @@ The product's ground truth lives in the parent QwenVoice app repo. When making p
 - `../config/public-product-facts.json` — public release, platform status, minimum support, and
   canonical benchmark-profile references.
 - `../Sources/Resources/qwenvoice_contract.json` — model registry, speakerMetadata, Hugging Face revisions.
-- `../Sources/QwenVoiceCore/EmotionPreset.swift` — actual emotion presets (9 non-Neutral × 3 intensities + Neutral = 10 total).
+- `../Sources/QwenVoiceCore/EmotionPreset.swift` — actual emotion presets (9 non-Neutral × 2 intensities, normal/strong, + Neutral = 10 total).
 - Voice Cloning has no controllable delivery — the engine path doesn't accept emotion/intensity for clone.
 
 The site has drifted from ground truth multiple times during iteration. Don't trust the existing copy — verify against the upstream.

@@ -83,7 +83,7 @@ export const Listen = () => {
           <div className="vc-label" id="delivery-vocab-label">Delivery presets</div>
           <p className="listen-deliveries-sub">
             Custom Voice and Voice Design shape a take with one of ten delivery
-            presets, each at subtle, normal, or strong intensity.
+            presets, each at normal or strong intensity.
           </p>
           <div className="try-chips" role="list" aria-labelledby="delivery-vocab-label">
             {DELIVERIES.map((d) => (
@@ -103,7 +103,7 @@ export const Listen = () => {
             />
           </div>
           <figcaption className="try-shot-caption">
-            All ten presets, each with subtle, normal, and strong intensity, live in the app.
+            All ten presets, each with normal and strong intensity, live in the app.
           </figcaption>
         </figure>
       </div>

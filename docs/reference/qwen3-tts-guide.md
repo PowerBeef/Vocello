@@ -259,20 +259,23 @@ replace the XCUITest UI path for the visible saved-voice workflow.
 
 ## 6. Delivery / emotion presets
 
-`Sources/QwenVoiceCore/EmotionPreset.swift` defines the single source of truth: **10 presets × 3 intensities**.
+`Sources/QwenVoiceCore/EmotionPreset.swift` defines the single source of truth: **10 presets × 2 intensities**
+(normal/strong; the former "subtle" tier was retired 2026-08-01 after calibration showed its measured
+prosody movement sat below the analyzer noise floor — a control that could not be verified to act).
+Neutral is itself a real instructed preset (steady, slightly monotone) with no intensity variation.
 
-| Preset | subtle | normal | strong |
-| --- | --- | --- | --- |
-| `neutral` | Neutral | Neutral | Neutral |
-| `happy` | Hint of warmth | Happy and upbeat, smiling | High pitch, loud, fast, bright, without laughing |
-| `sad` | Quiet reflective sadness | Heavy, restrained, lowered pitch | Fragile, tearful, slow, clear words |
-| `angry` | Quiet irritation | Firm, sharp consonants | Forceful tension, not screaming |
-| `fearful` | Quiet unease | Anxious, breath caught | Trembling panic, still audible |
-| `surprised` | Mild pitch lift | Pitch jumps, quick, astonished | High rising pitch, amazed, no gasping |
-| `whisper` | Gentle close-mic whisper | Hushed, breathy, confidential | Urgent, barely voiced, secretive |
-| `dramatic` | Measured theatrical weight | Heightened inflection | Sweeping grandeur, generous pauses |
-| `calm` | Relaxed and warm | Smooth, unhurried, reassuring | Serene, meditative stillness |
-| `excited` | Touch of enthusiasm | Bright, animated | Fast, driving, ringing, no laughing/shouting |
+| Preset | normal | strong |
+| --- | --- | --- |
+| `neutral` | Neutral (steady, slightly monotone) | same |
+| `happy` | Happy and upbeat, smiling | High pitch, loud, fast, bright, without laughing |
+| `sad` | Heavy, restrained, lowered pitch | Fragile, tearful, slow, clear words |
+| `angry` | Firm, sharp consonants | Forceful tension, not screaming |
+| `fearful` | Anxious, breath caught | Trembling panic, still audible |
+| `surprised` | Pitch jumps, quick, astonished | High rising pitch, amazed, no gasping |
+| `whisper` | Hushed, breathy, confidential | Urgent, barely voiced, secretive |
+| `dramatic` | Heightened inflection | Sweeping grandeur, generous pauses |
+| `calm` | Smooth, unhurried, reassuring | Serene, meditative stillness |
+| `excited` | Bright, animated | Fast, driving, ringing, no laughing/shouting |
 
 > `narrator` and `news` are Voice Design brief archetypes, not delivery presets.
 

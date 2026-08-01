@@ -72,10 +72,6 @@ class DeliveryGateTests(unittest.TestCase):
             verdict["flags"],
         )
 
-    def test_subtle_intensity_is_direction_only(self):
-        verdict = evaluate_delivery(metrics(f0=151.0, rate=4.05, std=26.0), metrics(), "happy.subtle")
-        self.assertTrue(verdict["passed"])
-
     def test_bare_preset_defaults_to_normal_intensity(self):
         verdict = evaluate_delivery(metrics(f0=140.0, rate=3.5), metrics(), "sad")
         self.assertEqual(verdict["intensity"], "normal")

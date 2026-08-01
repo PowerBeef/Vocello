@@ -6,8 +6,14 @@ import Foundation
 // Sources/iOSSupport/Models/EmotionPreset.swift, which had to be edited in
 // lockstep; consolidated here so preset copy changes land once.
 
+// Two calibrated tiers (maintainer decision 2026-08-01): the former "subtle"
+// tier measured below the prosody noise floor (its delivery-gate minimum
+// effect had to be zero), so it shipped takes indistinguishable from no
+// preset. Normal and strong both clear the 0.85 adherence gate with a
+// measured magnitude difference. Legacy saved drafts that carried a subtle
+// instruction round-trip through `DeliveryInputState(legacyEmotion:)` into
+// custom text, preserving their exact behavior.
 public enum EmotionIntensity: Int, CaseIterable, Identifiable, Sendable {
-    case subtle = 0
     case normal = 1
     case strong = 2
 
@@ -15,7 +21,6 @@ public enum EmotionIntensity: Int, CaseIterable, Identifiable, Sendable {
 
     public var label: String {
         switch self {
-        case .subtle: "Subtle"
         case .normal: "Normal"
         case .strong: "Strong"
         }
@@ -23,7 +28,6 @@ public enum EmotionIntensity: Int, CaseIterable, Identifiable, Sendable {
 
     public var rpcValue: String {
         switch self {
-        case .subtle: "subtle"
         case .normal: "normal"
         case .strong: "strong"
         }
@@ -153,7 +157,6 @@ public struct EmotionPreset: Identifiable, Sendable {
             label: "Neutral",
             sfSymbol: "face.dashed",
             instructions: [
-                .subtle: EmotionPreset.neutralPresetInstruction,
                 .normal: EmotionPreset.neutralPresetInstruction,
                 .strong: EmotionPreset.neutralPresetInstruction,
             ]
@@ -163,7 +166,6 @@ public struct EmotionPreset: Identifiable, Sendable {
             label: "Happy",
             sfSymbol: "face.smiling",
             instructions: [
-                .subtle: "Speak with a hint of warmth, a faint smile in the voice, a gently lifted pitch, and a relaxed easy pace; no laughing.",
                 .normal: "Speak happily and warmly, with a clearly lifted pitch, a light bouncing rhythm, a bright smiling tone, and quick cheerful pacing; no laughing.",
                 .strong: "Speak joyfully and energetically, with a noticeably higher pitch and louder volume, a fast animated pace, a bright ringing tone, and strong rising emphasis on key words; no laughing or shouting.",
             ]
@@ -173,7 +175,6 @@ public struct EmotionPreset: Identifiable, Sendable {
             label: "Sad",
             sfSymbol: "cloud.rain",
             instructions: [
-                .subtle: "Speak with quiet reflective sadness, a lowered pitch, a slightly slower pace, and a subdued restrained tone.",
                 .normal: "Speak sadly and softly, with a lowered pitch, a slow weighted pace, and a fragile restrained tone; keep every word clear and audible.",
                 .strong: "Speak through deep sorrow, fragile and tearful, with words slow and weighted with grief; keep every word clear and audible.",
             ]
@@ -183,7 +184,6 @@ public struct EmotionPreset: Identifiable, Sendable {
             label: "Angry",
             sfSymbol: "flame",
             instructions: [
-                .subtle: "Speak with quiet irritation, controlled and clipped, holding back the bigger feeling.",
                 .normal: "Speak angrily and firmly, with sharp consonants, tight stress, forceful tension, and a lower clipped tone; never shout or scream.",
                 .strong: "Speak with fierce open anger, hard biting consonants, a fast forceful attack, heated raised pitch, and strong projected volume; no screaming.",
             ]
@@ -193,7 +193,6 @@ public struct EmotionPreset: Identifiable, Sendable {
             label: "Fearful",
             sfSymbol: "exclamationmark.triangle",
             instructions: [
-                .subtle: "Speak with quiet unease, cautious and hesitant, voice a little smaller than usual.",
                 .normal: "Speak fearfully and anxiously, with a breathy shaky voice, uncertain pacing, and a smaller urgent tone; stay fully audible.",
                 .strong: "Speak in trembling panic, voice quavering and urgent, with fast uneven pacing and a thin tight tone; stay fully audible.",
             ]
@@ -203,7 +202,6 @@ public struct EmotionPreset: Identifiable, Sendable {
             label: "Surprised",
             sfSymbol: "exclamationmark.2",
             instructions: [
-                .subtle: "Speak with mild surprise, a light lift in pitch and a slightly quickened pace, as if just noticing something unexpected.",
                 .normal: "Speak with clear surprise, pitch rising steeply on key words, a quick animated pace with brief catches, and wide swings between low and high; no gasping or extra sounds.",
                 .strong: "Speak in sudden astonishment, the voice darting up and down with sharp pitch leaps at each discovery and quick catching bursts of pace; no gasping or extra sounds.",
             ]
@@ -213,7 +211,6 @@ public struct EmotionPreset: Identifiable, Sendable {
             label: "Excited",
             sfSymbol: "sparkles",
             instructions: [
-                .subtle: "Speak with a touch of enthusiasm, slightly energized and engaged, with a gentle lift in pitch.",
                 .normal: "Speak excitedly, with a fast driving pace, bright ringing tone, higher pitch and louder volume than normal; no laughing or shouting.",
                 .strong: "Speak with bursting excitement, a racing pace, big upward pitch leaps, a ringing bright tone, and emphatic peaks on every key word; no laughing or shouting.",
             ]
@@ -223,7 +220,6 @@ public struct EmotionPreset: Identifiable, Sendable {
             label: "Calm",
             sfSymbol: "leaf",
             instructions: [
-                .subtle: "Speak easily and unhurriedly, relaxed and warm throughout.",
                 .normal: "Speak calmly and soothingly, with smooth unhurried pacing, low settled pitch, and reassuring warmth; no tension or urgency.",
                 .strong: "Speak with serene meditative stillness, very slow and softly grounded, each phrase fully landed; no tension or urgency.",
             ]
@@ -233,7 +229,6 @@ public struct EmotionPreset: Identifiable, Sendable {
             label: "Whisper",
             sfSymbol: "ear",
             instructions: [
-                .subtle: "Whisper gently, close-mic and quiet, with soft breath and easy pacing.",
                 .normal: "Whisper throughout, hushed and breathy, every word voiced just above breath, close and confidential; never lift into normal speech.",
                 .strong: "Whisper at the very edge of hearing, hushed flat breath with minimal pitch movement, close and secretive; every word still audible, never lifted into normal speech.",
             ]
@@ -243,7 +238,6 @@ public struct EmotionPreset: Identifiable, Sendable {
             label: "Dramatic",
             sfSymbol: "theatermasks",
             instructions: [
-                .subtle: "Speak with measured theatrical weight, leaning into key beats without overdoing it.",
                 .normal: "Speak like a stage narrator, with sweeping rises and falls in pitch, firm stress landing on key words, deliberate pacing, and clear held pauses between phrases; no shouting.",
                 .strong: "Speak with sweeping theatrical grandeur, a wide pitch range swinging from low to high, bold stress on key words, generous well-timed pauses, and a projected resonant tone; no shouting.",
             ]

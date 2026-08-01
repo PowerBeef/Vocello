@@ -68,7 +68,7 @@ BUILTIN_PROFILE = {
     # promoted back to magnitude-bearing after their rewrites cleared the R1
     # acceptance bar.
     "delivery_expectations": {
-        "intensity_scale": {"subtle": 0.0, "normal": 1.0, "strong": 1.15},
+        "intensity_scale": {"normal": 1.0, "strong": 1.15},
         "presets": {
             "neutral": {
                 "arousal_score": {"direction": -1, "min_effect_normal": 0.0, "tier": "supporting"},
@@ -171,8 +171,8 @@ def _validate_delivery_expectations(block):
     if not isinstance(block, dict):
         raise ValueError("delivery_expectations must be an object")
     scale = block.get("intensity_scale")
-    if not isinstance(scale, dict) or set(scale.keys()) != {"subtle", "normal", "strong"}:
-        raise ValueError("delivery_expectations.intensity_scale must map subtle/normal/strong")
+    if not isinstance(scale, dict) or set(scale.keys()) != {"normal", "strong"}:
+        raise ValueError("delivery_expectations.intensity_scale must map normal/strong")
     for tier_name, factor in scale.items():
         if not isinstance(factor, (int, float)) or factor < 0:
             raise ValueError(f"intensity_scale.{tier_name} must be a non-negative number")

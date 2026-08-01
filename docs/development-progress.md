@@ -144,6 +144,11 @@ performance block after the fixture rebind, Tier 4 carryover). Immediate specifi
    (`QVOICE_IOS_DEVICE_ENROLL_VOICE_NAME`, registered knob; staged inputs are deleted
    after a clean enrollment). Ships in build 24; build 23 in review still carries the
    import UI.
+7. **Intensity tiers collapsed to two (2026-08-01, maintainer decision):** "subtle"
+   retired — its calibrated delivery-gate minimum effect was zero (below the prosody
+   noise floor), an unverifiable control. Normal/strong remain (both ≥0.85 adherence,
+   ~15% measured separation). Legacy subtle drafts degrade losslessly to custom text;
+   decision record in `docs/reference/delivery-remediation-plan-2026-08.md`.
 
 ## Staged roadmap state
 

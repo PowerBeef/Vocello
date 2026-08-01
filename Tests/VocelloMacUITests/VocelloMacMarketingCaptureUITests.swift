@@ -41,13 +41,13 @@ final class VocelloMacMarketingCaptureUITests: VocelloMacUITestCase {
         fullShot.lifetime = .keepAlways
         add(fullShot)
 
-        // Then select Calm from the open menu and Subtle intensity.
+        // Then select Calm from the open menu and Strong intensity (two-tier model).
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: calm, timeout: 10))
         let intensity = element("delivery_intensityPicker")
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: intensity, timeout: 20))
-        let subtle = app.menuItems["Subtle"].firstMatch
-        XCTAssertTrue(VocelloUIWait.exists(subtle, timeout: 10))
-        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: subtle, timeout: 10))
+        let strong = app.menuItems["Strong"].firstMatch
+        XCTAssertTrue(VocelloUIWait.exists(strong, timeout: 10))
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: strong, timeout: 10))
 
         assertReadyToGenerate(mode: .custom)
 

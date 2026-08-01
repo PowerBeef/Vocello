@@ -242,3 +242,17 @@ PASS-only publication for any banked evidence, fixed-seed comparisons for
 anything quality-affecting, contract-token/narrative sync in the same change
 where applicable, and OPTIMIZATION.md records numbers for kept AND declined
 outcomes.
+
+## Post-plan maintainer decision — intensity tiers collapse to two (2026-08-01)
+
+The recorded intensity-tier option closed: **"subtle" is retired; normal and strong
+remain.** Basis: the calibrated delivery-expectation profile could only gate subtle as
+direction-only (minimum effect 0 — its measured prosody movement sits below the analyzer
+noise floor), making it a control the product could not verify; normal and strong both
+clear the 0.85 adherence gate with a measured ~15% magnitude separation. Mechanics:
+`EmotionIntensity` drops the case (raw values 1/2 unchanged), all pickers derive from
+`allCases`, legacy saved subtle drafts round-trip through `DeliveryInputState(legacyEmotion:)`
+into custom text with identical instruction bytes (behavior preserved), the prosody profile
+and delivery gate drop the zero-tier special case (retired IDs in historical sidecars judge
+at normal strength via the 1.0 fallback), and public copy states two tiers. Ships with
+build 24 / the next macOS release.

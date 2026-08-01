@@ -54,7 +54,7 @@ Vocello is not a wrapper around a Python server: generation runs through a first
 | ![Vocello Voice Design screen](docs/screenshots/vocello-voice-design.png) | ![Vocello Voice Cloning screen](docs/screenshots/vocello-voice-cloning.png) |
 | Describe character, age, accent, texture, and delivery. Save a successful design as a reusable voice reference. | Record in the app; the Mac additionally imports WAV, MP3, AIFF, M4A, FLAC, OGG, or WebM files. A transcript improves conditioning but is optional. Generation requires the visible consent acknowledgment in Settings; only clone voices you own or are authorized to use. |
 
-Custom Voice and Voice Design support ten delivery styles at subtle, normal, or strong intensity, plus a free-text delivery description. Voice Cloning follows the reference voice and does not expose delivery controls.
+Custom Voice and Voice Design support ten delivery styles at normal or strong intensity, plus a free-text delivery description. Voice Cloning follows the reference voice and does not expose delivery controls.
 
 | Models | History |
 | --- | --- |

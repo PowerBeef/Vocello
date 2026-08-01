@@ -742,6 +742,7 @@ jobs:
             -clonedSourcePackagesDirPath build/cache/xcode/source-packages \
             -disableAutomaticPackageResolution \
             -onlyUsePackageVersionsFromResolvedFile \
+            -skipPackagePluginValidation \
             -archivePath build/dist/ios/Vocello.xcarchive \
             -authenticationKeyPath "$RUNNER_TEMP/asc/AuthKey_${ASC_API_KEY_ID}.p8" \
             -authenticationKeyID "$ASC_API_KEY_ID" \

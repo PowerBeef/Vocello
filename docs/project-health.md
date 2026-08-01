@@ -28,7 +28,7 @@
 | xpc-transport | macos | 3 | 3 / 15 | macos: fresh |
 | benchmark-validation | release-qa | 6 | 4 / 118 | macos: fresh, ios: fresh |
 | orchestration-assurance | release-qa | 3 | 1 / 12 | not hardware-gated |
-| release-supply-chain | release-qa | 6 | 3 / 51 | macos: fresh |
+| release-supply-chain | release-qa | 6 | 3 / 51 | macos: stale |
 | persistence-privacy | platform-release-qa | 4 | 2 / 7 | not hardware-gated |
 | runtime-hardening | backend-release-qa | 5 | 2 / 17 | not hardware-gated |
 

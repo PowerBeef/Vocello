@@ -276,6 +276,14 @@ struct IOSCustomVoiceView: View {
     @ViewBuilder
     private var customModeChips: some View {
         longFormResumeChip
+        IOSLongFormSegmentsMenuChip(
+            mode: .custom,
+            tint: IOSBrandTheme.custom,
+            appModel: appModel,
+            ttsEngine: ttsEngine,
+            audioPlayer: audioPlayer,
+            studioCoordinator: coordinator
+        )
         IOSStudioSetupChip(
             eyebrow: "Voice",
             value: speakerDisplayName,
@@ -1022,6 +1030,14 @@ struct IOSVoiceDesignView: View {
     @ViewBuilder
     private var designModeChips: some View {
         longFormResumeChip
+        IOSLongFormSegmentsMenuChip(
+            mode: .design,
+            tint: IOSBrandTheme.design,
+            appModel: appModel,
+            ttsEngine: ttsEngine,
+            audioPlayer: audioPlayer,
+            studioCoordinator: coordinator
+        )
         IOSStudioSetupChip(
             eyebrow: "Voice brief",
             value: briefChipLabel,
@@ -1627,6 +1643,14 @@ struct IOSVoiceCloningView: View {
     @ViewBuilder
     private var cloneModeChips: some View {
         longFormResumeChip
+        IOSLongFormSegmentsMenuChip(
+            mode: .clone,
+            tint: IOSBrandTheme.clone,
+            appModel: appModel,
+            ttsEngine: ttsEngine,
+            audioPlayer: audioPlayer,
+            studioCoordinator: coordinator
+        )
         IOSStudioSetupChip(
             eyebrow: draft.referenceAudioPath == nil ? "Reference" : "Voice",
             value: referenceChipLabel,

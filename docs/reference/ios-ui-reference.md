@@ -38,7 +38,10 @@ telemetry evidence per take.
 
 Scripts above the 900-character single-take limit route to a long-form project (all three modes):
 the helper line narrates per-segment progress, the dock's Cancel stops the whole run, and a
-stopped project with reusable takes exposes `longform_resumeChip`. The completed project surfaces
+stopped project with reusable takes exposes `longform_resumeChip`, and a completed in-session
+project exposes `iosLongForm_segmentsChip` (a setup-row menu whose items,
+`iosLongForm_regenerateSegment_<index>`, regenerate one segment with a fresh recorded seed and
+reassemble the joined output; device acceptance pending). The completed project surfaces
 the joined output as the inline player item.
 
 ### Voice Design

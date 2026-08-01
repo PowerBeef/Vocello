@@ -84,8 +84,10 @@ disclosure (`history_longFormSegmentsToggle_<digest8>`), flattens during search,
 segments visible. In-session resume reuses saved takes (`longform_resumeChip`); the
 sustained-performance refcount holds the fixed-refresh glass gate across the whole run. The
 editor ceiling is 30,000 characters with the planner's 100-segment cap authoritative.
-Differences from macOS: single-segment regeneration is not yet exposed (manifests carry empty
-`replacements`), and line-separated batch remains intentionally absent — long-form **is** the
+Differences from macOS: single-segment regeneration is implemented in-session (2026-08-01: the
+`iosLongForm_segmentsChip` setup-row menu regenerates one segment through the shared replacement
+lineage and reassembles the joined output; on-device acceptance is pending at the next phone
+window), and line-separated batch remains intentionally absent — long-form **is** the
 device-validated sequential-streaming design the iOS batch-removal invariant demanded.
 
 Device acceptance passed 2026-07-24 on the paired iPhone 17 Pro (smoke run
@@ -96,8 +98,9 @@ disclosure. The iOS smoke lane now runs both journeys (standard + long-form).
 
 ## Remaining work
 
-- **iOS single-segment regeneration** — expose the shared replacement-lineage machinery on
-  device (macOS-only today).
+- **iOS single-segment regeneration: device acceptance** — the implementation landed
+  2026-08-01; the explicit physical-iPhone acceptance (and the `longFormV4` residual flip)
+  rides the next phone window.
 - **Segment-count scaling evidence at audiobook scale** — the 12-segment run above proves flat
   steady-state memory through ~10 minutes of joined audio; a ~100-segment (multi-hour) proof
   remains open, and the scaled smoke journey currently caps at 12 segments per run.

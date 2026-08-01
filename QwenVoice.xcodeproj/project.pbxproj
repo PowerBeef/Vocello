@@ -65,6 +65,7 @@
 		239559E64242761BAE36E4E5 /* BenchMatrixSpec.swift in Sources */ = {isa = PBXBuildFile; fileRef = 669B831BA8E23D3DC59C2339 /* BenchMatrixSpec.swift */; };
 		239B41803755A4BB2741E159 /* LongFormPlanningTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A8C767365384FC934F4D47C /* LongFormPlanningTests.swift */; };
 		24117CB8A88679865DEFEF6F /* qwenvoice_production_model_catalog.json in Resources */ = {isa = PBXBuildFile; fileRef = B5AA98B0445794A0B2E8CDE9 /* qwenvoice_production_model_catalog.json */; };
+		2415FDE0E4276148A849EE15 /* IOSLongFormSegmentsPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E2EE7A73D3869F8639CB553 /* IOSLongFormSegmentsPanel.swift */; };
 		2589BEF4455DB23814489EF1 /* CLIRuntime.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5C15F6A1291506C7D8605BB /* CLIRuntime.swift */; };
 		258EEA1F20457D450A2883C0 /* IOSStudioInlinePlayerCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DB48541EB53A7C555669534 /* IOSStudioInlinePlayerCard.swift */; };
 		25AA6B68605F58DB9EE09EE6 /* RuntimeReleaseCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43033F9668B23257EDC8EEE3 /* RuntimeReleaseCoordinator.swift */; };
@@ -779,6 +780,7 @@
 		7D9DDDEEAEED933D8DB35472 /* VoicesCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoicesCommand.swift; sourceTree = "<group>"; };
 		7DE42BFBCAD789F940DC13D4 /* ryan.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = ryan.wav; sourceTree = "<group>"; };
 		7DF0CD00D988A7520B168252 /* EngineServiceTransportAccumulator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EngineServiceTransportAccumulator.swift; sourceTree = "<group>"; };
+		7E2EE7A73D3869F8639CB553 /* IOSLongFormSegmentsPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSLongFormSegmentsPanel.swift; sourceTree = "<group>"; };
 		7E6DC218BF438DBC1DEF6744 /* LongFormPlanning.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LongFormPlanning.swift; sourceTree = "<group>"; };
 		802B55E1EAC5684CDE4BBE03 /* TTSModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TTSModel.swift; sourceTree = "<group>"; };
 		8265666E168A61818AB382C1 /* IOSGenerationInputControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSGenerationInputControls.swift; sourceTree = "<group>"; };
@@ -1729,6 +1731,7 @@
 			children = (
 				695C458B83CCDCDDE7BA0A7F /* IOSFlexibleTextEditor.swift */,
 				27050F2F2D1A321AFF8BA020 /* IOSLongFormProject.swift */,
+				7E2EE7A73D3869F8639CB553 /* IOSLongFormSegmentsPanel.swift */,
 				35C26CF50ADDF233BEFB0351 /* IOSStudioGenerationActions.swift */,
 				6DB48541EB53A7C555669534 /* IOSStudioInlinePlayerCard.swift */,
 				2C3D5708FC88C667497CBF52 /* StudioGenerationCoordinator.swift */,
@@ -2293,6 +2296,7 @@
 				071633B3268879BAB9172CCE /* IOSGenerationVariationPreference.swift in Sources */,
 				41BE83F8965DC0784D661A82 /* IOSInterruptionRecorder.swift in Sources */,
 				9BD967FE4AE68C385A3EF7A2 /* IOSLongFormProject.swift in Sources */,
+				2415FDE0E4276148A849EE15 /* IOSLongFormSegmentsPanel.swift in Sources */,
 				9403DC2894861D0C2CDAE70F /* IOSMetricKitMemoryReporter.swift in Sources */,
 				734C58F78D1DD830791C7364 /* IOSModelDeliveryBackgroundEvents.swift in Sources */,
 				D9CD489105C5ADCF38E6EE96 /* IOSModelDeliverySupport.swift in Sources */,

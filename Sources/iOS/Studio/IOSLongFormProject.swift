@@ -10,9 +10,12 @@ import QwenVoiceCore
 /// v4, one joined History row per project). Everything model-free is shared
 /// QwenVoiceCore machinery; this file owns only the iOS execution shell.
 ///
-/// Scope note: in-session resume reuses saved takes; single-segment
-/// regeneration (replacement lineage) remains macOS-only for now — the shared
-/// manifest schema carries `replacements`, which iOS writes empty.
+/// Scope note: in-session resume reuses saved takes, and single-segment
+/// regeneration mirrors the macOS replacement lineage: revision >= 2 with a
+/// fresh recorded seed, per-segment QC that leaves the prior take untouched on
+/// failure, reassembly around the accepted take, and fail-closed manifest
+/// `replacements`. Regeneration is in-session only — the retained plan is the
+/// identity authority, exactly like resume.
 
 // MARK: - Segment state
 
@@ -109,10 +112,11 @@ struct IOSLongFormProjectRequest {
     func makeGenerationRequest(
         segmentIndex: Int,
         outputPath: String,
-        generationID: UUID
+        generationID: UUID,
+        seedOverride: UInt64? = nil
     ) -> GenerationRequest {
         let line = lines[segmentIndex]
-        let seed = plan.segments[segmentIndex].evidence.effectiveSubseed
+        let seed = seedOverride ?? plan.segments[segmentIndex].evidence.effectiveSubseed
         let payload: GenerationRequest.Payload
         switch mode {
         case .custom:
@@ -219,11 +223,24 @@ final class IOSLongFormCoordinator {
     private var runTask: Task<Void, Never>?
     private let cancellationState = IOSLongFormCancellationState()
 
+    /// Accepted-replacement lineage for the retained project (revision >= 2,
+    /// strictly increasing per segment, recorded seeds). Reset when a new plan
+    /// identity begins; preserved across resume and further regenerations.
+    private(set) var replacements: [LongFormSegmentReplacementEvidence] = []
+
     /// A stopped run with retained plan identity and at least one missing
     /// segment can resume without regenerating saved takes.
     var canResume: Bool {
         guard !isProcessing, lastRequest != nil, let outcome else { return false }
         return outcome.segments.contains { !$0.isSaved }
+    }
+
+    /// A completed project with retained plan identity can regenerate any
+    /// single segment; the joined output is reassembled around the new take.
+    var canRegenerateSegments: Bool {
+        guard !isProcessing, lastRequest != nil, let outcome else { return false }
+        if case .completed = outcome { return true }
+        return false
     }
 
     static func plan(originalText: String) throws -> LongFormPlan {
@@ -267,6 +284,59 @@ final class IOSLongFormCoordinator {
         )
     }
 
+    /// Regenerates one segment of the retained completed project with a fresh
+    /// recorded seed, then reassembles the joined output around the accepted
+    /// take. QC failure leaves the previous take and joined output unchanged.
+    func regenerateSegment(
+        index: Int,
+        ttsEngine: TTSEngineStore,
+        audioPlayer: AudioPlayerViewModel,
+        studioCoordinator: StudioGenerationCoordinator
+    ) {
+        guard canRegenerateSegments, !ttsEngine.hasActiveGeneration,
+              let request = lastRequest,
+              let priorSegments = outcome?.segments,
+              index >= 0, index < priorSegments.count else { return }
+        isProcessing = true
+        studioCoordinator.start(live: nil)
+        let runner = IOSLongFormProjectRunner(
+            ttsEngine: ttsEngine,
+            audioPlayer: audioPlayer,
+            cancellationState: cancellationState
+        )
+        Task { await cancellationState.reset() }
+        segments = priorSegments
+        progress = IOSLongFormProgressSnapshot(
+            completedCount: priorSegments.count(where: \.isSaved),
+            totalCount: priorSegments.count,
+            activeSegmentIndex: index,
+            statusMessage: "Regenerating segment \(index + 1) of \(priorSegments.count)…"
+        )
+        runTask = Task { [weak self] in
+            guard let self else { return }
+            let result = await runner.regenerateSegment(
+                request: request,
+                priorSegments: priorSegments,
+                segmentIndex: index,
+                priorReplacements: replacements,
+                onProgress: { [weak self] snapshot in self?.progress = snapshot },
+                onSegmentsUpdated: { [weak self] segments in self?.segments = segments },
+                studioCoordinator: studioCoordinator
+            )
+            self.isProcessing = false
+            self.runTask = nil
+            self.replacements = result.replacements
+            self.outcome = result.outcome
+            self.progress = IOSLongFormProgressSnapshot()
+            self.finish(
+                outcome: result.outcome,
+                request: request,
+                audioPlayer: audioPlayer,
+                studioCoordinator: studioCoordinator
+            )
+        }
+    }
+
     func cancel(ttsEngine: TTSEngineStore, audioPlayer: AudioPlayerViewModel) {
         guard isProcessing else { return }
         let state = cancellationState
@@ -286,6 +356,9 @@ final class IOSLongFormCoordinator {
         studioCoordinator: StudioGenerationCoordinator
     ) {
         guard !isProcessing, !ttsEngine.hasActiveGeneration else { return }
+        if lastRequest?.plan.evidence.planDigest != request.plan.evidence.planDigest {
+            replacements = []
+        }
         lastRequest = request
         lastMode = request.mode
         outcome = nil
@@ -314,6 +387,7 @@ final class IOSLongFormCoordinator {
             let outcome = await runner.run(
                 request: request,
                 initialSegments: segments,
+                priorReplacements: replacements,
                 onProgress: { [weak self] snapshot in self?.progress = snapshot },
                 onSegmentsUpdated: { [weak self] segments in self?.segments = segments },
                 studioCoordinator: studioCoordinator
@@ -415,6 +489,7 @@ final class IOSLongFormProjectRunner {
     func run(
         request: IOSLongFormProjectRequest,
         initialSegments: [IOSLongFormSegmentState],
+        priorReplacements: [LongFormSegmentReplacementEvidence],
         onProgress: @escaping @MainActor (IOSLongFormProgressSnapshot) -> Void,
         onSegmentsUpdated: @escaping @MainActor ([IOSLongFormSegmentState]) -> Void,
         studioCoordinator: StudioGenerationCoordinator
@@ -465,7 +540,7 @@ final class IOSLongFormProjectRunner {
                 qualityReports.append(report)
                 guard report.passed else {
                     segments[index].status = .failed(message: report.failureSummary)
-                    await persistManifest(request: request, segments: segments, qualityReports: qualityReports, assembly: nil)
+                    await persistManifest(request: request, segments: segments, qualityReports: qualityReports, assembly: nil, replacements: priorReplacements)
                     onSegmentsUpdated(segments)
                     return .failed(
                         segments: segments,
@@ -537,7 +612,7 @@ final class IOSLongFormProjectRunner {
                 qualityReports.append(report)
                 guard report.passed else {
                     segments[index].status = .failed(message: report.failureSummary)
-                    await persistManifest(request: request, segments: segments, qualityReports: qualityReports, assembly: nil)
+                    await persistManifest(request: request, segments: segments, qualityReports: qualityReports, assembly: nil, replacements: priorReplacements)
                     onSegmentsUpdated(segments)
                     return .failed(
                         segments: segments,
@@ -593,7 +668,8 @@ final class IOSLongFormProjectRunner {
                 request: request,
                 segments: segments,
                 qualityReports: qualityReports,
-                assembly: joined.evidence
+                assembly: joined.evidence,
+                replacements: priorReplacements
             )
             guard joinedReport.passed else {
                 return .failed(
@@ -620,11 +696,213 @@ final class IOSLongFormProjectRunner {
                 request: request,
                 segments: segments,
                 qualityReports: qualityReports,
-                assembly: nil
+                assembly: nil,
+                replacements: priorReplacements
             )
             return .failed(
                 segments: segments,
                 message: "Long-form assembly failed: \(error.localizedDescription)"
+            )
+        }
+    }
+
+    /// Mirrors the macOS `BatchGenerationRunner.regenerateSegment` semantics
+    /// on the iOS sequential runner: one fresh-seeded take for the chosen
+    /// segment, per-segment QC that leaves the prior take untouched on
+    /// failure, replacement lineage (revision >= 2, recorded seed), and
+    /// reassembly of the joined output around the accepted take.
+    func regenerateSegment(
+        request: IOSLongFormProjectRequest,
+        priorSegments: [IOSLongFormSegmentState],
+        segmentIndex: Int,
+        priorReplacements: [LongFormSegmentReplacementEvidence],
+        onProgress: @escaping @MainActor (IOSLongFormProgressSnapshot) -> Void,
+        onSegmentsUpdated: @escaping @MainActor ([IOSLongFormSegmentState]) -> Void,
+        studioCoordinator: StudioGenerationCoordinator
+    ) async -> (outcome: IOSLongFormOutcome, replacements: [LongFormSegmentReplacementEvidence]) {
+        ttsEngine.beginSustainedPerformanceActivity()
+        defer { ttsEngine.endSustainedPerformanceActivity() }
+
+        var segments = priorSegments
+        let total = segments.count
+        guard segmentIndex >= 0, segmentIndex < total,
+              segmentIndex < request.plan.segments.count,
+              segments.allSatisfy(\.isSaved) else {
+            return (
+                .failed(
+                    segments: segments,
+                    message: "The segment to regenerate is not part of this completed project."
+                ),
+                priorReplacements
+            )
+        }
+        let line = segments[segmentIndex].line
+        let segmentID = request.plan.segments[segmentIndex].segmentID
+        let revision = 2 + priorReplacements.count(where: { $0.segmentID == segmentID })
+        let replacementSeed = UInt64.random(in: UInt64.min ... UInt64.max)
+        let priorSegment = segments[segmentIndex]
+
+        func publish(active: Int?, message: String) {
+            onProgress(
+                IOSLongFormProgressSnapshot(
+                    completedCount: segments.count(where: \.isSaved),
+                    totalCount: total,
+                    activeSegmentIndex: active,
+                    statusMessage: message
+                )
+            )
+            onSegmentsUpdated(segments)
+        }
+
+        segments[segmentIndex].status = .running
+        publish(active: segmentIndex, message: "Regenerating segment \(segmentIndex + 1) of \(total)…")
+
+        let generationID = UUID()
+        let outputPath = makeOutputPath(
+            subfolder: request.model.outputSubfolder,
+            text: request.outputText(forSegment: segmentIndex)
+        )
+        do {
+            audioPlayer.setLivePreviewEstimate(LivePreviewEstimate(text: line))
+            audioPlayer.prepareStreamingPreview(
+                title: "Segment \(segmentIndex + 1) of \(total)",
+                shouldAutoPlay: AudioService.shouldAutoPlay
+            )
+            studioCoordinator.liveItem = IOSStudioLivePreviewItem(
+                voiceName: "Segment \(segmentIndex + 1) of \(total)",
+                modeLabel: "Long-form",
+                mode: request.mode,
+                transcript: line,
+                waveformSeed: IOSStableVisualHash.int(line),
+                estimatedAudioDuration: LivePreviewEstimate(text: line)?.estimatedAudioDuration ?? 0
+            )
+            await AppGenerationTimeline.shared.recordSubmitted(
+                id: generationID,
+                mode: request.mode.rawValue
+            )
+            let result = try await ttsEngine.generate(
+                request.makeGenerationRequest(
+                    segmentIndex: segmentIndex,
+                    outputPath: outputPath,
+                    generationID: generationID,
+                    seedOverride: replacementSeed
+                )
+            )
+            let cancellationRequestedAfterTake = await cancellationState.wasRequested()
+            if Task.isCancelled || cancellationRequestedAfterTake {
+                await AppGenerationTimeline.shared.recordFailed(id: generationID, finishReason: .cancelled)
+                IOSPullableDiagnosticsMirror.syncGenerationTelemetryIfEnabled(generationID: generationID)
+                try? FileManager.default.removeItem(atPath: result.audioPath)
+                audioPlayer.abortLivePreviewIfNeeded()
+                segments[segmentIndex] = priorSegment
+                onSegmentsUpdated(segments)
+                return (.cancelled(segments: segments), priorReplacements)
+            }
+            await AppGenerationTimeline.shared.recordCompleted(
+                id: generationID,
+                mode: request.mode.rawValue,
+                usedStreaming: true,
+                finishReason: result.finishReason?.rawValue,
+                summary: result.telemetrySummary
+            )
+            IOSPullableDiagnosticsMirror.syncGenerationTelemetryIfEnabled(generationID: generationID)
+
+            let report = await evaluateQC(
+                path: result.audioPath,
+                expectedPauseCount: PersistedWAVAudioQCAnalyzer.expectedPauseCount(in: line)
+            )
+            guard report.passed else {
+                segments[segmentIndex] = priorSegment
+                onSegmentsUpdated(segments)
+                return (
+                    .failed(
+                        segments: segments,
+                        message: "The regenerated take failed audio quality checks; the previous take is unchanged. \(report.failureSummary)"
+                    ),
+                    priorReplacements
+                )
+            }
+
+            publish(active: segmentIndex, message: "Saving segment \(segmentIndex + 1) of \(total)…")
+            let record = request.makeSegmentHistoryRecord(
+                forSegment: segmentIndex,
+                audioPath: result.audioPath,
+                duration: result.durationSeconds
+            )
+            GenerationPersistence.persist(record, caller: "IOSLongFormProjectRunner.regenerate")
+            segments[segmentIndex].status = .saved(audioPath: result.audioPath)
+
+            var replacements = priorReplacements
+            replacements.append(
+                LongFormSegmentReplacementEvidence(
+                    segmentID: segmentID,
+                    revision: revision,
+                    effectiveSeed: replacementSeed,
+                    generatedAtUTC: ISO8601DateFormatter().string(from: Date()),
+                    qcPassed: true,
+                    qcWarnings: report.warnings
+                )
+            )
+
+            audioPlayer.abortLivePreviewIfNeeded()
+            publish(active: nil, message: "Joining \(total) segments…")
+            let qualityReports: [AudioQualityGate.Report?] = segments.indices.map { index in
+                index == segmentIndex ? report : nil
+            }
+            let joined = try await assemble(request: request, segments: segments)
+            let joinedReport = await evaluateQC(
+                path: joined.outputURL.path,
+                expectedPauseCount: request.joinedOutputPauseBudget
+            )
+            await persistManifest(
+                request: request,
+                segments: segments,
+                qualityReports: qualityReports,
+                assembly: joined.evidence,
+                replacements: replacements
+            )
+            guard joinedReport.passed else {
+                return (
+                    .failed(
+                        segments: segments,
+                        message: "The joined long-form output failed audio quality checks after regeneration: \(joinedReport.failureSummary)"
+                    ),
+                    replacements
+                )
+            }
+            let joinedRecord = request.makeJoinedHistoryRecord(
+                assembly: joined.evidence,
+                outputURL: joined.outputURL
+            )
+            let saved = try await DatabaseService.shared.replaceLongFormJoinedGenerationAsync(joinedRecord)
+            NotificationCenter.default.post(name: .generationSaved, object: nil)
+            IOSSavedOutputsDestination.exportIfConfigured(internalAudioPath: joined.outputURL.path)
+            publish(active: nil, message: "Done")
+            return (
+                .completed(
+                    segments: segments,
+                    joinedAudioPath: joined.outputURL.path,
+                    joinedDurationSeconds: saved.duration
+                        ?? Double(joined.evidence.outputFrameCount) / Double(joined.evidence.sampleRate)
+                ),
+                replacements
+            )
+        } catch {
+            audioPlayer.abortLivePreviewIfNeeded()
+            let cancellationRequested = await cancellationState.wasRequested()
+            await AppGenerationTimeline.shared.recordFailed(
+                id: generationID,
+                finishReason: (error is CancellationError || cancellationRequested) ? .cancelled : .failed
+            )
+            IOSPullableDiagnosticsMirror.syncGenerationTelemetryIfEnabled(generationID: generationID)
+            segments[segmentIndex] = priorSegment
+            onSegmentsUpdated(segments)
+            if error is CancellationError || Task.isCancelled || cancellationRequested {
+                return (.cancelled(segments: segments), priorReplacements)
+            }
+            return (
+                .failed(segments: segments, message: error.localizedDescription),
+                priorReplacements
             )
         }
     }
@@ -676,7 +954,8 @@ final class IOSLongFormProjectRunner {
         request: IOSLongFormProjectRequest,
         segments: [IOSLongFormSegmentState],
         qualityReports: [AudioQualityGate.Report?],
-        assembly: LongFormAssemblyEvidence?
+        assembly: LongFormAssemblyEvidence?,
+        replacements: [LongFormSegmentReplacementEvidence]
     ) async {
         let plan = request.plan
         let audioPaths: [String?] = plan.evidence.segments.indices.map { index in
@@ -713,7 +992,7 @@ final class IOSLongFormProjectRunner {
                 segments: segmentEvidence
             ),
             assembly: assembly,
-            replacements: []
+            replacements: replacements
         )
         guard let firstAudioPath = segments.compactMap(\.audioPath).first else { return }
         let directory = URL(fileURLWithPath: firstAudioPath).deletingLastPathComponent()

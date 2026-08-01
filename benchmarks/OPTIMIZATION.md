@@ -1141,6 +1141,13 @@ short/medium/long × warm 3 at the canonical seed.
   matching §N exactly; QC 10/10 pass per arm, zero warnings; talker token streams
   byte-stable (identical durations across arms).
 
+- **Waveform fidelity quantified (sample-aligned, same seed, 10 pairs/arm):** the
+  half-precision render differs from the fp32 render by 55.3-57.7 dB SNR for **f16**
+  (worst single sample 351/32768 ≈ 1.1% FS) and 39.1-41.2 dB for **bf16** (worst
+  1014/32768). With the load blocker gone, **f16 supersedes bf16 as the candidate
+  variant** — §N chose bf16 only because f16 could not load on 0.30.6; f16 is ~16 dB
+  cleaner and µ-probed faster.
+
 **Standing decision (maintainer):** the trade is unchanged from §N — −234 MB resident
 and −325 MB installed per Speed chain for ~5% warm RTF — but its value is
 platform-asymmetric: on iPhone the resident saving is Jetsam headroom and could make

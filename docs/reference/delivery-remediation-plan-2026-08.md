@@ -25,14 +25,61 @@ expectations for the rewritten presets are then re-derived from the winning
 candidate's distributions and promoted from direction-only back to
 magnitude-bearing required features.
 
+**Intensity-ladder gate (added 2026-08-01, maintainer-approved).** The
+calibration matrix showed the shipped intensity ladder is non-monotone for
+about half the presets (angry, excited, surprised, whisper produce a weaker
+or opposite effect at `strong` than at `normal`), and `subtle` has never been
+measured. R1 therefore:
+
+1. **Measures the subtle baseline first** — one calibration pass over the 9
+   `.subtle` cells with the current instructions, completing the three-tier
+   picture before any rewrite.
+2. **Extends the rewrite scope** beyond dramatic/surprised to the inverted
+   `strong` phrasings (angry, excited, whisper) and the weak `normal`
+   phrasings (happy, excited).
+3. **Adds a pre-registered ladder gate:** for each rewritten preset,
+   `strong ≥ normal ≥ subtle` on its required features in ≥75% of seeds.
+4. **Collapse decision rule:** if the best candidates cannot make the ladder
+   monotone for a clear majority of presets, the intensity tiers are
+   collapsed to a single well-tuned instruction per preset (UI + draft-state
+   change, its own follow-up) — the removal question is answered by this
+   measured outcome, not by taste.
+
 **Acceptance (pre-registered):** rewritten presets reach ≥0.85 direction
-win-rate on at least one required feature across ≥7 seeds; no other preset's
-win-rates regress; all takes Fast-QC clean; fixed-seed neutral pairs
-byte-identical (instruction text does not touch the neutral path).
+win-rate on at least one required feature across ≥7 seeds AND pass the
+ladder gate; unchanged presets keep their banked data (per-preset
+instructions are independent, so no cross-preset re-run is required); all
+takes Fast-QC clean; fixed-seed neutral pairs byte-identical (instruction
+text does not touch the neutral path).
 
 **Non-goals:** angry keeps its measured pitch-raising behavior — the
-calibrated gate already encodes it; its instruction text is only touched if a
-rewrite is otherwise happening. UI preset labels/descriptions are unchanged.
+calibrated gate already encodes it; only its `strong` tier's inverted dose
+is in scope. UI preset labels/descriptions are unchanged; sad is untouched
+so the pinned seed-20260802 `sad.strong` reproduction stays valid for R2a.
+
+**R1 OUTCOME (executed 2026-08-01) — ACCEPTED, tiers kept.** Two candidate
+iterations (8 rewritten strings across 6 presets; whisper.strong and
+surprised.strong re-iterated once) validated over 7 seeds
+(delivery-r1c1/r1c2/r1final records; subtle baseline delivery-cal-subtle-s*):
+
+- Every rewritten preset cleared the ≥0.85 acceptance bar: angry.strong
+  0.86/0.86 (inversion cured, pitch var. 6.7 → 13.2), excited.strong
+  0.86/0.86 (3.2 → 9.75), dramatic.normal 0.86/0.86 (pitch var. +0.4 → +5.3,
+  finally a real preset), happy.normal arousal 0.86, surprised 0.86 on pitch
+  shift at both tiers, whisper.strong 1.00/1.00 (flattening −0.5 → −10.8
+  after the c2 re-iteration; the c1 "slow" phrasing had regressed it).
+  Delivery-gate warn-rates fell from 0.86–1.00 to 0.29–0.57.
+- **Ladder verdict:** subtle→normal is monotone in ≥75% of seeds for 5/6
+  rewritten presets; normal→strong saturates at parity for the hot emotions
+  (angry, excited, surprised) — no inverted cells remain anywhere. Whisper
+  saturates at the floor from `subtle` up. Per the collapse rule this is
+  neither a clean full-chain pass nor the harmful inversion that motivated
+  removal: **recommendation — keep the three tiers** (subtle is a real
+  lighter dose; strong guarantees ceiling), with the normal≈strong ceiling
+  for hot emotions documented rather than hidden. Collapse remains available
+  as its own follow-up if the maintainer prefers one honest control.
+- Gate expectations re-derived: dramatic and surprised promoted back to
+  magnitude-bearing required features on the shipping text.
 
 ## R2 — Defect diagnosis sweeps (evidence before fixes) [F5/F6]
 

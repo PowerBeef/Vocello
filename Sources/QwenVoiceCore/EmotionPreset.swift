@@ -153,7 +153,7 @@ public struct EmotionPreset: Identifiable, Sendable {
             sfSymbol: "face.smiling",
             instructions: [
                 .subtle: "Speak with a hint of warmth, a faint smile in the voice, a gently lifted pitch, and a relaxed easy pace; no laughing.",
-                .normal: "Speak happily and upbeat, with a bright beaming tone, slightly lifted pitch, and a lively bouncy pace; no laughing.",
+                .normal: "Speak happily and warmly, with a clearly lifted pitch, a light bouncing rhythm, a bright smiling tone, and quick cheerful pacing; no laughing.",
                 .strong: "Speak joyfully and energetically, with a noticeably higher pitch and louder volume, a fast animated pace, a bright ringing tone, and strong rising emphasis on key words; no laughing or shouting.",
             ]
         ),
@@ -174,7 +174,7 @@ public struct EmotionPreset: Identifiable, Sendable {
             instructions: [
                 .subtle: "Speak with quiet irritation, controlled and clipped, holding back the bigger feeling.",
                 .normal: "Speak angrily and firmly, with sharp consonants, tight stress, forceful tension, and a lower clipped tone; never shout or scream.",
-                .strong: "Speak furiously and forcefully, with biting sharp consonants, tight tension, and a lower clipped tone; never shout or scream.",
+                .strong: "Speak with fierce open anger, hard biting consonants, a fast forceful attack, heated raised pitch, and strong projected volume; no screaming.",
             ]
         ),
         EmotionPreset(
@@ -193,8 +193,8 @@ public struct EmotionPreset: Identifiable, Sendable {
             sfSymbol: "exclamationmark.2",
             instructions: [
                 .subtle: "Speak with mild surprise, a light lift in pitch and a slightly quickened pace, as if just noticing something unexpected.",
-                .normal: "Speak with unmistakable surprise, a quick animated pace, pitch jumping higher on key words, and sharp emphasis; no gasping or extra sounds.",
-                .strong: "Speak in open astonishment, with high rising pitch, fast eager bursts, and strong emphasis on every detail; no gasping or extra sounds.",
+                .normal: "Speak with clear surprise, pitch rising steeply on key words, a quick animated pace with brief catches, and wide swings between low and high; no gasping or extra sounds.",
+                .strong: "Speak in sudden astonishment, the voice darting up and down with sharp pitch leaps at each discovery and quick catching bursts of pace; no gasping or extra sounds.",
             ]
         ),
         EmotionPreset(
@@ -204,7 +204,7 @@ public struct EmotionPreset: Identifiable, Sendable {
             instructions: [
                 .subtle: "Speak with a touch of enthusiasm, slightly energized and engaged, with a gentle lift in pitch.",
                 .normal: "Speak excitedly, with a fast driving pace, bright ringing tone, higher pitch and louder volume than normal; no laughing or shouting.",
-                .strong: "Speak thrilled and eager, with a fast driving pace, noticeably higher pitch and louder volume, bright ringing tone, and strong rising emphasis; no laughing or shouting.",
+                .strong: "Speak with bursting excitement, a racing pace, big upward pitch leaps, a ringing bright tone, and emphatic peaks on every key word; no laughing or shouting.",
             ]
         ),
         EmotionPreset(
@@ -224,7 +224,7 @@ public struct EmotionPreset: Identifiable, Sendable {
             instructions: [
                 .subtle: "Whisper gently, close-mic and quiet, with soft breath and easy pacing.",
                 .normal: "Whisper throughout, hushed and breathy, every word voiced just above breath, close and confidential; never lift into normal speech.",
-                .strong: "Whisper urgently and barely voiced, secretive close-mic breath, audible but never lifted into normal speech.",
+                .strong: "Whisper at the very edge of hearing, hushed flat breath with minimal pitch movement, close and secretive; every word still audible, never lifted into normal speech.",
             ]
         ),
         EmotionPreset(
@@ -233,8 +233,8 @@ public struct EmotionPreset: Identifiable, Sendable {
             sfSymbol: "theatermasks",
             instructions: [
                 .subtle: "Speak with measured theatrical weight, leaning into key beats without overdoing it.",
-                .normal: "Speak dramatically with heightened inflection, deliberate pacing, bold stress on key words, and generous pauses; no shouting.",
-                .strong: "Speak with sweeping theatrical grandeur, bold stress on key words, generous well-timed pauses, and a projected resonant tone; no shouting.",
+                .normal: "Speak like a stage narrator, with sweeping rises and falls in pitch, firm stress landing on key words, deliberate pacing, and clear held pauses between phrases; no shouting.",
+                .strong: "Speak with sweeping theatrical grandeur, a wide pitch range swinging from low to high, bold stress on key words, generous well-timed pauses, and a projected resonant tone; no shouting.",
             ]
         ),
     ]

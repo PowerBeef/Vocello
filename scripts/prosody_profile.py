@@ -60,12 +60,13 @@ BUILTIN_PROFILE = {
         },
     },
     # Calibrated 2026-08-01 from the banked 7-seed × 18-cell paired matrix
-    # (records labeled delivery-cal-s1..s8; seed 20260802 excluded by its
-    # reproducible sad.strong Fast-QC failure). Required features have a
-    # measured ≥0.85 direction win-rate; supporting features 0.71–0.84;
-    # magnitudes sit near half the observed median effect. Dramatic and
-    # surprised measurably barely move prosody, so they carry direction-only
-    # supporting expectations — the honest reading of the data.
+    # (delivery-cal-s*; seed 20260802 excluded by its reproducible sad.strong
+    # Fast-QC failure), then re-derived after the R1 instruction rewrites
+    # (delivery-r1c1/r1c2/r1final records): required features carry a measured
+    # ≥0.85 direction win-rate on the shipping instruction text; magnitudes
+    # sit near half the observed median effect. Dramatic and surprised were
+    # promoted back to magnitude-bearing after their rewrites cleared the R1
+    # acceptance bar.
     "delivery_expectations": {
         "intensity_scale": {"subtle": 0.0, "normal": 1.0, "strong": 1.15},
         "presets": {
@@ -80,8 +81,8 @@ BUILTIN_PROFILE = {
                 "pitch_shift_semitones": {"direction": 1, "min_effect_normal": 0.0, "tier": "supporting"},
             },
             "surprised": {
+                "pitch_shift_semitones": {"direction": 1, "min_effect_normal": 0.5, "tier": "required"},
                 "pitch_variation_delta_hz": {"direction": 1, "min_effect_normal": 0.0, "tier": "supporting"},
-                "pitch_shift_semitones": {"direction": 1, "min_effect_normal": 0.0, "tier": "supporting"},
             },
             "sad": {
                 "arousal_score": {"direction": -1, "min_effect_normal": 0.5, "tier": "required"},
@@ -109,7 +110,7 @@ BUILTIN_PROFILE = {
                 "voiced_fraction_delta": {"direction": -1, "min_effect_normal": 0.0, "tier": "supporting"},
             },
             "dramatic": {
-                "roughness_delta": {"direction": 1, "min_effect_normal": 0.0, "tier": "supporting"},
+                "pitch_variation_delta_hz": {"direction": 1, "min_effect_normal": 1.5, "tier": "required"},
                 "pitch_shift_semitones": {"direction": 1, "min_effect_normal": 0.0, "tier": "supporting"},
             },
         },

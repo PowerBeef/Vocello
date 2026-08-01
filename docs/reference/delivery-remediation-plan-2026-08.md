@@ -100,6 +100,26 @@ lane monitoring stands as the remedy.
 
 **Cost:** ~30–40 min machine time total; no phone; no code changes.
 
+**R2 OUTCOME (executed 2026-08-01).**
+
+- **R2a — no engine fix warranted.** Incidence 1/11 seeds (only the pinned
+  20260802; ten fresh seeds pass clean), fourth byte-identical reproduction.
+  Root cause localized: the pipeline is healthy (all 20 chunks produced,
+  memory/thermal nominal) — the finalized audio itself carries three interior
+  silence gaps at this seed, i.e. `sad.strong`'s pause-heavy delivery landing
+  on the wrong side of the Fast-QC pause-vs-dropout boundary. Fail-closed
+  behavior already protects users. Banked scan: 0 QC flags across all 2,048
+  published takes. Recorded option if incidence ever grows: sharpen the
+  dropout classifier's edge discrimination so breathy pauses stop counting.
+- **R2b — no mitigation promoted; lane monitoring stands.** Pooled drift
+  incidence ≤12.5%: 1/8 expressiveness flags on the human-reference fixture
+  voice, 0/8 on a genuinely distinct male-register fixture ("R2b Ryan
+  Fixture", enrolled from a fresh self-generated reference after the saved
+  "Warm storyteller" voice proved to be a duplicate enrollment of the same
+  fixture clip — identical reference digest; fixed-seed determinism made the
+  duplicate visible as byte-identical takes). ECAPA separation re-confirmed:
+  clones 0.81–0.88 vs cross-speaker controls 0.02–0.39.
+
 ## R3 — Neutral stabilization experiment (engine, knob-gated) [F4]
 
 **Hypothesis:** a neutral-specific sampling preset (applied only when no

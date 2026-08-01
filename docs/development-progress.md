@@ -100,7 +100,10 @@ performance block after the fixture rebind, Tier 4 carryover). Immediate specifi
    clone identity measures strong (ECAPA 0.81–0.87 vs 0.10–0.39 negative
    controls), and the SER advisory + clone-fidelity lanes are standing tools.
    Product follow-ups recorded: dramatic/surprised instruction rewrites;
-   optional engine-level neutral stabilization experiment.
+   optional engine-level neutral stabilization experiment. The adopted
+   remediation tracks (R1 preset rewrites → R2 defect sweeps → R3 gated
+   neutral experiment → R4 process riders) live in
+   [`docs/reference/delivery-remediation-plan-2026-08.md`](reference/delivery-remediation-plan-2026-08.md).
 4. **Tier 1 is complete (2026-08-01):** the UI-checker v3 fold, quality-report
    consolidation (composed standard verdicts on delivery benches), single-take
    normalization, and the iOS segment-regeneration implementation half all landed with

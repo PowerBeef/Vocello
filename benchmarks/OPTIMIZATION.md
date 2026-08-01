@@ -1119,6 +1119,38 @@ macOS/iOS 26.0 floors stand.
   (`macos-engine-20260801-161901`) were removed from the registry because
   their source states are the reverted experiment.
 
+## R — Codec-precision re-test on 0.31.6 (2026-08-01)
+
+The §N 2.3 revival re-test on the kept pins, preceded by a full artifact dtype audit
+(the audit's other finding: the codec is the **only** remaining fp32 mass — talker
+chains are fully BF16 + quantized, so no further 2.2-style wins exist). Conversion
+tooling was rebuilt (492 tensors cast, the final two decoder layers kept fp32 per
+T-Mimi, 651 → 325 MB), three isolated data-dir arms (control/f16/bf16), custom/speed
+short/medium/long × warm 3 at the canonical seed.
+
+- **New fact: the fp16 load blocker is gone.** On 0.30.6 fp16 decoder weights failed
+  to load (missing metallib kernels; backend research report). On 0.31.6 both f16 and
+  bf16 load and generate cleanly — f16 is now a viable variant.
+- **The ~5% warm RTF cost is real, dtype-independent, and pin-independent.** Warm wall
+  deltas vs control: short +5.9/+5.9%, medium +4.2/+5.6%, long +4.8/+4.8-5.4%
+  (f16/bf16). Reproduces §N's 0.30-era ~4-5% on the new pins, while the §Q conv
+  µ-probe shows isolated half-precision convs FASTER than fp32 at these shapes — the
+  cost therefore lives in the composed decode graph (dtype-boundary casts, snake
+  activations, or the decoder transformer), not conv throughput.
+- **The prize confirmed: MLX active peak 1827 → 1593 MB (−234 MB) on both arms**,
+  matching §N exactly; QC 10/10 pass per arm, zero warnings; talker token streams
+  byte-stable (identical durations across arms).
+
+**Standing decision (maintainer):** the trade is unchanged from §N — −234 MB resident
+and −325 MB installed per Speed chain for ~5% warm RTF — but its value is
+platform-asymmetric: on iPhone the resident saving is Jetsam headroom and could make
+speech-tokenizer residency affordable there (503 → 0 ms model switches, §N phase 9
+left iOS disabled purely for headroom). The recorded option remains a per-platform
+artifact split (half-precision codec on iOS, fp32 on Mac), which is a 2.2-style
+artifact promotion (new uploads, catalog re-pin, fixture identities, promotion
+battery). Experiment tooling: scratchpad `convert_codec_precision.py` reimplemented
+this session; arms and evidence local-only.
+
 ## Status
 
 The optimization program tracked in this document is wrapped up. The §H P0–P6 work has been

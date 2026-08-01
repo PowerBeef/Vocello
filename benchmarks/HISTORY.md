@@ -624,6 +624,12 @@ cross-project comparisons.
 | 2026-07-29 | [`macos-xcui-benchmark-20260729-020753-75d2ec7b`](runs/ui-generation/macos-xcui-benchmark-20260729-020753-75d2ec7b.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | `3331eecfdcdb` | `0c3160232d0e` | vs macos-xcui-benchmark-20260729-015937-cd85b2d5: RTF +0.8%, RAM -0.0% | phase0-ui-control-2 |
 | 2026-07-29 | [`macos-xcui-benchmark-20260729-021554-659b10be`](runs/ui-generation/macos-xcui-benchmark-20260729-021554-659b10be.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | `3331eecfdcdb` | `0c3160232d0e` | vs macos-xcui-benchmark-20260729-020753-75d2ec7b: RTF -0.9%, RAM -0.3% | phase0-ui-control-3 |
 
+## ui-generation / macos / mac-mini-m2-8gb / config `0fc6cb69cd79`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---|---|---|---|
+| 2026-08-01 | [`macos-xcui-benchmark-20260801-182943-b0b5a448`](runs/ui-generation/macos-xcui-benchmark-20260801-182943-b0b5a448.json) | canonical | canonical | passedWithWarnings | qualified-with-warnings | 29 | `75896cfd538f` | `0fc6cb69cd79` | baseline | macos-xcui-benchmark-20260801-182943-b0b5a448 |
+
 ## ui-generation / macos / mac-mini-m2-8gb / config `126311b505ce`
 
 | completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |

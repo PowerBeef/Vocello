@@ -2,7 +2,7 @@ import React from "react";
 
 /*
   Measured performance, from the repository's tracked benchmark records:
-  - RTF bars: benchmarks/runs/ui-generation/macos-xcui-benchmark-20260801-162803-2dbdbcd1.json
+  - RTF bars: benchmarks/runs/ui-generation/macos-xcui-benchmark-20260801-182943-b0b5a448.json
     (the newest canonical matrix; refresh with every release, see
     docs/reference/macos-release-qa.md "Performance surfaces ship current numbers").
   - The retired gate chart's pinned A/B pair (…-9b6f267b / …-d02005ae) stays as history in
@@ -14,9 +14,9 @@ import React from "react";
   single-release billboard.
 */
 const MODES = [
-  { name: "Custom Voice", tone: "var(--mode-custom)", takes: [1.72, 1.94, 2.03] },
-  { name: "Voice Design", tone: "var(--mode-design)", takes: [1.75, 2.01, 2.11] },
-  { name: "Voice Cloning", tone: "var(--mode-clone)", takes: [1.55, 1.86, 2.02] },
+  { name: "Custom Voice", tone: "var(--mode-custom)", takes: [1.66, 1.94, 2.02] },
+  { name: "Voice Design", tone: "var(--mode-design)", takes: [1.95, 2.00, 2.13] },
+  { name: "Voice Cloning", tone: "var(--mode-clone)", takes: [1.50, 1.85, 2.02] },
 ];
 const LENGTHS = ["short", "medium", "long"];
 const RTF_SCALE_MAX = 2.4;
@@ -100,7 +100,7 @@ const RtfChart = () => {
       className="perf-chart"
       viewBox={`0 0 ${width} ${plotBottom + 30}`}
       role="img"
-      aria-label="Warm generation speed by mode and script length, as a multiple of realtime. Custom Voice 1.72× to 2.03×, Voice Design 1.75× to 2.11×, Voice Cloning 1.55× to 2.02×. Every bar passes the realtime line at 1.0×."
+      aria-label="Warm generation speed by mode and script length, as a multiple of realtime. Custom Voice 1.66× to 2.02×, Voice Design 1.95× to 2.13×, Voice Cloning 1.50× to 2.02×. Every bar passes the realtime line at 1.0×."
     >
       {gridlines}
       {rows}

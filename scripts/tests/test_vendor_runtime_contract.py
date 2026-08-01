@@ -431,7 +431,7 @@ public func stableFacadeEntryPoint() -> Bool { true }
     def test_benchmark_neutral_security_dependency_drift_preserves_evidence(self) -> None:
         runtime = ROOT / MODULE.RUNTIME_RELATIVE
         records = MODULE.benchmark_records(ROOT)
-        record = records["macos-xcui-benchmark-20260801-162803-2dbdbcd1"]
+        record = records["macos-xcui-benchmark-20260801-182943-b0b5a448"]
         git_blob = MODULE.git_blob
 
         def blob_with_neutral_drift(repo_root: Path, commit: str, path: Path) -> bytes | None:
@@ -458,7 +458,7 @@ public func stableFacadeEntryPoint() -> Bool { true }
     def test_benchmark_neutral_dependency_source_drift_invalidates_evidence(self) -> None:
         runtime = ROOT / MODULE.RUNTIME_RELATIVE
         records = MODULE.benchmark_records(ROOT)
-        record = records["macos-xcui-benchmark-20260801-162803-2dbdbcd1"]
+        record = records["macos-xcui-benchmark-20260801-182943-b0b5a448"]
         git_blob = MODULE.git_blob
 
         for field, value in (

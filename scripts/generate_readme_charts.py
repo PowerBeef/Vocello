@@ -35,7 +35,7 @@ ROOT = Path(__file__).resolve().parents[1]
 OUTPUT_DIR = ROOT / "docs" / "charts"
 
 # Newest canonical macOS UI matrix — refresh with every release.
-RTF_RECORD = "macos-xcui-benchmark-20260801-162803-2dbdbcd1"
+RTF_RECORD = "macos-xcui-benchmark-20260801-182943-b0b5a448"
 LONGFORM_RUN_ID = "macos-xcui-smoke-20260725-062451-8f15c1fd"
 # (audio seconds, engine phys-footprint end MB, peak MB) per segment.
 LONGFORM_SEGMENTS = (

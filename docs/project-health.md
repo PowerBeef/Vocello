@@ -13,22 +13,22 @@
 
 | Platform | Latest canonical run | Captured |
 | --- | --- | --- |
-| macos | `macos-xcui-benchmark-20260801-162803-2dbdbcd1` | 2026-08-01T16:41:42Z |
+| macos | `macos-xcui-benchmark-20260801-182943-b0b5a448` | 2026-08-01T18:43:00Z |
 | ios | `ios-xcui-benchmark-20260801-132415-abbec96b` | 2026-08-01T13:38:28Z |
 
 ## Critical-domain coverage and freshness
 
 | Domain | Owner | Production files | Direct test files / cases | Hardware evidence |
 | --- | --- | ---: | ---: | --- |
-| generation-terminal | backend | 4 | 2 / 16 | macos: unknown, ios: fresh |
-| clone-conditioning | backend | 31 | 2 / 32 | macos: unknown, ios: stale |
-| event-delivery | backend | 3 | 2 / 10 | macos: unknown, ios: fresh |
-| memory-policy | backend-platform | 6 | 2 / 25 | macos: unknown, ios: fresh |
-| model-delivery | backend-platform | 17 | 3 / 37 | macos: unknown, ios: fresh |
-| xpc-transport | macos | 3 | 3 / 15 | macos: unknown |
-| benchmark-validation | release-qa | 6 | 4 / 118 | macos: unknown, ios: fresh |
+| generation-terminal | backend | 4 | 2 / 16 | macos: fresh, ios: fresh |
+| clone-conditioning | backend | 31 | 2 / 32 | macos: fresh, ios: stale |
+| event-delivery | backend | 3 | 2 / 10 | macos: fresh, ios: fresh |
+| memory-policy | backend-platform | 6 | 2 / 25 | macos: fresh, ios: fresh |
+| model-delivery | backend-platform | 17 | 3 / 37 | macos: fresh, ios: fresh |
+| xpc-transport | macos | 3 | 3 / 15 | macos: fresh |
+| benchmark-validation | release-qa | 6 | 4 / 118 | macos: fresh, ios: fresh |
 | orchestration-assurance | release-qa | 3 | 1 / 12 | not hardware-gated |
-| release-supply-chain | release-qa | 6 | 3 / 51 | macos: unknown |
+| release-supply-chain | release-qa | 6 | 3 / 51 | macos: fresh |
 | persistence-privacy | platform-release-qa | 4 | 2 / 7 | not hardware-gated |
 | runtime-hardening | backend-release-qa | 5 | 2 / 17 | not hardware-gated |
 

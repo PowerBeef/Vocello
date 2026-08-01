@@ -399,8 +399,8 @@ explicit macOS fixture repair/bootstrap step. XCUITest is the sole autonomous ap
   tracked `exploratory` because the worktree was dirty. It proves its exact fingerprint and is
   excluded from clean trends. Earlier failed/interrupted attempts correctly published no history.
 - **Canonical UI evidence state**: the current clean canonical baselines are
-  `macos-xcui-benchmark-20260801-162803-2dbdbcd1` (schema v3, captured on the bumped
-  0.31.6 pin tree; also the vendor drift-test anchor) and
+  `macos-xcui-benchmark-20260801-182943-b0b5a448` (schema v3, captured on the 2.4.0
+  release tree on main; also the vendor drift-test anchor) and
   `ios-xcui-benchmark-20260801-132415-abbec96b` (the first canonical iOS schema-v3
   record, 2026.07.26.1 artifacts). In immutable pre-convergence history a
   clean canonical macOS schema-v2 baseline exists

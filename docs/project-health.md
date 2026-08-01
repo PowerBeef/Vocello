@@ -20,15 +20,15 @@
 
 | Domain | Owner | Production files | Direct test files / cases | Hardware evidence |
 | --- | --- | ---: | ---: | --- |
-| generation-terminal | backend | 4 | 2 / 16 | macos: fresh, ios: fresh |
-| clone-conditioning | backend | 31 | 2 / 32 | macos: fresh, ios: stale |
-| event-delivery | backend | 3 | 2 / 10 | macos: fresh, ios: fresh |
-| memory-policy | backend-platform | 6 | 2 / 25 | macos: fresh, ios: fresh |
-| model-delivery | backend-platform | 17 | 3 / 37 | macos: fresh, ios: fresh |
-| xpc-transport | macos | 3 | 3 / 15 | macos: fresh |
-| benchmark-validation | release-qa | 6 | 4 / 118 | macos: fresh, ios: fresh |
+| generation-terminal | backend | 4 | 2 / 16 | macos: unknown, ios: fresh |
+| clone-conditioning | backend | 31 | 2 / 32 | macos: unknown, ios: stale |
+| event-delivery | backend | 3 | 2 / 10 | macos: unknown, ios: fresh |
+| memory-policy | backend-platform | 6 | 2 / 25 | macos: unknown, ios: fresh |
+| model-delivery | backend-platform | 17 | 3 / 37 | macos: unknown, ios: fresh |
+| xpc-transport | macos | 3 | 3 / 15 | macos: unknown |
+| benchmark-validation | release-qa | 6 | 4 / 118 | macos: unknown, ios: fresh |
 | orchestration-assurance | release-qa | 3 | 1 / 12 | not hardware-gated |
-| release-supply-chain | release-qa | 6 | 3 / 51 | macos: stale |
+| release-supply-chain | release-qa | 6 | 3 / 51 | macos: unknown |
 | persistence-privacy | platform-release-qa | 4 | 2 / 7 | not hardware-gated |
 | runtime-hardening | backend-release-qa | 5 | 2 / 17 | not hardware-gated |
 

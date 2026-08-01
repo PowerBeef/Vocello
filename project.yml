@@ -20,8 +20,8 @@ configs:
 # and App Store Connect rejected the embedded frameworks (upload error 90057).
 settings:
   base:
-    MARKETING_VERSION: "2.3.0"
-    CURRENT_PROJECT_VERSION: "22"
+    MARKETING_VERSION: "2.4.0"
+    CURRENT_PROJECT_VERSION: "23"
 
 packages:
   GRDB:

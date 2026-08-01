@@ -13,36 +13,36 @@
 <circle cx="22" cy="80.0" r="5" fill="#8A6410"/>
 <text x="32.0" y="84.0" fill="#1f2328" font-size="13" font-weight="600" text-anchor="start">Custom Voice</text>
 <text x="102.0" y="106.0" fill="#656d76" font-size="11" font-weight="normal" text-anchor="end">short</text>
-<path d="M110.0 94.0 h400.4 a4 4 0 0 1 4 4 v8.0 a4 4 0 0 1 -4 4 h-400.4 z" fill="#8A6410"/>
-<text x="520.4" y="106.0" fill="#1f2328" font-size="11" font-weight="normal" text-anchor="start">1.85×</text>
+<path d="M110.0 94.0 h372.1 a4 4 0 0 1 4 4 v8.0 a4 4 0 0 1 -4 4 h-372.1 z" fill="#8A6410"/>
+<text x="492.1" y="106.0" fill="#1f2328" font-size="11" font-weight="normal" text-anchor="start">1.72×</text>
 <text x="102.0" y="128.0" fill="#656d76" font-size="11" font-weight="normal" text-anchor="end">medium</text>
-<path d="M110.0 116.0 h428.5 a4 4 0 0 1 4 4 v8.0 a4 4 0 0 1 -4 4 h-428.5 z" fill="#8A6410"/>
-<text x="548.5" y="128.0" fill="#1f2328" font-size="11" font-weight="normal" text-anchor="start">1.97×</text>
+<path d="M110.0 116.0 h421.1 a4 4 0 0 1 4 4 v8.0 a4 4 0 0 1 -4 4 h-421.1 z" fill="#8A6410"/>
+<text x="541.1" y="128.0" fill="#1f2328" font-size="11" font-weight="normal" text-anchor="start">1.94×</text>
 <text x="102.0" y="150.0" fill="#656d76" font-size="11" font-weight="normal" text-anchor="end">long</text>
-<path d="M110.0 138.0 h439.3 a4 4 0 0 1 4 4 v8.0 a4 4 0 0 1 -4 4 h-439.3 z" fill="#8A6410"/>
-<text x="559.3" y="150.0" fill="#1f2328" font-size="11" font-weight="normal" text-anchor="start">2.02×</text>
+<path d="M110.0 138.0 h441.4 a4 4 0 0 1 4 4 v8.0 a4 4 0 0 1 -4 4 h-441.4 z" fill="#8A6410"/>
+<text x="561.4" y="150.0" fill="#1f2328" font-size="11" font-weight="normal" text-anchor="start">2.03×</text>
 <circle cx="22" cy="182.0" r="5" fill="#6C47C8"/>
 <text x="32.0" y="186.0" fill="#1f2328" font-size="13" font-weight="600" text-anchor="start">Voice Design</text>
 <text x="102.0" y="208.0" fill="#656d76" font-size="11" font-weight="normal" text-anchor="end">short</text>
-<path d="M110.0 196.0 h416.0 a4 4 0 0 1 4 4 v8.0 a4 4 0 0 1 -4 4 h-416.0 z" fill="#6C47C8"/>
-<text x="536.0" y="208.0" fill="#1f2328" font-size="11" font-weight="normal" text-anchor="start">1.92×</text>
+<path d="M110.0 196.0 h380.4 a4 4 0 0 1 4 4 v8.0 a4 4 0 0 1 -4 4 h-380.4 z" fill="#6C47C8"/>
+<text x="500.4" y="208.0" fill="#1f2328" font-size="11" font-weight="normal" text-anchor="start">1.75×</text>
 <text x="102.0" y="230.0" fill="#656d76" font-size="11" font-weight="normal" text-anchor="end">medium</text>
-<path d="M110.0 218.0 h446.2 a4 4 0 0 1 4 4 v8.0 a4 4 0 0 1 -4 4 h-446.2 z" fill="#6C47C8"/>
-<text x="566.2" y="230.0" fill="#1f2328" font-size="11" font-weight="normal" text-anchor="start">2.05×</text>
+<path d="M110.0 218.0 h436.7 a4 4 0 0 1 4 4 v8.0 a4 4 0 0 1 -4 4 h-436.7 z" fill="#6C47C8"/>
+<text x="556.7" y="230.0" fill="#1f2328" font-size="11" font-weight="normal" text-anchor="start">2.01×</text>
 <text x="102.0" y="252.0" fill="#656d76" font-size="11" font-weight="normal" text-anchor="end">long</text>
-<path d="M110.0 240.0 h461.6 a4 4 0 0 1 4 4 v8.0 a4 4 0 0 1 -4 4 h-461.6 z" fill="#6C47C8"/>
-<text x="581.6" y="252.0" fill="#1f2328" font-size="11" font-weight="normal" text-anchor="start">2.12×</text>
+<path d="M110.0 240.0 h459.0 a4 4 0 0 1 4 4 v8.0 a4 4 0 0 1 -4 4 h-459.0 z" fill="#6C47C8"/>
+<text x="579.0" y="252.0" fill="#1f2328" font-size="11" font-weight="normal" text-anchor="start">2.11×</text>
 <circle cx="22" cy="284.0" r="5" fill="#B4471B"/>
 <text x="32.0" y="288.0" fill="#1f2328" font-size="13" font-weight="600" text-anchor="start">Voice Cloning</text>
 <text x="102.0" y="310.0" fill="#656d76" font-size="11" font-weight="normal" text-anchor="end">short</text>
-<path d="M110.0 298.0 h336.0 a4 4 0 0 1 4 4 v8.0 a4 4 0 0 1 -4 4 h-336.0 z" fill="#B4471B"/>
-<text x="456.0" y="310.0" fill="#1f2328" font-size="11" font-weight="normal" text-anchor="start">1.55×</text>
+<path d="M110.0 298.0 h334.8 a4 4 0 0 1 4 4 v8.0 a4 4 0 0 1 -4 4 h-334.8 z" fill="#B4471B"/>
+<text x="454.8" y="310.0" fill="#1f2328" font-size="11" font-weight="normal" text-anchor="start">1.55×</text>
 <text x="102.0" y="332.0" fill="#656d76" font-size="11" font-weight="normal" text-anchor="end">medium</text>
-<path d="M110.0 320.0 h409.4 a4 4 0 0 1 4 4 v8.0 a4 4 0 0 1 -4 4 h-409.4 z" fill="#B4471B"/>
-<text x="529.4" y="332.0" fill="#1f2328" font-size="11" font-weight="normal" text-anchor="start">1.89×</text>
+<path d="M110.0 320.0 h403.0 a4 4 0 0 1 4 4 v8.0 a4 4 0 0 1 -4 4 h-403.0 z" fill="#B4471B"/>
+<text x="523.0" y="332.0" fill="#1f2328" font-size="11" font-weight="normal" text-anchor="start">1.86×</text>
 <text x="102.0" y="354.0" fill="#656d76" font-size="11" font-weight="normal" text-anchor="end">long</text>
-<path d="M110.0 342.0 h441.2 a4 4 0 0 1 4 4 v8.0 a4 4 0 0 1 -4 4 h-441.2 z" fill="#B4471B"/>
-<text x="561.2" y="354.0" fill="#1f2328" font-size="11" font-weight="normal" text-anchor="start">2.03×</text>
-<text x="704.0" y="422.0" fill="#656d76" font-size="10" font-weight="normal" text-anchor="end">record 111d88c6 · benchmarks/HISTORY.md</text>
+<path d="M110.0 342.0 h438.1 a4 4 0 0 1 4 4 v8.0 a4 4 0 0 1 -4 4 h-438.1 z" fill="#B4471B"/>
+<text x="558.1" y="354.0" fill="#1f2328" font-size="11" font-weight="normal" text-anchor="start">2.02×</text>
+<text x="704.0" y="422.0" fill="#656d76" font-size="10" font-weight="normal" text-anchor="end">record 2dbdbcd1 · benchmarks/HISTORY.md</text>
 </g>
 </svg>

@@ -188,5 +188,82 @@ final class VocelloiOSSmokeUITests: VocelloiOSUITestCase {
             "Expanding the newest project must reveal the nonce-bearing first segment beside the joined row"
         )
         VocelloUIScreenshot.attach(app, named: "ios-longform-history-project")
+
+        // Single-segment regeneration acceptance (manifest-v4 replacement
+        // lineage on iOS): the retained completed project exposes the
+        // in-session segments menu in the studio setup row; regenerating the
+        // first segment runs one ordinary streaming take with a fresh
+        // recorded seed, reassembles the joined output, and leaves the studio
+        // clean with the project still regenerable. Mirrors the macOS
+        // replacement-flow acceptance.
+        //
+        // The History search keyboard obscures the tab bar; Return on a search
+        // field is a semantic dismissal, not a coordinate tap.
+        if app.keyboards.firstMatch.exists {
+            searchField.typeText("\n")
+            XCTAssertTrue(
+                VocelloUIWait.condition("history search keyboard to dismiss", timeout: 15) {
+                    !self.app.keyboards.firstMatch.exists
+                }
+            )
+        }
+        prepare(mode: .custom)
+        let segmentsChip = element("iosLongForm_segmentsChip")
+        XCTAssertTrue(
+            VocelloUIWait.exists(segmentsChip, timeout: 30),
+            "The retained completed project must expose the segments menu chip"
+        )
+        XCTAssertTrue(VocelloUIWait.enabled(segmentsChip, timeout: 30))
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: segmentsChip, timeout: 20))
+        // Dialog buttons occasionally drop identifiers in the on-device tree;
+        // match the genuine visible label as the equal-priority fallback.
+        let firstSegmentItem = app.buttons.matching(
+            NSPredicate(
+                format: "identifier == %@ OR label BEGINSWITH %@",
+                "iosLongForm_regenerateSegment_0", "Segment 1:"
+            )
+        ).firstMatch
+        XCTAssertTrue(
+            VocelloUIWait.exists(firstSegmentItem, timeout: 20),
+            "The segments dialog must list the project's first segment"
+        )
+        let completedPlayer = element("studio_inlinePlayer_playPause")
+        let generationError = element("textInput_generationError")
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: firstSegmentItem, timeout: 20))
+        // The chip leaves the tree while the replacement runs (isProcessing
+        // hides it), so this wait must stay existence-only — a property query
+        // on a vanished element throws instead of returning false.
+        XCTAssertTrue(
+            VocelloUIWait.condition("segment regeneration to visibly start", timeout: 60) {
+                !segmentsChip.exists || !completedPlayer.exists
+            },
+            "Choosing a segment must visibly start the replacement generation"
+        )
+        XCTAssertTrue(
+            VocelloUIWait.condition("regenerated project to reassemble", timeout: 600) {
+                completedPlayer.exists || generationError.exists
+            }
+        )
+        XCTAssertFalse(
+            generationError.exists,
+            "Segment regeneration must not surface the visible error control"
+        )
+        XCTAssertTrue(
+            VocelloUIWait.condition("segments chip to return after reassembly", timeout: 60) {
+                segmentsChip.exists
+            },
+            "The replaced project must remain regenerable in-session"
+        )
+        XCTAssertTrue(VocelloUIWait.enabled(segmentsChip, timeout: 60))
+        // No data loss: the nonce still surfaces both the joined output and a
+        // first-segment row in History search.
+        replaceHistorySearch(with: nonce)
+        XCTAssertTrue(
+            VocelloUIWait.condition("nonce rows to survive the replacement", timeout: 30) {
+                self.historyRows().count >= 2
+            },
+            "Replacement must keep the joined output and segment history searchable"
+        )
+        VocelloUIScreenshot.attach(app, named: "ios-longform-regenerated")
     }
 }

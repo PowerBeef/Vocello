@@ -2,11 +2,13 @@ import QwenVoiceCore
 import SwiftUI
 
 /// Per-segment regeneration for the retained completed long-form project:
-/// one pill-sized menu in the studio setup row (beside the resume chip's
-/// slot), listing the project's segments. Choosing one regenerates that
+/// a standard setup chip beside the resume chip's slot opens a confirmation
+/// dialog listing the project's segments. Choosing one regenerates that
 /// segment with a fresh recorded seed and reassembles the joined output,
 /// mirroring the macOS replacement flow. In-session only, exactly like
-/// resume — the retained plan is the identity authority.
+/// resume — the retained plan is the identity authority. The chip is a plain
+/// `IOSStudioSetupChip` button rather than a SwiftUI `Menu` because a Menu's
+/// accessibility identifier does not reliably reach the on-device tree.
 struct IOSLongFormSegmentsMenuChip: View {
     let mode: GenerationMode
     let tint: Color
@@ -15,53 +17,42 @@ struct IOSLongFormSegmentsMenuChip: View {
     let audioPlayer: AudioPlayerViewModel
     let studioCoordinator: StudioGenerationCoordinator
 
+    @State private var isChoosingSegment = false
+
     private var isVisible: Bool {
         appModel.longForm.canRegenerateSegments && appModel.longForm.lastMode == mode
     }
 
     var body: some View {
         if isVisible {
-            Menu {
+            IOSStudioSetupChip(
+                eyebrow: "Long-form",
+                value: "Regenerate segment",
+                abbreviation: "RS",
+                leadingSymbol: "square.stack.3d.up",
+                tint: tint,
+                accessibilityID: "iosLongForm_segmentsChip",
+                action: { isChoosingSegment = true }
+            )
+            .disabled(appModel.longForm.isProcessing || ttsEngine.hasActiveGeneration)
+            .confirmationDialog(
+                "Regenerate a segment",
+                isPresented: $isChoosingSegment,
+                titleVisibility: .visible
+            ) {
                 ForEach(appModel.longForm.segments) { segment in
-                    Button {
+                    Button("Segment \(segment.index + 1): \(String(segment.line.prefix(28)))") {
                         appModel.longForm.regenerateSegment(
                             index: segment.index,
                             ttsEngine: ttsEngine,
                             audioPlayer: audioPlayer,
                             studioCoordinator: studioCoordinator
                         )
-                    } label: {
-                        Label(
-                            "Segment \(segment.index + 1): \(String(segment.line.prefix(28)))",
-                            systemImage: "arrow.clockwise"
-                        )
                     }
                     .accessibilityIdentifier("iosLongForm_regenerateSegment_\(segment.index)")
                 }
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "square.stack.3d.up")
-                        .font(.caption2.weight(.semibold))
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text("Long-form")
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(.secondary)
-                        Text("Regenerate segment")
-                            .font(.caption.weight(.semibold))
-                            .lineLimit(1)
-                    }
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 7)
-                .frame(maxWidth: .infinity)
-                .background(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(tint.opacity(0.12))
-                )
-                .foregroundStyle(tint)
+                Button("Cancel", role: .cancel) {}
             }
-            .disabled(appModel.longForm.isProcessing || ttsEngine.hasActiveGeneration)
-            .accessibilityIdentifier("iosLongForm_segmentsChip")
         }
     }
 }

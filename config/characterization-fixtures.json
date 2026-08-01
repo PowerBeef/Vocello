@@ -9,7 +9,11 @@
   "minimumCleanControlRuns": 3,
   "minimumWarmTakesPerPromotedCell": 10,
   "minimumColdTakesPerPromotedCell": 3,
-  "modes": ["custom", "design", "clone"],
+  "modes": [
+    "custom",
+    "design",
+    "clone"
+  ],
   "fixtures": [
     {
       "id": "custom-speed-short-control",
@@ -17,14 +21,17 @@
       "variant": "speed",
       "length": "short",
       "samplingAlgorithmVersion": 2,
-      "chunkFrames": { "first": 7, "later": 7 },
+      "chunkFrames": {
+        "first": 7,
+        "later": 7
+      },
       "promptCharCount": 35,
       "promptDigest": "1693d0601bde462e08fe1019c27cdd34f12c9c4214a37dfad6b09aea33e5f9ea",
       "expectedTokenBudgetClass": "short",
       "longFormManifestSchema": null,
       "representativeWarmWAVDigest": {
-        "macosCLI": "713057a85ae957191d7193a2c3a605063297660e7887584c3a85fb33c14ad3f4",
-        "iosUI": "e67c4d9632068bca5ac468779f2382c6a3f0649f2057d828a7a65ce7fc9f7198"
+        "macosCLI": "a11bfe48391c849c71f5bd21d1aaf3076d21537517a8cc64e225ecc5bc1b538b",
+        "iosUI": "9336eb0fdda4c77c9f19548daf5de3a7ff84cadea27fd16191f4b6a62eb421d4"
       },
       "notes": "BenchMatrixSpec short corpus. Exact prompt text stays out of tracked fixtures; live controls bind promptDigest and representative warm WAV digests."
     },
@@ -34,14 +41,17 @@
       "variant": "speed",
       "length": "short",
       "samplingAlgorithmVersion": 2,
-      "chunkFrames": { "first": 7, "later": 14 },
+      "chunkFrames": {
+        "first": 7,
+        "later": 14
+      },
       "promptCharCount": 35,
       "promptDigest": "1693d0601bde462e08fe1019c27cdd34f12c9c4214a37dfad6b09aea33e5f9ea",
       "expectedTokenBudgetClass": "short",
       "longFormManifestSchema": null,
       "representativeWarmWAVDigest": {
-        "macosCLI": "ead545d706de2618bb40e480ba2b0d45389dec9f8338c5ba2a7c0f7dcc734fb0",
-        "iosUI": "88db1c115caca97703d4def7c872002477925471d6a5bd1a2adc4ba9ca64fb40"
+        "macosCLI": "7b9da9465c2deb7b7cb9ffa82ccb99eee1dae71dca3160f92aba712d379a5caa",
+        "iosUI": "870ae262d6ae5dc206185a9cfced0339ede093431fdc0a72d1e7d4511fe69844"
       },
       "notes": "Same short corpus as Custom with Design chunk frames (7/14)."
     },
@@ -51,14 +61,17 @@
       "variant": "speed",
       "length": "short",
       "samplingAlgorithmVersion": 2,
-      "chunkFrames": { "first": 7, "later": 14 },
+      "chunkFrames": {
+        "first": 7,
+        "later": 14
+      },
       "promptCharCount": 35,
       "promptDigest": "1693d0601bde462e08fe1019c27cdd34f12c9c4214a37dfad6b09aea33e5f9ea",
       "expectedTokenBudgetClass": "short",
       "longFormManifestSchema": null,
       "representativeWarmWAVDigest": {
-        "macosCLI": "5e7b0bfebe6adaa9eb8d8a302f5e0b441d1cfc6bac429e602a29fa49c92681ff",
-        "iosUI": "1582e17c477efa6d1be01a7f02147f8582a22837d455a1b00345e24d0324789c"
+        "macosCLI": "f1fc5620a26bdcd9bb03b5269f553e392b44706091f3d230039ad2a76dbcc493",
+        "iosUI": "8a2baa4ba1bec9f4b7c54d936479d575321db805a1ab0ec9d73d0514ec5b033e"
       },
       "notes": "Same short corpus; conditioning digests come from live prepared voices."
     },
@@ -68,12 +81,15 @@
       "variant": "speed",
       "length": "long",
       "samplingAlgorithmVersion": 2,
-      "chunkFrames": { "first": 7, "later": 7 },
+      "chunkFrames": {
+        "first": 7,
+        "later": 7
+      },
       "promptCharCount": 344,
       "promptDigest": "f1b3eae6b88ec0f01d8499129e8566501d26231e72b469d731af1b917d2d7b10",
       "expectedTokenBudgetClass": "long",
-      "longFormManifestSchema": 3,
-      "notes": "BenchMatrixSpec long corpus identity. Shipping long-form remains manifest-v3 non-streaming until Phase 11; not required for short-cell control close."
+      "longFormManifestSchema": 4,
+      "notes": "BenchMatrixSpec long corpus identity. Long-form ships manifest-v4 sequential streaming on both platforms (2026-07-24); schema updated at the 2026-08-01 rebind."
     }
   ],
   "secretSauceCells": [
@@ -91,8 +107,15 @@
         "maximumTrimLevel",
         "memoryTrimCount"
       ],
-      "failClosed": ["hardTrim", "fullUnload", "criticalPressure", "appMemoryWarning"],
-      "warnAllowed": ["softTrim"],
+      "failClosed": [
+        "hardTrim",
+        "fullUnload",
+        "criticalPressure",
+        "appMemoryWarning"
+      ],
+      "warnAllowed": [
+        "softTrim"
+      ],
       "purpose": "Protect perceived speed + 8 GB headroom before full 29-take matrices."
     },
     {
@@ -109,8 +132,15 @@
         "maximumTrimLevel",
         "memoryTrimCount"
       ],
-      "failClosed": ["hardTrim", "fullUnload", "criticalPressure", "appMemoryWarning"],
-      "warnAllowed": ["softTrim"],
+      "failClosed": [
+        "hardTrim",
+        "fullUnload",
+        "criticalPressure",
+        "appMemoryWarning"
+      ],
+      "warnAllowed": [
+        "softTrim"
+      ],
       "purpose": "Design-path latency/memory cell with later codec frames (7/14)."
     },
     {
@@ -127,8 +157,15 @@
         "maximumTrimLevel",
         "memoryTrimCount"
       ],
-      "failClosed": ["hardTrim", "fullUnload", "criticalPressure", "appMemoryWarning"],
-      "warnAllowed": ["softTrim"],
+      "failClosed": [
+        "hardTrim",
+        "fullUnload",
+        "criticalPressure",
+        "appMemoryWarning"
+      ],
+      "warnAllowed": [
+        "softTrim"
+      ],
       "purpose": "Clone conditioning latency/memory cell before matrix promotion."
     }
   ],
@@ -244,5 +281,12 @@
       "result": "pass"
     }
   ],
-  "liveEvidencePending": []
+  "liveEvidencePending": [],
+  "rebindAt": "2026-08-01",
+  "artifactVersion": "2026.07.26.1",
+  "rebindSources": {
+    "macosCLI": "macos-engine-20260729-005023-933281cb (phase0-cli-control-1)",
+    "iosUI": "ios-xcui-benchmark-20260801-130748-c3630f44 (phase0-ios-control-3, schema v3)"
+  },
+  "rebindNotes": "Representative warm digests rebound to the 2026.07.26.1 artifacts. Mid-battery engine deltas between the macOS/CLI controls (2026-07-29) and the iOS controls (2026-08-01): clone-prime reroute (removes a transient iOS memory spike; strictly better), single-take spoken-text normalization (proven identity on the bench corpus), and delivery-preset text changes (controls carry no delivery cells). Generation semantics, sampling algorithm v2, and seeds are untouched, so cross-platform comparability holds; prime-side timings differ."
 }

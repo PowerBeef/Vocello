@@ -34,7 +34,7 @@ machine-readable status record and wins over any older prose.
 | 8 — Shared component storage | Closed 2026-07-23 with live all-artifact validation on both canonical platforms (exact reuse, single tokenizer inode; `docs/reference/model-delivery.md`). |
 | 9 — Runtime component reuse | Closed 2026-07-26. Speech-tokenizer residency ships on macOS behind host-attested content identity; byte-identical fixed-seed switch A/B, adoption probe 503→0 ms, retained-memory qualification PASS on the 8 GB floor (`mac-memory-qualification-20260726-115343-5a1c8a85`). iOS stays disabled (Jetsam headroom). Off-switch: `QWENVOICE_TOKENIZER_RESIDENCY`. |
 | 10 — Spoken-text planning | Closed 2026-08-01: every take now speaks the conservatively normalized script at the engine entry (prompt assembly, language detection, QC pause budget, and telemetry evidence all see the same spoken text; transformed takes record `spokenTextTransformations` + digest). The fixed bench corpus is normalization-invariant by a standing core test, and the fixed-seed A/B on the medium corpus text was byte-identical across the change. Long-form/batch upstream planning passes through unchanged (idempotent). |
-| 11 — Long-form v4 | Stages A–E shipping on both platforms: planner-owned segmentation with per-segment sub-seeds, sequential streaming execution, bounded assembly, manifest v4, resume, grouped History projects. macOS acceptance 2026-07-23 (`macos-xcui-smoke-20260723-195700-ab46482a`); iPhone acceptance 2026-07-24 (`ios-xcui-smoke-20260724-183626-f9961535`). iOS single-segment regeneration implemented 2026-08-01 (in-session segments menu on the shared replacement lineage; device acceptance pending at the next phone window, when the longFormV4 residual flips); line batch stays removed from iOS by design; legacy XPC `generateBatch` retired 2026-07-24. |
+| 11 — Long-form v4 | Stages A–E shipping on both platforms: planner-owned segmentation with per-segment sub-seeds, sequential streaming execution, bounded assembly, manifest v4, resume, grouped History projects. macOS acceptance 2026-07-23 (`macos-xcui-smoke-20260723-195700-ab46482a`); iPhone acceptance 2026-07-24 (`ios-xcui-smoke-20260724-183626-f9961535`). iOS single-segment regeneration device-accepted 2026-08-01 (smoke run `ios-xcui-smoke-20260801-142416-79615150`: the retained project's segments chip opens a confirmation dialog, segment 1 regenerates with a fresh recorded seed, the joined output reassembles, and History keeps the lineage searchable — longFormV4 residual closed); line batch stays removed from iOS by design; legacy XPC `generateBatch` retired 2026-07-24. |
 | 12 — Bounded analysis and unified quality | Fast-depth registry shipping 2026-07-26 (typed `GenerationQualityReport` + fail-closed `QualityGateRegistry` verdict in telemetry notes on every finalization, live-verified). Same-day additions: the standard/canonical `deepReport` producer, per-take prosody gate verdicts on the bench sidecar (folded into history warnings), typed `languageASR` and `longFormContinuity` gates, and the advisory speaker-similarity dev metric. Composed standard-depth verdicts went live on the delivery bench 2026-08-01 (`bench-quality-composed.json`, proof run `macos-engine-20260801-010135-6607009f`): the sidecar prosody gate folds into `deepReport` with a fast-consistency guard and fail-closed missing analyzers. Canonical depth followed the same day: the promoted delivery-adherence rule v1 (per-preset signed expectations + intensity scaling in prosody profile v2, warn-first) emits a real `.delivery` gate per delivery take, the publisher banks the paired neutral-vs-instructed deltas, and the first canonical proof run (`macos-engine-20260801-024556-e826c4ec`, 18 delivery cells, seed 20260801) composed 3 pass / 15 warning / 0 fail across all seven gates. Open: threshold recalibration from the banked seed matrix; optional MOS-proxy. |
 | 13 — Benchmark/history v3 | Live 2026-07-29: the first schema-v3 records are committed (three clean `phase0-cli-control-*` engine records plus one exploratory run that also exposed and fixed the summarizer's v3 pin). `benchmarks/schema-v3.json` adds the typed quality identity to generation takes (pass/warning only, five fast gates required, machine-code issues); v1/v2 records stay valid immutable history; the publisher stamps v3 only when every take carries the identity. The UI benchmark checkers folded the same identity 2026-08-01: ui-generation records now publish v3 (first: the focused `v3-fold-proof` record `macos-xcui-benchmark-20260801-003208-403989cf`); the canonical iOS matrix publishes v3 at the next phone window. |
 | 14 — Organization and retirement | Closed 2026-07-23 (14a + 14b): compatibility SPI retired, actor-owned loading/metadata/priming/clone artifacts, clone conditioning epoch-bound end to end. |
@@ -72,18 +72,19 @@ The working order now lives in the adopted
 residuals plus the study's Gate 0 micro-benchmark, Tier 2 phone window, Tier 3 gated
 performance block after the fixture rebind, Tier 4 carryover). Immediate specifics:
 
-1. **Finish the deferred battery remainder on the paired iPhone** (phone unlocked,
-   Auto-Lock Never): re-run iOS control lane 3 (`phase0-ios-control-3`; the 2026-07-31
-   attempt was cleanly aborted mid-run for the release window — no publication), the
-   canonical 29-take iOS matrix, both control evaluators
-   (`check_characterization_controls.py`, `check_secret_sauce_cells.py`), memory
-   re-qualification on both platforms against the new artifacts, then rebind
-   `config/characterization-fixtures.json` to the new record identities in the same change
-   as this file's next sync. Caveat for evaluators: the banked macOS/CLI controls ran
-   before the clone-prime route change; generation semantics, sampling, and seeds are
-   untouched, so cross-platform comparability holds, but prime-side timings differ.
-   Cleanup afterwards: `~/Desktop/vocello-clone-fixture/` and the two staged reference
-   files in the phone's app Documents.
+1. **Battery remainder completed 2026-08-01** (Tier-2 phone window): control 3 re-ran
+   clean (`ios-xcui-benchmark-20260801-130748-c3630f44`, first schema-v3 iOS UI record),
+   the canonical 29-take matrix published as the first canonical iOS v3 record
+   (`ios-xcui-benchmark-20260801-132415-abbec96b`), both control evaluators PASS over
+   the current-artifact trio, and `config/characterization-fixtures.json` is rebound to
+   the 2026.07.26.1 identities with the mid-battery caveat recorded in its
+   `rebindNotes`. Memory qualification on both platforms was already banked 2026-07-29
+   against these artifacts (the only later memory-relevant change — the clone-prime
+   reroute — strictly removes a transient spike, so the banked evidence stays
+   conservative-valid; the task checkpoint is authoritative over the roadmap's
+   redundant re-qual listing). Every take carries only the familiar
+   `memory.pressure.soft_trim` advisory plus one warn-level design-short dropout,
+   consistent with the R2a boundary finding.
 2. **v2.3.0 released 2026-07-31** (maintainer call): the combined 2.2-promotion + Stage 1
    story is the headline (up to ~10% faster warm, ~280 MB less memory, ~1 GB smaller Speed
    footprint); notes in [`docs/releases/v2.3.0.md`](releases/v2.3.0.md) with the standing

@@ -889,10 +889,24 @@ actor NativeEngineRuntime {
             for: request.mode,
             effectiveStreamingInterval: effectiveInterval
         )
+        // Phase 10 close-out: every take speaks the same conservatively
+        // normalized text long-form segments already receive. The planner is
+        // deterministic and idempotent, so text normalized upstream (long-form
+        // segments, batch lines) passes through unchanged, and the fixed bench
+        // corpus is normalization-invariant by contract (core-tested).
+        let spokenText: String
+        do {
+            spokenText = try SpokenTextPlanner.plan(originalText: request.text).spokenText
+        } catch {
+            throw MLXTTSEngineError.unsupportedRequest(
+                "Spoken-text planning rejected the script: \(error)"
+            )
+        }
         let prompt = GenerationSemantics.qwen3PromptAssembly(
             for: request,
             capabilities: capabilities,
-            resolvedCloneTranscript: cloneConditioning?.resolvedTranscript
+            resolvedCloneTranscript: cloneConditioning?.resolvedTranscript,
+            spokenText: spokenText
         )
         let input: VocelloQwen3SynthesisInput
         switch request.payload {
@@ -913,7 +927,7 @@ actor NativeEngineRuntime {
         }
         return VocelloQwen3SynthesisRequest(
             generationID: generationID,
-            text: request.text,
+            text: spokenText,
             language: prompt.language,
             input: input,
             sampling: samplingConfiguration,

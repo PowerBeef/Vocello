@@ -530,11 +530,16 @@ public enum GenerationSemantics {
     public static func qwen3PromptAssembly(
         for request: GenerationRequest,
         capabilities: Qwen3TTSModelCapabilities,
-        resolvedCloneTranscript: String? = nil
+        resolvedCloneTranscript: String? = nil,
+        spokenText: String? = nil
     ) -> Qwen3PromptAssembly {
+        // Phase 10: when the engine speaks a normalized script, the prompt and
+        // the language detection must see the same spoken text, never a mix.
+        let effectiveText = spokenText ?? request.text
         let language = qwenLanguageHint(
             for: request,
-            resolvedCloneTranscript: resolvedCloneTranscript
+            resolvedCloneTranscript: resolvedCloneTranscript,
+            textOverride: spokenText
         )
         switch request.payload {
         case .custom(let speakerID, let deliveryStyle):
@@ -550,7 +555,7 @@ public enum GenerationSemantics {
                 : nil
             return Qwen3PromptAssembly(
                 mode: .customVoice,
-                text: request.text,
+                text: effectiveText,
                 language: language,
                 instruct: instruction,
                 refText: nil,
@@ -571,7 +576,7 @@ public enum GenerationSemantics {
             )
             return Qwen3PromptAssembly(
                 mode: .voiceDesign,
-                text: request.text,
+                text: effectiveText,
                 language: language,
                 instruct: instruction,
                 refText: nil,
@@ -585,7 +590,7 @@ public enum GenerationSemantics {
             let trimmedRefText = (rawRefText?.isEmpty == false) ? rawRefText : nil
             return Qwen3PromptAssembly(
                 mode: .voiceClone,
-                text: request.text,
+                text: effectiveText,
                 language: language,
                 instruct: nil,
                 refText: trimmedRefText,
@@ -650,8 +655,10 @@ public enum GenerationSemantics {
 
     public static func qwenLanguageHint(
         for request: GenerationRequest,
-        resolvedCloneTranscript: String? = nil
+        resolvedCloneTranscript: String? = nil,
+        textOverride: String? = nil
     ) -> String {
+        let effectiveText = textOverride ?? request.text
         if let languageHint = request.languageHint {
             let normalized = Qwen3SupportedLanguage.normalized(languageHint)
             if normalized != .auto {
@@ -660,15 +667,15 @@ public enum GenerationSemantics {
         }
         switch request.payload {
         case .custom:
-            return detectedQwenLanguage(in: request.text)?.rawValue ?? canonicalCustomWarmLanguage
+            return detectedQwenLanguage(in: effectiveText)?.rawValue ?? canonicalCustomWarmLanguage
         case .design:
-            return detectedQwenLanguage(in: request.text)?.rawValue ?? Qwen3SupportedLanguage.auto.rawValue
+            return detectedQwenLanguage(in: effectiveText)?.rawValue ?? Qwen3SupportedLanguage.auto.rawValue
         case .clone:
             if let transcript = resolvedCloneTranscript,
                let detectedLanguage = detectedQwenLanguage(in: transcript) {
                 return detectedLanguage.rawValue
             }
-            return detectedQwenLanguage(in: request.text)?.rawValue ?? Qwen3SupportedLanguage.auto.rawValue
+            return detectedQwenLanguage(in: effectiveText)?.rawValue ?? Qwen3SupportedLanguage.auto.rawValue
         }
     }
 

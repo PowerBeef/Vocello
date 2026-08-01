@@ -1477,7 +1477,10 @@ struct StreamingExecutionContext: Sendable {
             finalAudioQC = try Self.makePersistedWAVAudioQCReport(
                 at: stagingURL,
                 preWriteMetrics: scratchBuffer.limiterMetrics,
-                expectedPauseCount: Self.expectedPauseCount(in: request.text),
+                expectedPauseCount: Self.expectedPauseCount(
+                    in: (try? SpokenTextPlanner.plan(originalText: request.text).spokenText)
+                        ?? request.text
+                ),
                 chunkQC: chunkQCActive && !chunkQCReports.isEmpty ? chunkQCReports : nil
             )
             await telemetrySampler?.captureBoundary("after_audio_qc")
@@ -1790,6 +1793,9 @@ struct StreamingExecutionContext: Sendable {
         // Stamp the resolved device-memory tier so each row self-identifies which
         // policy it ran under — confirms a forced-tier benchmark took effect.
         // Reuses the free-form notes field; a caller-supplied key wins on collision.
+        // Phase 10: the same deterministic plan the engine spoke from; nil only
+        // for scripts the planner rejects (which never reach a success row).
+        let spokenTextPlan = try? SpokenTextPlanner.plan(originalText: request.text)
         var tierNotes = [
             "deviceClass": NativeMemoryPolicyResolver.deviceClass().rawValue,
             // Whether the tier was forced (QWENVOICE_FORCE_MEMORY_CLASS) vs the
@@ -1809,9 +1815,21 @@ struct StreamingExecutionContext: Sendable {
             // Latin-script NLLanguageRecognizer path) and gives delivery
             // benchmarks the language variable. Clone rows may differ when a
             // resolved transcript later refines the detection.
-            "languageHint": GenerationSemantics.qwenLanguageHint(for: request),
+            "languageHint": GenerationSemantics.qwenLanguageHint(
+                for: request,
+                textOverride: spokenTextPlan?.spokenText
+            ),
         ]
         tierNotes.merge(Self.samplingTelemetryNotes(for: request)) { current, _ in current }
+        // Phase 10: when the spoken script differs from the typed script, the
+        // row records the transformation count and the spoken-text digest so
+        // the evidence names exactly what was synthesized. Deterministic
+        // recomputation of the same plan the engine used; invariant scripts
+        // (including the entire bench corpus) add nothing.
+        if let spokenTextPlan, spokenTextPlan.transformationCount > 0 {
+            tierNotes["spokenTextTransformations"] = String(spokenTextPlan.transformationCount)
+            tierNotes["spokenTextDigest"] = spokenTextPlan.spokenTextDigest
+        }
         if let algorithmVersion = stringFlags["sampling_algorithm_version"] {
             tierNotes["samplingAlgorithmVersion"] = algorithmVersion
         }

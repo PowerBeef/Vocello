@@ -4,7 +4,7 @@
 > execute models, devices, UI tests, signing, or network checks.
 
 - Current source identity and dirty state: local JSON report only (kept out of the tracked snapshot to avoid self-referential drift)
-- Swift tests: 444 cases in 63 files
+- Swift tests: 442 cases in 62 files
 - Python tests: 718 cases in 58 files
 - Required-step assurance: 59 steps across 13 workflows, all covered by forced-failure fixtures
 - Unsafe-concurrency annotations: 47 (47 registered with owner and invariant; contract complete)
@@ -21,7 +21,7 @@
 | Domain | Owner | Production files | Direct test files / cases | Hardware evidence |
 | --- | --- | ---: | ---: | --- |
 | generation-terminal | backend | 4 | 2 / 16 | macos: fresh, ios: fresh |
-| clone-conditioning | backend | 32 | 2 / 32 | macos: stale, ios: stale |
+| clone-conditioning | backend | 31 | 2 / 32 | macos: stale, ios: stale |
 | event-delivery | backend | 3 | 2 / 10 | macos: stale, ios: fresh |
 | memory-policy | backend-platform | 6 | 2 / 25 | macos: fresh, ios: fresh |
 | model-delivery | backend-platform | 17 | 3 / 37 | macos: stale, ios: fresh |

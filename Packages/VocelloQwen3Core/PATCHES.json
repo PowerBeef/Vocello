@@ -391,29 +391,6 @@
       "upstreamDisposition": "local-only",
       "upstreamEquivalentCommit": null,
       "removalCriteria": "Remove only if the streaming loop stops replaying a fixed per-frame code-predictor position sequence (which the pass-indexed traces require) or an upstream compiled equivalent ships."
-    },
-    {
-      "id": "DECODE-002",
-      "title": "Static-shape compiled talker decode (branch experiment, null result)",
-      "category": "decoding",
-      "state": "diagnostic",
-      "files": [
-        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
-        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSTalkerCompiled.swift"
-      ],
-      "tests": [
-        "Tests/Qwen3RuntimeTests/Qwen3TalkerCompiledTests.swift"
-      ],
-      "documentation": [
-        "PERFORMANCE.md"
-      ],
-      "evidenceClass": "diagnostic",
-      "benchmarkRecordIDs": [],
-      "benchmarkEvidenceStatus": "diagnostic",
-      "benchmarkEvidenceReason": "Branch-only P1b experiment: eager-equivalent (258-step test incl. block re-trace) and byte-identical on the bf16 model, but decode-wall RTF flat vs P3 \u2014 the talker graph-build savings cancel against the padded-attention tax. Kept for the sanctioned 0.31.x pin-bump re-test; never merged to main.",
-      "upstreamDisposition": "local-only",
-      "upstreamEquivalentCommit": null,
-      "removalCriteria": "Delete with the branch if the 0.31.x pin-bump re-test supersedes it."
     }
   ]
 }

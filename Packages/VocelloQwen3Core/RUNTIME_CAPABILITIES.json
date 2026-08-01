@@ -172,7 +172,6 @@
         "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3StreamingMemoryTuning.swift",
         "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
         "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSCodePredictorCompiled.swift",
-        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSTalkerCompiled.swift",
         "Sources/MLXAudioTTS/RuntimeDebugGate.swift"
       ],
       "testPatterns": [
@@ -196,8 +195,7 @@
       "upstreamDeltaIDs": [
         "CONC-001",
         "STREAM-001",
-        "DECODE-001",
-        "DECODE-002"
+        "DECODE-001"
       ]
     },
     {

@@ -89,7 +89,19 @@ performance block after the fixture rebind, Tier 4 carryover). Immediate specifi
    footprint); notes in [`docs/releases/v2.3.0.md`](releases/v2.3.0.md) with the standing
    smoke-lane ledger. iOS build 22 ships the clone-prime and Wi-Fi-pin fixes that build 21
    carried as exposures.
-3. **Tier 1 is complete (2026-08-01):** the UI-checker v3 fold, quality-report
+3. **Delivery/clone fidelity verification program complete (2026-08-01):** the
+   maintainer's preset-adherence and clone-tone complaints are now measured
+   rather than perceived — see
+   [`docs/reference/delivery-fidelity-report-2026-08-01.md`](reference/delivery-fidelity-report-2026-08-01.md)
+   and OPTIMIZATION.md §P. The promoted delivery gate is calibrated from a
+   banked 7-seed × 18-cell paired matrix (canonical composed depth live on the
+   delivery bench), neutral cross-seed wander is quantified as by-construction
+   (2.7 st / 2.0 Hz at shipping defaults; cohort bounds sit above baseline),
+   clone identity measures strong (ECAPA 0.81–0.87 vs 0.10–0.39 negative
+   controls), and the SER advisory + clone-fidelity lanes are standing tools.
+   Product follow-ups recorded: dramatic/surprised instruction rewrites;
+   optional engine-level neutral stabilization experiment.
+4. **Tier 1 is complete (2026-08-01):** the UI-checker v3 fold, quality-report
    consolidation (composed standard verdicts on delivery benches), single-take
    normalization, and the iOS segment-regeneration implementation half all landed with
    evidence; Gate 0 ran and returned **no-go** (`benchmarks/OPTIMIZATION.md` §O — MPP

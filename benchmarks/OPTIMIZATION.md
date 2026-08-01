@@ -1034,6 +1034,34 @@ Gate 2 prototype from the 2026-08 roadmap's Tier 3.
   inherit; launch elimination remains P1b (static-shape compile) territory inside MLX
   itself.
 
+## P — Delivery-fidelity and clone-fidelity diagnosis (2026-08-01)
+
+Full findings and method: `docs/reference/delivery-fidelity-report-2026-08-01.md`.
+Headlines from the autonomous harness (7-seed × 18-cell paired preset matrix
+banked as `delivery-cal-s*` records; three 8-seed neutral cohorts; 6-take clone
+lane with negative controls):
+
+- Presets steer prosody with preset/intensity-dependent reliability: angry
+  (pitch +1.00 win-rate), sad/happy/fearful/whisper strong; **dramatic and
+  surprised barely move prosody** (0.64) and are the product-side fix
+  candidates. Two seeded gate assumptions were corrected by data (angry raises
+  pitch; fearful reads low-arousal) and the promoted delivery gate is now
+  calibrated from the banked distributions.
+- **Neutral cross-seed wander is real and by-construction** (no instruct turn
+  is sent): 2.70 st pitch / 1.97 Hz rate spread across 8 seeds at shipping
+  defaults; `consistent` variation does not help across seeds (3.99 st) and an
+  explicit steadying instruction helps pitch (~21%) but not rate. Engine-level
+  stabilization would be its own experiment.
+- Reproducible defect pinned: seed 20260802 × `sad.strong` × medium corpus
+  fails Fast QC with `dropout:excess2`, identically on repeat.
+- **Clone identity is strong**: ECAPA 0.814–0.871 vs 0.103/0.390 negative
+  controls; 5/6 takes prosody-fidelity clean (one expressiveness overshoot);
+  5/6 match the reference's SER emotion. The clone-tone complaint is
+  occasional expressiveness drift, not identity loss.
+- Advisory SER column pinned (Apache-2.0, revision-locked, fail-closed
+  loading after the first candidate checkpoint proved to initialize a random
+  classifier head); peak RSS 2.4 GB inside the 8 GB envelope, sequential-only.
+
 ## Status
 
 The optimization program tracked in this document is wrapped up. The §H P0–P6 work has been

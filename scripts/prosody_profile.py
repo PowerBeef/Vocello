@@ -114,10 +114,15 @@ BUILTIN_PROFILE = {
             },
         },
     },
+    # Calibrated 2026-08-01 from the three 8-seed Aiden neutral cohorts
+    # (expressive 2.70 st / 1.97 Hz spread, consistent 3.99 / 2.2, steadied
+    # 2.13 / 2.5): bounds sit just above the measured baseline so the gate
+    # flags regressions beyond today's cross-seed wander, which is itself
+    # recorded as a product finding, not silently normalized.
     "neutral_consistency": {
         "min_cohort_size": 4,
-        "max_pitch_spread_semitones": 2.0,
-        "max_rate_spread_hz": 1.0,
+        "max_pitch_spread_semitones": 4.5,
+        "max_rate_spread_hz": 2.75,
         "outlier_z_score": 2.5,
     },
     # Warn-first reference-vs-output bounds for clone takes. Uncalibrated

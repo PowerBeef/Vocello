@@ -17,11 +17,23 @@ cross-project comparisons.
 |---|---|---|---|---|---|---:|---|---|---|---|
 | 2026-07-12 | [`ios-engine-20260712-204019-1f40cea8`](runs/engine-generation/ios-engine-20260712-204019-1f40cea8.json) | focused | exploratory | passed | memory-contract-incomplete | 1 | `1ef1669326b5` dirty | `excluded` | baseline | telemetry-v7-headless-final |
 
+## engine-generation / ios / iphone-17-pro / config `4be5479ddc2d`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---|---|---|---|
+| 2026-08-01 | [`ios-engine-20260801-144252-d6160fd7`](runs/engine-generation/ios-engine-20260801-144252-d6160fd7.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 1 | `1f9ebeccef8b` | `excluded` | baseline | i15p-floor-custom |
+
 ## engine-generation / ios / iphone-17-pro / config `528ba2c2cfe1`
 
 | completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
 |---|---|---|---|---|---|---:|---|---|---|---|
 | 2026-07-24 | [`ios-engine-20260724-060000-1cc8ef23`](runs/engine-generation/ios-engine-20260724-060000-1cc8ef23.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 1 | `f98537cd7115` dirty | `excluded` | baseline | limit-900-proof |
+
+## engine-generation / ios / iphone-17-pro / config `a6ae7ce54378`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---|---|---|---|
+| 2026-08-01 | [`ios-engine-20260801-144748-9d129b7c`](runs/engine-generation/ios-engine-20260801-144748-9d129b7c.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 1 | `1f9ebeccef8b` | `excluded` | baseline | i15p-floor-design2 |
 
 ## engine-generation / ios / iphone-17-pro / config `f1c8dc2684fb`
 

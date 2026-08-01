@@ -84,7 +84,14 @@ performance block after the fixture rebind, Tier 4 carryover). Immediate specifi
    conservative-valid; the task checkpoint is authoritative over the roadmap's
    redundant re-qual listing). Every take carries only the familiar
    `memory.pressure.soft_trim` advisory plus one warn-level design-short dropout,
-   consistent with the R2a boundary finding.
+   consistent with the R2a boundary finding. Tier-2 riders also closed: the
+   iPhone-15-Pro floor-profile diagnostic (custom 2380 MB / design 2878 MB peak
+   against the clamped 5000 MB budget — over 2.1 GB headroom, healthy pressure;
+   exploratory-only by policy) and the iOS studio marketing recapture (README +
+   website now show the completed-player state via the new opt-in
+   `VocelloiOSMarketingCaptureUITests`). Desktop fixture staging is cleaned up;
+   the two 656 KB staged reference files in the phone's app Documents await a
+   quick manual Files-app deletion (devicectl has no remove operation).
 2. **v2.3.0 released 2026-07-31** (maintainer call): the combined 2.2-promotion + Stage 1
    story is the headline (up to ~10% faster warm, ~280 MB less memory, ~1 GB smaller Speed
    footprint); notes in [`docs/releases/v2.3.0.md`](releases/v2.3.0.md) with the standing

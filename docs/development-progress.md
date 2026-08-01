@@ -118,9 +118,19 @@ performance block after the fixture rebind, Tier 4 carryover). Immediate specifi
    evidence; Gate 0 ran and returned **no-go** (`benchmarks/OPTIMIZATION.md` §O — MPP
    never beats MLX on the floor and batch-1 is inexpressible at parallel scope), which
    withdraws the conditional fused-kernel Gate 2 from Tier 3. The optional delivery-chip
-   audio rider was skipped. What remains: the Tier-2 phone window (battery remainder +
-   riders, including 1.5's on-device acceptance), then the gated performance block, now
-   pin bump → P1b only, once the fixture rebind gives current baselines.
+   audio rider was skipped.
+5. **Tier 3 is complete (2026-08-01):** the sanctioned pin bump to
+   mlx-swift 0.31.6 + mlx-swift-lm 3.31.4 passed its same-day A/B (warm RTF
+   noise-band, QC identical, sampling byte-stable; swift-transformers 1.1.9
+   became a direct dependency after the lm 2→3 Hub/Tokenizers
+   externalization) and is the kept state; the codec-bf16 revival probe came
+   back negative (conv µ-throughput unchanged across pins — §N 2.3 stays
+   parked with only the device-measurement path open); P1b re-tested null
+   (−0.5…−2.1%, keep-gate +≥10%) and remains a preserved do-NOT; F7 was not
+   triggered, so the 26.0 floors stand. Full record:
+   `benchmarks/OPTIMIZATION.md` §Q. With Gate 2 withdrawn by Gate 0, the
+   2026-08 performance block is closed; Tier 4 (long-form text-context
+   carryover, design pass first) is the next open roadmap work.
 
 ## Staged roadmap state
 

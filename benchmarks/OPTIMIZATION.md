@@ -1062,6 +1062,56 @@ lane with negative controls):
   loading after the first candidate checkpoint proved to initialize a random
   classifier head); peak RSS 2.4 GB inside the 8 GB envelope, sequential-only.
 
+## Q — Sanctioned pin bump: mlx-swift 0.31.6 + mlx-swift-lm 3.31.4 (2026-08-01)
+
+The roadmap Tier-3.1 experiment on `chore/pin-bump-mlx-0.31.6`. mlx-swift-lm's
+2→3 major externalized the Hub/Tokenizers implementations (swift-transformers
+left its graph), so the runtime now pins swift-transformers 1.1.9 — the exact
+version the 2.30.6 graph resolved — directly, keeping tokenization
+byte-comparable across the A/B; `Tokenizer`/`TokenizerError` are re-pinned to
+the Tokenizers module by module-scope typealiases against MLXLMCommon 3.x's
+new same-named protocols. mlx-swift 0.31.x's CudaBuild build-tool plugin
+cannot receive interactive fingerprint approval headlessly; `xcb_run` now
+passes `-skipPackagePluginValidation` unconditionally (justification in
+`scripts/lib/build_cache.sh` — exact-version pins and lockstep-checked
+resolved files carry supply-chain identity; the plugin is inert on Darwin).
+F7 was **not** triggered: 0.31.6 vendors mlx core 0.31.1 (< 0.32), so the
+macOS/iOS 26.0 floors stand.
+
+- **Keep verdict: PASS (same-day A/B at seed 19790615, canonical M2 floor).**
+  58-take full matrix under new pins vs a 20-take 0.30.6 control rebuilt the
+  same afternoon: warm RTF deltas +0.6…+2.0% (noise band); QC verdict
+  distributions identical — including the deterministic `design/speed/long`
+  warn (dropout + near_silent, all three reps, both pin sets: a property of
+  that prompt × seed, not a regression); clone audio durations byte-equal
+  across pins (identical token counts ⇒ the request-local sampling path is
+  behaviorally stable). The earlier ±20–46% swings vs
+  `benchmarks/baselines/full-matrix-speed.json` were staleness of that
+  baseline, not the pins. Control run published as clean-source 0.30.6 record
+  `macos-engine-20260801-155513-991ccaf6` (exploratory: stash-dirty tree).
+- **2.3 codec-bf16 revival probe: negative, with a mechanism correction.** A
+  scratch conv-stack probe at the codec decoder's exact geometry (initial
+  1024→1536 k7, convT [8,5,4,3] k=2r, k7 residuals, final →1; batch 1;
+  L0 ∈ {7, 13, 63}) measured fp32/f16/bf16 under both pins with era-matched
+  metallibs: half-precision conv is *faster* than fp32 on **both** 0.30.6 and
+  0.31.6 (f16 −14…−26%, bf16 −4…−17%), and the two pins are within ~1% of
+  each other. The pin bump changes nothing at the conv level, and §N 2.3's
+  "half-precision conv throughput" attribution does not reproduce in
+  isolation — if 2.3 is ever revived, the ~4–5% end-to-end regression must be
+  sought elsewhere in the bf16 decode path (dtype boundaries, snake
+  activations, or the decoder transformer). 2.3 stays parked; the remaining
+  revival path is the iPhone 17 Pro device measurement.
+- **P1b re-test (DECODE-002): null again on 0.31.6.** The preserved
+  `feat/p1b-static-talker-compile` experiment cherry-picked onto the new pins:
+  the 258-step eager-equivalence test passes unchanged, and warm decode RTF
+  improves only −0.5…−2.1% across custom/design × short/medium/long
+  (0.30.6 result: ±1%/−2%). Direction is mildly positive but far from the
+  pre-registered +≥10% keep-gate; the padded-attention tax still cancels the
+  graph-build savings. Reverted from the pin-bump branch; the P1b branch
+  stays preserved for a future pin generation. Its bench run
+  (`macos-engine-20260801-161901`, local-only) was removed from the registry
+  because its source commit is the reverted experiment.
+
 ## Status
 
 The optimization program tracked in this document is wrapped up. The §H P0–P6 work has been

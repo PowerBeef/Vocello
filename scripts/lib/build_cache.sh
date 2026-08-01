@@ -551,19 +551,18 @@ warn_if_storage_bloated() {
 # Run xcodebuild, piping output through xcbeautify when it's on PATH and
 # stdout is a terminal. Preserves xcodebuild's exit code in both cases.
 #
-# QVOICE_XCODE_SKIP_PLUGIN_VALIDATION=1 adds -skipPackagePluginValidation for
-# the mlx-swift >=0.31 pin-bump experiment: that release ships a CudaBuild
-# build-tool plugin whose fingerprint Xcode cannot approve headlessly. The
-# dependency content itself stays exact-version pinned by resolution; a keep
-# decision must replace this opt-in with reviewed fingerprint handling before
-# the flag may reach ordinary CI or release lanes.
+# -skipPackagePluginValidation is passed unconditionally (reviewed with the
+# mlx-swift 0.31.6 keep decision): mlx-swift >=0.31 ships a CudaBuild
+# build-tool plugin whose interactive Xcode fingerprint approval cannot happen
+# on headless invocations, and the plugin is inert on Darwin. Supply-chain
+# identity does not rest on that fingerprint here: every package is
+# exact-version pinned with lockstep-checked resolved files, and external
+# Actions/tools use SHA pins per config/toolchain.json. Revisit if a pinned
+# dependency ever ships a plugin that must execute on Darwin.
 xcb_run() {
     acquire_package_store_lock "$QVOICE_XCODE_SOURCE_PACKAGES" || return 1
     local status=0
-    local -a extra_args=()
-    if [[ "${QVOICE_XCODE_SKIP_PLUGIN_VALIDATION:-0}" == "1" ]]; then
-        extra_args+=(-skipPackagePluginValidation)
-    fi
+    local -a extra_args=(-skipPackagePluginValidation)
     if command -v xcbeautify >/dev/null 2>&1 && [ -t 1 ]; then
         set -o pipefail
         xcodebuild "$@" "${extra_args[@]}" | xcbeautify --renderer terminal || status=${PIPESTATUS[0]}

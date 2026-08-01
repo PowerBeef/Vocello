@@ -60,23 +60,24 @@ Each item lands with its evidence, contract-token flip, and narrative sync (prog
 **Hard precondition: Tier 2's fixture rebind is complete**, so every comparison runs
 against current-artifact baselines.
 
-1. **Pin bump experiment** (the contract invariant's only sanctioned pin route;
-   throwaway branch): newest lockstep mlx-swift / mlx-swift-lm pair confirmed at bump
-   time (0.31.6-era; the old 0.31.3 target is stale). Bump all pin sites →
-   `./scripts/regenerate_project.sh` → both foundation compiles →
-   `attentionWithCacheUpdate` routing re-validation → full bench matrix + fixed-seed QC
-   vs the rebound baselines. Riders: (a) re-test the preserved
-   `feat/p1b-static-talker-compile` branch under the new pins; (b) parked 2.3 codec-bf16
-   revival check per its recorded path; (c) **OS-floor trigger check (F7)**: inspect the
-   vendored core for the 0.32.0 NAX deployment-target-26.2 requirement — if present, the
-   keep decision bundles the 26.2 floor raise per policy (verify against the actual
-   vendored core; never assume). Keep only with unchanged RTF/quality/QC; otherwise
-   record the blocker and revert. The 0.31 quantization-API change touches the 4/8-bit
-   load path.
-2. **P1b static-shape talker compile** on the surviving pins, per the §M P3 per-pass
-   keying pattern. Pre-registered keep-gate **+≥10% warm RTF on the M2 floor**; §K
-   12-seed soak; byte-identity verified, not assumed. Keep or record the do-NOT with
-   numbers.
+1. **Pin bump experiment — done 2026-08-01: KEEP (0.31.6 + 3.31.4).** Same-day A/B at
+   the canonical seed on the M2 floor: warm RTF within +0.6…+2.0% (noise), QC verdict
+   distributions identical, clone durations byte-equal (sampling stable). The lm 2→3
+   major externalized Hub/Tokenizers — swift-transformers 1.1.9 (the exact 2.30.6-era
+   resolution) is now a direct dependency; CudaBuild plugin fingerprint validation is
+   skipped unconditionally with reviewed justification in `scripts/lib/build_cache.sh`.
+   Riders: (a) P1b re-test → item 2; (b) codec-bf16 revival probe **negative** — conv
+   µ-throughput identical across pins and half-precision already beat fp32 on 0.30.6,
+   so §N 2.3's conv attribution does not reproduce in isolation (2.3 stays parked;
+   iPhone 17 Pro measurement is the remaining path); (c) **F7 not triggered** — 0.31.6
+   vendors mlx core 0.31.1 (< 0.32), floors stay 26.0. Full record:
+   `benchmarks/OPTIMIZATION.md` §Q.
+2. **P1b static-shape talker compile — done 2026-08-01: null again on 0.31.6 (do-NOT).**
+   Cherry-picked onto the new pins: 258-step eager equivalence passes; warm decode RTF
+   −0.5…−2.1% vs the same-pin eager path — far from the pre-registered +≥10% keep-gate,
+   so no 12-seed soak was spent. Reverted from the pin-bump branch; the preserved
+   `feat/p1b-static-talker-compile` branch remains for a future pin generation
+   (DECODE-002 updated in `benchmarks/OPTIMIZATION.md` §Q).
 3. **Gate 2 — Candidate A fused code-predictor kernel: WITHDRAWN (2026-08-01).** Gate 0
    returned no-go (`benchmarks/OPTIMIZATION.md` §O): MPP offers no building-block
    advantage on the floor, so the fused-kernel bet fails its first hard precondition.

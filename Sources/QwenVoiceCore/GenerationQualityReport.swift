@@ -44,6 +44,8 @@ public enum GenerationQualityMeasurementKey: String, Codable, Hashable, Sendable
     case pitchRangeSemitones = "pitch_range_semitones"
     case boundaryDiscontinuity = "boundary_discontinuity"
     case analyzerPeakWorkingSetBytes = "analyzer_peak_working_set_bytes"
+    case deliveryPitchShiftSemitones = "delivery_pitch_shift_semitones"
+    case deliveryArousalScore = "delivery_arousal_score"
 }
 
 public struct GenerationQualityMeasurement: Codable, Hashable, Sendable {

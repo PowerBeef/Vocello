@@ -897,6 +897,19 @@ def fold_delivery_prosody(
         for source, target in mapping.items():
             if (value := finite_number(metrics.get(source))) is not None:
                 tracked_take["metrics"][target] = value
+        # Paired neutral-vs-instructed deltas: the calibration signal for the
+        # per-preset delivery expectations. Banked so committed records grow
+        # fittable distributions instead of prose summaries.
+        paired_mapping = {
+            "dF0Std": "deliveryDF0StdHz",
+            "dRateCV": "deliveryDRateCV",
+            "dPauseRatio": "deliveryDPauseRatio",
+            "dRoughness": "deliveryDRoughness",
+            "prosodyEffect": "deliveryProsodyEffect",
+        }
+        for source, target in paired_mapping.items():
+            if (value := finite_number(matches[0].get(source))) is not None:
+                tracked_take["metrics"][target] = value
         gate = matches[0].get("qualityGate")
         if not isinstance(gate, dict) or gate.get("passed") not in (True, False) \
                 or not isinstance(gate.get("flags"), list):
@@ -912,6 +925,35 @@ def fold_delivery_prosody(
             tracked_take["warnings"] = sorted(
                 set(tracked_take.get("warnings", []))
                 | {f"prosody_gate:{flag}" for flag in gate_flags}
+            )
+            tracked_take["status"] = "passedWithWarnings"
+        delivery_gate = matches[0].get("deliveryGate")
+        if not isinstance(delivery_gate, dict) \
+                or delivery_gate.get("passed") not in (True, False) \
+                or not isinstance(delivery_gate.get("flags"), list):
+            raise PublicationError(
+                f"delivery take {tracked_take['generationID']} lacks a delivery adherence verdict"
+            )
+        delivery_flags = [str(flag) for flag in delivery_gate["flags"]]
+        failure_flags = {
+            "analysis_failed", "metrics_incomplete", "expectation_missing", "cohort_too_small",
+        }
+        if failure_flags & set(delivery_flags):
+            raise PublicationError(
+                f"delivery take {tracked_take['generationID']} delivery gate analysis is incomplete"
+            )
+        gate_metrics = delivery_gate.get("metrics")
+        if isinstance(gate_metrics, dict):
+            for source, target in (
+                ("pitch_shift_semitones", "deliveryPitchShiftSemitones"),
+                ("arousal_score", "deliveryArousalScore"),
+            ):
+                if (value := finite_number(gate_metrics.get(source))) is not None:
+                    tracked_take["metrics"][target] = value
+        if delivery_flags:
+            tracked_take["warnings"] = sorted(
+                set(tracked_take.get("warnings", []))
+                | {f"delivery_gate:{flag}" for flag in delivery_flags}
             )
             tracked_take["status"] = "passedWithWarnings"
 

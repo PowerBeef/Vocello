@@ -346,6 +346,9 @@ METRIC_KEYS = {
     "rushedSyllableRateThresholdHz", "rushedMaximumPauseRatio",
     "flatEnvelopeRoughnessThreshold", "flatRateCVThreshold",
     "maximumPauseThresholdSeconds", "maximumPauseRatioThreshold",
+    "deliveryDF0StdHz", "deliveryDRateCV", "deliveryDPauseRatio",
+    "deliveryDRoughness", "deliveryProsodyEffect",
+    "deliveryPitchShiftSemitones", "deliveryArousalScore",
 }
 MEMORY_REQUIRED_METRICS = {
     "residentStartMB", "residentEndMB", "residentDeltaMB", "peakResidentMB",

@@ -197,8 +197,10 @@ stays <55%, keep attacking launch count before anything else.
 > rationale: composed standard/canonical report emission at a lane call site (all
 > per-gate evidence already lands typed; the aggregate waits for a consumer) and the
 > optional MOS-proxy advisory column. **Update 2026-08-01:** composed standard-depth
-> emission landed on the delivery bench (`bench-quality-composed.json`); canonical
-> depth awaits a promoted delivery-adherence pass rule; MOS-proxy remains optional.
+> emission landed on the delivery bench (`bench-quality-composed.json`), and later the
+> same day the promoted delivery-adherence rule v1 (per-preset signed expectations in
+> prosody profile v2, warn-first) raised the delivery-bench composition to canonical
+> depth with a real `.delivery` gate; MOS-proxy remains optional.
 
 1. **Phase 12: wire the typed quality registry.** Emit and validate
    `GenerationQualityReport` from a real scheduler; fold persisted-WAV Fast QC into the

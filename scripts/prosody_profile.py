@@ -5,8 +5,9 @@ A profile is a plain JSON file with a schema version so future calibrations can
 be migrated. It is consumed by:
 
   - scripts/prosody_quality_gate.py      (pass/fail thresholds)
+  - scripts/delivery_quality_gate.py     (per-preset delivery expectations)
   - scripts/delivery_adherence.py        (arousal / prosody-effect weights)
-  - scripts/bench_delivery_prosody.py    (prosody-effect weights)
+  - scripts/bench_delivery_prosody.py    (prosody-effect weights + delivery gate)
 
 Usage:
   from prosody_profile import builtin_profile, load_profile
@@ -15,11 +16,21 @@ Usage:
 import json
 import os
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 # Built-in defaults mirror the original hard-coded thresholds/weights. They are
 # intentionally conservative: they flag obvious prosody issues, not subtle
 # artistic choices.
+#
+# Schema v2 adds two blocks:
+#   delivery_expectations — per-preset expected signed effects of an instructed
+#     take relative to its same-seed neutral pair. Each preset maps feature →
+#     {direction, min_effect_normal, tier}; magnitudes are scaled by intensity.
+#     Directions come from the preset instruction semantics
+#     (Sources/QwenVoiceCore/EmotionPreset.swift); the initial magnitudes are
+#     deliberately conservative seeds pending the paired calibration run.
+#   neutral_consistency — cohort dispersion bounds for repeated same-preset
+#     fixed-seed takes (the "neutral should not wander" check).
 BUILTIN_PROFILE = {
     "schema_version": SCHEMA_VERSION,
     "name": "builtin",
@@ -48,7 +59,127 @@ BUILTIN_PROFILE = {
             "energy_roughness_divisor": 0.05,
         },
     },
+    "delivery_expectations": {
+        "intensity_scale": {"subtle": 0.0, "normal": 1.0, "strong": 1.3},
+        "presets": {
+            "happy": {
+                "pitch_shift_semitones": {"direction": 1, "min_effect_normal": 0.5, "tier": "required"},
+                "rate_delta_hz": {"direction": 1, "min_effect_normal": 0.15, "tier": "required"},
+                "arousal_score": {"direction": 1, "min_effect_normal": 0.0, "tier": "supporting"},
+            },
+            "excited": {
+                "pitch_shift_semitones": {"direction": 1, "min_effect_normal": 0.8, "tier": "required"},
+                "rate_delta_hz": {"direction": 1, "min_effect_normal": 0.3, "tier": "required"},
+                "roughness_delta": {"direction": 1, "min_effect_normal": 0.0, "tier": "supporting"},
+            },
+            "surprised": {
+                "pitch_range_delta_semitones": {"direction": 1, "min_effect_normal": 0.5, "tier": "required"},
+                "pitch_variation_delta_hz": {"direction": 1, "min_effect_normal": 2.0, "tier": "required"},
+                "rate_delta_hz": {"direction": 1, "min_effect_normal": 0.0, "tier": "supporting"},
+            },
+            "sad": {
+                "pitch_shift_semitones": {"direction": -1, "min_effect_normal": 0.4, "tier": "required"},
+                "rate_delta_hz": {"direction": -1, "min_effect_normal": 0.15, "tier": "required"},
+                "arousal_score": {"direction": -1, "min_effect_normal": 0.0, "tier": "supporting"},
+            },
+            "calm": {
+                "rate_delta_hz": {"direction": -1, "min_effect_normal": 0.15, "tier": "required"},
+                "pitch_variation_delta_hz": {"direction": -1, "min_effect_normal": 2.0, "tier": "required"},
+                "pause_ratio_delta": {"direction": 1, "min_effect_normal": 0.0, "tier": "supporting"},
+            },
+            "angry": {
+                "roughness_delta": {"direction": 1, "min_effect_normal": 0.01, "tier": "required"},
+                "rate_cv_delta": {"direction": 1, "min_effect_normal": 0.02, "tier": "required"},
+                "pitch_shift_semitones": {"direction": -1, "min_effect_normal": 0.0, "tier": "supporting"},
+            },
+            "fearful": {
+                "pitch_variation_delta_hz": {"direction": 1, "min_effect_normal": 2.0, "tier": "required"},
+                "rate_cv_delta": {"direction": 1, "min_effect_normal": 0.02, "tier": "required"},
+                "voiced_fraction_delta": {"direction": -1, "min_effect_normal": 0.0, "tier": "supporting"},
+            },
+            "whisper": {
+                "voiced_fraction_delta": {"direction": -1, "min_effect_normal": 0.05, "tier": "required"},
+                "pitch_variation_delta_hz": {"direction": -1, "min_effect_normal": 0.0, "tier": "supporting"},
+            },
+            "dramatic": {
+                "pitch_range_delta_semitones": {"direction": 1, "min_effect_normal": 0.5, "tier": "required"},
+                "pause_ratio_delta": {"direction": 1, "min_effect_normal": 0.01, "tier": "required"},
+                "rate_delta_hz": {"direction": -1, "min_effect_normal": 0.0, "tier": "supporting"},
+            },
+        },
+    },
+    "neutral_consistency": {
+        "min_cohort_size": 4,
+        "max_pitch_spread_semitones": 2.0,
+        "max_rate_spread_hz": 1.0,
+        "outlier_z_score": 2.5,
+    },
 }
+
+
+_EXPECTATION_TIERS = ("required", "supporting")
+
+
+def migrate_profile(profile):
+    """Migrate an older-schema profile dict to the current schema in place.
+
+    A v1 profile predates the delivery-expectation and neutral-consistency
+    blocks; migration fills them from the builtin defaults so a calibrated v1
+    threshold file keeps working while new consumers see complete data.
+    """
+    if not isinstance(profile, dict):
+        return profile
+    if profile.get("schema_version") == 1:
+        profile = dict(profile)
+        profile["schema_version"] = SCHEMA_VERSION
+        for key in ("delivery_expectations", "neutral_consistency"):
+            profile.setdefault(key, json.loads(json.dumps(BUILTIN_PROFILE[key])))
+    return profile
+
+
+def _validate_delivery_expectations(block):
+    if not isinstance(block, dict):
+        raise ValueError("delivery_expectations must be an object")
+    scale = block.get("intensity_scale")
+    if not isinstance(scale, dict) or set(scale.keys()) != {"subtle", "normal", "strong"}:
+        raise ValueError("delivery_expectations.intensity_scale must map subtle/normal/strong")
+    for tier_name, factor in scale.items():
+        if not isinstance(factor, (int, float)) or factor < 0:
+            raise ValueError(f"intensity_scale.{tier_name} must be a non-negative number")
+    presets = block.get("presets")
+    if not isinstance(presets, dict) or not presets:
+        raise ValueError("delivery_expectations.presets must be a non-empty object")
+    for preset_id, features in presets.items():
+        if not isinstance(features, dict) or not features:
+            raise ValueError(f"delivery_expectations.presets.{preset_id} must be a non-empty object")
+        for feature, spec in features.items():
+            if not isinstance(spec, dict):
+                raise ValueError(f"expectation {preset_id}.{feature} must be an object")
+            if spec.get("direction") not in (1, -1):
+                raise ValueError(f"expectation {preset_id}.{feature}.direction must be 1 or -1")
+            minimum = spec.get("min_effect_normal")
+            if not isinstance(minimum, (int, float)) or minimum < 0:
+                raise ValueError(
+                    f"expectation {preset_id}.{feature}.min_effect_normal must be non-negative"
+                )
+            if spec.get("tier") not in _EXPECTATION_TIERS:
+                raise ValueError(
+                    f"expectation {preset_id}.{feature}.tier must be one of {_EXPECTATION_TIERS}"
+                )
+
+
+def _validate_neutral_consistency(block):
+    if not isinstance(block, dict):
+        raise ValueError("neutral_consistency must be an object")
+    required = set(BUILTIN_PROFILE["neutral_consistency"].keys())
+    present = set(block.keys())
+    if present != required:
+        raise ValueError(
+            f"neutral_consistency keys mismatch: missing {required - present}, extra {present - required}"
+        )
+    for key, value in block.items():
+        if not isinstance(value, (int, float)) or value <= 0:
+            raise ValueError(f"neutral_consistency.{key} must be a positive number")
 
 
 def validate_profile(profile):
@@ -74,6 +205,8 @@ def validate_profile(profile):
     # handled by callers via .get(..., default).
     if not isinstance(profile.get("delivery_weights"), dict):
         raise ValueError("delivery_weights must be an object")
+    _validate_delivery_expectations(profile["delivery_expectations"])
+    _validate_neutral_consistency(profile["neutral_consistency"])
     analyzer_version = profile.get("analyzer_algorithm_version")
     if analyzer_version is not None and (
         not isinstance(analyzer_version, int) or analyzer_version < 1
@@ -83,12 +216,12 @@ def validate_profile(profile):
 
 
 def load_profile(path):
-    """Load and validate a profile from JSON file."""
+    """Load, migrate, and validate a profile from JSON file."""
     if not os.path.exists(path):
         raise FileNotFoundError(f"prosody profile not found: {path}")
     with open(path, "r", encoding="utf-8") as f:
         profile = json.load(f)
-    return validate_profile(profile)
+    return validate_profile(migrate_profile(profile))
 
 
 def builtin_profile():
@@ -114,4 +247,23 @@ def delivery_weight(profile, section, key, default=None):
     builtin_section = BUILTIN_PROFILE["delivery_weights"][section]
     return profile["delivery_weights"].get(section, {}).get(
         key, default if default is not None else builtin_section[key]
+    )
+
+
+def delivery_expectation(profile, preset_id):
+    """Expectation feature map for one preset id, or None when uncovered."""
+    return profile.get("delivery_expectations", {}).get("presets", {}).get(preset_id)
+
+
+def intensity_factor(profile, intensity):
+    """Magnitude scale for an intensity tier, with built-in fallback."""
+    builtin_scale = BUILTIN_PROFILE["delivery_expectations"]["intensity_scale"]
+    scale = profile.get("delivery_expectations", {}).get("intensity_scale", builtin_scale)
+    return scale.get(intensity, builtin_scale.get(intensity, 1.0))
+
+
+def neutral_consistency(profile, key):
+    """Read a neutral-consistency bound, with built-in fallback."""
+    return profile.get("neutral_consistency", {}).get(
+        key, BUILTIN_PROFILE["neutral_consistency"][key]
     )

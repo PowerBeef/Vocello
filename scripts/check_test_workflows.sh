@@ -641,6 +641,9 @@ python3 -m unittest \
   scripts.tests.test_telemetry_overhead \
   scripts.tests.test_summarize_generation_telemetry \
   scripts.tests.test_analyze_prosody \
+  scripts.tests.test_analyze_delivery \
+  scripts.tests.test_prosody_quality_gate \
+  scripts.tests.test_delivery_quality_gate \
   scripts.tests.test_prosody_calibration \
   scripts.test_check_macos_xpc_bench \
   scripts.test_check_ios_ui_benchmark \

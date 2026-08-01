@@ -431,7 +431,7 @@ enum BenchCommand {
                 // (Fast QC + the sidecar prosody gate) into one composed
                 // standard-depth registry verdict per delivery take. A missing
                 // analyzer or a fail verdict fails the run (fail-closed).
-                try composeDeliveryStandardQuality(
+                try composeDeliveryCanonicalQuality(
                     diagnostics: diagDir, outputs: outDir, runID: runID
                 )
             } else {
@@ -799,13 +799,13 @@ enum BenchCommand {
         }
     }
 
-    /// Composed standard-depth verdicts for the delivery takes: the fast
+    /// Composed canonical-depth verdicts for the delivery takes: the fast
     /// finalization evidence is rebuilt from this run's typed engine telemetry
-    /// rows, the `.prosody` gate comes from the sidecar the analysis step just
-    /// wrote, and every verdict is checked against the take's stored fast
-    /// verdict (a composed verdict can never be better than the fast one it
-    /// finalized with). Fail-closed: a missing row, missing sidecar verdict,
-    /// or fail outcome fails the bench run.
+    /// rows, the `.prosody` and `.delivery` gates come from the sidecar the
+    /// analysis step just wrote, and every verdict is checked against the
+    /// take's stored fast verdict (a composed verdict can never be better
+    /// than the fast one it finalized with). Fail-closed: a missing row,
+    /// missing sidecar verdict, or fail outcome fails the bench run.
     private struct ComposeEngineRow: Decodable {
         struct AnyObjectElement: Decodable {}
         let generationID: String?
@@ -832,7 +832,7 @@ enum BenchCommand {
         let takes: [ComposedTakeVerdict]
     }
 
-    private static func composeDeliveryStandardQuality(
+    private static func composeDeliveryCanonicalQuality(
         diagnostics: URL, outputs: URL, runID: String
     ) throws {
         let sidecarURL = diagnostics.appendingPathComponent("bench-prosody.json")
@@ -840,6 +840,7 @@ enum BenchCommand {
             let generationID: String
             let deliveryWav: String
             let qualityGate: GenerationQualityComposition.ProsodySidecarGate
+            let deliveryGate: GenerationQualityComposition.DeliverySidecarGate
         }
         let entries = try JSONDecoder().decode(
             [SidecarEntry].self, from: Data(contentsOf: sidecarURL)
@@ -864,7 +865,7 @@ enum BenchCommand {
             rowsByID[id] = row
         }
 
-        let policy = GenerationQualityReportProducer.standardPolicy(requiresLanguageASR: false)
+        let policy = GenerationQualityReportProducer.canonicalPolicy(requiresLanguageASR: false)
         var verdicts: [ComposedTakeVerdict] = []
         var failures: [String] = []
         for entry in entries {
@@ -905,6 +906,9 @@ enum BenchCommand {
                     .prosody: GenerationQualityComposition.prosodyEvidence(
                         gate: entry.qualityGate, evidenceDigest: wavDigest
                     ),
+                    .delivery: GenerationQualityComposition.deliveryEvidence(
+                        gate: entry.deliveryGate, evidenceDigest: wavDigest
+                    ),
                 ]
             )
             let verdict: QualityGateRegistryVerdict
@@ -937,7 +941,7 @@ enum BenchCommand {
         let payload = ComposedQualityFile(
             schemaVersion: 1,
             runID: runID,
-            depth: "standard",
+            depth: "canonical",
             requiredGates: QualityGateRegistry.requiredGates(for: policy).map(\.rawValue),
             takes: verdicts.sorted { $0.deliveryWav < $1.deliveryWav }
         )
@@ -948,9 +952,9 @@ enum BenchCommand {
             options: .atomic
         )
         let warned = verdicts.filter { $0.outcome == "warning" }.count
-        note("composed standard quality: \(verdicts.count) delivery take(s), \(warned) warning(s) → bench-quality-composed.json")
+        note("composed canonical quality: \(verdicts.count) delivery take(s), \(warned) warning(s) → bench-quality-composed.json")
         if !failures.isEmpty {
-            throw CLIError("composed standard quality FAILED: \(failures.joined(separator: "; "))")
+            throw CLIError("composed canonical quality FAILED: \(failures.joined(separator: "; "))")
         }
     }
 

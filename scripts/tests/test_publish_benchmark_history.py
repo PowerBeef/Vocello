@@ -628,7 +628,15 @@ class PublisherTests(unittest.TestCase):
             publisher.history_record_schema_version([built, legacy])
 
     def test_delivery_prosody_gate_verdict_folds_into_published_warnings(self) -> None:
-        def fixture(gate: object) -> tuple[list[dict], list[dict], list[dict]]:
+        clean_delivery_gate = {
+            "passed": True,
+            "flags": [],
+            "metrics": {"pitch_shift_semitones": 0.9, "arousal_score": 1.7},
+        }
+
+        def fixture(
+            gate: object, delivery_gate: object = clean_delivery_gate
+        ) -> tuple[list[dict], list[dict], list[dict]]:
             result_takes = [{
                 "delivery": "happy.strong",
                 "mode": "custom",
@@ -645,9 +653,14 @@ class PublisherTests(unittest.TestCase):
                 "model": "pro_custom_speed",
                 "delivery": "happy.strong",
                 "deliveryMetrics": {"f0_std_hz": 31.5},
+                "dF0Std": 6.4,
+                "dRateCV": 0.03,
+                "prosodyEffect": 1.2,
             }
             if gate is not None:
                 row["qualityGate"] = gate
+            if delivery_gate is not None:
+                row["deliveryGate"] = delivery_gate
             return result_takes, takes, [row]
 
         clean = fixture({"passed": True, "flags": []})
@@ -655,6 +668,12 @@ class PublisherTests(unittest.TestCase):
         self.assertEqual(clean[1][0]["warnings"], [])
         self.assertEqual(clean[1][0]["status"], "passed")
         self.assertEqual(clean[1][0]["metrics"]["f0StdHz"], 31.5)
+        # Paired deltas and adherence measurements are banked for calibration.
+        self.assertEqual(clean[1][0]["metrics"]["deliveryDF0StdHz"], 6.4)
+        self.assertEqual(clean[1][0]["metrics"]["deliveryDRateCV"], 0.03)
+        self.assertEqual(clean[1][0]["metrics"]["deliveryProsodyEffect"], 1.2)
+        self.assertEqual(clean[1][0]["metrics"]["deliveryPitchShiftSemitones"], 0.9)
+        self.assertEqual(clean[1][0]["metrics"]["deliveryArousalScore"], 1.7)
 
         flagged = fixture({"passed": False, "flags": ["monotone", "long_pause"]})
         publisher.fold_delivery_prosody(*flagged)
@@ -664,13 +683,31 @@ class PublisherTests(unittest.TestCase):
         )
         self.assertEqual(flagged[1][0]["status"], "passedWithWarnings")
 
-        for name, gate in (
-            ("missing", None),
-            ("malformed", {"passed": "yes"}),
-            ("incomplete", {"passed": False, "flags": ["metrics_incomplete"]}),
+        adherence_flagged = fixture(
+            {"passed": True, "flags": []},
+            {"passed": False, "flags": ["delivery_effect_weak_rate_delta_hz"], "metrics": {}},
+        )
+        publisher.fold_delivery_prosody(*adherence_flagged)
+        self.assertEqual(
+            adherence_flagged[1][0]["warnings"],
+            ["delivery_gate:delivery_effect_weak_rate_delta_hz"],
+        )
+        self.assertEqual(adherence_flagged[1][0]["status"], "passedWithWarnings")
+
+        for name, gate, delivery_gate in (
+            ("missing", None, clean_delivery_gate),
+            ("malformed", {"passed": "yes"}, clean_delivery_gate),
+            ("incomplete", {"passed": False, "flags": ["metrics_incomplete"]}, clean_delivery_gate),
+            ("missing_delivery_gate", {"passed": True, "flags": []}, None),
+            ("malformed_delivery_gate", {"passed": True, "flags": []}, {"passed": 1}),
+            (
+                "uncovered_delivery_gate",
+                {"passed": True, "flags": []},
+                {"passed": False, "flags": ["expectation_missing"], "metrics": {}},
+            ),
         ):
             with self.subTest(name=name), self.assertRaises(publisher.PublicationError):
-                publisher.fold_delivery_prosody(*fixture(gate))
+                publisher.fold_delivery_prosody(*fixture(gate, delivery_gate))
 
     def test_forced_memory_profile_is_exploratory(self) -> None:
         self.assertFalse(publisher.uses_forced_memory_profile([engine_row("native")]))

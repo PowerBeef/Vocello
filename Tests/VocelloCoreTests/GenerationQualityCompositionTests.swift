@@ -160,6 +160,128 @@ final class GenerationQualityCompositionTests: XCTestCase {
         XCTAssertEqual(evidence.measurements.map(\.key), [.pitchRangeSemitones])
     }
 
+    private func deliveryGate(
+        passed: Bool,
+        flags: [String] = [],
+        metrics: [String: Double] = [:]
+    ) -> GenerationQualityComposition.DeliverySidecarGate {
+        GenerationQualityComposition.DeliverySidecarGate(
+            deliveryID: "excited.strong",
+            preset: "excited",
+            intensity: "strong",
+            algorithmVersion: 1,
+            passed: passed,
+            flags: flags,
+            metrics: metrics
+        )
+    }
+
+    func testCleanDeliveryGateMapsToPassWithTypedMeasurements() {
+        let evidence = GenerationQualityComposition.deliveryEvidence(
+            gate: deliveryGate(
+                passed: true,
+                metrics: ["pitch_shift_semitones": 1.4, "arousal_score": 2.1, "rate_delta_hz": 0.5]
+            ),
+            evidenceDigest: String(repeating: "d", count: 64)
+        )
+        XCTAssertEqual(evidence.outcome, .pass)
+        XCTAssertEqual(evidence.algorithmVersion, 1)
+        XCTAssertEqual(
+            Set(evidence.measurements.map(\.key)),
+            [.deliveryPitchShiftSemitones, .deliveryArousalScore]
+        )
+    }
+
+    func testDeliveryAdherenceFlagsMapToWarning() {
+        let evidence = GenerationQualityComposition.deliveryEvidence(
+            gate: deliveryGate(passed: false, flags: ["delivery_effect_weak_rate_delta_hz"])
+        )
+        XCTAssertEqual(evidence.outcome, .warning)
+    }
+
+    func testDeliveryFailureFlagsMapToUnavailable() {
+        for flag in ["analysis_failed", "metrics_incomplete", "expectation_missing"] {
+            let evidence = GenerationQualityComposition.deliveryEvidence(
+                gate: deliveryGate(passed: false, flags: [flag])
+            )
+            XCTAssertEqual(evidence.outcome, .unavailable, flag)
+        }
+    }
+
+    func testComposedCanonicalReportPassesRegistryWithBothGates() throws {
+        let digest = String(repeating: "e", count: 64)
+        let report = GenerationQualityReportProducer.deepReport(
+            generationID: UUID(),
+            policy: GenerationQualityReportProducer.canonicalPolicy(requiresLanguageASR: false),
+            finishReason: .eos,
+            hitTokenCap: false,
+            audioQC: Self.cleanAudioQC(durationSeconds: 5.0),
+            wavDigest: digest,
+            usedStreaming: true,
+            chunkCount: 7,
+            audioChannel: nil,
+            deepEvidence: [
+                .prosody: GenerationQualityComposition.prosodyEvidence(
+                    gate: gate(passed: true), evidenceDigest: digest
+                ),
+                .delivery: GenerationQualityComposition.deliveryEvidence(
+                    gate: deliveryGate(passed: true, metrics: ["pitch_shift_semitones": 1.1]),
+                    evidenceDigest: digest
+                ),
+            ]
+        )
+        let verdict = try QualityGateRegistry.evaluate(report)
+        XCTAssertEqual(verdict.outcome, GenerationQualityOutcome.pass)
+        XCTAssertTrue(verdict.requiredGates.contains(GenerationQualityGateID.delivery))
+    }
+
+    func testCanonicalWithoutDeliveryEvidenceFailsClosed() throws {
+        let digest = String(repeating: "f", count: 64)
+        let report = GenerationQualityReportProducer.deepReport(
+            generationID: UUID(),
+            policy: GenerationQualityReportProducer.canonicalPolicy(requiresLanguageASR: false),
+            finishReason: .eos,
+            hitTokenCap: false,
+            audioQC: Self.cleanAudioQC(durationSeconds: 5.0),
+            wavDigest: digest,
+            usedStreaming: true,
+            chunkCount: 7,
+            audioChannel: nil,
+            deepEvidence: [
+                .prosody: GenerationQualityComposition.prosodyEvidence(
+                    gate: gate(passed: true), evidenceDigest: digest
+                ),
+            ]
+        )
+        let verdict = try QualityGateRegistry.evaluate(report)
+        XCTAssertEqual(verdict.outcome, GenerationQualityOutcome.fail)
+        XCTAssertTrue(verdict.issues.contains("quality_gate_unavailable.delivery"))
+    }
+
+    func testDeliverySidecarGateDecodesFromScriptShape() throws {
+        let json = """
+        {
+          "deliveryID": "calm.subtle",
+          "preset": "calm",
+          "intensity": "subtle",
+          "algorithmVersion": 1,
+          "passed": true,
+          "flags": [],
+          "reason": "delivery adherence gate passed",
+          "metrics": {"pitch_shift_semitones": -0.4, "rate_delta_hz": -0.2, "intensity_factor": 0.0}
+        }
+        """
+        let gate = try JSONDecoder().decode(
+            GenerationQualityComposition.DeliverySidecarGate.self,
+            from: Data(json.utf8)
+        )
+        XCTAssertTrue(gate.passed)
+        XCTAssertEqual(gate.preset, "calm")
+        let evidence = GenerationQualityComposition.deliveryEvidence(gate: gate)
+        XCTAssertEqual(evidence.outcome, .pass)
+        XCTAssertEqual(evidence.measurements.map(\.key), [.deliveryPitchShiftSemitones])
+    }
+
     func testRankOrderingGuardsFastConsistency() {
         XCTAssertLessThan(
             GenerationQualityComposition.rank(of: .pass),

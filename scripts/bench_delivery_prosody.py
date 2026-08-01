@@ -29,6 +29,7 @@ from typing import Any
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+from delivery_quality_gate import evaluate_delivery
 from prosody_profile import builtin_profile, delivery_weight, load_profile
 from prosody_quality_gate import evaluate_metrics
 
@@ -230,6 +231,15 @@ def analyze_run(
                 # downstream typed quality reports can fold a real verdict
                 # instead of re-deriving thresholds.
                 "qualityGate": evaluate_metrics(instructed_metrics, resolved_profile),
+                # Per-preset adherence verdict against the same-seed neutral
+                # pair; carries the profile's delivery_expectations identity
+                # through the shared profileDigest.
+                "deliveryGate": evaluate_delivery(
+                    instructed_metrics,
+                    neutral_metrics,
+                    delivery["delivery"],
+                    resolved_profile,
+                ),
             }
         )
     return results

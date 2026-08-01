@@ -87,6 +87,12 @@ cross-project comparisons.
 | 2026-07-20 | [`macos-engine-20260720-052721-ebbbbda7`](runs/engine-generation/macos-engine-20260720-052721-ebbbbda7.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | `0d4eac8b336b` | `817164bfb96c` | vs macos-engine-20260720-052534-b9dcb26d: RTF +2.1%, TTFC -5.8%, RAM -0.4% | phase0-cli-control-2 |
 | 2026-07-20 | [`macos-engine-20260720-052856-845cd043`](runs/engine-generation/macos-engine-20260720-052856-845cd043.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | `0d4eac8b336b` | `817164bfb96c` | vs macos-engine-20260720-052721-ebbbbda7: RTF +0.3%, TTFC -1.3%, RAM +2.4% | phase0-cli-control-3 |
 
+## engine-generation / macos / mac-mini-m2-8gb / config `8831965d9ebd`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---|---|---|---|
+| 2026-08-01 | [`macos-engine-20260801-024556-e826c4ec`](runs/engine-generation/macos-engine-20260801-024556-e826c4ec.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 20 | `52a0b9546c45` dirty | `excluded` | baseline | delivery-cal-s1 |
+
 ## engine-generation / macos / mac-mini-m2-8gb / config `91f82d33a19f`
 
 | completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |

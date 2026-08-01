@@ -32,7 +32,7 @@ Each item lands with its evidence, contract-token flip, and narrative sync (prog
 
 | Item | Scope | Gate |
 | --- | --- | --- |
-| 1.1 Gate 0 micro-benchmark | Standalone probe (untracked scratch): MPP `matmul2d` (fp16, `execution_simdgroups`, `tensor_inline`, runtime-compiled MSL 4.0) vs MLX at the engine's real batch-1 GEMM shapes on the canonical M2; methodology + numbers become a new `benchmarks/OPTIMIZATION.md` section and the study's Gate 0 verdict | **Go/no-go: MPP ≥ parity on the floor.** No-go closes the custom-kernel question until the fallback or the floor changes |
+| 1.1 Gate 0 micro-benchmark — **done 2026-08-01: NO-GO** | Standalone probe (untracked scratch): MPP `matmul2d` (fp16, `execution_simdgroups`, `tensor_inline`, runtime-compiled MSL 4.0) vs MLX at the engine's real batch-1 GEMM shapes on the canonical M2; methodology + numbers in `benchmarks/OPTIMIZATION.md` §O and the study's Gate 0 ledger | Verdict: MPP ties only where launch overhead dominates and loses amortized on all seven shapes (MLX 1.03–1.53× faster); `M % 8 == 0` makes batch-1 inexpressible at parallel scope; one silent-wrong-result aspect ratio observed. Candidates A/B closed until the fallback or the floor changes — **Tier 3 item 3 is withdrawn** |
 | 1.2 Single-take spoken-text normalization | Route `SpokenTextPlanner` output into the single-take path in `QwenVoiceCore` (long-form already has it); tests in `Tests/VocelloCoreTests/SpokenTextPlanningTests.swift` extend to the single-take route | Core tests + bench-grade fixed-seed A/B with QC (text change is quality-affecting); flip `spokenTextPlanning` |
 | 1.3 Persisted-WAV consolidation + composed emission | Call `GenerationQualityReportProducer.deepReport(...)` (standard/canonical policies) from a real lane call site; `deepEvidence` assembled from the existing typed analyzers; fail closed on missing analyzers | Deterministic suites; flips `boundedAnalyzers` + `unifiedQuality` residuals; retires the "composed lane emission deferred" note |
 | 1.4 UI-checker quality-identity fold | Fold per-take quality identity into `scripts/check_ios_ui_benchmark.py`, `scripts/check_macos_xpc_bench.py`, and `scripts/publish_benchmark_history.py` (v3 stamps only when every take carries identity) | Checker self-tests + one local macOS UI benchmark publishing v3; flip the `historyV3` residual. **Land before Tier 2 so the canonical iOS matrix is the first v3 UI record** |
@@ -77,14 +77,11 @@ against current-artifact baselines.
    keying pattern. Pre-registered keep-gate **+≥10% warm RTF on the M2 floor**; §K
    12-seed soak; byte-identity verified, not assumed. Keep or record the do-NOT with
    numbers.
-3. **Gate 2 — Candidate A fused code-predictor kernel (conditional)**: only if Gate 0
-   was go AND a post-P1b GPU-busy re-capture still shows launch-bound AND P1b
-   under-delivered. One `MLXFast.metalKernel` for the 15-pass code-predictor loop (fp16,
-   explicit dequant at the 26.0 floor, Algorithm-v2 RNG semantics reproduced exactly),
-   behind a registered debug knob on a throwaway branch. Keep-gate ≥10% on the floor,
-   12/12 §K soak, GPU-busy delta recorded; numerics deltas route to the promotion
-   battery, never a waiver. Fold the outcome into OPTIMIZATION.md and the study's gate
-   ledger either way.
+3. **Gate 2 — Candidate A fused code-predictor kernel: WITHDRAWN (2026-08-01).** Gate 0
+   returned no-go (`benchmarks/OPTIMIZATION.md` §O): MPP offers no building-block
+   advantage on the floor, so the fused-kernel bet fails its first hard precondition.
+   Launch elimination remains item 2's (P1b) territory inside MLX itself. Revisit only
+   if Apple's portable MPP fallback improves or the canonical floor changes.
 
 ## Tier 4 — after the performance block
 
@@ -107,7 +104,8 @@ tensor formats (an artifact-promotion decision, per the study's F7).
 - 1.4 before Tier 2's canonical matrix (soft: makes it the first v3 UI record).
 - Tier 2's fixture rebind before all of Tier 3 (hard: baseline currency).
 - 1.5 implementation before its Tier 2 acceptance rider (hard).
-- Tier 3.3 requires 1.1 go plus the post-3.2 launch-bound re-check (hard).
+- Tier 3.3 required 1.1 go plus the post-3.2 launch-bound re-check (hard) — settled:
+  1.1 returned no-go on 2026-08-01, so 3.3 is withdrawn.
 - The OS floor moves only through Tier 3.1's trigger check (policy).
 - Every contract-token flip lands with its narrative sync in the same change; heavy
   gates batch at change-set ends; dense workstreams close with a `docs: currency pass`.

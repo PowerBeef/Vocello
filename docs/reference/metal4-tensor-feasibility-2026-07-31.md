@@ -208,6 +208,17 @@ kernel-side convenience justifies raising the floor to 27 ahead of it.
    GEMMs; batch 1). **Go only if MPP ≥ parity on the floor.** Expected cost: hours. If
    no-go, record the numbers in OPTIMIZATION.md and close the question until Apple's
    fallback or our floor changes.
+   **Executed 2026-08-01 — NO-GO** (`benchmarks/OPTIMIZATION.md` §O). MPP's strongest
+   configuration (M=8-padded, 32-column tiles per threadgroup) only ties MLX at
+   single-dispatch granularity — launch-overhead parity, ~250 µs either way — and loses
+   amortized on all seven shapes (MLX 1.03–1.53× faster, geomean ≈ 1.24×). Two
+   structural findings sharpen the close: `matmul2d` statically requires
+   `M % 8 == 0` at simdgroup scope, so batch-1 decode is inexpressible without an
+   8× row-padding tax or serial `execution_thread` (9.6–67 ms/GEMM, ~250× slower); and
+   the single-threadgroup padded variant reproducibly wrote silent zeros for half the
+   output at 8×1024 (K=3072) with no API error. Candidates A/B are closed until
+   Apple's portable fallback improves or the canonical floor changes; Gates 1–2 below
+   are moot and retained as record.
 2. **Gate 1 — sequencing.** Run only after the Stage-4 pin bump (revised target, F4) and
    the P1b static-shape talker compile have both landed or been closed out; P1b may
    consume the same headroom cheaper.

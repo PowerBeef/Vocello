@@ -971,6 +971,69 @@ the §K 12-seed clone/long QC soak.
   `model.safetensors` URLs were spot-verified live with exact byte counts. Fresh fixture
   identities, delivery proof, and memory re-qualification ride the release-QA battery.
 
+## O — Gate 0: MPP TensorOps `matmul2d` vs MLX on the M2 floor (2026-08-01)
+
+The pre-registered go/no-go from the Metal 4 feasibility study
+(`docs/reference/metal4-tensor-feasibility-2026-07-31.md`, roadmap 1.1): can
+MetalPerformancePrimitives `matmul2d` reach parity with MLX's kernels at the engine's real
+batch-1 GEMM shapes on the canonical Mac mini M2 8 GB floor? **Verdict: no-go.** MPP never
+exceeds parity; where it ties, launch overhead is doing the tying. Per the
+pre-registration this closes Candidates A/B (fused MPP-based kernels) until Apple's
+portable fallback improves or the canonical floor changes, and removes the conditional
+Gate 2 prototype from the 2026-08 roadmap's Tier 3.
+
+- **Probe.** Standalone untracked SwiftPM executable (session scratch), path-dependent on
+  the pinned mlx-swift 0.30.6 checkout; macOS 26.5, Xcode 26 SDK, runtime
+  `device.makeLibrary(source:)` MSL with `#include <metal_tensor>` +
+  `#include <MetalPerformancePrimitives/MetalPerformancePrimitives.h>`, classic
+  `MTLComputePipelineState`/`MTLComputeCommandEncoder`, `tensor_inline` over plain device
+  pointers — exactly the dispatch shape `MLXFast.metalKernel` produces. fp16, the seven
+  batch-1 GEMM shapes from the loaded CustomVoice-4bit config (talker attn-out/MLP/head,
+  code-predictor MLP/head). Metrics: median wall µs for a single dispatched GEMM (launch
+  included — what the launch-bound engine pays per op) and per-GEMM time with 100
+  dispatches in one command buffer (amortized — kernel execution cost, what an MPP matmul
+  would cost as a building block inside a fused kernel). In-kernel results verified
+  against a CPU reference; MLX arm evaluated per iteration (single) and as 100
+  distinct-input matmuls per eval (amortized, CSE-defeated).
+- **Structural finding 1 — batch-1 is inexpressible at parallel scope.** MPP
+  `matmul2d_descriptor` statically requires `M % 8 == 0` (or 16) under
+  `execution_simdgroups`; `static_assert` fires at pipeline creation for M=1. A batch-1
+  decode row therefore runs either padded to M=8 (7 of 8 rows wasted) or serially under
+  `execution_thread`. Three variants measured: `m8t` (M=8 padded, 32-column tile per
+  threadgroup — the strongest reasonable configuration), `m8` (M=8 padded, single
+  threadgroup), `t1` (M=1, `execution_thread`).
+- **Structural finding 2 — silent wrong results, no error.** The single-threadgroup `m8`
+  variant at 8×1024 (K=3072) reproducibly wrote zeros for the upper half of the output
+  (n ≥ 512) with no API or validation error, twice, while the same kernel text verified
+  clean at six other shapes. Tiling to 32-column threadgroups cleared it. A cooperative
+  API that silently drops half the output at some descriptor aspect ratios is itself
+  disqualifying evidence for shipping on this SDK without exhaustive per-shape
+  verification.
+- **Numbers (median µs per GEMM; M2 8 GB floor).**
+
+  | shape (K×N) | m8t 1× | mlx 1× | m8t amort | mlx amort | mlx edge (amort) |
+  |---|---|---|---|---|---|
+  | talker attn out 2048×2048 | 283.9 | 301.2 | 76.0 | 62.0 | 1.23× |
+  | talker mlp up 2048×6144 | 497.9 | 504.7 | 277.8 | 269.6 | 1.03× |
+  | talker mlp down 6144×2048 | 488.9 | 478.4 | 267.8 | 228.6 | 1.17× |
+  | talker head 2048×3072 | 356.8 | 360.1 | 135.7 | 107.6 | 1.26× |
+  | cp mlp up 1024×3072 | 248.7 | 262.9 | 55.6 | 46.3 | 1.20× |
+  | cp mlp down 3072×1024 | 250.9 | 247.6 | 55.5 | 43.7 | 1.27× |
+  | cp head 1024×2048 | 230.1 | 277.7 | 40.2 | 26.3 | 1.53× |
+
+  The naive variants are not competitive: single-threadgroup `m8` runs 0.8–17.4 ms and
+  serial `t1` 9.6–67 ms per GEMM. Single-dispatch parity (±10%) across every shape shows
+  both stacks pay the same ~250 µs launch/commit/wait cost — consistent with §H P0/§M:
+  the engine's bound is launches, not kernels, and a per-op MPP swap has nothing to win.
+  Amortized, MLX's tuned split-k GEMV beats the best MPP configuration on all seven
+  shapes (geomean ≈ 1.24×). Notably the 8× M-padding is nearly free — these GEMV-like
+  shapes are weight-bandwidth-bound, so the padded rows ride along — yet MPP's portable
+  fallback still loses. This matches MLX upstream's own routing decision: MPP kernels are
+  gated to M5/A19-class hardware (NAX), and hand-tuned steel kernels serve everything
+  below. On floor hardware there is no MPP building-block advantage for a fused kernel to
+  inherit; launch elimination remains P1b (static-shape compile) territory inside MLX
+  itself.
+
 ## Status
 
 The optimization program tracked in this document is wrapped up. The §H P0–P6 work has been

@@ -89,11 +89,15 @@ performance block after the fixture rebind, Tier 4 carryover). Immediate specifi
    footprint); notes in [`docs/releases/v2.3.0.md`](releases/v2.3.0.md) with the standing
    smoke-lane ledger. iOS build 22 ships the clone-prime and Wi-Fi-pin fixes that build 21
    carried as exposures.
-3. **Everything else follows the roadmap's tiers:** the Tier-1 residuals (single-take
-   normalization, quality-report consolidation, the UI-checker v3 fold ideally before the
-   phone window, the iOS segment-regeneration implementation half, Gate 0), then the gated
-   performance block (pin bump → P1b → conditional fused-kernel Gate 2) once the fixture
-   rebind gives current baselines.
+3. **Tier 1 is complete (2026-08-01):** the UI-checker v3 fold, quality-report
+   consolidation (composed standard verdicts on delivery benches), single-take
+   normalization, and the iOS segment-regeneration implementation half all landed with
+   evidence; Gate 0 ran and returned **no-go** (`benchmarks/OPTIMIZATION.md` §O — MPP
+   never beats MLX on the floor and batch-1 is inexpressible at parallel scope), which
+   withdraws the conditional fused-kernel Gate 2 from Tier 3. The optional delivery-chip
+   audio rider was skipped. What remains: the Tier-2 phone window (battery remainder +
+   riders, including 1.5's on-device acceptance), then the gated performance block, now
+   pin bump → P1b only, once the fixture rebind gives current baselines.
 
 ## Staged roadmap state
 

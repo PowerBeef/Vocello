@@ -1229,7 +1229,8 @@ cmd_bench() {
       --label=*) label="${1#*=}"; shift ;;
       # Restriction simulation (memory dimension only): forwards
       # QVOICE_IOS_MEMORY_PROFILE so the app clamps its effective per-process
-      # limit to the profile's entitled budget (iphone15pro → 5000 MB).
+      # limit to the profile's entitled budget (iphone15pro → 5000 MB,
+      # iphone14pro → 3600 MB: the 6 GB device class for floor feasibility).
       # Rows self-stamp notes.memoryProfile; GPU/thermal are NOT simulated.
       --memory-profile) export QVOICE_IOS_MEMORY_PROFILE="${2:-}"; shift 2 ;;
       --memory-profile=*) export QVOICE_IOS_MEMORY_PROFILE="${1#*=}"; shift ;;

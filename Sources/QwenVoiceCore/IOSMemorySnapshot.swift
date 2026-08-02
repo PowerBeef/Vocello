@@ -139,6 +139,13 @@ public struct IOSMemorySnapshot: Hashable, Codable, Sendable {
             // 8 GB iPhones — conservative: passing here implies passing on
             // whatever the real device grants.
             return 5_000 * 1_048_576
+        case "iphone14pro":
+            // 6 GB device class (iPhone 14 Pro / 15 / 15 Plus): bottom of the
+            // community-measured ~3.6–4.0 GB entitled band with the
+            // increased-memory-limit entitlement. Floor-feasibility evidence
+            // profile for the 6 GB hardware-floor question — exploratory-only
+            // classification, never canonical history.
+            return 3_600 * 1_048_576
         default:
             return nil
         }

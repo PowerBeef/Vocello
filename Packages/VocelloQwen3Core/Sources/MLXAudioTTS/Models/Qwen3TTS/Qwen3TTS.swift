@@ -413,28 +413,50 @@ final class Qwen3TTSPreparedComponentCache: Sendable {
 
 #if os(iOS)
     private let tokenizerLimit = 1
-    /// The iOS switch path deliberately pre-clears everything for Jetsam
-    /// headroom; speech-tokenizer residency stays macOS-only until a device
-    /// A/B qualifies it.
-    static let speechTokenizerResidencySupported = false
+    /// Adaptive iOS residency (2026-08-01): the f16 codec promotion (§R) cut
+    /// the resident decoder to ~218 MB, making residency a candidate on the
+    /// 8 GB device class (the Mac's model-switch win is 503 → 0 ms). The
+    /// device-class heuristic below stays dark until the on-device
+    /// retained-memory qualification passes at the next phone window —
+    /// force-enable for that lane with QWENVOICE_TOKENIZER_RESIDENCY=on
+    /// (debug-gated). Pressure ownership is unchanged either way: critical
+    /// trim and full unload invalidate the resident cache regardless.
+    static let iosAdaptiveResidencyQualified = false
+    /// 8 GB device class; 6 GB devices stay non-resident pending the
+    /// hardware-floor feasibility evidence (iphone14pro clamp profile).
+    static let iosResidencyMinimumPhysicalMemoryBytes: UInt64 = 7 * 1_073_741_824
+    static let speechTokenizerResidencySupported: Bool =
+        iosAdaptiveResidencyQualified
+            && ProcessInfo.processInfo.physicalMemory >= iosResidencyMinimumPhysicalMemoryBytes
 #else
     private let tokenizerLimit = 3
     static let speechTokenizerResidencySupported = true
 #endif
 
-    /// Registered diagnostic off-switch for the phase 9 residency A/B
-    /// (inert without the QWENVOICE_DEBUG master gate).
-    private static let speechTokenizerResidencyDisabled: Bool = {
-        let raw = VocelloQwen3ImplementationDebugGate.value(
+    /// Registered diagnostic switch for the phase 9 residency A/B (inert
+    /// without the QWENVOICE_DEBUG master gate). `off`-family values disable
+    /// residency anywhere; `on`-family values force-enable it — the iOS
+    /// qualification lane's entry point while the adaptive heuristic is dark.
+    private static let speechTokenizerResidencyOverride: String? =
+        VocelloQwen3ImplementationDebugGate.value(
             for: "QWENVOICE_TOKENIZER_RESIDENCY"
         )?
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .lowercased()
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+        .lowercased()
+
+    private static let speechTokenizerResidencyDisabled: Bool = {
+        let raw = speechTokenizerResidencyOverride
         return raw == "off" || raw == "false" || raw == "0" || raw == "no"
     }()
 
+    private static let speechTokenizerResidencyForcedOn: Bool = {
+        let raw = speechTokenizerResidencyOverride
+        return raw == "on" || raw == "true" || raw == "1" || raw == "yes"
+    }()
+
     static var speechTokenizerResidencyEnabled: Bool {
-        speechTokenizerResidencySupported && !speechTokenizerResidencyDisabled
+        if speechTokenizerResidencyForcedOn { return true }
+        return speechTokenizerResidencySupported && !speechTokenizerResidencyDisabled
     }
 
     private let state = OSAllocatedUnfairLock(initialState: State())

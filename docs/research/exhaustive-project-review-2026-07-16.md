@@ -1,3 +1,9 @@
+---
+status: historical
+owner: backend-mlx
+summary: QwenVoice / Vocello — Updated Exhaustive Technical Review. Imported point-in-time research snapshot. Pinned: superseded figures carry inline editor's notes; contract JSON remains status authority.
+contentDigest: sha256:460a58900b43fc3924a88ab18a2a97dd0dfa481d9b63c68e2e718b81bab5bef3
+---
 # QwenVoice / Vocello — Updated Exhaustive Technical Review
 
 > **Imported research snapshot (2026-07-16).** Converted 2026-07-22 from the external HTML

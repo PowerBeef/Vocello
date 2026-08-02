@@ -1,3 +1,9 @@
+---
+status: historical
+owner: release-qa
+summary: 06 — Verification, Test, and Benchmark Matrix. Archived point-in-time audit. Pinned historical record of findings as they stood at capture.
+contentDigest: sha256:76f1fdd7da9870fe9d7a7727261872c2ee1ab319fae8756bfa89d4030df3a30e
+---
 # 06 — Verification, Test, and Benchmark Matrix
 
 > **Historical snapshot.** This report is pinned to Vocello commit

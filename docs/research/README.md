@@ -1,3 +1,9 @@
+---
+status: historical
+owner: backend-mlx
+summary: Research corpus (imported point-in-time snapshots). Imported point-in-time research snapshot. Pinned: superseded figures carry inline editor's notes; contract JSON remains status authority.
+contentDigest: sha256:0a0ff98e0fd05a7d73676cc05777925b062c67a05fdb399a55ae9cbef3dffdde
+---
 # Research corpus (imported point-in-time snapshots)
 
 The first five documents in this directory are the research bundle that shaped the staged

@@ -1,3 +1,9 @@
+---
+status: historical
+owner: release-qa
+summary: 02 — Exhaustive Current-State Delta Catalogue. Archived point-in-time audit. Pinned historical record of findings as they stood at capture.
+contentDigest: sha256:855797d8ead5fecdf1d9248065943de5c428215dad57fbc6ceab46a2984151ea
+---
 # 02 — Exhaustive Current-State Delta Catalogue
 
 > **Historical snapshot.** This report is pinned to Vocello commit

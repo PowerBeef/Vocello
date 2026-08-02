@@ -1,3 +1,9 @@
+---
+status: historical
+owner: release-qa
+summary: 01 — Evidence Method and Correction Ledger. Archived point-in-time audit. Pinned historical record of findings as they stood at capture.
+contentDigest: sha256:33c3cc818c1ac575ed17fd0ef7ee7265343fe5b8e5167ef22c5fb089f2d294d6
+---
 # 01 — Evidence Method and Correction Ledger
 
 > **Historical snapshot.** This report is pinned to Vocello commit

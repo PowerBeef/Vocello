@@ -1,3 +1,9 @@
+---
+status: historical
+owner: release-qa
+summary: 03 — Performance, Memory, Streaming, and Numerical Optimizations. Archived point-in-time audit. Pinned historical record of findings as they stood at capture.
+contentDigest: sha256:2260a83e55136c03179ccae60b47da4faa63a72c309c1ebfa7626ddcd26fe0dd
+---
 # 03 — Performance, Memory, Streaming, and Numerical Optimizations
 
 > **Historical snapshot.** This report is pinned to Vocello commit

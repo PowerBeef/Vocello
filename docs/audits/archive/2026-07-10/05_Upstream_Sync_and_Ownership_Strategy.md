@@ -1,3 +1,9 @@
+---
+status: historical
+owner: release-qa
+summary: 05 — Upstream Synchronization and Ownership Strategy. Archived point-in-time audit. Pinned historical record of findings as they stood at capture.
+contentDigest: sha256:e1789bc188aaea7c7e81068d682e869f4fffa8097bdf08a2bb20dae7c02260ae
+---
 # 05 — Upstream Synchronization and Ownership Strategy
 
 > **Historical snapshot.** This report is pinned to Vocello commit

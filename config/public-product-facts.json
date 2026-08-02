@@ -1,5 +1,6 @@
 {
   "schemaVersion": 1,
+  "boundary": "Hand-curated PUBLIC product policy: what we state publicly about releases, platform support, and canonical benchmark hardware. Validated against project.yml, README, and benchmarks/hardware-profiles.json by scripts/documentation_contract.py. Distinct from config/derived-doc-facts.json, which is generated from code and covers internal engineering counts. If a value can be read out of the tree it belongs there; if it is a decision about what we publish it belongs here.",
   "stableMacRelease": {
     "version": "2.4.0",
     "tag": "v2.4.0",

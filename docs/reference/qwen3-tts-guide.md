@@ -1,3 +1,15 @@
+---
+status: active
+owner: backend-mlx
+summary: Qwen3-TTS architecture reference — model variants, tokenizer profile, Talker/decoder, speaker roster, generation modes, and parameters.
+sourceOfTruth:
+  - Sources/Resources/qwenvoice_contract.json
+  - Sources/QwenVoiceCore/EmotionPreset.swift
+  - Sources/QwenVoiceCore/GenerationSemantics.swift
+appliesTo:
+  - backend-mlx
+---
+
 # Qwen3-TTS Reference Guide
 
 A living reference for the Qwen3-TTS models that power Vocello (formerly QwenVoice). This document covers the model architecture, the three generation modes, the built-in speaker roster, emotion/delivery control, voice cloning, language handling, generation parameters, and the practical behaviors we have observed in the Swift + MLX implementation.
@@ -192,7 +204,7 @@ Qwen3PromptAssembly(
 ```
 
 - Instruction control is **only available on the 1.7B CustomVoice model**. The 0.6B model (not shipped in Vocello) does not support it.
-- For English text, `GenerationSemantics` appends a diction-reinforcement clause (`Native English pronunciation with clear English diction and natural stress.`) unless the instruction already contains diction-related words or the feature is disabled via the debug-gated `QWENVOICE_ENGLISH_DICTION_REINFORCEMENT=off` diagnostic override.
+- For English text, `GenerationSemantics` appends a diction-reinforcement clause (`Native English pronunciation with clear English diction and natural stress.`) unless the feature is disabled via the debug-gated `QWENVOICE_ENGLISH_DICTION_REINFORCEMENT=off` diagnostic override. The append is suppressed when the instruction already asks for clarity, and that decision resolves **preset-wide**: if any intensity tier of a preset contains a diction word, every tier of that preset suppresses. Resolving per string instead let a preset's two tiers differ by 76 characters of boilerplate that says nothing about intensity, confounding normal-versus-strong comparisons (fixed 2026-08-02; `scripts/check_delivery_instructions.py` fails the build if it returns). Free-form user instructions still resolve per string.
 - Celebrity imitation / voice impersonation instructions are rejected by `validateQwenPromptContract`.
 
 ### 5.2 Voice Design

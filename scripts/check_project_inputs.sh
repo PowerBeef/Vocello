@@ -85,6 +85,8 @@ REQUIRED_SURFACES=(
     "scripts/tests/test_check_release_notes.py"
     "scripts/check_delivery_instructions.py"
     "scripts/tests/test_check_delivery_instructions.py"
+    "scripts/doc_metadata.py"
+    "scripts/tests/test_doc_metadata.py"
     "scripts/release.sh"
     "Sources/Resources/qwenvoice_contract.json"
     "Sources/Resources/qwenvoice_production_model_catalog.json"
@@ -99,6 +101,9 @@ REQUIRED_SURFACES=(
     "config/memory-qualification-policy.json"
     "config/build-output-policy.json"
     "config/delivery-instruction-contract.json"
+    "config/derived-doc-facts.json"
+    "config/public-product-facts.json"
+    "docs/INDEX.json"
     "config/codex-session-storage-policy.json"
     "config/documentation-contract.json"
     "config/evidence-impact.json"
@@ -367,6 +372,13 @@ python3 "$SCRIPT_DIR/check_convergence_promotion_gate.py"
 # this checks those: append parity across a preset's intensity tiers, repeated
 # intensifiers, and direction conflicts against config/delivery-instruction-contract.json.
 python3 "$SCRIPT_DIR/check_delivery_instructions.py"
+# Per-file documentation metadata: pinned historical bodies cannot change without
+# an explicit re-pin, active docs are scanned for contradictions with facts derived
+# from code, and source bindings warn on drift. Non-strict during rollout: the
+# not-yet-annotated docs report rather than fail.
+python3 "$SCRIPT_DIR/doc_metadata.py" derive-facts --check
+python3 "$SCRIPT_DIR/doc_metadata.py" rebuild-index --check
+python3 "$SCRIPT_DIR/doc_metadata.py" validate
 
 "$SCRIPT_DIR/check_backend_resource_contract.sh" --project
 "$SCRIPT_DIR/check_qwen3_backend_only.sh"

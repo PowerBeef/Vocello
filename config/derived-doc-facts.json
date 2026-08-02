@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "generated": "python3 scripts/doc_metadata.py derive-facts",
+  "boundary": "Internal engineering facts, DERIVED from code and contracts and regenerated on demand. Never hand-edit. Distinct from config/public-product-facts.json, which is hand-curated public product policy (release version, minimum device, canonical benchmark hardware) validated against project.yml and README. Different provenance and different audience: if a value can be read out of the tree it belongs here; if it is a decision about what we publish it belongs there.",
+  "facts": {
+    "deliveryPresetCount": {
+      "value": 10,
+      "source": "Sources/QwenVoiceCore/EmotionPreset.swift"
+    },
+    "deliveryIntensityTiers": {
+      "value": 2,
+      "source": "Sources/QwenVoiceCore/EmotionPreset.swift"
+    },
+    "qwenSpeakerCount": {
+      "value": 9,
+      "source": "Sources/Resources/qwenvoice_contract.json"
+    }
+  }
+}

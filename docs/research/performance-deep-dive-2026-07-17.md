@@ -1,3 +1,9 @@
+---
+status: historical
+owner: backend-mlx
+summary: QwenVoice / Vocello Performance Architecture. Imported point-in-time research snapshot. Pinned: superseded figures carry inline editor's notes; contract JSON remains status authority.
+contentDigest: sha256:b30357f5fe6bfc7e05049c910909162c76ebb3ec9399a8b75a7cd28350d974c0
+---
 # QwenVoice / Vocello Performance Architecture
 
 > **Imported research snapshot (2026-07-17).** Converted 2026-07-22 from the external HTML

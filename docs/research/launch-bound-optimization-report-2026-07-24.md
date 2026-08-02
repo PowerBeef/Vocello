@@ -1,3 +1,9 @@
+---
+status: historical
+owner: backend-mlx
+summary: Vocello Optimization: Launch-Bound Decoding, Memory Efficiency, and Quality Harness for Qwen3-TTS on MLX. Imported point-in-time research snapshot. Pinned: superseded figures carry inline editor's notes; contract JSON remains status authority.
+contentDigest: sha256:c8181bf5810ef77f02db014e7325e17c8ab563475436bc6f692352963ea6e4ed
+---
 # Vocello Optimization: Launch-Bound Decoding, Memory Efficiency, and Quality Harness for Qwen3-TTS on MLX
 
 > **Imported research snapshot (2026-07-24).** Converted 2026-07-25 from the external PDF

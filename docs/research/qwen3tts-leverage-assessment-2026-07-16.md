@@ -1,3 +1,9 @@
+---
+status: historical
+owner: backend-mlx
+summary: Point-in-time assessment of unexploited Qwen3-TTS capability, captured 2026-07-16. Pinned snapshot: several figures were superseded and carry inline editor's notes.
+contentDigest: sha256:e3c9f4bebc98353645b4ada6ef5e9ac8a5979cdd9f78bb1b4b22accc73d99d7e
+---
 # Vocello Backend Quality Leverage Assessment
 
 > **Imported research snapshot (2026-07-16).** Converted 2026-07-22 from the external HTML

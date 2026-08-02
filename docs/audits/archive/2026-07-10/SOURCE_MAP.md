@@ -1,3 +1,9 @@
+---
+status: historical
+owner: release-qa
+summary: Source Map. Archived point-in-time audit. Pinned historical record of findings as they stood at capture.
+contentDigest: sha256:9a210ecec5b90d1a4568fb39c76742d80990d6c3086912e4788a55505d2f949b
+---
 # Source Map
 
 > **Historical snapshot.** This source map is pinned to Vocello commit

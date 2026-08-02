@@ -1,3 +1,9 @@
+---
+status: historical
+owner: release-qa
+summary: July 14 documentation and vendor audit resolution. Archived point-in-time audit. Pinned historical record of findings as they stood at capture.
+contentDigest: sha256:4d50a0e11eceb00a1579bb3a7c654118579eae8b29b119a8c11a4809b52bab8f
+---
 # July 14 documentation and vendor audit resolution
 
 > **Historical resolution.** The external audit package was evaluated against Vocello commit

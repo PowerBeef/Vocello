@@ -1,3 +1,10 @@
+---
+status: superseded
+owner: backend-mlx
+summary: Completed delivery/clone fidelity remediation program (R1-R4). Its R1 recommendation to keep three intensity tiers was overruled by the maintainer decision recorded later in the same file; current delivery state lives in development-progress.
+supersededBy: docs/development-progress.md
+contentDigest: sha256:b3b253977a1f67c5a530fe6ce3d04a6215e2f852d66627dc97186351963bbd27
+---
 # Delivery/clone fidelity remediation plan (2026-08)
 
 > Follow-up to [`delivery-fidelity-report-2026-08-01.md`](delivery-fidelity-report-2026-08-01.md)

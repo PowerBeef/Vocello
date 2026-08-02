@@ -1,3 +1,9 @@
+---
+status: historical
+owner: backend-mlx
+summary: Vocello Audio Quality Review System. Imported point-in-time research snapshot. Pinned: superseded figures carry inline editor's notes; contract JSON remains status authority.
+contentDigest: sha256:ed1d71a600db7c54e5d01ef9a817ee824a0faeb376e6d4d2d30cc75418701150
+---
 # Vocello Audio Quality Review System
 
 > **Imported research snapshot (2026-07-16).** Converted 2026-07-22 from the external HTML

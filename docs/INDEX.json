@@ -1,0 +1,220 @@
+{
+  "schemaVersion": 1,
+  "generated": "python3 scripts/doc_metadata.py rebuild-index",
+  "note": "Machine-readable documentation map. Query this instead of globbing docs/.",
+  "annotatedDocuments": 29,
+  "unannotatedDocuments": 54,
+  "documents": [
+    {
+      "path": "docs/audits/archive/2026-07-10/01_Evidence_Method_and_Corrections.md",
+      "status": "historical",
+      "owner": "release-qa",
+      "summary": "01 \u2014 Evidence Method and Correction Ledger. Archived point-in-time audit. Pinned historical record of findings as they stood at capture.",
+      "contentDigest": "sha256:33c3cc818c1ac575ed17fd0ef7ee7265343fe5b8e5167ef22c5fb089f2d294d6"
+    },
+    {
+      "path": "docs/audits/archive/2026-07-10/02_Exhaustive_Current_State_Delta_Catalogue.md",
+      "status": "historical",
+      "owner": "release-qa",
+      "summary": "02 \u2014 Exhaustive Current-State Delta Catalogue. Archived point-in-time audit. Pinned historical record of findings as they stood at capture.",
+      "contentDigest": "sha256:855797d8ead5fecdf1d9248065943de5c428215dad57fbc6ceab46a2984151ea"
+    },
+    {
+      "path": "docs/audits/archive/2026-07-10/03_Performance_Memory_Streaming_Optimizations.md",
+      "status": "historical",
+      "owner": "release-qa",
+      "summary": "03 \u2014 Performance, Memory, Streaming, and Numerical Optimizations. Archived point-in-time audit. Pinned historical record of findings as they stood at capture.",
+      "contentDigest": "sha256:2260a83e55136c03179ccae60b47da4faa63a72c309c1ebfa7626ddcd26fe0dd"
+    },
+    {
+      "path": "docs/audits/archive/2026-07-10/04_Correctness_Risk_and_Findings.md",
+      "status": "historical",
+      "owner": "release-qa",
+      "summary": "04 \u2014 Correctness, Concurrency, Integrity, and Maintainability Findings. Archived point-in-time audit. Pinned historical record of findings as they stood at capture.",
+      "contentDigest": "sha256:c98607a9f97492a99d5d79e40651cec4cf0b387911db55af6c5f000dc9f24318"
+    },
+    {
+      "path": "docs/audits/archive/2026-07-10/05_Upstream_Sync_and_Ownership_Strategy.md",
+      "status": "historical",
+      "owner": "release-qa",
+      "summary": "05 \u2014 Upstream Synchronization and Ownership Strategy. Archived point-in-time audit. Pinned historical record of findings as they stood at capture.",
+      "contentDigest": "sha256:e1789bc188aaea7c7e81068d682e869f4fffa8097bdf08a2bb20dae7c02260ae"
+    },
+    {
+      "path": "docs/audits/archive/2026-07-10/06_Verification_Test_and_Benchmark_Matrix.md",
+      "status": "historical",
+      "owner": "release-qa",
+      "summary": "06 \u2014 Verification, Test, and Benchmark Matrix. Archived point-in-time audit. Pinned historical record of findings as they stood at capture.",
+      "contentDigest": "sha256:76f1fdd7da9870fe9d7a7727261872c2ee1ab319fae8756bfa89d4030df3a30e"
+    },
+    {
+      "path": "docs/audits/archive/2026-07-10/README.md",
+      "status": "historical",
+      "owner": "release-qa",
+      "summary": "Corrected QwenVoice / `mlx-audio-swift` Backend Report Series. Archived point-in-time audit. Pinned historical record of findings as they stood at capture.",
+      "contentDigest": "sha256:2d6de6ec31cd0d7aa1708147710fb21f64ba712ede4ef17c4690701958bf9528"
+    },
+    {
+      "path": "docs/audits/archive/2026-07-10/SOURCE_MAP.md",
+      "status": "historical",
+      "owner": "release-qa",
+      "summary": "Source Map. Archived point-in-time audit. Pinned historical record of findings as they stood at capture.",
+      "contentDigest": "sha256:9a210ecec5b90d1a4568fb39c76742d80990d6c3086912e4788a55505d2f949b"
+    },
+    {
+      "path": "docs/audits/archive/2026-07-14/RESOLUTION.md",
+      "status": "historical",
+      "owner": "release-qa",
+      "summary": "July 14 documentation and vendor audit resolution. Archived point-in-time audit. Pinned historical record of findings as they stood at capture.",
+      "contentDigest": "sha256:4d50a0e11eceb00a1579bb3a7c654118579eae8b29b119a8c11a4809b52bab8f"
+    },
+    {
+      "path": "docs/reference/delivery-remediation-plan-2026-08.md",
+      "status": "superseded",
+      "owner": "backend-mlx",
+      "summary": "Completed delivery/clone fidelity remediation program (R1-R4). Its R1 recommendation to keep three intensity tiers was overruled by the maintainer decision recorded later in the same file; current delivery state lives in development-progress.",
+      "supersededBy": "docs/development-progress.md",
+      "contentDigest": "sha256:b3b253977a1f67c5a530fe6ce3d04a6215e2f852d66627dc97186351963bbd27"
+    },
+    {
+      "path": "docs/reference/qwen3-tts-guide.md",
+      "status": "active",
+      "owner": "backend-mlx",
+      "summary": "Qwen3-TTS architecture reference \u2014 model variants, tokenizer profile, Talker/decoder, speaker roster, generation modes, and parameters.",
+      "sourceOfTruth": [
+        "Sources/Resources/qwenvoice_contract.json",
+        "Sources/QwenVoiceCore/EmotionPreset.swift",
+        "Sources/QwenVoiceCore/GenerationSemantics.swift"
+      ],
+      "appliesTo": [
+        "backend-mlx"
+      ]
+    },
+    {
+      "path": "docs/releases/v1.2.1.md",
+      "status": "historical",
+      "owner": "release-qa",
+      "summary": "QwenVoice 1.2.1. Published release notes, copied verbatim into the GitHub Release. Pinned: the shipped text of a release cannot change retroactively.",
+      "contentDigest": "sha256:0fd7c499b7e36e6783da9d513fbb956c7d10985fb817d706a8c3ebd3afc39c15"
+    },
+    {
+      "path": "docs/releases/v1.2.2.md",
+      "status": "historical",
+      "owner": "release-qa",
+      "summary": "QwenVoice 1.2.2. Published release notes, copied verbatim into the GitHub Release. Pinned: the shipped text of a release cannot change retroactively.",
+      "contentDigest": "sha256:f58eee77b40dbe0d2aeda9d8994714804a18d13841495185d8f8bfec98784290"
+    },
+    {
+      "path": "docs/releases/v1.2.3.md",
+      "status": "historical",
+      "owner": "release-qa",
+      "summary": "QwenVoice 1.2.3. Published release notes, copied verbatim into the GitHub Release. Pinned: the shipped text of a release cannot change retroactively.",
+      "contentDigest": "sha256:62543ff2b32876f5570ce21e14909b9e92f1f55985641609d4bc25328858c6bd"
+    },
+    {
+      "path": "docs/releases/v2.0.0-beta.1.md",
+      "status": "historical",
+      "owner": "release-qa",
+      "summary": "Vocello 2.0.0 Beta 1. Published release notes, copied verbatim into the GitHub Release. Pinned: the shipped text of a release cannot change retroactively.",
+      "contentDigest": "sha256:dffb908de299edbba29a591de72f24c267b6f71cd7f0a3b254927961d046fff5"
+    },
+    {
+      "path": "docs/releases/v2.0.0.md",
+      "status": "historical",
+      "owner": "release-qa",
+      "summary": "Vocello 2.0.0. Published release notes, copied verbatim into the GitHub Release. Pinned: the shipped text of a release cannot change retroactively.",
+      "contentDigest": "sha256:10f45c757583f844ded0dafffd5c6f51537494c36fb454865e9ca87abe03650d"
+    },
+    {
+      "path": "docs/releases/v2.1.0.md",
+      "status": "historical",
+      "owner": "release-qa",
+      "summary": "Vocello 2.1.0. Published release notes, copied verbatim into the GitHub Release. Pinned: the shipped text of a release cannot change retroactively.",
+      "contentDigest": "sha256:bf84235d84846335d2742a5875da01802c495efbc7833df4d5aede9606786f03"
+    },
+    {
+      "path": "docs/releases/v2.2.0.md",
+      "status": "historical",
+      "owner": "release-qa",
+      "summary": "Vocello 2.2.0. Published release notes, copied verbatim into the GitHub Release. Pinned: the shipped text of a release cannot change retroactively.",
+      "contentDigest": "sha256:33c102219282d497db515b1ec1461197ffa0eab106231d12c42c98639159163f"
+    },
+    {
+      "path": "docs/releases/v2.2.1.md",
+      "status": "historical",
+      "owner": "release-qa",
+      "summary": "Vocello 2.2.1. Published release notes, copied verbatim into the GitHub Release. Pinned: the shipped text of a release cannot change retroactively.",
+      "contentDigest": "sha256:6a3cce8cdb845eab7016926d8218f228fd4319f0994014594e40b5fae80bf32c"
+    },
+    {
+      "path": "docs/releases/v2.2.2.md",
+      "status": "historical",
+      "owner": "release-qa",
+      "summary": "Vocello 2.2.2. Published release notes, copied verbatim into the GitHub Release. Pinned: the shipped text of a release cannot change retroactively.",
+      "contentDigest": "sha256:ba09bf8f5178638b68b3aaa8bf789df99d403eb37332a2e6bf7c3a1efa773f59"
+    },
+    {
+      "path": "docs/releases/v2.3.0.md",
+      "status": "historical",
+      "owner": "release-qa",
+      "summary": "Vocello 2.3.0. Published release notes, copied verbatim into the GitHub Release. Pinned: the shipped text of a release cannot change retroactively.",
+      "contentDigest": "sha256:464be50570133ea5063a0c28d14c6413aab2852ac5d3b7dcb990658b74fda9bc"
+    },
+    {
+      "path": "docs/releases/v2.4.0.md",
+      "status": "historical",
+      "owner": "release-qa",
+      "summary": "Vocello 2.4.0. Published release notes, copied verbatim into the GitHub Release. Pinned: the shipped text of a release cannot change retroactively.",
+      "contentDigest": "sha256:a18499f60e4ceaaceb2c2af08fd18c9a78582d34a29718344040303189a92bf3"
+    },
+    {
+      "path": "docs/research/README.md",
+      "status": "historical",
+      "owner": "backend-mlx",
+      "summary": "Research corpus (imported point-in-time snapshots). Imported point-in-time research snapshot. Pinned: superseded figures carry inline editor's notes; contract JSON remains status authority.",
+      "contentDigest": "sha256:0a0ff98e0fd05a7d73676cc05777925b062c67a05fdb399a55ae9cbef3dffdde"
+    },
+    {
+      "path": "docs/research/audio-quality-review-system-2026-07-16.md",
+      "status": "historical",
+      "owner": "backend-mlx",
+      "summary": "Vocello Audio Quality Review System. Imported point-in-time research snapshot. Pinned: superseded figures carry inline editor's notes; contract JSON remains status authority.",
+      "contentDigest": "sha256:ed1d71a600db7c54e5d01ef9a817ee824a0faeb376e6d4d2d30cc75418701150"
+    },
+    {
+      "path": "docs/research/exhaustive-project-review-2026-07-16.md",
+      "status": "historical",
+      "owner": "backend-mlx",
+      "summary": "QwenVoice / Vocello \u2014 Updated Exhaustive Technical Review. Imported point-in-time research snapshot. Pinned: superseded figures carry inline editor's notes; contract JSON remains status authority.",
+      "contentDigest": "sha256:460a58900b43fc3924a88ab18a2a97dd0dfa481d9b63c68e2e718b81bab5bef3"
+    },
+    {
+      "path": "docs/research/launch-bound-optimization-report-2026-07-24.md",
+      "status": "historical",
+      "owner": "backend-mlx",
+      "summary": "Vocello Optimization: Launch-Bound Decoding, Memory Efficiency, and Quality Harness for Qwen3-TTS on MLX. Imported point-in-time research snapshot. Pinned: superseded figures carry inline editor's notes; contract JSON remains status authority.",
+      "contentDigest": "sha256:c8181bf5810ef77f02db014e7325e17c8ab563475436bc6f692352963ea6e4ed"
+    },
+    {
+      "path": "docs/research/performance-deep-dive-2026-07-17.md",
+      "status": "historical",
+      "owner": "backend-mlx",
+      "summary": "QwenVoice / Vocello Performance Architecture. Imported point-in-time research snapshot. Pinned: superseded figures carry inline editor's notes; contract JSON remains status authority.",
+      "contentDigest": "sha256:b30357f5fe6bfc7e05049c910909162c76ebb3ec9399a8b75a7cd28350d974c0"
+    },
+    {
+      "path": "docs/research/qwen3tts-leverage-assessment-2026-07-16.md",
+      "status": "historical",
+      "owner": "backend-mlx",
+      "summary": "Point-in-time assessment of unexploited Qwen3-TTS capability, captured 2026-07-16. Pinned snapshot: several figures were superseded and carry inline editor's notes.",
+      "contentDigest": "sha256:e3c9f4bebc98353645b4ada6ef5e9ac8a5979cdd9f78bb1b4b22accc73d99d7e"
+    },
+    {
+      "path": "docs/research/refactor-blueprint-2026-07-17.md",
+      "status": "historical",
+      "owner": "backend-mlx",
+      "summary": "Vocello Runtime Convergence Refactor Blueprint. Imported point-in-time research snapshot. Pinned: superseded figures carry inline editor's notes; contract JSON remains status authority.",
+      "contentDigest": "sha256:36ae6415323824d6b601841dc4121183a2faae7045b3dc71fc225bdd1364e443"
+    }
+  ]
+}

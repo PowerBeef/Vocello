@@ -1,3 +1,9 @@
+---
+status: historical
+owner: release-qa
+summary: 04 — Correctness, Concurrency, Integrity, and Maintainability Findings. Archived point-in-time audit. Pinned historical record of findings as they stood at capture.
+contentDigest: sha256:c98607a9f97492a99d5d79e40651cec4cf0b387911db55af6c5f000dc9f24318
+---
 # 04 — Correctness, Concurrency, Integrity, and Maintainability Findings
 
 > **Historical snapshot.** This report is pinned to Vocello commit

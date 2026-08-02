@@ -1,3 +1,9 @@
+---
+status: historical
+owner: backend-mlx
+summary: Vocello Runtime Convergence Refactor Blueprint. Imported point-in-time research snapshot. Pinned: superseded figures carry inline editor's notes; contract JSON remains status authority.
+contentDigest: sha256:36ae6415323824d6b601841dc4121183a2faae7045b3dc71fc225bdd1364e443
+---
 # Vocello Runtime Convergence Refactor Blueprint
 
 > **Imported research snapshot (2026-07-17).** Converted 2026-07-22 from the external HTML

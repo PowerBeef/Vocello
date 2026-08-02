@@ -630,9 +630,13 @@ each is actually worth.
 | Avoid stacked intensifiers; `very very very happy` adds no value | **Partly contradicted.** Upstream's own examples are `Very happy.` and `Say it in a very angry and disappointed tone`. The defensible claim is that *repetition* adds nothing; our copy over-generalized it into avoiding intensifiers, and further into avoiding naming the emotion plainly at all — while emotion is an explicit APS feature. |
 | High-arousal instructions trigger literal laughter or breath sounds | **`COMMUNITY`, plausible.** Reported for extended generations. The `no laughing` remedy is the unverified part, not the symptom. |
 
-`MEASURED-HERE`. Two further corrections to [`qwen3-tts-guide.md`](qwen3-tts-guide.md): its line 489
-says "10 × 3 presets", contradicting its own §6 table and the shipped code, which are **10 presets ×
-2 intensity tiers**. [`../qwen_tone.md`](../qwen_tone.md) repeats the same "10 × 3". Both are stale.
+`MEASURED-HERE`. Two further corrections, both **applied 2026-08-02**:
+[`qwen3-tts-guide.md`](qwen3-tts-guide.md) and [`../qwen_tone.md`](../qwen_tone.md) each stated the
+preset grid with the wrong intensity-tier count, contradicting the guide's own §6 table and the
+shipped code. The correct figure is **10 presets × 2 intensity tiers**, and
+[`doc_metadata.py`](../../scripts/doc_metadata.py) now derives that count from
+[`EmotionPreset.swift`](../../Sources/QwenVoiceCore/EmotionPreset.swift) and fails the build on any
+document that contradicts it.
 
 `MEASURED-HERE`. [`../qwen_tone.md`](../qwen_tone.md) additionally attributes "negative constraints
 work and are officially endorsed" and "the official instruction-writing principle" to upstream

@@ -1,3 +1,9 @@
+---
+status: historical
+owner: release-qa
+summary: Corrected QwenVoice / `mlx-audio-swift` Backend Report Series. Archived point-in-time audit. Pinned historical record of findings as they stood at capture.
+contentDigest: sha256:2d6de6ec31cd0d7aa1708147710fb21f64ba712ede4ef17c4690701958bf9528
+---
 # Corrected QwenVoice / `mlx-audio-swift` Backend Report Series
 
 > **Historical snapshot.** This series is pinned to Vocello commit

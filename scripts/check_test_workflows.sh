@@ -647,6 +647,7 @@ python3 -m unittest \
   scripts.tests.test_delivery_separability \
   scripts.tests.test_delivery_statistics \
   scripts.tests.test_delivery_matrix_report \
+  scripts.tests.test_separability_listening_check \
   scripts.tests.test_emotion_advisory \
   scripts.tests.test_clone_prosody_fidelity \
   scripts.tests.test_clone_fidelity_lane \

@@ -613,6 +613,43 @@ public enum GenerationSemantics {
         return raw == "off" || raw == "0" || raw == "false" || raw == "no"
     }()
 
+    /// Words whose presence means the base instruction already asks for clarity,
+    /// so appending the reinforcement would be redundant and would crowd out the
+    /// dominant emotion signal.
+    private static let dictionTokens = [
+        "clear", "clearly", "diction", "articulation",
+        "pronunciation", "clarity", "intelligible", "understandable",
+    ]
+
+    private static func containsDictionToken(_ instruction: String) -> Bool {
+        let lowercased = instruction.lowercased()
+        return dictionTokens.contains { lowercased.contains($0) }
+    }
+
+    /// Every shipped preset instruction belonging to a preset that trips the
+    /// diction-token rule on *any* intensity tier.
+    ///
+    /// The append decision must not vary between a preset's tiers. It says
+    /// nothing about intensity, so a tier-varying 76-character difference is pure
+    /// confound: normal-versus-strong then differs by boilerplate as well as by
+    /// emotional wording. Measured 2026-08-02 — happy, surprised, and dramatic
+    /// each suppressed on `normal` and appended on `strong`, and the recorded
+    /// intensity-tier finding was measured over a matrix that included them.
+    /// Resolving preset-wide (suppress if any tier asks for clarity) keeps the
+    /// rule's intent and removes the asymmetry without touching emotional copy.
+    /// `scripts/check_delivery_instructions.py` fails the build if it returns.
+    private static let presetInstructionsSuppressingDictionReinforcement: Set<String> = {
+        var suppressed: Set<String> = []
+        for preset in EmotionPreset.all {
+            let tierInstructions = EmotionIntensity.allCases.map { preset.instruction(for: $0) }
+            guard tierInstructions.contains(where: containsDictionToken) else { continue }
+            suppressed.formUnion(tierInstructions.map {
+                $0.trimmingCharacters(in: .whitespacesAndNewlines)
+            })
+        }
+        return suppressed
+    }()
+
     public static func englishDictionReinforcedInstruction(
         baseInstruction: String?,
         language: String
@@ -637,17 +674,16 @@ public enum GenerationSemantics {
             .contains(normalizedConditioningCacheKeyText(reinforcement)) {
             return trimmedBase
         }
-        // Skip the reinforcement append when the base instruction already
-        // contains any diction/clarity tokens. Stops the model from receiving
+        // Preset instructions resolve preset-wide so the two intensity tiers of
+        // one preset never differ by boilerplate alone (see the set above).
+        if presetInstructionsSuppressingDictionReinforcement.contains(trimmedBase) {
+            return trimmedBase
+        }
+        // Free-form instructions resolve per string: skip the append when the
+        // caller already asked for clarity, so the model is not handed
         // "…with clear articulation… Native English pronunciation with clear
-        // English diction and natural stress." which is redundant and can
-        // crowd out the dominant emotion signal.
-        let baseLowercased = trimmedBase.lowercased()
-        let dictionTokens = [
-            "clear", "clearly", "diction", "articulation",
-            "pronunciation", "clarity", "intelligible", "understandable",
-        ]
-        if dictionTokens.contains(where: { baseLowercased.contains($0) }) {
+        // English diction and natural stress."
+        if containsDictionToken(trimmedBase) {
             return trimmedBase
         }
         return "\(trimmedBase) \(reinforcement)"

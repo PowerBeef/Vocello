@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "description": "Open findings from scripts/check_delivery_instructions.py that are real but whose resolution is not yet known. An entry here is a known-open issue that passes the gate; any new finding fails it, and an entry that no longer occurs also fails so the list cannot rot. Acknowledging is not approving: each entry names how it gets settled.",
+  "acknowledgedFindings": [
+    {
+      "key": "tier-direction-inversion/angry/pitch",
+      "why": "angry.normal asks for 'a lower clipped tone' and angry.strong for 'heated raised pitch', so the intensity tier inverts the pitch axis instead of pushing it harder. Already recorded as a self-contradiction in EmotionPreset.swift. Not fixed blind: an earlier rewrite that made five presets' tiers push the same axes was measured and REGRESSED whisper -0.72, fearful -1.15, and excited -0.61 against unchanged controls, so making tier texts more alike made outputs more alike. A candidate needs enough seeds to clear the ~0.35 noise floor, which the n=9 attempt did not.",
+      "opened": "2026-08-02",
+      "resolveWith": "scripts/delivery_matrix_report.py"
+    },
+    {
+      "key": "expectation-conflict/angry/normal/pitch",
+      "why": "The copy asks for a lowered pitch at angry.normal while the versioned prosody profile carries a required pitch_shift_semitones expectation of +1. One of the two is wrong. The expectation is not automatically the authority: the delivery expectations were seeded before the project had any voice-quality measurement, so treating them as ground truth would fit copy to an unvalidated target. Settle by measuring which direction actually reads as angry, then correct whichever side lost.",
+      "opened": "2026-08-02",
+      "resolveWith": "scripts/delivery_matrix_report.py"
+    }
+  ]
+}

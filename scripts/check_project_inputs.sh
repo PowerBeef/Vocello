@@ -83,6 +83,8 @@ REQUIRED_SURFACES=(
     "scripts/tests/test_ios_platform_preflight.py"
     "scripts/check_release_notes.py"
     "scripts/tests/test_check_release_notes.py"
+    "scripts/check_delivery_instructions.py"
+    "scripts/tests/test_check_delivery_instructions.py"
     "scripts/release.sh"
     "Sources/Resources/qwenvoice_contract.json"
     "Sources/Resources/qwenvoice_production_model_catalog.json"
@@ -96,6 +98,7 @@ REQUIRED_SURFACES=(
     "config/language-bench-diagnostic-cohort.json"
     "config/memory-qualification-policy.json"
     "config/build-output-policy.json"
+    "config/delivery-instruction-contract.json"
     "config/codex-session-storage-policy.json"
     "config/documentation-contract.json"
     "config/evidence-impact.json"
@@ -359,6 +362,11 @@ python3 "$SCRIPT_DIR/project_health.py" validate
 python3 "$SCRIPT_DIR/project_health.py" rebuild-summary --check
 python3 "$SCRIPT_DIR/runtime_security_contract.py"
 python3 "$SCRIPT_DIR/check_convergence_promotion_gate.py"
+# Delivery quality needs audio and models, so it can never gate ordinary CI.
+# The text-level ways the instruction copy can be wrong are deterministic, and
+# this checks those: append parity across a preset's intensity tiers, repeated
+# intensifiers, and direction conflicts against config/delivery-instruction-contract.json.
+python3 "$SCRIPT_DIR/check_delivery_instructions.py"
 
 "$SCRIPT_DIR/check_backend_resource_contract.sh" --project
 "$SCRIPT_DIR/check_qwen3_backend_only.sh"

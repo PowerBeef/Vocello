@@ -90,6 +90,14 @@ BUILTIN_PROFILE = {
     # promoted back to magnitude-bearing after their rewrites cleared the R1
     # acceptance bar.
     "delivery_expectations": {
+        # UNVALIDATED CONSTANT. 1.15 asserts that `strong` should land 15% above
+        # `normal`; nothing measured it. The 19-seed × 20-cell matrix put the
+        # actual mean inter-cell separation ratio at 0.997 (2.435 strong against
+        # 2.442 normal), so the tier moves cells sideways rather than further
+        # apart. Kept because changing it would silently move every strong-tier
+        # threshold, and flagged because tuning instruction copy until this
+        # passes would fit the copy to a target no measurement supports. Resolve
+        # it with evidence (scripts/delivery_matrix_report.py), not by reasoning.
         "intensity_scale": {"normal": 1.0, "strong": 1.15},
         "presets": {
             "neutral": {

@@ -165,11 +165,14 @@ public struct EmotionPreset: Identifiable, Sendable {
     //   defensible; upstream's own examples are "Very happy." and "Say it in a very
     //   angry and disappointed tone". The 500-character cap has no traceable origin.
     //
-    // Known confound (measured 2026-08-02): happy, surprised, and dramatic suppress
+    // Known confound, FIXED 2026-08-02: happy, surprised, and dramatic suppressed
     // the English diction append on `normal` but not on `strong`, so those three
-    // presets differ across tiers by 76 characters of unrelated boilerplate as well
-    // as by emotional wording. The intensity finding below was measured over a matrix
-    // that included them. See the prompting guide §8.2; A/B the append with
+    // presets differed across tiers by 76 characters of unrelated boilerplate as
+    // well as by emotional wording, and the intensity finding below was measured
+    // over a matrix that included them. The append now resolves preset-wide in
+    // GenerationSemantics, and scripts/check_delivery_instructions.py fails the
+    // build if that resolution is removed or a new preset reintroduces the split.
+    // Whether the sentence earns its place at all is still open: A/B it with
     // QWENVOICE_ENGLISH_DICTION_REINFORCEMENT=off before rewriting any copy.
     //
     // On the intensity tier, and a fix that did NOT work (measured 2026-08-02):

@@ -582,10 +582,34 @@ sideways rather than further apart — was run across a matrix in which three of
 confounded tier comparison.** That does not overturn the finding, and it does not explain the six
 unaffected presets, but it does mean the finding is weaker than it reads.
 
-The append is already A/B-gateable: `QWENVOICE_ENGLISH_DICTION_REINFORCEMENT=off` is registered in
+**Fixed 2026-08-02, without touching preset copy.** The append now resolves preset-wide: if any
+tier of a preset asks for clarity, the whole preset suppresses it, so the two tiers can never differ
+by boilerplate alone. [`check_delivery_instructions.py`](../../scripts/check_delivery_instructions.py)
+fails the build if that resolution is removed.
+
+Whether the sentence earns its place at all is still open, and still A/B-gateable:
+`QWENVOICE_ENGLISH_DICTION_REINFORCEMENT=off` is registered in
 [`runtime-debug-knobs.json`](../../config/runtime-debug-knobs.json) and inert without the
-`QWENVOICE_DEBUG` master gate. **This document does not change the preset copy.** The fix is §10.3
-and it is a measurement, not an edit.
+`QWENVOICE_DEBUG` master gate. That part is §10.3, and it is a measurement, not an edit.
+
+### 8.3 What now gates the instruction copy
+
+Delivery quality needs audio, models, and seeds, so it can never be an ordinary CI gate — but the
+text-level ways the copy can be wrong are deterministic, and
+[`check_delivery_instructions.py`](../../scripts/check_delivery_instructions.py) runs inside
+`check_project_inputs.sh` on every commit and push. It fails outright on **append parity** across a
+preset's tiers and on **repeated intensifiers**, both indefensible whatever the right copy turns out
+to be. It reports **tier direction inversions** and **copy-versus-expectation conflicts** against
+[`delivery-instruction-contract.json`](../../config/delivery-instruction-contract.json): a listed
+finding is known-open and passes, a new one fails, and a listed finding that no longer occurs also
+fails so the list cannot rot.
+
+It deliberately does **not** assert that the copy must conform to a delivery expectation. Those
+expectations were seeded before the project had any voice-quality measurement, so a conformance
+gate would fit copy to an unvalidated target — the failure mode this whole document exists to stop.
+It reports that the two disagree and that one of them is wrong, without presuming which. Two
+findings are acknowledged today, both on `angry`: its tiers invert the pitch axis, and its `normal`
+copy contradicts a `required` pitch expectation.
 
 ---
 

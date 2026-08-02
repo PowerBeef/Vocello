@@ -1,6 +1,12 @@
 # Tone and Emotion in Vocello
 
-_Last reviewed: 2026-06-11 (deep-research refresh: official Qwen3-TTS guidance + measured instruct-adherence findings folded in)._
+_Last reviewed: 2026-06-11. Provenance pass 2026-08-02._
+
+> **Where the sourced version lives.** [`reference/qwen3-tts-prompting-guide.md`](reference/qwen3-tts-prompting-guide.md)
+> is the primary-source reference: it labels every claim `OFFICIAL` / `RESEARCH` / `MEASURED-HERE` /
+> `COMMUNITY` / `UNVERIFIED` and cites upstream directly. This file stays as the app-facing quick
+> guide. Where the two disagree, the prompting guide wins — several rules below were traced in
+> August 2026 to no source at all, and are flagged inline.
 
 This guide is a supplemental prompt-writing reference for the shipped macOS app. It is supplemental and may lag shipped behavior — when in doubt, trust the sources listed below before this guide.
 
@@ -31,11 +37,11 @@ Useful instruction patterns:
 ## Practical Guidance
 
 - Be specific: combine voice character, emotional state, pacing, and clarity in one instruction.
-- Be multidimensional (the official instruction-writing principle): combine **emotion + pace + pitch + timbre** rather than a single dimension — `bright energy and a slightly lifted pitch` beats `happy`.
+- Be multidimensional: combine **emotion + pace + pitch + timbre** rather than a single dimension — `bright energy and a slightly lifted pitch` beats `happy`. (Officially sourced: Alibaba's "be multi-dimensional, not one-dimensional". Volume and speed are scored dimensions too.)
 - Keep requests concrete: `calm middle-aged narrator with steady pacing` works better than `make it better`. Measured adherence is highest for concrete acoustic wording and lowest for persona-only briefs ("like a detective") — describe the sound, not just the character.
-- Prefer short, direct performance direction over one-word labels; Qwen3-TTS follows natural-language delivery instructions. 1–3 dense sentences is the sweet spot; stacked intensifiers (`very, very deep`) do nothing.
+- Prefer short, direct performance direction over one-word labels; Qwen3-TTS follows natural-language delivery instructions. 1–3 dense sentences is a reasonable target for a **voice description**; for a **delivery instruction** the official examples are three to nine words, so the sweet spot there is untested. Repeated intensifiers (`very, very deep`) add nothing, but a single one is fine — upstream's own examples are `Very happy.` and `Say it in a very angry and disappointed tone`.
 - **Voice Design briefs especially: name the gender and a concrete pitch register.** Voice Design invents a brand-new voice each call (no fixed speaker), so an under-specified brief lets it sample a higher or different-gender voice — a gender-less `deep narrator` can come out high-pitched. Write `a deep, low-pitched male narrator, bass-resonant` rather than `deep narrator`.
-- **Negative constraints work and are officially endorsed**: high-arousal instructions like `very happy` can trigger literal laughter — add `but without laughing` / `no added sounds`. The shipped Happy/Excited Strong presets carry this clause.
+- **Negative constraints are unverified, not officially endorsed** (corrected 2026-08-02 — the earlier "officially endorsed" claim had no source). The *symptom* is community-reported: high-arousal instructions like `very happy` can trigger literal laughter. The *remedy* — adding `but without laughing` / `no added sounds` — is what nothing supports, and the nearest published ablation found bare paralinguistic tags reduced adherence. The shipped Happy/Excited Strong presets carry the clause; whether it earns its place is an open experiment.
 - Keep strong emotions intelligible: add constraints like `while keeping words clear`, `without shouting`, or `still understandable`.
 - For whisper delivery, say `whisper` explicitly. Generic `soft and quiet` wording can produce soft-spoken delivery instead of an actual whisper.
 - Phrase instructions as **descriptions, not requests**: a conversational instruction ("Could you read this like…") can leak a spoken "OK" acknowledgment into the audio.
@@ -95,4 +101,5 @@ Voice Cloning support text:
 
 - [`../README.md`](../README.md)
 - [`../CLAUDE.md`](../CLAUDE.md) — repo architecture, build, and conventions
-- `Sources/QwenVoiceCore/EmotionPreset.swift` — the shipped 10 × 3 preset instruction strings (single source for macOS + iOS + the CLI's `bench --delivery` cells); `Sources/QwenVoiceCore/GenerationSemantics.swift` assembles the Voice Design "Voice character / Delivery" framing.
+- [`reference/qwen3-tts-prompting-guide.md`](reference/qwen3-tts-prompting-guide.md) — the sourced prompting reference this file defers to
+- `Sources/QwenVoiceCore/EmotionPreset.swift` — the shipped 10 presets × 2 intensity tiers of instruction copy (single source for macOS + iOS + the CLI's `bench --delivery` cells); `Sources/QwenVoiceCore/GenerationSemantics.swift` assembles the Voice Design "Voice character / Delivery" framing.

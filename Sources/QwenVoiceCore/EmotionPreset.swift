@@ -144,13 +144,33 @@ public struct EmotionPreset: Identifiable, Sendable {
     public static let neutralPresetInstruction =
         "Speak in an even, level tone, slightly monotone, with steady measured pacing and no noticeable emotion; plain and matter-of-fact throughout."
 
-    // Instruction-writing canon (Qwen3-TTS official guidance + measured adherence):
-    // - Imperative verbs (Speak / Whisper / Narrate) are followed more reliably.
-    // - Combine emotion + pace + pitch + timbre in concrete acoustic wording.
-    // - Add negative constraints for high-arousal emotions (no laughing / shouting /
-    //   gasping) to avoid literal artifacts.
-    // - Keep intelligibility clauses for quiet/fragile tiers.
-    // - Avoid stacked intensifiers; stay under the 500-character cap.
+    // Instruction-writing canon. Written without citations and audited 2026-08-02
+    // against primary sources; docs/reference/qwen3-tts-prompting-guide.md §9 holds
+    // the adjudication and references. Provenance, so a future reader can tell which
+    // of these is load-bearing:
+    // - SUPPORTED: combine emotion + pace + pitch + timbre in concrete acoustic
+    //   wording. InstructTTSEval scores this checkpoint 77-83 on explicit acoustic
+    //   specification against 61-64 on persona/role framing. Volume, speed, and tone
+    //   (distinct from emotion) are also scored features that this copy underuses.
+    // - UNVERIFIED: negative constraints for high-arousal emotions (no laughing /
+    //   shouting / gasping). No upstream source endorses them, and the nearest
+    //   published ablation found bare paralinguistic tags *reduced* adherence.
+    // - UNVERIFIED: imperative verbs (Speak / Whisper / Narrate) are followed more
+    //   reliably. Upstream examples use imperative and descriptive forms alike.
+    // - UNVERIFIED: intelligibility clauses for quiet/fragile tiers. The vendor-
+    //   documented cousin is a closing recording-quality anchor, a different
+    //   mechanism; ours is a mid-string command to the speaker, and its wording is
+    //   what makes the English diction append land unevenly across tiers (below).
+    // - PARTLY CONTRADICTED: avoid stacked intensifiers. Repetition adding nothing is
+    //   defensible; upstream's own examples are "Very happy." and "Say it in a very
+    //   angry and disappointed tone". The 500-character cap has no traceable origin.
+    //
+    // Known confound (measured 2026-08-02): happy, surprised, and dramatic suppress
+    // the English diction append on `normal` but not on `strong`, so those three
+    // presets differ across tiers by 76 characters of unrelated boilerplate as well
+    // as by emotional wording. The intensity finding below was measured over a matrix
+    // that included them. See the prompting guide §8.2; A/B the append with
+    // QWENVOICE_ENGLISH_DICTION_REINFORCEMENT=off before rewriting any copy.
     //
     // On the intensity tier, and a fix that did NOT work (measured 2026-08-02):
     //

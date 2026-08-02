@@ -173,6 +173,10 @@ The 9 preset speakers are defined in `Sources/Resources/qwenvoice_contract.json`
 
 ## 5. Generation modes
 
+> Prompt-writing depth for all three modes — what each text surface does, how the modes differ in
+> what conditioning they accept, and which claims are sourced — lives in
+> [`qwen3-tts-prompting-guide.md`](qwen3-tts-prompting-guide.md).
+
 ### 5.1 Custom Voice
 
 Use a built-in speaker and optionally steer delivery with a natural-language instruction.
@@ -279,13 +283,15 @@ Neutral is itself a real instructed preset (steady, slightly monotone) with no i
 
 > `narrator` and `news` are Voice Design brief archetypes, not delivery presets.
 
-Prompt-writing lessons baked into the preset copy:
+Prompt-writing lessons baked into the preset copy. These were written without citations; each was
+sourced or retracted on 2026-08-02, and [`qwen3-tts-prompting-guide.md`](qwen3-tts-prompting-guide.md) §9
+carries the full adjudication with references. Summary:
 
-- **Concrete acoustic wording** (pitch, pace, timbre, volume) is followed more reliably than persona-only wording.
-- **Negative constraints work** (`"joyful but without laughing"`).
-- **Stacked intensifiers do not work** (`"very very very happy"` adds no value).
-- High-arousal instructions (`happy`, `excited`, `surprised`) can otherwise trigger literal laughter or extra breath sounds; the strong tiers explicitly forbid that.
-- An intelligibility clause (`"keeping every word audible"`) helps bound extreme emotions.
+- **Concrete acoustic wording** (pitch, pace, timbre, volume) is followed more reliably than persona-only wording. *Supported* — InstructTTSEval scores our checkpoint at 77–83 on explicit acoustic specification versus 61–64 on role-play framing.
+- **Negative constraints work** (`"joyful but without laughing"`). *Unverified* — no upstream source endorses them, and the nearest published ablation found bare paralinguistic tags reduced adherence.
+- **Stacked intensifiers do not work** (`"very very very happy"` adds no value). *Partly contradicted* — repetition adding nothing is defensible, but upstream's own examples are `"Very happy."` and `"Say it in a very angry and disappointed tone"`.
+- High-arousal instructions (`happy`, `excited`, `surprised`) can otherwise trigger literal laughter or extra breath sounds; the strong tiers explicitly forbid that. *Symptom is community-reported; the remedy is the unverified part.*
+- An intelligibility clause (`"keeping every word audible"`) helps bound extreme emotions. *Unverified as written* — the vendor-documented cousin is a closing recording-quality anchor, which is a different mechanism.
 
 ---
 
@@ -486,7 +492,7 @@ These are compiled from the official docs, community reports, and Vocello's own 
 | File | What it owns |
 | --- | --- |
 | `Sources/Resources/qwenvoice_contract.json` | Model list, variants, repos/revisions, tokenizer profile, generation defaults, speaker roster. |
-| `Sources/QwenVoiceCore/EmotionPreset.swift` | 10 × 3 emotion/delivery presets and instruction copy. |
+| `Sources/QwenVoiceCore/EmotionPreset.swift` | 10 emotion/delivery presets × 2 intensity tiers, and their instruction copy. |
 | `Sources/QwenVoiceCore/GenerationSemantics.swift` | Prompt assembly, language hint logic, English diction reinforcement, prompt validation. |
 | `Sources/QwenVoiceCore/NativeCloneSupport.swift` | Reference normalization, transcript resolution, clone prompt caching, quality warnings. |
 | `Sources/QwenVoiceCore/Qwen3TTSRuntimeProfile.swift` | Runtime model-family detection, capability validation, generation-defaults parsing. |

@@ -2049,7 +2049,11 @@ scripts/macos_test.sh test
       {"cmd":"./scripts/build_foundation_targets.sh macos|ios","desc":"Compile-safety for shared framework targets"},
       {"cmd":"python3 scripts/lib/ios_platform_preflight.py check","desc":"Read-only matching Xcode iOS Platform Support check before any iOS package/build side effect"},
       {"cmd":"./scripts/release.sh","desc":"Isolated optimized signing/notarization under build/scratch and build/dist"},
-      {"cmd":"python3 scripts/build_output_policy.py status|validate","desc":"Inventory and enforce the two-cache classified output contract"}
+      {"cmd":"python3 scripts/build_output_policy.py status|validate","desc":"Inventory and enforce the two-cache classified output contract"},
+      {"cmd":"python3 scripts/roadmap.py status|validate|render","desc":"Plans, items, and progress; validate resolves every evidence reference against the repository"},
+      {"cmd":"python3 scripts/doc_metadata.py validate","desc":"Per-file doc status, pinned-body digests, and contradictions against facts derived from code"},
+      {"cmd":"python3 scripts/check_surface_coverage.py","desc":"Every enforced gate and contract is named in CLAUDE.md or a domain rule"},
+      {"cmd":"python3 scripts/check_delivery_instructions.py","desc":"Delivery-copy tier parity, repeated intensifiers, and direction conflicts"}
     ],
     "macOS test":[
       {"cmd":"scripts/macos_test.sh models ensure","desc":"Explicit repair/bootstrap for real-engine Speed model fixtures"},

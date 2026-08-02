@@ -85,6 +85,9 @@ REQUIRED_SURFACES=(
     "scripts/tests/test_check_release_notes.py"
     "scripts/check_delivery_instructions.py"
     "scripts/tests/test_check_delivery_instructions.py"
+    "scripts/check_surface_coverage.py"
+    "scripts/tests/test_check_surface_coverage.py"
+    "config/surface-coverage-exemptions.json"
     "scripts/roadmap.py"
     "scripts/tests/test_roadmap.py"
     "scripts/doc_metadata.py"
@@ -387,6 +390,9 @@ python3 "$SCRIPT_DIR/doc_metadata.py" validate
 # item cannot claim completion by asserting it; staleness is surfaced, not fatal.
 python3 "$SCRIPT_DIR/roadmap.py" validate
 python3 "$SCRIPT_DIR/roadmap.py" render --check
+# Omission check: an enforced gate or contract that no guidance names is
+# invisible to anyone reading the docs. Contradiction checks cannot see this.
+python3 "$SCRIPT_DIR/check_surface_coverage.py"
 
 "$SCRIPT_DIR/check_backend_resource_contract.sh" --project
 "$SCRIPT_DIR/check_qwen3_backend_only.sh"

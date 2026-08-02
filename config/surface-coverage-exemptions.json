@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "description": "Surfaces that scripts/check_surface_coverage.py may leave undocumented in CLAUDE.md and the domain rules. An exemption is a recorded decision, not an oversight: each one says why the surface is internal. The check fails if an exempted surface later becomes documented, so this list cannot quietly rot.",
+  "exemptions": [
+    {
+      "surface": "config/characterization-fixtures.json",
+      "why": "Fixture data for the convergence promotion gate, not a policy anyone reads or edits by hand. The gate it feeds (check_convergence_promotion_gate.py) is documented; the fixtures are its inputs.",
+      "opened": "2026-08-02"
+    },
+    {
+      "surface": "config/model-catalog-schema-v1.json",
+      "why": "Superseded schema retained so historical catalog records stay validatable. The current authority, config/model-catalog-schema-v2.json, is documented; naming both would imply a choice that no longer exists.",
+      "opened": "2026-08-02"
+    }
+  ]
+}

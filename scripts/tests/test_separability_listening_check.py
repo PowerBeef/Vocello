@@ -120,6 +120,41 @@ class ListeningCheckTests(unittest.TestCase):
         self.assertIn("p09", report["missingRatings"])
         self.assertEqual(report["unknownPairIDs"], ["nonexistent"])
 
+    def test_repeat_pairs_measure_the_listener_against_themselves(self):
+        # A repeat is the same comparison shown again with A and B swapped. The
+        # listener's agreement with themselves caps how well any metric could
+        # correlate with them.
+        manifest = CLEAN_KEY + [
+            {"id": "r01", "bucket": "repeat", "a": "p01_b", "b": "p01_a",
+             "distance": 0.9, "repeatOf": "p01"},
+            {"id": "r02", "bucket": "repeat", "a": "p09_b", "b": "p09_a",
+             "distance": 4.2, "repeatOf": "p09"},
+        ]
+        ratings = {"p01": 1, "p02": 1, "p03": 2, "p04": 2, "p05": 3,
+                   "p06": 3, "p07": 4, "p08": 4, "p09": 4, "c01": 1,
+                   "r01": 1, "r02": 3}
+        report = evaluate_listening(manifest, ratings)
+        agreement = report["selfAgreement"]
+        self.assertEqual(agreement["n"], 2)
+        self.assertEqual(agreement["exactAgreement"], 0.5)
+        self.assertEqual(agreement["withinOnePoint"], 1.0)
+        # The repeat is a second look at a comparison already counted, so it
+        # must not double-weight the correlation.
+        self.assertEqual(report["ratedPairs"], 9)
+
+    def test_arbitrary_bucket_names_are_ordered_by_their_own_distance(self):
+        # Session 2 uses distance quantiles rather than close/mid/far, and the
+        # ordering check must follow the data instead of a fixed name list.
+        manifest = key([
+            ("p01", "q1", 0.9), ("p02", "q1", 1.0),
+            ("p03", "q3", 3.6), ("p04", "q3", 3.9),
+            ("p05", "q2", 2.2), ("p06", "q2", 2.4),
+        ])
+        ratings = {"p01": 1, "p02": 1, "p03": 4, "p04": 4, "p05": 2, "p06": 3}
+        report = evaluate_listening(manifest, ratings)
+        self.assertEqual(report["bucketsByDistance"], ["q1", "q2", "q3"])
+        self.assertTrue(report["bucketsOrderedCorrectly"])
+
     def test_largest_disagreements_name_the_pairs_to_go_listen_to(self):
         ratings = {"p01": 4, "p02": 1, "p03": 1, "p04": 2, "p05": 3,
                    "p06": 3, "p07": 4, "p08": 4, "p09": 1, "c01": 1}

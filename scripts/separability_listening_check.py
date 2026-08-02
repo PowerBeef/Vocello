@@ -136,25 +136,35 @@ def evaluate_listening(key, ratings):
         if pair_id in by_id
     ]
     controls = [(entry, rating) for entry, rating in scored if entry["bucket"] == "identity"]
-    judged = [(entry, rating) for entry, rating in scored if entry["bucket"] != "identity"]
+    # Repeats are second presentations of a pair already counted; including them
+    # in the correlation would double-weight those comparisons.
+    judged = [
+        (entry, rating) for entry, rating in scored
+        if entry["bucket"] not in ("identity", "repeat")
+    ]
 
     failed_controls = [
         entry["id"] for entry, rating in controls if rating > IDENTITY_CONTROL_MAX_RATING
     ]
 
+    # Bucket names are whatever the set used -- three coarse bands in session 1,
+    # finer quantiles later -- so they are ordered by their own mean distance
+    # rather than by a fixed name list.
+    bucket_names = sorted({entry["bucket"] for entry, _ in judged})
     buckets = {}
-    for name in ("close", "mid", "far"):
+    for name in bucket_names:
         values = [rating for entry, rating in judged if entry["bucket"] == name]
+        spans = [entry["distance"] for entry, _ in judged if entry["bucket"] == name]
         if values:
             buckets[name] = {
                 "n": len(values),
                 "meanRating": round(sum(values) / len(values), 2),
+                "meanDistance": round(sum(spans) / len(spans), 3),
             }
-    ordered = (
-        len(buckets) == 3
-        and buckets["close"]["meanRating"]
-        <= buckets["mid"]["meanRating"]
-        <= buckets["far"]["meanRating"]
+    by_distance = sorted(buckets, key=lambda name: buckets[name]["meanDistance"])
+    ratings_in_order = [buckets[name]["meanRating"] for name in by_distance]
+    ordered = len(ratings_in_order) >= 2 and all(
+        earlier <= later for earlier, later in zip(ratings_in_order, ratings_in_order[1:])
     )
 
     correlation = spearman(
@@ -180,8 +190,33 @@ def evaluate_listening(key, ratings):
 
     interval = correlation_interval(correlation, len(judged))
 
+    # Repeat pairs: the same comparison presented twice with A and B swapped.
+    # A listener's agreement with themselves caps how well *any* metric could
+    # correlate with them, so without it a mediocre correlation is
+    # unattributable between a bad metric and an inconsistent ear.
+    repeat_deltas = []
+    for entry, rating in scored:
+        origin = entry.get("repeatOf")
+        if origin and origin in ratings:
+            repeat_deltas.append(abs(rating - float(ratings[origin])))
+    self_agreement = None
+    if repeat_deltas:
+        self_agreement = {
+            "n": len(repeat_deltas),
+            "meanAbsoluteDifference": round(sum(repeat_deltas) / len(repeat_deltas), 2),
+            "exactAgreement": round(
+                sum(1 for delta in repeat_deltas if delta == 0) / len(repeat_deltas), 2
+            ),
+            "withinOnePoint": round(
+                sum(1 for delta in repeat_deltas if delta <= 1) / len(repeat_deltas), 2
+            ),
+        }
+
     # How often a pair the metric calls interchangeable was actually audible.
-    close_pairs = [rating for entry, rating in judged if entry["bucket"] == "close"]
+    closest_bucket = by_distance[0] if by_distance else None
+    close_pairs = [
+        rating for entry, rating in judged if entry["bucket"] == closest_bucket
+    ]
     close_audible = sum(1 for rating in close_pairs if rating >= CLOSE_BUCKET_AUDIBLE_RATING)
     scale_miscalibrated = bool(close_pairs) and close_audible > len(close_pairs) / 2
 
@@ -220,7 +255,9 @@ def evaluate_listening(key, ratings):
         ),
         "absoluteScaleMiscalibrated": scale_miscalibrated,
         "bucketMeans": buckets,
+        "bucketsByDistance": by_distance,
         "bucketsOrderedCorrectly": ordered,
+        "selfAgreement": self_agreement,
         "identityControls": {
             "n": len(controls),
             "failed": failed_controls,
@@ -263,11 +300,20 @@ def main():
             + ("  → absolute distance is miscalibrated"
                if report["absoluteScaleMiscalibrated"] else "")
         )
-    for name in ("close", "mid", "far"):
-        entry = report["bucketMeans"].get(name)
-        if entry:
-            print(f"  {name:6} mean rating {entry['meanRating']}  (n={entry['n']})")
+    for name in report["bucketsByDistance"]:
+        entry = report["bucketMeans"][name]
+        print(
+            f"  {name:8} mean rating {entry['meanRating']}  "
+            f"(distance {entry['meanDistance']}, n={entry['n']})"
+        )
     print(f"  buckets ordered correctly: {report['bucketsOrderedCorrectly']}")
+    agreement = report.get("selfAgreement")
+    if agreement:
+        print(
+            f"  listener self-agreement on {agreement['n']} repeats: "
+            f"exact {agreement['exactAgreement']}, within one point "
+            f"{agreement['withinOnePoint']} (mean gap {agreement['meanAbsoluteDifference']})"
+        )
     controls = report["identityControls"]
     print(f"  identity controls: {controls['n']}, failed: {controls['failed'] or 'none'}")
     if report["missingRatings"]:

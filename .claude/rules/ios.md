@@ -41,6 +41,7 @@ Before changing iOS UI or behavior, read:
   - `scripts/ios_device.sh profile [--kind cpu|memory] [--keep-trace] [spec]`
   - `scripts/ios_device.sh memory --voice-id ID [--label ID]` (one-process retained-memory sequence)
   - `scripts/ios_device.sh clone-conditioning [--label ID]` (compile-gated, local-only transcript-backed versus x-vector proof; no history publication)
+  - `scripts/ios_device.sh enroll-clone-fixture --wav W.wav --transcript W.txt` (headless benchmark-fixture voice enrollment; the iPhone app ships no file-import UI)
   - `scripts/ios_device.sh memory-field-report [pulled-diagnostics]` (local-only; never contacts the phone)
   - `scripts/ios_device.sh crashes`
   - `scripts/ios_device.sh gate`

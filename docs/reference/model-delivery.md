@@ -104,6 +104,12 @@ delivered Custom full-wire (2,312,057,897 bytes) then Design and Clone with exac
 shared-component reuse (wire 1,629,761,538 and 1,653,779,429; zero duplicates, zero retries,
 nominal thermal). Observed disk cost on the Mac was 12 GiB for the 16.2 GB catalog total.
 
+> **Currency note (2026-08-01):** artifactVersion **2026.08.01.1** halves the shared
+> speech tokenizer to f16 (341,179,884 bytes, digest `88f0a51a…`; OPTIMIZATION.md §R).
+> The live-validation record above remains exact history for the 2026.07.26.1
+> generation; fresh post-change delivery evidence rides the next release's battery per
+> the standing rule that static completeness never substitutes for live proof.
+
 The iOS ledger is atomically written, versioned, and contains only privacy-safe identifiers and
 relative paths. It records the logical request, model and artifact version, expected and verified
 files, retries, monotonic received bytes, and terminal state. A one-time migration cancels the old

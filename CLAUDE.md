@@ -10,7 +10,7 @@
 
 **Vocello** (`Vocello` repo, formerly `QwenVoice`; the local checkout directory and Xcode project keep the old name): local-first TTS on Apple Silicon — **Qwen3-TTS + MLX**, Swift 6, macOS/iOS 26+. No bundled weights; models download from Hugging Face. Also ships the `vocello` CLI, `scripts/`, benchmarks, and `website/`.
 
-macOS **2.3.0** released; iOS build 22 (v2.3.0) is the current TestFlight build — internal group live, and the
+macOS **2.4.0** released (2026-08-01); iOS build 23 (v2.4.0) is the current TestFlight build (submitted to beta review with distribution to both groups) — internal group live, and the
 **public beta link is live** (approved 2026-07-28): `https://testflight.apple.com/join/Cvp6yCv7`,
 linked from the README, the repo description, and the website.
 Releases are cut only on an explicit maintainer call — landed roadmap work never implies one.
@@ -264,6 +264,7 @@ scripts/ios_device.sh speech-assets
 scripts/ios_device.sh profile --kind memory
 scripts/ios_device.sh memory --voice-id <saved-voice-id> --label retained-check
 scripts/ios_device.sh clone-conditioning --label focused-clone-proof  # local two-mode semantic proof
+scripts/ios_device.sh enroll-clone-fixture --wav W.wav --transcript W.txt  # headless fixture voice enrollment
 scripts/ios_device.sh memory-field-report       # local-only delayed MetricKit aggregate
 python3 scripts/build_output_policy.py status
 python3 scripts/build_output_policy.py validate

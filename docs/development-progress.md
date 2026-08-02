@@ -32,7 +32,7 @@ machine-readable status record and wins over any older prose.
 | 6 — Telemetry v9 | Closed 2026-07-20: complete v9 sidecars are the history authority; the JSONL envelope remains schema v8. |
 | 7 — UI-context gap | Closed 2026-07-23 in two acts (OPTIMIZATION.md §J/§K): XCUITest screen recording was the canonical decline (fixed via `preferredScreenCaptureFormat: screenshots`); the honest residual was Liquid Glass compositor work, shipped as the generation performance gate (macOS; iOS applies it on fixed-refresh displays only). XPC topology itself measures ~3%. |
 | 8 — Shared component storage | Closed 2026-07-23 with live all-artifact validation on both canonical platforms (exact reuse, single tokenizer inode; `docs/reference/model-delivery.md`). |
-| 9 — Runtime component reuse | Closed 2026-07-26. Speech-tokenizer residency ships on macOS behind host-attested content identity; byte-identical fixed-seed switch A/B, adoption probe 503→0 ms, retained-memory qualification PASS on the 8 GB floor (`mac-memory-qualification-20260726-115343-5a1c8a85`). iOS became adaptive-dark 2026-08-01: a device-class gate (8 GB minimum) ships behind `iosAdaptiveResidencyQualified = false` pending the on-device retained-memory qualification; `QWENVOICE_TOKENIZER_RESIDENCY` is now a two-way debug switch (`off` disables anywhere, `on` force-enables for the qualification lane). 6 GB devices stay non-resident regardless. |
+| 9 — Runtime component reuse | Closed 2026-07-26. Speech-tokenizer residency ships on macOS behind host-attested content identity; byte-identical fixed-seed switch A/B, adoption probe 503→0 ms, retained-memory qualification PASS on the 8 GB floor (`mac-memory-qualification-20260726-115343-5a1c8a85`). iOS went adaptive-LIVE 2026-08-02: the device-class gate (8 GB minimum) ships enabled after the default-state on-device qualification passed (`ios-memory-qualification-20260802-011251`; engagement proven by load-event counts — one tokenizer load across the mode-switch sequence instead of three). `QWENVOICE_TOKENIZER_RESIDENCY` is a two-way debug switch (`off` disables anywhere, `on` force-enables). 6 GB devices stay non-resident regardless. |
 | 10 — Spoken-text planning | Closed 2026-08-01: every take now speaks the conservatively normalized script at the engine entry (prompt assembly, language detection, QC pause budget, and telemetry evidence all see the same spoken text; transformed takes record `spokenTextTransformations` + digest). The fixed bench corpus is normalization-invariant by a standing core test, and the fixed-seed A/B on the medium corpus text was byte-identical across the change. Long-form/batch upstream planning passes through unchanged (idempotent). |
 | 11 — Long-form v4 | Stages A–E shipping on both platforms: planner-owned segmentation with per-segment sub-seeds, sequential streaming execution, bounded assembly, manifest v4, resume, grouped History projects. macOS acceptance 2026-07-23 (`macos-xcui-smoke-20260723-195700-ab46482a`); iPhone acceptance 2026-07-24 (`ios-xcui-smoke-20260724-183626-f9961535`). iOS single-segment regeneration device-accepted 2026-08-01 (smoke run `ios-xcui-smoke-20260801-142416-79615150`: the retained project's segments chip opens a confirmation dialog, segment 1 regenerates with a fresh recorded seed, the joined output reassembles, and History keeps the lineage searchable — longFormV4 residual closed); line batch stays removed from iOS by design; legacy XPC `generateBatch` retired 2026-07-24. |
 | 12 — Bounded analysis and unified quality | Fast-depth registry shipping 2026-07-26 (typed `GenerationQualityReport` + fail-closed `QualityGateRegistry` verdict in telemetry notes on every finalization, live-verified). Same-day additions: the standard/canonical `deepReport` producer, per-take prosody gate verdicts on the bench sidecar (folded into history warnings), typed `languageASR` and `longFormContinuity` gates, and the advisory speaker-similarity dev metric. Composed standard-depth verdicts went live on the delivery bench 2026-08-01 (`bench-quality-composed.json`, proof run `macos-engine-20260801-010135-6607009f`): the sidecar prosody gate folds into `deepReport` with a fast-consistency guard and fail-closed missing analyzers. Canonical depth followed the same day: the promoted delivery-adherence rule v1 (per-preset signed expectations + intensity scaling in prosody profile v2, warn-first) emits a real `.delivery` gate per delivery take, the publisher banks the paired neutral-vs-instructed deltas, and the first canonical proof run (`macos-engine-20260801-024556-e826c4ec`, 18 delivery cells, seed 20260801) composed 3 pass / 15 warning / 0 fail across all seven gates. Open: threshold recalibration from the banked seed matrix; optional MOS-proxy. |
@@ -42,9 +42,14 @@ machine-readable status record and wins over any older prose.
 ## Resume here (2026-08-01)
 
 Stages 0–3 of the adopted roadmap are complete (the 2.2 artifact promotion included);
-Stage 4 stays gated. **v2.3.0 was cut 2026-07-31 on an explicit maintainer call** with the
-evidence battery deliberately mid-flight (deterministic publishing rule; deferral recorded
-below and in the release notes). The battery on the 2026.07.26.1 artifacts is more than
+Stage 4 closed with the kept 0.31.6 pin bump. **v2.3.0 was cut 2026-07-31 and v2.4.0 on
+2026-08-01** (both explicit maintainer calls): 2.4.0 shipped the delivery-preset rework
+(verified rewrites, Neutral as a real preset), iPhone long-form segment regeneration,
+spoken-text normalization, and the runtime refresh — macOS published, iOS build 23
+distributed to both TestFlight groups with review submitted. The f16 codec promotion
+(artifactVersion 2026.08.01.1) landed post-release; users receive it when the next app
+release bundles the new catalog, and its fixture rebind + delivery proof + memory
+re-qualification ride that release's battery. The battery on the 2026.07.26.1 artifacts is more than
 half banked, and its device lanes surfaced and shipped real fixes along the way:
 
 - **Banked (committed, PASS):** three clean CLI engine controls (the first schema-v3
@@ -339,8 +344,9 @@ Status report: [`docs/reference/runtime-refactor-status-report.md`](reference/ru
 - The generated cross-platform production model catalog (schema v2) is complete for all six
   Speed/Quality artifacts with exact pinned identities and the shared `speech_tokenizer`
   component; all hosts resolve the same delivery plan; reconciliation authenticates every catalog
-  file before reuse and failed checks grant no bytes. Since 2026-07-26 the pins are the
-  `PowerBeef02` 8-bit-embedding artifacts at **2026.07.26.1**, and installed models carry
+  file before reuse and failed checks grant no bytes. Since 2026-08-01 the pins are the
+  `PowerBeef02` artifacts at **2026.08.01.1** (8-bit talker embedding + f16 speech
+  tokenizer, §R); installed models carry
   stale-artifact update detection with visible Update states on both platforms (repair runs
   through the ordinary authenticated delivery path). Live delivery validation: 2026-07-23
   six-artifact isolated Mac run + three-artifact iPhone lane; 2026-07-26 isolated Mac proof from

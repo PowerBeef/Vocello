@@ -24,7 +24,7 @@
 | clone-conditioning | backend | 31 | 2 / 32 | macos: fresh, ios: stale |
 | event-delivery | backend | 3 | 2 / 10 | macos: fresh, ios: fresh |
 | memory-policy | backend-platform | 6 | 2 / 25 | macos: stale, ios: stale |
-| model-delivery | backend-platform | 17 | 3 / 37 | macos: fresh, ios: fresh |
+| model-delivery | backend-platform | 17 | 3 / 37 | macos: stale, ios: stale |
 | xpc-transport | macos | 3 | 3 / 15 | macos: fresh |
 | benchmark-validation | release-qa | 6 | 4 / 118 | macos: stale, ios: stale |
 | orchestration-assurance | release-qa | 3 | 1 / 12 | not hardware-gated |

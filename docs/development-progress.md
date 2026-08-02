@@ -130,8 +130,14 @@ performance block after the fixture rebind, Tier 4 carryover). Immediate specifi
    on medium (6/6 seeds), maintainer-ratified do-NOT, branch preserved; F7
    was not triggered, so the 26.0 floors stand. Full record:
    `benchmarks/OPTIMIZATION.md` §Q. With Gate 2 withdrawn by Gate 0, the
-   2026-08 performance block is closed; Tier 4 (long-form text-context
-   carryover, design pass first) is the next open roadmap work.
+   2026-08 performance block is closed.
+6. **Codec f16 promotion (2026-08-01, maintainer-approved, §R):** the speech
+   tokenizer ships at half precision on both platforms as artifactVersion
+   2026.08.01.1 — −234 MB resident during every generation, −341 MB installed,
+   ~5% warm RTF cost accepted, waveform SNR 55-58 dB vs fp32, QC clean. All six
+   repos re-pinned, catalog complete, URLs live-verified. Public disk-size copy
+   and the update-available user path ride the next app release (bundled
+   catalog); fixture rebind + memory re-qual ride that release's battery.
 
 6. **Brand + iPhone clone-surface change (2026-08-01, post-2.4.0):** the public surfaces
    (README, website hero) feature the slogan "Premium voice studio. Proven performance.

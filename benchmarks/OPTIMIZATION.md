@@ -1148,7 +1148,24 @@ short/medium/long × warm 3 at the canonical seed.
   variant** — §N chose bf16 only because f16 could not load on 0.30.6; f16 is ~16 dB
   cleaner and µ-probed faster.
 
-**Standing decision (maintainer):** the trade is unchanged from §N — −234 MB resident
+- **Promotion executed (2026-08-01, maintainer-approved — unified f16 on both
+  platforms).** The maintainer chose the unified route over a per-platform split
+  (multitasking headroom on entry-level Macs plus one artifact chain to maintain).
+  `scripts/convert_codec_f16.py` (deterministic, numpy-only, input-census guarded)
+  produced the promotion file byte-identical in payload to the validated experiment
+  arm (output `88f0a51a…`, 341,179,884 bytes), re-validated by a bench run against
+  the exact promotion bytes (QC clean, f16 timing signature, MLX active 1593 MB).
+  The shared component was uploaded to all six PowerBeef02 repos (single blob,
+  deduplicated), the contract, Quality receipts, and bundled iOS Speed catalog
+  re-pinned to the six new revisions as artifactVersion **2026.08.01.1**
+  (estimatedDownloadBytes −341,113,208 each), the production catalog regenerated,
+  `model_catalog_contract.py validate --require-complete` PASS, and every pinned
+  URL live-verified at the exact byte count. Users receive the smaller component
+  via Settings → Update available once an app release bundles the new catalog;
+  fresh fixture identities, delivery proof, and memory re-qualification ride that
+  release's QA battery per the 2.2 precedent.
+
+**Original decision framing (resolved above):** the trade is unchanged from §N — −234 MB resident
 and −325 MB installed per Speed chain for ~5% warm RTF — but its value is
 platform-asymmetric: on iPhone the resident saving is Jetsam headroom and could make
 speech-tokenizer residency affordable there (503 → 0 ms model switches, §N phase 9

@@ -1,0 +1,210 @@
+{
+  "schemaVersion": 1,
+  "description": "Single source of truth for plans, items, and progress. Narrative documents cite this file rather than restating it. Validated by scripts/roadmap.py: every evidence reference is resolved against the repository, so an item cannot claim completion by asserting it. Rendered to docs/ROADMAP.md.",
+  "plans": [
+    {
+      "id": "convergence-metal4-stage4-2026-08",
+      "title": "Convergence residuals, Metal 4 study, and Stage 4",
+      "status": "active",
+      "owner": "backend-and-platform",
+      "adopted": "2026-07-31",
+      "goal": "Close the open contract-phase residuals, work through the phone-gated evidence battery, and take Stage 4 as revised by the Metal 4 tensor feasibility study. Interleaved by cost; no item implies a release.",
+      "authority": "docs/reference/roadmap-2026-08.md"
+    },
+    {
+      "id": "delivery-prompting-2026-08",
+      "title": "Delivery instruction quality and Qwen3-TTS prompting",
+      "status": "active",
+      "owner": "backend-mlx",
+      "adopted": "2026-08-02",
+      "goal": "Establish from primary sources how Qwen3-TTS is meant to be prompted, then settle by measurement whether the shipped delivery-preset copy is the reason takes are reported as not reading like the requested emotion. No preset copy changes without evidence.",
+      "authority": "docs/reference/qwen3-tts-prompting-guide.md"
+    },
+    {
+      "id": "doc-governance-2026-08",
+      "title": "Documentation governance and staleness control",
+      "status": "active",
+      "owner": "release-qa",
+      "adopted": "2026-08-02",
+      "goal": "Make documentation state machine-checkable: pin historical records against accidental modification, derive facts from code so prose cannot silently contradict them, and give agents a queryable index instead of a directory to glob.",
+      "authority": "docs/reference/qwen3-tts-prompting-guide.md"
+    }
+  ],
+  "items": [
+    {
+      "id": "CM-1",
+      "plan": "convergence-metal4-stage4-2026-08",
+      "title": "Stage 4 mlx pin bump to the newest lockstep pair",
+      "status": "done",
+      "legacyIds": ["Tier 3.1"],
+      "gate": "Same-day A/B on the canonical matrix; keep only on a non-regression.",
+      "evidence": ["commit:19ea7e8", "doc:docs/reference/roadmap-2026-08.md"],
+      "sourceOfTruth": ["Package.resolved"],
+      "updated": "2026-08-01"
+    },
+    {
+      "id": "CM-2",
+      "plan": "convergence-metal4-stage4-2026-08",
+      "title": "P1b static-shape talker compile",
+      "status": "declined",
+      "legacyIds": ["P1b", "Tier 3.2"],
+      "reason": "Confirmed null on 0.31.6: no measurable effect against the pre-registered gate. Recorded as a do-NOT so it is not retried without a new premise.",
+      "evidence": ["doc:docs/reference/roadmap-2026-08.md"],
+      "updated": "2026-08-01"
+    },
+    {
+      "id": "CM-3",
+      "plan": "convergence-metal4-stage4-2026-08",
+      "title": "Gate 2 — Candidate A fused code-predictor kernel",
+      "status": "declined",
+      "legacyIds": ["Gate 2", "Tier 3.3"],
+      "reason": "Withdrawn 2026-08-01 at Gate 0; the premise did not survive its own falsifiability rail.",
+      "evidence": ["doc:docs/reference/roadmap-2026-08.md"],
+      "updated": "2026-08-01"
+    },
+    {
+      "id": "CM-4",
+      "plan": "convergence-metal4-stage4-2026-08",
+      "title": "Long-form text-context carryover, text first",
+      "status": "in-flight",
+      "legacyIds": ["Tier 4", "Q2"],
+      "gate": "Planner-only change proved on text before any acoustic carryover is attempted.",
+      "evidence": ["commit:bd92a59", "commit:59458bc"],
+      "sourceOfTruth": ["Sources/QwenVoiceCore/LongFormPlanning.swift"],
+      "updated": "2026-08-01"
+    },
+    {
+      "id": "CM-5",
+      "plan": "convergence-metal4-stage4-2026-08",
+      "title": "Phone-gated evidence battery remainder",
+      "status": "in-flight",
+      "gate": "One sitting with the phone unlocked and Auto-Lock Never; iOS control lanes re-run against the current artifacts.",
+      "evidence": ["doc:docs/reference/roadmap-2026-08.md"],
+      "updated": "2026-08-01"
+    },
+    {
+      "id": "CM-6",
+      "plan": "convergence-metal4-stage4-2026-08",
+      "title": "MOS-proxy advisory column (UTMOSv2)",
+      "status": "parked",
+      "unparkWhen": "Only opportunistically, and only as a dev-lane advisory column. It must never become a gate or a publication input.",
+      "evidence": ["doc:docs/reference/roadmap-2026-08.md"],
+      "updated": "2026-08-01"
+    },
+    {
+      "id": "DP-1",
+      "plan": "delivery-prompting-2026-08",
+      "title": "Sourced Qwen3-TTS prompting guide with per-claim provenance",
+      "status": "done",
+      "gate": "Every substantive claim labelled OFFICIAL / RESEARCH / MEASURED-HERE / COMMUNITY / UNVERIFIED, and the repo's unsourced canon adjudicated item by item.",
+      "evidence": ["commit:c14651c", "doc:docs/reference/qwen3-tts-prompting-guide.md"],
+      "sourceOfTruth": ["Sources/QwenVoiceCore/EmotionPreset.swift"],
+      "updated": "2026-08-02"
+    },
+    {
+      "id": "DP-2",
+      "plan": "delivery-prompting-2026-08",
+      "title": "Deterministic delivery-instruction contract gate",
+      "status": "done",
+      "gate": "Fails on append parity across a preset's tiers and on repeated intensifiers; reports direction conflicts against an acknowledgement file so no blind copy edit is forced.",
+      "evidence": ["commit:6f4c651", "file:scripts/check_delivery_instructions.py"],
+      "sourceOfTruth": ["Sources/QwenVoiceCore/GenerationSemantics.swift"],
+      "updated": "2026-08-02"
+    },
+    {
+      "id": "DP-3",
+      "plan": "delivery-prompting-2026-08",
+      "title": "Short-versus-long instruction A/B",
+      "status": "planned",
+      "gate": "Same preset and seeds: official-style short form against the shipped long form. Paired Wilcoxon with BH correction over the delivery matrix.",
+      "blockedBy": ["DP-2"],
+      "sourceOfTruth": ["Sources/QwenVoiceCore/EmotionPreset.swift"],
+      "updated": "2026-08-02"
+    },
+    {
+      "id": "DP-4",
+      "plan": "delivery-prompting-2026-08",
+      "title": "English diction append: does it earn its place",
+      "status": "planned",
+      "gate": "Delivery matrix with QWENVOICE_ENGLISH_DICTION_REINFORCEMENT=off against the shipped default.",
+      "blockedBy": ["DP-2"],
+      "sourceOfTruth": ["Sources/QwenVoiceCore/GenerationSemantics.swift"],
+      "updated": "2026-08-02"
+    },
+    {
+      "id": "DP-5",
+      "plan": "delivery-prompting-2026-08",
+      "title": "Voice Design merge template versus plain concatenation",
+      "status": "planned",
+      "gate": "The repo-invented 'Voice character: X. Delivery: Y.' framing against plain concatenation and against identity-first ordering with a closing quality anchor.",
+      "blockedBy": ["DP-2"],
+      "sourceOfTruth": ["Sources/QwenVoiceCore/GenerationSemantics.swift"],
+      "updated": "2026-08-02"
+    },
+    {
+      "id": "DP-6",
+      "plan": "delivery-prompting-2026-08",
+      "title": "Angry pitch-axis contradiction",
+      "status": "planned",
+      "gate": "Measure which pitch direction actually reads as angry, then correct whichever of the copy or the expectation lost. The expectation is not automatically the authority.",
+      "blockedBy": ["DP-3"],
+      "sourceOfTruth": ["Sources/QwenVoiceCore/EmotionPreset.swift", "scripts/prosody_profile.py"],
+      "updated": "2026-08-02"
+    },
+    {
+      "id": "DG-1",
+      "plan": "doc-governance-2026-08",
+      "title": "Per-file documentation metadata with derived-fact scanning",
+      "status": "done",
+      "gate": "Catches the 2026-08-01 stale tier count, which a git co-change check provably would not; pinned bodies fail the gate on accidental modification.",
+      "evidence": ["commit:3ed09cb", "file:scripts/doc_metadata.py"],
+      "updated": "2026-08-02"
+    },
+    {
+      "id": "DG-2",
+      "plan": "doc-governance-2026-08",
+      "title": "Phase 1 — pin every historical document",
+      "status": "done",
+      "gate": "docs/research, docs/audits/archive, and docs/releases sealed by body digest.",
+      "evidence": ["commit:3ed09cb", "file:docs/INDEX.json"],
+      "updated": "2026-08-02"
+    },
+    {
+      "id": "DG-3",
+      "plan": "doc-governance-2026-08",
+      "title": "Phase 2 — reclassify the nine misfiled point-in-time reports",
+      "status": "planned",
+      "gate": "Every dated report under docs/reference carries historical or superseded status, following the backend-optimization-research-report precedent.",
+      "blockedBy": ["DG-1"],
+      "updated": "2026-08-02"
+    },
+    {
+      "id": "DG-4",
+      "plan": "doc-governance-2026-08",
+      "title": "Phase 3 — source bindings on active documents",
+      "status": "planned",
+      "gate": "Annotated incrementally as documents are touched; a binding invented in bulk without reading the document is worse than none.",
+      "blockedBy": ["DG-1"],
+      "updated": "2026-08-02"
+    },
+    {
+      "id": "DG-5",
+      "plan": "doc-governance-2026-08",
+      "title": "Single-source-of-truth roadmap system",
+      "status": "in-flight",
+      "gate": "Multiple concurrent plans; every evidence reference resolved against the repository; staleness surfaced automatically.",
+      "evidence": ["file:scripts/roadmap.py"],
+      "updated": "2026-08-02"
+    },
+    {
+      "id": "DG-6",
+      "plan": "doc-governance-2026-08",
+      "title": "Security workflow starvation on main",
+      "status": "done",
+      "gate": "CodeQL runs to completion on main instead of being cancelled by the next push; branches still supersede.",
+      "evidence": ["commit:6e8f8b2", "file:.github/workflows/security.yml"],
+      "sourceOfTruth": [".github/workflows/security.yml"],
+      "updated": "2026-08-02"
+    }
+  ]
+}

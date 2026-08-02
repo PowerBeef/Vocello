@@ -634,6 +634,7 @@ python3 -m unittest \
   scripts.tests.test_check_release_notes \
   scripts.tests.test_check_delivery_instructions \
   scripts.tests.test_doc_metadata \
+  scripts.tests.test_roadmap \
   scripts.tests.test_publish_benchmark_history \
   scripts.tests.test_check_ios_clone_conditioning \
   scripts.tests.test_check_ios_smoke_acceptance \

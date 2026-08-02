@@ -72,6 +72,27 @@ ARTIFACTS: tuple[DerivedArtifact, ...] = (
         rebuild=("python3", "scripts/generate_readme_charts.py"),
         stale_markers=("README charts are stale",),
     ),
+    DerivedArtifact(
+        artifact_id="derived-doc-facts",
+        description="config/derived-doc-facts.json",
+        check=("python3", "scripts/doc_metadata.py", "derive-facts", "--check"),
+        rebuild=("python3", "scripts/doc_metadata.py", "derive-facts"),
+        stale_markers=("derived-doc-facts.json is stale",),
+    ),
+    DerivedArtifact(
+        artifact_id="documentation-metadata-index",
+        description="docs/INDEX.json",
+        check=("python3", "scripts/doc_metadata.py", "rebuild-index", "--check"),
+        rebuild=("python3", "scripts/doc_metadata.py", "rebuild-index"),
+        stale_markers=("docs/INDEX.json is stale",),
+    ),
+    DerivedArtifact(
+        artifact_id="roadmap-render",
+        description="docs/ROADMAP.md",
+        check=("python3", "scripts/roadmap.py", "render", "--check"),
+        rebuild=("python3", "scripts/roadmap.py", "render"),
+        stale_markers=("docs/ROADMAP.md is stale",),
+    ),
 )
 
 
@@ -177,6 +198,9 @@ def validate_all(root: Path) -> int:
         ("python3", "scripts/project_health.py", "rebuild-summary", "--check"),
         ("python3", "scripts/documentation_contract.py", "rebuild-index", "--check"),
         ("python3", "scripts/model_catalog_contract.py", "rebuild", "--check"),
+        ("python3", "scripts/doc_metadata.py", "derive-facts", "--check"),
+        ("python3", "scripts/doc_metadata.py", "rebuild-index", "--check"),
+        ("python3", "scripts/roadmap.py", "render", "--check"),
     )
     for command in commands:
         result = run_command(command, cwd=root)

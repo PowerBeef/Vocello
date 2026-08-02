@@ -85,6 +85,8 @@ REQUIRED_SURFACES=(
     "scripts/tests/test_check_release_notes.py"
     "scripts/check_delivery_instructions.py"
     "scripts/tests/test_check_delivery_instructions.py"
+    "scripts/roadmap.py"
+    "scripts/tests/test_roadmap.py"
     "scripts/doc_metadata.py"
     "scripts/tests/test_doc_metadata.py"
     "scripts/release.sh"
@@ -102,6 +104,8 @@ REQUIRED_SURFACES=(
     "config/build-output-policy.json"
     "config/delivery-instruction-contract.json"
     "config/derived-doc-facts.json"
+    "config/roadmap.json"
+    "docs/ROADMAP.md"
     "config/public-product-facts.json"
     "docs/INDEX.json"
     "config/codex-session-storage-policy.json"
@@ -379,6 +383,10 @@ python3 "$SCRIPT_DIR/check_delivery_instructions.py"
 python3 "$SCRIPT_DIR/doc_metadata.py" derive-facts --check
 python3 "$SCRIPT_DIR/doc_metadata.py" rebuild-index --check
 python3 "$SCRIPT_DIR/doc_metadata.py" validate
+# Roadmap state. Evidence references are resolved against the repository, so an
+# item cannot claim completion by asserting it; staleness is surfaced, not fatal.
+python3 "$SCRIPT_DIR/roadmap.py" validate
+python3 "$SCRIPT_DIR/roadmap.py" render --check
 
 "$SCRIPT_DIR/check_backend_resource_contract.sh" --project
 "$SCRIPT_DIR/check_qwen3_backend_only.sh"

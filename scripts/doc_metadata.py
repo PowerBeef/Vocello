@@ -103,12 +103,24 @@ def body_digest(body: str) -> str:
     return "sha256:" + hashlib.sha256(body.encode("utf-8")).hexdigest()
 
 
+# Generated documents are output, not authored prose. They carry no frontmatter
+# by design, and counting them as "not yet annotated" would leave the rollout
+# coverage number permanently short of complete.
+GENERATED_DOCS = frozenset({
+    "docs/INDEX.md",
+    "docs/ROADMAP.md",
+    "docs/project-health.md",
+})
+
+
 def iter_docs(root: pathlib.Path):
     for doc_root in DOC_ROOTS:
         base = root / doc_root
         if not base.exists():
             continue
         for path in sorted(base.rglob("*.md")):
+            if path.relative_to(root).as_posix() in GENERATED_DOCS:
+                continue
             yield path
 
 

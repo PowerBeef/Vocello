@@ -5,7 +5,7 @@
 
 - Current source identity and dirty state: local JSON report only (kept out of the tracked snapshot to avoid self-referential drift)
 - Swift tests: 448 cases in 61 files
-- Python tests: 835 cases in 65 files
+- Python tests: 862 cases in 66 files
 - Required-step assurance: 59 steps across 13 workflows, all covered by forced-failure fixtures
 - Unsafe-concurrency annotations: 47 (47 registered with owner and invariant; contract complete)
 
@@ -28,7 +28,7 @@
 | xpc-transport | macos | 3 | 3 / 15 | macos: fresh |
 | benchmark-validation | release-qa | 6 | 4 / 118 | macos: stale, ios: stale |
 | orchestration-assurance | release-qa | 3 | 1 / 12 | not hardware-gated |
-| release-supply-chain | release-qa | 6 | 3 / 51 | macos: fresh |
+| release-supply-chain | release-qa | 6 | 3 / 51 | macos: stale |
 | persistence-privacy | platform-release-qa | 4 | 2 / 7 | not hardware-gated |
 | runtime-hardening | backend-release-qa | 5 | 2 / 17 | not hardware-gated |
 

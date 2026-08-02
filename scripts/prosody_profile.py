@@ -161,13 +161,33 @@ BUILTIN_PROFILE = {
         "max_rate_ratio_deviation": 0.30,
         "max_abs_voiced_fraction_delta": 0.20,
     },
+    # Cross-preset separability bounds. Every other delivery check asks whether
+    # a preset moved prosody in its own direction; this one asks whether the
+    # presets remain distinguishable from each other, which is where "at strong
+    # intensity everything sounds angry" lives. Seeded conservatively and
+    # pending calibration from the first powered matrix: the point of the first
+    # run is to measure today's separability, not to pass a guessed bar.
+    "separability": {
+        "minimum_seeds_per_cell": 3,
+        "minimum_cell_recall": 0.50,
+        "minimum_pair_margin": 1.0,
+        # Flag when the strong tier's mean inter-cell distance falls below this
+        # fraction of the normal tier's: intensity should push cells apart.
+        "intensity_collapse_ratio": 1.0,
+        "covariance_ridge": 0.10,
+    },
 }
 
 
 _EXPECTATION_TIERS = ("required", "supporting")
 
 
-_ADDON_BLOCKS = ("delivery_expectations", "neutral_consistency", "clone_fidelity")
+_ADDON_BLOCKS = (
+    "delivery_expectations",
+    "neutral_consistency",
+    "clone_fidelity",
+    "separability",
+)
 
 
 def migrate_profile(profile):
@@ -253,6 +273,22 @@ def _validate_neutral_consistency(block):
             raise ValueError(f"neutral_consistency.{key} must be a positive number")
 
 
+def _validate_separability(block):
+    if not isinstance(block, dict):
+        raise ValueError("separability must be an object")
+    required = set(BUILTIN_PROFILE["separability"].keys())
+    present = set(block.keys())
+    if present != required:
+        raise ValueError(
+            f"separability keys mismatch: missing {required - present}, extra {present - required}"
+        )
+    for key, value in block.items():
+        if not isinstance(value, (int, float)) or isinstance(value, bool) or value <= 0:
+            raise ValueError(f"separability.{key} must be a positive number")
+    if not 0.0 < block["minimum_cell_recall"] <= 1.0:
+        raise ValueError("separability.minimum_cell_recall must fall in (0, 1]")
+
+
 def validate_profile(profile):
     """Return profile if valid, else raise ValueError with a clear message."""
     if not isinstance(profile, dict):
@@ -279,6 +315,7 @@ def validate_profile(profile):
     _validate_delivery_expectations(profile["delivery_expectations"])
     _validate_neutral_consistency(profile["neutral_consistency"])
     _validate_clone_fidelity(profile["clone_fidelity"])
+    _validate_separability(profile["separability"])
     analyzer_version = profile.get("analyzer_algorithm_version")
     if analyzer_version is not None and (
         not isinstance(analyzer_version, int) or analyzer_version < 1
@@ -345,4 +382,11 @@ def clone_fidelity_bound(profile, key):
     """Read a clone-fidelity bound, with built-in fallback."""
     return profile.get("clone_fidelity", {}).get(
         key, BUILTIN_PROFILE["clone_fidelity"][key]
+    )
+
+
+def separability_bound(profile, key):
+    """Read a cross-preset separability bound, with built-in fallback."""
+    return profile.get("separability", {}).get(
+        key, BUILTIN_PROFILE["separability"][key]
     )

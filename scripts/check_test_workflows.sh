@@ -644,6 +644,7 @@ python3 -m unittest \
   scripts.tests.test_analyze_delivery \
   scripts.tests.test_prosody_quality_gate \
   scripts.tests.test_delivery_quality_gate \
+  scripts.tests.test_delivery_separability \
   scripts.tests.test_emotion_advisory \
   scripts.tests.test_clone_prosody_fidelity \
   scripts.tests.test_clone_fidelity_lane \

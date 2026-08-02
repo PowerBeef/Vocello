@@ -416,12 +416,15 @@ final class Qwen3TTSPreparedComponentCache: Sendable {
     /// Adaptive iOS residency (2026-08-01): the f16 codec promotion (§R) cut
     /// the resident decoder to ~218 MB, making residency a candidate on the
     /// 8 GB device class (the Mac's model-switch win is 503 → 0 ms). The
-    /// device-class heuristic below stays dark until the on-device
-    /// retained-memory qualification passes at the next phone window —
-    /// force-enable for that lane with QWENVOICE_TOKENIZER_RESIDENCY=on
-    /// (debug-gated). Pressure ownership is unchanged either way: critical
-    /// trim and full unload invalidate the resident cache regardless.
-    static let iosAdaptiveResidencyQualified = false
+    /// device-class heuristic qualified 2026-08-02 on the paired iPhone 17
+    /// Pro with this exact build in its default state:
+    /// ios-memory-qualification-20260802-011251 — memoryQualified true, QC
+    /// clean, and engagement proven by load-event counts (one speech-tokenizer
+    /// load for the Custom→Design→Clone switch sequence instead of three;
+    /// retained cost absorbed within run noise). Pressure ownership is
+    /// unchanged: critical trim and full unload invalidate the resident cache
+    /// regardless.
+    static let iosAdaptiveResidencyQualified = true
     /// 8 GB device class; 6 GB devices stay non-resident pending the
     /// hardware-floor feasibility evidence (iphone14pro clamp profile).
     static let iosResidencyMinimumPhysicalMemoryBytes: UInt64 = 7 * 1_073_741_824

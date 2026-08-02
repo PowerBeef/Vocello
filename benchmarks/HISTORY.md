@@ -11,6 +11,12 @@ faster, 1.1 ≈ 1.1× realtime, and a positive RTF trend is an improvement. Much
 ecosystem defines RTF as the inverse (wall-clock ÷ audio, lower is better); convert before
 cross-project comparisons.
 
+## engine-generation / ios / iphone-17-pro / config `1f7856b56aef`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---|---|---|---|
+| 2026-08-02 | [`ios-engine-20260802-010645-909ebdd4`](runs/engine-generation/ios-engine-20260802-010645-909ebdd4.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 1 | `b6b2a028f1eb` | `excluded` | baseline | i14p-floor-clone |
+
 ## engine-generation / ios / iphone-17-pro / config `3abbfd2f50ea`
 
 | completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
@@ -29,11 +35,23 @@ cross-project comparisons.
 |---|---|---|---|---|---|---:|---|---|---|---|
 | 2026-07-24 | [`ios-engine-20260724-060000-1cc8ef23`](runs/engine-generation/ios-engine-20260724-060000-1cc8ef23.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 1 | `f98537cd7115` dirty | `excluded` | baseline | limit-900-proof |
 
+## engine-generation / ios / iphone-17-pro / config `a15ad30a4677`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---|---|---|---|
+| 2026-08-02 | [`ios-engine-20260802-010526-ab1e3c8e`](runs/engine-generation/ios-engine-20260802-010526-ab1e3c8e.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 1 | `b6b2a028f1eb` | `excluded` | baseline | i14p-floor-design |
+
 ## engine-generation / ios / iphone-17-pro / config `a6ae7ce54378`
 
 | completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
 |---|---|---|---|---|---|---:|---|---|---|---|
 | 2026-08-01 | [`ios-engine-20260801-144748-9d129b7c`](runs/engine-generation/ios-engine-20260801-144748-9d129b7c.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 1 | `1f9ebeccef8b` | `excluded` | baseline | i15p-floor-design2 |
+
+## engine-generation / ios / iphone-17-pro / config `e8b9dd91c1fe`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---|---|---|---|
+| 2026-08-02 | [`ios-engine-20260802-010405-88d9f30e`](runs/engine-generation/ios-engine-20260802-010405-88d9f30e.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 1 | `b6b2a028f1eb` | `excluded` | baseline | i14p-floor-custom |
 
 ## engine-generation / ios / iphone-17-pro / config `f1c8dc2684fb`
 
@@ -432,6 +450,15 @@ cross-project comparisons.
 |---|---|---|---|---|---|---:|---|---|---|---|
 | 2026-07-14 | [`ios-memory-qualification-20260714-112015-8aa21f7e`](runs/memory-qualification/ios-memory-qualification-20260714-112015-8aa21f7e.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 9 | `fe15820531a5` dirty | `excluded` | baseline | ios-memory-qualification-20260714-112015-8aa21f7e |
 | 2026-07-14 | [`ios-memory-qualification-20260714-112536-32554d95`](runs/memory-qualification/ios-memory-qualification-20260714-112536-32554d95.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 9 | `ab102beda89b` | `7482ce732e47` | baseline | ios-memory-qualification-20260714-112536-32554d95 |
+
+## memory-qualification / ios / iphone-17-pro / config `dcec19b63f13`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---|---|---|---|
+| 2026-08-02 | [`ios-memory-qualification-20260802-004313-87bfe92e`](runs/memory-qualification/ios-memory-qualification-20260802-004313-87bfe92e.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 9 | `b6b2a028f1eb` | `dcec19b63f13` | baseline | ios-memory-qualification-20260802-004313-87bfe92e |
+| 2026-08-02 | [`ios-memory-qualification-20260802-004801-03ebafe1`](runs/memory-qualification/ios-memory-qualification-20260802-004801-03ebafe1.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 9 | `b6b2a028f1eb` | `dcec19b63f13` | vs ios-memory-qualification-20260802-004313-87bfe92e: RTF +6.8%, TTFC -2.3%, RAM -9.4% | ios-memory-qualification-20260802-004801-03ebafe1 |
+| 2026-08-02 | [`ios-memory-qualification-20260802-011251-9bddb00a`](runs/memory-qualification/ios-memory-qualification-20260802-011251-9bddb00a.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 9 | `b6b2a028f1eb` dirty | `excluded` | baseline | ios-memory-qualification-20260802-011251-9bddb00a |
+| 2026-08-02 | [`ios-memory-qualification-20260802-011551-dba9b94f`](runs/memory-qualification/ios-memory-qualification-20260802-011551-dba9b94f.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 9 | `b6b2a028f1eb` dirty | `excluded` | baseline | ios-memory-qualification-20260802-011551-dba9b94f |
 
 ## memory-qualification / ios / iphone-17-pro / config `e08611b860f6`
 

@@ -175,12 +175,16 @@ performance block after the fixture rebind, Tier 4 carryover). Immediate specifi
    roadmap's substantive tiers are now all closed; opportunistic riders (MOS-proxy
    advisory, 60 Hz glass-gate measurement) and parked items remain.
 
-10. **iPhone 6 GB floor staged + adaptive residency dark (2026-08-01):** the f16
-   promotion reopened both questions. Adaptive speech-tokenizer residency shipped
-   dark (device-class gate, force-enable knob for the qualification lane); the new
-   `iphone14pro` 3,600 MB clamp profile and the pre-registered staged evidence plan
-   live in `docs/decisions/ios-6gb-floor-feasibility.md` — step 1 (clamp matrix)
-   runs at the next phone window; the floor moves only after real-A16 validation.
+10. **iPhone 6 GB floor step 1 green + adaptive residency LIVE (2026-08-02):** the
+   f16 promotion reopened both questions and the phone window settled them. The
+   clamped matrix (3,600 MB `iphone14pro` profile, fp32-conservative) passed all
+   three modes with ~1 GB margin (peaks 2,109–2,372 MB vs the ≤3,300 bound) — the
+   memory dimension of the 6 GB floor is green; the floor still moves only after
+   real-A16 validation (step 2 needs hardware). Adaptive speech-tokenizer
+   residency qualified the same night and ships enabled on the 8 GB device class:
+   default-state retained-memory run PASS with engagement proven by load-event
+   counts (one tokenizer load across the mode-switch sequence instead of three).
+   Evidence + methodology notes: `docs/decisions/ios-6gb-floor-feasibility.md`.
 ## Staged roadmap state
 
 Stage-by-stage details, closure evidence, and falsifiability criteria live in the

@@ -35,6 +35,27 @@ scripts/ios_device.sh bench clone:speed:…  --memory-profile iphone14pro --labe
 All clamped runs classify exploratory (forced-profile rule); they are evidence for
 this decision, never canonical history.
 
+### Step 1 result (2026-08-02) — FEASIBLE with ~1 GB margin
+
+Clamped matrix on the paired iPhone 17 Pro (`iphone14pro` profile honored: headroom
+started at 3,577 MB), fp32 artifacts (conservative — f16 subtracts another ~234 MB),
+full 140-character spec text, runs `ios-engine-20260802-0104/0105/0106…`:
+
+| mode | peak phys footprint | worst headroom | vs ≤3,300 MB bound |
+| --- | --- | --- | --- |
+| custom | 2,347 MB | 1,593 MB | pass, 953 MB under |
+| design | 2,109 MB | 1,669 MB | pass, 1,191 MB under |
+| clone | 2,372 MB | 1,374 MB | pass, 928 MB under |
+
+QC pass on every take; warnings limited to the policy's ordinary
+`memory.pressure.soft_trim` cadence; no memory warning, no hardTrim, no fullUnload.
+**The memory dimension of the 6 GB floor is green.** The question advances to step 2
+(real A16 compute/thermals) per plan. Operator note for reproduction: the
+`ios_device.sh bench` positional argument is bare *text*, not a mode — always pass
+the full `mode:variant:text` spec (a bare mode word generates that word as a
+six-character prompt, which mandatory Fast QC rejects; three early runs failed this
+way before diagnosis).
+
 ## Step 2 — real-silicon validation (requires hardware; only after step 1 passes)
 
 The clamp cannot simulate A16 compute, thermals, or real-world ambient Jetsam
@@ -53,8 +74,12 @@ is worse than never widening, which is why step 2 is not skippable.
 
 ## Related
 
-- Adaptive speech-tokenizer residency shipped dark the same day (device-class gate
-  in `Qwen3TTSPreparedComponentCache`, force-enable via
-  `QWENVOICE_TOKENIZER_RESIDENCY=on` for the qualification lane). Its 8 GB-class
-  enablement is a separate decision with its own on-device retained-memory
-  qualification; 6 GB devices stay non-resident under any outcome of this plan.
+- Adaptive speech-tokenizer residency shipped the same day and was qualified live
+  on 2026-08-02: the flip build's default-state retained-memory run
+  (`ios-memory-qualification-20260802-011251`) passed with engagement proven by
+  load-event counts — one speech-tokenizer load across the Custom→Design→Clone
+  switch sequence instead of three. (Methodology note: an earlier knob-based A/B
+  on the prior build read a footprint delta as engagement; load events showed the
+  knob never engaged there, and footprint deltas at this scale are run noise —
+  count loads, not megabytes.) 6 GB devices stay non-resident under any outcome
+  of this plan.

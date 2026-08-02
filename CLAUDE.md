@@ -115,6 +115,32 @@ needs a model, a device, or XCUITest. Exemptions from surface coverage live in
 | iOS frontend QA (explicit request only) | `scripts/ui_test.sh ios smoke|benchmark`; paired physical iPhone only |
 | External systems and current APIs | sosumi / context7 / docs MCP when callable; otherwise primary vendor docs |
 
+### Optional assists (user-scoped; verify before relying)
+
+These live in user configuration, not the repository, so **no gate can validate this table** — treat it
+as advisory and confirm a tool is currently callable before depending on it. Every entry is optional:
+`check_project_inputs.sh` and the domain rules remain the only gates, and nothing here is ever a
+prerequisite for a commit, push, or release.
+
+| Task | Reach for |
+| --- | --- |
+| MLX arrays, lazy eval, unified memory, wired-memory coordination | `mlx-swift`, `mlx-swift-lm` skills |
+| Swift 6 isolation, actors, `Sendable`, data races | `axiom-concurrency` skill |
+| Swift performance, ARC, allocation, generic specialization | `axiom-swift`, `axiom-performance` skills |
+| Current Apple framework behavior | `axiom-apple-docs` skill, or the sosumi MCP |
+| Library, SDK, or CLI documentation | context7 MCP |
+| XCUITest failure triage, `.xcresult` parsing | `test-runner`, `test-debugger` agents |
+| Crash `.ips` / MetricKit symbolication | `crash-analyzer` agent |
+| Flaky-test and suite-quality review | `axiom-testing` skill, `testing-auditor` agent |
+| Xcode build/run/debug inner loop | XcodeBuildMCP (`macos` or `ios-device` profile only) |
+| App Store submission, TestFlight, signing | `axiom-shipping`, `axiom-security` skills |
+| Auditing this file | `claude-md-improver` skill |
+| `website/` design and visual QA | `impeccable` skill; see [`website/CLAUDE.md`](website/CLAUDE.md) |
+
+Plugin skills are invoked as `plugin:skill` (for example `axiom:axiom-concurrency`); personal skills by
+their directory name (`mlx-swift`). Read a skill before use — none of them override a repository gate
+or a domain rule.
+
 ## Workflows
 
 ### Implement a change

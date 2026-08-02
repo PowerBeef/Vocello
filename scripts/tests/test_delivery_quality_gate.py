@@ -16,7 +16,12 @@ from delivery_quality_gate import (
     evaluate_delivery,
     evaluate_neutral_cohort,
 )
-from prosody_profile import builtin_profile, validate_profile
+from prosody_profile import (
+    SCHEMA_VERSION,
+    builtin_profile,
+    migrate_profile,
+    validate_profile,
+)
 
 
 def metrics(
@@ -123,6 +128,99 @@ class DeliveryGateTests(unittest.TestCase):
         verdict = evaluate_neutral_cohort([metrics(), metrics()])
         self.assertEqual(verdict["flags"], ["cohort_too_small"])
         self.assertIn("cohort_too_small", ANALYSIS_FAILURE_FLAGS)
+
+
+def voice_metrics(hnr=12.0, cpp=20.0, jitter=2.5, shimmer=1.0, alpha=15.0,
+                  hammarberg=27.0, hf=0.12, centroid=1400.0, flux=0.30,
+                  turning=20.0, max_pause=0.2, dynamic_range=18.0, **kwargs):
+    """A v3 metric dict: the v2 surface plus the voice-quality/spectral block."""
+    base = metrics(**kwargs)
+    base.update({
+        "voice_hnr_db_mean": hnr,
+        "voice_cpp_db_mean": cpp,
+        "voice_frame_jitter_pct": jitter,
+        "voice_frame_shimmer_db": shimmer,
+        "spectral_alpha_ratio_db": alpha,
+        "spectral_hammarberg_db": hammarberg,
+        "spectral_hf_energy_ratio": hf,
+        "spectral_centroid_hz": centroid,
+        "spectral_flux": flux,
+        "f0_turning_points_per_sec": turning,
+        "pauses_max_pause_seconds": max_pause,
+        "energy_dynamic_range_db": dynamic_range,
+    })
+    return base
+
+
+class VoiceQualityFeatureTests(unittest.TestCase):
+    """The analyzer-v3 paired block, and its backward-compatibility contract."""
+
+    def test_v2_metric_dicts_still_produce_a_verdict_without_the_new_block(self):
+        # Every bench-prosody.json row banked before analyzer v3 carries only
+        # the v2 surface. Those rows must keep evaluating, with the new
+        # features simply absent rather than the verdict failing.
+        features = delivery_features(metrics(f0=170.0), metrics(), builtin_profile())
+        self.assertIn("arousal_score", features)
+        for absent in ("hnr_delta_db", "voice_tension_score", "voice_breathiness_score"):
+            self.assertNotIn(absent, features)
+        verdict = evaluate_delivery(metrics(f0=170.0), metrics(), "happy.normal")
+        self.assertNotIn("metrics_incomplete", verdict["flags"])
+
+    def test_voice_quality_deltas_are_signed_instructed_minus_neutral(self):
+        features = delivery_features(
+            voice_metrics(hnr=9.0, cpp=15.0, jitter=3.4),
+            voice_metrics(hnr=12.0, cpp=20.0, jitter=2.5),
+            builtin_profile(),
+        )
+        self.assertAlmostEqual(features["hnr_delta_db"], -3.0)
+        self.assertAlmostEqual(features["cpp_delta_db"], -5.0)
+        self.assertAlmostEqual(features["jitter_delta_pct"], 0.9)
+
+    def test_breathiness_score_rises_when_hnr_and_cpp_fall(self):
+        # The whisper signature: aspiration noise lowers both harmonicity
+        # measures, which must read as *more* breathy, not less.
+        breathy = delivery_features(
+            voice_metrics(hnr=8.0, cpp=14.0), voice_metrics(), builtin_profile()
+        )
+        pressed = delivery_features(
+            voice_metrics(hnr=15.0, cpp=23.0), voice_metrics(), builtin_profile()
+        )
+        self.assertGreater(breathy["voice_breathiness_score"], 0.0)
+        self.assertLess(pressed["voice_breathiness_score"], 0.0)
+
+    def test_tension_score_rises_with_a_brighter_pressed_spectrum(self):
+        # The angry signature: relatively more energy above 1 kHz, so the alpha
+        # ratio and Hammarberg index fall while the HF share rises.
+        tense = delivery_features(
+            voice_metrics(alpha=11.5, hammarberg=22.0, hf=0.16),
+            voice_metrics(), builtin_profile(),
+        )
+        dark = delivery_features(
+            voice_metrics(alpha=18.0, hammarberg=30.0, hf=0.09),
+            voice_metrics(), builtin_profile(),
+        )
+        self.assertGreater(tense["voice_tension_score"], 0.0)
+        self.assertLess(dark["voice_tension_score"], 0.0)
+
+    def test_cadence_deltas_cover_the_previously_unbound_v2_keys(self):
+        # `dramatic` is described by held pauses and `surprised` by contour
+        # turns; both were measured by v2 and bound to no expectation.
+        features = delivery_features(
+            voice_metrics(turning=26.0, max_pause=0.62, dynamic_range=21.0),
+            voice_metrics(), builtin_profile(),
+        )
+        self.assertAlmostEqual(features["turning_points_delta_per_sec"], 6.0)
+        self.assertAlmostEqual(features["max_pause_delta_seconds"], 0.42)
+        self.assertAlmostEqual(features["dynamic_range_delta_db"], 3.0)
+
+    def test_profile_migration_fills_the_new_weight_section(self):
+        legacy = builtin_profile()
+        legacy["schema_version"] = 2
+        del legacy["delivery_weights"]["voice_quality"]
+        migrated = migrate_profile(legacy)
+        self.assertEqual(migrated["schema_version"], SCHEMA_VERSION)
+        self.assertIn("voice_quality", migrated["delivery_weights"])
+        validate_profile(migrated)
 
 
 if __name__ == "__main__":

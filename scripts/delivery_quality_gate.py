@@ -67,6 +67,38 @@ _REQUIRED_METRIC_KEYS = (
     "durationSec",
 )
 
+# Analyzer-v2 keys that were always computed but never bound to an expectation.
+# `dramatic` ("clear held pauses") and `surprised` ("pitch rising steeply on key
+# words") are described almost entirely by these, so they are now available as
+# paired deltas. Optional so banked rows analyzed before this change still load.
+_OPTIONAL_CADENCE_KEYS = (
+    "f0_turning_points_per_sec",
+    "pauses_max_pause_seconds",
+    "energy_dynamic_range_db",
+)
+
+# Analyzer-v3 voice-quality and spectral keys. Optional for the same reason:
+# every `bench-prosody.json` row banked under v2 predates them, and a missing
+# block must degrade to "this feature is unavailable", never to a failed verdict.
+_OPTIONAL_VOICE_KEYS = (
+    "voice_hnr_db_mean",
+    "voice_cpp_db_mean",
+    "voice_frame_jitter_pct",
+    "voice_frame_shimmer_db",
+    "spectral_alpha_ratio_db",
+    "spectral_hammarberg_db",
+    "spectral_hf_energy_ratio",
+    "spectral_centroid_hz",
+    "spectral_flux",
+)
+
+
+def _paired_delta(instructed, neutral, key):
+    """Signed instructed-minus-neutral delta, or None when either side lacks it."""
+    if key not in instructed or key not in neutral:
+        return None
+    return instructed[key] - neutral[key]
+
 
 def _parse_delivery_id(delivery_id):
     """Split ``<preset>[.<intensity>]`` with a normal-intensity default."""
@@ -111,6 +143,54 @@ def delivery_features(instructed, neutral, profile):
     )
     if neutral["durationSec"] > 0:
         features["duration_ratio"] = instructed["durationSec"] / neutral["durationSec"]
+
+    # --- cadence deltas the v2 analyzer already measured (see _OPTIONAL_*) ---
+    for feature_name, metric_key in (
+        ("turning_points_delta_per_sec", "f0_turning_points_per_sec"),
+        ("max_pause_delta_seconds", "pauses_max_pause_seconds"),
+        ("dynamic_range_delta_db", "energy_dynamic_range_db"),
+    ):
+        delta = _paired_delta(instructed, neutral, metric_key)
+        if delta is not None:
+            features[feature_name] = delta
+
+    # --- analyzer-v3 voice-quality / spectral deltas ---
+    for feature_name, metric_key in (
+        ("hnr_delta_db", "voice_hnr_db_mean"),
+        ("cpp_delta_db", "voice_cpp_db_mean"),
+        ("jitter_delta_pct", "voice_frame_jitter_pct"),
+        ("shimmer_delta_db", "voice_frame_shimmer_db"),
+        ("alpha_ratio_delta_db", "spectral_alpha_ratio_db"),
+        ("hammarberg_delta_db", "spectral_hammarberg_db"),
+        ("hf_energy_ratio_delta", "spectral_hf_energy_ratio"),
+        ("centroid_delta_hz", "spectral_centroid_hz"),
+        ("spectral_flux_delta", "spectral_flux"),
+    ):
+        delta = _paired_delta(instructed, neutral, metric_key)
+        if delta is not None:
+            features[feature_name] = delta
+
+    # Two summary axes over the v3 block, mirroring how `arousal_score`
+    # summarizes the v2 block. Named for the constructs they actually index --
+    # see the `voice_quality` weights in prosody_profile for why neither is
+    # called "valence".
+    if all(key in features for key in
+           ("alpha_ratio_delta_db", "hammarberg_delta_db", "hf_energy_ratio_delta")):
+        features["voice_tension_score"] = (
+            -features["alpha_ratio_delta_db"]
+            / delivery_weight(profile, "voice_quality", "alpha_ratio_divisor")
+            - features["hammarberg_delta_db"]
+            / delivery_weight(profile, "voice_quality", "hammarberg_divisor")
+            + features["hf_energy_ratio_delta"]
+            / delivery_weight(profile, "voice_quality", "hf_energy_ratio_divisor")
+        )
+    if all(key in features for key in ("hnr_delta_db", "cpp_delta_db")):
+        features["voice_breathiness_score"] = (
+            -features["hnr_delta_db"]
+            / delivery_weight(profile, "voice_quality", "hnr_divisor")
+            - features["cpp_delta_db"]
+            / delivery_weight(profile, "voice_quality", "cpp_divisor")
+        )
     return features
 
 

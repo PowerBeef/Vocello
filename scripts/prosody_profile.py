@@ -16,7 +16,7 @@ Usage:
 import json
 import os
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 # Built-in defaults mirror the original hard-coded thresholds/weights. They are
 # intentionally conservative: they flag obvious prosody issues, not subtle
@@ -57,6 +57,28 @@ BUILTIN_PROFILE = {
             "rate_cv_divisor": 0.1,
             "pause_ratio_divisor": 0.05,
             "energy_roughness_divisor": 0.05,
+        },
+        # Analyzer v3 voice-quality axes. These are deliberately NOT called
+        # "valence": the literature is explicit that valence is not reliably
+        # recoverable from spectral balance alone, and overclaiming here would
+        # be the same mistake as trusting an off-the-shelf emotion classifier.
+        # Each score indexes one construct these features genuinely measure.
+        #
+        #   tension     brightness / vocal effort. A tense, pressed voice puts
+        #               relatively more energy above 1 kHz, so the alpha ratio
+        #               and Hammarberg index fall while the HF share rises.
+        #   breathiness aspiration noise. Breathy and whispered phonation
+        #               lowers both the harmonics-to-noise ratio and the
+        #               cepstral peak prominence.
+        #
+        # Divisors normalize each delta to roughly unit scale so the summed
+        # score is readable; they are calibration inputs, not physical constants.
+        "voice_quality": {
+            "alpha_ratio_divisor": 2.0,
+            "hammarberg_divisor": 3.0,
+            "hf_energy_ratio_divisor": 0.02,
+            "hnr_divisor": 2.0,
+            "cpp_divisor": 2.0,
         },
     },
     # Calibrated 2026-08-01 from the banked 7-seed × 18-cell paired matrix
@@ -152,18 +174,23 @@ def migrate_profile(profile):
     """Migrate an older or partially populated profile dict to the current
     schema.
 
-    A v1 profile predates the schema-v2 add-on blocks; a v2 profile saved
-    before a later add-on block existed simply lacks it. Migration fills any
-    missing add-on block from the builtin defaults so a calibrated threshold
+    A v1 profile predates the schema-v2 add-on blocks; a v2 profile predates the
+    schema-v3 ``delivery_weights.voice_quality`` section; either may have been
+    saved before a later add-on block existed and simply lack it. Migration
+    fills anything missing from the builtin defaults so a calibrated threshold
     file keeps working while new consumers see complete data.
     """
     if not isinstance(profile, dict):
         return profile
-    if profile.get("schema_version") in (1, SCHEMA_VERSION):
+    if profile.get("schema_version") in (1, 2, SCHEMA_VERSION):
         profile = dict(profile)
         profile["schema_version"] = SCHEMA_VERSION
         for key in _ADDON_BLOCKS:
             profile.setdefault(key, json.loads(json.dumps(BUILTIN_PROFILE[key])))
+        weights = dict(profile.get("delivery_weights") or {})
+        for section, defaults in BUILTIN_PROFILE["delivery_weights"].items():
+            weights.setdefault(section, json.loads(json.dumps(defaults)))
+        profile["delivery_weights"] = weights
     return profile
 
 

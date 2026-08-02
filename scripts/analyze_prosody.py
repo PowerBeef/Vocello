@@ -1,18 +1,38 @@
 #!/usr/bin/env python3
 """Bounded, reference-free prosody analysis for Vocello PCM16 output.
 
-Algorithm v2 deliberately uses two bounded passes over the WAV.  It never
+Algorithm v3 deliberately uses two bounded passes over the WAV.  It never
 loads the complete clip or constructs an ``N x frameWidth`` matrix:
 
 * pass 1 validates PCM16, measures signal continuity, and builds the pitch
   anchor needed for deterministic octave rejection;
-* pass 2 computes pitch, cadence, pause, energy, and optional declared-boundary
-  summaries with fixed histograms and small rolling windows.
+* pass 2 computes pitch, cadence, pause, energy, voice-quality, spectral, and
+  optional declared-boundary summaries with fixed histograms and small rolling
+  windows.
 
-The established v1 output keys remain available to existing gates.  Pitch and
-level percentiles now come from deterministic fixed-width histograms, so values
+The established v1/v2 output keys remain available to existing gates.  Pitch and
+level percentiles come from deterministic fixed-width histograms, so values
 near a bin boundary may differ slightly from v1; ``analyzerAlgorithmVersion``
 makes that methodological change explicit.  No ML model or raw audio is kept.
+
+v3 adds the *valence* half of delivery.  v1/v2 measured only arousal-bearing
+dimensions (pitch height/variation, rate, pauses, energy dynamics), which cannot
+separate emotions that share arousal but oppose in valence -- happy versus angry
+being the canonical pair -- and cannot describe phonation at all, so ``whisper``
+had no breathiness measure and ``fearful`` had no tremor measure.  v3 adds:
+
+* ``voice_*`` -- harmonics-to-noise ratio (from the autocorrelation pass 2
+  already computes), frame-rate pitch/amplitude perturbation, and cepstral peak
+  prominence;
+* ``spectral_*`` -- the eGeMAPS-defined balance descriptors (alpha ratio,
+  Hammarberg index, band slopes) plus centroid, flux, and high-frequency share.
+
+Feature definitions follow Eyben et al. 2016 (GeMAPS/eGeMAPS) and Boersma 1993
+(HNR).  They are reimplemented here in NumPy rather than taken from openSMILE,
+whose licence forbids commercial use of the software *and* of features extracted
+with it.  Every addition is computed from the frame the analyzer already holds,
+so the bounded-working-set and determinism contracts are unchanged.
+
 
 Usage:
   scripts/analyze_prosody.py <wav> [<wav> ...] [--json]
@@ -35,7 +55,7 @@ from typing import Callable, Iterable, Iterator, Sequence
 import numpy as np
 
 
-ANALYZER_ALGORITHM_VERSION = 2
+ANALYZER_ALGORITHM_VERSION = 3
 ANALYSIS_PASS_COUNT = 2
 READ_BLOCK_FRAMES = 16_384
 
@@ -56,6 +76,23 @@ RMS_HISTOGRAM_STEP_DB = 0.05
 RATE_HISTOGRAM_MAX_HZ = 32.0
 RATE_HISTOGRAM_STEP_HZ = 0.05
 CLICK_DELTA_NORMALIZED = 0.45
+
+# --- v3 voice-quality / spectral constants -------------------------------
+# Band edges follow eGeMAPS (Eyben et al. 2016).  Frequencies in Hz.
+ALPHA_RATIO_LOW_BAND = (50.0, 1000.0)
+ALPHA_RATIO_HIGH_BAND = (1000.0, 5000.0)
+HAMMARBERG_LOW_BAND = (0.0, 2000.0)
+HAMMARBERG_HIGH_BAND = (2000.0, 5000.0)
+SPECTRAL_SLOPE_BANDS = ((0.0, 500.0), (500.0, 1500.0))
+HF_ENERGY_EDGE_HZ = 4000.0
+# Cepstral peak search window, expressed as the F0 band it corresponds to.
+CPP_QUEFRENCY_MIN_HZ, CPP_QUEFRENCY_MAX_HZ = F0_MIN, F0_MAX
+# Frames quieter than this contribute no spectral balance measurement: the
+# spectrum of near-silence is noise-shaped and would dominate the averages.
+SPECTRAL_FLOOR_DB = PAUSE_RMS_DB
+HNR_HISTOGRAM_MIN_DB = -20.0
+HNR_HISTOGRAM_MAX_DB = 60.0
+HNR_HISTOGRAM_STEP_DB = 0.1
 
 
 @dataclass(frozen=True)
@@ -170,6 +207,13 @@ class ManagedMemoryEstimate:
         # small fixed allowance covers deques, scalars, wave state, and Python
         # container overhead.  This estimate excludes NumPy/Python runtimes.
         f0_temporary_bytes = frame_samples * 8 * 5
+        # v3 spectral block: one rfft per frame owns a complex spectrum plus
+        # magnitude, power, log-magnitude, normalized and previous-normalized
+        # spectra and the cepstrum -- all (frame_samples/2 + 1) wide, with the
+        # complex spectrum counting double.  Retained frequency and window
+        # vectors are frame-width.  Bounded by frame size, not clip length.
+        spectrum_bins = frame_samples // 2 + 1
+        spectral_temporary_bytes = spectrum_bins * 8 * 9 + frame_samples * 8 * 2
         theoretical_block_bytes = (
             READ_BLOCK_FRAMES * channel_count * 2  # raw PCM bytes
             + READ_BLOCK_FRAMES * channel_count * 2  # Int16 view accounting
@@ -181,6 +225,7 @@ class ManagedMemoryEstimate:
             self.peak_histogram_bytes
             + theoretical_block_bytes
             + f0_temporary_bytes
+            + spectral_temporary_bytes
             + fixed_python_allowance
         )
 
@@ -502,6 +547,201 @@ def _rms_db(frame: np.ndarray) -> tuple[float, float]:
     return rms, rms_db
 
 
+def hnr_db(autocorrelation_peak: float) -> float:
+    """Harmonics-to-noise ratio in dB from a normalized autocorrelation peak.
+
+    Boersma (1993): with ``r`` the normalized autocorrelation at the pitch lag,
+    the harmonic share of the frame's energy is ``r`` and the noise share is
+    ``1 - r``, so ``HNR = 10*log10(r / (1 - r))``.  The peak is already computed
+    by ``f0_autocorr`` for pitch, so this costs nothing beyond the arithmetic.
+    Clamped to keep the logarithm finite at the degenerate ends.
+    """
+    ratio = min(max(float(autocorrelation_peak), 1e-6), 1.0 - 1e-6)
+    return 10.0 * math.log10(ratio / (1.0 - ratio))
+
+
+def _band_power(power: np.ndarray, frequencies: np.ndarray, low: float, high: float) -> float:
+    mask = (frequencies >= low) & (frequencies < high)
+    return float(power[mask].sum()) if mask.any() else 0.0
+
+
+def _band_peak_db(power: np.ndarray, frequencies: np.ndarray, low: float, high: float) -> float:
+    mask = (frequencies >= low) & (frequencies < high)
+    if not mask.any():
+        return -240.0
+    return 10.0 * math.log10(max(float(power[mask].max()), 1e-30))
+
+
+def _band_slope_db_per_khz(
+    power: np.ndarray, frequencies: np.ndarray, low: float, high: float
+) -> float:
+    """Least-squares slope of the dB spectrum across one band, in dB per kHz."""
+    mask = (frequencies >= low) & (frequencies < high)
+    if mask.sum() < 2:
+        return 0.0
+    band_frequencies = frequencies[mask] / 1000.0
+    band_db = 10.0 * np.log10(np.maximum(power[mask], 1e-30))
+    centered_frequency = band_frequencies - band_frequencies.mean()
+    denominator = float(np.dot(centered_frequency, centered_frequency))
+    if denominator <= 0.0:
+        return 0.0
+    return float(np.dot(centered_frequency, band_db - band_db.mean()) / denominator)
+
+
+def cepstral_peak_prominence_db(
+    log_magnitude: np.ndarray, sample_rate: int, minimum_hz: float, maximum_hz: float
+) -> float:
+    """Cepstral peak prominence (Hillenbrand): peak height above the cepstral trend.
+
+    The real cepstrum of the log magnitude spectrum has a peak at the pitch
+    quefrency for periodic voices; how far that peak stands above the regression
+    line through the cepstrum is the single strongest voice-quality/dysphonia
+    predictor in the literature.  Breathy and whispered phonation flatten it.
+    No temporal smoothing is applied here -- averaging over frames happens in
+    the accumulator -- so this is CPP rather than CPPS.
+    """
+    cepstrum = np.abs(np.fft.irfft(log_magnitude))
+    minimum_quefrency = max(1, int(sample_rate / max(maximum_hz, 1e-9)))
+    maximum_quefrency = min(len(cepstrum) - 1, int(sample_rate / max(minimum_hz, 1e-9)))
+    if maximum_quefrency <= minimum_quefrency:
+        return 0.0
+    search = cepstrum[minimum_quefrency:maximum_quefrency + 1]
+    peak_offset = int(np.argmax(search))
+    peak_quefrency = minimum_quefrency + peak_offset
+    peak_db = 20.0 * math.log10(max(float(search[peak_offset]), 1e-30))
+
+    # Regression baseline over the same quefrency window, in dB.
+    quefrencies = np.arange(minimum_quefrency, maximum_quefrency + 1, dtype=np.float64)
+    trend_db = 20.0 * np.log10(np.maximum(search, 1e-30))
+    centered_quefrency = quefrencies - quefrencies.mean()
+    denominator = float(np.dot(centered_quefrency, centered_quefrency))
+    if denominator <= 0.0:
+        return 0.0
+    slope = float(np.dot(centered_quefrency, trend_db - trend_db.mean()) / denominator)
+    intercept = float(trend_db.mean() - slope * quefrencies.mean())
+    return peak_db - (slope * peak_quefrency + intercept)
+
+
+class SpectralAccumulator:
+    """Constant-space accumulator for the v3 voice-quality / spectral block.
+
+    One ``rfft`` per analysis frame.  Only the previous frame's normalized
+    magnitude spectrum is retained (for flux), so the working set stays bounded
+    regardless of clip length.
+    """
+
+    __slots__ = (
+        "sample_rate", "frequencies", "window", "previous_magnitude",
+        "alpha_ratio", "hammarberg", "slope_low", "slope_high",
+        "centroid", "flux", "hf_ratio", "cpp", "hnr", "hnr_histogram",
+        "jitter", "shimmer", "_previous_period", "_previous_amplitude",
+    )
+
+    def __init__(self, sample_rate: int, frame_samples: int, hnr_histogram: FixedHistogram) -> None:
+        self.sample_rate = sample_rate
+        self.frequencies = np.fft.rfftfreq(frame_samples, d=1.0 / sample_rate)
+        self.window = np.hanning(frame_samples)
+        self.previous_magnitude: np.ndarray | None = None
+        self.alpha_ratio = RunningMoments()
+        self.hammarberg = RunningMoments()
+        self.slope_low = RunningMoments()
+        self.slope_high = RunningMoments()
+        self.centroid = RunningMoments()
+        self.flux = RunningMoments()
+        self.hf_ratio = RunningMoments()
+        self.cpp = RunningMoments()
+        self.hnr = RunningMoments()
+        self.hnr_histogram = hnr_histogram
+        self.jitter = RunningMoments()
+        self.shimmer = RunningMoments()
+        self._previous_period: float | None = None
+        self._previous_amplitude: float | None = None
+
+    @property
+    def nbytes(self) -> int:
+        spectrum_bytes = self.frequencies.nbytes + self.window.nbytes
+        if self.previous_magnitude is not None:
+            spectrum_bytes += self.previous_magnitude.nbytes
+        return spectrum_bytes
+
+    def add_spectral(self, frame: np.ndarray, memory: "ManagedMemoryEstimate") -> None:
+        """Spectral balance for one audible frame (voiced or not).
+
+        Consonant energy lives in unvoiced frames, so the spectral block is
+        measured on every audible frame rather than only the voiced ones.
+        """
+        spectrum = np.fft.rfft(frame * self.window)
+        magnitude = np.abs(spectrum)
+        power = magnitude * magnitude
+        memory.observe(spectrum, magnitude, power, self.frequencies, self.window)
+
+        total_power = float(power.sum())
+        if total_power <= 0.0:
+            return
+
+        low = _band_power(power, self.frequencies, *ALPHA_RATIO_LOW_BAND)
+        high = _band_power(power, self.frequencies, *ALPHA_RATIO_HIGH_BAND)
+        self.alpha_ratio.add(10.0 * math.log10(max(low, 1e-30) / max(high, 1e-30)))
+
+        self.hammarberg.add(
+            _band_peak_db(power, self.frequencies, *HAMMARBERG_LOW_BAND)
+            - _band_peak_db(power, self.frequencies, *HAMMARBERG_HIGH_BAND)
+        )
+
+        (low_band, high_band) = SPECTRAL_SLOPE_BANDS
+        self.slope_low.add(_band_slope_db_per_khz(power, self.frequencies, *low_band))
+        self.slope_high.add(_band_slope_db_per_khz(power, self.frequencies, *high_band))
+
+        self.centroid.add(float(np.dot(self.frequencies, power) / total_power))
+        self.hf_ratio.add(
+            _band_power(power, self.frequencies, HF_ENERGY_EDGE_HZ, float(self.sample_rate))
+            / total_power
+        )
+
+        normalized = magnitude / math.sqrt(total_power)
+        if self.previous_magnitude is not None:
+            difference = normalized - self.previous_magnitude
+            self.flux.add(float(np.sqrt(np.dot(difference, difference))))
+        self.previous_magnitude = normalized
+        memory.observe(normalized)
+
+        log_magnitude = np.log(np.maximum(magnitude, 1e-30))
+        memory.observe(log_magnitude)
+        self.cpp.add(
+            cepstral_peak_prominence_db(
+                log_magnitude, self.sample_rate, CPP_QUEFRENCY_MIN_HZ, CPP_QUEFRENCY_MAX_HZ
+            )
+        )
+
+    def add_voiced(self, f0: float, autocorrelation_peak: float, rms: float) -> None:
+        """Voice-quality for one accepted-voiced frame."""
+        value = hnr_db(autocorrelation_peak)
+        self.hnr.add(value)
+        self.hnr_histogram.add(value)
+
+        # Frame-rate perturbation.  This is a 10 ms-hop pitch/amplitude
+        # instability measure, NOT cycle-level jitter/shimmer: it indexes tremor
+        # and unsteadiness at the frame rate, which is what a "shaky" delivery
+        # instruction produces.  Named accordingly so it is not mistaken for the
+        # Praat cycle-level measures.
+        period = 1.0 / f0 if f0 > 0 else 0.0
+        if period > 0.0:
+            if self._previous_period is not None and self._previous_period > 0.0:
+                mean_period = 0.5 * (period + self._previous_period)
+                if mean_period > 0.0:
+                    self.jitter.add(100.0 * abs(period - self._previous_period) / mean_period)
+            self._previous_period = period
+        if rms > 0.0:
+            if self._previous_amplitude is not None and self._previous_amplitude > 0.0:
+                self.shimmer.add(abs(20.0 * math.log10(rms / self._previous_amplitude)))
+            self._previous_amplitude = rms
+
+    def break_voiced_run(self) -> None:
+        """Unvoiced/silent frame: perturbation must not span the discontinuity."""
+        self._previous_period = None
+        self._previous_amplitude = None
+
+
 def _sample_offsets(boundary_seconds: Iterable[float], metadata: WavMetadata) -> list[int]:
     offsets: list[int] = []
     previous = -1
@@ -633,7 +873,12 @@ def _analysis_pass(
         RATE_HISTOGRAM_MAX_HZ + RATE_HISTOGRAM_STEP_HZ / 2,
         RATE_HISTOGRAM_STEP_HZ,
     )
-    for histogram in (f0_histogram, rms_histogram, rate_histogram):
+    hnr_histogram = FixedHistogram(
+        HNR_HISTOGRAM_MIN_DB - HNR_HISTOGRAM_STEP_DB / 2,
+        HNR_HISTOGRAM_MAX_DB + HNR_HISTOGRAM_STEP_DB / 2,
+        HNR_HISTOGRAM_STEP_DB,
+    )
+    for histogram in (f0_histogram, rms_histogram, rate_histogram, hnr_histogram):
         memory.own_histogram(histogram)
 
     f0_moments = RunningMoments()
@@ -667,12 +912,16 @@ def _analysis_pass(
     frame_samples = int(metadata.sample_rate * FRAME_MS / 1000.0)
     hop_samples = int(metadata.sample_rate * HOP_MS / 1000.0)
     boundary_accumulator = BoundaryAccumulator(boundary_offsets, frame_samples, hop_samples)
+    spectral = SpectralAccumulator(metadata.sample_rate, frame_samples, hnr_histogram)
 
     for frame_index, frame in _analysis_frames(path, metadata, memory):
         rms, rms_db = _rms_db(frame)
         rms_moments.add(rms_db)
         rms_histogram.add(rms_db)
+        audible = rms_db >= SPECTRAL_FLOOR_DB
         pause_accumulator.add(frame_index, rms_db < PAUSE_RMS_DB)
+        if audible:
+            spectral.add_spectral(frame, memory)
 
         envelope = rms / (maximum_rms + 1e-9)
         smoothed = smoother.push(envelope)
@@ -690,7 +939,9 @@ def _analysis_pass(
         )
         boundary_accumulator.add(frame_index, rms_db, f0, voiced)
         if not accepted:
+            spectral.break_voiced_run()
             continue
+        spectral.add_voiced(f0, autocorrelation_peak, rms)
         f0_histogram.add(f0)
         f0_moments.add(f0)
         semitone_moments.add(12.0 * math.log2(f0 / median_anchor))
@@ -728,6 +979,8 @@ def _analysis_pass(
         "peak_accumulator": peak_accumulator,
         "pause_accumulator": pause_accumulator,
         "boundary_accumulator": boundary_accumulator,
+        "spectral": spectral,
+        "hnr_histogram": hnr_histogram,
     }
 
 
@@ -884,6 +1137,38 @@ def _analyze(path: str, boundary_seconds: Iterable[float]) -> dict[str, object]:
         "max_sample_jump": round(float(anchor["maximum_sample_jump"]), 6),
     }
 
+    spectral = metrics["spectral"]
+    hnr_histogram = metrics["hnr_histogram"]
+    assert isinstance(spectral, SpectralAccumulator)
+    assert isinstance(hnr_histogram, FixedHistogram)
+    voice_group = {
+        "hnr_db_mean": round(spectral.hnr.mean, 2) if spectral.hnr.count else 0.0,
+        "hnr_db_std": round(spectral.hnr.standard_deviation, 2) if spectral.hnr.count else 0.0,
+        "hnr_db_p10": round(hnr_histogram.quantile(0.10), 2) if spectral.hnr.count else 0.0,
+        "hnr_db_p90": round(hnr_histogram.quantile(0.90), 2) if spectral.hnr.count else 0.0,
+        "cpp_db_mean": round(spectral.cpp.mean, 2) if spectral.cpp.count else 0.0,
+        "cpp_db_std": round(spectral.cpp.standard_deviation, 2) if spectral.cpp.count else 0.0,
+        "frame_jitter_pct": round(spectral.jitter.mean, 3) if spectral.jitter.count else 0.0,
+        "frame_shimmer_db": round(spectral.shimmer.mean, 3) if spectral.shimmer.count else 0.0,
+    }
+    spectral_group = {
+        "alpha_ratio_db": round(spectral.alpha_ratio.mean, 2) if spectral.alpha_ratio.count else 0.0,
+        "hammarberg_db": round(spectral.hammarberg.mean, 2) if spectral.hammarberg.count else 0.0,
+        "slope_0_500_db_per_khz": (
+            round(spectral.slope_low.mean, 2) if spectral.slope_low.count else 0.0
+        ),
+        "slope_500_1500_db_per_khz": (
+            round(spectral.slope_high.mean, 2) if spectral.slope_high.count else 0.0
+        ),
+        "centroid_hz": round(spectral.centroid.mean, 1) if spectral.centroid.count else 0.0,
+        "centroid_std_hz": (
+            round(spectral.centroid.standard_deviation, 1) if spectral.centroid.count else 0.0
+        ),
+        "flux": round(spectral.flux.mean, 4) if spectral.flux.count else 0.0,
+        "hf_energy_ratio": round(spectral.hf_ratio.mean, 4) if spectral.hf_ratio.count else 0.0,
+        "measured_frames": spectral.alpha_ratio.count,
+    }
+
     flat: dict[str, object] = {
         "clip": os.path.basename(path),
         "durationSec": round(duration, 3),
@@ -902,6 +1187,8 @@ def _analyze(path: str, boundary_seconds: Iterable[float]) -> dict[str, object]:
     flat.update({f"energy_{key}": value for key, value in energy_group.items()})
     flat.update({f"boundaries_{key}": value for key, value in boundary_group.items()})
     flat.update({f"signal_{key}": value for key, value in signal_group.items()})
+    flat.update({f"voice_{key}": value for key, value in voice_group.items()})
+    flat.update({f"spectral_{key}": value for key, value in spectral_group.items()})
     flat["rate_cv"] = flat["rate_local_rate_cv"]
     flat["pause_ratio"] = flat["pauses_pause_speech_ratio"]
     flat["energy_roughness"] = flat["energy_envelope_roughness"]

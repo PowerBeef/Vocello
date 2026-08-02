@@ -17,6 +17,7 @@ import wave
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "scripts"))
 from prosody_calibration import corpus_digest, load_labels
+from analyze_prosody import ANALYZER_ALGORITHM_VERSION
 from prosody_profile import SCHEMA_VERSION
 
 SR = 24000
@@ -109,7 +110,9 @@ class ProsodyCalibrationTests(unittest.TestCase):
         with open(out, "r", encoding="utf-8") as f:
             profile = json.load(f)
         self.assertEqual(profile["schema_version"], SCHEMA_VERSION)
-        self.assertEqual(profile["analyzer_algorithm_version"], 2)
+        # A calibrated profile records the analyzer it was fitted against, so
+        # this tracks the constant rather than pinning a historical version.
+        self.assertEqual(profile["analyzer_algorithm_version"], ANALYZER_ALGORITHM_VERSION)
         self.assertIn("thresholds", profile)
         for key in ["monotone_f0_std_hz", "pause_max_seconds", "pause_ratio_max"]:
             self.assertIn(key, profile["thresholds"])

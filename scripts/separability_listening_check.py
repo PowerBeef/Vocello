@@ -52,6 +52,43 @@ IDENTITY_CONTROL_MAX_RATING = 2
 # Below this, the metric's ordering does not track perception well enough to
 # arbitrate preset decisions on its own.
 MINIMUM_TRUSTWORTHY_CORRELATION = 0.5
+# Full trust needs the *lower* confidence bound to clear this, not just the
+# point estimate. At the sample sizes a listening session realistically
+# reaches, a rho of 0.5 can carry an interval that nearly touches zero, and
+# acting on the point estimate alone would be exactly the unearned confidence
+# this check exists to prevent.
+MINIMUM_TRUSTWORTHY_LOWER_BOUND = 0.3
+# A "close" pair the metric calls interchangeable should not be heard as
+# noticeably different. When most of them are, the ordering may still be right
+# while the absolute scale is miscalibrated -- so distance thresholds cannot be
+# used to condemn a preset even though ranking remains useful.
+CLOSE_BUCKET_AUDIBLE_RATING = 3
+
+
+def correlation_interval(rho, count, confidence=0.95):
+    """Fisher z interval for a rank correlation."""
+    if rho is None or count < 5 or abs(rho) >= 1.0:
+        return None
+    z = math.atanh(rho)
+    spread = 1.0 / math.sqrt(count - 3)
+    # 1.96 for 95%; derived rather than hard-coded so other levels work.
+    critical = math.sqrt(2.0) * _inverse_erf(confidence)
+    return (
+        round(math.tanh(z - critical * spread), 3),
+        round(math.tanh(z + critical * spread), 3),
+    )
+
+
+def _inverse_erf(value):
+    """Inverse error function by Newton refinement on a rational seed."""
+    a = 0.147
+    ln = math.log(1.0 - value * value)
+    first = 2.0 / (math.pi * a) + ln / 2.0
+    guess = math.copysign(math.sqrt(math.sqrt(first * first - ln / a) - first), value)
+    for _ in range(3):
+        error = math.erf(guess) - value
+        guess -= error / (2.0 / math.sqrt(math.pi) * math.exp(-guess * guess))
+    return guess
 
 
 def _ranks(values):
@@ -141,24 +178,47 @@ def evaluate_listening(key, ratings):
             })
         disagreements.sort(key=lambda item: -item["rankGap"])
 
-    trustworthy = (
+    interval = correlation_interval(correlation, len(judged))
+
+    # How often a pair the metric calls interchangeable was actually audible.
+    close_pairs = [rating for entry, rating in judged if entry["bucket"] == "close"]
+    close_audible = sum(1 for rating in close_pairs if rating >= CLOSE_BUCKET_AUDIBLE_RATING)
+    scale_miscalibrated = bool(close_pairs) and close_audible > len(close_pairs) / 2
+
+    directional = (
         not failed_controls
         and correlation is not None
         and correlation >= MINIMUM_TRUSTWORTHY_CORRELATION
         and ordered
     )
+    calibrated = (
+        directional
+        and interval is not None
+        and interval[0] >= MINIMUM_TRUSTWORTHY_LOWER_BOUND
+        and not scale_miscalibrated
+    )
     if failed_controls:
         verdict = "session_unusable"
-    elif trustworthy:
+    elif calibrated:
         verdict = "metric_tracks_perception"
+    elif directional:
+        # Ranking is useful; absolute distance is not. Good enough to order
+        # candidates, not good enough to condemn a preset on a threshold.
+        verdict = "metric_ranks_but_is_not_calibrated"
     else:
         verdict = "metric_does_not_track_perception"
 
     return {
         "checkVersion": LISTENING_CHECK_VERSION,
         "verdict": verdict,
-        "trustworthy": trustworthy,
+        "trustworthy": calibrated,
+        "usableForRanking": directional,
         "spearman": round(correlation, 3) if correlation is not None else None,
+        "spearmanInterval": interval,
+        "closeBucketHeardAsDifferent": (
+            f"{close_audible}/{len(close_pairs)}" if close_pairs else None
+        ),
+        "absoluteScaleMiscalibrated": scale_miscalibrated,
         "bucketMeans": buckets,
         "bucketsOrderedCorrectly": ordered,
         "identityControls": {
@@ -191,7 +251,18 @@ def main():
         return 0 if report["trustworthy"] else 1
 
     print(f"listening check: {report['verdict']}")
-    print(f"  Spearman(metric distance, perceived difference) = {report['spearman']}")
+    interval = report["spearmanInterval"]
+    print(
+        f"  Spearman(metric distance, perceived difference) = {report['spearman']}"
+        + (f"  95% CI [{interval[0]}, {interval[1]}]" if interval else "")
+    )
+    if report["closeBucketHeardAsDifferent"]:
+        print(
+            f"  pairs the metric calls interchangeable that were audibly different: "
+            f"{report['closeBucketHeardAsDifferent']}"
+            + ("  → absolute distance is miscalibrated"
+               if report["absoluteScaleMiscalibrated"] else "")
+        )
     for name in ("close", "mid", "far"):
         entry = report["bucketMeans"].get(name)
         if entry:

@@ -64,6 +64,34 @@ class ListeningCheckTests(unittest.TestCase):
         self.assertFalse(report["trustworthy"])
         self.assertLess(report["spearman"], 0)
 
+    def test_ordering_can_be_right_while_the_absolute_scale_is_wrong(self):
+        # The observed real session: buckets order correctly and the
+        # correlation clears the point-estimate bar, but pairs the metric calls
+        # interchangeable are plainly audible. Ranking is usable; a distance
+        # threshold is not, so a preset must not be condemned on one.
+        ratings = {"p01": 3, "p02": 3, "p03": 3, "p04": 3, "p05": 3,
+                   "p06": 4, "p07": 4, "p08": 4, "p09": 4, "c01": 1}
+        report = evaluate_listening(CLEAN_KEY, ratings)
+        self.assertEqual(report["verdict"], "metric_ranks_but_is_not_calibrated")
+        self.assertTrue(report["usableForRanking"])
+        self.assertFalse(report["trustworthy"])
+        self.assertTrue(report["absoluteScaleMiscalibrated"])
+        self.assertEqual(report["closeBucketHeardAsDifferent"], "3/3")
+
+    def test_a_wide_confidence_interval_withholds_full_trust(self):
+        # A point estimate over the bar carried by an interval that nearly
+        # touches zero is not evidence the metric can arbitrate anything.
+        small_key = key([
+            ("p01", "close", 0.9), ("p02", "close", 1.0),
+            ("p03", "mid", 2.2), ("p04", "mid", 2.4),
+            ("p05", "far", 3.6), ("p06", "far", 4.2),
+        ])
+        ratings = {"p01": 1, "p02": 2, "p03": 1, "p04": 3, "p05": 3, "p06": 4}
+        report = evaluate_listening(small_key, ratings)
+        self.assertIsNotNone(report["spearmanInterval"])
+        self.assertLess(report["spearmanInterval"][0], 0.3)
+        self.assertFalse(report["trustworthy"])
+
     def test_a_failed_identity_control_discards_the_session(self):
         # Rating the identical recording as clearly different means the session
         # was guessing; a good correlation elsewhere cannot rescue it.

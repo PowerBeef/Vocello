@@ -115,6 +115,74 @@ def load_exemptions(root: pathlib.Path) -> dict[str, str]:
     return out
 
 
+ASSISTS_BEGIN = "<!-- BEGIN OPTIONAL ASSISTS -->"
+ASSISTS_END = "<!-- END OPTIONAL ASSISTS -->"
+# Phrases that carry the section's meaning, not its wording. Each one exists
+# because losing it would change what the section claims, not merely how it reads.
+ASSISTS_REQUIRED = (
+    ("no gate can validate", "the admission that the table is unverifiable"),
+    # "optional" alone is too weak -- the heading itself contains it, so the
+    # phrase survives even when the framing is inverted to "every entry is
+    # required". "prerequisite" appears only in the sentence that matters.
+    ("prerequisite", "the statement that no entry is a prerequisite"),
+)
+ASSISTS_MIN_ROWS = 5
+
+
+def assists_findings(root: pathlib.Path) -> list[str]:
+    """Guard the one CLAUDE.md section that no other check can defend.
+
+    Everything else in CLAUDE.md is machine-checked: paths resolve, gates are
+    named, facts are derived from code. The optional-assists table is the
+    deliberate exception -- it routes work to skills and MCP servers that live in
+    user configuration, outside the repository, where no gate can reach.
+
+    That makes it the section most likely to be removed by something acting in
+    good faith. A CLAUDE.md-improving agent evaluating against a template, or a
+    currency pass tidying unverifiable prose, would both have a reasonable case
+    for deleting it. This turns that from an incidental edit into a failing build.
+
+    Rows are free to change as user tooling changes. The section, its
+    unverifiability disclaimer, and its optional framing are not.
+    """
+    findings: list[str] = []
+    claude = root / "CLAUDE.md"
+    if not claude.exists():
+        return [f"missing guidance file: CLAUDE.md"]
+    text = claude.read_text(encoding="utf-8")
+
+    if text.count(ASSISTS_BEGIN) != 1 or text.count(ASSISTS_END) != 1:
+        return [
+            "CLAUDE.md: the optional-assists section markers are missing or duplicated. "
+            "This section is unverifiable by design and must not be deleted as untidy; "
+            f"restore {ASSISTS_BEGIN} … {ASSISTS_END}"
+        ]
+
+    start = text.index(ASSISTS_BEGIN)
+    end = text.index(ASSISTS_END)
+    if end < start:
+        return ["CLAUDE.md: optional-assists END marker precedes BEGIN"]
+    block = text[start:end]
+
+    lowered = block.lower()
+    for phrase, why in ASSISTS_REQUIRED:
+        if phrase not in lowered:
+            findings.append(
+                f"CLAUDE.md: the optional-assists section lost {why} "
+                f"(expected the phrase {phrase!r})"
+            )
+
+    rows = [line for line in block.splitlines()
+            if line.startswith("| ") and "---" not in line]
+    # Header plus content rows; a gutted stub is as bad as a deleted section.
+    if len(rows) - 1 < ASSISTS_MIN_ROWS:
+        findings.append(
+            f"CLAUDE.md: the optional-assists table has {max(len(rows) - 1, 0)} rows, "
+            f"fewer than the {ASSISTS_MIN_ROWS} expected; it appears gutted rather than curated"
+        )
+    return findings
+
+
 def evaluate(root: pathlib.Path) -> dict:
     text = guidance_text(root)
     exempt = load_exemptions(root)
@@ -148,13 +216,16 @@ def evaluate(root: pathlib.Path) -> dict:
         else:
             missing.append({"kind": kind, "surface": surface})
 
+    assists = assists_findings(root)
+
     return {
         "checked": len(surfaces),
         "covered": len(covered),
         "exempted": exempted,
         "missing": missing,
         "staleExemptions": stale_exemptions,
-        "ok": not missing and not stale_exemptions,
+        "assistsSection": assists,
+        "ok": not missing and not stale_exemptions and not assists,
     }
 
 
@@ -186,6 +257,8 @@ def main(argv=None) -> int:
             f"remove its entry from {EXEMPTIONS_PATH}",
             file=sys.stderr,
         )
+    for finding in report.get("assistsSection", []):
+        print(f"surface-coverage error: {finding}", file=sys.stderr)
     if not report["ok"]:
         print(
             "\nAn enforced surface that no guidance mentions is invisible to anyone "

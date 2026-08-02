@@ -14,9 +14,31 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from check_surface_coverage import CoverageError, evaluate, main  # noqa: E402
+from check_surface_coverage import (  # noqa: E402
+    CoverageError,
+    assists_findings,
+    evaluate,
+    main,
+)
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent.parent
+
+ASSISTS = """
+<!-- BEGIN OPTIONAL ASSISTS -->
+### Optional assists
+no gate can validate this table; no entry is ever a prerequisite.
+
+| Task | Reach for |
+| --- | --- |
+| a | one |
+| b | two |
+| c | three |
+| d | four |
+| e | five |
+<!-- END OPTIONAL ASSISTS -->
+"""
+
+
 
 GATE = '''#!/usr/bin/env bash
 python3 "$SCRIPT_DIR/documented_gate.py"
@@ -31,7 +53,7 @@ class Harness(unittest.TestCase):
         (root / "config").mkdir()
         (root / ".claude" / "rules").mkdir(parents=True)
         (root / "scripts" / "check_project_inputs.sh").write_text(gate)
-        (root / "CLAUDE.md").write_text(claude_text)
+        (root / "CLAUDE.md").write_text(claude_text + ASSISTS)
         for name in contracts:
             (root / "config" / name).write_text("{}")
         if exemptions is not None:
@@ -124,9 +146,58 @@ class SafetyTests(Harness):
             evaluate(root)
 
 
+class AssistsSectionTests(unittest.TestCase):
+    """The optional-assists table is unverifiable by design, which makes it the
+    section most likely to be deleted by something acting in good faith."""
+
+    def write(self, body):
+        root = pathlib.Path(tempfile.mkdtemp())
+        (root / "CLAUDE.md").write_text(body)
+        return root
+
+    def test_a_complete_section_passes(self):
+        self.assertEqual(assists_findings(self.write(ASSISTS)), [])
+
+    def test_deleting_the_section_fails(self):
+        findings = assists_findings(self.write("# Guidance\n\nnothing here\n"))
+        self.assertTrue(any("markers are missing" in f for f in findings))
+
+    def test_stripping_the_markers_fails(self):
+        body = ASSISTS.replace("<!-- BEGIN OPTIONAL ASSISTS -->", "").replace(
+            "<!-- END OPTIONAL ASSISTS -->", "")
+        self.assertTrue(assists_findings(self.write(body)))
+
+    def test_duplicated_markers_fail(self):
+        self.assertTrue(assists_findings(self.write(ASSISTS + ASSISTS)))
+
+    def test_losing_the_unverifiability_disclaimer_fails(self):
+        body = ASSISTS.replace("no gate can validate this table",
+                               "this table is fully checked")
+        findings = assists_findings(self.write(body))
+        self.assertTrue(any("unverifiable" in f for f in findings))
+
+    def test_losing_the_optional_framing_fails(self):
+        body = ASSISTS.replace("no entry is ever a prerequisite", "every entry is required")
+        findings = assists_findings(self.write(body))
+        self.assertTrue(any("prerequisite" in f for f in findings))
+
+    def test_gutting_the_table_to_a_stub_fails(self):
+        body = ASSISTS.replace("| c | three |\n| d | four |\n| e | five |\n", "")
+        findings = assists_findings(self.write(body))
+        self.assertTrue(any("gutted" in f for f in findings))
+
+    def test_rows_may_change_freely(self):
+        # User tooling changes; the rows should follow it without ceremony.
+        body = ASSISTS.replace("| a | one |", "| a | something entirely different |")
+        self.assertEqual(assists_findings(self.write(body)), [])
+
+
 class RepositoryTests(unittest.TestCase):
     def test_the_repository_documents_every_enforced_surface(self):
         self.assertEqual(main(["--root", str(REPO_ROOT)]), 0)
+
+    def test_the_shipped_assists_section_is_intact(self):
+        self.assertEqual(assists_findings(REPO_ROOT), [])
 
 
 if __name__ == "__main__":

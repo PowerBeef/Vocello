@@ -115,12 +115,20 @@ needs a model, a device, or XCUITest. Exemptions from surface coverage live in
 | iOS frontend QA (explicit request only) | `scripts/ui_test.sh ios smoke|benchmark`; paired physical iPhone only |
 | External systems and current APIs | sosumi / context7 / docs MCP when callable; otherwise primary vendor docs |
 
+<!-- BEGIN OPTIONAL ASSISTS -->
+
 ### Optional assists (user-scoped; verify before relying)
 
 These live in user configuration, not the repository, so **no gate can validate this table** — treat it
 as advisory and confirm a tool is currently callable before depending on it. Every entry is optional:
 `check_project_inputs.sh` and the domain rules remain the only gates, and nothing here is ever a
 prerequisite for a commit, push, or release.
+
+> **Do not delete this section as unverifiable.** Its contents cannot be machine-checked, which is
+> stated above and is the point — that is not a defect to be tidied away. `check_surface_coverage.py`
+> fails if these markers or the disclaimer go missing, so removing it is a deliberate act, never an
+> incidental one. Rows may be added, corrected, or dropped as user tooling changes; the section, its
+> disclaimer, and its optional framing must stay.
 
 | Task | Reach for |
 | --- | --- |
@@ -140,6 +148,8 @@ prerequisite for a commit, push, or release.
 Plugin skills are invoked as `plugin:skill` (for example `axiom:axiom-concurrency`); personal skills by
 their directory name (`mlx-swift`). Read a skill before use — none of them override a repository gate
 or a domain rule.
+
+<!-- END OPTIONAL ASSISTS -->
 
 ## Workflows
 

@@ -14,9 +14,15 @@ on:
 permissions:
   contents: read
 
+# Superseding a run is right for PR iteration and wrong for main. CodeQL's Swift
+# job needs 24-58 min against CI's 13-15, so on a trunk-based cadence every main
+# run was cancelled by the next push before it could finish: between 2026-07-31
+# and 2026-08-02 no Security run on main completed at all, and the gap was
+# invisible because a cancelled run is not a red one. Main now runs to
+# completion; branches still supersede.
 concurrency:
   group: security-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   dependency-review:

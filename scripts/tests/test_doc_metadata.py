@@ -22,6 +22,8 @@ FACTS = {
     "deliveryPresetCount": {"value": 10, "source": "x"},
     "deliveryIntensityTiers": {"value": 2, "source": "x"},
     "qwenSpeakerCount": {"value": 9, "source": "x"},
+    "stableMacReleaseVersion": {"value": "2.4.0", "source": "x"},
+    "canonicalMacBenchmarkChip": {"value": "Apple M2", "source": "x"},
 }
 
 
@@ -69,6 +71,39 @@ class FactScanTests(unittest.TestCase):
     def test_findings_carry_a_line_number(self):
         findings = scan_text("ok\nok\n10 × 3 presets\n", FACTS)
         self.assertEqual(findings[0]["line"], 3)
+
+
+class ReleaseFactTests(unittest.TestCase):
+    """CLAUDE.md and README.md are fact-scanned; these are the claims that drift."""
+
+    def test_a_stale_current_release_claim_is_caught(self):
+        self.assertTrue(matched("macOS **2.3.0** is the current release"))
+        self.assertTrue(matched("2.3.0 is the current macOS release"))
+
+    def test_the_true_current_release_passes(self):
+        self.assertEqual(matched("macOS **2.4.0** is the current release"), set())
+
+    def test_version_numbers_outside_a_currency_claim_are_ignored(self):
+        # Release notes and history legitimately name old versions; only the
+        # claim about which release is current may not drift.
+        for text in ("v2.3.0 was cut 2026-07-31",
+                     "the v2.3.0 auto-generated stub was fixed post-publication",
+                     "upgrading from 1.2.3 requires a fresh install"):
+            self.assertEqual(matched(text), set(), text)
+
+    def test_the_wrong_canonical_mac_is_caught(self):
+        # Standing risk: public performance copy citing M1 instead of the
+        # canonical M2 machine.
+        self.assertTrue(matched("measured on a Mac mini M1 8 GB"))
+        self.assertTrue(matched("Mac mini (M1, 8 GB)"))
+
+    def test_the_canonical_mac_passes(self):
+        for text in ("Mac mini M2 8 GB", "Mac mini (M2, 8 GB)", "canonical Mac mini M2"):
+            self.assertEqual(matched(text), set(), text)
+
+    def test_other_apple_silicon_mentions_are_not_claims_about_the_canonical_mac(self):
+        for text in ("M1 Max throughput", "an M1 Pro laptop", "Apple M3 results"):
+            self.assertEqual(matched(text), set(), text)
 
 
 class FrontmatterTests(unittest.TestCase):

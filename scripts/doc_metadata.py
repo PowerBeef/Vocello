@@ -56,6 +56,7 @@ REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 FACTS_PATH = "config/derived-doc-facts.json"
 INDEX_PATH = "docs/INDEX.json"
 DOC_ROOTS = ("docs", ".claude/rules")
+ROOT_SCAN_FILES = ("CLAUDE.md", "README.md")
 STATUSES = ("active", "historical", "superseded")
 PINNED = ("historical", "superseded")
 OWNERS = ("backend-mlx", "release-qa", "ios", "macos", "backend-and-platform")
@@ -152,7 +153,29 @@ def derive_facts(root: pathlib.Path) -> dict:
     )
     speakers = len(contract.get("speakerMetadata") or {})
 
-    if not (presets and tiers and speakers):
+    # project.yml is the version authority; public-product-facts.json is checked
+    # against it elsewhere, so deriving from the manifest skips the intermediary.
+    manifest = (root / "project.yml").read_text(encoding="utf-8")
+    version_match = re.search(r'MARKETING_VERSION:\s*"([0-9]+\.[0-9]+\.[0-9]+)"', manifest)
+    if not version_match:
+        raise ValueError("MARKETING_VERSION not found in project.yml")
+    version = version_match.group(1)
+
+    # The canonical benchmark machine is flagged in the profile registry itself,
+    # so the chip name is a derived fact rather than a policy restatement.
+    profiles = json.loads(
+        (root / "benchmarks/hardware-profiles.json").read_text(encoding="utf-8")
+    )["profiles"]
+    canonical_macs = [
+        p for p in profiles if p.get("canonical") and p.get("platform") == "macos"
+    ]
+    if len(canonical_macs) != 1:
+        raise ValueError(
+            f"expected exactly one canonical macOS hardware profile, found {len(canonical_macs)}"
+        )
+    canonical_chip = canonical_macs[0]["chip"]
+
+    if not (presets and tiers and speakers and version and canonical_chip):
         raise ValueError("a derived fact came out empty; refusing to write")
 
     return {
@@ -180,6 +203,14 @@ def derive_facts(root: pathlib.Path) -> dict:
                 "value": speakers,
                 "source": "Sources/Resources/qwenvoice_contract.json",
             },
+            "stableMacReleaseVersion": {
+                "value": version,
+                "source": "project.yml",
+            },
+            "canonicalMacBenchmarkChip": {
+                "value": canonical_chip,
+                "source": "benchmarks/hardware-profiles.json",
+            },
         },
     }
 
@@ -205,6 +236,8 @@ def deny_patterns(facts: dict) -> list[tuple[str, str, re.Pattern]]:
     presets = facts["deliveryPresetCount"]["value"]
     tiers = facts["deliveryIntensityTiers"]["value"]
     speakers = facts["qwenSpeakerCount"]["value"]
+    version = facts["stableMacReleaseVersion"]["value"]
+    chip = facts["canonicalMacBenchmarkChip"]["value"]
     out = [
         (
             "deliveryIntensityTiers",
@@ -242,6 +275,33 @@ def deny_patterns(facts: dict) -> list[tuple[str, str, re.Pattern]]:
             re.compile(
                 rf"\b(?!{speakers}\b)\d+\s+(?:built-in|preset|premium)\s+"
                 r"(?:speakers?|timbres?|voices?)\b",
+                re.I,
+            ),
+        ),
+        (
+            "stableMacReleaseVersion",
+            f"a current-release claim naming a version other than {version}",
+            # Only the *claim* forms. Version numbers appear legitimately all over
+            # release notes and history; what must not drift is the statement about
+            # which release is current.
+            re.compile(
+                r"(?:macOS\s+\*{0,2}(?!" + re.escape(version) + r"\b)\d+\.\d+\.\d+\*{0,2}"
+                r"\s+(?:is\s+)?(?:the\s+)?(?:current|latest|stable)"
+                r"|\*{0,2}(?!" + re.escape(version) + r"\b)\d+\.\d+\.\d+\*{0,2}"
+                r"\s+is\s+(?:the\s+)?current\s+(?:macOS\s+)?release)",
+                re.I,
+            ),
+        ),
+        (
+            "canonicalMacBenchmarkChip",
+            f"canonical benchmark hardware other than {chip}",
+            # The standing risk is public copy citing the wrong Mac. The chip is
+            # derived from the profile flagged canonical in the registry.
+            re.compile(
+                r"Mac\s+mini\s+\(?(?!"
+                + re.escape(chip.replace("Apple ", "")) + r"\b)M\d\b"
+                r"|canonical[^.\n]{0,40}\bMac\s+mini\s+\(?(?!"
+                + re.escape(chip.replace("Apple ", "")) + r"\b)M\d\b",
                 re.I,
             ),
         ),
@@ -389,6 +449,23 @@ def validate(root: pathlib.Path, strict: bool = False) -> dict:
                     f"{relative}:{finding['line']}: contradicts derived fact "
                     f"{finding['fact']} -- {finding['detail']} (matched {finding['matched']!r})"
                 )
+
+    # The two root documents are fact-scanned but never annotated. CLAUDE.md is
+    # the file that mandates fact-checking and was, until 2026-08-02, the one
+    # document exempt from it: a wrong preset count there passed every gate. They
+    # are scan-only rather than annotated because CLAUDE.md describes the whole
+    # repository, so a sourceOfTruth binding would be either uselessly broad or
+    # arbitrarily narrow. Contradictions here FAIL -- these are the two documents
+    # most read and most copied from.
+    for relative in ROOT_SCAN_FILES:
+        target = root / relative
+        if not target.exists():
+            continue
+        for finding in scan_text(target.read_text(encoding="utf-8"), facts):
+            errors.append(
+                f"{relative}:{finding['line']}: contradicts derived fact "
+                f"{finding['fact']} -- {finding['detail']} (matched {finding['matched']!r})"
+            )
 
     # Unannotated docs are scanned for contradictions too, but reported rather
     # than failed, so the prototype lands without a 60-file sweep.

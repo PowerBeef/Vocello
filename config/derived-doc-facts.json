@@ -14,6 +14,14 @@
     "qwenSpeakerCount": {
       "value": 9,
       "source": "Sources/Resources/qwenvoice_contract.json"
+    },
+    "stableMacReleaseVersion": {
+      "value": "2.4.0",
+      "source": "project.yml"
+    },
+    "canonicalMacBenchmarkChip": {
+      "value": "Apple M2",
+      "source": "benchmarks/hardware-profiles.json"
     }
   }
 }

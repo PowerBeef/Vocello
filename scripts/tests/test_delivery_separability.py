@@ -62,10 +62,12 @@ class SeparabilityTests(unittest.TestCase):
         # ridge would still return a number, and that number would be read as a
         # product finding. Refuse instead.
         records = []
-        for preset in ("alpha", "beta"):
+        for offset, preset in enumerate(("alpha", "beta")):
             for seed in range(2):
-                extras = {f"feature_{index}": float(index + seed) for index in range(10)}
-                records.append(record(preset, seed, 0.0, 1.0, **extras))
+                extras = {
+                    f"feature_{index}": float(index + seed + 3 * offset) for index in range(10)
+                }
+                records.append(record(preset, seed, float(offset), 1.0 + offset, **extras))
         verdict = evaluate_separability(records)
         self.assertFalse(verdict["passed"])
         self.assertEqual(verdict["flags"], ["separability_underpowered"])
@@ -123,6 +125,40 @@ class SeparabilityTests(unittest.TestCase):
         first = evaluate_separability(records, builtin_profile())
         second = evaluate_separability(records, builtin_profile())
         self.assertEqual(first, second)
+
+    def test_cells_naming_the_same_request_are_collapsed_and_reported(self):
+        # `neutral` forces its intensity to nil, so neutral.normal and
+        # neutral.strong carry identical instruction text and produce identical
+        # audio at a fixed seed. Scoring both guarantees mutual confusion for a
+        # reason that has nothing to do with delivery.
+        base = cohort({"alpha": (0.0, 0.0), "beta": (9.0, 9.0)})
+        alias = [dict(entry, intensity="strong") for entry in base if entry["preset"] == "alpha"]
+        verdict = evaluate_separability(base + alias, label_mode="cell")
+        self.assertIn("aliasedCells", verdict["metrics"])
+        self.assertEqual(verdict["metrics"]["aliasedCells"], {"alpha.strong": "alpha.normal"})
+        self.assertEqual(verdict["metrics"]["cellCount"], 2)
+
+    def test_a_single_coincidental_match_is_not_treated_as_an_alias(self):
+        # One shared seed agreeing is not evidence two cells are the same
+        # request; only agreement across seeds is.
+        records = [
+            record("alpha", 1, 0.0, 0.0), record("beta", 1, 0.0, 0.0),
+            record("alpha", 2, 1.0, 1.0), record("beta", 2, 5.0, 5.0),
+            record("alpha", 3, 1.2, 1.1), record("beta", 3, 5.2, 5.1),
+        ]
+        verdict = evaluate_separability(records, label_mode="cell")
+        self.assertNotIn("aliasedCells", verdict["metrics"])
+
+    def test_a_constant_feature_cannot_manufacture_separation(self):
+        # intensity_factor is the profile's own scaling constant echoed into the
+        # gate metrics; a constant that tracks the label would read as signal.
+        records = cohort({"alpha": (0.0, 0.0), "beta": (9.0, 9.0)})
+        for entry in records:
+            entry["features"]["intensity_factor"] = 1.0 if entry["preset"] == "alpha" else 1.15
+            entry["features"]["always_the_same"] = 7.0
+        verdict = evaluate_separability(records)
+        self.assertNotIn("intensity_factor", verdict["metrics"]["features"])
+        self.assertNotIn("always_the_same", verdict["metrics"]["features"])
 
     def test_sidecar_rows_become_records(self):
         rows = [

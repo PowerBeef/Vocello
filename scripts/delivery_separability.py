@@ -67,6 +67,11 @@ ANALYSIS_FAILURE_FLAGS = (
 _EXCLUDED_FEATURES = frozenset({
     # Ratios of absolute duration are seed-dependent scale, not delivery colour.
     "duration_ratio",
+    # The profile's own intensity scaling constant, echoed into the gate
+    # metrics. It is 1.0 for normal and 1.15 for strong regardless of what the
+    # audio does, so leaving it in lets the classifier read the tier straight
+    # off the label and inflates every by-cell score.
+    "intensity_factor",
 })
 
 
@@ -86,16 +91,71 @@ def _shared_feature_names(records):
     manufacture separation that the audio does not contain.
     """
     shared = None
+    seen_values = {}
     for record in records:
-        usable = {
-            name for name, value in (record.get("features") or {}).items()
-            if name not in _EXCLUDED_FEATURES
-            and isinstance(value, (int, float))
-            and not isinstance(value, bool)
-            and math.isfinite(float(value))
-        }
+        usable = set()
+        for name, value in (record.get("features") or {}).items():
+            if name in _EXCLUDED_FEATURES:
+                continue
+            if not isinstance(value, (int, float)) or isinstance(value, bool):
+                continue
+            if not math.isfinite(float(value)):
+                continue
+            usable.add(name)
+            seen_values.setdefault(name, set()).add(round(float(value), 12))
         shared = usable if shared is None else (shared & usable)
-    return sorted(shared or ())
+    # A feature that never varies carries no information and, worse, any
+    # constant that happens to track the label would be read as separation.
+    constant = {name for name, values in seen_values.items() if len(values) < 2}
+    return sorted((shared or set()) - constant)
+
+
+def _drop_aliased_cells(records, label_mode):
+    """Collapse cells that name the same request.
+
+    `neutral` forces its intensity to nil, so `neutral.normal` and
+    `neutral.strong` carry identical instruction text and produce byte-identical
+    audio at a fixed seed. Scoring both guarantees mutual confusion and drags
+    the aggregate down for a reason that has nothing to do with delivery.
+
+    A cell is an alias of another only when they agree exactly on every seed
+    they share, over at least two shared seeds -- one coincidental match between
+    genuinely different cells is not evidence they are the same request.
+    """
+    signatures = {}
+    for record in records:
+        cell = _cell_label(record, label_mode)
+        fingerprint = tuple(sorted(
+            (name, round(float(value), 9))
+            for name, value in record["features"].items()
+            # Excluded features must not enter the fingerprint: intensity_factor
+            # differs between tiers by construction, so leaving it in would hide
+            # exactly the aliasing this detects.
+            if name not in _EXCLUDED_FEATURES
+            and isinstance(value, (int, float)) and not isinstance(value, bool)
+        ))
+        signatures.setdefault(cell, {})[str(record.get("seed", ""))] = fingerprint
+
+    aliased = {}
+    cells = sorted(signatures)
+    for index, cell in enumerate(cells):
+        if cell in aliased:
+            continue
+        for other in cells[index + 1:]:
+            if other in aliased:
+                continue
+            shared = set(signatures[cell]) & set(signatures[other])
+            if len(shared) >= 2 and all(
+                signatures[cell][seed] == signatures[other][seed] for seed in shared
+            ):
+                aliased[other] = cell
+    if not aliased:
+        return records, {}
+    kept = [
+        record for record in records
+        if _cell_label(record, label_mode) not in aliased
+    ]
+    return kept, aliased
 
 
 def _matrix(records, feature_names):
@@ -178,6 +238,8 @@ def evaluate_separability(records, profile=None, label_mode="cell"):
         }
 
     records = [record for record in (records or []) if record.get("features")]
+    records, aliased_cells = _drop_aliased_cells(records, label_mode)
+
     if len(records) < 2:
         return failure("cohort_too_small", "separability needs at least two takes")
 
@@ -341,9 +403,32 @@ def evaluate_separability(records, profile=None, label_mode="cell"):
             if strong_spread < normal_spread * collapse_ratio:
                 flags.append("separability_intensity_collapse")
 
+    # A cell-mode miss that lands on the same preset's other tier is a wrong
+    # *intensity*, not a wrong emotion -- a listener would still name the
+    # emotion correctly. Separating the two keeps the headline number about
+    # what the product promises, with the tier question answered by the
+    # intensity spread below.
+    cross_preset_errors = 0
+    tier_errors = 0
+    for index in scored:
+        if predictions[index] == labels[index]:
+            continue
+        if labels[index].split(".")[0] == predictions[index].split(".")[0]:
+            tier_errors += 1
+        else:
+            cross_preset_errors += 1
+    total_errors = cross_preset_errors + tier_errors
+
     metrics = {
         "uar": round(sum(recalls) / len(recalls), 3) if recalls else 0.0,
         "macroF1": round(sum(f1_scores) / len(f1_scores), 3) if f1_scores else 0.0,
+        "crossPresetErrorRate": (
+            round(cross_preset_errors / len(scored), 3) if scored else 0.0
+        ),
+        "tierOnlyErrorRate": round(tier_errors / len(scored), 3) if scored else 0.0,
+        "errorsThatAreTierOnly": (
+            round(tier_errors / total_errors, 3) if total_errors else 0.0
+        ),
         "cellCount": len(cells),
         "takeCount": len(scored),
         "seedCount": len(set(seeds)),
@@ -353,6 +438,12 @@ def evaluate_separability(records, profile=None, label_mode="cell"):
         "pairDistances": pairs,
     }
     metrics.update(intensity_metrics)
+    if aliased_cells:
+        # Reported, never silent: an alias means two catalog cells issue the
+        # same request, which is a finding about the preset catalog.
+        metrics["aliasedCells"] = {
+            alias: canonical for alias, canonical in sorted(aliased_cells.items())
+        }
     if thin:
         # Reported, never silently dropped: a thin cell's recall is noise.
         metrics["cellsBelowMinimumSeeds"] = thin

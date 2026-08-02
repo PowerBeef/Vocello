@@ -58,6 +58,11 @@ _COMPOSITE_FEATURES = frozenset({
     "arousal_score", "voice_tension_score", "voice_breathiness_score", "duration_ratio",
 })
 
+# Not a measurement: the profile's own intensity scaling constant, echoed into
+# the gate metrics. It is 1.15 for every strong take regardless of the audio, so
+# it reports a perfect effect size for a value nothing measured.
+_NON_MEASUREMENT_FEATURES = frozenset({"intensity_factor"})
+
 
 def load_matrix(paths):
     """Merge bench sidecars into separability records, one seed per file."""
@@ -84,7 +89,9 @@ def per_preset_statistics(records, false_discovery_rate=0.10):
 
     report = {}
     for cell, feature_dicts in sorted(by_cell.items()):
-        names = sorted({name for entry in feature_dicts for name in entry})
+        names = sorted(
+            {name for entry in feature_dicts for name in entry} - _NON_MEASUREMENT_FEATURES
+        )
         rows = []
         for name in names:
             values = [
@@ -151,9 +158,113 @@ def expectation_candidates(statistics, minimum_effect=0.8, minimum_win_rate=0.85
     return candidates
 
 
+def intensity_ladder(statistics, minimum_effect=0.2):
+    """Does `strong` actually amplify what `normal` does, per preset?
+
+    The profile scales every expectation magnitude by ``intensity_scale``, so a
+    strong take is held to a higher bar than its normal counterpart. That is
+    only fair if the tier genuinely produces a larger effect. Where the ladder
+    saturates, strong fails a bar it was never going to clear, and the fix
+    belongs in the instruction rather than the threshold.
+
+    For each preset, compares the median effect of every feature the normal
+    tier moves against the same feature at strong, in normal's own direction.
+    """
+    ladder = {}
+    for cell, rows in statistics.items():
+        preset, _, intensity = cell.partition(".")
+        if intensity != "normal":
+            continue
+        strong_rows = {row["feature"]: row for row in statistics.get(f"{preset}.strong", [])}
+        amplified = []
+        saturated = []
+        reversed_features = []
+        ratios = []
+        for row in rows:
+            if row["composite"] or abs(row["median"]) < minimum_effect:
+                continue
+            counterpart = strong_rows.get(row["feature"])
+            if counterpart is None:
+                continue
+            # Project both onto normal's direction so "bigger" always means
+            # "further along the axis the preset intends".
+            sign = 1.0 if row["median"] > 0 else -1.0
+            normal_effect = sign * row["median"]
+            strong_effect = sign * counterpart["median"]
+            if normal_effect <= 0:
+                continue
+            ratios.append(strong_effect / normal_effect)
+            if strong_effect < 0:
+                reversed_features.append(row["feature"])
+            elif strong_effect >= normal_effect:
+                amplified.append(row["feature"])
+            else:
+                saturated.append(row["feature"])
+        if not ratios:
+            continue
+        ladder[preset] = {
+            "featuresCompared": len(ratios),
+            "medianStrongToNormalRatio": round(sorted(ratios)[len(ratios) // 2], 3),
+            "amplified": sorted(amplified),
+            "saturated": sorted(saturated),
+            "reversed": sorted(reversed_features),
+            "amplifiedFraction": round(len(amplified) / len(ratios), 3),
+        }
+    return ladder
+
+
+def emit_expectations(candidates, required_per_preset=2, effect_fraction=0.5):
+    """Derive a ``delivery_expectations.presets`` block from measured candidates.
+
+    **A derived expectation is a regression guard, not a correctness standard.**
+    It encodes what a preset currently does, so a later change that stops doing
+    it is caught. It says nothing about whether the preset *should* do that --
+    the project has never had a golden standard for delivery, and the previous
+    hand-seeded expectations were written before any voice-quality measurement
+    existed (finding F2 caught two of them being factually backwards). Judge
+    whether a preset is any good with the instruction-independent criteria --
+    separability between cells and intensity monotonicity within a preset --
+    not by whether it satisfies expectations derived from its own behaviour.
+
+    Follows the method the profile already documents -- required features carry
+    a real measured effect, magnitudes sit near half the observed median -- but
+    derives it from data rather than hand-tuning, so a recalibration is
+    reproducible from the sweep it came from.
+
+    A feature is promoted to ``required`` only when the preset's ``strong`` cell
+    agrees in direction with its ``normal`` cell. Magnitudes come from the
+    ``normal`` cell because the profile scales them by intensity, so binding a
+    strong-tier magnitude would double-count the tier.
+    """
+    presets = {}
+    for cell, chosen in candidates.items():
+        preset, _, intensity = cell.partition(".")
+        if intensity != "normal":
+            continue
+        strong_direction = {
+            item["feature"]: item["direction"]
+            for item in candidates.get(f"{preset}.strong", [])
+        }
+        features = {}
+        for rank, item in enumerate(chosen):
+            agrees = strong_direction.get(item["feature"]) == item["direction"]
+            required = agrees and rank < required_per_preset
+            features[item["feature"]] = {
+                "direction": item["direction"],
+                "min_effect_normal": (
+                    round(abs(item["medianEffect"]) * effect_fraction, 4) if required else 0.0
+                ),
+                "tier": "required" if required else "supporting",
+            }
+        if features:
+            presets[preset] = features
+    return presets
+
+
 def build_report(records, profile=None, false_discovery_rate=0.10):
     profile = profile or builtin_profile()
     statistics = per_preset_statistics(records, false_discovery_rate)
+    candidates = expectation_candidates(statistics)
     return {
         "reportVersion": MATRIX_REPORT_VERSION,
         "takeCount": len(records),
@@ -163,7 +274,9 @@ def build_report(records, profile=None, false_discovery_rate=0.10):
         "separabilityByCell": evaluate_separability(records, profile, label_mode="cell"),
         "separabilityByPreset": evaluate_separability(records, profile, label_mode="preset"),
         "statistics": statistics,
-        "expectationCandidates": expectation_candidates(statistics),
+        "intensityLadder": intensity_ladder(statistics),
+        "expectationCandidates": candidates,
+        "derivedExpectations": emit_expectations(candidates),
     }
 
 
@@ -191,6 +304,18 @@ def _print_summary(report):
                   + (f"  → {entry['topConfusion']}×{entry['topConfusionCount']}"
                      if entry.get("topConfusion") else ""))
 
+    ladder = report.get("intensityLadder") or {}
+    if ladder:
+        print("\nintensity ladder (does strong amplify what normal does?):")
+        for preset in sorted(ladder, key=lambda name: ladder[name]["amplifiedFraction"]):
+            entry = ladder[preset]
+            print(
+                f"  {preset:12} {entry['amplifiedFraction']:.2f} amplified "
+                f"({len(entry['amplified'])}/{entry['featuresCompared']}), "
+                f"median ratio {entry['medianStrongToNormalRatio']}"
+                + (f", reversed: {', '.join(entry['reversed'])}" if entry["reversed"] else "")
+            )
+
     print("\nexpectation candidates (survive BH, |d_z| ≥ 0.8, win-rate ≥ 0.85):")
     for cell in sorted(report["expectationCandidates"]):
         chosen = report["expectationCandidates"][cell]
@@ -212,6 +337,10 @@ def main():
     parser.add_argument("--profile", help="calibrated prosody profile JSON")
     parser.add_argument("--fdr", type=float, default=0.10, help="Benjamini-Hochberg q")
     parser.add_argument("--json", help="write the full report to this path")
+    parser.add_argument(
+        "--emit-expectations",
+        help="write the derived delivery_expectations.presets block to this path",
+    )
     arguments = parser.parse_args()
 
     paths = list(arguments.sidecar)
@@ -230,6 +359,10 @@ def main():
     if arguments.json:
         with open(arguments.json, "w", encoding="utf-8") as handle:
             json.dump(report, handle, indent=2, sort_keys=True)
+            handle.write("\n")
+    if arguments.emit_expectations:
+        with open(arguments.emit_expectations, "w", encoding="utf-8") as handle:
+            json.dump(report["derivedExpectations"], handle, indent=2, sort_keys=True)
             handle.write("\n")
     _print_summary(report)
     return 0

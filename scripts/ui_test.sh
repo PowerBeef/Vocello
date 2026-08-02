@@ -38,10 +38,13 @@ Usage:
   scripts/ui_test.sh macos benchmark [--modes custom,design,clone] [--lengths short,medium,long] [--warm 3] [--label RUN_ID]
   scripts/ui_test.sh ios smoke
   scripts/ui_test.sh ios benchmark [--modes custom,design,clone] [--lengths short,medium,long] [--warm 3] [--label RUN_ID]
+  scripts/ui_test.sh ios delivery-cohort --text SCRIPT [--takes 20] [--label RUN_ID]
   scripts/ui_test.sh ios model-download
 
 The iOS destination is the paired physical iPhone only. Simulator destinations are unsupported.
 `model-download` is an opt-in isolated lifecycle proof and never runs in smoke, benchmark, CI, or release.
+`delivery-cohort` is a diagnostic delivery-consistency lane (N identical Neutral Custom takes through
+the production UI); it never publishes benchmark history and never runs in smoke, benchmark, CI, or release.
 Benchmark clone-fixture enrollment moved to the headless diagnostics runner:
 `scripts/ios_device.sh enroll-clone-fixture` (the iPhone app no longer ships a Files-import UI).
 No lane retries automatically. A failed run keeps its log, xcresult, screenshots, and diagnostics.
@@ -55,14 +58,17 @@ platform="$1"
 lane="$2"
 shift 2
 [[ "$platform" == "macos" || "$platform" == "ios" ]] || usage
-[[ "$lane" == "smoke" || "$lane" == "benchmark" || "$lane" == "model-download" ]] || usage
+[[ "$lane" == "smoke" || "$lane" == "benchmark" || "$lane" == "model-download" || "$lane" == "delivery-cohort" ]] || usage
 [[ "$lane" != "model-download" || "$platform" == "ios" ]] || usage
+[[ "$lane" != "delivery-cohort" || "$platform" == "ios" ]] || usage
 
 modes="custom,design,clone"
 lengths="short,medium,long"
 warm=3
 label=""
 long_form_segments=""
+cohort_takes=20
+cohort_text=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --modes) modes="${2:?--modes requires a value}"; shift 2 ;;
@@ -73,6 +79,10 @@ while [[ $# -gt 0 ]]; do
     --warm=*) warm="${1#*=}"; shift ;;
     --label) label="${2:?--label requires a value}"; shift 2 ;;
     --label=*) label="${1#*=}"; shift ;;
+    --takes) cohort_takes="${2:?--takes requires a value}"; shift 2 ;;
+    --takes=*) cohort_takes="${1#*=}"; shift ;;
+    --text) cohort_text="${2:?--text requires a value}"; shift 2 ;;
+    --text=*) cohort_text="${1#*=}"; shift ;;
     --long-form-segments) long_form_segments="${2:?--long-form-segments requires a value}"; shift 2 ;;
     --long-form-segments=*) long_form_segments="${1#*=}"; shift ;;
     -h|--help|help) usage ;;
@@ -81,8 +91,20 @@ while [[ $# -gt 0 ]]; do
 done
 validate_benchmark_label "$label"
 
-if [[ "$lane" != "benchmark" && ( "$modes" != "custom,design,clone" || "$lengths" != "short,medium,long" || "$warm" != 3 || -n "$label" ) ]]; then
+if [[ "$lane" != "benchmark" && "$lane" != "delivery-cohort" ]] && [[ -n "$label" ]]; then
+  die "--label is accepted only by the benchmark and delivery-cohort lanes"
+fi
+if [[ "$lane" != "benchmark" && ( "$modes" != "custom,design,clone" || "$lengths" != "short,medium,long" || "$warm" != 3 ) ]]; then
   die "benchmark flags are accepted only by the benchmark lane"
+fi
+if [[ "$lane" != "delivery-cohort" ]] && [[ "$cohort_takes" != 20 || -n "$cohort_text" ]]; then
+  die "--takes and --text are accepted only by the delivery-cohort lane"
+fi
+if [[ "$lane" == "delivery-cohort" ]]; then
+  [[ "$cohort_takes" =~ ^[0-9]+$ ]] && (( cohort_takes >= 1 && cohort_takes <= 60 )) \
+    || die "--takes must be an integer between 1 and 60"
+  [[ -n "$cohort_text" ]] || die "delivery-cohort requires --text with the exact take script"
+  (( ${#cohort_text} <= 2000 )) || die "--text must be at most 2000 characters"
 fi
 
 # Optional macOS-smoke-only scaling of the long-form journey. Local evidence
@@ -910,6 +932,11 @@ else
     export TEST_RUNNER_QVOICE_IOS_BENCH_LENGTHS="$lengths"
     export TEST_RUNNER_QVOICE_IOS_BENCH_WARM="$warm"
     export TEST_RUNNER_QVOICE_IOS_BENCH_LABEL="${label:-$run_id}"
+  elif [[ "$lane" == "delivery-cohort" ]]; then
+    only_test="VocelloiOSUITests/VocelloiOSDeliveryCohortUITests/testNeutralCustomDeliveryCohort"
+    export TEST_RUNNER_QVOICE_IOS_COHORT_RUN_ID="$run_id"
+    export TEST_RUNNER_QVOICE_IOS_COHORT_TAKES="$cohort_takes"
+    export TEST_RUNNER_QVOICE_IOS_COHORT_TEXT="$cohort_text"
   else
     only_test="VocelloiOSUITests/VocelloiOSModelDownloadUITests/testIsolatedBackgroundDownloadAdoptionAndCleanup"
   fi

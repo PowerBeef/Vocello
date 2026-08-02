@@ -11,10 +11,13 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from delivery_matrix_report import (
     build_report,
+    emit_expectations,
     expectation_candidates,
+    intensity_ladder,
     load_matrix,
     per_preset_statistics,
 )
+from prosody_profile import _validate_delivery_expectations, builtin_profile
 
 
 def records(cell_features, seeds=12):
@@ -103,6 +106,63 @@ class MatrixReportTests(unittest.TestCase):
         # Grouping folds by run, not by take, is what keeps a take out of its
         # own training fold during cross-validation.
         self.assertEqual({record["seed"] for record in loaded}, {"seed-1", "seed-2"})
+
+    def test_derived_expectations_validate_against_the_profile_schema(self):
+        data = records({
+            ("alpha", "normal"): {"pitch_shift_semitones": 2.4, "hnr_delta_db": -3.0},
+            ("alpha", "strong"): {"pitch_shift_semitones": 3.6, "hnr_delta_db": -4.5},
+        })
+        derived = emit_expectations(expectation_candidates(per_preset_statistics(data)))
+        self.assertIn("alpha", derived)
+        block = dict(builtin_profile()["delivery_expectations"])
+        block["presets"] = derived
+        _validate_delivery_expectations(block)
+
+    def test_required_tier_needs_the_strong_cell_to_agree_in_direction(self):
+        # A feature the strong tier pushes the *other* way is not a stable
+        # description of the preset, whatever the normal tier measured.
+        data = records({
+            ("alpha", "normal"): {"pitch_shift_semitones": 2.4},
+            ("alpha", "strong"): {"pitch_shift_semitones": -2.4},
+        })
+        derived = emit_expectations(expectation_candidates(per_preset_statistics(data)))
+        self.assertEqual(derived["alpha"]["pitch_shift_semitones"]["tier"], "supporting")
+        self.assertEqual(derived["alpha"]["pitch_shift_semitones"]["min_effect_normal"], 0.0)
+
+    def test_required_magnitude_is_half_the_measured_normal_median(self):
+        data = records({
+            ("alpha", "normal"): {"pitch_shift_semitones": 2.0},
+            ("alpha", "strong"): {"pitch_shift_semitones": 3.0},
+        }, seeds=12)
+        derived = emit_expectations(expectation_candidates(per_preset_statistics(data)))
+        entry = derived["alpha"]["pitch_shift_semitones"]
+        self.assertEqual(entry["tier"], "required")
+        # Magnitudes come from the normal cell because the profile scales by
+        # intensity; binding the strong median would double-count the tier.
+        self.assertAlmostEqual(entry["min_effect_normal"], 1.0, delta=0.05)
+
+    def test_intensity_ladder_separates_amplified_from_saturated(self):
+        data = records({
+            ("grows", "normal"): {"pitch_shift_semitones": 2.0},
+            ("grows", "strong"): {"pitch_shift_semitones": 3.4},
+            ("flat", "normal"): {"pitch_shift_semitones": 2.0},
+            ("flat", "strong"): {"pitch_shift_semitones": 1.2},
+        })
+        ladder = intensity_ladder(per_preset_statistics(data))
+        self.assertEqual(ladder["grows"]["amplified"], ["pitch_shift_semitones"])
+        self.assertGreater(ladder["grows"]["medianStrongToNormalRatio"], 1.0)
+        # Saturation: strong moves the same axis less than normal does, so the
+        # 1.15x-scaled expectation is a bar it was never going to clear.
+        self.assertEqual(ladder["flat"]["saturated"], ["pitch_shift_semitones"])
+        self.assertLess(ladder["flat"]["medianStrongToNormalRatio"], 1.0)
+
+    def test_intensity_ladder_reports_a_reversed_feature(self):
+        data = records({
+            ("backwards", "normal"): {"pitch_shift_semitones": 2.0},
+            ("backwards", "strong"): {"pitch_shift_semitones": -1.5},
+        })
+        ladder = intensity_ladder(per_preset_statistics(data))
+        self.assertEqual(ladder["backwards"]["reversed"], ["pitch_shift_semitones"])
 
     def test_report_bundles_both_separability_label_modes(self):
         data = records({

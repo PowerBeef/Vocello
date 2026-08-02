@@ -192,6 +192,41 @@ final class GenerationQualityCompositionTests: XCTestCase {
         )
     }
 
+    func testDeliveryEvidenceSurfacesTheVoiceQualityAxesWhenPresent() {
+        let evidence = GenerationQualityComposition.deliveryEvidence(
+            gate: deliveryGate(
+                passed: true,
+                metrics: [
+                    "pitch_shift_semitones": 1.4,
+                    "arousal_score": 2.1,
+                    "voice_tension_score": 3.2,
+                    "voice_breathiness_score": -0.8,
+                ]
+            )
+        )
+        XCTAssertEqual(
+            Set(evidence.measurements.map(\.key)),
+            [
+                .deliveryPitchShiftSemitones, .deliveryArousalScore,
+                .deliveryVoiceTensionScore, .deliveryVoiceBreathinessScore,
+            ]
+        )
+    }
+
+    func testDeliveryEvidenceOmitsVoiceQualityAxesForAnalyzerV2Sidecars() {
+        // A sidecar produced before analyzer v3 carries no spectral block; the
+        // axes must be absent from the evidence rather than fail composition.
+        let evidence = GenerationQualityComposition.deliveryEvidence(
+            gate: deliveryGate(
+                passed: true,
+                metrics: ["pitch_shift_semitones": 1.4, "arousal_score": 2.1]
+            )
+        )
+        XCTAssertEqual(evidence.outcome, .pass)
+        XCTAssertFalse(evidence.measurements.contains { $0.key == .deliveryVoiceTensionScore })
+        XCTAssertFalse(evidence.measurements.contains { $0.key == .deliveryVoiceBreathinessScore })
+    }
+
     func testDeliveryAdherenceFlagsMapToWarning() {
         let evidence = GenerationQualityComposition.deliveryEvidence(
             gate: deliveryGate(passed: false, flags: ["delivery_effect_weak_rate_delta_hz"])

@@ -46,6 +46,12 @@ public enum GenerationQualityMeasurementKey: String, Codable, Hashable, Sendable
     case analyzerPeakWorkingSetBytes = "analyzer_peak_working_set_bytes"
     case deliveryPitchShiftSemitones = "delivery_pitch_shift_semitones"
     case deliveryArousalScore = "delivery_arousal_score"
+    // Analyzer-v3 voice-quality axes. Arousal alone cannot separate emotions
+    // that share it and oppose in valence, and says nothing about phonation,
+    // so a delivery verdict carrying only the two keys above could not
+    // describe whisper's breathiness or angry's vocal tension at all.
+    case deliveryVoiceTensionScore = "delivery_voice_tension_score"
+    case deliveryVoiceBreathinessScore = "delivery_voice_breathiness_score"
 }
 
 public struct GenerationQualityMeasurement: Codable, Hashable, Sendable {

@@ -129,11 +129,18 @@ public enum GenerationQualityComposition {
             outcome = .warning
         }
         var measurements: [GenerationQualityMeasurement] = []
-        if let pitchShift = gate.metrics["pitch_shift_semitones"], pitchShift.isFinite {
-            measurements.append(.init(key: .deliveryPitchShiftSemitones, value: pitchShift))
-        }
-        if let arousal = gate.metrics["arousal_score"], arousal.isFinite {
-            measurements.append(.init(key: .deliveryArousalScore, value: arousal))
+        // The voice-quality axes are optional: a sidecar produced by analyzer
+        // v2 carries no spectral block, and a missing axis must simply be
+        // absent from the evidence rather than fail composition.
+        for (metricKey, measurementKey) in [
+            ("pitch_shift_semitones", GenerationQualityMeasurementKey.deliveryPitchShiftSemitones),
+            ("arousal_score", .deliveryArousalScore),
+            ("voice_tension_score", .deliveryVoiceTensionScore),
+            ("voice_breathiness_score", .deliveryVoiceBreathinessScore),
+        ] {
+            if let value = gate.metrics[metricKey], value.isFinite {
+                measurements.append(.init(key: measurementKey, value: value))
+            }
         }
         return GenerationQualityReportProducer.DeepGateEvidence(
             outcome: outcome,

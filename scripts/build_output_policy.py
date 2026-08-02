@@ -85,6 +85,7 @@ HEAVY_LANE_IDS = {
     "memory-qualification",
     "ui-smoke",
     "ui-benchmark",
+    "ui-delivery-cohort",
     "ui-model-download",
     "ui-enroll-clone-fixture",
     "release",

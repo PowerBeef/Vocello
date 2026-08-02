@@ -68,6 +68,10 @@
         "requiredFreeBytes": 16106127360,
         "cleanupHint": "scripts/clean_build_caches.sh --prune-ui-results"
       },
+      "ui-delivery-cohort": {
+        "requiredFreeBytes": 12884901888,
+        "cleanupHint": "scripts/clean_build_caches.sh --prune-ui-results"
+      },
       "ui-model-download": {
         "requiredFreeBytes": 19327352832,
         "cleanupHint": "scripts/clean_build_caches.sh --prune-ui-results"

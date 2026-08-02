@@ -151,6 +151,36 @@ public struct EmotionPreset: Identifiable, Sendable {
     //   gasping) to avoid literal artifacts.
     // - Keep intelligibility clauses for quiet/fragile tiers.
     // - Avoid stacked intensifiers; stay under the 500-character cap.
+    //
+    // On the intensity tier, and a fix that did NOT work (measured 2026-08-02):
+    //
+    // The `strong` tier does not currently earn its place. Over a 19-seed x
+    // 20-cell matrix the mean inter-cell separation at strong was 2.435 against
+    // 2.442 at normal — a ratio of 0.997, meaning intensity moves cells sideways
+    // rather than further apart. A blind listening check agreed: excited.strong
+    // versus excited.normal was the one "close" pair a listener rated as merely
+    // very similar rather than different.
+    //
+    // The tiers that amplify best (calm 1.82x, happy 1.45x) re-state their own
+    // normal axes with stronger adjectives, while the ones that saturate
+    // (dramatic 0.18x, excited 0.63x, angry 0.64x) swap in different axes. Two
+    // are outright self-contradictions across tiers: angry asks for "a lower
+    // clipped tone" then "heated raised pitch", fearful for "breathy" then "a
+    // thin tight tone".
+    //
+    // Rewriting those five so `strong` pushed the same axes harder was tried and
+    // REJECTED. Against four unchanged control presets (drift 0.02-0.35 in tier
+    // distance at n=9), the rewrite regressed whisper -0.72, fearful -1.15 and
+    // excited -0.61, with dramatic +0.22 and angry +0.09 inside the noise floor;
+    // overall spread ratio was unchanged at 0.982. The mechanism is clear in
+    // hindsight: making the two instruction *texts* more alike makes the model's
+    // *output* more alike, so internal consistency traded away the very
+    // differentiation the tier needs. Do not retry that specific fix.
+    //
+    // The self-contradictions above are still worth removing on their own terms,
+    // but removing them must be measured, not assumed — and a candidate needs
+    // enough seeds to clear a ~0.35 noise floor, which n=9 does not.
+    // Verify with scripts/delivery_matrix_report.py, never by reading text back.
     public static let all: [EmotionPreset] = [
         EmotionPreset(
             id: "neutral",

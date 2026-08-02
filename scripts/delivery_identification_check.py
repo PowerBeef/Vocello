@@ -207,8 +207,140 @@ def evaluate_identification(key, answers):
     }
 
 
+def evaluate_discrimination(key, answers):
+    """Score a two-alternative forced-choice session.
+
+    Free identification from ten options is the hardest form of this test --
+    human listeners reach only ~41% with six options and real actors -- so a
+    listener who is unsure produces data too noisy to read. 2AFC names both
+    candidate deliveries and asks only which clip is which: chance rises to 50%
+    and the task becomes reliable.
+
+    The headline is not overall accuracy but whether accuracy on pairs
+    involving Angry *drops at the strong tier*, which is the standing complaint
+    stated as something measurable. Control pairs that do not involve Angry
+    answer the obvious rival explanation -- that the strong tier is simply worse
+    at everything rather than collapsing toward anger specifically.
+    """
+    by_id = {entry["id"]: entry for entry in key}
+    scored = [
+        (by_id[trial_id], choice)
+        for trial_id, choice in sorted(answers.items())
+        if trial_id in by_id
+    ]
+    missing = sorted(set(by_id) - set(answers))
+    unknown = sorted(set(answers) - set(by_id))
+
+    def accuracy_of(rows):
+        correct = sum(1 for entry, choice in rows if choice == entry["correctSide"])
+        return _wilson(correct, len(rows)) if rows else None
+
+    def split(group=None, tier=None):
+        return [
+            (entry, choice) for entry, choice in scored
+            if (group is None or entry.get("group") == group)
+            and (tier is None or entry.get("tier") == tier)
+        ]
+
+    groups = {}
+    for name in sorted({entry.get("group") for entry, _ in scored if entry.get("group")}):
+        rows = split(group=name)
+        entry = {"overall": accuracy_of(rows)}
+        for tier in ("normal", "strong"):
+            tier_rows = split(group=name, tier=tier)
+            if tier_rows:
+                entry[tier] = accuracy_of(tier_rows)
+        if "normal" in entry and "strong" in entry:
+            strong_rows = split(group=name, tier="strong")
+            normal_rows = split(group=name, tier="normal")
+            entry["strongMinusNormal"] = _difference_interval(
+                sum(1 for e, c in strong_rows if c == e["correctSide"]), len(strong_rows),
+                sum(1 for e, c in normal_rows if c == e["correctSide"]), len(normal_rows),
+            )
+        groups[name] = entry
+
+    # Per pairing, so a single bad preset does not hide inside a group average.
+    pairings = {}
+    for entry, choice in scored:
+        name = " vs ".join(sorted({entry["sideA"], entry["sideB"]}))
+        pairings.setdefault(name, {}).setdefault(entry.get("tier", "?"), []).append(
+            choice == entry["correctSide"]
+        )
+    pairing_report = {
+        name: {
+            tier: _wilson(sum(results), len(results))
+            for tier, results in sorted(tiers.items())
+        }
+        for name, tiers in sorted(pairings.items())
+    }
+
+    anchors = groups.get("anchor", {}).get("overall")
+    # Anchor pairs should be near-trivial. At or below chance the session was
+    # not engaged, and no other number in the report should be believed.
+    engaged = anchors is None or anchors["lower"] > 0.5
+    angry_drop = groups.get("angry", {}).get("strongMinusNormal")
+    control_drop = groups.get("control", {}).get("strongMinusNormal")
+
+    if not engaged:
+        verdict = "session_unusable"
+    elif angry_drop and angry_drop["excludesZero"] and angry_drop["difference"] < 0:
+        verdict = (
+            "strong_tier_collapses_toward_angry"
+            if not (control_drop and control_drop["excludesZero"]
+                    and control_drop["difference"] < 0)
+            else "strong_tier_worse_across_the_board"
+        )
+    else:
+        verdict = "no_measured_strong_tier_collapse"
+
+    return {
+        "checkVersion": IDENTIFICATION_CHECK_VERSION,
+        "mode": "discrimination",
+        "verdict": verdict,
+        "sessionEngaged": engaged,
+        "trials": len(scored),
+        "overallAccuracy": accuracy_of(scored),
+        "groups": groups,
+        "pairings": pairing_report,
+        "missingAnswers": missing,
+        "unknownTrialIDs": unknown,
+    }
+
+
+def _print_discrimination(report):
+    print(f"delivery discrimination (2AFC) — {report['trials']} trials, chance 0.5")
+    overall = report["overallAccuracy"]
+    if overall:
+        print(f"  overall {overall['rate']}  95% CI [{overall['lower']}, {overall['upper']}]")
+    print(f"  verdict: {report['verdict']}")
+    if not report["sessionEngaged"]:
+        print("  anchor pairs were not reliably answered — treat everything below as unusable")
+    for name in sorted(report["groups"]):
+        entry = report["groups"][name]
+        line = f"  {name:8} overall {entry['overall']['rate']} (n={entry['overall']['n']})"
+        for tier in ("normal", "strong"):
+            if tier in entry:
+                line += f"   {tier} {entry[tier]['rate']}"
+        print(line)
+        difference = entry.get("strongMinusNormal")
+        if difference:
+            print(f"           strong − normal {difference['difference']:+.3f} "
+                  f"[{difference['lower']}, {difference['upper']}]"
+                  f"{'  (excludes zero)' if difference['excludesZero'] else ''}")
+    print("\n  by pairing:")
+    for name, tiers in report["pairings"].items():
+        rendered = "  ".join(
+            f"{tier} {value['rate']:.2f} (n={value['n']})" for tier, value in tiers.items()
+        )
+        print(f"    {name:24} {rendered}")
+    if report["missingAnswers"]:
+        print(f"\n  missing answers: {len(report['missingAnswers'])}")
+
+
 def main():
-    parser = argparse.ArgumentParser(description="Score a blind delivery-identification session")
+    parser = argparse.ArgumentParser(
+        description="Score a blind delivery listening session (identification or 2AFC)"
+    )
     parser.add_argument("--key", required=True)
     parser.add_argument("--answers", required=True)
     parser.add_argument("--json", action="store_true")
@@ -219,9 +351,15 @@ def main():
     with open(arguments.answers, "r", encoding="utf-8") as handle:
         answers = json.load(handle)
 
-    report = evaluate_identification(key, answers)
+    # The key's own shape says which task it is, so an operator cannot pair a
+    # session with the wrong scorer.
+    discrimination = bool(key) and "correctSide" in key[0]
+    report = (evaluate_discrimination if discrimination else evaluate_identification)(key, answers)
     if arguments.json:
         print(json.dumps(report, indent=2, sort_keys=True))
+        return 0
+    if discrimination:
+        _print_discrimination(report)
         return 0
 
     accuracy = report["overallAccuracy"]

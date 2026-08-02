@@ -80,6 +80,7 @@ Review when: target or scheme changes; runtime topology; telemetry schema; test 
 - [`docs/reference/qwen3-apple-silicon-roadmap-review.md`](../docs/reference/qwen3-apple-silicon-roadmap-review.md)
 - [`docs/reference/qwen3-tts-guide.md`](../docs/reference/qwen3-tts-guide.md)
 - [`docs/reference/qwen3-tts-prompting-guide.md`](../docs/reference/qwen3-tts-prompting-guide.md)
+- [`docs/reference/repository-self-verification.md`](../docs/reference/repository-self-verification.md)
 - [`docs/reference/roadmap-2026-08.md`](../docs/reference/roadmap-2026-08.md)
 - [`docs/reference/runtime-refactor-status-report.md`](../docs/reference/runtime-refactor-status-report.md)
 - [`docs/reference/swift-performance-guide.md`](../docs/reference/swift-performance-guide.md)

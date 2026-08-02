@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "generated": "python3 scripts/doc_metadata.py rebuild-index",
   "note": "Machine-readable documentation map. Query this instead of globbing docs/.",
-  "annotatedDocuments": 29,
+  "annotatedDocuments": 30,
   "unannotatedDocuments": 52,
   "documents": [
     {
@@ -88,6 +88,22 @@
       ],
       "appliesTo": [
         "backend-mlx"
+      ]
+    },
+    {
+      "path": "docs/reference/repository-self-verification.md",
+      "status": "active",
+      "owner": "release-qa",
+      "summary": "How the repository checks itself \u2014 the five classes of failure the gates detect, which class each check belongs to, what none of them can see, and how to add a new one.",
+      "sourceOfTruth": [
+        "scripts/check_project_inputs.sh",
+        "scripts/check_surface_coverage.py",
+        "scripts/doc_metadata.py",
+        "scripts/roadmap.py",
+        "scripts/build_output_policy.py"
+      ],
+      "appliesTo": [
+        "release-qa"
       ]
     },
     {

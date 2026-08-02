@@ -36,10 +36,17 @@
       "plan": "convergence-metal4-stage4-2026-08",
       "title": "Stage 4 mlx pin bump to the newest lockstep pair",
       "status": "done",
-      "legacyIds": ["Tier 3.1"],
+      "legacyIds": [
+        "Tier 3.1"
+      ],
       "gate": "Same-day A/B on the canonical matrix; keep only on a non-regression.",
-      "evidence": ["commit:19ea7e8", "doc:docs/reference/roadmap-2026-08.md"],
-      "sourceOfTruth": ["Package.resolved"],
+      "evidence": [
+        "commit:19ea7e8",
+        "doc:docs/reference/roadmap-2026-08.md"
+      ],
+      "sourceOfTruth": [
+        "Package.resolved"
+      ],
       "updated": "2026-08-01"
     },
     {
@@ -47,19 +54,29 @@
       "plan": "convergence-metal4-stage4-2026-08",
       "title": "P1b static-shape talker compile",
       "status": "declined",
-      "legacyIds": ["P1b", "Tier 3.2"],
+      "legacyIds": [
+        "P1b",
+        "Tier 3.2"
+      ],
       "reason": "Confirmed null on 0.31.6: no measurable effect against the pre-registered gate. Recorded as a do-NOT so it is not retried without a new premise.",
-      "evidence": ["doc:docs/reference/roadmap-2026-08.md"],
+      "evidence": [
+        "doc:docs/reference/roadmap-2026-08.md"
+      ],
       "updated": "2026-08-01"
     },
     {
       "id": "CM-3",
       "plan": "convergence-metal4-stage4-2026-08",
-      "title": "Gate 2 — Candidate A fused code-predictor kernel",
+      "title": "Gate 2 \u2014 Candidate A fused code-predictor kernel",
       "status": "declined",
-      "legacyIds": ["Gate 2", "Tier 3.3"],
+      "legacyIds": [
+        "Gate 2",
+        "Tier 3.3"
+      ],
       "reason": "Withdrawn 2026-08-01 at Gate 0; the premise did not survive its own falsifiability rail.",
-      "evidence": ["doc:docs/reference/roadmap-2026-08.md"],
+      "evidence": [
+        "doc:docs/reference/roadmap-2026-08.md"
+      ],
       "updated": "2026-08-01"
     },
     {
@@ -67,10 +84,18 @@
       "plan": "convergence-metal4-stage4-2026-08",
       "title": "Long-form text-context carryover, text first",
       "status": "in-flight",
-      "legacyIds": ["Tier 4", "Q2"],
+      "legacyIds": [
+        "Tier 4",
+        "Q2"
+      ],
       "gate": "Planner-only change proved on text before any acoustic carryover is attempted.",
-      "evidence": ["commit:bd92a59", "commit:59458bc"],
-      "sourceOfTruth": ["Sources/QwenVoiceCore/LongFormPlanning.swift"],
+      "evidence": [
+        "commit:bd92a59",
+        "commit:59458bc"
+      ],
+      "sourceOfTruth": [
+        "Sources/QwenVoiceCore/LongFormPlanning.swift"
+      ],
       "updated": "2026-08-01"
     },
     {
@@ -79,7 +104,9 @@
       "title": "Phone-gated evidence battery remainder",
       "status": "in-flight",
       "gate": "One sitting with the phone unlocked and Auto-Lock Never; iOS control lanes re-run against the current artifacts.",
-      "evidence": ["doc:docs/reference/roadmap-2026-08.md"],
+      "evidence": [
+        "doc:docs/reference/roadmap-2026-08.md"
+      ],
       "updated": "2026-08-01"
     },
     {
@@ -88,7 +115,9 @@
       "title": "MOS-proxy advisory column (UTMOSv2)",
       "status": "parked",
       "unparkWhen": "Only opportunistically, and only as a dev-lane advisory column. It must never become a gate or a publication input.",
-      "evidence": ["doc:docs/reference/roadmap-2026-08.md"],
+      "evidence": [
+        "doc:docs/reference/roadmap-2026-08.md"
+      ],
       "updated": "2026-08-01"
     },
     {
@@ -97,8 +126,13 @@
       "title": "Sourced Qwen3-TTS prompting guide with per-claim provenance",
       "status": "done",
       "gate": "Every substantive claim labelled OFFICIAL / RESEARCH / MEASURED-HERE / COMMUNITY / UNVERIFIED, and the repo's unsourced canon adjudicated item by item.",
-      "evidence": ["commit:c14651c", "doc:docs/reference/qwen3-tts-prompting-guide.md"],
-      "sourceOfTruth": ["Sources/QwenVoiceCore/EmotionPreset.swift"],
+      "evidence": [
+        "commit:c14651c",
+        "doc:docs/reference/qwen3-tts-prompting-guide.md"
+      ],
+      "sourceOfTruth": [
+        "Sources/QwenVoiceCore/EmotionPreset.swift"
+      ],
       "updated": "2026-08-02"
     },
     {
@@ -107,8 +141,13 @@
       "title": "Deterministic delivery-instruction contract gate",
       "status": "done",
       "gate": "Fails on append parity across a preset's tiers and on repeated intensifiers; reports direction conflicts against an acknowledgement file so no blind copy edit is forced.",
-      "evidence": ["commit:6f4c651", "file:scripts/check_delivery_instructions.py"],
-      "sourceOfTruth": ["Sources/QwenVoiceCore/GenerationSemantics.swift"],
+      "evidence": [
+        "commit:6f4c651",
+        "file:scripts/check_delivery_instructions.py"
+      ],
+      "sourceOfTruth": [
+        "Sources/QwenVoiceCore/GenerationSemantics.swift"
+      ],
       "updated": "2026-08-02"
     },
     {
@@ -117,8 +156,12 @@
       "title": "Short-versus-long instruction A/B",
       "status": "planned",
       "gate": "Same preset and seeds: official-style short form against the shipped long form. Paired Wilcoxon with BH correction over the delivery matrix.",
-      "blockedBy": ["DP-2"],
-      "sourceOfTruth": ["Sources/QwenVoiceCore/EmotionPreset.swift"],
+      "blockedBy": [
+        "DP-2"
+      ],
+      "sourceOfTruth": [
+        "Sources/QwenVoiceCore/EmotionPreset.swift"
+      ],
       "updated": "2026-08-02"
     },
     {
@@ -127,8 +170,12 @@
       "title": "English diction append: does it earn its place",
       "status": "planned",
       "gate": "Delivery matrix with QWENVOICE_ENGLISH_DICTION_REINFORCEMENT=off against the shipped default.",
-      "blockedBy": ["DP-2"],
-      "sourceOfTruth": ["Sources/QwenVoiceCore/GenerationSemantics.swift"],
+      "blockedBy": [
+        "DP-2"
+      ],
+      "sourceOfTruth": [
+        "Sources/QwenVoiceCore/GenerationSemantics.swift"
+      ],
       "updated": "2026-08-02"
     },
     {
@@ -137,8 +184,12 @@
       "title": "Voice Design merge template versus plain concatenation",
       "status": "planned",
       "gate": "The repo-invented 'Voice character: X. Delivery: Y.' framing against plain concatenation and against identity-first ordering with a closing quality anchor.",
-      "blockedBy": ["DP-2"],
-      "sourceOfTruth": ["Sources/QwenVoiceCore/GenerationSemantics.swift"],
+      "blockedBy": [
+        "DP-2"
+      ],
+      "sourceOfTruth": [
+        "Sources/QwenVoiceCore/GenerationSemantics.swift"
+      ],
       "updated": "2026-08-02"
     },
     {
@@ -147,8 +198,13 @@
       "title": "Angry pitch-axis contradiction",
       "status": "planned",
       "gate": "Measure which pitch direction actually reads as angry, then correct whichever of the copy or the expectation lost. The expectation is not automatically the authority.",
-      "blockedBy": ["DP-3"],
-      "sourceOfTruth": ["Sources/QwenVoiceCore/EmotionPreset.swift", "scripts/prosody_profile.py"],
+      "blockedBy": [
+        "DP-3"
+      ],
+      "sourceOfTruth": [
+        "Sources/QwenVoiceCore/EmotionPreset.swift",
+        "scripts/prosody_profile.py"
+      ],
       "updated": "2026-08-02"
     },
     {
@@ -157,43 +213,57 @@
       "title": "Per-file documentation metadata with derived-fact scanning",
       "status": "done",
       "gate": "Catches the 2026-08-01 stale tier count, which a git co-change check provably would not; pinned bodies fail the gate on accidental modification.",
-      "evidence": ["commit:3ed09cb", "file:scripts/doc_metadata.py"],
+      "evidence": [
+        "commit:3ed09cb",
+        "file:scripts/doc_metadata.py"
+      ],
       "updated": "2026-08-02"
     },
     {
       "id": "DG-2",
       "plan": "doc-governance-2026-08",
-      "title": "Phase 1 — pin every historical document",
+      "title": "Phase 1 \u2014 pin every historical document",
       "status": "done",
       "gate": "docs/research, docs/audits/archive, and docs/releases sealed by body digest.",
-      "evidence": ["commit:3ed09cb", "file:docs/INDEX.json"],
+      "evidence": [
+        "commit:3ed09cb",
+        "file:docs/INDEX.json"
+      ],
       "updated": "2026-08-02"
     },
     {
       "id": "DG-3",
       "plan": "doc-governance-2026-08",
-      "title": "Phase 2 — reclassify the nine misfiled point-in-time reports",
+      "title": "Phase 2 \u2014 reclassify the nine misfiled point-in-time reports",
       "status": "planned",
       "gate": "Every dated report under docs/reference carries historical or superseded status, following the backend-optimization-research-report precedent.",
-      "blockedBy": ["DG-1"],
+      "blockedBy": [
+        "DG-1"
+      ],
       "updated": "2026-08-02"
     },
     {
       "id": "DG-4",
       "plan": "doc-governance-2026-08",
-      "title": "Phase 3 — source bindings on active documents",
+      "title": "Phase 3 \u2014 source bindings on active documents",
       "status": "planned",
       "gate": "Annotated incrementally as documents are touched; a binding invented in bulk without reading the document is worse than none.",
-      "blockedBy": ["DG-1"],
+      "blockedBy": [
+        "DG-1"
+      ],
       "updated": "2026-08-02"
     },
     {
       "id": "DG-5",
       "plan": "doc-governance-2026-08",
       "title": "Single-source-of-truth roadmap system",
-      "status": "in-flight",
+      "status": "done",
       "gate": "Multiple concurrent plans; every evidence reference resolved against the repository; staleness surfaced automatically.",
-      "evidence": ["file:scripts/roadmap.py"],
+      "evidence": [
+        "commit:346dba7",
+        "file:scripts/roadmap.py",
+        "file:docs/ROADMAP.md"
+      ],
       "updated": "2026-08-02"
     },
     {
@@ -202,8 +272,55 @@
       "title": "Security workflow starvation on main",
       "status": "done",
       "gate": "CodeQL runs to completion on main instead of being cancelled by the next push; branches still supersede.",
-      "evidence": ["commit:6e8f8b2", "file:.github/workflows/security.yml"],
-      "sourceOfTruth": [".github/workflows/security.yml"],
+      "evidence": [
+        "commit:6e8f8b2",
+        "file:.github/workflows/security.yml"
+      ],
+      "sourceOfTruth": [
+        ".github/workflows/security.yml"
+      ],
+      "updated": "2026-08-02"
+    },
+    {
+      "id": "DG-7",
+      "plan": "doc-governance-2026-08",
+      "title": "Surface-coverage omission gate and the optional-assists guard",
+      "status": "done",
+      "gate": "Every enforced gate and contract is named in guidance; the unverifiable assists section cannot be deleted incidentally.",
+      "evidence": [
+        "commit:6283e65",
+        "commit:ca1eafd",
+        "file:scripts/check_surface_coverage.py"
+      ],
+      "updated": "2026-08-02"
+    },
+    {
+      "id": "DG-8",
+      "plan": "doc-governance-2026-08",
+      "title": "Deep build-output ownership and storage remediation",
+      "status": "done",
+      "gate": "Every directory under build/ is governed at any depth; 3.48 GB of orphaned scratch reclaimed.",
+      "evidence": [
+        "commit:e83ebef",
+        "file:scripts/build_output_policy.py"
+      ],
+      "sourceOfTruth": [
+        "config/build-output-policy.json"
+      ],
+      "updated": "2026-08-02"
+    },
+    {
+      "id": "DG-9",
+      "plan": "doc-governance-2026-08",
+      "title": "Document the self-verification system and its failure classes",
+      "status": "done",
+      "gate": "The five classes, which check belongs to each, what none of them verify, and the procedure for adding one.",
+      "evidence": [
+        "doc:docs/reference/repository-self-verification.md"
+      ],
+      "sourceOfTruth": [
+        "scripts/check_project_inputs.sh"
+      ],
       "updated": "2026-08-02"
     }
   ]

@@ -83,6 +83,11 @@ none of them fails the build.
 needs a model, a device, or XCUITest. Exemptions from surface coverage live in
 [`config/surface-coverage-exemptions.json`](config/surface-coverage-exemptions.json) with a reason each.
 
+**How the checks relate to each other — which class of wrong each one can find, which classes are
+covered, and what none of them can see — is
+[`docs/reference/repository-self-verification.md`](docs/reference/repository-self-verification.md).
+Read it before adding a gate.**
+
 | Check | Enforces |
 | --- | --- |
 | `build_output_policy.py` | Generated-output ownership and heavy-lane floors |

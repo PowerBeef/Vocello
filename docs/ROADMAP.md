@@ -11,7 +11,7 @@
 | --- | --- | --- | --- |
 | `convergence-metal4-stage4-2026-08` | active | backend-and-platform | 3/6 (50%) |
 | `delivery-prompting-2026-08` | active | backend-mlx | 2/6 (33%) |
-| `doc-governance-2026-08` | active | release-qa | 3/6 (50%) |
+| `doc-governance-2026-08` | active | release-qa | 7/9 (78%) |
 
 ## Convergence residuals, Metal 4 study, and Stage 4
 
@@ -61,5 +61,8 @@ Narrative authority: [`docs/reference/qwen3-tts-prompting-guide.md`](reference/q
 | `DG-2` | done | Phase 1 — pin every historical document | `commit:3ed09cb`, `file:docs/INDEX.json` |
 | `DG-3` | planned | Phase 2 — reclassify the nine misfiled point-in-time reports | — |
 | `DG-4` | planned | Phase 3 — source bindings on active documents | — |
-| `DG-5` | in-flight | Single-source-of-truth roadmap system | `file:scripts/roadmap.py` |
+| `DG-5` | done | Single-source-of-truth roadmap system | `commit:346dba7`, `file:scripts/roadmap.py`, `file:docs/ROADMAP.md` |
 | `DG-6` | done | Security workflow starvation on main | `commit:6e8f8b2`, `file:.github/workflows/security.yml` |
+| `DG-7` | done | Surface-coverage omission gate and the optional-assists guard | `commit:6283e65`, `commit:ca1eafd`, `file:scripts/check_surface_coverage.py` |
+| `DG-8` | done | Deep build-output ownership and storage remediation | `commit:e83ebef`, `file:scripts/build_output_policy.py` |
+| `DG-9` | done | Document the self-verification system and its failure classes | `doc:docs/reference/repository-self-verification.md` |

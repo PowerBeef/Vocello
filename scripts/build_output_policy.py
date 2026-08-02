@@ -1015,37 +1015,81 @@ def build_status(policy: LoadedPolicy) -> dict[str, Any]:
 
 
 def _unowned_build_roots(policy: LoadedPolicy) -> list[dict[str, Any]]:
-    """Report generated top-level roots that are outside the manifest contract."""
+    """Report generated roots, at any depth, that are outside the manifest contract.
+
+    This walks the whole tree rather than only `build/*`. It used to check one
+    level, matching each top-level name against `parts[1]` of a governed path --
+    so `build/scratch/derived-data/foundation` made the bare name `scratch`
+    allowed, and *everything* nested beneath it became invisible. The same held
+    for `cache`, `artifacts`, and `dist`.
+
+    That gap hid 3.73 GB across nine directories, 3.43 GB of it in an orphaned
+    `build/scratch/derived-data/p7-opt` left by an experiment, stale for ten days
+    while `status` reported `unowned=0` and `validate` passed (2026-08-02). The
+    manifest's own rule -- never add an ad hoc DerivedData root -- was
+    unenforceable below depth one.
+
+    A directory is reported when it is none of: a governed path, an ancestor of
+    one (those exist only to hold governed children), or contained within one
+    (a producer owns everything under its root). Descent stops at the first
+    unowned directory, so one stray root is one finding rather than a flood.
+    """
 
     build = policy.build_root
     if not build.is_dir() or build.is_symlink():
         return []
-    allowed = {
-        PurePosixPath(entry["path"]).parts[1]
-        for entry in policy.entries
-    }
-    allowed.update(
-        PurePosixPath(link["path"]).parts[1]
-        for link in policy.document.get("publicLinks", [])
+    governed = {PurePosixPath(entry["path"]) for entry in policy.entries}
+    governed.update(
+        PurePosixPath(link["path"]) for link in policy.document.get("publicLinks", [])
     )
-    # Finder may recreate this metadata file whenever the ignored build folder
-    # is viewed. It is neither a producer root nor build evidence.
-    allowed.add(".DS_Store")
+    ancestors = {parent for path in governed for parent in path.parents}
+
+    def classify(relative: PurePosixPath) -> str:
+        if relative in governed:
+            return "governed"
+        if relative in ancestors:
+            return "ancestor"
+        if any(parent in governed for parent in relative.parents):
+            return "inside-governed"
+        return "unowned"
+
     result: list[dict[str, Any]] = []
-    for child in sorted(build.iterdir(), key=lambda item: item.name):
-        if child.name in allowed:
-            continue
-        _ensure_existing_path_is_contained(policy.repo_root, child, "unowned build root")
-        allocated, error = _allocated_bytes(child)
-        item: dict[str, Any] = {
-            "path": child.relative_to(policy.repo_root).as_posix(),
-            "kind": _path_kind(child),
-            "allocatedBytes": allocated,
-        }
-        if error:
-            item["inventoryError"] = error
-        result.append(item)
+
+    def walk(directory: Path) -> None:
+        for child in sorted(directory.iterdir(), key=lambda item: item.name):
+            if child.name == ".DS_Store":
+                # Finder recreates this whenever the ignored build folder is
+                # viewed. Neither a producer root nor build evidence.
+                continue
+            relative = PurePosixPath(child.relative_to(policy.repo_root).as_posix())
+            verdict = classify(relative)
+            if verdict in ("governed", "inside-governed"):
+                continue
+            if verdict == "ancestor":
+                if child.is_dir() and not child.is_symlink():
+                    walk(child)
+                continue
+            _record_unowned(policy, child, result)
+
+    walk(build)
     return result
+
+
+def _record_unowned(
+    policy: LoadedPolicy, child: Path, result: list[dict[str, Any]]
+) -> None:
+    """Append one unowned path, sized, to the report."""
+
+    _ensure_existing_path_is_contained(policy.repo_root, child, "unowned build root")
+    allocated, error = _allocated_bytes(child)
+    item: dict[str, Any] = {
+        "path": child.relative_to(policy.repo_root).as_posix(),
+        "kind": _path_kind(child),
+        "allocatedBytes": allocated,
+    }
+    if error:
+        item["inventoryError"] = error
+    result.append(item)
 
 
 def _markdown_cell(value: Any) -> str:

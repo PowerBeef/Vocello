@@ -535,6 +535,17 @@ _storage_warn_dir() {
             || echo "==> [storage] inspect governed ownership: python3 scripts/build_output_policy.py status" >&2
         [[ -z "$flag" ]] \
             || echo "==> [storage] bounded reclaim: scripts/clean_build_caches.sh ${flag}" >&2
+        # `--routine` is deliberately non-destructive: caches are aggressive-class
+        # and artifacts are governed or preserved, so it reclaims almost nothing at
+        # exactly the moment this warning fires. On 2026-08-02 it planned 692 KB
+        # against a 20.8 GB tree. Name the modes that actually free space, or the
+        # advice sends the reader to the one option that cannot help.
+        if [[ "$label" == "build/" ]]; then
+            echo "==> [storage] most of build/ is rebuildable Xcode/SwiftPM cache; free it with:" >&2
+            echo "==>           scripts/clean_build_caches.sh --cache macos|ios   (one cache, keeps the other)" >&2
+            echo "==>           scripts/clean_build_caches.sh --aggressive        (every cache)" >&2
+            echo "==>           both rebuild on the next build; --routine will not touch them" >&2
+        fi
     fi
 }
 

@@ -151,6 +151,15 @@
       "env": "QVOICE_SCRATCH_TRANSIENT"
     },
     {
+      "id": "scratch-gate-fingerprint",
+      "path": "build/scratch/gate-fingerprint",
+      "class": "scratch",
+      "owner": "T1 commit-gate hook (scripts/hooks/precommit_gate.sh)",
+      "cleanup": "routine",
+      "retention": "Tree fingerprint and last-run log for the commit gate; removing it only re-runs the gate once",
+      "env": "QVOICE_SCRATCH_GATE_FINGERPRINT"
+    },
+    {
       "id": "scratch-release-macos",
       "path": "build/scratch/derived-data/release-macos",
       "class": "scratch",

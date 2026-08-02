@@ -144,6 +144,7 @@ block byte-for-byte, so a manifest change cannot silently leave documentation st
 | `build/scratch/derived-data/foundation/` | Foundation target compile-safety lane | `scratch` | `routine` | Delete after successful invocation and during routine cleanup |
 | `build/scratch/derived-data/package-resolution/` | Serialized Xcode SwiftPM resolver | `scratch` | `routine` | Ephemeral resolver intermediates; the shared checkout lives under build/cache |
 | `build/scratch/transient/` | One-off repository tooling and migration-only diagnostic probes | `scratch` | `routine` | Invocation-local helpers and obsolete untracked probes; routine cleanup removes them |
+| `build/scratch/gate-fingerprint/` | T1 commit-gate hook (scripts/hooks/precommit_gate.sh) | `scratch` | `routine` | Tree fingerprint and last-run log for the commit gate; removing it only re-runs the gate once |
 | `build/scratch/derived-data/release-macos/` | macOS release build and archive lane | `scratch` | `routine` | Isolated release DerivedData; never reused as a development cache |
 | `build/scratch/derived-data/release-ios/` | Local iOS archive and export lane | `scratch` | `routine` | Isolated local archive DerivedData; never reused as a development cache |
 | `build/scratch/derived-data/xcodebuildmcp/macos/` | XcodeBuildMCP macOS profile | `scratch` | `routine` | Session scratch; repository scripts remain authoritative |

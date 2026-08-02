@@ -37,7 +37,7 @@ REQUIRED_EXPORTS = {
     "QVOICE_SCRATCH_FOUNDATION",
     "QVOICE_SCRATCH_PACKAGE_RESOLUTION",
     "QVOICE_SCRATCH_TRANSIENT",
-    "QVOICE_SCRATCH_TRANSIENT",
+    "QVOICE_SCRATCH_GATE_FINGERPRINT",
     "QVOICE_SCRATCH_RELEASE_MACOS",
     "QVOICE_SCRATCH_RELEASE_IOS",
     "QVOICE_SCRATCH_XCODEBUILDMCP_MACOS",
@@ -219,6 +219,58 @@ class BuildOutputPolicyTests(unittest.TestCase):
         self.assertTrue(other.exists())
         self.assertIn("filesystem", status)
         self.assertGreater(status["filesystem"]["totalBytes"], 0)
+
+    def test_a_nested_unowned_root_is_reported(self) -> None:
+        # The regression this exists for: the check used to look one level deep
+        # while governed paths are two to four levels deep, so a top-level name
+        # like `scratch` was allowed wholesale and anything beneath it was
+        # invisible. 3.43 GB sat in build/scratch/derived-data/p7-opt for ten
+        # days while status reported unowned=0 and validate passed (2026-08-02).
+        nested = self.root / "build/scratch/derived-data/ad-hoc-experiment"
+        nested.mkdir(parents=True)
+        (nested / "payload").write_bytes(b"unowned" * 512)
+
+        status = json.loads(self.command("status", "--json").stdout)
+        self.assertIn(
+            "build/scratch/derived-data/ad-hoc-experiment",
+            [item["path"] for item in status["unownedRoots"]],
+        )
+        self.assertGreater(status["unownedAllocatedBytes"], 0)
+
+        validate_result = self.command("validate", "--json")
+        self.assertEqual(validate_result.returncode, 1)
+        violations = json.loads(validate_result.stdout)["violations"]
+        self.assertTrue(any("ad-hoc-experiment" in item for item in violations))
+
+        shutil.rmtree(nested)
+        self.assertEqual(self.command("validate").returncode, 0)
+
+    def test_governed_paths_and_their_ancestors_are_not_reported(self) -> None:
+        # Descending must not flag the directories that exist only to hold
+        # governed children, nor anything a producer legitimately owns beneath
+        # its own root -- otherwise every build would fail the gate.
+        governed = self.root / "build/scratch/transient"
+        governed.mkdir(parents=True, exist_ok=True)
+        (governed / "producer-output").write_bytes(b"owned")
+        deep = governed / "nested/deeper"
+        deep.mkdir(parents=True)
+        (deep / "more-output").write_bytes(b"still owned")
+
+        status = json.loads(self.command("status", "--json").stdout)
+        self.assertEqual(status["unownedRoots"], [])
+        self.assertEqual(self.command("validate").returncode, 0)
+
+    def test_one_stray_root_is_one_finding_not_a_flood(self) -> None:
+        stray = self.root / "build/scratch/derived-data/stray/a/b/c"
+        stray.mkdir(parents=True)
+        (stray / "payload").write_bytes(b"deep")
+
+        status = json.loads(self.command("status", "--json").stdout)
+        self.assertEqual(
+            [item["path"] for item in status["unownedRoots"]],
+            ["build/scratch/derived-data/stray"],
+        )
+        shutil.rmtree(self.root / "build/scratch/derived-data/stray")
 
     def test_status_and_validate_expose_unowned_top_level_build_roots(self) -> None:
         unknown = self.root / "build/ad-hoc-derived-data"

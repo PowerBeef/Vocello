@@ -484,8 +484,41 @@ public enum GenerationSemantics {
         guard !trimmedDescription.isEmpty else {
             return trimmedEmotion.trimmingTerminalSentencePunctuation()
         }
-        return "Voice character: \(trimmedDescription.trimmingTerminalSentencePunctuation()). Delivery: \(trimmedEmotion.trimmingTerminalSentencePunctuation())."
+        let description = trimmedDescription.trimmingTerminalSentencePunctuation()
+        let delivery = trimmedEmotion.trimmingTerminalSentencePunctuation()
+
+        // DP-5 experiment arms. Production is `.labeled` and unchanged.
+        //
+        // Upstream carries voice identity and delivery in a single `instruct`
+        // string and documents no way to combine them, so the labeled framing is
+        // a repository invention (prompting guide §6.1). The labels may help the
+        // model segment two intents, or may simply be two out-of-distribution
+        // tokens at a high-attention position. `anchored` tests the vendor
+        // guidance that a closing recording-quality clause stops texture words
+        // being read as degradation.
+        switch designMergeForm {
+        case .plain:
+            return "\(description). \(delivery)."
+        case .anchored:
+            return "\(description). \(delivery). Perfect broadcast quality audio."
+        case .labeled:
+            return "Voice character: \(description). Delivery: \(delivery)."
+        }
     }
+
+    enum DesignMergeForm: String {
+        case labeled, plain, anchored
+    }
+
+    /// `QWENVOICE_DESIGN_MERGE_FORM=plain|anchored` selects a DP-5 arm. Registered
+    /// in `config/runtime-debug-knobs.json` and inert without the `QWENVOICE_DEBUG`
+    /// master gate, so production always resolves `.labeled`.
+    static let designMergeForm: DesignMergeForm = {
+        let raw = RuntimeDebugGate.value(for: "QWENVOICE_DESIGN_MERGE_FORM")?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        return raw.flatMap(DesignMergeForm.init(rawValue:)) ?? .labeled
+    }()
 
     public static func normalizedConditioningCacheKeyText(_ text: String) -> String {
         Qwen3TTSRuntimeProfile.normalizedCacheText(text)

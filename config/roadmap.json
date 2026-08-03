@@ -190,15 +190,19 @@
       "id": "DP-5",
       "plan": "delivery-prompting-2026-08",
       "title": "Voice Design merge template versus plain concatenation",
-      "status": "planned",
-      "gate": "The repo-invented 'Voice character: X. Delivery: Y.' framing against plain concatenation and against identity-first ordering with a closing quality anchor.",
+      "status": "done",
+      "gate": "Three arms over 8 paired seeds. RESULT: shipped labeled form best on all three metrics (46 features / 66.2% error / 0.338 recall) against plain (41 / 68.8% / 0.312) and anchored (35 / 68.8% / 0.312). Labeled-over-plain is directional, not settled; the firm result is that the borrowed quality anchor hurts. Kept as shipped.",
       "blockedBy": [
         "DP-2"
       ],
       "sourceOfTruth": [
         "Sources/QwenVoiceCore/GenerationSemantics.swift"
       ],
-      "updated": "2026-08-02"
+      "updated": "2026-08-03",
+      "evidence": [
+        "doc:docs/reference/qwen3-tts-prompting-guide.md",
+        "file:config/runtime-debug-knobs.json"
+      ]
     },
     {
       "id": "DP-6",

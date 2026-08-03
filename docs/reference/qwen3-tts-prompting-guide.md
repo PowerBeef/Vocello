@@ -417,9 +417,15 @@ with three rules that transfer well: use age *ranges* ("mid-20s to early 30s") r
 ("Perfect broadcast quality audio."), which Inworld calls "especially valuable when describing
 textural qualities potentially mistaken for degradation."
 
-That last rule is directly load-bearing. **A rasp or husk descriptor with no quality anchor can be
-read by the model as recording degradation.** If a description asks for "gentle rasp" and the take
-comes back muddy, this is the documented cause and the documented fix.
+`MEASURED-HERE`, **DP-5, 2026-08-03 — the quality anchor was tested on this model and it hurt.**
+Appending "Perfect broadcast quality audio." to the Design instruction cost 11 surviving features
+against the shipped form (35 against 46) over 8 paired seeds, the worst of three arms. It is sound
+advice for the vendor who published it and it does not transfer here. **Do not adopt it**, and treat
+the rest of this borrowed guidance as untested rather than recommended — the age-range and
+softened-texture rules above have not been measured either.
+
+The underlying claim it was meant to address — that a rasp descriptor with no anchor reads as
+recording degradation — remains plausible and unmeasured on this model.
 
 `OFFICIAL` (ElevenLabs): avoid audio-FX terms — "reverb", "echo", "phone", "tape" — they degrade
 output. Do not misuse "accent" to mean intonation or emphasis. "Foreign" and "exotic" produce
@@ -453,14 +459,30 @@ merge them, and **upstream gives no guidance on how.**
 return "Voice character: \(description). Delivery: \(emotion)."
 ```
 
-`UNVERIFIED`. The `Voice character: … Delivery: …` labeling is a repository invention with no
-upstream provenance. Upstream's examples are unlabeled attribute lists. The labels may help the
-model segment the two intents, or they may simply be two out-of-distribution tokens at a
-high-attention position. Nothing decides this but a measurement (§10.2).
+`MEASURED-HERE`, **DP-5, 2026-08-03 — tested against two alternatives; the repo invention won.**
+The labeling has no upstream provenance and upstream's examples are unlabeled attribute lists, so
+this was a real open question. Three arms, identical seeds and cells, 8 paired seeds:
 
-`RESEARCH`, on the merge *order* if we keep merging: the field ordering consensus across vendors
-and papers is **identity first, delivery last, quality anchor at the end**. That is the
-best-supported inference available, not an upstream rule.
+| arm | features surviving | cross-preset error | mean recall |
+| --- | --- | --- | --- |
+| `Voice character: X. Delivery: Y.` (shipped) | **46** | **66.2%** | **0.338** |
+| plain concatenation `X. Y.` | 41 | 68.8% | 0.312 |
+| plain plus a closing quality anchor | 35 | 68.8% | 0.312 |
+
+**Kept, with the strength of the evidence stated plainly.** The shipped form leads on all three
+metrics, but 46 against 41 is a 12% edge — far weaker than DP-3's 57 against 33 — and per cell the
+picture is incoherent: `dramatic.strong` gives 7/0/0 favouring labeled while `sad.strong` gives
+0/6/5 favouring the others. At 8 seeds that is a small mean difference with loud noise around it.
+Treat labeled-over-plain as **directional, not settled**.
+
+The firmer result is the third arm: the borrowed quality anchor is the worst of the three (§5.4).
+
+Design mode is also structurally noisier than Custom, because the one field carries voice identity
+*and* delivery, so changing the delivery changes who is speaking. Two things argue the signal
+survived that anyway: the ordering is consistent across three independent metrics, and all three
+arms show similar cross-preset error, which is what drift affecting every arm equally looks like.
+Note also that `plain` and `anchored` are identical to three decimals on both separability metrics,
+so those numbers are coarser than they appear — the feature counts carry more information.
 
 `RESEARCH`, the counter-position, stated for honesty: VoxInstruct (arXiv:2408.15676) argues the
 opposite, that forcing a content/description split "restricts the ability to control speech at a
@@ -736,8 +758,11 @@ experiment below is a matrix run plus a paired comparison.
    gate. **Do not retry this as a way to fix delivery**: the same run showed `happy`, `excited`,
    `neutral`, `dramatic.normal` and `surprised.normal` move nothing under *either* form, so the
    register is not the lever for the presets that fail.
-2. **The Design merge template.** `Voice character: X. Delivery: Y.` against a plain concatenation
-   and against identity-first-delivery-last with a closing quality anchor (§6.1).
+2. ~~**The Design merge template.**~~ **SETTLED 2026-08-03 — shipped form kept, quality anchor
+   rejected.** 46 / 41 / 35 surviving features across labeled / plain / anchored over 8 paired
+   seeds; see §6.1 for the numbers and §5.4 for the anchor. Reproduce with
+   `QWENVOICE_DESIGN_MERGE_FORM=plain|anchored`. The labeled-over-plain margin is directional
+   rather than settled — worth revisiting at higher seed count if Design work resumes.
 3. ~~**The English diction sentence.**~~ **SETTLED 2026-08-02 — prosodic null; kept.** See §8.3.
    The tier-parity half of this item was a bug and was fixed separately (§8.2).
 4. **`language="english"` versus `auto` on Design.** Different `think`/`nothink` prefill branch

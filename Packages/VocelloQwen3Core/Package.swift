@@ -32,7 +32,7 @@ let package = Package(
         // mlx-swift-lm 3.x dropped its swift-transformers dependency; the app now brings the
         // concrete Hub/Tokenizers implementation. Pinned to the exact version the 2.30.6 graph
         // resolved so tokenizer behavior stays identical across the pin-bump A/B.
-        .package(url: "https://github.com/huggingface/swift-transformers.git", exact: "1.1.9")
+        .package(url: "https://github.com/huggingface/swift-transformers.git", exact: "1.3.3")
     ],
     targets: [
         // MARK: - VocelloQwen3Core

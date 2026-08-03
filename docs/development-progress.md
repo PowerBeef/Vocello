@@ -190,6 +190,25 @@ performance block after the fixture rebind, Tier 4 carryover). Immediate specifi
    default-state retained-memory run PASS with engagement proven by load-event
    counts (one tokenizer load across the mode-switch sequence instead of three).
    Evidence + methodology notes: `docs/decisions/ios-6gb-floor-feasibility.md`.
+
+11. **Delivery roster cut to eight (2026-08-03, maintainer decision on DP-10):**
+   `excited` folded into `happy`, `dramatic` dropped. The shipped configuration was
+   re-measured after the intensity control was retired — 18 seeds, one cell per
+   preset — and gave cross-preset separability of UAR 0.311 against a 0.100 chance
+   floor. Both retired presets scored *below* that floor at 0.056 recall. Scoring the
+   high-arousal cluster (`happy`/`excited`/`surprised`/`dramatic`) against only each
+   other gave UAR 0.278 against a 0.250 floor — 1.11× chance, i.e. one acoustic
+   output for four controls. Rewriting the copy is ruled out by the same run: mean
+   prosodic effect ran 6.5–9.5 across all ten presets and was **uncorrelated with
+   separability**, so these instructions were not under-driving; every preset moves
+   prosody hard and they all move it along the arousal axis, which the literature puts
+   at ~91% classifiable against ~55% for valence. Same test that retired the intensity
+   tier, now with a measurement behind it. Two related facts worth carrying forward:
+   the directional delivery gate and separability **disagree** (`fearful` passes the
+   gate on 1 take in 18 and has the best recall at 0.500), and `surprised` survives on
+   probation at 0.222. Full record: `docs/reference/qwen3-tts-prompting-guide.md` §4.3
+   and the removal note in `Sources/QwenVoiceCore/EmotionPreset.swift`.
+
 ## Staged roadmap state
 
 Stage-by-stage details, closure evidence, and falsifiability criteria live in the

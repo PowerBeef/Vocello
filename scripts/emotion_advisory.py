@@ -22,7 +22,7 @@ module's verdict logic imports and unit-tests without them. One-time setup:
 Usage:
   scripts/emotion_advisory.py --sidecar <diag>/bench-prosody.json \
       --outputs-dir <data>/outputs/bench [--out emotion-advisory.json]
-  scripts/emotion_advisory.py clip.wav --delivery excited.strong [--json]
+  scripts/emotion_advisory.py clip.wav --delivery happy.strong [--json]
 """
 
 from __future__ import annotations
@@ -45,9 +45,9 @@ EMOTION_LABELS = (
 )
 
 # Preset id → emotion labels counted as agreement. Presets whose acoustic
-# target is not an emotion category (whisper, dramatic) abstain: whispered
-# speech is out-of-distribution for emotion corpora and "dramatic" is a
-# delivery style, so the SER column reports the top emotion without judging.
+# target is not an emotion category (whisper) abstain: whispered speech is
+# out-of-distribution for emotion corpora, so the SER column reports the top
+# emotion without judging.
 PRESET_ALLOWED_EMOTIONS = {
     "happy": {"happy"},
     "sad": {"sad"},
@@ -55,10 +55,9 @@ PRESET_ALLOWED_EMOTIONS = {
     "fearful": {"fearful"},
     "surprised": {"surprised"},
     "calm": {"neutral"},
-    "excited": {"happy", "surprised"},
     "neutral": {"neutral"},
 }
-ABSTAIN_PRESETS = {"whisper", "dramatic"}
+ABSTAIN_PRESETS = {"whisper"}
 
 ADVISORY_VERSION = 1
 

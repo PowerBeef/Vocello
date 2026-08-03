@@ -21,7 +21,7 @@ Preset instructions come from `vocello deliveries --json` (the DRY source is
 EmotionPreset). Dev tool only; no Python ships in the app.
 
 Usage:
-  scripts/delivery_adherence.py [--presets happy.normal,excited.strong,surprised.normal]
+  scripts/delivery_adherence.py [--presets happy.normal,angry.strong,surprised.normal]
       [--variants speed[,quality]] [--seeds 8] [--speaker aiden] [--text "..."]
       [--vocello build/vocello] [--out <jsonl>] [--workdir <dir>] [--keep] [--json]
 """
@@ -34,7 +34,7 @@ from prosody_profile import builtin_profile, load_profile, delivery_weight
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEFAULT_TEXT = ("The morning train slipped quietly out of the station, carrying a handful "
                 "of sleepy travelers toward the coast.")
-DEFAULT_PRESETS = ["happy.normal", "excited.normal", "surprised.normal"]
+DEFAULT_PRESETS = ["happy.normal", "surprised.normal", "angry.normal"]
 
 
 def _weight(profile, section, key):

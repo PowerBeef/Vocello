@@ -221,8 +221,10 @@ delivery biases (e.g. Ryan is naturally expressive; start from Aiden/Serena for 
 
 ### Delivery — `Sources/QwenVoiceCore/EmotionPreset.swift`
 
-10 presets: **Neutral** (treated as "no style instruction"), plus
-**Happy, Sad, Angry, Fearful, Surprised, Excited, Calm, Whisper, Dramatic** — one instruction each.
+8 presets: **Neutral** (treated as "no style instruction"), plus
+**Happy, Sad, Angry, Fearful, Surprised, Calm, Whisper** — one instruction each.
+`Excited` and `Dramatic` were retired 2026-08-03 (DP-10): both scored below the chance floor for
+cross-preset separability, so neither was a control a listener could act on.
 The user-facing **intensity** control was retired 2026-08-02: DP-3 measured the `strong` copy at
 nearly double the recognisability of `normal` (mean per-preset recall 0.278 against 0.157, chance
 0.053) and showed the two tiers are not separable from each other, so every preset now ships its

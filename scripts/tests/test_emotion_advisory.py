@@ -6,6 +6,7 @@ classifier, so the suite needs neither torch nor the pinned model.
 """
 import json
 import os
+import pathlib
 import sys
 import tempfile
 import unittest
@@ -27,8 +28,15 @@ def probabilities(top, value=0.8):
 
 class EmotionAdvisoryTests(unittest.TestCase):
     def test_every_expressive_preset_is_mapped_or_abstains(self):
-        presets = {"happy", "sad", "angry", "fearful", "surprised", "excited",
-                   "calm", "whisper", "dramatic", "neutral"}
+        # Derived from EmotionPreset.swift rather than restated here: a
+        # hardcoded roster silently passes for a preset that no longer exists
+        # and silently misses one that was just added. Retiring `excited` and
+        # `dramatic` on 2026-08-03 is what exposed that.
+        from check_delivery_instructions import load_presets
+
+        root = pathlib.Path(__file__).resolve().parents[2]
+        presets = set(load_presets(root))
+        self.assertTrue(presets, "parsed zero presets; the check must not pass vacuously")
         covered = set(PRESET_ALLOWED_EMOTIONS) | ABSTAIN_PRESETS
         self.assertEqual(presets - covered, set())
 
@@ -37,10 +45,11 @@ class EmotionAdvisoryTests(unittest.TestCase):
         self.assertTrue(report["agreement"])
         self.assertEqual(report["topEmotion"], "happy")
 
-    def test_excited_accepts_happy_or_surprised(self):
-        self.assertTrue(evaluate_agreement(probabilities("surprised"), "excited.normal")["agreement"])
-        self.assertTrue(evaluate_agreement(probabilities("happy"), "excited.normal")["agreement"])
-        self.assertFalse(evaluate_agreement(probabilities("sad"), "excited.normal")["agreement"])
+    def test_preset_may_map_to_a_differently_named_emotion(self):
+        # `calm` counts the SER label "neutral" as agreement: the allowed set is
+        # not required to equal the preset id.
+        self.assertTrue(evaluate_agreement(probabilities("neutral"), "calm.normal")["agreement"])
+        self.assertFalse(evaluate_agreement(probabilities("sad"), "calm.normal")["agreement"])
 
     def test_whisper_abstains(self):
         report = evaluate_agreement(probabilities("neutral"), "whisper.normal")

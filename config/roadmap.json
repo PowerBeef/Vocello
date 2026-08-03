@@ -382,6 +382,23 @@
         "Sources/QwenVoiceCore/EmotionPreset.swift"
       ],
       "updated": "2026-08-02"
+    },
+    {
+      "id": "DP-10",
+      "plan": "delivery-prompting-2026-08",
+      "title": "Cut the delivery roster to the presets that separate",
+      "status": "done",
+      "gate": "Shipped configuration re-measured after the intensity control was retired (18 seeds, one cell per preset): UAR 0.311 against a 0.100 chance floor. `excited` and `dramatic` both scored below that floor at 0.056 recall and were retired; the high-arousal cluster scored alone gave UAR 0.278 against a 0.250 floor, so no instruction rewrite can recover them. Mean prosodic effect (6.5-9.5) was uncorrelated with separability, which is what rules out a copy fix.",
+      "evidence": [
+        "doc:docs/reference/qwen3-tts-prompting-guide.md",
+        "doc:docs/development-progress.md",
+        "file:Sources/QwenVoiceCore/EmotionPreset.swift",
+        "file:scripts/delivery_separability.py"
+      ],
+      "sourceOfTruth": [
+        "Sources/QwenVoiceCore/EmotionPreset.swift"
+      ],
+      "updated": "2026-08-03"
     }
   ]
 }

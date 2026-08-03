@@ -283,7 +283,7 @@ actors that own the heavy, isolated work:
 - `ClonePreparationState { idle, preparing(...), primed(...), failed(...) }`
 
 `EmotionPreset.swift` defines the delivery/tone presets (`neutral`, `happy`,
-`sad`, `angry`, `fearful`, `surprised`, `excited`, `calm`, `whisper`, `dramatic`).
+`sad`, `angry`, `fearful`, `surprised`, `calm`, `whisper`).
 
 ### 4.3 Factory & paths
 

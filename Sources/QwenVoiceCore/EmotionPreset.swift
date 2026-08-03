@@ -167,10 +167,8 @@ public struct EmotionPreset: Identifiable, Sendable {
         "angry": [.normal: "Say it in an angry tone.", .strong: "Say it in a very angry tone."],
         "fearful": [.normal: "Frightened.", .strong: "Very frightened."],
         "surprised": [.normal: "Surprised.", .strong: "Very surprised."],
-        "excited": [.normal: "Excited.", .strong: "Very excited."],
         "calm": [.normal: "Calm.", .strong: "Very calm."],
         "whisper": [.normal: "Whisper it.", .strong: "Whisper it very quietly."],
-        "dramatic": [.normal: "Dramatic.", .strong: "Very dramatic."],
     ]
 
     public static func preset(id: String?) -> EmotionPreset? {
@@ -253,6 +251,31 @@ public struct EmotionPreset: Identifiable, Sendable {
     // but removing them must be measured, not assumed — and a candidate needs
     // enough seeds to clear a ~0.35 noise floor, which n=9 does not.
     // Verify with scripts/delivery_matrix_report.py, never by reading text back.
+    //
+    // REMOVED 2026-08-03, maintainer decision on DP-10 (18 seeds x 10 shipped
+    // cells, one cell per preset since the intensity control was retired):
+    // `excited` folded into `happy`, `dramatic` dropped. Both scored *below* a
+    // 0.100 chance floor in the 10-way separability test (0.056 each) while the
+    // set as a whole reached UAR 0.311, so they were not merely weak controls --
+    // they were worse than guessing. Scoring the high-arousal cluster
+    // (happy/excited/surprised/dramatic) against only each other gave UAR 0.278
+    // against a 0.250 chance floor: 1.11x chance, i.e. the model emits
+    // essentially one acoustic output for all four.
+    //
+    // The tempting fix -- rewrite the copy -- is ruled out by the same run.
+    // Mean prosodyEffect is uncorrelated with separability (dramatic 8.2,
+    // excited 8.9, happy 9.5, whole set 6.5-9.5), so these instructions were not
+    // under-driving; every preset moves prosody hard and they all move it along
+    // the same axis. That is the arousal axis saturating, which the research
+    // corpus reports as ~91% classifiable against ~55% for valence -- and
+    // valence is the only thing separating happy from excited. `dramatic` sat
+    // nearest to `neutral` (d=1.07, the smallest distance in the matrix): a
+    // large prosodic effect that is not legible as the thing it names.
+    //
+    // Do NOT reintroduce either preset on the strength of rewritten copy alone.
+    // DP-3 (long vs short form), DP-4 (prosodic null), DP-5 (merge form), and
+    // DP-6 all varied instruction *wording*; none moved this. Re-earning a slot
+    // takes a separability measurement, not a better sentence.
     public static let all: [EmotionPreset] = [
         EmotionPreset(
             id: "neutral",
@@ -309,15 +332,6 @@ public struct EmotionPreset: Identifiable, Sendable {
             ]
         ),
         EmotionPreset(
-            id: "excited",
-            label: "Excited",
-            sfSymbol: "sparkles",
-            instructions: [
-                .normal: "Speak excitedly, with a fast driving pace, bright ringing tone, higher pitch and louder volume than normal; no laughing or shouting.",
-                .strong: "Speak with bursting excitement, a racing pace, big upward pitch leaps, a ringing bright tone, and emphatic peaks on every key word; no laughing or shouting.",
-            ]
-        ),
-        EmotionPreset(
             id: "calm",
             label: "Calm",
             sfSymbol: "leaf",
@@ -333,15 +347,6 @@ public struct EmotionPreset: Identifiable, Sendable {
             instructions: [
                 .normal: "Whisper throughout, hushed and breathy, every word voiced just above breath, close and confidential; never lift into normal speech.",
                 .strong: "Whisper at the very edge of hearing, hushed flat breath with minimal pitch movement, close and secretive; every word still audible, never lifted into normal speech.",
-            ]
-        ),
-        EmotionPreset(
-            id: "dramatic",
-            label: "Dramatic",
-            sfSymbol: "theatermasks",
-            instructions: [
-                .normal: "Speak like a stage narrator, with sweeping rises and falls in pitch, firm stress landing on key words, deliberate pacing, and clear held pauses between phrases; no shouting.",
-                .strong: "Speak with sweeping theatrical grandeur, a wide pitch range swinging from low to high, bold stress on key words, generous well-timed pauses, and a projected resonant tone; no shouting.",
             ]
         ),
     ]

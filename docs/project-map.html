@@ -1643,7 +1643,7 @@ scripts/macos_test.sh test
     {"name":"Custom Voice","macos":"yes","ios":"yes","cli":"yes","note":"9 built-in speakers; delivery and language control"},
     {"name":"Voice Design","macos":"yes","ios":"yes","cli":"yes","note":"Natural-language brief; result can become a Saved Voice"},
     {"name":"Voice Cloning","macos":"yes","ios":"yes","cli":"yes","note":"Transcript-backed or genuine audio-only x-vector conditioning; app generation requires visible Settings consent"},
-    {"name":"Delivery presets / custom tone","macos":"yes","ios":"yes","cli":"yes","note":"10 presets × intensity; Clone follows its reference"},
+    {"name":"Delivery presets / custom tone","macos":"yes","ios":"yes","cli":"yes","note":"8 presets, one instruction each; Clone follows its reference"},
     {"name":"Language pin / Auto","macos":"yes","ios":"yes","cli":"yes","note":"10 spoken languages plus Auto"},
     {"name":"Speed (4-bit) models","macos":"yes","ios":"yes","cli":"yes","note":"iOS production tier; about 2.31–2.34 GB per mode"},
     {"name":"Quality (8-bit) models","macos":"yes","ios":"no","cli":"yes","note":"macOS and source-built CLI only"},
@@ -1677,7 +1677,7 @@ scripts/macos_test.sh test
     {
       "label":"Delivery",
       "title":"Emotion presets and free-form direction",
-      "body":"Neutral, Happy, Sad, Angry, Fearful, Surprised, Excited, Calm, Whisper, and Dramatic. Non-neutral presets have Subtle, Normal, and Strong intensity; custom direction is capped at 500 characters. Clone has no delivery picker.",
+      "body":"Neutral, Happy, Sad, Angry, Fearful, Surprised, Calm, and Whisper — one instruction each. The intensity control was retired 2026-08-02 and Excited and Dramatic were retired 2026-08-03, both for the same reason: a control whose effect cannot be distinguished is not a control. Custom direction is capped at 500 characters. Clone has no delivery picker.",
       "chips":[
         {"t":"EmotionPreset.swift","c":""},
         {"t":"IOSDeliveryPickerSheet","c":""},

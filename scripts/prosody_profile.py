@@ -86,9 +86,13 @@ BUILTIN_PROFILE = {
     # Fast-QC failure), then re-derived after the R1 instruction rewrites
     # (delivery-r1c1/r1c2/r1final records): required features carry a measured
     # ≥0.85 direction win-rate on the shipping instruction text; magnitudes
-    # sit near half the observed median effect. Dramatic and surprised were
-    # promoted back to magnitude-bearing after their rewrites cleared the R1
-    # acceptance bar.
+    # sit near half the observed median effect. Surprised was promoted back to
+    # magnitude-bearing after its rewrite cleared the R1 acceptance bar.
+    # `excited` and `dramatic` were removed 2026-08-03 (DP-10): both scored below
+    # the 0.100 chance floor for cross-preset separability, and their entries
+    # here passed while they did — direction-and-magnitude expectations prove a
+    # preset moved prosody, never that the result is distinguishable from the
+    # preset beside it. See Sources/QwenVoiceCore/EmotionPreset.swift.
     "delivery_expectations": {
         # UNVALIDATED CONSTANT. 1.15 asserts that `strong` should land 15% above
         # `normal`; nothing measured it. The 19-seed × 20-cell matrix put the
@@ -107,11 +111,6 @@ BUILTIN_PROFILE = {
             "happy": {
                 "pitch_variation_delta_hz": {"direction": 1, "min_effect_normal": 2.5, "tier": "required"},
                 "arousal_score": {"direction": 1, "min_effect_normal": 0.5, "tier": "required"},
-                "pitch_shift_semitones": {"direction": 1, "min_effect_normal": 0.0, "tier": "supporting"},
-            },
-            "excited": {
-                "pitch_variation_delta_hz": {"direction": 1, "min_effect_normal": 3.0, "tier": "required"},
-                "arousal_score": {"direction": 1, "min_effect_normal": 0.5, "tier": "supporting"},
                 "pitch_shift_semitones": {"direction": 1, "min_effect_normal": 0.0, "tier": "supporting"},
             },
             "surprised": {
@@ -142,10 +141,6 @@ BUILTIN_PROFILE = {
                 "pitch_variation_delta_hz": {"direction": -1, "min_effect_normal": 4.0, "tier": "required"},
                 "arousal_score": {"direction": -1, "min_effect_normal": 0.5, "tier": "required"},
                 "voiced_fraction_delta": {"direction": -1, "min_effect_normal": 0.0, "tier": "supporting"},
-            },
-            "dramatic": {
-                "pitch_variation_delta_hz": {"direction": 1, "min_effect_normal": 1.5, "tier": "required"},
-                "pitch_shift_semitones": {"direction": 1, "min_effect_normal": 0.0, "tier": "supporting"},
             },
         },
     },

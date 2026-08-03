@@ -100,12 +100,8 @@ enum AppTheme {
             return Color(red: 0.38, green: 0.72, blue: 0.72)  // bright teal
         case "whisper":
             return Color(red: 0.62, green: 0.62, blue: 0.66)  // cool gray
-        case "dramatic":
-            return Color(red: 0.78, green: 0.52, blue: 0.66)  // mauve
         case "calm":
             return Color(red: 0.62, green: 0.74, blue: 0.62)  // sage
-        case "excited":
-            return Color(red: 0.92, green: 0.58, blue: 0.32)  // warm orange
         case "narrator":
             return Color(red: 0.72, green: 0.58, blue: 0.42)  // warm tan
         case "news":

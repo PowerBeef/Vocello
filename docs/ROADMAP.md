@@ -10,7 +10,7 @@
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
 | `convergence-metal4-stage4-2026-08` | active | backend-and-platform | 3/6 (50%) |
-| `delivery-prompting-2026-08` | active | backend-mlx | 8/9 (89%) |
+| `delivery-prompting-2026-08` | active | backend-mlx | 9/10 (90%) |
 | `doc-governance-2026-08` | active | release-qa | 7/9 (78%) |
 
 ## Convergence residuals, Metal 4 study, and Stage 4
@@ -41,6 +41,7 @@ Narrative authority: [`docs/reference/qwen3-tts-prompting-guide.md`](reference/q
 | Item | Status | Title | Evidence |
 | --- | --- | --- | --- |
 | `DP-1` | done | Sourced Qwen3-TTS prompting guide with per-claim provenance | `commit:c14651c`, `doc:docs/reference/qwen3-tts-prompting-guide.md` |
+| `DP-10` | done | Cut the delivery roster to the presets that separate | `doc:docs/reference/qwen3-tts-prompting-guide.md`, `doc:docs/development-progress.md`, `file:Sources/QwenVoiceCore/EmotionPreset.swift`, `file:scripts/delivery_separability.py` |
 | `DP-2` | done | Deterministic delivery-instruction contract gate | `commit:6f4c651`, `file:scripts/check_delivery_instructions.py` |
 | `DP-3` | done | Short-versus-long instruction A/B | `doc:docs/reference/qwen3-tts-prompting-guide.md`, `file:config/runtime-debug-knobs.json` |
 | `DP-4` | done | English diction append: does it earn its place | `doc:docs/reference/qwen3-tts-prompting-guide.md`, `file:config/runtime-debug-knobs.json` |

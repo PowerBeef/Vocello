@@ -50,27 +50,27 @@ class DeliveryGateTests(unittest.TestCase):
         self.assertEqual(
             presets,
             {"neutral", "happy", "sad", "angry", "fearful", "surprised",
-             "excited", "calm", "whisper", "dramatic"},
+             "calm", "whisper"},
         )
 
-    def test_matching_excited_take_passes(self):
-        instructed = metrics(f0=160.0, rate=4.4, range_hz=80.0, std=35.0, rough=0.28)
-        verdict = evaluate_delivery(instructed, metrics(), "excited.strong")
+    def test_matching_angry_take_passes(self):
+        instructed = metrics(f0=165.0, rate=4.4, range_hz=80.0, std=35.0, rough=0.28)
+        verdict = evaluate_delivery(instructed, metrics(), "angry.strong")
         self.assertTrue(verdict["passed"])
         self.assertEqual(verdict["flags"], [])
         self.assertEqual(verdict["algorithmVersion"], DELIVERY_GATE_ALGORITHM_VERSION)
-        self.assertEqual(verdict["preset"], "excited")
+        self.assertEqual(verdict["preset"], "angry")
         self.assertEqual(verdict["intensity"], "strong")
 
     def test_opposite_direction_flags_required_features(self):
-        verdict = evaluate_delivery(metrics(f0=140.0, rate=3.6), metrics(), "excited.normal")
+        verdict = evaluate_delivery(metrics(f0=140.0, rate=3.6), metrics(), "angry.normal")
         self.assertFalse(verdict["passed"])
         self.assertIn("delivery_direction_miss_pitch_variation_delta_hz", verdict["flags"])
         self.assertIn("delivery_supporting_miss_arousal_score", verdict["flags"])
 
     def test_weak_effect_flags_but_direction_holds(self):
         # Right direction, but well under the normal-intensity magnitude.
-        verdict = evaluate_delivery(metrics(f0=151.0, std=26.0), metrics(), "excited.normal")
+        verdict = evaluate_delivery(metrics(f0=151.0, std=26.0), metrics(), "angry.normal")
         self.assertFalse(verdict["passed"])
         self.assertTrue(
             all(flag.startswith("delivery_effect_weak_") for flag in verdict["flags"]),

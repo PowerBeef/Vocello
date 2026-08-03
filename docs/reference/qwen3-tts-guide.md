@@ -275,7 +275,7 @@ replace the XCUITest UI path for the visible saved-voice workflow.
 
 ## 6. Delivery / emotion presets
 
-`Sources/QwenVoiceCore/EmotionPreset.swift` defines the single source of truth: **10 presets**, each
+`Sources/QwenVoiceCore/EmotionPreset.swift` defines the single source of truth: **8 presets**, each
 shipping one instruction. Neutral is itself a real instructed preset (steady, slightly monotone).
 
 The user-facing **intensity control was retired 2026-08-02**, following the "subtle" tier on
@@ -299,9 +299,7 @@ stored. The table below is that internal pair; the second column is what ships.
 | `fearful` | Anxious, breath caught | Trembling panic, still audible |
 | `surprised` | Pitch jumps, quick, astonished | High rising pitch, amazed, no gasping |
 | `whisper` | Hushed, breathy, confidential | Urgent, barely voiced, secretive |
-| `dramatic` | Heightened inflection | Sweeping grandeur, generous pauses |
 | `calm` | Smooth, unhurried, reassuring | Serene, meditative stillness |
-| `excited` | Bright, animated | Fast, driving, ringing, no laughing/shouting |
 
 > `narrator` and `news` are Voice Design brief archetypes, not delivery presets.
 
@@ -312,7 +310,7 @@ carries the full adjudication with references. Summary:
 - **Concrete acoustic wording** (pitch, pace, timbre, volume) is followed more reliably than persona-only wording. *Supported* — InstructTTSEval scores our checkpoint at 77–83 on explicit acoustic specification versus 61–64 on role-play framing.
 - **Negative constraints work** (`"joyful but without laughing"`). *Unverified* — no upstream source endorses them, and the nearest published ablation found bare paralinguistic tags reduced adherence.
 - **Stacked intensifiers do not work** (`"very very very happy"` adds no value). *Partly contradicted* — repetition adding nothing is defensible, but upstream's own examples are `"Very happy."` and `"Say it in a very angry and disappointed tone"`.
-- High-arousal instructions (`happy`, `excited`, `surprised`) can otherwise trigger literal laughter or extra breath sounds; the strong tiers explicitly forbid that. *Symptom is community-reported; the remedy is the unverified part.*
+- High-arousal instructions (`happy`, `surprised`) can otherwise trigger literal laughter or extra breath sounds; the shipped copy explicitly forbids that. *Symptom is community-reported; the remedy is the unverified part.*
 - An intelligibility clause (`"keeping every word audible"`) helps bound extreme emotions. *Unverified as written* — the vendor-documented cousin is a closing recording-quality anchor, which is a different mechanism.
 
 ---

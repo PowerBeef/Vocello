@@ -166,8 +166,8 @@ final class GenerationQualityCompositionTests: XCTestCase {
         metrics: [String: Double] = [:]
     ) -> GenerationQualityComposition.DeliverySidecarGate {
         GenerationQualityComposition.DeliverySidecarGate(
-            deliveryID: "excited.strong",
-            preset: "excited",
+            deliveryID: "angry.strong",
+            preset: "angry",
             intensity: "strong",
             algorithmVersion: 1,
             passed: passed,

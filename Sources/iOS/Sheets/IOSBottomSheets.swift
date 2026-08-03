@@ -21,9 +21,7 @@ enum IOSEmotionPresetPalette {
         case "fearful":   return Color(red: 0.62, green: 0.50, blue: 0.78)  // #9E80C7
         case "surprised": return Color(red: 0.38, green: 0.72, blue: 0.72)  // #61B8B8
         case "whisper":   return Color(red: 0.62, green: 0.62, blue: 0.66)  // #9E9EA8
-        case "dramatic":  return Color(red: 0.78, green: 0.52, blue: 0.66)  // #C785A8
         case "calm":      return Color(red: 0.62, green: 0.74, blue: 0.62)  // #9EBD9E
-        case "excited":   return Color(red: 0.92, green: 0.58, blue: 0.32)  // #EB9452
         default:          return .white.opacity(0.55)                       // neutral / unknown
         }
     }
@@ -420,9 +418,7 @@ struct IOSDeliveryPickerSheet: View {
         case "fearful":  return "Quiet, hesitant"
         case "surprised":return "Animated, pitch jumps"
         case "whisper":  return "Soft, close-mic breath"
-        case "dramatic": return "Theatrical, projected"
         case "calm":     return "Slower, reassuring"
-        case "excited":  return "Energetic, faster"
         default:         return ""
         }
     }

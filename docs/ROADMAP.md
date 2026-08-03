@@ -10,7 +10,7 @@
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
 | `convergence-metal4-stage4-2026-08` | active | backend-and-platform | 3/6 (50%) |
-| `delivery-prompting-2026-08` | active | backend-mlx | 7/9 (78%) |
+| `delivery-prompting-2026-08` | active | backend-mlx | 8/9 (89%) |
 | `doc-governance-2026-08` | active | release-qa | 7/9 (78%) |
 
 ## Convergence residuals, Metal 4 study, and Stage 4
@@ -45,7 +45,7 @@ Narrative authority: [`docs/reference/qwen3-tts-prompting-guide.md`](reference/q
 | `DP-3` | done | Short-versus-long instruction A/B | `doc:docs/reference/qwen3-tts-prompting-guide.md`, `file:config/runtime-debug-knobs.json` |
 | `DP-4` | done | English diction append: does it earn its place | `doc:docs/reference/qwen3-tts-prompting-guide.md`, `file:config/runtime-debug-knobs.json` |
 | `DP-5` | done | Voice Design merge template versus plain concatenation | `doc:docs/reference/qwen3-tts-prompting-guide.md`, `file:config/runtime-debug-knobs.json` |
-| `DP-6` | planned | Angry pitch-axis contradiction | — |
+| `DP-6` | done | Angry pitch-axis contradiction | `doc:docs/reference/qwen3-tts-prompting-guide.md`, `file:config/delivery-instruction-contract.json` |
 | `DP-7` | done | On-device delivery-consistency cohort lane | `file:Tests/VocelloiOSUITests/VocelloiOSDeliveryCohortUITests.swift`, `file:scripts/ui_test.sh` |
 | `DP-8` | done | Retire the user-facing intensity control (scoped) | `doc:docs/reference/qwen3-tts-guide.md`, `file:Sources/Views/Components/EmotionPickerView.swift` |
 | `DP-9` | planned | Remove EmotionIntensity outright, after DP-4/5/6 | — |

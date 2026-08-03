@@ -208,14 +208,18 @@
       "id": "DP-6",
       "plan": "delivery-prompting-2026-08",
       "title": "Angry pitch-axis contradiction",
-      "status": "planned",
-      "gate": "Measure which pitch direction actually reads as angry, then correct whichever of the copy or the expectation lost. The expectation is not automatically the authority.",
+      "status": "done",
+      "gate": "23 seeds, angry.normal against angry.strong. RESULT: the expectation (+1) is correct -- shipped copy moves pitch +5.98 st, d=1.40, win 0.91. The conflicting 'lower clipped tone' clause is simply not followed, so the contradiction is textual with no acoustic counterpart. angry.strong is also the better copy at this power (7 features vs 4), reversing DP-3's underpowered per-cell reading and confirming the global strong choice needs no exception.",
       "blockedBy": [],
       "sourceOfTruth": [
         "Sources/QwenVoiceCore/EmotionPreset.swift",
         "scripts/prosody_profile.py"
       ],
-      "updated": "2026-08-02"
+      "updated": "2026-08-03",
+      "evidence": [
+        "doc:docs/reference/qwen3-tts-prompting-guide.md",
+        "file:config/delivery-instruction-contract.json"
+      ]
     },
     {
       "id": "DG-1",

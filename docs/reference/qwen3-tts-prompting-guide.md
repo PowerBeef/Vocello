@@ -770,6 +770,20 @@ experiment below is a matrix run plus a paired comparison.
    following.
 5. **A Chinese instruction against the English one** on CustomVoice, output text held constant.
    Table 8 says Chinese leads English by 5.7 APS points on our exact checkpoint (§4.4).
+`MEASURED-HERE`, **DP-6, 2026-08-03 — an instruction clause can be simply ignored.** Over 23 seeds
+the shipped `angry` copy moves pitch **+5.98 semitones** (d=1.40, win rate 0.91), confirming the
+`required` +1 expectation. But the retired `angry.normal` copy asks for *"a lower clipped tone"* and
+the model **raises** pitch anyway. The contradiction our text-level gate flagged is real in the
+prose and absent from the audio, which is worth knowing before rewriting copy to resolve a conflict
+that only exists on the page.
+
+The same run carries a methodological caution. DP-3's *aggregate* comparison (57 features against
+33) was robust, but its *per-cell* numbers were not: `angry.normal` showed a 12/12 win rate for
+pitch at n=12 and fails to survive correction at n=23 on a different seed range, while
+`angry.strong` is stable across both (+4.48 then +5.98, win ≈0.91). **Read per-cell rows from a
+12-seed matrix as indicative only.** The tier decision in §8.2 leaned on such rows; the aggregate
+that decision actually rested on was much stronger than any single cell in it.
+
 6. **Negative constraints and intensifiers**, individually. Eight of ten presets carry a negation
    clause that no source supports; OV-InstructTTS's ablation points the other way.
 7. **8-bit versus bf16 instruction adherence.** Upstream measures bf16 only; we ship 8-bit (§7).

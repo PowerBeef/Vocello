@@ -654,9 +654,31 @@ emotion twice with an intensifier.
 
 It is tempting to read that contrast as the root cause. It is weaker evidence than it looks:
 examples are illustrations, not prescriptions, and the benchmark evidence in §4.2 says explicit
-enumeration is the *strongest* regime, not the weakest. The honest position is that our
-instructions are APS-shaped, which is right, and that whether *this much* APS beats *less* APS is
-simply untested. §10.1 is the experiment.
+enumeration is the *strongest* regime, not the weakest.
+
+`MEASURED-HERE`, **2026-08-02 — settled, and the contrast is not the cause.** DP-3 ran both forms
+over 12 paired seeds × 20 cells, identical seeds and cells, one variable: an official-style short
+form (`Very happy.`, `Say it in a very angry tone`) against the shipped long form. Features
+surviving Benjamini-Hochberg correction:
+
+| | features surviving | cells won |
+| --- | --- | --- |
+| shipped long form | **57** | 9 |
+| official-style short form | 33 | 2 |
+
+The shipped copy is **better**, not worse, and by a wide margin. Effect sizes move the same way —
+`whisper.normal` `cpp_delta_db` is d=−3.50 shipped against d=−1.16 short.
+
+This confirms §4.2 and retires the contrast above as a hypothesis. Our copy is APS-shaped;
+`Very happy.` is a bare emotion label, which InstructTTSEval scores in the weakest regime. Upstream's
+short examples are illustrations of the *interface*, not a recommended register — reading them as
+style guidance was the error, and the benchmark said so before the measurement did.
+
+**What the same run showed instead**, and it matters more: five presets move nothing that survives
+correction under *either* form — `happy`, `excited`, `neutral`, `dramatic.normal`,
+`surprised.normal`. Cross-preset separability fails in both arms (67.5% error shipped, 77.6%
+short), with `happy.normal` at 0.00 recall against a 5% chance floor. Instruction register is not
+the lever for those presets; nothing about the wording makes them separable.
 
 `MEASURED-HERE`. Three different instruction-length limits exist in this checkout, and they measure
 different things rather than disagreeing: 2,048 characters is the Model Studio `voice_prompt`
@@ -680,10 +702,14 @@ runs a seeded delivery matrix and [`scripts/delivery_statistics.py`](../../scrip
 provides paired Wilcoxon tests, Cohen's d_z, BCa intervals, and Benjamini-Hochberg correction. Each
 experiment below is a matrix run plus a paired comparison.
 
-1. **Short versus long instruction.** Same preset, same seeds: official-style short form
-   (`Very happy.`) against the shipped long form. Directly tests §9.1, and is the cheapest item
-   here. Both arms are legitimate; the benchmark predicts the long APS form should win, and the
-   official examples predict otherwise. Whichever way it lands, the answer is worth having.
+1. ~~**Short versus long instruction.**~~ **SETTLED 2026-08-02 — the shipped long form wins,
+   57 surviving features against 33 over 12 paired seeds.** The benchmark's prediction held and the
+   official-examples reading was wrong; see §9.1. Reproduce with
+   `QWENVOICE_DEBUG=1 QWENVOICE_DELIVERY_INSTRUCTION_SET=short`, registered in
+   [`runtime-debug-knobs.json`](../../config/runtime-debug-knobs.json) and inert without the master
+   gate. **Do not retry this as a way to fix delivery**: the same run showed `happy`, `excited`,
+   `neutral`, `dramatic.normal` and `surprised.normal` move nothing under *either* form, so the
+   register is not the lever for the presets that fail.
 2. **The Design merge template.** `Voice character: X. Delivery: Y.` against a plain concatenation
    and against identity-first-delivery-last with a closing quality anchor (§6.1).
 3. **The English diction sentence, and the §8.2 confound.** Run the delivery matrix with

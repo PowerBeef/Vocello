@@ -125,8 +125,53 @@ public struct EmotionPreset: Identifiable, Sendable {
     }
 
     public func instruction(for intensity: EmotionIntensity) -> String {
-        instructions[intensity] ?? instructions[.normal] ?? DeliveryProfile.neutralInstruction
+        if let alternate = EmotionPreset.experimentalInstruction(id: id, intensity: intensity) {
+            return alternate
+        }
+        return instructions[intensity] ?? instructions[.normal] ?? DeliveryProfile.neutralInstruction
     }
+
+    /// DP-3 experiment arm. Returns nil in production.
+    ///
+    /// `QWENVOICE_DELIVERY_INSTRUCTION_SET=short` swaps every preset for an
+    /// official-style short form so the shipped long form can be measured
+    /// against it on identical seeds. Registered in
+    /// `config/runtime-debug-knobs.json` and inert without the `QWENVOICE_DEBUG`
+    /// master gate, so production resolution is unchanged.
+    ///
+    /// The hypothesis: upstream's own Custom Voice examples are three to nine
+    /// words and name the emotion plainly (`Very happy.`, `Say it in a very
+    /// angry and disappointed tone`), while the shipped copy is ten to twenty
+    /// times longer, avoids naming the emotion in favour of acoustic
+    /// specification, and adds negative constraints. That contrast is documented
+    /// in `docs/reference/qwen3-tts-prompting-guide.md` §9.1 and has never been
+    /// measured. Whichever way it lands, the answer is worth having.
+    static func experimentalInstruction(id: String, intensity: EmotionIntensity) -> String? {
+        guard shortInstructionSetEnabled else { return nil }
+        return shortInstructions[id]?[intensity]
+    }
+
+    private static let shortInstructionSetEnabled: Bool = {
+        RuntimeDebugGate.value(for: "QWENVOICE_DELIVERY_INSTRUCTION_SET")?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased() == "short"
+    }()
+
+    /// Modelled directly on the documented upstream examples: a bare adjective
+    /// phrase, or `Say it in a … tone`, with the strong tier adding the single
+    /// intensifier those examples use freely.
+    private static let shortInstructions: [String: [EmotionIntensity: String]] = [
+        "neutral": [.normal: "Say it in a neutral tone.", .strong: "Say it in a neutral tone."],
+        "happy": [.normal: "Happy.", .strong: "Very happy."],
+        "sad": [.normal: "Sad.", .strong: "Very sad."],
+        "angry": [.normal: "Say it in an angry tone.", .strong: "Say it in a very angry tone."],
+        "fearful": [.normal: "Frightened.", .strong: "Very frightened."],
+        "surprised": [.normal: "Surprised.", .strong: "Very surprised."],
+        "excited": [.normal: "Excited.", .strong: "Very excited."],
+        "calm": [.normal: "Calm.", .strong: "Very calm."],
+        "whisper": [.normal: "Whisper it.", .strong: "Whisper it very quietly."],
+        "dramatic": [.normal: "Dramatic.", .strong: "Very dramatic."],
+    ]
 
     public static func preset(id: String?) -> EmotionPreset? {
         guard let id else { return nil }
@@ -148,10 +193,14 @@ public struct EmotionPreset: Identifiable, Sendable {
     // against primary sources; docs/reference/qwen3-tts-prompting-guide.md §9 holds
     // the adjudication and references. Provenance, so a future reader can tell which
     // of these is load-bearing:
-    // - SUPPORTED: combine emotion + pace + pitch + timbre in concrete acoustic
-    //   wording. InstructTTSEval scores this checkpoint 77-83 on explicit acoustic
-    //   specification against 61-64 on persona/role framing. Volume, speed, and tone
-    //   (distinct from emotion) are also scored features that this copy underuses.
+    // - SUPPORTED, and now MEASURED: combine emotion + pace + pitch + timbre in
+    //   concrete acoustic wording. InstructTTSEval scores this checkpoint 77-83 on
+    //   explicit acoustic specification against 61-64 on persona/role framing, and
+    //   DP-3 confirmed it directly on 2026-08-02: this long APS-shaped copy beat an
+    //   official-style short form (`Very happy.`) 57 surviving features to 33 over
+    //   12 paired seeds. Do NOT shorten this copy toward the upstream examples --
+    //   that experiment is done and the shorter form lost. Volume, speed, and tone
+    //   (distinct from emotion) remain scored features this copy underuses.
     // - UNVERIFIED: negative constraints for high-arousal emotions (no laughing /
     //   shouting / gasping). No upstream source endorses them, and the nearest
     //   published ablation found bare paralinguistic tags *reduced* adherence.

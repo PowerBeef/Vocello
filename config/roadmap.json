@@ -154,15 +154,19 @@
       "id": "DP-3",
       "plan": "delivery-prompting-2026-08",
       "title": "Short-versus-long instruction A/B",
-      "status": "planned",
-      "gate": "Same preset and seeds: official-style short form against the shipped long form. Paired Wilcoxon with BH correction over the delivery matrix.",
+      "status": "done",
+      "gate": "Official-style short form against the shipped long form, identical seeds and cells, paired Wilcoxon with BH correction. RESULT: shipped wins 57 surviving features to 33 over 12 paired seeds; the register hypothesis is refuted and the InstructTTSEval prediction held.",
       "blockedBy": [
         "DP-2"
       ],
       "sourceOfTruth": [
         "Sources/QwenVoiceCore/EmotionPreset.swift"
       ],
-      "updated": "2026-08-02"
+      "updated": "2026-08-02",
+      "evidence": [
+        "doc:docs/reference/qwen3-tts-prompting-guide.md",
+        "file:config/runtime-debug-knobs.json"
+      ]
     },
     {
       "id": "DP-4",
@@ -198,9 +202,7 @@
       "title": "Angry pitch-axis contradiction",
       "status": "planned",
       "gate": "Measure which pitch direction actually reads as angry, then correct whichever of the copy or the expectation lost. The expectation is not automatically the authority.",
-      "blockedBy": [
-        "DP-3"
-      ],
+      "blockedBy": [],
       "sourceOfTruth": [
         "Sources/QwenVoiceCore/EmotionPreset.swift",
         "scripts/prosody_profile.py"

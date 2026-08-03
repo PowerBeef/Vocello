@@ -20,12 +20,18 @@ class VocelloiOSUITestCase: XCTestCase {
 
     var app: XCUIApplication { session.app }
 
-    func beginSession(additionalEnvironment: [String: String] = [:]) {
+    func beginSession(
+        additionalEnvironment: [String: String] = [:],
+        additionalArguments: [String] = []
+    ) {
         continueAfterFailure = false
         assertToggleNormalizerContract()
         pendingAutoplayPreferenceRestore = nil
         session = VocelloUIApplicationSession()
-        launchApp(additionalEnvironment: additionalEnvironment)
+        launchApp(
+            additionalEnvironment: additionalEnvironment,
+            additionalArguments: additionalArguments
+        )
     }
 
     func endSession() {
@@ -39,7 +45,13 @@ class VocelloiOSUITestCase: XCTestCase {
 
     /// Launches the production UI. First-run onboarding is completed through
     /// its visible Skip control; no onboarding bypass environment is injected.
-    func launchApp(additionalEnvironment: [String: String] = [:]) {
+    /// `additionalArguments` reach `UserDefaults` through the standard
+    /// `NSArgumentDomain` (`-key value`), the same mechanism a user-typed
+    /// `defaults` override uses; they configure production preferences only.
+    func launchApp(
+        additionalEnvironment: [String: String] = [:],
+        additionalArguments: [String] = []
+    ) {
         var environment = [
             "QWENVOICE_DEBUG": "1",
             "QWENVOICE_NATIVE_TELEMETRY_MODE": "verbose",
@@ -48,7 +60,7 @@ class VocelloiOSUITestCase: XCTestCase {
             environment[key] = value
         }
 
-        session.launch(environment: environment)
+        session.launch(environment: environment, arguments: additionalArguments)
         XCTAssertTrue(
             VocelloUIWait.condition("Vocello to enter the foreground", timeout: 30) {
                 self.app.state == .runningForeground

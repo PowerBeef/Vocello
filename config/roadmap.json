@@ -322,6 +322,21 @@
         "scripts/check_project_inputs.sh"
       ],
       "updated": "2026-08-02"
+    },
+    {
+      "id": "DP-7",
+      "plan": "delivery-prompting-2026-08",
+      "title": "On-device delivery-consistency cohort lane",
+      "status": "done",
+      "gate": "N identical Custom-mode takes with Neutral through the production UI, WAVs routed to the pullable diagnostics mirror. Diagnostic-only; never publishes benchmark history.",
+      "evidence": [
+        "file:Tests/VocelloiOSUITests/VocelloiOSDeliveryCohortUITests.swift",
+        "file:scripts/ui_test.sh"
+      ],
+      "sourceOfTruth": [
+        "Tests/VocelloiOSUITests/VocelloiOSUITestCase.swift"
+      ],
+      "updated": "2026-08-02"
     }
   ]
 }

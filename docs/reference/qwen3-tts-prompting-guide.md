@@ -587,10 +587,36 @@ tier of a preset asks for clarity, the whole preset suppresses it, so the two ti
 by boilerplate alone. [`check_delivery_instructions.py`](../../scripts/check_delivery_instructions.py)
 fails the build if that resolution is removed.
 
-Whether the sentence earns its place at all is still open, and still A/B-gateable:
-`QWENVOICE_ENGLISH_DICTION_REINFORCEMENT=off` is registered in
-[`runtime-debug-knobs.json`](../../config/runtime-debug-knobs.json) and inert without the
-`QWENVOICE_DEBUG` master gate. That part is §10.3, and it is a measurement, not an edit.
+`MEASURED-HERE`, **DP-4, 2026-08-02 — prosodic null. The sentence stays.**
+
+Only six presets receive the append at all — `neutral`, `angry`, `fearful`, `excited`, `calm`,
+`whisper`. The other four already contain a diction token and suppress it, which gave the
+experiment a built-in control: 8 cells that must be byte-identical across arms and 12 that must
+differ. Over 13 paired seeds that held exactly — **104/104 identical, 0/156 identical** — so the
+null below is a real null and not a harness that failed to vary anything.
+
+| | features surviving | mean recall | cross-preset error |
+| --- | --- | --- | --- |
+| append on | 28 | 0.20 | 70.9% |
+| append off | 25 | 0.22 | 72.1% |
+
+Differences that small, pointing in opposite directions on the two metrics, are noise at this seed
+count. Per cell it is incoherent rather than mixed: `calm` and `fearful` look better with it,
+`neutral` and `whisper.strong` disagree with themselves between metrics. The one consistent signal
+is that **`angry` is worse with it** on both metrics — `angry.strong` falls from 0.31 recall to
+0.00 — which is worth remembering if angry copy is ever revised.
+
+**Intelligibility was tested too, and the test has no power here.** The sentence asks for diction,
+not prosody, so a prosodic null proves little on its own. Transcribing bench audio with
+`whisper-small` gave **28 of 29 cells at exactly 0.000 WER** (mean 0.0057). Clean 24 kHz synthesis
+of an 18-word sentence saturates ASR, so a WER A/B would compare 0.00 against 0.00. A future
+attempt needs a harder condition — longer text with proper nouns and numbers, or a deliberately
+weaker ASR — before it can discriminate. Do not read the saturated result as "the append does
+nothing"; it means this instrument cannot see whether it does.
+
+Kept on that basis: no measured prosodic effect, no usable intelligibility evidence either way, and
+removal would be an unmeasured change to six presets. The knob stays registered and inert so the
+question can be reopened when there is an instrument that can answer it.
 
 ### 8.3 What now gates the instruction copy
 
@@ -712,10 +738,8 @@ experiment below is a matrix run plus a paired comparison.
    register is not the lever for the presets that fail.
 2. **The Design merge template.** `Voice character: X. Delivery: Y.` against a plain concatenation
    and against identity-first-delivery-last with a closing quality anchor (§6.1).
-3. **The English diction sentence, and the §8.2 confound.** Run the delivery matrix with
-   `QWENVOICE_ENGLISH_DICTION_REINFORCEMENT=off` and compare. This is the one item that is also a
-   bug report: whatever the sentence is worth, applying it to one intensity tier and not the other
-   within the same preset cannot be right.
+3. ~~**The English diction sentence.**~~ **SETTLED 2026-08-02 — prosodic null; kept.** See §8.3.
+   The tier-parity half of this item was a bug and was fixed separately (§8.2).
 4. **`language="english"` versus `auto` on Design.** Different `think`/`nothink` prefill branch
    (§1.3), and the technical report credits the thinking pattern specifically for instruction
    following.

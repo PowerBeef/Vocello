@@ -10,7 +10,7 @@
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
 | `convergence-metal4-stage4-2026-08` | active | backend-and-platform | 3/6 (50%) |
-| `delivery-prompting-2026-08` | active | backend-mlx | 5/9 (56%) |
+| `delivery-prompting-2026-08` | active | backend-mlx | 6/9 (67%) |
 | `doc-governance-2026-08` | active | release-qa | 7/9 (78%) |
 
 ## Convergence residuals, Metal 4 study, and Stage 4
@@ -43,7 +43,7 @@ Narrative authority: [`docs/reference/qwen3-tts-prompting-guide.md`](reference/q
 | `DP-1` | done | Sourced Qwen3-TTS prompting guide with per-claim provenance | `commit:c14651c`, `doc:docs/reference/qwen3-tts-prompting-guide.md` |
 | `DP-2` | done | Deterministic delivery-instruction contract gate | `commit:6f4c651`, `file:scripts/check_delivery_instructions.py` |
 | `DP-3` | done | Short-versus-long instruction A/B | `doc:docs/reference/qwen3-tts-prompting-guide.md`, `file:config/runtime-debug-knobs.json` |
-| `DP-4` | planned | English diction append: does it earn its place | — |
+| `DP-4` | done | English diction append: does it earn its place | `doc:docs/reference/qwen3-tts-prompting-guide.md`, `file:config/runtime-debug-knobs.json` |
 | `DP-5` | planned | Voice Design merge template versus plain concatenation | — |
 | `DP-6` | planned | Angry pitch-axis contradiction | — |
 | `DP-7` | done | On-device delivery-consistency cohort lane | `file:Tests/VocelloiOSUITests/VocelloiOSDeliveryCohortUITests.swift`, `file:scripts/ui_test.sh` |

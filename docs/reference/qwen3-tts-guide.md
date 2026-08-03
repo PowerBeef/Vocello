@@ -275,10 +275,20 @@ replace the XCUITest UI path for the visible saved-voice workflow.
 
 ## 6. Delivery / emotion presets
 
-`Sources/QwenVoiceCore/EmotionPreset.swift` defines the single source of truth: **10 presets × 2 intensities**
-(normal/strong; the former "subtle" tier was retired 2026-08-01 after calibration showed its measured
-prosody movement sat below the analyzer noise floor — a control that could not be verified to act).
-Neutral is itself a real instructed preset (steady, slightly monotone) with no intensity variation.
+`Sources/QwenVoiceCore/EmotionPreset.swift` defines the single source of truth: **10 presets**, each
+shipping one instruction. Neutral is itself a real instructed preset (steady, slightly monotone).
+
+The user-facing **intensity control was retired 2026-08-02**, following the "subtle" tier on
+2026-08-01. Both went for the same reason and by the same test — a control whose effect cannot be
+verified is not a control. DP-3 measured the `strong` copy at nearly double the recognisability of
+`normal` (mean per-preset recall 0.278 against 0.157, chance 0.053) while showing the two tiers are
+not separable from each other: for five presets the nearest cell in the whole space is its own other
+tier, seven of nine moved *less* at strong than at normal, and dramatic reversed outright. Every
+preset therefore ships its strong copy.
+
+`EmotionIntensity` survives internally, addressing both texts, so the delivery matrix harness can
+keep running the queued experiments and drafts saved before the change resolve to exactly what they
+stored. The table below is that internal pair; the second column is what ships.
 
 | Preset | normal | strong |
 | --- | --- | --- |

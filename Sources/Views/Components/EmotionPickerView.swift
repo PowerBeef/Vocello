@@ -16,17 +16,23 @@ struct EmotionPickerView: View {
     var leadingColumns: AnyView? = nil
 
     @State private var selectedPreset: EmotionPreset?
-    @State private var intensity: EmotionIntensity = .normal
+    /// Every selection ships the `strong` copy. DP-3 (2026-08-02) measured it at
+    /// nearly double the recognisability of `normal` — mean per-preset recall
+    /// 0.278 against 0.157, chance 0.053 — and the same run showed the two tiers
+    /// are not separable from each other: for five presets the nearest cell in
+    /// the whole space is its own other tier, and seven of nine moved *less* at
+    /// strong than at normal, with dramatic reversing outright. A control that
+    /// cannot be heard is not a control.
+    @State private var intensity: EmotionIntensity = .strong
     @State private var isCustomMode = false
     @State private var customText = ""
 
-    private var showsIntensityPicker: Bool {
-        !isCustomMode && selectedPreset != nil && !isNeutralSelected
-    }
+    /// The intensity control was retired 2026-08-02. Both flags are the single
+    /// place the layout asks, so restoring it is a one-line change if a future
+    /// measurement earns it back.
+    private var showsIntensityPicker: Bool { false }
 
-    private var reservesIntensitySlot: Bool {
-        true
-    }
+    private var reservesIntensitySlot: Bool { false }
 
     private var isNeutralSelected: Bool {
         selectedPreset?.id == "neutral"
@@ -283,7 +289,7 @@ struct EmotionPickerView: View {
             selectedPreset = EmotionPreset.all.first
             isCustomMode = false
             customText = ""
-            intensity = .normal
+            intensity = .strong
             applyCurrentSelection()
         }
     }

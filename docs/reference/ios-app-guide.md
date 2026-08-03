@@ -87,8 +87,7 @@ tap Confirm to commit + dismiss. Preview plays audio without selecting/closing.
 `languagePicker_english`), confirm `languagePicker_confirm`.
 
 **Delivery picker** — confirm `deliveryPicker_confirm`; a 2-column preset grid over
-`EmotionPreset.all` (cells `deliveryPickerPreset_<presetID>`); an intensity row
-(Normal/Strong → `deliveryPickerIntensity_<level>`, disabled for Neutral); and a custom
+`EmotionPreset.all` (cells `deliveryPickerPreset_<presetID>`); and a custom
 tone editor: `deliveryPickerSheet_customTone` (toggle in), `deliveryPickerSheet_customTone_editor`
 (text, `/500` counter `deliveryPickerSheet_customTone_charCount`),
 `deliveryPickerSheet_customTone_examples`, `deliveryPickerSheet_customTone_back`.
@@ -222,10 +221,13 @@ delivery biases (e.g. Ryan is naturally expressive; start from Aiden/Serena for 
 
 ### Delivery — `Sources/QwenVoiceCore/EmotionPreset.swift`
 
-10 presets: **Neutral** (no intensity tiers — treated as "no style instruction"), plus
-**Happy, Sad, Angry, Fearful, Surprised, Excited, Calm, Whisper, Dramatic**. Each non-Neutral
-preset has two **intensity** tiers — **Normal / Strong** (`EmotionIntensity`,
-disabled for Neutral). Or write a **custom tone** (free text, 500-char cap) — see
+10 presets: **Neutral** (treated as "no style instruction"), plus
+**Happy, Sad, Angry, Fearful, Surprised, Excited, Calm, Whisper, Dramatic** — one instruction each.
+The user-facing **intensity** control was retired 2026-08-02: DP-3 measured the `strong` copy at
+nearly double the recognisability of `normal` (mean per-preset recall 0.278 against 0.157, chance
+0.053) and showed the two tiers are not separable from each other, so every preset now ships its
+strong copy. `EmotionIntensity` survives internally so the delivery matrix harness can still address
+both texts and drafts saved earlier resolve to exactly what they stored. Or write a **custom tone** (free text, 500-char cap) — see
 [`../qwen_tone.md`](../qwen_tone.md) for the prompt-writing rules (combine emotion + pace +
 pitch + timbre; negative constraints like "without laughing" work; write instructions in
 English or Chinese regardless of output language; describe the sound, not a persona).

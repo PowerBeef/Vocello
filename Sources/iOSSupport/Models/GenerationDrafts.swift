@@ -19,7 +19,14 @@ struct DeliveryInputState: Equatable {
     init(
         mode: DeliveryInputMode = .preset,
         selectedPresetID: String = DeliveryInputState.neutralPresetID,
-        selectedIntensity: EmotionIntensity = .normal,
+        // DP-3 (2026-08-02) measured the `strong` copy at nearly double the
+        // recognisability of `normal` -- mean per-preset recall 0.278 against
+        // 0.157, chance 0.053 -- so it is now what every new selection ships.
+        // The user-facing intensity control is gone; the tier survives only so
+        // the delivery matrix harness can still address both texts, and so
+        // drafts saved before this change keep resolving to exactly what they
+        // stored.
+        selectedIntensity: EmotionIntensity = .strong,
         customText: String = ""
     ) {
         self.mode = mode
@@ -49,9 +56,10 @@ struct DeliveryInputState: Equatable {
         self.init(mode: .custom, customText: trimmedEmotion)
     }
 
-    var supportsIntensity: Bool {
-        mode == .preset && selectedPresetID != DeliveryInputState.neutralPresetID
-    }
+    /// Always false: the intensity control was retired 2026-08-02. Kept as the
+    /// single place the UI asks, so restoring the control is a one-line change
+    /// if a future measurement earns it back.
+    var supportsIntensity: Bool { false }
 
     var resolvedDeliveryProfile: DeliveryProfile {
         switch mode {

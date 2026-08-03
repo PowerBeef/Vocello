@@ -165,18 +165,12 @@ struct IOSDeliveryPickerSheet: View {
                     }
                 }
 
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Intensity")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(IOSAppTheme.textPrimary)
-                    HStack(spacing: 8) {
-                        ForEach(EmotionIntensity.allCases) { level in
-                            intensityButton(level)
-                        }
-                    }
-                }
-                .disabled(intensityDisabled)
-                .opacity(intensityDisabled ? 0.45 : 1.0)
+                // Intensity row retired 2026-08-02. DP-3 measured `strong` at
+                // nearly double the recognisability of `normal` and showed the
+                // two tiers are not separable from each other, so every preset
+                // now ships its strong copy and there is nothing to choose.
+                // `intensityButton` and its identifiers are kept for the delivery
+                // matrix harness and for restoring the row if that changes.
 
                 if let onUseCustomTone {
                     Button {

@@ -102,4 +102,4 @@ Voice Cloning support text:
 - [`../README.md`](../README.md)
 - [`../CLAUDE.md`](../CLAUDE.md) — repo architecture, build, and conventions
 - [`reference/qwen3-tts-prompting-guide.md`](reference/qwen3-tts-prompting-guide.md) — the sourced prompting reference this file defers to
-- `Sources/QwenVoiceCore/EmotionPreset.swift` — the shipped 10 presets × 2 intensity tiers of instruction copy (single source for macOS + iOS + the CLI's `bench --delivery` cells); `Sources/QwenVoiceCore/GenerationSemantics.swift` assembles the Voice Design "Voice character / Delivery" framing.
+- `Sources/QwenVoiceCore/EmotionPreset.swift` — the shipped 10 preset instructions (the user-facing intensity control was retired 2026-08-02; every preset ships its measured-better `strong` copy, and the tier survives only for the delivery matrix harness) (single source for macOS + iOS + the CLI's `bench --delivery` cells); `Sources/QwenVoiceCore/GenerationSemantics.swift` assembles the Voice Design "Voice character / Delivery" framing.

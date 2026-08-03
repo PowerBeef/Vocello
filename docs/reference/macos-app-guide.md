@@ -157,7 +157,7 @@ is installed — otherwise the app prompts to download from Settings.
 ## 4. What each option means
 
 Same engine as iOS. See [`ios-app-guide.md`](ios-app-guide.md) §4 for the full reference
-(modes, 9 speakers + native languages, 10 delivery presets × Normal/Strong, custom
+(modes, 9 speakers + native languages, 10 delivery presets, custom
 tone, 10 languages, reproducible takes). macOS adds the **Quality (8-bit)** variant for
 higher-fidelity output.
 

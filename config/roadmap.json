@@ -339,6 +339,37 @@
         "Tests/VocelloiOSUITests/VocelloiOSUITestCase.swift"
       ],
       "updated": "2026-08-02"
+    },
+    {
+      "id": "DP-8",
+      "plan": "delivery-prompting-2026-08",
+      "title": "Retire the user-facing intensity control (scoped)",
+      "status": "done",
+      "gate": "Picker removed from both UIs; every preset ships its measured-better strong copy. EmotionIntensity survives internally so the delivery matrix harness keeps working for DP-4/5/6 and earlier drafts resolve unchanged.",
+      "evidence": [
+        "doc:docs/reference/qwen3-tts-guide.md",
+        "file:Sources/Views/Components/EmotionPickerView.swift"
+      ],
+      "sourceOfTruth": [
+        "Sources/QwenVoiceCore/EmotionPreset.swift"
+      ],
+      "updated": "2026-08-02"
+    },
+    {
+      "id": "DP-9",
+      "plan": "delivery-prompting-2026-08",
+      "title": "Remove EmotionIntensity outright, after DP-4/5/6",
+      "status": "planned",
+      "gate": "Delete the enum, collapse bench cells to one per preset, retire intensity_scale and the per-tier delivery expectations, update the tier-parity check and the derived deliveryIntensityTiers fact.",
+      "blockedBy": [
+        "DP-4",
+        "DP-5",
+        "DP-6"
+      ],
+      "sourceOfTruth": [
+        "Sources/QwenVoiceCore/EmotionPreset.swift"
+      ],
+      "updated": "2026-08-02"
     }
   ]
 }

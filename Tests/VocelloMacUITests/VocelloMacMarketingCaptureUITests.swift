@@ -41,13 +41,10 @@ final class VocelloMacMarketingCaptureUITests: VocelloMacUITestCase {
         fullShot.lifetime = .keepAlways
         add(fullShot)
 
-        // Then select Calm from the open menu and Strong intensity (two-tier model).
+        // Then select Calm from the open menu. The intensity control was retired
+        // 2026-08-02 and every preset now ships its strong copy, so the capture
+        // no longer selects a tier — it gets one by default.
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: calm, timeout: 10))
-        let intensity = element("delivery_intensityPicker")
-        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: intensity, timeout: 20))
-        let strong = app.menuItems["Strong"].firstMatch
-        XCTAssertTrue(VocelloUIWait.exists(strong, timeout: 10))
-        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: strong, timeout: 10))
 
         assertReadyToGenerate(mode: .custom)
 

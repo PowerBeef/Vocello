@@ -3,7 +3,7 @@
   "generated": "python3 scripts/doc_metadata.py rebuild-index",
   "note": "Machine-readable documentation map. Query this instead of globbing docs/.",
   "annotatedDocuments": 32,
-  "unannotatedDocuments": 51,
+  "unannotatedDocuments": 52,
   "documents": [
     {
       "path": "docs/audits/archive/2026-07-10/01_Evidence_Method_and_Corrections.md",

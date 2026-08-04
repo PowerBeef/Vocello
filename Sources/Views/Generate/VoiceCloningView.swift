@@ -122,6 +122,7 @@ struct VoiceCloningView: View {
             isModelAvailable: isModelAvailable,
             modelDisplayName: modelDisplayName,
             referenceAudioPath: draft.referenceAudioPath,
+            hasReferenceTranscript: draft.trimmedReferenceTranscript != nil,
             text: draft.text,
             contextStatus: cloneContextStatus
         )

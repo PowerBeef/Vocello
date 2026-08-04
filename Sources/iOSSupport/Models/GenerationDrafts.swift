@@ -228,6 +228,7 @@ enum VoiceCloningReadiness {
         isModelAvailable: Bool,
         modelDisplayName: String,
         referenceAudioPath: String?,
+        hasReferenceTranscript: Bool,
         text: String,
         contextStatus: VoiceCloningContextStatus?
     ) -> VoiceCloningReadinessDescriptor {
@@ -282,6 +283,19 @@ enum VoiceCloningReadiness {
                 title: "Add a script",
                 detail: "Reference is ready. Add the line for the cloned voice.",
                 trailingText: nil
+            )
+        }
+
+        // The transcript is what unlocks in-context prosody transfer: without
+        // it the engine falls back to speaker-embedding-only conditioning —
+        // identity without pacing or emotion. Visible by requirement of the
+        // 2026-08-04 delivery-control audit (F8); mirrors the macOS copy.
+        if !hasReferenceTranscript {
+            return VoiceCloningReadinessDescriptor(
+                noteIsReady: true,
+                title: "Ready — identity only",
+                detail: "This reference has no transcript, so only the voice's identity is cloned. Add a transcript to carry its pacing and emotion into the take.",
+                trailingText: "Ready"
             )
         }
 

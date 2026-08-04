@@ -305,6 +305,29 @@ performance block after the fixture rebind, Tier 4 carryover). Immediate specifi
    reframe as hints; the angry/happy/surprised nulls await the optional
    crowd panel before any further roster surgery.
 
+15. **Move 2 landed: curated emotion reference banks (2026-08-04, DP-13):**
+   `scripts/build_emotion_reference_bank.py` turns the session's lesson into a
+   pipeline — generate N VoiceDesign candidates per emotion against a neutral
+   anchor, score with the pinned SER advisory plus ECAPA identity-to-anchor
+   plus prosody deltas (strictly after generation; 8 GB rule), select the
+   emotion-passing candidate *nearest the anchor's identity*, and enroll
+   winners as ordinary saved voices — banks work in every existing clone
+   surface today with zero engine changes. The first real bank (Warm
+   Narrator) enrolled SER-verified happy/sad/angry references and honestly
+   refused whisper (VoiceDesign rendered soft-but-voiced speech, not whisper
+   phonation; a breathiness criterion is the recorded follow-up). The
+   end-to-end proof: clone identity 0.81–0.89 throughout; **sad 3/3 and
+   angry 3/3 SER-categorical** — against the session's uncurated 0/3 sad —
+   while happy's clones read angry despite a happy-verified reference: the
+   arousal survives the clone hop, the valence did not (per an instrument
+   with a measured angry-bias on this voice, so audition owns the final
+   word on Happy). The silent x-vector fallback is now disclosed on both
+   platforms ("Ready — identity only" on macOS; the iOS save-voice caption
+   states that the transcript is what carries pacing and emotion).
+   Follow-ups recorded in DP-13: the grouped persona/delivery picker UI and
+   the whisper breathiness criterion. Reference:
+   `docs/reference/emotion-reference-banks.md`.
+
 ## Staged roadmap state
 
 Stage-by-stage details, closure evidence, and falsifiability criteria live in the

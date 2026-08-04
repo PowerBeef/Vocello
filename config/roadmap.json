@@ -484,9 +484,21 @@
       "id": "DP-15",
       "plan": "delivery-prompting-2026-08",
       "title": "Seed retry/pin as a first-class take control",
-      "status": "planned",
-      "gate": "The audit's R6 remainder: expose regenerate-with-new-seed and pin-this-take's-seed in both apps — the stochastic-with-retry norm the market has institutionalized, with the local advantage that fixed seeds genuinely reproduce a take. Scoping findings from 2026-08-04: GenerationRequest already accepts seed (the CLI uses it) and the observed seed rides the result diagnostics, but persisting a take's seed for later reuse needs a History schema migration, which makes this its own arc under the database-migration rules rather than a rider on a copy pass.",
-      "updated": "2026-08-04"
+      "status": "done",
+      "gate": "The audit's R6 remainder: expose regenerate-with-new-seed and pin-this-take's-seed in both apps — the stochastic-with-retry norm the market has institutionalized, with the local advantage that fixed seeds genuinely reproduce a take. Scoping findings from 2026-08-04: GenerationRequest already accepts seed (the CLI uses it) and the observed seed rides the result diagnostics, but persisting a take's seed for later reuse needs a History schema migration, which makes this its own arc under the database-migration rules rather than a rider on a copy pass. DONE 2026-08-04: History schema v6 adds a nullable seed column (UInt64 stored as its Int64 bit pattern; pre-v6 rows stay NULL — unrecoverable by honesty, not accident), every completed take on both platforms persists the engine's observed effective seed (GenerationResult.observedSamplingSeed over the sampling_effective_seed diagnostics wire, which already crosses XPC), and each mode draft gains pinnedSeed threaded into its generation requests. Controls: a History row with a recorded seed offers 'Pin seed N for new takes' (macOS context menu; iOS row overflow menu), which pins the seed into that take's mode draft and lands the user in that mode; the composer shows the pinned state — macOS as a chip beside Generate (textInput_seedPinChip / textInput_seedUnpin), iOS as a studio Seed chip (studioChip_seedPin) with an unpin confirmation. Unpinned remains the default fresh-seed-per-take norm, so regenerate-with-new-seed is the ordinary Generate press and reproduce-this-take is the pin. GenerationSeedPersistenceTests pins the migration, the top-bit-range round trip, and the legacy NULL read. The long-form planner's per-segment sub-seed regeneration (already shipped) is unchanged and remains plan-scoped.",
+      "updated": "2026-08-04",
+      "evidence": [
+        "file:Sources/SharedSupport/Database/GenerationMigrations.swift",
+        "file:Tests/VocelloCoreTests/GenerationSeedPersistenceTests.swift",
+        "file:Sources/QwenVoiceCore/SemanticTypes.swift",
+        "file:Sources/Views/Components/TextInputView.swift",
+        "file:Sources/Views/Library/HistoryView.swift",
+        "file:Sources/iOS/History/HistoryScreen.swift",
+        "file:Sources/iOS/IOSDesignSystemPrimitives.swift"
+      ],
+      "sourceOfTruth": [
+        "Sources/SharedSupport/Database/GenerationMigrations.swift"
+      ]
     },
     {
       "id": "DP-16",

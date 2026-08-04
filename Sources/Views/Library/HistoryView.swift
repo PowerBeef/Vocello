@@ -207,6 +207,9 @@ struct HistoryView: View {
     @Binding var searchText: String
     @Binding var sortOrder: HistorySortOrder
     @Binding var clearRequest: HistoryClearRequest?
+    /// DP-15: routes a row's recorded sampling seed into the matching mode's
+    /// draft as the pinned seed. Nil hides the action (e.g. no host wiring).
+    var onPinSeed: ((Generation) -> Void)? = nil
 
     @State private var items: [HistoryListItem] = HistorySessionCache.generations.map(HistoryListItem.init)
     @State private var isLoading = false
@@ -375,6 +378,14 @@ struct HistoryView: View {
                         Label("Reveal in Finder", systemImage: "folder")
                     }
                     .disabled(!item.audioFileExists)
+
+                    if let onPinSeed, let seedValue = item.generation.samplingSeed {
+                        Button {
+                            onPinSeed(item.generation)
+                        } label: {
+                            Label("Pin seed \(String(seedValue)) for new takes", systemImage: "pin")
+                        }
+                    }
                 }
                 if let toggle = entry.projectToggle, toggle.segmentCount > 0 {
                         HStack {

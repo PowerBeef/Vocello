@@ -323,6 +323,7 @@ struct IOSCustomVoiceView: View {
             accessibilityID: "studioChip_language",
             action: presentLanguagePicker
         )
+        IOSSeedPinChip(pinnedSeed: $draft.pinnedSeed, tint: IOSBrandTheme.custom)
     }
 
     private func presentVoicePicker() {
@@ -469,6 +470,7 @@ struct IOSCustomVoiceView: View {
                                 : nil
                         ),
                         generationID: generationID,
+                        seed: draft.pinnedSeed,
                         variation: IOSGenerationVariationPreference.requestValue()
                     )
                 )
@@ -517,7 +519,8 @@ struct IOSCustomVoiceView: View {
                     speed: nil,
                     audioPath: result.audioPath,
                     duration: result.durationSeconds,
-                    createdAt: Date()
+                    createdAt: Date(),
+                    seed: result.observedSamplingSeed.map { Int64(bitPattern: $0) }
                 )
                 GenerationPersistence.persist(
                     generation,
@@ -1076,6 +1079,7 @@ struct IOSVoiceDesignView: View {
             accessibilityID: "studioChip_language",
             action: presentDesignLanguagePicker
         )
+        IOSSeedPinChip(pinnedSeed: $draft.pinnedSeed, tint: IOSBrandTheme.design)
     }
 
     private func presentBriefEditor() {
@@ -1200,6 +1204,7 @@ struct IOSVoiceDesignView: View {
                             deliveryStyle: draft.resolvedDeliveryInstruction
                         ),
                         generationID: generationID,
+                        seed: draft.pinnedSeed,
                         variation: IOSGenerationVariationPreference.requestValue()
                     )
                 )
@@ -1244,7 +1249,8 @@ struct IOSVoiceDesignView: View {
                     speed: nil,
                     audioPath: result.audioPath,
                     duration: result.durationSeconds,
-                    createdAt: Date()
+                    createdAt: Date(),
+                    seed: result.observedSamplingSeed.map { Int64(bitPattern: $0) }
                 )
                 GenerationPersistence.persist(
                     generation,
@@ -1729,6 +1735,7 @@ struct IOSVoiceCloningView: View {
             accessibilityID: "studioChip_language",
             action: presentCloneLanguagePicker
         )
+        IOSSeedPinChip(pinnedSeed: $draft.pinnedSeed, tint: IOSBrandTheme.clone)
     }
 
     private func presentReferencePicker() {
@@ -1978,6 +1985,7 @@ struct IOSVoiceCloningView: View {
                             )
                         ),
                         generationID: generationID,
+                        seed: draft.pinnedSeed,
                         variation: IOSGenerationVariationPreference.requestValue()
                     )
                 )
@@ -2023,7 +2031,8 @@ struct IOSVoiceCloningView: View {
                     speed: nil,
                     audioPath: result.audioPath,
                     duration: result.durationSeconds,
-                    createdAt: Date()
+                    createdAt: Date(),
+                    seed: result.observedSamplingSeed.map { Int64(bitPattern: $0) }
                 )
                 GenerationPersistence.persist(
                     generation,

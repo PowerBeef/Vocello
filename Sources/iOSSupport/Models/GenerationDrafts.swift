@@ -90,6 +90,10 @@ struct DeliveryInputState: Equatable {
 
 struct CustomVoiceDraft: Equatable {
     var selectedSpeaker = TTSModel.defaultSpeaker
+    /// A pinned effective sampling seed: when set, every generate request
+    /// carries it so a liked take reproduces exactly; nil = fresh seed each
+    /// take (the default stochastic-with-retry norm, DP-15).
+    var pinnedSeed: UInt64?
     var selectedLanguage = Qwen3SupportedLanguage.auto
     var delivery = DeliveryInputState()
     var text = ""
@@ -110,6 +114,7 @@ struct CustomVoiceDraft: Equatable {
 
 struct VoiceDesignDraft: Equatable {
     var voiceDescription = ""
+    var pinnedSeed: UInt64?
     var selectedLanguage = Qwen3SupportedLanguage.auto
     var delivery = DeliveryInputState()
     var text = ""
@@ -130,6 +135,7 @@ struct VoiceDesignDraft: Equatable {
 
 struct VoiceCloningDraft: Equatable {
     var selectedSavedVoiceID: String?
+    var pinnedSeed: UInt64?
     var referenceAudioPath: String?
     var selectedLanguage = Qwen3SupportedLanguage.auto
     var referenceTranscript = ""

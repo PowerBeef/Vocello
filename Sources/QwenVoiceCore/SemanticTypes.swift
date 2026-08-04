@@ -1149,6 +1149,14 @@ public struct GenerationResult: Hashable, Codable, Sendable {
         self.telemetrySummary = telemetrySummary
     }
 
+    /// The effective sampling seed the engine actually used for this take
+    /// (requested or generated), as reported through the diagnostics wire.
+    /// This is what a "pin this take's seed" control persists: replaying it
+    /// with the same parameters reproduces the take (DP-15).
+    public var observedSamplingSeed: UInt64? {
+        diagnosticStringFlags["sampling_effective_seed"].flatMap(UInt64.init)
+    }
+
     private enum CodingKeys: String, CodingKey {
         case audioPath
         case durationSeconds

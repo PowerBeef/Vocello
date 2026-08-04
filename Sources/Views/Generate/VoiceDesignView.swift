@@ -207,7 +207,8 @@ private extension VoiceDesignView {
                             ttsEngineStore: ttsEngineStore,
                             audioPlayer: audioPlayer
                         )
-                    }
+                    },
+                    pinnedSeed: $draft.pinnedSeed
                 )
 
                 composerFooter

@@ -167,7 +167,8 @@ final class VoiceDesignCoordinator {
                     speed: nil,
                     audioPath: result.audioPath,
                     duration: result.durationSeconds,
-                    createdAt: Date()
+                    createdAt: Date(),
+                    seed: result.observedSamplingSeed.map { Int64(bitPattern: $0) }
                 )
 
                 GenerationPersistence.persistAndAutoplay(
@@ -248,6 +249,7 @@ final class VoiceDesignCoordinator {
                 deliveryStyle: draft.emotion
             ),
             generationID: UUID(),
+            seed: draft.pinnedSeed,
             variation: GenerationVariationPreference.requestValue()
         )
     }

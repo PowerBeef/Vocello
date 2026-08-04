@@ -432,8 +432,11 @@ targets:
       - path: Sources/SharedSupport/Services/VoiceClipTranscriber.swift
       - path: Sources/SharedSupport/Telemetry/MainThreadStallWatchdog.swift
       - path: Sources/SharedSupport/Database/HistoryPersistenceError.swift
+      - path: Sources/SharedSupport/Database/GenerationMigrations.swift
+      - path: Sources/Models/Generation.swift
     dependencies:
       - target: QwenVoiceCore
+      - package: GRDB
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.qwenvoice.core.tests

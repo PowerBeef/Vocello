@@ -418,7 +418,8 @@ private extension VoiceCloningView {
                             ttsEngineStore: ttsEngineStore,
                             audioPlayer: audioPlayer
                         )
-                    }
+                    },
+                    pinnedSeed: $draft.pinnedSeed
                 )
 
                 VoiceCloningComposerFooter(

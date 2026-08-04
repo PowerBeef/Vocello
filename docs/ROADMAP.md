@@ -10,7 +10,7 @@
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
 | `convergence-metal4-stage4-2026-08` | active | backend-and-platform | 4/7 (57%) |
-| `delivery-prompting-2026-08` | active | backend-mlx | 14/20 (70%) |
+| `delivery-prompting-2026-08` | active | backend-mlx | 15/20 (75%) |
 | `doc-governance-2026-08` | active | release-qa | 8/9 (89%) |
 
 ## Convergence residuals, Metal 4 study, and Stage 4
@@ -47,7 +47,7 @@ Narrative authority: [`docs/reference/qwen3-tts-prompting-guide.md`](reference/q
 | `DP-12` | done | Move 1: fix the found defects, harden the harness, run the calibration session | `file:Sources/QwenVoiceCore/EmotionPreset.swift`, `file:Sources/Views/Components/EmotionPickerView.swift`, `file:Tests/VocelloCoreTests/EmotionPresetResolutionTests.swift`, `file:scripts/delivery_separability.py`, `file:scripts/bench_delivery_prosody.py`, `file:scripts/delivery_listening_session.py`, `doc:docs/reference/delivery-control-audit-2026-08.md` |
 | `DP-13` | done | Move 2: curated design-then-clone emotion reference banks | `file:scripts/build_emotion_reference_bank.py`, `file:scripts/tests/test_build_emotion_reference_bank.py`, `doc:docs/reference/emotion-reference-banks.md`, `file:Sources/Models/GenerationDrafts.swift`, `file:Sources/iOS/IOSGenerationInputControls.swift` |
 | `DP-14` | done | Move 3: honest delivery UX — the measured feature/hint split | `file:Sources/QwenVoiceCore/EmotionPreset.swift`, `file:Sources/Views/Components/EmotionPickerView.swift`, `file:Sources/iOS/Sheets/IOSBottomSheets.swift`, `file:Tests/VocelloCoreTests/EmotionPresetResolutionTests.swift` |
-| `DP-15` | planned | Seed retry/pin as a first-class take control | — |
+| `DP-15` | done | Seed retry/pin as a first-class take control | `file:Sources/SharedSupport/Database/GenerationMigrations.swift`, `file:Tests/VocelloCoreTests/GenerationSeedPersistenceTests.swift`, `file:Sources/QwenVoiceCore/SemanticTypes.swift`, `file:Sources/Views/Components/TextInputView.swift`, `file:Sources/Views/Library/HistoryView.swift`, `file:Sources/iOS/History/HistoryScreen.swift`, `file:Sources/iOS/IOSDesignSystemPrimitives.swift` |
 | `DP-16` | done | Bank picker UX: personas with a delivery choice | `file:Sources/QwenVoiceCore/VoiceBankCatalog.swift`, `file:Tests/VocelloCoreTests/VoiceBankCatalogTests.swift`, `file:Sources/Views/Generate/VoiceCloningView.swift`, `file:Sources/iOS/Sheets/IOSBottomSheets.swift`, `file:Sources/iOS/IOSGenerationModeViews.swift`, `file:docs/reference/emotion-reference-banks.md` |
 | `DP-17` | planned | Whisper breathiness criterion for bank curation | — |
 | `DP-18` | planned | Confirmatory delivery re-measure on solid statistics (audit R4) | — |

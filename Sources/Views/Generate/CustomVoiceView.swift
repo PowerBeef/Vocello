@@ -339,7 +339,8 @@ private extension CustomVoiceView {
                             ttsEngineStore: ttsEngineStore,
                             audioPlayer: audioPlayer
                         )
-                    }
+                    },
+                    pinnedSeed: $draft.pinnedSeed
                 )
 
                 composerFooter

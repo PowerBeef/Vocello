@@ -392,6 +392,21 @@ performance block after the fixture rebind, Tier 4 carryover). Immediate specifi
    streaming control still publishes. The clone-fixture bootstrap in
    `scripts/lib/test_models.sh` works again unchanged.
 
+20. **Seed retry/pin shipped (2026-08-04, DP-15):** the stochastic-with-retry
+   norm, with the local advantage that fixed seeds genuinely reproduce a
+   take. History schema v6 records every take's observed effective sampling
+   seed (nullable; pre-v6 rows honestly stay blank), and both apps expose
+   the two controls the audit's R6 called for: a History row's "Pin seed N
+   for new takes" pins that take's seed into its mode's draft and lands you
+   in that mode, and the composer shows the pinned state — a chip beside
+   Generate on macOS, a studio Seed chip with an unpin confirmation on
+   iPhone. While pinned, every take reproduces the seed with identical
+   settings; unpinned stays the default fresh-seed-per-take, so plain
+   Generate remains the regenerate-with-new-seed action.
+   `GenerationSeedPersistenceTests` pins the migration and the full-range
+   bit-pattern round trip. Long-form's plan-scoped per-segment sub-seeds are
+   untouched.
+
 ## Staged roadmap state
 
 Stage-by-stage details, closure evidence, and falsifiability criteria live in the

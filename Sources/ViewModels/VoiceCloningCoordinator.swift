@@ -201,7 +201,8 @@ final class VoiceCloningCoordinator {
                     speed: nil,
                     audioPath: result.audioPath,
                     duration: result.durationSeconds,
-                    createdAt: Date()
+                    createdAt: Date(),
+                    seed: result.observedSamplingSeed.map { Int64(bitPattern: $0) }
                 )
                 GenerationPersistence.persistAndAutoplay(
                     generation,
@@ -285,6 +286,7 @@ final class VoiceCloningCoordinator {
                 )
             ),
             generationID: UUID(),
+            seed: draft.pinnedSeed,
             variation: GenerationVariationPreference.requestValue()
         )
     }

@@ -78,6 +78,16 @@ enum GenerationMigrations {
             )
         }
 
+        migrator.registerMigration("v6_add_seed") { db in
+            try db.alter(table: "generations") { t in
+                // Nullable additive column: the engine's effective sampling
+                // seed (UInt64 stored as its Int64 bit pattern). Rows from
+                // before this migration keep NULL — their seeds were never
+                // recorded and cannot be recovered (DP-15).
+                t.add(column: "seed", .integer)
+            }
+        }
+
         return migrator
     }
 }

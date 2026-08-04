@@ -288,7 +288,25 @@ struct ContentView: View {
             HistoryView(
                 searchText: $historySearchText,
                 sortOrder: $historySortOrder,
-                clearRequest: $historyClearRequest
+                clearRequest: $historyClearRequest,
+                onPinSeed: { generation in
+                    guard let seedValue = generation.samplingSeed else { return }
+                    // Pin into the take's own mode and surface that mode so
+                    // the composer chip makes the new state visible.
+                    switch generation.mode {
+                    case GenerationMode.custom.rawValue:
+                        customVoiceDraft.pinnedSeed = seedValue
+                        selectSidebarItemIfEnabled(.customVoice)
+                    case GenerationMode.design.rawValue:
+                        voiceDesignDraft.pinnedSeed = seedValue
+                        selectSidebarItemIfEnabled(.voiceDesign)
+                    case GenerationMode.clone.rawValue:
+                        voiceCloningDraft.pinnedSeed = seedValue
+                        selectSidebarItemIfEnabled(.voiceCloning)
+                    default:
+                        break
+                    }
+                }
             )
         case .voices:
             VoicesView(

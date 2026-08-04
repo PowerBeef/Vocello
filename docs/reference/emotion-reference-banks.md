@@ -96,9 +96,15 @@ uninterpretable; relative comparisons within one build are the signal.
   produced no eligible whisper — its candidates measured *more* voiced than
   the anchor, meaning VoiceDesign rendered soft-but-voiced speech rather than
   whisper phonation, and the voiced-fraction criterion also entangles pause
-  structure (its denominator is the whole take). A breathiness criterion
-  (HNR/CPP deltas from the analyzer's voice-quality block) is the recorded
-  follow-up before whisper joins a bank.
+  structure (its denominator is the whole take). The breathiness criterion
+  prototype (DP-17, measured 2026-08-04 on those same candidates) sharpened
+  the diagnosis: whisper candidates run *more harmonic* than the anchor
+  (ΔHNR +1.0..+1.4 dB) while sad shows the bank's most negative deltas — the
+  HNR/CPP axis works as an instrument, but no criterion can rescue candidates
+  that contain no breathiness. The recorded follow-up is therefore a whisper
+  generation recipe (brief-wording variants, or cloning a genuinely whispered
+  reference) with the HNR/CPP-delta gate as the acceptance criterion once
+  candidates can plausibly pass it (roadmap DP-17).
 - Both apps present a bank as one persona with a delivery choice (DP-16,
   2026-08-04). Grouping is resolved from the naming convention alone by
   `VoiceBankCatalog` in QwenVoiceCore — a base-named voice plus at least one

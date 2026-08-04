@@ -280,12 +280,17 @@ performance block after the fixture rebind, Tier 4 carryover). Immediate specifi
    block was engaged (anchors 4/4) and returned
    `no_measured_strong_tier_collapse`: the "at strong it all sounds angry"
    claim that emotionally drove the intensity retirement does not replicate.
-   Sharper still: angry-group discrimination is above chance overall (0.708
-   [0.508, 0.851]) — anger is *distinguishable when named* while never being
-   *identified unprompted*, the audit's "difference is not identity" made
-   audible — except against `happy`, where discrimination sits at chance in
-   both tiers (the canonical same-arousal/opposite-valence pair the
-   literature predicts). Control pairs were **more** discriminable at strong
+   Sharper still: angry-group discrimination is above chance overall (0.75
+   [0.551, 0.88]; one declared mis-keystroke on trial 141 was corrected from
+   the listener's stated intent before unsealing any additional analysis) —
+   anger is *distinguishable when named* while never being *identified
+   unprompted*, the audit's "difference is not identity" made audible. The
+   angry-vs-happy pairing (the canonical same-arousal/opposite-valence pair
+   the literature predicts to be hardest) sits at chance at the strong tier
+   and 0.75 at normal (n=4 each), and the angry group's strong-minus-normal
+   drop is borderline (−0.33 [−0.61, 0.02]) — a hint, short of the
+   pre-registered bar, that the strong angry copy is *harder* to pick out
+   than the normal copy. Control pairs were **more** discriminable at strong
    (+0.50 [0.001, 0.812]), perceptually supporting ship-strong. The
    clone-transfer rows split decisively: `angry.clone` hit 0.667 — the only
    route through which the listener ever heard anger — while

@@ -265,6 +265,41 @@ performance block after the fixture rebind, Tier 4 carryover). Immediate specifi
    `scripts/lib/test_models.sh` if it ever needs to regenerate. The session
    clips were produced with streaming as the workaround.
 
+14. **The calibration session ran and was scored (2026-08-04, DP-12 done):**
+   146 blind trials, one listener (the maintainer; non-native English, so
+   positives are read as solid and nulls as provisional). Pooled preset
+   identification 26/88 = 0.295 against a 0.125 floor (exact binomial
+   p = 2e-05) — the presets are perceptibly categorical, and the perceptible
+   half matches the acoustic study's winners exactly: `calm` 0.55 and
+   `whisper` 0.55 (p = .001), `neutral` 0.36 and `sad` 0.36 (p = .039). The
+   high-arousal trio fails as identities: `angry` was never once named Angry
+   (0/11, mostly Unsure), `happy` reads as Surprised, `surprised` reads as
+   Unsure; `fearful` reads as **Sad** (6/11) — human confirmation of F2's
+   low-arousal fearful rendering, and of the listener's own mid-session
+   report that angry-group pairs sounded like "angry versus sad". The 2AFC
+   block was engaged (anchors 4/4) and returned
+   `no_measured_strong_tier_collapse`: the "at strong it all sounds angry"
+   claim that emotionally drove the intensity retirement does not replicate.
+   Sharper still: angry-group discrimination is above chance overall (0.708
+   [0.508, 0.851]) — anger is *distinguishable when named* while never being
+   *identified unprompted*, the audit's "difference is not identity" made
+   audible — except against `happy`, where discrimination sits at chance in
+   both tiers (the canonical same-arousal/opposite-valence pair the
+   literature predicts). Control pairs were **more** discriminable at strong
+   (+0.50 [0.001, 0.812]), perceptually supporting ship-strong. The
+   clone-transfer rows split decisively: `angry.clone` hit 0.667 — the only
+   route through which the listener ever heard anger — while
+   happy/sad/whisper clones read neutral-ish because their single-shot
+   VoiceDesign references never audibly carried the emotion; the lossy hop is
+   instruct→reference, not reference→clone, so Move 2's reference banks need
+   curation (generate candidates, keep the ones that audibly land), exactly
+   the pitfall the audit's prior-art review flagged. Listener self-agreement
+   on exact repeats was 0.333, which caps the agreement any automated judge
+   can ever reach with this ear. Decision consequences: the 8-preset roster
+   splits into a perceptible half worth featuring and a decorative half to
+   reframe as hints; the angry/happy/surprised nulls await the optional
+   crowd panel before any further roster surgery.
+
 ## Staged roadmap state
 
 Stage-by-stage details, closure evidence, and falsifiability criteria live in the

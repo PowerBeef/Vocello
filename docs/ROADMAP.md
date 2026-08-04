@@ -10,7 +10,7 @@
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
 | `convergence-metal4-stage4-2026-08` | active | backend-and-platform | 3/7 (43%) |
-| `delivery-prompting-2026-08` | active | backend-mlx | 10/12 (83%) |
+| `delivery-prompting-2026-08` | active | backend-mlx | 11/12 (92%) |
 | `doc-governance-2026-08` | active | release-qa | 7/9 (78%) |
 
 ## Convergence residuals, Metal 4 study, and Stage 4
@@ -44,7 +44,7 @@ Narrative authority: [`docs/reference/qwen3-tts-prompting-guide.md`](reference/q
 | `DP-1` | done | Sourced Qwen3-TTS prompting guide with per-claim provenance | `commit:c14651c`, `doc:docs/reference/qwen3-tts-prompting-guide.md` |
 | `DP-10` | done | Cut the delivery roster to the presets that separate | `doc:docs/reference/qwen3-tts-prompting-guide.md`, `doc:docs/development-progress.md`, `file:Sources/QwenVoiceCore/EmotionPreset.swift`, `file:scripts/delivery_separability.py` |
 | `DP-11` | done | Delivery-control audit: adversarial re-examination and external research sweep | `doc:docs/reference/delivery-control-audit-2026-08.md`, `doc:docs/development-progress.md`, `doc:docs/reference/qwen3-tts-prompting-guide.md` |
-| `DP-12` | in-flight | Move 1: fix the found defects, harden the harness, run the calibration session | `file:Sources/QwenVoiceCore/EmotionPreset.swift`, `file:Sources/Views/Components/EmotionPickerView.swift`, `file:Tests/VocelloCoreTests/EmotionPresetResolutionTests.swift`, `file:scripts/delivery_separability.py`, `file:scripts/bench_delivery_prosody.py`, `file:scripts/delivery_listening_session.py`, `doc:docs/reference/delivery-control-audit-2026-08.md` |
+| `DP-12` | done | Move 1: fix the found defects, harden the harness, run the calibration session | `file:Sources/QwenVoiceCore/EmotionPreset.swift`, `file:Sources/Views/Components/EmotionPickerView.swift`, `file:Tests/VocelloCoreTests/EmotionPresetResolutionTests.swift`, `file:scripts/delivery_separability.py`, `file:scripts/bench_delivery_prosody.py`, `file:scripts/delivery_listening_session.py`, `doc:docs/reference/delivery-control-audit-2026-08.md` |
 | `DP-2` | done | Deterministic delivery-instruction contract gate | `commit:6f4c651`, `file:scripts/check_delivery_instructions.py` |
 | `DP-3` | done | Short-versus-long instruction A/B | `doc:docs/reference/qwen3-tts-prompting-guide.md`, `file:config/runtime-debug-knobs.json` |
 | `DP-4` | done | English diction append: does it earn its place | `doc:docs/reference/qwen3-tts-prompting-guide.md`, `file:config/runtime-debug-knobs.json` |

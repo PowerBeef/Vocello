@@ -1,3 +1,9 @@
+---
+status: historical
+owner: release-qa
+summary: Cause record for the Codex task-storage ballooning observed during the runtime work. Incident explanation from a point-in-time snapshot; not a cleanup authorization, policy, or current inventory.
+contentDigest: sha256:db39324f249bac4cf275e0a25be2421692dd6522b65c92420b56b18ee42c35d9
+---
 # Codex Session Storage Ballooning — Cause Record
 
 This note records why Codex task storage grew unusually large during the QwenVoice runtime work.

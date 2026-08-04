@@ -1,3 +1,9 @@
+---
+status: historical
+owner: backend-mlx
+summary: Metal 4 tensors + MPP in MLX custom kernels — feasibility study (2026-07-31). Recorded the Gate 0 micro-benchmark rider and the OS-floor policy; Gate 0 returned no-go 2026-08-01, closing the fused-kernel candidate.
+contentDigest: sha256:6a56bc6fc4d872f1812f589789b5f66a1e7b50ef048d0675a3e808d4813cbb9b
+---
 # Metal 4 tensors + MPP in MLX custom kernels — feasibility study (2026-07-31)
 
 > Repo-authored research synthesis, in the tradition of

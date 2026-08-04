@@ -249,12 +249,20 @@
       "id": "DG-3",
       "plan": "doc-governance-2026-08",
       "title": "Phase 2 — reclassify the nine misfiled point-in-time reports",
-      "status": "planned",
-      "gate": "Every dated report under docs/reference carries historical or superseded status, following the backend-optimization-research-report precedent.",
+      "status": "done",
+      "gate": "Every dated report under docs/reference carries historical or superseded status, following the backend-optimization-research-report precedent. DONE 2026-08-04: six dated reports pinned historical with body digests (backend-optimization-research-report, metal4-tensor-feasibility-2026-07-31, optimization-report-review-2026-07-25, qwen3-apple-silicon-roadmap-review, runtime-refactor-status-report, codex-storage-ballooning-incident); the two delivery reports were already pinned during Move 1 (delivery-fidelity-report historical, delivery-remediation-plan superseded), and prosody-qa-research was adjudicated active instead of pinned — its usage section is live guidance, now bound to sourceOfTruth for freshness with its dated research sections marked inline. The ninth candidate class (ios-increased-memory-entitlement-request) is a living enablement guide, not a dated report; it stays with the DG-4 incremental annotation backlog. Pinning also cleared the metal4 derived-fact false positive, since pinned bodies are exempt from the active-doc scan.",
       "blockedBy": [
         "DG-1"
       ],
-      "updated": "2026-08-02"
+      "updated": "2026-08-04",
+      "evidence": [
+        "file:docs/reference/backend-optimization-research-report.md",
+        "file:docs/reference/metal4-tensor-feasibility-2026-07-31.md",
+        "file:docs/reference/optimization-report-review-2026-07-25.md",
+        "file:docs/reference/qwen3-apple-silicon-roadmap-review.md",
+        "file:docs/reference/runtime-refactor-status-report.md",
+        "file:docs/reference/codex-storage-ballooning-incident.md"
+      ]
     },
     {
       "id": "DG-4",

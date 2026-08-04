@@ -11,7 +11,7 @@
 | --- | --- | --- | --- |
 | `convergence-metal4-stage4-2026-08` | active | backend-and-platform | 4/7 (57%) |
 | `delivery-prompting-2026-08` | active | backend-mlx | 14/20 (70%) |
-| `doc-governance-2026-08` | active | release-qa | 7/9 (78%) |
+| `doc-governance-2026-08` | active | release-qa | 8/9 (89%) |
 
 ## Convergence residuals, Metal 4 study, and Stage 4
 
@@ -74,7 +74,7 @@ Narrative authority: [`docs/reference/repository-self-verification.md`](referenc
 | --- | --- | --- | --- |
 | `DG-1` | done | Per-file documentation metadata with derived-fact scanning | `commit:3ed09cb`, `file:scripts/doc_metadata.py` |
 | `DG-2` | done | Phase 1 — pin every historical document | `commit:3ed09cb`, `file:docs/INDEX.json` |
-| `DG-3` | planned | Phase 2 — reclassify the nine misfiled point-in-time reports | — |
+| `DG-3` | done | Phase 2 — reclassify the nine misfiled point-in-time reports | `file:docs/reference/backend-optimization-research-report.md`, `file:docs/reference/metal4-tensor-feasibility-2026-07-31.md`, `file:docs/reference/optimization-report-review-2026-07-25.md`, `file:docs/reference/qwen3-apple-silicon-roadmap-review.md`, `file:docs/reference/runtime-refactor-status-report.md`, `file:docs/reference/codex-storage-ballooning-incident.md` |
 | `DG-4` | planned | Phase 3 — source bindings on active documents | — |
 | `DG-5` | done | Single-source-of-truth roadmap system | `commit:346dba7`, `file:scripts/roadmap.py`, `file:docs/ROADMAP.md` |
 | `DG-6` | done | Security workflow starvation on main | `commit:6e8f8b2`, `file:.github/workflows/security.yml` |

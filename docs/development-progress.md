@@ -195,19 +195,43 @@ performance block after the fixture rebind, Tier 4 carryover). Immediate specifi
    `excited` folded into `happy`, `dramatic` dropped. The shipped configuration was
    re-measured after the intensity control was retired — 18 seeds, one cell per
    preset — and gave cross-preset separability of UAR 0.311 against a 0.100 chance
-   floor. Both retired presets scored *below* that floor at 0.056 recall. Scoring the
+   floor. Both retired presets recorded 0.056 recall (read at the time as below the
+   floor; finding 12 corrects this — the interval contains the floor). Scoring the
    high-arousal cluster (`happy`/`excited`/`surprised`/`dramatic`) against only each
-   other gave UAR 0.278 against a 0.250 floor — 1.11× chance, i.e. one acoustic
-   output for four controls. Rewriting the copy is ruled out by the same run: mean
-   prosodic effect ran 6.5–9.5 across all ten presets and was **uncorrelated with
-   separability**, so these instructions were not under-driving; every preset moves
-   prosody hard and they all move it along the arousal axis, which the literature puts
-   at ~91% classifiable against ~55% for valence. Same test that retired the intensity
+   other gave UAR 0.278 against a 0.250 floor (read at the time as 1.11× chance;
+   corrected in finding 12 to "no detectable separability"). Rewriting the copy is
+   ruled out by the same run: mean prosodic effect ran 6.5–9.5 across all ten presets
+   and was **uncorrelated with separability**, so these instructions were not
+   under-driving; every preset moves prosody hard and they all move it along the
+   arousal axis (the "~91% vs ~55%" figures previously cited here are untraceable
+   and retracted — finding 12). Same test that retired the intensity
    tier, now with a measurement behind it. Two related facts worth carrying forward:
    the directional delivery gate and separability **disagree** (`fearful` passes the
    gate on 1 take in 18 and has the best recall at 0.500), and `surprised` survives on
    probation at 0.222. Full record: `docs/reference/qwen3-tts-prompting-guide.md` §4.3
    and the removal note in `Sources/QwenVoiceCore/EmotionPreset.swift`.
+
+12. **Delivery-control audit (2026-08-04, DP-11):** a full-codebase analysis plus a
+   21-agent primary-source research sweep adversarially re-examined the DP-1..DP-10
+   record. Corrections: the 10-way UAR 0.311 is decisively real (permutation
+   p < 0.001, z = 8.7), but the high-arousal-cluster "1.11× chance" figure was an
+   ordinary null draw (permutation p = 0.28, underpowered below ~1.5× chance) and the
+   excited/dramatic "below chance" recall was a post-hoc selection artifact — the
+   roster cut is sustained as a product decision with its statistical justification
+   corrected. The "~91% vs ~55%" arousal/valence figures cited in earlier prose are
+   untraceable to any source and retracted; the literature puts prosody-only valence
+   at roughly a third of arousal's recoverability — a bottleneck, not a wall. New
+   defects found: macOS silently ships the `.normal` tier through an
+   `EmotionPickerView` state-sync bug (iOS correct; DP-8's ship-strong decision never
+   actually took effect on macOS, and the aborted 2026-08-02 blind A/B may have
+   auditioned the wrong tier), and the bench's fixed per-cell filenames overwrote the
+   DP-10 evidence WAVs (one seed per cell survives). The built free-identification and
+   2AFC human instruments were never run on real audio; running one ~30-minute
+   calibration session is the audit's first recommendation, followed by productizing
+   design-then-clone per-emotion reference banks (the strongest measured lever,
+   corroborated externally) and reframing presets as stochastic delivery hints with
+   pinned seeds. Full report, adjudications, and the week-one runbook:
+   `docs/reference/delivery-control-audit-2026-08.md`.
 
 ## Staged roadmap state
 

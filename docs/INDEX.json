@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "generated": "python3 scripts/doc_metadata.py rebuild-index",
   "note": "Machine-readable documentation map. Query this instead of globbing docs/.",
-  "annotatedDocuments": 30,
+  "annotatedDocuments": 31,
   "unannotatedDocuments": 52,
   "documents": [
     {
@@ -67,6 +67,13 @@
       "owner": "release-qa",
       "summary": "July 14 documentation and vendor audit resolution. Archived point-in-time audit. Pinned historical record of findings as they stood at capture.",
       "contentDigest": "sha256:4d50a0e11eceb00a1579bb3a7c654118579eae8b29b119a8c11a4809b52bab8f"
+    },
+    {
+      "path": "docs/reference/delivery-control-audit-2026-08.md",
+      "status": "historical",
+      "owner": "backend-mlx",
+      "summary": "Delivery-control audit (2026-08-04) \u2014 full-codebase analysis plus a 21-agent primary-source research sweep over the DP-1..DP-10 delivery program. Pinned point-in-time decision report; findings, adjudications, and ranked recommendations as they stood at capture.",
+      "contentDigest": "sha256:e171bdcd3e0f3377681728dc66b5b9c960a1d40788f3547a3aca879dec84d6cb"
     },
     {
       "path": "docs/reference/delivery-remediation-plan-2026-08.md",

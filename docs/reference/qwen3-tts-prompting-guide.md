@@ -298,28 +298,36 @@ represented during training." Training captions were LLM-generated from attribut
 free-written user prose is out-of-distribution by construction. Rewriting user prose toward the
 training distribution is an evidence-backed intervention, not a hack.
 
-`MEASURED-HERE` (DP-10, 2026-08-03). The third ceiling is the one that bites hardest, and it is not
-about adherence at all: **the model can place a take on the arousal axis and largely cannot place it
-on the valence axis.** Eighteen seeds across the ten then-shipping presets gave cross-preset
-separability of UAR 0.311 against a 0.100 chance floor. Scoring only the high-arousal cluster
-(`happy`, `excited`, `surprised`, `dramatic`) against each other gave **UAR 0.278 against a 0.250
-chance floor — 1.11x chance**. Four instructions, one acoustic output.
+`MEASURED-HERE` (DP-10, 2026-08-03; statistics corrected by the 2026-08-04 audit). The third
+ceiling is the one that bites hardest, and it is not about adherence at all: **this checkpoint's
+text-instruction channel moves essentially one arousal-shaped axis.** Eighteen seeds across the
+ten then-shipping presets gave cross-preset separability of UAR 0.311 against a 0.100 chance
+floor — a decisively real result (permutation p < 0.001 under a null mirroring the exact shipped
+procedure). Scoring only the high-arousal cluster (`happy`, `excited`, `surprised`, `dramatic`)
+against each other gave UAR 0.278 against a 0.250 chance floor — **no detectable separability**
+(permutation p = 0.28; the originally recorded "1.11x chance" reading over-stated an ordinary
+null draw, and at 18 seeds the test cannot exclude real separability below ~1.5x chance).
 
 The important part is what this is *not*. Mean prosodic effect size across all ten presets ran
-6.5 to 9.5 and was **uncorrelated with separability**: `dramatic` (8.2) and `excited` (8.9) both
-scored *below* the 0.100 chance floor at 0.056 recall, while `fearful` at 0.500 recall passed the
-directional delivery gate on only 1 take in 18. These instructions were not under-driving. Every
-preset moved prosody hard, and they all moved it the same way. This matches the published figure
-that arousal is roughly 91% classifiable from acoustics against roughly 55% for valence, and
-valence is the only thing separating happy from excited.
+6.5 to 9.5 and was **uncorrelated with separability**: `fearful` at 0.500 recall passed the
+directional delivery gate on only 1 take in 18, while `dramatic` (8.2) and `excited` (8.9)
+recorded 0.056 recall — a figure whose exact binomial interval [0.001, 0.27] contains the chance
+floor, so "below chance" was never demonstrated. These instructions were not under-driving. Every
+preset moved prosody hard, and they all moved it the same way. A previous revision cited "arousal
+roughly 91% classifiable from acoustics against roughly 55% for valence" as a published figure;
+that pair is untraceable to any source and is retracted. The real literature puts prosody-only
+valence at roughly a third of arousal's recoverability (adjusted R^2 0.17 vs 0.58, Sauter 2010;
+CCC .248 vs .658 for lexically blind models, Wagner 2023) — a bottleneck, not a wall — and human
+listeners decode eight emotions at 72% from prosody alone on a fixed neutral sentence (RAVDESS).
 
-Consequence for prompt-writing: **wording cannot buy a distinction the acoustic space does not
-carry.** DP-3 (long versus short form), DP-4 (prosodic null), DP-5 (merge form), and DP-6 all varied
-instruction text and none moved this. `excited` was folded into `happy` and `dramatic` dropped on
-2026-08-03 — not because their copy was bad, but because a control whose output cannot be
-distinguished from its neighbour is not a control. Presets that survive are the ones with a
-distinct acoustic signature (`whisper` breathiness, `fearful` tension, `sad`/`calm` low arousal);
-the ones that failed were a rhetorical register and an intensity variant of another emotion.
+Consequence for prompt-writing: **wording cannot buy a distinction this instruction channel does
+not carry.** DP-3 (long versus short form), DP-4 (prosodic null), DP-5 (merge form), and DP-6 all
+varied instruction text and none moved this. `excited` was folded into `happy` and `dramatic`
+dropped on 2026-08-03 — sustained as a product decision (a control whose output cannot be
+distinguished from its neighbour is not a control), with the statistical justification corrected
+by the audit. Presets that survive are the ones with a distinct acoustic signature (`whisper`
+breathiness, `fearful` tension, `sad`/`calm` low arousal). Corrected record and follow-up
+program: [`delivery-control-audit-2026-08.md`](delivery-control-audit-2026-08.md).
 
 ### 4.4 Instruction language: Chinese leads on our checkpoint
 

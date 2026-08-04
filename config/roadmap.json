@@ -67,7 +67,7 @@
     {
       "id": "CM-3",
       "plan": "convergence-metal4-stage4-2026-08",
-      "title": "Gate 2 \u2014 Candidate A fused code-predictor kernel",
+      "title": "Gate 2 — Candidate A fused code-predictor kernel",
       "status": "declined",
       "legacyIds": [
         "Gate 2",
@@ -236,7 +236,7 @@
     {
       "id": "DG-2",
       "plan": "doc-governance-2026-08",
-      "title": "Phase 1 \u2014 pin every historical document",
+      "title": "Phase 1 — pin every historical document",
       "status": "done",
       "gate": "docs/research, docs/audits/archive, and docs/releases sealed by body digest.",
       "evidence": [
@@ -248,7 +248,7 @@
     {
       "id": "DG-3",
       "plan": "doc-governance-2026-08",
-      "title": "Phase 2 \u2014 reclassify the nine misfiled point-in-time reports",
+      "title": "Phase 2 — reclassify the nine misfiled point-in-time reports",
       "status": "planned",
       "gate": "Every dated report under docs/reference carries historical or superseded status, following the backend-optimization-research-report precedent.",
       "blockedBy": [
@@ -259,7 +259,7 @@
     {
       "id": "DG-4",
       "plan": "doc-governance-2026-08",
-      "title": "Phase 3 \u2014 source bindings on active documents",
+      "title": "Phase 3 — source bindings on active documents",
       "status": "planned",
       "gate": "Annotated incrementally as documents are touched; a binding invented in bulk without reading the document is worse than none.",
       "blockedBy": [
@@ -399,6 +399,22 @@
         "Sources/QwenVoiceCore/EmotionPreset.swift"
       ],
       "updated": "2026-08-03"
+    },
+    {
+      "id": "DP-11",
+      "plan": "delivery-prompting-2026-08",
+      "title": "Delivery-control audit: adversarial re-examination and external research sweep",
+      "status": "done",
+      "gate": "Full-codebase analysis plus a 21-agent primary-source research sweep (13 research questions, 8 adversarial verifications, permutation-null simulation of the shipped separability procedure). The 10-way UAR 0.311 is confirmed real (permutation p < 0.001); the high-arousal-cluster '1.11x chance' figure is corrected to 'no detectable separability' (p = 0.28) and the excited/dramatic below-chance recall to a selection artifact; the '91%/55%' arousal/valence figures are retracted as untraceable. New defects recorded: the macOS .normal-tier state-sync bug and the bench per-cell WAV overwrite. Report lands pinned with ranked recommendations and a week-one runbook.",
+      "evidence": [
+        "doc:docs/reference/delivery-control-audit-2026-08.md",
+        "doc:docs/development-progress.md",
+        "doc:docs/reference/qwen3-tts-prompting-guide.md"
+      ],
+      "sourceOfTruth": [
+        "docs/reference/delivery-control-audit-2026-08.md"
+      ],
+      "updated": "2026-08-04"
     }
   ]
 }

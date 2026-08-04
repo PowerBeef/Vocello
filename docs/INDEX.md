@@ -52,6 +52,7 @@ Review when: target or scheme changes; runtime topology; telemetry schema; test 
 - [`docs/reference/cli.md`](../docs/reference/cli.md)
 - [`docs/reference/codex-session-storage.md`](../docs/reference/codex-session-storage.md)
 - [`docs/reference/codex-storage-ballooning-incident.md`](../docs/reference/codex-storage-ballooning-incident.md)
+- [`docs/reference/delivery-control-audit-2026-08.md`](../docs/reference/delivery-control-audit-2026-08.md)
 - [`docs/reference/delivery-fidelity-report-2026-08-01.md`](../docs/reference/delivery-fidelity-report-2026-08-01.md)
 - [`docs/reference/delivery-remediation-plan-2026-08.md`](../docs/reference/delivery-remediation-plan-2026-08.md)
 - [`docs/reference/evidence-impact.md`](../docs/reference/evidence-impact.md)

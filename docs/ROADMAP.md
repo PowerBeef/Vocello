@@ -10,7 +10,7 @@
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
 | `convergence-metal4-stage4-2026-08` | active | backend-and-platform | 3/7 (43%) |
-| `delivery-prompting-2026-08` | active | backend-mlx | 14/16 (88%) |
+| `delivery-prompting-2026-08` | active | backend-mlx | 14/20 (70%) |
 | `doc-governance-2026-08` | active | release-qa | 7/9 (78%) |
 
 ## Convergence residuals, Metal 4 study, and Stage 4
@@ -49,14 +49,18 @@ Narrative authority: [`docs/reference/qwen3-tts-prompting-guide.md`](reference/q
 | `DP-14` | done | Move 3: honest delivery UX — the measured feature/hint split | `file:Sources/QwenVoiceCore/EmotionPreset.swift`, `file:Sources/Views/Components/EmotionPickerView.swift`, `file:Sources/iOS/Sheets/IOSBottomSheets.swift`, `file:Tests/VocelloCoreTests/EmotionPresetResolutionTests.swift` |
 | `DP-15` | planned | Seed retry/pin as a first-class take control | — |
 | `DP-16` | done | Bank picker UX: personas with a delivery choice | `file:Sources/QwenVoiceCore/VoiceBankCatalog.swift`, `file:Tests/VocelloCoreTests/VoiceBankCatalogTests.swift`, `file:Sources/Views/Generate/VoiceCloningView.swift`, `file:Sources/iOS/Sheets/IOSBottomSheets.swift`, `file:Sources/iOS/IOSGenerationModeViews.swift`, `file:docs/reference/emotion-reference-banks.md` |
+| `DP-17` | planned | Whisper breathiness criterion for bank curation | — |
+| `DP-18` | planned | Confirmatory delivery re-measure on solid statistics (audit R4) | — |
+| `DP-19` | planned | Text-decoration valence channel (audit R5) | — |
 | `DP-2` | done | Deterministic delivery-instruction contract gate | `commit:6f4c651`, `file:scripts/check_delivery_instructions.py` |
+| `DP-20` | parked | External delivery-control lever watch list (audit R8) | — |
 | `DP-3` | done | Short-versus-long instruction A/B | `doc:docs/reference/qwen3-tts-prompting-guide.md`, `file:config/runtime-debug-knobs.json` |
 | `DP-4` | done | English diction append: does it earn its place | `doc:docs/reference/qwen3-tts-prompting-guide.md`, `file:config/runtime-debug-knobs.json` |
 | `DP-5` | done | Voice Design merge template versus plain concatenation | `doc:docs/reference/qwen3-tts-prompting-guide.md`, `file:config/runtime-debug-knobs.json` |
 | `DP-6` | done | Angry pitch-axis contradiction | `doc:docs/reference/qwen3-tts-prompting-guide.md`, `file:config/delivery-instruction-contract.json` |
 | `DP-7` | done | On-device delivery-consistency cohort lane | `file:Tests/VocelloiOSUITests/VocelloiOSDeliveryCohortUITests.swift`, `file:scripts/ui_test.sh` |
 | `DP-8` | done | Retire the user-facing intensity control (scoped) | `doc:docs/reference/qwen3-tts-guide.md`, `file:Sources/Views/Components/EmotionPickerView.swift` |
-| `DP-9` | planned | Remove EmotionIntensity outright, after DP-4/5/6 | — |
+| `DP-9` | parked | Remove EmotionIntensity outright, after DP-4/5/6 | — |
 
 ## Documentation governance and staleness control
 
@@ -64,7 +68,7 @@ Narrative authority: [`docs/reference/qwen3-tts-prompting-guide.md`](reference/q
 
 Make documentation state machine-checkable: pin historical records against accidental modification, derive facts from code so prose cannot silently contradict them, and give agents a queryable index instead of a directory to glob.
 
-Narrative authority: [`docs/reference/qwen3-tts-prompting-guide.md`](reference/qwen3-tts-prompting-guide.md)
+Narrative authority: [`docs/reference/repository-self-verification.md`](reference/repository-self-verification.md)
 
 | Item | Status | Title | Evidence |
 | --- | --- | --- | --- |

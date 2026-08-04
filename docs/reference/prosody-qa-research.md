@@ -1,3 +1,11 @@
+---
+status: active
+owner: backend-mlx
+summary: Research notes behind the automated tone/tempo/cadence quality gates — analyzer landscape, metric choices, and the usage entry points for the prosody lanes. Point-in-time sections are dated inline; commands reflect the live preset roster.
+sourceOfTruth:
+  - scripts/bench_delivery_prosody.py
+  - Sources/QwenVoiceCore/EmotionPreset.swift
+---
 # Prosody QA Research Notes
 
 > Research for improving Vocello's automated tone/tempo/cadence quality gate.
@@ -109,7 +117,7 @@ those specialized gates remain authoritative and one-pass ASR remains diagnostic
 scripts/prosody_quality_gate.py outputs/some_take.wav
 
 # Delivery A/B with richer prosody deltas
-scripts/delivery_adherence.py --presets happy,excited --seeds 4 --data-dir ~/Library/Application\ Support/QwenVoice
+scripts/delivery_adherence.py --presets happy,sad --seeds 4 --data-dir ~/Library/Application\ Support/QwenVoice
 
 # Bench with delivery cells + automatic prosody analysis
 build/vocello bench --delivery happy,calm --modes custom,design

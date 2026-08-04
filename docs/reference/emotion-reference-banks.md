@@ -1,3 +1,11 @@
+---
+status: active
+owner: backend-mlx
+summary: The design-then-clone workflow — build curated emotion reference banks with the pipeline script, how curation scores and honestly refuses candidates, and how banks present as personas with a delivery choice in both apps.
+sourceOfTruth:
+  - scripts/build_emotion_reference_bank.py
+  - Sources/QwenVoiceCore/VoiceBankCatalog.swift
+---
 # Emotion reference banks (design-then-clone, curated)
 
 > The delivery mechanism the 2026-08-04 calibration session proved out: emotion

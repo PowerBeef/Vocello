@@ -27,7 +27,7 @@
       "owner": "release-qa",
       "adopted": "2026-08-02",
       "goal": "Make documentation state machine-checkable: pin historical records against accidental modification, derive facts from code so prose cannot silently contradict them, and give agents a queryable index instead of a directory to glob.",
-      "authority": "docs/reference/qwen3-tts-prompting-guide.md"
+      "authority": "docs/reference/repository-self-verification.md"
     }
   ],
   "items": [
@@ -45,7 +45,8 @@
         "doc:docs/reference/roadmap-2026-08.md"
       ],
       "sourceOfTruth": [
-        "Package.resolved"
+        "Packages/VocelloQwen3Core/Package.resolved",
+        "QwenVoice.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved"
       ],
       "updated": "2026-08-01"
     },
@@ -103,11 +104,11 @@
       "plan": "convergence-metal4-stage4-2026-08",
       "title": "Phone-gated evidence battery remainder",
       "status": "in-flight",
-      "gate": "One sitting with the phone unlocked and Auto-Lock Never; iOS control lanes re-run against the current artifacts.",
+      "gate": "One sitting with the phone unlocked and Auto-Lock Never; iOS control lanes re-run against the current artifacts. Surface note 2026-08-04: the iOS UI under test changed after this item was dated (2026-08-03/04 delivery roster cut, sectioned delivery sheet, bank Delivery chip), so the control-lane re-run also observes the delivery/bank UI; the artifacts themselves are unchanged.",
       "evidence": [
         "doc:docs/reference/roadmap-2026-08.md"
       ],
-      "updated": "2026-08-01"
+      "updated": "2026-08-04"
     },
     {
       "id": "CM-6",
@@ -133,7 +134,7 @@
       "sourceOfTruth": [
         "Sources/QwenVoiceCore/EmotionPreset.swift"
       ],
-      "updated": "2026-08-02"
+      "updated": "2026-08-04"
     },
     {
       "id": "DP-2",
@@ -148,7 +149,7 @@
       "sourceOfTruth": [
         "Sources/QwenVoiceCore/GenerationSemantics.swift"
       ],
-      "updated": "2026-08-02"
+      "updated": "2026-08-04"
     },
     {
       "id": "DP-3",
@@ -162,7 +163,7 @@
       "sourceOfTruth": [
         "Sources/QwenVoiceCore/EmotionPreset.swift"
       ],
-      "updated": "2026-08-02",
+      "updated": "2026-08-04",
       "evidence": [
         "doc:docs/reference/qwen3-tts-prompting-guide.md",
         "file:config/runtime-debug-knobs.json"
@@ -180,7 +181,7 @@
       "sourceOfTruth": [
         "Sources/QwenVoiceCore/GenerationSemantics.swift"
       ],
-      "updated": "2026-08-02",
+      "updated": "2026-08-04",
       "evidence": [
         "doc:docs/reference/qwen3-tts-prompting-guide.md",
         "file:config/runtime-debug-knobs.json"
@@ -210,12 +211,11 @@
       "title": "Angry pitch-axis contradiction",
       "status": "done",
       "gate": "23 seeds, angry.normal against angry.strong. RESULT: the expectation (+1) is correct -- shipped copy moves pitch +5.98 st, d=1.40, win 0.91. The conflicting 'lower clipped tone' clause is simply not followed, so the contradiction is textual with no acoustic counterpart. angry.strong is also the better copy at this power (7 features vs 4), reversing DP-3's underpowered per-cell reading and confirming the global strong choice needs no exception.",
-      "blockedBy": [],
       "sourceOfTruth": [
         "Sources/QwenVoiceCore/EmotionPreset.swift",
         "scripts/prosody_profile.py"
       ],
-      "updated": "2026-08-03",
+      "updated": "2026-08-04",
       "evidence": [
         "doc:docs/reference/qwen3-tts-prompting-guide.md",
         "file:config/delivery-instruction-contract.json"
@@ -365,13 +365,13 @@
       "sourceOfTruth": [
         "Sources/QwenVoiceCore/EmotionPreset.swift"
       ],
-      "updated": "2026-08-02"
+      "updated": "2026-08-04"
     },
     {
       "id": "DP-9",
       "plan": "delivery-prompting-2026-08",
       "title": "Remove EmotionIntensity outright, after DP-4/5/6",
-      "status": "planned",
+      "status": "parked",
       "gate": "Delete the enum, collapse bench cells to one per preset, retire intensity_scale and the per-tier delivery expectations, update the tier-parity check and the derived deliveryIntensityTiers fact.",
       "blockedBy": [
         "DP-4",
@@ -381,7 +381,8 @@
       "sourceOfTruth": [
         "Sources/QwenVoiceCore/EmotionPreset.swift"
       ],
-      "updated": "2026-08-02"
+      "updated": "2026-08-04",
+      "unparkWhen": "Parked 2026-08-04 (maintainer call during the sync audit): DP-12's blind session contradicts this item's premise — the 2AFC verdict was no_measured_strong_tier_collapse, control pairs were MORE discriminable at strong (+0.50 [0.001, 0.812]), and angry-vs-happy discriminated at 0.75 at the normal tier versus chance at strong, so the tier machinery may yet carry product value. Unpark only after a dedicated measurement shows the tiers carry no exploitable product difference. Execution note: deleting the enum also retires the derived deliveryIntensityTiers fact, whose value feeds the doc staleness scanner's rule set (scripts/doc_metadata.py), so the scanner rules change in the same arc."
     },
     {
       "id": "DP-10",
@@ -398,7 +399,7 @@
       "sourceOfTruth": [
         "Sources/QwenVoiceCore/EmotionPreset.swift"
       ],
-      "updated": "2026-08-03"
+      "updated": "2026-08-04"
     },
     {
       "id": "DP-11",
@@ -496,6 +497,47 @@
       "sourceOfTruth": [
         "Sources/QwenVoiceCore/VoiceBankCatalog.swift"
       ],
+      "updated": "2026-08-04"
+    },
+    {
+      "id": "DP-17",
+      "plan": "delivery-prompting-2026-08",
+      "title": "Whisper breathiness criterion for bank curation",
+      "status": "planned",
+      "gate": "The first bank build (Warm Narrator, 2026-08-04) honestly refused whisper: VoiceDesign rendered soft-but-voiced speech, and the voiced-fraction criterion entangles pause structure (its denominator is the whole take). Replace it with a breathiness criterion from the bounded analyzer's voice-quality block (HNR/CPP deltas versus the anchor), validated on the existing scored candidates before any regeneration, so whisper can join a bank only when the phonation actually changed. Recorded follow-up in docs/reference/emotion-reference-banks.md.",
+      "sourceOfTruth": [
+        "scripts/build_emotion_reference_bank.py"
+      ],
+      "updated": "2026-08-04"
+    },
+    {
+      "id": "DP-18",
+      "plan": "delivery-prompting-2026-08",
+      "title": "Confirmatory delivery re-measure on solid statistics (audit R4)",
+      "status": "planned",
+      "gate": "The audit's R4: regenerate one full delivery matrix on fresh seeds with the hardened harness (retained WAVs, prompt provenance, computed chance floors), score with delivery_separability.py in confirmatory designation (pre-registered), apply FDR correction and bootstrap CIs, add the happy-vs-angry 2-way probe, and run a parallel 8-bit Quality arm — the quantization-vs-adherence question has never been measured here. Runs unattended (generation plus analyzer scoring; no listening). Decision input for whether any directional hint can be promoted back to a distinct delivery.",
+      "sourceOfTruth": [
+        "scripts/delivery_separability.py"
+      ],
+      "updated": "2026-08-04"
+    },
+    {
+      "id": "DP-19",
+      "plan": "delivery-prompting-2026-08",
+      "title": "Text-decoration valence channel (audit R5)",
+      "status": "planned",
+      "gate": "The audit's decision gate routed here on the branch the session actually landed on (clone-transfer strong, instruct valence weak): measure whether text-side paralinguistic decoration — interjections, punctuation, quoted-style cues appended to the script rather than the instruction — moves valence where the instruct channel does not. Fixed-seed A/B against undecorated text on the same cells, scored by the SER advisory and prosody deltas; product exposure only if the effect is categorical, since it changes the spoken text.",
+      "sourceOfTruth": [
+        "scripts/bench_delivery_prosody.py"
+      ],
+      "updated": "2026-08-04"
+    },
+    {
+      "id": "DP-20",
+      "plan": "delivery-prompting-2026-08",
+      "title": "External delivery-control lever watch list (audit R8)",
+      "status": "parked",
+      "unparkWhen": "Only when a watched lever becomes runnable on-device at the 8 GB floor: a Qwen3-TTS VoiceEditing/instruct variant that combines ICL with instructions, CosyVoice 3-class instruct control in an MLX-portable form, emotion-vector steering (IndexTTS-2/EmoSteer-class) with published weights, or a quantization-robust valence result. The pinned audit's R8 section is the source list; re-verify claims against primary sources at unpark time rather than trusting the 2026-08 snapshot.",
       "updated": "2026-08-04"
     },
     {

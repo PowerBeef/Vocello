@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "generated": "python3 scripts/doc_metadata.py rebuild-index",
   "note": "Machine-readable documentation map. Query this instead of globbing docs/.",
-  "annotatedDocuments": 32,
-  "unannotatedDocuments": 52,
+  "annotatedDocuments": 34,
+  "unannotatedDocuments": 50,
   "documents": [
     {
       "path": "docs/audits/archive/2026-07-10/01_Evidence_Method_and_Corrections.md",
@@ -89,6 +89,26 @@
       "summary": "Completed delivery/clone fidelity remediation program (R1-R4). Its R1 recommendation to keep three intensity tiers was overruled by the maintainer decision recorded later in the same file; current delivery state lives in development-progress.",
       "supersededBy": "docs/development-progress.md",
       "contentDigest": "sha256:b3b253977a1f67c5a530fe6ce3d04a6215e2f852d66627dc97186351963bbd27"
+    },
+    {
+      "path": "docs/reference/emotion-reference-banks.md",
+      "status": "active",
+      "owner": "backend-mlx",
+      "summary": "The design-then-clone workflow \u2014 build curated emotion reference banks with the pipeline script, how curation scores and honestly refuses candidates, and how banks present as personas with a delivery choice in both apps.",
+      "sourceOfTruth": [
+        "scripts/build_emotion_reference_bank.py",
+        "Sources/QwenVoiceCore/VoiceBankCatalog.swift"
+      ]
+    },
+    {
+      "path": "docs/reference/prosody-qa-research.md",
+      "status": "active",
+      "owner": "backend-mlx",
+      "summary": "Research notes behind the automated tone/tempo/cadence quality gates \u2014 analyzer landscape, metric choices, and the usage entry points for the prosody lanes. Point-in-time sections are dated inline; commands reflect the live preset roster.",
+      "sourceOfTruth": [
+        "scripts/bench_delivery_prosody.py",
+        "Sources/QwenVoiceCore/EmotionPreset.swift"
+      ]
     },
     {
       "path": "docs/reference/qwen3-tts-guide.md",

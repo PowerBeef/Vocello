@@ -144,7 +144,7 @@ performance block after the fixture rebind, Tier 4 carryover). Immediate specifi
    and the update-available user path ride the next app release (bundled
    catalog); fixture rebind + memory re-qual ride that release's battery.
 
-6. **Brand + iPhone clone-surface change (2026-08-01, post-2.4.0):** the public surfaces
+7. **Brand + iPhone clone-surface change (2026-08-01, post-2.4.0):** the public surfaces
    (README, website hero) feature the slogan "Premium voice studio. Proven performance.
    Private by design." The iPhone app deliberately dropped its Files-import and
    open-from-Files clone-reference paths (App Store review-risk posture; microphone
@@ -153,20 +153,21 @@ performance block after the fixture rebind, Tier 4 carryover). Immediate specifi
    `ui_test.sh ios enroll-clone-fixture` UI lane to the headless
    `scripts/ios_device.sh enroll-clone-fixture` diagnostics command
    (`QVOICE_IOS_DEVICE_ENROLL_VOICE_NAME`, registered knob; staged inputs are deleted
-   after a clean enrollment). Ships in build 24; build 23 in review still carries the
-   import UI.
-7. **Intensity tiers collapsed to two (2026-08-01, maintainer decision):** "subtle"
+   after a clean enrollment). Ships in the next TestFlight build cut after 23 (no bump
+   exists yet as of 2026-08-04 — build numbers are a maintainer call); build 23 in
+   review still carries the import UI.
+8. **Intensity tiers collapsed to two (2026-08-01, maintainer decision):** "subtle"
    retired — its calibrated delivery-gate minimum effect was zero (below the prosody
    noise floor), an unverifiable control. Normal/strong remain (both ≥0.85 adherence,
    ~15% measured separation). Legacy subtle drafts degrade losslessly to custom text;
    decision record in `docs/reference/delivery-remediation-plan-2026-08.md`.
-8. **R3 rate-only option parked (2026-08-01, maintainer decision):** the neutral
+9. **R3 rate-only option parked (2026-08-01, maintainer decision):** the neutral
    sampling profile's rate half is not adopted standalone (register wander stays
    floored; failed gates do not ship by halves). Three unpark triggers recorded in
    the remediation plan; the Tier-4 long-form fixtures are the designated
    re-evaluation point. Tier 4 (long-form text-context carryover, design pass
    first) is now the active roadmap work.
-9. **Tier 4 text-first landed (2026-08-01):** long-form planner v2 — R-tail orphan
+10. **Tier 4 text-first landed (2026-08-01):** long-form planner v2 — R-tail orphan
    rebalancing keeps the final segment from becoming a pacing-visible orphan, never
    degrades boundary kinds, and never trades a paragraph pause away. Version-bumped
    identity (new plans re-derive segment IDs/sub-seeds; retained projects replay
@@ -180,7 +181,7 @@ performance block after the fixture rebind, Tier 4 carryover). Immediate specifi
    roadmap's substantive tiers are now all closed; opportunistic riders (MOS-proxy
    advisory, 60 Hz glass-gate measurement) and parked items remain.
 
-10. **iPhone 6 GB floor step 1 green + adaptive residency LIVE (2026-08-02):** the
+11. **iPhone 6 GB floor step 1 green + adaptive residency LIVE (2026-08-02):** the
    f16 promotion reopened both questions and the phone window settled them. The
    clamped matrix (3,600 MB `iphone14pro` profile, fp32-conservative) passed all
    three modes with ~1 GB margin (peaks 2,109–2,372 MB vs the ≤3,300 bound) — the
@@ -191,27 +192,27 @@ performance block after the fixture rebind, Tier 4 carryover). Immediate specifi
    counts (one tokenizer load across the mode-switch sequence instead of three).
    Evidence + methodology notes: `docs/decisions/ios-6gb-floor-feasibility.md`.
 
-11. **Delivery roster cut to eight (2026-08-03, maintainer decision on DP-10):**
+12. **Delivery roster cut to eight (2026-08-03, maintainer decision on DP-10):**
    `excited` folded into `happy`, `dramatic` dropped. The shipped configuration was
    re-measured after the intensity control was retired — 18 seeds, one cell per
    preset — and gave cross-preset separability of UAR 0.311 against a 0.100 chance
    floor. Both retired presets recorded 0.056 recall (read at the time as below the
-   floor; finding 12 corrects this — the interval contains the floor). Scoring the
+   floor; finding 13 corrects this — the interval contains the floor). Scoring the
    high-arousal cluster (`happy`/`excited`/`surprised`/`dramatic`) against only each
    other gave UAR 0.278 against a 0.250 floor (read at the time as 1.11× chance;
-   corrected in finding 12 to "no detectable separability"). Rewriting the copy is
+   corrected in finding 13 to "no detectable separability"). Rewriting the copy is
    ruled out by the same run: mean prosodic effect ran 6.5–9.5 across all ten presets
    and was **uncorrelated with separability**, so these instructions were not
    under-driving; every preset moves prosody hard and they all move it along the
    arousal axis (the "~91% vs ~55%" figures previously cited here are untraceable
-   and retracted — finding 12). Same test that retired the intensity
+   and retracted — finding 13). Same test that retired the intensity
    tier, now with a measurement behind it. Two related facts worth carrying forward:
    the directional delivery gate and separability **disagree** (`fearful` passes the
    gate on 1 take in 18 and has the best recall at 0.500), and `surprised` survives on
    probation at 0.222. Full record: `docs/reference/qwen3-tts-prompting-guide.md` §4.3
    and the removal note in `Sources/QwenVoiceCore/EmotionPreset.swift`.
 
-12. **Delivery-control audit (2026-08-04, DP-11):** a full-codebase analysis plus a
+13. **Delivery-control audit (2026-08-04, DP-11):** a full-codebase analysis plus a
    21-agent primary-source research sweep adversarially re-examined the DP-1..DP-10
    record. Corrections: the 10-way UAR 0.311 is decisively real (permutation
    p < 0.001, z = 8.7), but the high-arousal-cluster "1.11× chance" figure was an
@@ -233,7 +234,7 @@ performance block after the fixture rebind, Tier 4 carryover). Immediate specifi
    pinned seeds. Full report, adjudications, and the week-one runbook:
    `docs/reference/delivery-control-audit-2026-08.md`.
 
-13. **Move 1 of the audit runbook landed (2026-08-04, DP-12):** fix-then-listen.
+14. **Move 1 of the audit runbook landed (2026-08-04, DP-12):** fix-then-listen.
    The macOS `.normal`-tier state-sync defect is fixed — instruction-string
    resolution moved into `EmotionPreset.matchInstruction` with strong-first
    tie-breaking (regression-pinned by
@@ -265,7 +266,7 @@ performance block after the fixture rebind, Tier 4 carryover). Immediate specifi
    `scripts/lib/test_models.sh` if it ever needs to regenerate. The session
    clips were produced with streaming as the workaround.
 
-14. **The calibration session ran and was scored (2026-08-04, DP-12 done):**
+15. **The calibration session ran and was scored (2026-08-04, DP-12 done):**
    146 blind trials, one listener (the maintainer; non-native English, so
    positives are read as solid and nulls as provisional). Pooled preset
    identification 26/88 = 0.295 against a 0.125 floor (exact binomial
@@ -305,7 +306,7 @@ performance block after the fixture rebind, Tier 4 carryover). Immediate specifi
    reframe as hints; the angry/happy/surprised nulls await the optional
    crowd panel before any further roster surgery.
 
-15. **Move 2 landed: curated emotion reference banks (2026-08-04, DP-13):**
+16. **Move 2 landed: curated emotion reference banks (2026-08-04, DP-13):**
    `scripts/build_emotion_reference_bank.py` turns the session's lesson into a
    pipeline — generate N VoiceDesign candidates per emotion against a neutral
    anchor, score with the pinned SER advisory plus ECAPA identity-to-anchor
@@ -336,7 +337,7 @@ performance block after the fixture rebind, Tier 4 carryover). Immediate specifi
    disabled by the one-time cloning consent. The readiness descriptor is now
    consent-aware on both platforms, so the note and the button agree.
 
-16. **Move 3 landed: the delivery UI tells the measured truth (2026-08-04,
+17. **Move 3 landed: the delivery UI tells the measured truth (2026-08-04,
    DP-14):** the roster split from the calibration session is now data with
    provenance — `EmotionPreset.distinctDeliveryIDs` holds the four presets
    the listener identified above chance (neutral, calm, whisper, sad), the
@@ -354,7 +355,7 @@ performance block after the fixture rebind, Tier 4 carryover). Immediate specifi
    which earns its own arc. With this, all three moves of the
    delivery-control audit are complete.
 
-17. **Bank picker UX landed: personas with a delivery choice (2026-08-04,
+18. **Bank picker UX landed: personas with a delivery choice (2026-08-04,
    DP-16):** emotion reference banks now present as what they are — one
    voice with curated deliveries — instead of flat name-suffixed list
    entries. `VoiceBankCatalog` (QwenVoiceCore) resolves grouping from the
@@ -402,10 +403,11 @@ Stage-by-stage details, closure evidence, and falsifiability criteria live in th
    throwaway branch (contract invariant), long-form carryover (text context first), with
    speculative/PCG, CFG, and KV quantization parked. Working order and dependency rules:
    [roadmap-2026-08](reference/roadmap-2026-08.md).
-6. **Smaller open threads**: iOS single-segment regeneration parity, the iPhone-15-Pro
-   memory-profile diagnostic, a 60 Hz-device measurement of the iOS fixed-refresh glass
-   gate if such hardware becomes available, and single-take spoken-text normalization
-   (phase 10 remainder).
+6. **Smaller open threads**: a 60 Hz-device measurement of the iOS fixed-refresh glass
+   gate if such hardware becomes available. (The other threads once listed here closed:
+   iOS single-segment regeneration parity and the iPhone-15-Pro memory-profile diagnostic
+   on 2026-08-01 — finding 1; single-take spoken-text normalization shipped 2026-08-01 as
+   phase 10.)
 7. ~~iOS 900-character single-take limit~~ **shipped 2026-07-24**
    (`IOSGenerationTextLimitPolicy.sharedScriptLimit` 150 → 900, memory-qualified on-device
    proof `ios-engine-20260724-060000-1cc8ef23`; the iOS UI-benchmark `long` cell keeps its
@@ -599,11 +601,13 @@ explicit macOS fixture repair/bootstrap step. XCUITest is the sole autonomous ap
 
 ## Open release work
 
-- **macOS 2.3.0 is the released version** (2026-07-31; notes under
-  [`docs/releases/`](releases/)) — the 2026.07.26.1 artifact generation, Stage 1 warm-speed
-  wins, delivery hardening, and the clone-prime/Wi-Fi-pin fixes, cut with the evidence
-  battery deliberately mid-flight per the deterministic publishing rule. Before it,
-  2.2.0 → 2.2.1 → 2.2.2 landed in one day on 2026-07-25. The 2.2.0 arc hardened the
+- **macOS 2.4.0 is the released version** (2026-08-01; notes under
+  [`docs/releases/`](releases/)) — the verified delivery-preset rework with Neutral as a
+  real preset, iPhone long-form segment regeneration, spoken-text normalization, and the
+  mlx 0.31.6 runtime refresh. Before it, 2.3.0 (2026-07-31) shipped the 2026.07.26.1
+  artifact generation, Stage 1 warm-speed wins, delivery hardening, and the
+  clone-prime/Wi-Fi-pin fixes, cut with the evidence battery deliberately mid-flight per
+  the deterministic publishing rule; 2.2.0 → 2.2.1 → 2.2.2 landed in one day on 2026-07-25. The 2.2.0 arc hardened the
   pipeline (SHA-pinned
   tooling in release jobs, nested-framework signing with an explicit notarization verdict check,
   self-diagnosing dirty-tree evidence errors) and renamed the repository

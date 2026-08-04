@@ -166,6 +166,7 @@ enum VoiceCloningReadiness {
         engineReady: Bool,
         isModelAvailable: Bool,
         modelDisplayName: String,
+        cloneConsentAcknowledged: Bool,
         referenceAudioPath: String?,
         hasReferenceTranscript: Bool,
         text: String,
@@ -185,6 +186,19 @@ enum VoiceCloningReadiness {
                 noteIsReady: false,
                 title: "Install the active model",
                 detail: "Install \(modelDisplayName) in Models to enable generation.",
+                trailingText: nil
+            )
+        }
+
+        // The Generate button has always gated on the one-time cloning
+        // consent, but this note did not — so the status line said "Ready to
+        // generate" beside a disabled button (found on the bank's first real
+        // use, 2026-08-04). The two must never disagree again.
+        if !cloneConsentAcknowledged {
+            return VoiceCloningReadinessDescriptor(
+                noteIsReady: false,
+                title: "Acknowledge voice cloning consent",
+                detail: "Voice cloning needs the one-time consent in Settings: clone only voices you have permission to use.",
                 trailingText: nil
             )
         }

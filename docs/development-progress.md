@@ -326,7 +326,15 @@ performance block after the fixture rebind, Tier 4 carryover). Immediate specifi
    states that the transcript is what carries pacing and emotion).
    Follow-ups recorded in DP-13: the grouped persona/delivery picker UI and
    the whisper breathiness criterion. Reference:
-   `docs/reference/emotion-reference-banks.md`.
+   `docs/reference/emotion-reference-banks.md`. **Closed by ear the same
+   day:** the maintainer auditioned the bank in the freshly built app
+   (informal, sighted) and reports the voices sound as intended — including
+   Happy, resolving the proof run's one open case in the bank's favor (the
+   SER angry-reading on Happy clones stands as an instrument caveat only).
+   First real use also surfaced one more status/control disagreement: the
+   clone readiness note said "Ready to generate" beside a Generate button
+   disabled by the one-time cloning consent. The readiness descriptor is now
+   consent-aware on both platforms, so the note and the button agree.
 
 ## Staged roadmap state
 

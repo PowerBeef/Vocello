@@ -121,6 +121,7 @@ struct VoiceCloningView: View {
             engineReady: ttsEngineStore.isReady,
             isModelAvailable: isModelAvailable,
             modelDisplayName: modelDisplayName,
+            cloneConsentAcknowledged: cloneConsentAcknowledged,
             referenceAudioPath: draft.referenceAudioPath,
             hasReferenceTranscript: draft.trimmedReferenceTranscript != nil,
             text: draft.text,

@@ -385,6 +385,7 @@ struct HistoryView: View {
                         } label: {
                             Label("Pin seed \(String(seedValue)) for new takes", systemImage: "pin")
                         }
+                        .accessibilityIdentifier("history_pinSeedButton")
                     }
                 }
                 if let toggle = entry.projectToggle, toggle.segmentCount > 0 {

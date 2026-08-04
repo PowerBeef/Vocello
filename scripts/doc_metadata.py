@@ -215,7 +215,10 @@ def derive_facts(root: pathlib.Path) -> dict:
     }
 
 
-_WORD_FORMS = {1: "one", 2: "two", 3: "three", 4: "four", 5: "five"}
+_WORD_FORMS = {
+    1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 6: "six",
+    7: "seven", 8: "eight", 9: "nine", 10: "ten", 11: "eleven", 12: "twelve",
+}
 
 
 def _number_forms(value: int) -> str:
@@ -266,7 +269,13 @@ def deny_patterns(facts: dict) -> list[tuple[str, str, re.Pattern]]:
             "deliveryPresetCount",
             f"a delivery/emotion preset count other than {presets}",
             re.compile(
-                rf"\b(?!{presets}\b)\d+\s+(?:delivery|emotion)\s+presets?\b", re.I
+                # "styles" and spelled-out numbers included after README shipped
+                # "ten delivery styles" for a day past the roster cut without
+                # tripping the digits-plus-"presets" pattern (2026-08-04).
+                rf"\b(?!{_number_forms(presets)}\b)"
+                r"(?:two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|\d+)"
+                r"\s+(?:delivery|emotion)\s+(?:presets?|styles?)\b",
+                re.I,
             ),
         ),
         (

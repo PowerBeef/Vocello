@@ -31,6 +31,14 @@ Narrative authority: [`docs/reference/roadmap-2026-08.md`](reference/roadmap-202
 | `CM-6` | parked | MOS-proxy advisory column (UTMOSv2) | `doc:docs/reference/roadmap-2026-08.md` |
 | `CM-7` | done | Non-streaming CLI generation publishes no WAV while reporting success | `file:Sources/QwenVoiceCore/GenerationOutputAdapter.swift`, `file:Tests/VocelloCoreTests/GenerationTerminalCleanupTests.swift`, `file:Sources/VocelloCLI/GenerateCommand.swift`, `file:Sources/VocelloCLI/BatchCommand.swift` |
 
+### Open items in detail
+
+- **`CM-5`** (in-flight) — Phone-gated evidence battery remainder.
+  gate: One sitting with the phone unlocked and Auto-Lock Never; iOS control lanes re-run against the current artifacts. Surface note 2026-08-04: the iOS UI under test changed after this item was dated (2026-08-03/04 delivery roster cut, sectioned delivery sheet, bank Delivery chip), so the control-lane re-run also observes the delivery/bank UI; the artifacts themselves are unchanged.
+
+- **`CM-6`** (parked) — MOS-proxy advisory column (UTMOSv2).
+  unparkWhen: Only opportunistically, and only as a dev-lane advisory column. It must never become a gate or a publication input.
+
 ## Delivery instruction quality and Qwen3-TTS prompting
 
 `delivery-prompting-2026-08` · **active** · backend-mlx · adopted 2026-08-02
@@ -42,6 +50,14 @@ Narrative authority: [`docs/reference/qwen3-tts-prompting-guide.md`](reference/q
 | Item | Status | Title | Evidence |
 | --- | --- | --- | --- |
 | `DP-1` | done | Sourced Qwen3-TTS prompting guide with per-claim provenance | `commit:c14651c`, `doc:docs/reference/qwen3-tts-prompting-guide.md` |
+| `DP-2` | done | Deterministic delivery-instruction contract gate | `commit:6f4c651`, `file:scripts/check_delivery_instructions.py` |
+| `DP-3` | done | Short-versus-long instruction A/B | `doc:docs/reference/qwen3-tts-prompting-guide.md`, `file:config/runtime-debug-knobs.json` |
+| `DP-4` | done | English diction append: does it earn its place | `doc:docs/reference/qwen3-tts-prompting-guide.md`, `file:config/runtime-debug-knobs.json` |
+| `DP-5` | done | Voice Design merge template versus plain concatenation | `doc:docs/reference/qwen3-tts-prompting-guide.md`, `file:config/runtime-debug-knobs.json` |
+| `DP-6` | done | Angry pitch-axis contradiction | `doc:docs/reference/qwen3-tts-prompting-guide.md`, `file:config/delivery-instruction-contract.json` |
+| `DP-7` | done | On-device delivery-consistency cohort lane | `file:Tests/VocelloiOSUITests/VocelloiOSDeliveryCohortUITests.swift`, `file:scripts/ui_test.sh` |
+| `DP-8` | done | Retire the user-facing intensity control (scoped) | `doc:docs/reference/qwen3-tts-guide.md`, `file:Sources/Views/Components/EmotionPickerView.swift` |
+| `DP-9` | parked | Remove EmotionIntensity outright, after DP-4/5/6 | — |
 | `DP-10` | done | Cut the delivery roster to the presets that separate | `doc:docs/reference/qwen3-tts-prompting-guide.md`, `doc:docs/development-progress.md`, `file:Sources/QwenVoiceCore/EmotionPreset.swift`, `file:scripts/delivery_separability.py` |
 | `DP-11` | done | Delivery-control audit: adversarial re-examination and external research sweep | `doc:docs/reference/delivery-control-audit-2026-08.md`, `doc:docs/development-progress.md`, `doc:docs/reference/qwen3-tts-prompting-guide.md` |
 | `DP-12` | done | Move 1: fix the found defects, harden the harness, run the calibration session | `file:Sources/QwenVoiceCore/EmotionPreset.swift`, `file:Sources/Views/Components/EmotionPickerView.swift`, `file:Tests/VocelloCoreTests/EmotionPresetResolutionTests.swift`, `file:scripts/delivery_separability.py`, `file:scripts/bench_delivery_prosody.py`, `file:scripts/delivery_listening_session.py`, `doc:docs/reference/delivery-control-audit-2026-08.md` |
@@ -52,15 +68,21 @@ Narrative authority: [`docs/reference/qwen3-tts-prompting-guide.md`](reference/q
 | `DP-17` | planned | Whisper breathiness criterion for bank curation | — |
 | `DP-18` | done | Confirmatory delivery re-measure on solid statistics (audit R4) | `file:scripts/delivery_separability.py`, `file:scripts/bench_delivery_prosody.py`, `file:benchmarks/HISTORY.md` |
 | `DP-19` | planned | Text-decoration valence channel (audit R5) | — |
-| `DP-2` | done | Deterministic delivery-instruction contract gate | `commit:6f4c651`, `file:scripts/check_delivery_instructions.py` |
 | `DP-20` | parked | External delivery-control lever watch list (audit R8) | — |
-| `DP-3` | done | Short-versus-long instruction A/B | `doc:docs/reference/qwen3-tts-prompting-guide.md`, `file:config/runtime-debug-knobs.json` |
-| `DP-4` | done | English diction append: does it earn its place | `doc:docs/reference/qwen3-tts-prompting-guide.md`, `file:config/runtime-debug-knobs.json` |
-| `DP-5` | done | Voice Design merge template versus plain concatenation | `doc:docs/reference/qwen3-tts-prompting-guide.md`, `file:config/runtime-debug-knobs.json` |
-| `DP-6` | done | Angry pitch-axis contradiction | `doc:docs/reference/qwen3-tts-prompting-guide.md`, `file:config/delivery-instruction-contract.json` |
-| `DP-7` | done | On-device delivery-consistency cohort lane | `file:Tests/VocelloiOSUITests/VocelloiOSDeliveryCohortUITests.swift`, `file:scripts/ui_test.sh` |
-| `DP-8` | done | Retire the user-facing intensity control (scoped) | `doc:docs/reference/qwen3-tts-guide.md`, `file:Sources/Views/Components/EmotionPickerView.swift` |
-| `DP-9` | parked | Remove EmotionIntensity outright, after DP-4/5/6 | — |
+
+### Open items in detail
+
+- **`DP-9`** (parked) — Remove EmotionIntensity outright, after DP-4/5/6.
+  gate: Delete the enum, collapse bench cells to one per preset, retire intensity_scale and the per-tier delivery expectations, update the tier-parity check and the derived deliveryIntensityTiers fact.
+
+- **`DP-17`** (planned) — Whisper breathiness criterion for bank curation.
+  gate: The first bank build (Warm Narrator, 2026-08-04) honestly refused whisper: VoiceDesign rendered soft-but-voiced speech, and the voiced-fraction criterion entangles pause structure (its denominator is the whole take). Replace it with a breathiness criterion from the bounded analyzer's voice-quality block (HNR/CPP deltas versus the anchor), validated on the existing scored candidates before any regeneration, so whisper can join a bank only when the phonation actually changed. Recorded follow-up in docs/reference/emotion-reference-banks.md. MEASURED 2026-08-04 (criterion prototype on the existing Warm Narrator candidates, analyze_prosody voice-quality block): the whisper candidates are MORE harmonic than the neutral anchor (delta-HNR +1.0..+1.4 dB, delta-CPP -0.5..+1.7 dB) while sad shows the most negative deltas of the whole bank — so the criterion axis works as an instrument, but these candidates contain no breathiness for any criterion to select: VoiceDesign rendered no whisper phonation at all, not merely too-voiced takes. Re-scoped accordingly: the remaining work is a whisper GENERATION recipe first (brief-wording variants, or cloning from a genuinely whispered reference), with the HNR/CPP-delta gate (breathier-than-anchor, e.g. deltaHNR <= -2 dB) wired into the builder as the acceptance criterion once candidates can plausibly pass it.
+
+- **`DP-19`** (planned) — Text-decoration valence channel (audit R5).
+  gate: The audit's decision gate routed here on the branch the session actually landed on (clone-transfer strong, instruct valence weak): measure whether text-side paralinguistic decoration — interjections, punctuation, quoted-style cues appended to the script rather than the instruction — moves valence where the instruct channel does not. Fixed-seed A/B against undecorated text on the same cells, scored by the SER advisory and prosody deltas; product exposure only if the effect is categorical, since it changes the spoken text.
+
+- **`DP-20`** (parked) — External delivery-control lever watch list (audit R8).
+  unparkWhen: Only when a watched lever becomes runnable on-device at the 8 GB floor: a Qwen3-TTS VoiceEditing/instruct variant that combines ICL with instructions, CosyVoice 3-class instruct control in an MLX-portable form, emotion-vector steering (IndexTTS-2/EmoSteer-class) with published weights, or a quantization-robust valence result. The pinned audit's R8 section is the source list; re-verify claims against primary sources at unpark time rather than trusting the 2026-08 snapshot.
 
 ## Documentation governance and staleness control
 
@@ -81,3 +103,8 @@ Narrative authority: [`docs/reference/repository-self-verification.md`](referenc
 | `DG-7` | done | Surface-coverage omission gate and the optional-assists guard | `commit:6283e65`, `commit:ca1eafd`, `file:scripts/check_surface_coverage.py` |
 | `DG-8` | done | Deep build-output ownership and storage remediation | `commit:e83ebef`, `file:scripts/build_output_policy.py` |
 | `DG-9` | done | Document the self-verification system and its failure classes | `doc:docs/reference/repository-self-verification.md` |
+
+### Open items in detail
+
+- **`DG-4`** (planned) — Phase 3 — source bindings on active documents.
+  gate: Annotated incrementally as documents are touched; a binding invented in bulk without reading the document is worse than none.

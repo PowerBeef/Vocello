@@ -15,7 +15,7 @@ Vocello opens on the Studio tab in Custom mode. The root tabs are:
 
 | Surface | Purpose | Stable identifier family |
 | --- | --- | --- |
-| Studio | Custom, Design, and Clone generation | `rootTab_studio`, `generateSection_*`, `studio_*`, `textInput_*` |
+| Studio | Custom, Design, and Clone generation | `rootTab_studio`, `generateSection_*`, `studio_*`, `studioChip_*`, `textInput_*` |
 | Voices | Saved voices and built-in speakers | `rootTab_voices`, `screen_voices`, `voicesRow_*` |
 | History | Generated takes, playback, export, deletion | `rootTab_history`, `historyModeFilter*`, `historyRow_*` |
 | Settings | Models, preferences, clone consent, storage, permissions, About | `rootTab_settings`, `iosSettings_*`, `iosModel*`, `voiceCloning_consentAcknowledgment` |
@@ -62,10 +62,21 @@ and keeps Generate disabled until it is enabled. A transcript is optional: suppl
 transcript-backed conditioning, while an empty transcript selects the distinct audio-only x-vector
 path.
 
+Emotion reference banks (DP-16) surface in Clone as a persona with a delivery choice: when the
+selected saved voice belongs to a bank, the reference chip shows the persona name and a Delivery
+chip appears (`studioChip_bankDelivery`) opening a member sheet whose rows are
+`bankDeliveryRow_<voiceID>` (Neutral is the persona's base; each emotion row is that delivery's
+verified reference voice). Selection applies the concrete member voice through the ordinary
+saved-voice path. The delivery preset sheet elsewhere in Studio is sectioned per DP-14 (Distinct
+deliveries / Directional hints) with the hints advisory as its footer
+(`deliveryPickerSheet_hintAdvisory`). While a sampling seed is pinned (DP-15), every Studio mode
+shows a Seed chip (`studioChip_seedPin`) whose tap offers the unpin confirmation.
+
 ## Voices and History
 
-Voices exposes saved rows (`voicesRow_saved_*`), built-in speakers, separate row and preview
-actions, search, filters, and one visible Save a New Voice action: `voices_saveNewVoice` records a
+Voices exposes saved rows (`voicesRow_saved_*`; a bank member's caption reads
+"Voice bank · <Delivery>" while standalone voices read "Cloned reference"), built-in speakers,
+separate row and preview actions, search, filters, and one visible Save a New Voice action: `voices_saveNewVoice` records a
 reference with the microphone (there is deliberately no file-import control on iPhone).
 `saveVoice_nameField`, `saveVoice_transcriptEditor`, and `saveVoice_saveButton` complete
 enrollment. A saved voice hands off to Studio Clone; a built-in speaker hands off to Studio
@@ -73,7 +84,9 @@ Custom. Benchmark-fixture enrollment is script-owned via
 `scripts/ios_device.sh enroll-clone-fixture`.
 
 History supports search, mode filtering, sorting, playback, export, saving a take as a voice, and
-deletion. Long-form projects group as one joined row plus a per-segment disclosure
+deletion. A row whose take recorded a sampling seed offers "Pin seed N for new takes" in its
+overflow menu (`historyRowPinSeed_<id>`, DP-15): pinning lands in that take's Studio mode with the
+Seed chip visible. Long-form projects group as one joined row plus a per-segment disclosure
 (`history_longFormSegmentsToggle_<digest8>`); search flattens the grouping, and orphan segments
 (no joined output yet) stay visible as ordinary rows. A typed database failure presents
 `historyRetryButton` rather than an empty list and keeps destructive actions disabled until a

@@ -320,14 +320,30 @@ valence at roughly a third of arousal's recoverability (adjusted R^2 0.17 vs 0.5
 CCC .248 vs .658 for lexically blind models, Wagner 2023) — a bottleneck, not a wall — and human
 listeners decode eight emotions at 72% from prosody alone on a fixed neutral sentence (RAVDESS).
 
+`MEASURED-HERE` (DP-18, 2026-08-04, pre-registered confirmatory; roadmap gate is the authority).
+The exploratory DP-10 result replicated on entirely fresh seeds in a two-arm sweep: 8-way
+separability UAR **0.477** (4-bit, 16 seeds) and **0.375** (8-bit, 18 seeds) against a 0.125
+computed floor, permutation p = 0.001 in each arm at 1000 iterations, per-cell claims under
+BH-FDR. The valence ceiling was upgraded from hypothesis to result: the pre-registered
+**happy-vs-angry 2-way probe sits at chance in both arms** (UAR 0.531 / 0.583 vs a 0.5 floor,
+p = 0.43 / 0.24), and `happy` fails FDR in both arms with `angry` as its top confusion each
+time. The 8-bit Quality arm separates no better than 4-bit, retiring quantization as a
+suspected adherence bottleneck. Protocol, provenance, and statistics:
+[`delivery-harness.md`](delivery-harness.md).
+
 Consequence for prompt-writing: **wording cannot buy a distinction this instruction channel does
 not carry.** DP-3 (long versus short form), DP-4 (prosodic null), DP-5 (merge form), and DP-6 all
 varied instruction text and none moved this. `excited` was folded into `happy` and `dramatic`
 dropped on 2026-08-03 — sustained as a product decision (a control whose output cannot be
 distinguished from its neighbour is not a control), with the statistical justification corrected
-by the audit. Presets that survive are the ones with a distinct acoustic signature (`whisper`
-breathiness, `fearful` tension, `sad`/`calm` low arousal). Corrected record and follow-up
-program: [`delivery-control-audit-2026-08.md`](delivery-control-audit-2026-08.md).
+by the audit and then confirmed by DP-18. What a *listener* reliably identifies is narrower
+still: the DP-12 blind session (146 trials) heard only `neutral`, `calm`, `whisper`, and `sad`
+above chance — exactly the shipped `EmotionPreset.distinctDeliveryIDs` set — while `angry` and
+`fearful` are acoustically separable (both clear FDR in both DP-18 arms) yet were never named
+correctly by ear (`angry` 0/11; `fearful` heard as sad). Acoustic separability is not listener
+recognizability; the UI's distinct-versus-directional-hint split follows the listener. Corrected
+record and follow-up program:
+[`delivery-control-audit-2026-08.md`](delivery-control-audit-2026-08.md).
 
 ### 4.4 Instruction language: Chinese leads on our checkpoint
 
@@ -599,6 +615,7 @@ settled one.
 | `think`/`nothink` branch | implemented; Design and Clone fall back to `nothink` |
 | Design merge template | `Voice character: … Delivery: …`, a repo invention |
 | English diction sentence | appended conditionally — see below |
+| Instruction receipt (2026-08-04) | every instructed take's telemetry row stamps `instructChars`/`instructDigest` from the request payload; the delivery harness verifies it fail-closed against the bench manifest echo ([`delivery-harness.md`](delivery-harness.md) §4) |
 
 Three of the four hazards that the research pass flagged as likely causes of "delivery sounds off"
 in MLX ports do not apply to this checkout. That is worth stating plainly, because it narrows the
@@ -784,10 +801,17 @@ Ordered by expected value. **None of these is a recommendation to change preset 
 unvalidated prompt guidance is the failure mode this document exists to stop; each item below is a
 measurement first.
 
-The harness already exists: [`scripts/delivery_matrix_report.py`](../../scripts/delivery_matrix_report.py)
-runs a seeded delivery matrix and [`scripts/delivery_statistics.py`](../../scripts/delivery_statistics.py)
+The harness already exists — the complete operator's reference is
+[`delivery-harness.md`](delivery-harness.md). In brief:
+[`scripts/delivery_separability.py`](../../scripts/delivery_separability.py) scores cross-preset
+separability (computed floors, permutation null, per-cell BH-FDR, `--presets` subset probes,
+exploratory/confirmatory designation), [`scripts/bench_delivery_prosody.py`](../../scripts/bench_delivery_prosody.py)
+turns a `bench --delivery` run into a receipt-verified paired sidecar,
+[`scripts/delivery_matrix_report.py`](../../scripts/delivery_matrix_report.py)
+runs a seeded delivery matrix, and [`scripts/delivery_statistics.py`](../../scripts/delivery_statistics.py)
 provides paired Wilcoxon tests, Cohen's d_z, BCa intervals, and Benjamini-Hochberg correction. Each
-experiment below is a matrix run plus a paired comparison.
+experiment below is a matrix run plus a paired comparison, pre-registered per
+[`delivery-harness.md`](delivery-harness.md) §6.
 
 1. ~~**Short versus long instruction.**~~ **SETTLED 2026-08-02 — the shipped long form wins,
    57 surviving features against 33 over 12 paired seeds.** The benchmark's prediction held and the
@@ -827,7 +851,11 @@ that decision actually rested on was much stronger than any single cell in it.
 6. **Negative constraints and intensifiers**, individually. Eight of the then-shipping ten presets
    carried a negation clause that no source supports, and most of the surviving eight-preset
    roster's copy still does; OV-InstructTTS's ablation points the other way.
-7. **8-bit versus bf16 instruction adherence.** Upstream measures bf16 only; we ship 8-bit (§7).
+7. **8-bit versus bf16 instruction adherence.** Partially answered by DP-18 (2026-08-04): the
+   4-bit and 8-bit quantizations were measured head-to-head on fresh seeds and the 8-bit arm
+   separates no *better* (UAR 0.375 vs 0.477, overlapping per-cell intervals) — quantization is
+   not the adherence bottleneck between our own tiers. The bf16 comparison itself remains
+   unmeasured; upstream measures bf16 only, we ship quantized (§7).
 
 `UNVERIFIED`, and worth stating so nobody re-derives it: upstream's answer for emotion control on
 *cloned* voices is `Qwen3-TTS-25Hz-1.7B-VoiceEditing`, announced by a maintainer with no committed

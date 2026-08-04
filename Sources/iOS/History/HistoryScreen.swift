@@ -640,6 +640,7 @@ private struct IOSHistoryItemCard: View {
                     } label: {
                         Label("Pin seed \(String(seedValue)) for new takes", systemImage: "pin")
                     }
+                    .accessibilityIdentifier("historyRowPinSeed_\(item.historyAccessibilityID)")
                 }
                 Divider()
                 Button("Delete", role: .destructive) {

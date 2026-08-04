@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "generated": "python3 scripts/doc_metadata.py rebuild-index",
   "note": "Machine-readable documentation map. Query this instead of globbing docs/.",
-  "annotatedDocuments": 40,
+  "annotatedDocuments": 41,
   "unannotatedDocuments": 44,
   "documents": [
     {
@@ -95,6 +95,16 @@
       "owner": "backend-mlx",
       "summary": "Delivery and clone fidelity autonomous diagnosis (2026-08-01). Pinned point-in-time report; F4's Neutral no-instruct design was reversed the same day, and the 2026-08-04 delivery-control audit supersedes its statistics and recommendations.",
       "contentDigest": "sha256:10cd4026c9181aa8499f01f5363e7fe6d7aca60481180e27e69904dc32e9627d"
+    },
+    {
+      "path": "docs/reference/delivery-harness.md",
+      "status": "active",
+      "owner": "backend-mlx",
+      "summary": "Operator's reference for the audio delivery analysis harness \u2014 the tools, the bench --delivery measurement protocol, evidence and provenance conventions, the statistics the separability scorer reports, the pre-registration discipline, the DP results ledger, and re-run recipes.",
+      "sourceOfTruth": [
+        "scripts/delivery_separability.py",
+        "scripts/bench_delivery_prosody.py"
+      ]
     },
     {
       "path": "docs/reference/delivery-remediation-plan-2026-08.md",

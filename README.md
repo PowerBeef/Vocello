@@ -54,7 +54,7 @@ Vocello is not a wrapper around a Python server: generation runs through a first
 | ![Vocello Voice Design screen](docs/screenshots/vocello-voice-design.png) | ![Vocello Voice Cloning screen](docs/screenshots/vocello-voice-cloning.png) |
 | Describe character, age, accent, texture, and delivery. Save a successful design as a reusable voice reference. | Record in the app; the Mac additionally imports WAV, MP3, AIFF, M4A, FLAC, OGG, or WebM files. A transcript improves conditioning but is optional. Generation requires the visible consent acknowledgment in Settings; only clone voices you own or are authorized to use. |
 
-Custom Voice and Voice Design support ten delivery styles at normal or strong intensity, plus a free-text delivery description. Voice Cloning follows the reference voice and does not expose delivery controls.
+Custom Voice and Voice Design support eight delivery presets plus a free-text delivery description. The picker is honest about what each preset can promise: four distinct deliveries (Neutral, Calm, Whisper, Sad) come through reliably, and the other four are directional hints that shape energy and pace while the named emotion may not land on every take. Voice Cloning follows the reference voice; with a curated emotion reference bank, a cloned persona additionally offers a delivery choice, with each delivery backed by its own verified reference clip.
 
 | Models | History |
 | --- | --- |
@@ -63,7 +63,7 @@ Custom Voice and Voice Design support ten delivery styles at normal or strong in
 
 ## Variation and reproducibility
 
-The Expressive, Balanced, and Consistent variation settings trade take-to-take variety against stability. Multi-line batches share one seed so their lines form a consistent performance. CLI and benchmark callers can provide an explicit seed for reproducible evidence. Ordinary interactive generations are not presented as seed-replayable takes.
+The Expressive, Balanced, and Consistent variation settings trade take-to-take variety against stability. Multi-line batches share one seed so their lines form a consistent performance. CLI and benchmark callers can provide an explicit seed for reproducible evidence. Every finished take also records the seed it actually used: pin a take's seed from History and subsequent generations reproduce it exactly with the same settings, or leave it unpinned for a fresh take each time.
 
 ## Local-first privacy
 

@@ -66,9 +66,13 @@ mode segments, composer, and primary action; there is no hidden screen-presence 
 
 | Mode | Identified pills |
 |---|---|
-| Custom | `studioChip_voice` → voice picker · `studioChip_delivery` · `studioChip_language` |
-| Design | `studioChip_voiceBrief` → brief editor · `studioChip_delivery` · `studioChip_language` |
-| Clone | `studioChip_reference` → record or saved voice · `studioChip_language` |
+| Custom | `studioChip_voice` → voice picker · `studioChip_delivery` · `studioChip_language` · `studioChip_seedPin` (only while a seed is pinned) |
+| Design | `studioChip_voiceBrief` → brief editor · `studioChip_delivery` · `studioChip_language` · `studioChip_seedPin` (conditional) |
+| Clone | `studioChip_reference` → record or saved voice · `studioChip_bankDelivery` (only while a bank member is selected) · `studioChip_language` · `studioChip_seedPin` (conditional) |
+
+`studioChip_seedPin` (DP-15) shows the pinned sampling seed; tapping offers the unpin
+confirmation, returning to a fresh seed per take. `studioChip_bankDelivery` (DP-16) shows the
+selected emotion-bank persona's current delivery and opens the bank member sheet below.
 
 Clone reads the persistent `voiceCloning_consentAcknowledgment` preference from Settings. Generate
 remains unavailable until the user acknowledges consent there. The optional transcript selects
@@ -86,18 +90,27 @@ tap Confirm to commit + dismiss. Preview plays audio without selecting/closing.
 **Language picker** — rows `languagePicker_<rawValue>` (e.g. `languagePicker_auto`,
 `languagePicker_english`), confirm `languagePicker_confirm`.
 
-**Delivery picker** — confirm `deliveryPicker_confirm`; a 2-column preset grid over
-`EmotionPreset.all` (cells `deliveryPickerPreset_<presetID>`); and a custom
+**Delivery picker** — confirm `deliveryPicker_confirm`; a 2-column preset grid in two labeled
+sections per the DP-14 measured split — "Distinct deliveries" (Neutral/Calm/Whisper/Sad) then
+"Directional hints" (Happy/Angry/Fearful/Surprised) — with cells `deliveryPickerPreset_<presetID>`
+and the hints advisory as the section footer (`deliveryPickerSheet_hintAdvisory`); and a custom
 tone editor: `deliveryPickerSheet_customTone` (toggle in), `deliveryPickerSheet_customTone_editor`
 (text, `/500` counter `deliveryPickerSheet_customTone_charCount`),
 `deliveryPickerSheet_customTone_examples`, `deliveryPickerSheet_customTone_back`.
+
+**Bank delivery picker** (Clone only, DP-16) — `IOSBankDeliveryPickerSheet`: one row per bank
+member (`bankDeliveryRow_<voiceID>`; Neutral is the persona's base voice, each emotion row that
+delivery's verified reference). Selecting applies the concrete member voice through the ordinary
+`applySavedVoice` path and dismisses.
 
 **Voice brief editor** (Design only) — `voiceBrief_editor` (multi-line) + `voiceBrief_confirm`.
 
 ### Voices tab — `Sources/iOS/IOSVoicesView.swift`
 
 Container `screen_voices`. Filter chips `voicesFilter_all|builtIn|saved`. Built-in rows
-`voicesRow_<speakerId>` (e.g. `voicesRow_aiden`); saved-voice rows `voicesRow_saved_<id>`.
+`voicesRow_<speakerId>` (e.g. `voicesRow_aiden`); saved-voice rows `voicesRow_saved_<id>` (an
+emotion-bank member's caption reads "Voice bank · <Delivery>"; standalone voices read "Cloned
+reference" — every member stays listed because each reference clip is individually previewable).
 The Save a New Voice card has one visible action: `voices_saveNewVoice` starts the recorder
 (iPhone deliberately offers no file import; a saved Voice Design voice can also serve as the
 clone reference through the Studio handoff). The enrollment sheet exposes `saveVoice_nameField`,
@@ -110,7 +123,9 @@ Search `historySearchField`; clear menu `historyClearMenu` → `historyClearKeep
 `historyClearDeleteFiles`; retry `historyRetryButton`. Mode-filter chips
 `historyModeFilter` container + `historyModeFilter_all|custom|design|clone`. Rows:
 `historyRow_<id>`, tap area `historyRowTap_<id>` (opens player), menu `historyRowMenu_<id>`
-(Play/Save/Delete), delete-confirm `historyRowDeleteConfirm_<id>`. Grouped by Today /
+(Play / Save audio / Pin seed / Delete — the pin item `historyRowPinSeed_<id>` appears only for
+takes with a recorded seed and lands in that take's Studio mode with `studioChip_seedPin`
+visible), delete-confirm `historyRowDeleteConfirm_<id>`. Grouped by Today /
 Yesterday / Previous 7/30 Days / Earlier.
 
 Database failures are typed and fail closed. The error state does not masquerade as empty History;
@@ -210,8 +225,11 @@ Generate rather than Install. Destructive install/cancel/delete actions are outs
   conditioning, while an empty transcript uses the genuine audio-only x-vector path. The visible
   Settings control `voiceCloning_consentAcknowledgment` must be enabled before Generate. Saved
   voices from the Voices tab are reusable references. Clone
-  cannot take a separate delivery instruction on current checkpoints — pick a reference clip that
-  already carries the delivery you want.
+  cannot take a separate delivery instruction on current checkpoints — the delivery must live in
+  the reference clip. Curated emotion reference banks make that practical: a bank persona's
+  members enroll as ordinary saved voices ("Voice bank · <Delivery>" captions in Voices), and
+  selecting the persona in Clone offers a Delivery chip that swaps between its verified
+  per-emotion references ([emotion-reference-banks.md](emotion-reference-banks.md)).
 
 ### Speakers (Custom Voice) — `qwenvoice_contract.json`
 
@@ -221,8 +239,12 @@ delivery biases (e.g. Ryan is naturally expressive; start from Aiden/Serena for 
 
 ### Delivery — `Sources/QwenVoiceCore/EmotionPreset.swift`
 
-8 presets: **Neutral** (treated as "no style instruction"), plus
-**Happy, Sad, Angry, Fearful, Surprised, Calm, Whisper** — one instruction each.
+8 presets: **Neutral** (a real instructed preset since 2026-08-01), plus
+**Happy, Sad, Angry, Fearful, Surprised, Calm, Whisper** — one instruction each. The picker is
+sectioned by the measured DP-12/DP-14 split: **Neutral, Calm, Whisper, Sad** are distinct
+deliveries a listener identifies above chance (`EmotionPreset.distinctDeliveryIDs`); **Happy,
+Angry, Fearful, Surprised** are directional hints that move energy and pace reliably while the
+named emotion may not land on every take, and selecting one shows the shared advisory copy.
 `Excited` and `Dramatic` were retired 2026-08-03 (DP-10): both scored below the chance floor for
 cross-preset separability, so neither was a control a listener could act on.
 The user-facing **intensity** control was retired 2026-08-02: DP-3 measured the `strong` copy at
@@ -244,7 +266,9 @@ Italian. The instruction/brief language is independent of the spoken-text langua
 
 - **Speed vs Quality** — iOS is Speed-only (smaller, faster, lower memory). Quality (8-bit) is macOS-only.
 - **Reproducible takes** — Settings → `iosSettings_variationRow`: **Expressive** (most variety,
-  default) / **Balanced** / **Consistent** (most stable). Each generation records its seed. Batch
+  default) / **Balanced** / **Consistent** (most stable). Each generation records its effective
+  seed in History (schema v6); "Pin seed" on a History row reproduces that take on demand and the
+  Studio Seed chip shows/unpins the state (DP-15). Batch
   generation is intentionally absent from iOS.
 - **Text limits** — enforced live (`textInput_lengthCount` + `textInput_limitMessage`); custom-tone cap `/500`.
 

@@ -392,13 +392,36 @@ def render(root: pathlib.Path) -> str:
             lines += ["_No items yet._", ""]
             continue
         lines += ["| Item | Status | Title | Evidence |", "| --- | --- | --- | --- |"]
-        for item in sorted(owned, key=lambda i: i["id"]):
+        for item in sorted(owned, key=lambda i: _item_sort_key(i["id"])):
             evidence = ", ".join(f"`{e}`" for e in item.get("evidence", [])) or "—"
             lines.append(
                 f"| `{item['id']}` | {item['status']} | {item['title']} | {evidence} |"
             )
         lines.append("")
+        # Open items carry their full gate/unpark text into the render: the
+        # JSON is the authority, but a fresh session reads this file first,
+        # and open work whose requirements are invisible here is open work
+        # that gets re-derived from scratch.
+        open_items = [
+            i for i in sorted(owned, key=lambda i: _item_sort_key(i["id"]))
+            if i["status"] not in TERMINAL
+        ]
+        if open_items:
+            lines += ["### Open items in detail", ""]
+            for item in open_items:
+                detail = item.get("gate") or item.get("unparkWhen") or "(no gate text)"
+                label = "unparkWhen" if (not item.get("gate") and item.get("unparkWhen")) else "gate"
+                lines += [f"- **`{item['id']}`** ({item['status']}) — {item['title']}.",
+                          f"  {label}: {detail}", ""]
     return "\n".join(lines).rstrip() + "\n"
+
+
+def _item_sort_key(item_id: str):
+    """Numeric-aware id ordering: DP-2 sorts before DP-10."""
+    match = re.match(r"^([A-Za-z]+)-(\d+)$", item_id)
+    if match:
+        return (match.group(1), int(match.group(2)))
+    return (item_id, 0)
 
 
 def main(argv=None) -> int:

@@ -33,7 +33,7 @@ Current app behavior:
 - **Voice Design** has its own generation screen and prompt flow using a natural-language voice/design instruction
 - **Voice Cloning** uses reference audio and can optionally use a transcript for better preparation quality, but it does not expose a separate instruction-only tone surface
 - single generations produce a complete final take, and the app does not expose temperature or max-token controls
-- **Neutral** delivery is intentionally treated as no meaningful style instruction. Custom Voice and Voice Design prompts use direct natural language rather than `Delivery style:` fields.
+- **Neutral** is a real instructed preset since 2026-08-01 (`EmotionPreset.neutralPresetInstruction`), not an absent instruction — see the sourced guide's §6.3. Only the typed-synonym path ("neutral", "default") drops the instruction entirely. Custom Voice and Voice Design prompts use direct natural language rather than `Delivery style:` fields.
 
 Useful instruction patterns:
 
@@ -57,7 +57,7 @@ Useful instruction patterns:
 - **Don't expect dialect or accent switching from instructions** — emotion and style follow, but `speak in a Sichuan dialect` yields standard Mandarin. Dialects come from the dialect speakers (Dylan — Beijing, Eric — Sichuan) or from cloning an accented reference.
 - **Speakers carry baked-in delivery biases**: Ryan is inherently expressive and resists a flat newscast read; for neutral delivery start from a calmer voice (Aiden, Serena) instead of fighting the timbre with instructions.
 - Iterate wording: instruction following is probabilistic, so small prompt changes can materially change the result.
-- Use Voice Design when you want a reusable prompt-driven voice shape, and use Voice Cloning when you want a specific reference identity from audio. (Cloned voices cannot take delivery instructions on the current checkpoints — pick a reference clip that already carries the delivery you want, e.g. by saving a Voice Design result.)
+- Use Voice Design when you want a reusable prompt-driven voice shape, and use Voice Cloning when you want a specific reference identity from audio. Cloned voices cannot take delivery instructions on the current checkpoints — the delivery must live in the reference clip. A single saved Voice Design take is usually not enough (measured 2026-08-04: three of four single-shot references failed to carry their emotion); use the curated design-then-clone bank pipeline instead ([emotion reference banks](reference/emotion-reference-banks.md)), which verifies each per-emotion reference before enrolling it.
 - **Long scripts drift**: very long single generations tend to speed up and compress pauses toward the end. Break long material into paragraph-sized generations (each re-asserts the delivery instruction) for steadier pacing.
 
 ## Pauses in the Spoken Text

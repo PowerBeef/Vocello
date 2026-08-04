@@ -102,7 +102,7 @@ those specialized gates remain authoritative and one-pass ASR remains diagnostic
     boundary sample/RMS/pitch/silence discontinuity aggregates. Boundary positions are supplied by
     the caller; the analyzer does not infer chunk or segment identity from audio.
 - **`scripts/prosody_quality_gate.py`** — flags monotone, rushed, flat/slurred, and pause-issue takes with conservative thresholds. Run per-clip or import `evaluate(path)`.
-- **`scripts/bench_delivery_prosody.py`** — post-processes `vocello bench --delivery` WAVs, pairs each instructed take with its neutral reference, and writes `diagnostics/bench-prosody.json`.
+- **`scripts/bench_delivery_prosody.py`** — post-processes `vocello bench --delivery` WAVs, pairs each instructed take with its neutral reference, and writes `diagnostics/bench-prosody.json`. Since 2026-08-04 every instructed row is receipt-verified fail-closed (engine-side `instructChars`/`instructDigest` must match the manifest's instruction echo; the neutral pair must carry none). The consolidated harness reference, including the statistics layer built on this sidecar, is [`delivery-harness.md`](delivery-harness.md).
 
 ### Updated scripts
 

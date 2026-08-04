@@ -287,7 +287,11 @@ ten-preset roster: for five presets the nearest cell in the whole space was its 
 seven of nine non-neutral presets moved *less* at strong than at normal, and the since-retired
 `dramatic` reversed outright (the roster was cut to 8 on 2026-08-03 — see
 [`delivery-control-audit-2026-08.md`](delivery-control-audit-2026-08.md)). Every
-preset therefore ships its strong copy.
+preset therefore ships its strong copy. Since 2026-08-04 the eight presets also carry the
+measured recognizability split (`EmotionPreset.distinctDeliveryIDs`): Neutral, Calm,
+Whisper, and Sad present as distinct deliveries, while Happy, Angry, Fearful, and
+Surprised present as directional hints with advisory copy — the measurement program and
+its results are consolidated in [`delivery-harness.md`](delivery-harness.md).
 
 `EmotionIntensity` survives internally, addressing both texts, so the delivery matrix harness can
 keep running the queued experiments and drafts saved before the change resolve to exactly what they

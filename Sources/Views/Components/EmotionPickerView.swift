@@ -78,6 +78,13 @@ struct EmotionPickerView: View {
                 toneControlRow
             }
 
+            if !isCustomMode, selectedPreset?.isDirectionalHint == true {
+                Label(EmotionPreset.directionalHintAdvisory, systemImage: "wand.and.sparkles")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("\(accessibilityPrefix)_hintAdvisory")
+            }
+
             customToneField
         }
         .onAppear {
@@ -86,14 +93,28 @@ struct EmotionPickerView: View {
     }
 
     private var tonePicker: some View {
+        // The measured split (DP-12): distinct deliveries first, directional
+        // hints second, so the menu itself tells the truth about what each
+        // half can promise.
         Picker(title, selection: selectedOptionID) {
-            ForEach(EmotionPreset.all) { preset in
-                Text(preset.label)
-                    .tag(preset.id)
+            Section("Distinct deliveries") {
+                ForEach(EmotionPreset.all.filter { !$0.isDirectionalHint }) { preset in
+                    Text(preset.label)
+                        .tag(preset.id)
+                }
             }
 
-            Text("Custom")
-                .tag("custom")
+            Section("Directional hints") {
+                ForEach(EmotionPreset.all.filter(\.isDirectionalHint)) { preset in
+                    Text(preset.label)
+                        .tag(preset.id)
+                }
+            }
+
+            Section {
+                Text("Custom")
+                    .tag("custom")
+            }
         }
         .labelsHidden()
         .pickerStyle(.menu)

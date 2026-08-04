@@ -157,10 +157,30 @@ struct IOSDeliveryPickerSheet: View {
     private var presetPickerBody: some View {
         IOSScrollView(bottomFadeHeight: 0) {
             VStack(alignment: .leading, spacing: 18) {
-                LazyVGrid(columns: columns, spacing: 12) {
-                    ForEach(EmotionPreset.all) { preset in
-                        cell(for: preset)
+                // The measured split (DP-12): distinct deliveries listeners
+                // actually identify, then directional hints framed honestly.
+                VStack(alignment: .leading, spacing: 10) {
+                    sectionHeader("Distinct deliveries")
+                    LazyVGrid(columns: columns, spacing: 12) {
+                        ForEach(EmotionPreset.all.filter { !$0.isDirectionalHint }) { preset in
+                            cell(for: preset)
+                        }
                     }
+                }
+
+                VStack(alignment: .leading, spacing: 10) {
+                    sectionHeader("Directional hints")
+                    LazyVGrid(columns: columns, spacing: 12) {
+                        ForEach(EmotionPreset.all.filter(\.isDirectionalHint)) { preset in
+                            cell(for: preset)
+                        }
+                    }
+
+                    Text(EmotionPreset.directionalHintAdvisory)
+                        .font(.system(size: 12))
+                        .foregroundStyle(IOSAppTheme.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("deliveryPickerSheet_hintAdvisory")
                 }
 
                 // Intensity row retired 2026-08-02. DP-3 measured `strong` at
@@ -409,14 +429,24 @@ struct IOSDeliveryPickerSheet: View {
     /// `design_references/Vocello iOS/data.js` `deliveries[]`. Hand-wired
     /// here instead of as a `description` field on `EmotionPreset` to
     /// keep the iOSSupport model layer untouched.
+    private func sectionHeader(_ title: String) -> some View {
+        Text(title.uppercased())
+            .font(.system(size: 11, weight: .semibold))
+            .tracking(0.8)
+            .foregroundStyle(IOSAppTheme.textSecondary)
+    }
+
     private func description(for preset: EmotionPreset) -> String {
+        // The hint half's copy is honest about what was measured (DP-12):
+        // these move energy and pace hard, but the named emotion is not what
+        // listeners reliably hear.
         switch preset.id {
         case "neutral":  return "Default, even pacing"
-        case "happy":    return "Warm, bright, smiling"
+        case "happy":    return "Bright lift; can read as surprise"
         case "sad":      return "Quiet, slower, somber"
-        case "angry":    return "Tense, sharp"
-        case "fearful":  return "Quiet, hesitant"
-        case "surprised":return "Animated, pitch jumps"
+        case "angry":    return "Hard, driving push"
+        case "fearful":  return "Soft, unsteady; can read as sad"
+        case "surprised":return "Pitch jumps, quick catches"
         case "whisper":  return "Soft, close-mic breath"
         case "calm":     return "Slower, reassuring"
         default:         return ""

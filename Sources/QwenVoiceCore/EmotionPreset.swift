@@ -198,6 +198,28 @@ public struct EmotionPreset: Identifiable, Sendable {
         return nil
     }
 
+    /// The measured roster split (DP-12 calibration session, 2026-08-04;
+    /// docs/reference/delivery-control-audit-2026-08.md finding record in
+    /// docs/development-progress.md finding 14). Listeners identify these
+    /// four presets above chance (calm 0.55, whisper 0.55, neutral 0.36,
+    /// sad 0.36), so the UI presents them as distinct deliveries. The
+    /// remaining four moved prosody hard but were not identified as
+    /// themselves (angry 0/11 — never once named Angry; happy heard as
+    /// Surprised; fearful heard as Sad; surprised mostly Unsure), so they
+    /// present as directional hints that shape energy and pace without
+    /// promising the named emotion. Membership changes require a new
+    /// listening measurement, not taste.
+    public static let distinctDeliveryIDs: Set<String> = ["neutral", "calm", "whisper", "sad"]
+
+    /// Honest framing for the hint half of the roster, shared by both
+    /// platforms so the wording cannot drift.
+    public static let directionalHintAdvisory =
+        "Directional hints shape energy and pace reliably, but the named emotion may not come through on every take. Regenerate to explore, or clone from an emotion reference voice for a dependable delivery."
+
+    public var isDirectionalHint: Bool {
+        !EmotionPreset.distinctDeliveryIDs.contains(id)
+    }
+
     /// The Neutral preset's real instruction (adopted 2026-08-01, maintainer
     /// decision closing finding F4): Neutral is a preset like any other — a
     /// slightly monotone, emotion-free delivery target — rather than the

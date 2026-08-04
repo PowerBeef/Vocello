@@ -54,4 +54,17 @@ final class EmotionPresetResolutionTests: XCTestCase {
         XCTAssertNil(EmotionPreset.matchInstruction("   "))
         XCTAssertNil(EmotionPreset.matchInstruction(""))
     }
+
+    func testMeasuredRosterSplitStaysCoherent() {
+        // The distinct/hint split is measured (DP-12), not taste: every
+        // distinct id must exist in the roster, and the two halves must
+        // partition it exactly — a retired preset lingering in the split, or
+        // a new preset silently landing unclassified, both fail here.
+        let rosterIDs = Set(EmotionPreset.all.map(\.id))
+        XCTAssertTrue(EmotionPreset.distinctDeliveryIDs.isSubset(of: rosterIDs))
+        let hints = Set(EmotionPreset.all.filter(\.isDirectionalHint).map(\.id))
+        XCTAssertEqual(hints.union(EmotionPreset.distinctDeliveryIDs), rosterIDs)
+        XCTAssertTrue(hints.isDisjoint(with: EmotionPreset.distinctDeliveryIDs))
+        XCTAssertFalse(EmotionPreset.directionalHintAdvisory.isEmpty)
+    }
 }

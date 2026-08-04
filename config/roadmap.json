@@ -455,6 +455,31 @@
       "updated": "2026-08-04"
     },
     {
+      "id": "DP-14",
+      "plan": "delivery-prompting-2026-08",
+      "title": "Move 3: honest delivery UX — the measured feature/hint split",
+      "status": "done",
+      "gate": "Landed 2026-08-04. EmotionPreset carries the measured roster split as data with provenance (distinctDeliveryIDs = neutral/calm/whisper/sad — the four the DP-12 listener identified above chance; the other four are directional hints), plus the shared directionalHintAdvisory string so both platforms' wording cannot drift; a Core test pins the split as an exact partition of the live roster so a retired preset lingering in it, or a new preset landing unclassified, fails the suite. The macOS delivery menu is sectioned (Distinct deliveries / Directional hints / Custom) and shows the advisory caption whenever a hint preset is selected (delivery_hintAdvisory); the iOS sheet gets the same sections, the advisory as the hints footer (deliveryPickerSheet_hintAdvisory), and honest per-preset descriptions (happy 'can read as surprise', fearful 'can read as sad' — the confusions the session actually measured). Preset ordering in EmotionPreset.all is untouched, so bench cells and harness identities are unaffected.",
+      "evidence": [
+        "file:Sources/QwenVoiceCore/EmotionPreset.swift",
+        "file:Sources/Views/Components/EmotionPickerView.swift",
+        "file:Sources/iOS/Sheets/IOSBottomSheets.swift",
+        "file:Tests/VocelloCoreTests/EmotionPresetResolutionTests.swift"
+      ],
+      "sourceOfTruth": [
+        "Sources/QwenVoiceCore/EmotionPreset.swift"
+      ],
+      "updated": "2026-08-04"
+    },
+    {
+      "id": "DP-15",
+      "plan": "delivery-prompting-2026-08",
+      "title": "Seed retry/pin as a first-class take control",
+      "status": "planned",
+      "gate": "The audit's R6 remainder: expose regenerate-with-new-seed and pin-this-take's-seed in both apps — the stochastic-with-retry norm the market has institutionalized, with the local advantage that fixed seeds genuinely reproduce a take. Scoping findings from 2026-08-04: GenerationRequest already accepts seed (the CLI uses it) and the observed seed rides the result diagnostics, but persisting a take's seed for later reuse needs a History schema migration, which makes this its own arc under the database-migration rules rather than a rider on a copy pass.",
+      "updated": "2026-08-04"
+    },
+    {
       "id": "CM-7",
       "plan": "convergence-metal4-stage4-2026-08",
       "title": "Non-streaming CLI generation publishes no WAV while reporting success",

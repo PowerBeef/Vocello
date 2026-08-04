@@ -10,7 +10,7 @@
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
 | `convergence-metal4-stage4-2026-08` | active | backend-and-platform | 3/7 (43%) |
-| `delivery-prompting-2026-08` | active | backend-mlx | 12/13 (92%) |
+| `delivery-prompting-2026-08` | active | backend-mlx | 13/15 (87%) |
 | `doc-governance-2026-08` | active | release-qa | 7/9 (78%) |
 
 ## Convergence residuals, Metal 4 study, and Stage 4
@@ -46,6 +46,8 @@ Narrative authority: [`docs/reference/qwen3-tts-prompting-guide.md`](reference/q
 | `DP-11` | done | Delivery-control audit: adversarial re-examination and external research sweep | `doc:docs/reference/delivery-control-audit-2026-08.md`, `doc:docs/development-progress.md`, `doc:docs/reference/qwen3-tts-prompting-guide.md` |
 | `DP-12` | done | Move 1: fix the found defects, harden the harness, run the calibration session | `file:Sources/QwenVoiceCore/EmotionPreset.swift`, `file:Sources/Views/Components/EmotionPickerView.swift`, `file:Tests/VocelloCoreTests/EmotionPresetResolutionTests.swift`, `file:scripts/delivery_separability.py`, `file:scripts/bench_delivery_prosody.py`, `file:scripts/delivery_listening_session.py`, `doc:docs/reference/delivery-control-audit-2026-08.md` |
 | `DP-13` | done | Move 2: curated design-then-clone emotion reference banks | `file:scripts/build_emotion_reference_bank.py`, `file:scripts/tests/test_build_emotion_reference_bank.py`, `doc:docs/reference/emotion-reference-banks.md`, `file:Sources/Models/GenerationDrafts.swift`, `file:Sources/iOS/IOSGenerationInputControls.swift` |
+| `DP-14` | done | Move 3: honest delivery UX — the measured feature/hint split | `file:Sources/QwenVoiceCore/EmotionPreset.swift`, `file:Sources/Views/Components/EmotionPickerView.swift`, `file:Sources/iOS/Sheets/IOSBottomSheets.swift`, `file:Tests/VocelloCoreTests/EmotionPresetResolutionTests.swift` |
+| `DP-15` | planned | Seed retry/pin as a first-class take control | — |
 | `DP-2` | done | Deterministic delivery-instruction contract gate | `commit:6f4c651`, `file:scripts/check_delivery_instructions.py` |
 | `DP-3` | done | Short-versus-long instruction A/B | `doc:docs/reference/qwen3-tts-prompting-guide.md`, `file:config/runtime-debug-knobs.json` |
 | `DP-4` | done | English diction append: does it earn its place | `doc:docs/reference/qwen3-tts-prompting-guide.md`, `file:config/runtime-debug-knobs.json` |

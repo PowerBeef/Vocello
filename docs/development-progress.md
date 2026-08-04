@@ -336,6 +336,24 @@ performance block after the fixture rebind, Tier 4 carryover). Immediate specifi
    disabled by the one-time cloning consent. The readiness descriptor is now
    consent-aware on both platforms, so the note and the button agree.
 
+16. **Move 3 landed: the delivery UI tells the measured truth (2026-08-04,
+   DP-14):** the roster split from the calibration session is now data with
+   provenance — `EmotionPreset.distinctDeliveryIDs` holds the four presets
+   the listener identified above chance (neutral, calm, whisper, sad), the
+   other four are directional hints, and a Core test pins the split as an
+   exact partition of the live roster. The macOS delivery menu is sectioned
+   (Distinct deliveries / Directional hints / Custom) and shows a shared
+   advisory whenever a hint is selected; the iOS sheet gets the same
+   sections, the advisory as the hints footer, and honest per-preset copy
+   that names the measured confusions (happy "can read as surprise",
+   fearful "can read as sad"). Preset ordering in `EmotionPreset.all` is
+   untouched, so bench cells and harness identities are unaffected. The R6
+   remainder — regenerate-with-new-seed and pin-this-seed as first-class
+   take controls — is scoped and parked as DP-15: the request plumbing
+   exists, but persisting a take's seed needs a History schema migration,
+   which earns its own arc. With this, all three moves of the
+   delivery-control audit are complete.
+
 ## Staged roadmap state
 
 Stage-by-stage details, closure evidence, and falsifiability criteria live in the

@@ -278,6 +278,38 @@ def _uar_of(predictions, labels, cells):
     return sum(recalls) / len(recalls) if recalls else 0.0
 
 
+def _binomial_at_least_p(successes, trials, probability):
+    """Exact one-sided binomial p-value: P(X >= successes | n, p)."""
+    if trials <= 0:
+        return 1.0
+    total = 0.0
+    for k in range(successes, trials + 1):
+        total += math.comb(trials, k) * (probability ** k) * ((1 - probability) ** (trials - k))
+    return min(1.0, total)
+
+
+def benjamini_hochberg(p_values):
+    """BH step-up adjusted q-values, order-preserving with the inputs.
+
+    DP-18 (audit R4): per-cell above-chance claims are a family of tests;
+    the confirmatory run reports FDR-adjusted q-values so eight cells
+    cannot each borrow the single-test alpha.
+    """
+    m = len(p_values)
+    if m == 0:
+        return []
+    indexed = sorted(range(m), key=lambda i: p_values[i])
+    q_values = [0.0] * m
+    running_min = 1.0
+    for rank_from_end in range(m - 1, -1, -1):
+        index = indexed[rank_from_end]
+        rank = rank_from_end + 1
+        candidate = p_values[index] * m / rank
+        running_min = min(running_min, candidate)
+        q_values[index] = min(1.0, running_min)
+    return q_values
+
+
 def _wilson_bounds(successes, trials, z=1.959963984540054):
     """Wilson score interval for a binomial proportion; (low, high)."""
     if trials <= 0:
@@ -438,8 +470,20 @@ def evaluate_separability(
             per_cell[cell]["aboveChance"] = low > chance_floor
             per_cell[cell]["belowChance"] = high < chance_floor
         if support:
+            per_cell[cell]["aboveChanceP"] = round(
+                _binomial_at_least_p(correct, support, chance_floor), 4
+            )
             recalls.append(recall)
             f1_scores.append(f1)
+
+    # FDR across the per-cell above-chance family (DP-18 / audit R4): eight
+    # cells tested at alpha each would inflate the family-wise false-positive
+    # rate; BH q-values make the multiplicity explicit in the verdict itself.
+    fdr_cells = [cell for cell in per_cell if "aboveChanceP" in per_cell[cell]]
+    fdr_q = benjamini_hochberg([per_cell[cell]["aboveChanceP"] for cell in fdr_cells])
+    for cell, q_value in zip(fdr_cells, fdr_q):
+        per_cell[cell]["aboveChanceQ"] = round(q_value, 4)
+        per_cell[cell]["aboveChanceFdr05"] = q_value <= 0.05
 
     # Centroid geometry over the whole set, for pair margins and the intensity
     # collapse check.  Standardized once here; the CV above is what guards
@@ -641,6 +685,13 @@ def main():
         help="evidentiary status of this run; decision-bearing claims need a "
              "preregistered confirmatory run on fresh seeds",
     )
+    parser.add_argument(
+        "--presets", metavar="LIST",
+        help="comma-separated preset subset (e.g. happy,angry) — runs the "
+             "discriminant on only those presets' records, for pre-registered "
+             "K-way probes like DP-18's happy-vs-angry 2-way; the verdict "
+             "records the filter so a subset run can never pass as the full set",
+    )
     parser.add_argument("--json", action="store_true", help="emit the verdict as JSON")
     arguments = parser.parse_args()
 
@@ -648,6 +699,10 @@ def main():
     with open(arguments.sidecar or arguments.records, "r", encoding="utf-8") as handle:
         payload = json.load(handle)
     records = records_from_sidecar(payload) if arguments.sidecar else payload
+    preset_filter = None
+    if arguments.presets:
+        preset_filter = sorted({token.strip() for token in arguments.presets.split(",") if token.strip()})
+        records = [record for record in records if record.get("preset") in preset_filter]
     verdict = evaluate_separability(
         records,
         profile,
@@ -655,6 +710,8 @@ def main():
         null_iterations=arguments.null_iters,
         designation=arguments.designation,
     )
+    if preset_filter is not None:
+        verdict["presetFilter"] = preset_filter
 
     if arguments.json:
         print(json.dumps(verdict, indent=2, sort_keys=True))

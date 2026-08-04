@@ -271,3 +271,54 @@ class SeparabilityTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class FdrTests(unittest.TestCase):
+    """DP-18 (audit R4): per-cell above-chance claims are a family of tests."""
+
+    def test_benjamini_hochberg_matches_hand_computation(self):
+        from delivery_separability import benjamini_hochberg
+        # Classic worked example: p = [0.01, 0.02, 0.03, 0.04] at m=4 gives
+        # q = [0.04, 0.04, 0.04, 0.04]; a lone large p stays its own q.
+        self.assertEqual(benjamini_hochberg([0.01, 0.02, 0.03, 0.04]), [0.04, 0.04, 0.04, 0.04])
+        q = benjamini_hochberg([0.001, 0.8])
+        self.assertAlmostEqual(q[0], 0.002)
+        self.assertAlmostEqual(q[1], 0.8)
+        self.assertEqual(benjamini_hochberg([]), [])
+
+    def test_exact_binomial_tail_is_exact(self):
+        from delivery_separability import _binomial_at_least_p
+        # P(X >= 1 | n=2, p=0.5) = 0.75; P(X >= 0) = 1; empty trials fail safe.
+        self.assertAlmostEqual(_binomial_at_least_p(1, 2, 0.5), 0.75)
+        self.assertAlmostEqual(_binomial_at_least_p(0, 2, 0.5), 1.0)
+        self.assertEqual(_binomial_at_least_p(1, 0, 0.5), 1.0)
+
+    def test_verdict_carries_q_values_and_fdr_flags(self):
+        verdict = evaluate_separability(
+            cohort({"alpha": (0.0, 0.0), "beta": (12.0, 12.0), "gamma": (24.0, 24.0)})
+        )
+        for cell, stats in verdict["cells"].items():
+            self.assertIn("aboveChanceP", stats, cell)
+            self.assertIn("aboveChanceQ", stats, cell)
+            self.assertIn("aboveChanceFdr05", stats, cell)
+            # Perfectly separated cells at 8 seeds vs a 1/3 floor survive FDR.
+            self.assertTrue(stats["aboveChanceFdr05"], (cell, stats))
+            self.assertLessEqual(stats["aboveChanceP"], stats["aboveChanceQ"] + 1e-9)
+
+    def test_chance_level_cells_do_not_survive_fdr(self):
+        # Features are deterministic pseudo-noise uncorrelated with the label:
+        # whatever the discriminant memorizes in train folds cannot transfer,
+        # so held-out recall sits at chance and no cell may clear FDR.
+        import math as _math
+        records = []
+        for index, preset in enumerate(("alpha", "beta")):
+            for seed in range(8):
+                noise_a = _math.sin(12.9898 * (seed * 2 + index) + 78.233)
+                noise_b = _math.sin(39.3468 * (seed * 2 + index) + 11.135)
+                records.append(record(preset, seed, noise_a, noise_b))
+        verdict = evaluate_separability(records)
+        survivors = [
+            cell for cell, stats in verdict["cells"].items()
+            if stats.get("aboveChanceFdr05")
+        ]
+        self.assertEqual(survivors, [], verdict["cells"])

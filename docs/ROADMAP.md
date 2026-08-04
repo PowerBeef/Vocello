@@ -9,7 +9,7 @@
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `convergence-metal4-stage4-2026-08` | active | backend-and-platform | 4/7 (57%) |
+| `convergence-metal4-stage4-2026-08` | active | backend-and-platform | 5/7 (71%) |
 | `delivery-prompting-2026-08` | active | backend-mlx | 15/20 (75%) |
 | `doc-governance-2026-08` | active | release-qa | 8/9 (89%) |
 
@@ -26,7 +26,7 @@ Narrative authority: [`docs/reference/roadmap-2026-08.md`](reference/roadmap-202
 | `CM-1` | done | Stage 4 mlx pin bump to the newest lockstep pair | `commit:19ea7e8`, `doc:docs/reference/roadmap-2026-08.md` |
 | `CM-2` | declined | P1b static-shape talker compile | `doc:docs/reference/roadmap-2026-08.md` |
 | `CM-3` | declined | Gate 2 — Candidate A fused code-predictor kernel | `doc:docs/reference/roadmap-2026-08.md` |
-| `CM-4` | in-flight | Long-form text-context carryover, text first | `commit:bd92a59`, `commit:59458bc` |
+| `CM-4` | done | Long-form text-context carryover, text first | `commit:bd92a59`, `commit:59458bc`, `doc:docs/decisions/long-form-context-planning-v2.md`, `doc:docs/decisions/long-form-acoustic-carryover-experiment.md` |
 | `CM-5` | in-flight | Phone-gated evidence battery remainder | `doc:docs/reference/roadmap-2026-08.md` |
 | `CM-6` | parked | MOS-proxy advisory column (UTMOSv2) | `doc:docs/reference/roadmap-2026-08.md` |
 | `CM-7` | done | Non-streaming CLI generation publishes no WAV while reporting success | `file:Sources/QwenVoiceCore/GenerationOutputAdapter.swift`, `file:Tests/VocelloCoreTests/GenerationTerminalCleanupTests.swift`, `file:Sources/VocelloCLI/GenerateCommand.swift`, `file:Sources/VocelloCLI/BatchCommand.swift` |

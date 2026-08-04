@@ -84,20 +84,22 @@
       "id": "CM-4",
       "plan": "convergence-metal4-stage4-2026-08",
       "title": "Long-form text-context carryover, text first",
-      "status": "in-flight",
+      "status": "done",
       "legacyIds": [
         "Tier 4",
         "Q2"
       ],
-      "gate": "Planner-only change proved on text before any acoustic carryover is attempted.",
+      "gate": "Planner-only change proved on text before any acoustic carryover is attempted. CLOSED 2026-08-04 (sync audit follow-up — the work landed 2026-08-01 but the item was never flipped): the text-first half shipped as planner v2 (R-tail orphan rebalancing, version-bumped identity, fixtures-first; commit bd92a59 with LongFormPlanningTests and the long-form-context-planning-v2 ADR), and the acoustic-carryover half was probed the same day and closed as a pre-registered do-NOT (commit 59458bc: join pitch -16.4% under gate, rate -54%, identity intact — docs/decisions/long-form-acoustic-carryover-experiment.md). Nothing in this item's scope remains open.",
       "evidence": [
         "commit:bd92a59",
-        "commit:59458bc"
+        "commit:59458bc",
+        "doc:docs/decisions/long-form-context-planning-v2.md",
+        "doc:docs/decisions/long-form-acoustic-carryover-experiment.md"
       ],
       "sourceOfTruth": [
         "Sources/QwenVoiceCore/LongFormPlanning.swift"
       ],
-      "updated": "2026-08-01"
+      "updated": "2026-08-04"
     },
     {
       "id": "CM-5",

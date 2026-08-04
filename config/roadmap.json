@@ -415,6 +415,34 @@
         "docs/reference/delivery-control-audit-2026-08.md"
       ],
       "updated": "2026-08-04"
+    },
+    {
+      "id": "DP-12",
+      "plan": "delivery-prompting-2026-08",
+      "title": "Move 1: fix the found defects, harden the harness, run the calibration session",
+      "status": "in-flight",
+      "gate": "Landed: the macOS .normal-tier state-sync fix (selections always ship strong; strong-first instruction resolution in EmotionPreset.matchInstruction with a Core regression test), bench evidence retention (per-run outputs/bench-archive plus deliveryInstruction echo and an engine promptChars/promptDigest provenance assertion in the prosody sidecar), separability scorer v2 (computed chance floors, Wilson recall intervals, label-permutation null band, fold-grouping honesty, exploratory/confirmatory designation), and the blind listening-session tool (build/run/score through the existing identification and 2AFC instruments with pre-registered exact-binomial decision rules). Completes when the maintainer's ~30-minute session is scored.",
+      "evidence": [
+        "file:Sources/QwenVoiceCore/EmotionPreset.swift",
+        "file:Sources/Views/Components/EmotionPickerView.swift",
+        "file:Tests/VocelloCoreTests/EmotionPresetResolutionTests.swift",
+        "file:scripts/delivery_separability.py",
+        "file:scripts/bench_delivery_prosody.py",
+        "file:scripts/delivery_listening_session.py",
+        "doc:docs/reference/delivery-control-audit-2026-08.md"
+      ],
+      "sourceOfTruth": [
+        "scripts/delivery_listening_session.py"
+      ],
+      "updated": "2026-08-04"
+    },
+    {
+      "id": "CM-7",
+      "plan": "convergence-metal4-stage4-2026-08",
+      "title": "Non-streaming CLI generation publishes no WAV while reporting success",
+      "status": "planned",
+      "gate": "Found 2026-08-04 while generating calibration clips: `vocello generate --no-stream` prints the output path and a success line (finish=eos, plausible RTF) but no file exists at the path for any destination tried (scratch, app-support outputs, repo build/). The streaming path publishes correctly, so the defect sits in the non-streaming product-finalization/publication path of the owned runtime. Blast radius: every `--no-stream` CLI generate, and the clone-fixture bootstrap in scripts/lib/test_models.sh (`models ensure` regeneration would silently enroll nothing). Fix must include a regression guard that fails the CLI when the reported audioPath does not exist, so success can never again be claimed without a published file.",
+      "updated": "2026-08-04"
     }
   ]
 }

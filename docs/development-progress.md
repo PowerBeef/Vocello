@@ -233,6 +233,38 @@ performance block after the fixture rebind, Tier 4 carryover). Immediate specifi
    pinned seeds. Full report, adjudications, and the week-one runbook:
    `docs/reference/delivery-control-audit-2026-08.md`.
 
+13. **Move 1 of the audit runbook landed (2026-08-04, DP-12):** fix-then-listen.
+   The macOS `.normal`-tier state-sync defect is fixed — instruction-string
+   resolution moved into `EmotionPreset.matchInstruction` with strong-first
+   tie-breaking (regression-pinned by
+   `Tests/VocelloCoreTests/EmotionPresetResolutionTests.swift`), and every new
+   preset pick resets to the strong tier; the CLI's bare `--delivery` names and
+   default set now ship strong too, and its error copy no longer offers the
+   deleted `subtle` tier. Bench evidence is retention-hardened: every delivery
+   run archives its WAVs, manifest, and sidecars under
+   `outputs/bench-archive/<runID>` (the fixed per-cell filenames that destroyed
+   DP-10's audio keep overwrite semantics only in the live outputs dir), the
+   manifest echoes each delivery cell's exact instruction, and the prosody
+   sidecar fails closed unless the engine's own `promptChars` prove the
+   instructed prompt outgrew its paired neutral. `scripts/delivery_separability.py`
+   is algorithm v2: computed chance floors, Wilson recall intervals ("below
+   chance" now requires the whole interval under the floor), an optional
+   label-permutation null band with a p-value, fold-grouping honesty (the
+   generation-ID fallback is reported as leave-one-take-out), and an
+   exploratory/confirmatory designation. The blind listening session the audit
+   ranked first is staged end to end by `scripts/delivery_listening_session.py`
+   (build/run/score through the existing identification and 2AFC instruments,
+   pre-registered exact-binomial decision rules, clone-transfer rows in the
+   key); DP-12 completes when the maintainer's ~30-minute session is scored.
+   Deferred deliberately: the dead intensity plumbing (DP-9 owns it) and the
+   clone-transcript UI disclosure (Move 2 reworks that flow). Generating the
+   session clips also surfaced a new engine defect, recorded as CM-7:
+   `vocello generate --no-stream` reports success and prints an output path
+   while publishing no WAV anywhere (the streaming path publishes correctly) —
+   which also silently breaks the clone-fixture bootstrap in
+   `scripts/lib/test_models.sh` if it ever needs to regenerate. The session
+   clips were produced with streaming as the workaround.
+
 ## Staged roadmap state
 
 Stage-by-stage details, closure evidence, and falsifiability criteria live in the

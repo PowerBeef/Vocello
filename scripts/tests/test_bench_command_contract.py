@@ -100,6 +100,27 @@ class BenchCommandSourceContractTests(unittest.TestCase):
         self.assertIn("Zero is", self.source)
         self.assertNotIn("let warm = max(1", self.source)
 
+    def test_delivery_runs_archive_their_evidence(self) -> None:
+        # 2026-08-04 audit: fixed per-cell filenames overwrote 17/18ths of the
+        # DP-10 sweep's audio. Delivery runs must retain WAVs + manifests in a
+        # per-run archive, fail-closed for the required files.
+        self.assertIn("private static func archiveDeliveryEvidence(", self.source)
+        self.assertIn("try archiveDeliveryEvidence(", self.source)
+        self.assertIn("outputs/bench-archive", self.source)
+        self.assertIn("evidence archive: missing required file", self.source)
+
+    def test_delivery_cells_echo_their_instruction_and_default_to_strong(self) -> None:
+        # Prompt-echo provenance (audit hardening item 2) plus the DP-8
+        # ship-strong contract for bare preset names and the default set.
+        self.assertIn("let deliveryInstruction: String?", self.source)
+        self.assertIn("deliveryInstruction: item.instruction", self.source)
+        self.assertIn("resolved an empty instruction", self.source)
+        self.assertIn("use normal | strong", self.source)
+        self.assertNotIn("subtle | normal | strong", self.source)
+        self.assertIn(
+            '["happy.strong", "calm.strong", "whisper.strong"]', self.source
+        )
+
 
 class BenchDeliveryProsodyTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -121,8 +142,9 @@ class BenchDeliveryProsodyTests(unittest.TestCase):
         delivery: str | None,
         mode: str = "custom",
         model: str = "pro_custom_speed",
+        instruction: str | None = None,
     ) -> dict[str, object]:
-        return {
+        row: dict[str, object] = {
             "takeIndex": index,
             "generationID": generation_id,
             "outputFileName": name,
@@ -133,14 +155,60 @@ class BenchDeliveryProsodyTests(unittest.TestCase):
             "repetition": 0,
             "delivery": delivery,
         }
+        if delivery is not None:
+            row["deliveryInstruction"] = (
+                instruction if instruction is not None else f"Speak {delivery}."
+            )
+        return row
 
     def write_manifest(self, takes: list[dict[str, object]]) -> None:
         self.manifest.write_text(
-            json.dumps({"schemaVersion": 1, "runID": "run-current", "takes": takes}),
+            json.dumps(
+                {
+                    "schemaVersion": 1,
+                    "runID": "run-current",
+                    "label": "unit",
+                    "seed": 9320,
+                    "takes": takes,
+                }
+            ),
             encoding="utf-8",
         )
         for take in takes:
             (self.bench_dir / str(take["outputFileName"])).touch()
+
+    def write_engine_rows(
+        self,
+        takes: list[dict[str, object]],
+        prompt_chars: dict[str, int] | None = None,
+    ) -> None:
+        """Engine telemetry rows carrying the prompt provenance the sidecar
+        joins on: instructed prompts default to more characters than neutral
+        prompts, which is what a correctly plumbed instruction produces."""
+        engine_dir = self.diagnostics / "engine"
+        engine_dir.mkdir(parents=True, exist_ok=True)
+        lines = []
+        for take in takes:
+            generation_id = str(take["generationID"])
+            default_chars = 300 if take.get("delivery") else 200
+            lines.append(
+                json.dumps(
+                    {
+                        "generationID": generation_id,
+                        "notes": {
+                            "benchRunID": "run-current",
+                            "promptChars": (prompt_chars or {}).get(
+                                generation_id, default_chars
+                            ),
+                            "promptDigest": f"digest-{generation_id}",
+                            "samplingObservedSeed": "9320",
+                        },
+                    }
+                )
+            )
+        (engine_dir / "generations.jsonl").write_text(
+            "\n".join(lines) + "\n", encoding="utf-8"
+        )
 
     @staticmethod
     def metrics(path: str) -> dict[str, float]:
@@ -163,12 +231,12 @@ class BenchDeliveryProsodyTests(unittest.TestCase):
     def test_analysis_ignores_stale_shared_outputs(self) -> None:
         neutral = "custom_pro_custom_speed_medium_warm_0.wav"
         delivery = "custom_pro_custom_speed_medium_warm_d-happy.strong_0.wav"
-        self.write_manifest(
-            [
-                self.take(1, "neutral-current", neutral, delivery=None),
-                self.take(2, "delivery-current", delivery, delivery="happy.strong"),
-            ]
-        )
+        takes = [
+            self.take(1, "neutral-current", neutral, delivery=None),
+            self.take(2, "delivery-current", delivery, delivery="happy.strong"),
+        ]
+        self.write_manifest(takes)
+        self.write_engine_rows(takes)
         # These valid-looking older files must never be discovered without a
         # corresponding current-run manifest entry.
         (self.bench_dir / "design_pro_design_speed_medium_warm_0.wav").touch()
@@ -183,6 +251,13 @@ class BenchDeliveryProsodyTests(unittest.TestCase):
         self.assertEqual(results[0]["neutralGenerationID"], "neutral-current")
         self.assertEqual(results[0]["deliveryWav"], delivery)
         self.assertEqual(results[0]["neutralWav"], neutral)
+        # Prompt provenance rides every row (audit hardening item 2).
+        self.assertEqual(results[0]["seed"], 9320)
+        self.assertEqual(results[0]["runLabel"], "unit")
+        self.assertEqual(results[0]["instructEcho"], "Speak happy.strong.")
+        self.assertEqual(results[0]["promptChars"], 300)
+        self.assertEqual(results[0]["neutralPromptChars"], 200)
+        self.assertEqual(results[0]["promptDigest"], "digest-delivery-current")
         analyzed_names = {Path(call.args[0]).name for call in analyzer.call_args_list}
         self.assertEqual(analyzed_names, {neutral, delivery})
         # Per-take prosody gate verdict rides the sidecar row, computed from
@@ -196,12 +271,12 @@ class BenchDeliveryProsodyTests(unittest.TestCase):
     def test_quality_gate_flags_ride_the_sidecar_row(self) -> None:
         neutral = "custom_pro_custom_speed_medium_warm_0.wav"
         delivery = "custom_pro_custom_speed_medium_warm_d-calm.normal_0.wav"
-        self.write_manifest(
-            [
-                self.take(1, "neutral-current", neutral, delivery=None),
-                self.take(2, "delivery-current", delivery, delivery="calm.normal"),
-            ]
-        )
+        takes = [
+            self.take(1, "neutral-current", neutral, delivery=None),
+            self.take(2, "delivery-current", delivery, delivery="calm.normal"),
+        ]
+        self.write_manifest(takes)
+        self.write_engine_rows(takes)
 
         def monotone_metrics(path: str) -> dict[str, float]:
             metrics = dict(self.metrics(path))
@@ -220,6 +295,51 @@ class BenchDeliveryProsodyTests(unittest.TestCase):
         self.write_manifest([self.take(1, "delivery-current", delivery, delivery="happy.strong")])
         with self.assertRaisesRegex(ValueError, "no neutral reference"):
             prosody.analyze_run(self.diagnostics, self.manifest)
+
+    def test_instruction_that_did_not_reach_the_engine_fails(self) -> None:
+        neutral = "custom_pro_custom_speed_medium_warm_0.wav"
+        delivery = "custom_pro_custom_speed_medium_warm_d-happy.strong_0.wav"
+        takes = [
+            self.take(1, "neutral-current", neutral, delivery=None),
+            self.take(2, "delivery-current", delivery, delivery="happy.strong"),
+        ]
+        self.write_manifest(takes)
+        # Equal prompt lengths mean the instruction never entered the request:
+        # exactly the silent plumbing null the provenance check exists to catch.
+        self.write_engine_rows(
+            takes, prompt_chars={"neutral-current": 200, "delivery-current": 200}
+        )
+        with mock.patch.object(prosody, "analyze", side_effect=self.metrics):
+            with self.assertRaisesRegex(ValueError, "did not reach the engine"):
+                prosody.analyze_run(self.diagnostics, self.manifest)
+
+    def test_missing_engine_row_fails(self) -> None:
+        neutral = "custom_pro_custom_speed_medium_warm_0.wav"
+        delivery = "custom_pro_custom_speed_medium_warm_d-happy.strong_0.wav"
+        takes = [
+            self.take(1, "neutral-current", neutral, delivery=None),
+            self.take(2, "delivery-current", delivery, delivery="happy.strong"),
+        ]
+        self.write_manifest(takes)
+        self.write_engine_rows(takes[:1])
+        with mock.patch.object(prosody, "analyze", side_effect=self.metrics):
+            with self.assertRaisesRegex(ValueError, "no engine telemetry row"):
+                prosody.analyze_run(self.diagnostics, self.manifest)
+
+    def test_empty_delivery_instruction_fails(self) -> None:
+        neutral = "custom_pro_custom_speed_medium_warm_0.wav"
+        delivery = "custom_pro_custom_speed_medium_warm_d-happy.strong_0.wav"
+        takes = [
+            self.take(1, "neutral-current", neutral, delivery=None),
+            self.take(
+                2, "delivery-current", delivery, delivery="happy.strong", instruction="  "
+            ),
+        ]
+        self.write_manifest(takes)
+        self.write_engine_rows(takes)
+        with mock.patch.object(prosody, "analyze", side_effect=self.metrics):
+            with self.assertRaisesRegex(ValueError, "empty deliveryInstruction"):
+                prosody.analyze_run(self.diagnostics, self.manifest)
 
     def test_filename_manifest_disagreement_fails(self) -> None:
         neutral = "custom_pro_custom_speed_medium_warm_0.wav"

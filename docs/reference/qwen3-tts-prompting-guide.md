@@ -616,18 +616,21 @@ The append is skipped when the base instruction already contains any of eight di
 `understandable`) — a reasonable rule, added to stop the model receiving redundant clarity
 instructions that crowd out the emotion signal.
 
-But which presets trip that rule is incidental to their wording, and **three presets trip it on one
-intensity tier and not the other**:
+But which presets tripped that rule was incidental to their wording, and — on the then-shipping
+ten-preset × two-tier roster (the roster was cut to 8 on 2026-08-03 and the user-facing intensity
+control retired 2026-08-02; see §4.3 and
+[`delivery-control-audit-2026-08.md`](delivery-control-audit-2026-08.md)) — **three presets tripped
+it on one intensity tier and not the other**:
 
 | Preset | `normal` | `strong` | Boilerplate delta |
 | --- | --- | --- | --- |
 | happy | suppressed (142 chars) | appended (270 chars) | **+76 on strong only** |
 | surprised | suppressed (169 chars) | appended (239 chars) | **+76 on strong only** |
-| dramatic | suppressed (173 chars) | appended (260 chars) | **+76 on strong only** |
+| dramatic *(retired 2026-08-03)* | suppressed (173 chars) | appended (260 chars) | **+76 on strong only** |
 | sad | suppressed | suppressed | none |
 | the other six | appended | appended | none |
 
-For happy, surprised, and dramatic, the `strong` tier differs from `normal` not only by its
+For happy, surprised, and dramatic, the `strong` tier differed from `normal` not only by its
 emotional wording but by an extra sentence about English diction that has nothing to do with
 intensity. **The intensity-tier measurement recorded in
 [`EmotionPreset.swift`](../../Sources/QwenVoiceCore/EmotionPreset.swift) — that `strong` moves cells
@@ -642,8 +645,9 @@ fails the build if that resolution is removed.
 
 `MEASURED-HERE`, **DP-4, 2026-08-02 — prosodic null. The sentence stays.**
 
-Only six presets receive the append at all — `neutral`, `angry`, `fearful`, `excited`, `calm`,
-`whisper`. The other four already contain a diction token and suppress it, which gave the
+Only six of the then-shipping ten presets received the append at all — `neutral`, `angry`,
+`fearful`, `excited` (folded into `happy` when the roster was cut on 2026-08-03), `calm`,
+`whisper`. The other four already contained a diction token and suppressed it, which gave the
 experiment a built-in control: 8 cells that must be byte-identical across arms and 12 that must
 differ. Over 13 paired seeds that held exactly — **104/104 identical, 0/156 identical** — so the
 null below is a real null and not a harness that failed to vary anything.
@@ -704,7 +708,7 @@ each is actually worth.
 | Concrete acoustic wording beats persona-only wording | **`RESEARCH`, supported.** InstructTTSEval APS 77–83 versus RP 61–64 on our checkpoint. The strongest-supported item on either list. |
 | Combine emotion + pace + pitch + timbre | **`OFFICIAL`, supported.** Alibaba's "be multi-dimensional, not one-dimensional". The twelve APS features go further: volume, speed, and tone-distinct-from-emotion are also first-class and our copy is thin on them. |
 | Imperative verbs (Speak / Whisper / Narrate) are followed more reliably | **`UNVERIFIED`.** Upstream examples use both imperative (`Speak slowly and professionally`) and descriptive (`Male, 17 years old, tenor range…`) forms with no stated preference. Plausible, unsourced. |
-| Negative constraints work (`no laughing`, `never shout`) | **`UNVERIFIED`, and the one nearby datapoint is negative.** No upstream source endorses them. OV-InstructTTS (arXiv:2601.01459) Table 3 found bare paralinguistic tags *reduced* adherence by 0.72 while reasoning-mediated attributes raised it by 2.08. Eight of ten shipped presets spend characters on negation that nothing supports. |
+| Negative constraints work (`no laughing`, `never shout`) | **`UNVERIFIED`, and the one nearby datapoint is negative.** No upstream source endorses them. OV-InstructTTS (arXiv:2601.01459) Table 3 found bare paralinguistic tags *reduced* adherence by 0.72 while reasoning-mediated attributes raised it by 2.08. Eight of the ten then-shipped presets spent characters on negation that nothing supports (roster cut to 8 on 2026-08-03; the surviving copy still carries negation clauses). |
 | Intelligibility clauses help bound extreme emotions | **`UNVERIFIED` as written, with a documented cousin.** The vendor-supported version is a *recording-quality anchor* at the end ("Perfect broadcast quality audio."), which addresses texture-mistaken-for-degradation. Ours is a *command to the speaker* ("stay fully audible") in the middle. Different mechanism, and ours is what trips the §8.2 boilerplate rule. |
 | Avoid stacked intensifiers; `very very very happy` adds no value | **Partly contradicted.** Upstream's own examples are `Very happy.` and `Say it in a very angry and disappointed tone`. The defensible claim is that *repetition* adds nothing; our copy over-generalized it into avoiding intensifiers, and further into avoiding naming the emotion plainly at all — while emotion is an explicit APS feature. |
 | High-arousal instructions trigger literal laughter or breath sounds | **`COMMUNITY`, plausible.** Reported for extended generations. The `no laughing` remedy is the unverified part, not the symptom. |
@@ -712,10 +716,13 @@ each is actually worth.
 `MEASURED-HERE`. Two further corrections, both **applied 2026-08-02**:
 [`qwen3-tts-guide.md`](qwen3-tts-guide.md) and [`../qwen_tone.md`](../qwen_tone.md) each stated the
 preset grid with the wrong intensity-tier count, contradicting the guide's own §6 table and the
-shipped code. The correct figure is **10 presets × 2 intensity tiers**, and
-[`doc_metadata.py`](../../scripts/doc_metadata.py) now derives that count from
+then-shipped code. The correct figure at the time was **10 presets × 2 intensity tiers**; the
+roster has since been cut to 8 presets (2026-08-03) and the user-facing intensity control retired
+(2026-08-02), each surviving preset shipping its `strong` copy — see §4.3 and
+[`delivery-control-audit-2026-08.md`](delivery-control-audit-2026-08.md).
+[`doc_metadata.py`](../../scripts/doc_metadata.py) now derives the current counts from
 [`EmotionPreset.swift`](../../Sources/QwenVoiceCore/EmotionPreset.swift) and fails the build on any
-document that contradicts it.
+document that contradicts them.
 
 `MEASURED-HERE`. [`../qwen_tone.md`](../qwen_tone.md) additionally attributes "negative constraints
 work and are officially endorsed" and "the official instruction-writing principle" to upstream
@@ -753,11 +760,12 @@ This confirms §4.2 and retires the contrast above as a hypothesis. Our copy is 
 short examples are illustrations of the *interface*, not a recommended register — reading them as
 style guidance was the error, and the benchmark said so before the measurement did.
 
-**What the same run showed instead**, and it matters more: five presets move nothing that survives
-correction under *either* form — `happy`, `excited`, `neutral`, `dramatic.normal`,
-`surprised.normal`. Cross-preset separability fails in both arms (67.5% error shipped, 77.6%
+**What the same run showed instead**, and it matters more: five of the then-shipping presets moved
+nothing that survives correction under *either* form — `happy`, `excited`, `neutral`,
+`dramatic.normal`, `surprised.normal` (`excited` and `dramatic` have since been retired,
+2026-08-03). Cross-preset separability failed in both arms (67.5% error shipped, 77.6%
 short), with `happy.normal` at 0.00 recall against a 5% chance floor. Instruction register is not
-the lever for those presets; nothing about the wording makes them separable.
+the lever for those presets; nothing about the wording made them separable.
 
 `MEASURED-HERE`. Three different instruction-length limits exist in this checkout, and they measure
 different things rather than disagreeing: 2,048 characters is the Model Studio `voice_prompt`
@@ -787,8 +795,9 @@ experiment below is a matrix run plus a paired comparison.
    `QWENVOICE_DEBUG=1 QWENVOICE_DELIVERY_INSTRUCTION_SET=short`, registered in
    [`runtime-debug-knobs.json`](../../config/runtime-debug-knobs.json) and inert without the master
    gate. **Do not retry this as a way to fix delivery**: the same run showed `happy`, `excited`,
-   `neutral`, `dramatic.normal` and `surprised.normal` move nothing under *either* form, so the
-   register is not the lever for the presets that fail.
+   `neutral`, `dramatic.normal` and `surprised.normal` moved nothing under *either* form
+   (`excited` and `dramatic` have since been retired, 2026-08-03), so the register is not the
+   lever for the presets that failed.
 2. ~~**The Design merge template.**~~ **SETTLED 2026-08-03 — shipped form kept, quality anchor
    rejected.** 46 / 41 / 35 surviving features across labeled / plain / anchored over 8 paired
    seeds; see §6.1 for the numbers and §5.4 for the anchor. Reproduce with
@@ -815,8 +824,9 @@ pitch at n=12 and fails to survive correction at n=23 on a different seed range,
 12-seed matrix as indicative only.** The tier decision in §8.2 leaned on such rows; the aggregate
 that decision actually rested on was much stronger than any single cell in it.
 
-6. **Negative constraints and intensifiers**, individually. Eight of ten presets carry a negation
-   clause that no source supports; OV-InstructTTS's ablation points the other way.
+6. **Negative constraints and intensifiers**, individually. Eight of the then-shipping ten presets
+   carried a negation clause that no source supports, and most of the surviving eight-preset
+   roster's copy still does; OV-InstructTTS's ablation points the other way.
 7. **8-bit versus bf16 instruction adherence.** Upstream measures bf16 only; we ship 8-bit (§7).
 
 `UNVERIFIED`, and worth stating so nobody re-derives it: upstream's answer for emotion control on

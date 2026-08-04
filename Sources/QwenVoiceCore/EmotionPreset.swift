@@ -176,6 +176,28 @@ public struct EmotionPreset: Identifiable, Sendable {
         return all.first(where: { $0.id == id })
     }
 
+    /// Resolve a stored instruction string back to the preset and tier that
+    /// produced it, checking the `strong` tier first. Tiers with identical copy
+    /// (Neutral) must resolve to `.strong`, the shipped tier: resolving the tie
+    /// to `.normal` is the defect that made every macOS preset pick silently
+    /// emit the normal-tier copy after the Neutral draft default synced
+    /// (found by the 2026-08-04 delivery-control audit, F4 — DP-8's
+    /// ship-strong decision never actually took effect on macOS).
+    public static func matchInstruction(
+        _ text: String
+    ) -> (preset: EmotionPreset, intensity: EmotionIntensity)? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        for preset in all {
+            for level in EmotionIntensity.allCases.reversed() {
+                if preset.instruction(for: level).caseInsensitiveCompare(trimmed) == .orderedSame {
+                    return (preset, level)
+                }
+            }
+        }
+        return nil
+    }
+
     /// The Neutral preset's real instruction (adopted 2026-08-01, maintainer
     /// decision closing finding F4): Neutral is a preset like any other — a
     /// slightly monotone, emotion-free delivery target — rather than the

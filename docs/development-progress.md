@@ -407,6 +407,22 @@ performance block after the fixture rebind, Tier 4 carryover). Immediate specifi
    bit-pattern round trip. Long-form's plan-scoped per-segment sub-seeds are
    untouched.
 
+21. **DP-18's first live run caught a fixture-true, live-false guard
+   (2026-08-04):** Move 1's fail-closed delivery-provenance check compared
+   `promptChars` between an instructed take and its neutral pair — but
+   `promptChars` counts only the script text, which never includes the
+   delivery instruction, so the instructed-longer premise could never pass
+   outside its synthetic fixtures (no `bench --delivery` had run since the
+   guard landed). The pre-registered DP-18 sweep tripped it on every cell
+   before any data was scored. Replaced with a genuine end-to-end proof: the
+   engine stamps an instruction receipt (`instructChars` + `instructDigest`
+   from the request payload) on every instructed row, and the sidecar fails
+   closed unless the receipt exists, its digest matches the manifest's
+   instruction echo, and the paired neutral reference carries none.
+   Twenty-two harness tests pin the new semantics; the DP-18 registration
+   carries the amendment note and the sweep restarted with hypotheses,
+   seeds, and decision rules unchanged.
+
 ## Staged roadmap state
 
 Stage-by-stage details, closure evidence, and falsifiability criteria live in the

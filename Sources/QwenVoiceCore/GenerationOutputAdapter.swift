@@ -1847,6 +1847,17 @@ struct StreamingExecutionContext: Sendable {
             ),
         ]
         tierNotes.merge(Self.samplingTelemetryNotes(for: request)) { current, _ in current }
+        // Delivery-instruction receipt (DP-18): the request-level proof that an
+        // instruction entered the engine, as length + digest so the delivery
+        // sidecar can fail closed by matching the CLI manifest's echo instead
+        // of inferring from prompt length (the script length never includes
+        // the instruction, so the old inequality guard could never pass live).
+        if let deliveryInstruction = request.payload.deliveryInstructionText,
+           !deliveryInstruction.isEmpty {
+            tierNotes["instructChars"] = String(deliveryInstruction.count)
+            tierNotes["instructDigest"] = SHA256.hash(data: Data(deliveryInstruction.utf8))
+                .map { String(format: "%02x", $0) }.joined()
+        }
         // Phase 10: when the spoken script differs from the typed script, the
         // row records the transformation count and the spoken-text digest so
         // the evidence names exactly what was synthesized. Deterministic

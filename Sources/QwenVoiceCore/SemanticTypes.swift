@@ -1365,6 +1365,19 @@ public struct GenerationRequest: Hashable, Codable, Sendable {
         case custom(speakerID: String, deliveryStyle: String?)
         case design(voiceDescription: String, deliveryStyle: String?)
         case clone(reference: CloneReference)
+
+        /// The delivery instruction this payload carries into the engine, if
+        /// any. Clone has no instruction channel. Telemetry records this as a
+        /// length + digest receipt so delivery harnesses can prove end to end
+        /// that an instructed take's instruction actually entered the request.
+        public var deliveryInstructionText: String? {
+            switch self {
+            case .custom(_, let deliveryStyle), .design(_, let deliveryStyle):
+                return deliveryStyle
+            case .clone:
+                return nil
+            }
+        }
     }
 
     public let mode: GenerationMode

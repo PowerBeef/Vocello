@@ -181,31 +181,40 @@ class BenchDeliveryProsodyTests(unittest.TestCase):
         self,
         takes: list[dict[str, object]],
         prompt_chars: dict[str, int] | None = None,
+        instruct_receipts: dict[str, dict[str, object] | None] | None = None,
     ) -> None:
-        """Engine telemetry rows carrying the prompt provenance the sidecar
-        joins on: instructed prompts default to more characters than neutral
-        prompts, which is what a correctly plumbed instruction produces."""
+        """Engine telemetry rows carrying the provenance the sidecar joins on.
+
+        By default a delivery take gets an instruction receipt whose digest
+        matches its manifest echo (a correctly plumbed instruction); pass
+        ``instruct_receipts={generation_id: None}`` to drop the receipt or a
+        dict to override its fields."""
+        import hashlib as _hashlib
         engine_dir = self.diagnostics / "engine"
         engine_dir.mkdir(parents=True, exist_ok=True)
         lines = []
         for take in takes:
             generation_id = str(take["generationID"])
             default_chars = 300 if take.get("delivery") else 200
-            lines.append(
-                json.dumps(
-                    {
-                        "generationID": generation_id,
-                        "notes": {
-                            "benchRunID": "run-current",
-                            "promptChars": (prompt_chars or {}).get(
-                                generation_id, default_chars
-                            ),
-                            "promptDigest": f"digest-{generation_id}",
-                            "samplingObservedSeed": "9320",
-                        },
-                    }
-                )
-            )
+            notes: dict[str, object] = {
+                "benchRunID": "run-current",
+                "promptChars": (prompt_chars or {}).get(
+                    generation_id, default_chars
+                ),
+                "promptDigest": f"digest-{generation_id}",
+                "samplingObservedSeed": "9320",
+            }
+            if take.get("delivery"):
+                echo = str(take.get("deliveryInstruction") or "")
+                receipt: dict[str, object] | None = {
+                    "instructChars": len(echo),
+                    "instructDigest": _hashlib.sha256(echo.encode("utf-8")).hexdigest(),
+                }
+                if instruct_receipts is not None and generation_id in instruct_receipts:
+                    receipt = instruct_receipts[generation_id]
+                if receipt is not None:
+                    notes.update(receipt)
+            lines.append(json.dumps({"generationID": generation_id, "notes": notes}))
         (engine_dir / "generations.jsonl").write_text(
             "\n".join(lines) + "\n", encoding="utf-8"
         )
@@ -304,13 +313,90 @@ class BenchDeliveryProsodyTests(unittest.TestCase):
             self.take(2, "delivery-current", delivery, delivery="happy.strong"),
         ]
         self.write_manifest(takes)
-        # Equal prompt lengths mean the instruction never entered the request:
-        # exactly the silent plumbing null the provenance check exists to catch.
+        # No engine-side instruction receipt means the instruction never
+        # entered the request: exactly the silent plumbing null the provenance
+        # check exists to catch. (Prompt lengths are equal by design — the
+        # script text never includes the instruction — so they prove nothing.)
+        self.write_engine_rows(takes, instruct_receipts={"delivery-current": None})
+        with mock.patch.object(prosody, "analyze", side_effect=self.metrics):
+            with self.assertRaisesRegex(ValueError, "did not reach the engine"):
+                prosody.analyze_run(self.diagnostics, self.manifest)
+
+    def test_receipt_digest_mismatch_fails(self) -> None:
+        neutral = "custom_pro_custom_speed_medium_warm_0.wav"
+        delivery = "custom_pro_custom_speed_medium_warm_d-happy.strong_0.wav"
+        takes = [
+            self.take(1, "neutral-current", neutral, delivery=None),
+            self.take(2, "delivery-current", delivery, delivery="happy.strong"),
+        ]
+        self.write_manifest(takes)
+        self.write_engine_rows(
+            takes,
+            instruct_receipts={
+                "delivery-current": {"instructChars": 12, "instructDigest": "deadbeef"}
+            },
+        )
+        with mock.patch.object(prosody, "analyze", side_effect=self.metrics):
+            with self.assertRaisesRegex(ValueError, "does not match"):
+                prosody.analyze_run(self.diagnostics, self.manifest)
+
+    def test_neutral_cell_with_receipt_passes_and_prompt_lengths_are_ignored(self) -> None:
+        # DP-18: the neutral preset's cell is an ordinary instructed take under
+        # receipt semantics — its instruction is real even though the prompt
+        # lengths tie the reference's (the script never includes instructions).
+        neutral = "custom_pro_custom_speed_medium_warm_0.wav"
+        delivery = "custom_pro_custom_speed_medium_warm_d-neutral.strong_0.wav"
+        takes = [
+            self.take(1, "neutral-current", neutral, delivery=None),
+            self.take(2, "delivery-current", delivery, delivery="neutral.strong"),
+        ]
+        self.write_manifest(takes)
         self.write_engine_rows(
             takes, prompt_chars={"neutral-current": 200, "delivery-current": 200}
         )
         with mock.patch.object(prosody, "analyze", side_effect=self.metrics):
-            with self.assertRaisesRegex(ValueError, "did not reach the engine"):
+            results = prosody.analyze_run(self.diagnostics, self.manifest)
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]["delivery"], "neutral.strong")
+
+    def test_receipt_on_the_neutral_reference_fails(self) -> None:
+        # An instruction on the reference poisons every paired delta.
+        neutral = "custom_pro_custom_speed_medium_warm_0.wav"
+        delivery = "custom_pro_custom_speed_medium_warm_d-happy.strong_0.wav"
+        takes = [
+            self.take(1, "neutral-current", neutral, delivery=None),
+            self.take(2, "delivery-current", delivery, delivery="happy.strong"),
+        ]
+        self.write_manifest(takes)
+        self.write_engine_rows(
+            takes,
+            instruct_receipts={
+                "neutral-current": {"instructChars": 20, "instructDigest": "aa"}
+            },
+        )
+        # The fixture writer only stamps receipts on delivery takes; force one
+        # onto the reference row by rewriting it with a delivery marker first.
+        import hashlib as _hashlib
+        engine_dir = self.diagnostics / "engine"
+        echo = "Speak happy.strong."
+        rows = [
+            {"generationID": "neutral-current", "notes": {
+                "benchRunID": "run-current", "promptChars": 200,
+                "promptDigest": "digest-neutral-current",
+                "samplingObservedSeed": "9320",
+                "instructChars": 20, "instructDigest": "aa"}},
+            {"generationID": "delivery-current", "notes": {
+                "benchRunID": "run-current", "promptChars": 300,
+                "promptDigest": "digest-delivery-current",
+                "samplingObservedSeed": "9320",
+                "instructChars": len(echo),
+                "instructDigest": _hashlib.sha256(echo.encode()).hexdigest()}},
+        ]
+        (engine_dir / "generations.jsonl").write_text(
+            "\n".join(json.dumps(r) for r in rows) + "\n", encoding="utf-8"
+        )
+        with mock.patch.object(prosody, "analyze", side_effect=self.metrics):
+            with self.assertRaisesRegex(ValueError, "reference is not neutral"):
                 prosody.analyze_run(self.diagnostics, self.manifest)
 
     def test_missing_engine_row_fails(self) -> None:

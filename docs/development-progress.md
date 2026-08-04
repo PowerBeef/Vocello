@@ -371,6 +371,27 @@ performance block after the fixture rebind, Tier 4 carryover). Immediate specifi
    owns no clone state and cannot desynchronize hydration, priming, or
    consent gating.
 
+19. **Sync audit + CM-7 fixed (2026-08-04):** a full roadmap-versus-tree
+   audit (three exploration passes plus adversarial cross-checks) found no
+   false done claims anywhere; the drift was in connective tissue and was
+   corrected in one currency pass — the release section said 2.3.0, the
+   contract said benchmark history v2 and lacked phase 9's iOS
+   adaptive-residency go-live, one roadmap evidence pointer was broken, the
+   doc-governance plan cited the wrong authority, and one live doc's example
+   named a retired preset. DP-9 was parked on the maintainer's call (DP-12's
+   session contradicts its premise), and the audit's untracked follow-ups
+   became items DP-17..DP-20. CM-7 then fell to root cause: the generation
+   exit path's cleanup defer coupled the final WAV's fate to
+   streaming-session retention, so every completed non-streaming take wrote
+   its file, deleted it, and returned the path. The exit path now decides
+   per artifact through the pure `terminalCleanup` table (a completed take
+   always keeps its WAV), pinned by `GenerationTerminalCleanupTests`, and
+   the CLI fails closed at the product boundary — generate and batch refuse
+   to claim success when no file exists at the reported path. Live proof:
+   `--no-stream` published a valid WAV matching its reported duration; the
+   streaming control still publishes. The clone-fixture bootstrap in
+   `scripts/lib/test_models.sh` works again unchanged.
+
 ## Staged roadmap state
 
 Stage-by-stage details, closure evidence, and falsifiability criteria live in the

@@ -17,7 +17,8 @@ the ML scorers never run concurrently):
 
 1. **Generate** — a neutral anchor take plus N VoiceDesign candidates per
    emotion, same brief, same transcript, distinct fixed seeds, streaming
-   (`--no-stream` publishes no WAV — CM-7). Audio QC is fail-closed inside
+   (the app-matched chunk path; also immune to CM-7, fixed 2026-08-04, which
+   made `--no-stream` publish nothing). Audio QC is fail-closed inside
    the engine, so every surviving candidate already passed it.
 2. **Score and select** — per candidate: the pinned SER advisory
    (`scripts/emotion_advisory.py` checkpoint), ECAPA identity cosine against
@@ -121,8 +122,9 @@ def plan_generation(
     candidates: int,
     base_seed: int,
 ) -> list[dict[str, Any]]:
-    """Pure generation plan. Streaming always: `--no-stream` reports success
-    while publishing no WAV (CM-7), which would silently empty the bank."""
+    """Pure generation plan. Streaming always: it matches the app's chunk
+    path, and it was the route unaffected by CM-7 (fixed 2026-08-04), whose
+    no-published-WAV shape would have silently emptied the bank."""
     plan: list[dict[str, Any]] = []
     for retry in range(ANCHOR_SEED_RETRIES):
         seed = base_seed + retry

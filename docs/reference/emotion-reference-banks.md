@@ -48,8 +48,10 @@ run concurrently):
 1. **Generate.** A neutral anchor take plus N candidates per emotion
    (default 4 × happy/sad/angry/whisper), same brief, same neutral-content
    transcript (~20 s — an emotional transcript would leak semantics into the
-   conditioning), distinct fixed seeds, streaming (`--no-stream` publishes no
-   WAV — CM-7). Audio QC is fail-closed inside the engine; a QC casualty
+   conditioning), distinct fixed seeds, streaming (matches the app's chunk
+   path; also the route that stayed correct while CM-7 — fixed 2026-08-04 —
+   made `--no-stream` publish nothing). Audio QC is fail-closed inside the
+   engine; a QC casualty
    costs one candidate, never the build.
 2. **Score and select.** Per candidate: the pinned SER advisory
    (`scripts/emotion_advisory.py` checkpoint), ECAPA identity cosine against

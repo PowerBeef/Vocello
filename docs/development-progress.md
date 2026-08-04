@@ -423,6 +423,26 @@ performance block after the fixture rebind, Tier 4 carryover). Immediate specifi
    carries the amendment note and the sweep restarted with hypotheses,
    seeds, and decision rules unchanged.
 
+22. **The confirmatory delivery sweep ran both arms (2026-08-04, DP-18
+   done):** the audit's R4, pre-registered and executed the same day.
+   Eight-way preset separability replicates on fresh seeds in both arms
+   (4-bit UAR 0.477, 8-bit 0.375, chance 0.125, permutation p=0.001 each),
+   and every distinct-set cell (neutral/calm/whisper/sad) clears FDR in
+   both — DP-10's cut and DP-14's split now rest on confirmatory statistics
+   rather than exploratory ones. The pre-registered happy-vs-angry 2-way
+   sits at chance in both arms (p=0.43/0.24): the valence bottleneck is now
+   a confirmed result, not a hypothesis — the instruct channel moves
+   arousal, not valence, and `happy` fails FDR in both arms with angry as
+   its top confusion every time. The 8-bit arm separates no better than
+   4-bit, retiring quantization as a suspected adherence bottleneck. Angry
+   and fearful meet the registered two-arm acoustic eligibility bar for
+   promotion, but acoustic separability is not listener recognizability
+   (the session heard angry 0/11), so the hint/distinct split stands until
+   a listening probe on fresh takes — a maintainer call either way.
+   Coverage: 16/18 seeds banked at 4-bit (two deterministic dropout-QC
+   casualties), 18/18 at 8-bit; the runs published 34 PASS registry
+   records, committed with this closure.
+
 ## Staged roadmap state
 
 Stage-by-stage details, closure evidence, and falsifiability criteria live in the

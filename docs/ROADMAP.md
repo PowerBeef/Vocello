@@ -10,7 +10,7 @@
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
 | `convergence-metal4-stage4-2026-08` | active | backend-and-platform | 5/7 (71%) |
-| `delivery-prompting-2026-08` | active | backend-mlx | 15/20 (75%) |
+| `delivery-prompting-2026-08` | active | backend-mlx | 16/20 (80%) |
 | `doc-governance-2026-08` | active | release-qa | 8/9 (89%) |
 
 ## Convergence residuals, Metal 4 study, and Stage 4
@@ -50,7 +50,7 @@ Narrative authority: [`docs/reference/qwen3-tts-prompting-guide.md`](reference/q
 | `DP-15` | done | Seed retry/pin as a first-class take control | `file:Sources/SharedSupport/Database/GenerationMigrations.swift`, `file:Tests/VocelloCoreTests/GenerationSeedPersistenceTests.swift`, `file:Sources/QwenVoiceCore/SemanticTypes.swift`, `file:Sources/Views/Components/TextInputView.swift`, `file:Sources/Views/Library/HistoryView.swift`, `file:Sources/iOS/History/HistoryScreen.swift`, `file:Sources/iOS/IOSDesignSystemPrimitives.swift` |
 | `DP-16` | done | Bank picker UX: personas with a delivery choice | `file:Sources/QwenVoiceCore/VoiceBankCatalog.swift`, `file:Tests/VocelloCoreTests/VoiceBankCatalogTests.swift`, `file:Sources/Views/Generate/VoiceCloningView.swift`, `file:Sources/iOS/Sheets/IOSBottomSheets.swift`, `file:Sources/iOS/IOSGenerationModeViews.swift`, `file:docs/reference/emotion-reference-banks.md` |
 | `DP-17` | planned | Whisper breathiness criterion for bank curation | — |
-| `DP-18` | planned | Confirmatory delivery re-measure on solid statistics (audit R4) | — |
+| `DP-18` | done | Confirmatory delivery re-measure on solid statistics (audit R4) | `file:scripts/delivery_separability.py`, `file:scripts/bench_delivery_prosody.py`, `file:benchmarks/HISTORY.md` |
 | `DP-19` | planned | Text-decoration valence channel (audit R5) | — |
 | `DP-2` | done | Deterministic delivery-instruction contract gate | `commit:6f4c651`, `file:scripts/check_delivery_instructions.py` |
 | `DP-20` | parked | External delivery-control lever watch list (audit R8) | — |

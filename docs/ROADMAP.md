@@ -10,7 +10,7 @@
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
 | `convergence-metal4-stage4-2026-08` | active | backend-and-platform | 3/7 (43%) |
-| `delivery-prompting-2026-08` | active | backend-mlx | 13/15 (87%) |
+| `delivery-prompting-2026-08` | active | backend-mlx | 14/16 (88%) |
 | `doc-governance-2026-08` | active | release-qa | 7/9 (78%) |
 
 ## Convergence residuals, Metal 4 study, and Stage 4
@@ -48,6 +48,7 @@ Narrative authority: [`docs/reference/qwen3-tts-prompting-guide.md`](reference/q
 | `DP-13` | done | Move 2: curated design-then-clone emotion reference banks | `file:scripts/build_emotion_reference_bank.py`, `file:scripts/tests/test_build_emotion_reference_bank.py`, `doc:docs/reference/emotion-reference-banks.md`, `file:Sources/Models/GenerationDrafts.swift`, `file:Sources/iOS/IOSGenerationInputControls.swift` |
 | `DP-14` | done | Move 3: honest delivery UX — the measured feature/hint split | `file:Sources/QwenVoiceCore/EmotionPreset.swift`, `file:Sources/Views/Components/EmotionPickerView.swift`, `file:Sources/iOS/Sheets/IOSBottomSheets.swift`, `file:Tests/VocelloCoreTests/EmotionPresetResolutionTests.swift` |
 | `DP-15` | planned | Seed retry/pin as a first-class take control | — |
+| `DP-16` | done | Bank picker UX: personas with a delivery choice | `file:Sources/QwenVoiceCore/VoiceBankCatalog.swift`, `file:Tests/VocelloCoreTests/VoiceBankCatalogTests.swift`, `file:Sources/Views/Generate/VoiceCloningView.swift`, `file:Sources/iOS/Sheets/IOSBottomSheets.swift`, `file:Sources/iOS/IOSGenerationModeViews.swift`, `file:docs/reference/emotion-reference-banks.md` |
 | `DP-2` | done | Deterministic delivery-instruction contract gate | `commit:6f4c651`, `file:scripts/check_delivery_instructions.py` |
 | `DP-3` | done | Short-versus-long instruction A/B | `doc:docs/reference/qwen3-tts-prompting-guide.md`, `file:config/runtime-debug-knobs.json` |
 | `DP-4` | done | English diction append: does it earn its place | `doc:docs/reference/qwen3-tts-prompting-guide.md`, `file:config/runtime-debug-knobs.json` |

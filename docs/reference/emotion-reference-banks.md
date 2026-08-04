@@ -89,6 +89,15 @@ uninterpretable; relative comparisons within one build are the signal.
   structure (its denominator is the whole take). A breathiness criterion
   (HNR/CPP deltas from the analyzer's voice-quality block) is the recorded
   follow-up before whisper joins a bank.
-- Bank entries appear in every saved-voice list alongside ordinary voices; a
-  grouped picker surface (choose the persona, then the delivery) is the
-  follow-up UI arc, deliberately not part of this one.
+- Both apps present a bank as one persona with a delivery choice (DP-16,
+  2026-08-04). Grouping is resolved from the naming convention alone by
+  `VoiceBankCatalog` in QwenVoiceCore — a base-named voice plus at least one
+  "(Suffix)" sibling whose suffix matches a live preset; anything else stays
+  a standalone voice. On macOS the clone source picker collapses members to
+  one "· voice bank" row and adds a Delivery menu
+  (`voiceCloning_bankDeliveryPicker`); on iOS the clone composer gains a
+  Delivery chip (`studioChip_bankDelivery`) with a member sheet, while the
+  Voices library and reference sheet keep every member listed (each has its
+  own preview-worthy clip) under truthful "Voice bank · <Delivery>" captions.
+  Every selection resolves to a concrete member voice through the ordinary
+  saved-voice path — the bank layer owns no clone state.

@@ -716,28 +716,73 @@ private struct CloneSourceRow: View {
     let referenceAudioPath: String?
 
     var body: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(alignment: .center, spacing: 8) {
-                if !savedVoices.isEmpty {
-                    savedVoicePicker
+        VStack(alignment: .leading, spacing: 6) {
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .center, spacing: 8) {
+                    if !savedVoices.isEmpty {
+                        savedVoicePicker
+                    }
+
+                    importButton
+                    recordButton
+
+                    Spacer(minLength: 0)
                 }
 
-                importButton
-                recordButton
+                VStack(alignment: .leading, spacing: 6) {
+                    if !savedVoices.isEmpty {
+                        savedVoicePicker
+                    }
 
-                Spacer(minLength: 0)
-            }
-
-            VStack(alignment: .leading, spacing: 6) {
-                if !savedVoices.isEmpty {
-                    savedVoicePicker
+                    importButton
+                    recordButton
                 }
-
-                importButton
-                recordButton
             }
+
+            bankDeliveryPicker
         }
         .help("Choose a saved voice, import a reference clip, or record one with your microphone. Use clips you own or have permission to clone.")
+    }
+
+    /// Emotion reference banks group by naming convention alone
+    /// ("<Persona>" + "<Persona> (<Emotion>)"); the picker shows one row per
+    /// persona and a delivery selector picks the concrete member voice, so
+    /// selection always flows through the ordinary saved-voice path.
+    private var bankCatalog: VoiceBankCatalog {
+        VoiceBankCatalog.build(voices: savedVoices.map { (id: $0.id, name: $0.name) })
+    }
+
+    private struct SourceEntry: Identifiable {
+        let id: String
+        let label: String
+    }
+
+    /// One entry per standalone voice plus one per persona, in library order.
+    /// A persona row is tagged with the currently selected member (falling
+    /// back to its base), so the menu selection always matches a live tag
+    /// while the delivery picker moves between members.
+    private var sourceEntries: [SourceEntry] {
+        let catalog = bankCatalog
+        var representedPersonas = Set<String>()
+        var entries: [SourceEntry] = []
+        for voice in savedVoices {
+            if let persona = catalog.persona(containing: voice.id) {
+                guard representedPersonas.insert(persona.baseVoiceID).inserted else { continue }
+                let tag: String
+                if let selectedSavedVoiceID, persona.contains(voiceID: selectedSavedVoiceID) {
+                    tag = selectedSavedVoiceID
+                } else {
+                    tag = persona.baseVoiceID
+                }
+                entries.append(SourceEntry(id: tag, label: "\(persona.name) · voice bank"))
+            } else {
+                entries.append(SourceEntry(
+                    id: voice.id,
+                    label: voice.hasTranscript ? "\(voice.name) · transcript" : "\(voice.name) · audio only"
+                ))
+            }
+        }
+        return entries
     }
 
     @ViewBuilder
@@ -747,9 +792,9 @@ private struct CloneSourceRow: View {
                 Text("Choose a saved voice")
                     .tag(Optional<String>.none)
 
-                ForEach(savedVoices) { voice in
-                    Text(voice.hasTranscript ? "\(voice.name) · transcript" : "\(voice.name) · audio only")
-                        .tag(Optional(voice.id))
+                ForEach(sourceEntries) { entry in
+                    Text(entry.label)
+                        .tag(Optional(entry.id))
                 }
             }
             .labelsHidden()
@@ -758,6 +803,34 @@ private struct CloneSourceRow: View {
             .frame(minWidth: LayoutConstants.configurationControlMinWidth, maxWidth: 180, alignment: .leading)
             .accessibilityValue(savedVoices.first(where: { $0.id == selectedSavedVoiceID })?.name ?? "")
             .accessibilityIdentifier("voiceCloning_savedVoicePicker")
+        }
+    }
+
+    @ViewBuilder
+    private var bankDeliveryPicker: some View {
+        if let selectedSavedVoiceID,
+           let persona = bankCatalog.persona(containing: selectedSavedVoiceID) {
+            HStack(alignment: .center, spacing: 8) {
+                Text("Delivery")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.secondary)
+
+                Picker("Delivery", selection: $selectedSavedVoiceID) {
+                    Text("Neutral")
+                        .tag(Optional(persona.baseVoiceID))
+
+                    ForEach(persona.orderedVariants, id: \.voiceID) { variant in
+                        Text(EmotionPreset.preset(id: variant.presetID)?.label ?? variant.presetID.capitalized)
+                            .tag(Optional(variant.voiceID))
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+                .focusEffectDisabled()
+                .frame(minWidth: 110, maxWidth: 160, alignment: .leading)
+                .accessibilityValue(persona.presetID(for: selectedSavedVoiceID).flatMap { EmotionPreset.preset(id: $0)?.label } ?? "Neutral")
+                .accessibilityIdentifier("voiceCloning_bankDeliveryPicker")
+            }
         }
     }
 

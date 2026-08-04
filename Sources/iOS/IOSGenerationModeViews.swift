@@ -1347,13 +1347,20 @@ struct IOSVoiceCloningView: View {
     }
 
     private var referenceChipLabel: String {
-        if let voice = selectedVoice { return voice.name }
+        if let voice = selectedVoice {
+            // A bank member reads as its persona here; the adjacent Delivery
+            // chip carries the emotion, so the pair never repeats itself.
+            if let persona = bankCatalog.persona(containing: voice.id) {
+                return persona.name
+            }
+            return voice.name
+        }
         if draft.referenceAudioPath != nil { return "Recorded clip" }
         return "Choose reference"
     }
 
     private var referenceChipAbbreviation: String {
-        if let voice = selectedVoice { return IOSStudioChipAbbreviation.initials(voice.name) }
+        if selectedVoice != nil { return IOSStudioChipAbbreviation.initials(referenceChipLabel) }
         if draft.referenceAudioPath != nil { return "IM" }
         return IOSStudioChipAbbreviation.placeholder
     }
@@ -1374,6 +1381,36 @@ struct IOSVoiceCloningView: View {
     private var selectedVoice: Voice? {
         guard let selectedSavedVoiceID = draft.selectedSavedVoiceID else { return nil }
         return savedVoices.first(where: { $0.id == selectedSavedVoiceID })
+    }
+
+    /// Emotion reference banks group by naming convention alone
+    /// ("<Persona>" + "<Persona> (<Emotion>)"); the delivery chip swaps
+    /// between members through the ordinary saved-voice apply path.
+    private var bankCatalog: VoiceBankCatalog {
+        VoiceBankCatalog.build(voices: savedVoices.map { (id: $0.id, name: $0.name) })
+    }
+
+    private var selectedBankPersona: VoiceBankCatalog.Persona? {
+        bankCatalog.persona(containing: draft.selectedSavedVoiceID)
+    }
+
+    private func bankDeliveryLabel(_ persona: VoiceBankCatalog.Persona) -> String {
+        guard let selectedID = draft.selectedSavedVoiceID,
+              let presetID = persona.presetID(for: selectedID),
+              let preset = EmotionPreset.preset(id: presetID) else {
+            return "Neutral"
+        }
+        return preset.label
+    }
+
+    private func bankDeliveryOptions(_ persona: VoiceBankCatalog.Persona) -> [IOSBankDeliveryOption] {
+        [IOSBankDeliveryOption(id: persona.baseVoiceID, label: "Neutral")]
+            + persona.orderedVariants.map { variant in
+                IOSBankDeliveryOption(
+                    id: variant.voiceID,
+                    label: EmotionPreset.preset(id: variant.presetID)?.label ?? variant.presetID.capitalized
+                )
+            }
     }
 
     private var clonePrimingRequestKey: String? {
@@ -1664,6 +1701,17 @@ struct IOSVoiceCloningView: View {
             accessibilityID: "studioChip_reference",
             action: presentReferencePicker
         )
+        if let persona = selectedBankPersona {
+            IOSStudioSetupChip(
+                eyebrow: "Delivery",
+                value: bankDeliveryLabel(persona),
+                abbreviation: IOSStudioChipAbbreviation.initials(bankDeliveryLabel(persona)),
+                leadingSymbol: "theatermasks",
+                tint: IOSBrandTheme.clone,
+                accessibilityID: "studioChip_bankDelivery",
+                action: { presentBankDeliveryPicker(persona) }
+            )
+        }
         IOSStudioSetupChip(
             eyebrow: "Language",
             value: LanguageSelectionPresentation.buttonLabel(
@@ -1711,6 +1759,29 @@ struct IOSVoiceCloningView: View {
         }
     }
 
+    private func presentBankDeliveryPicker(_ persona: VoiceBankCatalog.Persona) {
+        appModel.presentBottomPanel { bottomSafeAreaInset, availableHeight, dismiss in
+            AnyView(
+                IOSBankDeliveryPickerSheet(
+                    personaName: persona.name,
+                    options: bankDeliveryOptions(persona),
+                    selectedVoiceID: draft.selectedSavedVoiceID,
+                    onSelect: { voiceID in
+                        if let voice = savedVoices.first(where: { $0.id == voiceID }) {
+                            applySavedVoice(voice)
+                        }
+                        dismiss()
+                    },
+                    onDismiss: dismiss,
+                    presentation: .edgeToEdge(
+                        bottomSafeAreaInset: bottomSafeAreaInset,
+                        height: IOSBottomSheetChrome.expandedHeight(forScreenHeight: availableHeight)
+                    )
+                )
+            )
+        }
+    }
+
     private func presentCloneLanguagePicker() {
         appModel.presentBottomPanel { bottomSafeAreaInset, availableHeight, dismiss in
             AnyView(
@@ -1729,11 +1800,20 @@ struct IOSVoiceCloningView: View {
     }
 
     private var savedVoiceOptions: [IOSVoicePickerOption] {
-        savedVoices.map { voice in
-            IOSVoicePickerOption(
+        let catalog = bankCatalog
+        return savedVoices.map { voice in
+            let subtitle: String
+            if let persona = catalog.persona(containing: voice.id) {
+                let delivery = persona.presetID(for: voice.id)
+                    .flatMap { EmotionPreset.preset(id: $0)?.label } ?? "Neutral"
+                subtitle = "Voice bank · \(delivery)"
+            } else {
+                subtitle = "Cloned reference"
+            }
+            return IOSVoicePickerOption(
                 id: voice.id,
                 name: voice.name,
-                subtitle: "Cloned reference",
+                subtitle: subtitle,
                 isRecommended: detectedPromptLanguage != .auto
                     && savedVoiceLanguages[voice.id] == detectedPromptLanguage
             )

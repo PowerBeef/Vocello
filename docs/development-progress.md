@@ -354,6 +354,22 @@ performance block after the fixture rebind, Tier 4 carryover). Immediate specifi
    which earns its own arc. With this, all three moves of the
    delivery-control audit are complete.
 
+17. **Bank picker UX landed: personas with a delivery choice (2026-08-04,
+   DP-16):** emotion reference banks now present as what they are — one
+   voice with curated deliveries — instead of flat name-suffixed list
+   entries. `VoiceBankCatalog` (QwenVoiceCore) resolves grouping from the
+   enrollment naming convention alone (base name + "(Suffix)" siblings whose
+   suffix matches a live preset; everything else stays standalone), with ten
+   Core tests pinning the contract. macOS collapses bank members to one
+   "· voice bank" row in the clone source picker and adds a Delivery menu;
+   iOS shows the persona on the reference chip and adds a Delivery chip with
+   a member sheet, while the Voices library keeps every member listed under
+   truthful "Voice bank · <Delivery>" captions (each member's reference clip
+   is individually previewable). Every selection resolves to a concrete
+   member voice through the ordinary saved-voice path, so the bank layer
+   owns no clone state and cannot desynchronize hydration, priming, or
+   consent gating.
+
 ## Staged roadmap state
 
 Stage-by-stage details, closure evidence, and falsifiability criteria live in the

@@ -480,6 +480,25 @@
       "updated": "2026-08-04"
     },
     {
+      "id": "DP-16",
+      "plan": "delivery-prompting-2026-08",
+      "title": "Bank picker UX: personas with a delivery choice",
+      "status": "done",
+      "gate": "Landed 2026-08-04. VoiceBankCatalog (QwenVoiceCore) groups saved voices into emotion reference banks from the naming convention alone: a base-named voice plus at least one \"(Suffix)\" sibling whose suffix matches a live preset label or id; orphan variants, unknown suffixes, and bases without variants stay standalone, and variants order by the preset roster. Ten Core tests pin the contract (roster-derived suffix coverage, case-insensitivity, orphan/unknown fallback, member resolution). macOS: the clone source picker collapses members to one persona row (\"· voice bank\") tagged with the current member so selection always matches a tag, and a Delivery menu (voiceCloning_bankDeliveryPicker) swaps concrete member voices through the existing selectedSavedVoiceID binding. iOS: the clone composer shows the persona on the reference chip and adds a Delivery chip (studioChip_bankDelivery) opening IOSBankDeliveryPickerSheet, whose rows apply the member through the ordinary applySavedVoice path; the Voices library and reference sheet keep every member listed under truthful \"Voice bank · <Delivery>\" captions. The bank layer owns no clone state.",
+      "evidence": [
+        "file:Sources/QwenVoiceCore/VoiceBankCatalog.swift",
+        "file:Tests/VocelloCoreTests/VoiceBankCatalogTests.swift",
+        "file:Sources/Views/Generate/VoiceCloningView.swift",
+        "file:Sources/iOS/Sheets/IOSBottomSheets.swift",
+        "file:Sources/iOS/IOSGenerationModeViews.swift",
+        "file:docs/reference/emotion-reference-banks.md"
+      ],
+      "sourceOfTruth": [
+        "Sources/QwenVoiceCore/VoiceBankCatalog.swift"
+      ],
+      "updated": "2026-08-04"
+    },
+    {
       "id": "CM-7",
       "plan": "convergence-metal4-stage4-2026-08",
       "title": "Non-streaming CLI generation publishes no WAV while reporting success",

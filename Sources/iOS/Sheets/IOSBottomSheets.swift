@@ -1274,6 +1274,83 @@ struct IOSReferenceClipSheet: View {
     }
 }
 
+// MARK: - Bank delivery picker
+
+struct IOSBankDeliveryOption: Identifiable, Equatable {
+    /// Concrete saved-voice id of the bank member this delivery selects.
+    let id: String
+    /// "Neutral" for the persona's base anchor, else the preset label.
+    let label: String
+}
+
+/// Delivery selector for an emotion reference bank: one persona, one row per
+/// curated member. Selecting a row hands the concrete member voice back to
+/// the ordinary saved-voice apply path — the sheet itself owns no clone
+/// state.
+struct IOSBankDeliveryPickerSheet: View {
+    let personaName: String
+    let options: [IOSBankDeliveryOption]
+    let selectedVoiceID: String?
+    var onSelect: (String) -> Void
+    var onDismiss: (() -> Void)?
+    var presentation: IOSBottomSheetPresentationStyle = .system
+
+    var body: some View {
+        IOSBottomSheetSurface(
+            title: "Delivery",
+            tint: IOSBrandTheme.clone,
+            presentation: presentation,
+            onDismiss: onDismiss
+        ) {
+            IOSScrollView(bottomFadeHeight: 0) {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("\(personaName) is a voice bank: the same voice with curated emotion references. Each delivery clones its measured reference clip.")
+                        .font(.caption)
+                        .foregroundStyle(IOSAppTheme.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    ForEach(options) { row(for: $0) }
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 24)
+            }
+        }
+    }
+
+    private func row(for option: IOSBankDeliveryOption) -> some View {
+        let isSelected = option.id == selectedVoiceID
+        return Button {
+            IOSHaptics.selection()
+            onSelect(option.id)
+        } label: {
+            HStack(alignment: .center, spacing: 12) {
+                IOSVoiceAvatar(seed: option.id, initials: option.label, diameter: 36)
+
+                Text(option.label)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(IOSAppTheme.textPrimary)
+
+                Spacer(minLength: 8)
+
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 16))
+                    .foregroundStyle(IOSBrandTheme.clone)
+                    .opacity(isSelected ? 1 : 0)
+                    .frame(width: 20)
+                    .accessibilityHidden(true)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 9)
+            .background {
+                RoundedRectangle(cornerRadius: IOSCornerRadius.card, style: .continuous)
+                    .fill(isSelected ? IOSAppTheme.accentWash(IOSBrandTheme.clone) : Color.clear)
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("bankDeliveryRow_\(option.id)")
+    }
+}
+
 // MARK: - Delete model sheet
 
 /// Destructive-confirmation sheet for removing an installed model.

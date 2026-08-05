@@ -7,6 +7,14 @@ also contains files from older ``--keep`` runs. The resulting sidecar is written
 before the telemetry summary so the current summary and history record include
 the same prosody evidence.
 
+Each sidecar row also carries prompt provenance (2026-08-04 delivery-control
+audit, hardening item 2): the run seed, the exact instruction string the bench
+sent (``instructEcho``), and the engine's own ``promptChars``/``promptDigest``
+notes for the take and its paired neutral. The instructed prompt must be
+strictly longer than the neutral prompt — the end-to-end proof that the
+instruction reached the engine — and the analysis fails closed when that or
+any provenance field cannot be established.
+
 Usage:
     scripts/bench_delivery_prosody.py <diagnostics_dir> \
         --results-manifest <run-artifact-dir>/bench-results.json
@@ -68,7 +76,9 @@ def parse_filename(name: str) -> dict[str, Any] | None:
     }
 
 
-def collect_run_outputs(bench_dir: Path, results_manifest: Path) -> tuple[str, list[dict[str, Any]]]:
+def collect_run_outputs(
+    bench_dir: Path, results_manifest: Path
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     """Resolve and validate the exact output set named by one run manifest."""
     try:
         manifest = json.loads(results_manifest.read_text(encoding="utf-8"))
@@ -121,10 +131,71 @@ def collect_run_outputs(bench_dir: Path, results_manifest: Path) -> tuple[str, l
             raise ValueError(f"current run output is missing: {name}")
         parsed["path"] = str(output_path)
         parsed["generationID"] = generation_id
+        parsed["deliveryInstruction"] = take.get("deliveryInstruction")
         parsed_outputs.append(parsed)
         names.add(name)
         generation_ids.add(generation_id)
-    return run_id, parsed_outputs
+    return manifest, parsed_outputs
+
+
+def load_engine_provenance(diagnostics_dir: Path, run_id: str) -> dict[str, dict[str, Any]]:
+    """Per-generation prompt provenance from the engine's own telemetry rows.
+
+    The engine stamps every row with the character count and digest of the
+    input script (``notes.promptChars`` / ``notes.promptDigest`` — the script
+    text, which never includes the delivery instruction), the observed
+    sampling seed, and — when the request payload carried a delivery
+    instruction — the instruction receipt (``notes.instructChars`` /
+    ``notes.instructDigest``). Joining the receipt back to the bench
+    manifest's instruction echo is what lets the sidecar prove, from evidence
+    alone, that a delivery cell's instruction actually entered the engine
+    request. Fail-closed: a missing rows file or a row without
+    ``promptChars`` is a provenance gap, not a soft degradation.
+    """
+    rows_path = diagnostics_dir / "engine" / "generations.jsonl"
+    if not rows_path.is_file():
+        raise ValueError(f"engine telemetry rows not found: {rows_path}")
+    provenance: dict[str, dict[str, Any]] = {}
+    with rows_path.open("r", encoding="utf-8") as handle:
+        for line in handle:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            notes = row.get("notes") or {}
+            if notes.get("benchRunID") != run_id:
+                continue
+            generation_id = row.get("generationID")
+            if not isinstance(generation_id, str) or not generation_id:
+                continue
+            try:
+                chars = int(notes.get("promptChars"))
+            except (TypeError, ValueError):
+                raise ValueError(
+                    f"engine row {generation_id} carries no promptChars note; "
+                    "prompt provenance cannot be established"
+                ) from None
+            entry: dict[str, Any] = {"promptChars": chars}
+            digest = notes.get("promptDigest")
+            if isinstance(digest, str) and digest:
+                entry["promptDigest"] = digest
+            instruct_digest = notes.get("instructDigest")
+            if isinstance(instruct_digest, str) and instruct_digest:
+                entry["instructDigest"] = instruct_digest
+            try:
+                entry["instructChars"] = int(notes.get("instructChars"))
+            except (TypeError, ValueError):
+                pass
+            seed = notes.get("samplingObservedSeed") or notes.get("samplingSeed")
+            if isinstance(seed, str) and seed.isdigit():
+                entry["seed"] = int(seed)
+            elif isinstance(seed, int) and not isinstance(seed, bool):
+                entry["seed"] = seed
+            provenance[generation_id] = entry
+    return provenance
 
 
 def find_neutral(parsed: list[dict[str, Any]], target: dict[str, Any]) -> dict[str, Any] | None:
@@ -172,10 +243,21 @@ def analyze_run(
     bench_dir = diagnostics_dir.parent / "outputs" / "bench"
     if not bench_dir.is_dir():
         raise ValueError(f"bench outputs dir not found: {bench_dir}")
-    run_id, parsed = collect_run_outputs(bench_dir, results_manifest)
+    manifest, parsed = collect_run_outputs(bench_dir, results_manifest)
+    run_id = manifest["runID"]
     deliveries = [item for item in parsed if item["delivery"]]
     if not deliveries:
         raise ValueError("current results manifest contains no delivery takes")
+
+    # Structural pairing first, so a missing neutral surfaces before any IO.
+    pairs = []
+    for delivery in deliveries:
+        neutral = find_neutral(parsed, delivery)
+        if neutral is None:
+            raise ValueError(f"current run has no neutral reference for {delivery['name']}")
+        pairs.append((delivery, neutral))
+
+    provenance = load_engine_provenance(diagnostics_dir, run_id)
 
     resolved_profile = profile if profile is not None else builtin_profile()
     profile_digest = hashlib.sha256(
@@ -188,10 +270,48 @@ def analyze_run(
     ).hexdigest()
 
     results: list[dict[str, Any]] = []
-    for delivery in deliveries:
-        neutral = find_neutral(parsed, delivery)
-        if neutral is None:
-            raise ValueError(f"current run has no neutral reference for {delivery['name']}")
+    for delivery, neutral in pairs:
+        instructed_provenance = provenance.get(delivery["generationID"])
+        neutral_provenance = provenance.get(neutral["generationID"])
+        if instructed_provenance is None or neutral_provenance is None:
+            raise ValueError(
+                f"no engine telemetry row for {delivery['name']} or its neutral pair; "
+                "prompt provenance cannot be established"
+            )
+        # The end-to-end plumbing proof (v2, DP-18): the engine stamps an
+        # instruction receipt (length + digest of the payload's delivery
+        # instruction) on every instructed row. The instructed take must carry
+        # a receipt, its digest must match the manifest's instruction echo when
+        # both exist, and the paired neutral reference must carry none — an
+        # instruction on the reference would poison every delta. The previous
+        # guard compared promptChars, but that counts only the script text
+        # (identical across the pair by design), so it could never pass live.
+        instruct_echo = delivery.get("deliveryInstruction")
+        if instruct_echo is not None and not str(instruct_echo).strip():
+            raise ValueError(
+                f"{delivery['name']}: manifest carries an empty deliveryInstruction"
+            )
+        receipt_chars = instructed_provenance.get("instructChars")
+        if not isinstance(receipt_chars, int) or receipt_chars <= 0:
+            raise ValueError(
+                f"{delivery['name']}: engine row carries no delivery-instruction "
+                "receipt (instructChars); the delivery instruction did not reach "
+                "the engine"
+            )
+        receipt_digest = instructed_provenance.get("instructDigest")
+        if instruct_echo is not None and receipt_digest is not None:
+            echo_digest = hashlib.sha256(str(instruct_echo).encode("utf-8")).hexdigest()
+            if echo_digest != receipt_digest:
+                raise ValueError(
+                    f"{delivery['name']}: engine instruction receipt does not match "
+                    "the manifest's deliveryInstruction echo; a different "
+                    "instruction reached the engine"
+                )
+        if neutral_provenance.get("instructChars"):
+            raise ValueError(
+                f"{delivery['name']}: the paired neutral reference carries a "
+                "delivery-instruction receipt; the reference is not neutral"
+            )
         instructed_metrics = analyze(delivery["path"])
         neutral_metrics = analyze(neutral["path"])
         if "error" in instructed_metrics or "error" in neutral_metrics:
@@ -199,6 +319,13 @@ def analyze_run(
         results.append(
             {
                 "runID": run_id,
+                "runLabel": manifest.get("label"),
+                "seed": instructed_provenance.get("seed", manifest.get("seed")),
+                "instructEcho": instruct_echo,
+                "promptChars": instructed_provenance["promptChars"],
+                "neutralPromptChars": neutral_provenance["promptChars"],
+                "promptDigest": instructed_provenance.get("promptDigest"),
+                "neutralPromptDigest": neutral_provenance.get("promptDigest"),
                 "generationID": delivery["generationID"],
                 "neutralGenerationID": neutral["generationID"],
                 "mode": delivery["mode"],

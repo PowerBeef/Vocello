@@ -985,6 +985,42 @@ struct IOSBottomSheet<Content: View>: View {
 /// (see `IOSStudioCanvas.setupRow`). The full value + category ("Voice: Aiden")
 /// live in the VoiceOver label and the picker that tapping opens.
 ///
+/// DP-15 pinned-seed chip: visible only while a seed is pinned, in which
+/// case every take reproduces that seed with identical settings. Tapping
+/// offers the unpin (back to a fresh seed per take). Pinning itself happens
+/// from a History row's "Pin seed" action — this chip owns no other state.
+struct IOSSeedPinChip: View {
+    @Binding var pinnedSeed: UInt64?
+    let tint: Color
+
+    @State private var isConfirmingUnpin = false
+
+    var body: some View {
+        if let seedValue = pinnedSeed {
+            IOSStudioSetupChip(
+                eyebrow: "Seed",
+                value: String(seedValue),
+                abbreviation: "PN",
+                leadingSymbol: "pin.fill",
+                tint: tint,
+                accessibilityID: "studioChip_seedPin",
+                action: { isConfirmingUnpin = true }
+            )
+            .confirmationDialog(
+                "Seed \(String(seedValue)) is pinned — every take reproduces it with the same settings.",
+                isPresented: $isConfirmingUnpin,
+                titleVisibility: .visible
+            ) {
+                Button("Unpin — new seed each take") {
+                    IOSHaptics.selection()
+                    pinnedSeed = nil
+                }
+                Button("Keep pinned", role: .cancel) {}
+            }
+        }
+    }
+}
+
 /// Uses the app's tinted language via `IOSSetupChipPill`. `IOSVoiceAvatar` is
 /// no longer used here (the voice slot is a symbol pill like the others).
 struct IOSStudioSetupChip: View {

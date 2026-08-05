@@ -9,9 +9,10 @@
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `convergence-metal4-stage4-2026-08` | active | backend-and-platform | 3/6 (50%) |
-| `delivery-prompting-2026-08` | active | backend-mlx | 9/10 (90%) |
-| `doc-governance-2026-08` | active | release-qa | 7/9 (78%) |
+| `convergence-metal4-stage4-2026-08` | active | backend-and-platform | 5/7 (71%) |
+| `delivery-prompting-2026-08` | active | backend-mlx | 18/20 (90%) |
+| `doc-governance-2026-08` | active | release-qa | 8/9 (89%) |
+| `macos-ui-2026-08` | complete | macos | 7/7 (100%) |
 
 ## Convergence residuals, Metal 4 study, and Stage 4
 
@@ -26,9 +27,18 @@ Narrative authority: [`docs/reference/roadmap-2026-08.md`](reference/roadmap-202
 | `CM-1` | done | Stage 4 mlx pin bump to the newest lockstep pair | `commit:19ea7e8`, `doc:docs/reference/roadmap-2026-08.md` |
 | `CM-2` | declined | P1b static-shape talker compile | `doc:docs/reference/roadmap-2026-08.md` |
 | `CM-3` | declined | Gate 2 — Candidate A fused code-predictor kernel | `doc:docs/reference/roadmap-2026-08.md` |
-| `CM-4` | in-flight | Long-form text-context carryover, text first | `commit:bd92a59`, `commit:59458bc` |
+| `CM-4` | done | Long-form text-context carryover, text first | `commit:bd92a59`, `commit:59458bc`, `doc:docs/decisions/long-form-context-planning-v2.md`, `doc:docs/decisions/long-form-acoustic-carryover-experiment.md` |
 | `CM-5` | in-flight | Phone-gated evidence battery remainder | `doc:docs/reference/roadmap-2026-08.md` |
 | `CM-6` | parked | MOS-proxy advisory column (UTMOSv2) | `doc:docs/reference/roadmap-2026-08.md` |
+| `CM-7` | done | Non-streaming CLI generation publishes no WAV while reporting success | `file:Sources/QwenVoiceCore/GenerationOutputAdapter.swift`, `file:Tests/VocelloCoreTests/GenerationTerminalCleanupTests.swift`, `file:Sources/VocelloCLI/GenerateCommand.swift`, `file:Sources/VocelloCLI/BatchCommand.swift` |
+
+### Open items in detail
+
+- **`CM-5`** (in-flight) — Phone-gated evidence battery remainder.
+  gate: One sitting with the phone unlocked and Auto-Lock Never; iOS control lanes re-run against the current artifacts. Surface note 2026-08-04: the iOS UI under test changed after this item was dated (2026-08-03/04 delivery roster cut, sectioned delivery sheet, bank Delivery chip), so the control-lane re-run also observes the delivery/bank UI; the artifacts themselves are unchanged.
+
+- **`CM-6`** (parked) — MOS-proxy advisory column (UTMOSv2).
+  unparkWhen: Only opportunistically, and only as a dev-lane advisory column. It must never become a gate or a publication input.
 
 ## Delivery instruction quality and Qwen3-TTS prompting
 
@@ -41,7 +51,6 @@ Narrative authority: [`docs/reference/qwen3-tts-prompting-guide.md`](reference/q
 | Item | Status | Title | Evidence |
 | --- | --- | --- | --- |
 | `DP-1` | done | Sourced Qwen3-TTS prompting guide with per-claim provenance | `commit:c14651c`, `doc:docs/reference/qwen3-tts-prompting-guide.md` |
-| `DP-10` | done | Cut the delivery roster to the presets that separate | `doc:docs/reference/qwen3-tts-prompting-guide.md`, `doc:docs/development-progress.md`, `file:Sources/QwenVoiceCore/EmotionPreset.swift`, `file:scripts/delivery_separability.py` |
 | `DP-2` | done | Deterministic delivery-instruction contract gate | `commit:6f4c651`, `file:scripts/check_delivery_instructions.py` |
 | `DP-3` | done | Short-versus-long instruction A/B | `doc:docs/reference/qwen3-tts-prompting-guide.md`, `file:config/runtime-debug-knobs.json` |
 | `DP-4` | done | English diction append: does it earn its place | `doc:docs/reference/qwen3-tts-prompting-guide.md`, `file:config/runtime-debug-knobs.json` |
@@ -49,7 +58,26 @@ Narrative authority: [`docs/reference/qwen3-tts-prompting-guide.md`](reference/q
 | `DP-6` | done | Angry pitch-axis contradiction | `doc:docs/reference/qwen3-tts-prompting-guide.md`, `file:config/delivery-instruction-contract.json` |
 | `DP-7` | done | On-device delivery-consistency cohort lane | `file:Tests/VocelloiOSUITests/VocelloiOSDeliveryCohortUITests.swift`, `file:scripts/ui_test.sh` |
 | `DP-8` | done | Retire the user-facing intensity control (scoped) | `doc:docs/reference/qwen3-tts-guide.md`, `file:Sources/Views/Components/EmotionPickerView.swift` |
-| `DP-9` | planned | Remove EmotionIntensity outright, after DP-4/5/6 | — |
+| `DP-9` | parked | Remove EmotionIntensity outright, after DP-4/5/6 | — |
+| `DP-10` | done | Cut the delivery roster to the presets that separate | `doc:docs/reference/qwen3-tts-prompting-guide.md`, `doc:docs/development-progress.md`, `file:Sources/QwenVoiceCore/EmotionPreset.swift`, `file:scripts/delivery_separability.py` |
+| `DP-11` | done | Delivery-control audit: adversarial re-examination and external research sweep | `doc:docs/reference/delivery-control-audit-2026-08.md`, `doc:docs/development-progress.md`, `doc:docs/reference/qwen3-tts-prompting-guide.md` |
+| `DP-12` | done | Move 1: fix the found defects, harden the harness, run the calibration session | `file:Sources/QwenVoiceCore/EmotionPreset.swift`, `file:Sources/Views/Components/EmotionPickerView.swift`, `file:Tests/VocelloCoreTests/EmotionPresetResolutionTests.swift`, `file:scripts/delivery_separability.py`, `file:scripts/bench_delivery_prosody.py`, `file:scripts/delivery_listening_session.py`, `doc:docs/reference/delivery-control-audit-2026-08.md` |
+| `DP-13` | done | Move 2: curated design-then-clone emotion reference banks | `file:scripts/build_emotion_reference_bank.py`, `file:scripts/tests/test_build_emotion_reference_bank.py`, `doc:docs/reference/emotion-reference-banks.md`, `file:Sources/Models/GenerationDrafts.swift`, `file:Sources/iOS/IOSGenerationInputControls.swift` |
+| `DP-14` | done | Move 3: honest delivery UX — the measured feature/hint split | `file:Sources/QwenVoiceCore/EmotionPreset.swift`, `file:Sources/Views/Components/EmotionPickerView.swift`, `file:Sources/iOS/Sheets/IOSBottomSheets.swift`, `file:Tests/VocelloCoreTests/EmotionPresetResolutionTests.swift` |
+| `DP-15` | done | Seed retry/pin as a first-class take control | `file:Sources/SharedSupport/Database/GenerationMigrations.swift`, `file:Tests/VocelloCoreTests/GenerationSeedPersistenceTests.swift`, `file:Sources/QwenVoiceCore/SemanticTypes.swift`, `file:Sources/Views/Components/TextInputView.swift`, `file:Sources/Views/Library/HistoryView.swift`, `file:Sources/iOS/History/HistoryScreen.swift`, `file:Sources/iOS/IOSDesignSystemPrimitives.swift` |
+| `DP-16` | done | Bank picker UX: personas with a delivery choice | `file:Sources/QwenVoiceCore/VoiceBankCatalog.swift`, `file:Tests/VocelloCoreTests/VoiceBankCatalogTests.swift`, `file:Sources/Views/Generate/VoiceCloningView.swift`, `file:Sources/iOS/Sheets/IOSBottomSheets.swift`, `file:Sources/iOS/IOSGenerationModeViews.swift`, `file:docs/reference/emotion-reference-banks.md` |
+| `DP-17` | done | Whisper breathiness criterion for bank curation | `file:scripts/analyze_prosody.py`, `file:docs/reference/emotion-reference-banks.md`, `file:docs/development-progress.md` |
+| `DP-18` | done | Confirmatory delivery re-measure on solid statistics (audit R4) | `file:scripts/delivery_separability.py`, `file:scripts/bench_delivery_prosody.py`, `file:benchmarks/HISTORY.md` |
+| `DP-19` | done | Text-decoration valence channel (audit R5) | `file:scripts/delivery_separability.py`, `file:scripts/emotion_advisory.py`, `file:docs/development-progress.md` |
+| `DP-20` | parked | External delivery-control lever watch list (audit R8) | — |
+
+### Open items in detail
+
+- **`DP-9`** (parked) — Remove EmotionIntensity outright, after DP-4/5/6.
+  gate: Delete the enum, collapse bench cells to one per preset, retire intensity_scale and the per-tier delivery expectations, update the tier-parity check and the derived deliveryIntensityTiers fact.
+
+- **`DP-20`** (parked) — External delivery-control lever watch list (audit R8).
+  unparkWhen: Only when a watched lever becomes runnable on-device at the 8 GB floor: a Qwen3-TTS VoiceEditing/instruct variant that combines ICL with instructions, CosyVoice 3-class instruct control in an MLX-portable form, emotion-vector steering (IndexTTS-2/EmoSteer-class) with published weights, or a quantization-robust valence result. The pinned audit's R8 section is the source list; re-verify claims against primary sources at unpark time rather than trusting the 2026-08 snapshot.
 
 ## Documentation governance and staleness control
 
@@ -57,16 +85,39 @@ Narrative authority: [`docs/reference/qwen3-tts-prompting-guide.md`](reference/q
 
 Make documentation state machine-checkable: pin historical records against accidental modification, derive facts from code so prose cannot silently contradict them, and give agents a queryable index instead of a directory to glob.
 
-Narrative authority: [`docs/reference/qwen3-tts-prompting-guide.md`](reference/qwen3-tts-prompting-guide.md)
+Narrative authority: [`docs/reference/repository-self-verification.md`](reference/repository-self-verification.md)
 
 | Item | Status | Title | Evidence |
 | --- | --- | --- | --- |
 | `DG-1` | done | Per-file documentation metadata with derived-fact scanning | `commit:3ed09cb`, `file:scripts/doc_metadata.py` |
 | `DG-2` | done | Phase 1 — pin every historical document | `commit:3ed09cb`, `file:docs/INDEX.json` |
-| `DG-3` | planned | Phase 2 — reclassify the nine misfiled point-in-time reports | — |
+| `DG-3` | done | Phase 2 — reclassify the nine misfiled point-in-time reports | `file:docs/reference/backend-optimization-research-report.md`, `file:docs/reference/metal4-tensor-feasibility-2026-07-31.md`, `file:docs/reference/optimization-report-review-2026-07-25.md`, `file:docs/reference/qwen3-apple-silicon-roadmap-review.md`, `file:docs/reference/runtime-refactor-status-report.md`, `file:docs/reference/codex-storage-ballooning-incident.md` |
 | `DG-4` | planned | Phase 3 — source bindings on active documents | — |
 | `DG-5` | done | Single-source-of-truth roadmap system | `commit:346dba7`, `file:scripts/roadmap.py`, `file:docs/ROADMAP.md` |
 | `DG-6` | done | Security workflow starvation on main | `commit:6e8f8b2`, `file:.github/workflows/security.yml` |
 | `DG-7` | done | Surface-coverage omission gate and the optional-assists guard | `commit:6283e65`, `commit:ca1eafd`, `file:scripts/check_surface_coverage.py` |
 | `DG-8` | done | Deep build-output ownership and storage remediation | `commit:e83ebef`, `file:scripts/build_output_policy.py` |
 | `DG-9` | done | Document the self-verification system and its failure classes | `doc:docs/reference/repository-self-verification.md` |
+
+### Open items in detail
+
+- **`DG-4`** (planned) — Phase 3 — source bindings on active documents.
+  gate: Annotated incrementally as documents are touched; a binding invented in bulk without reading the document is worse than none.
+
+## macOS UI performance harness, measured review, and staged refresh
+
+`macos-ui-2026-08` · **complete** · macos · adopted 2026-08-04
+
+Give the macOS app a deterministic SwiftUI frame-health lane, use it to baseline and rank the UI's real costs, land the maintainer-approved safe fixes, and stage a brand-preserving refresh gated on the maintainer's remote review of the proposals artifact.
+
+Narrative authority: [`docs/reference/macos-ui-refresh-2026-08.md`](reference/macos-ui-refresh-2026-08.md)
+
+| Item | Status | Title | Evidence |
+| --- | --- | --- | --- |
+| `UI-1` | done | SwiftUI frame-health harness (scripts/ui_test.sh macos perf) | `commit:9d283a9`, `file:scripts/check_macos_ui_perf.py`, `file:Tests/VocelloMacUITests/VocelloMacPerfUITests.swift` |
+| `UI-2` | done | Frame-health baseline (1 warm-up + 5 counted runs) | `file:docs/reference/macos-ui-refresh-2026-08.md` |
+| `UI-3` | done | Four-audit UI review, ranked synthesis, and refresh proposals | `file:docs/reference/macos-ui-refresh-2026-08.md` |
+| `UI-4` | done | Safe fixes: dead-UI-code removal + Reduce Transparency at direct glass sites | `commit:99d746d` |
+| `UI-5` | done | Refinement wave 1 (warm text ramp, motion family, focus rings, scoped observation, type scaling, stable resize fields, glass helper) | `commit:4e0c7cf`, `commit:bc7c108`, `commit:357d482`, `commit:20e14b2`, `file:docs/reference/macos-ui-refresh-2026-08.md` |
+| `UI-6` | done | Wave 2 re-engineering: store observation migration, History/Voices coordinators, shared generation lifecycle, player split | `file:docs/reference/macos-ui-refresh-2026-08.md`, `file:Sources/QwenVoiceCore/HistoryDeletionEngine.swift`, `file:Sources/ViewModels/GenerationLifecycleExecutor.swift`, `file:Sources/SharedSupport/Services/LiveStreamingPlaybackEngine.swift` |
+| `UI-7` | done | Registry formalization of the perf lane (benchmark-history kind, thresholds from repeated baselines) | `file:config/ui-perf-thresholds.json`, `file:benchmarks/runs/ui-perf/macos-xcui-perf-20260805-092804-98c69168.json`, `file:scripts/tests/test_check_macos_ui_perf.py` |

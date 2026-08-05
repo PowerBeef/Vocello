@@ -177,7 +177,7 @@ struct SettingsView: View {
                         HStack(spacing: 8) {
                             Text(appVersion)
                                 .font(.caption.monospacedDigit())
-                                .foregroundStyle(.tertiary)
+                                .foregroundStyle(AppTheme.textMuted)
                             Button("Reveal in Finder") {
                                 NSWorkspace.shared.open(QwenVoiceApp.appSupportDir)
                             }
@@ -452,14 +452,17 @@ private struct ModelPackageLine: View {
                         .lineLimit(1)
                         .accessibilityIdentifier("settings_packageStatus_\(model.id)")
                 }
-                .frame(width: 94, alignment: .leading)
+                // W1-E: minWidth keeps the status column aligned while
+                // letting longer labels grow instead of truncating at
+                // larger text sizes.
+                .frame(minWidth: 94, alignment: .leading)
 
                 ActionButton(
                     model: model,
                     viewModel: viewModel,
                     onDelete: onDelete
                 )
-                .frame(width: 78, alignment: .trailing)
+                .frame(minWidth: 78, alignment: .trailing)
             }
 
             if let detail = presentation.detail ?? capabilityDetail {

@@ -9,7 +9,7 @@ struct VoiceDesignView: View {
     /// to a "Recommended" section in the language picker.
     @State private var detectedPromptLanguage: Qwen3SupportedLanguage = .auto
 
-    @ObservedObject private var ttsEngineStore: TTSEngineStore
+    private let ttsEngineStore: TTSEngineStore
     private var modelManager: ModelManagerViewModel
     private let audioPlayer: AudioPlayerViewModel
     private let savedVoicesViewModel: SavedVoicesViewModel
@@ -65,7 +65,7 @@ struct VoiceDesignView: View {
         savedVoicesViewModel: SavedVoicesViewModel
     ) {
         _draft = draft
-        _ttsEngineStore = ObservedObject(wrappedValue: ttsEngineStore)
+        self.ttsEngineStore = ttsEngineStore
         self.modelManager = modelManager
         self.audioPlayer = audioPlayer
         self.savedVoicesViewModel = savedVoicesViewModel
@@ -110,7 +110,7 @@ struct VoiceDesignView: View {
                     initialText: configuration.initialText,
                     initialSegmentationMode: configuration.initialSegmentationMode
                 )
-                .environmentObject(ttsEngineStore)
+                .environment(ttsEngineStore)
                 .environmentObject(audioPlayer)
             case .saveVoice(let configuration):
                 SavedVoiceSheet(configuration: configuration) { voice in
@@ -121,7 +121,7 @@ struct VoiceDesignView: View {
                         ttsEngineStore: ttsEngineStore
                     )
                 }
-                .environmentObject(ttsEngineStore)
+                .environment(ttsEngineStore)
             }
         }
         .alert(item: $coordinator.actionAlert) { alert in
@@ -207,7 +207,8 @@ private extension VoiceDesignView {
                             ttsEngineStore: ttsEngineStore,
                             audioPlayer: audioPlayer
                         )
-                    }
+                    },
+                    pinnedSeed: $draft.pinnedSeed
                 )
 
                 composerFooter

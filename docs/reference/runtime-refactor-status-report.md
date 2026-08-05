@@ -1,3 +1,9 @@
+---
+status: historical
+owner: backend-and-platform
+summary: Maintainer status report for the staged convergence program as reviewed 2026-07-20 after overallPromotion passed. Point-in-time interpretation; the living phase summary is the table in docs/development-progress.md, and config/runtime-refactor-contract.json stays the status authority.
+contentDigest: sha256:b9dc43c56fda8fb45609df13a8e4c417b8a40d85ffacf07e262da3704cba1629
+---
 # Vocello structure, backend depth, and runtime-refactor status report
 
 > Maintainer status report for the active staged convergence program. Confirm against the

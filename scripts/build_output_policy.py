@@ -85,6 +85,7 @@ HEAVY_LANE_IDS = {
     "memory-qualification",
     "ui-smoke",
     "ui-benchmark",
+    "ui-perf",
     "ui-delivery-cohort",
     "ui-model-download",
     "ui-enroll-clone-fixture",
@@ -322,7 +323,7 @@ def _validate_policy_document(document: Any) -> tuple[tuple[dict[str, Any], ...]
     if ui_retention.get("pinFilename") != "retention-pin.json":
         raise PolicyError("childRetention.uiResults.pinFilename must be retention-pin.json")
     lanes = _validate_string_list(ui_retention.get("lanes"), "childRetention.uiResults.lanes")
-    if set(lanes) != {"smoke", "benchmark", "model-download"}:
+    if not {"smoke", "benchmark", "model-download"}.issubset(set(lanes)):
         raise PolicyError("childRetention.uiResults.lanes must cover smoke, benchmark, and model-download")
     for key in (
         "keepPassingPerPlatformLane",

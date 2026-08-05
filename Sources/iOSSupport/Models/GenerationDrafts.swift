@@ -90,6 +90,10 @@ struct DeliveryInputState: Equatable {
 
 struct CustomVoiceDraft: Equatable {
     var selectedSpeaker = TTSModel.defaultSpeaker
+    /// A pinned effective sampling seed: when set, every generate request
+    /// carries it so a liked take reproduces exactly; nil = fresh seed each
+    /// take (the default stochastic-with-retry norm, DP-15).
+    var pinnedSeed: UInt64?
     var selectedLanguage = Qwen3SupportedLanguage.auto
     var delivery = DeliveryInputState()
     var text = ""
@@ -110,6 +114,7 @@ struct CustomVoiceDraft: Equatable {
 
 struct VoiceDesignDraft: Equatable {
     var voiceDescription = ""
+    var pinnedSeed: UInt64?
     var selectedLanguage = Qwen3SupportedLanguage.auto
     var delivery = DeliveryInputState()
     var text = ""
@@ -130,6 +135,7 @@ struct VoiceDesignDraft: Equatable {
 
 struct VoiceCloningDraft: Equatable {
     var selectedSavedVoiceID: String?
+    var pinnedSeed: UInt64?
     var referenceAudioPath: String?
     var selectedLanguage = Qwen3SupportedLanguage.auto
     var referenceTranscript = ""
@@ -227,7 +233,9 @@ enum VoiceCloningReadiness {
         engineReady: Bool,
         isModelAvailable: Bool,
         modelDisplayName: String,
+        cloneConsentAcknowledged: Bool,
         referenceAudioPath: String?,
+        hasReferenceTranscript: Bool,
         text: String,
         contextStatus: VoiceCloningContextStatus?
     ) -> VoiceCloningReadinessDescriptor {
@@ -245,6 +253,17 @@ enum VoiceCloningReadiness {
                 noteIsReady: false,
                 title: "Install the active model",
                 detail: "Install \(modelDisplayName) in Models to enable generation.",
+                trailingText: nil
+            )
+        }
+
+        // Mirrors macOS: the readiness note must agree with the consent gate
+        // (found disagreeing on the bank's first real use, 2026-08-04).
+        if !cloneConsentAcknowledged {
+            return VoiceCloningReadinessDescriptor(
+                noteIsReady: false,
+                title: "Acknowledge voice cloning consent",
+                detail: "Voice cloning needs the one-time consent in Settings: clone only voices you have permission to use.",
                 trailingText: nil
             )
         }
@@ -282,6 +301,19 @@ enum VoiceCloningReadiness {
                 title: "Add a script",
                 detail: "Reference is ready. Add the line for the cloned voice.",
                 trailingText: nil
+            )
+        }
+
+        // The transcript is what unlocks in-context prosody transfer: without
+        // it the engine falls back to speaker-embedding-only conditioning —
+        // identity without pacing or emotion. Visible by requirement of the
+        // 2026-08-04 delivery-control audit (F8); mirrors the macOS copy.
+        if !hasReferenceTranscript {
+            return VoiceCloningReadinessDescriptor(
+                noteIsReady: true,
+                title: "Ready — identity only",
+                detail: "This reference has no transcript, so only the voice's identity is cloned. Add a transcript to carry its pacing and emotion into the take.",
+                trailingText: "Ready"
             )
         }
 

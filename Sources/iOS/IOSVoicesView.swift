@@ -41,6 +41,22 @@ struct IOSVoicesView: View {
         }
     }
 
+    /// Bank membership by naming convention; every voice stays listed (each
+    /// member has its own preview-worthy reference clip) — the caption just
+    /// tells the truth about which rows are one persona.
+    private var bankCatalog: VoiceBankCatalog {
+        VoiceBankCatalog.build(voices: saved.map { (id: $0.id, name: $0.name) })
+    }
+
+    private func savedRowCaption(_ voice: Voice) -> String {
+        guard let persona = bankCatalog.persona(containing: voice.id) else {
+            return "Cloned reference"
+        }
+        let delivery = persona.presetID(for: voice.id)
+            .flatMap { EmotionPreset.preset(id: $0)?.label } ?? "Neutral"
+        return "Voice bank · \(delivery)"
+    }
+
     private var filteredBuiltIn: [SpeakerDescriptor] {
         guard filter != .saved else { return [] }
         return builtIn.filter(matchesSearch)
@@ -294,7 +310,7 @@ struct IOSVoicesView: View {
                         Text(voice.name)
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(IOSAppTheme.textPrimary)
-                        Text("Cloned reference")
+                        Text(savedRowCaption(voice))
                             .font(.caption)
                             .foregroundStyle(IOSAppTheme.textSecondary)
                     }

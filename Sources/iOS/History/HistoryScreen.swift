@@ -160,6 +160,7 @@ private struct IOSHistoryClearConfirmation: Identifiable {
 }
 
 private struct IOSHistoryLibrarySection: View {
+    @Environment(AppModel.self) private var appModel
     @State private var items: [Generation] = []
     @State private var errorMessage: String?
     @State private var modeFilter: IOSHistoryModeFilter = .all
@@ -441,7 +442,10 @@ private struct IOSHistoryLibrarySection: View {
         IOSHistoryItemCard(
             item: item,
             allowsDeletion: !databaseUnavailable,
-            onDelete: { delete(item) }
+            onDelete: { delete(item) },
+            onPinSeed: item.samplingSeed.map { seedValue in
+                { pinSeed(seedValue, mode: item.mode) }
+            }
         )
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("historyRow_\(item.historyAccessibilityID)")
@@ -479,6 +483,26 @@ private struct IOSHistoryLibrarySection: View {
         }
     }
 
+    /// DP-15: pin the take's recorded seed into its mode's draft and land the
+    /// user in that studio mode so the seed chip makes the state visible.
+    private func pinSeed(_ seedValue: UInt64, mode: String) {
+        switch mode.lowercased() {
+        case GenerationMode.custom.rawValue:
+            appModel.customVoiceDraft.pinnedSeed = seedValue
+            appModel.studioMode = .custom
+        case GenerationMode.design.rawValue:
+            appModel.voiceDesignDraft.pinnedSeed = seedValue
+            appModel.studioMode = .design
+        case GenerationMode.clone.rawValue:
+            appModel.voiceCloningDraft.pinnedSeed = seedValue
+            appModel.studioMode = .clone
+        default:
+            return
+        }
+        IOSHaptics.selection()
+        appModel.tab = .studio
+    }
+
     private func delete(_ item: Generation) {
         do {
             if let id = item.id {
@@ -499,6 +523,9 @@ private struct IOSHistoryItemCard: View {
     let item: Generation
     let allowsDeletion: Bool
     let onDelete: () -> Void
+    /// DP-15: pins this take's recorded sampling seed into its mode's draft.
+    /// Nil (or a seedless pre-v6 row) hides the action.
+    var onPinSeed: (() -> Void)? = nil
 
     @State private var isConfirmingDelete = false
     @Environment(\.presentIOSPlayerSheet) private var presentPlayerSheet
@@ -606,6 +633,14 @@ private struct IOSHistoryItemCard: View {
                     ShareLink(item: URL(fileURLWithPath: item.audioPath)) {
                         Label("Save audio", systemImage: "square.and.arrow.down")
                     }
+                }
+                if let onPinSeed, let seedValue = item.samplingSeed {
+                    Button {
+                        onPinSeed()
+                    } label: {
+                        Label("Pin seed \(String(seedValue)) for new takes", systemImage: "pin")
+                    }
+                    .accessibilityIdentifier("historyRowPinSeed_\(item.historyAccessibilityID)")
                 }
                 Divider()
                 Button("Delete", role: .destructive) {

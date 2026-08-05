@@ -1,151 +1,159 @@
 {
- "schemaVersion": 1,
- "indexPath": "docs/INDEX.md",
- "generatedRepositoryPaths": [
-  {
-   "path": "website/dist",
-   "owner": "website",
-   "producer": "npm --prefix website run build",
-   "requiredInCheckout": false
-  }
- ],
- "groups": [
-  {
-   "id": "onboarding",
-   "title": "Onboarding and product",
-   "status": "active",
-   "owner": "release-qa",
-   "authority": "repository guidance",
-   "audience": "contributors and users",
-   "reviewTriggers": [
-    "release facts",
-    "workflow changes",
-    "platform support"
-   ],
-   "paths": [
-    "CLAUDE.md",
-    "README.md",
-    "CONTRIBUTING.md",
-    "PRODUCT.md",
-    "SECURITY.md",
-    ".claude/rules/*.md",
-    "website/CLAUDE.md",
-    "website/DESIGN.md",
-    "website/PRODUCT.md",
-    "website/README.md"
-   ]
-  },
-  {
-   "id": "architecture",
-   "title": "Architecture and active references",
-   "status": "active",
-   "owner": "backend-and-platform",
-   "authority": "derived from source, project.yml, scripts, and machine-readable contracts",
-   "audience": "maintainers",
-   "reviewTriggers": [
-    "target or scheme changes",
-    "runtime topology",
-    "telemetry schema",
-    "test workflow"
-   ],
-   "paths": [
-    "docs/ARCHITECTURE.md",
-    "docs/decisions/*.md",
-    "docs/development-progress.md",
-    "docs/project-map.html",
-    "docs/qwen_tone.md",
-    "docs/reference/*.md",
-    "Sources/Resources/voice-previews/README.md"
-   ]
-  },
-  {
-   "id": "benchmarking",
-   "title": "Benchmark governance",
-   "status": "active",
-   "owner": "release-qa",
-   "authority": "benchmark schemas, validators, and tracked PASS records",
-   "audience": "performance and release maintainers",
-   "reviewTriggers": [
-    "benchmark schema",
-    "telemetry schema",
-    "hardware profiles",
-    "publication rules"
-   ],
-   "paths": [
-    "benchmarks/README.md",
-    "benchmarks/OPTIMIZATION.md"
-   ]
-  },
-  {
-   "id": "vendor-runtime",
-   "title": "Owned Qwen3 runtime",
-   "status": "active",
-   "owner": "backend-mlx",
-   "authority": "owned runtime lineage, compatibility, ownership, and capability contracts",
-   "audience": "backend maintainers",
-   "reviewTriggers": [
-    "owned runtime source changes",
-    "dependency pins",
-    "upstream review",
-    "performance semantics"
-   ],
-   "paths": [
-    "Packages/VocelloQwen3Core/README.md",
-    "Packages/VocelloQwen3Core/UPSTREAM.md",
-    "Packages/VocelloQwen3Core/ORIGINS.md",
-    "Packages/VocelloQwen3Core/NOTICES.md",
-    "Packages/VocelloQwen3Core/PERFORMANCE.md",
-    "Packages/VocelloQwen3Core/CLONE_ARTIFACT_FORMAT.md"
-   ]
-  },
-  {
-   "id": "generated",
-   "title": "Generated indexes",
-   "status": "generated",
-   "owner": "release-qa",
-   "authority": "generators",
-   "audience": "maintainers",
-   "reviewTriggers": [
-    "source manifest or benchmark record changes"
-   ],
-   "paths": [
-    "docs/INDEX.md",
-    "docs/project-health.md",
-    "benchmarks/HISTORY.md"
-   ]
-  },
-  {
-   "id": "research",
-   "title": "Imported research corpus (point-in-time)",
-   "status": "historical",
-   "owner": "backend-mlx",
-   "authority": "external research snapshots counter-verified 2026-07-22; superseded figures carry inline editor's notes; contract JSON remains status authority",
-   "audience": "maintainers",
-   "reviewTriggers": [
-    "runtime refactor phase changes",
-    "canonical benchmark supersession"
-   ],
-   "paths": [
-    "docs/research/*.md"
-   ]
-  },
-  {
-   "id": "historical",
-   "title": "Historical evidence",
-   "status": "historical",
-   "owner": "archive",
-   "authority": "pinned historical snapshot only",
-   "audience": "research and provenance review",
-   "reviewTriggers": [
-    "link repair or archive classification only"
-   ],
-   "paths": [
-    "benchmarks/LEGACY_HISTORY.md",
-    "benchmarks/baseline-*.md",
-    "docs/releases/*.md",
-    "docs/audits/archive/**/*.md",
-    "docs/reference/backend-optimization-research-report.md"
-   ]
-  }
- ]
+  "schemaVersion": 1,
+  "indexPath": "docs/INDEX.md",
+  "generatedRepositoryPaths": [
+    {
+      "path": "website/dist",
+      "owner": "website",
+      "producer": "npm --prefix website run build",
+      "requiredInCheckout": false
+    }
+  ],
+  "groups": [
+    {
+      "id": "onboarding",
+      "title": "Onboarding and product",
+      "status": "active",
+      "owner": "release-qa",
+      "authority": "repository guidance",
+      "audience": "contributors and users",
+      "reviewTriggers": [
+        "release facts",
+        "workflow changes",
+        "platform support"
+      ],
+      "paths": [
+        "CLAUDE.md",
+        "README.md",
+        "CONTRIBUTING.md",
+        "PRODUCT.md",
+        "SECURITY.md",
+        ".claude/rules/*.md",
+        "website/CLAUDE.md",
+        "website/DESIGN.md",
+        "website/PRODUCT.md",
+        "website/README.md"
+      ]
+    },
+    {
+      "id": "architecture",
+      "title": "Architecture and active references",
+      "status": "active",
+      "owner": "backend-and-platform",
+      "authority": "derived from source, project.yml, scripts, and machine-readable contracts",
+      "audience": "maintainers",
+      "reviewTriggers": [
+        "target or scheme changes",
+        "runtime topology",
+        "telemetry schema",
+        "test workflow"
+      ],
+      "paths": [
+        "docs/ARCHITECTURE.md",
+        "docs/decisions/*.md",
+        "docs/development-progress.md",
+        "docs/project-map.html",
+        "docs/qwen_tone.md",
+        "docs/reference/*.md",
+        "Sources/Resources/voice-previews/README.md"
+      ]
+    },
+    {
+      "id": "benchmarking",
+      "title": "Benchmark governance",
+      "status": "active",
+      "owner": "release-qa",
+      "authority": "benchmark schemas, validators, and tracked PASS records",
+      "audience": "performance and release maintainers",
+      "reviewTriggers": [
+        "benchmark schema",
+        "telemetry schema",
+        "hardware profiles",
+        "publication rules"
+      ],
+      "paths": [
+        "benchmarks/README.md",
+        "benchmarks/OPTIMIZATION.md"
+      ]
+    },
+    {
+      "id": "vendor-runtime",
+      "title": "Owned Qwen3 runtime",
+      "status": "active",
+      "owner": "backend-mlx",
+      "authority": "owned runtime lineage, compatibility, ownership, and capability contracts",
+      "audience": "backend maintainers",
+      "reviewTriggers": [
+        "owned runtime source changes",
+        "dependency pins",
+        "upstream review",
+        "performance semantics"
+      ],
+      "paths": [
+        "Packages/VocelloQwen3Core/README.md",
+        "Packages/VocelloQwen3Core/UPSTREAM.md",
+        "Packages/VocelloQwen3Core/ORIGINS.md",
+        "Packages/VocelloQwen3Core/NOTICES.md",
+        "Packages/VocelloQwen3Core/PERFORMANCE.md",
+        "Packages/VocelloQwen3Core/CLONE_ARTIFACT_FORMAT.md"
+      ]
+    },
+    {
+      "id": "generated",
+      "title": "Generated indexes",
+      "status": "generated",
+      "owner": "release-qa",
+      "authority": "generators",
+      "audience": "maintainers",
+      "reviewTriggers": [
+        "source manifest or benchmark record changes"
+      ],
+      "paths": [
+        "docs/INDEX.md",
+        "docs/project-health.md",
+        "benchmarks/HISTORY.md"
+      ]
+    },
+    {
+      "id": "research",
+      "title": "Imported research corpus (point-in-time)",
+      "status": "historical",
+      "owner": "backend-mlx",
+      "authority": "external research snapshots counter-verified 2026-07-22; superseded figures carry inline editor's notes; contract JSON remains status authority",
+      "audience": "maintainers",
+      "reviewTriggers": [
+        "runtime refactor phase changes",
+        "canonical benchmark supersession"
+      ],
+      "paths": [
+        "docs/research/*.md"
+      ]
+    },
+    {
+      "id": "historical",
+      "title": "Historical evidence",
+      "status": "historical",
+      "owner": "archive",
+      "authority": "pinned historical snapshot only",
+      "audience": "research and provenance review",
+      "reviewTriggers": [
+        "link repair or archive classification only"
+      ],
+      "paths": [
+        "benchmarks/LEGACY_HISTORY.md",
+        "benchmarks/baseline-*.md",
+        "docs/releases/*.md",
+        "docs/audits/archive/**/*.md",
+        "docs/reference/backend-optimization-research-report.md",
+        "docs/reference/delivery-control-audit-2026-08.md",
+        "docs/reference/delivery-fidelity-report-2026-08-01.md",
+        "docs/reference/delivery-remediation-plan-2026-08.md",
+        "docs/reference/metal4-tensor-feasibility-2026-07-31.md",
+        "docs/reference/optimization-report-review-2026-07-25.md",
+        "docs/reference/qwen3-apple-silicon-roadmap-review.md",
+        "docs/reference/runtime-refactor-status-report.md",
+        "docs/reference/codex-storage-ballooning-incident.md"
+      ]
+    }
+  ]
 }

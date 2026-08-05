@@ -45,11 +45,12 @@ Tests assert these visible production surfaces directly.
 |---|---|
 | Speaker picker | `customVoice_speakerPicker` (visible menu; selected speaker is its accessibility value) |
 | Language picker | `customVoice_languageSetup` |
-| Delivery (tone) | `customVoice_toneSpeed` |
+| Delivery (tone) | `customVoice_toneSpeed` row; the menu itself is `customVoice_tonePicker`, sectioned since DP-14 into "Distinct deliveries" (Neutral/Calm/Whisper/Sad), "Directional hints" (Happy/Angry/Fearful/Surprised), and Custom; selecting a hint shows the advisory caption `customVoice_hintAdvisory` |
 | Script editor | `textInput_textEditor` / `textInput_charCount` |
 | Generate CTA | `textInput_generateButton` |
 | Cancel | `textInput_cancelButton` |
 | Batch | `textInput_batchButton` |
+| Pinned seed chip | `textInput_seedPinChip` beside Generate while a seed is pinned (DP-15); `textInput_seedUnpin` clears it back to fresh-seed-per-take. Shared across all three modes |
 
 ### Voice Design (`sidebar_voiceDesign` → `screen_voiceDesign`)
 
@@ -58,7 +59,7 @@ Tests assert these visible production surfaces directly.
 | Voice brief field | `voiceDesign_voiceDescriptionField` (visible field; current brief is its accessibility value) |
 | Brief starters | `voiceDesign_briefStarter_<n>` |
 | Brief char count | `voiceDesign_briefCharCount` |
-| Language + delivery | `voiceDesign_toneSpeed` / `voiceDesign_languageSetup` |
+| Language + delivery | `voiceDesign_toneSpeed` / `voiceDesign_languageSetup`; delivery menu `voiceDesign_tonePicker` with the same DP-14 sectioning and `voiceDesign_hintAdvisory` caption as Custom |
 | Save voice | `voiceDesign_saveVoiceButton` / `voiceDesign_saveVoiceCompleted` |
 | Script + CTAs | `textInput_*` (shared) |
 
@@ -66,7 +67,8 @@ Tests assert these visible production surfaces directly.
 
 | Element | Identifier |
 |---|---|
-| Reference picker | `voiceCloning_savedVoicePicker` (saved voices menu) |
+| Reference picker | `voiceCloning_savedVoicePicker` (saved voices menu). Standalone voices list as `<name> · transcript` / `<name> · audio only`; emotion-bank members collapse into one persona row labeled `<persona> · voice bank` (`VoiceBankCatalog` naming convention; [emotion-reference-banks.md](emotion-reference-banks.md)) |
+| Bank delivery menu | `voiceCloning_bankDeliveryPicker` — visible only while a bank member is selected; lists Neutral (the persona's base) plus its curated emotion variants and swaps the concrete member voice through the ordinary selection path |
 | Import | `voiceCloning_importButton` |
 | Record | `voiceCloning_recordReferenceButton` |
 | Active reference | `voiceCloning_activeReference` / `voiceCloning_referenceWarning` |
@@ -82,6 +84,7 @@ Tests assert these visible production surfaces directly.
 | Sort | `history_sortPicker` (menu) |
 | Clear | `history_clearMenu` → `history_clearKeepFiles` / `history_clearDeleteFiles` |
 | Row | `historyRow_<genID>` / `historyRow_play_<genID>` / `historyRow_saveAs_<genID>` / `historyRow_delete_<genID>` |
+| Pin seed | `history_pinSeedButton` in the row context menu (only for rows with a recorded seed, DP-15): pins the take's seed into its mode's draft and switches to that mode; the composer then shows the pinned-seed chip |
 | Long-form project | joined row plus `history_longFormSegmentsToggle_<digest8>` disclosure over the per-segment map; segments collapse under the project, flatten during search, and orphans stay visible |
 | Degraded database state | `history_errorState`; destructive actions stay disabled until a later reload/read succeeds |
 
@@ -157,7 +160,7 @@ is installed — otherwise the app prompts to download from Settings.
 ## 4. What each option means
 
 Same engine as iOS. See [`ios-app-guide.md`](ios-app-guide.md) §4 for the full reference
-(modes, 9 speakers + native languages, 10 delivery presets, custom
+(modes, 9 speakers + native languages, 8 delivery presets, custom
 tone, 10 languages, reproducible takes). macOS adds the **Quality (8-bit)** variant for
 higher-fidelity output.
 
@@ -221,7 +224,8 @@ macOS controls not currently targeted by the minimal smoke/benchmark lanes:
 - Model "Manage" popover menu items.
 - Per-segment long-form controls beyond the batch journeys (`batch_regenerateSegment_<index>` and
   `batch_resumeLongFormButton` exist but are not yet exercised by the minimal lanes).
-- History context menu items ("Reveal in Finder").
+- The History "Reveal in Finder" context menu item (the pin-seed item carries
+  `history_pinSeedButton`).
 
 Add stable identifiers before extending autonomous coverage to these controls; do not introduce
 label-only or coordinate-based selectors.

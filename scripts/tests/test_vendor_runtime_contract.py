@@ -434,16 +434,23 @@ public func stableFacadeEntryPoint() -> Bool { true }
         record = records["macos-xcui-benchmark-20260801-182943-b0b5a448"]
         git_blob = MODULE.git_blob
 
+        # Tree-independence: synthesize the "historical" package manifest and
+        # lockfile from the CURRENT tree so the only difference is the injected
+        # neutral drift. Reading them from the record's real commit made the
+        # test break on every legitimate non-neutral pin bump (first hit:
+        # swift-transformers 1.3.3), which is the contract working — not the
+        # property under test here.
         def blob_with_neutral_drift(repo_root: Path, commit: str, path: Path) -> bytes | None:
-            blob = git_blob(repo_root, commit, path)
-            if path.name == "Package.resolved" and blob is not None:
-                payload = json.loads(blob)
+            if path.name == "Package.swift":
+                return (runtime / "Package.swift").read_bytes()
+            if path.name == "Package.resolved":
+                payload = json.loads((runtime / "Package.resolved").read_bytes())
                 for pin in payload["pins"]:
                     if pin["identity"] == "swift-nio":
                         pin["state"] = {"revision": "0" * 40, "version": "2.99.0"}
                         break
                 return json.dumps(payload, sort_keys=True).encode("utf-8")
-            return blob
+            return git_blob(repo_root, commit, path)
 
         with mock.patch.object(MODULE, "git_blob", side_effect=blob_with_neutral_drift):
             self.assertTrue(
@@ -471,15 +478,17 @@ public func stableFacadeEntryPoint() -> Bool { true }
                     commit: str,
                     path: Path,
                 ) -> bytes | None:
-                    blob = git_blob(repo_root, commit, path)
-                    if path.name == "Package.resolved" and blob is not None:
-                        payload = json.loads(blob)
+                    # Same tree-independence as the neutral-drift test above.
+                    if path.name == "Package.swift":
+                        return (runtime / "Package.swift").read_bytes()
+                    if path.name == "Package.resolved":
+                        payload = json.loads((runtime / "Package.resolved").read_bytes())
                         for pin in payload["pins"]:
                             if pin["identity"] == "swift-nio":
                                 pin[field] = value
                                 break
                         return json.dumps(payload, sort_keys=True).encode("utf-8")
-                    return blob
+                    return git_blob(repo_root, commit, path)
 
                 with mock.patch.object(MODULE, "git_blob", side_effect=blob_with_source_drift):
                     self.assertFalse(

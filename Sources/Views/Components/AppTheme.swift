@@ -66,6 +66,17 @@ enum AppTheme {
     static let sidebarHoverFill = Color.white.opacity(0.03)
     static let sidebarHoverStroke = Color.white.opacity(0.08)
 
+    // Warm ink ramp, ported from the iOS theme (Sources/iOS/Theme/Theme.swift
+    // `Theme.Text`) per the 2026-08 UI review (W1-A): hierarchy through
+    // warm-tinted steps instead of the cold system `.tertiary`, whose
+    // ~2.0-2.4:1 contrast against the dark surfaces fails WCAG AA for
+    // state-bearing text. `textMuted` clears 4.5:1 on every app surface
+    // including the field fill.
+    static let textPrimary = Color(red: 0.95, green: 0.94, blue: 0.92)
+    static let textSecondary = Color(red: 0.78, green: 0.76, blue: 0.72)
+    static let textMuted = Color(red: 0.62, green: 0.60, blue: 0.55)
+    static let textMutedNSColor = NSColor(red: 0.62, green: 0.60, blue: 0.55, alpha: 1)
+
     static var windowTitlebarSeparatorStyle: NSTitlebarSeparatorStyle {
         #if QW_UI_LIQUID
         return .none
@@ -184,6 +195,49 @@ enum AppTheme {
         let progress = max(0, min(1, position))
         return accent.opacity(0.45 + (progress * 0.45))
     }
+
+    /// Named motion family, ported from the iOS theme (`Theme.Motion`,
+    /// cubic-bezier(0.22, 1, 0.36, 1)) per the 2026-08 UI review (W1-B).
+    /// Every animation routes through `appAnimation` so Reduce Motion
+    /// still disables the lot; these tokens replace scattered ad-hoc
+    /// `easeInOut(duration:)` literals with one intentional family.
+    enum Motion {
+        /// Quick state feedback: hover, focus, selection highlights.
+        static let state = Animation.easeOut(duration: 0.15)
+        /// Default transition for showing/hiding controls and status.
+        static let standard = Animation.timingCurve(0.22, 1.0, 0.36, 1.0, duration: 0.22)
+        /// Larger movements: panel slides, prominent reveals.
+        static let gentle = Animation.timingCurve(0.22, 1.0, 0.36, 1.0, duration: 0.32)
+        /// Tap-press response.
+        static let press = Animation.easeOut(duration: 0.09)
+    }
+}
+
+/// The one place the Liquid Glass render decision lives (W1-G): glass
+/// renders only on liquid builds with Reduce Transparency off and the §K
+/// generation performance gate inactive — otherwise the caller's solid-fill
+/// fallback. Hand-rolled copies of this condition drifted (the eight direct
+/// glass sites shipped without the Reduce Transparency check until
+/// 2026-08-05); routing every glass surface through this container makes
+/// the invariant structural instead of remembered.
+struct GatedGlass<Glass: View, Fallback: View>: View {
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.generationPerformanceGate) private var performanceGate
+
+    @ViewBuilder let glass: () -> Glass
+    @ViewBuilder let fallback: () -> Fallback
+
+    var body: some View {
+        #if QW_UI_LIQUID
+        if !reduceTransparency, !performanceGate {
+            glass()
+        } else {
+            fallback()
+        }
+        #else
+        fallback()
+        #endif
+    }
 }
 
 private struct NativeSurfaceStyle: ViewModifier {
@@ -245,58 +299,7 @@ private struct NativeSurfaceStyle: ViewModifier {
     }
 }
 
-private struct StudioChipStyle: ViewModifier {
-    let isSelected: Bool
-    let color: Color
-
-    // Per the May 2026 audit (Batch 2 — quieter): chips no longer
-    // use Liquid Glass + 3D depth. Glass is reserved for cards /
-    // panels / the primary CTA so the chrome around them reads
-    // quieter and the cards feel more substantial. Single flat code
-    // path for both Liquid + legacy builds.
-    func body(content: Content) -> some View {
-        content
-            .font(.subheadline.weight(.semibold))
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .foregroundStyle(isSelected ? color : .primary)
-            .background(
-                Capsule(style: .continuous)
-                    .fill(
-                        isSelected
-                            ? AppTheme.accentWash(color)
-                            : AppTheme.inlineFill
-                    )
-            )
-            .overlay(
-                Capsule(style: .continuous)
-                    .stroke(
-                        isSelected
-                            ? color.opacity(0.32)
-                            : AppTheme.cardStroke.opacity(0.20),
-                        lineWidth: isSelected ? 1 : 0.75
-                    )
-            )
-            .appAnimation(.easeInOut(duration: 0.15), value: isSelected)
-    }
-}
-
 extension View {
-    func studioCard(
-        padding: CGFloat = LayoutConstants.cardPadding,
-        radius: CGFloat = LayoutConstants.cardRadius
-    ) -> some View {
-        modifier(NativeSurfaceStyle(padding: padding, radius: radius, fill: AppTheme.cardFill))
-    }
-
-    func glassCard() -> some View {
-        studioCard(padding: LayoutConstants.glassCardPadding, radius: LayoutConstants.cardRadius)
-    }
-
-    func stageCard() -> some View {
-        modifier(NativeSurfaceStyle(padding: 0, radius: LayoutConstants.stageRadius, fill: AppTheme.stageFill))
-    }
-
     func inlinePanel(padding: CGFloat = 14, radius: CGFloat = 16) -> some View {
         modifier(NativeSurfaceStyle(padding: padding, radius: radius, fill: AppTheme.inlineFill))
     }
@@ -305,30 +308,36 @@ extension View {
         self.animation(AppLaunchConfiguration.current.animation(animation), value: value)
     }
 
-    func studioChip(isSelected: Bool, color: Color) -> some View {
-        modifier(StudioChipStyle(isSelected: isSelected, color: color))
-    }
-
-    func chipStyle(isSelected: Bool, color: Color) -> some View {
-        modifier(StudioChipStyle(isSelected: isSelected, color: color))
-    }
-
-    func voiceChoiceChip(isSelected: Bool, color: Color) -> some View {
-        modifier(StudioChipStyle(isSelected: isSelected, color: color))
+    /// Visible keyboard-focus indicator in the active mode's accent color
+    /// (2026-08 UI review, W1-C). The system blue ring stays suppressed —
+    /// it painted a stray selection halo on first appearance under Full
+    /// Keyboard Access — but suppression alone left twelve controls with
+    /// no focus indication at all (WCAG 2.4.7). This modifier keeps the
+    /// suppression and draws a 2 pt accent ring only while the control
+    /// actually has focus.
+    func vocelloFocusRing(_ color: Color, radius: CGFloat = 8) -> some View {
+        modifier(VocelloFocusRing(color: color, radius: radius))
     }
 }
 
-private struct ToolbarRowStyle: ViewModifier {
-    let label: String
+private struct VocelloFocusRing: ViewModifier {
+    let color: Color
+    let radius: CGFloat
+    @FocusState private var isFocused: Bool
 
     func body(content: Content) -> some View {
-        HStack(alignment: .center, spacing: 10) {
-            Text(label.uppercased())
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .frame(width: 52, alignment: .leading)
-            content
-        }
+        content
+            .focused($isFocused)
+            .focusEffectDisabled()
+            .overlay {
+                if isFocused {
+                    RoundedRectangle(cornerRadius: radius + 2, style: .continuous)
+                        .strokeBorder(color.opacity(0.85), lineWidth: 2)
+                        .padding(-3)
+                        .allowsHitTesting(false)
+                }
+            }
+            .appAnimation(AppTheme.Motion.state, value: isFocused)
     }
 }
 
@@ -428,127 +437,6 @@ private struct Glass3DDepthStyle: ViewModifier {
     }
 }
 
-struct SectionHeaderStyle: ViewModifier {
-    func body(content: Content) -> some View {
-        content
-            .font(.subheadline.weight(.semibold))
-            .foregroundStyle(.secondary)
-    }
-}
-
-struct GlowingGradientButtonStyle: ButtonStyle {
-    let baseColor: Color
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-    @Environment(\.generationPerformanceGate) private var performanceGate
-
-    func makeBody(configuration: Configuration) -> some View {
-        #if QW_UI_LIQUID
-        if #available(macOS 26, *), !reduceTransparency, !performanceGate {
-            configuration.label
-                .font(.body.weight(.semibold))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
-                .glassEffect(.regular.tint(baseColor), in: .rect(cornerRadius: 8))
-                .opacity(configuration.isPressed ? 0.75 : 1.0)
-                .appAnimation(.easeInOut(duration: 0.15), value: configuration.isPressed)
-        } else {
-            legacyBody(configuration: configuration)
-        }
-        #else
-        legacyBody(configuration: configuration)
-        #endif
-    }
-
-    private func legacyBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.body.weight(.semibold))
-            .foregroundStyle(.white)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
-            .background(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(baseColor.opacity(configuration.isPressed ? 0.75 : 0.95))
-            )
-            .appAnimation(.easeInOut(duration: 0.15), value: configuration.isPressed)
-    }
-}
-
-struct CompactGenerateButtonStyle: ButtonStyle {
-    let baseColor: Color
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-    @Environment(\.generationPerformanceGate) private var performanceGate
-
-    func makeBody(configuration: Configuration) -> some View {
-        #if QW_UI_LIQUID
-        if #available(macOS 26, *), !reduceTransparency, !performanceGate {
-            configuration.label
-                .foregroundStyle(.white)
-                .padding(12)
-                .glassEffect(.regular.tint(baseColor), in: .circle)
-                .opacity(configuration.isPressed ? 0.75 : 1.0)
-                .appAnimation(.easeInOut(duration: 0.15), value: configuration.isPressed)
-        } else {
-            legacyBody(configuration: configuration)
-        }
-        #else
-        legacyBody(configuration: configuration)
-        #endif
-    }
-
-    private func legacyBody(configuration: Configuration) -> some View {
-        configuration.label
-            .foregroundStyle(.white)
-            .padding(12)
-            .background(
-                Circle()
-                    .fill(baseColor.opacity(configuration.isPressed ? 0.75 : 0.95))
-            )
-            .appAnimation(.easeInOut(duration: 0.15), value: configuration.isPressed)
-    }
-}
-
-struct AuroraBackground: View {
-    var body: some View {
-        #if QW_UI_LIQUID
-        if #available(macOS 26, *) {
-            LinearGradient(
-                colors: [
-                    Color(red: 0.06, green: 0.07, blue: 0.09),
-                    Color(red: 0.10, green: 0.11, blue: 0.13),
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            ).ignoresSafeArea()
-        } else {
-            AppTheme.canvasBackground.ignoresSafeArea()
-        }
-        #else
-        AppTheme.canvasBackground.ignoresSafeArea()
-        #endif
-    }
-}
-
-struct EmptyStateStyle: ViewModifier {
-    func body(content: Content) -> some View {
-        content.foregroundStyle(.secondary)
-    }
-}
-
-extension View {
-    func toolbarRow(_ label: String) -> some View {
-        modifier(ToolbarRowStyle(label: label))
-    }
-
-    func sectionHeader() -> some View {
-        modifier(SectionHeaderStyle())
-    }
-
-    func emptyStateStyle() -> some View {
-        modifier(EmptyStateStyle())
-    }
-}
-
 // MARK: - Studio GroupBox Style (material-based legacy fallback)
 
 struct StudioGroupBoxStyle: GroupBoxStyle {
@@ -631,18 +519,6 @@ struct GlassGroupBoxStyle: GroupBoxStyle {
 #endif
 
 extension View {
-    /// Wraps content in a GlassEffectContainer on liquid builds.
-    @ViewBuilder
-    func liquidGlassContainer(spacing: CGFloat = 8) -> some View {
-        #if QW_UI_LIQUID
-        if #available(macOS 26, *) {
-            GlassEffectContainer(spacing: spacing) { self }
-        } else { self }
-        #else
-        self
-        #endif
-    }
-
     /// Profile-aware background: clear for liquid, specified color for legacy.
     @ViewBuilder
     func profileBackground(_ legacyColor: Color) -> some View {

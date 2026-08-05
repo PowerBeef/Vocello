@@ -1,13 +1,28 @@
 import Combine
 import Foundation
+import Observation
 import QwenVoiceCore
 
+/// `@Observable` (W2-A, 2026-08 UI review): views that read one property no
+/// longer re-render when any other one changes — the coarse
+/// `ObservableObject` made every screen re-diff on every engine tick. The
+/// Observation framework has no publishers, so the two imperative consumers
+/// (the root shell's snapshot handler and the performance-gate model)
+/// subscribe to the explicit Combine bridges below instead of `$`-projections.
 @MainActor
-public final class TTSEngineStore: ObservableObject {
-    @Published public private(set) var snapshot: TTSEngineSnapshot
-    @Published public private(set) var frontendState: TTSEngineFrontendState
-    @Published public private(set) var latestEvent: GenerationEvent?
-    @Published public private(set) var hasActiveGeneration = false
+@Observable
+public final class TTSEngineStore {
+    public private(set) var snapshot: TTSEngineSnapshot
+    public private(set) var frontendState: TTSEngineFrontendState
+    public private(set) var latestEvent: GenerationEvent?
+    public private(set) var hasActiveGeneration = false
+
+    /// Fires on every applied snapshot change (already deduplicated by
+    /// `apply`). Imperative bridge — never read in a view body.
+    @ObservationIgnored public let snapshotUpdates = PassthroughSubject<TTSEngineSnapshot, Never>()
+    /// Fires with `hasActiveGeneration || hasSustainedPerformanceActivity`
+    /// whenever either input mutates; the gate model deduplicates flips.
+    @ObservationIgnored public let performanceActivityUpdates = PassthroughSubject<Bool, Never>()
 
     public var isReady: Bool { snapshot.isReady }
     public var loadState: EngineLoadState { snapshot.loadState }
@@ -15,15 +30,15 @@ public final class TTSEngineStore: ObservableObject {
     public var visibleErrorMessage: String? { snapshot.visibleErrorMessage }
     public var lifecycleState: EngineLifecycleState { frontendState.lifecycleState }
 
-    private let engine: any MacTTSEngine
-    private var snapshotCancellable: AnyCancellable?
-    private var activeGenerationDepth = 0
+    @ObservationIgnored private let engine: any MacTTSEngine
+    @ObservationIgnored private var snapshotCancellable: AnyCancellable?
+    @ObservationIgnored private var activeGenerationDepth = 0
     /// Sustained performance-critical activity (for example a long-form
     /// project spanning several generations plus QC and assembly). Keeps the
     /// generation performance gate engaged across inter-segment gaps without
     /// tripping the single-generation busy guard.
-    @Published public private(set) var hasSustainedPerformanceActivity = false
-    private var sustainedPerformanceDepth = 0
+    public private(set) var hasSustainedPerformanceActivity = false
+    @ObservationIgnored private var sustainedPerformanceDepth = 0
 
     public init(engine: any MacTTSEngine) {
         self.engine = engine
@@ -96,6 +111,7 @@ public final class TTSEngineStore: ObservableObject {
         defer {
             activeGenerationDepth = 0
             hasActiveGeneration = Self.snapshotHasActiveGeneration(snapshot)
+            publishPerformanceActivity()
         }
         try await engine.cancelActiveGeneration()
     }
@@ -134,16 +150,20 @@ public final class TTSEngineStore: ObservableObject {
         self.snapshot = snapshot
         frontendState = nextFrontendState
         hasActiveGeneration = nextHasActiveGeneration
+        snapshotUpdates.send(snapshot)
+        publishPerformanceActivity()
     }
 
     public func beginSustainedPerformanceActivity() {
         sustainedPerformanceDepth += 1
         hasSustainedPerformanceActivity = true
+        publishPerformanceActivity()
     }
 
     public func endSustainedPerformanceActivity() {
         sustainedPerformanceDepth = max(sustainedPerformanceDepth - 1, 0)
         hasSustainedPerformanceActivity = sustainedPerformanceDepth > 0
+        publishPerformanceActivity()
     }
 
     private func beginActiveGeneration() throws {
@@ -154,11 +174,17 @@ public final class TTSEngineStore: ObservableObject {
         }
         activeGenerationDepth += 1
         hasActiveGeneration = true
+        publishPerformanceActivity()
     }
 
     private func finishActiveGeneration() {
         activeGenerationDepth = max(activeGenerationDepth - 1, 0)
         hasActiveGeneration = activeGenerationDepth > 0 || Self.snapshotHasActiveGeneration(snapshot)
+        publishPerformanceActivity()
+    }
+
+    private func publishPerformanceActivity() {
+        performanceActivityUpdates.send(hasActiveGeneration || hasSustainedPerformanceActivity)
     }
 
     private static func snapshotHasActiveGeneration(_ snapshot: TTSEngineSnapshot) -> Bool {

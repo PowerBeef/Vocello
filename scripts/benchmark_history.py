@@ -72,7 +72,9 @@ KINDS = {
     "prosody-calibration",
 }
 V1_KINDS = set(KINDS)
-V2_KINDS = (KINDS - {"telemetry-overhead"}) | {"memory-qualification"}
+# ui-perf (UI-7, 2026-08): the macOS SwiftUI frame-health lane. v2-only like
+# memory-qualification — no historical v1 records can carry it.
+V2_KINDS = (KINDS - {"telemetry-overhead"}) | {"memory-qualification", "ui-perf"}
 ALL_KINDS = V1_KINDS | V2_KINDS
 MEMORY_QUALIFIED_KINDS = {
     "ui-generation", "engine-generation", "language", "instrument-profile",
@@ -349,6 +351,21 @@ METRIC_KEYS = {
     "deliveryDF0StdHz", "deliveryDRateCV", "deliveryDPauseRatio",
     "deliveryDRoughness", "deliveryProsodyEffect",
     "deliveryPitchShiftSemitones", "deliveryArousalScore",
+    # ui-perf (UI-7): per-scenario SwiftUI frame-health evidence from the
+    # in-app display-link probe, joined by scripts/check_macos_ui_perf.py.
+    "uiHitchTimeMSPerS", "uiMaxGapMS", "uiP95GapMSApprox", "uiFramesDelivered",
+    "uiExpectedFrames", "uiProbeCoverage", "uiRefreshIntervalMS",
+    "uiWindowDurationMS", "uiActionCount",
+}
+UI_PERF_REQUIRED_METRICS = {
+    "uiHitchTimeMSPerS", "uiMaxGapMS", "uiFramesDelivered", "uiExpectedFrames",
+    "uiProbeCoverage", "uiRefreshIntervalMS", "uiWindowDurationMS", "uiActionCount",
+    "cpuUserSeconds", "cpuSystemSeconds",
+}
+UI_PERF_SCENARIOS = {
+    "idle-baseline", "sidebar-navigation", "history-scroll", "history-filter",
+    "delivery-menu", "settings-scroll", "composer-typing", "window-resize",
+    "generation-active",
 }
 MEMORY_REQUIRED_METRICS = {
     "residentStartMB", "residentEndMB", "residentDeltaMB", "peakResidentMB",
@@ -848,7 +865,14 @@ def default_inputs(record: dict[str, Any]) -> dict[str, Any]:
         REPO_ROOT / "scripts" / "check_language_output.py",
         REPO_ROOT / "Tests" / "UIAutomationSupport" / "VocelloUIAutomationSupport.swift",
         REPO_ROOT / "Tests" / "VocelloMacUITests" / "VocelloMacBenchmarkUITests.swift",
+        REPO_ROOT / "Tests" / "VocelloMacUITests" / "VocelloMacPerfUITests.swift",
         REPO_ROOT / "Tests" / "VocelloiOSUITests" / "VocelloiOSBenchmarkUITests.swift",
+        # ui-perf (UI-7): the frame probe, history seeder, gate checker, and
+        # threshold contract shape published frame-health evidence.
+        REPO_ROOT / "scripts" / "check_macos_ui_perf.py",
+        REPO_ROOT / "Sources" / "Services" / "UIPerfFrameProbe.swift",
+        REPO_ROOT / "Sources" / "Services" / "UIPerfHistorySeeder.swift",
+        REPO_ROOT / "config" / "ui-perf-thresholds.json",
         REPO_ROOT / "Sources" / "QwenVoiceCore" / "BenchMatrixSpec.swift",
         REPO_ROOT / "Sources" / "VocelloCLI" / "BenchCommand.swift",
         REPO_ROOT / "Sources" / "QwenVoiceCore" / "GenerationTelemetryRecord.swift",
@@ -1441,8 +1465,9 @@ def build_record(manifest_path: Path) -> dict[str, Any]:
         run_metadata = load_json(run_metadata_path)
         if run_metadata.get("runID") != run.get("id") or run_metadata.get("platform") != run.get("platform"):
             raise HistoryError("run.json identity does not match benchmark evidence")
-        if run_metadata.get("lane") != "benchmark" or run_metadata.get("status") not in {"pass", "passed"}:
-            raise HistoryError("run.json does not describe a successful benchmark lane")
+        expected_lane = "perf" if run.get("kind") == "ui-perf" else "benchmark"
+        if run_metadata.get("lane") != expected_lane or run_metadata.get("status") not in {"pass", "passed"}:
+            raise HistoryError(f"run.json does not describe a successful {expected_lane} lane")
         if run_metadata.get("startedAt"):
             run["startedAt"] = run_metadata["startedAt"]
         if run_metadata.get("finishedAt"):
@@ -1756,6 +1781,46 @@ def validate_prosody_semantics(record: dict[str, Any]) -> None:
             raise HistoryError(f"prosody calibration metric {name} is outside [0, 1]")
     require_digest(record["inputs"].get("corpusHash"), "inputs.corpusHash", allow_na=False)
     require_digest(record["inputs"].get("analysisProfileHash"), "inputs.analysisProfileHash", allow_na=False)
+
+
+def validate_ui_perf_semantics(record: dict[str, Any]) -> None:
+    """ui-perf (UI-7): one SwiftUI frame-health take per scenario, no model,
+    engine-telemetry, or audio-QC claims — the probe measures main-run-loop
+    cadence, not generation. Threshold breaches are warn-only and surface as
+    take/run warnings, never as a failed status."""
+    run = record["run"]
+    if run.get("platform") != "macos" or run.get("matrixScope") != "canonical":
+        raise HistoryError("ui-perf must be a canonical-matrix macOS benchmark")
+    if record.get("models"):
+        raise HistoryError("ui-perf must not claim a generation model")
+    if (
+        record["evidence"].get("telemetrySchemaVersion") != "not-applicable"
+        or record["evidence"].get("qcAlgorithmVersion") != "not-applicable"
+    ):
+        raise HistoryError("ui-perf must not claim generation telemetry or audio-QC")
+    takes = record["takes"]
+    scenarios = [str(take.get("cell", "")).removeprefix("ui-perf/") for take in takes]
+    if len(takes) != len(UI_PERF_SCENARIOS) or set(scenarios) != UI_PERF_SCENARIOS:
+        raise HistoryError("ui-perf requires exactly one take per probe scenario")
+    for take, scenario in zip(takes, scenarios):
+        expected_identity = {
+            "cell": f"ui-perf/{scenario}",
+            "generationID": f"{run['id']}-{scenario}",
+            "mode": "not-applicable", "modelID": "not-applicable",
+            "variant": "not-applicable", "warmState": "not-applicable",
+            "length": "not-applicable", "finishReason": "completed",
+        }
+        if any(take.get(key) != value for key, value in expected_identity.items()):
+            raise HistoryError(f"ui-perf take identity is not exact for {scenario}")
+        metrics = take["metrics"]
+        if missing := sorted(UI_PERF_REQUIRED_METRICS - set(metrics)):
+            raise HistoryError(f"ui-perf {scenario} metrics are incomplete: {', '.join(missing)}")
+        if not 0.9 <= metrics["uiProbeCoverage"] <= 1.0:
+            raise HistoryError(f"ui-perf {scenario} probe coverage is outside [0.9, 1.0]")
+        if not 1000.0 / 140.0 <= metrics["uiRefreshIntervalMS"] <= 1000.0 / 30.0:
+            raise HistoryError(f"ui-perf {scenario} refresh interval is outside the 30-140 Hz band")
+        if metrics["uiHitchTimeMSPerS"] < 0 or metrics["uiMaxGapMS"] < 0:
+            raise HistoryError(f"ui-perf {scenario} frame-health metrics are negative")
 
 
 def _safe_build_artifact_path(value: Any, *, suffix: str, location: str) -> PurePosixPath:
@@ -2442,6 +2507,8 @@ def validate_record(
             raise HistoryError("tracked model identity does not match the pinned model contract")
     if kind == "prosody-calibration":
         validate_prosody_semantics(record)
+    if kind == "ui-perf":
+        validate_ui_perf_semantics(record)
     if kind == "telemetry-overhead":
         validate_telemetry_overhead_semantics(record, model_lookup)
     if "trace" in evidence:

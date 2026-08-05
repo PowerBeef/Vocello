@@ -10,7 +10,7 @@
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
 | `convergence-metal4-stage4-2026-08` | active | backend-and-platform | 5/7 (71%) |
-| `delivery-prompting-2026-08` | active | backend-mlx | 19/22 (86%) |
+| `delivery-prompting-2026-08` | active | backend-mlx | 20/23 (87%) |
 | `doc-governance-2026-08` | active | release-qa | 8/9 (89%) |
 | `macos-ui-2026-08` | complete | macos | 7/7 (100%) |
 
@@ -71,7 +71,8 @@ Narrative authority: [`docs/reference/qwen3-tts-prompting-guide.md`](reference/q
 | `DP-19` | done | Text-decoration valence channel (audit R5) | `file:scripts/delivery_separability.py`, `file:scripts/emotion_advisory.py`, `file:docs/development-progress.md` |
 | `DP-20` | parked | External delivery-control lever watch list (audit R8) | — |
 | `DP-21` | done | Delivery-adherence thresholds calibrated from the banked seed matrix | `file:scripts/prosody_profile.py`, `file:scripts/delivery_quality_gate.py`, `file:scripts/tests/test_delivery_quality_gate.py`, `file:docs/reference/delivery-harness.md` |
-| `DP-22` | planned | Normal-tier acoustic arm: does the normal tier carry the happy/angry distinction (DP-12 follow-up) | — |
+| `DP-22` | done | Normal-tier acoustic arm: does the normal tier carry the happy/angry distinction (DP-12 follow-up) | `file:scripts/delivery_separability.py`, `file:benchmarks/HISTORY.md`, `file:docs/reference/delivery-harness.md` |
+| `DP-23` | planned | Ship happy at its normal copy (cross-tier pairing candidate from DP-22) | — |
 
 ### Open items in detail
 
@@ -81,8 +82,8 @@ Narrative authority: [`docs/reference/qwen3-tts-prompting-guide.md`](reference/q
 - **`DP-20`** (parked) — External delivery-control lever watch list (audit R8).
   unparkWhen: Only when a watched lever becomes runnable on-device at the 8 GB floor: a Qwen3-TTS VoiceEditing/instruct variant that combines ICL with instructions, CosyVoice 3-class instruct control in an MLX-portable form, emotion-vector steering (IndexTTS-2/EmoSteer-class) with published weights, or a quantization-robust valence result. The pinned audit's R8 section is the source list; re-verify claims against primary sources at unpark time rather than trusting the 2026-08 snapshot.
 
-- **`DP-22`** (planned) — Normal-tier acoustic arm: does the normal tier carry the happy/angry distinction (DP-12 follow-up).
-  gate: PRE-REGISTERED 2026-08-05, before any generation. Motivation: DP-12's blind 2AFC found angry-vs-happy discriminable at 0.75 at the normal tier but at chance at strong (one listener, self-agreement ceiling 0.333 — a lead, not a result), while DP-18's confirmatory H3 showed the instruct channel carries no acoustic happy/angry distinction at the shipped strong copy. The normal tier is currently the only measured channel anywhere in the project carrying a happy/angry difference, and it is exactly the machinery DP-9 proposes to delete. Protocol: mirror DP-18's sweep at the normal-tier instruction copies — fresh seeds (>=18), all 8 presets, speed and quality variants, retained WAVs with instruction receipts, scored with delivery_separability.py in confirmatory designation with computed chance floors, FDR correction, and bootstrap CIs. PRIMARY: the pre-registered angry-vs-happy 2-way probe at normal. SECONDARY: 8-way separability at normal versus the DP-18 strong-tier arms. SIDE PAYOFF either way: the run banks real normal-tier paired rows, replacing DP-21's normal minima (currently strong-tier measurements divided by the unvalidated 1.15 intensity scale) with measured floors. DECISION RULE, registered both ways: (a) if the normal tier separates angry-vs-happy acoustically (2-way probe clears its computed floor after FDR), the product move is per-preset tier selection under DP-8's existing 'ship the measured-better copy' rule — angry/happy ship their normal copy — and DP-9 stays parked; (b) if null, DP-12's 0.75 attributes to single-listener noise, the DP-9 unpark condition ('a dedicated measurement shows the tiers carry no exploitable product difference') is met, and DP-9 unparks and executes. Machine-only: needs models and engine time, no phone, no listening; runs serially on the canonical 8 GB machine.
+- **`DP-23`** (planned) — Ship happy at its normal copy (cross-tier pairing candidate from DP-22).
+  gate: DP-22's exploratory cross-tier probe found angry.strong-vs-happy.normal is the widest measured happy/angry separation (2.424 vs 1.469 shipped) and happy.normal the only FDR-clear happy cell ever measured (happy.strong fails FDR in every arm of DP-18). Before any copy ships: (1) a small pre-registered confirmatory probe of the exact candidate pairing (angry.strong vs happy.normal, fresh seeds, both variants — the cross-tier finding is currently exploratory and 4-bit); (2) the maintainer's listening check that happy.normal does not reintroduce the heard-as-Surprised confusion (DP-12 heard happy.strong as Surprised); (3) if it ships, per-preset tier selection lands under DP-8's measured-better-copy rule, the delivery-instruction contract re-checks tier parity, and per-tier gate floors (profile schema v4) come with it since the shipped tier would no longer be uniform. Maintainer-gated at step 2; step 1 is machine-only and can run in any free window.
 
 ## Documentation governance and staleness control
 

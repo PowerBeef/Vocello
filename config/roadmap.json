@@ -400,8 +400,8 @@
       "sourceOfTruth": [
         "Sources/QwenVoiceCore/EmotionPreset.swift"
       ],
-      "updated": "2026-08-04",
-      "unparkWhen": "Parked 2026-08-04 (maintainer call during the sync audit): DP-12's blind session contradicts this item's premise — the 2AFC verdict was no_measured_strong_tier_collapse, control pairs were MORE discriminable at strong (+0.50 [0.001, 0.812]), and angry-vs-happy discriminated at 0.75 at the normal tier versus chance at strong, so the tier machinery may yet carry product value. Unpark only after a dedicated measurement shows the tiers carry no exploitable product difference. Execution note: deleting the enum also retires the derived deliveryIntensityTiers fact, whose value feeds the doc staleness scanner's rule set (scripts/doc_metadata.py), so the scanner rules change in the same arc."
+      "updated": "2026-08-05",
+      "unparkWhen": "Parked 2026-08-04 (maintainer call during the sync audit): DP-12's blind session contradicts this item's premise — the 2AFC verdict was no_measured_strong_tier_collapse, control pairs were MORE discriminable at strong (+0.50 [0.001, 0.812]), and angry-vs-happy discriminated at 0.75 at the normal tier versus chance at strong, so the tier machinery may yet carry product value. Unpark only after a dedicated measurement shows the tiers carry no exploitable product difference. Execution note: deleting the enum also retires the derived deliveryIntensityTiers fact, whose value feeds the doc staleness scanner's rule set (scripts/doc_metadata.py), so the scanner rules change in the same arc. That dedicated measurement is now registered as DP-22 (normal-tier acoustic arm, pre-registered 2026-08-05): its null branch unparks this item; its positive branch keeps the tier machinery as a product lever via per-preset tier selection."
     },
     {
       "id": "DP-10",
@@ -603,6 +603,17 @@
         "file:scripts/tests/test_delivery_quality_gate.py",
         "file:docs/reference/delivery-harness.md"
       ]
+    },
+    {
+      "id": "DP-22",
+      "plan": "delivery-prompting-2026-08",
+      "title": "Normal-tier acoustic arm: does the normal tier carry the happy/angry distinction (DP-12 follow-up)",
+      "status": "planned",
+      "gate": "PRE-REGISTERED 2026-08-05, before any generation. Motivation: DP-12's blind 2AFC found angry-vs-happy discriminable at 0.75 at the normal tier but at chance at strong (one listener, self-agreement ceiling 0.333 — a lead, not a result), while DP-18's confirmatory H3 showed the instruct channel carries no acoustic happy/angry distinction at the shipped strong copy. The normal tier is currently the only measured channel anywhere in the project carrying a happy/angry difference, and it is exactly the machinery DP-9 proposes to delete. Protocol: mirror DP-18's sweep at the normal-tier instruction copies — fresh seeds (>=18), all 8 presets, speed and quality variants, retained WAVs with instruction receipts, scored with delivery_separability.py in confirmatory designation with computed chance floors, FDR correction, and bootstrap CIs. PRIMARY: the pre-registered angry-vs-happy 2-way probe at normal. SECONDARY: 8-way separability at normal versus the DP-18 strong-tier arms. SIDE PAYOFF either way: the run banks real normal-tier paired rows, replacing DP-21's normal minima (currently strong-tier measurements divided by the unvalidated 1.15 intensity scale) with measured floors. DECISION RULE, registered both ways: (a) if the normal tier separates angry-vs-happy acoustically (2-way probe clears its computed floor after FDR), the product move is per-preset tier selection under DP-8's existing 'ship the measured-better copy' rule — angry/happy ship their normal copy — and DP-9 stays parked; (b) if null, DP-12's 0.75 attributes to single-listener noise, the DP-9 unpark condition ('a dedicated measurement shows the tiers carry no exploitable product difference') is met, and DP-9 unparks and executes. Machine-only: needs models and engine time, no phone, no listening; runs serially on the canonical 8 GB machine.",
+      "sourceOfTruth": [
+        "scripts/delivery_separability.py"
+      ],
+      "updated": "2026-08-05"
     },
     {
       "id": "CM-7",

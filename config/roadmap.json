@@ -653,16 +653,23 @@
       "id": "UI-5",
       "plan": "macos-ui-2026-08",
       "title": "Refinement wave 1 (warm text ramp, motion family, focus rings, scoped observation, type scaling, stable resize fields, glass helper)",
-      "status": "planned",
-      "gate": "Each W1 item lands independently with the perf lane re-run before/after where perf-relevant; blocked on the maintainer's review of the proposals artifact.",
-      "updated": "2026-08-05"
+      "status": "done",
+      "gate": "All seven refinements landed with the maintainer's go (warm ink ramp, motion family, mode-tinted focus rings, flip-scoped gate + History cache, ScaledMetric adoption, AnyLayout field stability, shared GatedGlass container). Verified: full gate, both compiles, core tests, 7/7 smoke, and a before/after perf session — settings-scroll -19%, composer-typing -16%, History unchanged with the stall localized to per-row List materialization (UI-6's first target). Table and honest read in the authority doc.",
+      "updated": "2026-08-05",
+      "evidence": [
+        "commit:4e0c7cf",
+        "commit:bc7c108",
+        "commit:357d482",
+        "commit:20e14b2",
+        "file:docs/reference/macos-ui-refresh-2026-08.md"
+      ]
     },
     {
       "id": "UI-6",
       "plan": "macos-ui-2026-08",
       "title": "Wave 2 re-engineering: store observation migration, History/Voices coordinators, shared generation lifecycle, player split",
       "status": "planned",
-      "gate": "Separate scoped arcs; each carries its own deterministic tests plus perf-lane deltas.",
+      "gate": "Separate scoped arcs; each carries its own deterministic tests plus perf-lane deltas. First work item (from the wave-1 after-session): profile a HistoryRow render under Instruments — the deterministic ~3.1 s scroll stall is ~100 ms per materialized row and survives observation-scope fixes.",
       "updated": "2026-08-05"
     },
     {

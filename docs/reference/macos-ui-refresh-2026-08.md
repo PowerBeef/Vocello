@@ -104,6 +104,40 @@ migration with scoped projections; History/Voices coordinator extraction (test s
 delete paths); shared generation-lifecycle executor (triplicated generate/cancel);
 `AudioPlayerViewModel` split (streaming playback engine extraction).
 
+## Wave 1 results (landed 2026-08-05, maintainer go)
+
+All seven W1 items shipped (`4e0c7cf`, `bc7c108`, `357d482`, `20e14b2`). Verified by the full gate, both
+platform compiles, core tests, a 7/7 smoke lane on the wave-1 tree, and an
+after-measurement session under the baseline protocol (warm-up + 5 counted runs;
+two additional runs were discarded per protocol after a concurrent-use memory
+pressure transient failed their generation takes mid-stream — engine telemetry
+showed identical 82-char failures with no crash, and a post-quiescence CLI take
+plus both replacement runs generated cleanly).
+
+| scenario | before ms/s | after ms/s | Δ | note |
+| --- | --- | --- | --- | --- |
+| settings-scroll | 43.3 | 35.0 | **−19%** | |
+| composer-typing | 51.4 | 43.3 | **−16%** | |
+| sidebar-navigation | 131.3 | 126.5 | −4% | |
+| delivery-menu | 119.1 | 120.4 | +1% | unchanged |
+| history-filter | 312.4 | 326.2 | +4% | unchanged — see finding below |
+| history-scroll | 270.7 | 287.6 | +6% (IQR 205) | unchanged — see finding below |
+| generation-active | 158.1 | 172.2 | +9% (IQR 33) | within spread |
+| window-resize | 26.1 | 29.4 | +13% (IQR 19) | within spread |
+| idle-baseline | 0.0 | 0.0 | — | still pristine |
+
+**Honest read:** the W1-D observation scoping delivered real but modest wins on
+the light scenarios and did NOT move the History numbers. The after-session
+localized why: the ~3.1 s history-scroll stall is deterministic — it fires at
++22 s of launch in every run, exactly when the first deep scroll materializes a
+~30-row List batch (~100 ms per row) — so the dominant History cost is per-row
+render weight, not invalidation scope, and the same materialization explains the
+~2 s history-filter gap on content replacement. The displayEntries cache and
+store-observation removal remain correct (they eliminate redundant recomputation
+and tick-driven re-renders the scenarios don't isolate), but History's headline
+fix is row-cost re-engineering: profile a HistoryRow render under Instruments,
+then thin it (UI-6's first work item).
+
 ## Landed in this arc
 
 - `9d283a9` — the perf harness (nine scenarios, structural gate, fail-closed proofs,

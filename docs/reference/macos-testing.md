@@ -53,7 +53,12 @@ compositor ground truth remains an Instruments Hitches/Core Animation trace.
 Baseline protocol: one discarded warm-up run, then five counted runs (fixed
 scenario order, AC power, cursor parked, `caffeinate` held by the lane); report
 per-scenario median and IQR; discard any counted run whose thermal state left
-nominal. Thresholds are set only after repeated baselines establish spread.
+nominal, that failed, or that ran during concurrent machine use, and replace it
+with a fresh counted run. **Copy `ui-perf-report.json` out of the run directory
+after every counted run**: retention keeps only the newest passing perf run per
+lane, so a multi-run session that skips the copy loses its earlier reports (the
+probe JSONL under the debug diagnostics store remains the recoverable raw
+source). Thresholds are set only after repeated baselines establish spread.
 
 | Lane | Scope |
 | --- | --- |

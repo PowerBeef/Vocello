@@ -48,10 +48,14 @@ the four-audit review are recorded in
 [`docs/reference/macos-ui-refresh-2026-08.md`](reference/macos-ui-refresh-2026-08.md)
 (the plan's authority — History pipeline and root-shell invalidation are the measured
 top costs), and the approved safe fixes shipped (`99d746d`: −615 dead UI lines,
-Reduce Transparency at all 8 direct glass sites, 7/7 smoke green). Refinement wave 1
-(UI-5) is fully specified there and **waits on the maintainer's review of the private
-proposals artifact** (published 2026-08-05, viewable in the Claude iOS app); wave 2
-re-engineering is UI-6, perf-lane registry formalization UI-7.
+Reduce Transparency at all 8 direct glass sites, 7/7 smoke green). **Refinement wave 1
+landed the same day on the maintainer's go** (`4e0c7cf`..`20e14b2`: warm ink ramp,
+motion family, mode-tinted focus rings, flip-scoped gate + History cache, ScaledMetric
+adoption, AnyLayout field stability, the shared GatedGlass container; UI-5 done) with a
+full before/after perf session — settings-scroll −19%, composer-typing −16%, and the
+honest finding that History's ~3.1 s stall is per-row List materialization, which is
+now UI-6's first work item. Wave 2 re-engineering is UI-6, perf-lane registry
+formalization UI-7.
 
 The pre-UI-arc checkpoint (2026-08-01) follows.
 

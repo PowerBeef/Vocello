@@ -40,7 +40,12 @@ EXPECTED_SCENARIOS = [
     "window-resize",
     "generation-active",
 ]
-EXPLORATORY = {"window-resize", "generation-active"}
+# history-filter is exploratory because driving a filter via the UI cannot
+# avoid per-interaction XCUITest element queries, whose accessibility
+# snapshot walk over the 400-row tree executes on the app's main thread and
+# inflates the scenario's numbers (Time Profiler evidence 2026-08-05; the
+# scroll scenarios avoid this via window-anchored coordinates).
+EXPLORATORY = {"window-resize", "generation-active", "history-filter"}
 COVERAGE_FLOOR = 0.90
 REFRESH_INTERVAL_SANE_MS = (1000.0 / 140.0, 1000.0 / 30.0)
 # Gap-histogram bucket upper bounds, in multiples of the refresh interval;
@@ -255,7 +260,10 @@ def main() -> int:
         "evidence": "local-only",
         "runID": args.run_id,
         "measurement": "main-run-loop display-link cadence (UI-thread hitch proxy; "
-        "not compositor presents)",
+        "not compositor presents; interaction-issued XCUITest accessibility "
+        "queries execute on the app main thread — scenarios minimize them "
+        "inside measured windows, and residual query cost marks a scenario "
+        "exploratory)",
         "scenarios": scenarios,
     }
     output = Path(args.output)

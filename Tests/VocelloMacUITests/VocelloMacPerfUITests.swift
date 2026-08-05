@@ -96,12 +96,21 @@ final class VocelloMacPerfUITests: VocelloMacUITestCase {
         )
         let search = element("history_searchField", type: .searchField)
         XCTAssertTrue(VocelloUITextEntry.replace(in: search, with: "", timeout: 20))
-        let scrollView = app.scrollViews.firstMatch
-        XCTAssertTrue(VocelloUIWait.exists(scrollView, timeout: 10))
+        // Scroll through a WINDOW-anchored coordinate, never through
+        // `scrollViews.firstMatch`: an element-addressed scroll re-resolves
+        // its query on every event, and that snapshot walk (elementType
+        // checked across the 400-row accessibility tree) executes on the
+        // app's MAIN thread — a Time Profiler sample (2026-08-05) showed it
+        // was the entire "3.1 s History stall" the first baseline reported.
+        // The window query is shallow, so the measured window now contains
+        // only the app's own scroll work.
+        let window = app.windows.firstMatch
+        XCTAssertTrue(VocelloUIWait.exists(window, timeout: 10))
+        let listPoint = window.coordinate(withNormalizedOffset: CGVector(dx: 0.62, dy: 0.5))
         VocelloUICursor.park()
         measuredWindow("history-scroll", actionCount: 10) {
             for sweep in 0..<10 {
-                scrollView.scroll(byDeltaX: 0, deltaY: sweep.isMultiple(of: 2) ? -1400 : 1400)
+                listPoint.scroll(byDeltaX: 0, deltaY: sweep.isMultiple(of: 2) ? -1400 : 1400)
                 Thread.sleep(forTimeInterval: 0.6)
             }
         }
@@ -153,12 +162,16 @@ final class VocelloMacPerfUITests: VocelloMacUITestCase {
     func test06SettingsScroll() {
         beginScenario("settings-scroll")
         navigate(to: .settings)
-        let scrollView = app.scrollViews.firstMatch
-        XCTAssertTrue(VocelloUIWait.exists(scrollView, timeout: 10))
+        // Window-anchored coordinate for the same reason as history-scroll:
+        // element-addressed scrolls re-query the tree per event on the
+        // app's main thread.
+        let window = app.windows.firstMatch
+        XCTAssertTrue(VocelloUIWait.exists(window, timeout: 10))
+        let listPoint = window.coordinate(withNormalizedOffset: CGVector(dx: 0.62, dy: 0.5))
         VocelloUICursor.park()
         measuredWindow("settings-scroll", actionCount: 8) {
             for nudge in 0..<8 {
-                scrollView.scroll(byDeltaX: 0, deltaY: nudge.isMultiple(of: 2) ? -900 : 900)
+                listPoint.scroll(byDeltaX: 0, deltaY: nudge.isMultiple(of: 2) ? -900 : 900)
                 Thread.sleep(forTimeInterval: 0.6)
             }
         }

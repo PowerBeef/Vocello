@@ -669,7 +669,7 @@
       "plan": "macos-ui-2026-08",
       "title": "Wave 2 re-engineering: store observation migration, History/Voices coordinators, shared generation lifecycle, player split",
       "status": "planned",
-      "gate": "Separate scoped arcs; each carries its own deterministic tests plus perf-lane deltas. First work item (from the wave-1 after-session): profile a HistoryRow render under Instruments — the deterministic ~3.1 s scroll stall is ~100 ms per materialized row and survives observation-scope fixes.",
+      "gate": "Separate scoped arcs; each carries its own deterministic tests plus perf-lane deltas. The wave-1 'History stall' finding was overturned by a Time Profiler sample: the 3.1 s stall was the harness's own accessibility queries on the app main thread; the corrected scenario measures ~210 ms/s scroll hitch with ~200 ms worst gaps, so History row thinning proceeds at that scale.",
       "updated": "2026-08-05"
     },
     {

@@ -126,17 +126,23 @@ plus both replacement runs generated cleanly).
 | window-resize | 26.1 | 29.4 | +13% (IQR 19) | within spread |
 | idle-baseline | 0.0 | 0.0 | — | still pristine |
 
-**Honest read:** the W1-D observation scoping delivered real but modest wins on
-the light scenarios and did NOT move the History numbers. The after-session
-localized why: the ~3.1 s history-scroll stall is deterministic — it fires at
-+22 s of launch in every run, exactly when the first deep scroll materializes a
-~30-row List batch (~100 ms per row) — so the dominant History cost is per-row
-render weight, not invalidation scope, and the same materialization explains the
-~2 s history-filter gap on content replacement. The displayEntries cache and
-store-observation removal remain correct (they eliminate redundant recomputation
-and tick-driven re-renders the scenarios don't isolate), but History's headline
-fix is row-cost re-engineering: profile a HistoryRow render under Instruments,
-then thin it (UI-6's first work item).
+**Honest read, twice corrected:** the W1-D observation scoping delivered real
+but modest wins on the light scenarios and did NOT move the History numbers.
+The after-session first localized the ~3.1 s history-scroll stall to row
+materialization — and then a Time Profiler sample (2026-08-05, wave-2 phase A)
+overturned that too: the stall was **the measurement harness observing
+itself**. Element-addressed XCUITest scrolls re-resolve their query per event,
+and that accessibility snapshot walk over the 400-row tree executes on the
+app's main thread — the sampled window showed the app idle apart from
+XCTElementQuery machinery. Users never trigger it. The scenarios were fixed to
+scroll through window-anchored coordinates (shallow query), history-filter was
+reclassified exploratory (typing cannot avoid per-interaction queries), and the
+first corrected run measured history-scroll's TRUE cost at ~210 ms/s hitch with
+a worst gap of ~200 ms — no multi-second stalls exist outside the harness.
+History numbers from the original baseline are not comparable to the corrected
+scenario and are superseded by the baseline-v2 session. Row thinning remains a
+legitimate wave-2 item at the ~200 ms-batch scale (UI-6), an order of magnitude
+smaller than first believed.
 
 ## Landed in this arc
 

@@ -125,7 +125,7 @@ Narrative authority: [`docs/reference/macos-ui-refresh-2026-08.md`](reference/ma
 ### Open items in detail
 
 - **`UI-6`** (planned) — Wave 2 re-engineering: store observation migration, History/Voices coordinators, shared generation lifecycle, player split.
-  gate: Separate scoped arcs; each carries its own deterministic tests plus perf-lane deltas. First work item (from the wave-1 after-session): profile a HistoryRow render under Instruments — the deterministic ~3.1 s scroll stall is ~100 ms per materialized row and survives observation-scope fixes.
+  gate: Separate scoped arcs; each carries its own deterministic tests plus perf-lane deltas. The wave-1 'History stall' finding was overturned by a Time Profiler sample: the 3.1 s stall was the harness's own accessibility queries on the app main thread; the corrected scenario measures ~210 ms/s scroll hitch with ~200 ms worst gaps, so History row thinning proceeds at that scale.
 
 - **`UI-7`** (planned) — Registry formalization of the perf lane (benchmark-history kind, thresholds from repeated baselines).
   gate: Follows the prosody-calibration precedent: schema enums, metric allowlist, orchestration workflow, and thresholds only after repeated baselines establish spread.

@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		00B734817E009DFA3A4C4604 /* LiveStreamingPlaybackEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE376ADE93795C18BBBB0ED9 /* LiveStreamingPlaybackEngine.swift */; };
 		01902C5209092E3E24AE9FB7 /* HuggingFaceDownloader.swift in Sources */ = {isa = PBXBuildFile; fileRef = A836AA336201DB6B2A733B80 /* HuggingFaceDownloader.swift */; };
 		0196A4E83340F6A545000D76 /* RuntimeDebugGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5A05CB297244D1E8AE77829 /* RuntimeDebugGate.swift */; };
 		019E5164FDE5AFD5FE86CBC9 /* TTSModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 802B55E1EAC5684CDE4BBE03 /* TTSModel.swift */; };
@@ -205,6 +206,7 @@
 		782CC4A0B12968AC18654792 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 9B899A22B7619F15A40FC99C /* Assets.xcassets */; };
 		787E11404DA9C66416E9AD42 /* SharedModelComponentStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71FBA7C29EB94E1A7001A623 /* SharedModelComponentStoreTests.swift */; };
 		78F9B96AD0F134D9B962BB03 /* QwenVoiceCore-Bridging-Header.h in Headers */ = {isa = PBXBuildFile; fileRef = 37A24CFA152E52E69333925C /* QwenVoiceCore-Bridging-Header.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		7910589B348FC1B801FFE8A8 /* LiveStreamingPlaybackEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE376ADE93795C18BBBB0ED9 /* LiveStreamingPlaybackEngine.swift */; };
 		792EB7E2673786EEA5BE5929 /* MLX in Frameworks */ = {isa = PBXBuildFile; productRef = 8F0F57EE1787C0627AD36CC7 /* MLX */; };
 		798142E93F48855144EDA9F3 /* qwenvoice_contract.json in Resources */ = {isa = PBXBuildFile; fileRef = 617BE72142511CD5043C341E /* qwenvoice_contract.json */; };
 		7A3609BE3FA29990DA25C78A /* Qwen3TTSRuntimeProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DBC73A84091D2DFAD12A5AB /* Qwen3TTSRuntimeProfile.swift */; };
@@ -938,6 +940,7 @@
 		ECF8577E65C258F1081F57A2 /* GenerationFailureDiagnosticLoggerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GenerationFailureDiagnosticLoggerTests.swift; sourceTree = "<group>"; };
 		ED2B347F80135ACE933CB140 /* ServiceActiveGenerationCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceActiveGenerationCoordinator.swift; sourceTree = "<group>"; };
 		EDAF51C92D6D16B455C573AC /* dylan.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = dylan.wav; sourceTree = "<group>"; };
+		EE376ADE93795C18BBBB0ED9 /* LiveStreamingPlaybackEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveStreamingPlaybackEngine.swift; sourceTree = "<group>"; };
 		EECB9DCA7AFA30E81B87B467 /* RecoverableStoreCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecoverableStoreCoordinator.swift; sourceTree = "<group>"; };
 		EEDF6DA907D19E85D5B6E1A7 /* VocelloMacUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = VocelloMacUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		F0699EDC590E2AF981A1D618 /* VocelloMacBenchmarkUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VocelloMacBenchmarkUITests.swift; sourceTree = "<group>"; };
@@ -1616,6 +1619,7 @@
 				9B31FA4FAD84410F74EB19EB /* GenerationOutputVerifier.swift */,
 				220CFD2739290441DB6C2732 /* GenerationPersistence.swift */,
 				DE98ABA2A416060FE667DD45 /* LanguageSelectionPresentation.swift */,
+				EE376ADE93795C18BBBB0ED9 /* LiveStreamingPlaybackEngine.swift */,
 				1F068FE73DB34691E0E3372C /* VoiceClipTranscriber.swift */,
 				AE6BCB1EBEAB95BB7072AC30 /* VoiceDesignBriefCatalog.swift */,
 			);
@@ -2366,6 +2370,7 @@
 				493EE818205079D0607CD1C4 /* IOSWordTimingPlanner.swift in Sources */,
 				2DC2A03B415A9E73BFB2D991 /* LanguageSelectionPresentation.swift in Sources */,
 				447FCAF92871DDEB0C8E164A /* LivePreviewDiagnostics.swift in Sources */,
+				7910589B348FC1B801FFE8A8 /* LiveStreamingPlaybackEngine.swift in Sources */,
 				66E1A7D6BACD92132EDF16EE /* MainThreadStallWatchdog.swift in Sources */,
 				41764DF5703C28EBF5105E5E /* ModelManagerViewModel.swift in Sources */,
 				2C76DCA86A8223765A4151FE /* QVoiceiOSApp.swift in Sources */,
@@ -2493,6 +2498,7 @@
 				AA2B0C9E9453C0E583369947 /* LanguageSelectionPresentation.swift in Sources */,
 				2E6A0B30C35D6D082403D964 /* LayoutConstants.swift in Sources */,
 				40A94D5A75E9D1F5FB41023C /* LivePreviewDiagnostics.swift in Sources */,
+				00B734817E009DFA3A4C4604 /* LiveStreamingPlaybackEngine.swift in Sources */,
 				A41BEBCD40A6E278CE00E0AF /* LongTextGenerationRouter.swift in Sources */,
 				F674AE89EAE48E64296DA6F0 /* MacEngineServiceLifecycleCoordinator.swift in Sources */,
 				B8B9814A59B20C56BDFA4B24 /* MacGenerationWarmupCoordinator.swift in Sources */,

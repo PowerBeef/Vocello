@@ -10,7 +10,6 @@ private struct VoicesAlertState: Identifiable {
 }
 
 struct VoicesView: View {
-    @Environment(\.generationPerformanceGate) private var performanceGate
     @EnvironmentObject private var ttsEngineStore: TTSEngineStore
     @EnvironmentObject private var audioPlayer: AudioPlayerViewModel
     @Environment(SavedVoicesViewModel.self) private var savedVoicesViewModel
@@ -297,8 +296,6 @@ private extension VoicesView {
 }
 
 private struct VoiceRow: View {
-    @Environment(\.generationPerformanceGate) private var performanceGate
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     let voice: Voice
     let isHighlighted: Bool
     let canUseInVoiceCloning: Bool
@@ -342,31 +339,28 @@ private struct VoiceRow: View {
         }
         .padding(.vertical, 10)
         .padding(.horizontal, 6)
-        #if QW_UI_LIQUID
         .background {
-            if #available(macOS 26, *), isHighlighted, !reduceTransparency, !performanceGate {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(.clear)
-                    .glassEffect(.regular.tint(AppTheme.accent), in: .rect(cornerRadius: 12))
-            } else {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(highlightFill)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .stroke(highlightStroke, lineWidth: isHighlighted ? 1 : 0)
-                    )
+            GatedGlass {
+                if isHighlighted {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(.clear)
+                        .glassEffect(.regular.tint(AppTheme.accent), in: .rect(cornerRadius: 12))
+                } else {
+                    highlightBackground
+                }
+            } fallback: {
+                highlightBackground
             }
         }
-        #else
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(highlightFill)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(highlightStroke, lineWidth: isHighlighted ? 1 : 0)
-        )
-        #endif
+    }
+
+    private var highlightBackground: some View {
+        RoundedRectangle(cornerRadius: 12, style: .continuous)
+            .fill(highlightFill)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(highlightStroke, lineWidth: isHighlighted ? 1 : 0)
+            )
     }
 
     /// W1-F: one width signal + `AnyLayout` replaces the `ViewThatFits`

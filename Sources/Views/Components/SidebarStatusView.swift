@@ -16,8 +16,6 @@ struct SidebarFooterPresentation: Equatable {
 }
 
 struct SidebarStatusView: View {
-    @Environment(\.generationPerformanceGate) private var performanceGate
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     let sidebarStatus: SidebarStatus
     let clearError: @MainActor () -> Void
 
@@ -221,10 +219,8 @@ struct SidebarStatusView: View {
 
     // MARK: - Shared Background
 
-    @ViewBuilder
     private func statusBackground(color: Color, fillOpacity: Double, strokeOpacity: Double) -> some View {
-        #if QW_UI_LIQUID
-        if #available(macOS 26, *), !reduceTransparency, !performanceGate {
+        GatedGlass {
             RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .fill(Color.clear)
                 .overlay(
@@ -243,12 +239,9 @@ struct SidebarStatusView: View {
                     in: .rect(cornerRadius: 8)
                 )
                 .glass3DDepth(radius: 8, intensity: 0.55)
-        } else {
+        } fallback: {
             statusBackgroundLegacy(color: color, fillOpacity: fillOpacity, strokeOpacity: strokeOpacity)
         }
-        #else
-        statusBackgroundLegacy(color: color, fillOpacity: fillOpacity, strokeOpacity: strokeOpacity)
-        #endif
     }
 
     private func statusBackgroundLegacy(color: Color, fillOpacity: Double, strokeOpacity: Double) -> some View {

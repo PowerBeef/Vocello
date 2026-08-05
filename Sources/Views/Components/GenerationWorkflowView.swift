@@ -158,8 +158,6 @@ enum StudioCardStyle {
 }
 
 struct StudioSectionCard<Content: View>: View {
-    @Environment(\.generationPerformanceGate) private var performanceGate
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.cardGlassTint) private var cardGlassTint
 
     let title: String
@@ -220,10 +218,8 @@ struct StudioSectionCard<Content: View>: View {
         }
     }
 
-    @ViewBuilder
     private var styledCard: some View {
-        #if QW_UI_LIQUID
-        if #available(macOS 26, *), !reduceTransparency, !performanceGate {
+        GatedGlass {
             cardContent
                 .padding(12)
                 .background(
@@ -248,12 +244,9 @@ struct StudioSectionCard<Content: View>: View {
                     in: .rect(cornerRadius: 16)
                 )
                 .glass3DDepth(radius: 16, intensity: cardGlassTint == nil ? 1.0 : 1.15)
-        } else {
+        } fallback: {
             legacyStyledCard
         }
-        #else
-        legacyStyledCard
-        #endif
     }
 
     private var legacyStyledCard: some View {
@@ -274,8 +267,6 @@ struct StudioSectionCard<Content: View>: View {
 }
 
 struct CompactConfigurationSection<Content: View>: View {
-    @Environment(\.generationPerformanceGate) private var performanceGate
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.cardGlassTint) private var cardGlassTint
 
     let title: String
@@ -308,9 +299,8 @@ struct CompactConfigurationSection<Content: View>: View {
             panelBody
             .padding(.horizontal, panelPadding)
             .padding(.vertical, max(panelPadding - 1, 0))
-            #if QW_UI_LIQUID
             .background {
-                if #available(macOS 26, *), !reduceTransparency, !performanceGate {
+                GatedGlass {
                     RoundedRectangle(cornerRadius: panelCornerRadius, style: .continuous)
                         .fill(AppTheme.inlineFill)
                         .overlay(
@@ -332,20 +322,10 @@ struct CompactConfigurationSection<Content: View>: View {
                             radius: panelCornerRadius,
                             intensity: cardGlassTint == nil ? 1.0 : 1.15
                         )
-                } else {
+                } fallback: {
                     compactPanelLegacyBackground
                 }
             }
-            #else
-            .background(
-                RoundedRectangle(cornerRadius: panelCornerRadius, style: .continuous)
-                    .fill(AppTheme.inlineFill.opacity(0.58))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: panelCornerRadius, style: .continuous)
-                    .stroke(AppTheme.inlineStroke.opacity(0.24), lineWidth: 1)
-            )
-            #endif
         }
         .optionalAccessibilityIdentifier(accessibilityIdentifier)
     }
@@ -412,7 +392,6 @@ struct CompactConfigurationSection<Content: View>: View {
         }
     }
 
-    #if QW_UI_LIQUID
     private var compactPanelLegacyBackground: some View {
         ZStack {
             RoundedRectangle(cornerRadius: panelCornerRadius, style: .continuous)
@@ -421,7 +400,6 @@ struct CompactConfigurationSection<Content: View>: View {
                 .stroke(AppTheme.inlineStroke.opacity(0.12), lineWidth: 0.5)
         }
     }
-    #endif
 }
 
 struct GenerationSetupRow<Content: View, Supporting: View>: View {

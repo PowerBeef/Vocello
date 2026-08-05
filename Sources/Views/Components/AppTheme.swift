@@ -213,6 +213,33 @@ enum AppTheme {
     }
 }
 
+/// The one place the Liquid Glass render decision lives (W1-G): glass
+/// renders only on liquid builds with Reduce Transparency off and the §K
+/// generation performance gate inactive — otherwise the caller's solid-fill
+/// fallback. Hand-rolled copies of this condition drifted (the eight direct
+/// glass sites shipped without the Reduce Transparency check until
+/// 2026-08-05); routing every glass surface through this container makes
+/// the invariant structural instead of remembered.
+struct GatedGlass<Glass: View, Fallback: View>: View {
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.generationPerformanceGate) private var performanceGate
+
+    @ViewBuilder let glass: () -> Glass
+    @ViewBuilder let fallback: () -> Fallback
+
+    var body: some View {
+        #if QW_UI_LIQUID
+        if !reduceTransparency, !performanceGate {
+            glass()
+        } else {
+            fallback()
+        }
+        #else
+        fallback()
+        #endif
+    }
+}
+
 private struct NativeSurfaceStyle: ViewModifier {
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.generationPerformanceGate) private var performanceGate

@@ -144,8 +144,6 @@ enum SavedVoiceNameSuggestion {
 }
 
 struct SavedVoiceSheet: View {
-    @Environment(\.generationPerformanceGate) private var performanceGate
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @EnvironmentObject private var ttsEngineStore: TTSEngineStore
     @Environment(\.dismiss) private var dismiss
 
@@ -304,13 +302,12 @@ struct SavedVoiceSheet: View {
                         .vocelloFocusRing(AppTheme.accent, radius: 10)
                         .frame(minHeight: 100)
                         .padding(8)
-                        #if QW_UI_LIQUID
                         .background {
-                            if #available(macOS 26, *), !reduceTransparency, !performanceGate {
+                            GatedGlass {
                                 RoundedRectangle(cornerRadius: 10, style: .continuous)
                                     .fill(Color(white: 0.16))
                                     .glassEffect(.regular.tint(AppTheme.smokedGlassTint), in: .rect(cornerRadius: 10))
-                            } else {
+                            } fallback: {
                                 ZStack {
                                     RoundedRectangle(cornerRadius: 10, style: .continuous)
                                         .fill(Color(nsColor: .textBackgroundColor))
@@ -319,16 +316,6 @@ struct SavedVoiceSheet: View {
                                 }
                             }
                         }
-                        #else
-                        .background(
-                            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                .fill(Color(nsColor: .textBackgroundColor))
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                .stroke(AppTheme.cardStroke.opacity(0.45), lineWidth: 1)
-                        )
-                        #endif
                         .accessibilityIdentifier("voicesEnroll_transcriptField")
 
                     Text("Transcript-backed voices can reuse prepared Qwen3 clone prompts; audio-only voices remain available as a lower-guidance fallback.")

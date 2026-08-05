@@ -1149,6 +1149,14 @@ public struct GenerationResult: Hashable, Codable, Sendable {
         self.telemetrySummary = telemetrySummary
     }
 
+    /// The effective sampling seed the engine actually used for this take
+    /// (requested or generated), as reported through the diagnostics wire.
+    /// This is what a "pin this take's seed" control persists: replaying it
+    /// with the same parameters reproduces the take (DP-15).
+    public var observedSamplingSeed: UInt64? {
+        diagnosticStringFlags["sampling_effective_seed"].flatMap(UInt64.init)
+    }
+
     private enum CodingKeys: String, CodingKey {
         case audioPath
         case durationSeconds
@@ -1357,6 +1365,19 @@ public struct GenerationRequest: Hashable, Codable, Sendable {
         case custom(speakerID: String, deliveryStyle: String?)
         case design(voiceDescription: String, deliveryStyle: String?)
         case clone(reference: CloneReference)
+
+        /// The delivery instruction this payload carries into the engine, if
+        /// any. Clone has no instruction channel. Telemetry records this as a
+        /// length + digest receipt so delivery harnesses can prove end to end
+        /// that an instructed take's instruction actually entered the request.
+        public var deliveryInstructionText: String? {
+            switch self {
+            case .custom(_, let deliveryStyle), .design(_, let deliveryStyle):
+                return deliveryStyle
+            case .clone:
+                return nil
+            }
+        }
     }
 
     public let mode: GenerationMode

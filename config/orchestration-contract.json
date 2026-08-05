@@ -278,6 +278,21 @@
         "ui-preflight",
         "ui-build"
       ]
+    },
+    "ui-macos-perf": {
+      "producer": "scripts/ui_test.sh",
+      "requiredSteps": [
+        "source-provenance",
+        "xcuitest",
+        "crash-delta",
+        "perf-validation"
+      ],
+      "optionalSteps": [
+        "history-publication",
+        "result-retention",
+        "ui-build",
+        "ui-preflight"
+      ]
     }
   }
 }

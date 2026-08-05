@@ -30,6 +30,9 @@
 - `docs/ARCHITECTURE.md` §4 (engine core), §11 (model management), §12 (telemetry)
 - `docs/reference/{mlx-guide,qwen3-tts-guide,mimi-codec-guide,metal-guide,swift-performance-guide,ios-engine-optimization,telemetry-and-benchmarking}.md`
 - Root `CLAUDE.md` (Hard rules) + [`docs/ARCHITECTURE.md`](../../docs/ARCHITECTURE.md) (engine invariants)
+- Delivery/emotion quality measurement: [`docs/reference/delivery-harness.md`](../../docs/reference/delivery-harness.md)
+  (tools, `bench --delivery` protocol, instruction-receipt provenance, statistics semantics,
+  pre-registration discipline, and the DP results ledger)
 
 ## Required pre-read
 

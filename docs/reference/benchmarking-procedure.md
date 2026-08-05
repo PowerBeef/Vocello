@@ -226,6 +226,10 @@ Then summarize and confirm non-zero `trims` / `memory_pressure` stage marks.
 
 ### 4.6 Delivery / prosody cells
 
+> Full delivery-measurement reference — tools, multi-seed sweep protocol,
+> instruction-receipt provenance, statistics semantics, and the DP results
+> ledger: [`delivery-harness.md`](delivery-harness.md).
+
 ```sh
 QWENVOICE_DEBUG=1 ./build/vocello bench \
   --modes custom,design \
@@ -787,7 +791,8 @@ an automated gate and does not authorize overriding a deterministic failure or w
 | `.../app/generations.jsonl` | UI timings |
 | `.../generations-merged.jsonl` | Joined layers (macOS) |
 | `.../engine/samples-<UUID>.jsonl` | Verbose per-sample series |
-| `QwenVoice-Debug/outputs/bench/*.wav` | Bench WAV outputs |
+| `QwenVoice-Debug/outputs/bench/*.wav` | Bench WAV outputs (fixed per-cell filenames — overwritten across seeds) |
+| `QwenVoice-Debug/outputs/bench-archive/<runID>/` | Durable per-run evidence for every `--delivery` run: all take WAVs plus `bench-results.json`, `bench-prosody.json`, `bench-quality-composed.json`. Fail-closed for required files, written before the sidecar analysis; unbounded, prune manually. Successful diagnostics run dirs are cleaned after publication, so multi-run scoring reads from this archive ([`delivery-harness.md`](delivery-harness.md) §3) |
 | `<run-artifact-dir>/benchmark-evidence.json` | Atomic run-scoped validator selection and verdict used for publication |
 | `build/**/*.xcresult`, screenshots | UI evidence retained locally under bounded lane retention |
 | `build/**/profiles/` | Compact local profile summaries; raw `*.trace` is success-ephemeral unless `--keep-trace` was explicit |

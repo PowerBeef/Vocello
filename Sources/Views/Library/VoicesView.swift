@@ -10,8 +10,7 @@ private struct VoicesAlertState: Identifiable {
 }
 
 struct VoicesView: View {
-    @Environment(\.generationPerformanceGate) private var performanceGate
-    @EnvironmentObject private var ttsEngineStore: TTSEngineStore
+    @Environment(TTSEngineStore.self) private var ttsEngineStore
     @EnvironmentObject private var audioPlayer: AudioPlayerViewModel
     @Environment(SavedVoicesViewModel.self) private var savedVoicesViewModel
 
@@ -68,7 +67,7 @@ struct VoicesView: View {
                 SavedVoiceSheet(configuration: configuration) { voice in
                     handleSavedVoiceSheetCompletion(voice)
                 }
-                .environmentObject(ttsEngineStore)
+                .environment(ttsEngineStore)
             }
             .alert("Delete Saved Voice?", isPresented: $showDeleteConfirmation) {
                 Button("Cancel", role: .cancel) {
@@ -297,7 +296,6 @@ private extension VoicesView {
 }
 
 private struct VoiceRow: View {
-    @Environment(\.generationPerformanceGate) private var performanceGate
     let voice: Voice
     let isHighlighted: Bool
     let canUseInVoiceCloning: Bool
@@ -332,42 +330,55 @@ private struct VoiceRow: View {
                 .frame(width: 24, alignment: .center)
                 .padding(.top, 4)
 
-            ViewThatFits(in: .horizontal) {
-                wideRowLayout
-                stackedRowLayout
-            }
+            rowContent
+                .onGeometryChange(for: CGFloat.self) { proxy in
+                    proxy.size.width
+                } action: { width in
+                    rowWidth = width
+                }
         }
         .padding(.vertical, 10)
         .padding(.horizontal, 6)
-        #if QW_UI_LIQUID
         .background {
-            if #available(macOS 26, *), isHighlighted, !performanceGate {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(.clear)
-                    .glassEffect(.regular.tint(AppTheme.accent), in: .rect(cornerRadius: 12))
-            } else {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(highlightFill)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .stroke(highlightStroke, lineWidth: isHighlighted ? 1 : 0)
-                    )
+            GatedGlass {
+                if isHighlighted {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(.clear)
+                        .glassEffect(.regular.tint(AppTheme.accent), in: .rect(cornerRadius: 12))
+                } else {
+                    highlightBackground
+                }
+            } fallback: {
+                highlightBackground
             }
         }
-        #else
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(highlightFill)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(highlightStroke, lineWidth: isHighlighted ? 1 : 0)
-        )
-        #endif
     }
 
-    private var wideRowLayout: some View {
-        HStack(alignment: .center, spacing: 14) {
+    private var highlightBackground: some View {
+        RoundedRectangle(cornerRadius: 12, style: .continuous)
+            .fill(highlightFill)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(highlightStroke, lineWidth: isHighlighted ? 1 : 0)
+            )
+    }
+
+    /// W1-F: one width signal + `AnyLayout` replaces the `ViewThatFits`
+    /// that built and measured BOTH full row layouts for every visible row
+    /// on every layout pass. Child identity is preserved across the flip.
+    /// 430 pt fits the metadata column beside the fixed action cluster;
+    /// width 0 (pre-first-layout) renders wide, matching the default window.
+    @State private var rowWidth: CGFloat = 0
+
+    private var usesWideLayout: Bool {
+        rowWidth == 0 || rowWidth >= 430
+    }
+
+    private var rowContent: some View {
+        let layout = usesWideLayout
+            ? AnyLayout(HStackLayout(alignment: .center, spacing: 14))
+            : AnyLayout(VStackLayout(alignment: .leading, spacing: 12))
+        return layout {
             VoiceRowMetadata(
                 voiceName: voice.name,
                 voiceID: voice.id,
@@ -379,27 +390,6 @@ private struct VoiceRow: View {
             )
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            VoiceRowActions(
-                voiceID: voice.id,
-                canUseInVoiceCloning: canUseInVoiceCloning,
-                onPlay: onPlay,
-                onUseInVoiceCloning: onUseInVoiceCloning,
-                onDelete: onDelete
-            )
-        }
-    }
-
-    private var stackedRowLayout: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            VoiceRowMetadata(
-                voiceName: voice.name,
-                voiceID: voice.id,
-                transcriptStatus: transcriptStatus,
-                detailCopy: detailCopy,
-                qualityHeadline: voice.qualityHeadline,
-                qualityWarnings: voice.qualityWarnings,
-                onReplaceReference: onReplaceReference
-            )
             VoiceRowActions(
                 voiceID: voice.id,
                 canUseInVoiceCloning: canUseInVoiceCloning,

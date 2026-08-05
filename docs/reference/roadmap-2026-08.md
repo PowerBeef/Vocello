@@ -119,3 +119,20 @@ tensor formats (an artifact-promotion decision, per the study's F7).
 - The OS floor moves only through Tier 3.1's trigger check (policy).
 - Every contract-token flip lands with its narrative sync in the same change; heavy
   gates batch at change-set ends; dense workstreams close with a `docs: currency pass`.
+
+## State as of 2026-08-04 (currency addendum)
+
+The working order above is complete except for four items; everything else closed by
+2026-08-01 (tiers 1–4 substantive work, Gate 0 no-go withdrawing the fused-kernel
+candidate, the pin bump kept, the phone battery's Tier-2 sitting banked). Work state
+moved to the single-source roadmap on 2026-08-02: [`config/roadmap.json`](../../config/roadmap.json)
+plan `convergence-metal4-stage4-2026-08` (rendered in [`docs/ROADMAP.md`](../ROADMAP.md)),
+which is the sole item-status authority — this document remains the narrative rationale
+for the interleave and its dependency rules, not a live tracker. Open as of this
+addendum: CM-4 (long-form text-context carryover, text first), CM-5 (phone-gated
+control-lane re-run; the iOS UI surface has since gained the 2026-08-03/04 delivery and
+bank-picker changes), CM-6 (MOS-proxy advisory, parked), and CM-7 (the non-streaming CLI
+publication defect found 2026-08-04). The 2026-08-02..04 delivery-quality arc (roster
+cut, delivery-control audit, calibration session, emotion reference banks, honest-UX
+split, bank picker) ran under the separate `delivery-prompting-2026-08` plan and is not
+part of this working order.

@@ -27,7 +27,16 @@
       "owner": "release-qa",
       "adopted": "2026-08-02",
       "goal": "Make documentation state machine-checkable: pin historical records against accidental modification, derive facts from code so prose cannot silently contradict them, and give agents a queryable index instead of a directory to glob.",
-      "authority": "docs/reference/qwen3-tts-prompting-guide.md"
+      "authority": "docs/reference/repository-self-verification.md"
+    },
+    {
+      "id": "macos-ui-2026-08",
+      "title": "macOS UI performance harness, measured review, and staged refresh",
+      "status": "complete",
+      "owner": "macos",
+      "adopted": "2026-08-04",
+      "goal": "Give the macOS app a deterministic SwiftUI frame-health lane, use it to baseline and rank the UI's real costs, land the maintainer-approved safe fixes, and stage a brand-preserving refresh gated on the maintainer's remote review of the proposals artifact.",
+      "authority": "docs/reference/macos-ui-refresh-2026-08.md"
     }
   ],
   "items": [
@@ -45,7 +54,8 @@
         "doc:docs/reference/roadmap-2026-08.md"
       ],
       "sourceOfTruth": [
-        "Package.resolved"
+        "Packages/VocelloQwen3Core/Package.resolved",
+        "QwenVoice.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved"
       ],
       "updated": "2026-08-01"
     },
@@ -67,7 +77,7 @@
     {
       "id": "CM-3",
       "plan": "convergence-metal4-stage4-2026-08",
-      "title": "Gate 2 \u2014 Candidate A fused code-predictor kernel",
+      "title": "Gate 2 — Candidate A fused code-predictor kernel",
       "status": "declined",
       "legacyIds": [
         "Gate 2",
@@ -83,31 +93,33 @@
       "id": "CM-4",
       "plan": "convergence-metal4-stage4-2026-08",
       "title": "Long-form text-context carryover, text first",
-      "status": "in-flight",
+      "status": "done",
       "legacyIds": [
         "Tier 4",
         "Q2"
       ],
-      "gate": "Planner-only change proved on text before any acoustic carryover is attempted.",
+      "gate": "Planner-only change proved on text before any acoustic carryover is attempted. CLOSED 2026-08-04 (sync audit follow-up — the work landed 2026-08-01 but the item was never flipped): the text-first half shipped as planner v2 (R-tail orphan rebalancing, version-bumped identity, fixtures-first; commit bd92a59 with LongFormPlanningTests and the long-form-context-planning-v2 ADR), and the acoustic-carryover half was probed the same day and closed as a pre-registered do-NOT (commit 59458bc: join pitch -16.4% under gate, rate -54%, identity intact — docs/decisions/long-form-acoustic-carryover-experiment.md). Nothing in this item's scope remains open.",
       "evidence": [
         "commit:bd92a59",
-        "commit:59458bc"
+        "commit:59458bc",
+        "doc:docs/decisions/long-form-context-planning-v2.md",
+        "doc:docs/decisions/long-form-acoustic-carryover-experiment.md"
       ],
       "sourceOfTruth": [
         "Sources/QwenVoiceCore/LongFormPlanning.swift"
       ],
-      "updated": "2026-08-01"
+      "updated": "2026-08-04"
     },
     {
       "id": "CM-5",
       "plan": "convergence-metal4-stage4-2026-08",
       "title": "Phone-gated evidence battery remainder",
       "status": "in-flight",
-      "gate": "One sitting with the phone unlocked and Auto-Lock Never; iOS control lanes re-run against the current artifacts.",
+      "gate": "One sitting with the phone unlocked and Auto-Lock Never; iOS control lanes re-run against the current artifacts. Surface note 2026-08-04: the iOS UI under test changed after this item was dated (2026-08-03/04 delivery roster cut, sectioned delivery sheet, bank Delivery chip), so the control-lane re-run also observes the delivery/bank UI; the artifacts themselves are unchanged.",
       "evidence": [
         "doc:docs/reference/roadmap-2026-08.md"
       ],
-      "updated": "2026-08-01"
+      "updated": "2026-08-04"
     },
     {
       "id": "CM-6",
@@ -133,7 +145,7 @@
       "sourceOfTruth": [
         "Sources/QwenVoiceCore/EmotionPreset.swift"
       ],
-      "updated": "2026-08-02"
+      "updated": "2026-08-04"
     },
     {
       "id": "DP-2",
@@ -148,7 +160,7 @@
       "sourceOfTruth": [
         "Sources/QwenVoiceCore/GenerationSemantics.swift"
       ],
-      "updated": "2026-08-02"
+      "updated": "2026-08-04"
     },
     {
       "id": "DP-3",
@@ -162,7 +174,7 @@
       "sourceOfTruth": [
         "Sources/QwenVoiceCore/EmotionPreset.swift"
       ],
-      "updated": "2026-08-02",
+      "updated": "2026-08-04",
       "evidence": [
         "doc:docs/reference/qwen3-tts-prompting-guide.md",
         "file:config/runtime-debug-knobs.json"
@@ -180,7 +192,7 @@
       "sourceOfTruth": [
         "Sources/QwenVoiceCore/GenerationSemantics.swift"
       ],
-      "updated": "2026-08-02",
+      "updated": "2026-08-04",
       "evidence": [
         "doc:docs/reference/qwen3-tts-prompting-guide.md",
         "file:config/runtime-debug-knobs.json"
@@ -210,12 +222,11 @@
       "title": "Angry pitch-axis contradiction",
       "status": "done",
       "gate": "23 seeds, angry.normal against angry.strong. RESULT: the expectation (+1) is correct -- shipped copy moves pitch +5.98 st, d=1.40, win 0.91. The conflicting 'lower clipped tone' clause is simply not followed, so the contradiction is textual with no acoustic counterpart. angry.strong is also the better copy at this power (7 features vs 4), reversing DP-3's underpowered per-cell reading and confirming the global strong choice needs no exception.",
-      "blockedBy": [],
       "sourceOfTruth": [
         "Sources/QwenVoiceCore/EmotionPreset.swift",
         "scripts/prosody_profile.py"
       ],
-      "updated": "2026-08-03",
+      "updated": "2026-08-04",
       "evidence": [
         "doc:docs/reference/qwen3-tts-prompting-guide.md",
         "file:config/delivery-instruction-contract.json"
@@ -236,7 +247,7 @@
     {
       "id": "DG-2",
       "plan": "doc-governance-2026-08",
-      "title": "Phase 1 \u2014 pin every historical document",
+      "title": "Phase 1 — pin every historical document",
       "status": "done",
       "gate": "docs/research, docs/audits/archive, and docs/releases sealed by body digest.",
       "evidence": [
@@ -248,18 +259,26 @@
     {
       "id": "DG-3",
       "plan": "doc-governance-2026-08",
-      "title": "Phase 2 \u2014 reclassify the nine misfiled point-in-time reports",
-      "status": "planned",
-      "gate": "Every dated report under docs/reference carries historical or superseded status, following the backend-optimization-research-report precedent.",
+      "title": "Phase 2 — reclassify the nine misfiled point-in-time reports",
+      "status": "done",
+      "gate": "Every dated report under docs/reference carries historical or superseded status, following the backend-optimization-research-report precedent. DONE 2026-08-04: six dated reports pinned historical with body digests (backend-optimization-research-report, metal4-tensor-feasibility-2026-07-31, optimization-report-review-2026-07-25, qwen3-apple-silicon-roadmap-review, runtime-refactor-status-report, codex-storage-ballooning-incident); the two delivery reports were already pinned during Move 1 (delivery-fidelity-report historical, delivery-remediation-plan superseded), and prosody-qa-research was adjudicated active instead of pinned — its usage section is live guidance, now bound to sourceOfTruth for freshness with its dated research sections marked inline. The ninth candidate class (ios-increased-memory-entitlement-request) is a living enablement guide, not a dated report; it stays with the DG-4 incremental annotation backlog. Pinning also cleared the metal4 derived-fact false positive, since pinned bodies are exempt from the active-doc scan.",
       "blockedBy": [
         "DG-1"
       ],
-      "updated": "2026-08-02"
+      "updated": "2026-08-04",
+      "evidence": [
+        "file:docs/reference/backend-optimization-research-report.md",
+        "file:docs/reference/metal4-tensor-feasibility-2026-07-31.md",
+        "file:docs/reference/optimization-report-review-2026-07-25.md",
+        "file:docs/reference/qwen3-apple-silicon-roadmap-review.md",
+        "file:docs/reference/runtime-refactor-status-report.md",
+        "file:docs/reference/codex-storage-ballooning-incident.md"
+      ]
     },
     {
       "id": "DG-4",
       "plan": "doc-governance-2026-08",
-      "title": "Phase 3 \u2014 source bindings on active documents",
+      "title": "Phase 3 — source bindings on active documents",
       "status": "planned",
       "gate": "Annotated incrementally as documents are touched; a binding invented in bulk without reading the document is worse than none.",
       "blockedBy": [
@@ -365,13 +384,13 @@
       "sourceOfTruth": [
         "Sources/QwenVoiceCore/EmotionPreset.swift"
       ],
-      "updated": "2026-08-02"
+      "updated": "2026-08-04"
     },
     {
       "id": "DP-9",
       "plan": "delivery-prompting-2026-08",
       "title": "Remove EmotionIntensity outright, after DP-4/5/6",
-      "status": "planned",
+      "status": "parked",
       "gate": "Delete the enum, collapse bench cells to one per preset, retire intensity_scale and the per-tier delivery expectations, update the tier-parity check and the derived deliveryIntensityTiers fact.",
       "blockedBy": [
         "DP-4",
@@ -381,7 +400,8 @@
       "sourceOfTruth": [
         "Sources/QwenVoiceCore/EmotionPreset.swift"
       ],
-      "updated": "2026-08-02"
+      "updated": "2026-08-04",
+      "unparkWhen": "Parked 2026-08-04 (maintainer call during the sync audit): DP-12's blind session contradicts this item's premise — the 2AFC verdict was no_measured_strong_tier_collapse, control pairs were MORE discriminable at strong (+0.50 [0.001, 0.812]), and angry-vs-happy discriminated at 0.75 at the normal tier versus chance at strong, so the tier machinery may yet carry product value. Unpark only after a dedicated measurement shows the tiers carry no exploitable product difference. Execution note: deleting the enum also retires the derived deliveryIntensityTiers fact, whose value feeds the doc staleness scanner's rule set (scripts/doc_metadata.py), so the scanner rules change in the same arc."
     },
     {
       "id": "DP-10",
@@ -398,7 +418,278 @@
       "sourceOfTruth": [
         "Sources/QwenVoiceCore/EmotionPreset.swift"
       ],
-      "updated": "2026-08-03"
+      "updated": "2026-08-04"
+    },
+    {
+      "id": "DP-11",
+      "plan": "delivery-prompting-2026-08",
+      "title": "Delivery-control audit: adversarial re-examination and external research sweep",
+      "status": "done",
+      "gate": "Full-codebase analysis plus a 21-agent primary-source research sweep (13 research questions, 8 adversarial verifications, permutation-null simulation of the shipped separability procedure). The 10-way UAR 0.311 is confirmed real (permutation p < 0.001); the high-arousal-cluster '1.11x chance' figure is corrected to 'no detectable separability' (p = 0.28) and the excited/dramatic below-chance recall to a selection artifact; the '91%/55%' arousal/valence figures are retracted as untraceable. New defects recorded: the macOS .normal-tier state-sync bug and the bench per-cell WAV overwrite. Report lands pinned with ranked recommendations and a week-one runbook.",
+      "evidence": [
+        "doc:docs/reference/delivery-control-audit-2026-08.md",
+        "doc:docs/development-progress.md",
+        "doc:docs/reference/qwen3-tts-prompting-guide.md"
+      ],
+      "sourceOfTruth": [
+        "docs/reference/delivery-control-audit-2026-08.md"
+      ],
+      "updated": "2026-08-04"
+    },
+    {
+      "id": "DP-12",
+      "plan": "delivery-prompting-2026-08",
+      "title": "Move 1: fix the found defects, harden the harness, run the calibration session",
+      "status": "done",
+      "gate": "Landed and scored 2026-08-04. The maintainer's 146-trial blind session (88 identification + 6 repeats + 12 clone rows + 40 2AFC; single listener, non-native English — positives read as solid, nulls as provisional): pooled identification 26/88 = 0.295 against a 0.125 chance floor (exact binomial p = 2e-05). The perceptible half of the roster matches the acoustic study's winners exactly — calm 0.55 and whisper 0.55 (p = .001), neutral 0.36 and sad 0.36 (p = .039) — while the high-arousal trio fails as identities: angry 0/11 (never named Angry, mostly Unsure), happy 0.18 (heard as Surprised), surprised 0.18 (Unsure); fearful 0.18 is heard as Sad (6/11), confirming F2's low-arousal rendering. 2AFC: session engaged (anchors 4/4); verdict no_measured_strong_tier_collapse — the attractor claim behind the intensity retirement does not replicate; angry-group discrimination 0.75 [0.551, 0.88] after one declared mis-keystroke correction on trial 141 (angry is distinguishable when named, though never identified unprompted — difference is not identity, listener-confirmed); angry-vs-happy (the canonical same-arousal opposite-valence pair) sits at chance at strong and 0.75 at normal, with the angry group's strong-minus-normal drop borderline at -0.33 [-0.61, 0.02]; control pairs are MORE discriminable at strong (+0.50 [0.001, 0.812]), supporting ship-strong perceptually. Clone-transfer rows: 2/12 overall — but the 2 hits are angry.clone at 0.667, the only route through which the listener ever heard anger (instruct angry: 0/11); happy/sad/whisper clones read neutral-ish because their single-shot design references never audibly carried the emotion — reference curation, not the ICL mechanism, is the gap. Listener self-agreement on exact repeats: 0.333, capping any judge's achievable agreement. Session artifacts remain local (untracked); numbers recorded here and in docs/development-progress.md finding 14.",
+      "evidence": [
+        "file:Sources/QwenVoiceCore/EmotionPreset.swift",
+        "file:Sources/Views/Components/EmotionPickerView.swift",
+        "file:Tests/VocelloCoreTests/EmotionPresetResolutionTests.swift",
+        "file:scripts/delivery_separability.py",
+        "file:scripts/bench_delivery_prosody.py",
+        "file:scripts/delivery_listening_session.py",
+        "doc:docs/reference/delivery-control-audit-2026-08.md"
+      ],
+      "sourceOfTruth": [
+        "scripts/delivery_listening_session.py"
+      ],
+      "updated": "2026-08-04"
+    },
+    {
+      "id": "DP-13",
+      "plan": "delivery-prompting-2026-08",
+      "title": "Move 2: curated design-then-clone emotion reference banks",
+      "status": "done",
+      "gate": "Landed 2026-08-04. scripts/build_emotion_reference_bank.py generates N VoiceDesign candidates per emotion against a neutral anchor, scores them (pinned SER advisory + ECAPA identity-to-anchor + prosody deltas, strictly after generation per the 8 GB rule), selects the emotion-passing candidate nearest the anchor's identity (never peak expressiveness), and enrolls winners as ordinary saved voices — so every existing clone surface uses banks today with no engine changes. First real bank (Warm Narrator): SER-verified happy 0.74 / sad 0.72 / angry 0.48 references enrolled; whisper honestly refused (candidates measured MORE voiced than the anchor — VoiceDesign rendered soft-but-voiced speech, and the voiced-fraction criterion entangles pause structure; a breathiness HNR/CPP criterion is the recorded follow-up). End-to-end proof (12 clone takes, 3 seeds x 4 voices): identity 0.81-0.89 throughout; sad 3/3 and angry 3/3 SER-categorical — the session's uncurated sad clones read neutral 0/3, so curation demonstrably closes the instruct-to-reference gap — while happy's clones read angry despite the happy-verified reference (arousal survives the clone hop; valence did not, per an instrument that also shows an angry-bias on this voice's anchor takes — human audition owns the verdict). The silent x-vector fallback is disclosed on both platforms: macOS clone readiness gains a 'Ready — identity only' state and the iOS save-voice transcript caption states what the transcript unlocks. Follow-ups recorded: grouped persona/delivery picker UI, whisper breathiness criterion. Maintainer audition on the freshly launched build (2026-08-04, informal/sighted): the bank voices sound as intended, including Happy — the human verdict the proof run deferred to; the SER angry-reading on Happy clones stands as an instrument caveat only. First real use also found the clone readiness note saying 'Ready to generate' beside a Generate button disabled by the one-time cloning consent; the readiness descriptor is now consent-aware on both platforms so the status line and the button can never disagree again.",
+      "evidence": [
+        "file:scripts/build_emotion_reference_bank.py",
+        "file:scripts/tests/test_build_emotion_reference_bank.py",
+        "doc:docs/reference/emotion-reference-banks.md",
+        "file:Sources/Models/GenerationDrafts.swift",
+        "file:Sources/iOS/IOSGenerationInputControls.swift"
+      ],
+      "sourceOfTruth": [
+        "scripts/build_emotion_reference_bank.py"
+      ],
+      "updated": "2026-08-04"
+    },
+    {
+      "id": "DP-14",
+      "plan": "delivery-prompting-2026-08",
+      "title": "Move 3: honest delivery UX — the measured feature/hint split",
+      "status": "done",
+      "gate": "Landed 2026-08-04. EmotionPreset carries the measured roster split as data with provenance (distinctDeliveryIDs = neutral/calm/whisper/sad — the four the DP-12 listener identified above chance; the other four are directional hints), plus the shared directionalHintAdvisory string so both platforms' wording cannot drift; a Core test pins the split as an exact partition of the live roster so a retired preset lingering in it, or a new preset landing unclassified, fails the suite. The macOS delivery menu is sectioned (Distinct deliveries / Directional hints / Custom) and shows the advisory caption whenever a hint preset is selected (delivery_hintAdvisory); the iOS sheet gets the same sections, the advisory as the hints footer (deliveryPickerSheet_hintAdvisory), and honest per-preset descriptions (happy 'can read as surprise', fearful 'can read as sad' — the confusions the session actually measured). Preset ordering in EmotionPreset.all is untouched, so bench cells and harness identities are unaffected.",
+      "evidence": [
+        "file:Sources/QwenVoiceCore/EmotionPreset.swift",
+        "file:Sources/Views/Components/EmotionPickerView.swift",
+        "file:Sources/iOS/Sheets/IOSBottomSheets.swift",
+        "file:Tests/VocelloCoreTests/EmotionPresetResolutionTests.swift"
+      ],
+      "sourceOfTruth": [
+        "Sources/QwenVoiceCore/EmotionPreset.swift"
+      ],
+      "updated": "2026-08-04"
+    },
+    {
+      "id": "DP-15",
+      "plan": "delivery-prompting-2026-08",
+      "title": "Seed retry/pin as a first-class take control",
+      "status": "done",
+      "gate": "The audit's R6 remainder: expose regenerate-with-new-seed and pin-this-take's-seed in both apps — the stochastic-with-retry norm the market has institutionalized, with the local advantage that fixed seeds genuinely reproduce a take. Scoping findings from 2026-08-04: GenerationRequest already accepts seed (the CLI uses it) and the observed seed rides the result diagnostics, but persisting a take's seed for later reuse needs a History schema migration, which makes this its own arc under the database-migration rules rather than a rider on a copy pass. DONE 2026-08-04: History schema v6 adds a nullable seed column (UInt64 stored as its Int64 bit pattern; pre-v6 rows stay NULL — unrecoverable by honesty, not accident), every completed take on both platforms persists the engine's observed effective seed (GenerationResult.observedSamplingSeed over the sampling_effective_seed diagnostics wire, which already crosses XPC), and each mode draft gains pinnedSeed threaded into its generation requests. Controls: a History row with a recorded seed offers 'Pin seed N for new takes' (macOS context menu; iOS row overflow menu), which pins the seed into that take's mode draft and lands the user in that mode; the composer shows the pinned state — macOS as a chip beside Generate (textInput_seedPinChip / textInput_seedUnpin), iOS as a studio Seed chip (studioChip_seedPin) with an unpin confirmation. Unpinned remains the default fresh-seed-per-take norm, so regenerate-with-new-seed is the ordinary Generate press and reproduce-this-take is the pin. GenerationSeedPersistenceTests pins the migration, the top-bit-range round trip, and the legacy NULL read. The long-form planner's per-segment sub-seed regeneration (already shipped) is unchanged and remains plan-scoped.",
+      "updated": "2026-08-04",
+      "evidence": [
+        "file:Sources/SharedSupport/Database/GenerationMigrations.swift",
+        "file:Tests/VocelloCoreTests/GenerationSeedPersistenceTests.swift",
+        "file:Sources/QwenVoiceCore/SemanticTypes.swift",
+        "file:Sources/Views/Components/TextInputView.swift",
+        "file:Sources/Views/Library/HistoryView.swift",
+        "file:Sources/iOS/History/HistoryScreen.swift",
+        "file:Sources/iOS/IOSDesignSystemPrimitives.swift"
+      ],
+      "sourceOfTruth": [
+        "Sources/SharedSupport/Database/GenerationMigrations.swift"
+      ]
+    },
+    {
+      "id": "DP-16",
+      "plan": "delivery-prompting-2026-08",
+      "title": "Bank picker UX: personas with a delivery choice",
+      "status": "done",
+      "gate": "Landed 2026-08-04. VoiceBankCatalog (QwenVoiceCore) groups saved voices into emotion reference banks from the naming convention alone: a base-named voice plus at least one \"(Suffix)\" sibling whose suffix matches a live preset label or id; orphan variants, unknown suffixes, and bases without variants stay standalone, and variants order by the preset roster. Ten Core tests pin the contract (roster-derived suffix coverage, case-insensitivity, orphan/unknown fallback, member resolution). macOS: the clone source picker collapses members to one persona row (\"· voice bank\") tagged with the current member so selection always matches a tag, and a Delivery menu (voiceCloning_bankDeliveryPicker) swaps concrete member voices through the existing selectedSavedVoiceID binding. iOS: the clone composer shows the persona on the reference chip and adds a Delivery chip (studioChip_bankDelivery) opening IOSBankDeliveryPickerSheet, whose rows apply the member through the ordinary applySavedVoice path; the Voices library and reference sheet keep every member listed under truthful \"Voice bank · <Delivery>\" captions. The bank layer owns no clone state.",
+      "evidence": [
+        "file:Sources/QwenVoiceCore/VoiceBankCatalog.swift",
+        "file:Tests/VocelloCoreTests/VoiceBankCatalogTests.swift",
+        "file:Sources/Views/Generate/VoiceCloningView.swift",
+        "file:Sources/iOS/Sheets/IOSBottomSheets.swift",
+        "file:Sources/iOS/IOSGenerationModeViews.swift",
+        "file:docs/reference/emotion-reference-banks.md"
+      ],
+      "sourceOfTruth": [
+        "Sources/QwenVoiceCore/VoiceBankCatalog.swift"
+      ],
+      "updated": "2026-08-04"
+    },
+    {
+      "id": "DP-17",
+      "plan": "delivery-prompting-2026-08",
+      "title": "Whisper breathiness criterion for bank curation",
+      "status": "done",
+      "gate": "The first bank build (Warm Narrator, 2026-08-04) honestly refused whisper: VoiceDesign rendered soft-but-voiced speech, and the voiced-fraction criterion entangles pause structure (its denominator is the whole take). Replace it with a breathiness criterion from the bounded analyzer's voice-quality block (HNR/CPP deltas versus the anchor), validated on the existing scored candidates before any regeneration, so whisper can join a bank only when the phonation actually changed. Recorded follow-up in docs/reference/emotion-reference-banks.md. MEASURED 2026-08-04 (criterion prototype on the existing Warm Narrator candidates, analyze_prosody voice-quality block): the whisper candidates are MORE harmonic than the neutral anchor (delta-HNR +1.0..+1.4 dB, delta-CPP -0.5..+1.7 dB) while sad shows the most negative deltas of the whole bank — so the criterion axis works as an instrument, but these candidates contain no breathiness for any criterion to select: VoiceDesign rendered no whisper phonation at all, not merely too-voiced takes. Re-scoped accordingly: the remaining work is a whisper GENERATION recipe first (brief-wording variants, or cloning from a genuinely whispered reference), with the HNR/CPP-delta gate (breathier-than-anchor, e.g. deltaHNR <= -2 dB) wired into the builder as the acceptance criterion once candidates can plausibly pass it. GENERATION-RECIPE EXPLORATION PRE-REGISTERED 2026-08-04 (this commit precedes its generation). Mechanism note from the recovered Move 2 build: candidates used the persona brief plus the shipped whisper.strong INSTRUCTION only — the brief channel never asked for whisper. Design: anchor stays the existing Warm Narrator anchor_s42000.wav (persona brief 'A warm, calm middle-aged male narrator with a clear, measured pace.', digest-verified against the bank manifest); six registered variants, four fresh seeds each (seeds 20260850+10*variant+i): V1 control replicates the failed original (base brief + whisper.strong delivery); V2 brief-only 'base brief, speaking entirely in a hushed whisper.'; V3 brief-only 'base brief, whispering very quietly, breathy and unvoiced, as if not to wake someone.'; V4 brief-only 'base brief. His voice is a soft breathy whisper with no vocal cord tone.'; V5 = V2's brief plus whisper.strong delivery (both channels); V6 base brief plus the custom instruction 'Whisper the entire passage: fully breathy, unvoiced, air over the words, close to the microphone.'. All design/speed on the bank transcript. Criterion (as already re-scoped): a candidate is whispered when delta voice_hnr_db_mean versus the anchor is at most -2 dB; delta CPP and delta voiced fraction reported as secondary; ECAPA identity reported for passing candidates. Success rule: any variant with at least 2 of 4 candidates passing breathiness becomes the recipe wired into the bank builder (follow-up code change under this item); all-variants-fail closes the VoiceDesign route and leaves cloning a genuinely whispered human reference as the remaining path. RESULTS 2026-08-04 (run exactly as registered): ALL SIX VARIANTS FAIL — every surviving candidate across brief-only whisper identities (V2/V3/V4), both-channels (V5), the stronger custom instruction (V6), and the original-recipe control (V1) measured MORE harmonic than the anchor (delta HNR +0.06..+2.91 dB against the -2 dB pass bar; voiced fraction UP in 17 of 19 survivors). The registered all-fail rule closes the VoiceDesign route: this checkpoint's design channel renders 'whisper' as soft-but-fully-voiced speech regardless of where the request lives. Side-finding, recorded not hidden: 5 of 24 takes fell to the fast audio QC's dropout detector (1.4-1.9 s dropout codes) concentrated in whisper-adjacent generations — low-energy breathy audio can read as dropout to the gate, so any future whisper lane needs a whisper-aware QC posture before its takes can even survive to scoring. The bank builder keeps refusing whisper honestly; the one remaining path is cloning a genuinely whispered human reference (needs a recorded clip - maintainer-assisted), with the validated HNR/CPP criterion as its acceptance gate. Closed as measured.",
+      "sourceOfTruth": [
+        "scripts/build_emotion_reference_bank.py"
+      ],
+      "updated": "2026-08-04",
+      "evidence": [
+        "file:scripts/analyze_prosody.py",
+        "file:docs/reference/emotion-reference-banks.md",
+        "file:docs/development-progress.md"
+      ]
+    },
+    {
+      "id": "DP-18",
+      "plan": "delivery-prompting-2026-08",
+      "title": "Confirmatory delivery re-measure on solid statistics (audit R4)",
+      "status": "done",
+      "gate": "The audit's R4: regenerate one full delivery matrix on fresh seeds with the hardened harness (retained WAVs, prompt provenance, computed chance floors), score with delivery_separability.py in confirmatory designation (pre-registered), apply FDR correction and bootstrap CIs, add the happy-vs-angry 2-way probe, and run a parallel 8-bit Quality arm — the quantization-vs-adherence question has never been measured here. Runs unattended (generation plus analyzer scoring; no listening). Decision input for whether any directional hint can be promoted back to a distinct delivery. AMENDMENT 2026-08-04 (pre-data; no cell was ever scored): the sweep's first live run exposed a defect in Move 1's fail-closed provenance guard — notes.promptChars counts only the script text, which never includes the delivery instruction, so the instructed-longer-than-neutral premise could never pass live (it had only ever run against synthetic fixtures). Replaced before any analysis: the engine now stamps a delivery-instruction receipt (instructChars + instructDigest from the request payload) on every instructed row, and the sidecar fails closed unless the instructed take carries a receipt whose digest matches the manifest's instruction echo and the paired neutral reference carries none. Hypotheses, seeds, and decision rules are unchanged; the sweep restarts from seed 20260810 on the amended tree. RESULTS 2026-08-04 (both arms run and scored exactly as registered; scoring inputs and verdicts retained under outputs/bench-archive/, including dp18-verdicts/): H1 CONFIRMED in both arms — 8-way preset separability replicates on fresh seeds, 4-bit UAR 0.477 and 8-bit UAR 0.375 against the 0.125 computed floor, permutation p=0.001 in each (1000 iterations). H2 CONFIRMED in both arms — every distinct-set cell (neutral, calm, whisper, sad) clears FDR at q<=0.05 in both. H3 REFUTED in both arms — the pre-registered happy-vs-angry 2-way sits at chance (4-bit UAR 0.531 p=0.43; 8-bit UAR 0.583 p=0.24): the instruct channel carries no acoustic happy/angry distinction, upgrading the audit's valence bottleneck from hypothesis to confirmatory result. H4 (descriptive): the 8-bit arm does NOT separate better (0.375 vs 0.477, overlapping per-cell Wilson intervals) — no support for quantization as the adherence bottleneck. Per-cell eligibility under the registered rule (FDR-clear in BOTH arms): angry (0.625/0.333) and fearful (0.750/0.444) meet the acoustic bar; happy fails FDR in both (top confusion angry both times); surprised clears 4-bit only. Interpretation boundary: acoustic separability is not listener recognizability — the DP-12 session heard angry 0/11 and fearful as sad, so the DP-14 hint/distinct split stays until a listening probe on fresh takes says otherwise (maintainer-reviewed either way). Coverage notes, never silent: the 4-bit arm banked 16/18 seeds (20260817 and 20260827 were deterministic dropout-QC casualties at sad.strong-class cells; the 8-bit arm banked 18/18), and the 8-bit arm ran under the same dp18-4bit bench label by scripting slip — arms are separated by per-take modelID, which the collection records. 34 PASS registry records published by the runs are committed with this closure.",
+      "sourceOfTruth": [
+        "scripts/delivery_separability.py"
+      ],
+      "updated": "2026-08-04",
+      "evidence": [
+        "file:scripts/delivery_separability.py",
+        "file:scripts/bench_delivery_prosody.py",
+        "file:benchmarks/HISTORY.md"
+      ]
+    },
+    {
+      "id": "DP-19",
+      "plan": "delivery-prompting-2026-08",
+      "title": "Text-decoration valence channel (audit R5)",
+      "status": "done",
+      "gate": "The audit's decision gate routed here on the branch the session actually landed on (clone-transfer strong, instruct valence weak): measure whether text-side paralinguistic decoration — interjections, punctuation, quoted-style cues appended to the script rather than the instruction — moves valence where the instruct channel does not. Fixed-seed A/B against undecorated text on the same cells, scored by the SER advisory and prosody deltas; product exposure only if the effect is categorical, since it changes the spoken text. PRE-REGISTERED 2026-08-04 before any generation (this commit is the registration). Design: custom/speed, speaker aiden, 12 fresh seeds 20260830..20260841, four cells per seed via vocello generate --delivery: happy.strong and angry.strong instructions crossed with two text arms — PLAIN, the valence-suppressing base sentence 'The morning train slipped quietly out of the station, carrying a handful of sleepy travelers toward the coast.'; and DECORATED, the registered exact variants HAPPY_TEXT='Haha! The morning train slipped quietly out of the station, carrying a handful of sleepy travelers toward the coast. Oh, that is wonderful!' and ANGRY_TEXT='Ugh. The morning train slipped quietly out of the station, carrying a handful of sleepy travelers toward the coast. Enough of this!'. 48 takes, generation strictly before scorers (8 GB rule). Scoring: emotion_advisory per clip (pinned SER, .venv, advisory semantics) and analyze_prosody features into delivery_separability --presets happy,angry per arm (raw-feature records, seed-grouped, --null-iters 1000, confirmatory designation). Hypotheses: H1 per emotion, the decorated arm raises SER target-emotion probability over the plain arm (paired per seed, one-sided Wilcoxon p<0.05 via delivery_statistics); H2 the decorated arm's happy-vs-angry 2-way clears its permutation null (p<0.05) while the plain arm is the internal control expected at chance, mirroring DP-18's refuted H3. Registered interpretation boundary: decoration changes the spoken text, so H2's acoustics include lexical-content effects — H1 (SER) carries the perceptual claim and H2 is supporting; text decoration becomes a product lever only if BOTH hold, and any product exposure (it changes what is spoken) is a separate maintainer-reviewed item. Decision on failure: a null closes the text-decoration route and the valence answer moves to the watch list's external levers (DP-20). RESULTS 2026-08-04 (run exactly as registered; 48/48 takes, zero QC casualties; instruction receipts verified on all instructed rows): H1 NULL for both emotions — decoration did not raise SER target probability (happy meanDiff +0.088, dz 0.21, Wilcoxon p=0.52, win 0.58 [0.32,0.81]; angry meanDiff -0.069, dz -0.27, p=0.27, win 0.33 — directionally negative), and top-1 agreement was unchanged (happy 7/12 to 8/12; angry 2/12 to 1/12). H2 uninterpretable in decoration's favor: the decorated arm cleared its permutation null (2-way UAR 0.792, p=0.018) but so did the plain internal control (0.75, p=0.037), so decoration added ~0.04 UAR over baseline — not the categorical gain the lever needed. ANALYSIS AMENDMENT (pre-H2, recorded): the registered raw feature space (55 features) was refused by the scorer's own power rail at 24 takes; the structural 21-feature harness-axis subset (raw counterparts of the standard delta axes) was substituted identically for both arms before any H2 number was seen. Measurement note: the plain control exceeding chance in RAW-feature space does not contradict DP-18's at-chance verdict in PAIRED-DELTA space — the spaces measure different things (absolute rendering vs instruction-isolated movement). DECISION per the registered rule (both hypotheses required): text decoration FAILS as a valence lever and the route closes; the valence answer moves to the external levers watched by DP-20. Evidence: scratch verdicts retained locally; the numbers above are the record.",
+      "sourceOfTruth": [
+        "scripts/bench_delivery_prosody.py"
+      ],
+      "updated": "2026-08-04",
+      "evidence": [
+        "file:scripts/delivery_separability.py",
+        "file:scripts/emotion_advisory.py",
+        "file:docs/development-progress.md"
+      ]
+    },
+    {
+      "id": "DP-20",
+      "plan": "delivery-prompting-2026-08",
+      "title": "External delivery-control lever watch list (audit R8)",
+      "status": "parked",
+      "unparkWhen": "Only when a watched lever becomes runnable on-device at the 8 GB floor: a Qwen3-TTS VoiceEditing/instruct variant that combines ICL with instructions, CosyVoice 3-class instruct control in an MLX-portable form, emotion-vector steering (IndexTTS-2/EmoSteer-class) with published weights, or a quantization-robust valence result. The pinned audit's R8 section is the source list; re-verify claims against primary sources at unpark time rather than trusting the 2026-08 snapshot.",
+      "updated": "2026-08-04"
+    },
+    {
+      "id": "CM-7",
+      "plan": "convergence-metal4-stage4-2026-08",
+      "title": "Non-streaming CLI generation publishes no WAV while reporting success",
+      "status": "done",
+      "gate": "Found 2026-08-04 while generating calibration clips: `vocello generate --no-stream` prints the output path and a success line (finish=eos, plausible RTF) but no file exists at the path for any destination tried (scratch, app-support outputs, repo build/). The streaming path publishes correctly, so the defect sits in the non-streaming product-finalization/publication path of the owned runtime. Blast radius: every `--no-stream` CLI generate, and the clone-fixture bootstrap in scripts/lib/test_models.sh (`models ensure` regeneration would silently enroll nothing). Fix must include a regression guard that fails the CLI when the reported audioPath does not exist, so success can never again be claimed without a published file. FIXED 2026-08-04: root cause was the generation exit path's cleanup defer coupling the final WAV's fate to streaming-session retention — every completed non-streaming take wrote its file, then deleted it, then returned the path. The exit path now decides per artifact via the pure GenerationOutputAdapter.terminalCleanup table (completed keeps the WAV always; session directory retained only for streaming; unfinished removes both), pinned by GenerationTerminalCleanupTests. The CLI additionally fails closed at the product boundary: generate and batch refuse to claim success when no file exists at the reported audioPath. Live proof: --no-stream published a valid 24 kHz WAV whose duration matches the reported 3.68 s; the streaming control still publishes.",
+      "updated": "2026-08-04",
+      "evidence": [
+        "file:Sources/QwenVoiceCore/GenerationOutputAdapter.swift",
+        "file:Tests/VocelloCoreTests/GenerationTerminalCleanupTests.swift",
+        "file:Sources/VocelloCLI/GenerateCommand.swift",
+        "file:Sources/VocelloCLI/BatchCommand.swift"
+      ],
+      "sourceOfTruth": [
+        "Sources/QwenVoiceCore/GenerationOutputAdapter.swift"
+      ]
+    },
+    {
+      "id": "UI-1",
+      "plan": "macos-ui-2026-08",
+      "title": "SwiftUI frame-health harness (scripts/ui_test.sh macos perf)",
+      "status": "done",
+      "gate": "Nine XCUITest scenarios join an in-app 500 ms display-link probe through a structural gate (all scenarios present once, >=90% window coverage, monotonic blocks, sane refresh); proven by one clean 9/9 PASS plus three fail-closed refusals.",
+      "evidence": [
+        "commit:9d283a9",
+        "file:scripts/check_macos_ui_perf.py",
+        "file:Tests/VocelloMacUITests/VocelloMacPerfUITests.swift"
+      ],
+      "updated": "2026-08-05"
+    },
+    {
+      "id": "UI-2",
+      "plan": "macos-ui-2026-08",
+      "title": "Frame-health baseline (1 warm-up + 5 counted runs)",
+      "status": "done",
+      "gate": "Per-scenario medians/IQR on the canonical M2 8 GB with thermals nominal in every counted run; idle-baseline exactly 0.0 ms/s hitch. Table recorded in the authority doc.",
+      "evidence": [
+        "file:docs/reference/macos-ui-refresh-2026-08.md"
+      ],
+      "updated": "2026-08-05"
+    },
+    {
+      "id": "UI-3",
+      "plan": "macos-ui-2026-08",
+      "title": "Four-audit UI review, ranked synthesis, and refresh proposals",
+      "status": "done",
+      "gate": "Architecture/performance/accessibility/layout audits merged with measured costs into ranked findings; wave-1/wave-2 proposal set published as a private remote-review artifact and recorded in the authority doc.",
+      "evidence": [
+        "file:docs/reference/macos-ui-refresh-2026-08.md"
+      ],
+      "updated": "2026-08-05"
+    },
+    {
+      "id": "UI-4",
+      "plan": "macos-ui-2026-08",
+      "title": "Safe fixes: dead-UI-code removal + Reduce Transparency at direct glass sites",
+      "status": "done",
+      "gate": "-615 lines of reference-free-verified dead scaffolding removed; all 8 direct glassEffect sites honor accessibilityReduceTransparency; full gate, both platform compiles, core tests, and a 7/7 smoke lane green.",
+      "evidence": [
+        "commit:99d746d"
+      ],
+      "updated": "2026-08-05"
+    },
+    {
+      "id": "UI-5",
+      "plan": "macos-ui-2026-08",
+      "title": "Refinement wave 1 (warm text ramp, motion family, focus rings, scoped observation, type scaling, stable resize fields, glass helper)",
+      "status": "done",
+      "gate": "All seven refinements landed with the maintainer's go (warm ink ramp, motion family, mode-tinted focus rings, flip-scoped gate + History cache, ScaledMetric adoption, AnyLayout field stability, shared GatedGlass container). Verified: full gate, both compiles, core tests, 7/7 smoke, and a before/after perf session — settings-scroll -19%, composer-typing -16%, History unchanged with the stall localized to per-row List materialization (UI-6's first target). Table and honest read in the authority doc.",
+      "updated": "2026-08-05",
+      "evidence": [
+        "commit:4e0c7cf",
+        "commit:bc7c108",
+        "commit:357d482",
+        "commit:20e14b2",
+        "file:docs/reference/macos-ui-refresh-2026-08.md"
+      ]
+    },
+    {
+      "id": "UI-6",
+      "plan": "macos-ui-2026-08",
+      "title": "Wave 2 re-engineering: store observation migration, History/Voices coordinators, shared generation lifecycle, player split",
+      "status": "done",
+      "gate": "All wave-2 re-engineering landed with the maintainer's go: TTSEngineStore @Observable migration with Combine bridges (sidebar-navigation 131.3 -> 118.6 ms/s across both waves), HistoryDeletionEngine with eight deterministic core tests on the irreversible delete paths, GenerationLifecycleExecutor unifying the triplicated generate/cancel, and the LiveStreamingPlaybackEngine extraction from the shared player. The 'History stall' was profiler-attributed to the harness's own accessibility work; History scenarios are exploratory and the app-real scroll cost is ~210 ms/s (~200 ms batches). Verified: full deterministic suite, both compiles, 7/7 smoke, baseline-v2 (5 clean counted runs). Table in the authority doc.",
+      "updated": "2026-08-05",
+      "evidence": [
+        "file:docs/reference/macos-ui-refresh-2026-08.md",
+        "file:Sources/QwenVoiceCore/HistoryDeletionEngine.swift",
+        "file:Sources/ViewModels/GenerationLifecycleExecutor.swift",
+        "file:Sources/SharedSupport/Services/LiveStreamingPlaybackEngine.swift"
+      ]
+    },
+    {
+      "id": "UI-7",
+      "plan": "macos-ui-2026-08",
+      "title": "Registry formalization of the perf lane (benchmark-history kind, thresholds from repeated baselines)",
+      "status": "done",
+      "gate": "ui-perf is a registered PASS-only benchmark kind (prosody-calibration precedent): schema v2/v3 enums, bounded uiperf metric allowlist, kind semantics validator (one take per scenario, no model/telemetry/QC claims, coverage and refresh sanity), harness-hash binding, and warn-only ceilings in config/ui-perf-thresholds.json derived from baseline-v2 medians. The perf lane emits evidence on canonical hardware and publishes via benchmark_history record; five offline self-tests cover the gate, thresholds, and take identities, and the first live record published from the real baseline-v2 v5 run (exploratory by honest late-publication provenance; canonical records mint from in-run publications). Hard ceilings wait for repeated baseline sessions.",
+      "updated": "2026-08-05",
+      "evidence": [
+        "file:config/ui-perf-thresholds.json",
+        "file:benchmarks/runs/ui-perf/macos-xcui-perf-20260805-092804-98c69168.json",
+        "file:scripts/tests/test_check_macos_ui_perf.py"
+      ]
     }
   ]
 }

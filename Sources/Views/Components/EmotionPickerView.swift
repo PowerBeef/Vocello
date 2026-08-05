@@ -78,6 +78,13 @@ struct EmotionPickerView: View {
                 toneControlRow
             }
 
+            if !isCustomMode, selectedPreset?.isDirectionalHint == true {
+                Label(EmotionPreset.directionalHintAdvisory, systemImage: "wand.and.sparkles")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("\(accessibilityPrefix)_hintAdvisory")
+            }
+
             customToneField
         }
         .onAppear {
@@ -86,18 +93,32 @@ struct EmotionPickerView: View {
     }
 
     private var tonePicker: some View {
+        // The measured split (DP-12): distinct deliveries first, directional
+        // hints second, so the menu itself tells the truth about what each
+        // half can promise.
         Picker(title, selection: selectedOptionID) {
-            ForEach(EmotionPreset.all) { preset in
-                Text(preset.label)
-                    .tag(preset.id)
+            Section("Distinct deliveries") {
+                ForEach(EmotionPreset.all.filter { !$0.isDirectionalHint }) { preset in
+                    Text(preset.label)
+                        .tag(preset.id)
+                }
             }
 
-            Text("Custom")
-                .tag("custom")
+            Section("Directional hints") {
+                ForEach(EmotionPreset.all.filter(\.isDirectionalHint)) { preset in
+                    Text(preset.label)
+                        .tag(preset.id)
+                }
+            }
+
+            Section {
+                Text("Custom")
+                    .tag("custom")
+            }
         }
         .labelsHidden()
         .pickerStyle(.menu)
-        .focusEffectDisabled()
+        .vocelloFocusRing(accentColor, radius: 6)
         .frame(
             minWidth: usesColumnLabels ? 110 : LayoutConstants.configurationControlMinWidth,
             maxWidth: 240,
@@ -184,7 +205,7 @@ struct EmotionPickerView: View {
         HStack(alignment: .center, spacing: 10) {
             Text("Intensity")
                 .font(.footnote.weight(.semibold))
-                .foregroundStyle(showsIntensityPicker ? .secondary : .tertiary)
+                .foregroundStyle(showsIntensityPicker ? AppTheme.textSecondary : AppTheme.textMuted)
 
             intensityPicker
         }
@@ -198,12 +219,12 @@ struct EmotionPickerView: View {
         }
         .labelsHidden()
         .pickerStyle(.menu)
-        .focusEffectDisabled()
+        .vocelloFocusRing(accentColor, radius: 6)
         .frame(minWidth: 112, maxWidth: 152, alignment: .leading)
         .tint(showsIntensityPicker ? AppTheme.emotionColor(for: selectedPreset?.id ?? "neutral") : .secondary)
         .opacity(showsIntensityPicker ? 1 : 0.6)
         .disabled(!showsIntensityPicker)
-        .appAnimation(.easeInOut(duration: 0.2), value: showsIntensityPicker)
+        .appAnimation(AppTheme.Motion.standard, value: showsIntensityPicker)
         .accessibilityIdentifier("\(accessibilityPrefix)_intensityPicker")
         .onChange(of: intensity) { _, _ in
             if selectedPreset != nil {
@@ -218,11 +239,11 @@ struct EmotionPickerView: View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Custom tone")
                 .font(.footnote.weight(.semibold))
-                .foregroundStyle(isCustomMode ? .secondary : .tertiary)
+                .foregroundStyle(isCustomMode ? AppTheme.textSecondary : AppTheme.textMuted)
 
             TextField("e.g. whispered, close-mic and breathy", text: $customText)
                 .textFieldStyle(.plain)
-                .focusEffectDisabled()
+                .vocelloFocusRing(accentColor, radius: 8)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 6)
                 .frame(minWidth: LayoutConstants.configurationControlMinWidth, maxWidth: .infinity, alignment: .leading)
@@ -253,6 +274,10 @@ struct EmotionPickerView: View {
 
     private func selectPreset(_ preset: EmotionPreset) {
         selectedPreset = preset
+        // A new selection always ships the strong copy (DP-8). Without this
+        // reset, a `.normal` tier synced from an older draft leaked into every
+        // subsequent pick (2026-08-04 audit, F4).
+        intensity = .strong
         isCustomMode = false
         customText = ""
         applyCurrentSelection()
@@ -267,17 +292,18 @@ struct EmotionPickerView: View {
     private func syncSelectionFromText() {
         let trimmedEmotion = emotion.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        for preset in EmotionPreset.all {
-            for level in EmotionIntensity.allCases {
-                if preset.instruction(for: level).caseInsensitiveCompare(trimmedEmotion) == .orderedSame {
-                    selectedPreset = preset
-                    intensity = level
-                    isCustomMode = false
-                    customText = ""
-                    applyCurrentSelection()
-                    return
-                }
-            }
+        // Strong-first resolution: identical tier strings (Neutral) must sync
+        // as `.strong`. A legacy draft that stored a genuine `.normal` string
+        // keeps resolving to exactly what it stored (same contract as iOS
+        // `DeliveryInputState(legacyEmotion:)`); the `selectPreset` reset is
+        // what guarantees every *new* pick ships strong.
+        if let match = EmotionPreset.matchInstruction(trimmedEmotion) {
+            selectedPreset = match.preset
+            intensity = match.intensity
+            isCustomMode = false
+            customText = ""
+            applyCurrentSelection()
+            return
         }
 
         if !DeliveryProfile.isNeutralInstruction(trimmedEmotion) {

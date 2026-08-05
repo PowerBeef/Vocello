@@ -375,7 +375,10 @@ struct IOSSaveVoiceSheet: View {
 
                     fieldSection(
                         label: "What you said",
-                        caption: "Auto-transcribed · optional"
+                        // Honest about what the transcript buys: it is the key
+                        // to in-context prosody transfer, not a nicety
+                        // (2026-08-04 delivery-control audit, F8).
+                        caption: "Auto-transcribed. With it, clones carry this clip's pacing and emotion; without it, identity only."
                     ) {
                         IOSMultilineTextView(
                             text: $transcript,

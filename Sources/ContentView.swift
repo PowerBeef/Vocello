@@ -111,7 +111,13 @@ enum SidebarItem: String, CaseIterable, Identifiable {
 @MainActor
 struct ContentView: View {
     @Environment(ModelManagerViewModel.self) private var modelManager
-    @EnvironmentObject private var ttsEngineStore: TTSEngineStore
+    /// Plain reference, deliberately NOT `@EnvironmentObject` (W1-D): the
+    /// root shell must not subscribe to the whole engine store — every use
+    /// below is imperative, and the only body-relevant signal is the gate,
+    /// which `gateModel` republishes flip-scoped. Descendant screens keep
+    /// their own environment-object injection.
+    private let ttsEngineStore: TTSEngineStore
+    @StateObject private var gateModel: GenerationPerformanceGateModel
     @Environment(SavedVoicesViewModel.self) private var savedVoicesViewModel
     @EnvironmentObject private var appCommandRouter: AppCommandRouter
 
@@ -163,7 +169,11 @@ struct ContentView: View {
         )
     }
 
-    init() {
+    init(ttsEngineStore: TTSEngineStore) {
+        self.ttsEngineStore = ttsEngineStore
+        _gateModel = StateObject(
+            wrappedValue: GenerationPerformanceGateModel(store: ttsEngineStore)
+        )
         // Read through AppDefaults because @AppStorage is not materialized in init yet.
         let storedSidebar = AppDefaults.store
             .string(forKey: ContentView.lastSidebarItemKey)
@@ -235,10 +245,8 @@ struct ContentView: View {
         // generates, glass surfaces fall back to the solid-fill design so the
         // material's continuous compositor work stops competing with MLX for
         // the GPU (measured 1.37 with glass vs 1.84 solid on the 8 GB tier).
-        .environment(
-            \.generationPerformanceGate,
-            ttsEngineStore.hasActiveGeneration || ttsEngineStore.hasSustainedPerformanceActivity
-        )
+        // Read through the flip-scoped gate model (W1-D), never the store.
+        .environment(\.generationPerformanceGate, gateModel.isActive)
         .onAppear(perform: handleAppear)
         .task { await handleInitialLoad() }
         .onChange(of: selectedItem) { _, newValue in handleSelectionChange(newValue) }
@@ -250,7 +258,10 @@ struct ContentView: View {
         }
         .onChange(of: modelManager.statuses) { _, _ in handleStatusesChange() }
         .onChange(of: modelManager.activeVariantRevision) { _, _ in handleActiveVariantChange() }
-        .onChange(of: ttsEngineStore.snapshot) { _, newSnapshot in
+        // `onReceive`, not `onChange`: `onChange(of:)` would need the
+        // snapshot read in body, which would track the store (W1-D/W2-A).
+        // The store's explicit bridge fires only on applied changes.
+        .onReceive(ttsEngineStore.snapshotUpdates) { newSnapshot in
             handleEngineSnapshotChange(newSnapshot)
         }
         .onReceive(appCommandRouter.sidebarSelection) { item in
@@ -286,9 +297,28 @@ struct ContentView: View {
             )
         case .history:
             HistoryView(
+                ttsEngineStore: ttsEngineStore,
                 searchText: $historySearchText,
                 sortOrder: $historySortOrder,
-                clearRequest: $historyClearRequest
+                clearRequest: $historyClearRequest,
+                onPinSeed: { generation in
+                    guard let seedValue = generation.samplingSeed else { return }
+                    // Pin into the take's own mode and surface that mode so
+                    // the composer chip makes the new state visible.
+                    switch generation.mode {
+                    case GenerationMode.custom.rawValue:
+                        customVoiceDraft.pinnedSeed = seedValue
+                        selectSidebarItemIfEnabled(.customVoice)
+                    case GenerationMode.design.rawValue:
+                        voiceDesignDraft.pinnedSeed = seedValue
+                        selectSidebarItemIfEnabled(.voiceDesign)
+                    case GenerationMode.clone.rawValue:
+                        voiceCloningDraft.pinnedSeed = seedValue
+                        selectSidebarItemIfEnabled(.voiceCloning)
+                    default:
+                        break
+                    }
+                }
             )
         case .voices:
             VoicesView(
@@ -508,7 +538,7 @@ struct ContentView: View {
 private struct CustomVoiceScreenHost: View {
     @Binding var draft: CustomVoiceDraft
 
-    @EnvironmentObject private var ttsEngineStore: TTSEngineStore
+    @Environment(TTSEngineStore.self) private var ttsEngineStore
     @EnvironmentObject private var audioPlayer: AudioPlayerViewModel
     @Environment(ModelManagerViewModel.self) private var modelManager
 
@@ -525,7 +555,7 @@ private struct CustomVoiceScreenHost: View {
 private struct VoiceDesignScreenHost: View {
     @Binding var draft: VoiceDesignDraft
 
-    @EnvironmentObject private var ttsEngineStore: TTSEngineStore
+    @Environment(TTSEngineStore.self) private var ttsEngineStore
     @EnvironmentObject private var audioPlayer: AudioPlayerViewModel
     @Environment(ModelManagerViewModel.self) private var modelManager
     @Environment(SavedVoicesViewModel.self) private var savedVoicesViewModel
@@ -545,7 +575,7 @@ private struct VoiceCloningScreenHost: View {
     @Binding var draft: VoiceCloningDraft
     @Binding var pendingSavedVoiceHandoff: PendingVoiceCloningHandoff?
 
-    @EnvironmentObject private var ttsEngineStore: TTSEngineStore
+    @Environment(TTSEngineStore.self) private var ttsEngineStore
     @EnvironmentObject private var audioPlayer: AudioPlayerViewModel
     @Environment(ModelManagerViewModel.self) private var modelManager
     @Environment(SavedVoicesViewModel.self) private var savedVoicesViewModel

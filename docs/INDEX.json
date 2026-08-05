@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "generated": "python3 scripts/doc_metadata.py rebuild-index",
   "note": "Machine-readable documentation map. Query this instead of globbing docs/.",
-  "annotatedDocuments": 30,
-  "unannotatedDocuments": 52,
+  "annotatedDocuments": 42,
+  "unannotatedDocuments": 44,
   "documents": [
     {
       "path": "docs/audits/archive/2026-07-10/01_Evidence_Method_and_Corrections.md",
@@ -69,12 +69,101 @@
       "contentDigest": "sha256:4d50a0e11eceb00a1579bb3a7c654118579eae8b29b119a8c11a4809b52bab8f"
     },
     {
+      "path": "docs/reference/backend-optimization-research-report.md",
+      "status": "historical",
+      "owner": "backend-mlx",
+      "summary": "1.7B custom-backend optimization research report \u2014 the repository at its 2026-06-16 checkpoint, with the measurements and decisions made there. Superseded for current behavior by telemetry-and-benchmarking.md and the generated history.",
+      "contentDigest": "sha256:43469de2d31b138e5539e2c8a81e87f3493ae41dae45e50a827bc1176582db6b"
+    },
+    {
+      "path": "docs/reference/codex-storage-ballooning-incident.md",
+      "status": "historical",
+      "owner": "release-qa",
+      "summary": "Cause record for the Codex task-storage ballooning observed during the runtime work. Incident explanation from a point-in-time snapshot; not a cleanup authorization, policy, or current inventory.",
+      "contentDigest": "sha256:db39324f249bac4cf275e0a25be2421692dd6522b65c92420b56b18ee42c35d9"
+    },
+    {
+      "path": "docs/reference/delivery-control-audit-2026-08.md",
+      "status": "historical",
+      "owner": "backend-mlx",
+      "summary": "Delivery-control audit (2026-08-04) \u2014 full-codebase analysis plus a 21-agent primary-source research sweep over the DP-1..DP-10 delivery program. Pinned point-in-time decision report; findings, adjudications, and ranked recommendations as they stood at capture.",
+      "contentDigest": "sha256:e171bdcd3e0f3377681728dc66b5b9c960a1d40788f3547a3aca879dec84d6cb"
+    },
+    {
+      "path": "docs/reference/delivery-fidelity-report-2026-08-01.md",
+      "status": "historical",
+      "owner": "backend-mlx",
+      "summary": "Delivery and clone fidelity autonomous diagnosis (2026-08-01). Pinned point-in-time report; F4's Neutral no-instruct design was reversed the same day, and the 2026-08-04 delivery-control audit supersedes its statistics and recommendations.",
+      "contentDigest": "sha256:10cd4026c9181aa8499f01f5363e7fe6d7aca60481180e27e69904dc32e9627d"
+    },
+    {
+      "path": "docs/reference/delivery-harness.md",
+      "status": "active",
+      "owner": "backend-mlx",
+      "summary": "Operator's reference for the audio delivery analysis harness \u2014 the tools, the bench --delivery measurement protocol, evidence and provenance conventions, the statistics the separability scorer reports, the pre-registration discipline, the DP results ledger, and re-run recipes.",
+      "sourceOfTruth": [
+        "scripts/delivery_separability.py",
+        "scripts/bench_delivery_prosody.py"
+      ]
+    },
+    {
       "path": "docs/reference/delivery-remediation-plan-2026-08.md",
       "status": "superseded",
       "owner": "backend-mlx",
       "summary": "Completed delivery/clone fidelity remediation program (R1-R4). Its R1 recommendation to keep three intensity tiers was overruled by the maintainer decision recorded later in the same file; current delivery state lives in development-progress.",
       "supersededBy": "docs/development-progress.md",
       "contentDigest": "sha256:b3b253977a1f67c5a530fe6ce3d04a6215e2f852d66627dc97186351963bbd27"
+    },
+    {
+      "path": "docs/reference/emotion-reference-banks.md",
+      "status": "active",
+      "owner": "backend-mlx",
+      "summary": "The design-then-clone workflow \u2014 build curated emotion reference banks with the pipeline script, how curation scores and honestly refuses candidates, and how banks present as personas with a delivery choice in both apps.",
+      "sourceOfTruth": [
+        "scripts/build_emotion_reference_bank.py",
+        "Sources/QwenVoiceCore/VoiceBankCatalog.swift"
+      ]
+    },
+    {
+      "path": "docs/reference/macos-ui-refresh-2026-08.md",
+      "status": "active",
+      "owner": "macos",
+      "summary": "The 2026-08 macOS UI review \u2014 measured frame-health baseline, ranked audit findings, the staged refresh proposal (wave 1 refinements, wave 2 re-engineering), and what already landed. Roadmap authority for the macos-ui-2026-08 plan.",
+      "sourceOfTruth": [
+        "scripts/check_macos_ui_perf.py",
+        "Tests/VocelloMacUITests/VocelloMacPerfUITests.swift"
+      ]
+    },
+    {
+      "path": "docs/reference/metal4-tensor-feasibility-2026-07-31.md",
+      "status": "historical",
+      "owner": "backend-mlx",
+      "summary": "Metal 4 tensors + MPP in MLX custom kernels \u2014 feasibility study (2026-07-31). Recorded the Gate 0 micro-benchmark rider and the OS-floor policy; Gate 0 returned no-go 2026-08-01, closing the fused-kernel candidate.",
+      "contentDigest": "sha256:6a56bc6fc4d872f1812f589789b5f66a1e7b50ef048d0675a3e808d4813cbb9b"
+    },
+    {
+      "path": "docs/reference/optimization-report-review-2026-07-25.md",
+      "status": "historical",
+      "owner": "backend-and-platform",
+      "summary": "Counter-verification of the imported optimization research and the staged plan adopted from it (2026-07-25). The stage-closure evidence and falsifiability rails for Stages 0-4, all closed by 2026-08-01.",
+      "contentDigest": "sha256:a6eef3de350836f763837524655ac0734ea36dca0900437c72c1596c08c73905"
+    },
+    {
+      "path": "docs/reference/prosody-qa-research.md",
+      "status": "active",
+      "owner": "backend-mlx",
+      "summary": "Research notes behind the automated tone/tempo/cadence quality gates \u2014 analyzer landscape, metric choices, and the usage entry points for the prosody lanes. Point-in-time sections are dated inline; commands reflect the live preset roster.",
+      "sourceOfTruth": [
+        "scripts/bench_delivery_prosody.py",
+        "Sources/QwenVoiceCore/EmotionPreset.swift"
+      ]
+    },
+    {
+      "path": "docs/reference/qwen3-apple-silicon-roadmap-review.md",
+      "status": "historical",
+      "owner": "backend-and-platform",
+      "summary": "Cross-check of the convergence roadmap against official Qwen3-TTS and Apple Metal/MLX guidance (reviewed 2026-07-19, position syncs through 2026-07-25). Point-in-time review; item status lives in config/roadmap.json.",
+      "contentDigest": "sha256:33fd92b0ce213fac47c016f74d96fd80f444c09ca51f3247b270dd356bc8b5fa"
     },
     {
       "path": "docs/reference/qwen3-tts-guide.md",
@@ -105,6 +194,13 @@
       "appliesTo": [
         "release-qa"
       ]
+    },
+    {
+      "path": "docs/reference/runtime-refactor-status-report.md",
+      "status": "historical",
+      "owner": "backend-and-platform",
+      "summary": "Maintainer status report for the staged convergence program as reviewed 2026-07-20 after overallPromotion passed. Point-in-time interpretation; the living phase summary is the table in docs/development-progress.md, and config/runtime-refactor-contract.json stays the status authority.",
+      "contentDigest": "sha256:b9dc43c56fda8fb45609df13a8e4c417b8a40d85ffacf07e262da3704cba1629"
     },
     {
       "path": "docs/releases/v1.2.1.md",

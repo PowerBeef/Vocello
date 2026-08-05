@@ -30,5 +30,11 @@ final class QwenVoiceApplicationDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // UI-perf lane hooks (both inert without QWENVOICE_DEBUG + their
+        // registered knobs): seed History before any navigation can reach it,
+        // then start the frame probe so its display link binds the first key
+        // window.
+        UIPerfHistorySeeder.seedIfConfigured()
+        UIPerfFrameProbe.startIfConfigured()
     }
 }

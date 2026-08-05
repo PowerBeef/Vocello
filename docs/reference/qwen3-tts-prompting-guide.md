@@ -298,28 +298,52 @@ represented during training." Training captions were LLM-generated from attribut
 free-written user prose is out-of-distribution by construction. Rewriting user prose toward the
 training distribution is an evidence-backed intervention, not a hack.
 
-`MEASURED-HERE` (DP-10, 2026-08-03). The third ceiling is the one that bites hardest, and it is not
-about adherence at all: **the model can place a take on the arousal axis and largely cannot place it
-on the valence axis.** Eighteen seeds across the ten then-shipping presets gave cross-preset
-separability of UAR 0.311 against a 0.100 chance floor. Scoring only the high-arousal cluster
-(`happy`, `excited`, `surprised`, `dramatic`) against each other gave **UAR 0.278 against a 0.250
-chance floor — 1.11x chance**. Four instructions, one acoustic output.
+`MEASURED-HERE` (DP-10, 2026-08-03; statistics corrected by the 2026-08-04 audit). The third
+ceiling is the one that bites hardest, and it is not about adherence at all: **this checkpoint's
+text-instruction channel moves essentially one arousal-shaped axis.** Eighteen seeds across the
+ten then-shipping presets gave cross-preset separability of UAR 0.311 against a 0.100 chance
+floor — a decisively real result (permutation p < 0.001 under a null mirroring the exact shipped
+procedure). Scoring only the high-arousal cluster (`happy`, `excited`, `surprised`, `dramatic`)
+against each other gave UAR 0.278 against a 0.250 chance floor — **no detectable separability**
+(permutation p = 0.28; the originally recorded "1.11x chance" reading over-stated an ordinary
+null draw, and at 18 seeds the test cannot exclude real separability below ~1.5x chance).
 
 The important part is what this is *not*. Mean prosodic effect size across all ten presets ran
-6.5 to 9.5 and was **uncorrelated with separability**: `dramatic` (8.2) and `excited` (8.9) both
-scored *below* the 0.100 chance floor at 0.056 recall, while `fearful` at 0.500 recall passed the
-directional delivery gate on only 1 take in 18. These instructions were not under-driving. Every
-preset moved prosody hard, and they all moved it the same way. This matches the published figure
-that arousal is roughly 91% classifiable from acoustics against roughly 55% for valence, and
-valence is the only thing separating happy from excited.
+6.5 to 9.5 and was **uncorrelated with separability**: `fearful` at 0.500 recall passed the
+directional delivery gate on only 1 take in 18, while `dramatic` (8.2) and `excited` (8.9)
+recorded 0.056 recall — a figure whose exact binomial interval [0.001, 0.27] contains the chance
+floor, so "below chance" was never demonstrated. These instructions were not under-driving. Every
+preset moved prosody hard, and they all moved it the same way. A previous revision cited "arousal
+roughly 91% classifiable from acoustics against roughly 55% for valence" as a published figure;
+that pair is untraceable to any source and is retracted. The real literature puts prosody-only
+valence at roughly a third of arousal's recoverability (adjusted R^2 0.17 vs 0.58, Sauter 2010;
+CCC .248 vs .658 for lexically blind models, Wagner 2023) — a bottleneck, not a wall — and human
+listeners decode eight emotions at 72% from prosody alone on a fixed neutral sentence (RAVDESS).
 
-Consequence for prompt-writing: **wording cannot buy a distinction the acoustic space does not
-carry.** DP-3 (long versus short form), DP-4 (prosodic null), DP-5 (merge form), and DP-6 all varied
-instruction text and none moved this. `excited` was folded into `happy` and `dramatic` dropped on
-2026-08-03 — not because their copy was bad, but because a control whose output cannot be
-distinguished from its neighbour is not a control. Presets that survive are the ones with a
-distinct acoustic signature (`whisper` breathiness, `fearful` tension, `sad`/`calm` low arousal);
-the ones that failed were a rhetorical register and an intensity variant of another emotion.
+`MEASURED-HERE` (DP-18, 2026-08-04, pre-registered confirmatory; roadmap gate is the authority).
+The exploratory DP-10 result replicated on entirely fresh seeds in a two-arm sweep: 8-way
+separability UAR **0.477** (4-bit, 16 seeds) and **0.375** (8-bit, 18 seeds) against a 0.125
+computed floor, permutation p = 0.001 in each arm at 1000 iterations, per-cell claims under
+BH-FDR. The valence ceiling was upgraded from hypothesis to result: the pre-registered
+**happy-vs-angry 2-way probe sits at chance in both arms** (UAR 0.531 / 0.583 vs a 0.5 floor,
+p = 0.43 / 0.24), and `happy` fails FDR in both arms with `angry` as its top confusion each
+time. The 8-bit Quality arm separates no better than 4-bit, retiring quantization as a
+suspected adherence bottleneck. Protocol, provenance, and statistics:
+[`delivery-harness.md`](delivery-harness.md).
+
+Consequence for prompt-writing: **wording cannot buy a distinction this instruction channel does
+not carry.** DP-3 (long versus short form), DP-4 (prosodic null), DP-5 (merge form), and DP-6 all
+varied instruction text and none moved this. `excited` was folded into `happy` and `dramatic`
+dropped on 2026-08-03 — sustained as a product decision (a control whose output cannot be
+distinguished from its neighbour is not a control), with the statistical justification corrected
+by the audit and then confirmed by DP-18. What a *listener* reliably identifies is narrower
+still: the DP-12 blind session (146 trials) heard only `neutral`, `calm`, `whisper`, and `sad`
+above chance — exactly the shipped `EmotionPreset.distinctDeliveryIDs` set — while `angry` and
+`fearful` are acoustically separable (both clear FDR in both DP-18 arms) yet were never named
+correctly by ear (`angry` 0/11; `fearful` heard as sad). Acoustic separability is not listener
+recognizability; the UI's distinct-versus-directional-hint split follows the listener. Corrected
+record and follow-up program:
+[`delivery-control-audit-2026-08.md`](delivery-control-audit-2026-08.md).
 
 ### 4.4 Instruction language: Chinese leads on our checkpoint
 
@@ -591,6 +615,7 @@ settled one.
 | `think`/`nothink` branch | implemented; Design and Clone fall back to `nothink` |
 | Design merge template | `Voice character: … Delivery: …`, a repo invention |
 | English diction sentence | appended conditionally — see below |
+| Instruction receipt (2026-08-04) | every instructed take's telemetry row stamps `instructChars`/`instructDigest` from the request payload; the delivery harness verifies it fail-closed against the bench manifest echo ([`delivery-harness.md`](delivery-harness.md) §4) |
 
 Three of the four hazards that the research pass flagged as likely causes of "delivery sounds off"
 in MLX ports do not apply to this checkout. That is worth stating plainly, because it narrows the
@@ -608,18 +633,21 @@ The append is skipped when the base instruction already contains any of eight di
 `understandable`) — a reasonable rule, added to stop the model receiving redundant clarity
 instructions that crowd out the emotion signal.
 
-But which presets trip that rule is incidental to their wording, and **three presets trip it on one
-intensity tier and not the other**:
+But which presets tripped that rule was incidental to their wording, and — on the then-shipping
+ten-preset × two-tier roster (the roster was cut to 8 on 2026-08-03 and the user-facing intensity
+control retired 2026-08-02; see §4.3 and
+[`delivery-control-audit-2026-08.md`](delivery-control-audit-2026-08.md)) — **three presets tripped
+it on one intensity tier and not the other**:
 
 | Preset | `normal` | `strong` | Boilerplate delta |
 | --- | --- | --- | --- |
 | happy | suppressed (142 chars) | appended (270 chars) | **+76 on strong only** |
 | surprised | suppressed (169 chars) | appended (239 chars) | **+76 on strong only** |
-| dramatic | suppressed (173 chars) | appended (260 chars) | **+76 on strong only** |
+| dramatic *(retired 2026-08-03)* | suppressed (173 chars) | appended (260 chars) | **+76 on strong only** |
 | sad | suppressed | suppressed | none |
 | the other six | appended | appended | none |
 
-For happy, surprised, and dramatic, the `strong` tier differs from `normal` not only by its
+For happy, surprised, and dramatic, the `strong` tier differed from `normal` not only by its
 emotional wording but by an extra sentence about English diction that has nothing to do with
 intensity. **The intensity-tier measurement recorded in
 [`EmotionPreset.swift`](../../Sources/QwenVoiceCore/EmotionPreset.swift) — that `strong` moves cells
@@ -634,8 +662,9 @@ fails the build if that resolution is removed.
 
 `MEASURED-HERE`, **DP-4, 2026-08-02 — prosodic null. The sentence stays.**
 
-Only six presets receive the append at all — `neutral`, `angry`, `fearful`, `excited`, `calm`,
-`whisper`. The other four already contain a diction token and suppress it, which gave the
+Only six of the then-shipping ten presets received the append at all — `neutral`, `angry`,
+`fearful`, `excited` (folded into `happy` when the roster was cut on 2026-08-03), `calm`,
+`whisper`. The other four already contained a diction token and suppressed it, which gave the
 experiment a built-in control: 8 cells that must be byte-identical across arms and 12 that must
 differ. Over 13 paired seeds that held exactly — **104/104 identical, 0/156 identical** — so the
 null below is a real null and not a harness that failed to vary anything.
@@ -696,7 +725,7 @@ each is actually worth.
 | Concrete acoustic wording beats persona-only wording | **`RESEARCH`, supported.** InstructTTSEval APS 77–83 versus RP 61–64 on our checkpoint. The strongest-supported item on either list. |
 | Combine emotion + pace + pitch + timbre | **`OFFICIAL`, supported.** Alibaba's "be multi-dimensional, not one-dimensional". The twelve APS features go further: volume, speed, and tone-distinct-from-emotion are also first-class and our copy is thin on them. |
 | Imperative verbs (Speak / Whisper / Narrate) are followed more reliably | **`UNVERIFIED`.** Upstream examples use both imperative (`Speak slowly and professionally`) and descriptive (`Male, 17 years old, tenor range…`) forms with no stated preference. Plausible, unsourced. |
-| Negative constraints work (`no laughing`, `never shout`) | **`UNVERIFIED`, and the one nearby datapoint is negative.** No upstream source endorses them. OV-InstructTTS (arXiv:2601.01459) Table 3 found bare paralinguistic tags *reduced* adherence by 0.72 while reasoning-mediated attributes raised it by 2.08. Eight of ten shipped presets spend characters on negation that nothing supports. |
+| Negative constraints work (`no laughing`, `never shout`) | **`UNVERIFIED`, and the one nearby datapoint is negative.** No upstream source endorses them. OV-InstructTTS (arXiv:2601.01459) Table 3 found bare paralinguistic tags *reduced* adherence by 0.72 while reasoning-mediated attributes raised it by 2.08. Eight of the ten then-shipped presets spent characters on negation that nothing supports (roster cut to 8 on 2026-08-03; the surviving copy still carries negation clauses). |
 | Intelligibility clauses help bound extreme emotions | **`UNVERIFIED` as written, with a documented cousin.** The vendor-supported version is a *recording-quality anchor* at the end ("Perfect broadcast quality audio."), which addresses texture-mistaken-for-degradation. Ours is a *command to the speaker* ("stay fully audible") in the middle. Different mechanism, and ours is what trips the §8.2 boilerplate rule. |
 | Avoid stacked intensifiers; `very very very happy` adds no value | **Partly contradicted.** Upstream's own examples are `Very happy.` and `Say it in a very angry and disappointed tone`. The defensible claim is that *repetition* adds nothing; our copy over-generalized it into avoiding intensifiers, and further into avoiding naming the emotion plainly at all — while emotion is an explicit APS feature. |
 | High-arousal instructions trigger literal laughter or breath sounds | **`COMMUNITY`, plausible.** Reported for extended generations. The `no laughing` remedy is the unverified part, not the symptom. |
@@ -704,10 +733,13 @@ each is actually worth.
 `MEASURED-HERE`. Two further corrections, both **applied 2026-08-02**:
 [`qwen3-tts-guide.md`](qwen3-tts-guide.md) and [`../qwen_tone.md`](../qwen_tone.md) each stated the
 preset grid with the wrong intensity-tier count, contradicting the guide's own §6 table and the
-shipped code. The correct figure is **10 presets × 2 intensity tiers**, and
-[`doc_metadata.py`](../../scripts/doc_metadata.py) now derives that count from
+then-shipped code. The correct figure at the time was **10 presets × 2 intensity tiers**; the
+roster has since been cut to 8 presets (2026-08-03) and the user-facing intensity control retired
+(2026-08-02), each surviving preset shipping its `strong` copy — see §4.3 and
+[`delivery-control-audit-2026-08.md`](delivery-control-audit-2026-08.md).
+[`doc_metadata.py`](../../scripts/doc_metadata.py) now derives the current counts from
 [`EmotionPreset.swift`](../../Sources/QwenVoiceCore/EmotionPreset.swift) and fails the build on any
-document that contradicts it.
+document that contradicts them.
 
 `MEASURED-HERE`. [`../qwen_tone.md`](../qwen_tone.md) additionally attributes "negative constraints
 work and are officially endorsed" and "the official instruction-writing principle" to upstream
@@ -745,11 +777,12 @@ This confirms §4.2 and retires the contrast above as a hypothesis. Our copy is 
 short examples are illustrations of the *interface*, not a recommended register — reading them as
 style guidance was the error, and the benchmark said so before the measurement did.
 
-**What the same run showed instead**, and it matters more: five presets move nothing that survives
-correction under *either* form — `happy`, `excited`, `neutral`, `dramatic.normal`,
-`surprised.normal`. Cross-preset separability fails in both arms (67.5% error shipped, 77.6%
+**What the same run showed instead**, and it matters more: five of the then-shipping presets moved
+nothing that survives correction under *either* form — `happy`, `excited`, `neutral`,
+`dramatic.normal`, `surprised.normal` (`excited` and `dramatic` have since been retired,
+2026-08-03). Cross-preset separability failed in both arms (67.5% error shipped, 77.6%
 short), with `happy.normal` at 0.00 recall against a 5% chance floor. Instruction register is not
-the lever for those presets; nothing about the wording makes them separable.
+the lever for those presets; nothing about the wording made them separable.
 
 `MEASURED-HERE`. Three different instruction-length limits exist in this checkout, and they measure
 different things rather than disagreeing: 2,048 characters is the Model Studio `voice_prompt`
@@ -768,10 +801,17 @@ Ordered by expected value. **None of these is a recommendation to change preset 
 unvalidated prompt guidance is the failure mode this document exists to stop; each item below is a
 measurement first.
 
-The harness already exists: [`scripts/delivery_matrix_report.py`](../../scripts/delivery_matrix_report.py)
-runs a seeded delivery matrix and [`scripts/delivery_statistics.py`](../../scripts/delivery_statistics.py)
+The harness already exists — the complete operator's reference is
+[`delivery-harness.md`](delivery-harness.md). In brief:
+[`scripts/delivery_separability.py`](../../scripts/delivery_separability.py) scores cross-preset
+separability (computed floors, permutation null, per-cell BH-FDR, `--presets` subset probes,
+exploratory/confirmatory designation), [`scripts/bench_delivery_prosody.py`](../../scripts/bench_delivery_prosody.py)
+turns a `bench --delivery` run into a receipt-verified paired sidecar,
+[`scripts/delivery_matrix_report.py`](../../scripts/delivery_matrix_report.py)
+runs a seeded delivery matrix, and [`scripts/delivery_statistics.py`](../../scripts/delivery_statistics.py)
 provides paired Wilcoxon tests, Cohen's d_z, BCa intervals, and Benjamini-Hochberg correction. Each
-experiment below is a matrix run plus a paired comparison.
+experiment below is a matrix run plus a paired comparison, pre-registered per
+[`delivery-harness.md`](delivery-harness.md) §6.
 
 1. ~~**Short versus long instruction.**~~ **SETTLED 2026-08-02 — the shipped long form wins,
    57 surviving features against 33 over 12 paired seeds.** The benchmark's prediction held and the
@@ -779,8 +819,9 @@ experiment below is a matrix run plus a paired comparison.
    `QWENVOICE_DEBUG=1 QWENVOICE_DELIVERY_INSTRUCTION_SET=short`, registered in
    [`runtime-debug-knobs.json`](../../config/runtime-debug-knobs.json) and inert without the master
    gate. **Do not retry this as a way to fix delivery**: the same run showed `happy`, `excited`,
-   `neutral`, `dramatic.normal` and `surprised.normal` move nothing under *either* form, so the
-   register is not the lever for the presets that fail.
+   `neutral`, `dramatic.normal` and `surprised.normal` moved nothing under *either* form
+   (`excited` and `dramatic` have since been retired, 2026-08-03), so the register is not the
+   lever for the presets that failed.
 2. ~~**The Design merge template.**~~ **SETTLED 2026-08-03 — shipped form kept, quality anchor
    rejected.** 46 / 41 / 35 surviving features across labeled / plain / anchored over 8 paired
    seeds; see §6.1 for the numbers and §5.4 for the anchor. Reproduce with
@@ -807,9 +848,14 @@ pitch at n=12 and fails to survive correction at n=23 on a different seed range,
 12-seed matrix as indicative only.** The tier decision in §8.2 leaned on such rows; the aggregate
 that decision actually rested on was much stronger than any single cell in it.
 
-6. **Negative constraints and intensifiers**, individually. Eight of ten presets carry a negation
-   clause that no source supports; OV-InstructTTS's ablation points the other way.
-7. **8-bit versus bf16 instruction adherence.** Upstream measures bf16 only; we ship 8-bit (§7).
+6. **Negative constraints and intensifiers**, individually. Eight of the then-shipping ten presets
+   carried a negation clause that no source supports, and most of the surviving eight-preset
+   roster's copy still does; OV-InstructTTS's ablation points the other way.
+7. **8-bit versus bf16 instruction adherence.** Partially answered by DP-18 (2026-08-04): the
+   4-bit and 8-bit quantizations were measured head-to-head on fresh seeds and the 8-bit arm
+   separates no *better* (UAR 0.375 vs 0.477, overlapping per-cell intervals) — quantization is
+   not the adherence bottleneck between our own tiers. The bf16 comparison itself remains
+   unmeasured; upstream measures bf16 only, we ship quantized (§7).
 
 `UNVERIFIED`, and worth stating so nobody re-derives it: upstream's answer for emotion control on
 *cloned* voices is `Qwen3-TTS-25Hz-1.7B-VoiceEditing`, announced by a maintainer with no committed

@@ -12,7 +12,8 @@
       "lanes": [
         "smoke",
         "benchmark",
-        "model-download"
+        "model-download",
+        "perf"
       ],
       "keepPassingPerPlatformLane": 1,
       "keepUnresolvedFailuresPerPlatformLane": 1
@@ -83,6 +84,10 @@
       "release": {
         "requiredFreeBytes": 21474836480,
         "cleanupHint": "scripts/clean_build_caches.sh --routine"
+      },
+      "ui-perf": {
+        "requiredFreeBytes": 12884901888,
+        "cleanupHint": "scripts/clean_build_caches.sh --prune-ui-results"
       }
     }
   },

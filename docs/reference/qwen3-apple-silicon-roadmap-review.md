@@ -1,3 +1,9 @@
+---
+status: historical
+owner: backend-and-platform
+summary: Cross-check of the convergence roadmap against official Qwen3-TTS and Apple Metal/MLX guidance (reviewed 2026-07-19, position syncs through 2026-07-25). Point-in-time review; item status lives in config/roadmap.json.
+contentDigest: sha256:33fd92b0ce213fac47c016f74d96fd80f444c09ca51f3247b270dd356bc8b5fa
+---
 # Qwen3-TTS, Apple Silicon, and Vocello roadmap review
 
 > Cross-check of Vocello’s convergence roadmap against official Qwen3-TTS docs and

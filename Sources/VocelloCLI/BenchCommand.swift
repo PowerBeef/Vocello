@@ -30,6 +30,13 @@ enum BenchCommand {
         let warmState: String
         let repetition: Int
         let delivery: String?
+        /// The exact instruction string sent as `deliveryStyle` for a delivery
+        /// cell; nil on plain takes. Provenance echo for the harness — the
+        /// downstream prosody sidecar asserts it is non-empty and cross-checks
+        /// the engine row's promptChars against the paired neutral take, so an
+        /// instruction that silently failed to reach the request is detectable
+        /// from the evidence alone (2026-08-04 audit, hardening item 2).
+        let deliveryInstruction: String?
         let audioSeconds: Double
         let wallSeconds: Double
         let firstChunkMS: Double?
@@ -71,8 +78,10 @@ enum BenchCommand {
 
     /// Default delivery cells for `--delivery` (bare flag): one expressive, one
     /// calm, one whisper — the three preset families with distinct acoustic
-    /// signatures, so QC + the prosody gate cover the delivery spectrum.
-    static let defaultDeliverySet = ["happy.strong", "calm.normal", "whisper.normal"]
+    /// signatures, so QC + the prosody gate cover the delivery spectrum. All at
+    /// the strong tier, which is what every product surface ships (DP-8);
+    /// normal-tier cells remain addressable explicitly for experiments.
+    static let defaultDeliverySet = ["happy.strong", "calm.strong", "whisper.strong"]
 
     /// Bucket a prompt char count into the short/medium/long labels used for
     /// filenames and the telemetry `lenBucket`. Mirrors the logic in
@@ -108,11 +117,13 @@ enum BenchCommand {
             let intensity: EmotionIntensity
             if parts.count == 2 {
                 guard let resolved = EmotionIntensity.allCases.first(where: { $0.rpcValue == parts[1] }) else {
-                    throw CLIError("unknown delivery intensity '\(parts[1])' (use subtle | normal | strong)")
+                    throw CLIError("unknown delivery intensity '\(parts[1])' (use normal | strong)")
                 }
                 intensity = resolved
             } else {
-                intensity = .normal
+                // Bare preset names take the tier the product ships (DP-8:
+                // every selection ships the strong copy).
+                intensity = .strong
             }
             return DeliveryItem(
                 id: "\(preset.id).\(intensity.rpcValue)",
@@ -375,6 +386,13 @@ enum BenchCommand {
                 if !deliveryItems.isEmpty, mode != .clone {
                     let deliveryText = try requiredText(for: "medium")
                     for item in deliveryItems {
+                        // Prompt-echo provenance: a delivery cell whose
+                        // instruction resolves empty would generate a silent
+                        // neutral take labelled as instructed — the plumbing
+                        // null the audit's H3 could never rule out. Refuse.
+                        guard !item.instruction.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                            throw CLIError("delivery cell \(item.id) resolved an empty instruction")
+                        }
                         let deliveryPayload = try Self.payload(
                             for: mode, customSpeaker: runtime.defaultSpeakerID,
                             designBrief: designBrief, cloneReference: cloneReference,
@@ -388,6 +406,7 @@ enum BenchCommand {
                             runtime, mode: mode, modelID: modelID, payload: deliveryPayload,
                             len: "medium", text: deliveryText, state: "warm", n: 0,
                             outDir: outDir, takeIndex: total, cell: cell, delivery: item.id,
+                            deliveryInstruction: item.instruction,
                             shouldStream: !noStream, seed: seed
                         ))
                     }
@@ -440,6 +459,17 @@ enum BenchCommand {
                     at: diagDir.appendingPathComponent("bench-prosody.json")
                 )
             }
+        }
+        // Evidence retention for delivery runs, independent of publication:
+        // the live outputs directory keeps fixed per-cell filenames (and
+        // therefore overwrite semantics), so without this archive an 18-seed
+        // sweep destroys 17/18ths of its own audio evidence — which is
+        // exactly what happened to DP-10 (2026-08-04 delivery-control audit).
+        if !deliveryItems.isEmpty {
+            try archiveDeliveryEvidence(
+                dataDir: resolvedDataDir, outputs: outDir, diagnostics: diagDir,
+                artifactDirectory: historyArtifactDir, takes: takeResults, runID: runID
+            )
         }
         // Optional engine first-chunk-latency probe. Runs after the main matrix but
         // before final evidence publication. The immutable results manifest selects
@@ -524,6 +554,7 @@ enum BenchCommand {
                              payload: GenerationRequest.Payload, len: String, text: String,
                              state: String, n: Int, outDir: URL,
                              takeIndex: Int, cell: String, delivery: String? = nil,
+                             deliveryInstruction: String? = nil,
                              shouldStream: Bool = true, seed: UInt64? = nil) async throws -> BenchTakeResult {
         // Bucket the char count with the SAME function the summarizer uses, so
         // the filename and the telemetry row agree by construction regardless of
@@ -568,6 +599,7 @@ enum BenchCommand {
             warmState: state,
             repetition: n,
             delivery: delivery,
+            deliveryInstruction: deliveryInstruction,
             audioSeconds: result.durationSeconds,
             wallSeconds: wall,
             firstChunkMS: firstChunkMS,
@@ -958,6 +990,48 @@ enum BenchCommand {
         }
     }
 
+    /// Copy this run's WAVs plus the immutable manifest and analysis sidecars
+    /// into an untracked per-run archive under `outputs/bench-archive/<runID>`.
+    /// WAV and manifest copies are fail-closed (evidence retention is part of
+    /// the run's success contract); the analysis sidecars are copied when they
+    /// exist, because `--no-summary` parent lanes own their own artifacts.
+    private static func archiveDeliveryEvidence(
+        dataDir: URL,
+        outputs: URL,
+        diagnostics: URL,
+        artifactDirectory: URL,
+        takes: [BenchTakeResult],
+        runID: String
+    ) throws {
+        let archive = dataDir
+            .appendingPathComponent("outputs/bench-archive", isDirectory: true)
+            .appendingPathComponent(runID, isDirectory: true)
+        let fileManager = FileManager.default
+        try fileManager.createDirectory(at: archive, withIntermediateDirectories: true)
+
+        func copy(_ source: URL, required: Bool) throws {
+            guard fileManager.fileExists(atPath: source.path) else {
+                if required {
+                    throw CLIError("evidence archive: missing required file \(source.lastPathComponent)")
+                }
+                return
+            }
+            let destination = archive.appendingPathComponent(source.lastPathComponent)
+            if fileManager.fileExists(atPath: destination.path) {
+                try fileManager.removeItem(at: destination)
+            }
+            try fileManager.copyItem(at: source, to: destination)
+        }
+
+        for take in takes {
+            try copy(outputs.appendingPathComponent(take.outputFileName), required: true)
+        }
+        try copy(artifactDirectory.appendingPathComponent("bench-results.json"), required: true)
+        try copy(diagnostics.appendingPathComponent("bench-prosody.json"), required: false)
+        try copy(diagnostics.appendingPathComponent("bench-quality-composed.json"), required: false)
+        note("delivery evidence archived → \(archive.path)")
+    }
+
     private static func locateDeliveryProsodyAnalyzer() -> URL? {
         let rel = "scripts/bench_delivery_prosody.py"
         let cwd = FileManager.default.currentDirectoryPath
@@ -1232,6 +1306,9 @@ enum BenchCommand {
                          neutral take. Only WAVs in the current run manifest are
                          analyzed before aggregation, so results appear in the
                          final delivery table without stale --keep contamination.
+                         Every delivery run's WAVs, manifest, and sidecars are
+                         also archived under outputs/bench-archive/<runID> so a
+                         multi-seed sweep can never overwrite its own evidence.
           --prosody-profile <path>
                          use a calibrated prosody profile for the delivery analysis
                          (default: built-in profile)

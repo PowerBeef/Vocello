@@ -1,4 +1,5 @@
 import AppKit
+import QwenVoiceCore
 import QwenVoiceNative
 import SwiftUI
 import UniformTypeIdentifiers
@@ -149,10 +150,17 @@ private struct HistoryActionAlert: Identifiable {
     static var generations: [Generation] = []
 }
 
-private enum HistoryDeletionResult {
-    case deleted
-    case databaseFailure(String)
-    case audioCleanupFailure(String)
+/// Database- and file-manager-backed effects for the pure sequencing engine
+/// (W2-B). The rules live tested in `QwenVoiceCore.HistoryDeletionEngine`;
+/// this wiring is the only untested residue.
+extension HistoryDeletionEngine {
+    static let databaseBacked = HistoryDeletionEngine(
+        deleteRecord: { try DatabaseService.shared.deleteGeneration(id: $0) },
+        deleteAllRecords: { try DatabaseService.shared.deleteAllGenerations() },
+        audioPathsForAllRecords: { try DatabaseService.shared.fetchAllGenerations().map(\.audioPath) },
+        removeFile: { try FileManager.default.removeItem(atPath: $0) },
+        fileExists: { FileManager.default.fileExists(atPath: $0) }
+    )
 }
 
 enum HistorySortOrder: String, CaseIterable, Identifiable {
@@ -201,12 +209,19 @@ struct HistoryClearRequest: Equatable {
 
 struct HistoryView: View {
     @EnvironmentObject private var audioPlayer: AudioPlayerViewModel
-    @EnvironmentObject private var ttsEngineStore: TTSEngineStore
     @Environment(SavedVoicesViewModel.self) private var savedVoicesViewModel
     @EnvironmentObject private var generationLibraryEvents: GenerationLibraryEvents
+    /// Plain reference, not `@EnvironmentObject` (W1-D): History uses the
+    /// store only to forward into the saved-voice sheet and for one
+    /// imperative refresh — subscribing re-rendered every row on every
+    /// engine tick for nothing.
+    let ttsEngineStore: TTSEngineStore
     @Binding var searchText: String
     @Binding var sortOrder: HistorySortOrder
     @Binding var clearRequest: HistoryClearRequest?
+    /// DP-15: routes a row's recorded sampling seed into the matching mode's
+    /// draft as the pinned seed. Nil hides the action (e.g. no host wiring).
+    var onPinSeed: ((Generation) -> Void)? = nil
 
     @State private var items: [HistoryListItem] = HistorySessionCache.generations.map(HistoryListItem.init)
     @State private var isLoading = false
@@ -218,6 +233,13 @@ struct HistoryView: View {
     @State private var savedVoiceSheetConfiguration: SavedVoiceSheetConfiguration?
     @State private var pendingReloadAfterCurrentLoad = false
     @State private var filteredItems: [HistoryListItem] = []
+    /// Cached grouped list (W1-D). This used to be a computed property that
+    /// rebuilt the whole dictionary + per-project segment sorts on EVERY
+    /// body evaluation — the single worst measured surface in the 2026-08
+    /// UI review (312 ms/s hitch, 2.9 s scroll stalls). It now recomputes
+    /// only when its actual inputs change: `filteredItems`, the search
+    /// activity flag, and `expandedProjects`.
+    @State private var displayEntries: [HistoryDisplayEntry] = []
     @State private var expandedProjects: Set<String> = []
     @State private var itemsRevision = 0
     @State private var searchDebounceTask: Task<Void, Never>?
@@ -231,6 +253,7 @@ struct HistoryView: View {
             .onReceive(generationLibraryEvents.generationAppended) { generation in handleGenerationAppended(generation) }
             .onChange(of: itemsRevision) { _, _ in recomputeFilteredItems() }
             .onChange(of: sortOrder) { _, _ in recomputeFilteredItems() }
+            .onChange(of: expandedProjects) { _, _ in recomputeDisplayEntries() }
             .onChange(of: searchText) { _, _ in
                 searchDebounceTask?.cancel()
                 searchDebounceTask = Task {
@@ -307,7 +330,7 @@ struct HistoryView: View {
                 SavedVoiceSheet(configuration: configuration) { voice in
                     handleSavedVoice(voice)
                 }
-                .environmentObject(ttsEngineStore)
+                .environment(ttsEngineStore)
             }
     }
 
@@ -375,6 +398,15 @@ struct HistoryView: View {
                         Label("Reveal in Finder", systemImage: "folder")
                     }
                     .disabled(!item.audioFileExists)
+
+                    if let onPinSeed, let seedValue = item.generation.samplingSeed {
+                        Button {
+                            onPinSeed(item.generation)
+                        } label: {
+                            Label("Pin seed \(String(seedValue)) for new takes", systemImage: "pin")
+                        }
+                        .accessibilityIdentifier("history_pinSeedButton")
+                    }
                 }
                 if let toggle = entry.projectToggle, toggle.segmentCount > 0 {
                         HStack {
@@ -412,13 +444,6 @@ struct HistoryView: View {
         }
     }
 
-    private var displayEntries: [HistoryDisplayEntry] {
-        HistoryDisplayEntry.entries(
-            from: filteredItems,
-            searchActive: !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-            expandedProjects: expandedProjects
-        )
-    }
 }
 
 private extension HistoryView {
@@ -475,6 +500,15 @@ private extension HistoryView {
         }
 
         filteredItems = result
+        recomputeDisplayEntries()
+    }
+
+    func recomputeDisplayEntries() {
+        displayEntries = HistoryDisplayEntry.entries(
+            from: filteredItems,
+            searchActive: !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+            expandedProjects: expandedProjects
+        )
     }
 
     @ViewBuilder
@@ -625,16 +659,15 @@ private extension HistoryView {
         }
     }
 
-    func deleteItem(_ item: HistoryListItem) -> HistoryDeletionResult {
-        guard let id = item.generation.id else {
-            return .databaseFailure("Missing generation identifier.")
-        }
+    func deleteItem(_ item: HistoryListItem) -> HistoryDeletionEngine.SingleOutcome {
+        let outcome = HistoryDeletionEngine.databaseBacked.deleteSingle(
+            recordID: item.generation.id,
+            audioPath: item.generation.audioPath
+        )
 
-        do {
-            try DatabaseService.shared.deleteGeneration(id: id)
-        } catch {
+        if case .databaseFailure = outcome {
             databaseUnavailable = true
-            return .databaseFailure(error.localizedDescription)
+            return outcome
         }
         databaseUnavailable = false
 
@@ -646,17 +679,7 @@ private extension HistoryView {
             }
             return generationID == itemID
         }
-
-        guard item.audioFileExists else {
-            return .deleted
-        }
-
-        do {
-            try FileManager.default.removeItem(atPath: item.generation.audioPath)
-            return .deleted
-        } catch {
-            return .audioCleanupFailure(error.localizedDescription)
-        }
+        return outcome
     }
 
     /// Clears the whole history. With `deleteAudio` false (GitHub #48), only
@@ -668,22 +691,16 @@ private extension HistoryView {
     /// release-QA audit); state updates hop back to the MainActor.
     func performClearAll(deleteAudio: Bool) {
         Task.detached(priority: .userInitiated) {
-            var fileFailures = 0
+            let outcome: HistoryDeletionEngine.ClearAllOutcome
             do {
-                if deleteAudio {
-                    let allGenerations = try DatabaseService.shared.fetchAllGenerations()
-                    let fileManager = FileManager.default
-                    for generation in allGenerations where fileManager.fileExists(atPath: generation.audioPath) {
-                        do {
-                            try fileManager.removeItem(atPath: generation.audioPath)
-                        } catch {
-                            fileFailures += 1
-                        }
-                    }
-                }
-                try DatabaseService.shared.deleteAllGenerations()
+                outcome = try HistoryDeletionEngine.databaseBacked.clearAll(deleteAudio: deleteAudio)
             } catch {
-                let message = error.localizedDescription
+                let message: String
+                if case HistoryDeletionEngine.ClearAllError.database(let detail) = error {
+                    message = detail
+                } else {
+                    message = error.localizedDescription
+                }
                 await MainActor.run {
                     databaseUnavailable = true
                     presentActionAlert(
@@ -694,7 +711,7 @@ private extension HistoryView {
                 return
             }
 
-            let failures = fileFailures
+            let failures = outcome.failedFileRemovals
             await MainActor.run {
                 databaseUnavailable = false
                 items = []

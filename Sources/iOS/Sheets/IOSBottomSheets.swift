@@ -157,10 +157,30 @@ struct IOSDeliveryPickerSheet: View {
     private var presetPickerBody: some View {
         IOSScrollView(bottomFadeHeight: 0) {
             VStack(alignment: .leading, spacing: 18) {
-                LazyVGrid(columns: columns, spacing: 12) {
-                    ForEach(EmotionPreset.all) { preset in
-                        cell(for: preset)
+                // The measured split (DP-12): distinct deliveries listeners
+                // actually identify, then directional hints framed honestly.
+                VStack(alignment: .leading, spacing: 10) {
+                    sectionHeader("Distinct deliveries")
+                    LazyVGrid(columns: columns, spacing: 12) {
+                        ForEach(EmotionPreset.all.filter { !$0.isDirectionalHint }) { preset in
+                            cell(for: preset)
+                        }
                     }
+                }
+
+                VStack(alignment: .leading, spacing: 10) {
+                    sectionHeader("Directional hints")
+                    LazyVGrid(columns: columns, spacing: 12) {
+                        ForEach(EmotionPreset.all.filter(\.isDirectionalHint)) { preset in
+                            cell(for: preset)
+                        }
+                    }
+
+                    Text(EmotionPreset.directionalHintAdvisory)
+                        .font(.system(size: 12))
+                        .foregroundStyle(IOSAppTheme.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("deliveryPickerSheet_hintAdvisory")
                 }
 
                 // Intensity row retired 2026-08-02. DP-3 measured `strong` at
@@ -409,14 +429,24 @@ struct IOSDeliveryPickerSheet: View {
     /// `design_references/Vocello iOS/data.js` `deliveries[]`. Hand-wired
     /// here instead of as a `description` field on `EmotionPreset` to
     /// keep the iOSSupport model layer untouched.
+    private func sectionHeader(_ title: String) -> some View {
+        Text(title.uppercased())
+            .font(.system(size: 11, weight: .semibold))
+            .tracking(0.8)
+            .foregroundStyle(IOSAppTheme.textSecondary)
+    }
+
     private func description(for preset: EmotionPreset) -> String {
+        // The hint half's copy is honest about what was measured (DP-12):
+        // these move energy and pace hard, but the named emotion is not what
+        // listeners reliably hear.
         switch preset.id {
         case "neutral":  return "Default, even pacing"
-        case "happy":    return "Warm, bright, smiling"
+        case "happy":    return "Bright lift; can read as surprise"
         case "sad":      return "Quiet, slower, somber"
-        case "angry":    return "Tense, sharp"
-        case "fearful":  return "Quiet, hesitant"
-        case "surprised":return "Animated, pitch jumps"
+        case "angry":    return "Hard, driving push"
+        case "fearful":  return "Soft, unsteady; can read as sad"
+        case "surprised":return "Pitch jumps, quick catches"
         case "whisper":  return "Soft, close-mic breath"
         case "calm":     return "Slower, reassuring"
         default:         return ""
@@ -1241,6 +1271,83 @@ struct IOSReferenceClipSheet: View {
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("referenceClipRow_\(option.id)")
+    }
+}
+
+// MARK: - Bank delivery picker
+
+struct IOSBankDeliveryOption: Identifiable, Equatable {
+    /// Concrete saved-voice id of the bank member this delivery selects.
+    let id: String
+    /// "Neutral" for the persona's base anchor, else the preset label.
+    let label: String
+}
+
+/// Delivery selector for an emotion reference bank: one persona, one row per
+/// curated member. Selecting a row hands the concrete member voice back to
+/// the ordinary saved-voice apply path — the sheet itself owns no clone
+/// state.
+struct IOSBankDeliveryPickerSheet: View {
+    let personaName: String
+    let options: [IOSBankDeliveryOption]
+    let selectedVoiceID: String?
+    var onSelect: (String) -> Void
+    var onDismiss: (() -> Void)?
+    var presentation: IOSBottomSheetPresentationStyle = .system
+
+    var body: some View {
+        IOSBottomSheetSurface(
+            title: "Delivery",
+            tint: IOSBrandTheme.clone,
+            presentation: presentation,
+            onDismiss: onDismiss
+        ) {
+            IOSScrollView(bottomFadeHeight: 0) {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("\(personaName) is a voice bank: the same voice with curated emotion references. Each delivery clones its measured reference clip.")
+                        .font(.caption)
+                        .foregroundStyle(IOSAppTheme.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    ForEach(options) { row(for: $0) }
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 24)
+            }
+        }
+    }
+
+    private func row(for option: IOSBankDeliveryOption) -> some View {
+        let isSelected = option.id == selectedVoiceID
+        return Button {
+            IOSHaptics.selection()
+            onSelect(option.id)
+        } label: {
+            HStack(alignment: .center, spacing: 12) {
+                IOSVoiceAvatar(seed: option.id, initials: option.label, diameter: 36)
+
+                Text(option.label)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(IOSAppTheme.textPrimary)
+
+                Spacer(minLength: 8)
+
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 16))
+                    .foregroundStyle(IOSBrandTheme.clone)
+                    .opacity(isSelected ? 1 : 0)
+                    .frame(width: 20)
+                    .accessibilityHidden(true)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 9)
+            .background {
+                RoundedRectangle(cornerRadius: IOSCornerRadius.card, style: .continuous)
+                    .fill(isSelected ? IOSAppTheme.accentWash(IOSBrandTheme.clone) : Color.clear)
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("bankDeliveryRow_\(option.id)")
     }
 }
 

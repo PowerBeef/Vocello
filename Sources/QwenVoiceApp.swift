@@ -6,7 +6,7 @@ import QwenVoiceNative
 struct QwenVoiceApp: App {
     @NSApplicationDelegateAdaptor(QwenVoiceApplicationDelegate.self)
     private var appDelegate
-    @StateObject private var ttsEngineStore: TTSEngineStore
+    @State private var ttsEngineStore: TTSEngineStore
     @State private var didInitializeSelectedTTSEngine = false
     @StateObject private var audioPlayer = AudioPlayerViewModel()
     @State private var modelManager = ModelManagerViewModel()
@@ -20,8 +20,8 @@ struct QwenVoiceApp: App {
         let appEngineSelection = AppEngineSelection.current()
         self.appEngineSelection = appEngineSelection
         let engine = appEngineSelection.makeEngine()
-        _ttsEngineStore = StateObject(
-            wrappedValue: TTSEngineStore(
+        _ttsEngineStore = State(
+            initialValue: TTSEngineStore(
                 engine: engine
             )
         )
@@ -121,8 +121,8 @@ struct QwenVoiceApp: App {
                 )
                 .frame(minWidth: 520, minHeight: 420)
             } else {
-                ContentView()
-                    .environmentObject(ttsEngineStore)
+                ContentView(ttsEngineStore: ttsEngineStore)
+                    .environment(ttsEngineStore)
                     .environmentObject(audioPlayer)
                     .environmentObject(audioPlayer.playbackProgress)
                     .environment(modelManager)

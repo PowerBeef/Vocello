@@ -36,9 +36,27 @@ Method (closed-form, deterministic, NumPy only -- no new pinned dependency):
 Aggregate scores use UAR (unweighted average recall) and macro-F1 rather than
 accuracy, because delivery cells are unbalanced whenever a take fails QC.
 
+Algorithm v2 (2026-08-04 delivery-control audit, hardening items 3-5):
+
+* the chance floor (1/cells) is computed and reported, never hand-stated;
+* ``--null-iters N`` adds a label-permutation null band (mean, p95, and a
+  permutation p-value for the observed UAR) using the exact same folds and
+  discriminant — the audit found the original "1.11x chance" cluster reading
+  was an ordinary null draw (p = 0.28) that a computed null would have caught;
+* per-cell recalls carry Wilson 95% bounds, and "below chance" may only be
+  claimed when the *upper* bound sits under the floor (the retired
+  excited/dramatic "below chance" recalls had intervals containing it);
+* fold grouping prefers the sidecar row's real ``seed`` (present since the
+  bench started echoing engine provenance) and loudly reports when unique
+  per-take identifiers degenerate the grouping into leave-one-take-out;
+* every verdict carries an exploratory/confirmatory designation, defaulting
+  to exploratory — decision-bearing claims need a preregistered
+  fresh-seed confirmation run.
+
 Usage:
   scripts/delivery_separability.py --sidecar bench-prosody.json [--json]
   scripts/delivery_separability.py --records records.json [--label-mode preset]
+  scripts/delivery_separability.py --sidecar bench-prosody.json --null-iters 200
 """
 
 from __future__ import annotations
@@ -53,7 +71,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from prosody_profile import builtin_profile, load_profile, separability_bound
 
-SEPARABILITY_ALGORITHM_VERSION = 1
+SEPARABILITY_ALGORITHM_VERSION = 2
+
+PERMUTATION_RNG_SEED = 20260804
 
 # Verdict could not be computed rather than "the presets are indistinguishable".
 ANALYSIS_FAILURE_FLAGS = (
@@ -213,12 +233,111 @@ def _predict(rows, centroids, precision, cells):
     return [ordered[index] for index in distances.argmin(axis=1)]
 
 
-def evaluate_separability(records, profile=None, label_mode="cell"):
+def _cross_validated_predictions(matrix, labels, seeds, cells, ridge):
+    """Leave-one-seed-out predictions with fold-local standardisation.
+
+    Extracted so the label-permutation null runs the *identical* procedure —
+    same folds, same z-scoring, same discriminant — with only the labels
+    shuffled.
+    """
+    import numpy as np
+
+    predictions = [None] * len(labels)
+    for held_out in sorted(set(seeds)):
+        test_index = [index for index, seed in enumerate(seeds) if seed == held_out]
+        train_index = [index for index, seed in enumerate(seeds) if seed != held_out]
+        if not train_index:
+            continue
+        train = matrix[train_index]
+        mean = train.mean(axis=0)
+        deviation = np.maximum(train.std(axis=0), 1e-9)
+        centroids, precision = _fit_discriminant(
+            (train - mean) / deviation,
+            [labels[index] for index in train_index],
+            cells,
+            ridge,
+        )
+        assigned = _predict((matrix[test_index] - mean) / deviation, centroids, precision, cells)
+        for position, index in enumerate(test_index):
+            if position < len(assigned):
+                predictions[index] = assigned[position]
+    return predictions
+
+
+def _uar_of(predictions, labels, cells):
+    """Unweighted average recall over the cells that received predictions."""
+    counts = {cell: [0, 0] for cell in cells}
+    for index, prediction in enumerate(predictions):
+        if prediction is None:
+            continue
+        cell = labels[index]
+        counts[cell][1] += 1
+        if prediction == cell:
+            counts[cell][0] += 1
+    recalls = [correct / total for correct, total in counts.values() if total]
+    return sum(recalls) / len(recalls) if recalls else 0.0
+
+
+def _binomial_at_least_p(successes, trials, probability):
+    """Exact one-sided binomial p-value: P(X >= successes | n, p)."""
+    if trials <= 0:
+        return 1.0
+    total = 0.0
+    for k in range(successes, trials + 1):
+        total += math.comb(trials, k) * (probability ** k) * ((1 - probability) ** (trials - k))
+    return min(1.0, total)
+
+
+def benjamini_hochberg(p_values):
+    """BH step-up adjusted q-values, order-preserving with the inputs.
+
+    DP-18 (audit R4): per-cell above-chance claims are a family of tests;
+    the confirmatory run reports FDR-adjusted q-values so eight cells
+    cannot each borrow the single-test alpha.
+    """
+    m = len(p_values)
+    if m == 0:
+        return []
+    indexed = sorted(range(m), key=lambda i: p_values[i])
+    q_values = [0.0] * m
+    running_min = 1.0
+    for rank_from_end in range(m - 1, -1, -1):
+        index = indexed[rank_from_end]
+        rank = rank_from_end + 1
+        candidate = p_values[index] * m / rank
+        running_min = min(running_min, candidate)
+        q_values[index] = min(1.0, running_min)
+    return q_values
+
+
+def _wilson_bounds(successes, trials, z=1.959963984540054):
+    """Wilson score interval for a binomial proportion; (low, high)."""
+    if trials <= 0:
+        return None
+    proportion = successes / trials
+    denominator = 1.0 + z * z / trials
+    centre = (proportion + z * z / (2 * trials)) / denominator
+    spread = z * math.sqrt(
+        proportion * (1.0 - proportion) / trials + z * z / (4 * trials * trials)
+    ) / denominator
+    return (max(0.0, centre - spread), min(1.0, centre + spread))
+
+
+def evaluate_separability(
+    records, profile=None, label_mode="cell", null_iterations=0, designation="exploratory"
+):
     """Cross-validated separability verdict over paired delivery feature vectors.
 
     ``records`` is a sequence of ``{preset, intensity, seed, features}`` dicts.
     Returns a warn-first verdict mirroring the other delivery gates.
+    ``null_iterations`` > 0 additionally runs a label-permutation null with the
+    identical folds and discriminant, reporting the null band and a permutation
+    p-value for the observed UAR. ``designation`` labels the run exploratory
+    (default) or confirmatory; decision-bearing claims require the latter on
+    fresh seeds.
     """
+    if designation not in ("exploratory", "confirmatory"):
+        raise ValueError("designation must be 'exploratory' or 'confirmatory'")
     profile = profile or builtin_profile()
     minimum_seeds = int(separability_bound(profile, "minimum_seeds_per_cell"))
     minimum_recall = float(separability_bound(profile, "minimum_cell_recall"))
@@ -233,6 +352,7 @@ def evaluate_separability(records, profile=None, label_mode="cell"):
             "flags": [flag],
             "reason": reason,
             "labelMode": label_mode,
+            "designation": designation,
             "cells": {},
             "metrics": {},
         }
@@ -290,27 +410,18 @@ def evaluate_separability(records, profile=None, label_mode="cell"):
 
     matrix = _matrix(records, feature_names)
 
+    # Fold-grouping honesty: when every take carries a unique "seed" (the
+    # historic fallback used per-take generation IDs), leave-one-seed-out
+    # silently degenerates into leave-one-take-out and the docstring's
+    # no-leak-across-folds guarantee is void. Report it loudly instead of
+    # letting the verdict claim a grouping that never happened.
+    degenerate_folds = (
+        len(set(seeds)) == len(records) and len(records) >= 2 * len(cells)
+    )
+
     # Leave-one-seed-out: a take never shares a fold with another take from its
     # own seed, so seed-specific sampling luck cannot inflate the score.
-    predictions: list[str | None] = [None] * len(records)
-    for held_out in sorted(set(seeds)):
-        test_index = [index for index, seed in enumerate(seeds) if seed == held_out]
-        train_index = [index for index, seed in enumerate(seeds) if seed != held_out]
-        if not train_index:
-            continue
-        train = matrix[train_index]
-        mean = train.mean(axis=0)
-        deviation = np.maximum(train.std(axis=0), 1e-9)
-        centroids, precision = _fit_discriminant(
-            (train - mean) / deviation,
-            [labels[index] for index in train_index],
-            cells,
-            ridge,
-        )
-        assigned = _predict((matrix[test_index] - mean) / deviation, centroids, precision, cells)
-        for position, index in enumerate(test_index):
-            if position < len(assigned):
-                predictions[index] = assigned[position]
+    predictions = _cross_validated_predictions(matrix, labels, seeds, cells, ridge)
 
     scored = [index for index, prediction in enumerate(predictions) if prediction is not None]
     if not scored:
@@ -319,6 +430,8 @@ def evaluate_separability(records, profile=None, label_mode="cell"):
     confusion = {cell: {other: 0 for other in cells} for cell in cells}
     for index in scored:
         confusion[labels[index]][predictions[index]] += 1
+
+    chance_floor = 1.0 / len(cells)
 
     per_cell = {}
     recalls = []
@@ -344,9 +457,33 @@ def evaluate_separability(records, profile=None, label_mode="cell"):
             "topConfusion": confusions[0][0] if confusions else None,
             "topConfusionCount": confusions[0][1] if confusions else 0,
         }
+        # Interval-honest chance comparison: a cell is only "below chance"
+        # when its whole Wilson interval sits under the computed floor, and
+        # only "above chance" when the interval clears it. At n=18 a recall
+        # of 1/18 has interval [0.01, 0.26] -- compatible with the floor, not
+        # below it, which is the misreading the audit retired.
+        bounds = _wilson_bounds(correct, support)
+        if bounds is not None:
+            low, high = bounds
+            per_cell[cell]["recallWilsonLow"] = round(low, 3)
+            per_cell[cell]["recallWilsonHigh"] = round(high, 3)
+            per_cell[cell]["aboveChance"] = low > chance_floor
+            per_cell[cell]["belowChance"] = high < chance_floor
         if support:
+            per_cell[cell]["aboveChanceP"] = round(
+                _binomial_at_least_p(correct, support, chance_floor), 4
+            )
             recalls.append(recall)
             f1_scores.append(f1)
+
+    # FDR across the per-cell above-chance family (DP-18 / audit R4): eight
+    # cells tested at alpha each would inflate the family-wise false-positive
+    # rate; BH q-values make the multiplicity explicit in the verdict itself.
+    fdr_cells = [cell for cell in per_cell if "aboveChanceP" in per_cell[cell]]
+    fdr_q = benjamini_hochberg([per_cell[cell]["aboveChanceP"] for cell in fdr_cells])
+    for cell, q_value in zip(fdr_cells, fdr_q):
+        per_cell[cell]["aboveChanceQ"] = round(q_value, 4)
+        per_cell[cell]["aboveChanceFdr05"] = q_value <= 0.05
 
     # Centroid geometry over the whole set, for pair margins and the intensity
     # collapse check.  Standardized once here; the CV above is what guards
@@ -374,6 +511,8 @@ def evaluate_separability(records, profile=None, label_mode="cell"):
             per_cell[cell]["nearestDistance"] = distance
 
     flags = []
+    if degenerate_folds:
+        flags.append("separability_degenerate_folds")
     for cell in sorted(per_cell):
         entry = per_cell[cell]
         if entry["support"] and entry["recall"] < minimum_recall:
@@ -419,9 +558,44 @@ def evaluate_separability(records, profile=None, label_mode="cell"):
             cross_preset_errors += 1
     total_errors = cross_preset_errors + tier_errors
 
+    observed_uar = sum(recalls) / len(recalls) if recalls else 0.0
+
+    # Label-permutation null: the same folds, standardisation, and
+    # discriminant, with only the labels shuffled. This is the band the
+    # observed UAR must clear before "x times chance" means anything -- the
+    # audit's re-analysis showed the 4-cell null has SD ~0.06, so a "1.11x
+    # chance" reading was an ordinary draw (permutation p = 0.28).
+    permutation = None
+    if null_iterations:
+        rng = np.random.default_rng(PERMUTATION_RNG_SEED)
+        null_uars = []
+        for _ in range(int(null_iterations)):
+            permuted = list(labels)
+            rng.shuffle(permuted)
+            null_predictions = _cross_validated_predictions(
+                matrix, permuted, seeds, cells, ridge
+            )
+            null_uars.append(_uar_of(null_predictions, permuted, cells))
+        null_uars.sort()
+        at_or_above = sum(1 for value in null_uars if value >= observed_uar - 1e-12)
+        null_mean = sum(null_uars) / len(null_uars)
+        null_sd = math.sqrt(
+            sum((value - null_mean) ** 2 for value in null_uars) / len(null_uars)
+        )
+        permutation = {
+            "iterations": len(null_uars),
+            "rngSeed": PERMUTATION_RNG_SEED,
+            "nullMeanUAR": round(null_mean, 4),
+            "nullSdUAR": round(null_sd, 4),
+            "nullP95UAR": round(null_uars[int(0.95 * (len(null_uars) - 1))], 4),
+            "pValueUAR": round((1 + at_or_above) / (len(null_uars) + 1), 4),
+        }
+
     metrics = {
-        "uar": round(sum(recalls) / len(recalls), 3) if recalls else 0.0,
+        "uar": round(observed_uar, 3),
         "macroF1": round(sum(f1_scores) / len(f1_scores), 3) if f1_scores else 0.0,
+        "chanceFloor": round(chance_floor, 4),
+        "foldGrouping": "leave-one-take-out" if degenerate_folds else "seed-grouped",
         "crossPresetErrorRate": (
             round(cross_preset_errors / len(scored), 3) if scored else 0.0
         ),
@@ -438,6 +612,8 @@ def evaluate_separability(records, profile=None, label_mode="cell"):
         "pairDistances": pairs,
     }
     metrics.update(intensity_metrics)
+    if permutation:
+        metrics["permutation"] = permutation
     if aliased_cells:
         # Reported, never silent: an alias means two catalog cells issue the
         # same request, which is a finding about the preset catalog.
@@ -454,6 +630,7 @@ def evaluate_separability(records, profile=None, label_mode="cell"):
         "flags": flags,
         "reason": "; ".join(flags) if flags else "delivery cells remain separable",
         "labelMode": label_mode,
+        "designation": designation,
         "cells": per_cell,
         "confusion": confusion,
         "metrics": metrics,
@@ -472,10 +649,17 @@ def records_from_sidecar(rows):
         features = gate.get("metrics") or {}
         if not features:
             continue
+        # Prefer the row's real seed (echoed from engine provenance since
+        # 2026-08-04). The historic per-take fallbacks degenerate the fold
+        # grouping into leave-one-take-out, which evaluate_separability now
+        # reports rather than silently claiming seed-grouped CV.
+        seed = row.get("seed")
+        if seed in (None, ""):
+            seed = row.get("generationID") or row.get("deliveryWav") or delivery
         records.append({
             "preset": gate.get("preset") or preset,
             "intensity": gate.get("intensity") or (intensity if separator else "normal"),
-            "seed": row.get("generationID") or row.get("deliveryWav") or delivery,
+            "seed": seed,
             "features": features,
         })
     return records
@@ -491,6 +675,23 @@ def main():
         "--label-mode", choices=("cell", "preset"), default="cell",
         help="'cell' keeps intensity distinct (default); 'preset' pools intensities",
     )
+    parser.add_argument(
+        "--null-iters", type=int, default=0, metavar="N",
+        help="label-permutation null iterations (0 = off; 200 gives a stable "
+             "band and p-value at ~seconds of cost)",
+    )
+    parser.add_argument(
+        "--designation", choices=("exploratory", "confirmatory"), default="exploratory",
+        help="evidentiary status of this run; decision-bearing claims need a "
+             "preregistered confirmatory run on fresh seeds",
+    )
+    parser.add_argument(
+        "--presets", metavar="LIST",
+        help="comma-separated preset subset (e.g. happy,angry) — runs the "
+             "discriminant on only those presets' records, for pre-registered "
+             "K-way probes like DP-18's happy-vs-angry 2-way; the verdict "
+             "records the filter so a subset run can never pass as the full set",
+    )
     parser.add_argument("--json", action="store_true", help="emit the verdict as JSON")
     arguments = parser.parse_args()
 
@@ -498,7 +699,19 @@ def main():
     with open(arguments.sidecar or arguments.records, "r", encoding="utf-8") as handle:
         payload = json.load(handle)
     records = records_from_sidecar(payload) if arguments.sidecar else payload
-    verdict = evaluate_separability(records, profile, label_mode=arguments.label_mode)
+    preset_filter = None
+    if arguments.presets:
+        preset_filter = sorted({token.strip() for token in arguments.presets.split(",") if token.strip()})
+        records = [record for record in records if record.get("preset") in preset_filter]
+    verdict = evaluate_separability(
+        records,
+        profile,
+        label_mode=arguments.label_mode,
+        null_iterations=arguments.null_iters,
+        designation=arguments.designation,
+    )
+    if preset_filter is not None:
+        verdict["presetFilter"] = preset_filter
 
     if arguments.json:
         print(json.dumps(verdict, indent=2, sort_keys=True))
@@ -506,12 +719,27 @@ def main():
 
     metrics = verdict["metrics"]
     print(f"separability: {'PASS' if verdict['passed'] else 'WARN'} — {verdict['reason']}")
+    print(f"  designation: {verdict['designation']}")
     if metrics:
         print(
             f"  UAR {metrics.get('uar', 0.0)}  macro-F1 {metrics.get('macroF1', 0.0)}  "
+            f"chance {metrics.get('chanceFloor', 0.0)}  "
             f"{metrics.get('cellCount', 0)} cells, {metrics.get('takeCount', 0)} takes, "
             f"{metrics.get('featureCount', 0)} features"
         )
+        if metrics.get("foldGrouping") == "leave-one-take-out":
+            print(
+                "  WARNING: fold grouping degenerated to leave-one-take-out — "
+                "rows carry unique per-take seeds, so the seed-grouped CV "
+                "guarantee does not hold for this data"
+            )
+        permutation = metrics.get("permutation")
+        if permutation:
+            print(
+                f"  permutation null ({permutation['iterations']} iters): "
+                f"mean {permutation['nullMeanUAR']}  p95 {permutation['nullP95UAR']}  "
+                f"p(UAR ≥ observed) = {permutation['pValueUAR']}"
+            )
         if "strongToNormalRatio" in metrics:
             print(
                 f"  intensity spread — normal {metrics['normalMeanPairDistance']}, "

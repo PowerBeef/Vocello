@@ -443,6 +443,35 @@ performance block after the fixture rebind, Tier 4 carryover). Immediate specifi
    casualties), 18/18 at 8-bit; the runs published 34 PASS registry
    records, committed with this closure.
 
+23. **The text-decoration valence route closed (2026-08-04, DP-19 done):**
+   pre-registered same-day and run to a clean twin verdict. Decorating the
+   script with interjections and terminal punctuation did not raise SER
+   target-emotion probability for happy (p=0.52) or angry (p=0.27,
+   directionally negative), and while the decorated arm's happy-vs-angry
+   discriminant cleared its permutation null, so did the plain internal
+   control — decoration added roughly 0.04 UAR over baseline, nothing like
+   a lever. Per the registered decision rule the route closes; the valence
+   answer now rests entirely with the external levers DP-20 watches. One
+   analysis amendment is recorded in the gate (the scorer's power rail
+   refused the raw 55-feature space; the structural 21-feature harness-axis
+   subset was applied to both arms before any result was seen), along with
+   the raw-vs-delta measurement note explaining why the plain control can
+   exceed chance here without contradicting DP-18.
+
+24. **The VoiceDesign whisper route closed (2026-08-04, DP-17 done):** six
+   registered brief/instruction recipes, four seeds each, judged against
+   the digest-verified Warm Narrator anchor on the validated HNR/CPP
+   breathiness criterion. Every surviving candidate measured MORE harmonic
+   than the anchor (delta HNR up to +2.9 dB against a -2 dB pass bar) —
+   this checkpoint's design channel renders "whisper" as soft-but-voiced
+   speech no matter where the request lives, so the bank builder keeps
+   refusing whisper honestly. Side-finding: five takes fell to the fast
+   audio QC's dropout detector, concentrated in whisper-adjacent
+   generations — a future whisper lane needs a whisper-aware QC posture
+   before its takes can even reach scoring. The one remaining path is
+   cloning a genuinely whispered human reference (needs a recorded clip),
+   with the HNR/CPP criterion as its acceptance gate.
+
 ## Staged roadmap state
 
 Stage-by-stage details, closure evidence, and falsifiability criteria live in the

@@ -101,10 +101,16 @@ uninterpretable; relative comparisons within one build are the signal.
   the diagnosis: whisper candidates run *more harmonic* than the anchor
   (ΔHNR +1.0..+1.4 dB) while sad shows the bank's most negative deltas — the
   HNR/CPP axis works as an instrument, but no criterion can rescue candidates
-  that contain no breathiness. The recorded follow-up is therefore a whisper
-  generation recipe (brief-wording variants, or cloning a genuinely whispered
-  reference) with the HNR/CPP-delta gate as the acceptance criterion once
-  candidates can plausibly pass it (roadmap DP-17).
+  that contain no breathiness. The registered recipe exploration (DP-17,
+  closed 2026-08-04) then exhausted the VoiceDesign channel: six
+  brief/instruction variants all produced candidates MORE harmonic than the
+  anchor, so this checkpoint's design channel cannot render whisper phonation
+  no matter where the request lives, and the builder keeps refusing whisper
+  honestly. The one remaining path is cloning a genuinely whispered human
+  reference (record a 10-20 s whispered clip, enroll it, judge it with the
+  validated HNR/CPP-delta criterion); any such lane also needs a
+  whisper-aware audio-QC posture first, because the fast QC's dropout
+  detector fails low-energy breathy takes before they reach scoring.
 - Both apps present a bank as one persona with a delivery choice (DP-16,
   2026-08-04). Grouping is resolved from the naming convention alone by
   `VoiceBankCatalog` in QwenVoiceCore — a base-named voice plus at least one

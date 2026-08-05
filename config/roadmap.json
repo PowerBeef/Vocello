@@ -48,7 +48,7 @@
       "legacyIds": [
         "Tier 3.1"
       ],
-      "gate": "Same-day A/B on the canonical matrix; keep only on a non-regression.",
+      "gate": "Same-day A/B on the canonical matrix; keep only on a non-regression. RECONFIRMED 2026-08-05: the Package.resolved change was the swift-transformers 1.1.9 -> 1.3.3 bump (PR #94, byte-identity + battery verified); the mlx-swift/mlx-swift-lm lockstep pair is untouched at 0.31.6/3.31.4.",
       "evidence": [
         "commit:19ea7e8",
         "doc:docs/reference/roadmap-2026-08.md"
@@ -57,7 +57,7 @@
         "Packages/VocelloQwen3Core/Package.resolved",
         "QwenVoice.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved"
       ],
-      "updated": "2026-08-01"
+      "updated": "2026-08-05"
     },
     {
       "id": "CM-2",
@@ -221,12 +221,12 @@
       "plan": "delivery-prompting-2026-08",
       "title": "Angry pitch-axis contradiction",
       "status": "done",
-      "gate": "23 seeds, angry.normal against angry.strong. RESULT: the expectation (+1) is correct -- shipped copy moves pitch +5.98 st, d=1.40, win 0.91. The conflicting 'lower clipped tone' clause is simply not followed, so the contradiction is textual with no acoustic counterpart. angry.strong is also the better copy at this power (7 features vs 4), reversing DP-3's underpowered per-cell reading and confirming the global strong choice needs no exception.",
+      "gate": "23 seeds, angry.normal against angry.strong. RESULT: the expectation (+1) is correct -- shipped copy moves pitch +5.98 st, d=1.40, win 0.91. The conflicting 'lower clipped tone' clause is simply not followed, so the contradiction is textual with no acoustic counterpart. angry.strong is also the better copy at this power (7 features vs 4), reversing DP-3's underpowered per-cell reading and confirming the global strong choice needs no exception. RECONFIRMED 2026-08-05: the DP-21 calibration keeps angry's +1 pitch direction — this item's confirmed conclusion — and only moves the floor to the measured noise decile; the two acknowledged instruction-contract findings still hold live.",
       "sourceOfTruth": [
         "Sources/QwenVoiceCore/EmotionPreset.swift",
         "scripts/prosody_profile.py"
       ],
-      "updated": "2026-08-04",
+      "updated": "2026-08-05",
       "evidence": [
         "doc:docs/reference/qwen3-tts-prompting-guide.md",
         "file:config/delivery-instruction-contract.json"
@@ -304,7 +304,7 @@
       "plan": "doc-governance-2026-08",
       "title": "Security workflow starvation on main",
       "status": "done",
-      "gate": "CodeQL runs to completion on main instead of being cancelled by the next push; branches still supersede.",
+      "gate": "CodeQL runs to completion on main instead of being cancelled by the next push; branches still supersede. RECONFIRMED 2026-08-05: the security.yml change was the #83 pinned-action SHA bump (checkout v7.0.1, codeql-action v4.37.4, toolchain-manifest lockstep); the scheduling/trigger structure this item fixed is untouched.",
       "evidence": [
         "commit:6e8f8b2",
         "file:.github/workflows/security.yml"
@@ -312,7 +312,7 @@
       "sourceOfTruth": [
         ".github/workflows/security.yml"
       ],
-      "updated": "2026-08-02"
+      "updated": "2026-08-05"
     },
     {
       "id": "DG-7",

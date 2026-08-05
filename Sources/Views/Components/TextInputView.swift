@@ -119,7 +119,7 @@ struct TextInputView: View {
             } label: {
                 Image(systemName: "xmark.circle.fill")
                     .font(.system(size: 11))
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(AppTheme.textMuted)
             }
             .buttonStyle(.plain)
             .help("Unpin — new seed each take")
@@ -272,7 +272,7 @@ final class PlaceholderTextView: NSTextView {
 
         if string.isEmpty, let font = self.font {
             let attrs: [NSAttributedString.Key: Any] = [
-                .foregroundColor: NSColor.tertiaryLabelColor,
+                .foregroundColor: AppTheme.textMutedNSColor,
                 .font: font
             ]
             let inset = textContainerInset

@@ -66,6 +66,17 @@ enum AppTheme {
     static let sidebarHoverFill = Color.white.opacity(0.03)
     static let sidebarHoverStroke = Color.white.opacity(0.08)
 
+    // Warm ink ramp, ported from the iOS theme (Sources/iOS/Theme/Theme.swift
+    // `Theme.Text`) per the 2026-08 UI review (W1-A): hierarchy through
+    // warm-tinted steps instead of the cold system `.tertiary`, whose
+    // ~2.0-2.4:1 contrast against the dark surfaces fails WCAG AA for
+    // state-bearing text. `textMuted` clears 4.5:1 on every app surface
+    // including the field fill.
+    static let textPrimary = Color(red: 0.95, green: 0.94, blue: 0.92)
+    static let textSecondary = Color(red: 0.78, green: 0.76, blue: 0.72)
+    static let textMuted = Color(red: 0.62, green: 0.60, blue: 0.55)
+    static let textMutedNSColor = NSColor(red: 0.62, green: 0.60, blue: 0.55, alpha: 1)
+
     static var windowTitlebarSeparatorStyle: NSTitlebarSeparatorStyle {
         #if QW_UI_LIQUID
         return .none
@@ -184,6 +195,22 @@ enum AppTheme {
         let progress = max(0, min(1, position))
         return accent.opacity(0.45 + (progress * 0.45))
     }
+
+    /// Named motion family, ported from the iOS theme (`Theme.Motion`,
+    /// cubic-bezier(0.22, 1, 0.36, 1)) per the 2026-08 UI review (W1-B).
+    /// Every animation routes through `appAnimation` so Reduce Motion
+    /// still disables the lot; these tokens replace scattered ad-hoc
+    /// `easeInOut(duration:)` literals with one intentional family.
+    enum Motion {
+        /// Quick state feedback: hover, focus, selection highlights.
+        static let state = Animation.easeOut(duration: 0.15)
+        /// Default transition for showing/hiding controls and status.
+        static let standard = Animation.timingCurve(0.22, 1.0, 0.36, 1.0, duration: 0.22)
+        /// Larger movements: panel slides, prominent reveals.
+        static let gentle = Animation.timingCurve(0.22, 1.0, 0.36, 1.0, duration: 0.32)
+        /// Tap-press response.
+        static let press = Animation.easeOut(duration: 0.09)
+    }
 }
 
 private struct NativeSurfaceStyle: ViewModifier {
@@ -252,6 +279,38 @@ extension View {
 
     func appAnimation<Value: Equatable>(_ animation: Animation?, value: Value) -> some View {
         self.animation(AppLaunchConfiguration.current.animation(animation), value: value)
+    }
+
+    /// Visible keyboard-focus indicator in the active mode's accent color
+    /// (2026-08 UI review, W1-C). The system blue ring stays suppressed —
+    /// it painted a stray selection halo on first appearance under Full
+    /// Keyboard Access — but suppression alone left twelve controls with
+    /// no focus indication at all (WCAG 2.4.7). This modifier keeps the
+    /// suppression and draws a 2 pt accent ring only while the control
+    /// actually has focus.
+    func vocelloFocusRing(_ color: Color, radius: CGFloat = 8) -> some View {
+        modifier(VocelloFocusRing(color: color, radius: radius))
+    }
+}
+
+private struct VocelloFocusRing: ViewModifier {
+    let color: Color
+    let radius: CGFloat
+    @FocusState private var isFocused: Bool
+
+    func body(content: Content) -> some View {
+        content
+            .focused($isFocused)
+            .focusEffectDisabled()
+            .overlay {
+                if isFocused {
+                    RoundedRectangle(cornerRadius: radius + 2, style: .continuous)
+                        .strokeBorder(color.opacity(0.85), lineWidth: 2)
+                        .padding(-3)
+                        .allowsHitTesting(false)
+                }
+            }
+            .appAnimation(AppTheme.Motion.state, value: isFocused)
     }
 }
 

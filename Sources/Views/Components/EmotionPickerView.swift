@@ -118,7 +118,7 @@ struct EmotionPickerView: View {
         }
         .labelsHidden()
         .pickerStyle(.menu)
-        .focusEffectDisabled()
+        .vocelloFocusRing(accentColor, radius: 6)
         .frame(
             minWidth: usesColumnLabels ? 110 : LayoutConstants.configurationControlMinWidth,
             maxWidth: 240,
@@ -205,7 +205,7 @@ struct EmotionPickerView: View {
         HStack(alignment: .center, spacing: 10) {
             Text("Intensity")
                 .font(.footnote.weight(.semibold))
-                .foregroundStyle(showsIntensityPicker ? .secondary : .tertiary)
+                .foregroundStyle(showsIntensityPicker ? AppTheme.textSecondary : AppTheme.textMuted)
 
             intensityPicker
         }
@@ -219,12 +219,12 @@ struct EmotionPickerView: View {
         }
         .labelsHidden()
         .pickerStyle(.menu)
-        .focusEffectDisabled()
+        .vocelloFocusRing(accentColor, radius: 6)
         .frame(minWidth: 112, maxWidth: 152, alignment: .leading)
         .tint(showsIntensityPicker ? AppTheme.emotionColor(for: selectedPreset?.id ?? "neutral") : .secondary)
         .opacity(showsIntensityPicker ? 1 : 0.6)
         .disabled(!showsIntensityPicker)
-        .appAnimation(.easeInOut(duration: 0.2), value: showsIntensityPicker)
+        .appAnimation(AppTheme.Motion.standard, value: showsIntensityPicker)
         .accessibilityIdentifier("\(accessibilityPrefix)_intensityPicker")
         .onChange(of: intensity) { _, _ in
             if selectedPreset != nil {
@@ -239,11 +239,11 @@ struct EmotionPickerView: View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Custom tone")
                 .font(.footnote.weight(.semibold))
-                .foregroundStyle(isCustomMode ? .secondary : .tertiary)
+                .foregroundStyle(isCustomMode ? AppTheme.textSecondary : AppTheme.textMuted)
 
             TextField("e.g. whispered, close-mic and breathy", text: $customText)
                 .textFieldStyle(.plain)
-                .focusEffectDisabled()
+                .vocelloFocusRing(accentColor, radius: 8)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 6)
                 .frame(minWidth: LayoutConstants.configurationControlMinWidth, maxWidth: .infinity, alignment: .leading)

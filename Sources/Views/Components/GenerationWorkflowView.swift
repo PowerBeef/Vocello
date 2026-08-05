@@ -597,12 +597,11 @@ struct GenerationVariantSelector: View {
             }
         }
         // Match the rest of the app's pickers (EmotionPickerView,
-        // VoiceCloningView transcript + source) — keyboard
-        // focusability stays, only the system blue focus ring is
-        // suppressed so the segment doesn't render a stray
-        // selection halo on first appearance under Full Keyboard
-        // Access.
-        .focusEffectDisabled()
+        // VoiceCloningView transcript + source): keyboard focus shows the
+        // mode-accent ring; the system blue ring stays suppressed inside
+        // the modifier so the segment cannot render a stray selection halo
+        // on first appearance under Full Keyboard Access.
+        .vocelloFocusRing(accentColor, radius: 8)
         .padding(3)
         .background(
             RoundedRectangle(cornerRadius: 8, style: .continuous)
@@ -744,11 +743,11 @@ struct ConfigurationColumn<Content: View>: View {
             HStack(spacing: 4) {
                 Text(label)
                     .font(.footnote.weight(.semibold))
-                    .foregroundStyle(isEnabled ? .secondary : .tertiary)
+                    .foregroundStyle(isEnabled ? AppTheme.textSecondary : AppTheme.textMuted)
                 if let detail {
                     Text(detail)
                         .font(.footnote.weight(.medium))
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(AppTheme.textMuted)
                 }
             }
 
@@ -871,7 +870,7 @@ struct QwenLanguagePicker: View {
         .menuStyle(.button)
         .buttonStyle(.bordered)
         .menuIndicator(.hidden)
-        .focusEffectDisabled()
+        .vocelloFocusRing(accentColor, radius: 6)
         .frame(minWidth: minWidth, maxWidth: maxWidth, alignment: .leading)
         .tint(accentColor)
         .accessibilityValue(isFollowingDetection ? "\(effectiveLabel), auto" : effectiveLabel)

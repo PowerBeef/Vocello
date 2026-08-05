@@ -44,7 +44,7 @@ struct SidebarStatusView: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("sidebar_generationStatus")
-        .appAnimation(.easeInOut(duration: 0.25), value: stateKey)
+        .appAnimation(AppTheme.Motion.standard, value: stateKey)
     }
 
     @ViewBuilder
@@ -146,7 +146,7 @@ struct SidebarStatusView: View {
                         .scaleEffect(y: 0.6)
                     Text("\(percent)%")
                         .font(.caption2.monospacedDigit().weight(.medium))
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(AppTheme.textMuted)
                 }
             }
         }
@@ -174,7 +174,7 @@ struct SidebarStatusView: View {
                 } label: {
                     Image(systemName: "xmark")
                         .font(.caption2)
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(AppTheme.textMuted)
                 }
                 .buttonStyle(.plain)
             }

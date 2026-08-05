@@ -46,7 +46,7 @@ struct VoiceBriefEditor: View {
                 if trimmedIsEmpty {
                     Text(VoiceDesignBriefCatalog.placeholder)
                         .font(.body)
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(AppTheme.textMuted)
                         .padding(.horizontal, 9)
                         .padding(.vertical, 10)
                         .allowsHitTesting(false)

@@ -523,7 +523,7 @@ private struct SpeakerPickerRow: View {
             }
             .labelsHidden()
             .pickerStyle(.menu)
-            .focusEffectDisabled()
+            .vocelloFocusRing(AppTheme.customVoice, radius: 6)
             .frame(minWidth: LayoutConstants.configurationControlMinWidth, maxWidth: 220, alignment: .leading)
             .accessibilityValue(TTSModel.speakerPickerLabel(for: selectedSpeaker))
             .accessibilityIdentifier("customVoice_speakerPicker")

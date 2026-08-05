@@ -546,7 +546,7 @@ private struct VoiceCloningTranscriptSettings: View {
                 text: $referenceTranscript
             )
             .textFieldStyle(.plain)
-            .focusEffectDisabled()
+            .vocelloFocusRing(AppTheme.voiceCloning, radius: 10)
             .padding(.horizontal, 8)
             .padding(.vertical, 6)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -800,7 +800,7 @@ private struct CloneSourceRow: View {
             }
             .labelsHidden()
             .pickerStyle(.menu)
-            .focusEffectDisabled()
+            .vocelloFocusRing(AppTheme.voiceCloning, radius: 6)
             .frame(minWidth: LayoutConstants.configurationControlMinWidth, maxWidth: 180, alignment: .leading)
             .accessibilityValue(savedVoices.first(where: { $0.id == selectedSavedVoiceID })?.name ?? "")
             .accessibilityIdentifier("voiceCloning_savedVoicePicker")
@@ -827,7 +827,7 @@ private struct CloneSourceRow: View {
                 }
                 .labelsHidden()
                 .pickerStyle(.menu)
-                .focusEffectDisabled()
+                .vocelloFocusRing(AppTheme.voiceCloning, radius: 6)
                 .frame(minWidth: 110, maxWidth: 160, alignment: .leading)
                 .accessibilityValue(persona.presetID(for: selectedSavedVoiceID).flatMap { EmotionPreset.preset(id: $0)?.label } ?? "Neutral")
                 .accessibilityIdentifier("voiceCloning_bankDeliveryPicker")

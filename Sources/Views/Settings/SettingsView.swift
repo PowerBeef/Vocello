@@ -177,7 +177,7 @@ struct SettingsView: View {
                         HStack(spacing: 8) {
                             Text(appVersion)
                                 .font(.caption.monospacedDigit())
-                                .foregroundStyle(.tertiary)
+                                .foregroundStyle(AppTheme.textMuted)
                             Button("Reveal in Finder") {
                                 NSWorkspace.shared.open(QwenVoiceApp.appSupportDir)
                             }

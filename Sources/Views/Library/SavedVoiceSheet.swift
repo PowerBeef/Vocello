@@ -228,7 +228,7 @@ struct SavedVoiceSheet: View {
                         .foregroundStyle(.secondary)
                     TextField("Saved voice name", text: $name)
                         .textFieldStyle(.plain)
-                        .focusEffectDisabled()
+                        .vocelloFocusRing(AppTheme.accent, radius: 8)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 6)
                         .glassTextField(radius: 8)
@@ -243,7 +243,7 @@ struct SavedVoiceSheet: View {
                     HStack {
                         TextField("Reference audio file", text: $audioPath)
                             .textFieldStyle(.plain)
-                            .focusEffectDisabled()
+                            .vocelloFocusRing(AppTheme.accent, radius: 8)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 6)
                             .glassTextField(radius: 8)
@@ -301,7 +301,7 @@ struct SavedVoiceSheet: View {
 
                     TextEditor(text: $transcript)
                         .font(.body)
-                        .focusEffectDisabled()
+                        .vocelloFocusRing(AppTheme.accent, radius: 10)
                         .frame(minHeight: 100)
                         .padding(8)
                         #if QW_UI_LIQUID

@@ -332,7 +332,7 @@
       "plan": "doc-governance-2026-08",
       "title": "Deep build-output ownership and storage remediation",
       "status": "done",
-      "gate": "Every directory under build/ is governed at any depth; 3.48 GB of orphaned scratch reclaimed.",
+      "gate": "Every directory under build/ is governed at any depth; 3.48 GB of orphaned scratch reclaimed. RECONFIRMED 2026-08-05: the 2026-08-04 manifest change was the ui-perf lane registering its own heavyLanePreflight/childRetention entries (9d283a9), which extends deep governance rather than weakening it; live build_output_policy.py validate passes.",
       "evidence": [
         "commit:e83ebef",
         "file:scripts/build_output_policy.py"
@@ -340,7 +340,7 @@
       "sourceOfTruth": [
         "config/build-output-policy.json"
       ],
-      "updated": "2026-08-02"
+      "updated": "2026-08-05"
     },
     {
       "id": "DG-9",

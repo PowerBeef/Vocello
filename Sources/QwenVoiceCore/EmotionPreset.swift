@@ -176,6 +176,50 @@ public struct EmotionPreset: Identifiable, Sendable {
         return all.first(where: { $0.id == id })
     }
 
+    /// Resolve a stored instruction string back to the preset and tier that
+    /// produced it, checking the `strong` tier first. Tiers with identical copy
+    /// (Neutral) must resolve to `.strong`, the shipped tier: resolving the tie
+    /// to `.normal` is the defect that made every macOS preset pick silently
+    /// emit the normal-tier copy after the Neutral draft default synced
+    /// (found by the 2026-08-04 delivery-control audit, F4 — DP-8's
+    /// ship-strong decision never actually took effect on macOS).
+    public static func matchInstruction(
+        _ text: String
+    ) -> (preset: EmotionPreset, intensity: EmotionIntensity)? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        for preset in all {
+            for level in EmotionIntensity.allCases.reversed() {
+                if preset.instruction(for: level).caseInsensitiveCompare(trimmed) == .orderedSame {
+                    return (preset, level)
+                }
+            }
+        }
+        return nil
+    }
+
+    /// The measured roster split (DP-12 calibration session, 2026-08-04;
+    /// docs/reference/delivery-control-audit-2026-08.md finding record in
+    /// docs/development-progress.md finding 14). Listeners identify these
+    /// four presets above chance (calm 0.55, whisper 0.55, neutral 0.36,
+    /// sad 0.36), so the UI presents them as distinct deliveries. The
+    /// remaining four moved prosody hard but were not identified as
+    /// themselves (angry 0/11 — never once named Angry; happy heard as
+    /// Surprised; fearful heard as Sad; surprised mostly Unsure), so they
+    /// present as directional hints that shape energy and pace without
+    /// promising the named emotion. Membership changes require a new
+    /// listening measurement, not taste.
+    public static let distinctDeliveryIDs: Set<String> = ["neutral", "calm", "whisper", "sad"]
+
+    /// Honest framing for the hint half of the roster, shared by both
+    /// platforms so the wording cannot drift.
+    public static let directionalHintAdvisory =
+        "Directional hints shape energy and pace reliably, but the named emotion may not come through on every take. Regenerate to explore, or clone from an emotion reference voice for a dependable delivery."
+
+    public var isDirectionalHint: Bool {
+        !EmotionPreset.distinctDeliveryIDs.contains(id)
+    }
+
     /// The Neutral preset's real instruction (adopted 2026-08-01, maintainer
     /// decision closing finding F4): Neutral is a preset like any other — a
     /// slightly monotone, emotion-free delivery target — rather than the

@@ -229,25 +229,10 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
 
     private var playbackMode: PlaybackMode = .none
     private var player: AVAudioPlayer?
-    private var liveEngine: AVAudioEngine?
-    private var livePlayerNode: AVAudioPlayerNode?
-    private var liveScheduledCount = 0
-    // Real audio-second queue depth used by `shouldStartLivePlayback`.
-    // Bumped on every `scheduleLiveBuffer` and decremented in
-    // `handleLiveBufferPlaybackCompletion` (FIFO via
-    // `liveBufferDurations`). Distinct from `livePreviewDuration`,
-    // which is monotonically-cumulative total received audio used
-    // for UI / `final_handoff` audio-length reporting. Audit
-    // Finding #3 (May 2026): the prior code path reused
-    // `livePreviewDuration` for queue health, which after an
-    // underrun read multi-second-stale, and the
-    // `shouldStartLivePlayback` predicate would resume playback
-    // with a buffer claim of 6+ s while the AVAudioEngine queue
-    // actually held one fresh chunk (~0.6 s). Repeated
-    // resume/cutoff cycles followed.
-    private var liveQueuedAudioSeconds: TimeInterval = 0
-    private var liveBufferDurations: [TimeInterval] = []
-    private var liveFormat: AVAudioFormat?
+    /// AVAudioEngine graph + FIFO scheduled-buffer bookkeeping (W2-D
+    /// extraction; see `LiveStreamingPlaybackEngine`). Session identity,
+    /// staleness guards, published state, timers, and telemetry stay here.
+    private let livePlayback = LiveStreamingPlaybackEngine()
     // Smooth-first prebuffer state — set before generation starts,
     // picked up by startLiveSession, cleared at session end.
     private var pendingLivePreviewEstimate: LivePreviewEstimate?
@@ -456,7 +441,7 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
     func pause() {
         switch playbackMode {
         case .live:
-            livePlayerNode?.pause()
+            livePlayback.pauseNode()
             isPlaying = false
             stopTimer()
         case .file:
@@ -556,14 +541,12 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
         liveAutoplayEnabled = shouldAutoPlay
         pendingAutoplaySignpost = shouldAutoPlay
         pendingFirstChunkInterval = AppPerformanceSignposts.begin("Preview To First Chunk")
-        liveScheduledCount = 0
-        liveQueuedAudioSeconds = 0
-        liveBufferDurations.removeAll(keepingCapacity: true)
+        livePlayback.resetBookkeeping()
+        livePlayback.clearFormat()
         livePlaybackStarted = false
         livePreviewDuration = 0
         livePlaybackTimeOffset = 0
         liveUnderrunCount = 0
-        liveFormat = nil
         livePreviewEstimate = sessionEstimate
         pendingLivePreviewEstimate = nil
         liveExpectedFrameOffset = 0
@@ -584,17 +567,17 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
         // the engine's expected output format (24 kHz Int16 mono per
         // the Qwen3-TTS streaming contract). This avoids paying the
         // allocation/connect cost on the first live chunk.
-        // `configureLiveEngine` is idempotent against an identical
-        // format so the chunk-arrival site is a cheap no-op when the
-        // format matches; if it ever mismatches (different model or
-        // contract change) the chunk site falls back to reconfiguring.
+        // `configure` is idempotent against an identical format so the
+        // chunk-arrival site is a cheap no-op when the format matches; if
+        // it ever mismatches (different model or contract change) the
+        // chunk site falls back to reconfiguring.
         if let prewarmFormat = AVAudioFormat(
             commonFormat: .pcmFormatInt16,
             sampleRate: 24_000,
             channels: 1,
             interleaved: false
         ) {
-            configureLiveEngine(with: prewarmFormat)
+            livePlayback.configure(with: prewarmFormat)
         }
     }
 
@@ -641,7 +624,7 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
         // buffers have already drained. Otherwise the existing buffer-drain
         // mechanism (handleLiveBufferPlaybackCompletion -> finishLivePlaybackAfterDrainingBuffers)
         // keeps playback moving from the heard preview position into the final file.
-        if !livePlaybackStarted || liveScheduledCount == 0 {
+        if !livePlaybackStarted || livePlayback.scheduledCount == 0 {
             // Immediate-handoff branch: live preview is over (never
             // started or already drained). Any chunk arriving from
             // the broker now is genuinely stale. Record the session
@@ -838,14 +821,12 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
         // gain. Set it here so the signpost mirrors the live engine's
         // play() call when autoplay is enabled for this session.
         pendingAutoplaySignpost = autoPlay
-        liveScheduledCount = 0
-        liveQueuedAudioSeconds = 0
-        liveBufferDurations.removeAll(keepingCapacity: true)
+        livePlayback.resetBookkeeping()
+        livePlayback.clearFormat()
         livePlaybackStarted = false
         livePreviewDuration = 0
         livePlaybackTimeOffset = 0
         liveUnderrunCount = 0
-        liveFormat = nil
         // Smooth-first prebuffer estimate handoff: pending values
         // captured pre-generation become the active session's
         // estimate, then are cleared so a future session that arrives
@@ -884,20 +865,16 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
             return
         }
 
-        if liveEngine == nil || livePlayerNode == nil {
-            configureLiveEngine(with: fileFormat)
+        if !livePlayback.isConfigured {
+            livePlayback.configure(with: fileFormat)
         }
 
         AppPerformanceSignposts.emit("Chunk Decoded")
         let chunkAudioSeconds = TimeInterval(buffer.frameLength) / fileFormat.sampleRate
-        liveScheduledCount += 1
-        liveBufferDurations.append(chunkAudioSeconds)
-        liveQueuedAudioSeconds += chunkAudioSeconds
-        setLivePreviewQueueDepth(liveScheduledCount)
-        scheduleLiveBuffer(buffer)
+        enqueueLiveBuffer(buffer, chunkAudioSeconds: chunkAudioSeconds)
         AppGenerationTimeline.shared.recordPlaybackChunk(
             id: liveSessionID,
-            queuedAudioSeconds: liveQueuedAudioSeconds
+            queuedAudioSeconds: livePlayback.queuedAudioSeconds
         )
 
         livePreviewDuration = cumulativeDuration
@@ -912,8 +889,8 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
 
         if Self.shouldStartLivePlayback(
             autoplayEnabled: liveAutoplayEnabled,
-            queuedChunks: liveScheduledCount,
-            queuedDuration: liveQueuedAudioSeconds,
+            queuedChunks: livePlayback.scheduledCount,
+            queuedDuration: livePlayback.queuedAudioSeconds,
             prebufferThreshold: livePreviewConfiguration.prebufferThreshold,
             minimumBufferedDuration: livePreviewConfiguration.minimumBufferedDuration,
             finalFileAvailable: liveFinalFilePath != nil,
@@ -964,9 +941,7 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
         AppGenerationTimeline.shared.recordPlaybackContinuityFailure(id: liveSessionID)
         livePreviewDisabledSessionID = liveSessionID
         stopLivePlayback(resetCurrentTime: true)
-        liveScheduledCount = 0
-        liveQueuedAudioSeconds = 0
-        liveBufferDurations.removeAll(keepingCapacity: true)
+        livePlayback.resetBookkeeping()
         livePlaybackStarted = false
         livePreviewDuration = 0
         livePlaybackTimeOffset = 0
@@ -984,20 +959,16 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
             return
         }
 
-        if liveEngine == nil || livePlayerNode == nil {
-            configureLiveEngine(with: format)
+        if !livePlayback.isConfigured {
+            livePlayback.configure(with: format)
         }
 
         AppPerformanceSignposts.emit("Chunk Decoded")
         let chunkAudioSeconds = TimeInterval(buffer.frameLength) / format.sampleRate
-        liveScheduledCount += 1
-        liveBufferDurations.append(chunkAudioSeconds)
-        liveQueuedAudioSeconds += chunkAudioSeconds
-        setLivePreviewQueueDepth(liveScheduledCount)
-        scheduleLiveBuffer(buffer)
+        enqueueLiveBuffer(buffer, chunkAudioSeconds: chunkAudioSeconds)
         AppGenerationTimeline.shared.recordPlaybackChunk(
             id: liveSessionID,
-            queuedAudioSeconds: liveQueuedAudioSeconds
+            queuedAudioSeconds: livePlayback.queuedAudioSeconds
         )
 
         livePreviewDuration = cumulativeDuration
@@ -1012,8 +983,8 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
 
         if Self.shouldStartLivePlayback(
             autoplayEnabled: liveAutoplayEnabled,
-            queuedChunks: liveScheduledCount,
-            queuedDuration: liveQueuedAudioSeconds,
+            queuedChunks: livePlayback.scheduledCount,
+            queuedDuration: livePlayback.queuedAudioSeconds,
             prebufferThreshold: livePreviewConfiguration.prebufferThreshold,
             minimumBufferedDuration: livePreviewConfiguration.minimumBufferedDuration,
             finalFileAvailable: liveFinalFilePath != nil,
@@ -1024,6 +995,20 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
         } else {
             setLivePreviewPhase(.buffering)
         }
+    }
+
+    /// Shared enqueue path for both chunk formats: FIFO bookkeeping lives
+    /// in the engine; the completion hop applies this view model's session
+    /// staleness guards in `handleLiveBufferPlaybackCompletion`.
+    private func enqueueLiveBuffer(_ buffer: AVAudioPCMBuffer, chunkAudioSeconds: TimeInterval) {
+        livePlayback.enqueue(
+            buffer,
+            chunkAudioSeconds: chunkAudioSeconds,
+            sessionID: liveSessionID
+        ) { [weak self] sessionID in
+            self?.handleLiveBufferPlaybackCompletion(sessionID: sessionID)
+        }
+        setLivePreviewQueueDepth(livePlayback.scheduledCount)
     }
 
     private func attemptLivePlay() {
@@ -1042,23 +1027,21 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
             return
         }
 
-        guard let liveEngine, let livePlayerNode else { return }
+        guard livePlayback.isConfigured else { return }
 
         do {
-            if !liveEngine.isRunning {
-                try liveEngine.start()
-            }
-            if !livePlayerNode.isPlaying {
+            try livePlayback.startEngineIfNeeded()
+            if !livePlayback.isNodePlaying {
                 if livePlaybackStarted {
                     livePlaybackTimeOffset = currentTime
-                    scheduleLeadingSilence()
+                    livePlayback.scheduleLeadingSilence()
                 }
-                livePlayerNode.play()
+                livePlayback.playNode()
                 AppGenerationTimeline.shared.recordPlaybackScheduled(
                     id: liveSessionID,
                     source: .liveStream,
-                    queuedChunks: liveScheduledCount,
-                    queuedAudioSeconds: liveQueuedAudioSeconds
+                    queuedChunks: livePlayback.scheduledCount,
+                    queuedAudioSeconds: livePlayback.queuedAudioSeconds
                 )
                 livePlaybackStarted = true
                 AppPerformanceSignposts.emit("Live Engine Play")
@@ -1071,62 +1054,6 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
         } catch {
             playbackError = "Playback could not start."
         }
-    }
-
-    private func configureLiveEngine(with format: AVAudioFormat) {
-        // Idempotent: if a prior pre-warm or chunk-arrival call already
-        // configured the engine with this exact format, skip the
-        // expensive allocation + attach + connect path. This is what
-        // makes the `prepareStreamingPreview` pre-warm a free win at
-        // the first chunk's arrival site.
-        if let existingEngine = liveEngine,
-           let existingNode = livePlayerNode,
-           let existingFormat = liveFormat,
-           existingFormat == format {
-            // Belt-and-suspenders: the engine could have been torn
-            // down between pre-warm and chunk arrival (e.g. a panic
-            // path called `engine.stop()`); confirm it's still running
-            // a valid graph before reusing.
-            if existingEngine.attachedNodes.contains(existingNode) {
-                return
-            }
-        }
-
-        let engine = AVAudioEngine()
-        let playerNode = AVAudioPlayerNode()
-        engine.attach(playerNode)
-        engine.connect(playerNode, to: engine.mainMixerNode, format: format)
-        liveEngine = engine
-        livePlayerNode = playerNode
-        liveFormat = format
-    }
-
-    private func scheduleLiveBuffer(_ buffer: AVAudioPCMBuffer) {
-        // Capture the session ID at scheduling time. The completion callback
-        // is hopped to MainActor via a `Task`, which can be delayed — by the
-        // time it runs, `liveSessionID` may have moved on to a new session
-        // (warm-after-cold). Without this tag, stale completions from cold
-        // wrongly decrement warm's `liveScheduledCount` and remove warm's
-        // entries from `liveBufferDurations`, leaving the buffer math
-        // permanently low → `shouldStartLivePlayback` never returns true →
-        // warm falls back to file playback at the end of generation.
-        let scheduleSessionID = liveSessionID
-        livePlayerNode?.scheduleBuffer(buffer, completionCallbackType: .dataPlayedBack) { @Sendable [weak self] _ in
-            // AVFAudio invokes completion handlers on its own queue, so keep
-            // the callback nonisolated and hop back to MainActor explicitly.
-            Task { @MainActor [weak self] in
-                self?.handleLiveBufferPlaybackCompletion(sessionID: scheduleSessionID)
-            }
-        }
-    }
-
-    private func scheduleLeadingSilence() {
-        guard let format = liveFormat, let livePlayerNode else { return }
-        let silenceFrames: AVAudioFrameCount = 1024
-        guard let silentBuffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: silenceFrames) else { return }
-        silentBuffer.frameLength = silenceFrames
-        // AVAudioPCMBuffer is zero-filled on creation
-        livePlayerNode.scheduleBuffer(silentBuffer)
     }
 
     private func handleLiveBufferPlaybackCompletion(sessionID: String? = nil) {
@@ -1146,31 +1073,23 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
         if livePreviewDisabledSessionID == liveSessionID {
             return
         }
-        liveScheduledCount = max(0, liveScheduledCount - 1)
-        // Decrement the audio-second queue depth in lock-step with
-        // `liveScheduledCount`. AVAudioEngine plays scheduled
-        // buffers FIFO, so the head of `liveBufferDurations` is
-        // the buffer that just completed (`.dataPlayedBack`).
-        if !liveBufferDurations.isEmpty {
-            let drained = liveBufferDurations.removeFirst()
-            liveQueuedAudioSeconds = max(0, liveQueuedAudioSeconds - drained)
-        }
+        livePlayback.drainCompletedBuffer()
         AppGenerationTimeline.shared.recordPlaybackQueueDepth(
             id: liveSessionID,
-            queuedAudioSeconds: liveQueuedAudioSeconds
+            queuedAudioSeconds: livePlayback.queuedAudioSeconds
         )
-        setLivePreviewQueueDepth(liveScheduledCount)
-        if liveScheduledCount > 0 {
+        setLivePreviewQueueDepth(livePlayback.scheduledCount)
+        if livePlayback.scheduledCount > 0 {
             setLivePreviewPhase(isPlaying ? .playing : .draining)
         }
-        if liveScheduledCount == 0, liveFinalFilePath != nil {
+        if livePlayback.scheduledCount == 0, liveFinalFilePath != nil {
             setLivePreviewPhase(.finalizing)
             finishLivePlaybackAfterDrainingBuffers()
-        } else if liveScheduledCount == 0 {
+        } else if livePlayback.scheduledCount == 0 {
             liveUnderrunCount += 1
             AppPerformanceSignposts.emit("Live Preview Underrun")
             AppGenerationTimeline.shared.recordPlaybackUnderrun(id: liveSessionID)
-            livePlayerNode?.pause()
+            livePlayback.pauseNode()
             isPlaying = false
             stopTimer()
             setLivePreviewPhase(.buffering)
@@ -1244,14 +1163,12 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
         recordCompletedLiveSessionID(liveSessionID)
 
         stopLivePlayback(resetCurrentTime: true)
-        liveScheduledCount = 0
-        liveQueuedAudioSeconds = 0
-        liveBufferDurations.removeAll(keepingCapacity: true)
+        livePlayback.resetBookkeeping()
         livePlaybackStarted = false
         livePreviewDuration = 0
         livePlaybackTimeOffset = 0
         liveUnderrunCount = 0
-        liveFormat = nil
+        livePlayback.clearFormat()
         livePreviewEstimate = nil
         liveExpectedFrameOffset = nil
         setLivePreviewQueueDepth(0)
@@ -1267,28 +1184,15 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
             livePreviewDisabledSessionID = nil
             isLiveStream = false
             setLivePreviewPhase(.idle)
-            // Phase 4 fix: nil out the audio graph so the next session's
-            // first chunk triggers `configureLiveEngine` to rebuild a
-            // fresh engine + player node. Without this, `liveEngine.reset()`
-            // (in `stopLivePlayback` above) leaves the engine in a state
-            // where `liveEngine.start()` throws on the next session — the
-            // catch block in `attemptLivePlay` silently sets `playbackError`
-            // and the user falls through to file playback once generation
-            // ends, losing the perceived-speed win.
-            //
-            // The reference-counted detach is intentional: `livePlayerNode`
-            // is attached to `liveEngine`. Letting both go to nil triggers
-            // ARC teardown of the attached nodes, avoiding stale-graph
-            // assertions on the next attach.
-            livePlayerNode = nil
-            liveEngine = nil
+            // Discard the audio graph so the next session rebuilds fresh
+            // (Phase 4 fix rationale lives with
+            // `LiveStreamingPlaybackEngine.discardGraph`).
+            livePlayback.discardGraph()
         }
     }
 
     private func stopLivePlayback(resetCurrentTime: Bool) {
-        livePlayerNode?.stop()
-        liveEngine?.stop()
-        liveEngine?.reset()
+        livePlayback.stopAndReset()
         isPlaying = false
         stopTimer()
         if resetCurrentTime {
@@ -1397,12 +1301,12 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
 
         if transitionFromLive {
             stopLivePlayback(resetCurrentTime: false)
-            liveScheduledCount = 0
+            livePlayback.resetBookkeeping()
             livePlaybackStarted = false
             livePreviewDuration = 0
             livePlaybackTimeOffset = 0
             liveUnderrunCount = 0
-            liveFormat = nil
+            livePlayback.clearFormat()
             livePreviewEstimate = nil
             liveExpectedFrameOffset = nil
             livePreviewDisabledSessionID = nil
@@ -1631,16 +1535,13 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
                 stopTimer()
             }
         case .live:
-            guard let livePlayerNode else { return }
-            if let lastRenderTime = livePlayerNode.lastRenderTime,
-               let playerTime = livePlayerNode.playerTime(forNodeTime: lastRenderTime),
-               playerTime.sampleRate > 0 {
-                let renderedTime = Double(playerTime.sampleTime) / playerTime.sampleRate
+            guard livePlayback.isConfigured else { return }
+            if let renderedTime = livePlayback.renderedNodeSeconds {
                 let adjustedTime = renderedTime + livePlaybackTimeOffset
                 currentTime = duration > 0 ? min(adjustedTime, duration) : adjustedTime
             }
 
-            if !livePlayerNode.isPlaying, liveFinalFilePath != nil {
+            if !livePlayback.isNodePlaying, liveFinalFilePath != nil {
                 isPlaying = false
                 stopTimer()
                 let handoff = Self.finalPlaybackHandoff(

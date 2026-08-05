@@ -257,7 +257,7 @@ class DocumentationContractTests(unittest.TestCase):
             "| --- | --- | --- | --- |\n"
             "| Mac | supported | Speed (4-bit) and Quality (8-bit) | available |\n"
             "| iPhone | supported | Speed (4-bit) | pending |\n\n"
-            "Voice Cloning follows its reference and does not expose delivery controls.\n\n"
+            "Voice Cloning follows the reference voice; bank personas add a delivery choice.\n\n"
             "[mlx-audio-swift](https://github.com/Blaizzy/mlx-audio-swift)\n\n"
             "![Banner](docs/readme_banner_vocello.png)\n"
             "![Design](docs/screenshots/voice-design.png)\n"

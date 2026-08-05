@@ -16,7 +16,6 @@ struct SidebarFooterPresentation: Equatable {
 }
 
 struct SidebarStatusView: View {
-    @Environment(\.generationPerformanceGate) private var performanceGate
     let sidebarStatus: SidebarStatus
     let clearError: @MainActor () -> Void
 
@@ -43,7 +42,7 @@ struct SidebarStatusView: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("sidebar_generationStatus")
-        .appAnimation(.easeInOut(duration: 0.25), value: stateKey)
+        .appAnimation(AppTheme.Motion.standard, value: stateKey)
     }
 
     @ViewBuilder
@@ -145,7 +144,7 @@ struct SidebarStatusView: View {
                         .scaleEffect(y: 0.6)
                     Text("\(percent)%")
                         .font(.caption2.monospacedDigit().weight(.medium))
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(AppTheme.textMuted)
                 }
             }
         }
@@ -173,7 +172,7 @@ struct SidebarStatusView: View {
                 } label: {
                     Image(systemName: "xmark")
                         .font(.caption2)
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(AppTheme.textMuted)
                 }
                 .buttonStyle(.plain)
             }
@@ -220,10 +219,8 @@ struct SidebarStatusView: View {
 
     // MARK: - Shared Background
 
-    @ViewBuilder
     private func statusBackground(color: Color, fillOpacity: Double, strokeOpacity: Double) -> some View {
-        #if QW_UI_LIQUID
-        if #available(macOS 26, *), !performanceGate {
+        GatedGlass {
             RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .fill(Color.clear)
                 .overlay(
@@ -242,12 +239,9 @@ struct SidebarStatusView: View {
                     in: .rect(cornerRadius: 8)
                 )
                 .glass3DDepth(radius: 8, intensity: 0.55)
-        } else {
+        } fallback: {
             statusBackgroundLegacy(color: color, fillOpacity: fillOpacity, strokeOpacity: strokeOpacity)
         }
-        #else
-        statusBackgroundLegacy(color: color, fillOpacity: fillOpacity, strokeOpacity: strokeOpacity)
-        #endif
     }
 
     private func statusBackgroundLegacy(color: Color, fillOpacity: Double, strokeOpacity: Double) -> some View {

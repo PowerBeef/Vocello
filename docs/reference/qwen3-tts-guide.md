@@ -281,10 +281,17 @@ shipping one instruction. Neutral is itself a real instructed preset (steady, sl
 The user-facing **intensity control was retired 2026-08-02**, following the "subtle" tier on
 2026-08-01. Both went for the same reason and by the same test — a control whose effect cannot be
 verified is not a control. DP-3 measured the `strong` copy at nearly double the recognisability of
-`normal` (mean per-preset recall 0.278 against 0.157, chance 0.053) while showing the two tiers are
-not separable from each other: for five presets the nearest cell in the whole space is its own other
-tier, seven of nine moved *less* at strong than at normal, and dramatic reversed outright. Every
-preset therefore ships its strong copy.
+`normal` (mean per-preset recall 0.278 against 0.157, chance 0.053) while showing the two tiers were
+not separable from each other. That measurement was taken in early August 2026 on the then-shipping
+ten-preset roster: for five presets the nearest cell in the whole space was its own other tier,
+seven of nine non-neutral presets moved *less* at strong than at normal, and the since-retired
+`dramatic` reversed outright (the roster was cut to 8 on 2026-08-03 — see
+[`delivery-control-audit-2026-08.md`](delivery-control-audit-2026-08.md)). Every
+preset therefore ships its strong copy. Since 2026-08-04 the eight presets also carry the
+measured recognizability split (`EmotionPreset.distinctDeliveryIDs`): Neutral, Calm,
+Whisper, and Sad present as distinct deliveries, while Happy, Angry, Fearful, and
+Surprised present as directional hints with advisory copy — the measurement program and
+its results are consolidated in [`delivery-harness.md`](delivery-harness.md).
 
 `EmotionIntensity` survives internally, addressing both texts, so the delivery matrix harness can
 keep running the queued experiments and drafts saved before the change resolve to exactly what they
@@ -512,7 +519,7 @@ These are compiled from the official docs, community reports, and Vocello's own 
 | File | What it owns |
 | --- | --- |
 | `Sources/Resources/qwenvoice_contract.json` | Model list, variants, repos/revisions, tokenizer profile, generation defaults, speaker roster. |
-| `Sources/QwenVoiceCore/EmotionPreset.swift` | 10 emotion/delivery presets × 2 intensity tiers, and their instruction copy. |
+| `Sources/QwenVoiceCore/EmotionPreset.swift` | 8 delivery presets and their instruction copy (each ships its `strong` text; the internal normal/strong pair survives for the delivery matrix harness). |
 | `Sources/QwenVoiceCore/GenerationSemantics.swift` | Prompt assembly, language hint logic, English diction reinforcement, prompt validation. |
 | `Sources/QwenVoiceCore/NativeCloneSupport.swift` | Reference normalization, transcript resolution, clone prompt caching, quality warnings. |
 | `Sources/QwenVoiceCore/Qwen3TTSRuntimeProfile.swift` | Runtime model-family detection, capability validation, generation-defaults parsing. |

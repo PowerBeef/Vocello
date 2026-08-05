@@ -116,6 +116,18 @@ each analyzer records its measured peak RSS in its report (SER ≈ 2.4 GB).
 Unit tests inject fake classifiers/embedders, so the deterministic suites
 never import torch.
 
+## Listening calibration session (operator-local)
+
+`scripts/delivery_listening_session.py` builds, runs, and scores the blind
+delivery listening session recommended by the 2026-08-04 delivery-control
+audit: `build` assembles opaque-ID trials from `vocello bench` evidence
+archives (`outputs/bench-archive/<runID>`) plus optional clone-transfer
+clips, `run` plays them with `afplay` and records answers resumably, and
+`score` feeds the answers through `scripts/delivery_identification_check.py`
+and evaluates the pre-registered exact-binomial decision rules. Listening
+stays calibration, never a gate: no CI lane, benchmark record, or promotion
+decision consumes the session report automatically.
+
 ## Fail-closed orchestration
 
 The macOS gate and release-readiness command, the iOS gate, and every XCUITest lane write an

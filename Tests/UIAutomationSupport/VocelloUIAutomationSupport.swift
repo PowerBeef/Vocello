@@ -332,6 +332,49 @@ public enum VocelloUITextEntry {
     }
 }
 
+#if os(macOS)
+/// Cursor parking for measurement scenarios (§K): after a positioning click
+/// the pointer rests on the control it clicked and Liquid Glass hover
+/// effects animate at display refresh for as long as it stays there. Parking
+/// at the screen corner removes the hover surface without touching the app.
+public enum VocelloUICursor {
+    public static func park() {
+        CGEvent(
+            mouseEventSource: nil,
+            mouseType: .mouseMoved,
+            mouseCursorPosition: CGPoint(x: 2, y: 2),
+            mouseButton: .left
+        )?.post(tap: .cghidEventTap)
+    }
+}
+#endif
+
+/// Scenario wall-clock markers for the macOS UI-perf lane. The test process
+/// prints one base64 JSON line per scenario window; the runner's log capture
+/// preserves it and `scripts/check_macos_ui_perf.py` joins the windows
+/// against the in-app frame probe's continuous rows (same transport as the
+/// bench take manifest).
+public struct VocelloUIPerfScenarioMarker: Codable {
+    public let schemaVersion: Int
+    public let scenario: String
+    public let windowStartEpochMS: Int64
+    public let windowEndEpochMS: Int64
+    public let actionCount: Int
+
+    public init(scenario: String, windowStartEpochMS: Int64, windowEndEpochMS: Int64, actionCount: Int) {
+        self.schemaVersion = 1
+        self.scenario = scenario
+        self.windowStartEpochMS = windowStartEpochMS
+        self.windowEndEpochMS = windowEndEpochMS
+        self.actionCount = actionCount
+    }
+
+    public func emit() {
+        guard let data = try? JSONEncoder().encode(self) else { return }
+        print("VOCELLO_UIPERF_SCENARIO=\(data.base64EncodedString())")
+    }
+}
+
 /// Screenshots are retained in the xcresult; no out-of-band coordinate metadata is used.
 @MainActor
 public enum VocelloUIScreenshot {

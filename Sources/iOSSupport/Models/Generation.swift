@@ -18,6 +18,9 @@ struct Generation: Identifiable, Codable, Hashable, Sendable {
     var longFormProjectID: String?
     /// "segment" or "joined" within a long-form project; nil otherwise.
     var longFormRole: String?
+    /// The engine's effective sampling seed for this take (UInt64 stored as
+    /// its Int64 bit pattern), or nil for rows recorded before v6 (DP-15).
+    var seed: Int64?
     private static let dateFormatter: DateFormatter = {
         let f = DateFormatter()
         f.dateStyle = .medium
@@ -34,6 +37,11 @@ struct Generation: Identifiable, Codable, Hashable, Sendable {
     var textPreview: String {
         if text.count <= 60 { return text }
         return String(text.prefix(60)) + "..."
+    }
+
+    /// The effective sampling seed as the engine reported it.
+    var samplingSeed: UInt64? {
+        seed.map { UInt64(bitPattern: $0) }
     }
 
     /// Whether the audio file still exists on disk
@@ -57,7 +65,7 @@ extension Generation: TableRecord, FetchableRecord, MutablePersistableRecord {
 
     enum Columns: String, ColumnExpression {
         case id, text, mode, modelTier, voice, emotion, speed, audioPath, duration, createdAt
-        case longFormProjectID, longFormRole
+        case longFormProjectID, longFormRole, seed
     }
 
     init(row: Row) {
@@ -73,6 +81,7 @@ extension Generation: TableRecord, FetchableRecord, MutablePersistableRecord {
         createdAt = row[Columns.createdAt]
         longFormProjectID = row[Columns.longFormProjectID]
         longFormRole = row[Columns.longFormRole]
+        seed = row[Columns.seed]
     }
 
     mutating func didInsert(_ inserted: InsertionSuccess) {

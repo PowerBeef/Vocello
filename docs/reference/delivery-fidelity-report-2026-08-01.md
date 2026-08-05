@@ -1,4 +1,20 @@
+---
+status: historical
+owner: backend-mlx
+summary: Delivery and clone fidelity autonomous diagnosis (2026-08-01). Pinned point-in-time report; F4's Neutral no-instruct design was reversed the same day, and the 2026-08-04 delivery-control audit supersedes its statistics and recommendations.
+contentDigest: sha256:10cd4026c9181aa8499f01f5363e7fe6d7aca60481180e27e69904dc32e9627d
+---
 # Delivery fidelity and clone fidelity — autonomous diagnosis (2026-08-01)
+
+> **Editor's note (2026-08-04).** This is a point-in-time diagnosis as of 2026-08-01, pinned as
+> history. Three later events change how to read it: (1) the Neutral no-instruct design described
+> in F4 was reversed by a maintainer decision the same day — Neutral now sends an explicit
+> instruction (see [`Sources/QwenVoiceCore/EmotionPreset.swift`](../../Sources/QwenVoiceCore/EmotionPreset.swift));
+> (2) the preset roster was cut to 8 presets on 2026-08-03 (`excited` folded into `happy`,
+> `dramatic` dropped) and the user-facing intensity control was retired on 2026-08-02; (3) the
+> DP-program statistics were re-examined and partly corrected by
+> [`delivery-control-audit-2026-08.md`](delivery-control-audit-2026-08.md), which supersedes this
+> report's recommendations.
 
 > Answers the maintainer's two reported gaps with measured evidence, no human
 > listening: (1) Custom-mode delivery presets "don't seem properly applied"

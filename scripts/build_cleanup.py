@@ -98,7 +98,9 @@ def load_policy() -> dict[str, Any]:
         and ui_retention.get("entry") == "artifacts-ui-tests"
         and ui_retention.get("metadataFilename") == "run.json"
         and ui_retention.get("pinFilename") == "retention-pin.json"
-        and set(ui_retention.get("lanes") or ()) == {"smoke", "benchmark", "model-download"}
+        and {"smoke", "benchmark", "model-download"}.issubset(
+            set(ui_retention.get("lanes") or ())
+        )
         and isinstance(ui_retention.get("keepPassingPerPlatformLane"), int)
         and ui_retention["keepPassingPerPlatformLane"] >= 1
         and isinstance(ui_retention.get("keepUnresolvedFailuresPerPlatformLane"), int)

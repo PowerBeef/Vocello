@@ -149,7 +149,7 @@ private struct InlineLivePreviewStatusView: View {
                 if let percentLabel {
                     Text(percentLabel)
                         .font(.caption2.monospacedDigit().weight(.medium))
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(AppTheme.textMuted)
                 }
             }
 

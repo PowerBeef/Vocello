@@ -415,6 +415,23 @@ final class GenerationOutputAdapter: GenerationOutputAdapting, @unchecked Sendab
         sessionDirectory.appendingPathComponent(chunkFileName(for: chunkIndex))
     }
 
+    /// What the generation exit path may delete. Three terminal states:
+    /// a completed streaming take keeps both the final WAV and the chunk
+    /// session directory (the player replays chunks from it); a completed
+    /// non-streaming take keeps only the final WAV; anything that did not
+    /// complete (throw, cancellation) removes both so partial artifacts
+    /// cannot leak. The final output is a product artifact, never session
+    /// state — CM-7 was this table wrongly coupling its fate to streaming.
+    nonisolated static func terminalCleanup(
+        didCompleteProduct: Bool,
+        usedStreaming: Bool
+    ) -> (removeSession: Bool, removeOutput: Bool) {
+        guard didCompleteProduct else {
+            return (removeSession: true, removeOutput: true)
+        }
+        return (removeSession: !usedStreaming, removeOutput: false)
+    }
+
 }
 
 private enum PCM16WAVWriter {
@@ -1182,14 +1199,23 @@ struct StreamingExecutionContext: Sendable {
             throw error
         }
 
-        // Retention flag flipped to true only on the successful-return path.
-        // Any error or cancellation between directory creation and successful
-        // return cleans up the session directory and the partially-written
-        // output file so they cannot leak (Tier 1.5).
-        var shouldRetainSession = false
+        // Cleanup is decided per artifact on the way out. Any error or
+        // cancellation between directory creation and successful return
+        // removes both the session directory and the partially-written
+        // output file so they cannot leak (Tier 1.5). A completed take
+        // always keeps its final WAV — retention of the *session directory*
+        // is a streaming-only concern and must never delete the product
+        // output with it (CM-7: every non-streaming success published a
+        // path whose file this defer had just removed).
+        var terminalCleanup = GenerationOutputAdapter.terminalCleanup(
+            didCompleteProduct: false,
+            usedStreaming: request.shouldStream
+        )
         defer {
-            if !shouldRetainSession {
+            if terminalCleanup.removeSession {
                 try? FileManager.default.removeItem(at: sessionDirectory)
+            }
+            if terminalCleanup.removeOutput {
                 try? FileManager.default.removeItem(at: outputURL)
             }
         }
@@ -1657,10 +1683,10 @@ struct StreamingExecutionContext: Sendable {
             )
         )
 
-        shouldRetainSession = request.shouldStream
-        if !request.shouldStream {
-            try? FileManager.default.removeItem(at: sessionDirectory)
-        }
+        terminalCleanup = GenerationOutputAdapter.terminalCleanup(
+            didCompleteProduct: true,
+            usedStreaming: request.shouldStream
+        )
         return GenerationResult(
             audioPath: outputURL.path,
             durationSeconds: durationSeconds,
@@ -1821,6 +1847,17 @@ struct StreamingExecutionContext: Sendable {
             ),
         ]
         tierNotes.merge(Self.samplingTelemetryNotes(for: request)) { current, _ in current }
+        // Delivery-instruction receipt (DP-18): the request-level proof that an
+        // instruction entered the engine, as length + digest so the delivery
+        // sidecar can fail closed by matching the CLI manifest's echo instead
+        // of inferring from prompt length (the script length never includes
+        // the instruction, so the old inequality guard could never pass live).
+        if let deliveryInstruction = request.payload.deliveryInstructionText,
+           !deliveryInstruction.isEmpty {
+            tierNotes["instructChars"] = String(deliveryInstruction.count)
+            tierNotes["instructDigest"] = SHA256.hash(data: Data(deliveryInstruction.utf8))
+                .map { String(format: "%02x", $0) }.joined()
+        }
         // Phase 10: when the spoken script differs from the typed script, the
         // row records the transformation count and the spoken-text digest so
         // the evidence names exactly what was synthesized. Deterministic

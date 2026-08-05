@@ -491,8 +491,14 @@ def validate_readme_public_contract(root: Path) -> list[str]:
         errors.append("README.md: Mac model availability must state Speed and Quality")
     if not re.search(r"(?is)\|\s*iPhone\s*\|[^\n]+\|\s*Speed \(4-bit\)\s*\|", readme):
         errors.append("README.md: iPhone model availability must state Speed only")
-    if not re.search(r"(?i)Voice Cloning[^\n]+does not expose delivery controls", readme):
-        errors.append("README.md: delivery controls must be scoped away from Voice Cloning")
+    if not re.search(r"(?i)Voice Cloning follows the reference voice", readme):
+        # Since the emotion-reference banks (DP-16), clone personas DO offer a
+        # delivery choice, but it selects a verified reference clip; the
+        # instruction channel stays scoped away and the copy must attribute
+        # clone delivery to the reference, never to an instruction control.
+        errors.append(
+            "README.md: clone delivery must be attributed to the reference voice"
+        )
     local_assets = set(re.findall(r"\]\((docs/(?:screenshots/[^)]+|readme_banner_vocello\.png))\)", readme))
     if len(local_assets) < 5:
         errors.append("README.md: expected repository-versioned banner and product screenshots are missing")

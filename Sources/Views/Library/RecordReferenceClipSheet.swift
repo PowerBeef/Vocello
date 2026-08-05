@@ -131,7 +131,7 @@ struct RecordReferenceClipSheet: View {
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 8)
-            .appAnimation(.easeInOut(duration: 0.15), value: recorder.isRecording)
+            .appAnimation(AppTheme.Motion.state, value: recorder.isRecording)
 
             HStack(spacing: 10) {
                 Button("Cancel") {

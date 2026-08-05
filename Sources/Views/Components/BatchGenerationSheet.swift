@@ -3,8 +3,7 @@ import QwenVoiceNative
 import SwiftUI
 
 struct BatchGenerationSheet: View {
-    @Environment(\.generationPerformanceGate) private var performanceGate
-    @EnvironmentObject var ttsEngineStore: TTSEngineStore
+    @Environment(TTSEngineStore.self) var ttsEngineStore
     @EnvironmentObject var audioPlayer: AudioPlayerViewModel
     @Environment(ModelManagerViewModel.self) var modelManager
     @EnvironmentObject var appCommandRouter: AppCommandRouter
@@ -134,13 +133,12 @@ struct BatchGenerationSheet: View {
         )
         .padding(8)
         .frame(minHeight: 220)
-        #if QW_UI_LIQUID
         .background {
-            if #available(macOS 26, *), !performanceGate {
+            GatedGlass {
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
                     .fill(.clear)
                     .glassEffect(.regular.tint(AppTheme.smokedGlassTint), in: .rect(cornerRadius: 10))
-            } else {
+            } fallback: {
                 ZStack {
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
                         .fill(Color(nsColor: .textBackgroundColor))
@@ -149,16 +147,6 @@ struct BatchGenerationSheet: View {
                 }
             }
         }
-        #else
-        .background(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(Color(nsColor: .textBackgroundColor))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(AppTheme.cardStroke.opacity(0.45), lineWidth: 1)
-        )
-        #endif
         .disabled(coordinator.isProcessing)
 
         if coordinator.isProcessing {

@@ -14,8 +14,16 @@ struct TextInputView: View {
     var usesFlexibleEmbeddedHeight: Bool = false
     var onGenerate: () -> Void
     var onCancel: (() -> Void)? = nil
+    /// DP-15 seed control: non-nil binding exposes the pin state. While a
+    /// seed is pinned every take reproduces it; unpinning returns to a
+    /// fresh seed per take. Pinning happens from a History row's
+    /// "Pin seed" action; this chip is the visible state + the unpin.
+    var pinnedSeed: Binding<UInt64?>? = nil
 
     @State private var isEditorFocused = false
+    /// W1-E: scales the seed chip's fixed micro-glyph sizes with the
+    /// system text-size setting (base ×1 keeps today's default rendering).
+    @ScaledMetric(relativeTo: .caption) private var glyphScale: CGFloat = 1
 
     private var isTextEmptyForGeneration: Bool {
         text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -87,10 +95,46 @@ struct TextInputView: View {
                 }
             }
 
+            if let pinnedSeed, let seedValue = pinnedSeed.wrappedValue {
+                seedPinChip(binding: pinnedSeed, seedValue: seedValue)
+            }
+
             Spacer(minLength: 0)
 
             characterCount
         }
+    }
+
+    /// Compact pinned-seed indicator + unpin. Icon pairs with the label
+    /// (no color-only signal); the seed value itself is the identity a
+    /// user may want to note down or re-pin later from History.
+    private func seedPinChip(binding: Binding<UInt64?>, seedValue: UInt64) -> some View {
+        HStack(spacing: 5) {
+            Image(systemName: "pin.fill")
+                .font(.system(size: 9 * glyphScale))
+                .foregroundStyle(buttonColor)
+            Text("Seed \(String(seedValue))")
+                .font(.footnote.monospacedDigit())
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            Button {
+                binding.wrappedValue = nil
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 11 * glyphScale))
+                    .foregroundStyle(AppTheme.textMuted)
+            }
+            .buttonStyle(.plain)
+            .help("Unpin — new seed each take")
+            .accessibilityLabel("Unpin seed")
+            .accessibilityIdentifier("textInput_seedUnpin")
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 3)
+        .background(Capsule().fill(buttonColor.opacity(0.10)))
+        .help("Takes reproduce pinned seed \(String(seedValue)) with identical settings")
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("textInput_seedPinChip")
     }
 
     /// Pairs the character count with an icon when the script crosses
@@ -231,7 +275,7 @@ final class PlaceholderTextView: NSTextView {
 
         if string.isEmpty, let font = self.font {
             let attrs: [NSAttributedString.Key: Any] = [
-                .foregroundColor: NSColor.tertiaryLabelColor,
+                .foregroundColor: AppTheme.textMutedNSColor,
                 .font: font
             ]
             let inset = textContainerInset

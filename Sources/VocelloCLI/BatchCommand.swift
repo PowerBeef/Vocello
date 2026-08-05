@@ -81,6 +81,14 @@ enum BatchCommand {
         }
         let wall = Date().timeIntervalSince(wallStart)
 
+        // Fail closed on the CM-7 shape: never print a path with no file
+        // behind it as a successful batch item.
+        for r in results where !FileManager.default.fileExists(atPath: r.audioPath) {
+            throw CLIError(
+                "engine reported success but no audio file exists at \(r.audioPath); refusing to claim success (CM-7 guard)"
+            )
+        }
+
         if args.flag("json") {
             let items = (0..<results.count).map { i in
                 ItemJSON(index: i, text: lines[i], audioPath: results[i].audioPath,

@@ -1,3 +1,9 @@
+---
+status: historical
+owner: backend-mlx
+summary: 1.7B custom-backend optimization research report — the repository at its 2026-06-16 checkpoint, with the measurements and decisions made there. Superseded for current behavior by telemetry-and-benchmarking.md and the generated history.
+contentDigest: sha256:43469de2d31b138e5539e2c8a81e87f3493ae41dae45e50a827bc1176582db6b
+---
 # 1.7B Custom Backend Optimization Research Report
 
 > **Historical snapshot.** This report records the repository at its stated 2026-06-16 checkpoint and

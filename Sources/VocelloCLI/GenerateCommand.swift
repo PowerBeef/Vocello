@@ -122,6 +122,15 @@ enum GenerateCommand {
         let (result, firstChunkMS, chunkCount) = try await generateObservingFirstChunk(runtime, request)
         let wall = Date().timeIntervalSince(t0)
 
+        // Fail closed on the CM-7 shape: success must never be claimed for a
+        // path with no file behind it. The engine publishing contract is
+        // verified here at the product boundary, not trusted.
+        guard FileManager.default.fileExists(atPath: result.audioPath) else {
+            throw CLIError(
+                "engine reported success but no audio file exists at \(result.audioPath); refusing to claim success (CM-7 guard)"
+            )
+        }
+
         let rtf = wall > 0 ? result.durationSeconds / wall : 0
         if args.flag("json") {
             emitJSON(GenerateJSON(

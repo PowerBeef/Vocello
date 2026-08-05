@@ -39,7 +39,35 @@ machine-readable status record and wins over any older prose.
 | 13 — Benchmark/history v3 | Live 2026-07-29: the first schema-v3 records are committed (three clean `phase0-cli-control-*` engine records plus one exploratory run that also exposed and fixed the summarizer's v3 pin). `benchmarks/schema-v3.json` adds the typed quality identity to generation takes (pass/warning only, five fast gates required, machine-code issues); v1/v2 records stay valid immutable history; the publisher stamps v3 only when every take carries the identity. The UI benchmark checkers folded the same identity 2026-08-01: ui-generation records now publish v3 (first: the focused `v3-fold-proof` record `macos-xcui-benchmark-20260801-003208-403989cf`); the canonical iOS matrix published its first v3 record 2026-08-01 (`ios-xcui-benchmark-20260801-132415-abbec96b`). |
 | 14 — Organization and retirement | Closed 2026-07-23 (14a + 14b): compatibility SPI retired, actor-owned loading/metadata/priming/clone artifacts, clone conditioning epoch-bound end to end. |
 
-## Resume here (2026-08-01)
+## Resume here (2026-08-05)
+
+**macOS UI arc (2026-08-04/05, plan `macos-ui-2026-08`):** the SwiftUI frame-health
+lane `scripts/ui_test.sh macos perf` landed and proved itself (`9d283a9`; nine
+scenarios, structural gate, fail-closed refusals), the five-counted-run baseline and
+the four-audit review are recorded in
+[`docs/reference/macos-ui-refresh-2026-08.md`](reference/macos-ui-refresh-2026-08.md)
+(the plan's authority — History pipeline and root-shell invalidation are the measured
+top costs), and the approved safe fixes shipped (`99d746d`: −615 dead UI lines,
+Reduce Transparency at all 8 direct glass sites, 7/7 smoke green). **Refinement wave 1
+landed the same day on the maintainer's go** (`4e0c7cf`..`20e14b2`: warm ink ramp,
+motion family, mode-tinted focus rings, flip-scoped gate + History cache, ScaledMetric
+adoption, AnyLayout field stability, the shared GatedGlass container; UI-5 done) with a
+full before/after perf session — settings-scroll −19%, composer-typing −16%, and the
+honest finding that History's ~3.1 s stall is per-row List materialization — which
+**wave 2 then overturned with a Time Profiler sample**: the stall was the harness's
+own accessibility queries on the app main thread; the History scenarios are now
+exploratory and the app-real scroll cost is ~210 ms/s. **Wave 2 shipped the same day
+(UI-6 done)**: store `@Observable` migration (sidebar-navigation 131→119 ms/s),
+core-tested HistoryDeletionEngine, GenerationLifecycleExecutor dedup, and the
+LiveStreamingPlaybackEngine player extraction — full deterministic suite, both
+compiles, 7/7 smoke, and a clean 5-run baseline-v2 (settings-scroll measured a
+verified-genuine 0.0 ms/s). **UI-7 then closed the plan the same day**: `ui-perf` is a
+registered PASS-only benchmark kind with warn-only baseline-v2-derived ceilings
+(`config/ui-perf-thresholds.json`), canonical-hardware-gated publication from the lane,
+five offline self-tests, and a first live record. The `macos-ui-2026-08` plan is
+**complete**; History row thinning proceeds via Instruments whenever wanted.
+
+The pre-UI-arc checkpoint (2026-08-01) follows.
 
 Stages 0–3 of the adopted roadmap are complete (the 2.2 artifact promotion included);
 Stage 4 closed with the kept 0.31.6 pin bump. **v2.3.0 was cut 2026-07-31 and v2.4.0 on
@@ -144,7 +172,7 @@ performance block after the fixture rebind, Tier 4 carryover). Immediate specifi
    and the update-available user path ride the next app release (bundled
    catalog); fixture rebind + memory re-qual ride that release's battery.
 
-6. **Brand + iPhone clone-surface change (2026-08-01, post-2.4.0):** the public surfaces
+7. **Brand + iPhone clone-surface change (2026-08-01, post-2.4.0):** the public surfaces
    (README, website hero) feature the slogan "Premium voice studio. Proven performance.
    Private by design." The iPhone app deliberately dropped its Files-import and
    open-from-Files clone-reference paths (App Store review-risk posture; microphone
@@ -153,20 +181,21 @@ performance block after the fixture rebind, Tier 4 carryover). Immediate specifi
    `ui_test.sh ios enroll-clone-fixture` UI lane to the headless
    `scripts/ios_device.sh enroll-clone-fixture` diagnostics command
    (`QVOICE_IOS_DEVICE_ENROLL_VOICE_NAME`, registered knob; staged inputs are deleted
-   after a clean enrollment). Ships in build 24; build 23 in review still carries the
-   import UI.
-7. **Intensity tiers collapsed to two (2026-08-01, maintainer decision):** "subtle"
+   after a clean enrollment). Ships in the next TestFlight build cut after 23 (no bump
+   exists yet as of 2026-08-04 — build numbers are a maintainer call); build 23 in
+   review still carries the import UI.
+8. **Intensity tiers collapsed to two (2026-08-01, maintainer decision):** "subtle"
    retired — its calibrated delivery-gate minimum effect was zero (below the prosody
    noise floor), an unverifiable control. Normal/strong remain (both ≥0.85 adherence,
    ~15% measured separation). Legacy subtle drafts degrade losslessly to custom text;
    decision record in `docs/reference/delivery-remediation-plan-2026-08.md`.
-8. **R3 rate-only option parked (2026-08-01, maintainer decision):** the neutral
+9. **R3 rate-only option parked (2026-08-01, maintainer decision):** the neutral
    sampling profile's rate half is not adopted standalone (register wander stays
    floored; failed gates do not ship by halves). Three unpark triggers recorded in
    the remediation plan; the Tier-4 long-form fixtures are the designated
    re-evaluation point. Tier 4 (long-form text-context carryover, design pass
    first) is now the active roadmap work.
-9. **Tier 4 text-first landed (2026-08-01):** long-form planner v2 — R-tail orphan
+10. **Tier 4 text-first landed (2026-08-01):** long-form planner v2 — R-tail orphan
    rebalancing keeps the final segment from becoming a pacing-visible orphan, never
    degrades boundary kinds, and never trades a paragraph pause away. Version-bumped
    identity (new plans re-derive segment IDs/sub-seeds; retained projects replay
@@ -180,7 +209,7 @@ performance block after the fixture rebind, Tier 4 carryover). Immediate specifi
    roadmap's substantive tiers are now all closed; opportunistic riders (MOS-proxy
    advisory, 60 Hz glass-gate measurement) and parked items remain.
 
-10. **iPhone 6 GB floor step 1 green + adaptive residency LIVE (2026-08-02):** the
+11. **iPhone 6 GB floor step 1 green + adaptive residency LIVE (2026-08-02):** the
    f16 promotion reopened both questions and the phone window settled them. The
    clamped matrix (3,600 MB `iphone14pro` profile, fp32-conservative) passed all
    three modes with ~1 GB margin (peaks 2,109–2,372 MB vs the ≤3,300 bound) — the
@@ -191,23 +220,285 @@ performance block after the fixture rebind, Tier 4 carryover). Immediate specifi
    counts (one tokenizer load across the mode-switch sequence instead of three).
    Evidence + methodology notes: `docs/decisions/ios-6gb-floor-feasibility.md`.
 
-11. **Delivery roster cut to eight (2026-08-03, maintainer decision on DP-10):**
+12. **Delivery roster cut to eight (2026-08-03, maintainer decision on DP-10):**
    `excited` folded into `happy`, `dramatic` dropped. The shipped configuration was
    re-measured after the intensity control was retired — 18 seeds, one cell per
    preset — and gave cross-preset separability of UAR 0.311 against a 0.100 chance
-   floor. Both retired presets scored *below* that floor at 0.056 recall. Scoring the
+   floor. Both retired presets recorded 0.056 recall (read at the time as below the
+   floor; finding 13 corrects this — the interval contains the floor). Scoring the
    high-arousal cluster (`happy`/`excited`/`surprised`/`dramatic`) against only each
-   other gave UAR 0.278 against a 0.250 floor — 1.11× chance, i.e. one acoustic
-   output for four controls. Rewriting the copy is ruled out by the same run: mean
-   prosodic effect ran 6.5–9.5 across all ten presets and was **uncorrelated with
-   separability**, so these instructions were not under-driving; every preset moves
-   prosody hard and they all move it along the arousal axis, which the literature puts
-   at ~91% classifiable against ~55% for valence. Same test that retired the intensity
+   other gave UAR 0.278 against a 0.250 floor (read at the time as 1.11× chance;
+   corrected in finding 13 to "no detectable separability"). Rewriting the copy is
+   ruled out by the same run: mean prosodic effect ran 6.5–9.5 across all ten presets
+   and was **uncorrelated with separability**, so these instructions were not
+   under-driving; every preset moves prosody hard and they all move it along the
+   arousal axis (the "~91% vs ~55%" figures previously cited here are untraceable
+   and retracted — finding 13). Same test that retired the intensity
    tier, now with a measurement behind it. Two related facts worth carrying forward:
    the directional delivery gate and separability **disagree** (`fearful` passes the
    gate on 1 take in 18 and has the best recall at 0.500), and `surprised` survives on
    probation at 0.222. Full record: `docs/reference/qwen3-tts-prompting-guide.md` §4.3
    and the removal note in `Sources/QwenVoiceCore/EmotionPreset.swift`.
+
+13. **Delivery-control audit (2026-08-04, DP-11):** a full-codebase analysis plus a
+   21-agent primary-source research sweep adversarially re-examined the DP-1..DP-10
+   record. Corrections: the 10-way UAR 0.311 is decisively real (permutation
+   p < 0.001, z = 8.7), but the high-arousal-cluster "1.11× chance" figure was an
+   ordinary null draw (permutation p = 0.28, underpowered below ~1.5× chance) and the
+   excited/dramatic "below chance" recall was a post-hoc selection artifact — the
+   roster cut is sustained as a product decision with its statistical justification
+   corrected. The "~91% vs ~55%" arousal/valence figures cited in earlier prose are
+   untraceable to any source and retracted; the literature puts prosody-only valence
+   at roughly a third of arousal's recoverability — a bottleneck, not a wall. New
+   defects found: macOS silently ships the `.normal` tier through an
+   `EmotionPickerView` state-sync bug (iOS correct; DP-8's ship-strong decision never
+   actually took effect on macOS, and the aborted 2026-08-02 blind A/B may have
+   auditioned the wrong tier), and the bench's fixed per-cell filenames overwrote the
+   DP-10 evidence WAVs (one seed per cell survives). The built free-identification and
+   2AFC human instruments were never run on real audio; running one ~30-minute
+   calibration session is the audit's first recommendation, followed by productizing
+   design-then-clone per-emotion reference banks (the strongest measured lever,
+   corroborated externally) and reframing presets as stochastic delivery hints with
+   pinned seeds. Full report, adjudications, and the week-one runbook:
+   `docs/reference/delivery-control-audit-2026-08.md`.
+
+14. **Move 1 of the audit runbook landed (2026-08-04, DP-12):** fix-then-listen.
+   The macOS `.normal`-tier state-sync defect is fixed — instruction-string
+   resolution moved into `EmotionPreset.matchInstruction` with strong-first
+   tie-breaking (regression-pinned by
+   `Tests/VocelloCoreTests/EmotionPresetResolutionTests.swift`), and every new
+   preset pick resets to the strong tier; the CLI's bare `--delivery` names and
+   default set now ship strong too, and its error copy no longer offers the
+   deleted `subtle` tier. Bench evidence is retention-hardened: every delivery
+   run archives its WAVs, manifest, and sidecars under
+   `outputs/bench-archive/<runID>` (the fixed per-cell filenames that destroyed
+   DP-10's audio keep overwrite semantics only in the live outputs dir), the
+   manifest echoes each delivery cell's exact instruction, and the prosody
+   sidecar fails closed unless the engine's own `promptChars` prove the
+   instructed prompt outgrew its paired neutral. `scripts/delivery_separability.py`
+   is algorithm v2: computed chance floors, Wilson recall intervals ("below
+   chance" now requires the whole interval under the floor), an optional
+   label-permutation null band with a p-value, fold-grouping honesty (the
+   generation-ID fallback is reported as leave-one-take-out), and an
+   exploratory/confirmatory designation. The blind listening session the audit
+   ranked first is staged end to end by `scripts/delivery_listening_session.py`
+   (build/run/score through the existing identification and 2AFC instruments,
+   pre-registered exact-binomial decision rules, clone-transfer rows in the
+   key); DP-12 completes when the maintainer's ~30-minute session is scored.
+   Deferred deliberately: the dead intensity plumbing (DP-9 owns it) and the
+   clone-transcript UI disclosure (Move 2 reworks that flow). Generating the
+   session clips also surfaced a new engine defect, recorded as CM-7:
+   `vocello generate --no-stream` reports success and prints an output path
+   while publishing no WAV anywhere (the streaming path publishes correctly) —
+   which also silently breaks the clone-fixture bootstrap in
+   `scripts/lib/test_models.sh` if it ever needs to regenerate. The session
+   clips were produced with streaming as the workaround.
+
+15. **The calibration session ran and was scored (2026-08-04, DP-12 done):**
+   146 blind trials, one listener (the maintainer; non-native English, so
+   positives are read as solid and nulls as provisional). Pooled preset
+   identification 26/88 = 0.295 against a 0.125 floor (exact binomial
+   p = 2e-05) — the presets are perceptibly categorical, and the perceptible
+   half matches the acoustic study's winners exactly: `calm` 0.55 and
+   `whisper` 0.55 (p = .001), `neutral` 0.36 and `sad` 0.36 (p = .039). The
+   high-arousal trio fails as identities: `angry` was never once named Angry
+   (0/11, mostly Unsure), `happy` reads as Surprised, `surprised` reads as
+   Unsure; `fearful` reads as **Sad** (6/11) — human confirmation of F2's
+   low-arousal fearful rendering, and of the listener's own mid-session
+   report that angry-group pairs sounded like "angry versus sad". The 2AFC
+   block was engaged (anchors 4/4) and returned
+   `no_measured_strong_tier_collapse`: the "at strong it all sounds angry"
+   claim that emotionally drove the intensity retirement does not replicate.
+   Sharper still: angry-group discrimination is above chance overall (0.75
+   [0.551, 0.88]; one declared mis-keystroke on trial 141 was corrected from
+   the listener's stated intent before unsealing any additional analysis) —
+   anger is *distinguishable when named* while never being *identified
+   unprompted*, the audit's "difference is not identity" made audible. The
+   angry-vs-happy pairing (the canonical same-arousal/opposite-valence pair
+   the literature predicts to be hardest) sits at chance at the strong tier
+   and 0.75 at normal (n=4 each), and the angry group's strong-minus-normal
+   drop is borderline (−0.33 [−0.61, 0.02]) — a hint, short of the
+   pre-registered bar, that the strong angry copy is *harder* to pick out
+   than the normal copy. Control pairs were **more** discriminable at strong
+   (+0.50 [0.001, 0.812]), perceptually supporting ship-strong. The
+   clone-transfer rows split decisively: `angry.clone` hit 0.667 — the only
+   route through which the listener ever heard anger — while
+   happy/sad/whisper clones read neutral-ish because their single-shot
+   VoiceDesign references never audibly carried the emotion; the lossy hop is
+   instruct→reference, not reference→clone, so Move 2's reference banks need
+   curation (generate candidates, keep the ones that audibly land), exactly
+   the pitfall the audit's prior-art review flagged. Listener self-agreement
+   on exact repeats was 0.333, which caps the agreement any automated judge
+   can ever reach with this ear. Decision consequences: the 8-preset roster
+   splits into a perceptible half worth featuring and a decorative half to
+   reframe as hints; the angry/happy/surprised nulls await the optional
+   crowd panel before any further roster surgery.
+
+16. **Move 2 landed: curated emotion reference banks (2026-08-04, DP-13):**
+   `scripts/build_emotion_reference_bank.py` turns the session's lesson into a
+   pipeline — generate N VoiceDesign candidates per emotion against a neutral
+   anchor, score with the pinned SER advisory plus ECAPA identity-to-anchor
+   plus prosody deltas (strictly after generation; 8 GB rule), select the
+   emotion-passing candidate *nearest the anchor's identity*, and enroll
+   winners as ordinary saved voices — banks work in every existing clone
+   surface today with zero engine changes. The first real bank (Warm
+   Narrator) enrolled SER-verified happy/sad/angry references and honestly
+   refused whisper (VoiceDesign rendered soft-but-voiced speech, not whisper
+   phonation; a breathiness criterion is the recorded follow-up). The
+   end-to-end proof: clone identity 0.81–0.89 throughout; **sad 3/3 and
+   angry 3/3 SER-categorical** — against the session's uncurated 0/3 sad —
+   while happy's clones read angry despite a happy-verified reference: the
+   arousal survives the clone hop, the valence did not (per an instrument
+   with a measured angry-bias on this voice, so audition owns the final
+   word on Happy). The silent x-vector fallback is now disclosed on both
+   platforms ("Ready — identity only" on macOS; the iOS save-voice caption
+   states that the transcript is what carries pacing and emotion).
+   Follow-ups recorded in DP-13: the grouped persona/delivery picker UI and
+   the whisper breathiness criterion. Reference:
+   `docs/reference/emotion-reference-banks.md`. **Closed by ear the same
+   day:** the maintainer auditioned the bank in the freshly built app
+   (informal, sighted) and reports the voices sound as intended — including
+   Happy, resolving the proof run's one open case in the bank's favor (the
+   SER angry-reading on Happy clones stands as an instrument caveat only).
+   First real use also surfaced one more status/control disagreement: the
+   clone readiness note said "Ready to generate" beside a Generate button
+   disabled by the one-time cloning consent. The readiness descriptor is now
+   consent-aware on both platforms, so the note and the button agree.
+
+17. **Move 3 landed: the delivery UI tells the measured truth (2026-08-04,
+   DP-14):** the roster split from the calibration session is now data with
+   provenance — `EmotionPreset.distinctDeliveryIDs` holds the four presets
+   the listener identified above chance (neutral, calm, whisper, sad), the
+   other four are directional hints, and a Core test pins the split as an
+   exact partition of the live roster. The macOS delivery menu is sectioned
+   (Distinct deliveries / Directional hints / Custom) and shows a shared
+   advisory whenever a hint is selected; the iOS sheet gets the same
+   sections, the advisory as the hints footer, and honest per-preset copy
+   that names the measured confusions (happy "can read as surprise",
+   fearful "can read as sad"). Preset ordering in `EmotionPreset.all` is
+   untouched, so bench cells and harness identities are unaffected. The R6
+   remainder — regenerate-with-new-seed and pin-this-seed as first-class
+   take controls — is scoped and parked as DP-15: the request plumbing
+   exists, but persisting a take's seed needs a History schema migration,
+   which earns its own arc. With this, all three moves of the
+   delivery-control audit are complete.
+
+18. **Bank picker UX landed: personas with a delivery choice (2026-08-04,
+   DP-16):** emotion reference banks now present as what they are — one
+   voice with curated deliveries — instead of flat name-suffixed list
+   entries. `VoiceBankCatalog` (QwenVoiceCore) resolves grouping from the
+   enrollment naming convention alone (base name + "(Suffix)" siblings whose
+   suffix matches a live preset; everything else stays standalone), with ten
+   Core tests pinning the contract. macOS collapses bank members to one
+   "· voice bank" row in the clone source picker and adds a Delivery menu;
+   iOS shows the persona on the reference chip and adds a Delivery chip with
+   a member sheet, while the Voices library keeps every member listed under
+   truthful "Voice bank · <Delivery>" captions (each member's reference clip
+   is individually previewable). Every selection resolves to a concrete
+   member voice through the ordinary saved-voice path, so the bank layer
+   owns no clone state and cannot desynchronize hydration, priming, or
+   consent gating.
+
+19. **Sync audit + CM-7 fixed (2026-08-04):** a full roadmap-versus-tree
+   audit (three exploration passes plus adversarial cross-checks) found no
+   false done claims anywhere; the drift was in connective tissue and was
+   corrected in one currency pass — the release section said 2.3.0, the
+   contract said benchmark history v2 and lacked phase 9's iOS
+   adaptive-residency go-live, one roadmap evidence pointer was broken, the
+   doc-governance plan cited the wrong authority, and one live doc's example
+   named a retired preset. DP-9 was parked on the maintainer's call (DP-12's
+   session contradicts its premise), and the audit's untracked follow-ups
+   became items DP-17..DP-20. CM-7 then fell to root cause: the generation
+   exit path's cleanup defer coupled the final WAV's fate to
+   streaming-session retention, so every completed non-streaming take wrote
+   its file, deleted it, and returned the path. The exit path now decides
+   per artifact through the pure `terminalCleanup` table (a completed take
+   always keeps its WAV), pinned by `GenerationTerminalCleanupTests`, and
+   the CLI fails closed at the product boundary — generate and batch refuse
+   to claim success when no file exists at the reported path. Live proof:
+   `--no-stream` published a valid WAV matching its reported duration; the
+   streaming control still publishes. The clone-fixture bootstrap in
+   `scripts/lib/test_models.sh` works again unchanged.
+
+20. **Seed retry/pin shipped (2026-08-04, DP-15):** the stochastic-with-retry
+   norm, with the local advantage that fixed seeds genuinely reproduce a
+   take. History schema v6 records every take's observed effective sampling
+   seed (nullable; pre-v6 rows honestly stay blank), and both apps expose
+   the two controls the audit's R6 called for: a History row's "Pin seed N
+   for new takes" pins that take's seed into its mode's draft and lands you
+   in that mode, and the composer shows the pinned state — a chip beside
+   Generate on macOS, a studio Seed chip with an unpin confirmation on
+   iPhone. While pinned, every take reproduces the seed with identical
+   settings; unpinned stays the default fresh-seed-per-take, so plain
+   Generate remains the regenerate-with-new-seed action.
+   `GenerationSeedPersistenceTests` pins the migration and the full-range
+   bit-pattern round trip. Long-form's plan-scoped per-segment sub-seeds are
+   untouched.
+
+21. **DP-18's first live run caught a fixture-true, live-false guard
+   (2026-08-04):** Move 1's fail-closed delivery-provenance check compared
+   `promptChars` between an instructed take and its neutral pair — but
+   `promptChars` counts only the script text, which never includes the
+   delivery instruction, so the instructed-longer premise could never pass
+   outside its synthetic fixtures (no `bench --delivery` had run since the
+   guard landed). The pre-registered DP-18 sweep tripped it on every cell
+   before any data was scored. Replaced with a genuine end-to-end proof: the
+   engine stamps an instruction receipt (`instructChars` + `instructDigest`
+   from the request payload) on every instructed row, and the sidecar fails
+   closed unless the receipt exists, its digest matches the manifest's
+   instruction echo, and the paired neutral reference carries none.
+   Twenty-two harness tests pin the new semantics; the DP-18 registration
+   carries the amendment note and the sweep restarted with hypotheses,
+   seeds, and decision rules unchanged.
+
+22. **The confirmatory delivery sweep ran both arms (2026-08-04, DP-18
+   done):** the audit's R4, pre-registered and executed the same day.
+   Eight-way preset separability replicates on fresh seeds in both arms
+   (4-bit UAR 0.477, 8-bit 0.375, chance 0.125, permutation p=0.001 each),
+   and every distinct-set cell (neutral/calm/whisper/sad) clears FDR in
+   both — DP-10's cut and DP-14's split now rest on confirmatory statistics
+   rather than exploratory ones. The pre-registered happy-vs-angry 2-way
+   sits at chance in both arms (p=0.43/0.24): the valence bottleneck is now
+   a confirmed result, not a hypothesis — the instruct channel moves
+   arousal, not valence, and `happy` fails FDR in both arms with angry as
+   its top confusion every time. The 8-bit arm separates no better than
+   4-bit, retiring quantization as a suspected adherence bottleneck. Angry
+   and fearful meet the registered two-arm acoustic eligibility bar for
+   promotion, but acoustic separability is not listener recognizability
+   (the session heard angry 0/11), so the hint/distinct split stands until
+   a listening probe on fresh takes — a maintainer call either way.
+   Coverage: 16/18 seeds banked at 4-bit (two deterministic dropout-QC
+   casualties), 18/18 at 8-bit; the runs published 34 PASS registry
+   records, committed with this closure.
+
+23. **The text-decoration valence route closed (2026-08-04, DP-19 done):**
+   pre-registered same-day and run to a clean twin verdict. Decorating the
+   script with interjections and terminal punctuation did not raise SER
+   target-emotion probability for happy (p=0.52) or angry (p=0.27,
+   directionally negative), and while the decorated arm's happy-vs-angry
+   discriminant cleared its permutation null, so did the plain internal
+   control — decoration added roughly 0.04 UAR over baseline, nothing like
+   a lever. Per the registered decision rule the route closes; the valence
+   answer now rests entirely with the external levers DP-20 watches. One
+   analysis amendment is recorded in the gate (the scorer's power rail
+   refused the raw 55-feature space; the structural 21-feature harness-axis
+   subset was applied to both arms before any result was seen), along with
+   the raw-vs-delta measurement note explaining why the plain control can
+   exceed chance here without contradicting DP-18.
+
+24. **The VoiceDesign whisper route closed (2026-08-04, DP-17 done):** six
+   registered brief/instruction recipes, four seeds each, judged against
+   the digest-verified Warm Narrator anchor on the validated HNR/CPP
+   breathiness criterion. Every surviving candidate measured MORE harmonic
+   than the anchor (delta HNR up to +2.9 dB against a -2 dB pass bar) —
+   this checkpoint's design channel renders "whisper" as soft-but-voiced
+   speech no matter where the request lives, so the bank builder keeps
+   refusing whisper honestly. Side-finding: five takes fell to the fast
+   audio QC's dropout detector, concentrated in whisper-adjacent
+   generations — a future whisper lane needs a whisper-aware QC posture
+   before its takes can even reach scoring. The one remaining path is
+   cloning a genuinely whispered human reference (needs a recorded clip),
+   with the HNR/CPP criterion as its acceptance gate.
 
 ## Staged roadmap state
 
@@ -241,10 +532,11 @@ Stage-by-stage details, closure evidence, and falsifiability criteria live in th
    throwaway branch (contract invariant), long-form carryover (text context first), with
    speculative/PCG, CFG, and KV quantization parked. Working order and dependency rules:
    [roadmap-2026-08](reference/roadmap-2026-08.md).
-6. **Smaller open threads**: iOS single-segment regeneration parity, the iPhone-15-Pro
-   memory-profile diagnostic, a 60 Hz-device measurement of the iOS fixed-refresh glass
-   gate if such hardware becomes available, and single-take spoken-text normalization
-   (phase 10 remainder).
+6. **Smaller open threads**: a 60 Hz-device measurement of the iOS fixed-refresh glass
+   gate if such hardware becomes available. (The other threads once listed here closed:
+   iOS single-segment regeneration parity and the iPhone-15-Pro memory-profile diagnostic
+   on 2026-08-01 — finding 1; single-take spoken-text normalization shipped 2026-08-01 as
+   phase 10.)
 7. ~~iOS 900-character single-take limit~~ **shipped 2026-07-24**
    (`IOSGenerationTextLimitPolicy.sharedScriptLimit` 150 → 900, memory-qualified on-device
    proof `ios-engine-20260724-060000-1cc8ef23`; the iOS UI-benchmark `long` cell keeps its
@@ -438,11 +730,13 @@ explicit macOS fixture repair/bootstrap step. XCUITest is the sole autonomous ap
 
 ## Open release work
 
-- **macOS 2.3.0 is the released version** (2026-07-31; notes under
-  [`docs/releases/`](releases/)) — the 2026.07.26.1 artifact generation, Stage 1 warm-speed
-  wins, delivery hardening, and the clone-prime/Wi-Fi-pin fixes, cut with the evidence
-  battery deliberately mid-flight per the deterministic publishing rule. Before it,
-  2.2.0 → 2.2.1 → 2.2.2 landed in one day on 2026-07-25. The 2.2.0 arc hardened the
+- **macOS 2.4.0 is the released version** (2026-08-01; notes under
+  [`docs/releases/`](releases/)) — the verified delivery-preset rework with Neutral as a
+  real preset, iPhone long-form segment regeneration, spoken-text normalization, and the
+  mlx 0.31.6 runtime refresh. Before it, 2.3.0 (2026-07-31) shipped the 2026.07.26.1
+  artifact generation, Stage 1 warm-speed wins, delivery hardening, and the
+  clone-prime/Wi-Fi-pin fixes, cut with the evidence battery deliberately mid-flight per
+  the deterministic publishing rule; 2.2.0 → 2.2.1 → 2.2.2 landed in one day on 2026-07-25. The 2.2.0 arc hardened the
   pipeline (SHA-pinned
   tooling in release jobs, nested-framework signing with an explicit notarization verdict check,
   self-diagnosing dirty-tree evidence errors) and renamed the repository

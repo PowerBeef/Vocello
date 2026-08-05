@@ -152,55 +152,12 @@ struct WorkflowReadinessNote: View {
     }
 }
 
-struct ModelRecoveryCard: View {
-    let title: String
-    let detail: String
-    let primaryActionTitle: String
-    var accentColor: Color = AppTheme.accent
-    var accessibilityIdentifier: String? = nil
-    let onPrimaryAction: () -> Void
-    let onSecondaryAction: () -> Void
-
-    var body: some View {
-        GroupBox {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(alignment: .top, spacing: 10) {
-                    Image(systemName: "square.stack.3d.down.forward")
-                        .font(.subheadline)
-                        .foregroundStyle(accentColor)
-
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(title)
-                            .font(.subheadline.weight(.semibold))
-                        Text(detail)
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
-                HStack(spacing: 10) {
-                    Button(primaryActionTitle, action: onPrimaryAction)
-                        .buttonStyle(.borderedProminent)
-                        .tint(accentColor)
-
-                    Button("Show Models", action: onSecondaryAction)
-                        .buttonStyle(.bordered)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .profileGroupBoxStyle()
-        .optionalAccessibilityIdentifier(accessibilityIdentifier)
-    }
-}
-
 enum StudioCardStyle {
     case standard
     case inline
 }
 
 struct StudioSectionCard<Content: View>: View {
-    @Environment(\.generationPerformanceGate) private var performanceGate
     @Environment(\.cardGlassTint) private var cardGlassTint
 
     let title: String
@@ -261,10 +218,8 @@ struct StudioSectionCard<Content: View>: View {
         }
     }
 
-    @ViewBuilder
     private var styledCard: some View {
-        #if QW_UI_LIQUID
-        if #available(macOS 26, *), !performanceGate {
+        GatedGlass {
             cardContent
                 .padding(12)
                 .background(
@@ -289,12 +244,9 @@ struct StudioSectionCard<Content: View>: View {
                     in: .rect(cornerRadius: 16)
                 )
                 .glass3DDepth(radius: 16, intensity: cardGlassTint == nil ? 1.0 : 1.15)
-        } else {
+        } fallback: {
             legacyStyledCard
         }
-        #else
-        legacyStyledCard
-        #endif
     }
 
     private var legacyStyledCard: some View {
@@ -315,7 +267,6 @@ struct StudioSectionCard<Content: View>: View {
 }
 
 struct CompactConfigurationSection<Content: View>: View {
-    @Environment(\.generationPerformanceGate) private var performanceGate
     @Environment(\.cardGlassTint) private var cardGlassTint
 
     let title: String
@@ -348,9 +299,8 @@ struct CompactConfigurationSection<Content: View>: View {
             panelBody
             .padding(.horizontal, panelPadding)
             .padding(.vertical, max(panelPadding - 1, 0))
-            #if QW_UI_LIQUID
             .background {
-                if #available(macOS 26, *), !performanceGate {
+                GatedGlass {
                     RoundedRectangle(cornerRadius: panelCornerRadius, style: .continuous)
                         .fill(AppTheme.inlineFill)
                         .overlay(
@@ -372,20 +322,10 @@ struct CompactConfigurationSection<Content: View>: View {
                             radius: panelCornerRadius,
                             intensity: cardGlassTint == nil ? 1.0 : 1.15
                         )
-                } else {
+                } fallback: {
                     compactPanelLegacyBackground
                 }
             }
-            #else
-            .background(
-                RoundedRectangle(cornerRadius: panelCornerRadius, style: .continuous)
-                    .fill(AppTheme.inlineFill.opacity(0.58))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: panelCornerRadius, style: .continuous)
-                    .stroke(AppTheme.inlineStroke.opacity(0.24), lineWidth: 1)
-            )
-            #endif
         }
         .optionalAccessibilityIdentifier(accessibilityIdentifier)
     }
@@ -452,7 +392,6 @@ struct CompactConfigurationSection<Content: View>: View {
         }
     }
 
-    #if QW_UI_LIQUID
     private var compactPanelLegacyBackground: some View {
         ZStack {
             RoundedRectangle(cornerRadius: panelCornerRadius, style: .continuous)
@@ -461,7 +400,6 @@ struct CompactConfigurationSection<Content: View>: View {
                 .stroke(AppTheme.inlineStroke.opacity(0.12), lineWidth: 0.5)
         }
     }
-    #endif
 }
 
 struct GenerationSetupRow<Content: View, Supporting: View>: View {
@@ -494,22 +432,46 @@ struct GenerationSetupRow<Content: View, Supporting: View>: View {
         self.supporting = supporting
     }
 
+    /// W1-F: one deterministic width signal decides side-by-side vs stacked,
+    /// and `AnyLayout` preserves child identity across the flip. The previous
+    /// `ViewThatFits` built the content twice per pass and REMOUNTED it on
+    /// breakpoint changes — text fields inside (Clone transcript, Design
+    /// brief) lost first-responder mid-typing when a window resize crossed
+    /// the threshold. Width 0 (pre-first-layout) renders side-by-side, which
+    /// matches every default-window row.
+    @State private var availableWidth: CGFloat = 0
+
+    private var usesSideBySideLayout: Bool {
+        availableWidth == 0
+            || availableWidth >= LayoutConstants.configurationLabelWidth
+                + horizontalSpacing
+                + LayoutConstants.configurationControlMinWidth
+                + 40
+    }
+
+    private var rowLayout: AnyLayout {
+        usesSideBySideLayout
+            ? AnyLayout(HStackLayout(alignment: .center, spacing: horizontalSpacing))
+            : AnyLayout(VStackLayout(alignment: .leading, spacing: stackedSpacing))
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: supportingSpacing) {
-            ViewThatFits(in: .horizontal) {
-                HStack(alignment: .center, spacing: horizontalSpacing) {
-                    labelView
-                        .frame(width: LayoutConstants.configurationLabelWidth, alignment: .leading)
+            rowLayout {
+                labelView
+                    .frame(
+                        width: usesSideBySideLayout
+                            ? LayoutConstants.configurationLabelWidth : nil,
+                        alignment: .leading
+                    )
 
-                    content()
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-
-                VStack(alignment: .leading, spacing: stackedSpacing) {
-                    labelView
-                    content()
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
+                content()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .onGeometryChange(for: CGFloat.self) { proxy in
+                proxy.size.width
+            } action: { width in
+                availableWidth = width
             }
 
             supporting()
@@ -593,6 +555,11 @@ struct GenerationVariantSelector: View {
     var accessibilityPrefix: String
     var isDisabled: Bool = false
 
+    // W1-E: the segment used to be a hard 62x24 that clipped its caption
+    // at larger system text sizes.
+    @ScaledMetric(relativeTo: .caption) private var segmentWidth: CGFloat = 62
+    @ScaledMetric(relativeTo: .caption) private var segmentHeight: CGFloat = 24
+
     private var selectedModel: TTSModel? {
         modelManager.generationActiveVariant(for: mode)
     }
@@ -637,12 +604,11 @@ struct GenerationVariantSelector: View {
             }
         }
         // Match the rest of the app's pickers (EmotionPickerView,
-        // VoiceCloningView transcript + source) — keyboard
-        // focusability stays, only the system blue focus ring is
-        // suppressed so the segment doesn't render a stray
-        // selection halo on first appearance under Full Keyboard
-        // Access.
-        .focusEffectDisabled()
+        // VoiceCloningView transcript + source): keyboard focus shows the
+        // mode-accent ring; the system blue ring stays suppressed inside
+        // the modifier so the segment cannot render a stray selection halo
+        // on first appearance under Full Keyboard Access.
+        .vocelloFocusRing(accentColor, radius: 8)
         .padding(3)
         .background(
             RoundedRectangle(cornerRadius: 8, style: .continuous)
@@ -669,7 +635,7 @@ struct GenerationVariantSelector: View {
             Text(kind.displayName)
                 .font(.caption.weight(.semibold))
                 .lineLimit(1)
-                .frame(width: 62, height: 24)
+                .frame(width: segmentWidth, height: segmentHeight)
                 .foregroundStyle(segmentForeground(isSelected: isSelected, isSelectable: isSelectable))
                 .background { segmentBackground(isSelected: isSelected) }
         }
@@ -767,71 +733,6 @@ struct GenerationVariantSelector: View {
 
 }
 
-struct ConfigurationFieldRow<Content: View, Supporting: View>: View {
-    let label: String
-    var rowVerticalPadding: CGFloat = LayoutConstants.configurationRowVerticalPadding
-    var horizontalSpacing: CGFloat = 16
-    var stackedSpacing: CGFloat = 8
-    var supportingSpacing: CGFloat = 6
-    var accessibilityIdentifier: String? = nil
-    @ViewBuilder let content: () -> Content
-    @ViewBuilder let supporting: () -> Supporting
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: supportingSpacing) {
-            ViewThatFits(in: .horizontal) {
-                HStack(alignment: .top, spacing: horizontalSpacing) {
-                    labelView
-                        .frame(width: LayoutConstants.configurationLabelWidth, alignment: .leading)
-
-                    content()
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-
-                VStack(alignment: .leading, spacing: stackedSpacing) {
-                    labelView
-                    content()
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-            }
-
-            supporting()
-        }
-        .padding(.vertical, rowVerticalPadding)
-        .optionalAccessibilityIdentifier(accessibilityIdentifier)
-    }
-
-    private var labelView: some View {
-        Text(label)
-            .font(.callout.weight(.semibold))
-            .foregroundStyle(.primary)
-    }
-}
-
-extension ConfigurationFieldRow where Supporting == EmptyView {
-    init(
-        label: String,
-        rowVerticalPadding: CGFloat = LayoutConstants.configurationRowVerticalPadding,
-        horizontalSpacing: CGFloat = 16,
-        stackedSpacing: CGFloat = 8,
-        supportingSpacing: CGFloat = 6,
-        accessibilityIdentifier: String? = nil,
-        @ViewBuilder content: @escaping () -> Content
-    ) {
-        self.init(
-            label: label,
-            rowVerticalPadding: rowVerticalPadding,
-            horizontalSpacing: horizontalSpacing,
-            stackedSpacing: stackedSpacing,
-            supportingSpacing: supportingSpacing,
-            accessibilityIdentifier: accessibilityIdentifier,
-            content: content
-        ) {
-            EmptyView()
-        }
-    }
-}
-
 /// Caption-above-control column for the merged configuration line —
 /// the same label idiom as the Delivery panel's "Custom tone" field
 /// (footnote semibold, secondary; tertiary when the control is dimmed).
@@ -849,11 +750,11 @@ struct ConfigurationColumn<Content: View>: View {
             HStack(spacing: 4) {
                 Text(label)
                     .font(.footnote.weight(.semibold))
-                    .foregroundStyle(isEnabled ? .secondary : .tertiary)
+                    .foregroundStyle(isEnabled ? AppTheme.textSecondary : AppTheme.textMuted)
                 if let detail {
                     Text(detail)
                         .font(.footnote.weight(.medium))
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(AppTheme.textMuted)
                 }
             }
 
@@ -976,7 +877,7 @@ struct QwenLanguagePicker: View {
         .menuStyle(.button)
         .buttonStyle(.bordered)
         .menuIndicator(.hidden)
-        .focusEffectDisabled()
+        .vocelloFocusRing(accentColor, radius: 6)
         .frame(minWidth: minWidth, maxWidth: maxWidth, alignment: .leading)
         .tint(accentColor)
         .accessibilityValue(isFollowingDetection ? "\(effectiveLabel), auto" : effectiveLabel)
@@ -1017,56 +918,6 @@ struct QwenLanguagePickerRow: View {
                     accessibilityIdentifier: "\(accessibilityPrefix)_languageHelp"
                 )
             }
-        }
-    }
-}
-
-struct AdaptiveControlDeck<Primary: View, Secondary: View>: View {
-    @ViewBuilder let primary: () -> Primary
-    @ViewBuilder let secondary: () -> Secondary
-
-    var body: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(alignment: .top, spacing: LayoutConstants.generationShellSpacing) {
-                primary()
-                    .frame(
-                        minWidth: LayoutConstants.workflowPrimaryMinWidth,
-                        maxWidth: .infinity,
-                        alignment: .topLeading
-                    )
-                    .layoutPriority(1)
-
-                secondary()
-                    .frame(
-                        minWidth: LayoutConstants.workflowSecondaryMinWidth,
-                        idealWidth: LayoutConstants.workflowSecondaryIdealWidth,
-                        maxWidth: LayoutConstants.workflowSecondaryMaxWidth,
-                        alignment: .topLeading
-                    )
-            }
-
-            VStack(alignment: .leading, spacing: LayoutConstants.generationShellSpacing) {
-                primary()
-                secondary()
-            }
-        }
-    }
-}
-
-struct GenerationStudioShell<Setup: View, Delivery: View, Composer: View>: View {
-    @ViewBuilder let setup: () -> Setup
-    @ViewBuilder let delivery: () -> Delivery
-    @ViewBuilder let composer: () -> Composer
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: LayoutConstants.generationShellSpacing) {
-            AdaptiveControlDeck {
-                setup()
-            } secondary: {
-                delivery()
-            }
-
-            composer()
         }
     }
 }

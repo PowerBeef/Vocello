@@ -558,7 +558,8 @@
             "language",
             "instrument-profile",
             "prosody-calibration",
-            "memory-qualification"
+            "memory-qualification",
+            "ui-perf"
           ]
         },
         "label": {

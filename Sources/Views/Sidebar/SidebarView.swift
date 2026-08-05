@@ -66,20 +66,23 @@ private struct SidebarBrandHeader: View {
 }
 
 private struct SidebarRow: View {
-    @Environment(\.generationPerformanceGate) private var performanceGate
     let item: SidebarItem
     @Binding var selection: SidebarItem?
     let isDisabled: Bool
     @State private var isHovered = false
 
+    // W1-E: the sidebar's 17/14 pt fonts and 22 pt icon slot were fixed
+    // and ignored the system text-size setting.
+    @ScaledMetric(relativeTo: .body) private var iconSize: CGFloat = 17
+    @ScaledMetric(relativeTo: .body) private var labelSize: CGFloat = 14
+    @ScaledMetric(relativeTo: .body) private var iconSlotWidth: CGFloat = 22
+
     private var isSelected: Bool {
         selection == item
     }
 
-    @ViewBuilder
     private var rowBackground: some View {
-        #if QW_UI_LIQUID
-        if #available(macOS 26, *), !performanceGate {
+        GatedGlass {
             if isSelected {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .fill(AppTheme.sidebarSelectionFill)
@@ -112,12 +115,9 @@ private struct SidebarRow: View {
             } else {
                 Color.clear
             }
-        } else {
+        } fallback: {
             legacyRowBackground
         }
-        #else
-        legacyRowBackground
-        #endif
     }
 
     private var legacyRowBackground: some View {
@@ -224,12 +224,12 @@ private struct SidebarRow: View {
                     .frame(width: 3, height: 16)
 
                 Image(systemName: item.iconName)
-                    .font(.system(size: 17, weight: isSelected ? .semibold : .regular))
+                    .font(.system(size: iconSize, weight: isSelected ? .semibold : .regular))
                     .foregroundStyle(iconColor)
-                    .frame(width: 22, alignment: .center)
+                    .frame(width: iconSlotWidth, alignment: .center)
 
                 Text(item.rawValue)
-                    .font(.system(size: 14, weight: isSelected ? .semibold : .regular))
+                    .font(.system(size: labelSize, weight: isSelected ? .semibold : .regular))
                     .foregroundStyle(textColor)
                     .lineLimit(1)
 
@@ -251,8 +251,8 @@ private struct SidebarRow: View {
                     isHovered = false
                 }
             }
-            .appAnimation(.easeOut(duration: 0.14), value: isHovered)
-            .appAnimation(.easeOut(duration: 0.14), value: isSelected)
+            .appAnimation(AppTheme.Motion.state, value: isHovered)
+            .appAnimation(AppTheme.Motion.state, value: isSelected)
             .disabled(isDisabled)
             .accessibilityLabel(item.rawValue)
             .accessibilityValue(accessibilityStateValue)
@@ -318,7 +318,7 @@ struct SidebarView: View {
 
 private struct SidebarFooterRegion: View {
     @EnvironmentObject private var audioPlayer: AudioPlayerViewModel
-    @EnvironmentObject private var ttsEngineStore: TTSEngineStore
+    @Environment(TTSEngineStore.self) private var ttsEngineStore
 
     private let appEngineSelection = AppEngineSelection.current()
 

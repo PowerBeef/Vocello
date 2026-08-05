@@ -67,6 +67,7 @@ private struct SidebarBrandHeader: View {
 
 private struct SidebarRow: View {
     @Environment(\.generationPerformanceGate) private var performanceGate
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     let item: SidebarItem
     @Binding var selection: SidebarItem?
     let isDisabled: Bool
@@ -79,7 +80,7 @@ private struct SidebarRow: View {
     @ViewBuilder
     private var rowBackground: some View {
         #if QW_UI_LIQUID
-        if #available(macOS 26, *), !performanceGate {
+        if #available(macOS 26, *), !reduceTransparency, !performanceGate {
             if isSelected {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .fill(AppTheme.sidebarSelectionFill)

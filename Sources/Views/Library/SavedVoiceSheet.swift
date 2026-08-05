@@ -145,6 +145,7 @@ enum SavedVoiceNameSuggestion {
 
 struct SavedVoiceSheet: View {
     @Environment(\.generationPerformanceGate) private var performanceGate
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @EnvironmentObject private var ttsEngineStore: TTSEngineStore
     @Environment(\.dismiss) private var dismiss
 
@@ -305,7 +306,7 @@ struct SavedVoiceSheet: View {
                         .padding(8)
                         #if QW_UI_LIQUID
                         .background {
-                            if #available(macOS 26, *), !performanceGate {
+                            if #available(macOS 26, *), !reduceTransparency, !performanceGate {
                                 RoundedRectangle(cornerRadius: 10, style: .continuous)
                                     .fill(Color(white: 0.16))
                                     .glassEffect(.regular.tint(AppTheme.smokedGlassTint), in: .rect(cornerRadius: 10))

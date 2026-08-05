@@ -4,6 +4,7 @@ import SwiftUI
 
 struct BatchGenerationSheet: View {
     @Environment(\.generationPerformanceGate) private var performanceGate
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @EnvironmentObject var ttsEngineStore: TTSEngineStore
     @EnvironmentObject var audioPlayer: AudioPlayerViewModel
     @Environment(ModelManagerViewModel.self) var modelManager
@@ -136,7 +137,7 @@ struct BatchGenerationSheet: View {
         .frame(minHeight: 220)
         #if QW_UI_LIQUID
         .background {
-            if #available(macOS 26, *), !performanceGate {
+            if #available(macOS 26, *), !reduceTransparency, !performanceGate {
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
                     .fill(.clear)
                     .glassEffect(.regular.tint(AppTheme.smokedGlassTint), in: .rect(cornerRadius: 10))

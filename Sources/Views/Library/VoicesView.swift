@@ -298,6 +298,7 @@ private extension VoicesView {
 
 private struct VoiceRow: View {
     @Environment(\.generationPerformanceGate) private var performanceGate
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     let voice: Voice
     let isHighlighted: Bool
     let canUseInVoiceCloning: Bool
@@ -341,7 +342,7 @@ private struct VoiceRow: View {
         .padding(.horizontal, 6)
         #if QW_UI_LIQUID
         .background {
-            if #available(macOS 26, *), isHighlighted, !performanceGate {
+            if #available(macOS 26, *), isHighlighted, !reduceTransparency, !performanceGate {
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .fill(.clear)
                     .glassEffect(.regular.tint(AppTheme.accent), in: .rect(cornerRadius: 12))

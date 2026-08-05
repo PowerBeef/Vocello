@@ -152,48 +152,6 @@ struct WorkflowReadinessNote: View {
     }
 }
 
-struct ModelRecoveryCard: View {
-    let title: String
-    let detail: String
-    let primaryActionTitle: String
-    var accentColor: Color = AppTheme.accent
-    var accessibilityIdentifier: String? = nil
-    let onPrimaryAction: () -> Void
-    let onSecondaryAction: () -> Void
-
-    var body: some View {
-        GroupBox {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(alignment: .top, spacing: 10) {
-                    Image(systemName: "square.stack.3d.down.forward")
-                        .font(.subheadline)
-                        .foregroundStyle(accentColor)
-
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(title)
-                            .font(.subheadline.weight(.semibold))
-                        Text(detail)
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
-                HStack(spacing: 10) {
-                    Button(primaryActionTitle, action: onPrimaryAction)
-                        .buttonStyle(.borderedProminent)
-                        .tint(accentColor)
-
-                    Button("Show Models", action: onSecondaryAction)
-                        .buttonStyle(.bordered)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .profileGroupBoxStyle()
-        .optionalAccessibilityIdentifier(accessibilityIdentifier)
-    }
-}
-
 enum StudioCardStyle {
     case standard
     case inline
@@ -201,6 +159,7 @@ enum StudioCardStyle {
 
 struct StudioSectionCard<Content: View>: View {
     @Environment(\.generationPerformanceGate) private var performanceGate
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.cardGlassTint) private var cardGlassTint
 
     let title: String
@@ -264,7 +223,7 @@ struct StudioSectionCard<Content: View>: View {
     @ViewBuilder
     private var styledCard: some View {
         #if QW_UI_LIQUID
-        if #available(macOS 26, *), !performanceGate {
+        if #available(macOS 26, *), !reduceTransparency, !performanceGate {
             cardContent
                 .padding(12)
                 .background(
@@ -316,6 +275,7 @@ struct StudioSectionCard<Content: View>: View {
 
 struct CompactConfigurationSection<Content: View>: View {
     @Environment(\.generationPerformanceGate) private var performanceGate
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.cardGlassTint) private var cardGlassTint
 
     let title: String
@@ -350,7 +310,7 @@ struct CompactConfigurationSection<Content: View>: View {
             .padding(.vertical, max(panelPadding - 1, 0))
             #if QW_UI_LIQUID
             .background {
-                if #available(macOS 26, *), !performanceGate {
+                if #available(macOS 26, *), !reduceTransparency, !performanceGate {
                     RoundedRectangle(cornerRadius: panelCornerRadius, style: .continuous)
                         .fill(AppTheme.inlineFill)
                         .overlay(
@@ -767,71 +727,6 @@ struct GenerationVariantSelector: View {
 
 }
 
-struct ConfigurationFieldRow<Content: View, Supporting: View>: View {
-    let label: String
-    var rowVerticalPadding: CGFloat = LayoutConstants.configurationRowVerticalPadding
-    var horizontalSpacing: CGFloat = 16
-    var stackedSpacing: CGFloat = 8
-    var supportingSpacing: CGFloat = 6
-    var accessibilityIdentifier: String? = nil
-    @ViewBuilder let content: () -> Content
-    @ViewBuilder let supporting: () -> Supporting
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: supportingSpacing) {
-            ViewThatFits(in: .horizontal) {
-                HStack(alignment: .top, spacing: horizontalSpacing) {
-                    labelView
-                        .frame(width: LayoutConstants.configurationLabelWidth, alignment: .leading)
-
-                    content()
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-
-                VStack(alignment: .leading, spacing: stackedSpacing) {
-                    labelView
-                    content()
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-            }
-
-            supporting()
-        }
-        .padding(.vertical, rowVerticalPadding)
-        .optionalAccessibilityIdentifier(accessibilityIdentifier)
-    }
-
-    private var labelView: some View {
-        Text(label)
-            .font(.callout.weight(.semibold))
-            .foregroundStyle(.primary)
-    }
-}
-
-extension ConfigurationFieldRow where Supporting == EmptyView {
-    init(
-        label: String,
-        rowVerticalPadding: CGFloat = LayoutConstants.configurationRowVerticalPadding,
-        horizontalSpacing: CGFloat = 16,
-        stackedSpacing: CGFloat = 8,
-        supportingSpacing: CGFloat = 6,
-        accessibilityIdentifier: String? = nil,
-        @ViewBuilder content: @escaping () -> Content
-    ) {
-        self.init(
-            label: label,
-            rowVerticalPadding: rowVerticalPadding,
-            horizontalSpacing: horizontalSpacing,
-            stackedSpacing: stackedSpacing,
-            supportingSpacing: supportingSpacing,
-            accessibilityIdentifier: accessibilityIdentifier,
-            content: content
-        ) {
-            EmptyView()
-        }
-    }
-}
-
 /// Caption-above-control column for the merged configuration line —
 /// the same label idiom as the Delivery panel's "Custom tone" field
 /// (footnote semibold, secondary; tertiary when the control is dimmed).
@@ -1017,56 +912,6 @@ struct QwenLanguagePickerRow: View {
                     accessibilityIdentifier: "\(accessibilityPrefix)_languageHelp"
                 )
             }
-        }
-    }
-}
-
-struct AdaptiveControlDeck<Primary: View, Secondary: View>: View {
-    @ViewBuilder let primary: () -> Primary
-    @ViewBuilder let secondary: () -> Secondary
-
-    var body: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(alignment: .top, spacing: LayoutConstants.generationShellSpacing) {
-                primary()
-                    .frame(
-                        minWidth: LayoutConstants.workflowPrimaryMinWidth,
-                        maxWidth: .infinity,
-                        alignment: .topLeading
-                    )
-                    .layoutPriority(1)
-
-                secondary()
-                    .frame(
-                        minWidth: LayoutConstants.workflowSecondaryMinWidth,
-                        idealWidth: LayoutConstants.workflowSecondaryIdealWidth,
-                        maxWidth: LayoutConstants.workflowSecondaryMaxWidth,
-                        alignment: .topLeading
-                    )
-            }
-
-            VStack(alignment: .leading, spacing: LayoutConstants.generationShellSpacing) {
-                primary()
-                secondary()
-            }
-        }
-    }
-}
-
-struct GenerationStudioShell<Setup: View, Delivery: View, Composer: View>: View {
-    @ViewBuilder let setup: () -> Setup
-    @ViewBuilder let delivery: () -> Delivery
-    @ViewBuilder let composer: () -> Composer
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: LayoutConstants.generationShellSpacing) {
-            AdaptiveControlDeck {
-                setup()
-            } secondary: {
-                delivery()
-            }
-
-            composer()
         }
     }
 }

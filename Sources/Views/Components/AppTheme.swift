@@ -245,90 +245,13 @@ private struct NativeSurfaceStyle: ViewModifier {
     }
 }
 
-private struct StudioChipStyle: ViewModifier {
-    let isSelected: Bool
-    let color: Color
-
-    // Per the May 2026 audit (Batch 2 — quieter): chips no longer
-    // use Liquid Glass + 3D depth. Glass is reserved for cards /
-    // panels / the primary CTA so the chrome around them reads
-    // quieter and the cards feel more substantial. Single flat code
-    // path for both Liquid + legacy builds.
-    func body(content: Content) -> some View {
-        content
-            .font(.subheadline.weight(.semibold))
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .foregroundStyle(isSelected ? color : .primary)
-            .background(
-                Capsule(style: .continuous)
-                    .fill(
-                        isSelected
-                            ? AppTheme.accentWash(color)
-                            : AppTheme.inlineFill
-                    )
-            )
-            .overlay(
-                Capsule(style: .continuous)
-                    .stroke(
-                        isSelected
-                            ? color.opacity(0.32)
-                            : AppTheme.cardStroke.opacity(0.20),
-                        lineWidth: isSelected ? 1 : 0.75
-                    )
-            )
-            .appAnimation(.easeInOut(duration: 0.15), value: isSelected)
-    }
-}
-
 extension View {
-    func studioCard(
-        padding: CGFloat = LayoutConstants.cardPadding,
-        radius: CGFloat = LayoutConstants.cardRadius
-    ) -> some View {
-        modifier(NativeSurfaceStyle(padding: padding, radius: radius, fill: AppTheme.cardFill))
-    }
-
-    func glassCard() -> some View {
-        studioCard(padding: LayoutConstants.glassCardPadding, radius: LayoutConstants.cardRadius)
-    }
-
-    func stageCard() -> some View {
-        modifier(NativeSurfaceStyle(padding: 0, radius: LayoutConstants.stageRadius, fill: AppTheme.stageFill))
-    }
-
     func inlinePanel(padding: CGFloat = 14, radius: CGFloat = 16) -> some View {
         modifier(NativeSurfaceStyle(padding: padding, radius: radius, fill: AppTheme.inlineFill))
     }
 
     func appAnimation<Value: Equatable>(_ animation: Animation?, value: Value) -> some View {
         self.animation(AppLaunchConfiguration.current.animation(animation), value: value)
-    }
-
-    func studioChip(isSelected: Bool, color: Color) -> some View {
-        modifier(StudioChipStyle(isSelected: isSelected, color: color))
-    }
-
-    func chipStyle(isSelected: Bool, color: Color) -> some View {
-        modifier(StudioChipStyle(isSelected: isSelected, color: color))
-    }
-
-    func voiceChoiceChip(isSelected: Bool, color: Color) -> some View {
-        modifier(StudioChipStyle(isSelected: isSelected, color: color))
-    }
-}
-
-private struct ToolbarRowStyle: ViewModifier {
-    let label: String
-
-    func body(content: Content) -> some View {
-        HStack(alignment: .center, spacing: 10) {
-            Text(label.uppercased())
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .frame(width: 52, alignment: .leading)
-            content
-        }
     }
 }
 
@@ -428,127 +351,6 @@ private struct Glass3DDepthStyle: ViewModifier {
     }
 }
 
-struct SectionHeaderStyle: ViewModifier {
-    func body(content: Content) -> some View {
-        content
-            .font(.subheadline.weight(.semibold))
-            .foregroundStyle(.secondary)
-    }
-}
-
-struct GlowingGradientButtonStyle: ButtonStyle {
-    let baseColor: Color
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-    @Environment(\.generationPerformanceGate) private var performanceGate
-
-    func makeBody(configuration: Configuration) -> some View {
-        #if QW_UI_LIQUID
-        if #available(macOS 26, *), !reduceTransparency, !performanceGate {
-            configuration.label
-                .font(.body.weight(.semibold))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
-                .glassEffect(.regular.tint(baseColor), in: .rect(cornerRadius: 8))
-                .opacity(configuration.isPressed ? 0.75 : 1.0)
-                .appAnimation(.easeInOut(duration: 0.15), value: configuration.isPressed)
-        } else {
-            legacyBody(configuration: configuration)
-        }
-        #else
-        legacyBody(configuration: configuration)
-        #endif
-    }
-
-    private func legacyBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.body.weight(.semibold))
-            .foregroundStyle(.white)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
-            .background(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(baseColor.opacity(configuration.isPressed ? 0.75 : 0.95))
-            )
-            .appAnimation(.easeInOut(duration: 0.15), value: configuration.isPressed)
-    }
-}
-
-struct CompactGenerateButtonStyle: ButtonStyle {
-    let baseColor: Color
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-    @Environment(\.generationPerformanceGate) private var performanceGate
-
-    func makeBody(configuration: Configuration) -> some View {
-        #if QW_UI_LIQUID
-        if #available(macOS 26, *), !reduceTransparency, !performanceGate {
-            configuration.label
-                .foregroundStyle(.white)
-                .padding(12)
-                .glassEffect(.regular.tint(baseColor), in: .circle)
-                .opacity(configuration.isPressed ? 0.75 : 1.0)
-                .appAnimation(.easeInOut(duration: 0.15), value: configuration.isPressed)
-        } else {
-            legacyBody(configuration: configuration)
-        }
-        #else
-        legacyBody(configuration: configuration)
-        #endif
-    }
-
-    private func legacyBody(configuration: Configuration) -> some View {
-        configuration.label
-            .foregroundStyle(.white)
-            .padding(12)
-            .background(
-                Circle()
-                    .fill(baseColor.opacity(configuration.isPressed ? 0.75 : 0.95))
-            )
-            .appAnimation(.easeInOut(duration: 0.15), value: configuration.isPressed)
-    }
-}
-
-struct AuroraBackground: View {
-    var body: some View {
-        #if QW_UI_LIQUID
-        if #available(macOS 26, *) {
-            LinearGradient(
-                colors: [
-                    Color(red: 0.06, green: 0.07, blue: 0.09),
-                    Color(red: 0.10, green: 0.11, blue: 0.13),
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            ).ignoresSafeArea()
-        } else {
-            AppTheme.canvasBackground.ignoresSafeArea()
-        }
-        #else
-        AppTheme.canvasBackground.ignoresSafeArea()
-        #endif
-    }
-}
-
-struct EmptyStateStyle: ViewModifier {
-    func body(content: Content) -> some View {
-        content.foregroundStyle(.secondary)
-    }
-}
-
-extension View {
-    func toolbarRow(_ label: String) -> some View {
-        modifier(ToolbarRowStyle(label: label))
-    }
-
-    func sectionHeader() -> some View {
-        modifier(SectionHeaderStyle())
-    }
-
-    func emptyStateStyle() -> some View {
-        modifier(EmptyStateStyle())
-    }
-}
-
 // MARK: - Studio GroupBox Style (material-based legacy fallback)
 
 struct StudioGroupBoxStyle: GroupBoxStyle {
@@ -631,18 +433,6 @@ struct GlassGroupBoxStyle: GroupBoxStyle {
 #endif
 
 extension View {
-    /// Wraps content in a GlassEffectContainer on liquid builds.
-    @ViewBuilder
-    func liquidGlassContainer(spacing: CGFloat = 8) -> some View {
-        #if QW_UI_LIQUID
-        if #available(macOS 26, *) {
-            GlassEffectContainer(spacing: spacing) { self }
-        } else { self }
-        #else
-        self
-        #endif
-    }
-
     /// Profile-aware background: clear for liquid, specified color for legacy.
     @ViewBuilder
     func profileBackground(_ legacyColor: Color) -> some View {

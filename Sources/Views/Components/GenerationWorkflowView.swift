@@ -454,22 +454,46 @@ struct GenerationSetupRow<Content: View, Supporting: View>: View {
         self.supporting = supporting
     }
 
+    /// W1-F: one deterministic width signal decides side-by-side vs stacked,
+    /// and `AnyLayout` preserves child identity across the flip. The previous
+    /// `ViewThatFits` built the content twice per pass and REMOUNTED it on
+    /// breakpoint changes — text fields inside (Clone transcript, Design
+    /// brief) lost first-responder mid-typing when a window resize crossed
+    /// the threshold. Width 0 (pre-first-layout) renders side-by-side, which
+    /// matches every default-window row.
+    @State private var availableWidth: CGFloat = 0
+
+    private var usesSideBySideLayout: Bool {
+        availableWidth == 0
+            || availableWidth >= LayoutConstants.configurationLabelWidth
+                + horizontalSpacing
+                + LayoutConstants.configurationControlMinWidth
+                + 40
+    }
+
+    private var rowLayout: AnyLayout {
+        usesSideBySideLayout
+            ? AnyLayout(HStackLayout(alignment: .center, spacing: horizontalSpacing))
+            : AnyLayout(VStackLayout(alignment: .leading, spacing: stackedSpacing))
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: supportingSpacing) {
-            ViewThatFits(in: .horizontal) {
-                HStack(alignment: .center, spacing: horizontalSpacing) {
-                    labelView
-                        .frame(width: LayoutConstants.configurationLabelWidth, alignment: .leading)
+            rowLayout {
+                labelView
+                    .frame(
+                        width: usesSideBySideLayout
+                            ? LayoutConstants.configurationLabelWidth : nil,
+                        alignment: .leading
+                    )
 
-                    content()
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-
-                VStack(alignment: .leading, spacing: stackedSpacing) {
-                    labelView
-                    content()
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
+                content()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .onGeometryChange(for: CGFloat.self) { proxy in
+                proxy.size.width
+            } action: { width in
+                availableWidth = width
             }
 
             supporting()
@@ -553,6 +577,11 @@ struct GenerationVariantSelector: View {
     var accessibilityPrefix: String
     var isDisabled: Bool = false
 
+    // W1-E: the segment used to be a hard 62x24 that clipped its caption
+    // at larger system text sizes.
+    @ScaledMetric(relativeTo: .caption) private var segmentWidth: CGFloat = 62
+    @ScaledMetric(relativeTo: .caption) private var segmentHeight: CGFloat = 24
+
     private var selectedModel: TTSModel? {
         modelManager.generationActiveVariant(for: mode)
     }
@@ -628,7 +657,7 @@ struct GenerationVariantSelector: View {
             Text(kind.displayName)
                 .font(.caption.weight(.semibold))
                 .lineLimit(1)
-                .frame(width: 62, height: 24)
+                .frame(width: segmentWidth, height: segmentHeight)
                 .foregroundStyle(segmentForeground(isSelected: isSelected, isSelectable: isSelectable))
                 .background { segmentBackground(isSelected: isSelected) }
         }

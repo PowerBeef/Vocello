@@ -73,6 +73,12 @@ private struct SidebarRow: View {
     let isDisabled: Bool
     @State private var isHovered = false
 
+    // W1-E: the sidebar's 17/14 pt fonts and 22 pt icon slot were fixed
+    // and ignored the system text-size setting.
+    @ScaledMetric(relativeTo: .body) private var iconSize: CGFloat = 17
+    @ScaledMetric(relativeTo: .body) private var labelSize: CGFloat = 14
+    @ScaledMetric(relativeTo: .body) private var iconSlotWidth: CGFloat = 22
+
     private var isSelected: Bool {
         selection == item
     }
@@ -225,12 +231,12 @@ private struct SidebarRow: View {
                     .frame(width: 3, height: 16)
 
                 Image(systemName: item.iconName)
-                    .font(.system(size: 17, weight: isSelected ? .semibold : .regular))
+                    .font(.system(size: iconSize, weight: isSelected ? .semibold : .regular))
                     .foregroundStyle(iconColor)
-                    .frame(width: 22, alignment: .center)
+                    .frame(width: iconSlotWidth, alignment: .center)
 
                 Text(item.rawValue)
-                    .font(.system(size: 14, weight: isSelected ? .semibold : .regular))
+                    .font(.system(size: labelSize, weight: isSelected ? .semibold : .regular))
                     .foregroundStyle(textColor)
                     .lineLimit(1)
 

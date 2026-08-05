@@ -21,6 +21,9 @@ struct TextInputView: View {
     var pinnedSeed: Binding<UInt64?>? = nil
 
     @State private var isEditorFocused = false
+    /// W1-E: scales the seed chip's fixed micro-glyph sizes with the
+    /// system text-size setting (base ×1 keeps today's default rendering).
+    @ScaledMetric(relativeTo: .caption) private var glyphScale: CGFloat = 1
 
     private var isTextEmptyForGeneration: Bool {
         text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -108,7 +111,7 @@ struct TextInputView: View {
     private func seedPinChip(binding: Binding<UInt64?>, seedValue: UInt64) -> some View {
         HStack(spacing: 5) {
             Image(systemName: "pin.fill")
-                .font(.system(size: 9))
+                .font(.system(size: 9 * glyphScale))
                 .foregroundStyle(buttonColor)
             Text("Seed \(String(seedValue))")
                 .font(.footnote.monospacedDigit())
@@ -118,7 +121,7 @@ struct TextInputView: View {
                 binding.wrappedValue = nil
             } label: {
                 Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 11))
+                    .font(.system(size: 11 * glyphScale))
                     .foregroundStyle(AppTheme.textMuted)
             }
             .buttonStyle(.plain)

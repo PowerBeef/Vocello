@@ -32,7 +32,7 @@
     {
       "id": "macos-ui-2026-08",
       "title": "macOS UI performance harness, measured review, and staged refresh",
-      "status": "active",
+      "status": "complete",
       "owner": "macos",
       "adopted": "2026-08-04",
       "goal": "Give the macOS app a deterministic SwiftUI frame-health lane, use it to baseline and rank the UI's real costs, land the maintainer-approved safe fixes, and stage a brand-preserving refresh gated on the maintainer's remote review of the proposals artifact.",
@@ -682,9 +682,14 @@
       "id": "UI-7",
       "plan": "macos-ui-2026-08",
       "title": "Registry formalization of the perf lane (benchmark-history kind, thresholds from repeated baselines)",
-      "status": "planned",
-      "gate": "Follows the prosody-calibration precedent: schema enums, metric allowlist, orchestration workflow, and thresholds only after repeated baselines establish spread.",
-      "updated": "2026-08-05"
+      "status": "done",
+      "gate": "ui-perf is a registered PASS-only benchmark kind (prosody-calibration precedent): schema v2/v3 enums, bounded uiperf metric allowlist, kind semantics validator (one take per scenario, no model/telemetry/QC claims, coverage and refresh sanity), harness-hash binding, and warn-only ceilings in config/ui-perf-thresholds.json derived from baseline-v2 medians. The perf lane emits evidence on canonical hardware and publishes via benchmark_history record; five offline self-tests cover the gate, thresholds, and take identities, and the first live record published from the real baseline-v2 v5 run (exploratory by honest late-publication provenance; canonical records mint from in-run publications). Hard ceilings wait for repeated baseline sessions.",
+      "updated": "2026-08-05",
+      "evidence": [
+        "file:config/ui-perf-thresholds.json",
+        "file:benchmarks/runs/ui-perf/macos-xcui-perf-20260805-092804-98c69168.json",
+        "file:scripts/tests/test_check_macos_ui_perf.py"
+      ]
     }
   ]
 }

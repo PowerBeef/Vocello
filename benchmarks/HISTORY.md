@@ -1038,3 +1038,9 @@ cross-project comparisons.
 | completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
 |---|---|---|---|---|---|---:|---|---|---|---|
 | 2026-07-23 | [`macos-xcui-benchmark-20260723-074746-40ab73d6`](runs/ui-generation/macos-xcui-benchmark-20260723-074746-40ab73d6.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 4 | `495a77e6c4ad` dirty | `excluded` | baseline | macos-xcui-benchmark-20260723-074746-40ab73d6 |
+
+## ui-perf / macos / mac-mini-m2-8gb / config `c6729d972efe`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---|---|---|---|
+| 2026-08-05 | [`macos-xcui-perf-20260805-092804-98c69168`](runs/ui-perf/macos-xcui-perf-20260805-092804-98c69168.json) | canonical | exploratory | passed | not-applicable | 9 | `c8c86d7075ae` dirty | `excluded` | baseline | macos-xcui-perf-20260805-092804-98c69168 |

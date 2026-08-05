@@ -7,15 +7,21 @@ in-app frame probe's continuous 500 ms rows
 (``diagnostics/ui-perf/frames-<launchEpochMS>-<scenario>.jsonl``), and emits
 ``ui-perf-report.json`` under the run directory.
 
-Phase-1 posture, deliberate:
+Phase-2 posture (UI-7, 2026-08-05):
 
-* **Local evidence only** (``"evidence": "local-only"``): no benchmark-history
-  record is ever written by this lane; registry formalization is a separate
-  roadmap item (`prosody-calibration` is the precedent when it happens).
-* **No performance thresholds.** The gate is structural: every expected
-  scenario present exactly once, probe coverage of each marked window >= the
-  floor, monotonic block timestamps, a sane refresh interval. Thresholds are
-  set only after repeated baselines establish medians and spread.
+* **The gate stays structural**: every expected scenario present exactly
+  once, probe coverage of each marked window >= the floor, monotonic block
+  timestamps, a sane refresh interval.
+* **Thresholds are warn-only** (``config/ui-perf-thresholds.json``, derived
+  from the baseline-v2 medians): a ceiling breach marks the scenario and run
+  ``passedWithWarnings`` and never fails the gate or blocks publication.
+  Promotion to hard ceilings waits for repeated baseline sessions.
+* **Registry publication** (``--emit-evidence``): on the canonical hardware
+  profile the checker writes ``benchmark-evidence.json`` for
+  ``benchmark_history.py record`` (kind ``ui-perf``, one take per scenario,
+  no model/telemetry/QC claims — the ``prosody-calibration`` precedent).
+  Non-canonical hosts keep local-only reports; a dirty or late publication
+  classifies ``exploratory`` via the standard source provenance.
 * The probe measures main-run-loop display-link cadence — a proxy for
   UI-thread hitching, not compositor-level presents (stated in the report).
 """
@@ -23,11 +29,15 @@ from __future__ import annotations
 
 import argparse
 import base64
+import hashlib
 import json
 import math
 import shutil
 import sys
 from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_THRESHOLDS_PATH = REPO_ROOT / "config" / "ui-perf-thresholds.json"
 
 EXPECTED_SCENARIOS = [
     "idle-baseline",
@@ -210,6 +220,121 @@ def summarize_scenario(marker: dict, rows: list[dict]) -> dict:
     }, coverage
 
 
+def load_thresholds(path: Path) -> dict:
+    thresholds = json.loads(path.read_text(encoding="utf-8"))
+    if thresholds.get("schemaVersion") != 1 or thresholds.get("warnOnly") is not True:
+        raise GateError(f"unsupported thresholds contract: {path}")
+    return thresholds
+
+
+def evaluate_thresholds(summary: dict, thresholds: dict) -> list[str]:
+    """Warn-only ceilings (UI-7): a breach never fails the gate; it marks the
+    scenario and run passedWithWarnings so the registry shows the drift."""
+    scenario = summary["scenario"]
+    warnings = []
+    hitch_ceiling = thresholds["hitchCeilingMSPerS"].get(scenario)
+    if hitch_ceiling is not None and summary["hitchTimeMSPerS"] > hitch_ceiling:
+        warnings.append(
+            f"uiperf.hitch:{scenario}"
+            f"({round(summary['hitchTimeMSPerS'])}/{round(hitch_ceiling)})"
+        )
+    gap_ceiling = thresholds["maxGapCeilingMS"].get(scenario)
+    if gap_ceiling is not None and summary["maxGapMS"] > gap_ceiling:
+        warnings.append(
+            f"uiperf.maxgap:{scenario}"
+            f"({round(summary['maxGapMS'])}/{round(gap_ceiling)})"
+        )
+    return warnings
+
+
+def take_metrics(summary: dict) -> dict:
+    metrics = {
+        "uiHitchTimeMSPerS": summary["hitchTimeMSPerS"],
+        "uiMaxGapMS": summary["maxGapMS"],
+        "uiFramesDelivered": summary["framesDelivered"],
+        "uiExpectedFrames": summary["expectedFrames"],
+        "uiProbeCoverage": summary["probeCoverage"],
+        "uiRefreshIntervalMS": summary["refreshIntervalMS"],
+        "uiWindowDurationMS": summary["durationMS"],
+        "uiActionCount": summary["actionCount"],
+        "cpuUserSeconds": round(summary["cpuUserMS"] / 1000.0, 3),
+        "cpuSystemSeconds": round(summary["cpuSystemMS"] / 1000.0, 3),
+    }
+    optional = {
+        "uiP95GapMSApprox": summary.get("p95GapMSApprox"),
+        "physicalFootprintStartMB": summary.get("footprintStartMB"),
+        "peakPhysicalFootprintMB": summary.get("footprintPeakMB"),
+        "physicalFootprintDeltaMB": summary.get("footprintDeltaMB"),
+        "uiMaximumDelayedHeartbeatMS": summary.get("launchMaxStallMS"),
+        "delayedHeartbeatCount": summary.get("launchStalls50"),
+    }
+    metrics.update({key: value for key, value in optional.items() if value is not None})
+    return metrics
+
+
+def build_evidence_manifest(
+    run_id: str,
+    label: str,
+    scenarios: list[dict],
+    scenario_warnings: dict[str, list[str]],
+    probe_digest: str,
+    profile_id: str,
+) -> dict:
+    takes = []
+    for index, summary in enumerate(scenarios, start=1):
+        scenario = summary["scenario"]
+        warnings = scenario_warnings.get(scenario, [])
+        takes.append({
+            "takeIndex": index,
+            "generationID": f"{run_id}-{scenario}",
+            "cell": f"ui-perf/{scenario}",
+            "mode": "not-applicable",
+            "modelID": "not-applicable",
+            "variant": "not-applicable",
+            "warmState": "not-applicable",
+            "length": "not-applicable",
+            "finishReason": "completed",
+            "status": "passedWithWarnings" if warnings else "passed",
+            "thermalState": (summary.get("thermalStates") or ["unknown"])[-1],
+            "metrics": take_metrics(summary),
+            "warnings": warnings,
+        })
+    run_warnings = sorted({code for codes in scenario_warnings.values() for code in codes})
+    status = "passedWithWarnings" if run_warnings else "passed"
+    return {
+        "schemaVersion": 1,
+        "benchmarkKind": "ui-perf",
+        "platform": "macos",
+        "runID": run_id,
+        "status": status,
+        "label": label or run_id,
+        "historyRecord": {
+            "run": {
+                "id": run_id,
+                "kind": "ui-perf",
+                "platform": "macos",
+                "status": status,
+                "label": label or run_id,
+                "matrixScope": "canonical",
+                "warnings": run_warnings,
+            },
+            "hardware": {"profileID": profile_id},
+            "models": [],
+            "evidence": {
+                "validatorPassed": True,
+                "crashDeltaPassed": True,
+                "crashCount": 0,
+                "expectedTakeCount": len(EXPECTED_SCENARIOS),
+                "actualTakeCount": len(takes),
+                "telemetrySchemaVersion": "not-applicable",
+                "qcAlgorithmVersion": "not-applicable",
+                "rawTelemetryDigest": probe_digest,
+            },
+            "takes": takes,
+        },
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--xcodebuild-log", required=True)
@@ -221,10 +346,22 @@ def main() -> int:
         "--copy-probe-files-to",
         help="directory receiving copies of the matched probe JSONL files",
     )
+    parser.add_argument(
+        "--thresholds", type=Path, default=DEFAULT_THRESHOLDS_PATH,
+        help="warn-only ceiling contract (config/ui-perf-thresholds.json)",
+    )
+    parser.add_argument("--label", default="")
+    parser.add_argument(
+        "--emit-evidence", action="store_true",
+        help="write benchmark-evidence.json beside the report when the live "
+        "host matches the canonical hardware profile (registry publication "
+        "input; skipped with a note on non-canonical hardware)",
+    )
     args = parser.parse_args()
 
     ui_perf_dir = Path(args.diagnostics).expanduser() / "ui-perf"
     try:
+        thresholds = load_thresholds(args.thresholds)
         markers = parse_markers(Path(args.xcodebuild_log))
         missing = [s for s in EXPECTED_SCENARIOS if s not in markers]
         if missing:
@@ -234,6 +371,8 @@ def main() -> int:
             raise GateError(f"unexpected scenario markers: {', '.join(unexpected)}")
 
         scenarios = []
+        scenario_warnings: dict[str, list[str]] = {}
+        probe_hash = hashlib.sha256()
         for name in EXPECTED_SCENARIOS:
             probe_path = find_probe_file(ui_perf_dir, name, args.run_started_epoch_ms)
             rows = load_probe_rows(probe_path)
@@ -250,7 +389,11 @@ def main() -> int:
                     f"{COVERAGE_FLOOR:.0%} of the marked window"
                 )
             summary["probeFile"] = probe_path.name
+            warnings = evaluate_thresholds(summary, thresholds)
+            summary["thresholdWarnings"] = warnings
+            scenario_warnings[name] = warnings
             scenarios.append(summary)
+            probe_hash.update(probe_path.read_bytes())
             if args.copy_probe_files_to:
                 destination = Path(args.copy_probe_files_to)
                 destination.mkdir(parents=True, exist_ok=True)
@@ -259,10 +402,13 @@ def main() -> int:
         print(f"ui-perf gate FAILED: {error}", file=sys.stderr)
         return 1
 
+    run_warnings = sorted({code for codes in scenario_warnings.values() for code in codes})
     report = {
         "schemaVersion": 1,
-        "evidence": "local-only",
+        "evidence": "registry" if args.emit_evidence else "local-only",
         "runID": args.run_id,
+        "status": "passedWithWarnings" if run_warnings else "passed",
+        "thresholds": {"path": str(args.thresholds), "warnOnly": True, "warnings": run_warnings},
         "measurement": "main-run-loop display-link cadence (UI-thread hitch proxy; "
         "not compositor presents; interaction-issued XCUITest accessibility "
         "queries execute on the app main thread — scenarios minimize them "
@@ -274,11 +420,35 @@ def main() -> int:
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     for row in scenarios:
+        flag = " !" + ",".join(row["thresholdWarnings"]) if row["thresholdWarnings"] else ""
         print(
             f"  {row['scenario']:20} hitch {row['hitchTimeMSPerS']:>8} ms/s  "
             f"maxGap {row['maxGapMS']:>8} ms  frames {row['framesDelivered']:>6}  "
-            f"coverage {row['probeCoverage']:.0%}  [{row['designation']}]"
+            f"coverage {row['probeCoverage']:.0%}  [{row['designation']}]{flag}"
         )
+
+    if args.emit_evidence:
+        sys.path.insert(0, str(REPO_ROOT / "scripts"))
+        import publish_benchmark_history as publisher
+        try:
+            profile_id = publisher.verify_canonical_hardware("macos")["profileID"]
+        except publisher.PublicationError as error:
+            print(f"ui-perf evidence skipped (non-canonical hardware): {error}")
+        else:
+            manifest = build_evidence_manifest(
+                run_id=args.run_id,
+                label=args.label,
+                scenarios=scenarios,
+                scenario_warnings=scenario_warnings,
+                probe_digest=probe_hash.hexdigest(),
+                profile_id=profile_id,
+            )
+            evidence_path = output.parent / "benchmark-evidence.json"
+            evidence_path.write_text(
+                json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+            )
+            print(f"ui-perf evidence -> {evidence_path}")
+
     print(f"ui-perf gate PASS: {len(scenarios)} scenarios -> {output}")
     return 0
 

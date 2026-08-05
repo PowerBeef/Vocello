@@ -61,7 +61,11 @@ exploratory and the app-real scroll cost is ~210 ms/s. **Wave 2 shipped the same
 core-tested HistoryDeletionEngine, GenerationLifecycleExecutor dedup, and the
 LiveStreamingPlaybackEngine player extraction — full deterministic suite, both
 compiles, 7/7 smoke, and a clean 5-run baseline-v2 (settings-scroll measured a
-verified-genuine 0.0 ms/s). Remaining in the plan: UI-7 registry formalization.
+verified-genuine 0.0 ms/s). **UI-7 then closed the plan the same day**: `ui-perf` is a
+registered PASS-only benchmark kind with warn-only baseline-v2-derived ceilings
+(`config/ui-perf-thresholds.json`), canonical-hardware-gated publication from the lane,
+five offline self-tests, and a first live record. The `macos-ui-2026-08` plan is
+**complete**; History row thinning proceeds via Instruments whenever wanted.
 
 The pre-UI-arc checkpoint (2026-08-01) follows.
 

@@ -642,6 +642,7 @@ python3 -m unittest \
   scripts.tests.test_doc_metadata \
   scripts.tests.test_roadmap \
   scripts.tests.test_check_surface_coverage \
+  scripts.tests.test_check_macos_ui_perf \
   scripts.tests.test_publish_benchmark_history \
   scripts.tests.test_check_ios_clone_conditioning \
   scripts.tests.test_check_ios_smoke_acceptance \

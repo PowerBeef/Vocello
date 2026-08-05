@@ -288,9 +288,10 @@
         "perf-validation"
       ],
       "optionalSteps": [
+        "history-publication",
         "result-retention",
-        "ui-preflight",
-        "ui-build"
+        "ui-build",
+        "ui-preflight"
       ]
     }
   }

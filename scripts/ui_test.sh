@@ -94,8 +94,8 @@ while [[ $# -gt 0 ]]; do
 done
 validate_benchmark_label "$label"
 
-if [[ "$lane" != "benchmark" && "$lane" != "delivery-cohort" ]] && [[ -n "$label" ]]; then
-  die "--label is accepted only by the benchmark and delivery-cohort lanes"
+if [[ "$lane" != "benchmark" && "$lane" != "delivery-cohort" && "$lane" != "perf" ]] && [[ -n "$label" ]]; then
+  die "--label is accepted only by the benchmark, delivery-cohort, and perf lanes"
 fi
 if [[ "$lane" != "benchmark" && ( "$modes" != "custom,design,clone" || "$lengths" != "short,medium,long" || "$warm" != 3 ) ]]; then
   die "benchmark flags are accepted only by the benchmark lane"
@@ -729,6 +729,9 @@ run_xcodebuild() {
 
 validate_macos_ui_perf() {
   local diagnostics="$HOME/Library/Application Support/QwenVoice-Debug/diagnostics"
+  # --emit-evidence writes benchmark-evidence.json only when the live host
+  # matches the canonical hardware profile (UI-7); non-canonical hosts keep
+  # local-only reports and the publication step below no-ops.
   python3 "$ROOT_DIR/scripts/check_macos_ui_perf.py" \
     --xcodebuild-log "$out/xcodebuild.log" \
     --diagnostics "$diagnostics" \
@@ -736,6 +739,8 @@ validate_macos_ui_perf() {
     --run-started-epoch-ms "$perf_run_started_epoch_ms" \
     --output "$out/ui-perf-report.json" \
     --copy-probe-files-to "$out/diagnostics/ui-perf" \
+    --label "$label" \
+    --emit-evidence \
     >"$out/ui-perf-gate.txt" 2>&1
   local status=$?
   cat "$out/ui-perf-gate.txt" >&2
@@ -1030,6 +1035,16 @@ if [[ "$lane" == "benchmark" ]]; then
     die "benchmark passed, but history publication failed; evidence is preserved in $out (repair: python3 scripts/benchmark_history.py record --artifact-dir '$out')"
   fi
   note "tracked benchmark record → $history_record"
+fi
+
+# UI-7: perf runs publish only when the checker emitted evidence (canonical
+# hardware); non-canonical hosts keep local-only reports by design.
+if [[ "$lane" == "perf" && -f "$out/benchmark-evidence.json" ]]; then
+  if ! history_record="$(required_step_run "$step_ledger" history-publication \
+      python3 "$ROOT_DIR/scripts/benchmark_history.py" record --artifact-dir "$out")"; then
+    die "perf lane passed, but history publication failed; evidence is preserved in $out (repair: python3 scripts/benchmark_history.py record --artifact-dir '$out')"
+  fi
+  note "tracked ui-perf record → $history_record"
 fi
 
 # Keep the most recent passing result for each platform/lane only after this

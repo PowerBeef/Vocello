@@ -41,7 +41,10 @@ Before changing macOS app or XPC code, read:
   - `scripts/macos_test.sh profile [--kind cpu|memory] [--keep-trace] [spec]`
   - `scripts/macos_test.sh memory [--label ID]` (fixed retained-memory qualification)
   - `scripts/macos_test.sh models check|ensure|install`
-  - `scripts/ui_test.sh macos smoke|benchmark`
+  - `scripts/ui_test.sh macos smoke|benchmark|perf` — the perf lane's warn-only frame-health
+    ceilings live in [`config/ui-perf-thresholds.json`](../../config/ui-perf-thresholds.json)
+    (baseline-v2-derived; breaches mark `passedWithWarnings`, never fail the lane), and on the
+    canonical hardware profile a PASS publishes a `ui-perf` registry record
   - `./scripts/regenerate_project.sh` after `project.yml` changes
 - When an XcodeBuildMCP server is installed and callable, use the one shared route for optional
   macOS project discovery, build, run, and debug: call `session_show_defaults`, select the `macos`

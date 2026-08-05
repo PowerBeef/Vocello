@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "basis": "baseline-v2 medians (2026-08-05: five counted runs on the corrected window-anchored scenarios, wave-2 tree, Mac mini M2 8 GB) plus generous first-cut margin. Warn-only: a breach marks the scenario and run passedWithWarnings and never blocks publication; promotion to hard ceilings requires repeated baseline sessions showing stable spread.",
+  "warnOnly": true,
+  "confirmatoryScenarios": [
+    "idle-baseline",
+    "sidebar-navigation",
+    "delivery-menu",
+    "settings-scroll",
+    "composer-typing"
+  ],
+  "hitchCeilingMSPerS": {
+    "idle-baseline": 5.0,
+    "settings-scroll": 15.0,
+    "composer-typing": 60.0,
+    "sidebar-navigation": 150.0,
+    "delivery-menu": 150.0
+  },
+  "maxGapCeilingMS": {
+    "idle-baseline": 40.0,
+    "settings-scroll": 40.0,
+    "composer-typing": 130.0,
+    "sidebar-navigation": 340.0,
+    "delivery-menu": 140.0
+  }
+}

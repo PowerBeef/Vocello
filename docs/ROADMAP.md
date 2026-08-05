@@ -12,7 +12,7 @@
 | `convergence-metal4-stage4-2026-08` | active | backend-and-platform | 5/7 (71%) |
 | `delivery-prompting-2026-08` | active | backend-mlx | 18/20 (90%) |
 | `doc-governance-2026-08` | active | release-qa | 8/9 (89%) |
-| `macos-ui-2026-08` | active | macos | 6/7 (86%) |
+| `macos-ui-2026-08` | complete | macos | 7/7 (100%) |
 
 ## Convergence residuals, Metal 4 study, and Stage 4
 
@@ -106,7 +106,7 @@ Narrative authority: [`docs/reference/repository-self-verification.md`](referenc
 
 ## macOS UI performance harness, measured review, and staged refresh
 
-`macos-ui-2026-08` · **active** · macos · adopted 2026-08-04
+`macos-ui-2026-08` · **complete** · macos · adopted 2026-08-04
 
 Give the macOS app a deterministic SwiftUI frame-health lane, use it to baseline and rank the UI's real costs, land the maintainer-approved safe fixes, and stage a brand-preserving refresh gated on the maintainer's remote review of the proposals artifact.
 
@@ -120,9 +120,4 @@ Narrative authority: [`docs/reference/macos-ui-refresh-2026-08.md`](reference/ma
 | `UI-4` | done | Safe fixes: dead-UI-code removal + Reduce Transparency at direct glass sites | `commit:99d746d` |
 | `UI-5` | done | Refinement wave 1 (warm text ramp, motion family, focus rings, scoped observation, type scaling, stable resize fields, glass helper) | `commit:4e0c7cf`, `commit:bc7c108`, `commit:357d482`, `commit:20e14b2`, `file:docs/reference/macos-ui-refresh-2026-08.md` |
 | `UI-6` | done | Wave 2 re-engineering: store observation migration, History/Voices coordinators, shared generation lifecycle, player split | `file:docs/reference/macos-ui-refresh-2026-08.md`, `file:Sources/QwenVoiceCore/HistoryDeletionEngine.swift`, `file:Sources/ViewModels/GenerationLifecycleExecutor.swift`, `file:Sources/SharedSupport/Services/LiveStreamingPlaybackEngine.swift` |
-| `UI-7` | planned | Registry formalization of the perf lane (benchmark-history kind, thresholds from repeated baselines) | — |
-
-### Open items in detail
-
-- **`UI-7`** (planned) — Registry formalization of the perf lane (benchmark-history kind, thresholds from repeated baselines).
-  gate: Follows the prosody-calibration precedent: schema enums, metric allowlist, orchestration workflow, and thresholds only after repeated baselines establish spread.
+| `UI-7` | done | Registry formalization of the perf lane (benchmark-history kind, thresholds from repeated baselines) | `file:config/ui-perf-thresholds.json`, `file:benchmarks/runs/ui-perf/macos-xcui-perf-20260805-092804-98c69168.json`, `file:scripts/tests/test_check_macos_ui_perf.py` |

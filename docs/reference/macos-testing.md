@@ -49,10 +49,17 @@ frame time, max gap, gap histogram, CPU, footprint, thermal) to
 and writes `ui-perf-report.json` under the run directory. History seeding uses
 `QWENVOICE_UIPERF_SEED_HISTORY` (registered knob; idempotent, debug-store only).
 
-Phase-1 posture: **local evidence only** — no benchmark-history record; no
-performance thresholds (the gate is structural: every scenario present once,
-probe coverage ≥90% of each window, monotonic blocks, sane refresh interval).
-The probe measures main-run-loop display-link cadence, a UI-thread hitch proxy;
+Registry posture (UI-7): the structural gate is unchanged (every scenario
+present once, probe coverage ≥90% of each window, monotonic blocks, sane
+refresh interval). On a PASS the checker evaluates the **warn-only** ceilings
+in [`config/ui-perf-thresholds.json`](../../config/ui-perf-thresholds.json)
+(derived from the baseline-v2 medians; a breach marks the run
+`passedWithWarnings`, never fails it) and — on the canonical hardware profile
+only — emits `benchmark-evidence.json`, which the lane publishes as a
+PASS-only `ui-perf` registry record (one take per scenario, no
+model/telemetry/QC claims). Non-canonical hosts keep local-only reports, and
+dirty-source or late publications classify `exploratory` as usual. The probe
+measures main-run-loop display-link cadence, a UI-thread hitch proxy;
 compositor ground truth remains an Instruments Hitches/Core Animation trace.
 
 Baseline protocol: one discarded warm-up run, then five counted runs (fixed

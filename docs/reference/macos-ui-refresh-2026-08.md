@@ -182,6 +182,24 @@ materialization under fast scrolling — row thinning remains open at that
 scale (tracked under UI-7's threshold formalization; any further History
 work should lean on Instruments, not the lane's polluted History numbers).
 
+## UI-7 (landed 2026-08-05): the perf lane is a registered benchmark kind
+
+`ui-perf` joined the PASS-only registry on the `prosody-calibration`
+precedent: schema v2/v3 enums, a bounded `ui*` metric allowlist, a kind
+semantics validator (one take per scenario, no model/telemetry/QC claims,
+coverage and refresh sanity), harness-hash binding of the probe/seeder/
+scenarios/checker/threshold contract, and **warn-only ceilings** in
+[`config/ui-perf-thresholds.json`](../../config/ui-perf-thresholds.json)
+derived from the baseline-v2 medians (a breach marks the run
+`passedWithWarnings`; hard ceilings wait for repeated baseline sessions).
+The lane emits evidence only on the canonical hardware profile and
+publishes through `benchmark_history.py record`; five offline self-tests
+cover the gate, thresholds, and take identities, and the first live record
+published from the real baseline-v2 v5 run (classified exploratory by the
+standard provenance because publication came after later commits; canonical
+records mint automatically from in-run publications). With UI-7 done the
+`macos-ui-2026-08` plan is **complete**.
+
 ## Landed in this arc
 
 - `9d283a9` — the perf harness (nine scenarios, structural gate, fail-closed proofs,

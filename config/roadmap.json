@@ -668,9 +668,15 @@
       "id": "UI-6",
       "plan": "macos-ui-2026-08",
       "title": "Wave 2 re-engineering: store observation migration, History/Voices coordinators, shared generation lifecycle, player split",
-      "status": "planned",
-      "gate": "Separate scoped arcs; each carries its own deterministic tests plus perf-lane deltas. The wave-1 'History stall' finding was overturned by a Time Profiler sample: the 3.1 s stall was the harness's own accessibility queries on the app main thread; the corrected scenario measures ~210 ms/s scroll hitch with ~200 ms worst gaps, so History row thinning proceeds at that scale.",
-      "updated": "2026-08-05"
+      "status": "done",
+      "gate": "All wave-2 re-engineering landed with the maintainer's go: TTSEngineStore @Observable migration with Combine bridges (sidebar-navigation 131.3 -> 118.6 ms/s across both waves), HistoryDeletionEngine with eight deterministic core tests on the irreversible delete paths, GenerationLifecycleExecutor unifying the triplicated generate/cancel, and the LiveStreamingPlaybackEngine extraction from the shared player. The 'History stall' was profiler-attributed to the harness's own accessibility work; History scenarios are exploratory and the app-real scroll cost is ~210 ms/s (~200 ms batches). Verified: full deterministic suite, both compiles, 7/7 smoke, baseline-v2 (5 clean counted runs). Table in the authority doc.",
+      "updated": "2026-08-05",
+      "evidence": [
+        "file:docs/reference/macos-ui-refresh-2026-08.md",
+        "file:Sources/QwenVoiceCore/HistoryDeletionEngine.swift",
+        "file:Sources/ViewModels/GenerationLifecycleExecutor.swift",
+        "file:Sources/SharedSupport/Services/LiveStreamingPlaybackEngine.swift"
+      ]
     },
     {
       "id": "UI-7",

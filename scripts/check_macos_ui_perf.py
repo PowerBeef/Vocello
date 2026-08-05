@@ -40,12 +40,16 @@ EXPECTED_SCENARIOS = [
     "window-resize",
     "generation-active",
 ]
-# history-filter is exploratory because driving a filter via the UI cannot
-# avoid per-interaction XCUITest element queries, whose accessibility
-# snapshot walk over the 400-row tree executes on the app's main thread and
-# inflates the scenario's numbers (Time Profiler evidence 2026-08-05; the
-# scroll scenarios avoid this via window-anchored coordinates).
-EXPLORATORY = {"window-resize", "generation-active", "history-filter"}
+# The History scenarios are exploratory because a 400-row list under
+# XCUITest cannot be measured clean: per-interaction element queries and
+# the post-search-clear accessibility maintenance for 400 re-rendered rows
+# execute on the app's main thread. A Time Profiler sample over the
+# recurring ~3.1 s stall (2026-08-05) attributed it to XCTest query
+# servicing, not app frames; with window-anchored coordinate scrolling the
+# drain lands deterministically inside history-scroll's window
+# (baseline-v2: 456 +/- 3 ms/s), so the number tracks harness+app, never
+# the app alone.
+EXPLORATORY = {"window-resize", "generation-active", "history-filter", "history-scroll"}
 COVERAGE_FLOOR = 0.90
 REFRESH_INTERVAL_SANE_MS = (1000.0 / 140.0, 1000.0 / 30.0)
 # Gap-histogram bucket upper bounds, in multiples of the refresh interval;

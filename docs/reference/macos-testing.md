@@ -34,9 +34,14 @@ scripts/ui_test.sh macos perf
 
 Nine XCUITest-driven scenarios measure SwiftUI frame health, resource usage, and
 animation smoothness: idle-baseline, sidebar-navigation, history-scroll (400 seeded
-rows), history-filter, delivery-menu, settings-scroll, composer-typing,
-window-resize (exploratory), and generation-active (exploratory; gate ON, engine
-busy). Each scenario launches the app once with the in-app frame probe enabled
+rows; exploratory), history-filter (exploratory), delivery-menu, settings-scroll,
+composer-typing, window-resize (exploratory), and generation-active (exploratory;
+gate ON, engine busy). Scroll scenarios drive a WINDOW-anchored coordinate, never
+`scrollViews.firstMatch`: element-addressed events re-resolve their query per
+event and that accessibility walk executes on the app's main thread, polluting
+the measurement (Time Profiler evidence 2026-08-05). The History scenarios stay
+exploratory because the 400-row tree's accessibility maintenance cannot be
+excluded from their windows at all. Each scenario launches the app once with the in-app frame probe enabled
 (`QWENVOICE_UIPERF_FRAME_PROBE`, registered knob) and marks its wall-clock window;
 the probe streams 500 ms display-link blocks (frames delivered vs expected, excess
 frame time, max gap, gap histogram, CPU, footprint, thermal) to

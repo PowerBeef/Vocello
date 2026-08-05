@@ -144,6 +144,44 @@ scenario and are superseded by the baseline-v2 session. Row thinning remains a
 legitimate wave-2 item at the ~200 ms-batch scale (UI-6), an order of magnitude
 smaller than first believed.
 
+## Wave 2 results (landed 2026-08-05, maintainer go)
+
+All wave-2 items shipped in five commits (`de063d9` harness-honesty
+correction, `40ba8ab` store `@Observable` migration, the deletion-engine,
+lifecycle-executor, and player-split commits): the measurement correction
+above; `TTSEngineStore` migrated to `@Observable` with explicit Combine
+bridges for its two imperative consumers; History's irreversible delete
+paths extracted into the core-tested `HistoryDeletionEngine` (eight
+deterministic tests); the triplicated generate/cancel unified in
+`GenerationLifecycleExecutor` with the May-2026 no-flicker discipline
+preserved; and the shared player's audio-graph mechanics extracted into
+`LiveStreamingPlaybackEngine` (both platforms compile; session semantics
+stay in the view model). Verified: full deterministic suite, both
+compiles, a 7/7 smoke lane, and the baseline-v2 session below (5 counted
+runs on the corrected scenarios, thermals nominal, zero failed runs).
+
+**Baseline-v2** (corrected scenarios: scrolls are window-anchored, History
+scenarios exploratory):
+
+| scenario | v2 median ms/s | IQR | trend from first baseline |
+| --- | --- | --- | --- |
+| idle-baseline | 0.0 | 0.0 | unchanged, pristine |
+| settings-scroll | **0.0** | 0.0 | 43.3 → 0 — verified genuine (≈700 ms CPU, ≈57 fps in-window): the old number was query pollution; the screen scrolls perfectly |
+| window-resize | 28.7 | 10.4 | ≈ unchanged (exploratory) |
+| composer-typing | 41.9 | 4.0 | 51.4 → 41.9 (**−18%**) |
+| sidebar-navigation | 118.6 | 1.1 | 131.3 → 118.6 (**−10%**, store migration measurable) |
+| delivery-menu | 120.4 | 2.9 | ≈ unchanged |
+| generation-active | 175.4 | 38.8 | ≈ unchanged within spread (exploratory) |
+| history-filter | 321.3 | 6.2 | exploratory — includes harness AX cost |
+| history-scroll | 456.4 | 5.7 | exploratory — the ~3.1 s AX drain now lands deterministically in-window; the app-real component measured standalone is ≈210 ms/s with ≈200 ms worst gaps |
+
+The confirmatory picture after both waves: every interaction surface a
+user touches outside History sits at or under ~120 ms/s with the two
+scroll surfaces at 0.0, and History's true app cost is ~200 ms batch
+materialization under fast scrolling — row thinning remains open at that
+scale (tracked under UI-7's threshold formalization; any further History
+work should lean on Instruments, not the lane's polluted History numbers).
+
 ## Landed in this arc
 
 - `9d283a9` — the perf harness (nine scenarios, structural gate, fail-closed proofs,

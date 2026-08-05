@@ -53,9 +53,15 @@ landed the same day on the maintainer's go** (`4e0c7cf`..`20e14b2`: warm ink ram
 motion family, mode-tinted focus rings, flip-scoped gate + History cache, ScaledMetric
 adoption, AnyLayout field stability, the shared GatedGlass container; UI-5 done) with a
 full before/after perf session — settings-scroll −19%, composer-typing −16%, and the
-honest finding that History's ~3.1 s stall is per-row List materialization, which is
-now UI-6's first work item. Wave 2 re-engineering is UI-6, perf-lane registry
-formalization UI-7.
+honest finding that History's ~3.1 s stall is per-row List materialization — which
+**wave 2 then overturned with a Time Profiler sample**: the stall was the harness's
+own accessibility queries on the app main thread; the History scenarios are now
+exploratory and the app-real scroll cost is ~210 ms/s. **Wave 2 shipped the same day
+(UI-6 done)**: store `@Observable` migration (sidebar-navigation 131→119 ms/s),
+core-tested HistoryDeletionEngine, GenerationLifecycleExecutor dedup, and the
+LiveStreamingPlaybackEngine player extraction — full deterministic suite, both
+compiles, 7/7 smoke, and a clean 5-run baseline-v2 (settings-scroll measured a
+verified-genuine 0.0 ms/s). Remaining in the plan: UI-7 registry formalization.
 
 The pre-UI-arc checkpoint (2026-08-01) follows.
 

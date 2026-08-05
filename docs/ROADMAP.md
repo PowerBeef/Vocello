@@ -12,7 +12,7 @@
 | `convergence-metal4-stage4-2026-08` | active | backend-and-platform | 5/7 (71%) |
 | `delivery-prompting-2026-08` | active | backend-mlx | 18/20 (90%) |
 | `doc-governance-2026-08` | active | release-qa | 8/9 (89%) |
-| `macos-ui-2026-08` | active | macos | 5/7 (71%) |
+| `macos-ui-2026-08` | active | macos | 6/7 (86%) |
 
 ## Convergence residuals, Metal 4 study, and Stage 4
 
@@ -119,13 +119,10 @@ Narrative authority: [`docs/reference/macos-ui-refresh-2026-08.md`](reference/ma
 | `UI-3` | done | Four-audit UI review, ranked synthesis, and refresh proposals | `file:docs/reference/macos-ui-refresh-2026-08.md` |
 | `UI-4` | done | Safe fixes: dead-UI-code removal + Reduce Transparency at direct glass sites | `commit:99d746d` |
 | `UI-5` | done | Refinement wave 1 (warm text ramp, motion family, focus rings, scoped observation, type scaling, stable resize fields, glass helper) | `commit:4e0c7cf`, `commit:bc7c108`, `commit:357d482`, `commit:20e14b2`, `file:docs/reference/macos-ui-refresh-2026-08.md` |
-| `UI-6` | planned | Wave 2 re-engineering: store observation migration, History/Voices coordinators, shared generation lifecycle, player split | — |
+| `UI-6` | done | Wave 2 re-engineering: store observation migration, History/Voices coordinators, shared generation lifecycle, player split | `file:docs/reference/macos-ui-refresh-2026-08.md`, `file:Sources/QwenVoiceCore/HistoryDeletionEngine.swift`, `file:Sources/ViewModels/GenerationLifecycleExecutor.swift`, `file:Sources/SharedSupport/Services/LiveStreamingPlaybackEngine.swift` |
 | `UI-7` | planned | Registry formalization of the perf lane (benchmark-history kind, thresholds from repeated baselines) | — |
 
 ### Open items in detail
-
-- **`UI-6`** (planned) — Wave 2 re-engineering: store observation migration, History/Voices coordinators, shared generation lifecycle, player split.
-  gate: Separate scoped arcs; each carries its own deterministic tests plus perf-lane deltas. The wave-1 'History stall' finding was overturned by a Time Profiler sample: the 3.1 s stall was the harness's own accessibility queries on the app main thread; the corrected scenario measures ~210 ms/s scroll hitch with ~200 ms worst gaps, so History row thinning proceeds at that scale.
 
 - **`UI-7`** (planned) — Registry formalization of the perf lane (benchmark-history kind, thresholds from repeated baselines).
   gate: Follows the prosody-calibration precedent: schema enums, metric allowlist, orchestration workflow, and thresholds only after repeated baselines establish spread.

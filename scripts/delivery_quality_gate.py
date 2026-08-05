@@ -43,7 +43,10 @@ from prosody_profile import (
     neutral_consistency,
 )
 
-DELIVERY_GATE_ALGORITHM_VERSION = 1
+# v2 (2026-08-05): expectations may bind optional-analyzer features; a pair
+# whose analysis predates those keys skips them into the verdict's
+# `unavailableFeatures` list instead of failing `metrics_incomplete`.
+DELIVERY_GATE_ALGORITHM_VERSION = 2
 
 # Flags that mean the verdict could not be computed (mapped to a distinct
 # "unavailable" outcome downstream, mirroring the prosody sidecar contract).
@@ -53,6 +56,28 @@ ANALYSIS_FAILURE_FLAGS = (
     "expectation_missing",
     "cohort_too_small",
 )
+
+# Expectation-bindable features derived from the optional analyzer keys
+# (`_OPTIONAL_CADENCE_KEYS`, `_OPTIONAL_VOICE_KEYS`). When one of these is
+# absent from an analyzed pair, the expectation entry is skipped as
+# unavailable; a missing feature derived from `_REQUIRED_METRIC_KEYS` still
+# fails closed as `metrics_incomplete`.
+OPTIONAL_EXPECTATION_FEATURES = frozenset({
+    "turning_points_delta_per_sec",
+    "max_pause_delta_seconds",
+    "dynamic_range_delta_db",
+    "hnr_delta_db",
+    "cpp_delta_db",
+    "jitter_delta_pct",
+    "shimmer_delta_db",
+    "alpha_ratio_delta_db",
+    "hammarberg_delta_db",
+    "hf_energy_ratio_delta",
+    "centroid_delta_hz",
+    "spectral_flux_delta",
+    "voice_tension_score",
+    "voice_breathiness_score",
+})
 
 _REQUIRED_METRIC_KEYS = (
     "f0_median_hz",
@@ -226,15 +251,22 @@ def evaluate_delivery(instructed_metrics, neutral_metrics, delivery_id, profile=
         )
 
     features = delivery_features(instructed_metrics, neutral_metrics, prof)
-    if any(feature not in features for feature in expectation):
+    missing = [feature for feature in sorted(expectation) if feature not in features]
+    if any(feature not in OPTIONAL_EXPECTATION_FEATURES for feature in missing):
         return _verdict(
             delivery_id, preset, intensity, False, ["metrics_incomplete"],
             "expectation features missing from analyzed metrics", {},
         )
+    # Expectations may bind optional-analyzer features (cadence, voice
+    # quality). A pair analyzed before those keys existed skips them —
+    # "this feature is unavailable", never a failed or warned verdict.
+    unavailable = missing
 
     factor = intensity_factor(prof, intensity)
     flags = []
     for feature, spec in sorted(expectation.items()):
+        if feature in unavailable:
+            continue
         signed = features[feature] * spec["direction"]
         minimum = spec["min_effect_normal"] * factor
         if spec["tier"] == "required":
@@ -247,12 +279,14 @@ def evaluate_delivery(instructed_metrics, neutral_metrics, delivery_id, profile=
 
     metrics = {key: round(value, 3) for key, value in sorted(features.items())}
     metrics["intensity_factor"] = round(factor, 3)
-    return _verdict(
+    verdict = _verdict(
         delivery_id, preset, intensity,
         len(flags) == 0, flags,
         "; ".join(flags) if flags else "delivery adherence gate passed",
         metrics,
     )
+    verdict["unavailableFeatures"] = unavailable
+    return verdict
 
 
 def evaluate_neutral_cohort(cohort_metrics, profile=None):

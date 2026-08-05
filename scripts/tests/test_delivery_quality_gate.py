@@ -63,14 +63,18 @@ class DeliveryGateTests(unittest.TestCase):
         self.assertEqual(verdict["intensity"], "strong")
 
     def test_opposite_direction_flags_required_features(self):
-        verdict = evaluate_delivery(metrics(f0=140.0, rate=3.6), metrics(), "angry.normal")
+        # An aroused, pitch-lively take scored as sad misses both required
+        # directions (sad keeps required tiers under the calibrated profile).
+        verdict = evaluate_delivery(
+            metrics(f0=165.0, rate=4.5, std=35.0), metrics(), "sad.normal"
+        )
         self.assertFalse(verdict["passed"])
+        self.assertIn("delivery_direction_miss_arousal_score", verdict["flags"])
         self.assertIn("delivery_direction_miss_pitch_variation_delta_hz", verdict["flags"])
-        self.assertIn("delivery_supporting_miss_arousal_score", verdict["flags"])
 
     def test_weak_effect_flags_but_direction_holds(self):
-        # Right direction, but well under the normal-intensity magnitude.
-        verdict = evaluate_delivery(metrics(f0=151.0, std=26.0), metrics(), "angry.normal")
+        # Right direction, but well under the calibrated normal-intensity floor.
+        verdict = evaluate_delivery(metrics(f0=145.0, std=23.0), metrics(), "sad.normal")
         self.assertFalse(verdict["passed"])
         self.assertTrue(
             all(flag.startswith("delivery_effect_weak_") for flag in verdict["flags"]),
@@ -78,9 +82,9 @@ class DeliveryGateTests(unittest.TestCase):
         )
 
     def test_bare_preset_defaults_to_normal_intensity(self):
-        verdict = evaluate_delivery(metrics(f0=140.0, rate=3.5), metrics(), "sad")
+        verdict = evaluate_delivery(metrics(f0=138.0, rate=3.4, std=15.0), metrics(), "sad")
         self.assertEqual(verdict["intensity"], "normal")
-        self.assertTrue(verdict["passed"])
+        self.assertTrue(verdict["passed"], verdict["flags"])
 
     def test_uncovered_preset_reports_expectation_missing(self):
         verdict = evaluate_delivery(metrics(), metrics(), "bogus.normal")
@@ -212,6 +216,41 @@ class VoiceQualityFeatureTests(unittest.TestCase):
         self.assertAlmostEqual(features["turning_points_delta_per_sec"], 6.0)
         self.assertAlmostEqual(features["max_pause_delta_seconds"], 0.42)
         self.assertAlmostEqual(features["dynamic_range_delta_db"], 3.0)
+
+    def test_optional_expectation_feature_skips_as_unavailable(self):
+        # whisper's calibrated block requires voice_breathiness_score, but a
+        # v2-analyzed pair has no voice block: the entry must skip into
+        # unavailableFeatures — never metrics_incomplete, never a warn.
+        whispered = metrics(voiced=0.5, std=15.0, rate=3.6)
+        verdict = evaluate_delivery(whispered, metrics(), "whisper.normal")
+        self.assertTrue(verdict["passed"], verdict["flags"])
+        self.assertEqual(verdict["unavailableFeatures"], ["voice_breathiness_score"])
+        self.assertEqual(verdict["algorithmVersion"], 2)
+
+    def test_breathiness_required_evaluates_when_v3_block_present(self):
+        neutral = voice_metrics()
+        breathy = voice_metrics(hnr=8.0, cpp=14.0, voiced=0.5, std=15.0, rate=3.6)
+        verdict = evaluate_delivery(breathy, neutral, "whisper.normal")
+        self.assertTrue(verdict["passed"], verdict["flags"])
+        self.assertEqual(verdict["unavailableFeatures"], [])
+        self.assertIn("voice_breathiness_score", verdict["metrics"])
+        pressed = voice_metrics(hnr=15.0, cpp=23.0, voiced=0.75)
+        verdict = evaluate_delivery(pressed, neutral, "whisper.normal")
+        self.assertFalse(verdict["passed"])
+        self.assertIn("delivery_direction_miss_voice_breathiness_score", verdict["flags"])
+
+    def test_fearful_strong_expects_raised_arousal(self):
+        # fearful.strong asks for "trembling panic … urgent … fast uneven
+        # pacing": the calibration flipped its arousal direction to +1, so an
+        # urgent high-pitched take with added pauses adheres.
+        urgent = metrics(f0=170.0, rate=4.6, pause=0.08)
+        verdict = evaluate_delivery(urgent, metrics(), "fearful.strong")
+        self.assertTrue(verdict["passed"], verdict["flags"])
+        self.assertIn("turning_points_delta_per_sec", verdict["unavailableFeatures"])
+        placid = metrics(f0=140.0, rate=3.2, pause=0.05)
+        verdict = evaluate_delivery(placid, metrics(), "fearful.strong")
+        self.assertFalse(verdict["passed"])
+        self.assertIn("delivery_direction_miss_pause_ratio_delta", verdict["flags"])
 
     def test_profile_migration_fills_the_new_weight_section(self):
         legacy = builtin_profile()

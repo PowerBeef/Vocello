@@ -27,8 +27,9 @@ SCHEMA_VERSION = 3
 #     take relative to its same-seed neutral pair. Each preset maps feature →
 #     {direction, min_effect_normal, tier}; magnitudes are scaled by intensity.
 #     Directions come from the preset instruction semantics
-#     (Sources/QwenVoiceCore/EmotionPreset.swift); the initial magnitudes are
-#     deliberately conservative seeds pending the paired calibration run.
+#     (Sources/QwenVoiceCore/EmotionPreset.swift); magnitudes and tiers were
+#     calibrated 2026-08-05 from the banked paired seed matrix (see the block
+#     comment on "presets" below for the data, rules, and kept-seed cases).
 #   neutral_consistency — cohort dispersion bounds for repeated same-preset
 #     fixed-seed takes (the "neutral should not wander" check).
 BUILTIN_PROFILE = {
@@ -103,44 +104,68 @@ BUILTIN_PROFILE = {
         # passes would fit the copy to a target no measurement supports. Resolve
         # it with evidence (scripts/delivery_matrix_report.py), not by reasoning.
         "intensity_scale": {"normal": 1.0, "strong": 1.15},
+        # CALIBRATED 2026-08-05 from the banked paired seed matrix: 272 unique
+        # neutral-vs-instructed rows (8 presets × .strong × speed/quality ×
+        # 17-18 seeds, one fixed text, bench-archive sidecars). Rules, fixed
+        # before computing: required = semantically-central feature with
+        # posRate ≥ 0.90 and both variant medians agreeing, floor at the
+        # observed 10th percentile of the signed effect; supporting =
+        # posRate ≥ 0.70 (or variant disagreement), floor at |q10| so only
+        # clear opposite moves flag (~10% designed tail); semantically-central
+        # features the model reliably misses KEEP their seed values so the
+        # gate keeps warning truthfully (surprised pitch rise, posRate 0.62;
+        # fearful pause/pacing, 0.68). Strong-tier measurements divide by the
+        # 1.15 scale to state normal-tier minima; no .normal rows are banked,
+        # so normal minima are derived, not measured. fearful's arousal
+        # direction was flipped +1: its .strong copy asks for "trembling
+        # panic … urgent … fast uneven pacing" (high arousal); the old -1 seed
+        # scored adherence backwards (measured posRate under +1: 0.71). New
+        # binds come from features the analyzer already computed and Swift
+        # already types: whisper breathiness (posRate 0.97, the strongest
+        # delivery signature measured to date), whisper voicing drop (0.94),
+        # sad pitch-variation collapse (0.94), angry/happy vocal tension
+        # (0.82/0.76), fearful turning-point quaver (0.68).
         "presets": {
             "neutral": {
-                "arousal_score": {"direction": -1, "min_effect_normal": 0.0, "tier": "supporting"},
-                "pitch_variation_delta_hz": {"direction": -1, "min_effect_normal": 0.0, "tier": "supporting"},
+                "arousal_score": {"direction": -1, "min_effect_normal": 2.1, "tier": "supporting"},
+                "pitch_variation_delta_hz": {"direction": -1, "min_effect_normal": 5.2, "tier": "supporting"},
             },
             "happy": {
-                "pitch_variation_delta_hz": {"direction": 1, "min_effect_normal": 2.5, "tier": "required"},
-                "arousal_score": {"direction": 1, "min_effect_normal": 0.5, "tier": "required"},
-                "pitch_shift_semitones": {"direction": 1, "min_effect_normal": 0.0, "tier": "supporting"},
+                "pitch_shift_semitones": {"direction": 1, "min_effect_normal": 0.12, "tier": "supporting"},
+                "arousal_score": {"direction": 1, "min_effect_normal": 1.5, "tier": "supporting"},
+                "voice_tension_score": {"direction": 1, "min_effect_normal": 0.53, "tier": "supporting"},
+                "pitch_variation_delta_hz": {"direction": 1, "min_effect_normal": 5.1, "tier": "supporting"},
             },
             "surprised": {
                 "pitch_shift_semitones": {"direction": 1, "min_effect_normal": 0.5, "tier": "required"},
-                "pitch_variation_delta_hz": {"direction": 1, "min_effect_normal": 0.0, "tier": "supporting"},
+                "pitch_variation_delta_hz": {"direction": 1, "min_effect_normal": 8.2, "tier": "supporting"},
             },
             "sad": {
-                "arousal_score": {"direction": -1, "min_effect_normal": 0.5, "tier": "required"},
-                "pitch_variation_delta_hz": {"direction": -1, "min_effect_normal": 0.0, "tier": "supporting"},
-                "pause_ratio_delta": {"direction": 1, "min_effect_normal": 0.0, "tier": "supporting"},
+                "arousal_score": {"direction": -1, "min_effect_normal": 1.0, "tier": "required"},
+                "pitch_variation_delta_hz": {"direction": -1, "min_effect_normal": 4.3, "tier": "required"},
+                "pause_ratio_delta": {"direction": 1, "min_effect_normal": 0.0031, "tier": "supporting"},
             },
             "calm": {
-                "pitch_shift_semitones": {"direction": -1, "min_effect_normal": 0.6, "tier": "required"},
-                "arousal_score": {"direction": -1, "min_effect_normal": 0.5, "tier": "supporting"},
+                "pitch_shift_semitones": {"direction": -1, "min_effect_normal": 1.7, "tier": "supporting"},
+                "arousal_score": {"direction": -1, "min_effect_normal": 1.4, "tier": "supporting"},
             },
             "angry": {
-                "pitch_shift_semitones": {"direction": 1, "min_effect_normal": 1.0, "tier": "required"},
-                "pitch_variation_delta_hz": {"direction": 1, "min_effect_normal": 3.0, "tier": "required"},
-                "arousal_score": {"direction": 1, "min_effect_normal": 0.5, "tier": "supporting"},
+                "pitch_shift_semitones": {"direction": 1, "min_effect_normal": 0.39, "tier": "supporting"},
+                "pitch_variation_delta_hz": {"direction": 1, "min_effect_normal": 5.1, "tier": "supporting"},
+                "arousal_score": {"direction": 1, "min_effect_normal": 1.6, "tier": "supporting"},
+                "voice_tension_score": {"direction": 1, "min_effect_normal": 0.33, "tier": "supporting"},
             },
             "fearful": {
-                "pitch_shift_semitones": {"direction": 1, "min_effect_normal": 0.8, "tier": "required"},
-                "arousal_score": {"direction": -1, "min_effect_normal": 0.5, "tier": "required"},
+                "pitch_shift_semitones": {"direction": 1, "min_effect_normal": 1.3, "tier": "supporting"},
+                "arousal_score": {"direction": 1, "min_effect_normal": 3.4, "tier": "supporting"},
+                "turning_points_delta_per_sec": {"direction": 1, "min_effect_normal": 2.0, "tier": "supporting"},
                 "pause_ratio_delta": {"direction": 1, "min_effect_normal": 0.01, "tier": "required"},
-                "pitch_variation_delta_hz": {"direction": -1, "min_effect_normal": 0.0, "tier": "supporting"},
             },
             "whisper": {
-                "pitch_variation_delta_hz": {"direction": -1, "min_effect_normal": 4.0, "tier": "required"},
-                "arousal_score": {"direction": -1, "min_effect_normal": 0.5, "tier": "required"},
-                "voiced_fraction_delta": {"direction": -1, "min_effect_normal": 0.0, "tier": "supporting"},
+                "voice_breathiness_score": {"direction": 1, "min_effect_normal": 0.32, "tier": "required"},
+                "voiced_fraction_delta": {"direction": -1, "min_effect_normal": 0.0035, "tier": "required"},
+                "pitch_variation_delta_hz": {"direction": -1, "min_effect_normal": 2.3, "tier": "supporting"},
+                "arousal_score": {"direction": -1, "min_effect_normal": 0.23, "tier": "supporting"},
             },
         },
     },

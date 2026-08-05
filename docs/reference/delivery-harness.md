@@ -167,6 +167,7 @@ codified in §6: exercise every new fail-closed check live in the arc that lands
 | DP-15 | Seed retry/pin shipped: History schema v6 records each take's effective seed; pin from History reproduces a take |
 | DP-17 | Whisper criterion prototype: candidates MORE harmonic than anchor (ΔHNR +1.0..+1.4 dB) — generation recipe needed before any criterion can select |
 | DP-18 | Confirmatory two-arm sweep: H1 replicates (4-bit UAR 0.477 / 8-bit 0.375 vs 0.125, perm p=0.001 both); H2 all distinct cells clear FDR both arms; H3 refuted — happy-vs-angry 2-way at chance (p=0.43/0.24), valence bottleneck confirmed; H4 8-bit no better; angry+fearful meet the two-arm acoustic eligibility bar (promotion needs fresh listening — maintainer call) |
+| DP-21 | Adherence expectations calibrated from the banked matrix (272 paired rows, 8 presets × strong × 2 variants × 17-18 seeds; gate algorithm v2, profile digest `133d46bd…`): fearful arousal direction flipped +1 (its `.strong` copy asks for panic/urgency; old seed scored adherence backwards, posRate 0.71 under +1); new binds whisper breathiness (posRate 0.97, strongest signature measured) + voicing drop (0.94), sad variation collapse (0.94), angry/happy tension (0.82/0.76); floors at the noise decile (supporting flags ≈10% by design); genuine misses kept warning at seed values — surprised pitch rise (0.62), fearful fast-pacing (slower in 74%). Bank replay: 181 pass / 91 warn (seeds scored 128/144) |
 
 ## 8. Re-run recipes
 

@@ -587,6 +587,24 @@
       "updated": "2026-08-04"
     },
     {
+      "id": "DP-21",
+      "plan": "delivery-prompting-2026-08",
+      "title": "Delivery-adherence thresholds calibrated from the banked seed matrix",
+      "status": "done",
+      "gate": "Close the phase-12 open item: recalibrate the delivery-adherence rule's per-preset expectations from the banked paired neutral-vs-instructed matrix instead of the conservative seeds. RESULTS 2026-08-05 (method fixed before computing; revisions documented openly): 272 unique banked rows (8 presets x .strong x speed/quality x 17-18 seeds, one fixed text) recomputed through delivery_features. Required floors sit at the observed noise decile (a first-draft q25 floor flagged the bottom quartile of genuinely adhering takes by construction and was rejected); supporting floors at |q10| so only clear opposite moves flag (~10% designed tail). fearful's arousal direction was corrected -1 -> +1 from its own .strong instruction text ('trembling panic ... urgent ... fast uneven pacing'); the old seed scored adherence backwards (posRate 0.71 under +1). New semantically-central binds from features the analyzer and Swift measurement keys already carried: whisper voice_breathiness_score required (posRate 0.97, the strongest delivery signature measured to date), whisper voiced-fraction drop required (0.94), sad pitch-variation collapse required (0.94), angry/happy voice_tension_score supporting (0.82/0.76), fearful turning-point quaver supporting (0.68). Genuine adherence misses were deliberately NOT tuned away and keep warning at seed values: surprised pitch rise (posRate 0.62) and fearful fast-pacing (the model gets slower in 74% of takes despite 'urgent, fast'). Gate algorithm v2: expectations may bind optional-analyzer features and a pre-v3 pair skips them into the verdict's unavailableFeatures list instead of failing metrics_incomplete; Swift passthrough comment updated in lockstep. Bank replay under the calibrated profile (digest 133d46bd...): 181 pass / 91 warn versus 128/144 under the seeds, with residual warns concentrated on the two kept genuine misses plus the designed noise tails. Verified: 22/22 delivery-gate unit tests (three rewritten for the calibrated profile, three added for skip/flip/breathiness semantics), adjacent prosody/matrix/calibration suites, and a live check_delivery_instructions.py run holding at exactly the 2 acknowledged findings. Limitation, recorded: no .normal rows are banked, so normal-tier minima are strong-tier measurements divided by the unvalidated 1.15 intensity scale.",
+      "sourceOfTruth": [
+        "scripts/prosody_profile.py",
+        "scripts/delivery_quality_gate.py"
+      ],
+      "updated": "2026-08-05",
+      "evidence": [
+        "file:scripts/prosody_profile.py",
+        "file:scripts/delivery_quality_gate.py",
+        "file:scripts/tests/test_delivery_quality_gate.py",
+        "file:docs/reference/delivery-harness.md"
+      ]
+    },
+    {
       "id": "CM-7",
       "plan": "convergence-metal4-stage4-2026-08",
       "title": "Non-streaming CLI generation publishes no WAV while reporting success",

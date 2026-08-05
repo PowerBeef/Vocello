@@ -113,9 +113,12 @@ public enum GenerationQualityComposition {
 
     /// Maps one sidecar delivery-adherence verdict into typed deep evidence
     /// for the `.delivery` gate. Adherence flags (direction misses, weak
-    /// effects, supporting misses) are warnings — the rule is deliberately
-    /// warn-first until the paired calibration run promotes magnitudes — and
-    /// only the analysis-failure flags escalate to `.unavailable`.
+    /// effects, supporting misses) are warnings — magnitudes were calibrated
+    /// 2026-08-05 from the banked paired seed matrix (gate algorithm v2), and
+    /// the rule deliberately stays warn-first — and only the analysis-failure
+    /// flags escalate to `.unavailable`. A v2 verdict may also list skipped
+    /// optional features in `unavailableFeatures`; that key is informational
+    /// and never changes the outcome.
     public static func deliveryEvidence(
         gate: DeliverySidecarGate,
         evidenceDigest: String? = nil

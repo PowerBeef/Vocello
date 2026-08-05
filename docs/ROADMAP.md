@@ -10,7 +10,7 @@
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
 | `convergence-metal4-stage4-2026-08` | active | backend-and-platform | 5/7 (71%) |
-| `delivery-prompting-2026-08` | active | backend-mlx | 18/20 (90%) |
+| `delivery-prompting-2026-08` | active | backend-mlx | 19/21 (90%) |
 | `doc-governance-2026-08` | active | release-qa | 8/9 (89%) |
 | `macos-ui-2026-08` | complete | macos | 7/7 (100%) |
 
@@ -70,6 +70,7 @@ Narrative authority: [`docs/reference/qwen3-tts-prompting-guide.md`](reference/q
 | `DP-18` | done | Confirmatory delivery re-measure on solid statistics (audit R4) | `file:scripts/delivery_separability.py`, `file:scripts/bench_delivery_prosody.py`, `file:benchmarks/HISTORY.md` |
 | `DP-19` | done | Text-decoration valence channel (audit R5) | `file:scripts/delivery_separability.py`, `file:scripts/emotion_advisory.py`, `file:docs/development-progress.md` |
 | `DP-20` | parked | External delivery-control lever watch list (audit R8) | — |
+| `DP-21` | done | Delivery-adherence thresholds calibrated from the banked seed matrix | `file:scripts/prosody_profile.py`, `file:scripts/delivery_quality_gate.py`, `file:scripts/tests/test_delivery_quality_gate.py`, `file:docs/reference/delivery-harness.md` |
 
 ### Open items in detail
 

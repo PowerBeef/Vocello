@@ -30,9 +30,12 @@ let package = Package(
         .package(url: "https://github.com/ml-explore/mlx-swift-lm.git", exact: "3.31.4"),
         .package(url: "https://github.com/huggingface/swift-huggingface.git", exact: "0.9.0"),
         // mlx-swift-lm 3.x dropped its swift-transformers dependency; the app now brings the
-        // concrete Hub/Tokenizers implementation. Pinned to the exact version the 2.30.6 graph
-        // resolved so tokenizer behavior stays identical across the pin-bump A/B.
-        .package(url: "https://github.com/huggingface/swift-transformers.git", exact: "1.1.9")
+        // concrete Hub/Tokenizers implementation. Exact-pinned because tokenizer behavior is
+        // engine behavior: 1.3.3 (from 1.1.9, 2026-08-05) deliberately changes BPE/Unigram
+        // tokenization (Unicode-scalar merges, NFD fixes) and speeds up encode 5-25x, so the
+        // bump carried the benchmark battery instead of the byte-identity A/B; see
+        // benchmarks/HISTORY.md and the pin-bump procedure in docs/reference/mlx-guide.md §9.
+        .package(url: "https://github.com/huggingface/swift-transformers.git", exact: "1.3.3")
     ],
     targets: [
         // MARK: - VocelloQwen3Core

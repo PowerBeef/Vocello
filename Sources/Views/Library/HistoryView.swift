@@ -1,4 +1,5 @@
 import AppKit
+import QwenVoiceCore
 import QwenVoiceNative
 import SwiftUI
 import UniformTypeIdentifiers
@@ -149,10 +150,17 @@ private struct HistoryActionAlert: Identifiable {
     static var generations: [Generation] = []
 }
 
-private enum HistoryDeletionResult {
-    case deleted
-    case databaseFailure(String)
-    case audioCleanupFailure(String)
+/// Database- and file-manager-backed effects for the pure sequencing engine
+/// (W2-B). The rules live tested in `QwenVoiceCore.HistoryDeletionEngine`;
+/// this wiring is the only untested residue.
+extension HistoryDeletionEngine {
+    static let databaseBacked = HistoryDeletionEngine(
+        deleteRecord: { try DatabaseService.shared.deleteGeneration(id: $0) },
+        deleteAllRecords: { try DatabaseService.shared.deleteAllGenerations() },
+        audioPathsForAllRecords: { try DatabaseService.shared.fetchAllGenerations().map(\.audioPath) },
+        removeFile: { try FileManager.default.removeItem(atPath: $0) },
+        fileExists: { FileManager.default.fileExists(atPath: $0) }
+    )
 }
 
 enum HistorySortOrder: String, CaseIterable, Identifiable {
@@ -651,16 +659,15 @@ private extension HistoryView {
         }
     }
 
-    func deleteItem(_ item: HistoryListItem) -> HistoryDeletionResult {
-        guard let id = item.generation.id else {
-            return .databaseFailure("Missing generation identifier.")
-        }
+    func deleteItem(_ item: HistoryListItem) -> HistoryDeletionEngine.SingleOutcome {
+        let outcome = HistoryDeletionEngine.databaseBacked.deleteSingle(
+            recordID: item.generation.id,
+            audioPath: item.generation.audioPath
+        )
 
-        do {
-            try DatabaseService.shared.deleteGeneration(id: id)
-        } catch {
+        if case .databaseFailure = outcome {
             databaseUnavailable = true
-            return .databaseFailure(error.localizedDescription)
+            return outcome
         }
         databaseUnavailable = false
 
@@ -672,17 +679,7 @@ private extension HistoryView {
             }
             return generationID == itemID
         }
-
-        guard item.audioFileExists else {
-            return .deleted
-        }
-
-        do {
-            try FileManager.default.removeItem(atPath: item.generation.audioPath)
-            return .deleted
-        } catch {
-            return .audioCleanupFailure(error.localizedDescription)
-        }
+        return outcome
     }
 
     /// Clears the whole history. With `deleteAudio` false (GitHub #48), only
@@ -694,22 +691,16 @@ private extension HistoryView {
     /// release-QA audit); state updates hop back to the MainActor.
     func performClearAll(deleteAudio: Bool) {
         Task.detached(priority: .userInitiated) {
-            var fileFailures = 0
+            let outcome: HistoryDeletionEngine.ClearAllOutcome
             do {
-                if deleteAudio {
-                    let allGenerations = try DatabaseService.shared.fetchAllGenerations()
-                    let fileManager = FileManager.default
-                    for generation in allGenerations where fileManager.fileExists(atPath: generation.audioPath) {
-                        do {
-                            try fileManager.removeItem(atPath: generation.audioPath)
-                        } catch {
-                            fileFailures += 1
-                        }
-                    }
-                }
-                try DatabaseService.shared.deleteAllGenerations()
+                outcome = try HistoryDeletionEngine.databaseBacked.clearAll(deleteAudio: deleteAudio)
             } catch {
-                let message = error.localizedDescription
+                let message: String
+                if case HistoryDeletionEngine.ClearAllError.database(let detail) = error {
+                    message = detail
+                } else {
+                    message = error.localizedDescription
+                }
                 await MainActor.run {
                     databaseUnavailable = true
                     presentActionAlert(
@@ -720,7 +711,7 @@ private extension HistoryView {
                 return
             }
 
-            let failures = fileFailures
+            let failures = outcome.failedFileRemovals
             await MainActor.run {
                 databaseUnavailable = false
                 items = []

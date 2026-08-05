@@ -1,8 +1,16 @@
+---
+status: active
+owner: backend-mlx
+summary: Project-specific MLX runtime reference — arrays and lazy eval, memory and wired-limit posture, the Qwen3-TTS backend shape, version pins, and the safe pin-bump procedure (§9).
+sourceOfTruth:
+  - Packages/VocelloQwen3Core/Package.swift
+  - Sources/QwenVoiceCore/MLXTTSEngine.swift
+---
 # MLX Guide for Vocello
 
 > **Living document.** A project-specific reference for the MLX runtime, the Qwen3-TTS backend, and the optimization decisions that shape Vocello's macOS/iOS engine. When this doc disagrees with the code, the code wins — fix this file.
 >
-> Last reviewed: 2026-08-01. Shipping pins: `mlx-swift` **0.31.6**, `mlx-swift-lm` **3.31.4**, `swift-transformers` **1.1.9** (direct since the lm 3.x Hub/Tokenizers externalization).
+> Last reviewed: 2026-08-05. Shipping pins: `mlx-swift` **0.31.6**, `mlx-swift-lm` **3.31.4**, `swift-transformers` **1.3.3** (direct since the lm 3.x Hub/Tokenizers externalization; 1.1.9 → 1.3.3 shipped 2026-08-05 with byte-identical English fixed-seed WAVs and the full §9.3 battery).
 
 ---
 
@@ -417,7 +425,7 @@ See [`telemetry-and-benchmarking.md`](telemetry-and-benchmarking.md) for the ful
 
 - `mlx-swift`: exact **0.31.6** in `project.yml` and `Packages/VocelloQwen3Core/Package.swift`
 - `mlx-swift-lm`: exact **3.31.4** in `Packages/VocelloQwen3Core/Package.swift`
-- `swift-transformers`: exact **1.1.9** in `Packages/VocelloQwen3Core/Package.swift` — the app-supplied
+- `swift-transformers`: exact **1.3.3** in `Packages/VocelloQwen3Core/Package.swift` — the app-supplied
   Hub/Tokenizers implementation required since mlx-swift-lm 3.x
 
 Move the mlx pair in lockstep; review the swift-transformers pin in the same change. Do not float one without the others. mlx-swift ≥0.31 ships a `CudaBuild` build-tool plugin that cannot be fingerprint-approved headlessly; `xcb_run` (scripts/lib/build_cache.sh) passes `-skipPackagePluginValidation` unconditionally with the reviewed justification recorded in its header.

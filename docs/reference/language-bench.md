@@ -1,3 +1,12 @@
+---
+status: active
+owner: backend-mlx
+summary: The Phase 2-3 language bench — hint-contract and on-device output verification matrices, subset semantics, Speech asset prerequisites, and how to read hint_gate/output_gate verdicts.
+sourceOfTruth:
+  - scripts/check_language_hints.py
+  - scripts/check_language_output.py
+  - config/language-bench-matrix.json
+---
 # Language bench (Phases 2–3)
 
 Headless matrix for the Qwen3 language path:

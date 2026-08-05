@@ -516,7 +516,10 @@ def _script_help(root: Path, script: str) -> str:
 def validate_documented_subcommands(root: Path, paths: list[Path]) -> list[str]:
     errors: list[str] = []
     help_text = {script: _script_help(root, script) for script in SCRIPT_HELP_SURFACES if (root / script).is_file()}
-    command = re.compile(r"(?:^|\s)(?:\./)?(?P<script>scripts/[A-Za-z0-9_-]+\.sh)\s+(?P<sub>[A-Za-z0-9_-]+)")
+    # Same-line whitespace only: a command and its subcommand never span a
+    # line break, and letting them join lines false-matched a frontmatter
+    # `sourceOfTruth: scripts/ui_test.sh` entry with the closing `---` fence.
+    command = re.compile(r"(?:^|\s)(?:\./)?(?P<script>scripts/[A-Za-z0-9_-]+\.sh)[^\S\n]+(?P<sub>[A-Za-z0-9_-]+)")
     for source in paths:
         for match in command.finditer(source.read_text(encoding="utf-8")):
             script, subcommand = match.group("script"), match.group("sub")

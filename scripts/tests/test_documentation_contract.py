@@ -282,6 +282,28 @@ class DocumentationContractTests(unittest.TestCase):
         self.assertNotIn(report, paths)
         self.assertEqual(DOCUMENTATION.validate_historical_banners(self.root), [])
 
+    def test_subcommand_scan_does_not_span_line_breaks(self) -> None:
+        # A frontmatter `sourceOfTruth: scripts/ui_test.sh` entry sits directly
+        # above the closing `---` fence; joining the two lines read the fence
+        # as a subcommand (2026-08-05). Same-line mentions still validate.
+        (self.root / "scripts").mkdir(exist_ok=True)
+        stub = self.root / "scripts/ui_test.sh"
+        stub.write_text("#!/bin/sh\necho 'usage: ui_test.sh macos smoke|benchmark|perf'\n")
+        stub.chmod(0o755)
+        doc = self.write(
+            "docs/reference/frontmatter-bound.md",
+            "---\nsourceOfTruth:\n  - scripts/ui_test.sh\n---\n# Doc\n\nRun scripts/ui_test.sh perf today.\n",
+        )
+        bad = self.write(
+            "docs/reference/retired-lane.md",
+            "# Doc\n\nRun scripts/ui_test.sh warp today.\n",
+        )
+        errors = DOCUMENTATION.validate_documented_subcommands(self.root, [doc, bad])
+        self.assertEqual(
+            errors,
+            ["docs/reference/retired-lane.md: undocumented or retired subcommand scripts/ui_test.sh warp"],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

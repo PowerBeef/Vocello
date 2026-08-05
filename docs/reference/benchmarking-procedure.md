@@ -1,3 +1,12 @@
+---
+status: active
+owner: release-qa
+summary: Operator runbook for performance and quality benchmarks — when to bench, the macOS CLI/app-XPC and iOS device paths, expected artifacts, and how to read results.
+sourceOfTruth:
+  - scripts/macos_test.sh
+  - scripts/ios_device.sh
+  - scripts/ui_test.sh
+---
 # Benchmarking procedure — operator runbook
 
 Step-by-step guide for running Vocello performance and quality benchmarks on **macOS**
@@ -78,6 +87,7 @@ UI heartbeat        —                       yes                    yes
 | **macOS profile** | `scripts/macos_test.sh profile --kind cpu|memory` | In-process via CLI inside exact-PID trace | CPU/signpost or allocation/VM validation |
 | **iOS device** | `scripts/ios_device.sh bench` | In-process | iPhone tier, Jetsam, on-device RTF (headless diagnostics, single take) |
 | **iOS UI benchmark** | `scripts/ui_test.sh ios benchmark` | In-process | Full UI matrix through XCUITest on the paired physical iPhone; telemetry gated per take |
+| **macOS UI frame health** | `scripts/ui_test.sh macos perf` | No engine claims (UI-only) | Nine scripted SwiftUI scenarios with the in-app frame probe; warn-only ceilings; canonical-hardware runs publish `ui-perf` registry records ([`macos-ui-refresh-2026-08.md`](macos-ui-refresh-2026-08.md)) |
 
 **Important:** CLI bench numbers are **not** identical to macOS XPC UI numbers. Compare like with
 like (CLI vs CLI, UI vs UI). Use CLI for backend optimization; use UI/XPC for integration regressions.

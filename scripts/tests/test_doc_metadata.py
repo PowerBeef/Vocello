@@ -44,6 +44,14 @@ class FactScanTests(unittest.TestCase):
         self.assertEqual(matched("10 × 2 presets"), set())
         self.assertEqual(matched("10 x 2 presets"), set())
 
+    def test_multiplication_chains_are_arithmetic_not_tier_claims(self):
+        # docs/reference/mimi-codec-guide.md line 160, 2026-08-05: the SEANet
+        # upsample product "2 × 2 × 10 × 5 × 4 × 3" false-matched on "10 × 5".
+        self.assertEqual(matched("2 × 2 × 10 × 5 × 4 × 3 = 2,400"), set())
+        self.assertEqual(matched("a 10 × 5 × 4 chain tail"), set())
+        # A standalone wrong product still fails.
+        self.assertEqual(matched("the 10 × 5 delivery matrix"), {"10 × 5"})
+
     def test_spelled_and_numeric_forms_of_the_true_count_both_pass(self):
         # Only excluding the word form let "2 intensities" fail as a false
         # positive on the real corpus.

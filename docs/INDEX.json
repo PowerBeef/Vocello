@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "generated": "python3 scripts/doc_metadata.py rebuild-index",
   "note": "Machine-readable documentation map. Query this instead of globbing docs/.",
-  "annotatedDocuments": 42,
-  "unannotatedDocuments": 44,
+  "annotatedDocuments": 46,
+  "unannotatedDocuments": 40,
   "documents": [
     {
       "path": "docs/audits/archive/2026-07-10/01_Evidence_Method_and_Corrections.md",
@@ -76,6 +76,17 @@
       "contentDigest": "sha256:43469de2d31b138e5539e2c8a81e87f3493ae41dae45e50a827bc1176582db6b"
     },
     {
+      "path": "docs/reference/benchmarking-procedure.md",
+      "status": "active",
+      "owner": "release-qa",
+      "summary": "Operator runbook for performance and quality benchmarks \u2014 when to bench, the macOS CLI/app-XPC and iOS device paths, expected artifacts, and how to read results.",
+      "sourceOfTruth": [
+        "scripts/macos_test.sh",
+        "scripts/ios_device.sh",
+        "scripts/ui_test.sh"
+      ]
+    },
+    {
       "path": "docs/reference/codex-storage-ballooning-incident.md",
       "status": "historical",
       "owner": "release-qa",
@@ -125,6 +136,27 @@
       ]
     },
     {
+      "path": "docs/reference/language-bench.md",
+      "status": "active",
+      "owner": "backend-mlx",
+      "summary": "The Phase 2-3 language bench \u2014 hint-contract and on-device output verification matrices, subset semantics, Speech asset prerequisites, and how to read hint_gate/output_gate verdicts.",
+      "sourceOfTruth": [
+        "scripts/check_language_hints.py",
+        "scripts/check_language_output.py",
+        "config/language-bench-matrix.json"
+      ]
+    },
+    {
+      "path": "docs/reference/macos-testing.md",
+      "status": "active",
+      "owner": "macos",
+      "summary": "macOS test lanes \u2014 deterministic development verification, the platform gate, model fixtures, explicit XCUITest smoke/benchmark/perf acceptance with the ui-perf baseline protocol (copy reports out between runs; discard-and-replace on concurrent use), and crash/profile evidence.",
+      "sourceOfTruth": [
+        "scripts/macos_test.sh",
+        "scripts/ui_test.sh"
+      ]
+    },
+    {
       "path": "docs/reference/macos-ui-refresh-2026-08.md",
       "status": "active",
       "owner": "macos",
@@ -140,6 +172,16 @@
       "owner": "backend-mlx",
       "summary": "Metal 4 tensors + MPP in MLX custom kernels \u2014 feasibility study (2026-07-31). Recorded the Gate 0 micro-benchmark rider and the OS-floor policy; Gate 0 returned no-go 2026-08-01, closing the fused-kernel candidate.",
       "contentDigest": "sha256:6a56bc6fc4d872f1812f589789b5f66a1e7b50ef048d0675a3e808d4813cbb9b"
+    },
+    {
+      "path": "docs/reference/mlx-guide.md",
+      "status": "active",
+      "owner": "backend-mlx",
+      "summary": "Project-specific MLX runtime reference \u2014 arrays and lazy eval, memory and wired-limit posture, the Qwen3-TTS backend shape, version pins, and the safe pin-bump procedure (\u00a79).",
+      "sourceOfTruth": [
+        "Packages/VocelloQwen3Core/Package.swift",
+        "Sources/QwenVoiceCore/MLXTTSEngine.swift"
+      ]
     },
     {
       "path": "docs/reference/optimization-report-review-2026-07-25.md",

@@ -1,3 +1,11 @@
+---
+status: active
+owner: macos
+summary: macOS test lanes — deterministic development verification, the platform gate, model fixtures, explicit XCUITest smoke/benchmark/perf acceptance with the ui-perf baseline protocol (copy reports out between runs; discard-and-replace on concurrent use), and crash/profile evidence.
+sourceOfTruth:
+  - scripts/macos_test.sh
+  - scripts/ui_test.sh
+---
 # macOS testing
 
 Vocello separates routine deterministic development verification from explicit native-app UI

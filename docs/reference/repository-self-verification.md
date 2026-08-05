@@ -78,7 +78,9 @@ Deny patterns are generated from the derived value, so they cannot rot either: i
 ever becomes three, the pattern that rejects "10 × N where N is not 3" follows automatically. They
 also target **claim forms rather than bare values** — release notes legitimately name old versions,
 so `v2.3.0 was cut 2026-07-31` passes, while asserting that a superseded version *is the current
-release* fails.
+release* fails. Matches embedded in a longer multiplication chain are likewise excluded
+(2026-08-05): a codec guide's upsample arithmetic (`2 × 2 × 8 × …`) is factor math, not a
+preset-by-tier claim.
 
 That rule is strict enough to have caught this document: an earlier draft spelled the failing form
 out literally as an example, and the gate rejected it. Illustrating a banned claim requires

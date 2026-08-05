@@ -245,7 +245,14 @@ def deny_patterns(facts: dict) -> list[tuple[str, str, re.Pattern]]:
         (
             "deliveryIntensityTiers",
             f"a preset x tier product whose tier count is not {tiers}",
-            re.compile(rf"\b{presets}\s*[x×]\s*(?!{tiers}\b)\d+\b"),
+            # A match embedded in a longer multiplication chain is arithmetic,
+            # not a preset-by-tier claim (mimi-codec-guide's SEANet upsample
+            # product "2 × 2 × 8 × 5 × 4 × 3" false-matched on "8 × 5"), so a
+            # leading or trailing "×" term disqualifies the match.
+            re.compile(
+                rf"(?<![x×])(?<![x×] )\b{presets}\s*[x×]\s*(?!{tiers}\b)\d+\b"
+                r"(?![^\S\n]*[x×])"
+            ),
         ),
         (
             "deliveryIntensityTiers",

@@ -14,9 +14,8 @@ final class GenerationPerformanceGateModel: ObservableObject {
 
     @MainActor
     init(store: TTSEngineStore) {
-        store.$hasActiveGeneration
-            .combineLatest(store.$hasSustainedPerformanceActivity)
-            .map { $0 || $1 }
+        isActive = store.hasActiveGeneration || store.hasSustainedPerformanceActivity
+        store.performanceActivityUpdates
             .removeDuplicates()
             .assign(to: &$isActive)
     }

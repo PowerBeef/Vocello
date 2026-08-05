@@ -10,7 +10,7 @@ private struct VoicesAlertState: Identifiable {
 }
 
 struct VoicesView: View {
-    @EnvironmentObject private var ttsEngineStore: TTSEngineStore
+    @Environment(TTSEngineStore.self) private var ttsEngineStore
     @EnvironmentObject private var audioPlayer: AudioPlayerViewModel
     @Environment(SavedVoicesViewModel.self) private var savedVoicesViewModel
 
@@ -67,7 +67,7 @@ struct VoicesView: View {
                 SavedVoiceSheet(configuration: configuration) { voice in
                     handleSavedVoiceSheetCompletion(voice)
                 }
-                .environmentObject(ttsEngineStore)
+                .environment(ttsEngineStore)
             }
             .alert("Delete Saved Voice?", isPresented: $showDeleteConfirmation) {
                 Button("Cancel", role: .cancel) {

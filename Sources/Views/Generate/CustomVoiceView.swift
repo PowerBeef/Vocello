@@ -128,7 +128,7 @@ struct CustomVoiceView: View {
     /// the matching language to "Recommended" sections in the pickers.
     @State private var detectedPromptLanguage: Qwen3SupportedLanguage = .auto
 
-    @ObservedObject private var ttsEngineStore: TTSEngineStore
+    private let ttsEngineStore: TTSEngineStore
     private var modelManager: ModelManagerViewModel
     private let audioPlayer: AudioPlayerViewModel
 
@@ -213,7 +213,7 @@ struct CustomVoiceView: View {
         modelManager: ModelManagerViewModel
     ) {
         _draft = draft
-        _ttsEngineStore = ObservedObject(wrappedValue: ttsEngineStore)
+        self.ttsEngineStore = ttsEngineStore
         self.modelManager = modelManager
         self.audioPlayer = audioPlayer
     }
@@ -257,7 +257,7 @@ struct CustomVoiceView: View {
                     initialText: configuration.initialText,
                     initialSegmentationMode: configuration.initialSegmentationMode
                 )
-                .environmentObject(ttsEngineStore)
+                .environment(ttsEngineStore)
                 .environmentObject(audioPlayer)
             }
         }

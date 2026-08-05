@@ -318,7 +318,7 @@ struct SidebarView: View {
 
 private struct SidebarFooterRegion: View {
     @EnvironmentObject private var audioPlayer: AudioPlayerViewModel
-    @EnvironmentObject private var ttsEngineStore: TTSEngineStore
+    @Environment(TTSEngineStore.self) private var ttsEngineStore
 
     private let appEngineSelection = AppEngineSelection.current()
 

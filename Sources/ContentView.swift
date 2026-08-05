@@ -259,10 +259,9 @@ struct ContentView: View {
         .onChange(of: modelManager.statuses) { _, _ in handleStatusesChange() }
         .onChange(of: modelManager.activeVariantRevision) { _, _ in handleActiveVariantChange() }
         // `onReceive`, not `onChange`: `onChange(of:)` would need the
-        // snapshot read in body, which requires observing the store (W1-D).
-        // The publisher route runs the same handler without invalidating
-        // the shell; `dropFirst` mirrors onChange's changes-only semantics.
-        .onReceive(ttsEngineStore.$snapshot.dropFirst().removeDuplicates()) { newSnapshot in
+        // snapshot read in body, which would track the store (W1-D/W2-A).
+        // The store's explicit bridge fires only on applied changes.
+        .onReceive(ttsEngineStore.snapshotUpdates) { newSnapshot in
             handleEngineSnapshotChange(newSnapshot)
         }
         .onReceive(appCommandRouter.sidebarSelection) { item in
@@ -539,7 +538,7 @@ struct ContentView: View {
 private struct CustomVoiceScreenHost: View {
     @Binding var draft: CustomVoiceDraft
 
-    @EnvironmentObject private var ttsEngineStore: TTSEngineStore
+    @Environment(TTSEngineStore.self) private var ttsEngineStore
     @EnvironmentObject private var audioPlayer: AudioPlayerViewModel
     @Environment(ModelManagerViewModel.self) private var modelManager
 
@@ -556,7 +555,7 @@ private struct CustomVoiceScreenHost: View {
 private struct VoiceDesignScreenHost: View {
     @Binding var draft: VoiceDesignDraft
 
-    @EnvironmentObject private var ttsEngineStore: TTSEngineStore
+    @Environment(TTSEngineStore.self) private var ttsEngineStore
     @EnvironmentObject private var audioPlayer: AudioPlayerViewModel
     @Environment(ModelManagerViewModel.self) private var modelManager
     @Environment(SavedVoicesViewModel.self) private var savedVoicesViewModel
@@ -576,7 +575,7 @@ private struct VoiceCloningScreenHost: View {
     @Binding var draft: VoiceCloningDraft
     @Binding var pendingSavedVoiceHandoff: PendingVoiceCloningHandoff?
 
-    @EnvironmentObject private var ttsEngineStore: TTSEngineStore
+    @Environment(TTSEngineStore.self) private var ttsEngineStore
     @EnvironmentObject private var audioPlayer: AudioPlayerViewModel
     @Environment(ModelManagerViewModel.self) private var modelManager
     @Environment(SavedVoicesViewModel.self) private var savedVoicesViewModel

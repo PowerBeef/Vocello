@@ -322,7 +322,7 @@ struct HistoryView: View {
                 SavedVoiceSheet(configuration: configuration) { voice in
                     handleSavedVoice(voice)
                 }
-                .environmentObject(ttsEngineStore)
+                .environment(ttsEngineStore)
             }
     }
 

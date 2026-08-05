@@ -26,7 +26,34 @@ scripts/ui_test.sh macos benchmark
 scripts/ui_test.sh macos benchmark --modes custom --lengths short --warm 1 --label "focused"
 # Scaled long-form memory evidence (local only, 2–12 segments; default 2):
 scripts/ui_test.sh macos smoke --long-form-segments 10
+# SwiftUI performance / animation-smoothness scenarios (local evidence only):
+scripts/ui_test.sh macos perf
 ```
+
+## UI-performance lane (`macos perf`)
+
+Nine XCUITest-driven scenarios measure SwiftUI frame health, resource usage, and
+animation smoothness: idle-baseline, sidebar-navigation, history-scroll (400 seeded
+rows), history-filter, delivery-menu, settings-scroll, composer-typing,
+window-resize (exploratory), and generation-active (exploratory; gate ON, engine
+busy). Each scenario launches the app once with the in-app frame probe enabled
+(`QWENVOICE_UIPERF_FRAME_PROBE`, registered knob) and marks its wall-clock window;
+the probe streams 500 ms display-link blocks (frames delivered vs expected, excess
+frame time, max gap, gap histogram, CPU, footprint, thermal) to
+`diagnostics/ui-perf/`, and `scripts/check_macos_ui_perf.py` joins windows to rows
+and writes `ui-perf-report.json` under the run directory. History seeding uses
+`QWENVOICE_UIPERF_SEED_HISTORY` (registered knob; idempotent, debug-store only).
+
+Phase-1 posture: **local evidence only** — no benchmark-history record; no
+performance thresholds (the gate is structural: every scenario present once,
+probe coverage ≥90% of each window, monotonic blocks, sane refresh interval).
+The probe measures main-run-loop display-link cadence, a UI-thread hitch proxy;
+compositor ground truth remains an Instruments Hitches/Core Animation trace.
+
+Baseline protocol: one discarded warm-up run, then five counted runs (fixed
+scenario order, AC power, cursor parked, `caffeinate` held by the lane); report
+per-scenario median and IQR; discard any counted run whose thermal state left
+nominal. Thresholds are set only after repeated baselines establish spread.
 
 | Lane | Scope |
 | --- | --- |

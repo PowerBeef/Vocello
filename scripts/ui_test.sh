@@ -36,6 +36,7 @@ usage() {
 Usage:
   scripts/ui_test.sh macos smoke [--long-form-segments N]
   scripts/ui_test.sh macos benchmark [--modes custom,design,clone] [--lengths short,medium,long] [--warm 3] [--label RUN_ID]
+  scripts/ui_test.sh macos perf
   scripts/ui_test.sh ios smoke
   scripts/ui_test.sh ios benchmark [--modes custom,design,clone] [--lengths short,medium,long] [--warm 3] [--label RUN_ID]
   scripts/ui_test.sh ios delivery-cohort --text SCRIPT [--takes 20] [--label RUN_ID]
@@ -58,15 +59,17 @@ platform="$1"
 lane="$2"
 shift 2
 [[ "$platform" == "macos" || "$platform" == "ios" ]] || usage
-[[ "$lane" == "smoke" || "$lane" == "benchmark" || "$lane" == "model-download" || "$lane" == "delivery-cohort" ]] || usage
+[[ "$lane" == "smoke" || "$lane" == "benchmark" || "$lane" == "model-download" || "$lane" == "delivery-cohort" || "$lane" == "perf" ]] || usage
 [[ "$lane" != "model-download" || "$platform" == "ios" ]] || usage
 [[ "$lane" != "delivery-cohort" || "$platform" == "ios" ]] || usage
+[[ "$lane" != "perf" || "$platform" == "macos" ]] || usage
 
 modes="custom,design,clone"
 lengths="short,medium,long"
 warm=3
 label=""
 long_form_segments=""
+perf_run_started_epoch_ms=0
 cohort_takes=20
 cohort_text=""
 while [[ $# -gt 0 ]]; do
@@ -724,6 +727,21 @@ run_xcodebuild() {
   return "$status"
 }
 
+validate_macos_ui_perf() {
+  local diagnostics="$HOME/Library/Application Support/QwenVoice-Debug/diagnostics"
+  python3 "$ROOT_DIR/scripts/check_macos_ui_perf.py" \
+    --xcodebuild-log "$out/xcodebuild.log" \
+    --diagnostics "$diagnostics" \
+    --run-id "$run_id" \
+    --run-started-epoch-ms "$perf_run_started_epoch_ms" \
+    --output "$out/ui-perf-report.json" \
+    --copy-probe-files-to "$out/diagnostics/ui-perf" \
+    >"$out/ui-perf-gate.txt" 2>&1
+  local status=$?
+  cat "$out/ui-perf-gate.txt" >&2
+  return "$status"
+}
+
 validate_macos_benchmark() {
   local diagnostics="$HOME/Library/Application Support/QwenVoice-Debug/diagnostics"
   local evidence="$out/benchmark-evidence.json"
@@ -819,6 +837,13 @@ if [[ "$platform" == "macos" ]]; then
     if [[ -n "$long_form_segments" ]]; then
       export TEST_RUNNER_QVOICE_MAC_LONGFORM_SEGMENTS="$long_form_segments"
     fi
+  elif [[ "$lane" == "perf" ]]; then
+    # UI-performance scenarios (frame probe + marked windows). Runs
+    # unattended: caffeinate holds off display/system sleep for the
+    # lifetime of this script.
+    only_test="VocelloMacUITests/VocelloMacPerfUITests"
+    perf_run_started_epoch_ms="$(($(date +%s) * 1000))"
+    caffeinate -dimsuw $$ &
   else
     only_test="VocelloMacUITests/VocelloMacBenchmarkUITests/testOrderedConfigurableMatrix"
     rm -f "$MAC_TAKE_MANIFEST" "$MAC_TAKE_MANIFEST.next"
@@ -860,8 +885,19 @@ WAV
   # followed by test-without-building against the already-built products.
   # Ordinary CI never invokes this script; the workflow-YML guard on
   # test-without-building is unaffected.
+  # HEAD + dirty paths + dirty CONTENT: `status --porcelain` alone lists
+  # paths, so editing an already-modified file left the fingerprint
+  # unchanged and repeat lanes reused stale test products (found live
+  # 2026-08-04 when a freshly added test class ran as zero tests).
+  # `diff HEAD` covers tracked edits only; untracked files must hash their
+  # content too (found live 2026-08-04 again: edits to a not-yet-committed
+  # test file reran the stale binary).
   mac_fingerprint="$( { git -C "$ROOT_DIR" rev-parse HEAD 2>/dev/null; \
-    git -C "$ROOT_DIR" status --porcelain 2>/dev/null; } | shasum -a 256 | cut -d' ' -f1)"
+    git -C "$ROOT_DIR" status --porcelain 2>/dev/null; \
+    git -C "$ROOT_DIR" diff HEAD 2>/dev/null; \
+    git -C "$ROOT_DIR" ls-files --others --exclude-standard -z 2>/dev/null \
+      | (cd "$ROOT_DIR" && xargs -0 shasum -a 256 2>/dev/null); } \
+    | shasum -a 256 | cut -d' ' -f1)"
   mac_build_marker="$MAC_DERIVED/.vocello-ui-build-fingerprint"
   mac_products_ready="$(find "$MAC_DERIVED/Build/Products" -maxdepth 1 \
     -name 'VocelloMacUI_*.xctestrun' -print -quit 2>/dev/null || true)"
@@ -907,6 +943,9 @@ WAV
   [[ "$lane" != "benchmark" ]] || required_step_run "$step_ledger" \
     benchmark-validation validate_macos_benchmark \
     || die "macOS benchmark telemetry gate failed"
+  [[ "$lane" != "perf" ]] || required_step_run "$step_ledger" \
+    perf-validation validate_macos_ui_perf \
+    || die "macOS ui-perf evidence gate failed"
   terminate_macos_app
 else
   probe="$(ios_probe)"

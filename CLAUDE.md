@@ -330,6 +330,7 @@ scripts/macos_test.sh profile --kind memory custom:speed:
 scripts/macos_test.sh memory --label retained-check   # fixed retained-memory sequence
 scripts/ui_test.sh macos smoke
 scripts/ui_test.sh macos benchmark
+scripts/ui_test.sh macos perf
 scripts/ui_test.sh ios smoke
 scripts/ui_test.sh ios benchmark
 scripts/ios_device.sh lang-bench --subset quick

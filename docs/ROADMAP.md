@@ -12,6 +12,7 @@
 | `convergence-metal4-stage4-2026-08` | active | backend-and-platform | 5/7 (71%) |
 | `delivery-prompting-2026-08` | active | backend-mlx | 18/20 (90%) |
 | `doc-governance-2026-08` | active | release-qa | 8/9 (89%) |
+| `macos-ui-2026-08` | active | macos | 4/7 (57%) |
 
 ## Convergence residuals, Metal 4 study, and Stage 4
 
@@ -102,3 +103,32 @@ Narrative authority: [`docs/reference/repository-self-verification.md`](referenc
 
 - **`DG-4`** (planned) — Phase 3 — source bindings on active documents.
   gate: Annotated incrementally as documents are touched; a binding invented in bulk without reading the document is worse than none.
+
+## macOS UI performance harness, measured review, and staged refresh
+
+`macos-ui-2026-08` · **active** · macos · adopted 2026-08-04
+
+Give the macOS app a deterministic SwiftUI frame-health lane, use it to baseline and rank the UI's real costs, land the maintainer-approved safe fixes, and stage a brand-preserving refresh gated on the maintainer's remote review of the proposals artifact.
+
+Narrative authority: [`docs/reference/macos-ui-refresh-2026-08.md`](reference/macos-ui-refresh-2026-08.md)
+
+| Item | Status | Title | Evidence |
+| --- | --- | --- | --- |
+| `UI-1` | done | SwiftUI frame-health harness (scripts/ui_test.sh macos perf) | `commit:9d283a9`, `file:scripts/check_macos_ui_perf.py`, `file:Tests/VocelloMacUITests/VocelloMacPerfUITests.swift` |
+| `UI-2` | done | Frame-health baseline (1 warm-up + 5 counted runs) | `file:docs/reference/macos-ui-refresh-2026-08.md` |
+| `UI-3` | done | Four-audit UI review, ranked synthesis, and refresh proposals | `file:docs/reference/macos-ui-refresh-2026-08.md` |
+| `UI-4` | done | Safe fixes: dead-UI-code removal + Reduce Transparency at direct glass sites | `commit:99d746d` |
+| `UI-5` | planned | Refinement wave 1 (warm text ramp, motion family, focus rings, scoped observation, type scaling, stable resize fields, glass helper) | — |
+| `UI-6` | planned | Wave 2 re-engineering: store observation migration, History/Voices coordinators, shared generation lifecycle, player split | — |
+| `UI-7` | planned | Registry formalization of the perf lane (benchmark-history kind, thresholds from repeated baselines) | — |
+
+### Open items in detail
+
+- **`UI-5`** (planned) — Refinement wave 1 (warm text ramp, motion family, focus rings, scoped observation, type scaling, stable resize fields, glass helper).
+  gate: Each W1 item lands independently with the perf lane re-run before/after where perf-relevant; blocked on the maintainer's review of the proposals artifact.
+
+- **`UI-6`** (planned) — Wave 2 re-engineering: store observation migration, History/Voices coordinators, shared generation lifecycle, player split.
+  gate: Separate scoped arcs; each carries its own deterministic tests plus perf-lane deltas.
+
+- **`UI-7`** (planned) — Registry formalization of the perf lane (benchmark-history kind, thresholds from repeated baselines).
+  gate: Follows the prosody-calibration precedent: schema enums, metric allowlist, orchestration workflow, and thresholds only after repeated baselines establish spread.

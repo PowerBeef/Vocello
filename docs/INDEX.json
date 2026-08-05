@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "generated": "python3 scripts/doc_metadata.py rebuild-index",
   "note": "Machine-readable documentation map. Query this instead of globbing docs/.",
-  "annotatedDocuments": 41,
+  "annotatedDocuments": 42,
   "unannotatedDocuments": 44,
   "documents": [
     {
@@ -122,6 +122,16 @@
       "sourceOfTruth": [
         "scripts/build_emotion_reference_bank.py",
         "Sources/QwenVoiceCore/VoiceBankCatalog.swift"
+      ]
+    },
+    {
+      "path": "docs/reference/macos-ui-refresh-2026-08.md",
+      "status": "active",
+      "owner": "macos",
+      "summary": "The 2026-08 macOS UI review \u2014 measured frame-health baseline, ranked audit findings, the staged refresh proposal (wave 1 refinements, wave 2 re-engineering), and what already landed. Roadmap authority for the macos-ui-2026-08 plan.",
+      "sourceOfTruth": [
+        "scripts/check_macos_ui_perf.py",
+        "Tests/VocelloMacUITests/VocelloMacPerfUITests.swift"
       ]
     },
     {

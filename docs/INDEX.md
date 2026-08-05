@@ -67,6 +67,7 @@ Review when: target or scheme changes; runtime topology; telemetry schema; test 
 - [`docs/reference/macos-permissions.md`](../docs/reference/macos-permissions.md)
 - [`docs/reference/macos-release-qa.md`](../docs/reference/macos-release-qa.md)
 - [`docs/reference/macos-testing.md`](../docs/reference/macos-testing.md)
+- [`docs/reference/macos-ui-refresh-2026-08.md`](../docs/reference/macos-ui-refresh-2026-08.md)
 - [`docs/reference/metal-guide.md`](../docs/reference/metal-guide.md)
 - [`docs/reference/mimi-codec-guide.md`](../docs/reference/mimi-codec-guide.md)
 - [`docs/reference/mlx-audio-swift-patching.md`](../docs/reference/mlx-audio-swift-patching.md)

@@ -28,6 +28,15 @@
       "adopted": "2026-08-02",
       "goal": "Make documentation state machine-checkable: pin historical records against accidental modification, derive facts from code so prose cannot silently contradict them, and give agents a queryable index instead of a directory to glob.",
       "authority": "docs/reference/repository-self-verification.md"
+    },
+    {
+      "id": "macos-ui-2026-08",
+      "title": "macOS UI performance harness, measured review, and staged refresh",
+      "status": "active",
+      "owner": "macos",
+      "adopted": "2026-08-04",
+      "goal": "Give the macOS app a deterministic SwiftUI frame-health lane, use it to baseline and rank the UI's real costs, land the maintainer-approved safe fixes, and stage a brand-preserving refresh gated on the maintainer's remote review of the proposals artifact.",
+      "authority": "docs/reference/macos-ui-refresh-2026-08.md"
     }
   ],
   "items": [
@@ -593,6 +602,76 @@
       "sourceOfTruth": [
         "Sources/QwenVoiceCore/GenerationOutputAdapter.swift"
       ]
+    },
+    {
+      "id": "UI-1",
+      "plan": "macos-ui-2026-08",
+      "title": "SwiftUI frame-health harness (scripts/ui_test.sh macos perf)",
+      "status": "done",
+      "gate": "Nine XCUITest scenarios join an in-app 500 ms display-link probe through a structural gate (all scenarios present once, >=90% window coverage, monotonic blocks, sane refresh); proven by one clean 9/9 PASS plus three fail-closed refusals.",
+      "evidence": [
+        "commit:9d283a9",
+        "file:scripts/check_macos_ui_perf.py",
+        "file:Tests/VocelloMacUITests/VocelloMacPerfUITests.swift"
+      ],
+      "updated": "2026-08-05"
+    },
+    {
+      "id": "UI-2",
+      "plan": "macos-ui-2026-08",
+      "title": "Frame-health baseline (1 warm-up + 5 counted runs)",
+      "status": "done",
+      "gate": "Per-scenario medians/IQR on the canonical M2 8 GB with thermals nominal in every counted run; idle-baseline exactly 0.0 ms/s hitch. Table recorded in the authority doc.",
+      "evidence": [
+        "file:docs/reference/macos-ui-refresh-2026-08.md"
+      ],
+      "updated": "2026-08-05"
+    },
+    {
+      "id": "UI-3",
+      "plan": "macos-ui-2026-08",
+      "title": "Four-audit UI review, ranked synthesis, and refresh proposals",
+      "status": "done",
+      "gate": "Architecture/performance/accessibility/layout audits merged with measured costs into ranked findings; wave-1/wave-2 proposal set published as a private remote-review artifact and recorded in the authority doc.",
+      "evidence": [
+        "file:docs/reference/macos-ui-refresh-2026-08.md"
+      ],
+      "updated": "2026-08-05"
+    },
+    {
+      "id": "UI-4",
+      "plan": "macos-ui-2026-08",
+      "title": "Safe fixes: dead-UI-code removal + Reduce Transparency at direct glass sites",
+      "status": "done",
+      "gate": "-615 lines of reference-free-verified dead scaffolding removed; all 8 direct glassEffect sites honor accessibilityReduceTransparency; full gate, both platform compiles, core tests, and a 7/7 smoke lane green.",
+      "evidence": [
+        "commit:99d746d"
+      ],
+      "updated": "2026-08-05"
+    },
+    {
+      "id": "UI-5",
+      "plan": "macos-ui-2026-08",
+      "title": "Refinement wave 1 (warm text ramp, motion family, focus rings, scoped observation, type scaling, stable resize fields, glass helper)",
+      "status": "planned",
+      "gate": "Each W1 item lands independently with the perf lane re-run before/after where perf-relevant; blocked on the maintainer's review of the proposals artifact.",
+      "updated": "2026-08-05"
+    },
+    {
+      "id": "UI-6",
+      "plan": "macos-ui-2026-08",
+      "title": "Wave 2 re-engineering: store observation migration, History/Voices coordinators, shared generation lifecycle, player split",
+      "status": "planned",
+      "gate": "Separate scoped arcs; each carries its own deterministic tests plus perf-lane deltas.",
+      "updated": "2026-08-05"
+    },
+    {
+      "id": "UI-7",
+      "plan": "macos-ui-2026-08",
+      "title": "Registry formalization of the perf lane (benchmark-history kind, thresholds from repeated baselines)",
+      "status": "planned",
+      "gate": "Follows the prosody-calibration precedent: schema enums, metric allowlist, orchestration workflow, and thresholds only after repeated baselines establish spread.",
+      "updated": "2026-08-05"
     }
   ]
 }

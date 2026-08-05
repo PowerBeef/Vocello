@@ -39,7 +39,21 @@ machine-readable status record and wins over any older prose.
 | 13 — Benchmark/history v3 | Live 2026-07-29: the first schema-v3 records are committed (three clean `phase0-cli-control-*` engine records plus one exploratory run that also exposed and fixed the summarizer's v3 pin). `benchmarks/schema-v3.json` adds the typed quality identity to generation takes (pass/warning only, five fast gates required, machine-code issues); v1/v2 records stay valid immutable history; the publisher stamps v3 only when every take carries the identity. The UI benchmark checkers folded the same identity 2026-08-01: ui-generation records now publish v3 (first: the focused `v3-fold-proof` record `macos-xcui-benchmark-20260801-003208-403989cf`); the canonical iOS matrix published its first v3 record 2026-08-01 (`ios-xcui-benchmark-20260801-132415-abbec96b`). |
 | 14 — Organization and retirement | Closed 2026-07-23 (14a + 14b): compatibility SPI retired, actor-owned loading/metadata/priming/clone artifacts, clone conditioning epoch-bound end to end. |
 
-## Resume here (2026-08-01)
+## Resume here (2026-08-05)
+
+**macOS UI arc (2026-08-04/05, plan `macos-ui-2026-08`):** the SwiftUI frame-health
+lane `scripts/ui_test.sh macos perf` landed and proved itself (`9d283a9`; nine
+scenarios, structural gate, fail-closed refusals), the five-counted-run baseline and
+the four-audit review are recorded in
+[`docs/reference/macos-ui-refresh-2026-08.md`](reference/macos-ui-refresh-2026-08.md)
+(the plan's authority — History pipeline and root-shell invalidation are the measured
+top costs), and the approved safe fixes shipped (`99d746d`: −615 dead UI lines,
+Reduce Transparency at all 8 direct glass sites, 7/7 smoke green). Refinement wave 1
+(UI-5) is fully specified there and **waits on the maintainer's review of the private
+proposals artifact** (published 2026-08-05, viewable in the Claude iOS app); wave 2
+re-engineering is UI-6, perf-lane registry formalization UI-7.
+
+The pre-UI-arc checkpoint (2026-08-01) follows.
 
 Stages 0–3 of the adopted roadmap are complete (the 2.2 artifact promotion included);
 Stage 4 closed with the kept 0.31.6 pin bump. **v2.3.0 was cut 2026-07-31 and v2.4.0 on

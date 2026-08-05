@@ -137,104 +137,72 @@ final class VoiceCloningCoordinator {
         isGenerating = true
         errorMessage = nil
 
-        generationTask = Task { @MainActor in
-            var submittedGenerationID: UUID?
-            defer {
-                audioPlayer.setLivePreviewEstimate(nil)
-                isGenerating = false
-                generationTask = nil
+        generationTask = GenerationLifecycleExecutor.run(
+            ttsEngineStore: ttsEngineStore,
+            audioPlayer: audioPlayer,
+            setErrorMessage: { [weak self] message in self?.errorMessage = message },
+            onFinish: { [weak self] in
+                self?.isGenerating = false
+                self?.generationTask = nil
             }
-            do {
-                let primedReferenceMatches = ttsEngineStore.clonePreparationState.isPrimed
-                    && ttsEngineStore.clonePreparationState.key == clonePrimingRequestKey
+        ) {
+            let primedReferenceMatches = ttsEngineStore.clonePreparationState.isPrimed
+                && ttsEngineStore.clonePreparationState.key == clonePrimingRequestKey
 
-                if !primedReferenceMatches {
-                    do {
-                        try await ttsEngineStore.ensureCloneReferencePrimed(
-                            modelID: model.id,
-                            reference: CloneReference(
-                                audioPath: refPath,
-                                transcript: currentDraft.trimmedReferenceTranscript,
-                                preparedVoiceID: currentDraft.selectedSavedVoiceID
-                            )
+            if !primedReferenceMatches {
+                do {
+                    try await ttsEngineStore.ensureCloneReferencePrimed(
+                        modelID: model.id,
+                        reference: CloneReference(
+                            audioPath: refPath,
+                            transcript: currentDraft.trimmedReferenceTranscript,
+                            preparedVoiceID: currentDraft.selectedSavedVoiceID
                         )
-                    } catch {
-                        if DebugMode.isEnabled {
-                            print("[Performance][VoiceCloningCoordinator] clone priming degraded: \(error.localizedDescription)")
-                        }
+                    )
+                } catch {
+                    if DebugMode.isEnabled {
+                        print("[Performance][VoiceCloningCoordinator] clone priming degraded: \(error.localizedDescription)")
                     }
                 }
-
-                let outputPath = makeOutputPath(
-                    subfolder: model.outputSubfolder,
-                    text: currentDraft.text
-                )
-                // Sync prefix already validated text + referenceAudioPath
-                // so makeGenerationRequest can never return nil here. If
-                // it does (defensive only) throw and let the catch reset
-                // isGenerating cleanly via the single exit point below —
-                // never flip isGenerating false inline.
-                guard let generationRequest = Self.makeGenerationRequest(
-                    draft: currentDraft,
-                    model: model,
-                    outputPath: outputPath
-                ) else {
-                    throw VoiceCloningCoordinatorError.requestConstructionFailed
-                }
-                await AppGenerationTimeline.shared.recordSubmitted(
-                    id: generationRequest.generationID,
-                    mode: generationRequest.modeIdentifier
-                )
-                submittedGenerationID = generationRequest.generationID
-                audioPlayer.setLivePreviewEstimate(
-                    LivePreviewEstimate(text: currentDraft.text)
-                )
-                let result = try await ttsEngineStore.generate(generationRequest)
-                let voiceName = selectedVoice?.name
-                    ?? URL(fileURLWithPath: refPath).deletingPathExtension().lastPathComponent
-                var generation = Generation(
-                    text: currentDraft.text,
-                    mode: model.mode.rawValue,
-                    modelTier: model.tier,
-                    voice: voiceName,
-                    emotion: nil,
-                    speed: nil,
-                    audioPath: result.audioPath,
-                    duration: result.durationSeconds,
-                    createdAt: Date(),
-                    seed: result.observedSamplingSeed.map { Int64(bitPattern: $0) }
-                )
-                GenerationPersistence.persistAndAutoplay(
-                    generation,
-                    result: result,
-                    text: currentDraft.text,
-                    audioPlayer: audioPlayer,
-                    caller: "VoiceCloningCoordinator"
-                )
-                // Finalize app telemetry only after the synchronous playback
-                // handoff has recorded the real scheduled-playback milestone.
-                await AppGenerationTimeline.shared.recordCompleted(
-                    id: generationRequest.generationID,
-                    mode: generationRequest.modeIdentifier,
-                    usedStreaming: result.usedStreaming,
-                    finishReason: result.finishReason?.rawValue,
-                    summary: result.telemetrySummary
-                )
-                GenerationTelemetryMerger.scheduleMerge(generationID: generationRequest.generationID)
-            } catch is CancellationError {
-                await AppGenerationTimeline.shared.recordFailed(
-                    id: submittedGenerationID,
-                    finishReason: .cancelled
-                )
-                GenerationTelemetryMerger.scheduleMerge(generationID: submittedGenerationID)
-                audioPlayer.abortLivePreviewIfNeeded()
-                errorMessage = nil
-            } catch {
-                await AppGenerationTimeline.shared.recordFailed(id: submittedGenerationID)
-                GenerationTelemetryMerger.scheduleMerge(generationID: submittedGenerationID)
-                audioPlayer.abortLivePreviewIfNeeded()
-                errorMessage = error.localizedDescription
             }
+
+            let outputPath = makeOutputPath(
+                subfolder: model.outputSubfolder,
+                text: currentDraft.text
+            )
+            // Sync prefix already validated text + referenceAudioPath so
+            // makeGenerationRequest can never return nil here. If it does
+            // (defensive only) throw and let the executor's failure path
+            // reset state via the single exit point — never flip
+            // isGenerating false inline.
+            guard let generationRequest = Self.makeGenerationRequest(
+                draft: currentDraft,
+                model: model,
+                outputPath: outputPath
+            ) else {
+                throw VoiceCloningCoordinatorError.requestConstructionFailed
+            }
+            let voiceName = selectedVoice?.name
+                ?? URL(fileURLWithPath: refPath).deletingPathExtension().lastPathComponent
+            return GenerationLifecycleExecutor.PreparedTake(
+                request: generationRequest,
+                text: currentDraft.text,
+                persistCaller: "VoiceCloningCoordinator",
+                makeGeneration: { result in
+                    Generation(
+                        text: currentDraft.text,
+                        mode: model.mode.rawValue,
+                        modelTier: model.tier,
+                        voice: voiceName,
+                        emotion: nil,
+                        speed: nil,
+                        audioPath: result.audioPath,
+                        duration: result.durationSeconds,
+                        createdAt: Date(),
+                        seed: result.observedSamplingSeed.map { Int64(bitPattern: $0) }
+                    )
+                }
+            )
         }
     }
 
@@ -242,19 +210,13 @@ final class VoiceCloningCoordinator {
         ttsEngineStore: TTSEngineStore,
         audioPlayer: AudioPlayerViewModel
     ) {
-        guard isGenerating || generationTask != nil else { return }
-        // Reset state synchronously (already on MainActor) — routing it
-        // through a second Task raced the generation task's own defer and
-        // could null a FRESH generation's handle if the user re-generated
-        // quickly, leaving its cancel button inert.
-        generationTask?.cancel()
-        generationTask = nil
-        isGenerating = false
-        errorMessage = nil
-        audioPlayer.abortLivePreviewIfNeeded()
-        Task { @MainActor [weak ttsEngineStore] in
-            try? await ttsEngineStore?.cancelActiveGeneration()
-        }
+        GenerationLifecycleExecutor.cancelActiveWork(
+            generationTask: &generationTask,
+            isGenerating: &isGenerating,
+            errorMessage: &errorMessage,
+            ttsEngineStore: ttsEngineStore,
+            audioPlayer: audioPlayer
+        )
     }
 
     /// Cancel any in-flight auto-transcription (called from onDisappear so a

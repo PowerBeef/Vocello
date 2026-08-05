@@ -126,21 +126,22 @@ final class VoiceDesignCoordinator {
         let voiceDescription = draft.voiceDescription
         let emotion = draft.emotion
 
-        generationTask = Task { @MainActor in
-            var submittedGenerationID: UUID?
-            defer {
-                audioPlayer.setLivePreviewEstimate(nil)
-                self.isGenerating = false
-                self.generationTask = nil
+        generationTask = GenerationLifecycleExecutor.run(
+            ttsEngineStore: ttsEngineStore,
+            audioPlayer: audioPlayer,
+            setErrorMessage: { [weak self] message in self?.errorMessage = message },
+            onFinish: { [weak self] in
+                self?.isGenerating = false
+                self?.generationTask = nil
             }
-            do {
-                guard let model = activeModel else {
-                    self.errorMessage = "Model configuration not found"
-                    return
-                }
-
-                let outputPath = makeOutputPath(subfolder: model.outputSubfolder, text: text)
-                let generationRequest = Self.makeGenerationRequest(
+        ) { [weak self] in
+            guard let model = activeModel else {
+                self?.errorMessage = "Model configuration not found"
+                return nil
+            }
+            let outputPath = makeOutputPath(subfolder: model.outputSubfolder, text: text)
+            return GenerationLifecycleExecutor.PreparedTake(
+                request: Self.makeGenerationRequest(
                     draft: VoiceDesignDraft(
                         voiceDescription: voiceDescription,
                         emotion: emotion,
@@ -148,68 +149,34 @@ final class VoiceDesignCoordinator {
                     ),
                     model: model,
                     outputPath: outputPath
-                )
-                await AppGenerationTimeline.shared.recordSubmitted(
-                    id: generationRequest.generationID,
-                    mode: generationRequest.modeIdentifier
-                )
-                submittedGenerationID = generationRequest.generationID
-                audioPlayer.setLivePreviewEstimate(
-                    LivePreviewEstimate(text: text)
-                )
-                let result = try await ttsEngineStore.generate(generationRequest)
-                var generation = Generation(
-                    text: text,
-                    mode: model.mode.rawValue,
-                    modelTier: model.tier,
-                    voice: voiceDescription,
-                    emotion: emotion,
-                    speed: nil,
-                    audioPath: result.audioPath,
-                    duration: result.durationSeconds,
-                    createdAt: Date(),
-                    seed: result.observedSamplingSeed.map { Int64(bitPattern: $0) }
-                )
-
-                GenerationPersistence.persistAndAutoplay(
-                    generation,
-                    result: result,
-                    text: text,
-                    audioPlayer: audioPlayer,
-                    caller: "VoiceDesignCoordinator"
-                )
-                // Finalize app telemetry only after the synchronous playback
-                // handoff has recorded the real scheduled-playback milestone.
-                await AppGenerationTimeline.shared.recordCompleted(
-                    id: generationRequest.generationID,
-                    mode: generationRequest.modeIdentifier,
-                    usedStreaming: result.usedStreaming,
-                    finishReason: result.finishReason?.rawValue,
-                    summary: result.telemetrySummary
-                )
-                GenerationTelemetryMerger.scheduleMerge(generationID: generationRequest.generationID)
-                self.latestSavedVoiceCandidate = VoiceDesignSavedVoiceCandidate(
-                    audioPath: generation.audioPath,
-                    transcript: text,
-                    suggestedName: SavedVoiceNameSuggestion.designResultName(from: voiceDescription),
-                    voiceDescription: voiceDescription,
-                    emotion: emotion,
-                    text: text
-                )
-            } catch is CancellationError {
-                await AppGenerationTimeline.shared.recordFailed(
-                    id: submittedGenerationID,
-                    finishReason: .cancelled
-                )
-                GenerationTelemetryMerger.scheduleMerge(generationID: submittedGenerationID)
-                audioPlayer.abortLivePreviewIfNeeded()
-                self.errorMessage = nil
-            } catch {
-                await AppGenerationTimeline.shared.recordFailed(id: submittedGenerationID)
-                GenerationTelemetryMerger.scheduleMerge(generationID: submittedGenerationID)
-                audioPlayer.abortLivePreviewIfNeeded()
-                self.errorMessage = error.localizedDescription
-            }
+                ),
+                text: text,
+                persistCaller: "VoiceDesignCoordinator",
+                makeGeneration: { result in
+                    Generation(
+                        text: text,
+                        mode: model.mode.rawValue,
+                        modelTier: model.tier,
+                        voice: voiceDescription,
+                        emotion: emotion,
+                        speed: nil,
+                        audioPath: result.audioPath,
+                        duration: result.durationSeconds,
+                        createdAt: Date(),
+                        seed: result.observedSamplingSeed.map { Int64(bitPattern: $0) }
+                    )
+                },
+                onSuccess: { generation, _ in
+                    self?.latestSavedVoiceCandidate = VoiceDesignSavedVoiceCandidate(
+                        audioPath: generation.audioPath,
+                        transcript: text,
+                        suggestedName: SavedVoiceNameSuggestion.designResultName(from: voiceDescription),
+                        voiceDescription: voiceDescription,
+                        emotion: emotion,
+                        text: text
+                    )
+                }
+            )
         }
     }
 
@@ -217,19 +184,13 @@ final class VoiceDesignCoordinator {
         ttsEngineStore: TTSEngineStore,
         audioPlayer: AudioPlayerViewModel
     ) {
-        guard isGenerating || generationTask != nil else { return }
-        // Reset state synchronously (already on MainActor) — routing it
-        // through a second Task raced the generation task's own defer and
-        // could null a FRESH generation's handle if the user re-generated
-        // quickly, leaving its cancel button inert.
-        generationTask?.cancel()
-        generationTask = nil
-        isGenerating = false
-        errorMessage = nil
-        audioPlayer.abortLivePreviewIfNeeded()
-        Task { @MainActor [weak ttsEngineStore] in
-            try? await ttsEngineStore?.cancelActiveGeneration()
-        }
+        GenerationLifecycleExecutor.cancelActiveWork(
+            generationTask: &generationTask,
+            isGenerating: &isGenerating,
+            errorMessage: &errorMessage,
+            ttsEngineStore: ttsEngineStore,
+            audioPlayer: audioPlayer
+        )
     }
 
     nonisolated static func makeGenerationRequest(

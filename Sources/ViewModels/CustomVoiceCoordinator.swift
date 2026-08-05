@@ -50,80 +50,43 @@ final class CustomVoiceCoordinator {
         isGenerating = true
         errorMessage = nil
 
-        generationTask = Task { @MainActor in
-            var submittedGenerationID: UUID?
-            defer {
-                audioPlayer.setLivePreviewEstimate(nil)
-                self.isGenerating = false
-                self.generationTask = nil
+        generationTask = GenerationLifecycleExecutor.run(
+            ttsEngineStore: ttsEngineStore,
+            audioPlayer: audioPlayer,
+            setErrorMessage: { [weak self] message in self?.errorMessage = message },
+            onFinish: { [weak self] in
+                self?.isGenerating = false
+                self?.generationTask = nil
             }
-            do {
-                guard let model = activeModel else {
-                    self.errorMessage = "Model configuration not found"
-                    return
-                }
-
-                let outputPath = makeOutputPath(subfolder: model.outputSubfolder, text: draft.text)
-                let generationRequest = Self.makeGenerationRequest(
+        ) { [weak self] in
+            guard let model = activeModel else {
+                self?.errorMessage = "Model configuration not found"
+                return nil
+            }
+            let outputPath = makeOutputPath(subfolder: model.outputSubfolder, text: draft.text)
+            return GenerationLifecycleExecutor.PreparedTake(
+                request: Self.makeGenerationRequest(
                     draft: draft,
                     model: model,
                     outputPath: outputPath
-                )
-                await AppGenerationTimeline.shared.recordSubmitted(
-                    id: generationRequest.generationID,
-                    mode: generationRequest.modeIdentifier
-                )
-                submittedGenerationID = generationRequest.generationID
-                audioPlayer.setLivePreviewEstimate(
-                    LivePreviewEstimate(text: draft.text)
-                )
-                let result = try await ttsEngineStore.generate(generationRequest)
-                var generation = Generation(
-                    text: draft.text,
-                    mode: model.mode.rawValue,
-                    modelTier: model.tier,
-                    voice: draft.selectedSpeaker,
-                    emotion: draft.emotion,
-                    speed: nil,
-                    audioPath: result.audioPath,
-                    duration: result.durationSeconds,
-                    createdAt: Date(),
-                    seed: result.observedSamplingSeed.map { Int64(bitPattern: $0) }
-                )
-
-                GenerationPersistence.persistAndAutoplay(
-                    generation,
-                    result: result,
-                    text: draft.text,
-                    audioPlayer: audioPlayer,
-                    caller: "CustomVoiceCoordinator"
-                )
-                // Keep the frontend timeline open through the genuine player
-                // handoff. Short clips can complete before live playback has
-                // started, in which case final-file autoplay is the first real
-                // playback-scheduled event.
-                await AppGenerationTimeline.shared.recordCompleted(
-                    id: generationRequest.generationID,
-                    mode: generationRequest.modeIdentifier,
-                    usedStreaming: result.usedStreaming,
-                    finishReason: result.finishReason?.rawValue,
-                    summary: result.telemetrySummary
-                )
-                GenerationTelemetryMerger.scheduleMerge(generationID: generationRequest.generationID)
-            } catch is CancellationError {
-                await AppGenerationTimeline.shared.recordFailed(
-                    id: submittedGenerationID,
-                    finishReason: .cancelled
-                )
-                GenerationTelemetryMerger.scheduleMerge(generationID: submittedGenerationID)
-                audioPlayer.abortLivePreviewIfNeeded()
-                self.errorMessage = nil
-            } catch {
-                await AppGenerationTimeline.shared.recordFailed(id: submittedGenerationID)
-                GenerationTelemetryMerger.scheduleMerge(generationID: submittedGenerationID)
-                audioPlayer.abortLivePreviewIfNeeded()
-                self.errorMessage = error.localizedDescription
-            }
+                ),
+                text: draft.text,
+                persistCaller: "CustomVoiceCoordinator",
+                makeGeneration: { result in
+                    Generation(
+                        text: draft.text,
+                        mode: model.mode.rawValue,
+                        modelTier: model.tier,
+                        voice: draft.selectedSpeaker,
+                        emotion: draft.emotion,
+                        speed: nil,
+                        audioPath: result.audioPath,
+                        duration: result.durationSeconds,
+                        createdAt: Date(),
+                        seed: result.observedSamplingSeed.map { Int64(bitPattern: $0) }
+                    )
+                }
+            )
         }
     }
 
@@ -131,19 +94,13 @@ final class CustomVoiceCoordinator {
         ttsEngineStore: TTSEngineStore,
         audioPlayer: AudioPlayerViewModel
     ) {
-        guard isGenerating || generationTask != nil else { return }
-        // Reset state synchronously (already on MainActor) — routing it
-        // through a second Task raced the generation task's own defer and
-        // could null a FRESH generation's handle if the user re-generated
-        // quickly, leaving its cancel button inert.
-        generationTask?.cancel()
-        generationTask = nil
-        isGenerating = false
-        errorMessage = nil
-        audioPlayer.abortLivePreviewIfNeeded()
-        Task { @MainActor [weak ttsEngineStore] in
-            try? await ttsEngineStore?.cancelActiveGeneration()
-        }
+        GenerationLifecycleExecutor.cancelActiveWork(
+            generationTask: &generationTask,
+            isGenerating: &isGenerating,
+            errorMessage: &errorMessage,
+            ttsEngineStore: ttsEngineStore,
+            audioPlayer: audioPlayer
+        )
     }
 
     nonisolated static func makeGenerationRequest(

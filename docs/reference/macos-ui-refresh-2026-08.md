@@ -200,6 +200,22 @@ standard provenance because publication came after later commits; canonical
 records mint automatically from in-run publications). With UI-7 done the
 `macos-ui-2026-08` plan is **complete**.
 
+### Baseline session 2 (2026-08-05 evening, source `8e3d860` lineage)
+
+One discarded warm-up plus five counted runs under the standing protocol
+(AC power, cursor parked, reports copied out between runs), all six PASS,
+all thermal-nominal, each publishing a canonical `ui-perf` registry record
+in-run — the first full session through the UI-7 publication path.
+Confirmatory medians (IQR): idle **0.0**, settings-scroll **0.0**,
+composer-typing **41.4** (1.5), sidebar-navigation **122.3** (1.8),
+delivery-menu **120.8** (2.1) ms/s — all inside the warn ceilings and
+consistent with baseline-v2 (41.9 / 118.6 / 119.1). Exploratory:
+history-filter 328.6, history-scroll 458.9 (the deterministic in-lane AX
+drain), generation-active 171.9 (IQR 17.3, engine variance), window-resize
+28.6. This is session two of the roughly three stable sessions the ceiling
+promotion rule asks for; one more consistent session justifies promoting
+the confirmatory warn ceilings to hard.
+
 ## Landed in this arc
 
 - `9d283a9` — the perf harness (nine scenarios, structural gate, fail-closed proofs,

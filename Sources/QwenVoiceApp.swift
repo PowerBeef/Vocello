@@ -121,7 +121,7 @@ struct QwenVoiceApp: App {
                 )
                 .frame(minWidth: 520, minHeight: 420)
             } else {
-                ContentView()
+                ContentView(ttsEngineStore: ttsEngineStore)
                     .environmentObject(ttsEngineStore)
                     .environmentObject(audioPlayer)
                     .environmentObject(audioPlayer.playbackProgress)

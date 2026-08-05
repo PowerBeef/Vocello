@@ -361,6 +361,7 @@
 		E447EEA77FF3E8CF88579794 /* MacTTSEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F29561FAD2A80235462F4B6 /* MacTTSEngine.swift */; };
 		E4A1017F2F4529E7438EA004 /* uncle_fu.wav in Resources */ = {isa = PBXBuildFile; fileRef = 8EA3CF699353B8B928488B93 /* uncle_fu.wav */; };
 		E4CEA3E7589F1B62509C9AC0 /* VocelloQwen3Core in Frameworks */ = {isa = PBXBuildFile; productRef = E5CE7911DE113C3DED3EB345 /* VocelloQwen3Core */; };
+		E54229D6C2AFF3935B0D937F /* GenerationPerformanceGateModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B3409105D8B13D105286374 /* GenerationPerformanceGateModel.swift */; };
 		E5B267679DD2497BD6481F96 /* QwenVoiceCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C1CD42CBFA3E0E68EDA48DEA /* QwenVoiceCore.framework */; };
 		E5EFE20CE2FB2E7B7A5912AF /* AllocationRetryAnnotationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AECE897B0DF2B47EF2AD3F91 /* AllocationRetryAnnotationTests.swift */; };
 		E6A83FA2D777E4FFC5221EC6 /* MLX in Frameworks */ = {isa = PBXBuildFile; productRef = 39EB137F1E02BDF05CCE4CB1 /* MLX */; };
@@ -640,6 +641,7 @@
 		08A7675DBAF4D1D043862803 /* IOSCrashObserver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSCrashObserver.swift; sourceTree = "<group>"; };
 		08A7E4D67B06F288693FEAC2 /* GenerationScreenPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GenerationScreenPresentation.swift; sourceTree = "<group>"; };
 		0AEC31C6C5F1978398C647E5 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		0B3409105D8B13D105286374 /* GenerationPerformanceGateModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GenerationPerformanceGateModel.swift; sourceTree = "<group>"; };
 		0B8174C5EB5C39242E7EF445 /* DatabaseService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseService.swift; sourceTree = "<group>"; };
 		0D3C6777F2ABFE603D026E0D /* VoicesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoicesView.swift; sourceTree = "<group>"; };
 		0DBC73A84091D2DFAD12A5AB /* Qwen3TTSRuntimeProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Qwen3TTSRuntimeProfile.swift; sourceTree = "<group>"; };
@@ -1772,6 +1774,7 @@
 			isa = PBXGroup;
 			children = (
 				0F45C532854D962580423BF6 /* CustomVoiceCoordinator.swift */,
+				0B3409105D8B13D105286374 /* GenerationPerformanceGateModel.swift */,
 				4A367AAE25201E301F646DCA /* ModelManagerViewModel.swift */,
 				1A8A61CE5C27E5BDC4EE04BA /* SavedVoicesViewModel.swift */,
 				B8BD934015DBE86EA1193A6B /* VoiceCloningCoordinator.swift */,
@@ -2467,6 +2470,7 @@
 				ECEE4AE6F2D1AF6BA9EFECAA /* GenerationLibraryEvents.swift in Sources */,
 				C3891DCC4B928A9413F2BFA2 /* GenerationMigrations.swift in Sources */,
 				B32F94C80713C55BAFACCDFE /* GenerationOutputVerifier.swift in Sources */,
+				E54229D6C2AFF3935B0D937F /* GenerationPerformanceGateModel.swift in Sources */,
 				603FCEB24230E8474ABC9C36 /* GenerationPersistence.swift in Sources */,
 				7197E0B1B11DA77FF707BB2B /* GenerationScreenPresentation.swift in Sources */,
 				B98933702A7AE0E0F7F73A8F /* GenerationTelemetryMerger.swift in Sources */,

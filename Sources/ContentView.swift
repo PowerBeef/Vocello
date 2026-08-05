@@ -111,7 +111,13 @@ enum SidebarItem: String, CaseIterable, Identifiable {
 @MainActor
 struct ContentView: View {
     @Environment(ModelManagerViewModel.self) private var modelManager
-    @EnvironmentObject private var ttsEngineStore: TTSEngineStore
+    /// Plain reference, deliberately NOT `@EnvironmentObject` (W1-D): the
+    /// root shell must not subscribe to the whole engine store — every use
+    /// below is imperative, and the only body-relevant signal is the gate,
+    /// which `gateModel` republishes flip-scoped. Descendant screens keep
+    /// their own environment-object injection.
+    private let ttsEngineStore: TTSEngineStore
+    @StateObject private var gateModel: GenerationPerformanceGateModel
     @Environment(SavedVoicesViewModel.self) private var savedVoicesViewModel
     @EnvironmentObject private var appCommandRouter: AppCommandRouter
 
@@ -163,7 +169,11 @@ struct ContentView: View {
         )
     }
 
-    init() {
+    init(ttsEngineStore: TTSEngineStore) {
+        self.ttsEngineStore = ttsEngineStore
+        _gateModel = StateObject(
+            wrappedValue: GenerationPerformanceGateModel(store: ttsEngineStore)
+        )
         // Read through AppDefaults because @AppStorage is not materialized in init yet.
         let storedSidebar = AppDefaults.store
             .string(forKey: ContentView.lastSidebarItemKey)
@@ -235,10 +245,8 @@ struct ContentView: View {
         // generates, glass surfaces fall back to the solid-fill design so the
         // material's continuous compositor work stops competing with MLX for
         // the GPU (measured 1.37 with glass vs 1.84 solid on the 8 GB tier).
-        .environment(
-            \.generationPerformanceGate,
-            ttsEngineStore.hasActiveGeneration || ttsEngineStore.hasSustainedPerformanceActivity
-        )
+        // Read through the flip-scoped gate model (W1-D), never the store.
+        .environment(\.generationPerformanceGate, gateModel.isActive)
         .onAppear(perform: handleAppear)
         .task { await handleInitialLoad() }
         .onChange(of: selectedItem) { _, newValue in handleSelectionChange(newValue) }
@@ -250,7 +258,11 @@ struct ContentView: View {
         }
         .onChange(of: modelManager.statuses) { _, _ in handleStatusesChange() }
         .onChange(of: modelManager.activeVariantRevision) { _, _ in handleActiveVariantChange() }
-        .onChange(of: ttsEngineStore.snapshot) { _, newSnapshot in
+        // `onReceive`, not `onChange`: `onChange(of:)` would need the
+        // snapshot read in body, which requires observing the store (W1-D).
+        // The publisher route runs the same handler without invalidating
+        // the shell; `dropFirst` mirrors onChange's changes-only semantics.
+        .onReceive(ttsEngineStore.$snapshot.dropFirst().removeDuplicates()) { newSnapshot in
             handleEngineSnapshotChange(newSnapshot)
         }
         .onReceive(appCommandRouter.sidebarSelection) { item in
@@ -286,6 +298,7 @@ struct ContentView: View {
             )
         case .history:
             HistoryView(
+                ttsEngineStore: ttsEngineStore,
                 searchText: $historySearchText,
                 sortOrder: $historySortOrder,
                 clearRequest: $historyClearRequest,

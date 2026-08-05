@@ -201,9 +201,13 @@ struct HistoryClearRequest: Equatable {
 
 struct HistoryView: View {
     @EnvironmentObject private var audioPlayer: AudioPlayerViewModel
-    @EnvironmentObject private var ttsEngineStore: TTSEngineStore
     @Environment(SavedVoicesViewModel.self) private var savedVoicesViewModel
     @EnvironmentObject private var generationLibraryEvents: GenerationLibraryEvents
+    /// Plain reference, not `@EnvironmentObject` (W1-D): History uses the
+    /// store only to forward into the saved-voice sheet and for one
+    /// imperative refresh — subscribing re-rendered every row on every
+    /// engine tick for nothing.
+    let ttsEngineStore: TTSEngineStore
     @Binding var searchText: String
     @Binding var sortOrder: HistorySortOrder
     @Binding var clearRequest: HistoryClearRequest?
@@ -221,6 +225,13 @@ struct HistoryView: View {
     @State private var savedVoiceSheetConfiguration: SavedVoiceSheetConfiguration?
     @State private var pendingReloadAfterCurrentLoad = false
     @State private var filteredItems: [HistoryListItem] = []
+    /// Cached grouped list (W1-D). This used to be a computed property that
+    /// rebuilt the whole dictionary + per-project segment sorts on EVERY
+    /// body evaluation — the single worst measured surface in the 2026-08
+    /// UI review (312 ms/s hitch, 2.9 s scroll stalls). It now recomputes
+    /// only when its actual inputs change: `filteredItems`, the search
+    /// activity flag, and `expandedProjects`.
+    @State private var displayEntries: [HistoryDisplayEntry] = []
     @State private var expandedProjects: Set<String> = []
     @State private var itemsRevision = 0
     @State private var searchDebounceTask: Task<Void, Never>?
@@ -234,6 +245,7 @@ struct HistoryView: View {
             .onReceive(generationLibraryEvents.generationAppended) { generation in handleGenerationAppended(generation) }
             .onChange(of: itemsRevision) { _, _ in recomputeFilteredItems() }
             .onChange(of: sortOrder) { _, _ in recomputeFilteredItems() }
+            .onChange(of: expandedProjects) { _, _ in recomputeDisplayEntries() }
             .onChange(of: searchText) { _, _ in
                 searchDebounceTask?.cancel()
                 searchDebounceTask = Task {
@@ -424,13 +436,6 @@ struct HistoryView: View {
         }
     }
 
-    private var displayEntries: [HistoryDisplayEntry] {
-        HistoryDisplayEntry.entries(
-            from: filteredItems,
-            searchActive: !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-            expandedProjects: expandedProjects
-        )
-    }
 }
 
 private extension HistoryView {
@@ -487,6 +492,15 @@ private extension HistoryView {
         }
 
         filteredItems = result
+        recomputeDisplayEntries()
+    }
+
+    func recomputeDisplayEntries() {
+        displayEntries = HistoryDisplayEntry.entries(
+            from: filteredItems,
+            searchActive: !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+            expandedProjects: expandedProjects
+        )
     }
 
     @ViewBuilder

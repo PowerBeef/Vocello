@@ -37,6 +37,15 @@
       "adopted": "2026-08-04",
       "goal": "Give the macOS app a deterministic SwiftUI frame-health lane, use it to baseline and rank the UI's real costs, land the maintainer-approved safe fixes, and stage a brand-preserving refresh gated on the maintainer's remote review of the proposals artifact.",
       "authority": "docs/reference/macos-ui-refresh-2026-08.md"
+    },
+    {
+      "id": "compliance-2026-08",
+      "title": "EU AI Act Article 50 readiness",
+      "status": "active",
+      "owner": "release-qa",
+      "adopted": "2026-08-06",
+      "goal": "Understand and, on the maintainer's call, meet the EU AI Act Article 50 synthetic-content marking obligations (applicable 2026-08-02). Research first, posture decision second, technical work only behind that gate; no item implies accepting provider status or a release.",
+      "authority": "docs/reference/eu-ai-act-article50-assessment.md"
     }
   ],
   "items": [
@@ -741,6 +750,17 @@
         "file:benchmarks/runs/ui-perf/macos-xcui-perf-20260805-092804-98c69168.json",
         "file:scripts/tests/test_check_macos_ui_perf.py"
       ]
+    },
+    {
+      "id": "CP-1",
+      "plan": "compliance-2026-08",
+      "title": "Article 50 marking readiness — posture decision and gated options",
+      "status": "planned",
+      "gate": "The 2026-08-06 research assessment (authority doc) establishes: Article 50(2) machine-readable marking became applicable 2026-08-02 (Omnibus left the date unchanged; grace to 2026-12-02 for systems on the market before then); the FOSS exemption does not cover Article 50 systems, so applicability hinges on whether free, unmonetized distribution is \"placing on the market in the course of a commercial activity\" — a genuine gray zone that thins toward App Store submission; Vocello outputs today carry zero marking (bare 44-byte WAV headers). MAINTAINER DECISION REQUIRED: adopt the \"applicable-soon\" posture or defer. Gated options from the assessment: (A) WAV metadata provenance chunk (small, backend); (B) C2PA manifest on export (medium); (C) AudioSeal-class imperceptible watermark (large; MLX/Swift port + 8 GB benchmark); (D) cloning-disclosure UX copy for users' own Article 50(4) duty (small; recommended unconditionally); (E) Code of Practice signature (maintainer-only, presumes provider status). The App Store submission runbook gains an Article 50 checklist row when any option lands.",
+      "sourceOfTruth": [
+        "docs/reference/eu-ai-act-article50-assessment.md"
+      ],
+      "updated": "2026-08-06"
     }
   ]
 }

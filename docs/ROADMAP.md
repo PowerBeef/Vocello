@@ -9,10 +9,28 @@
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
+| `compliance-2026-08` | active | release-qa | 0/1 (0%) |
 | `convergence-metal4-stage4-2026-08` | active | backend-and-platform | 6/7 (86%) |
 | `delivery-prompting-2026-08` | active | backend-mlx | 20/23 (87%) |
 | `doc-governance-2026-08` | active | release-qa | 8/9 (89%) |
 | `macos-ui-2026-08` | complete | macos | 7/7 (100%) |
+
+## EU AI Act Article 50 readiness
+
+`compliance-2026-08` · **active** · release-qa · adopted 2026-08-06
+
+Understand and, on the maintainer's call, meet the EU AI Act Article 50 synthetic-content marking obligations (applicable 2026-08-02). Research first, posture decision second, technical work only behind that gate; no item implies accepting provider status or a release.
+
+Narrative authority: [`docs/reference/eu-ai-act-article50-assessment.md`](reference/eu-ai-act-article50-assessment.md)
+
+| Item | Status | Title | Evidence |
+| --- | --- | --- | --- |
+| `CP-1` | planned | Article 50 marking readiness — posture decision and gated options | — |
+
+### Open items in detail
+
+- **`CP-1`** (planned) — Article 50 marking readiness — posture decision and gated options.
+  gate: The 2026-08-06 research assessment (authority doc) establishes: Article 50(2) machine-readable marking became applicable 2026-08-02 (Omnibus left the date unchanged; grace to 2026-12-02 for systems on the market before then); the FOSS exemption does not cover Article 50 systems, so applicability hinges on whether free, unmonetized distribution is "placing on the market in the course of a commercial activity" — a genuine gray zone that thins toward App Store submission; Vocello outputs today carry zero marking (bare 44-byte WAV headers). MAINTAINER DECISION REQUIRED: adopt the "applicable-soon" posture or defer. Gated options from the assessment: (A) WAV metadata provenance chunk (small, backend); (B) C2PA manifest on export (medium); (C) AudioSeal-class imperceptible watermark (large; MLX/Swift port + 8 GB benchmark); (D) cloning-disclosure UX copy for users' own Article 50(4) duty (small; recommended unconditionally); (E) Code of Practice signature (maintainer-only, presumes provider status). The App Store submission runbook gains an Article 50 checklist row when any option lands.
 
 ## Convergence residuals, Metal 4 study, and Stage 4
 

@@ -53,6 +53,7 @@ Review when: target or scheme changes; runtime topology; telemetry schema; test 
 - [`docs/reference/codex-session-storage.md`](../docs/reference/codex-session-storage.md)
 - [`docs/reference/delivery-harness.md`](../docs/reference/delivery-harness.md)
 - [`docs/reference/emotion-reference-banks.md`](../docs/reference/emotion-reference-banks.md)
+- [`docs/reference/eu-ai-act-article50-assessment.md`](../docs/reference/eu-ai-act-article50-assessment.md)
 - [`docs/reference/evidence-impact.md`](../docs/reference/evidence-impact.md)
 - [`docs/reference/interactive-ui-qa.md`](../docs/reference/interactive-ui-qa.md)
 - [`docs/reference/ios-app-guide.md`](../docs/reference/ios-app-guide.md)

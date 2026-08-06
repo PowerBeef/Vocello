@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "generated": "python3 scripts/doc_metadata.py rebuild-index",
   "note": "Machine-readable documentation map. Query this instead of globbing docs/.",
-  "annotatedDocuments": 46,
+  "annotatedDocuments": 47,
   "unannotatedDocuments": 40,
   "documents": [
     {
@@ -133,6 +133,15 @@
       "sourceOfTruth": [
         "scripts/build_emotion_reference_bank.py",
         "Sources/QwenVoiceCore/VoiceBankCatalog.swift"
+      ]
+    },
+    {
+      "path": "docs/reference/eu-ai-act-article50-assessment.md",
+      "status": "active",
+      "owner": "release-qa",
+      "summary": "Point-in-time research assessment (2026-08-06) of the EU AI Act's Article 50 synthetic-content marking obligations \u2014 what the law requires, whether and how it applies to Vocello, the current gap, and maintainer decision points. Not legal advice.",
+      "sourceOfTruth": [
+        "Sources/QwenVoiceCore/GenerationOutputAdapter.swift"
       ]
     },
     {

@@ -117,7 +117,7 @@ Read it before adding a gate.**
 | Scripts / CI / release / benchmarks | [`.claude/rules/release-qa.md`](.claude/rules/release-qa.md); GitHub MCP when callable, otherwise `gh` |
 | Website (`website/`) | [`website/CLAUDE.md`](website/CLAUDE.md); browser MCP for localhost verification |
 | Derived/generated inventories | [`.claude/rules/derived-artifacts.md`](.claude/rules/derived-artifacts.md) |
-| macOS frontend QA (explicit request only) | `scripts/ui_test.sh macos smoke|benchmark`; native macOS target only |
+| macOS frontend QA (explicit request only) | `scripts/ui_test.sh macos smoke|benchmark|perf`; native macOS target only |
 | iOS frontend QA (explicit request only) | `scripts/ui_test.sh ios smoke|benchmark`; paired physical iPhone only |
 | External systems and current APIs | sosumi / context7 / docs MCP when callable; otherwise primary vendor docs |
 
@@ -229,6 +229,7 @@ Run these strict lanes only when the user explicitly requests frontend/device ac
 # macOS: native app UI on the current Mac.
 scripts/ui_test.sh macos smoke
 scripts/ui_test.sh macos benchmark
+scripts/ui_test.sh macos perf      # frame-health lane; canonical-hardware PASS publishes a ui-perf record
 scripts/macos_test.sh gate
 
 # iOS: paired physical iPhone only; never Simulator.

@@ -181,6 +181,7 @@ The shell harness owns deterministic proof and evidence:
 | `scripts/macos_test.sh test` | Core, XPC transport, and runtime tests; no UI driving |
 | `scripts/ui_test.sh macos smoke` | Seven ordered focused journeys (navigation/readiness, completed generation + History, mid-generation cancellation, virtual-mic recording, library surfaces, three-segment long-form project, two-line batch) with named screenshots and automatic on-failure desktop + element-tree evidence |
 | `scripts/ui_test.sh macos benchmark` | UI-driven generation matrix plus merged telemetry proof |
+| `scripts/ui_test.sh macos perf` | Nine scripted frame-health scenarios (`VocelloMacPerfUITests`) with the in-app 500 ms display-link probe, gated by `scripts/check_macos_ui_perf.py` against warn-only ceilings in `config/ui-perf-thresholds.json`; a canonical-hardware PASS publishes a `ui-perf` registry record → [`macos-ui-refresh-2026-08.md`](macos-ui-refresh-2026-08.md) |
 
 ### macOS-specific patterns (vs iOS)
 

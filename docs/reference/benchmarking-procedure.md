@@ -680,7 +680,8 @@ An accepted QC warning produces `passedWithWarnings` and remains visible in run/
 counts and worst-QC fields. A QC failure is never downgraded or published.
 
 Schema-v2 tracked benchmark kinds are `ui-generation`, `engine-generation`, `language`,
-`instrument-profile`, `memory-qualification`, and `prosody-calibration`. Schema-v1
+`instrument-profile`, `memory-qualification`, `prosody-calibration`, and `ui-perf`
+(registered 2026-08 with the macOS frame-health lane). Schema-v1
 `telemetry-overhead` records remain readable historical evidence, but new overhead runs are local
 observer-effect diagnostics and do not publish. Delivery/prosody cells from
 `vocello bench --delivery` remain inside their parent engine-generation record. Smoke, unit tests,
@@ -694,6 +695,7 @@ crash inspection, preflight, and standalone analysis tools do not publish benchm
 | `instrument-profile` | macOS/iOS profile commands | Memory-qualified target generation PASS, exact PID, tracer success, valid trace TOC, non-empty exported performance rows, and run/generation/take/cell-correlated signposts |
 | `memory-qualification` | macOS/iOS `memory` commands | Fixed policy topology, v8 sidecar qualification, output/QC success, and within-mode retained-footprint growth ≤5% of physical RAM |
 | `prosody-calibration` | `prosody_calibration.py` | Required corpus coverage with no analysis failure |
+| `ui-perf` | `ui_test.sh macos perf` via `check_macos_ui_perf.py` | Structural gate PASS (nine scenarios once each, coverage/refresh sanity), canonical hardware profile, and crash delta; threshold breaches are warn-only (`passedWithWarnings`) |
 
 `HISTORY.md` is a generated index grouped by kind, platform, hardware, and comparable
 configuration. It computes a delta against the nearest earlier compatible clean record; a delta is

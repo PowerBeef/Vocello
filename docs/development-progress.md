@@ -18,7 +18,7 @@
 Phase 4 `overallPromotion: passed` closed the cutover gate on 2026-07-20 (with Phases 0/5/6).
 Phases 7, 8, and 14 closed 2026-07-23. Phase 9 closed 2026-07-26; Phase 12 ships the fast-depth
 quality registry with the deep producer landed; Phase 13 (history v3) went live 2026-07-29 with
-the first schema-v3 records committed, and the UI-checker fold (2026-08-01) extended v3 to ui-generation records; phase 10–11 remainders stay open. The contract JSON is the
+the first schema-v3 records committed, and the UI-checker fold (2026-08-01) extended v3 to ui-generation records; phases 10 and 11 closed 2026-08-01 (see the phase table), leaving phase 12's optional MOS-proxy as the block's remainder. The contract JSON is the
 machine-readable status record and wins over any older prose.
 
 | Plan phase | Current state |
@@ -64,7 +64,10 @@ compiles, 7/7 smoke, and a clean 5-run baseline-v2 (settings-scroll measured a
 verified-genuine 0.0 ms/s). **UI-7 then closed the plan the same day**: `ui-perf` is a
 registered PASS-only benchmark kind with warn-only baseline-v2-derived ceilings
 (`config/ui-perf-thresholds.json`), canonical-hardware-gated publication from the lane,
-five offline self-tests, and a first live record. The `macos-ui-2026-08` plan is
+five offline self-tests, and a first live record. Baseline session 2 (2026-08-05
+evening) then published six canonical ui-perf records through the live path — all
+confirmatory scenarios consistent with baseline-v2, session two of the ~three the
+hard-ceiling promotion rule asks for. The `macos-ui-2026-08` plan is
 **complete**; History row thinning proceeds via Instruments whenever wanted.
 
 The pre-UI-arc checkpoint (2026-08-01) follows.
@@ -156,7 +159,10 @@ performance block after the fixture rebind, Tier 4 carryover). Immediate specifi
    mlx-swift 0.31.6 + mlx-swift-lm 3.31.4 passed its same-day A/B (warm RTF
    noise-band, QC identical, sampling byte-stable; swift-transformers 1.1.9
    became a direct dependency after the lm 2→3 Hub/Tokenizers
-   externalization) and is the kept state; the codec-bf16 revival probe came
+   externalization) and was the kept state — superseded 2026-08-05 by the
+   governed swift-transformers 1.1.9 → 1.3.3 bump (PR #94, `f72bdb3`): full
+   pin contract set, the §9.3 battery, and a 48/48 byte-identical paired
+   seed×cell delivery A/B against the DP-18 baseline; the codec-bf16 revival probe came
    back negative (conv µ-throughput unchanged across pins — §N 2.3 stays
    parked with only the device-measurement path open); P1b re-tested null —
    a paired 6-seed soak resolved the initial cross-run read to +0.74% slower
@@ -499,6 +505,32 @@ performance block after the fixture rebind, Tier 4 carryover). Immediate specifi
    before its takes can even reach scoring. The one remaining path is
    cloning a genuinely whispered human reference (needs a recorded clip),
    with the HNR/CPP criterion as its acceptance gate.
+
+25. **The delivery-adherence gate was calibrated from its banked matrix
+   (2026-08-05, DP-21 done):** 272 banked paired rows recalibrated every
+   expectation — required floors at the measured noise decile, supporting
+   floors at |q10|, fearful's arousal direction corrected to its own
+   `.strong` instruction semantics, and new binds the analyzer already
+   computed (whisper breathiness posRate 0.97, sad variation collapse 0.94,
+   angry/happy vocal tension). Genuine adherence misses keep warning at
+   seed values. Gate algorithm v2 skips optional-analyzer features on
+   pre-v3 pairs instead of failing. Bank replay: 181 pass / 91 warn
+   (seeds scored 128/144). Ledger: `docs/reference/delivery-harness.md`.
+
+26. **The normal tier carries the happy/angry distinction the strong tier
+   lacks (2026-08-05, DP-22 done; DP-23 probed and re-parked 2026-08-06):**
+   the pre-registered normal-tier arm replicated DP-12's perceptual lead
+   acoustically — angry-vs-happy UAR 0.765 (perm p=0.007) in the 4-bit arm
+   at the `.normal` copies, against DP-18's strong-tier null — so DP-9
+   (EmotionIntensity removal) stays parked on measured product value. The
+   follow-up cross-tier shipping candidate (angry.strong vs happy.normal)
+   missed its registered confirmatory bar on fresh seeds (4-bit UAR 0.639,
+   p=0.12; the descriptive 8-bit arm's clearance was not promoted) and
+   re-parked pending a new lead. Measured along the way: normal-tier
+   effects are weak-to-absent for the hint presets while whisper/sad stay
+   solid at any tier, doubly refuting the 1.15 intensity scale; fearful's
+   two tier copies render different emotions (anxious-slow vs panic-fast),
+   not scaled intensity.
 
 ## Staged roadmap state
 

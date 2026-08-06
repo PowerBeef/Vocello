@@ -76,6 +76,9 @@ scripts/ios_device.sh preflight
 # XCUITest verifies all Speed tiers visibly in Settings before generation.
 scripts/ui_test.sh ios smoke
 scripts/ui_test.sh ios benchmark
+# Opt-in iOS-only diagnostic lanes (never ordinary acceptance):
+scripts/ui_test.sh ios delivery-cohort   # delivery-consistency cohort (--text/--takes/--label)
+scripts/ui_test.sh ios model-download    # isolated background-delivery lifecycle proof
 scripts/ios_device.sh gate            # deterministic physical-device/runtime proof
 ```
 

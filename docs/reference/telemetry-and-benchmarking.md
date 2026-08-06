@@ -542,8 +542,8 @@ warm by design.
 ### Tracking performance over time
 
 Each successful publishable runner creates one canonical, privacy-safe schema-v2 record under one
-of six kinds: UI generation, engine generation, language, instrument profile, retained-memory
-qualification, or prosody calibration. `scripts/benchmark_history.py` validates these records and regenerates
+of seven kinds: UI generation, engine generation, language, instrument profile, retained-memory
+qualification, prosody calibration, or UI frame health (`ui-perf`, from the macOS perf lane). `scripts/benchmark_history.py` validates these records and regenerates
 `benchmarks/HISTORY.md`; direct Markdown append is unsupported. A strict allowlist rejects
 identifiers and content that could expose serials, UDIDs/ECIDs, host/device/user names, absolute
 paths, prompts/transcripts/voice descriptions, raw errors, email addresses, URLs, or secrets. Run

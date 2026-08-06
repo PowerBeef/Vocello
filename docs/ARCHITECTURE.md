@@ -367,8 +367,9 @@ Design, and Clone.
 record, and [`decisions/runtime-streaming-quality-convergence.md`](decisions/runtime-streaming-quality-convergence.md)
 defines the promotion boundaries. The source cutover, focused macOS plus physical-iPhone
 Custom/Design/Clone proof, clean Phase 0 controls, and the canonical matrices all passed:
-`overallPromotion: passed` (2026-07-20). Phases 7, 8, and 14 closed 2026-07-23; the contract
-records the remaining open phases (9–13).
+`overallPromotion: passed` (2026-07-20). Per-phase status lives solely in the contract's
+`phaseStatus` block — cite it rather than restating phase state here (the human summary is the
+phase table in [`development-progress.md`](development-progress.md)).
 
 ### 4.5 Memory policy
 
@@ -551,8 +552,13 @@ can't lag the producer; only `lastPublishedEvent` hops to `MainActor`.
 macOS generation flows through three coordinators in `Sources/ViewModels/`:
 `CustomVoiceCoordinator`, `VoiceDesignCoordinator`, `VoiceCloningCoordinator`
 (all `@MainActor @Observable`). Each builds a `GenerationRequest` from its draft
-and calls `TTSEngineStore.generate(...)`; `VoiceCloningCoordinator` additionally
-primes the clone reference via `ensureCloneReferencePrimed(...)`.
+and runs it through the shared `GenerationLifecycleExecutor`
+(`Sources/ViewModels/GenerationLifecycleExecutor.swift`, extracted in the 2026-08
+UI review's wave 2): the executor owns the single-take prepare/run/cancel
+sequencing against `TTSEngineStore.generate(...)` — a nil prepared take aborts
+silently, a throw is the failure path, and `cancelActiveWork` resets task,
+generating-flag, and player state in one place. `VoiceCloningCoordinator`
+additionally primes the clone reference via `ensureCloneReferencePrimed(...)`.
 
 ---
 
@@ -633,9 +639,11 @@ goes to stderr. Full reference: [`reference/cli.md`](reference/cli.md).
 - Entry: `QwenVoiceApp.swift` → `ContentView.swift`. Layout is a
   `NavigationSplitView` with a `SidebarItem` enum: `customVoice`, `voiceDesign`,
   `voiceCloning`, `history`, `voices`, `settings`.
-- State: a mix of `@Observable` and `ObservableObject`. Coordinators are
-  `@MainActor @Observable`; `TTSEngineStore`, `AudioPlayerViewModel`, and
-  `ModelManagerViewModel` are `ObservableObject`.
+- State: predominantly `@Observable`. Coordinators, `ModelManagerViewModel`,
+  and (since the 2026-08 UI review's W2-A migration) `TTSEngineStore` are
+  `@MainActor @Observable` — the store bridges snapshot/performance-activity
+  Combine publishers for the non-observation consumers; `AudioPlayerViewModel`
+  remains `ObservableObject`.
 - `Sources/Services/` — app-level services: `DatabaseService` (GRDB),
   `BatchGenerationRunner`, `GenerationTelemetryMerger`,
   `MacGenerationWarmupCoordinator`, `MacEngineServiceLifecycleCoordinator`
@@ -671,7 +679,11 @@ goes to stderr. Full reference: [`reference/cli.md`](reference/cli.md).
 ## 9. Cross-platform sharing
 
 - **`Sources/SharedSupport/`** is compiled into **both** apps — the dual-platform
-  UI-layer share point: `AudioPlayerViewModel` (playback + live streaming),
+  UI-layer share point: `AudioPlayerViewModel` (playback surface; its
+  AVAudioEngine/player-node live-preview mechanics were extracted into
+  `Services/LiveStreamingPlaybackEngine` in the 2026-08 UI review's wave 2 —
+  FIFO buffer bookkeeping and graph control live there, session policy stays in
+  the view model),
   `ReferenceClipRecorder` + `ClipReviewPlayer` (reference capture),
   `VoiceClipTranscriber` (on-device transcription), `GenerationPersistence`
   (async GRDB writes), `LanguageSelectionPresentation`, `VoiceDesignBriefCatalog`,
@@ -908,14 +920,15 @@ oldest-first); raw `*.jsonl` is gitignored; committed summaries must be ≤256 K
 `GenerationStreamingTelemetryV9` is the complete target contract for the convergence program. It
 models plan/policy digests, separate model and product terminals, codec/materialized/written/preview
 frame counts, frame-bounded channel pressure, exact chunk ranges, XPC sequence evidence, and
-first-render observation metadata. New shipping schema-v8 rows automatically embed a nested
-`GenerationStreamingTelemetryTransitionV9` projection. It carries the safe shadow-plan/policy
-digests and already-owned typed transport/frontend evidence while enumerating every actor-session,
-output-adapter, exact codec-range, and render observation that the current producer cannot prove.
-This partial projection is not a schema-v9 record and is not consumed by the shipping merger,
-validator, summarizer, or benchmark-history publisher. Until the complete v9 path is cut over and
-promoted, all operational guidance and publication gates continue to require telemetry v8 and
-benchmark-evidence v2.
+first-render observation metadata. Complete v9 documents are now written, validated, and published
+as sidecars by `GenerationStreamingTelemetryV9Publication`
+(`*.streaming-telemetry-v9.json`) where the producer can prove every enumerated observation, and
+shipping schema-v8 rows continue to embed the nested `GenerationStreamingTelemetryTransitionV9`
+projection — the contract's `phaseStatus` records this as complete-sidecar authority with a v8
+envelope (`config/runtime-refactor-contract.json`, `telemetryV9`). Operational guidance and
+publication gates continue to require telemetry v8 and benchmark-evidence v2; the v8 envelope
+remains the record of authority for the merger, validator, summarizer, and benchmark-history
+publisher.
 
 Retained-memory qualification is separate from Instruments profiling. The versioned
 `retained-memory-v1` policy runs fixed Custom→Design→Clone Speed/medium sequences and limits

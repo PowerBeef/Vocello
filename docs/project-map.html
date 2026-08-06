@@ -1267,7 +1267,7 @@ table.matrix .note {
       from Hugging Face; only metadata, privacy resources, UI assets, and iOS voice previews are bundled.
     </p>
     <div class="badge-row">
-      <span class="badge gold"><strong>2.3.0</strong> · build 22</span>
+      <span class="badge gold"><strong>2.4.0</strong> · build 23</span>
       <span class="badge"><strong>macOS</strong> 26+ · Apple Silicon</span>
       <span class="badge"><strong>iOS</strong> 26+ · on-device capable</span>
       <span class="badge"><strong>Swift</strong> 6 · Xcode 26</span>
@@ -1355,7 +1355,7 @@ table.matrix .note {
         <div class="mark"></div>
         <div>
           <h4>MLX pins in lockstep</h4>
-          <p><code>mlx-swift</code> 0.30.6 and <code>mlx-swift-lm</code> 2.30.6 move together. No Core ML pivot.</p>
+          <p><code>mlx-swift</code> 0.31.6 and <code>mlx-swift-lm</code> 3.31.4 move together. No Core ML pivot.</p>
         </div>
       </div>
       <div class="invariant">
@@ -1407,7 +1407,7 @@ table.matrix .note {
     <p class="section-label">03 · Modules</p>
     <h2 class="section-title">Target dependency graph</h2>
     <p class="section-lede">
-      Eleven Swift targets from <code>project.yml</code>. Click a node for details.
+      Thirteen Swift targets from <code>project.yml</code>; the graph shows the ten build-graph participants — the three UI/logic test bundles ride the targets they test. Click a node for details.
       Hover highlights connected edges. Layering rule:
       <code>BackendCore</code> ← <code>Core</code> ← apps / XPC / CLI.
     </p>
@@ -1421,7 +1421,7 @@ table.matrix .note {
           <span><i style="background:rgba(191,170,219,0.35);border:1px solid var(--lavender-300)"></i> SPM / packages</span>
           <span><i style="background:rgba(140,143,155,0.3);border:1px solid var(--charcoal-200)"></i> Tests</span>
         </div>
-        <svg id="moduleGraph" viewBox="0 0 860 620" role="img" aria-labelledby="moduleGraphTitle moduleGraphDesc"><title id="moduleGraphTitle">Vocello build dependency graph</title><desc id="moduleGraphDesc">Eleven Xcode targets and their direct package dependencies. Select a node for exact dependencies and key paths.</desc></svg>
+        <svg id="moduleGraph" viewBox="0 0 860 620" role="img" aria-labelledby="moduleGraphTitle moduleGraphDesc"><title id="moduleGraphTitle">Vocello build dependency graph</title><desc id="moduleGraphDesc">Ten of the thirteen Xcode targets and their direct package dependencies. Select a node for exact dependencies and key paths.</desc></svg>
       </div>
       <aside class="detail-panel" id="detailPanel" aria-live="polite">
         <div class="empty">Select a module to inspect its type, platform, dependencies, and key files.</div>
@@ -1508,7 +1508,7 @@ table.matrix .note {
     <h2 class="section-title">Scripts, tests &amp; CI</h2>
     <p class="section-lede">
       Development is Claude Code + scripts-first; optional MCP tools assist only when callable.
-      Native builds are the typecheck. Commits, pushes, pull requests, ordinary merges, CI, and release packaging use deterministic checks only. XCUITest smoke and benchmark lanes are explicit frontend acceptance work.
+      Native builds are the typecheck. Commits, pushes, pull requests, ordinary merges, CI, and release packaging use deterministic checks only. XCUITest smoke, benchmark, and perf lanes are explicit frontend acceptance work.
     </p>
 
     <div class="tool-tabs" id="toolTabs" role="tablist" aria-label="Build, test, release, and agent workflow categories"></div>
@@ -1565,11 +1565,11 @@ scripts/macos_test.sh test
       <article class="dist-card">
         <h4>macOS release</h4>
         <p>Signed Developer ID + notarized + stapled DMG (<code>Vocello-macos26.dmg</code>) via <code>scripts/release.sh</code> and <code>.github/workflows/release.yml</code>, gated by deterministic release-readiness and artifact checks.</p>
-        <span class="status">Shipped · 2.3.0</span>
+        <span class="status">Shipped · 2.4.0</span>
       </article>
       <article class="dist-card">
         <h4>iOS distribution</h4>
-        <p>Public TestFlight beta is live via the public join link (build 22 carries v2.3.0). Builds come from the manual CI job (<code>archive_ios</code>) gated by signing, entitlement, archive, catalog, and artifact checks. App Store listing still needs metadata, screenshots, and submission.</p>
+        <p>Public TestFlight beta is live via the public join link (build 23 carries v2.4.0). Builds come from the manual CI job (<code>archive_ios</code>) gated by signing, entitlement, archive, catalog, and artifact checks. App Store listing still needs metadata, screenshots, and submission.</p>
         <span class="status">TestFlight beta · live</span>
       </article>
       <article class="dist-card">
@@ -1668,7 +1668,7 @@ scripts/macos_test.sh test
       "title":"Compose → Generate → Review",
       "body":"Mode-specific setup, script composer, readiness gate, typed cancellation barrier, streaming player, fail-closed persistence, and replay. Both platforms route scripts above 900 characters into a long-form project (sequential streaming segments, joined output); single takes keep the 900-character ceiling.",
       "chips":[
-        {"t":"GenerationStudioShell","c":""},
+        {"t":"GenerationWorkflowView","c":""},
         {"t":"StudioGenerationCoordinator","c":""},
         {"t":"textInput_*","c":""},
         {"t":"studioChip_*","c":""}
@@ -1780,11 +1780,11 @@ scripts/macos_test.sh test
       "depends":["mlx-swift","mlx-swift-lm","SwiftHuggingFace"],"files":["Packages/VocelloQwen3Core/Package.swift"]
     },
     {
-      "id":"MLXSwift","label":"mlx-swift","sub":"0.30.6","kind":"spm","type":"SPM package","platform":"iOS + macOS","bundle":"github.com/ml-explore/mlx-swift",
+      "id":"MLXSwift","label":"mlx-swift","sub":"0.31.6","kind":"spm","type":"SPM package","platform":"iOS + macOS","bundle":"github.com/ml-explore/mlx-swift",
       "desc":"MLX arrays, neural-network layers, Metal compute, random seeding, and memory interfaces.","depends":[],"files":[]
     },
     {
-      "id":"MLXLM","label":"mlx-swift-lm","sub":"2.30.6","kind":"spm","type":"SPM package","platform":"iOS + macOS","bundle":"github.com/ml-explore/mlx-swift-lm",
+      "id":"MLXLM","label":"mlx-swift-lm","sub":"3.31.4","kind":"spm","type":"SPM package","platform":"iOS + macOS","bundle":"github.com/ml-explore/mlx-swift-lm",
       "desc":"Language-model utilities consumed by the owned Qwen3 runtime; pinned in lockstep with mlx-swift.",
       "depends":["mlx-swift","swift-transformers","swift-jinja"],"files":[]
     },
@@ -1875,7 +1875,8 @@ scripts/macos_test.sh test
         {"name":"VoiceBankCatalog.swift","desc":"Emotion-bank persona grouping from the saved-voice naming convention (DP-16)"},
         {"name":"NativeCloneSupport.swift","desc":"Reference normalization and prepared prompt caches"},
         {"name":"GenerationOutputAdapter.swift","desc":"GenerationOutputAdapter: lossless PCM drain, QC, telemetry, atomic WAV publication, and finalization"},
-        {"name":"HuggingFaceDownloader.swift","desc":"Native repository download and staging"}
+        {"name":"HuggingFaceDownloader.swift","desc":"Native repository download and staging"},
+        {"name":"HistoryDeletionEngine.swift","desc":"Pure effect-injected History deletion sequencing (W2-B extraction)"}
       ]
     },
     {
@@ -1905,10 +1906,11 @@ scripts/macos_test.sh test
     {
       "name":"Sources/Views/ · ViewModels/ · Services/ · Models/","plat":"macOS","desc":"Six-surface SwiftUI app, coordinators, model manager, lifecycle, history, playback, and batch.",
       "children":[
-        {"name":"Views/Generate/","desc":"Custom, Design, Clone and GenerationStudioShell"},
+        {"name":"Views/Generate/","desc":"Custom, Design, Clone and the shared GenerationWorkflowView"},
         {"name":"Views/Library/","desc":"History, Saved Voices, recording and save sheets"},
         {"name":"Views/Settings/","desc":"Model downloads, clone consent, and preferences"},
-        {"name":"Services/","desc":"Database, audio, telemetry merge, XPC lifecycle, warmup, and the batch/long-form runner (sequential streaming, planner, bounded assembly)"}
+        {"name":"Services/","desc":"Database, audio, telemetry merge, XPC lifecycle, warmup, and the batch/long-form runner (sequential streaming, planner, bounded assembly)"},
+        {"name":"ViewModels/GenerationLifecycleExecutor.swift","desc":"Shared single-take prepare/run/cancel sequencing for the three coordinators (W2-C extraction)"}
       ]
     },
     {
@@ -1937,7 +1939,8 @@ scripts/macos_test.sh test
         {"name":"Database/","desc":"GRDB schema and queue"},
         {"name":"Services/GenerationPersistence.swift","desc":"Async History writes"},
         {"name":"Services/VoiceClipTranscriber.swift","desc":"Local Speech transcription"},
-        {"name":"ViewModels/AudioPlayerViewModel.swift","desc":"Streaming and completed playback"}
+        {"name":"ViewModels/AudioPlayerViewModel.swift","desc":"Playback surface; session policy and progress"},
+        {"name":"Services/LiveStreamingPlaybackEngine.swift","desc":"AVAudioEngine live-preview graph and FIFO buffer bookkeeping (W2-D extraction)"}
       ]
     },
     {
@@ -1966,7 +1969,7 @@ scripts/macos_test.sh test
         {"name":"VocelloCoreTests/","desc":"Language, schema-v8 memory/coverage compatibility, sampler/QC, and atomic WAV tests"},
         {"name":"VocelloEngineIntegrationTests/","desc":"Injectable XPC lifecycle and correlation tests"},
         {"name":"UIAutomationSupport/","desc":"Shared waits, fixtures, queries, and evidence helpers"},
-        {"name":"VocelloMacUITests/ · VocelloiOSUITests/","desc":"Explicit smoke and benchmark XCUITest lanes"},
+        {"name":"VocelloMacUITests/ · VocelloiOSUITests/","desc":"Explicit smoke, benchmark, and macOS frame-health (perf) XCUITest lanes"},
         {"name":"VocelloiOSLogicTests/","desc":"App-host-free iOS catalog, ledger, memory, cancellation, storage-gate, and diagnostic policy tests; generic device-SDK compile in CI"}
       ]
     },
@@ -1976,7 +1979,7 @@ scripts/macos_test.sh test
         {"name":"build-output-policy.json · build_output_policy.py","desc":"Machine-readable cache/scratch/artifact/dist ownership, inventory, validation, and migration"},
         {"name":"generate_cli_scheme.py · generate_ios_logic_scheme.py","desc":"Two deterministic post-XcodeGen schemes for the CLI tool and app-host-free iOS policy tests"},
         {"name":"macos_test.sh","desc":"macOS deterministic test/gate, exact-PID profile, and retained-memory router"},
-        {"name":"ui_test.sh","desc":"Unified explicit XCUITest smoke and benchmark entry point"},
+        {"name":"ui_test.sh","desc":"Unified explicit XCUITest smoke/benchmark/perf entry point"},
         {"name":"clean_build_caches.sh","desc":"Policy-bounded routine/aggressive/UI/dist/external/clobber cleanup"},
         {"name":"benchmark_history.py","desc":"Validate/publish privacy-safe records and reproduce HISTORY.md"},
         {"name":"backend-risk-spine.json","desc":"Tracked backend report-risk contract"},
@@ -2005,8 +2008,8 @@ scripts/macos_test.sh test
   ],
   "deps": [
     {"name":"VocelloQwen3Core","ver":"owned local package","role":"Stable typed application facade over the owned Qwen3-TTS/Mimi runtime; legacy MLXAudio products remain implementation compatibility","tag":"owned","direct":true},
-    {"name":"mlx-swift","ver":"0.30.6","role":"MLX arrays, Metal compute, NN layers, MLXRandom","tag":"direct","direct":true},
-    {"name":"mlx-swift-lm","ver":"2.30.6","role":"MLXLMCommon used by the owned Qwen3 runtime; lockstep pin","tag":"owned-runtime direct","direct":true},
+    {"name":"mlx-swift","ver":"0.31.6","role":"MLX arrays, Metal compute, NN layers, MLXRandom","tag":"direct","direct":true},
+    {"name":"mlx-swift-lm","ver":"3.31.4","role":"MLXLMCommon used by the owned Qwen3 runtime; lockstep pin","tag":"owned-runtime direct","direct":true},
     {"name":"GRDB.swift","ver":"7.10.0","role":"SQLite persistence for History","tag":"direct","direct":true},
     {"name":"SwiftHuggingFace","ver":"0.9.0","role":"Hub/model utilities in the package graph","tag":"direct","direct":true},
     {"name":"EventSource","ver":"1.4.1","role":"Transitive server-sent events support","tag":"transitive","direct":false},
@@ -2014,11 +2017,13 @@ scripts/macos_test.sh test
     {"name":"swift-atomics","ver":"1.3.0","role":"Transitive atomic primitives","tag":"transitive","direct":false},
     {"name":"swift-collections","ver":"1.4.1","role":"Transitive collections","tag":"transitive","direct":false},
     {"name":"swift-crypto","ver":"4.4.0","role":"Transitive cryptographic primitives","tag":"transitive","direct":false},
-    {"name":"swift-jinja","ver":"2.3.5","role":"Template rendering used by model utilities","tag":"transitive","direct":false},
+    {"name":"swift-jinja","ver":"2.4.2","role":"Template rendering used by model utilities","tag":"transitive","direct":false},
     {"name":"swift-nio","ver":"2.100.0","role":"Transitive networking/event-loop primitives; security baseline includes the ByteBuffer bounds fix","tag":"transitive","direct":false},
     {"name":"swift-numerics","ver":"1.1.1","role":"Transitive numeric utilities","tag":"transitive","direct":false},
     {"name":"swift-system","ver":"1.6.4","role":"Transitive system interfaces","tag":"transitive","direct":false},
-    {"name":"swift-transformers","ver":"1.1.9","role":"Tokenizer/model utilities","tag":"transitive","direct":false},
+    {"name":"swift-argument-parser","ver":"1.8.2","role":"Transitive command-line parsing in the package graph","tag":"transitive","direct":false},
+    {"name":"swift-syntax","ver":"603.0.2","role":"Transitive macro support in the package graph","tag":"transitive","direct":false},
+    {"name":"swift-transformers","ver":"1.3.3","role":"App-supplied Hub/Tokenizers implementation for the owned runtime; exact-pinned, reviewed with the mlx pair","tag":"owned-runtime direct","direct":true},
     {"name":"yyjson","ver":"0.12.0","role":"Fast JSON parsing in the package graph","tag":"transitive","direct":false}
   ],
   "nativeFrameworks": [
@@ -2061,6 +2066,7 @@ scripts/macos_test.sh test
       {"cmd":"scripts/macos_test.sh test","desc":"Core, XPC transport, and owned Qwen3 runtime tests; no frontend driving"},
       {"cmd":"scripts/ui_test.sh macos smoke","desc":"Native-app navigation, visible readiness, one Custom generation, player, History, and screenshots"},
       {"cmd":"scripts/ui_test.sh macos benchmark","desc":"Full 29-take UI matrix with complete app/XPC/engine evidence and PASS-only history"},
+      {"cmd":"scripts/ui_test.sh macos perf","desc":"Nine frame-health scenarios with the in-app display-link probe; warn-only ceilings; canonical-hardware runs publish ui-perf records"},
       {"cmd":"scripts/macos_test.sh telemetry-overhead","desc":"Local-only three-rotation PCM and RTF/TTFC observer-effect diagnostic"},
       {"cmd":"scripts/macos_test.sh profile --kind memory [--keep-trace]","desc":"Exact-PID memory profile; compact summary by default, raw trace opt-in"},
       {"cmd":"scripts/macos_test.sh memory","desc":"Custom→Design→Clone retained-memory policy qualification"},

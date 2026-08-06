@@ -35,6 +35,7 @@ the script self-test suite via `scripts/check_test_workflows.sh`.
 | `scripts/delivery_identification_check.py` | Score a blind identification session: confusion matrix, per-preset recall, attractor test | `test_delivery_identification_check.py` |
 | `scripts/delivery_matrix_report.py` | Matrix-level report over paired delivery rows | `test_delivery_matrix_report.py` |
 | `scripts/separability_listening_check.py` | Human spot-check protocol against a separability verdict | `test_separability_listening_check.py` |
+| `scripts/analyze_delivery.py` | Reference-free delivery acoustic analyzer (F0 median/range, syllable rate, duration, voicing) consumed by `delivery_adherence.py` and the bench sidecar | `test_analyze_delivery.py` |
 | `scripts/analyze_prosody.py` | Bounded reference-free prosody analyzer (pitch/cadence/pause/energy + `voice_*` HNR/jitter/CPP + spectral balance) | `test_analyze_prosody.py` |
 | `scripts/prosody_profile.py` | Versioned prosody profile: thresholds, delivery weights, per-preset expectations | via gate/separability tests |
 | `scripts/prosody_quality_gate.py` | Reference-free per-take prosody gate (monotone / rushed / flat / pause issues) | `test_prosody_quality_gate.py` |

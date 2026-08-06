@@ -59,7 +59,8 @@ jobs:
     steps:
       - name: Select and validate native toolchain
         run: |
-          arch -arm64 /opt/homebrew/bin/brew install xcbeautify shellcheck numpy
+          NUMPY_PIN="$(python3 -c "import json; print(json.load(open('config/toolchain.json'))['native']['numpy']['version'])")"
+          python3 -m pip install --quiet --break-system-packages "numpy==${NUMPY_PIN}"
           ./scripts/install_pinned_tools.sh
           if ! xcrun metal --version >/dev/null 2>&1; then
             xcodebuild -downloadComponent metalToolchain
@@ -280,23 +281,37 @@ jobs:
         )
         self.assertTrue(any("audit must run only" in value for value in module.validate(self.root)))
 
-    def test_swift_codeql_tooling_must_run_homebrew_natively(self) -> None:
+    def test_swift_codeql_tooling_must_stay_pinned_and_brew_free(self) -> None:
         path = self.root / ".github/workflows/security.yml"
         text = path.read_text(encoding="utf-8")
         path.write_text(
             text.replace(
-                "arch -arm64 /opt/homebrew/bin/brew install xcbeautify shellcheck numpy",
-                "brew install xcbeautify shellcheck numpy",
+                'python3 -m pip install --quiet --break-system-packages "numpy==${NUMPY_PIN}"',
+                "python3 -m pip install --quiet numpy",
+            ).replace("NUMPY_PIN=\"$(python3 -c \"import json; print(json.load(open('config/toolchain.json'))['native']['numpy']['version'])\")\"", ""),
+            encoding="utf-8",
+        )
+        self.assertTrue(
+            any("pip-pin numpy" in value for value in module.validate(self.root))
+        )
+        path.write_text(
+            text.replace(
+                "./scripts/install_pinned_tools.sh",
+                "brew install xcbeautify shellcheck\n          ./scripts/install_pinned_tools.sh",
             ),
             encoding="utf-8",
         )
-        self.assertTrue(any("ARM Homebrew" in value for value in module.validate(self.root)))
+        self.assertTrue(
+            any("must not install drifting tools through Homebrew" in value
+                for value in module.validate(self.root))
+        )
         path.write_text(
             text.replace("./scripts/install_pinned_tools.sh", "echo skip-pinned-tools"),
             encoding="utf-8",
         )
         self.assertTrue(
-            any("SHA-pinned xcodegen/ripgrep" in value for value in module.validate(self.root))
+            any("SHA-pinned xcodegen/ripgrep/xcbeautify/shellcheck" in value
+                for value in module.validate(self.root))
         )
         path.write_text(text.replace("runner: macos-26", "runner: macos-15"), encoding="utf-8")
         self.assertTrue(any("macos-26 ARM runner" in value for value in module.validate(self.root)))

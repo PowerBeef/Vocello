@@ -13,7 +13,7 @@
   },
   "baselineInventory": {
     "path": "UPSTREAM_BASELINE.json",
-    "sha256": "08099111586a931f12b8d259938963ccdc8385d21009701779fea2ceb847c1c2"
+    "sha256": "6136a2c2b2d56590deca279ef4ae809a11aff41132916a73619caf2012ef362a"
   },
   "lastReviewedUpstream": {
     "commit": "d302a5c6080d2bb97bae38c7418f82abb76013b6",

@@ -1,13 +1,56 @@
 {
   "schemaVersion": 1,
   "native": {
-    "xcode": {"version": "26.6", "versionCommand": ["xcodebuild", "-version"]},
-    "swift": {"version": "6.3.3", "versionCommand": ["swift", "--version"]},
-    "xcodegen": {"version": "2.46.0", "versionCommand": ["xcodegen", "--version"]},
-    "xcbeautify": {"version": "3.2.1", "versionCommand": ["xcbeautify", "--version"]},
-    "ripgrep": {"version": "15.2.0", "versionCommand": ["rg", "--version"]},
-    "shellcheck": {"version": "0.11.0", "versionCommand": ["shellcheck", "--version"]},
-    "numpy": {"version": "2.5.1", "versionCommand": ["brew", "list", "--versions", "numpy"]}
+    "xcode": {
+      "version": "26.6",
+      "versionCommand": [
+        "xcodebuild",
+        "-version"
+      ]
+    },
+    "swift": {
+      "version": "6.3.3",
+      "versionCommand": [
+        "swift",
+        "--version"
+      ]
+    },
+    "xcodegen": {
+      "version": "2.46.0",
+      "versionCommand": [
+        "xcodegen",
+        "--version"
+      ]
+    },
+    "xcbeautify": {
+      "version": "3.2.1",
+      "versionCommand": [
+        "xcbeautify",
+        "--version"
+      ]
+    },
+    "ripgrep": {
+      "version": "15.2.0",
+      "versionCommand": [
+        "rg",
+        "--version"
+      ]
+    },
+    "shellcheck": {
+      "version": "0.11.0",
+      "versionCommand": [
+        "shellcheck",
+        "--version"
+      ]
+    },
+    "numpy": {
+      "version": "2.5.1",
+      "versionCommand": [
+        "python3",
+        "-c",
+        "import numpy; print(numpy.__version__)"
+      ]
+    }
   },
   "artifactPins": {
     "xcodegen": {
@@ -21,22 +64,73 @@
       "url": "https://github.com/BurntSushi/ripgrep/releases/download/15.2.0/ripgrep-15.2.0-aarch64-apple-darwin.tar.gz",
       "sha256": "3750b2e93f37e0c692657da574d7019a101c0084da05a790c83fd335bad973e4",
       "archivePath": "ripgrep-15.2.0-aarch64-apple-darwin/rg"
+    },
+    "xcbeautify": {
+      "version": "3.2.1",
+      "url": "https://github.com/cpisciotta/xcbeautify/releases/download/3.2.1/xcbeautify-3.2.1-universal-apple-macosx.zip",
+      "sha256": "87fdbe786f71d7b2ee28c5c1ca97087587292f2c5c6f9e721cf02db8b2a3c241",
+      "archivePath": "release/xcbeautify"
+    },
+    "shellcheck": {
+      "version": "0.11.0",
+      "url": "https://github.com/koalaman/shellcheck/releases/download/v0.11.0/shellcheck-v0.11.0.darwin.aarch64.tar.xz",
+      "sha256": "56affdd8de5527894dca6dc3d7e0a99a873b0f004d7aabc30ae407d3f48b0a79",
+      "archivePath": "shellcheck-v0.11.0/shellcheck"
     }
   },
   "release": {
-    "gh": {"version": "2.96.0", "versionCommand": ["gh", "--version"]}
+    "gh": {
+      "version": "2.96.0",
+      "versionCommand": [
+        "gh",
+        "--version"
+      ]
+    }
   },
   "website": {
-    "node": {"version": "24.15.0", "versionCommand": ["node", "--version"]},
-    "npm": {"version": "11.12.1", "versionCommand": ["npm", "--version"]}
+    "node": {
+      "version": "24.15.0",
+      "versionCommand": [
+        "node",
+        "--version"
+      ]
+    },
+    "npm": {
+      "version": "11.12.1",
+      "versionCommand": [
+        "npm",
+        "--version"
+      ]
+    }
   },
   "actions": {
-    "actions/checkout": {"version": "v7.0.1", "sha": "3d3c42e5aac5ba805825da76410c181273ba90b1"},
-    "actions/cache": {"version": "v6.1.0", "sha": "55cc8345863c7cc4c66a329aec7e433d2d1c52a9"},
-    "actions/upload-artifact": {"version": "v7.0.1", "sha": "043fb46d1a93c77aae656e7c1c64a875d1fc6a0a"},
-    "actions/setup-node": {"version": "v7.0.0", "sha": "820762786026740c76f36085b0efc47a31fe5020"},
-    "actions/dependency-review-action": {"version": "v5.0.0", "sha": "a1d282b36b6f3519aa1f3fc636f609c47dddb294"},
-    "actions/attest-build-provenance": {"version": "v4.1.1", "sha": "0f67c3f4856b2e3261c31976d6725780e5e4c373"},
-    "github/codeql-action": {"version": "v4.37.4", "sha": "f205ea1c3313d32999d8d6a48b4f6530d4437b38"}
+    "actions/checkout": {
+      "version": "v7.0.1",
+      "sha": "3d3c42e5aac5ba805825da76410c181273ba90b1"
+    },
+    "actions/cache": {
+      "version": "v6.1.0",
+      "sha": "55cc8345863c7cc4c66a329aec7e433d2d1c52a9"
+    },
+    "actions/upload-artifact": {
+      "version": "v7.0.1",
+      "sha": "043fb46d1a93c77aae656e7c1c64a875d1fc6a0a"
+    },
+    "actions/setup-node": {
+      "version": "v7.0.0",
+      "sha": "820762786026740c76f36085b0efc47a31fe5020"
+    },
+    "actions/dependency-review-action": {
+      "version": "v5.0.0",
+      "sha": "a1d282b36b6f3519aa1f3fc636f609c47dddb294"
+    },
+    "actions/attest-build-provenance": {
+      "version": "v4.1.1",
+      "sha": "0f67c3f4856b2e3261c31976d6725780e5e4c373"
+    },
+    "github/codeql-action": {
+      "version": "v4.37.4",
+      "sha": "f205ea1c3313d32999d8d6a48b4f6530d4437b38"
+    }
   }
 }

@@ -25,10 +25,12 @@ concurrency:
 
 jobs:
   # Cheap path router: computes which surfaces changed so heavy macos-26 jobs
-  # skip for docs-only pushes. The local commit-gate hook still runs the
-  # documentation/link contracts on every commit, and any native change
-  # re-runs the full suite here. `ci-required` aggregates results (skipped
-  # counts as pass) and is the single branch-protection context.
+  # skip for docs-only pushes. Any native change re-runs the full suite here,
+  # and `docs-contracts` below runs unconditionally so a docs-only push can
+  # never green `CI required` without the documentation/link/roadmap
+  # contracts (the local T1 hook is Claude-session tooling, not a universal
+  # git hook). `ci-required` aggregates results (skipped counts as pass) and
+  # is the single branch-protection context.
   changes:
     name: Change routing
     runs-on: ubuntu-latest
@@ -77,6 +79,30 @@ jobs:
           echo "website=$website" >>"$GITHUB_OUTPUT"
           echo "routing: native=$native website=$website (empty diff ⇒ run everything)"
 
+  # Always-on lightweight contract gate: documentation, doc metadata,
+  # surface coverage, and roadmap validators run on every push/PR regardless
+  # of path routing. Runs on macos-26 deliberately — these validators shell
+  # repository scripts' --help surfaces, which are exercised on macOS hosts
+  # only (T1 runs the same set locally).
+  docs-contracts:
+    name: Documentation contracts
+    runs-on: macos-26
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # roadmap.py validate resolves evidence commits against history.
+          fetch-depth: 0
+
+      - name: Validate documentation, roadmap, and surface contracts
+        run: |
+          set -euo pipefail
+          python3 scripts/documentation_contract.py validate
+          python3 scripts/doc_metadata.py validate
+          python3 scripts/check_surface_coverage.py
+          python3 scripts/roadmap.py validate
+
   ios-compile-check:
     name: iOS compile check (device SDK)
     needs: changes
@@ -98,9 +124,13 @@ jobs:
 
       - name: Install deterministic tooling
         run: |
-          brew install xcbeautify shellcheck numpy
-          # xcodegen + ripgrep are SHA-pinned release artifacts (mixed runner
-          # image pools make brew's formula index nondeterministic mid-roll).
+          # xcodegen, ripgrep, xcbeautify, and shellcheck are SHA-pinned
+          # release artifacts (mixed runner image pools make brew's formula
+          # index nondeterministic mid-roll); numpy pip-pins to the
+          # config/toolchain.json version for the same reason.
+          NUMPY_PIN="$(python3 -c "import json; print(json.load(open('config/toolchain.json'))['native']['numpy']['version'])")"
+          python3 -m pip install --quiet --break-system-packages "numpy==${NUMPY_PIN}" \
+            || python3 -m pip install --quiet "numpy==${NUMPY_PIN}"
           ./scripts/install_pinned_tools.sh
           export PATH="$HOME/.qwenvoice-pinned-tools/bin:$PATH"
           xcodegen --version
@@ -190,9 +220,13 @@ jobs:
 
       - name: Install deterministic tooling
         run: |
-          brew install xcbeautify shellcheck numpy
-          # xcodegen + ripgrep are SHA-pinned release artifacts (mixed runner
-          # image pools make brew's formula index nondeterministic mid-roll).
+          # xcodegen, ripgrep, xcbeautify, and shellcheck are SHA-pinned
+          # release artifacts (mixed runner image pools make brew's formula
+          # index nondeterministic mid-roll); numpy pip-pins to the
+          # config/toolchain.json version for the same reason.
+          NUMPY_PIN="$(python3 -c "import json; print(json.load(open('config/toolchain.json'))['native']['numpy']['version'])")"
+          python3 -m pip install --quiet --break-system-packages "numpy==${NUMPY_PIN}" \
+            || python3 -m pip install --quiet "numpy==${NUMPY_PIN}"
           ./scripts/install_pinned_tools.sh
           export PATH="$HOME/.qwenvoice-pinned-tools/bin:$PATH"
           xcodegen --version
@@ -259,7 +293,7 @@ jobs:
 
   ci-required:
     name: CI required
-    needs: [changes, ios-compile-check, macos-deterministic-tests, website-deterministic]
+    needs: [changes, docs-contracts, ios-compile-check, macos-deterministic-tests, website-deterministic]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5

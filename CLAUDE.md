@@ -175,7 +175,7 @@ QVOICE_GATES=quick ./scripts/check_project_inputs.sh   # fast loop (see below)
 | --- | --- | --- | --- |
 | T0 iterate | while editing | build-as-typecheck, targeted checks | seconds |
 | T1 checkpoint | every `git commit` (hook-enforced, automatic) | `QVOICE_GATES=quick ./scripts/check_project_inputs.sh`; fingerprint-cached no-op when the tree is unchanged since the last pass | ~0–45 s |
-| T2 CI | every push/PR (automatic) | full deterministic suite on GitHub, path-aware (docs-only pushes skip the heavy jobs; `ci-required` aggregates) | minutes, non-blocking locally |
+| T2 CI | every push/PR (automatic) | full deterministic suite on GitHub, path-aware (docs-only pushes skip the heavy jobs but always run the lightweight `docs-contracts` validator job; `ci-required` aggregates) | minutes, non-blocking locally |
 | T3 release | `v*` tags only | the full evidence/signing/notarization chain | unchanged |
 
 `QVOICE_GATES=quick` skips only the ~75 s script self-test suite, and only while nothing under

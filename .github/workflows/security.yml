@@ -124,12 +124,13 @@ jobs:
         if: matrix.language == 'swift'
         run: |
           sudo xcode-select -s /Applications/Xcode_26.6.app
-          # CodeQL's tracing shell currently runs through Rosetta on the ARM
-          # macos-26 image. Invoke the ARM Homebrew binary explicitly so its
-          # architecture guard does not reject the otherwise native runner.
-          arch -arm64 /opt/homebrew/bin/brew install xcbeautify shellcheck numpy
-          # xcodegen + ripgrep are SHA-pinned release artifacts (mixed runner
-          # image pools make brew's formula index nondeterministic mid-roll).
+          # xcodegen, ripgrep, xcbeautify, and shellcheck are SHA-pinned
+          # release artifacts (mixed runner image pools make brew's formula
+          # index nondeterministic mid-roll); numpy pip-pins to the
+          # config/toolchain.json version for the same reason.
+          NUMPY_PIN="$(python3 -c "import json; print(json.load(open('config/toolchain.json'))['native']['numpy']['version'])")"
+          python3 -m pip install --quiet --break-system-packages "numpy==${NUMPY_PIN}" \
+            || python3 -m pip install --quiet "numpy==${NUMPY_PIN}"
           ./scripts/install_pinned_tools.sh
           export PATH="$HOME/.qwenvoice-pinned-tools/bin:$PATH"
           # Xcode 26 ships Metal as an optional component, and GitHub's fresh

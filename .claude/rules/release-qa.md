@@ -202,13 +202,15 @@ scripts/clean_build_caches.sh --compact-profile-failure <run-id> --dry-run
 - **Gate quick mode is local-only.** `QVOICE_GATES=quick` may skip the script self-test suite
   only while `scripts/` and `config/` have no pending changes; CI and release lanes never set it,
   so every push and package still runs the full suite. Do not widen the skip's scope.
-- **CI topology.** `ci.yml`: a cheap `changes` router classifies pushed paths; the two macos-26
-  jobs run only for native-surface changes (Sources/Tests/Packages/config/scripts/benchmarks/
-  project files/.github), the website job for `website/` changes, and the `CI required` aggregator
-  (the sole branch-protection context) passes when jobs are path-skipped. Both macOS jobs cache
-  SwiftPM checkouts. The T1 commit-gate hook (`scripts/hooks/precommit_gate.sh`, owned here) keeps
-  docs/link/contract validation on every local commit, so path-skipping CI for docs-only pushes
-  loses no coverage class.
+- **CI topology.** `ci.yml`: a cheap `changes` router classifies pushed paths; the two heavy
+  macos-26 jobs run only for native-surface changes (Sources/Tests/Packages/config/scripts/
+  benchmarks/project files/.github), the website job for `website/` changes, and the `CI required`
+  aggregator (the sole branch-protection context) passes when jobs are path-skipped. The
+  lightweight `docs-contracts` job runs unconditionally on every push/PR (documentation,
+  doc-metadata, surface-coverage, and roadmap validators), so a docs-only push can never green
+  `CI required` without the contract suite — the T1 commit-gate hook
+  (`scripts/hooks/precommit_gate.sh`, owned here) provides the same coverage locally but is
+  Claude-session tooling, not a universal git hook. Both heavy macOS jobs cache SwiftPM checkouts.
 - **Ordinary CI is deterministic-only.** GitHub CI compiles the `VocelloiOS` app and standalone
   `VocelloiOSLogicTests` bundle with `generic/platform=iOS`, runs macOS deterministic verification,
   and never executes XCUITest. Xcode 26 cannot execute the app-host-free tool-hosted policy bundle

@@ -1,3 +1,0 @@
-// Copy to Local.xcconfig and customize.
-APP_BUNDLE_ID = com.example.VoicesApp
-DEVELOPMENT_TEAM = YOURTEAMID

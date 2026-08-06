@@ -41,8 +41,7 @@
       "state": "active",
       "files": [
         ".gitignore",
-        "Package.swift",
-        "Examples/**"
+        "Package.swift"
       ],
       "tests": [
         "Tests/Qwen3RuntimeTests/**"

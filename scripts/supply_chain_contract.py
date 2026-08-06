@@ -185,10 +185,17 @@ def validate(root: Path, installed: str | None = None) -> list[str]:
     else:
         if "runner: macos-26" not in codeql:
             errors.append("Swift CodeQL must retain the macos-26 ARM runner")
-        if "arch -arm64 /opt/homebrew/bin/brew install xcbeautify shellcheck numpy" not in codeql:
-            errors.append("Swift CodeQL tooling must invoke ARM Homebrew explicitly on the macos-26 runner")
+        # 2026-08-06: the drifting tools moved off Homebrew entirely —
+        # xcodegen/ripgrep/xcbeautify/shellcheck install from artifactPins
+        # and numpy pip-pins to the manifest version. Homebrew's mid-roll
+        # formula drift (and the ARM/Rosetta guard dance it required here)
+        # must not return.
+        if "numpy==${NUMPY_PIN}" not in codeql:
+            errors.append("Swift CodeQL must pip-pin numpy to the toolchain manifest version")
+        if "brew install" in codeql:
+            errors.append("Swift CodeQL must not install drifting tools through Homebrew; use the pinned installer")
         if "./scripts/install_pinned_tools.sh" not in codeql:
-            errors.append("Swift CodeQL must install SHA-pinned xcodegen/ripgrep release artifacts")
+            errors.append("Swift CodeQL must install SHA-pinned xcodegen/ripgrep/xcbeautify/shellcheck release artifacts")
         if "xcodebuild -downloadComponent metalToolchain" not in codeql:
             errors.append("Swift CodeQL must install Xcode 26's optional Metal Toolchain when absent")
         if "xcrun metal --version" not in codeql:

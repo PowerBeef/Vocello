@@ -5,7 +5,7 @@
 > lifecycle, persistence, model management, and telemetry. When this doc disagrees
 > with the code, **the code wins** — fix this doc.
 >
-> Last reviewed: 2026-07-17.
+> Last reviewed: 2026-08-06.
 
 ## TL;DR
 
@@ -26,8 +26,9 @@ One engine core (`QwenVoiceCore` / `MLXTTSEngine`) is hosted three ways:
 Platforms: macOS 26+, iOS 26+, Apple Silicon (`arm64`), Xcode 26, Swift 6. Minimum
 hardware support is an Apple Silicon Mac with 8 GB or iPhone 15 Pro or newer; canonical benchmark
 hardware is separately defined as Mac mini M2 8 GB and iPhone 17 Pro.
-Stable macOS release: **Vocello 2.1.0**. iOS is on-device-capable on `main` but
-not yet distributed.
+Release identities live in [`project.yml`](../project.yml); at last review the
+stable macOS release is **Vocello 2.4.0** and iOS build 23 (v2.4.0) is live as a
+**public TestFlight beta** (both distribution groups).
 
 > Start with the canonical interactive [`project map`](project-map.html). For repo conventions,
 > build commands, engine invariants, and release process, read [`CLAUDE.md`](../CLAUDE.md).
@@ -487,7 +488,10 @@ records plan + execution + assembly + replacement evidence fail-closed, with sch
 readable only as a limited legacy summary. Resume reuses saved takes, single-segment regeneration
 appends revision-≥2 replacement lineage, and migration v5 History project columns group the joined
 output as one accepted row. Line-separated batch runs on the same sequential streaming path.
-iOS long-form remains a later arc. See
+Long-form v4 ships on both platforms: iOS runs the same planner-owned
+sequential-streaming design through `IOSLongFormProjectRunner` (one ordinary
+streaming take per segment, never a concurrent batch), with single-segment
+regeneration device-accepted 2026-08-01. See
 [`reference/long-form-generation.md`](reference/long-form-generation.md).
 
 ---

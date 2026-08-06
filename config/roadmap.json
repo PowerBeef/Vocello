@@ -125,12 +125,17 @@
       "id": "CM-6",
       "plan": "convergence-metal4-stage4-2026-08",
       "title": "MOS-proxy advisory column (UTMOSv2)",
-      "status": "parked",
-      "unparkWhen": "Only opportunistically, and only as a dev-lane advisory column. It must never become a gate or a publication input.",
+      "status": "done",
       "evidence": [
-        "doc:docs/reference/roadmap-2026-08.md"
+        "file:scripts/mos_advisory.py",
+        "file:scripts/tests/test_mos_advisory.py",
+        "file:docs/reference/testing-runbook.md"
       ],
-      "updated": "2026-08-01"
+      "updated": "2026-08-06",
+      "gate": "Unparked opportunistically 2026-08-06 within its own condition (dev-lane advisory column, never a gate or publication input) during a remote away-work window. Shipped: scripts/mos_advisory.py — UTMOSv2 MOS-proxy pinned by git commit (cc2700db57bb83ee13dc31ebe1b868c254e15d09) and weights SHA-256 (fail-closed on drift), CPU-only, lazy heavy imports so the offline unit suite (test_mos_advisory.py, registered in the self-test lane) runs without torch, peak RSS recorded per run, paired instructed-vs-neutral deltas and per-cell medians in the report, explicit gate:false in the schema. Live-exercised on an archived dp23 run: 4/4 takes scored (overall median MOS 3.33; e.g. happy.normal/quality 3.85), digest check green, peak RSS 3.6 GB — recorded so the 8 GB floor schedules it strictly after generation, per the runbook's ML-analyzers section. Advisory semantics documented in testing-runbook.md and the delivery-harness tool inventory: relative signal only (a synthetic-speech MOS predictor is domain-shifted for this engine), never absolute quality claims.",
+      "sourceOfTruth": [
+        "scripts/mos_advisory.py"
+      ]
     },
     {
       "id": "DP-1",

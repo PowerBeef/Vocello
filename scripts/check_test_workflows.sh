@@ -663,6 +663,7 @@ python3 -m unittest \
   scripts.tests.test_delivery_listening_session \
   scripts.tests.test_build_emotion_reference_bank \
   scripts.tests.test_emotion_advisory \
+  scripts.tests.test_mos_advisory \
   scripts.tests.test_clone_prosody_fidelity \
   scripts.tests.test_clone_fidelity_lane \
   scripts.tests.test_prosody_calibration \

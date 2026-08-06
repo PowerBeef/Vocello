@@ -9,7 +9,7 @@
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `convergence-metal4-stage4-2026-08` | active | backend-and-platform | 5/7 (71%) |
+| `convergence-metal4-stage4-2026-08` | active | backend-and-platform | 6/7 (86%) |
 | `delivery-prompting-2026-08` | active | backend-mlx | 20/23 (87%) |
 | `doc-governance-2026-08` | active | release-qa | 8/9 (89%) |
 | `macos-ui-2026-08` | complete | macos | 7/7 (100%) |
@@ -29,16 +29,13 @@ Narrative authority: [`docs/reference/roadmap-2026-08.md`](reference/roadmap-202
 | `CM-3` | declined | Gate 2 — Candidate A fused code-predictor kernel | `doc:docs/reference/roadmap-2026-08.md` |
 | `CM-4` | done | Long-form text-context carryover, text first | `commit:bd92a59`, `commit:59458bc`, `doc:docs/decisions/long-form-context-planning-v2.md`, `doc:docs/decisions/long-form-acoustic-carryover-experiment.md` |
 | `CM-5` | in-flight | Phone-gated evidence battery remainder | `doc:docs/reference/roadmap-2026-08.md` |
-| `CM-6` | parked | MOS-proxy advisory column (UTMOSv2) | `doc:docs/reference/roadmap-2026-08.md` |
+| `CM-6` | done | MOS-proxy advisory column (UTMOSv2) | `file:scripts/mos_advisory.py`, `file:scripts/tests/test_mos_advisory.py`, `file:docs/reference/testing-runbook.md` |
 | `CM-7` | done | Non-streaming CLI generation publishes no WAV while reporting success | `file:Sources/QwenVoiceCore/GenerationOutputAdapter.swift`, `file:Tests/VocelloCoreTests/GenerationTerminalCleanupTests.swift`, `file:Sources/VocelloCLI/GenerateCommand.swift`, `file:Sources/VocelloCLI/BatchCommand.swift` |
 
 ### Open items in detail
 
 - **`CM-5`** (in-flight) — Phone-gated evidence battery remainder.
   gate: One sitting with the phone unlocked and Auto-Lock Never; iOS control lanes re-run against the current artifacts. Surface note 2026-08-04: the iOS UI under test changed after this item was dated (2026-08-03/04 delivery roster cut, sectioned delivery sheet, bank Delivery chip), so the control-lane re-run also observes the delivery/bank UI; the artifacts themselves are unchanged.
-
-- **`CM-6`** (parked) — MOS-proxy advisory column (UTMOSv2).
-  unparkWhen: Only opportunistically, and only as a dev-lane advisory column. It must never become a gate or a publication input.
 
 ## Delivery instruction quality and Qwen3-TTS prompting
 

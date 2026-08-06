@@ -116,6 +116,18 @@ each analyzer records its measured peak RSS in its report (SER ≈ 2.4 GB).
 Unit tests inject fake classifiers/embedders, so the deterministic suites
 never import torch.
 
+`scripts/mos_advisory.py` (CM-6) adds a naturalness MOS-proxy column with the
+same advisory semantics: UTMOSv2 pinned by git commit and weights SHA-256
+(fail-closed on drift), CPU-only, peak RSS recorded (≈ 3.6 GB — schedule
+accordingly on the 8 GB floor). Install with
+`.venv/bin/pip install "utmosv2 @ git+https://github.com/sarulab-speech/UTMOSv2.git@cc2700db57bb83ee13dc31ebe1b868c254e15d09"`;
+the library's own weight downloader shells out to `wget` (absent here), so
+fetch the pinned checkpoint with
+`curl -sL -o ~/.cache/utmosv2/models/fusion_stage3/fold0_s42_best_model.pth https://huggingface.co/sarulab-speech/UTMOSv2/resolve/main/fold0_s42_best_model.pth`.
+Treat the column as relative signal only (take-vs-take, instructed-vs-neutral,
+build-vs-build): a synthetic-speech MOS predictor is domain-shifted for this
+engine's audio, and the score is never a gate or a publication input.
+
 ## Listening calibration session (operator-local)
 
 `scripts/delivery_listening_session.py` builds, runs, and scores the blind

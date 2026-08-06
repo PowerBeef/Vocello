@@ -29,6 +29,7 @@ the script self-test suite via `scripts/check_test_workflows.sh`.
 | `scripts/delivery_listening_session.py` | Build / run / score the blind 2AFC + free-identification listening session from bench archives; sealed keys, pre-registered exact-binomial decision rules | `test_delivery_listening_session.py` |
 | `scripts/build_emotion_reference_bank.py` | Generate → score → select → enroll curated per-emotion VoiceDesign reference banks (design-then-clone) → [`emotion-reference-banks.md`](emotion-reference-banks.md) | `test_build_emotion_reference_bank.py` |
 | `scripts/emotion_advisory.py` | Advisory SER agreement column (pinned wav2vec2-XLSR checkpoint + revision); never a gate, never publication input → [`testing-runbook.md`](testing-runbook.md) | `test_emotion_advisory.py` |
+| `scripts/mos_advisory.py` | Advisory naturalness MOS-proxy column (UTMOSv2 pinned by commit + weights digest, CPU, relative signal only); never a gate, never publication input → [`testing-runbook.md`](testing-runbook.md) | `test_mos_advisory.py` |
 | `scripts/delivery_adherence.py` | Standalone paired neutral-vs-instructed adherence bench (drives `vocello generate` itself) | none |
 | `scripts/delivery_quality_gate.py` | Per-preset delivery-adherence verdict + neutral-cohort dispersion, thresholds from the versioned prosody profile | `test_delivery_quality_gate.py` |
 | `scripts/delivery_statistics.py` | Library: Wilcoxon, Cohen's d_z, BCa bootstrap, Wilson, Benjamini-Hochberg, required-pairs power | `test_delivery_statistics.py` |

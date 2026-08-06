@@ -88,6 +88,7 @@ enum IOSDeviceDiagnosticsRunner {
             environmentKey,
             memoryQualificationEnvironmentKey,
             speechAssetLocalesEnvironmentKey,
+            enrollVoiceNameEnvironmentKey,
         ]
         #if QVOICE_DEVICE_DIAGNOSTICS
         keys.append(cloneConditioningAcceptanceEnvironmentKey)

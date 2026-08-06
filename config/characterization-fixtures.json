@@ -30,8 +30,8 @@
       "expectedTokenBudgetClass": "short",
       "longFormManifestSchema": null,
       "representativeWarmWAVDigest": {
-        "macosCLI": "a11bfe48391c849c71f5bd21d1aaf3076d21537517a8cc64e225ecc5bc1b538b",
-        "iosUI": "9336eb0fdda4c77c9f19548daf5de3a7ff84cadea27fd16191f4b6a62eb421d4"
+        "macosCLI": "3ca43444edf35e4fb8fcc782c45b7dc8f742e2e76a4e645c3597b557f3b21207",
+        "iosUI": "9acbafe6a83ba2b542ec1bbd3d832e710eaa935b48ea5500d8d211c30880f2e7"
       },
       "notes": "BenchMatrixSpec short corpus. Exact prompt text stays out of tracked fixtures; live controls bind promptDigest and representative warm WAV digests."
     },
@@ -50,8 +50,8 @@
       "expectedTokenBudgetClass": "short",
       "longFormManifestSchema": null,
       "representativeWarmWAVDigest": {
-        "macosCLI": "7b9da9465c2deb7b7cb9ffa82ccb99eee1dae71dca3160f92aba712d379a5caa",
-        "iosUI": "870ae262d6ae5dc206185a9cfced0339ede093431fdc0a72d1e7d4511fe69844"
+        "macosCLI": "563a8d538400fd54094b34f7702c1bbe0adaf10019a6357d644b563120aa19f3",
+        "iosUI": "02fe8b7d3878f779bcb9ea47ab0fd2f5d7b8aca5cf3d6eb95c4366abedd3cb82"
       },
       "notes": "Same short corpus as Custom with Design chunk frames (7/14)."
     },
@@ -70,8 +70,8 @@
       "expectedTokenBudgetClass": "short",
       "longFormManifestSchema": null,
       "representativeWarmWAVDigest": {
-        "macosCLI": "f1fc5620a26bdcd9bb03b5269f553e392b44706091f3d230039ad2a76dbcc493",
-        "iosUI": "8a2baa4ba1bec9f4b7c54d936479d575321db805a1ab0ec9d73d0514ec5b033e"
+        "macosCLI": "3b68e8f5af30f2903cd12792758ff5f4ebb26c096d873fc2f3bc714aca179cdd",
+        "iosUI": "f77b6db8e297ab06600429845603494534127a94731c11bda35c11e5fa5c9c2f"
       },
       "notes": "Same short corpus; conditioning digests come from live prepared voices."
     },
@@ -282,11 +282,11 @@
     }
   ],
   "liveEvidencePending": [],
-  "rebindAt": "2026-08-01",
-  "artifactVersion": "2026.07.26.1",
+  "rebindAt": "2026-08-06",
+  "artifactVersion": "2026.08.01.1",
   "rebindSources": {
-    "macosCLI": "macos-engine-20260729-005023-933281cb (phase0-cli-control-1)",
-    "iosUI": "ios-xcui-benchmark-20260801-130748-c3630f44 (phase0-ios-control-3, schema v3)"
+    "macosCLI": "macos-engine-20260806-143201-f3512027 (phase0-cli-control-3, schema v3; first warm take per promoted cell)",
+    "iosUI": "ios-xcui-benchmark-20260806-135457-1d545686 (phase0-ios-control-3, schema v3; first warm take per promoted cell)"
   },
-  "rebindNotes": "Representative warm digests rebound to the 2026.07.26.1 artifacts. Mid-battery engine deltas between the macOS/CLI controls (2026-07-29) and the iOS controls (2026-08-01): clone-prime reroute (removes a transient iOS memory spike; strictly better), single-take spoken-text normalization (proven identity on the bench corpus), and delivery-preset text changes (controls carry no delivery cells). Generation semantics, sampling algorithm v2, and seeds are untouched, so cross-platform comparability holds; prime-side timings differ."
+  "rebindNotes": "Representative warm digests rebound to the 2026.08.01.1 artifacts (f16 speech tokenizer): the half-precision codec renders waveforms at 55-58 dB SNR versus fp32, so every control WAV digest legitimately moves. Both platforms' controls were minted the same day (2026-08-06) with no mid-battery engine deltas; the swift-transformers 1.1.9->1.3.3 bump is tokenization-proven byte-identical on the bench corpus (48/48 paired A/B, PR #94), controls carry no delivery cells, and sampling algorithm v2 and seeds are untouched. Device note: the phone's app container was found reset during this window — the Clone Speed package was re-delivered through the product download path and the benchmark fixture voice re-enrolled headlessly from the archived reference (staged audio SHA-256 03187893a3d82d38264d433f24828982c67ed42cddb71eefccb776b37ab9fe35, matching every banked control record's fixtureDigest), so the clone identity is continuous across the reset."
 }

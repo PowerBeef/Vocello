@@ -10,9 +10,9 @@
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
 | `compliance-2026-08` | active | release-qa | 0/2 (0%) |
-| `convergence-metal4-stage4-2026-08` | active | backend-and-platform | 6/7 (86%) |
 | `delivery-prompting-2026-08` | active | backend-mlx | 20/23 (87%) |
 | `doc-governance-2026-08` | active | release-qa | 8/9 (89%) |
+| `convergence-metal4-stage4-2026-08` | complete | backend-and-platform | 7/7 (100%) |
 | `macos-ui-2026-08` | complete | macos | 7/7 (100%) |
 
 ## EU AI Act Article 50 readiness
@@ -35,29 +35,6 @@ Narrative authority: [`docs/reference/eu-ai-act-article50-assessment.md`](refere
 
 - **`CP-2`** (in-flight) — AudioSeal watermark validation spike, then MLX-Swift port (option C).
   gate: Maintainer go 2026-08-06 ('test and implement this now'). STAGE 1 PRE-REGISTERED acceptance criteria, fixed before any embedding run — Python validation on the banked 24 kHz bench-archive corpus using pinned audioseal + pinned HF weights, engine idle (8 GB rule): (1) DETECTION: detector TPR = 1.0 on marked and FPR = 0.0 on clean takes at the default 0.5 threshold across the corpus; (2) INAUDIBILITY PROXY: per-take analyze_delivery + analyze_prosody metric deltas between marked and unmarked within analyzer noise (no delivery/prosody gate flag changes), SI-SNR of the watermark delta >= 20 dB; (3) QC-PROXY NEUTRALITY: prosody_quality_gate verdicts unchanged marked vs unmarked on every take (the Swift Fast-QC neutrality proof lands with the port stage); (4) ROBUSTNESS through real share paths: detection still fires after afconvert AAC 128 kbps round-trip, 16 kHz resample, +/-3 dB gain, and a 1 s head trim; (5) DETERMINISM: repeated embedding of the same input is byte-identical; (6) PERFORMANCE: embed wall time faster than realtime on CPU with peak RSS recorded; (7) the model card's native-24 kHz claim verified (else the 16 kHz delta-resample design is recorded as required). STAGE 2 (on stage-1 pass): MLX-Swift port of the generator reusing the owned MLXAudioCodecs SEANet primitives, integrated as a deterministic post-process at the output-adapter publication seam, default-on for published WAVs, with memory-qualified benchmark evidence and Swift Fast-QC neutrality before any release. A stage-1 failure on any criterion is recorded honestly and stops stage 2 pending redesign. STAGE-1 RESULTS 2026-08-06 (run as registered; 24-take corpus: one full dp22 normal-tier run plus whisper/sad/angry/fearful strong takes; audioseal 0.2.0 pinned, generator 14.7M/detector 8.6M params, weights fetched from facebook/audioseal): ALL SEVEN CRITERIA PASS. (1) Detection TPR 1.0 (min marked prob 1.0), FPR 0.0 (max clean prob 0.032). (2) Inaudibility: SI-SNR min 25.5 dB / median 29.5 dB; worst per-take F0-median analyzer delta 4.3 Hz with zero delivery/prosody verdict changes. (3) QC-proxy neutrality: prosody gate parity on 24/24. (4) Robustness: worst detection 0.997 after AAC-64k mono round-trip, 1.0 after +/-3 dB gain, 0.984 after 1 s head trim; the 16 kHz chain reads 0.0 if detected at 16 kHz but 0.997+ under the standard verifier protocol of resampling suspect audio back to the 24 kHz embed rate — recorded as a required detection-protocol note for any verify tooling. (5) Deterministic embeds, byte-identical. (6) Performance: 14.5x realtime embedding on CPU (a 6 s take costs ~0.4 s); peak RSS 1.42 GB under PyTorch (the MLX port carries only 56 MB of weights). (7) Native 24 kHz embedding confirmed — no resample-delta design needed (AudioSeal 0.2 semantics: no internal resampling; rates must be handled explicitly). Stage 2 (MLX-Swift port at the output-adapter publication seam) proceeds per the registered gate. STAGE-2 DESIGN CONSTRAINTS 2026-08-06 (maintainer-blessed; motivated by the iPhone 14 Pro 6 GB opportunity the recent memory work opened): ZERO-PEAK design — the embedding pass runs at publication strictly AFTER the post-take cache trim, on the CPU stream (never GPU wired pages), in 1-2 s streaming chunks with carried conv state (working set ~40-55 MB incl. fp16 weights, unwired, freed at pass end), with lazy per-publication weight load-and-drop on 6 GB-class devices. The take lifecycle's peak footprint must be UNCHANGED: the qualification lane asserts peak equality with the pre-watermark baseline within sampler noise, fail-closed. Embedding during generation (AudioSeal streaming mode) is REJECTED with reason: it adds weights+state on top of the generation peak — the wrong direction for the 6 GB goal — accepting the residual costs instead: ~1-2 s iPhone file-ready latency post-take, 29 MB on-disk catalog asset, unmarked live preview (the published file is the legal boundary). fp16 weights require the added parity criterion (detector probability + SI-SNR hold at half precision) before adoption. STAGE-2 PROGRESS 2026-08-06 (pieces 1-2 landed, 2729ce4 + 5ba9c78): the MLX-Swift port is complete and parity-exact — MLXAudioMark target in the owned package (lineage MARK-001, capability audio-marking, state internal), whole-buffer output >=40 dB SNR against the PyTorch reference on protocol fixtures, and the shipping exact-streaming windowed path (windowed convs + full-sequence frame-rate LSTMs, bounded activations) >=55 dB against whole-buffer; the reference detector scores Swift-marked real Vocello speech 1.0000 (clean 0.001) with the fixed 0x56C0 payload decoding exactly at SI-SNR 29.6 dB. Design notes locked by evidence: naive per-window embedding with cold LSTMs degraded detection to 0.28-0.46 and was replaced by the exact decomposition; the upstream get_watermark API draws a random message per process, so the fixed payload is mandatory for determinism. Piece 2: WAVProvenanceChunk (LIST/INFO ISFT+ICMT machine-readable statement, RIFF-size patch, PCM untouched, read-back helper, five core tests) — built but deliberately not applied at publication yet. REMAINING (piece 3, next window): catalog delivery of the fused weights as a required shared component, publication-seam wiring (watermark then metadata then QC) flipping both marks together, registered debug knob for the dev path, memory-qualified macOS bench with peak-equality assertion, Swift Fast-QC live neutrality, docs; then iOS device acceptance queues with CM-5 for phone access.
-
-## Convergence residuals, Metal 4 study, and Stage 4
-
-`convergence-metal4-stage4-2026-08` · **active** · backend-and-platform · adopted 2026-07-31
-
-Close the open contract-phase residuals, work through the phone-gated evidence battery, and take Stage 4 as revised by the Metal 4 tensor feasibility study. Interleaved by cost; no item implies a release.
-
-Narrative authority: [`docs/reference/roadmap-2026-08.md`](reference/roadmap-2026-08.md)
-
-| Item | Status | Title | Evidence |
-| --- | --- | --- | --- |
-| `CM-1` | done | Stage 4 mlx pin bump to the newest lockstep pair | `commit:19ea7e8`, `doc:docs/reference/roadmap-2026-08.md` |
-| `CM-2` | declined | P1b static-shape talker compile | `doc:docs/reference/roadmap-2026-08.md` |
-| `CM-3` | declined | Gate 2 — Candidate A fused code-predictor kernel | `doc:docs/reference/roadmap-2026-08.md` |
-| `CM-4` | done | Long-form text-context carryover, text first | `commit:bd92a59`, `commit:59458bc`, `doc:docs/decisions/long-form-context-planning-v2.md`, `doc:docs/decisions/long-form-acoustic-carryover-experiment.md` |
-| `CM-5` | in-flight | Phone-gated evidence battery remainder | `doc:docs/reference/roadmap-2026-08.md` |
-| `CM-6` | done | MOS-proxy advisory column (UTMOSv2) | `file:scripts/mos_advisory.py`, `file:scripts/tests/test_mos_advisory.py`, `file:docs/reference/testing-runbook.md` |
-| `CM-7` | done | Non-streaming CLI generation publishes no WAV while reporting success | `file:Sources/QwenVoiceCore/GenerationOutputAdapter.swift`, `file:Tests/VocelloCoreTests/GenerationTerminalCleanupTests.swift`, `file:Sources/VocelloCLI/GenerateCommand.swift`, `file:Sources/VocelloCLI/BatchCommand.swift` |
-
-### Open items in detail
-
-- **`CM-5`** (in-flight) — Phone-gated evidence battery remainder.
-  gate: One sitting with the phone unlocked and Auto-Lock Never; iOS control lanes re-run against the current artifacts. Surface note 2026-08-04: the iOS UI under test changed after this item was dated (2026-08-03/04 delivery roster cut, sectioned delivery sheet, bank Delivery chip), so the control-lane re-run also observes the delivery/bank UI; the artifacts themselves are unchanged.
 
 ## Delivery instruction quality and Qwen3-TTS prompting
 
@@ -128,6 +105,24 @@ Narrative authority: [`docs/reference/repository-self-verification.md`](referenc
 
 - **`DG-4`** (planned) — Phase 3 — source bindings on active documents.
   gate: Annotated incrementally as documents are touched; a binding invented in bulk without reading the document is worse than none.
+
+## Convergence residuals, Metal 4 study, and Stage 4
+
+`convergence-metal4-stage4-2026-08` · **complete** · backend-and-platform · adopted 2026-07-31
+
+Close the open contract-phase residuals, work through the phone-gated evidence battery, and take Stage 4 as revised by the Metal 4 tensor feasibility study. Interleaved by cost; no item implies a release.
+
+Narrative authority: [`docs/reference/roadmap-2026-08.md`](reference/roadmap-2026-08.md)
+
+| Item | Status | Title | Evidence |
+| --- | --- | --- | --- |
+| `CM-1` | done | Stage 4 mlx pin bump to the newest lockstep pair | `commit:19ea7e8`, `doc:docs/reference/roadmap-2026-08.md` |
+| `CM-2` | declined | P1b static-shape talker compile | `doc:docs/reference/roadmap-2026-08.md` |
+| `CM-3` | declined | Gate 2 — Candidate A fused code-predictor kernel | `doc:docs/reference/roadmap-2026-08.md` |
+| `CM-4` | done | Long-form text-context carryover, text first | `commit:bd92a59`, `commit:59458bc`, `doc:docs/decisions/long-form-context-planning-v2.md`, `doc:docs/decisions/long-form-acoustic-carryover-experiment.md` |
+| `CM-5` | done | Phone-gated evidence battery remainder | `doc:docs/reference/roadmap-2026-08.md`, `file:benchmarks/runs/engine-generation/macos-engine-20260806-142908-12599e2c.json`, `file:benchmarks/runs/engine-generation/macos-engine-20260806-143035-941b0ea5.json`, `file:benchmarks/runs/engine-generation/macos-engine-20260806-143201-f3512027.json`, `file:benchmarks/runs/ui-generation/ios-xcui-benchmark-20260806-135457-1d545686.json`, `file:benchmarks/runs/ui-generation/ios-xcui-benchmark-20260806-141150-97c286b1.json`, `file:benchmarks/runs/memory-qualification/mac-memory-qualification-20260806-143414-d4284646.json`, `file:config/characterization-fixtures.json`, `file:Sources/iOS/IOSDeviceDiagnosticsRunner.swift` |
+| `CM-6` | done | MOS-proxy advisory column (UTMOSv2) | `file:scripts/mos_advisory.py`, `file:scripts/tests/test_mos_advisory.py`, `file:docs/reference/testing-runbook.md` |
+| `CM-7` | done | Non-streaming CLI generation publishes no WAV while reporting success | `file:Sources/QwenVoiceCore/GenerationOutputAdapter.swift`, `file:Tests/VocelloCoreTests/GenerationTerminalCleanupTests.swift`, `file:Sources/VocelloCLI/GenerateCommand.swift`, `file:Sources/VocelloCLI/BatchCommand.swift` |
 
 ## macOS UI performance harness, measured review, and staged refresh
 

@@ -79,8 +79,8 @@ Stage 4 closed with the kept 0.31.6 pin bump. **v2.3.0 was cut 2026-07-31 and v2
 spoken-text normalization, and the runtime refresh — macOS published, iOS build 23
 distributed to both TestFlight groups with review submitted. The f16 codec promotion
 (artifactVersion 2026.08.01.1) landed post-release; users receive it when the next app
-release bundles the new catalog, and its fixture rebind + delivery proof + memory
-re-qualification ride that release's battery. The battery on the 2026.07.26.1 artifacts is more than
+release bundles the new catalog. Its fixture rebind and memory re-qualification closed
+2026-08-06 (finding 27, CM-5); the promotion's own delivery evidence is recorded in §R. The battery on the 2026.07.26.1 artifacts is more than
 half banked, and its device lanes surfaced and shipped real fixes along the way:
 
 - **Banked (committed, PASS):** three clean CLI engine controls (the first schema-v3
@@ -126,8 +126,9 @@ performance block after the fixture rebind, Tier 4 carryover). Immediate specifi
    exploratory-only by policy) and the iOS studio marketing recapture (README +
    website now show the completed-player state via the new opt-in
    `VocelloiOSMarketingCaptureUITests`). Desktop fixture staging is cleaned up;
-   the two 656 KB staged reference files in the phone's app Documents await a
-   quick manual Files-app deletion (devicectl has no remove operation).
+   the two 656 KB staged reference files in the phone's app Documents were
+   later found gone with the rest of the app container (finding 27) — that
+   cleanup rider is moot.
 2. **v2.3.0 released 2026-07-31** (maintainer call): the combined 2.2-promotion + Stage 1
    story is the headline (up to ~10% faster warm, ~280 MB less memory, ~1 GB smaller Speed
    footprint); notes in [`docs/releases/v2.3.0.md`](releases/v2.3.0.md) with the standing
@@ -531,6 +532,31 @@ performance block after the fixture rebind, Tier 4 carryover). Immediate specifi
    solid at any tier, doubly refuting the 1.15 intensity scale; fearful's
    two tier copies render different emotions (anxious-slow vs panic-fast),
    not scaled intensity.
+
+27. **The f16 evidence battery closed in one phone sitting (2026-08-06, CM-5
+   done; plan `convergence-metal4-stage4-2026-08` complete):** the control
+   lanes re-ran against the 2026.08.01.1 artifacts on the canonical
+   iPhone 17 Pro (iOS 26.6) — CLI control trio
+   (`macos-engine-20260806-142908/143035/143201`), iOS control 3 and the
+   canonical filter-free matrix (`ios-xcui-benchmark-20260806-135457`,
+   `ios-xcui-benchmark-20260806-141150`, both schema v3, soft-trim-only),
+   and the macOS retained-memory re-qualification
+   (`mac-memory-qualification-20260806-143414`, PASS; iOS memory evidence
+   stands on the 2026-08-02 f16 runs). Both control evaluators PASS over
+   the five records, and `config/characterization-fixtures.json` is
+   rebound to 2026.08.01.1 with same-day cross-platform digests. The
+   sitting kept the battery tradition of surfacing real defects: the
+   headless `enroll-clone-fixture` lane shipped 2026-08-01 with its
+   environment key missing from `IOSDeviceDiagnosticsRunner.isRequested`,
+   so its first live run could never enter the enrollment branch — fixed
+   and live-proven in the same window (the fixture voice re-enrolled at
+   the exact banked `fixtureDigest`, keeping clone identity continuous).
+   Honest device finding: the phone's app container had been reset since
+   2026-08-02 (Clone Speed package, enrolled voice, and the two staged
+   reference files all gone — that cleanup rider is moot); recovery used
+   the product's own download path plus the fixed headless enrollment,
+   and the new delivery/bank UI was observed by both UI lanes as the
+   2026-08-04 surface note anticipated.
 
 ## Staged roadmap state
 

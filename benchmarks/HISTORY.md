@@ -571,6 +571,14 @@ cross-project comparisons.
 |---|---|---|---|---|---|---:|---|---|---|---|
 | 2026-08-06 | [`macos-engine-20260806-000534-9b713efa`](runs/engine-generation/macos-engine-20260806-000534-9b713efa.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 8 | `d8e31ffe4957` | `9d1f0fab80dc` | baseline | dp23-crosstier |
 
+## engine-generation / macos / mac-mini-m2-8gb / config `9f7184673cf3`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---|---|---|---|
+| 2026-08-06 | [`macos-engine-20260806-142908-12599e2c`](runs/engine-generation/macos-engine-20260806-142908-12599e2c.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 32 | `a2f01c95b089` dirty | `excluded` | baseline | phase0-cli-control-1 |
+| 2026-08-06 | [`macos-engine-20260806-143035-941b0ea5`](runs/engine-generation/macos-engine-20260806-143035-941b0ea5.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 32 | `a2f01c95b089` dirty | `excluded` | baseline | phase0-cli-control-2 |
+| 2026-08-06 | [`macos-engine-20260806-143201-f3512027`](runs/engine-generation/macos-engine-20260806-143201-f3512027.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 32 | `a2f01c95b089` dirty | `excluded` | baseline | phase0-cli-control-3 |
+
 ## engine-generation / macos / mac-mini-m2-8gb / config `9fa2f2bc02c8`
 
 | completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
@@ -922,6 +930,12 @@ cross-project comparisons.
 |---|---|---|---|---|---|---:|---|---|---|---|
 | 2026-07-15 | [`mac-memory-qualification-20260715-142146-84663e70`](runs/memory-qualification/mac-memory-qualification-20260715-142146-84663e70.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 11 | `247b266b0f1c` | `0efe7c615c69` | baseline | owned-core-retained-247b266 |
 
+## memory-qualification / macos / mac-mini-m2-8gb / config `2db9b5d8c68d`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---|---|---|---|
+| 2026-08-06 | [`mac-memory-qualification-20260806-143414-d4284646`](runs/memory-qualification/mac-memory-qualification-20260806-143414-d4284646.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 11 | `a2f01c95b089` dirty | `excluded` | baseline | retained-check |
+
 ## memory-qualification / macos / mac-mini-m2-8gb / config `3ec69e66d20e`
 
 | completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
@@ -978,6 +992,12 @@ cross-project comparisons.
 | 2026-07-20 | [`ios-xcui-benchmark-20260720-063420-e0258f45`](runs/ui-generation/ios-xcui-benchmark-20260720-063420-e0258f45.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | `0d4eac8b336b` | `35a3b94d3ba6` | vs ios-xcui-benchmark-20260720-061732-10df7fd1: RTF -0.2%, RAM -0.2% | phase0-ios-control-2 |
 | 2026-07-20 | [`ios-xcui-benchmark-20260720-164844-5f6e9240`](runs/ui-generation/ios-xcui-benchmark-20260720-164844-5f6e9240.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 32 | `0d4eac8b336b` dirty | `excluded` | baseline | phase0-ios-control-3 |
 
+## ui-generation / ios / iphone-17-pro / config `410479be8ae2`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---|---|---|---|
+| 2026-08-06 | [`ios-xcui-benchmark-20260806-141150-97c286b1`](runs/ui-generation/ios-xcui-benchmark-20260806-141150-97c286b1.json) | canonical | exploratory | passedWithWarnings | qualified-with-warnings | 29 | `a2f01c95b089` dirty | `excluded` | baseline | ios-xcui-benchmark-20260806-141150-97c286b1 |
+
 ## ui-generation / ios / iphone-17-pro / config `4b53e59b2bf6`
 
 | completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
@@ -1027,6 +1047,12 @@ cross-project comparisons.
 | completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
 |---|---|---|---|---|---|---:|---|---|---|---|
 | 2026-07-12 | [`ios-xcui-benchmark-20260712-202308-154fbe92`](runs/ui-generation/ios-xcui-benchmark-20260712-202308-154fbe92.json) | canonical | exploratory | passed | memory-contract-incomplete | 29 | `1ef1669326b5` dirty | `excluded` | baseline | telemetry-v7-full-final |
+
+## ui-generation / ios / iphone-17-pro / config `a291160fc9bc`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---|---|---|---|
+| 2026-08-06 | [`ios-xcui-benchmark-20260806-135457-1d545686`](runs/ui-generation/ios-xcui-benchmark-20260806-135457-1d545686.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 32 | `a2f01c95b089` dirty | `excluded` | baseline | phase0-ios-control-3 |
 
 ## ui-generation / ios / iphone-17-pro / config `b618272db7b3`
 

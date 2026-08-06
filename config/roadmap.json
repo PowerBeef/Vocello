@@ -5,7 +5,7 @@
     {
       "id": "convergence-metal4-stage4-2026-08",
       "title": "Convergence residuals, Metal 4 study, and Stage 4",
-      "status": "active",
+      "status": "complete",
       "owner": "backend-and-platform",
       "adopted": "2026-07-31",
       "goal": "Close the open contract-phase residuals, work through the phone-gated evidence battery, and take Stage 4 as revised by the Metal 4 tensor feasibility study. Interleaved by cost; no item implies a release.",
@@ -123,12 +123,20 @@
       "id": "CM-5",
       "plan": "convergence-metal4-stage4-2026-08",
       "title": "Phone-gated evidence battery remainder",
-      "status": "in-flight",
-      "gate": "One sitting with the phone unlocked and Auto-Lock Never; iOS control lanes re-run against the current artifacts. Surface note 2026-08-04: the iOS UI under test changed after this item was dated (2026-08-03/04 delivery roster cut, sectioned delivery sheet, bank Delivery chip), so the control-lane re-run also observes the delivery/bank UI; the artifacts themselves are unchanged.",
+      "status": "done",
+      "gate": "One sitting with the phone unlocked and Auto-Lock Never; iOS control lanes re-run against the current artifacts. Surface note 2026-08-04: the iOS UI under test changed after this item was dated (2026-08-03/04 delivery roster cut, sectioned delivery sheet, bank Delivery chip), so the control-lane re-run also observes the delivery/bank UI; the artifacts themselves are unchanged. CLOSED 2026-08-06: the f16 (2026.08.01.1) control-lane re-run completed in one sitting on the canonical iPhone 17 Pro. Records: phase0-cli-control-1..3 (macos-engine-20260806-142908/143035/143201), phase0-ios-control-3 (ios-xcui-benchmark-20260806-135457-1d545686, schema v3, 32 takes), the canonical filter-free matrix (ios-xcui-benchmark-20260806-141150-97c286b1, schema v3, 29 takes), and the macOS retained-memory re-qualification (mac-memory-qualification-20260806-143414-d4284646, PASS; iOS memory evidence stands on the 2026-08-02 f16 runs). Both control evaluators PASS over the five new records and config/characterization-fixtures.json is rebound to 2026.08.01.1 with same-day cross-platform digests (no mid-battery deltas; the delivery/bank UI was observed by both UI lanes per the 2026-08-04 surface note). The window surfaced and shipped one real fix in the battery tradition: the headless enroll-clone-fixture lane's environment key was missing from IOSDeviceDiagnosticsRunner.isRequested, so its first live run could never enter the enrollment branch — fixed and live-proven (the fixture voice re-enrolled at the exact banked fixtureDigest 03187893a3d8...). Honest device finding: the phone's app container had been reset since 2026-08-02 (Clone Speed package, enrolled fixture voice, and staged reference files gone); recovery used the product download path plus the fixed headless enrollment, and the staged-file cleanup rider is moot.",
       "evidence": [
-        "doc:docs/reference/roadmap-2026-08.md"
+        "doc:docs/reference/roadmap-2026-08.md",
+        "file:benchmarks/runs/engine-generation/macos-engine-20260806-142908-12599e2c.json",
+        "file:benchmarks/runs/engine-generation/macos-engine-20260806-143035-941b0ea5.json",
+        "file:benchmarks/runs/engine-generation/macos-engine-20260806-143201-f3512027.json",
+        "file:benchmarks/runs/ui-generation/ios-xcui-benchmark-20260806-135457-1d545686.json",
+        "file:benchmarks/runs/ui-generation/ios-xcui-benchmark-20260806-141150-97c286b1.json",
+        "file:benchmarks/runs/memory-qualification/mac-memory-qualification-20260806-143414-d4284646.json",
+        "file:config/characterization-fixtures.json",
+        "file:Sources/iOS/IOSDeviceDiagnosticsRunner.swift"
       ],
-      "updated": "2026-08-04"
+      "updated": "2026-08-06"
     },
     {
       "id": "CM-6",

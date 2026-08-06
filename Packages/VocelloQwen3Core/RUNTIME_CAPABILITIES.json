@@ -237,6 +237,24 @@
       "upstreamDeltaIDs": [
         "PKG-001"
       ]
+    },
+    {
+      "id": "audio-marking",
+      "title": "AudioSeal watermark generator (Article 50 machine-readable marking)",
+      "state": "internal",
+      "sourcePatterns": [
+        "Sources/MLXAudioMark/**"
+      ],
+      "testPatterns": [
+        "Tests/Qwen3RuntimeTests/AudioSealParityTests.swift"
+      ],
+      "documentation": [
+        "PATCHES.json"
+      ],
+      "evidenceClass": "static",
+      "upstreamDeltaIDs": [
+        "MARK-001"
+      ]
     }
   ]
 }

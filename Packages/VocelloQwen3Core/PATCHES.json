@@ -391,6 +391,28 @@
       "upstreamDisposition": "local-only",
       "upstreamEquivalentCommit": null,
       "removalCriteria": "Remove only if the streaming loop stops replaying a fixed per-frame code-predictor position sequence (which the pass-indexed traces require) or an upstream compiled equivalent ships."
+    },
+    {
+      "id": "MARK-001",
+      "title": "AudioSeal watermark generator port (EU AI Act Article 50 marking)",
+      "category": "architecture",
+      "state": "active",
+      "files": [
+        "Sources/MLXAudioMark/AudioSealGenerator.swift"
+      ],
+      "tests": [
+        "Tests/Qwen3RuntimeTests/AudioSealParityTests.swift"
+      ],
+      "documentation": [
+        "PATCHES.json"
+      ],
+      "evidenceClass": "static",
+      "benchmarkRecordIDs": [],
+      "benchmarkEvidenceStatus": "unverified",
+      "benchmarkEvidenceReason": "Numerical parity is the governing evidence: whole-buffer output matches the PyTorch reference (facebookresearch/audioseal @ cc2700db, MIT) at >=40 dB SNR on committed-protocol fixtures, the exact-streaming windowed path matches whole-buffer at >=55 dB, and the reference detector scores Swift-marked real speech 1.0000 with the fixed 0x56C0 payload decoding exactly (CP-2 stage-2 evidence, 2026-08-06). Memory-qualified benchmarks arrive with the publication-seam integration.",
+      "upstreamDisposition": "local-only",
+      "upstreamEquivalentCommit": null,
+      "removalCriteria": "Remove only if Vocello adopts a different Article 50 marking layer or upstream mlx-audio-swift ships an equivalent watermark generator."
     }
   ]
 }

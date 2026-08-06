@@ -44,6 +44,7 @@ let package = Package(
             dependencies: [
                 "MLXAudioCore",
                 "MLXAudioTTS",
+                "MLXAudioMark",
                 .product(name: "MLX", package: "mlx-swift"),
                 .product(name: "MLXLMCommon", package: "mlx-swift-lm"),
                 .product(name: "HuggingFace", package: "swift-huggingface"),
@@ -80,6 +81,17 @@ let package = Package(
             path: "Sources/MLXAudioCodecs"
         ),
 
+        // MARK: - MLXAudioMark
+        // AudioSeal watermark generator (EU AI Act Article 50 marking; CP-2).
+        // Self-contained SEANet port over MLX; consumed through the facade.
+        .target(
+            name: "MLXAudioMark",
+            dependencies: [
+                .product(name: "MLX", package: "mlx-swift"),
+            ],
+            path: "Sources/MLXAudioMark"
+        ),
+
         // MARK: - MLXAudioTTS
         .target(
             name: "MLXAudioTTS",
@@ -105,6 +117,7 @@ let package = Package(
                 "MLXAudioCore",
                 "MLXAudioCodecs",
                 "MLXAudioTTS",
+                "MLXAudioMark",
                 .product(name: "MLX", package: "mlx-swift"),
                 .product(name: "MLXLMCommon", package: "mlx-swift-lm"),
             ],

@@ -208,7 +208,7 @@
     },
     {
       "path": "Package.swift",
-      "sha256": "16c54187348f033034ad5b662dd0f058fbd29410c689bbe7fc88a839cb695c57",
+      "sha256": "6521a17d5dfd34ad17eb09785719caa1dd7f620a49014c1c4f4e513362583bb4",
       "upstreamStatus": "modified"
     },
     {
@@ -250,6 +250,11 @@
       "path": "Sources/MLXAudioCore/ModelUtils.swift",
       "sha256": "170ebf94c0e9b2d1bda65e915d30d7d64604fb750c49dc3194e9a147e08736fc",
       "upstreamStatus": "modified"
+    },
+    {
+      "path": "Sources/MLXAudioMark/AudioSealGenerator.swift",
+      "sha256": "271dabe512c90a108a05a81bf2b4dc94f4c6bb9d9c3e5382afb4ad8675336e13",
+      "upstreamStatus": "added"
     },
     {
       "path": "Sources/MLXAudioTTS/Generation.swift",
@@ -367,6 +372,11 @@
       "upstreamStatus": "added"
     },
     {
+      "path": "Tests/Qwen3RuntimeTests/AudioSealParityTests.swift",
+      "sha256": "c50d3db173a09d109d1647867593b3d99f696e5a0bdc2990c4734a7c20da0778",
+      "upstreamStatus": "added"
+    },
+    {
       "path": "Tests/Qwen3RuntimeTests/ClassifiedGenerationSessionTests.swift",
       "sha256": "39ce2496721f08779cc31767b897cb56de41abaff6626688aa07d16bc8b5c61e",
       "upstreamStatus": "added"
@@ -427,11 +437,11 @@
     "Examples/**"
   ],
   "summary": {
-    "added": 25,
+    "added": 27,
     "identical": 37,
     "modified": 21,
     "removed": 0,
-    "retained": 83
+    "retained": 85
   },
   "upstreamBaselineSHA256": "08099111586a931f12b8d259938963ccdc8385d21009701779fea2ceb847c1c2"
 }

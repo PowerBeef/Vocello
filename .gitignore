@@ -75,3 +75,4 @@ benchmarks/**/*.dSYM/
 samples-*.jsonl
 **/diagnostics/
 .pytest_cache/
+.impeccable/

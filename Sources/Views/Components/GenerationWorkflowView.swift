@@ -147,7 +147,9 @@ struct WorkflowReadinessNote: View {
         .padding(.vertical, 2)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(title)
-        .accessibilityValue(isReady ? "ready=true" : "ready=false")
+        // Human-readable for VoiceOver; the XCUITest readiness wait matches
+        // "Ready" (capital R — "Waiting" must never contain it).
+        .accessibilityValue(isReady ? "Ready" : "Waiting")
         .optionalAccessibilityIdentifier(accessibilityIdentifier)
     }
 }
@@ -259,8 +261,8 @@ struct StudioSectionCard<Content: View>: View {
             .overlay(
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .stroke(
-                        AppTheme.cardStroke.opacity(0.20),
-                        lineWidth: 0.5
+                        AppTheme.cardStroke.opacity(0.12),
+                        lineWidth: 1.0
                     )
             )
     }
@@ -364,7 +366,7 @@ struct CompactConfigurationSection<Content: View>: View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             if let iconName {
                 Image(systemName: iconName)
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.body.weight(.semibold))
                     .foregroundStyle(accentColor)
             }
 
@@ -397,7 +399,7 @@ struct CompactConfigurationSection<Content: View>: View {
             RoundedRectangle(cornerRadius: panelCornerRadius, style: .continuous)
                 .fill(AppTheme.inlineFill.opacity(0.58))
             RoundedRectangle(cornerRadius: panelCornerRadius, style: .continuous)
-                .stroke(AppTheme.inlineStroke.opacity(0.12), lineWidth: 0.5)
+                .stroke(AppTheme.inlineStroke.opacity(0.08), lineWidth: 1.0)
         }
     }
 }
@@ -580,15 +582,42 @@ struct GenerationVariantSelector: View {
             HStack(alignment: .center, spacing: 8) {
                 variantLabel
                 variantControl
+                heavyBadge
             }
 
             VStack(alignment: .leading, spacing: 5) {
                 variantLabel
-                variantControl
+                HStack(alignment: .center, spacing: 8) {
+                    variantControl
+                    heavyBadge
+                }
             }
         }
         .fixedSize(horizontal: true, vertical: false)
         .help("Choose the Qwen3-TTS package for \(mode.displayName). Current status: \(statusCaption).")
+    }
+
+    // The memory-risk signal used to live only in this control's hover
+    // tooltip (the visible "Heavy" badge existed only in Settings), so an
+    // 8 GB user could switch to a risky package with no visible warning.
+    // Icon + label pairing keeps the no-color-only rule.
+    @ViewBuilder
+    private var heavyBadge: some View {
+        if let selectedModel,
+           modelManager.isHardwareRisky(selectedModel),
+           case .ready = modelManager.packagePresentation(for: selectedModel).kind {
+            HStack(spacing: 4) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.caption2)
+                Text("Heavy")
+                    .font(.caption2.weight(.semibold))
+            }
+            .foregroundStyle(.orange)
+            .help("This package is heavy for this Mac's memory. Generation may be slow or unstable under pressure.")
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Heavy on this Mac")
+            .accessibilityIdentifier("\(accessibilityPrefix)_heavyBadge")
+        }
     }
 
     private var variantLabel: some View {
@@ -616,7 +645,7 @@ struct GenerationVariantSelector: View {
         )
         .overlay(
             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .stroke(AppTheme.inlineStroke.opacity(0.24), lineWidth: 0.75)
+                .stroke(AppTheme.inlineStroke.opacity(0.18), lineWidth: 1.0)
         )
     }
 
@@ -672,7 +701,7 @@ struct GenerationVariantSelector: View {
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: radius, style: .continuous)
-                        .strokeBorder(accentColor.opacity(0.38), lineWidth: 0.75)
+                        .strokeBorder(accentColor.opacity(0.30), lineWidth: 1.0)
                 )
         } else {
             RoundedRectangle(cornerRadius: radius, style: .continuous)

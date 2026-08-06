@@ -305,7 +305,7 @@ struct SavedVoiceSheet: View {
                         .background {
                             GatedGlass {
                                 RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                    .fill(Color(white: 0.16))
+                                    .fill(AppTheme.sheetWellFill)
                                     .glassEffect(.regular.tint(AppTheme.smokedGlassTint), in: .rect(cornerRadius: 10))
                             } fallback: {
                                 ZStack {
@@ -351,7 +351,9 @@ struct SavedVoiceSheet: View {
             }
         }
         .padding(20)
-        .frame(width: 520)
+        // Min instead of fixed: the fixed 520 squeezed content at large
+        // accessibility text sizes.
+        .frame(minWidth: 520, maxWidth: 600)
         .task {
             speechAvailability = VoiceClipTranscriber.availability()
             await loadExistingVoiceNames()

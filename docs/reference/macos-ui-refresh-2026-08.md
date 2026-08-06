@@ -224,3 +224,33 @@ the confirmatory warn ceilings to hard.
 - `99d746d` — safe fixes: dead-UI-code removal (−615 lines, reference-free-verified)
   and Reduce Transparency honored at all 8 direct glass sites; verified by the full
   gate, both platform compiles, core tests, and a green 7/7 smoke lane.
+
+## 2026-08-06 dual-agent critique — polish landed, questions parked
+
+A dual-agent design critique (isolated design-director review + mechanical
+detector/evidence pass; snapshot in `.impeccable/critique/`) scored the shipped UI
+31/40 and confirmed the system as product-authored. Its actionable findings landed
+the same day as the maintainer-approved polish pass (Generate-CTA `ControlGroup`
+collapse fix, gold/blue accent unification, scaled-display robustness — 1 pt
+boundary-stroke floor, Library/Settings content-width caps, Larger-Text scaling for
+fixed font literals — inline cloning consent, the generation-screen "Heavy" badge,
+VoiceOver value/label/seek fixes, and repetition trims).
+
+**Parked design questions (maintainer-gated; no implementation without an explicit
+call):**
+
+1. **The hero handoff.** A finished take materializes as a 24 pt strip in the
+   sidebar's bottom corner — the maximum distance from the Generate gesture. Should
+   a brief, quiet surfaced-player moment exist near the composer before the strip
+   settles into the rail?
+2. **Dark-only posture.** The pinned `darkAqua` appearance is the app's least
+   Mac-native behavior. Is dark-only a brand decision worth stating, or a scope
+   decision worth revisiting with a light theme?
+3. **Speed/Quality naming.** "Speed" reads as a speech-performance control beside
+   the "Delivery" picker. Renaming along a size/fidelity axis (with the memory cost
+   inline) would end the collision; the new visible Heavy badge narrows but does not
+   close it.
+4. **Styling the §K glass flip.** The generation performance gate swaps every glass
+   surface to solid at take start/end; on large panels it is the most visible motion
+   event in the app and reads as unstyled. A deliberate, Reduce-Motion-gated
+   treatment would make the same behavior read as intention.

@@ -13,6 +13,8 @@ import SwiftUI
 /// recorder's temp dir before dismissal (the recorder deletes its own file on
 /// teardown) and handed to `onComplete`.
 struct RecordReferenceClipSheet: View {
+    // The timer is the sheet's focal reading; it must grow with Larger Text.
+    @ScaledMetric(relativeTo: .largeTitle) private var timerFontSize: CGFloat = 44
     var onComplete: (URL) -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -102,7 +104,7 @@ struct RecordReferenceClipSheet: View {
                     .foregroundStyle(.secondary)
 
                 Text(timeString)
-                    .font(.system(size: 44, weight: .bold, design: .monospaced))
+                    .font(.system(size: timerFontSize, weight: .bold, design: .monospaced))
                     .monospacedDigit()
                     .foregroundStyle(timerColor)
                     .accessibilityIdentifier("recordClip_timer")
@@ -184,7 +186,9 @@ struct RecordReferenceClipSheet: View {
             }
         }
         .padding(20)
-        .frame(width: 480)
+        // Min instead of fixed: at large accessibility text sizes the
+        // fixed 480 squeezed the coaching copy instead of growing.
+        .frame(minWidth: 480, maxWidth: 560)
         .task {
             await recorder.requestPermissionIfNeeded()
         }
@@ -228,7 +232,7 @@ struct RecordReferenceClipSheet: View {
                 reviewPlayer.toggle()
             } label: {
                 Image(systemName: reviewPlayer.isPlaying ? "pause.fill" : "play.fill")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.body.weight(.semibold))
                     .frame(width: 28, height: 28)
             }
             .buttonStyle(.bordered)

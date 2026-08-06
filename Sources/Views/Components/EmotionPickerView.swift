@@ -85,7 +85,12 @@ struct EmotionPickerView: View {
                     .accessibilityIdentifier("\(accessibilityPrefix)_hintAdvisory")
             }
 
-            customToneField
+            // Shown only in Custom mode: a permanently visible but inert
+            // 60%-opacity field made users parse a control that was
+            // disabled in every other delivery mode.
+            if isCustomMode {
+                customToneField
+            }
         }
         .onAppear {
             syncSelectionFromText()

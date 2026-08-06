@@ -19,6 +19,8 @@ struct BatchGenerationSheet: View {
     var refText: String?
 
     @State private var batchText = ""
+    @State private var isEditorFocused = false
+    @ScaledMetric(relativeTo: .largeTitle) private var completionIconSize: CGFloat = 48
     @State private var segmentationMode: BatchSegmentationMode = .lineSeparated
     @StateObject private var coordinator = BatchGenerationCoordinator()
 
@@ -128,7 +130,7 @@ struct BatchGenerationSheet: View {
             text: $batchText,
             placeholder: "Enter one line per generation...",
             font: .systemFont(ofSize: NSFont.systemFontSize),
-            isFocused: .constant(false),
+            isFocused: $isEditorFocused,
             accessibilityIdentifier: "batch_textEditor"
         )
         .padding(8)
@@ -147,6 +149,15 @@ struct BatchGenerationSheet: View {
                 }
             }
         }
+        // Match the composer's focused-field treatment; this editor
+        // previously pinned isFocused to a constant and never showed it.
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(
+                    isEditorFocused ? AppTheme.accent.opacity(0.24) : .clear,
+                    lineWidth: 1.0
+                )
+        )
         .disabled(coordinator.isProcessing)
 
         if coordinator.isProcessing {
@@ -209,7 +220,7 @@ struct BatchGenerationSheet: View {
 
         VStack(spacing: 16) {
             Image(systemName: completionIconName(for: outcome))
-                .font(.system(size: 48))
+                .font(.system(size: completionIconSize))
                 .foregroundStyle(completionIconColor(for: outcome))
 
             Text(completionTitle(for: outcome))

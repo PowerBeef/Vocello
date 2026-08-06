@@ -61,7 +61,12 @@ struct TextInputView: View {
 
     private var actionRow: some View {
         HStack(alignment: .center, spacing: isEmbedded ? 10 : 12) {
-            ControlGroup {
+            // Plain HStack, deliberately not a ControlGroup: on macOS 26 the
+            // group collapses its children into one compact capsule and
+            // silently discards prominence, tint, label, and width — the
+            // Generate CTA shipped as an unlabeled icon sliver (2026-08-06
+            // critique, P1-A).
+            HStack(spacing: 8) {
                 if let batchAction {
                     Button("Batch") {
                         batchAction()

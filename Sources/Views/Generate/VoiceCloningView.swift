@@ -427,7 +427,9 @@ private extension VoiceCloningView {
                     readinessTitle: readinessDescriptor.title,
                     readinessDetail: readinessDescriptor.detail,
                     isGenerating: isGenerationActive,
-                    errorMessage: coordinator.errorMessage
+                    errorMessage: coordinator.errorMessage,
+                    needsConsent: !cloneConsentAcknowledged,
+                    onAcknowledgeConsent: { cloneConsentAcknowledged = true }
                 )
             }
             .frame(maxHeight: .infinity, alignment: .topLeading)
@@ -566,6 +568,8 @@ private struct VoiceCloningComposerFooter: View {
     let readinessDetail: String
     let isGenerating: Bool
     let errorMessage: String?
+    var needsConsent: Bool = false
+    var onAcknowledgeConsent: () -> Void = {}
 
     var body: some View {
         VStack(alignment: .leading, spacing: LayoutConstants.compactGap) {
@@ -577,6 +581,29 @@ private struct VoiceCloningComposerFooter: View {
                 isBusy: isGenerating,
                 accessibilityIdentifier: "voiceCloning_readiness"
             )
+
+            // Inline one-time consent: the Settings-only toggle dead-ended
+            // first-run cloning at the exact moment of first value (2026-08-06
+            // critique, P1-B). Writes the same stored key; the Settings toggle
+            // remains the persistent record.
+            if needsConsent, !isGenerating {
+                Button {
+                    onAcknowledgeConsent()
+                } label: {
+                    Label(
+                        "I own or have permission to clone the voices I use",
+                        systemImage: "checkmark.circle"
+                    )
+                    .font(.callout.weight(.semibold))
+                }
+                .buttonStyle(.bordered)
+                .tint(AppTheme.voiceCloning)
+                .accessibilityIdentifier("voiceCloning_inlineConsent")
+
+                Text("One-time acknowledgment. Review it anytime in Settings.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
 
             if let errorMessage {
                 Label(errorMessage, systemImage: "exclamationmark.triangle")
@@ -609,7 +636,7 @@ private struct CloneReferenceStatus: View {
         if let path = referenceAudioPath {
             HStack(spacing: 8) {
                 Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.body.weight(.semibold))
                     .foregroundStyle(accentColor)
 
                 VStack(alignment: .leading, spacing: 3) {
@@ -785,7 +812,9 @@ private struct CloneSourceRow: View {
             } else {
                 entries.append(SourceEntry(
                     id: voice.id,
-                    label: voice.hasTranscript ? "\(voice.name) · transcript" : "\(voice.name) · audio only"
+                    label: voice.hasTranscript
+                        ? "\(voice.name.replacingOccurrences(of: "_", with: " ")) · transcript"
+                        : "\(voice.name.replacingOccurrences(of: "_", with: " ")) · audio only"
                 ))
             }
         }
@@ -846,7 +875,7 @@ private struct CloneSourceRow: View {
             browseForAudio()
         } label: {
             Label(referenceAudioPath == nil ? "Import" : "Replace", systemImage: "waveform.badge.plus")
-                .font(.system(size: 12, weight: .semibold))
+                .font(.callout.weight(.semibold))
         }
         .buttonStyle(.bordered)
         .tint(AppTheme.voiceCloning)
@@ -859,7 +888,7 @@ private struct CloneSourceRow: View {
             recordReference()
         } label: {
             Label("Record", systemImage: "mic.fill")
-                .font(.system(size: 12, weight: .semibold))
+                .font(.callout.weight(.semibold))
         }
         .buttonStyle(.bordered)
         .tint(AppTheme.voiceCloning)

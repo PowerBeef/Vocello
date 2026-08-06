@@ -35,18 +35,24 @@ private struct NavigationSectionHeader: View {
 /// to defer to the output, so the lockup sits in the same visual tier
 /// as the section headers instead of competing with them.
 private struct SidebarBrandHeader: View {
+    // Scale with the nav rows: under Larger Text the sidebar rows grew via
+    // ScaledMetric while the brand stayed fixed, shrinking the lockup
+    // relative to its own navigation.
+    @ScaledMetric(relativeTo: .title2) private var brandMarkHeight: CGFloat = 22
+    @ScaledMetric(relativeTo: .title2) private var brandWordmarkSize: CGFloat = 18
+
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Image("VocelloHeaderMark")
                 .resizable()
                 .scaledToFit()
-                .frame(height: 22)
+                .frame(height: brandMarkHeight)
                 .alignmentGuide(.firstTextBaseline) { dimension in
                     dimension[.bottom] - 2
                 }
 
             Text("Vocello")
-                .font(.system(size: 18, weight: .semibold, design: .rounded))
+                .font(.system(size: brandWordmarkSize, weight: .semibold, design: .rounded))
                 .foregroundStyle(.primary)
 
             Text("AI·TTS")
@@ -307,10 +313,14 @@ struct SidebarView: View {
                         .listRowBackground(Color.clear)
                 }
             } header: {
-                NavigationSectionHeader(
-                    title: section.rawValue,
-                    accessibilityID: section.accessibilityID
-                )
+                // The Settings section holds exactly the Settings row —
+                // a header would restate the row directly beneath it.
+                if section != .settings {
+                    NavigationSectionHeader(
+                        title: section.rawValue,
+                        accessibilityID: section.accessibilityID
+                    )
+                }
             }
         }
     }

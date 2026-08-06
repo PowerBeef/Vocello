@@ -558,6 +558,34 @@ performance block after the fixture rebind, Tier 4 carryover). Immediate specifi
    and the new delivery/bank UI was observed by both UI lanes as the
    2026-08-04 surface note anticipated.
 
+28. **Dual-agent UI critique → maintainer-approved polish pass
+   (2026-08-06):** an isolated design-director review plus a mechanical
+   detector/evidence pass scored the shipped macOS UI 31/40
+   (product-authored; snapshot in `.impeccable/critique/`) and surfaced
+   one real regression-class defect: the composer's `ControlGroup`
+   collapsed the designed gold Generate/Cancel CTA into an unlabeled icon
+   sliver on macOS 26 — confirmed in code, smoke screenshots, and a live
+   capture, and fixed by replacing the group with a plain HStack. The
+   same-day polish landed the full approved scope: gold/blue accent
+   unification, a 1 pt boundary-stroke floor with opacity-carried
+   quietness plus Library/Settings content-width caps and Larger-Text
+   scaling for ~10 fixed font literals (scaled-external-display
+   robustness), inline one-time cloning consent in the composer footer
+   (Settings toggle stays the persistent record), a visible "Heavy"
+   memory badge on the generation screens' model control, VoiceOver
+   dignity fixes (human "Ready"/"Waiting" readiness values with the test
+   helper updated in the same change, a labeled player close button, an
+   adjustable waveform seek), the Custom-tone field shown only in Custom
+   delivery, and repetition/copy trims. Verified by the deterministic
+   suite and a 7/7 smoke acceptance run
+   (`macos-xcui-smoke-20260806-155739-34f0be6e`); the two failed smoke
+   iterations before it caught a real constraint now encoded in code
+   comments — flexible or generous toolbar frames push the History
+   trailing group into the overflow chevron at compact widths. Four
+   design-direction questions are parked maintainer-gated in
+   `docs/reference/macos-ui-refresh-2026-08.md` (hero handoff, dark-only
+   posture, Speed/Quality naming, styling the §K glass flip).
+
 ## Staged roadmap state
 
 Stage-by-stage details, closure evidence, and falsifiability criteria live in the

@@ -642,7 +642,12 @@ private struct MainWindowToolbar: ToolbarContent {
                         placeholder: "Search history",
                         accessibilityIdentifier: "history_searchField"
                     )
-                    .frame(width: 150)
+                    // Fixed width on purpose: flexible or generous frames
+                    // push the trailing toolbar group into the overflow
+                    // chevron at compact window widths (smoke-verified
+                    // 2026-08-06, twice). 170 is just enough to unclip the
+                    // "Search history" placeholder the old 150 cut off.
+                    .frame(width: 170)
                 }
             }
         }
@@ -653,6 +658,7 @@ private struct MainWindowToolbar: ToolbarContent {
                     voicesEnrollRequestID = UUID()
                 }
                 .buttonStyle(.borderedProminent)
+                .tint(AppTheme.accent)
                 .accessibilityIdentifier("voices_enrollButton")
             }
         }

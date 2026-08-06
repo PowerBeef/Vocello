@@ -161,6 +161,8 @@ struct VoicesView: View {
                 }
                 .listStyle(.inset)
                 .scrollContentBackground(.hidden)
+                .frame(maxWidth: LayoutConstants.contentMaxWidth)
+                .frame(maxWidth: .infinity)
                 .onChange(of: voices) { _, newVoices in
                     guard let pendingRevealVoiceID else { return }
                     guard newVoices.contains(where: { $0.id == pendingRevealVoiceID }) else { return }
@@ -318,14 +320,14 @@ private struct VoiceRow: View {
 
     private var detailCopy: String {
         voice.hasTranscript
-            ? "Reusable Qwen3 clone prompt can be prepared."
-            : "Add a transcript later for the strongest reusable clone prompt."
+            ? "Clone prompt prepares on first use."
+            : "Add a transcript for the strongest clone."
     }
 
     var body: some View {
         HStack(alignment: .top, spacing: 14) {
             Image(systemName: "person.2.wave.2")
-                .font(.system(size: 18, weight: .semibold))
+                .font(.title3.weight(.semibold))
                 .foregroundStyle(AppTheme.accent)
                 .frame(width: 24, alignment: .center)
                 .padding(.top, 4)
@@ -415,7 +417,10 @@ private struct VoiceRowMetadata: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(voiceName)
+                // Display-only humanization: sanitized voice names carry
+                // underscores (stable IDs, CLI, and test identifiers keep
+                // the raw form).
+                Text(voiceName.replacingOccurrences(of: "_", with: " "))
                     .font(.body.weight(.semibold))
                     .lineLimit(1)
                     .accessibilityIdentifier("voicesRow_\(voiceID)")
@@ -480,7 +485,7 @@ private struct VoiceRowMetadata: View {
             )
             .overlay(
                 Capsule(style: .continuous)
-                    .stroke(Color.orange.opacity(0.30), lineWidth: 0.5)
+                    .stroke(Color.orange.opacity(0.24), lineWidth: 1.0)
             )
         }
         .buttonStyle(.plain)

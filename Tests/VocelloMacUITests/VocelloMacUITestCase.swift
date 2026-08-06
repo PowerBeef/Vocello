@@ -304,7 +304,10 @@ class VocelloMacUITestCase: XCTestCase {
         case .clone: readinessID = "voiceCloning_readiness"
         }
         XCTAssertTrue(
-            VocelloUIWait.value(element(readinessID), contains: "ready=true", timeout: 60)
+            // The readiness note's accessibilityValue is human-readable for
+            // VoiceOver: "Ready" when generation can start, "Waiting"
+            // otherwise (capital R distinguishes the states).
+            VocelloUIWait.value(element(readinessID), contains: "Ready", timeout: 60)
         )
         XCTAssertTrue(VocelloUIWait.enabled(button("textInput_generateButton"), timeout: 60))
     }

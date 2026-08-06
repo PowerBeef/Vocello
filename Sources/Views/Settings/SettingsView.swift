@@ -193,7 +193,8 @@ struct SettingsView: View {
             // own lighter gray panel that diverges from the rest
             // of the app's chrome.
             .scrollContentBackground(.hidden)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .frame(maxWidth: LayoutConstants.contentMaxWidth)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .settingsNavigationTitle(showsNavigationTitle)
             .accessibilityIdentifier("screen_settings")
             .task {
@@ -381,7 +382,7 @@ private struct ModelDownloadRow: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Image(systemName: AppTheme.modeGlyph(for: mode))
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.callout.weight(.semibold))
                     .foregroundStyle(AppTheme.modeColor(for: mode))
                     .frame(width: 16)
                     .accessibilityHidden(true)

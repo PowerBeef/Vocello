@@ -441,6 +441,11 @@ struct HistoryView: View {
             }
             .listStyle(.inset)
             .scrollContentBackground(.hidden)
+            // Match the generation screens' content column: uncapped rows
+            // tear apart on wide displays (title far left, actions far
+            // right on a 43" panel).
+            .frame(maxWidth: LayoutConstants.contentMaxWidth)
+            .frame(maxWidth: .infinity)
         }
     }
 
@@ -636,7 +641,7 @@ private extension HistoryView {
             } catch {
                 presentActionAlert(
                     title: "Export Error",
-                    message: "Export failed: \(error.localizedDescription)"
+                    message: "The file could not be exported: \(error.localizedDescription) Choose another destination and try again."
                 )
             }
         }
@@ -649,7 +654,7 @@ private extension HistoryView {
         case .databaseFailure(let message):
             presentActionAlert(
                 title: "Delete Error",
-                message: "Failed to delete generation: \(message)"
+                message: "The generation could not be removed from History: \(message) Try again after closing anything using the file."
             )
         case .audioCleanupFailure(let message):
             presentActionAlert(
@@ -881,8 +886,8 @@ private struct HistoryRow: View {
         .background(
             RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .stroke(
-                    isHovered ? AppTheme.cardStroke.opacity(0.4) : .clear,
-                    lineWidth: 0.75
+                    isHovered ? AppTheme.cardStroke.opacity(0.3) : .clear,
+                    lineWidth: 1.0
                 )
         )
         .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
@@ -898,6 +903,6 @@ private struct HistoryRow: View {
         if let duration = item.generation.duration, duration > 0 {
             return String(format: "%.1fs", duration)
         }
-        return "-"
+        return "–"
     }
 }

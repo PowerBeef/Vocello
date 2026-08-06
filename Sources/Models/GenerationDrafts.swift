@@ -204,7 +204,7 @@ enum VoiceCloningReadiness {
             return VoiceCloningReadinessDescriptor(
                 noteIsReady: false,
                 title: "Acknowledge voice cloning consent",
-                detail: "Voice cloning needs the one-time consent in Settings: clone only voices you have permission to use.",
+                detail: "Confirm the one-time acknowledgment below: clone only voices you have permission to use.",
                 trailingText: nil
             )
         }

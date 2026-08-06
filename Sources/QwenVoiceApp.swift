@@ -31,7 +31,7 @@ struct QwenVoiceApp: App {
         WindowGroup(id: "mainWindow") {
             mainWindowContent
         }
-        .defaultSize(width: 720, height: 560)
+        .defaultSize(width: 880, height: 640)
         Settings {
             // The Cmd+, scene hosts the same SettingsView the
             // sidebar shows, so muscle memory keeps working. Deep

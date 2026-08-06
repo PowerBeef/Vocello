@@ -48,6 +48,7 @@ struct SidebarPlayerView: View {
                             .foregroundStyle(.secondary)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel("Close player")
                     .accessibilityIdentifier("sidebarPlayer_dismiss")
                 }
 
@@ -62,10 +63,20 @@ struct SidebarPlayerView: View {
                 }
                 .frame(height: 24)
                 .accessibilityElement(children: .ignore)
-                .accessibilityLabel("Waveform")
+                .accessibilityLabel("Playback position")
                 .opacity(audioPlayer.canSeek ? 1.0 : 0.75)
                 .accessibilityIdentifier("sidebarPlayer_waveform")
-                .accessibilityValue(audioPlayer.canSeek ? "seek enabled" : "seek disabled")
+                .accessibilityValue("\(Int((playbackProgress.progress * 100).rounded())) percent")
+                // VoiceOver seek: the waveform was click-only, leaving
+                // assistive users with no way to scrub at all.
+                .accessibilityAdjustableAction { direction in
+                    guard audioPlayer.canSeek else { return }
+                    let step = 0.05
+                    let target = direction == .increment
+                        ? min(1.0, playbackProgress.progress + step)
+                        : max(0.0, playbackProgress.progress - step)
+                    audioPlayer.seek(to: target)
+                }
 
                 HStack(spacing: 6) {
                     Button {

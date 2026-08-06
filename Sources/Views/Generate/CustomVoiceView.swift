@@ -65,7 +65,7 @@ struct CustomVoiceReadinessPresentation: Equatable {
             return CustomVoiceReadinessPresentation(
                 isReady: true,
                 title: "Ready to generate",
-                detail: "Ready to generate and save.",
+                detail: "Takes save to History automatically.",
                 trailingText: "Ready",
                 isBusy: false
             )

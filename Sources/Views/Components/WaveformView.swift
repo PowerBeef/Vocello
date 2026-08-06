@@ -27,9 +27,11 @@ struct WaveformView: View {
                 let y = (size.height - height) / 2
                 let rect = CGRect(x: x, y: y, width: barWidth, height: height)
                 let progressFraction = Double(index) / Double(max(barCount - 1, 1))
+                // 0.20 keeps the unplayed half legible on crushed panels
+                // (TV gamma at scaled modes erased the old 0.12).
                 let color = progressFraction <= clampedProgress
                     ? AppTheme.waveformColor(at: progressFraction)
-                    : Color.primary.opacity(0.12)
+                    : Color.primary.opacity(0.20)
                 context.fill(
                     Path(roundedRect: rect, cornerRadius: 1.5),
                     with: .color(color)

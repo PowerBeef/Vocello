@@ -30,13 +30,16 @@ enum AppTheme {
 
     static let vocelloGold = Color(red: 0.93, green: 0.80, blue: 0.54)
     static let accent = vocelloGold
-    static let inlinePreviewProgressTint = Color(red: 0.93, green: 0.80, blue: 0.54)
-    static let statusProgressTint = Color(red: 0.93, green: 0.80, blue: 0.54)
+    static let inlinePreviewProgressTint = vocelloGold
+    static let statusProgressTint = vocelloGold
     static let smokedGlassTint = Color(white: 0.15, opacity: 0.6)
+    // Solid sheet-well fill (recording/save sheets). Kept beside
+    // smokedGlassTint so near-duplicate greys stay one decision.
+    static let sheetWellFill = Color(white: 0.16)
     // Vocello mode palette (mirrors Sources/iOS/IOSShellPrimitives.swift:IOSBrandTheme).
     // The app is dark-only (appearance pinned in QwenVoiceApplicationDelegate),
     // matching the iOS brand values exactly.
-    static let customVoice = Color(red: 0.93, green: 0.80, blue: 0.54)   // warm golden — Vocello primary
+    static let customVoice = vocelloGold                                 // warm golden — Vocello primary
     static let voiceDesign = Color(red: 0.75, green: 0.67, blue: 0.86)   // lavender purple
     static let voiceCloning = Color(red: 0.86, green: 0.66, blue: 0.53)  // warm terracotta
     // Library + Settings continue to resolve to the primary accent (golden) so
@@ -181,9 +184,12 @@ enum AppTheme {
         color.opacity(0.34)
     }
 
-    static let surfaceStrokeOpacity: Double = 0.16
+    // Boundary-bearing strokes floor at 1 pt: sub-1-pt hairlines round to
+    // zero or dither at 1x backing scale (scaled external displays, "More
+    // Space" on 4K panels). Quietness is carried by opacity, not width.
+    static let surfaceStrokeOpacity: Double = 0.12
 
-    static let surfaceStrokeWidth: CGFloat = 0.75
+    static let surfaceStrokeWidth: CGFloat = 1.0
 
     static let waveformGradient = LinearGradient(
         colors: [accent.opacity(0.45), accent],
@@ -292,8 +298,8 @@ private struct NativeSurfaceStyle: ViewModifier {
             .overlay(
                 RoundedRectangle(cornerRadius: radius, style: .continuous)
                     .stroke(
-                        AppTheme.cardStroke.opacity(0.20),
-                        lineWidth: 0.5
+                        AppTheme.cardStroke.opacity(0.12),
+                        lineWidth: 1.0
                     )
             )
     }
@@ -357,7 +363,7 @@ private struct GlassBadgeStyle: ViewModifier {
             )
             .overlay(
                 Capsule(style: .continuous)
-                    .stroke(badgeStroke, lineWidth: 0.5)
+                    .stroke(badgeStroke.opacity(0.6), lineWidth: 1.0)
             )
     }
 
@@ -393,8 +399,8 @@ private struct GlassTextFieldStyle: ViewModifier {
             .overlay(
                 RoundedRectangle(cornerRadius: radius, style: .continuous)
                     .stroke(
-                        (strokeColor ?? AppTheme.fieldStroke).opacity(0.45),
-                        lineWidth: 0.5
+                        (strokeColor ?? AppTheme.fieldStroke).opacity(0.28),
+                        lineWidth: 1.0
                     )
             )
     }
@@ -424,7 +430,7 @@ private struct Glass3DDepthStyle: ViewModifier {
                                 startPoint: .top,
                                 endPoint: .bottom
                             ),
-                            lineWidth: 0.75
+                            lineWidth: 1.0
                         )
                 }
                 .shadow(color: .black.opacity(shadowOpacity), radius: 2.0, y: 2.0)
@@ -453,8 +459,8 @@ struct StudioGroupBoxStyle: GroupBoxStyle {
         .overlay(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .stroke(
-                    AppTheme.cardStroke.opacity(0.20),
-                    lineWidth: 0.5
+                    AppTheme.cardStroke.opacity(0.12),
+                    lineWidth: 1.0
                 )
         )
     }

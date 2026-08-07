@@ -935,6 +935,7 @@ cross-project comparisons.
 | completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
 |---|---|---|---|---|---|---:|---|---|---|---|
 | 2026-08-07 | [`mac-memory-qualification-20260807-020642-201fc2ba`](runs/memory-qualification/mac-memory-qualification-20260807-020642-201fc2ba.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 11 | `80b1632c42e0` dirty | `excluded` | baseline | marking-peak-equality |
+| 2026-08-07 | [`mac-memory-qualification-20260807-022819-3eb4d25b`](runs/memory-qualification/mac-memory-qualification-20260807-022819-3eb4d25b.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 11 | `269a0f74057b` | `23c2fd61c5e8` | baseline | marking-peak-equality |
 
 ## memory-qualification / macos / mac-mini-m2-8gb / config `2db9b5d8c68d`
 

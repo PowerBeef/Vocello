@@ -57,19 +57,6 @@ struct SettingsView: View {
     var body: some View {
         ScrollViewReader { proxy in
             Form {
-                Section("Voice cloning") {
-                    Toggle(isOn: $cloneConsentAcknowledged) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("I own or have permission to clone the voices I use")
-                            Text("Only clone voices you own or have explicit permission to use.")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .tint(AppTheme.voiceCloning)
-                    .accessibilityIdentifier("voiceCloning_consentAcknowledgment")
-                }
-
                 Section("Model downloads") {
                     ModelSetupSummaryRow(viewModel: viewModel)
 
@@ -97,6 +84,9 @@ struct SettingsView: View {
                         }
                     }
                     .pickerStyle(.segmented)
+                    // Gold, not system blue: the only other saturated blue
+                    // in the app was removed in the accent unification.
+                    .tint(AppTheme.accent)
                     .accessibilityIdentifier("settings_generationVariation")
                     Text(
                         "How much takes vary when regenerating the same text. " +
@@ -185,6 +175,22 @@ struct SettingsView: View {
                             .accessibilityIdentifier("preferences_openFinderButton")
                         }
                     }
+                }
+
+                // Last, not first: this is the persistent record of the
+                // one-time acknowledgment (also offered inline in the
+                // cloning flow) — a policy row, not the screen's job.
+                Section("Voice cloning") {
+                    Toggle(isOn: $cloneConsentAcknowledged) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("I own or have permission to clone the voices I use")
+                            Text("Only clone voices you own or have explicit permission to use.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .tint(AppTheme.voiceCloning)
+                    .accessibilityIdentifier("voiceCloning_consentAcknowledgment")
                 }
             }
             .formStyle(.grouped)
@@ -378,6 +384,21 @@ private struct ModelDownloadRow: View {
         viewModel.variants(for: mode)
     }
 
+    private var modeSubtitle: String {
+        var parts = [viewModel.modePurpose(for: mode)]
+        if let first = variants.first {
+            if let size = first.modelSizeLabel {
+                parts.append(size)
+            }
+            if mode == .custom, first.supportsInstructionControl {
+                parts.append("delivery control")
+            } else if mode == .clone, first.supportsVoiceClone {
+                parts.append("clone capable")
+            }
+        }
+        return parts.joined(separator: " · ")
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
@@ -391,7 +412,9 @@ private struct ModelDownloadRow: View {
                     Text(mode.displayName)
                         .font(.callout.weight(.semibold))
                         .lineLimit(1)
-                    Text(viewModel.modePurpose(for: mode))
+                    // Mode-constant facts live here once (size, capability)
+                    // instead of repeating on every package line below.
+                    Text(modeSubtitle)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
@@ -400,7 +423,7 @@ private struct ModelDownloadRow: View {
                 Spacer(minLength: 8)
             }
 
-            VStack(spacing: 5) {
+            VStack(spacing: 4) {
                 ForEach(variants) { model in
                     ModelPackageLine(
                         model: model,
@@ -412,7 +435,7 @@ private struct ModelDownloadRow: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.leading, 18)
         }
-        .padding(.vertical, 5)
+        .padding(.vertical, 4)
         .listRowBackground(isFlashed ? Color.accentColor.opacity(0.10) : nil)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("settings_mode_\(mode.rawValue)")
@@ -436,7 +459,11 @@ private struct ModelPackageLine: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .center, spacing: 8) {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Text(viewModel.activeVariantLabel(for: model))
+                    // Short tier label ("Speed · 4-bit"): the model size is
+                    // mode-constant and already stated once in the mode
+                    // subtitle — the old "(1.7B 4-bit)" form repeated it per
+                    // row and truncated.
+                    Text(compactVariantLabel)
                         .font(.caption.weight(.semibold))
                         .lineLimit(1)
                     packageBadge
@@ -463,10 +490,17 @@ private struct ModelPackageLine: View {
                     viewModel: viewModel,
                     onDelete: onDelete
                 )
-                .frame(minWidth: 78, alignment: .trailing)
+                // Fixed, not minWidth: the button labels fill their slot
+                // (maxWidth: .infinity), so a flexible slot let each row's
+                // leftover width decide the button size — Manage/Download
+                // rendered different widths and misaligned across rows.
+                .frame(width: 92, alignment: .trailing)
             }
 
-            if let detail = presentation.detail ?? capabilityDetail {
+            // Dynamic detail only (repair reasons, download specifics) —
+            // the static size/capability line repeated mode-constant facts
+            // on every row and doubled each row's height.
+            if let detail = presentation.detail {
                 Text(detail)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
@@ -476,7 +510,7 @@ private struct ModelPackageLine: View {
 
             downloadProgress
         }
-        .padding(.vertical, 5)
+        .padding(.vertical, 4)
         .padding(.horizontal, 8)
         .background(.quaternary.opacity(0.16), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
         .accessibilityElement(children: .contain)
@@ -492,26 +526,22 @@ private struct ModelPackageLine: View {
                 .help("Heavy on this Mac")
                 .accessibilityLabel("Heavy on this Mac")
         } else if viewModel.isHardwareRecommended(model) {
+            // Quiet, not green: this is static guidance — install state is
+            // the row's one semantic color.
             Text("Recommended")
                 .font(.caption2.weight(.semibold))
-                .foregroundStyle(.green)
+                .foregroundStyle(.secondary)
         }
     }
 
-    private var capabilityDetail: String? {
-        var parts: [String] = []
-        if let size = model.modelSizeLabel {
-            parts.append(size)
+    /// "Speed · 4-bit" — the tier plus only the per-row fact (bit depth).
+    private var compactVariantLabel: String {
+        let kind = model.variantKind?.displayName ?? model.name
+        guard let bits = model.variantKind?.bitDepthLabel,
+              let depth = bits.split(separator: " ").last else {
+            return kind
         }
-        if model.mode == .custom, !model.supportsInstructionControl {
-            parts.append("speaker only")
-        } else if model.mode == .custom {
-            parts.append("delivery control")
-        }
-        if model.mode == .clone, model.supportsVoiceClone {
-            parts.append("clone capable")
-        }
-        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+        return "\(kind) · \(depth)"
     }
 
     @ViewBuilder

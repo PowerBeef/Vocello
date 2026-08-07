@@ -270,6 +270,29 @@ public enum VocelloUIToggle {
     }
 }
 
+#if os(macOS)
+/// Wheel-scrolls a container until an element becomes hittable. Needed for
+/// controls that live below the fold of a Form/List at the test window size
+/// (e.g. the Settings clone-consent toggle, deliberately placed last) —
+/// `VocelloUIPrimaryAction` requires hittability and macOS clicks never
+/// auto-scroll.
+@MainActor
+public enum VocelloUIScroll {
+    @discardableResult
+    public static func intoView(
+        _ element: XCUIElement,
+        in container: XCUIElement,
+        maxAttempts: Int = 8
+    ) -> Bool {
+        for _ in 0 ..< maxAttempts {
+            if element.exists && element.isHittable { return true }
+            container.scroll(byDeltaX: 0, deltaY: -120)
+        }
+        return element.exists && element.isHittable
+    }
+}
+#endif
+
 /// The platform-native primary activation gesture, always against an exact element.
 @MainActor
 public enum VocelloUIPrimaryAction {

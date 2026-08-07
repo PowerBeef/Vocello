@@ -764,13 +764,18 @@ private struct CloneSourceRow: View {
                     Spacer(minLength: 0)
                 }
 
+                // Designed compact fallback: the picker owns its line and
+                // the two peer actions share one row — the previous loose
+                // three-deep stack read as broken, not compact.
                 VStack(alignment: .leading, spacing: 6) {
                     if !savedVoices.isEmpty {
                         savedVoicePicker(catalog: catalog)
                     }
 
-                    importButton
-                    recordButton
+                    HStack(spacing: 8) {
+                        importButton
+                        recordButton
+                    }
                 }
             }
 
@@ -836,7 +841,7 @@ private struct CloneSourceRow: View {
             .labelsHidden()
             .pickerStyle(.menu)
             .vocelloFocusRing(AppTheme.voiceCloning, radius: 6)
-            .frame(minWidth: LayoutConstants.configurationControlMinWidth, maxWidth: 180, alignment: .leading)
+            .frame(minWidth: LayoutConstants.configurationControlMinWidth, maxWidth: 220, alignment: .leading)
             .accessibilityValue(savedVoices.first(where: { $0.id == selectedSavedVoiceID })?.name ?? "")
             .accessibilityIdentifier("voiceCloning_savedVoicePicker")
         }
@@ -863,7 +868,9 @@ private struct CloneSourceRow: View {
                 .labelsHidden()
                 .pickerStyle(.menu)
                 .vocelloFocusRing(AppTheme.voiceCloning, radius: 6)
-                .frame(minWidth: 110, maxWidth: 160, alignment: .leading)
+                // Same fixed width as the merged-line column pickers so
+                // every compact picker in the app shares one rhythm.
+                .frame(width: LayoutConstants.configurationColumnControlWidth, alignment: .leading)
                 .accessibilityValue(persona.presetID(for: selectedSavedVoiceID).flatMap { EmotionPreset.preset(id: $0)?.label } ?? "Neutral")
                 .accessibilityIdentifier("voiceCloning_bankDeliveryPicker")
             }

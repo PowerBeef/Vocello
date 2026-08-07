@@ -125,8 +125,15 @@ struct EmotionPickerView: View {
         .pickerStyle(.menu)
         .vocelloFocusRing(accentColor, radius: 6)
         .frame(
-            minWidth: usesColumnLabels ? 110 : LayoutConstants.configurationControlMinWidth,
-            maxWidth: 240,
+            // Column mode: one fixed width shared with the Language pill so
+            // the merged line's two controls read as equal columns, not
+            // ragged tags.
+            width: usesColumnLabels ? LayoutConstants.configurationColumnControlWidth : nil,
+            alignment: .leading
+        )
+        .frame(
+            minWidth: usesColumnLabels ? nil : LayoutConstants.configurationControlMinWidth,
+            maxWidth: usesColumnLabels ? nil : 240,
             alignment: .leading
         )
         .accessibilityValue(emotion)

@@ -63,14 +63,18 @@ struct VoiceBriefEditor: View {
                 }
             }
 
+            // Two lines with clean roles: the helper reads as the editor's
+            // caption; actions and the counter share the row below. The old
+            // single row wrapped the helper mid-sentence beside the menu
+            // and counter and read as a jumble.
+            Text("Combine character, age, accent, and texture.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
             HStack(alignment: .firstTextBaseline) {
-                Text("Combine character, age, accent, and texture.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                startingPointsMenu
 
                 Spacer(minLength: 8)
-
-                startingPointsMenu
 
                 Text("\(text.count)/\(VoiceDesignBriefCatalog.descriptionLimit)")
                     .font(.caption.monospacedDigit())

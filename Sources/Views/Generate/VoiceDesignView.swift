@@ -227,7 +227,13 @@ private extension VoiceDesignView {
     /// row (Custom tone spans full width below, inside the delivery
     /// controls) — mirrors the Custom Voice panel.
     var languageAndDeliverySettings: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        // Empty-label setup row: joins the same left rail as the Voice brief
+        // control instead of hugging the card edge (same grid fix as the
+        // Custom Voice panel).
+        GenerationSetupRow(
+            label: "",
+            accessibilityIdentifier: "voiceDesign_toneSpeed"
+        ) {
             DeliveryControlsView(
                 emotion: $draft.emotion,
                 accentColor: AppTheme.voiceDesign,
@@ -237,9 +243,6 @@ private extension VoiceDesignView {
                 leadingColumns: AnyView(languageColumn)
             )
         }
-        .padding(.vertical, 4)
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("voiceDesign_toneSpeed")
     }
 
     var languageColumn: some View {
@@ -254,8 +257,7 @@ private extension VoiceDesignView {
                 selectedLanguage: $draft.selectedLanguage,
                 accentColor: AppTheme.voiceDesign,
                 accessibilityPrefix: "voiceDesign",
-                recommended: detectedPromptLanguage,
-                minWidth: 110
+                recommended: detectedPromptLanguage
             )
         }
         .accessibilityElement(children: .contain)

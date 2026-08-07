@@ -452,20 +452,29 @@ struct GenerationSetupRow<Content: View, Supporting: View>: View {
     }
 
     private var rowLayout: AnyLayout {
+        // First-baseline, not center: a centered label floats oddly beside
+        // tall multi-line content (the Clone Source stack); baseline pins it
+        // to the content's first line and reads identically on one-liners.
         usesSideBySideLayout
-            ? AnyLayout(HStackLayout(alignment: .center, spacing: horizontalSpacing))
+            ? AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: horizontalSpacing))
             : AnyLayout(VStackLayout(alignment: .leading, spacing: stackedSpacing))
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: supportingSpacing) {
             rowLayout {
-                labelView
-                    .frame(
-                        width: usesSideBySideLayout
-                            ? LayoutConstants.configurationLabelWidth : nil,
-                        alignment: .leading
-                    )
+                // label == "" joins the label-column grid without a label
+                // (used by the merged Language/Delivery line so its controls
+                // share the card's left rail); stacked mode drops the empty
+                // line entirely instead of reserving a blank text row.
+                if !label.isEmpty || usesSideBySideLayout {
+                    labelView
+                        .frame(
+                            width: usesSideBySideLayout
+                                ? LayoutConstants.configurationLabelWidth : nil,
+                            alignment: .leading
+                        )
+                }
 
                 content()
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -834,8 +843,7 @@ struct QwenLanguagePicker: View {
     /// button always mirrors the selected row's text — the compact button
     /// label needs to be independent of the row labels.
     var recommended: Qwen3SupportedLanguage? = nil
-    var minWidth: CGFloat = LayoutConstants.configurationControlMinWidth
-    var maxWidth: CGFloat = 220
+    var minWidth: CGFloat = LayoutConstants.configurationColumnControlWidth
 
     private var options: [Qwen3SupportedLanguage] {
         includesAuto ? Qwen3SupportedLanguage.allCases : Qwen3SupportedLanguage.selectableCases
@@ -890,24 +898,37 @@ struct QwenLanguagePicker: View {
                 }
             }
         } label: {
-            // A single concatenated Text so the bordered button style cannot
-            // decompose the label and move the chevron to the leading edge
-            // (it reorders HStack{Text, Image} labels); per-segment color
-            // keeps the chevron quiet like the native picker's.
-            (Text(effectiveLabel)
-                + Text("  ")
-                + Text(Image(systemName: "chevron.up.chevron.down"))
+            // Custom-drawn pill (same fill/stroke family as the variant
+            // segments): the bordered menu style sizes strictly from the
+            // label's text — it ignores label frames and reorders structural
+            // children — so equal column widths and a trailing chevron are
+            // only reachable by owning the drawing under a plain style.
+            HStack(spacing: 6) {
+                Text(effectiveLabel)
+                    .lineLimit(1)
+
+                Spacer(minLength: 0)
+
+                Image(systemName: "chevron.up.chevron.down")
                     .font(.caption2.weight(.semibold))
-                    .foregroundColor(.secondary))
-                .lineLimit(1)
-                .padding(.horizontal, 3)
-                .padding(.vertical, 1)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 8)
+            .frame(width: minWidth, height: 25, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(AppTheme.inlineFill.opacity(0.72))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .stroke(AppTheme.inlineStroke.opacity(0.24), lineWidth: 1.0)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
         }
         .menuStyle(.button)
-        .buttonStyle(.bordered)
+        .buttonStyle(.plain)
         .menuIndicator(.hidden)
         .vocelloFocusRing(accentColor, radius: 6)
-        .frame(minWidth: minWidth, maxWidth: maxWidth, alignment: .leading)
         .tint(accentColor)
         .accessibilityValue(isFollowingDetection ? "\(effectiveLabel), auto" : effectiveLabel)
         .accessibilityIdentifier("\(accessibilityPrefix)_languagePicker")

@@ -586,6 +586,29 @@ performance block after the fixture rebind, Tier 4 carryover). Immediate specifi
    `docs/reference/macos-ui-refresh-2026-08.md` (hero handoff, dark-only
    posture, Speed/Quality naming, styling the §K glass flip).
 
+29. **Maintainer-driven layout follow-up (2026-08-06, same-day):** live
+   iteration with the maintainer on the generation cards and Settings.
+   One alignment grid per card: setup-row labels moved to first-baseline,
+   the merged Language/Delivery line joins the label-column rail via an
+   empty-label row, and a phantom-width bug died — the language menu's
+   flexible frame claimed layout space its hugging button never drew,
+   splitting the columns with dead space. The language control now draws
+   its own fixed-width pill (bordered menu styles size strictly from label
+   text and reorder structural children — width and a trailing chevron are
+   only reachable by owning the drawing), sharing one
+   `configurationColumnControlWidth` (150 pt; 160 overflowed the
+   default-window card and collapsed the row to its stacked fallback) with
+   the delivery and bank pickers. Clone's compact Source fallback became a
+   designed stack; the Design brief footer split into caption + actions
+   lines. Settings: sections reordered by job (Model downloads first,
+   consent record last, with a `VocelloUIScroll.intoView` helper keeping
+   the below-fold toggle test-reachable), tier rows collapsed to one line
+   ("Speed · 4-bit"; size/capability stated once per mode; "Recommended"
+   quieted so install state owns the only green), fixed 92 pt button slots
+   ending per-row Manage/Download width drift, and the Variation segmented
+   control tinted gold (the last system-blue holdout). Verified by build
+   plus a 7/7 smoke acceptance (`macos-xcui-smoke-20260806-234647`).
+
 ## Staged roadmap state
 
 Stage-by-stage details, closure evidence, and falsifiability criteria live in the

@@ -201,6 +201,9 @@ class VocelloMacUITestCase: XCTestCase {
         navigate(to: .settings)
         let consent = element("voiceCloning_consentAcknowledgment")
         XCTAssertTrue(VocelloUIWait.exists(consent, timeout: 20))
+        // The consent section deliberately sits last in Settings; scroll it
+        // into view before any read/click at the test window height.
+        _ = VocelloUIScroll.intoView(consent, in: element("screen_settings"))
         guard let consentState = VocelloUIToggle.state(of: consent) else {
             XCTFail("Could not read the visible Clone consent state")
             return

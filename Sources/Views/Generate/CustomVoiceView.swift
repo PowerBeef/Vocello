@@ -370,7 +370,14 @@ private extension CustomVoiceView {
     /// controls). The language hint, when present, spans the full panel
     /// width under the line.
     var languageAndDeliverySettings: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        // Empty-label setup row: the merged line's controls join the same
+        // left rail as the Speaker control instead of hugging the card edge
+        // (the card previously mixed two alignment grids). The hint keeps
+        // its full panel width through the supporting slot.
+        GenerationSetupRow(
+            label: "",
+            accessibilityIdentifier: "customVoice_toneSpeed"
+        ) {
             DeliveryControlsView(
                 emotion: $draft.emotion,
                 accentColor: AppTheme.customVoice,
@@ -379,7 +386,7 @@ private extension CustomVoiceView {
                 usesColumnLabels: true,
                 leadingColumns: AnyView(languageColumn)
             )
-
+        } supporting: {
             if let languageHintMessage {
                 GenerationSetupHint(
                     message: languageHintMessage,
@@ -387,17 +394,14 @@ private extension CustomVoiceView {
                 )
             }
         }
-        .padding(.vertical, 4)
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("customVoice_toneSpeed")
     }
 
     /// Language alone (delivery unsupported by the active model): same
     /// column idiom, picker capped at its usual width.
     var languageOnlySettings: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        GenerationSetupRow(label: "") {
             languageColumn
-
+        } supporting: {
             if let languageHintMessage {
                 GenerationSetupHint(
                     message: languageHintMessage,
@@ -405,7 +409,6 @@ private extension CustomVoiceView {
                 )
             }
         }
-        .padding(.vertical, 4)
     }
 
     var languageColumn: some View {
@@ -420,8 +423,7 @@ private extension CustomVoiceView {
                 selectedLanguage: $draft.selectedLanguage,
                 accentColor: AppTheme.customVoice,
                 accessibilityPrefix: "customVoice",
-                recommended: detectedPromptLanguage,
-                minWidth: 110
+                recommended: detectedPromptLanguage
             )
         }
         .accessibilityElement(children: .contain)

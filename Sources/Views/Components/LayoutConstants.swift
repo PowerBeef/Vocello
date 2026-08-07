@@ -17,6 +17,11 @@ enum LayoutConstants {
     static let generationConfigurationRowSpacing: CGFloat = 6
     static let configurationLabelWidth: CGFloat = 92
     static let configurationControlMinWidth: CGFloat = 160
+    /// Fixed width shared by the compact column pickers (Language, Delivery,
+    /// bank Delivery) so adjacent columns read as one rhythm. 150, not 160:
+    /// two columns + the label-column indent must fit the default-window
+    /// card, or the merged line falls to its stacked variant.
+    static let configurationColumnControlWidth: CGFloat = 150
     static let cardRadius: CGFloat = 16
     static let controlHeight: CGFloat = 41
     static let composerDefaultMinHeight: CGFloat = 252

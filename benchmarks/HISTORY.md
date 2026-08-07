@@ -112,6 +112,7 @@ cross-project comparisons.
 | completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
 |---|---|---|---|---|---|---:|---|---|---|---|
 | 2026-08-07 | [`macos-engine-20260807-023057-5275b724`](runs/engine-generation/macos-engine-20260807-023057-5275b724.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 8 | `46da18acdcd5` | `08537b5694f6` | baseline | marking-qc-marked |
+| 2026-08-07 | [`macos-engine-20260807-023242-fce41fcb`](runs/engine-generation/macos-engine-20260807-023242-fce41fcb.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 8 | `517e69ea0617` | `08537b5694f6` | vs macos-engine-20260807-023057-5275b724: RTF +10.2%, TTFC +0.2%, RAM +0.0% | marking-qc-off |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `08613eaf0dca`
 

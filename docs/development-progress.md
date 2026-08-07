@@ -39,7 +39,28 @@ machine-readable status record and wins over any older prose.
 | 13 — Benchmark/history v3 | Live 2026-07-29: the first schema-v3 records are committed (three clean `phase0-cli-control-*` engine records plus one exploratory run that also exposed and fixed the summarizer's v3 pin). `benchmarks/schema-v3.json` adds the typed quality identity to generation takes (pass/warning only, five fast gates required, machine-code issues); v1/v2 records stay valid immutable history; the publisher stamps v3 only when every take carries the identity. The UI benchmark checkers folded the same identity 2026-08-01: ui-generation records now publish v3 (first: the focused `v3-fold-proof` record `macos-xcui-benchmark-20260801-003208-403989cf`); the canonical iOS matrix published its first v3 record 2026-08-01 (`ios-xcui-benchmark-20260801-132415-abbec96b`). |
 | 14 — Organization and retirement | Closed 2026-07-23 (14a + 14b): compatibility SPI retired, actor-owned loading/metadata/priming/clone artifacts, clone conditioning epoch-bound end to end. |
 
-## Resume here (2026-08-05)
+## Resume here (2026-08-07)
+
+**Article 50 marking arc (2026-08-06/07, plan `compliance-2026-08`, CP-2 stage 2 piece 3):**
+every published WAV now carries both marks — the AudioSeal watermark (fixed payload
+`0x56C0`, owned MLX port) embeds and the `LIST`/`INFO` provenance chunk appends at the
+`GenerationOutputAdapter` publication seam, after staging finalization and before Fast QC,
+flipping together as one byte-identity discontinuity. The registered `QWENVOICE_MARKING`
+knob is the sole off-switch, and marking telemetry boundaries exist only when the pass
+executes. The zero-peak promise is enforced by a **within-take** fail-closed gate in the
+memory-qualification lane (`config/marking-peak-equality.json`); its originally designed
+cross-run form was refuted by its own knob-off control — host-pressure drift of hundreds of
+MB across back-to-back runs on the 8 GB canonical Mac — while the marking pass itself
+measures +9 to +18 MB. Evidence, all clean-tree: canonical
+`mac-memory-qualification-20260807-022819-3eb4d25b` (11/11 takes, marking interval 500–1100
+MB under each take's peak), fixed-seed QC-neutrality pair
+`macos-engine-20260807-023057-5275b724` / `-023242-fce41fcb` (8/8 verdict parity), and a
+shipping CLI WAV the pinned reference detector scores 1.0000 with `0x56C0` decoding exactly
+(knob-off outputs: 0.011–0.034, no chunk). The roadmap CP-2 gate is the detailed authority.
+Remaining, maintainer-gated: the six HF weight uploads and the follow-on artifact re-pin
+(one-shot rollout script prepared for the maintainer's go; `model_catalog_contract.py`
+already enforces marking-file uniformity once any artifact carries it), then iOS device
+acceptance at the next phone window.
 
 **macOS UI arc (2026-08-04/05, plan `macos-ui-2026-08`):** the SwiftUI frame-health
 lane `scripts/ui_test.sh macos perf` landed and proved itself (`9d283a9`; nine

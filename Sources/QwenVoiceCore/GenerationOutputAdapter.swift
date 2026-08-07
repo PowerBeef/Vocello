@@ -115,6 +115,7 @@ final class GenerationOutputAdapter: GenerationOutputAdapting, @unchecked Sendab
     /// telemetry-write time so the rescued `TelemetrySummary` lands under
     /// `diagnostics/engine/generations.jsonl`. `nil` for callers that don't supply it.
     private let diagnosticAppSupportBox: DiagnosticAppSupportBox?
+    private let markingConfiguration: AudioMarkingConfiguration?
 
     init(
         generationID: UUID,
@@ -137,7 +138,8 @@ final class GenerationOutputAdapter: GenerationOutputAdapting, @unchecked Sendab
         memoryPolicy: NativeMemoryPolicy,
         mlxMemorySnapshots: [String: NativeMLXMemorySnapshot],
         pcmScratchBuffer: PCM16ScratchBuffer? = nil,
-        diagnosticAppSupportBox: DiagnosticAppSupportBox? = nil
+        diagnosticAppSupportBox: DiagnosticAppSupportBox? = nil,
+        markingConfiguration: AudioMarkingConfiguration? = nil
     ) {
         self.generationID = generationID
         self.requestID = requestID
@@ -160,6 +162,7 @@ final class GenerationOutputAdapter: GenerationOutputAdapting, @unchecked Sendab
         self.initialMLXMemorySnapshots = mlxMemorySnapshots
         self.pcmScratchBuffer = pcmScratchBuffer
         self.diagnosticAppSupportBox = diagnosticAppSupportBox
+        self.markingConfiguration = markingConfiguration
     }
 
     func run(
@@ -211,7 +214,8 @@ final class GenerationOutputAdapter: GenerationOutputAdapting, @unchecked Sendab
                         memoryPolicy: memoryPolicy,
                         initialMLXMemorySnapshots: initialMLXMemorySnapshots,
                         pcmScratchBuffer: pcmScratchBuffer,
-                        diagnosticAppSupportBox: diagnosticAppSupportBox
+                        diagnosticAppSupportBox: diagnosticAppSupportBox,
+                        markingConfiguration: markingConfiguration
                     )
                     // The reservation stays inert until its mandatory consumer
                     // and every fallible product-side setup step are complete.
@@ -1108,6 +1112,7 @@ struct StreamingExecutionContext: Sendable {
     /// to high-water mark and stay there across generations.
     let pcmScratchBuffer: PCM16ScratchBuffer?
     let diagnosticAppSupportBox: DiagnosticAppSupportBox?
+    let markingConfiguration: AudioMarkingConfiguration?
 
     private func scratchBuffer() -> PCM16ScratchBuffer {
         if let pooled = pcmScratchBuffer {
@@ -1498,6 +1503,29 @@ struct StreamingExecutionContext: Sendable {
                 throw MLXTTSEngineError.generationFailed(
                     "The staged streaming WAV could not be reopened for verification."
                 )
+            }
+            // Article 50 marking (CP-2): watermark + provenance chunk land on
+            // the finalized staging file so Fast QC below judges the exact
+            // published bytes. Generation has ended, so the load-and-drop
+            // pass sits well under the generation peak — the memory lane's
+            // per-take assertion proves the marking interval never moves the
+            // take peak. The boundaries are captured only when marking
+            // actually executes, so a knob-disabled run can never present
+            // marking-shaped telemetry as marking evidence.
+            if let markingConfiguration, AudioMarkingPolicy.resolvedEnabled() {
+                await telemetrySampler?.captureBoundary("before_marking")
+                // Zero-peak ordering (the CP-2 gate's design): release the
+                // generation pass's allocator cache BEFORE the marking
+                // weights load, and drop the marking pass's own buffers
+                // after — the resident peak must never stack marking on top
+                // of generation's still-cached working set.
+                Memory.clearCache()
+                try AudioPublicationMarker.markStagedWAV(
+                    at: stagingURL,
+                    configuration: markingConfiguration
+                )
+                Memory.clearCache()
+                await telemetrySampler?.captureBoundary("after_marking")
             }
             await telemetrySampler?.captureBoundary("before_audio_qc")
             finalAudioQC = try Self.makePersistedWAVAudioQCReport(

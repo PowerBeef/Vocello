@@ -241,9 +241,10 @@
     {
       "id": "audio-marking",
       "title": "AudioSeal watermark generator (Article 50 machine-readable marking)",
-      "state": "internal",
+      "state": "production",
       "sourcePatterns": [
-        "Sources/MLXAudioMark/**"
+        "Sources/MLXAudioMark/**",
+        "Sources/VocelloQwen3Core/AudioMarking.swift"
       ],
       "testPatterns": [
         "Tests/Qwen3RuntimeTests/AudioSealParityTests.swift"

@@ -326,8 +326,9 @@ flowchart TD
     Open --> Codec["6. Mimi codec → materialized PCM<br/>(owned MLXAudioCodecs)"]
     Codec --> Channel["7. frame-bounded suspending channel<br/>ordered, single consumer, lossless"]
     Channel --> Lim["8. PCM16StreamLimiter + defect detection<br/>(clip/click/slew/dropout/nanInf)"]
-    Lim --> WAV["9. AtomicPCM16WAVWriter + Fast QC"]
-    WAV --> Out["10. product terminal + finalization acknowledgment<br/>GenerationResult"]
+    Lim --> WAV["9. AtomicPCM16WAVWriter"]
+    WAV --> Mark["9b. publication marking (Article 50)<br/>AudioSeal watermark + LIST/INFO provenance chunk<br/>on the staged WAV, then Fast QC"]
+    Mark --> Out["10. product terminal + finalization acknowledgment<br/>GenerationResult"]
     Open -.->|"bounded suspending events"| Ev["preview/progress/status<br/>after output drain"]
     Lim --> QC["AudioQCReport → telemetry"]
 ```
@@ -337,6 +338,16 @@ immutable post-load facts, and every lifecycle operation (load, prewarm, priming
 conditioning and artifacts, diagnostics) routes through `VocelloQwen3Engine`'s public surface.
 The legacy compatibility SPI is retired (Phase 14b, 2026-07-23); the previously SPI-gated
 symbols are internal to the package.
+
+Step 9b is the CP-2 publication-marking seam (`AudioPublicationMarker` in
+`Sources/QwenVoiceCore/AudioPublicationMarking.swift`): after the staged WAV is finalized and
+readable, the fixed-payload AudioSeal watermark is embedded through the `VocelloQwen3AudioMarking`
+facade and the machine-readable `LIST`/`INFO` provenance chunk is appended, before QC reads the
+file. Both marks flip together — one byte-identity discontinuity for published audio. The pass
+fails closed (a sample-count change aborts publication), resolves its weights from the generating
+model's own directory, and is disabled only by the registered `QWENVOICE_MARKING` debug knob under
+the master gate. Long-form assembly re-marks nothing: segments are marked at segment publication,
+and `LongFormAssembly` appends only the provenance chunk to the stitched product.
 
 The shipping product-generation path is `VocelloQwen3Engine` plus its classified session and
 QwenVoiceCore's `GenerationOutputAdapter`. Sampling and Qwen generation-memory settings remain

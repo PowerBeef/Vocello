@@ -397,7 +397,8 @@
       "category": "architecture",
       "state": "active",
       "files": [
-        "Sources/MLXAudioMark/AudioSealGenerator.swift"
+        "Sources/MLXAudioMark/AudioSealGenerator.swift",
+        "Sources/VocelloQwen3Core/AudioMarking.swift"
       ],
       "tests": [
         "Tests/Qwen3RuntimeTests/AudioSealParityTests.swift"

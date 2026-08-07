@@ -75,7 +75,8 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         NativeTelemetryTerminalPolicy,
         NativeLoadCapabilityProfile,
         NativeMemoryPolicy,
-        [String: NativeMLXMemorySnapshot]
+        [String: NativeMLXMemorySnapshot],
+        AudioMarkingConfiguration?
     ) -> any GenerationOutputAdapting
 
     public let modelRegistry: any ModelRegistry
@@ -486,7 +487,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         pcmScratchBuffer: PCM16ScratchBuffer,
         diagnosticAppSupportBox: DiagnosticAppSupportBox
     ) -> StreamingSessionFactory {
-        { generationID, requestID, request, model, actorRequest, cloneHandle, cancellationIngress, streamSessionsDirectory, warmState, timingOverridesMS, booleanFlags, stringFlags, wasPrimed, telemetryRecorder, telemetrySampler, telemetryTerminalPolicy, loadCapabilityProfile, memoryPolicy, mlxMemorySnapshots in
+        { generationID, requestID, request, model, actorRequest, cloneHandle, cancellationIngress, streamSessionsDirectory, warmState, timingOverridesMS, booleanFlags, stringFlags, wasPrimed, telemetryRecorder, telemetrySampler, telemetryTerminalPolicy, loadCapabilityProfile, memoryPolicy, mlxMemorySnapshots, markingConfiguration in
             GenerationOutputAdapter(
                 generationID: generationID,
                 requestID: requestID,
@@ -508,7 +509,8 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
                 memoryPolicy: memoryPolicy,
                 mlxMemorySnapshots: mlxMemorySnapshots,
                 pcmScratchBuffer: pcmScratchBuffer,
-                diagnosticAppSupportBox: diagnosticAppSupportBox
+                diagnosticAppSupportBox: diagnosticAppSupportBox,
+                markingConfiguration: markingConfiguration
             )
         }
     }
@@ -1240,6 +1242,21 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         }
     }
 
+    /// Article 50 marking context for a generation: the catalog-delivered
+    /// marking weights live inside the request's installed model directory
+    /// (a required uniform artifact file, so the active model's folder always
+    /// carries them once delivery completes).
+    private func markingConfiguration(for request: GenerationRequest) -> AudioMarkingConfiguration? {
+        guard let descriptor = modelAssetStore.descriptor(id: request.modelID) else {
+            return nil
+        }
+        return AudioMarkingConfiguration.resolve(
+            modelDirectory: modelAssetStore.localRoot(for: descriptor),
+            modelID: request.modelID,
+            mode: request.mode.rawValue
+        )
+    }
+
     private func runGenerationAttempt(
         _ request: GenerationRequest,
         telemetryTerminalPolicy: NativeTelemetryTerminalPolicy,
@@ -1277,7 +1294,8 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
             prepared.telemetryTerminalPolicy,
             prepared.loadCapabilityProfile,
             prepared.memoryPolicy,
-            prepared.mlxMemorySnapshots
+            prepared.mlxMemorySnapshots,
+            markingConfiguration(for: request)
         )
         let deliveryGenerationID = request.generationID ?? prepared.generationID
         return try await session.run { [weak self] event in

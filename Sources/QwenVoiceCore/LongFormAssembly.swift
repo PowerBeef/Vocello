@@ -1,6 +1,7 @@
 import AVFoundation
 import CryptoKit
 import Foundation
+import VocelloQwen3Core
 
 public enum LongFormAssemblyError: Error, Equatable, Sendable {
     case noSegments
@@ -192,7 +193,9 @@ public enum BoundedLongFormAssembler {
     public static func assemble(
         segments: [LongFormAssemblySegmentSource],
         outputURL: URL,
-        configuration: LongFormAssemblyConfiguration = LongFormAssemblyConfiguration()
+        configuration: LongFormAssemblyConfiguration = LongFormAssemblyConfiguration(),
+        provenanceModelID: String? = nil,
+        provenanceMode: String? = nil
     ) async throws -> LongFormAssemblyEvidence {
         try Task.checkCancellation()
         let configuration = try configuration.validated()
@@ -282,7 +285,26 @@ public enum BoundedLongFormAssembler {
             }
 
             try Task.checkCancellation()
-            try writer.finish()
+            let stagingURL = try writer.finishStaging()
+            // Article 50 provenance on the joined output (CP-2): the PCM is
+            // already watermarked — every segment was marked at its own
+            // publication — so the join needs only the machine-readable
+            // provenance chunk before atomic publication. Re-embedding here
+            // would stack watermark deltas for no detection gain.
+            if let provenanceModelID, let provenanceMode,
+               AudioMarkingPolicy.resolvedEnabled() {
+                try WAVProvenanceChunk.append(
+                    toWAVAt: stagingURL,
+                    software: "Vocello",
+                    comment: WAVProvenanceChunk.comment(
+                        modelID: provenanceModelID,
+                        mode: provenanceMode,
+                        createdAt: Date(),
+                        watermarkPayload: VocelloQwen3AudioMarking.payload
+                    )
+                )
+            }
+            try writer.publish()
         } catch {
             writer.discard()
             throw error

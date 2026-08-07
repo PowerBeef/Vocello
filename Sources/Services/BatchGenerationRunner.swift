@@ -1137,7 +1137,9 @@ final class BatchGenerationRunner {
             .appendingPathComponent("long_form_joined_\(digestPrefix).wav", isDirectory: false)
         let evidence = try await BoundedLongFormAssembler.assemble(
             segments: sources,
-            outputURL: outputURL
+            outputURL: outputURL,
+            provenanceModelID: request.model.id,
+            provenanceMode: request.model.mode.rawValue
         )
         return (evidence, outputURL)
     }

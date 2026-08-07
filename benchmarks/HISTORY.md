@@ -930,6 +930,12 @@ cross-project comparisons.
 |---|---|---|---|---|---|---:|---|---|---|---|
 | 2026-07-15 | [`mac-memory-qualification-20260715-142146-84663e70`](runs/memory-qualification/mac-memory-qualification-20260715-142146-84663e70.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 11 | `247b266b0f1c` | `0efe7c615c69` | baseline | owned-core-retained-247b266 |
 
+## memory-qualification / macos / mac-mini-m2-8gb / config `23c2fd61c5e8`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---|---|---|---|
+| 2026-08-07 | [`mac-memory-qualification-20260807-020642-201fc2ba`](runs/memory-qualification/mac-memory-qualification-20260807-020642-201fc2ba.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 11 | `80b1632c42e0` dirty | `excluded` | baseline | marking-peak-equality |
+
 ## memory-qualification / macos / mac-mini-m2-8gb / config `2db9b5d8c68d`
 
 | completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |

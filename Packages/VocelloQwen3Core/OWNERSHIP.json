@@ -5,23 +5,64 @@
   "targets": {
     "VocelloQwen3Core": {
       "sourceRoot": "Sources/VocelloQwen3Core",
-      "allowedImports": ["Foundation", "HuggingFace", "MLX", "MLXAudioCore", "MLXAudioTTS", "MLXLMCommon", "os"],
-      "allowedRuntimeTargetDependencies": ["MLXAudioCore", "MLXAudioTTS"]
+      "allowedImports": [
+        "Foundation",
+        "HuggingFace",
+        "MLX",
+        "MLXAudioCore",
+        "MLXAudioMark",
+        "MLXAudioTTS",
+        "MLXLMCommon",
+        "os"
+      ],
+      "allowedRuntimeTargetDependencies": [
+        "MLXAudioCore",
+        "MLXAudioTTS"
+      ]
     },
     "MLXAudioCore": {
       "sourceRoot": "Sources/MLXAudioCore",
       "allowedRuntimeTargetDependencies": [],
-      "allowedImports": ["AVFoundation", "Foundation", "HuggingFace", "MLX"]
+      "allowedImports": [
+        "AVFoundation",
+        "Foundation",
+        "HuggingFace",
+        "MLX"
+      ]
     },
     "MLXAudioCodecs": {
       "sourceRoot": "Sources/MLXAudioCodecs",
-      "allowedRuntimeTargetDependencies": ["MLXAudioCore"],
-      "allowedImports": ["Foundation", "MLX", "MLXAudioCore", "MLXLMCommon", "MLXNN"]
+      "allowedRuntimeTargetDependencies": [
+        "MLXAudioCore"
+      ],
+      "allowedImports": [
+        "Foundation",
+        "MLX",
+        "MLXAudioCore",
+        "MLXLMCommon",
+        "MLXNN"
+      ]
     },
     "MLXAudioTTS": {
       "sourceRoot": "Sources/MLXAudioTTS",
-      "allowedRuntimeTargetDependencies": ["MLXAudioCore", "MLXAudioCodecs"],
-      "allowedImports": ["AVFoundation", "CryptoKit", "Foundation", "Hub", "HuggingFace", "MLX", "MLXAudioCodecs", "MLXAudioCore", "MLXLMCommon", "MLXNN", "Tokenizers", "os"]
+      "allowedRuntimeTargetDependencies": [
+        "MLXAudioCore",
+        "MLXAudioCodecs"
+      ],
+      "allowedImports": [
+        "AVFoundation",
+        "CryptoKit",
+        "Foundation",
+        "Hub",
+        "HuggingFace",
+        "MLX",
+        "MLXAudioCodecs",
+        "MLXAudioCore",
+        "MLXLMCommon",
+        "MLXNN",
+        "Tokenizers",
+        "os"
+      ]
     }
   },
   "forbiddenRepositoryImports": [
@@ -34,6 +75,10 @@
     "SharedSupport",
     "VocelloCLI"
   ],
-  "forbiddenFrameworkImports": ["AppKit", "SwiftUI", "UIKit"],
+  "forbiddenFrameworkImports": [
+    "AppKit",
+    "SwiftUI",
+    "UIKit"
+  ],
   "consumerBoundary": "Application layers may depend on this package. This package must never depend back on an application, platform UI, XPC, persistence, or product-policy module."
 }

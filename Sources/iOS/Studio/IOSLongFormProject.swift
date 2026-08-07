@@ -946,7 +946,12 @@ final class IOSLongFormProjectRunner {
                 "long_form_joined_\(request.projectDigestPrefix).wav",
                 isDirectory: false
             )
-        let evidence = try await BoundedLongFormAssembler.assemble(segments: sources, outputURL: outputURL)
+        let evidence = try await BoundedLongFormAssembler.assemble(
+            segments: sources,
+            outputURL: outputURL,
+            provenanceModelID: request.model.id,
+            provenanceMode: request.model.mode.rawValue
+        )
         return (evidence, outputURL)
     }
 

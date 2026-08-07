@@ -2,6 +2,9 @@
   "componentID": "vocello-qwen3-core",
   "module": "VocelloQwen3Core",
   "publicDeclarations": [
+    "Sources/VocelloQwen3Core/AudioMarking.swift::public enum VocelloQwen3AudioMarking",
+    "Sources/VocelloQwen3Core/AudioMarking.swift::public static var payload: UInt16",
+    "Sources/VocelloQwen3Core/AudioMarking.swift::public static func markedPCM( _ pcm: [Float], weightsURL: URL ) throws -> [Float]",
     "Sources/VocelloQwen3Core/ClassifiedGenerationSession.swift::public enum VocelloQwen3SessionError: Error, Equatable, Sendable",
     "Sources/VocelloQwen3Core/ClassifiedGenerationSession.swift::public struct VocelloQwen3AudioChannelStatistics: Codable, Hashable, Sendable",
     "Sources/VocelloQwen3Core/ClassifiedGenerationSession.swift::public let capacityFrames: Int",
@@ -374,6 +377,10 @@
   ],
   "schemaVersion": 1,
   "sourceFiles": [
+    {
+      "path": "Sources/VocelloQwen3Core/AudioMarking.swift",
+      "sha256": "a83095a099274f6cc6389346fe4574c648288f955835de3882af88b81cf499e8"
+    },
     {
       "path": "Sources/VocelloQwen3Core/ClassifiedGenerationSession.swift",
       "sha256": "0448721212ea4f743faf709c9ae3118c8c8373cca6ef9786e6ba20e7f704b8a7"

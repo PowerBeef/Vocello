@@ -580,6 +580,18 @@ cmd_memory() {
     --run-id "$run_id" --evidence-manifest "$artifacts/benchmark-evidence.json" \
     --engine-only --label "$label" >"$artifacts/summary.txt" 2>&1 \
     || die "memory qualification evidence was valid but its frozen summary failed"
+  # CP-2 zero-peak (Article 50 marking): within every take, nothing at or
+  # after the marking interval may exceed the take's pre-marking peak, and
+  # the marking boundaries must be present (marking actually ran). Fail
+  # closed before the record may publish.
+  local equality_policy="$ROOT_DIR/config/marking-peak-equality.json"
+  if [[ -f "$equality_policy" ]]; then
+    python3 "$SCRIPT_DIR/check_marking_peak_equality.py" \
+      "$artifacts/benchmark-evidence.json" \
+      --tolerance-percent "$(python3 -c "import json;print(json.load(open('$equality_policy')).get('tolerancePercent',5.0))")" \
+      --tolerance-mb "$(python3 -c "import json;print(json.load(open('$equality_policy')).get('toleranceMB',48.0))")" \
+      || die "marking peak-equality assertion failed; the qualification record was not published"
+  fi
   record_benchmark_history "$artifacts" >/dev/null \
     || die "memory qualification history publication failed"
   note "memory qualification PASS · $artifacts"

@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 2,
+  "purpose": "CP-2 zero-peak (Article 50 marking): publication-time audio marking must leave each take's peak footprint unchanged. The macOS memory-qualification lane fail-closes on a within-take assertion — no sample at or after the marking interval may exceed that take's pre-marking peak beyond tolerance, and the marking boundaries must be present. Within-take comparison replaced the schema-1 cross-run baseline after a QWENVOICE_MARKING=off control run failed the cross-run bound worse than the marked run in every mode (2026-08-07): whole-lifecycle peaks on the 8 GB canonical host swing hundreds of MB with system memory pressure between runs, while the marking pass itself measures +9 to +18 MB.",
+  "tolerancePercent": 5.0,
+  "toleranceMB": 48.0,
+  "platform": "macos"
+}

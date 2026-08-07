@@ -53,7 +53,7 @@
     },
     {
       "path": "Sources/MLXAudioMark/AudioSealGenerator.swift",
-      "sha256": "271dabe512c90a108a05a81bf2b4dc94f4c6bb9d9c3e5382afb4ad8675336e13",
+      "sha256": "5f3edab5cfed85d7d88066bbeed0316229d5ccb920b6c4f63cfc71c4f97ff4fb",
       "upstreamStatus": "added"
     },
     {
@@ -132,6 +132,11 @@
       "upstreamStatus": "added"
     },
     {
+      "path": "Sources/VocelloQwen3Core/AudioMarking.swift",
+      "sha256": "a83095a099274f6cc6389346fe4574c648288f955835de3882af88b81cf499e8",
+      "upstreamStatus": "added"
+    },
+    {
       "path": "Sources/VocelloQwen3Core/ClassifiedGenerationSession.swift",
       "sha256": "0448721212ea4f743faf709c9ae3118c8c8373cca6ef9786e6ba20e7f704b8a7",
       "upstreamStatus": "added"
@@ -173,7 +178,7 @@
     },
     {
       "path": "Tests/Qwen3RuntimeTests/AudioSealParityTests.swift",
-      "sha256": "c50d3db173a09d109d1647867593b3d99f696e5a0bdc2990c4734a7c20da0778",
+      "sha256": "e205aacdb7feaa93cc4328072b0bd00ad791f9bb8e9963f957424ec99310bbd3",
       "upstreamStatus": "added"
     },
     {
@@ -237,11 +242,11 @@
     "Examples/**"
   ],
   "summary": {
-    "added": 27,
+    "added": 28,
     "identical": 6,
     "modified": 12,
     "removed": 0,
-    "retained": 45
+    "retained": 46
   },
   "upstreamBaselineSHA256": "6136a2c2b2d56590deca279ef4ae809a11aff41132916a73619caf2012ef362a"
 }

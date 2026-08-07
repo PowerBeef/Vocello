@@ -274,7 +274,12 @@ public final class AudioSealGenerator {
     /// the LSTMs and other frame-rate stages run over the full 75 Hz
     /// sequence, keeping sequential state exact. Only bottleneck-rate
     /// buffers span the whole take (128× smaller than audio).
-    public func watermark(pcm: [Float], coreFrames: Int = 150, marginFrames: Int = 64) -> [Float] {
+    // Default geometry 64/8 (was 150/64): the conv stacks' receptive field
+    // is a handful of frames, so 8-frame margins stay exact (parity-tested
+    // ≥55 dB against whole-buffer), and the ~3.5× smaller windows bound the
+    // marking pass's per-window conv workspaces — the Metal-heap high-water
+    // this leaves behind is what the fail-closed peak-equality lane meters.
+    public func watermark(pcm: [Float], coreFrames: Int = 64, marginFrames: Int = 8) -> [Float] {
         let stride = Self.totalStride
         let totalFrames = (pcm.count + stride - 1) / stride
         guard totalFrames > coreFrames + 2 * marginFrames else {
@@ -282,50 +287,71 @@ public final class AudioSealGenerator {
             return zip(pcm, delta).map { max(-1, min(1, $0 + $1)) }
         }
 
+        // Every stage drains an explicit autoreleasepool: eval commits Metal
+        // command buffers and other autoreleased ObjC objects, and the Swift
+        // Concurrency thread that runs publication-time marking never drains
+        // the thread pool's implicit pool — without this, each marked take
+        // leaves its command-buffer graph resident until process idle, which
+        // the retained-memory lane meters as a permanent per-take leak.
+
         // Stage 1: windowed encoder convolutions → exact bottleneck sequence.
         var bottleneckParts = [MLXArray]()
         var frame = 0
         while frame < totalFrames {
-            let coreEnd = min(frame + coreFrames, totalFrames)
-            let windowStartFrame = max(0, frame - marginFrames)
-            let windowStart = windowStartFrame * stride
-            let windowEnd = min(pcm.count, (coreEnd + marginFrames) * stride)
-            let x = MLXArray(Array(pcm[windowStart ..< windowEnd]))
-                .reshaped([1, windowEnd - windowStart, 1])
-            let window = encoderConvs(x)
-            let lo = frame - windowStartFrame
-            let hi = min(lo + (coreEnd - frame), window.dim(1))
-            let core = window[0..., lo ..< hi, 0...]
-            core.eval()
-            bottleneckParts.append(core)
-            frame = coreEnd
+            autoreleasepool {
+                let coreEnd = min(frame + coreFrames, totalFrames)
+                let windowStartFrame = max(0, frame - marginFrames)
+                let windowStart = windowStartFrame * stride
+                let windowEnd = min(pcm.count, (coreEnd + marginFrames) * stride)
+                let x = MLXArray(Array(pcm[windowStart ..< windowEnd]))
+                    .reshaped([1, windowEnd - windowStart, 1])
+                let window = encoderConvs(x)
+                let lo = frame - windowStartFrame
+                let hi = min(lo + (coreEnd - frame), window.dim(1))
+                let core = window[0..., lo ..< hi, 0...]
+                core.eval()
+                bottleneckParts.append(core)
+                // Zero-peak: return each window's conv temporaries to the OS
+                // instead of letting the allocator cache accumulate across
+                // windows — the resident-peak budget for publication-time
+                // marking is a rounding error, not a working set.
+                Memory.clearCache()
+                frame = coreEnd
+            }
         }
         let bottleneck = concatenated(bottleneckParts, axis: 1)
 
         // Stage 2: exact full-sequence frame-rate stages (LSTMs + message).
-        let lstmOut = frameStages(bottleneck)
-        lstmOut.eval()
+        let lstmOut = autoreleasepool { () -> MLXArray in
+            let out = frameStages(bottleneck)
+            out.eval()
+            Memory.clearCache()
+            return out
+        }
 
         // Stage 3: windowed decoder convolutions → delta samples.
         var out = [Float](repeating: 0, count: pcm.count)
         frame = 0
         while frame < totalFrames {
-            let coreEnd = min(frame + coreFrames, totalFrames)
-            let windowStartFrame = max(0, frame - marginFrames)
-            let windowEndFrame = min(totalFrames, coreEnd + marginFrames)
-            let window = decoderConvs(lstmOut[0..., windowStartFrame ..< windowEndFrame, 0...])
-            let sampleLo = (frame - windowStartFrame) * stride
-            let coreStart = frame * stride
-            let coreSampleEnd = min(coreEnd * stride, pcm.count)
-            let span = coreSampleEnd - coreStart
-            let deltaSlice = window[0..., sampleLo ..< min(sampleLo + span, window.dim(1)), 0]
-                .reshaped([-1])
-            deltaSlice.eval()
-            let delta = deltaSlice.asArray(Float.self)
-            for i in 0 ..< min(span, delta.count) {
-                out[coreStart + i] = max(-1, min(1, pcm[coreStart + i] + delta[i]))
+            autoreleasepool {
+                let coreEnd = min(frame + coreFrames, totalFrames)
+                let windowStartFrame = max(0, frame - marginFrames)
+                let windowEndFrame = min(totalFrames, coreEnd + marginFrames)
+                let window = decoderConvs(lstmOut[0..., windowStartFrame ..< windowEndFrame, 0...])
+                let sampleLo = (frame - windowStartFrame) * stride
+                let coreStart = frame * stride
+                let coreSampleEnd = min(coreEnd * stride, pcm.count)
+                let span = coreSampleEnd - coreStart
+                let deltaSlice = window[0..., sampleLo ..< min(sampleLo + span, window.dim(1)), 0]
+                    .reshaped([-1])
+                deltaSlice.eval()
+                let delta = deltaSlice.asArray(Float.self)
+                for i in 0 ..< min(span, delta.count) {
+                    out[coreStart + i] = max(-1, min(1, pcm[coreStart + i] + delta[i]))
+                }
+                Memory.clearCache()
+                frame = coreEnd
             }
-            frame = coreEnd
         }
         return out
     }

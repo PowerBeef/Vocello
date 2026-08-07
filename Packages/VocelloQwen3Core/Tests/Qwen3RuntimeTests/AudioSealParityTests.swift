@@ -70,6 +70,16 @@ final class AudioSealParityTests: XCTestCase {
         let windowed2 = generator.watermark(pcm: pcm, coreFrames: 50, marginFrames: 64)
         XCTAssertEqual(windowed, windowed2, "windowed embedding must be deterministic")
 
+        // Zero-peak geometry: the conv stacks' receptive field is a handful
+        // of frames, so small margins must stay exact too — this is the
+        // shipping window shape (small transients bound the marking pass's
+        // Metal-heap high-water).
+        let tight = generator.watermark(pcm: pcm, coreFrames: 64, marginFrames: 8)
+        let tightError = zip(tight, windowed).map(-)
+        let tightSNR = snrDB(reference: windowed.map { $0 }, error: tightError)
+        XCTAssertGreaterThanOrEqual(tightSNR, 55,
+            "tight-margin windowing (64/8) SNR \(tightSNR) dB — margins no longer cover the receptive field")
+
         let wholeDelta = generator.watermarkDelta(pcm: pcm)
         let whole = zip(pcm, wholeDelta).map { max(-1, min(1, $0 + $1)) }
         let error = zip(windowed, whole).map(-)

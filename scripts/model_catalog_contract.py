@@ -32,6 +32,7 @@ ALLOWED_HOSTS = ("huggingface.co",)
 ALLOWED_REDIRECT_HOST_SUFFIXES = ("huggingface.co", "hf.co")
 HEX_40 = re.compile(r"^[0-9a-f]{40}$")
 HEX_64 = re.compile(r"^[0-9a-f]{64}$")
+MARKING_REQUIRED_PATH = "marking/audioseal_wm16_generator_fp16.safetensors"
 SHARED_COMPONENT_ID = "qwen3-speech-tokenizer-v1"
 SHARED_COMPONENT_ROOT = "speech_tokenizer"
 SHARED_COMPONENT_PATHS = (
@@ -413,6 +414,33 @@ def validate_catalog(root: Path = REPO_ROOT, require_complete: bool = False) -> 
         not isinstance(components, list) or len(components) != 1
     ):
         errors.append("production catalog must contain one shared speech_tokenizer component")
+    # CP-2 marking weights (Article 50): shipped as a required UNIFORM
+    # artifact file rather than a store shared component (the delivery
+    # planner and installed-model manifest are single-component by design).
+    # The check is conditional so pre-rollout catalogs stay valid: once any
+    # artifact carries the file, every artifact must carry it at one digest.
+    marking_files = {
+        artifact_identity(artifact): file
+        for artifact in artifacts
+        for file in artifact.get("files", [])
+        if isinstance(file, dict) and file.get("relativePath") == MARKING_REQUIRED_PATH
+    }
+    if marking_files:
+        missing_marking = sorted(
+            artifact_identity(artifact)
+            for artifact in artifacts
+            if artifact_identity(artifact) not in marking_files
+        )
+        if missing_marking:
+            errors.append(
+                "marking weights must be uniform across every artifact; missing from: "
+                + ", ".join(missing_marking)
+            )
+        identities = {
+            (file.get("sha256"), file.get("sizeBytes")) for file in marking_files.values()
+        }
+        if len(identities) > 1:
+            errors.append("marking weights differ across artifacts; one exact digest is required")
     missing = actual.get("missingArtifactIdentities")
     if not isinstance(missing, list) or any(not isinstance(item, str) for item in missing):
         errors.append("production catalog missingArtifactIdentities must be an array of strings")

@@ -74,8 +74,19 @@ Verified against the tree at this assessment's date:
   one prior mention of this space is a 2026-07-16 threat-model row naming "optional source
   note/export labeling" as a possible next control for voice misuse.
 
-So if Article 50(2) applies, Vocello currently satisfies none of it: outputs are
-indistinguishable, by bytes, from any other 24 kHz mono PCM WAV.
+So if Article 50(2) applies, Vocello at this assessment's date satisfied none of it: outputs
+were indistinguishable, by bytes, from any other 24 kHz mono PCM WAV.
+
+> **Status update (CP-2, 2026-08).** The gap above is being closed in the tree: every
+> published WAV now passes a publication-marking seam in `GenerationOutputAdapter`
+> (`Sources/QwenVoiceCore/AudioPublicationMarking.swift`) that embeds an imperceptible
+> AudioSeal watermark with a fixed Vocello payload (owned MLX port,
+> `Packages/VocelloQwen3Core/Sources/MLXAudioMark/`, parity-proven against the PyTorch
+> reference) and appends a machine-readable `LIST`/`INFO` provenance chunk — the layered
+> approach §4 recommends. Both marks flip together and fail closed; the only off-switch is
+> a registered debug knob under the `QWENVOICE_DEBUG` master gate. Weights ship through the
+> model catalog as a required per-model file. This section's point-in-time findings are
+> retained unedited as the motivating record.
 
 ## 3. Does it apply to Vocello? An honest analysis
 

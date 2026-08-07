@@ -13,7 +13,8 @@
   `config/codex-session-storage-policy.json`,
   `config/public-product-facts.json`, `config/toolchain.json`,
   `config/orchestration-contract.json`, `config/evidence-impact.json`,
-  `config/project-health-contract.json`, and `config/release-evidence-contract.json`
+  `config/project-health-contract.json`, `config/release-evidence-contract.json`,
+  and `config/marking-peak-equality.json`
 - `benchmarks/` schema-v1 compatibility, schema-v2 memory-qualified, and schema-v3
   quality-identity records, generated history, and preserved reference baselines
 - `docs/releases/`
@@ -257,6 +258,15 @@ scripts/clean_build_caches.sh --compact-profile-failure <run-id> --dry-run
   and evidence manifest v2, exact sidecar digests, ≥95% sampler coverage, zero capture failures,
   and no critical pressure, memory warning/exit, `hardTrim`, or `fullUnload`. A 95–<100% coverage
   result or guarded/soft-trim state is retained as `passedWithWarnings`; it is never silently clean.
+- **Publication marking must not move the take peak.** The macOS memory-qualification lane
+  fail-closes on `config/marking-peak-equality.json` (checker:
+  `scripts/check_marking_peak_equality.py`): within every take, no footprint sample at or after
+  the Article 50 marking interval may exceed that take's pre-marking peak beyond tolerance, and
+  the marking boundaries must be present (they are captured only when marking executes, so a
+  `QWENVOICE_MARKING=off` run cannot publish as marking evidence). Comparison is within-take by
+  design — cross-run lifecycle-peak comparison was refuted by its own knob-off control
+  (2026-08-07), which drifted hundreds of MB with host memory pressure while the marking pass
+  itself measures +9 to +18 MB.
 - **MetricKit field evidence stays local and delayed.** `memory-field-report` summarizes only
   already-pulled privacy-reduced aggregates. It never wakes a device, and its daily/non-run-
   correlated values cannot qualify or retroactively fail a benchmark take.

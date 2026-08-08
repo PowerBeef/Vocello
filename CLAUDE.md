@@ -311,7 +311,7 @@ gates. Listening remains optional independent annotation →
 | `Tests/VocelloiOSUITests/` | Physical-iPhone smoke and benchmark UI tests |
 | `Tests/VocelloiOSLogicTests/` | App-host-free iOS policy contracts; compile-only generic device-SDK coverage in CI |
 | `scripts/ui_test.sh` | Unified explicit XCUITest entry point |
-| `docs/reference/model-delivery.md` | Shared downloader, iOS restoration ledger, retry/cancel, diagnostics, and isolated live proof |
+| `docs/reference/model-delivery.md` | Shared downloader, chunked-transfer defaults and download tuning policy, iOS restoration ledger, retry/cancel, diagnostics, and isolated live proof |
 | `benchmarks/`, `scripts/benchmark_history.py` | PASS-only, privacy-safe benchmark registry and generated index |
 | `Tests/VocelloCoreTests/`, `Tests/VocelloEngineIntegrationTests/` | Deterministic Core/output/telemetry and XPC transport tests |
 | `docs/project-map.html` | Canonical interactive feature, component, dependency, and workflow map |

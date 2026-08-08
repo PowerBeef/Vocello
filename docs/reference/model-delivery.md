@@ -71,8 +71,11 @@ read-compatible but cannot claim shared-component reuse.
 macOS, CLI, and iOS now resolve `ProductionModelCatalog.deliveryPlan(...)` rather than enumerating a
 live repository. `validate --require-complete` proves this static contract. It does not replace the
 isolated Mac/iPhone lifecycle proofs, which must be refreshed after redirect, restoration,
-delivery-routing, or shared-component changes; the current proofs are the 2026-07-23
-six-artifact Mac run and three-artifact iPhone run described below.
+delivery-routing, or shared-component changes. The current Mac proof is the 2026-08-08
+isolated `pro_custom_speed` install at the 2026.08.06.1 marking re-pin (currency note
+below); the current-generation iPhone proof is queued for the next phone window. The
+2026-07-23 six-artifact Mac run and three-artifact iPhone run described below remain exact
+history for the prior artifact generation.
 
 ## Shared component store
 

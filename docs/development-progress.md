@@ -94,7 +94,8 @@ MB under each take's peak), fixed-seed QC-neutrality pair
 shipping CLI WAV the pinned reference detector scores 1.0000 with `0x56C0` decoding exactly
 (knob-off outputs: 0.011–0.034, no chunk). The roadmap CP-2 gate is the detailed authority.
 The maintainer-gated rollout completed 2026-08-08 (see the CP-1 close entry above); what
-remains is iOS device acceptance at the next phone window.
+remains is iOS marking device acceptance plus the iOS post-change delivery evidence at the
+next phone window.
 
 **macOS UI arc (2026-08-04/05, plan `macos-ui-2026-08`):** the SwiftUI frame-health
 lane `scripts/ui_test.sh macos perf` landed and proved itself (`9d283a9`; nine

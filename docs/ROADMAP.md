@@ -12,6 +12,7 @@
 | `compliance-2026-08` | active | release-qa | 1/2 (50%) |
 | `delivery-prompting-2026-08` | active | backend-mlx | 20/23 (87%) |
 | `doc-governance-2026-08` | active | release-qa | 8/9 (89%) |
+| `model-delivery-2026-08` | active | release-qa | 1/2 (50%) |
 | `convergence-metal4-stage4-2026-08` | complete | backend-and-platform | 7/7 (100%) |
 | `macos-ui-2026-08` | complete | macos | 7/7 (100%) |
 
@@ -102,6 +103,24 @@ Narrative authority: [`docs/reference/repository-self-verification.md`](referenc
 
 - **`DG-4`** (planned) — Phase 3 — source bindings on active documents.
   gate: Annotated incrementally as documents are touched; a binding invented in bulk without reading the document is worse than none.
+
+## Model download throughput
+
+`model-delivery-2026-08` · **active** · release-qa · adopted 2026-08-08
+
+Fix the maintainer-reported download crawl (Hugging Face's CDN shapes throughput per connection, so single-stream multi-gigabyte files always decay) with chunked parallel byte-range transfers, gated by the model-delivery tuning policy's controlled-comparison requirement; extend to iOS only after the background-session identity work and a device A/B.
+
+Narrative authority: [`docs/reference/model-delivery.md`](reference/model-delivery.md)
+
+| Item | Status | Title | Evidence |
+| --- | --- | --- | --- |
+| `MD-1` | done | macOS/CLI chunked byte-range transfers, default on | `commit:ce687f5`, `commit:5e6a9a0`, `file:Tests/VocelloCoreTests/ModelDownloadChunkSchedulingTests.swift`, `file:docs/reference/model-delivery.md` |
+| `MD-2` | planned | iOS chunked delivery (identity schema + reconciler + device A/B) | — |
+
+### Open items in detail
+
+- **`MD-2`** (planned) — iOS chunked delivery (identity schema + reconciler + device A/B).
+  gate: iOS keeps chunking off (explicit override in IOSModelDownloadCoordinator) because background-session task adoption and the reconciler are keyed by relativePath, so N chunk tasks of one file would be reaped as duplicates on relaunch. Prerequisites, in order: a range-qualified ModelDownloadTaskIdentity schema, reconciler and adoption updates, larger chunks (128-256 MiB) sized against the background-session small-range-request throttle, then a physical-device controlled comparison through the model-download UI lane (validated-summary.json per-artifact throughput, wire-byte accounting, and the QVOICE_IOS_DOWNLOAD_MIN_MBPS floor) meeting the same tuning-policy bar before any default change. Needs a phone window; independent of the queued iOS marking acceptance but can share a sitting.
 
 ## Convergence residuals, Metal 4 study, and Stage 4
 

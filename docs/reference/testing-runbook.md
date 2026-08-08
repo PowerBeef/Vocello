@@ -66,7 +66,8 @@ scripts/ui_test.sh ios benchmark
 # Filtered benchmark example
 scripts/ui_test.sh ios benchmark --modes custom --lengths short --warm 1 --label "focused"
 
-# Opt-in ~2.3 GB background-session restoration proof; isolated data, genuine Settings controls
+# Opt-in three-artifact background-session restoration proof (~1.7 GB Custom full-wire,
+# then Design and Clone with shared-component reuse); isolated data, genuine Settings controls
 scripts/ui_test.sh ios model-download
 ```
 
@@ -75,8 +76,10 @@ each runs the canonical 29-take matrix. Filtered runs are targeted diagnostics, 
 the full matrix when full frontend benchmark acceptance is explicitly requested.
 
 `ios model-download` is not a third routine UI lane. It selects one isolated physical-device test
-directly, backgrounds and relaunches the app during transfer, checks adopted progress, verifies the
-install, and deletes the isolated model through Settings. It never runs in ordinary CI or release.
+directly, backgrounds and relaunches the app during transfer, checks adopted progress, installs
+Custom full-wire and then Design and Clone with mandatory shared-component reuse, validates
+per-artifact wire-byte accounting and the throughput floor, and deletes all three isolated models
+through Settings. It never runs in ordinary CI or release.
 See [`model-delivery.md`](model-delivery.md).
 
 ## Model readiness

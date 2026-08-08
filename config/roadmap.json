@@ -46,6 +46,15 @@
       "adopted": "2026-08-06",
       "goal": "Understand and, on the maintainer's call, meet the EU AI Act Article 50 synthetic-content marking obligations (applicable 2026-08-02). Research first, posture decision second, technical work only behind that gate; no item implies accepting provider status or a release.",
       "authority": "docs/reference/eu-ai-act-article50-assessment.md"
+    },
+    {
+      "id": "model-delivery-2026-08",
+      "title": "Model download throughput",
+      "status": "active",
+      "owner": "release-qa",
+      "adopted": "2026-08-08",
+      "goal": "Fix the maintainer-reported download crawl (Hugging Face's CDN shapes throughput per connection, so single-stream multi-gigabyte files always decay) with chunked parallel byte-range transfers, gated by the model-delivery tuning policy's controlled-comparison requirement; extend to iOS only after the background-session identity work and a device A/B.",
+      "authority": "docs/reference/model-delivery.md"
     }
   ],
   "items": [
@@ -791,6 +800,36 @@
         "benchmarks/runs/memory-qualification/mac-memory-qualification-20260807-022819-3eb4d25b.json",
         "benchmarks/runs/engine-generation/macos-engine-20260807-023057-5275b724.json",
         "benchmarks/runs/engine-generation/macos-engine-20260807-023242-fce41fcb.json"
+      ],
+      "updated": "2026-08-08"
+    },
+    {
+      "id": "MD-1",
+      "plan": "model-delivery-2026-08",
+      "title": "macOS/CLI chunked byte-range transfers, default on",
+      "status": "done",
+      "gate": "Root cause established by live probes 2026-08-08: the HF Xet CDN throttles per connection (~20 MB/s burst, 2-6 MB/s sustained, high variance) and every file rode one URLSessionDownloadTask; the 2026-06 iOS chunking revert (39485bc) had misdiagnosed the max(64 MiB, size/6) static-split straggler as a chunking defect. Landed: 64 MiB ranges with a quarter-size tail window, bounded work-queue workers, per-chunk transient retry, active sibling cancellation (no duplicate wire bytes), largest-first dispatch, session-namespaced task keys with an optional per-worker-session strategy, chunk transfer-metrics file attribution keeping wireBytes delivery evidence byte-exact, EWMA skip/resume speed-sample exclusion, per-file verifying status, and the registered QVOICE_DOWNLOAD_ENGINE_PROFILE knob. Tuning-policy controlled comparison (interleaved ABBABA, n=6/arm, fresh isolated pro_custom_speed installs): legacy median 232.6 s vs chunked median 30.0 s, an 87.1% median improvement (~7.3 to ~57 MB/s) with zero retries, zero duplicate bytes, nominal thermal, clean integrity, and run-to-run variance collapsed from ~100 s to ~2 s; per-worker sessions measured within noise of the shared session. Defaults flipped for macOS/CLI in the same arc; post-flip live install verified wireBytes 1,708,583,689 exactly at 57.6 MB/s.",
+      "sourceOfTruth": [
+        "Sources/QwenVoiceCore/HuggingFaceDownloader.swift",
+        "docs/reference/model-delivery.md"
+      ],
+      "updated": "2026-08-08",
+      "evidence": [
+        "commit:ce687f5",
+        "commit:5e6a9a0",
+        "file:Tests/VocelloCoreTests/ModelDownloadChunkSchedulingTests.swift",
+        "file:docs/reference/model-delivery.md"
+      ]
+    },
+    {
+      "id": "MD-2",
+      "plan": "model-delivery-2026-08",
+      "title": "iOS chunked delivery (identity schema + reconciler + device A/B)",
+      "status": "planned",
+      "gate": "iOS keeps chunking off (explicit override in IOSModelDownloadCoordinator) because background-session task adoption and the reconciler are keyed by relativePath, so N chunk tasks of one file would be reaped as duplicates on relaunch. Prerequisites, in order: a range-qualified ModelDownloadTaskIdentity schema, reconciler and adoption updates, larger chunks (128-256 MiB) sized against the background-session small-range-request throttle, then a physical-device controlled comparison through the model-download UI lane (validated-summary.json per-artifact throughput, wire-byte accounting, and the QVOICE_IOS_DOWNLOAD_MIN_MBPS floor) meeting the same tuning-policy bar before any default change. Needs a phone window; independent of the queued iOS marking acceptance but can share a sitting.",
+      "sourceOfTruth": [
+        "Sources/iOS/IOSModelDownloadCoordinator.swift",
+        "docs/reference/model-delivery.md"
       ],
       "updated": "2026-08-08"
     }

@@ -47,7 +47,7 @@ download it automatically.
 - [ ] **iOS Distribution certificate** created (Developer portal → Certificates → Apple Distribution).
 - [ ] App ID `com.patricedery.vocello` has **App Groups** + **Increased Memory Limit** capabilities enabled.
       The `increased-memory-limit` capability is self-serve (no Apple review). It MUST be on the App Store
-      provisioning profile or the ~2.3 GB model load is Jetsam-killed on a signed build.
+      provisioning profile or the multi-gigabyte model load is Jetsam-killed on a signed build.
 - [ ] **App Store provisioning profile** for `com.patricedery.vocello` (Distribution → App Store), regenerated
       after enabling the capabilities so it carries `increased-memory-limit` + the App Group.
 - [ ] App record created in App Store Connect (bundle id `com.patricedery.vocello`, primary language, category).
@@ -74,11 +74,11 @@ download it automatically.
 
 > Vocello generates speech entirely on-device. It ships with **no bundled model weights** to keep the app
 > small; on first launch you install a voice model from Settings → Voice models (tap **Install** on
-> "Custom Voice"; it downloads a ~2.3 GB 4-bit Speed model from Hugging Face over Wi-Fi, ~1–2 min). After the model
+> "Custom Voice"; it downloads a ~1.7 GB 4-bit Speed model from Hugging Face over Wi-Fi). After the model
 > shows **Active**, open Studio, type a short line, pick a built-in speaker, and tap Generate to hear on-device
 > synthesis. Voice Design and Voice Cloning each install their own model the same way. No account or login is
-> required. Voice Cloning can record a reference on-device or import WAV, MP3, AIFF, or M4A from Files;
-> Microphone + Speech permissions are only requested for the in-app recording/transcription route.
+> required. Voice Cloning records its reference with the in-app microphone (there is no file import on
+> iPhone); Microphone + Speech permissions are only requested for that recording/transcription flow.
 
 No demo account is needed (no login). Note the model download requirement so the app is not judged
 non-functional under Guideline 2.1.
@@ -87,7 +87,7 @@ non-functional under Guideline 2.1.
 
 - [ ] iPhone screenshots (6.9" and 6.5" required). Capture from the **device** for all
       surfaces (generation, model install, sheets). Studio (with a script + voice), Voice Design, Voice
-      Cloning, Voices import/enrollment, History, and model-install Settings. Export named screenshots from a current
+      Cloning, the Voices library, History, and model-install Settings. Export named screenshots from a current
       `scripts/ui_test.sh ios smoke` result bundle.
 - [ ] App name, subtitle (≤30 chars each), description, keywords (≤100), support URL (the GitHub repo or the
       website), marketing URL (`https://vocello.vercel.app`), copyright.
@@ -188,7 +188,7 @@ Upload the IPA via Transporter or `xcrun altool --upload-app -f build/dist/ios/e
 
 The repo's standing iOS quality work covers the code side (audio-session lifecycle, accessibility, dismissible
 onboarding, error/empty states, portrait lock, privacy link). Before submitting, additionally confirm on a real
-device: launch + all 4 tabs; install a model; generate in each mode; import→enroll→clone; record→clone with mic/speech permission
+device: launch + all 4 tabs; install a model; generate in each mode; record→enroll→clone with mic/speech permission
 **denial + recovery** via Settings → About → Open iOS Settings; cancel mid-generation; an incoming call mid-record
 keeps the take; VoiceOver reads the primary controls; the largest Dynamic Type doesn't clip the composer.
 

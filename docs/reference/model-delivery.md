@@ -137,19 +137,26 @@ the canonical and debug-isolated coordinators retain and acknowledge only their 
 handler. A foreign handler is neither stored nor completed, while an owned session with no durable
 work is completed after reconciliation.
 
-iPhone runs one model request at a time. macOS keeps its existing foreground concurrency. Both
-platforms keep per-file range chunking disabled by default.
+iPhone runs one model request at a time. macOS keeps its existing foreground concurrency.
+**macOS/CLI run per-file range chunking by default since 2026-08-08** (evidence under the
+tuning policy below); iPhone keeps chunking off — background-session task adoption and the
+reconciler are keyed by `relativePath`, so chunked files there first need a range-qualified
+task-identity schema, a reconciler update, and a fresh device A/B through the
+model-download UI lane.
 
-The chunked-transfer mechanism itself landed 2026-08-08 (download-throughput investigation:
-Hugging Face's CDN shapes throughput per connection, so the multi-gigabyte long pole crawls
-on any single stream). When enabled, files at or above the 96 MiB threshold split into
-64 MiB ranges drained by a bounded worker pool, with a quarter-size tail window so the last
-ranges never leave one throttled connection running alone; a failed chunk retries its own
-16-64 MiB range, sibling chunk tasks are actively cancelled on file failure (no duplicate
-wire bytes), files dispatch largest-first, and an optional per-worker-session mode defeats
-HTTP/2/3 connection coalescing. The defaults stay off pending the tuning-policy controlled
-comparison below; the CLI A/B knob is `QVOICE_DOWNLOAD_ENGINE_PROFILE`
-(`legacy` | `chunked` | `chunked-multisession`, registered, inert without `QWENVOICE_DEBUG`).
+The chunked-transfer mechanism landed 2026-08-08 (download-throughput investigation:
+Hugging Face's CDN shapes throughput per connection — measured from the canonical Mac,
+~20 MB/s for the first ~15 s of a connection, then 2-6 MB/s sustained with high variance —
+so the multi-gigabyte long pole crawls on any single stream). Files at or above the
+96 MiB threshold split into 64 MiB ranges drained by a bounded worker pool, with a
+quarter-size tail window so the last ranges never leave one throttled connection running
+alone; a failed chunk retries its own 16-64 MiB range, sibling chunk tasks are actively
+cancelled on file failure (no duplicate wire bytes), files dispatch largest-first, chunk
+transfer metrics attribute their bytes to their file so `wireBytes` accounting stays
+exact, and an optional per-worker-session mode defeats HTTP/2/3 connection coalescing
+(measured equivalent to the shared session on this CDN; kept as a diagnostic lever). The
+CLI A/B knob is `QVOICE_DOWNLOAD_ENGINE_PROFILE` (`legacy` | `chunked` |
+`chunked-multisession`, registered, inert without `QWENVOICE_DEBUG`).
 Known trade-off while chunking is enabled: a process death mid-file discards that file's
 chunk progress (the holey partial cannot be range-resumed), whereas a single stream resumes
 from its partial; in-process retries are unaffected.
@@ -251,6 +258,19 @@ transfers are lifecycle evidence rather than concurrency tuning experiments.
 One live transfer is a lifecycle proof, not a concurrency experiment. Connection counts or chunking
 defaults may change only after a controlled comparison improves total transfer time by at least 15%
 without more retries, duplicate bytes, thermal regression, or restoration failure.
+
+> **Controlled comparison (2026-08-08, canonical Mac mini M2, isolated roots):** interleaved
+> ABBABA·ABBABA, n=6 per arm, full fresh `pro_custom_speed` installs (1,708,583,689 bytes,
+> artifactVersion 2026.08.06.1). Arm A (`legacy`: single-stream, 4 connections/host): median
+> network window **232.6 s** (185.1-284.7 s; ~7.3 MB/s — the CDN was shaping, so the regime
+> guard passes). Arm B (`chunked`: 64 MiB ranges + quarter-size tail, 4 workers,
+> 6 connections/host, shared session): median **30.0 s** (28.2-30.5 s; ~57 MB/s).
+> **Median improvement 87.1%**, every run zero retries, zero duplicate bytes, nominal
+> thermal, final integrity clean; the chunked arm also collapsed run-to-run variance from
+> ~100 s to ~2 s. A per-worker-session pilot measured within noise of the shared session
+> (30.8 s vs 28.6 s), so the shared session remains the default topology. This is the
+> evidence behind the macOS/CLI default flip; iPhone chunking remains a future device
+> experiment per the concurrency section above.
 
 Background Assets was evaluated and not adopted in this change. See
 [`../decisions/model-delivery-background-assets.md`](../decisions/model-delivery-background-assets.md).

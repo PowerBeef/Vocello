@@ -164,22 +164,24 @@ enum ModelsCommand {
                 .deletingLastPathComponent()
                 .appendingPathComponent("diagnostics/model-downloads", isDirectory: true)
         )
-        // A/B download-engine profile for the chunked-transfer controlled comparison
-        // (registered debug knob; inert without QWENVOICE_DEBUG). `legacy` (default)
-        // keeps shipping defaults; `chunked` enables byte-range chunking with 6
-        // connections per host; `chunked-multisession` additionally gives each chunk
+        // A/B download-engine profile (registered debug knob; inert without
+        // QWENVOICE_DEBUG). The shipping default IS the chunked profile since the
+        // 2026-08-08 controlled comparison (87% median improvement). `legacy`
+        // reproduces the pre-chunking profile for regression comparisons; `chunked`
+        // names the default explicitly; `chunked-multisession` gives each chunk
         // worker its own URLSession so ranges cannot coalesce onto one HTTP/2/3
-        // connection.
+        // connection (measured equivalent to the shared session on this CDN; kept
+        // as a diagnostic lever).
         var engineConfiguration = HuggingFaceDownloader.Configuration()
         switch RuntimeDebugGate.value(for: "QVOICE_DOWNLOAD_ENGINE_PROFILE")?
             .trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        case "legacy":
+            engineConfiguration.chunkLargeFiles = false
+            engineConfiguration.maxConnectionsPerHost = 4
+            note("download engine profile: legacy")
         case "chunked":
-            engineConfiguration.chunkLargeFiles = true
-            engineConfiguration.maxConnectionsPerHost = 6
-            note("download engine profile: chunked")
+            note("download engine profile: chunked (default)")
         case "chunked-multisession":
-            engineConfiguration.chunkLargeFiles = true
-            engineConfiguration.maxConnectionsPerHost = 6
             engineConfiguration.chunkSessionStrategy = .perWorker
             note("download engine profile: chunked-multisession")
         default:

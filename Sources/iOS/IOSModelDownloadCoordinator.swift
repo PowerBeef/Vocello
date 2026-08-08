@@ -480,6 +480,11 @@ final class IOSModelDownloadCoordinator {
     private func makeSharedDownloader() -> HuggingFaceDownloader {
         var engineConfig = HuggingFaceDownloader.Configuration()
         engineConfig.maxConcurrentFiles = 6
+        // Chunking stays off on iOS even though the macOS/CLI default flipped on
+        // (2026-08-08): background-session task adoption and the reconciler are keyed
+        // by relativePath, so N chunk tasks of one file would be reaped as duplicates
+        // on relaunch. Enabling it needs a range-qualified task-identity schema, a
+        // reconciler update, and a fresh device A/B through the model-download UI lane.
         engineConfig.chunkLargeFiles = false
 
         let sessionConfig = URLSessionConfiguration.background(

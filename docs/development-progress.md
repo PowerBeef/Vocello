@@ -41,6 +41,24 @@ machine-readable status record and wins over any older prose.
 
 ## Resume here (2026-08-08)
 
+**Download-throughput fix (2026-08-08, maintainer-requested investigation):** the
+"speeds all over the place, always slowing to a crawl" report root-caused to Hugging
+Face's CDN shaping throughput per connection (~20 MB/s burst then 2-6 MB/s sustained,
+measured live) while every file rode one URLSession stream; the old dead chunk path's
+`max(64 MiB, size/6)` split — six ~355 MB chunks with a lone straggler — explains the
+2026-06 "tapering" revert. The chunked work-queue mechanism (64 MiB ranges + quarter-size
+tail, bounded workers, per-chunk retry, active sibling cancellation, largest-first
+dispatch, session-namespaced task keys with an optional per-worker-session mode) landed
+with twelve deterministic tests, then the tuning-policy controlled comparison (interleaved
+n=6/arm, `docs/reference/model-delivery.md` Tuning policy) measured **median 232.6 s →
+30.0 s (87.1% improvement, ~57 MB/s)** with zero retries/duplicates and run-to-run
+variance collapsed from ~100 s to ~2 s, so the macOS/CLI defaults flipped in the same
+arc. Chunk transfer metrics now attribute bytes to their file, keeping `wireBytes`
+delivery evidence exact under chunking. Speed-display fixes rode along (skipped files no
+longer inject fake speed spikes; the long-pole SHA pass shows a visible verifying status
+instead of freezing). iPhone keeps chunking off pending a range-qualified task-identity
+schema, reconciler update, and its own device A/B at a future phone window.
+
 **CP-1 close (2026-08-08, plan `compliance-2026-08`):** the Article 50 posture item is done
 as far as it reaches before the paid launch. Option A verified complete after adding the
 generator version to the provenance chunk (`version=` ICMT field, `Vocello <version>` ISFT,

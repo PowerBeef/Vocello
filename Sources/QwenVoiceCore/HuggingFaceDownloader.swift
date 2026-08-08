@@ -51,21 +51,23 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
     }
 
     /// Tunable download-engine parameters. Defaults match the shipping macOS/CLI profile:
-    /// up to 6 files in flight, per-file byte-range chunking off, and the foreground
-    /// URLSession capped at `maxConnectionsPerHost`. iOS passes the same file concurrency
-    /// with chunking off (background URLSession task adoption is keyed by relative path,
-    /// so chunked files need an identity-schema extension first). Chunking parameters:
-    /// files at or above `chunkedDownloadThreshold` split into `chunkTargetSize` ranges
-    /// drained by `chunkWorkerCount` workers, with a shrinking tail (quarter-size ranges
-    /// over the final `chunkWorkerCount x chunkTargetSize` bytes) so the last ranges never
-    /// leave one throttled connection running alone.
+    /// up to 6 files in flight, per-file byte-range chunking ON (the 2026-08-08 controlled
+    /// comparison measured an 87% median transfer-time improvement: the CDN shapes
+    /// throughput per connection, so the multi-gigabyte long pole must not ride a single
+    /// stream), and the foreground URLSession capped at `maxConnectionsPerHost`. iOS
+    /// explicitly overrides chunking off (background URLSession task adoption is keyed by
+    /// relative path, so chunked files need an identity-schema extension first). Chunking
+    /// parameters: files at or above `chunkedDownloadThreshold` split into
+    /// `chunkTargetSize` ranges drained by `chunkWorkerCount` workers, with a shrinking
+    /// tail (quarter-size ranges over the final `chunkWorkerCount x chunkTargetSize`
+    /// bytes) so the last ranges never leave one throttled connection running alone.
     public struct Configuration: Sendable {
         public var maxConcurrentFiles = 6
-        public var chunkLargeFiles = false
+        public var chunkLargeFiles = true
         public var chunkedDownloadThreshold: Int64 = 96 * 1024 * 1024
         public var chunkTargetSize: Int64 = 64 * 1024 * 1024
         public var chunkWorkerCount = 4
-        public var maxConnectionsPerHost = 4
+        public var maxConnectionsPerHost = 6
         public var chunkSessionStrategy: ChunkSessionStrategy = .shared
         public var maxDownloadRetries = 3
         public init() {}
@@ -758,6 +760,13 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
     /// worker i's session; the main `session` carries task-key namespace 0 and these carry
     /// namespaces 1...N so task identifiers never collide across sessions.
     private let chunkSessionsBox = Mutex<[URLSession]>([])
+    /// Task-key -> relativePath for in-flight chunk tasks. Chunk tasks carry no
+    /// `ModelDownloadTaskIdentity` (background adoption would misread it), so without
+    /// this map their transfer metrics would classify as control-plane bytes and the
+    /// diagnostics store's `wireBytes` — delivery-evidence input — would under-count by
+    /// the whole chunked payload. Entries are removed in `didCompleteWithError`, after
+    /// the metrics callback has consumed them.
+    private let chunkTaskPathsBox = Mutex<[Int: String]>([:])
     private let state: DownloadStateRegistry
     private let delegateProgressGate = Mutex(ModelDownloadDelegateProgressGate())
     private let terminalEventSequencer = ModelDownloadDelegateTerminalSequencer()
@@ -1495,7 +1504,8 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             resumeDataURL: resumeDataURL,
             expectedSize: file.size,
             sha256: file.sha256,
-            fileIndex: fileIndex
+            fileIndex: fileIndex,
+            relativePath: relativePath
         )
 
         try await recordVerifiedReceipt(
@@ -1546,7 +1556,8 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         resumeDataURL: URL,
         expectedSize: Int64,
         sha256: String?,
-        fileIndex: Int
+        fileIndex: Int,
+        relativePath: String
     ) async throws {
         if fileIsValid(at: partialURL, expectedSize: expectedSize, sha256: sha256) {
             try publishDownloadedFile(partialURL, to: destination)
@@ -1572,6 +1583,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
                     expectedSize: expectedSize,
                     sha256: sha256,
                     fileIndex: fileIndex,
+                    relativePath: relativePath,
                     avoidChunking: avoidChunking
                 )
                 return
@@ -1635,6 +1647,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         expectedSize: Int64,
         sha256: String?,
         fileIndex: Int,
+        relativePath: String,
         avoidChunking: Bool
     ) async throws {
         // Large LFS files (known size + sha256) download as parallel byte-range chunks so
@@ -1650,7 +1663,8 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
                 partialURL: partialURL,
                 expectedSize: expectedSize,
                 sha256: sha256,
-                fileIndex: fileIndex
+                fileIndex: fileIndex,
+                relativePath: relativePath
             )
             return
         }
@@ -1773,7 +1787,8 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         partialURL: URL,
         expectedSize: Int64,
         sha256: String?,
-        fileIndex: Int
+        fileIndex: Int,
+        relativePath: String
     ) async throws {
         // A partial from a prior single-stream or chunked attempt that isn't the expected
         // size would leave holes; drop it so chunks write a clean file.
@@ -1803,6 +1818,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
                                 url: url,
                                 range: range,
                                 fileIndex: fileIndex,
+                                relativePath: relativePath,
                                 assembly: assembly,
                                 transferSession: workerSession
                             )
@@ -1836,6 +1852,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         url: URL,
         range: ChunkRange,
         fileIndex: Int,
+        relativePath: String,
         assembly: ChunkAssemblyCoordinator,
         transferSession: URLSession
     ) async throws {
@@ -1846,6 +1863,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
                     url: url,
                     range: range,
                     fileIndex: fileIndex,
+                    relativePath: relativePath,
                     assembly: assembly,
                     transferSession: transferSession
                 )
@@ -1877,6 +1895,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         url: URL,
         range: ChunkRange,
         fileIndex: Int,
+        relativePath: String,
         assembly: ChunkAssemblyCoordinator,
         transferSession: URLSession
     ) async throws {
@@ -1884,6 +1903,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         request.setValue("bytes=\(range.start)-\(range.end)", forHTTPHeaderField: "Range")
         let task = transferSession.downloadTask(with: request)
         let key = taskKey(for: task, in: transferSession)
+        chunkTaskPathsBox.withLock { $0[key] = relativePath }
         let downloaded: DownloadedTemporaryFile = try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { continuation in
                 Task {
@@ -2487,9 +2507,12 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         let transactions = metrics.transactionMetrics
         let last = transactions.last
         let identity = ModelDownloadTaskIdentity.decode(taskDescription: task.taskDescription)
+        // Chunk tasks carry no task-description identity; attribute their bytes to
+        // their file via the chunk-path map so wireBytes accounting stays exact.
+        let chunkPath = chunkTaskPathsBox.withLock { $0[taskKey(for: task, in: session)] }
         transferMetricsHandler.handler(
             TransferMetrics(
-                relativePath: identity?.relativePath,
+                relativePath: identity?.relativePath ?? chunkPath,
                 protocolName: last?.networkProtocolName,
                 redirectCount: metrics.redirectCount,
                 reusedConnection: transactions.contains(where: { $0.isReusedConnection }),
@@ -2511,6 +2534,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         delegateProgressGate.withLock { gate in
             gate.finish(taskID: taskID)
         }
+        chunkTaskPathsBox.withLock { $0.removeValue(forKey: taskID) }
         terminalEventSequencer.complete(taskID: taskID) { [state] in
             await state.setWaitingForConnectivity(false)
             guard let error else {

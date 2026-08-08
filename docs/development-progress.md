@@ -51,8 +51,11 @@ Local-first-privacy bullet pair and a website Limitations "AI disclosure" entry 
 only there: shipping 2.4.0 predates the marking seam). The App Store submission runbook
 gained its Article 50 checklist row beside the EU DSA row and DG-4 frontmatter. B (C2PA),
 E (Code of Practice), and the real legal review stay paid-launch-gated, recorded in the
-CP-1 gate. The same day, five of the six CP-2 marking-weight uploads landed on the
-maintainer's go (the sixth plus the catalog re-pin are in flight this session).
+CP-1 gate. The same day, on the maintainer's go, all six CP-2 marking-weight uploads
+landed and the contract, receipts, and iOS catalog re-pinned to the marked revisions at
+`artifactVersion 2026.08.06.1` (production catalog validates complete). CP-2's remaining
+tail is iOS device acceptance at the next phone window plus a fresh isolated delivery run
+as the explicit post-change delivery evidence.
 
 **Article 50 marking arc (2026-08-06/07, plan `compliance-2026-08`, CP-2 stage 2 piece 3):**
 every published WAV now carries both marks — the AudioSeal watermark (fixed payload
@@ -70,10 +73,8 @@ MB under each take's peak), fixed-seed QC-neutrality pair
 `macos-engine-20260807-023057-5275b724` / `-023242-fce41fcb` (8/8 verdict parity), and a
 shipping CLI WAV the pinned reference detector scores 1.0000 with `0x56C0` decoding exactly
 (knob-off outputs: 0.011–0.034, no chunk). The roadmap CP-2 gate is the detailed authority.
-Remaining, maintainer-gated: the six HF weight uploads and the follow-on artifact re-pin
-(one-shot rollout script prepared for the maintainer's go; `model_catalog_contract.py`
-already enforces marking-file uniformity once any artifact carries it), then iOS device
-acceptance at the next phone window.
+The maintainer-gated rollout completed 2026-08-08 (see the CP-1 close entry above); what
+remains is iOS device acceptance at the next phone window.
 
 **macOS UI arc (2026-08-04/05, plan `macos-ui-2026-08`):** the SwiftUI frame-health
 lane `scripts/ui_test.sh macos perf` landed and proved itself (`9d283a9`; nine

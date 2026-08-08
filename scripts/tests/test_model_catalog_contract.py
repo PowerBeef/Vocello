@@ -128,12 +128,12 @@ class ModelCatalogContractTests(unittest.TestCase):
             f"{artifact['modelID']}:{artifact['variantID']}": artifact["totalBytes"]
             for artifact in document["artifacts"]
         }
-        # Exact 2026.08.01.1 totals (f16 speech-tokenizer promotion, §R:
-        # the 2026.07.26.1 totals minus the shared component's 341,113,208-byte
-        # reduction).
-        self.assertEqual(totals["pro_custom:quality"], 2_447_306_065)
-        self.assertEqual(totals["pro_design:quality"], 2_447_305_572)
-        self.assertEqual(totals["pro_clone:quality"], 2_471_323_205)
+        # Exact 2026.08.06.1 totals (Article 50 marking rollout: the
+        # 2026.08.01.1 totals plus the 29,360,042-byte AudioSeal generator
+        # added to every artifact).
+        self.assertEqual(totals["pro_custom:quality"], 2_476_666_107)
+        self.assertEqual(totals["pro_design:quality"], 2_476_665_614)
+        self.assertEqual(totals["pro_clone:quality"], 2_500_683_247)
         self.assertEqual(document["schemaVersion"], 2)
         self.assertEqual(len(document["sharedComponents"]), 1)
         component = document["sharedComponents"][0]

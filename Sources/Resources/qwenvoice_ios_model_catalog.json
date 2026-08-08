@@ -2,8 +2,8 @@
   "generatedAt": "2026-08-01T23:56:53Z",
   "models": [
     {
-      "artifactVersion": "2026.08.01.1",
-      "baseURL": "https://huggingface.co/PowerBeef02/Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit/resolve/b345ee9059808ecb480fa6731ccb6feeb0e96bf2",
+      "artifactVersion": "2026.08.06.1",
+      "baseURL": "https://huggingface.co/PowerBeef02/Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit/resolve/f84295ee776abf19745312ae197f1e044a0ce53b",
       "files": [
         {
           "relativePath": "README.md",
@@ -19,6 +19,11 @@
           "relativePath": "generation_config.json",
           "sha256": "f1b90b4513f3b34c62851049e2492d7b4c5940daf1276f89c82b8ef04127f3aa",
           "sizeBytes": 245
+        },
+        {
+          "relativePath": "marking/audioseal_wm16_generator_fp16.safetensors",
+          "sha256": "0e743d11fb8e973803aaa605bed2779429b2e1b13ec9b6e6c8f64b1098e637a3",
+          "sizeBytes": 29360042
         },
         {
           "relativePath": "merges.txt",
@@ -72,11 +77,11 @@
         }
       ],
       "modelID": "pro_custom",
-      "totalBytes": 1679223647
+      "totalBytes": 1708583689
     },
     {
-      "artifactVersion": "2026.08.01.1",
-      "baseURL": "https://huggingface.co/PowerBeef02/Qwen3-TTS-12Hz-1.7B-VoiceDesign-4bit/resolve/cc2eb0584fbd04e7baf85b4f59978eaa77254e6d",
+      "artifactVersion": "2026.08.06.1",
+      "baseURL": "https://huggingface.co/PowerBeef02/Qwen3-TTS-12Hz-1.7B-VoiceDesign-4bit/resolve/ff503f17dd41f8cd589638ec2cade5c0d1c59ecd",
       "files": [
         {
           "relativePath": "README.md",
@@ -92,6 +97,11 @@
           "relativePath": "generation_config.json",
           "sha256": "f1b90b4513f3b34c62851049e2492d7b4c5940daf1276f89c82b8ef04127f3aa",
           "sizeBytes": 245
+        },
+        {
+          "relativePath": "marking/audioseal_wm16_generator_fp16.safetensors",
+          "sha256": "0e743d11fb8e973803aaa605bed2779429b2e1b13ec9b6e6c8f64b1098e637a3",
+          "sizeBytes": 29360042
         },
         {
           "relativePath": "merges.txt",
@@ -145,11 +155,11 @@
         }
       ],
       "modelID": "pro_design",
-      "totalBytes": 1679223154
+      "totalBytes": 1708583196
     },
     {
-      "artifactVersion": "2026.08.01.1",
-      "baseURL": "https://huggingface.co/PowerBeef02/Qwen3-TTS-12Hz-1.7B-Base-4bit/resolve/93e5bba11ed9734d6f5993b01a60e378a2e1dd42",
+      "artifactVersion": "2026.08.06.1",
+      "baseURL": "https://huggingface.co/PowerBeef02/Qwen3-TTS-12Hz-1.7B-Base-4bit/resolve/fdad8c2d93c555ddc02e8ce475aeb72645268ae3",
       "files": [
         {
           "relativePath": "README.md",
@@ -165,6 +175,11 @@
           "relativePath": "generation_config.json",
           "sha256": "f1b90b4513f3b34c62851049e2492d7b4c5940daf1276f89c82b8ef04127f3aa",
           "sizeBytes": 245
+        },
+        {
+          "relativePath": "marking/audioseal_wm16_generator_fp16.safetensors",
+          "sha256": "0e743d11fb8e973803aaa605bed2779429b2e1b13ec9b6e6c8f64b1098e637a3",
+          "sizeBytes": 29360042
         },
         {
           "relativePath": "merges.txt",
@@ -218,7 +233,7 @@
         }
       ],
       "modelID": "pro_clone",
-      "totalBytes": 1703240727
+      "totalBytes": 1732600769
     }
   ]
 }

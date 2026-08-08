@@ -53,8 +53,8 @@ def engine_row(generation_id: str, *, run_id: str = "run-one", cell: str = "cust
         "modelRuntimeIdentity": {
             "resolvedModelID": "pro_custom_speed",
             "modelRepository": "PowerBeef02/Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit",
-            "huggingFaceRevision": "b345ee9059808ecb480fa6731ccb6feeb0e96bf2",
-            "artifactVersion": "2026.08.01.1",
+            "huggingFaceRevision": "f84295ee776abf19745312ae197f1e044a0ce53b",
+            "artifactVersion": "2026.08.06.1",
             "quantization": "4-bit",
             "integrityManifestDigest": "f" * 64,
             "runtimeProfileSignature": "pro_custom_speed:fixture-v1",
@@ -890,8 +890,8 @@ class PublisherTests(unittest.TestCase):
         row["modelRuntimeIdentity"] = {
             "resolvedModelID": "pro_design_speed",
             "modelRepository": "PowerBeef02/Qwen3-TTS-12Hz-1.7B-VoiceDesign-4bit",
-            "huggingFaceRevision": "cc2eb0584fbd04e7baf85b4f59978eaa77254e6d",
-            "artifactVersion": "2026.08.01.1",
+            "huggingFaceRevision": "ff503f17dd41f8cd589638ec2cade5c0d1c59ecd",
+            "artifactVersion": "2026.08.06.1",
             "quantization": "4-bit",
             "integrityManifestDigest": "c" * 64,
             "runtimeProfileSignature": "pro_design_speed:profile-v2",
@@ -1668,7 +1668,7 @@ class PublisherTests(unittest.TestCase):
             models[0]["modelID"],
             "PowerBeef02/Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit",
         )
-        self.assertEqual(models[0]["revision"], "b345ee9059808ecb480fa6731ccb6feeb0e96bf2")
+        self.assertEqual(models[0]["revision"], "f84295ee776abf19745312ae197f1e044a0ce53b")
         invalid = json.loads(verdict.read_text())
         invalid["summary"]["results"]["off"]["pcmSHA256"]["r1-t1"] = (
             publisher.hashlib.sha256(b"").hexdigest()

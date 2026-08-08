@@ -21,6 +21,10 @@ const LIMITATIONS = [
     k: "Cloning varies",
     v: "Use voices you own or have permission to use. For local voice cloning workflows, reference quality matters, and subjective similarity can vary by clip and model behavior.",
   },
+  {
+    k: "AI disclosure",
+    v: "If you publish audio of a cloned real voice, tell your audience it is AI-generated. EU law may require this disclosure.",
+  },
 ];
 
 export const Limitations = () => (

@@ -164,6 +164,20 @@ posture — it is honest product design.
 This assessment and its options are registered on the roadmap as a maintainer-gated
 compliance item; no technical work proceeds without that call.
 
+> **Status update (CP-1 close, 2026-08-08).** The maintainer's posture call (a one-time
+> purchase is planned, so Article 50(2) binds the paid offering with certainty; roadmap
+> CP-1 records the adopted sequence) has been executed as far as it reaches today:
+> **Option C** landed first via the CP-2 marking seam (§2 status update). **Option A** is
+> now verified complete against this section's field set — the `LIST/INFO` chunk carries
+> the AI-generated declaration, generator (`Vocello` + a `version=` field added in this
+> close), engine, exact model ID, mode, ISO 8601 date, and the watermark payload
+> reference. **Option D** landed as one disclosure sentence beside the consent gate on
+> both platforms plus a README bullet and a website "AI disclosure" limitations entry
+> (the site line states only the user duty: the shipping 2.4.0 release predates the
+> marking seam). Recommendation 3 is done — the submission runbook carries the Article 50
+> checklist row beside the DSA row. **Options B (C2PA) and E (Code of Practice) plus the
+> real legal review remain gated on the paid launch**, recorded in roadmap CP-1's gate.
+
 ## Sources
 
 - [Commission FAQ: Transparency obligations under Article 50 of the AI Act](https://digital-strategy.ec.europa.eu/en/faqs/transparency-obligations-under-article-50-ai-act)

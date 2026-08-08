@@ -295,7 +295,7 @@ public enum BoundedLongFormAssembler {
                AudioMarkingPolicy.resolvedEnabled() {
                 try WAVProvenanceChunk.append(
                     toWAVAt: stagingURL,
-                    software: "Vocello",
+                    software: WAVProvenanceChunk.generatorSoftware(),
                     comment: WAVProvenanceChunk.comment(
                         modelID: provenanceModelID,
                         mode: provenanceMode,

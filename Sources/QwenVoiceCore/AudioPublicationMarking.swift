@@ -104,7 +104,7 @@ public enum AudioPublicationMarker {
 
         try WAVProvenanceChunk.append(
             toWAVAt: url,
-            software: "Vocello",
+            software: WAVProvenanceChunk.generatorSoftware(),
             comment: WAVProvenanceChunk.comment(
                 modelID: configuration.modelID,
                 mode: configuration.mode,
@@ -127,7 +127,7 @@ public enum AudioPublicationMarker {
         guard AudioMarkingPolicy.resolvedEnabled(environment: environment) else { return }
         try WAVProvenanceChunk.append(
             toWAVAt: url,
-            software: "Vocello",
+            software: WAVProvenanceChunk.generatorSoftware(),
             comment: WAVProvenanceChunk.comment(
                 modelID: configuration.modelID,
                 mode: configuration.mode,

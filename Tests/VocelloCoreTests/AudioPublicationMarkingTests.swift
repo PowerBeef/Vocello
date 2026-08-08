@@ -66,7 +66,9 @@ final class AudioPublicationMarkingTests: XCTestCase {
         }
 
         let fields = try WAVProvenanceChunk.readInfoFields(fromWAVAt: url)
-        XCTAssertEqual(fields["ISFT"], "Vocello")
+        // ISFT is "Vocello <version>" when the test-host bundle carries a
+        // marketing version, bare "Vocello" otherwise.
+        XCTAssertEqual(fields["ISFT"], WAVProvenanceChunk.generatorSoftware())
         let comment = try XCTUnwrap(fields["ICMT"])
         XCTAssertTrue(comment.hasPrefix("AI-generated audio"), comment)
         XCTAssertTrue(comment.contains("model=pro_custom_speed"), comment)

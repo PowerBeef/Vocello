@@ -74,6 +74,10 @@ The Expressive, Balanced, and Consistent variation settings trade take-to-take v
 - Voice cloning should only be used with voices you own or have permission to use.
 - Clone generation remains disabled until its visible consent acknowledgment is enabled in
   Settings; the choice is stored locally and can be changed there.
+- Generated audio is marked as AI-generated: an inaudible AudioSeal watermark plus a
+  machine-readable provenance note in the WAV file.
+- If you publish audio of a cloned real voice, disclose that it is AI-generated. EU law may
+  require this disclosure (EU AI Act, Article 50).
 
 Storage locations and deletion behavior are documented in [`docs/reference/privacy-storage.md`](docs/reference/privacy-storage.md).
 

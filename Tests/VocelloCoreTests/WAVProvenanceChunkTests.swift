@@ -5,8 +5,8 @@ import XCTest
 
 /// The Article 50 provenance chunk (CP-2 piece 2): appended LIST/INFO must
 /// keep the WAV well-formed, carry the machine-readable statement, and be
-/// readable back field-for-field. Not yet applied by publication — these
-/// tests own the utility's contract until the marking flip ships.
+/// readable back field-for-field. Applied by both publication paths since
+/// CP-2 piece 3; these tests own the utility's contract.
 final class WAVProvenanceChunkTests: XCTestCase {
     private func makeBareWAV(samples: [Int16] = Array(repeating: 0, count: 2_400)) throws -> URL {
         let url = FileManager.default.temporaryDirectory
@@ -36,7 +36,7 @@ final class WAVProvenanceChunkTests: XCTestCase {
         let comment = WAVProvenanceChunk.comment(
             modelID: "pro_custom_speed", mode: "custom",
             createdAt: Date(timeIntervalSince1970: 1_786_000_000),
-            watermarkPayload: 0x56C0)
+            watermarkPayload: 0x56C0, generatorVersion: "9.9.9")
         try WAVProvenanceChunk.append(toWAVAt: url, software: "Vocello test", comment: comment)
 
         let fields = try WAVProvenanceChunk.readInfoFields(fromWAVAt: url)
@@ -75,8 +75,27 @@ final class WAVProvenanceChunkTests: XCTestCase {
     func testCommentOmitsMarkingFieldWithoutPayload() {
         let comment = WAVProvenanceChunk.comment(
             modelID: "m", mode: "design", createdAt: Date(timeIntervalSince1970: 0),
-            watermarkPayload: nil)
+            watermarkPayload: nil, generatorVersion: nil)
         XCTAssertFalse(comment.contains("marking="), comment)
         XCTAssertTrue(comment.contains("mode=design"), comment)
+    }
+
+    func testCommentCarriesGeneratorVersionAfterGeneratorField() {
+        let comment = WAVProvenanceChunk.comment(
+            modelID: "m", mode: "clone", createdAt: Date(timeIntervalSince1970: 0),
+            watermarkPayload: 0x56C0, generatorVersion: "9.9.9")
+        XCTAssertTrue(comment.contains("generator=Vocello; version=9.9.9; engine=Qwen3-TTS"), comment)
+    }
+
+    func testCommentOmitsVersionFieldWhenUnresolvable() {
+        let comment = WAVProvenanceChunk.comment(
+            modelID: "m", mode: "custom", createdAt: Date(timeIntervalSince1970: 0),
+            watermarkPayload: nil, generatorVersion: nil)
+        XCTAssertFalse(comment.contains("version="), comment)
+    }
+
+    func testGeneratorSoftwareFormatsVersion() {
+        XCTAssertEqual(WAVProvenanceChunk.generatorSoftware(version: "9.9.9"), "Vocello 9.9.9")
+        XCTAssertEqual(WAVProvenanceChunk.generatorSoftware(version: nil), "Vocello")
     }
 }

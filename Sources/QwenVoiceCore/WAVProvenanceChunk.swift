@@ -8,16 +8,34 @@ import Foundation
 /// (in-memory header builder and the streaming `AVAudioFile` output) because
 /// it operates on the finalized file.
 ///
-/// Not yet applied by the publication path: the metadata chunk and the
-/// AudioSeal watermark flip on together (one byte-identity discontinuity for
-/// the fixed-seed evidence methodology) when the marking component ships.
+/// Applied by the publication paths since CP-2 piece 3 (2026-08): the
+/// single-take marking seam in `GenerationOutputAdapter` and the long-form
+/// join in `LongFormAssembly` both append it whenever marking is enabled;
+/// the chunk and the AudioSeal watermark flip on together (one byte-identity
+/// discontinuity for the fixed-seed evidence methodology).
 public enum WAVProvenanceChunk {
+    /// Marketing version of the process embedding the chunk (app, XPC engine
+    /// service, or CLI; all targets carry `MARKETING_VERSION`). `nil` when the
+    /// host bundle has no version so the field is omitted rather than invented.
+    public static let generatorVersion: String? = {
+        guard let raw = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String,
+              !raw.isEmpty else { return nil }
+        return raw
+    }()
+
+    /// The `ISFT` software tag: "Vocello <version>", or bare "Vocello" when
+    /// no version is resolvable.
+    public static func generatorSoftware(version: String? = WAVProvenanceChunk.generatorVersion) -> String {
+        version.map { "Vocello \($0)" } ?? "Vocello"
+    }
+
     /// The machine-readable generation statement embedded as `ICMT`.
     public static func comment(
         modelID: String,
         mode: String,
         createdAt: Date,
-        watermarkPayload: UInt16?
+        watermarkPayload: UInt16?,
+        generatorVersion: String? = WAVProvenanceChunk.generatorVersion
     ) -> String {
         let stamp = ISO8601DateFormatter().string(from: createdAt)
         var fields = [
@@ -28,6 +46,9 @@ public enum WAVProvenanceChunk {
             "mode=\(mode)",
             "created=\(stamp)",
         ]
+        if let generatorVersion {
+            fields.insert("version=\(generatorVersion)", at: 2)
+        }
         if let payload = watermarkPayload {
             fields.append(String(format: "marking=AudioSeal:0x%04X", payload))
         }

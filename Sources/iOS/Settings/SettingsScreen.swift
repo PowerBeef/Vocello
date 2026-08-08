@@ -64,6 +64,15 @@ struct SettingsScreen: View {
                             isOn: $cloneConsentAcknowledged,
                             tint: IOSBrandTheme.clone
                         )
+
+                        // CP-1 option D: the users' own EU AI Act Article
+                        // 50(4) disclosure duty, beside the rights gate.
+                        Text("If you publish audio of a cloned real voice, disclose that it is AI-generated. EU law may require this.")
+                            .iosScaledFont(size: 12, relativeTo: .caption)
+                            .foregroundStyle(IOSAppTheme.textSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 12)
                     }
 
                     IOSSettingsReferenceSection(title: "Voice models") {

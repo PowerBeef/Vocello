@@ -187,6 +187,11 @@ struct SettingsView: View {
                             Text("Only clone voices you own or have explicit permission to use.")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
+                            // CP-1 option D: the users' own EU AI Act Article
+                            // 50(4) disclosure duty, beside the rights gate.
+                            Text("If you publish audio of a cloned real voice, disclose that it is AI-generated. EU law may require this.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
                         }
                     }
                     .tint(AppTheme.voiceCloning)

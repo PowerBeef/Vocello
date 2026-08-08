@@ -1,3 +1,11 @@
+---
+status: active
+owner: release-qa
+summary: Operator checklist for shipping Vocello for iPhone to TestFlight / the App Store — account prerequisites, App Store Connect privacy and compliance rows, App Review notes, and the credential-bound archive/upload steps.
+sourceOfTruth:
+  - project.yml
+  - docs/reference/eu-ai-act-article50-assessment.md
+---
 # iOS App Store submission runbook
 
 The end-to-end steps to ship **Vocello for iPhone** (`com.patricedery.vocello`) to TestFlight / the App Store. The app code, assets, privacy manifest, entitlements, the in-app privacy link, and a signed-archive CI lane are all in place (see the iOS readiness work). What remains is **credential-bound**: it needs the maintainer's Apple Developer account. This doc is the checklist for those steps.
@@ -57,6 +65,10 @@ download it automatically.
       themes, no data collection → expected **4+**. Answer honestly; the app is a local TTS tool.
 - [ ] **Account deletion / Sign in with Apple**: N/A — there is no account and no third-party login.
 - [ ] EU DSA trader status: complete if distributing in the EU.
+- [ ] **EU AI Act Article 50**: published audio must ship with the built-in AI marking enabled
+      (AudioSeal watermark + WAV provenance chunk; the only off-switch is a registered debug knob).
+      Review [`eu-ai-act-article50-assessment.md`](eu-ai-act-article50-assessment.md) for the
+      posture and the paid-launch gates (C2PA, Code of Practice, legal review).
 
 ## 2. App Review demo notes (paste into "App Review Information → Notes")
 

@@ -39,7 +39,20 @@ machine-readable status record and wins over any older prose.
 | 13 — Benchmark/history v3 | Live 2026-07-29: the first schema-v3 records are committed (three clean `phase0-cli-control-*` engine records plus one exploratory run that also exposed and fixed the summarizer's v3 pin). `benchmarks/schema-v3.json` adds the typed quality identity to generation takes (pass/warning only, five fast gates required, machine-code issues); v1/v2 records stay valid immutable history; the publisher stamps v3 only when every take carries the identity. The UI benchmark checkers folded the same identity 2026-08-01: ui-generation records now publish v3 (first: the focused `v3-fold-proof` record `macos-xcui-benchmark-20260801-003208-403989cf`); the canonical iOS matrix published its first v3 record 2026-08-01 (`ios-xcui-benchmark-20260801-132415-abbec96b`). |
 | 14 — Organization and retirement | Closed 2026-07-23 (14a + 14b): compatibility SPI retired, actor-owned loading/metadata/priming/clone artifacts, clone conditioning epoch-bound end to end. |
 
-## Resume here (2026-08-07)
+## Resume here (2026-08-08)
+
+**CP-1 close (2026-08-08, plan `compliance-2026-08`):** the Article 50 posture item is done
+as far as it reaches before the paid launch. Option A verified complete after adding the
+generator version to the provenance chunk (`version=` ICMT field, `Vocello <version>` ISFT,
+bundle-resolved and omitted when unresolvable). Option D landed: the disclosure sentence
+("If you publish audio of a cloned real voice, disclose that it is AI-generated. EU law may
+require this.") sits beside the consent gate on both platforms, plus a README
+Local-first-privacy bullet pair and a website Limitations "AI disclosure" entry (user duty
+only there: shipping 2.4.0 predates the marking seam). The App Store submission runbook
+gained its Article 50 checklist row beside the EU DSA row and DG-4 frontmatter. B (C2PA),
+E (Code of Practice), and the real legal review stay paid-launch-gated, recorded in the
+CP-1 gate. The same day, five of the six CP-2 marking-weight uploads landed on the
+maintainer's go (the sixth plus the catalog re-pin are in flight this session).
 
 **Article 50 marking arc (2026-08-06/07, plan `compliance-2026-08`, CP-2 stage 2 piece 3):**
 every published WAV now carries both marks — the AudioSeal watermark (fixed payload

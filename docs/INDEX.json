@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "generated": "python3 scripts/doc_metadata.py rebuild-index",
   "note": "Machine-readable documentation map. Query this instead of globbing docs/.",
-  "annotatedDocuments": 47,
-  "unannotatedDocuments": 40,
+  "annotatedDocuments": 48,
+  "unannotatedDocuments": 39,
   "documents": [
     {
       "path": "docs/audits/archive/2026-07-10/01_Evidence_Method_and_Corrections.md",
@@ -142,6 +142,16 @@
       "summary": "Point-in-time research assessment (2026-08-06) of the EU AI Act's Article 50 synthetic-content marking obligations \u2014 what the law requires, whether and how it applies to Vocello, the current gap, and maintainer decision points. Not legal advice.",
       "sourceOfTruth": [
         "Sources/QwenVoiceCore/GenerationOutputAdapter.swift"
+      ]
+    },
+    {
+      "path": "docs/reference/ios-appstore-submission.md",
+      "status": "active",
+      "owner": "release-qa",
+      "summary": "Operator checklist for shipping Vocello for iPhone to TestFlight / the App Store \u2014 account prerequisites, App Store Connect privacy and compliance rows, App Review notes, and the credential-bound archive/upload steps.",
+      "sourceOfTruth": [
+        "project.yml",
+        "docs/reference/eu-ai-act-article50-assessment.md"
       ]
     },
     {

@@ -53,9 +53,11 @@ gained its Article 50 checklist row beside the EU DSA row and DG-4 frontmatter. 
 E (Code of Practice), and the real legal review stay paid-launch-gated, recorded in the
 CP-1 gate. The same day, on the maintainer's go, all six CP-2 marking-weight uploads
 landed and the contract, receipts, and iOS catalog re-pinned to the marked revisions at
-`artifactVersion 2026.08.06.1` (production catalog validates complete). CP-2's remaining
-tail is iOS device acceptance at the next phone window plus a fresh isolated delivery run
-as the explicit post-change delivery evidence.
+`artifactVersion 2026.08.06.1` (production catalog validates complete). The Mac
+post-change delivery evidence passed the same day: an isolated root installed
+`pro_custom_speed` at the new 1,708,583,689-byte plan with the marking file byte-exact
+against its pinned digest, verify + install clean, zero retries. CP-2's remaining tail is
+iOS device acceptance plus the iOS delivery evidence at the next phone window.
 
 **Article 50 marking arc (2026-08-06/07, plan `compliance-2026-08`, CP-2 stage 2 piece 3):**
 every published WAV now carries both marks — the AudioSeal watermark (fixed payload

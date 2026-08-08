@@ -110,6 +110,14 @@ nominal thermal). Observed disk cost on the Mac was 12 GiB for the 16.2 GB catal
 > generation; fresh post-change delivery evidence rides the next release's battery per
 > the standing rule that static completeness never substitutes for live proof.
 
+> **Currency note (2026-08-08):** artifactVersion **2026.08.06.1** adds the required
+> Article 50 marking generator (`marking/audioseal_wm16_generator_fp16.safetensors`,
+> 29,360,042 bytes, digest `0e743d11…`) to every artifact. Fresh Mac delivery evidence
+> ran the same day: an isolated root installed `pro_custom_speed` at the new
+> 1,708,583,689-byte plan with the marking file arriving byte-exact against its pinned
+> digest, full verify + install clean, zero retries. iOS post-change delivery evidence
+> queues for the next physical-device window.
+
 The iOS ledger is atomically written, versioned, and contains only privacy-safe identifiers and
 relative paths. It records the logical request, model and artifact version, expected and verified
 files, retries, monotonic received bytes, and terminal state. A one-time migration cancels the old

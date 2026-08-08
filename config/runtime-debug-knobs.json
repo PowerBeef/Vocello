@@ -14,6 +14,7 @@
       "purpose": "Isolated storage, catalog, sampler, streaming, lifecycle, and memory-policy diagnostics.",
       "keys": [
         "QVOICE_APP_SUPPORT_DIR",
+        "QVOICE_DOWNLOAD_ENGINE_PROFILE",
         "QVOICE_IOS_DISABLE_PROACTIVE_PREFETCH",
         "QVOICE_IOS_MEMORY_GUARD_FORCE_BAND",
         "QVOICE_IOS_MEMORY_GUARD_FORCE_CRITICAL_ONCE",

@@ -10,10 +10,12 @@
     {
       "source": "Sources/QwenVoiceCore/HuggingFaceDownloader.swift",
       "names": [
-        "session"
+        "foregroundTransferConfiguration",
+        "session",
+        "transferDelegateQueue"
       ],
       "owner": "downloader initializer and terminal invalidation",
-      "invariant": "The URLSession reference is assigned once after delegate construction and invalidated only after terminal processing."
+      "invariant": "The URLSession reference, the retained foreground configuration, and the shared serial delegate queue are assigned once during init and never mutated; sessions (including lazily created per-worker chunk sessions behind a Mutex) are invalidated only after terminal processing."
     },
     {
       "source": "Sources/QwenVoiceCore/TelemetryGate.swift",

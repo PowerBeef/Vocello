@@ -164,6 +164,27 @@ enum ModelsCommand {
                 .deletingLastPathComponent()
                 .appendingPathComponent("diagnostics/model-downloads", isDirectory: true)
         )
+        // A/B download-engine profile for the chunked-transfer controlled comparison
+        // (registered debug knob; inert without QWENVOICE_DEBUG). `legacy` (default)
+        // keeps shipping defaults; `chunked` enables byte-range chunking with 6
+        // connections per host; `chunked-multisession` additionally gives each chunk
+        // worker its own URLSession so ranges cannot coalesce onto one HTTP/2/3
+        // connection.
+        var engineConfiguration = HuggingFaceDownloader.Configuration()
+        switch RuntimeDebugGate.value(for: "QVOICE_DOWNLOAD_ENGINE_PROFILE")?
+            .trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        case "chunked":
+            engineConfiguration.chunkLargeFiles = true
+            engineConfiguration.maxConnectionsPerHost = 6
+            note("download engine profile: chunked")
+        case "chunked-multisession":
+            engineConfiguration.chunkLargeFiles = true
+            engineConfiguration.maxConnectionsPerHost = 6
+            engineConfiguration.chunkSessionStrategy = .perWorker
+            note("download engine profile: chunked-multisession")
+        default:
+            break
+        }
         let downloader = HuggingFaceDownloader(
             progressHandler: { progress in
                 diagnostics.record(progress: progress)
@@ -174,6 +195,7 @@ enum ModelsCommand {
                 let eta = progress.estimatedSecondsRemaining.map { " · ETA \(max(1, Int($0.rounded())))s" } ?? ""
                 noteVerbose("  \(progress.phase.rawValue) · \(pct)% · \(humanBytes(progress.downloadedBytes))/\(humanBytes(progress.totalBytes)) · \(speed)\(eta)")
             },
+            engineConfiguration: engineConfiguration,
             transferMetricsHandler: { diagnostics.record(metrics: $0) },
             artifactURLPolicy: catalog.downloadURLPolicy
         )

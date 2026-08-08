@@ -140,6 +140,20 @@ work is completed after reconciliation.
 iPhone runs one model request at a time. macOS keeps its existing foreground concurrency. Both
 platforms keep per-file range chunking disabled by default.
 
+The chunked-transfer mechanism itself landed 2026-08-08 (download-throughput investigation:
+Hugging Face's CDN shapes throughput per connection, so the multi-gigabyte long pole crawls
+on any single stream). When enabled, files at or above the 96 MiB threshold split into
+64 MiB ranges drained by a bounded worker pool, with a quarter-size tail window so the last
+ranges never leave one throttled connection running alone; a failed chunk retries its own
+16-64 MiB range, sibling chunk tasks are actively cancelled on file failure (no duplicate
+wire bytes), files dispatch largest-first, and an optional per-worker-session mode defeats
+HTTP/2/3 connection coalescing. The defaults stay off pending the tuning-policy controlled
+comparison below; the CLI A/B knob is `QVOICE_DOWNLOAD_ENGINE_PROFILE`
+(`legacy` | `chunked` | `chunked-multisession`, registered, inert without `QWENVOICE_DEBUG`).
+Known trade-off while chunking is enabled: a process death mid-file discards that file's
+chunk progress (the holey partial cannot be range-resumed), whereas a single stream resumes
+from its partial; in-process retries are unaffected.
+
 ## States, cancellation, and retry
 
 Visible states are: queued, waiting for connectivity, downloading, retrying, verifying, installing,

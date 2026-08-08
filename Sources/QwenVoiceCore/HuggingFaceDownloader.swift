@@ -40,16 +40,33 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         public let durationSeconds: Double
     }
 
-    /// Tunable download-engine parameters. Defaults match the macOS/CLI profile: 6 parallel
-    /// connections per host and `chunkLargeFiles = false`. iOS uses a memory-safer profile:
-    /// fewer parallel files and `chunkLargeFiles = false` (background URLSession throttles many
-    /// small range requests, and chunks multiply in-flight buffers). The foreground URLSession's
-    /// `httpMaximumConnectionsPerHost` is capped at 4.
+    /// How byte-range chunk downloads map onto URLSessions. HTTP/2 and HTTP/3 prefer
+    /// multiplexing every task for a host onto one connection, which would leave all
+    /// chunks sharing a single connection's CDN throughput shaping. `.perWorker` gives
+    /// each chunk worker its own foreground URLSession so chunks ride distinct
+    /// connections. Ignored on background sessions (chunking is unavailable there).
+    public enum ChunkSessionStrategy: Sendable {
+        case shared
+        case perWorker
+    }
+
+    /// Tunable download-engine parameters. Defaults match the shipping macOS/CLI profile:
+    /// up to 6 files in flight, per-file byte-range chunking off, and the foreground
+    /// URLSession capped at `maxConnectionsPerHost`. iOS passes the same file concurrency
+    /// with chunking off (background URLSession task adoption is keyed by relative path,
+    /// so chunked files need an identity-schema extension first). Chunking parameters:
+    /// files at or above `chunkedDownloadThreshold` split into `chunkTargetSize` ranges
+    /// drained by `chunkWorkerCount` workers, with a shrinking tail (quarter-size ranges
+    /// over the final `chunkWorkerCount x chunkTargetSize` bytes) so the last ranges never
+    /// leave one throttled connection running alone.
     public struct Configuration: Sendable {
         public var maxConcurrentFiles = 6
         public var chunkLargeFiles = false
         public var chunkedDownloadThreshold: Int64 = 96 * 1024 * 1024
         public var chunkTargetSize: Int64 = 64 * 1024 * 1024
+        public var chunkWorkerCount = 4
+        public var maxConnectionsPerHost = 4
+        public var chunkSessionStrategy: ChunkSessionStrategy = .shared
         public var maxDownloadRetries = 3
         public init() {}
     }
@@ -230,6 +247,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         private var heartbeatTask: Task<Void, Never>?
         private var retryCount = 0
         private var statusMessage: String?
+        private var verifyingFileCount = 0
         // A download file callback precedes task metrics and the terminal task callback.
         // Keep the durable file staged until didCompleteWithError so callers cannot publish
         // a success summary before URLSession has delivered its final metrics.
@@ -315,6 +333,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         }
 
         func register(
+            taskKey: Int,
             task: URLSessionDownloadTask,
             destination: URL,
             continuation: CheckedContinuation<DownloadedTemporaryFile, Error>,
@@ -322,7 +341,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             fileIndex: Int,
             existingBytes: Int64 = 0
         ) -> Bool {
-            let taskID = task.taskIdentifier
+            let taskID = taskKey
             if isCancelled {
                 task.cancel()
                 continuation.resume(throwing: DownloadError.cancelled)
@@ -340,12 +359,10 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             taskFileIndex[taskID] = fileIndex
             taskBytes[taskID] = existingBytes
             if existingBytes > 0 {
-                let now = ProcessInfo.processInfo.systemUptime
-                applySpeedMeasurement(
-                    now: now,
-                    totalDownloaded: repositoryDownloadedBytes,
-                    advancedDelta: existingBytes
-                )
+                // A resumed partial's bytes are progress, not fresh network throughput:
+                // fold them into the speed baseline instead of injecting them as one
+                // instantaneous sample that spikes the displayed speed.
+                lastSpeedSampleBytes += existingBytes
                 emitRepositoryProgress(isStalled: false)
             }
             return true
@@ -481,8 +498,10 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         /// A file finished (downloaded, or already-valid and skipped). Fold its live task
         /// bytes into the completed-files total at the exact expected size, then drop the
         /// file's task entries. Reconciliation is implicit: the live sum loses the file's
-        /// task bytes and `completedFilesBytes` gains `expectedSize`.
-        func reportFileCompleted(fileIndex: Int, expectedSize: Int64) {
+        /// task bytes and `completedFilesBytes` gains `expectedSize`. A file that was not
+        /// transferred this run (already valid on disk) adjusts the speed baseline instead
+        /// of injecting its whole size as one spurious "instantaneous" speed sample.
+        func reportFileCompleted(fileIndex: Int, expectedSize: Int64, wasTransferred: Bool = true) {
             let fileTaskIDs = taskFileIndex.keys.filter { taskFileIndex[$0] == fileIndex }
             var liveForFile: Int64 = 0
             for taskID in fileTaskIDs {
@@ -491,9 +510,33 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             }
             completedFilesBytes += expectedSize
             repositoryCompletedFiles += 1
-            let now = ProcessInfo.processInfo.systemUptime
-            applySpeedMeasurement(now: now, totalDownloaded: repositoryDownloadedBytes, advancedDelta: expectedSize - liveForFile)
+            if wasTransferred {
+                let now = ProcessInfo.processInfo.systemUptime
+                applySpeedMeasurement(now: now, totalDownloaded: repositoryDownloadedBytes, advancedDelta: expectedSize - liveForFile)
+            } else {
+                lastSpeedSampleBytes += expectedSize - liveForFile
+            }
             emitRepositoryProgress(isStalled: false, force: true)
+        }
+
+        /// Per-file digest verification window. The SHA-256 pass over a multi-gigabyte
+        /// file produces no byte progress, so without a visible status the displayed
+        /// speed freezes and the transfer reads as stalled. Counted, because several
+        /// files can verify concurrently.
+        func beginFileVerification() {
+            verifyingFileCount += 1
+            if verifyingFileCount == 1 {
+                statusMessage = "Verifying downloaded files"
+                emitRepositoryProgress(isStalled: false, force: true)
+            }
+        }
+
+        func endFileVerification() {
+            verifyingFileCount = max(0, verifyingFileCount - 1)
+            if verifyingFileCount == 0, statusMessage == "Verifying downloaded files" {
+                statusMessage = nil
+                emitRepositoryProgress(isStalled: false, force: true)
+            }
         }
 
         func finishRepositoryDownload() {
@@ -704,6 +747,17 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
     // self so it can retain this delegate. The session reference is assigned once during init;
     // all mutable transfer state remains isolated by DownloadStateRegistry.
     private nonisolated(unsafe) var session: URLSession!
+    /// Foreground transfer configuration retained for lazily created per-worker chunk
+    /// sessions (`nil` for background sessions, where chunking is unavailable). Assigned
+    /// once in init and never mutated afterward.
+    private nonisolated(unsafe) let foregroundTransferConfiguration: URLSessionConfiguration?
+    /// The single serial delegate queue shared by every session this downloader owns.
+    /// Assigned once in init.
+    private nonisolated(unsafe) let transferDelegateQueue: OperationQueue
+    /// Lazily created per-worker chunk sessions (`.perWorker` strategy only). Index i is
+    /// worker i's session; the main `session` carries task-key namespace 0 and these carry
+    /// namespaces 1...N so task identifiers never collide across sessions.
+    private let chunkSessionsBox = Mutex<[URLSession]>([])
     private let state: DownloadStateRegistry
     private let delegateProgressGate = Mutex(ModelDownloadDelegateProgressGate())
     private let terminalEventSequencer = ModelDownloadDelegateTerminalSequencer()
@@ -722,6 +776,69 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
     private let transferMetricsHandler: TransferMetricsHandlerBox?
     private let verifiedArtifactHandler: VerifiedArtifactHandlerBox?
     private let artifactURLPolicy: ModelArtifactURLPolicy?
+
+    // MARK: - Transfer sessions and task keys
+
+    /// Keeps task identifiers from distinct URLSessions from colliding in the shared
+    /// per-task registries: identifiers are small per-session integers, so one billion of
+    /// namespace stride is safe headroom.
+    private static let taskKeyNamespaceStride = 1_000_000_000
+
+    /// The registry/gate key for a task: namespace 0 is the main session (so background
+    /// sessions and the `.shared` strategy keep today's identifier-equals-key behavior);
+    /// per-worker chunk sessions occupy namespaces 1...N.
+    private nonisolated func taskKey(for task: URLSessionTask, in candidate: URLSession) -> Int {
+        sessionNamespace(of: candidate) * Self.taskKeyNamespaceStride + task.taskIdentifier
+    }
+
+    private nonisolated func sessionNamespace(of candidate: URLSession) -> Int {
+        if candidate === session { return 0 }
+        return chunkSessionsBox.withLock { sessions in
+            guard let index = sessions.firstIndex(where: { $0 === candidate }) else { return 0 }
+            return index + 1
+        }
+    }
+
+    /// The URLSession a chunk worker's ranges ride on. `.shared` (and any background
+    /// session) returns the main session. `.perWorker` lazily creates one foreground
+    /// session per worker slot: HTTP/2/3 coalesce a host's tasks onto one connection,
+    /// which would leave every chunk sharing a single connection's CDN throughput
+    /// shaping; distinct sessions force distinct connections.
+    private func chunkTransferSession(forWorker workerIndex: Int) -> URLSession {
+        guard engineConfiguration.chunkSessionStrategy == .perWorker,
+              !isBackgroundSession,
+              let configuration = foregroundTransferConfiguration else {
+            return session
+        }
+        return chunkSessionsBox.withLock { sessions in
+            while sessions.count <= workerIndex {
+                let workerConfiguration =
+                    (configuration.copy() as? URLSessionConfiguration) ?? configuration
+                sessions.append(URLSession(
+                    configuration: workerConfiguration,
+                    delegate: self,
+                    delegateQueue: transferDelegateQueue
+                ))
+            }
+            return sessions[workerIndex]
+        }
+    }
+
+    /// Tear down any lazily created per-worker chunk sessions alongside the main session.
+    private func invalidateChunkSessions(cancelling: Bool) {
+        let sessions = chunkSessionsBox.withLock { sessions in
+            let snapshot = sessions
+            sessions.removeAll()
+            return snapshot
+        }
+        for extra in sessions {
+            if cancelling {
+                extra.invalidateAndCancel()
+            } else {
+                extra.finishTasksAndInvalidate()
+            }
+        }
+    }
 
     static func validatedRelativeRepoPath(_ path: String) throws -> String {
         let trimmed = path.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -896,25 +1013,30 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         self.artifactURLPolicy = artifactURLPolicy
         self.isBackgroundSession = sessionConfiguration.identifier != nil
         self.durableTemporaryDirectory = durableTemporaryDirectory ?? fileManager.temporaryDirectory
-        super.init()
 
-        let isBackground = isBackgroundSession
         let config: URLSessionConfiguration
-        if isBackground {
+        if sessionConfiguration.identifier != nil {
             // Background configs are effectively singletons-by-identifier; copying/mutating one
             // (e.g. httpMaximumConnectionsPerHost) is unreliable and the key is ignored anyway.
             // Concurrency is bounded by the task group's `maxConcurrentFiles` instead. Callers
             // (iOS) configure the background config fully before passing it in.
             config = sessionConfiguration
+            self.foregroundTransferConfiguration = nil
         } else {
             let copy = sessionConfiguration.copy() as? URLSessionConfiguration ?? .default
             copy.timeoutIntervalForResource = 3600
-            copy.httpMaximumConnectionsPerHost = 4
+            copy.httpMaximumConnectionsPerHost = engineConfiguration.maxConnectionsPerHost
             config = copy
+            self.foregroundTransferConfiguration = copy
         }
+        // One serial queue shared by the main session and any per-worker chunk sessions,
+        // preserving the ordered-delegate invariant across every transfer.
         let delegateQueue = OperationQueue()
         delegateQueue.maxConcurrentOperationCount = 1
         delegateQueue.qualityOfService = .userInitiated
+        self.transferDelegateQueue = delegateQueue
+        super.init()
+
         session = URLSession(configuration: config, delegate: self, delegateQueue: delegateQueue)
     }
 
@@ -1114,14 +1236,20 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             try? fileManager.removeItem(at: stagingRoot)
             await state.finishRepositoryDownload()
             await completeBackgroundEventsAfterPostprocessing()
-            if !isBackgroundSession { session.finishTasksAndInvalidate() }
+            if !isBackgroundSession {
+                session.finishTasksAndInvalidate()
+                invalidateChunkSessions(cancelling: false)
+            }
         } catch {
             // A failure (or cancellation) mid-download: tear down any remaining
             // in-flight URLSession tasks so the caller doesn't wait for them.
             await state.requestCancellation()
             await state.finishRepositoryDownload()
             await completeBackgroundEventsAfterPostprocessing()
-            if !isBackgroundSession { session.invalidateAndCancel() }
+            if !isBackgroundSession {
+                session.invalidateAndCancel()
+                invalidateChunkSessions(cancelling: true)
+            }
             throw error
         }
     }
@@ -1261,7 +1389,12 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         let maxConcurrent = min(max(1, engineConfiguration.maxConcurrentFiles), files.count)
 
         try await withThrowingTaskGroup(of: Void.self) { group in
-            var fileIterator = files.enumerated().makeIterator()
+            // Largest first: the multi-gigabyte long pole dominates total transfer time,
+            // so its stream (or chunk queue) starts at t=0 instead of waiting behind a
+            // catalog position; the small files fill remaining slots either way.
+            var fileIterator = files.enumerated()
+                .sorted { $0.element.size > $1.element.size }
+                .makeIterator()
 
             // Prime the group with up to `maxConcurrent` file downloads.
             for _ in 0..<maxConcurrent {
@@ -1333,7 +1466,11 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
                 expectedSHA256: file.sha256,
                 fileURL: destURL
             )
-            await state.reportFileCompleted(fileIndex: fileIndex, expectedSize: file.size)
+            await state.reportFileCompleted(
+                fileIndex: fileIndex,
+                expectedSize: file.size,
+                wasTransferred: false
+            )
             return
         }
 
@@ -1440,20 +1577,9 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
                 return
             } catch {
                 if let dlError = error as? DownloadError {
-                    // The server ignored a byte-range request — fall back to single-stream
-                    // for the remaining attempts instead of thrashing on chunks. The chunked
-                    // attempt may have left a sparse/holey partial, so clear it too.
-                    if case .rangeUnsupported = dlError {
-                        avoidChunking = true
-                        try? fileManager.removeItem(at: partialURL)
-                    }
-                    // Any chunk-related failure (integrity mismatch or assembly error) is not
-                    // a simple transient network error; retry as a single stream instead.
-                    if case .integrityCheckFailed = dlError {
-                        avoidChunking = true
-                    }
-                    if case .chunkAssemblyFailed = dlError {
-                        avoidChunking = true
+                    let adjustment = Self.chunkFallbackAdjustment(for: dlError)
+                    if adjustment.avoidChunking { avoidChunking = true }
+                    if adjustment.clearPartial {
                         try? fileManager.removeItem(at: partialURL)
                     }
                 }
@@ -1554,13 +1680,38 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             partialURL: partialURL,
             existingBytes: completedBytes
         )
-        try Self.validateDownloadedFile(
-            at: partialURL,
-            expectedSize: expectedSize,
-            sha256: sha256
-        )
+        await state.beginFileVerification()
+        do {
+            try Self.validateDownloadedFile(
+                at: partialURL,
+                expectedSize: expectedSize,
+                sha256: sha256
+            )
+        } catch {
+            await state.endFileVerification()
+            throw error
+        }
+        await state.endFileVerification()
         try? fileManager.removeItem(at: resumeDataURL)
         try publishDownloadedFile(partialURL, to: destination)
+    }
+
+    /// How a failed attempt adjusts the file-level retry: the server ignoring a
+    /// byte-range request, an integrity mismatch, or a chunk-assembly error all force
+    /// the remaining attempts onto the single-stream path instead of thrashing on
+    /// chunks; range/assembly failures may also have left a sparse or holey partial
+    /// that must be cleared before the next attempt.
+    static func chunkFallbackAdjustment(
+        for error: DownloadError
+    ) -> (avoidChunking: Bool, clearPartial: Bool) {
+        switch error {
+        case .rangeUnsupported, .chunkAssemblyFailed:
+            return (avoidChunking: true, clearPartial: true)
+        case .integrityCheckFailed:
+            return (avoidChunking: true, clearPartial: false)
+        default:
+            return (avoidChunking: false, clearPartial: false)
+        }
     }
 
     private func retryReason(for error: Error) -> String {
@@ -1578,11 +1729,44 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         return "Network transfer"
     }
 
+    /// One byte range of a chunked file, inclusive on both ends.
+    struct ChunkRange: Equatable, Sendable {
+        let start: Int64
+        let end: Int64
+    }
+
+    /// FIFO work queue drained by a bounded pool of chunk workers. Any worker that frees
+    /// up pulls the next pending range, so no range ever waits behind a slow sibling
+    /// (work-conserving tail). `next()` returns nil once drained, aborted, or when the
+    /// pulling task is cancelled, so a failing group never dispatches new ranges.
+    actor ChunkWorkQueue {
+        private var pending: [ChunkRange]
+        private var nextIndex = 0
+        private var isAborted = false
+
+        init(ranges: [ChunkRange]) {
+            pending = ranges
+        }
+
+        func next() -> ChunkRange? {
+            guard !isAborted, !Task.isCancelled, nextIndex < pending.count else { return nil }
+            defer { nextIndex += 1 }
+            return pending[nextIndex]
+        }
+
+        func abort() {
+            isAborted = true
+        }
+    }
+
     /// Download a large file as parallel byte-range chunks, assembling them into the
     /// partial, then validating size + SHA-256 (same gate as the single-stream path).
     /// Each chunk is its own `URLSessionDownloadTask` registered under the same
-    /// `fileIndex`, so progress aggregates via the per-task counters. A single chunk
-    /// failure cancels its siblings and bubbles to the file-level retry.
+    /// `fileIndex`, so progress aggregates via the per-task counters. A bounded worker
+    /// pool drains a shared range queue; when any chunk fails, group cancellation
+    /// actively cancels every sibling's URLSession task (via each chunk's cancellation
+    /// handler), so a file-level retry never overlaps stale chunk transfers and never
+    /// accrues duplicate wire bytes.
     private func downloadChunkedFile(
         from url: URL,
         to destination: URL,
@@ -1597,68 +1781,132 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             try? fileManager.removeItem(at: partialURL)
         }
 
-        let chunkSize = max(engineConfiguration.chunkTargetSize, expectedSize / Int64(engineConfiguration.maxConcurrentFiles))
-        let ranges = Self.byteRanges(total: expectedSize, chunkSize: chunkSize)
+        let ranges = Self.chunkRanges(
+            total: expectedSize,
+            chunkSize: engineConfiguration.chunkTargetSize,
+            tailWorkerCount: engineConfiguration.chunkWorkerCount
+        )
+        let queue = ChunkWorkQueue(ranges: ranges)
+        let workerCount = max(1, min(engineConfiguration.chunkWorkerCount, ranges.count))
 
         let assembly = ChunkAssemblyCoordinator(partialURL: partialURL)
         try await assembly.open()
 
         do {
             try await withThrowingTaskGroup(of: Void.self) { group in
-                for (chunkIndex, range) in ranges.enumerated() {
+                for workerIndex in 0..<workerCount {
+                    let workerSession = chunkTransferSession(forWorker: workerIndex)
                     group.addTask { [self] in
-                        try await self.downloadOneChunk(
-                            url: url,
-                            start: range.start,
-                            end: range.end,
-                            chunkIndex: chunkIndex,
-                            fileIndex: fileIndex,
-                            assembly: assembly
-                        )
+                        while let range = await queue.next() {
+                            try Task.checkCancellation()
+                            try await self.downloadOneChunkWithRetry(
+                                url: url,
+                                range: range,
+                                fileIndex: fileIndex,
+                                assembly: assembly,
+                                transferSession: workerSession
+                            )
+                        }
                     }
                 }
                 try await group.waitForAll()
             }
             await assembly.close()
-            try Self.validateDownloadedFile(at: partialURL, expectedSize: expectedSize, sha256: sha256)
+            await state.beginFileVerification()
+            do {
+                try Self.validateDownloadedFile(at: partialURL, expectedSize: expectedSize, sha256: sha256)
+            } catch {
+                await state.endFileVerification()
+                throw error
+            }
+            await state.endFileVerification()
             try publishDownloadedFile(partialURL, to: destination)
         } catch {
+            await queue.abort()
             await assembly.close()
             throw error
         }
     }
 
-    /// Download one byte-range `[start, end]` (inclusive) of `url` and write it into the
-    /// partial at offset `start`. Throws if the server ignores the Range request (200).
+    /// One range with a bounded transient-retry loop, so a single 5xx/429/network hiccup
+    /// re-fetches 16-64 MiB instead of restarting a multi-gigabyte file. Non-transient
+    /// dispositions (range ignored, integrity, assembly) throw immediately to the
+    /// file-level fallback.
+    private func downloadOneChunkWithRetry(
+        url: URL,
+        range: ChunkRange,
+        fileIndex: Int,
+        assembly: ChunkAssemblyCoordinator,
+        transferSession: URLSession
+    ) async throws {
+        var attempt = 0
+        while true {
+            do {
+                try await downloadOneChunk(
+                    url: url,
+                    range: range,
+                    fileIndex: fileIndex,
+                    assembly: assembly,
+                    transferSession: transferSession
+                )
+                return
+            } catch {
+                attempt += 1
+                guard attempt <= 2, !Task.isCancelled,
+                      !(await state.cancellationRequested()) else { throw error }
+                guard case .retry(let afterSeconds) = ModelDownloadRetryPolicy.disposition(
+                    error: error,
+                    retryNumber: attempt,
+                    integrityRetryAlreadyUsed: true
+                ) else { throw error }
+                do {
+                    try await Task.sleep(for: .seconds(afterSeconds))
+                } catch {
+                    throw DownloadError.cancelled
+                }
+            }
+        }
+    }
+
+    /// Download one byte range of `url` and write it into the partial at its offset.
+    /// Throws if the server ignores the Range request (200). Cancellation-aware: if the
+    /// surrounding task is cancelled (group failure or caller cancellation), the
+    /// in-flight URLSession task is cancelled so the delegate resumes the continuation
+    /// promptly instead of letting the chunk stream to completion.
     private func downloadOneChunk(
         url: URL,
-        start: Int64,
-        end: Int64,
-        chunkIndex: Int,
+        range: ChunkRange,
         fileIndex: Int,
-        assembly: ChunkAssemblyCoordinator
+        assembly: ChunkAssemblyCoordinator,
+        transferSession: URLSession
     ) async throws {
         var request = URLRequest(url: url)
-        request.setValue("bytes=\(start)-\(end)", forHTTPHeaderField: "Range")
-        let downloaded = try await withCheckedThrowingContinuation { continuation in
-            let task = session.downloadTask(with: request)
-            Task {
-                let shouldResume = await state.register(
-                    task: task,
-                    destination: url,
-                    continuation: continuation,
-                    resumeDataURL: nil,
-                    fileIndex: fileIndex
-                )
-                if shouldResume { task.resume() }
+        request.setValue("bytes=\(range.start)-\(range.end)", forHTTPHeaderField: "Range")
+        let task = transferSession.downloadTask(with: request)
+        let key = taskKey(for: task, in: transferSession)
+        let downloaded: DownloadedTemporaryFile = try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                Task {
+                    let shouldResume = await state.register(
+                        taskKey: key,
+                        task: task,
+                        destination: url,
+                        continuation: continuation,
+                        resumeDataURL: nil,
+                        fileIndex: fileIndex
+                    )
+                    if shouldResume { task.resume() }
+                }
             }
+        } onCancel: {
+            task.cancel()
         }
 
         // The delegate treats 200 and 206 as success; for a range request 200 means the
         // server ignored Range and returned the whole file — throw a dedicated error so the
         // file-level retry falls back to a single stream instead of thrashing on chunks.
         guard downloaded.statusCode == 206,
-              Self.contentRange(downloaded.contentRange, matchesStart: start, end: end) else {
+              Self.contentRange(downloaded.contentRange, matchesStart: range.start, end: range.end) else {
             try? fileManager.removeItem(at: downloaded.url)
             throw DownloadError.rangeUnsupported(path: url.path)
         }
@@ -1668,18 +1916,37 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             throw DownloadError.cancelled
         }
 
-        try await assembly.writeChunk(tempURL: downloaded.url, offset: start)
+        try await assembly.writeChunk(tempURL: downloaded.url, offset: range.start)
         try? fileManager.removeItem(at: downloaded.url)
     }
 
-    /// Partition `[0, total)` into inclusive `[start, end]` byte ranges of `chunkSize`.
-    private static func byteRanges(total: Int64, chunkSize: Int64) -> [(start: Int64, end: Int64)] {
+    /// Partition `[0, total)` into uniform `chunkSize` ranges, except the final
+    /// `tailWorkerCount x chunkSize` bytes, which are emitted as quarter-size ranges.
+    /// The shrinking tail bounds the cost of the last-range straggler: with uniform
+    /// ranges the file's completion waits on one connection finishing a full chunk at
+    /// whatever rate the CDN shapes that single connection to; quarter-size tail ranges
+    /// cut that worst case by 4x while adding only ~3 x tailWorkerCount extra requests.
+    static func chunkRanges(
+        total: Int64,
+        chunkSize: Int64,
+        tailWorkerCount: Int
+    ) -> [ChunkRange] {
         guard total > 0, chunkSize > 0 else { return [] }
-        var ranges: [(start: Int64, end: Int64)] = []
+        let tailChunkSize = max(1, chunkSize / 4)
+        let tailWindow = min(total, Int64(max(0, tailWorkerCount)) * chunkSize)
+        let bodyTotal = total - tailWindow
+
+        var ranges: [ChunkRange] = []
         var start: Int64 = 0
+        while start < bodyTotal {
+            let end = min(start + chunkSize - 1, bodyTotal - 1)
+            ranges.append(ChunkRange(start: start, end: end))
+            start = end + 1
+        }
+        start = bodyTotal
         while start < total {
-            let end = min(start + chunkSize - 1, total - 1)
-            ranges.append((start, end))
+            let end = min(start + tailChunkSize - 1, total - 1)
+            ranges.append(ChunkRange(start: start, end: end))
             start = end + 1
         }
         return ranges
@@ -1728,6 +1995,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
                 Task {
                     let receivedBytes = max(existingBytes, adoptedTask.countOfBytesReceived)
                     let shouldResume = await state.register(
+                        taskKey: self.taskKey(for: adoptedTask, in: self.session),
                         task: adoptedTask,
                         destination: url,
                         continuation: continuation,
@@ -1750,6 +2018,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
                     Task {
                         task.taskDescription = await state.expectedIdentity(for: url)?.encodedTaskDescription
                         let shouldResume = await state.register(
+                            taskKey: self.taskKey(for: task, in: self.session),
                             task: task,
                             destination: url,
                             continuation: continuation,
@@ -1783,6 +2052,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             Task {
                 task.taskDescription = await state.expectedIdentity(for: url)?.encodedTaskDescription
                 let shouldResume = await state.register(
+                    taskKey: self.taskKey(for: task, in: self.session),
                     task: task,
                     destination: url,
                     continuation: continuation,
@@ -2138,7 +2408,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         totalBytesWritten: Int64,
         totalBytesExpectedToWrite: Int64
     ) {
-        let taskID = downloadTask.taskIdentifier
+        let taskID = taskKey(for: downloadTask, in: session)
         let shouldForward = delegateProgressGate.withLock { gate in
             gate.shouldForward(
                 taskID: taskID,
@@ -2159,7 +2429,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         downloadTask: URLSessionDownloadTask,
         didFinishDownloadingTo location: URL
     ) {
-        let taskID = downloadTask.taskIdentifier
+        let taskID = taskKey(for: downloadTask, in: session)
 
         let response = downloadTask.response as? HTTPURLResponse
         let statusCode = response?.statusCode
@@ -2237,7 +2507,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         task: URLSessionTask,
         didCompleteWithError error: Error?
     ) {
-        let taskID = task.taskIdentifier
+        let taskID = taskKey(for: task, in: session)
         delegateProgressGate.withLock { gate in
             gate.finish(taskID: taskID)
         }

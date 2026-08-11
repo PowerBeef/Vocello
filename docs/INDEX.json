@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "generated": "python3 scripts/doc_metadata.py rebuild-index",
   "note": "Machine-readable documentation map. Query this instead of globbing docs/.",
-  "annotatedDocuments": 48,
+  "annotatedDocuments": 49,
   "unannotatedDocuments": 39,
   "documents": [
     {
@@ -152,6 +152,16 @@
       "sourceOfTruth": [
         "project.yml",
         "docs/reference/eu-ai-act-article50-assessment.md"
+      ]
+    },
+    {
+      "path": "docs/reference/ios-ui-refresh-2026-08.md",
+      "status": "active",
+      "owner": "ios",
+      "summary": "The 2026-08 iOS UI review \u2014 the planned frame-health lane, measured baseline, ranked audit findings, maintainer pick-list, and fix waves. Roadmap authority for the ios-ui-2026-08 plan.",
+      "sourceOfTruth": [
+        "scripts/ui_test.sh",
+        "Tests/VocelloiOSUITests/VocelloiOSUITestCase.swift"
       ]
     },
     {

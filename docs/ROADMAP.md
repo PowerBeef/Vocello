@@ -11,6 +11,7 @@
 | --- | --- | --- | --- |
 | `delivery-prompting-2026-08` | active | backend-mlx | 20/23 (87%) |
 | `doc-governance-2026-08` | active | release-qa | 8/9 (89%) |
+| `ios-ui-2026-08` | active | ios | 0/6 (0%) |
 | `compliance-2026-08` | complete | release-qa | 2/2 (100%) |
 | `convergence-metal4-stage4-2026-08` | complete | backend-and-platform | 7/7 (100%) |
 | `macos-ui-2026-08` | complete | macos | 7/7 (100%) |
@@ -85,6 +86,43 @@ Narrative authority: [`docs/reference/repository-self-verification.md`](referenc
 
 - **`DG-4`** (planned) — Phase 3 — source bindings on active documents.
   gate: Annotated incrementally as documents are touched; a binding invented in bulk without reading the document is worse than none.
+
+## iOS UI performance harness, measured review, and fix waves
+
+`ios-ui-2026-08` · **active** · ios · adopted 2026-08-11
+
+Mirror the macOS UI arc on the iPhone: build a deterministic frame-health lane (scripts/ui_test.sh ios perf) on the canonical iPhone 17 Pro, baseline the real UI costs, run a four-lens audit merged with the numbers into ONE ranked findings list spanning performance and design (maintainer chose audit-first: design items become a maintainer pick-list, never pre-committed work), land fixes in measured waves, and close by making the ui-perf benchmark kind platform-aware. Instrument-first ordering is mandatory - the 2026-06 iOS fix wave shipped unmeasured and its own commit messages say so. Pre-arc housekeeping (standalone commit): add the missing ui-ios-delivery-cohort workflow to config/orchestration-contract.json (existing lane unrunnable without it).
+
+Narrative authority: [`docs/reference/ios-ui-refresh-2026-08.md`](reference/ios-ui-refresh-2026-08.md)
+
+| Item | Status | Title | Evidence |
+| --- | --- | --- | --- |
+| `IUI-1` | planned | Instrument: scripts/ui_test.sh ios perf frame-health harness | — |
+| `IUI-2` | planned | Frame-health baseline (1 warm-up + 5 counted runs) | — |
+| `IUI-3` | planned | Audit-first review: four lenses + measurements into one ranked list + maintainer pick-list | — |
+| `IUI-4` | planned | Wave 1: safe fixes with before/after measurement | — |
+| `IUI-5` | planned | Wave 2: refinements + re-engineering (macOS UI-5/UI-6 collapsed) | — |
+| `IUI-6` | planned | Registry formalization: platform-aware ui-perf kind + warn-only ceilings | — |
+
+### Open items in detail
+
+- **`IUI-1`** (planned) — Instrument: scripts/ui_test.sh ios perf frame-health harness.
+  gate: New IOSUIPerfFrameProbe (CADisplayLink pinned preferredFrameRateRange(60,60,60) per the IOSStudioInlinePlayerCard precedent; 500 ms JSONL blocks; expected frames computed from the OBSERVED per-tick cadence, never a hard-coded 16.67 ms; output under the devicectl-pullable Library/Caches/Vocello/diagnostics tree, not the App Group; launch hook in QVoiceiOSApp.init; both QWENVOICE_UIPERF_* knobs already registered). Nine scenarios in a new Tests/VocelloiOSUITests/VocelloiOSPerfUITests.swift using swipes/taps (VocelloUIScroll/Cursor are macOS-only; VocelloUIPerfScenarioMarker is already cross-platform): confirmatory ios-idle-baseline, ios-tab-navigation, ios-history-scroll, ios-voices-scroll, ios-settings-scroll, ios-composer-typing, ios-sheet-present-dismiss; exploratory ios-player-scrub, ios-generation-active. iOS port of UIPerfHistorySeeder (debug-knob-gated GRDB rows + one small bundled audio fixture, needed by history-scroll and player-scrub). New scripts/check_ios_ui_perf.py structural fail-closed gate: every scenario marked once, >=90% probe coverage, monotonic blocks, median block cadence within 55-65 Hz (fail-closed outside - catches Low Power Mode/thermal caps/idle throttling that ignored the pin; Low Power Mode off is a run precondition), probe files from the PULLED diagnostics, canonical-hardware proof via verify_canonical_hardware('ios', ios_evidence=...) with the test setting QVOICE_IOS_DEVICE_RUN_ID. Wiring: lift the ui_test.sh platform guard, iOS perf dispatch + perf-validation required step, ui-ios-perf workflow in config/orchestration-contract.json, check_test_workflows.sh no-delays/no-coordinates exclusion for the perf test file with recorded justification, offline self-tests registered. Fold in MetricKit MXAnimationMetric/MXAppResponsivenessMetric collection (instrumentation, advisory-only, additive fields in IOSMetricKitMemoryReporter + ios_memory_field_report.py allowlists). NO behavioral riders - the instrument must not change what it measures; honesty limits stated in the authority doc (main-runloop CADisplayLink measures main-thread cadence at 60 Hz, not render-server-only hitches - same claim limits as macOS). GATE: one clean 9/9 PASS on the canonical iPhone 17 Pro plus three deliberate fail-closed refusals (missing scenario, coverage shortfall, cadence-band violation).
+
+- **`IUI-2`** (planned) — Frame-health baseline (1 warm-up + 5 counted runs).
+  gate: One discarded warm-up plus five counted runs on the canonical iPhone 17 Pro; per-scenario medians + IQR recorded in the authority doc. Preconditions per counted run: thermals nominal AND Low Power Mode off; a run violating either is discarded and replaced. Phone window shared with IUI-1 validation.
+
+- **`IUI-3`** (planned) — Audit-first review: four lenses + measurements into one ranked list + maintainer pick-list.
+  gate: Architecture/performance/accessibility/layout audits over the iOS surfaces, merged with the IUI-2 numbers and the nine pre-known candidates (root-shell whole-store observation in RootView.body - the unported macOS 158 ms/s finding; the un-migrated 30 fps IOSPlayerSheetController with per-tick karaoke AttributedString rebuild; IOSVoicesView O(n^2) catalog build; TabDock dead @EnvironmentObject; IOSEngineLifecycleToast redundant observation; IOSModelInstallerViewModel dictionary republish; dual theme namespaces + duplicate glass modifiers; 13 dead prefetch onChange handlers; the unmeasured 60 Hz glass-gate tier, annotated unmeasurable-on-canonical-hardware) into ONE ranked findings list spanning performance and design. Design items become a maintainer pick-list; wave-1/wave-2 scoping proposal published. THE MAINTAINER GATE SITS AT THIS ITEM'S EXIT: no fix lands until the pick-list and wave scope get an explicit go. Desk work, no phone. GATE: ranked synthesis + pick-list recorded in the authority doc with maintainer sign-off on wave scope.
+
+- **`IUI-4`** (planned) — Wave 1: safe fixes with before/after measurement.
+  gate: Opens with the zero-risk removals (TabDock dead environment object, redundant toast observation, dead prefetch handlers) plus maintainer-picked low-risk items (candidates: IOSModelInstallerViewModel republish scoping, IOSVoicesView catalog memoization). ALL fixes wait for the baseline, including obviously-safe ones - the 2026-06 lesson. Before/after 5-run measurement on affected scenarios. GATE: wave-1 items landed after maintainer go; before/after table in the authority doc; both platform compiles and the smoke lane green.
+
+- **`IUI-5`** (planned) — Wave 2: refinements + re-engineering (macOS UI-5/UI-6 collapsed).
+  gate: The store-observation port (RootView whole-store body observation -> iOS TTSEngineStore @Observable migration or a flip-scoped gate model), IOSPlayerSheetController @Observable migration + karaoke per-tick scoping, plus whatever re-engineering the IUI-3 pick-list approved (theme-namespace unification is design-scope, lands only if picked). Split into two sub-waves only if the findings justify it. GATE: landed after maintainer go with measured before/after deltas on the touched scenarios recorded in the authority doc.
+
+- **`IUI-6`** (planned) — Registry formalization: platform-aware ui-perf kind + warn-only ceilings.
+  gate: One ui-perf kind, platform-aware: relax validate_ui_perf_semantics' macOS bind and make the scenario table per-platform in benchmark_history.py (schema already permits platform ios; the metric allowlist is platform-neutral - a second kind would fork enums, validators, and ceiling machinery for identical semantics). Publish the baselines; derive warn-only ceilings for the confirmatory scenarios from repeated counted baselines (macOS UI-7 precedent - promotion to hard ceilings needs ~3 stable sessions); harness-hash source list gains the iOS probe/checker/test files. 60 Hz-tier posture recorded in the authority doc: the tier stays behaviorally frozen through the fix waves; a physical 60 Hz device, if available, runs the lane as recorded non-canonical evidence only. GATE: a canonical platform-ios ui-perf record validates, publishes, and exercises the warn path end-to-end; benchmark_history.py validate --all green.
 
 ## EU AI Act Article 50 readiness
 

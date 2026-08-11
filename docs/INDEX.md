@@ -62,6 +62,7 @@ Review when: target or scheme changes; runtime topology; telemetry schema; test 
 - [`docs/reference/ios-engine-optimization.md`](../docs/reference/ios-engine-optimization.md)
 - [`docs/reference/ios-increased-memory-entitlement-request.md`](../docs/reference/ios-increased-memory-entitlement-request.md)
 - [`docs/reference/ios-ui-reference.md`](../docs/reference/ios-ui-reference.md)
+- [`docs/reference/ios-ui-refresh-2026-08.md`](../docs/reference/ios-ui-refresh-2026-08.md)
 - [`docs/reference/language-bench.md`](../docs/reference/language-bench.md)
 - [`docs/reference/long-form-generation.md`](../docs/reference/long-form-generation.md)
 - [`docs/reference/macos-app-guide.md`](../docs/reference/macos-app-guide.md)

@@ -277,4 +277,345 @@ final class ModelDownloadChunkSchedulingTests: XCTestCase {
 
         XCTAssertEqual(try Data(contentsOf: partial), payload)
     }
+
+    // MARK: - Range-qualified task identity (schema v2, iOS background chunking)
+
+    private func chunkIdentity(
+        path: String = "weights/model.safetensors",
+        size: Int64 = 1_000,
+        start: Int64? = nil,
+        end: Int64? = nil
+    ) -> ModelDownloadTaskIdentity {
+        ModelDownloadTaskIdentity(
+            logicalRequestID: "request",
+            modelID: "model",
+            artifactVersion: "v1",
+            relativePath: path,
+            expectedSize: size,
+            expectedSHA256: String(repeating: "a", count: 64),
+            rangeStart: start,
+            rangeEnd: end
+        )
+    }
+
+    func testRangeQualifiedIdentityRoundTripsThroughTaskDescription() throws {
+        let identity = chunkIdentity(start: 128, end: 255)
+        XCTAssertTrue(identity.isValidProductionIdentity)
+        XCTAssertEqual(identity.reconciliationKey, "/range/128-255/weights/model.safetensors")
+
+        let decoded = ModelDownloadTaskIdentity.decode(
+            taskDescription: try XCTUnwrap(identity.encodedTaskDescription)
+        )
+        XCTAssertEqual(decoded, identity)
+        XCTAssertEqual(decoded?.rangeStart, 128)
+        XCTAssertEqual(decoded?.rangeEnd, 255)
+
+        // Whole-file identities keep their v1-shaped key: the bare relative path.
+        let wholeFile = chunkIdentity()
+        XCTAssertEqual(wholeFile.reconciliationKey, wholeFile.relativePath)
+    }
+
+    func testChunkIdentityRejectsIncoherentRanges() {
+        // Half-specified, inverted, negative, and out-of-bounds ranges all fail closed.
+        XCTAssertFalse(chunkIdentity(start: 0, end: nil).isValidProductionIdentity)
+        XCTAssertFalse(chunkIdentity(start: nil, end: 10).isValidProductionIdentity)
+        XCTAssertFalse(chunkIdentity(start: 20, end: 10).isValidProductionIdentity)
+        XCTAssertFalse(chunkIdentity(start: -1, end: 10).isValidProductionIdentity)
+        XCTAssertFalse(chunkIdentity(size: 100, start: 0, end: 100).isValidProductionIdentity)
+        XCTAssertNil(chunkIdentity(start: 20, end: 10).encodedTaskDescription)
+        // The last in-bounds byte is valid.
+        XCTAssertTrue(chunkIdentity(size: 100, start: 0, end: 99).isValidProductionIdentity)
+    }
+
+    func testSchemaV1TaskDescriptionsFailClosed() throws {
+        // A task minted by a pre-chunking build carries schemaVersion 1; it must be
+        // rejected so reconciliation cancels it and the request restarts cleanly.
+        let v1JSON: [String: Any] = [
+            "schemaVersion": 1,
+            "logicalRequestID": "request",
+            "modelID": "model",
+            "artifactVersion": "v1",
+            "relativePath": "weights/model.safetensors",
+            "expectedSize": 1_000,
+            "expectedSHA256": String(repeating: "a", count: 64),
+        ]
+        let data = try JSONSerialization.data(withJSONObject: v1JSON)
+        XCTAssertNil(ModelDownloadTaskIdentity.decode(taskDescription: data.base64EncodedString()))
+    }
+
+    func testReconcilerAdoptsOneTaskPerChunkSlot() {
+        // One file expected as a whole-file slot plus three chunk slots. Every slot
+        // adopts its own live task; a duplicate for an occupied slot is cancelled.
+        // Before the v2 keying, all four identities shared one relativePath key and
+        // building the plan trapped on duplicate dictionary keys.
+        let wholeFile = chunkIdentity()
+        let chunks = [
+            chunkIdentity(start: 0, end: 399),
+            chunkIdentity(start: 400, end: 799),
+            chunkIdentity(start: 800, end: 999),
+        ]
+        let plan = ModelDownloadTaskReconciler.plan(
+            expected: [wholeFile] + chunks,
+            existing: [
+                ModelDownloadExistingTask(taskID: 11, identity: chunks[0]),
+                ModelDownloadExistingTask(taskID: 12, identity: chunks[1]),
+                ModelDownloadExistingTask(taskID: 13, identity: chunks[1]),
+                ModelDownloadExistingTask(taskID: 14, identity: chunks[2]),
+            ]
+        )
+
+        XCTAssertEqual(plan.adoptedTaskByReconciliationKey, [
+            chunks[0].reconciliationKey: 11,
+            chunks[1].reconciliationKey: 12,
+            chunks[2].reconciliationKey: 14,
+        ])
+        XCTAssertEqual(plan.cancelledTaskIDs, [13])
+        XCTAssertEqual(plan.missingReconciliationKeys, [wholeFile.relativePath])
+    }
+
+    // MARK: - Completed-range sidecar (crash-resumable sparse partial)
+
+    func testMergedChunkRangesCoalesceSortAndDropInvalid() {
+        let merged = HuggingFaceDownloader.mergedChunkRanges([
+            ChunkRange(start: 40, end: 59),
+            ChunkRange(start: 0, end: 19),
+            ChunkRange(start: 20, end: 39),
+            ChunkRange(start: 90, end: 80),
+            ChunkRange(start: 100, end: 119),
+        ])
+        XCTAssertEqual(merged, [
+            ChunkRange(start: 0, end: 59),
+            ChunkRange(start: 100, end: 119),
+        ])
+    }
+
+    func testChunkRangeCoverageIsFullContainmentOnly() {
+        let completed = [ChunkRange(start: 0, end: 99)]
+        XCTAssertTrue(HuggingFaceDownloader.chunkRangeCovered(ChunkRange(start: 0, end: 99), by: completed))
+        XCTAssertTrue(HuggingFaceDownloader.chunkRangeCovered(ChunkRange(start: 10, end: 50), by: completed))
+        XCTAssertFalse(
+            HuggingFaceDownloader.chunkRangeCovered(ChunkRange(start: 50, end: 149), by: completed),
+            "a partially covered range must be re-fetched whole"
+        )
+    }
+
+    func testChunkSidecarRoundTripsAndFailsClosed() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("chunk-sidecar-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let sidecar = root.appendingPathComponent("file.partial.ranges")
+
+        let ranges = [ChunkRange(start: 0, end: 99), ChunkRange(start: 200, end: 299)]
+        HuggingFaceDownloader.writeChunkSidecar(at: sidecar, expectedSize: 1_000, ranges: ranges)
+        XCTAssertEqual(HuggingFaceDownloader.loadChunkSidecar(at: sidecar, expectedSize: 1_000), ranges)
+
+        // A size mismatch means the record describes a different artifact revision.
+        XCTAssertNil(HuggingFaceDownloader.loadChunkSidecar(at: sidecar, expectedSize: 999))
+
+        // An out-of-bounds range or torn JSON must never validate.
+        HuggingFaceDownloader.writeChunkSidecar(
+            at: sidecar,
+            expectedSize: 100,
+            ranges: [ChunkRange(start: 0, end: 100)]
+        )
+        XCTAssertNil(HuggingFaceDownloader.loadChunkSidecar(at: sidecar, expectedSize: 100))
+        try Data("{".utf8).write(to: sidecar)
+        XCTAssertNil(HuggingFaceDownloader.loadChunkSidecar(at: sidecar, expectedSize: 1_000))
+        XCTAssertNil(
+            HuggingFaceDownloader.loadChunkSidecar(
+                at: root.appendingPathComponent("absent.ranges"),
+                expectedSize: 1_000
+            )
+        )
+    }
+
+    func testAssemblyRecordsCompletedRangesDurably() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("chunk-durable-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let partial = root.appendingPathComponent("file.partial")
+        let sidecar = HuggingFaceDownloader.chunkSidecarURL(forPartial: partial)
+
+        let assembly = HuggingFaceDownloader.ChunkAssemblyCoordinator(
+            partialURL: partial,
+            sidecarURL: sidecar,
+            expectedSize: 64,
+            initialCompletedRanges: [ChunkRange(start: 0, end: 15)]
+        )
+        try await assembly.open()
+        let temp = root.appendingPathComponent("chunk.tmp")
+        try Data(repeating: 7, count: 16).write(to: temp)
+        try await assembly.writeChunk(tempURL: temp, offset: 16)
+        await assembly.recordCompleted(range: ChunkRange(start: 16, end: 31))
+        await assembly.close()
+
+        // The recovered record merges the pre-existing and newly recorded ranges, so a
+        // relaunch re-fetches only the genuinely missing bytes.
+        XCTAssertEqual(
+            HuggingFaceDownloader.loadChunkSidecar(at: sidecar, expectedSize: 64),
+            [ChunkRange(start: 0, end: 31)]
+        )
+    }
+
+    // MARK: - Registry: adopted-task teardown and identity-exact claims
+
+    func testCancellationDrainsAdoptedButUnconsumedTasks() async throws {
+        let registry = HuggingFaceDownloader.DownloadStateRegistry(repositoryProgressHandler: nil)
+        let session = URLSession(configuration: .ephemeral)
+        defer { session.invalidateAndCancel() }
+        await registry.beginRepositoryDownload(totalBytes: 1_000, totalFiles: 1)
+
+        // A relaunch-adopted task that no range slot has consumed yet is a live
+        // daemon transfer with no registered continuation; user cancel must stop it.
+        let adopted = makeDummyTask(session: session)
+        let accepted = await registry.adopt(task: adopted, identity: chunkIdentity(start: 0, end: 499))
+        XCTAssertTrue(accepted)
+        XCTAssertEqual(adopted.state, .suspended)
+
+        await registry.requestCancellation()
+        let left: Bool = await {
+            for _ in 0..<50 {
+                if adopted.state != .suspended { return true }
+                try? await Task.sleep(for: .milliseconds(20))
+            }
+            return adopted.state != .suspended
+        }()
+        XCTAssertTrue(left, "cancel must tear down adopted-but-unconsumed tasks")
+        // And the slot is gone: nothing can consume the cancelled task later.
+        let taken = await registry.takeAdoptedTask(forKey: chunkIdentity(start: 0, end: 499).reconciliationKey)
+        XCTAssertNil(taken)
+    }
+
+    func testParkedCompletionClaimRequiresExactIdentity() async throws {
+        let registry = HuggingFaceDownloader.DownloadStateRegistry(repositoryProgressHandler: nil)
+        let session = URLSession(configuration: .ephemeral)
+        defer { session.invalidateAndCancel() }
+        await registry.beginRepositoryDownload(totalBytes: 1_000, totalFiles: 1)
+
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("chunk-claim-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        // Park a completion under artifact generation v1.
+        let stale = chunkIdentity(start: 0, end: 499)
+        let temp = root.appendingPathComponent("stale-bytes")
+        try Data("stale".utf8).write(to: temp)
+        await registry.stageSuccess(
+            taskID: 41,
+            identity: stale,
+            temporaryFile: HuggingFaceDownloader.DownloadedTemporaryFile(
+                url: temp, statusCode: 206, retryAfterSeconds: nil, contentRange: nil
+            )
+        )
+        await registry.completeStagedSuccess(taskID: 41)
+
+        // A v2-generation task shares the reconciliation slot but not the identity:
+        // it must NOT be handed the stale bytes; the stale parking is discarded and
+        // the fresh registration proceeds.
+        let fresh = ModelDownloadTaskIdentity(
+            logicalRequestID: "request",
+            modelID: "model",
+            artifactVersion: "v2",
+            relativePath: stale.relativePath,
+            expectedSize: stale.expectedSize,
+            expectedSHA256: String(repeating: "a", count: 64),
+            rangeStart: 0,
+            rangeEnd: 499
+        )
+        XCTAssertEqual(fresh.reconciliationKey, stale.reconciliationKey)
+
+        let dummy = makeDummyTask(session: session)
+        dummy.taskDescription = fresh.encodedTaskDescription
+        let registered: Bool = await withCheckedContinuation { outer in
+            Task {
+                _ = try? await withCheckedThrowingContinuation { (continuation: CheckedContinuation<HuggingFaceDownloader.DownloadedTemporaryFile, Error>) in
+                    Task {
+                        let shouldResume = await registry.register(
+                            taskKey: 42,
+                            task: dummy,
+                            destination: URL(string: "https://chunk-tests.invalid/blob")!,
+                            continuation: continuation,
+                            resumeDataURL: nil,
+                            fileIndex: 0
+                        )
+                        outer.resume(returning: shouldResume)
+                        if shouldResume {
+                            await registry.resumeFailure(
+                                taskID: 42,
+                                error: HuggingFaceDownloader.DownloadError.cancelled
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        XCTAssertTrue(registered, "a mismatched parked identity must not satisfy the claim")
+        XCTAssertFalse(
+            FileManager.default.fileExists(atPath: temp.path),
+            "the unclaimable stale parking must be discarded, not leaked"
+        )
+    }
+
+    // MARK: - Registry: parked chunk completions claim by range slot
+
+    func testParkedChunkCompletionsAreClaimedPerRangeSlot() async throws {
+        let registry = HuggingFaceDownloader.DownloadStateRegistry(repositoryProgressHandler: nil)
+        let session = URLSession(configuration: .ephemeral)
+        defer { session.invalidateAndCancel() }
+        await registry.beginRepositoryDownload(totalBytes: 1_000, totalFiles: 1)
+
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("chunk-park-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        // Two chunk completions of one file land while nothing is registered (the
+        // background daemon finished them while the app was dead). Both must park
+        // side by side — the old per-file keying deleted the first as superseded.
+        let first = chunkIdentity(start: 0, end: 499)
+        let second = chunkIdentity(start: 500, end: 999)
+        for (taskID, identity) in [(21, first), (22, second)] {
+            let temp = root.appendingPathComponent("parked-\(taskID)")
+            try Data("chunk-\(taskID)".utf8).write(to: temp)
+            await registry.stageSuccess(
+                taskID: taskID,
+                identity: identity,
+                temporaryFile: HuggingFaceDownloader.DownloadedTemporaryFile(
+                    url: temp,
+                    statusCode: 206,
+                    retryAfterSeconds: nil,
+                    contentRange: nil
+                )
+            )
+            await registry.completeStagedSuccess(taskID: taskID)
+        }
+
+        // A fresh task per range slot claims exactly its own parked completion.
+        for (key, identity) in [(31, first), (32, second)] {
+            let dummy = makeDummyTask(session: session)
+            dummy.taskDescription = identity.encodedTaskDescription
+            let claimed: HuggingFaceDownloader.DownloadedTemporaryFile =
+                try await withCheckedThrowingContinuation { continuation in
+                    Task {
+                        let shouldResume = await registry.register(
+                            taskKey: key,
+                            task: dummy,
+                            destination: URL(string: "https://chunk-tests.invalid/blob")!,
+                            continuation: continuation,
+                            resumeDataURL: nil,
+                            fileIndex: 0
+                        )
+                        XCTAssertFalse(shouldResume, "a claimed completion must not start a transfer")
+                    }
+                }
+            let expectedStart = try XCTUnwrap(identity.rangeStart)
+            XCTAssertEqual(
+                try String(decoding: Data(contentsOf: claimed.url), as: UTF8.self),
+                "chunk-\(expectedStart == 0 ? 21 : 22)"
+            )
+        }
+    }
 }

@@ -40,7 +40,7 @@ Usage:
   scripts/ui_test.sh ios smoke
   scripts/ui_test.sh ios benchmark [--modes custom,design,clone] [--lengths short,medium,long] [--warm 3] [--label RUN_ID]
   scripts/ui_test.sh ios delivery-cohort --text SCRIPT [--takes 20] [--label RUN_ID]
-  scripts/ui_test.sh ios model-download
+  scripts/ui_test.sh ios model-download [--engine-profile legacy|chunked|chunked-multisession]
 
 The iOS destination is the paired physical iPhone only. Simulator destinations are unsupported.
 `model-download` is an opt-in isolated lifecycle proof and never runs in smoke, benchmark, CI, or release.
@@ -72,8 +72,11 @@ long_form_segments=""
 perf_run_started_epoch_ms=0
 cohort_takes=20
 cohort_text=""
+engine_profile=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --engine-profile) engine_profile="${2:?--engine-profile requires a value}"; shift 2 ;;
+    --engine-profile=*) engine_profile="${1#*=}"; shift ;;
     --modes) modes="${2:?--modes requires a value}"; shift 2 ;;
     --modes=*) modes="${1#*=}"; shift ;;
     --lengths) lengths="${2:?--lengths requires a value}"; shift 2 ;;
@@ -102,6 +105,11 @@ if [[ "$lane" != "benchmark" && ( "$modes" != "custom,design,clone" || "$lengths
 fi
 if [[ "$lane" != "delivery-cohort" ]] && [[ "$cohort_takes" != 20 || -n "$cohort_text" ]]; then
   die "--takes and --text are accepted only by the delivery-cohort lane"
+fi
+if [[ -n "$engine_profile" ]]; then
+  [[ "$lane" == "model-download" ]] || die "--engine-profile is accepted only by the model-download lane"
+  [[ "$engine_profile" == "legacy" || "$engine_profile" == "chunked" || "$engine_profile" == "chunked-multisession" ]] \
+    || die "--engine-profile must be legacy, chunked, or chunked-multisession"
 fi
 if [[ "$lane" == "delivery-cohort" ]]; then
   [[ "$cohort_takes" =~ ^[0-9]+$ ]] && (( cohort_takes >= 1 && cohort_takes <= 60 )) \
@@ -455,9 +463,11 @@ shared_component_bytes = sum(
 if shared_component_bytes <= 0:
     raise SystemExit("production catalog is missing shared-component byte identities")
 
+# Upper bound mirrors ModelDownloadDiagnosticsStore.maxRetainedRecords (200), sized
+# for a chunked three-artifact lifecycle's per-range task metrics; the two move together.
 files = sorted(root.glob("*.json"))
-if not files or len(files) > 60:
-    raise SystemExit(f"expected 1-60 compact diagnostic records, found {len(files)}")
+if not files or len(files) > 200:
+    raise SystemExit(f"expected 1-200 compact diagnostic records, found {len(files)}")
 if sum(path.stat().st_size for path in files) > 5 * 1024 * 1024:
     raise SystemExit("model-download diagnostics exceed the 5 MiB retention contract")
 records = [json.loads(path.read_text(encoding="utf-8")) for path in files]
@@ -529,24 +539,42 @@ for success in successes[-3:]:
         )
     # The shared-component store omits exactly the verified tokenizer bytes from a
     # later artifact's plan. A success must therefore account for its full catalog
-    # bytes either entirely on the wire or with exactly the component reused; any
-    # other total is duplicate or missing payload and fails closed.
+    # bytes either entirely on the wire or with exactly the component reused. A
+    # chunk retry legitimately meters a failed range's partial bytes before the
+    # re-fetch, so bounded overage is tolerated ONLY when the success recorded
+    # retries — capped at one full 128 MiB range per retry. Shortfall is missing
+    # payload and always fails closed; retry-free runs must still be byte-exact.
     if wire == expected:
-        reused = 0
+        reused, duplicate = 0, 0
     elif wire == expected - shared_component_bytes:
-        reused = shared_component_bytes
+        reused, duplicate = shared_component_bytes, 0
     else:
-        raise SystemExit(
-            "wire bytes match neither the full artifact nor exact shared-component reuse: "
-            f"wire={wire} expected={expected} sharedComponent={shared_component_bytes}"
-        )
+        retry_count = int(success.get("retryCount", 0) or 0)
+        max_overage = retry_count * 128 * 1024 * 1024
+        if wire > expected:
+            reused, duplicate = 0, wire - expected
+        elif wire > expected - shared_component_bytes:
+            reused = shared_component_bytes
+            duplicate = wire - (expected - shared_component_bytes)
+        else:
+            raise SystemExit(
+                "wire bytes fall short of every valid accounting (missing payload): "
+                f"wire={wire} expected={expected} sharedComponent={shared_component_bytes}"
+            )
+        if duplicate > max_overage:
+            raise SystemExit(
+                "wire bytes exceed the exact accounting beyond the recorded retry "
+                f"allowance: wire={wire} expected={expected} "
+                f"sharedComponent={shared_component_bytes} duplicate={duplicate} "
+                f"retryCount={retry_count}"
+            )
     validated.append({
         "capturedAtUTC": success_time,
         "finalIntegrity": True,
         "expectedBytes": expected,
         "wireBytes": wire,
         "reusedComponentBytes": reused,
-        "duplicateBytes": 0,
+        "duplicateBytes": duplicate,
         "retryCount": success.get("retryCount", 0),
         "protocols": protocols,
         "thermalState": success.get("thermalState"),
@@ -567,6 +595,7 @@ if sum(1 for entry in validated if entry["reusedComponentBytes"] > 0) < 2:
 summary = {
     "schemaVersion": 2,
     "sharedComponentBytes": shared_component_bytes,
+    "engineProfile": os.environ.get("TEST_RUNNER_QVOICE_IOS_DOWNLOAD_ENGINE_PROFILE") or "default",
     "artifacts": validated,
 }
 (root.parent / "validated-summary.json").write_text(
@@ -983,6 +1012,13 @@ else
     export TEST_RUNNER_QVOICE_IOS_COHORT_TEXT="$cohort_text"
   else
     only_test="VocelloiOSUITests/VocelloiOSModelDownloadUITests/testIsolatedBackgroundDownloadAdoptionAndCleanup"
+    # A/B arm selection for the MD-2 device comparison: forwarded to the test
+    # runner, which passes it into the app as the registered
+    # QVOICE_DOWNLOAD_ENGINE_PROFILE debug knob (inert without QWENVOICE_DEBUG,
+    # which the UI-test base case already sets for the isolated app).
+    if [[ -n "$engine_profile" ]]; then
+      export TEST_RUNNER_QVOICE_IOS_DOWNLOAD_ENGINE_PROFILE="$engine_profile"
+    fi
   fi
 
   note "physical-iPhone XCUITest $lane on $device → $out"

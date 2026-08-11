@@ -15,7 +15,15 @@ final class VocelloiOSModelDownloadUITests: VocelloiOSUITestCase {
         select(tab: .settings)
         let canonicalSnapshot = snapshotQuiescentCanonicalDelivery()
 
-        let environment = ["QVOICE_APP_SUPPORT_DIR": isolatedSupportRoot]
+        var environment = ["QVOICE_APP_SUPPORT_DIR": isolatedSupportRoot]
+        // MD-2 A/B arm selection: `scripts/ui_test.sh ios model-download
+        // --engine-profile …` forwards the registered download-engine knob through
+        // the runner into the isolated app (the base case already sets
+        // QWENVOICE_DEBUG). Absent, the app uses its shipping default.
+        if let engineProfile = ProcessInfo.processInfo
+            .environment["QVOICE_IOS_DOWNLOAD_ENGINE_PROFILE"], !engineProfile.isEmpty {
+            environment["QVOICE_DOWNLOAD_ENGINE_PROFILE"] = engineProfile
+        }
         launchApp(additionalEnvironment: environment)
 
         select(tab: .settings)

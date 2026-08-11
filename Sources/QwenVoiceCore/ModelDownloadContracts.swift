@@ -70,8 +70,16 @@ public struct ModelArtifactURLPolicy: Equatable, Sendable {
 
 /// Stable identity encoded in `URLSessionTask.taskDescription`. It deliberately contains no URL
 /// or filesystem path so it is safe to persist and use when adopting background tasks.
+///
+/// Schema v2 adds optional byte-range qualification so one logical file may be transferred as
+/// N chunk tasks that each survive background-session relaunch adoption. A whole-file identity
+/// leaves both range fields nil; a chunk identity carries the inclusive `[rangeStart, rangeEnd]`
+/// it transfers while `expectedSize`/`expectedSHA256` remain the WHOLE FILE's values (chunk
+/// verification happens at assembly against the full file, never per range). v1 descriptions
+/// fail decode closed, so tasks from a pre-v2 build are cancelled by reconciliation and their
+/// requests restart cleanly.
 public struct ModelDownloadTaskIdentity: Codable, Equatable, Hashable, Sendable {
-    public static let currentSchemaVersion = 1
+    public static let currentSchemaVersion = 2
 
     public let schemaVersion: Int
     public let logicalRequestID: String
@@ -80,6 +88,8 @@ public struct ModelDownloadTaskIdentity: Codable, Equatable, Hashable, Sendable 
     public let relativePath: String
     public let expectedSize: Int64
     public let expectedSHA256: String?
+    public let rangeStart: Int64?
+    public let rangeEnd: Int64?
 
     public init(
         logicalRequestID: String,
@@ -87,7 +97,9 @@ public struct ModelDownloadTaskIdentity: Codable, Equatable, Hashable, Sendable 
         artifactVersion: String,
         relativePath: String,
         expectedSize: Int64,
-        expectedSHA256: String?
+        expectedSHA256: String?,
+        rangeStart: Int64? = nil,
+        rangeEnd: Int64? = nil
     ) {
         self.schemaVersion = Self.currentSchemaVersion
         self.logicalRequestID = logicalRequestID
@@ -96,6 +108,8 @@ public struct ModelDownloadTaskIdentity: Codable, Equatable, Hashable, Sendable 
         self.relativePath = relativePath
         self.expectedSize = expectedSize
         self.expectedSHA256 = expectedSHA256
+        self.rangeStart = rangeStart
+        self.rangeEnd = rangeEnd
     }
 
     public var encodedTaskDescription: String? {
@@ -118,7 +132,8 @@ public struct ModelDownloadTaskIdentity: Codable, Equatable, Hashable, Sendable 
     /// Background adoption is a production trust boundary. A task without an
     /// immutable artifact identity, exact size, safe path, and SHA-256 may
     /// finish in its current process, but it can never be adopted after a
-    /// relaunch.
+    /// relaunch. A chunk identity must carry a coherent in-bounds byte range;
+    /// a half-specified range is invalid.
     public var isValidProductionIdentity: Bool {
         schemaVersion == Self.currentSchemaVersion
             && isSafeIdentityComponent(logicalRequestID)
@@ -127,6 +142,31 @@ public struct ModelDownloadTaskIdentity: Codable, Equatable, Hashable, Sendable 
             && isSafeRelativeArtifactPath(relativePath)
             && expectedSize > 0
             && isLowercaseSHA256(expectedSHA256)
+            && hasValidRangeQualification
+    }
+
+    private var hasValidRangeQualification: Bool {
+        switch (rangeStart, rangeEnd) {
+        case (nil, nil):
+            return true
+        case let (start?, end?):
+            return start >= 0 && start <= end && end < expectedSize
+        default:
+            return false
+        }
+    }
+
+    /// One reconciliation slot per transferable unit: the relative path for a
+    /// whole-file task, a range-qualified form for a chunk task. Chunk keys start
+    /// with `/`, which a validated relative artifact path never does, so a chunk
+    /// key can never collide with any whole-file key.
+    public var reconciliationKey: String {
+        guard let rangeStart, let rangeEnd else { return relativePath }
+        return Self.chunkReconciliationKey(relativePath: relativePath, start: rangeStart, end: rangeEnd)
+    }
+
+    public static func chunkReconciliationKey(relativePath: String, start: Int64, end: Int64) -> String {
+        "/range/\(start)-\(end)/\(relativePath)"
     }
 }
 
@@ -181,9 +221,11 @@ public struct ModelDownloadExistingTask: Equatable, Sendable {
 }
 
 public struct ModelDownloadReconciliationPlan: Equatable, Sendable {
-    public let adoptedTaskByRelativePath: [String: Int]
+    /// Adopted live task per `ModelDownloadTaskIdentity.reconciliationKey` (the
+    /// relative path for whole-file tasks; range-qualified for chunk tasks).
+    public let adoptedTaskByReconciliationKey: [String: Int]
     public let cancelledTaskIDs: [Int]
-    public let missingRelativePaths: [String]
+    public let missingReconciliationKeys: [String]
 }
 
 /// Small production-used state machine that makes UIKit background-event completion testable
@@ -299,31 +341,37 @@ final class ModelDownloadDelegateTerminalSequencer: Sendable {
 }
 
 /// Deterministic task-inventory reconciliation used by the live URLSession bridge and fake-task
-/// tests. Exactly one valid task may own a file; stale, unknown, or duplicate tasks are cancelled.
+/// tests. Exactly one valid task may own a reconciliation slot (a whole file, or one byte-range
+/// chunk of a file); stale, unknown, and duplicate tasks are cancelled.
 public enum ModelDownloadTaskReconciler {
     public static func plan(
         expected: [ModelDownloadTaskIdentity],
         existing: [ModelDownloadExistingTask]
     ) -> ModelDownloadReconciliationPlan {
-        let expectedByPath = Dictionary(uniqueKeysWithValues: expected.map { ($0.relativePath, $0) })
+        // Keys are unique by construction (one identity per file or per chunk range);
+        // keep-first uniquing keeps a malformed expected list from trapping at runtime.
+        let expectedByKey = Dictionary(
+            expected.map { ($0.reconciliationKey, $0) },
+            uniquingKeysWith: { first, _ in first }
+        )
         var adopted: [String: Int] = [:]
         var cancelled: [Int] = []
 
         for task in existing.sorted(by: { $0.taskID < $1.taskID }) {
             guard let identity = task.identity,
                   identity.isValidProductionIdentity,
-                  expectedByPath[identity.relativePath] == identity,
-                  adopted[identity.relativePath] == nil else {
+                  expectedByKey[identity.reconciliationKey] == identity,
+                  adopted[identity.reconciliationKey] == nil else {
                 cancelled.append(task.taskID)
                 continue
             }
-            adopted[identity.relativePath] = task.taskID
+            adopted[identity.reconciliationKey] = task.taskID
         }
 
         return ModelDownloadReconciliationPlan(
-            adoptedTaskByRelativePath: adopted,
+            adoptedTaskByReconciliationKey: adopted,
             cancelledTaskIDs: cancelled.sorted(),
-            missingRelativePaths: expectedByPath.keys.filter { adopted[$0] == nil }.sorted()
+            missingReconciliationKeys: expectedByKey.keys.filter { adopted[$0] == nil }.sorted()
         )
     }
 }

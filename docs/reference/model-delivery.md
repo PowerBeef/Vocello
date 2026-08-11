@@ -142,10 +142,27 @@ work is completed after reconciliation.
 
 iPhone runs one model request at a time. macOS keeps its existing foreground concurrency.
 **macOS/CLI run per-file range chunking by default since 2026-08-08** (evidence under the
-tuning policy below); iPhone keeps chunking off — background-session task adoption and the
-reconciler are keyed by `relativePath`, so chunked files there first need a range-qualified
-task-identity schema, a reconciler update, and a fresh device A/B through the
-model-download UI lane.
+tuning policy below). **iPhone runs chunked transfers by default since 2026-08-11.** The
+background mechanism: task identities are schema v2 with optional range qualification, so
+one file's N chunk tasks each survive relaunch adoption instead of being reaped as
+`relativePath` duplicates; reconciliation, completion parking, and adoption are keyed per
+range slot; chunk tasks on a background session fan out to the daemon up front (submitted
+tasks keep transferring across process death, and the OS scheduler owns concurrency —
+per-host caps are inert there) with 128 MiB ranges; and chunk task descriptions carry
+their identity so post-relaunch transfer metrics still attribute payload bytes to their
+file. The registered `QVOICE_DOWNLOAD_ENGINE_PROFILE` knob keeps `legacy` as the
+regression-comparison arm on iPhone (inert without `QWENVOICE_DEBUG`).
+
+The iPhone default flip is an explicit maintainer call (2026-08-11) and a recorded
+deviation from the pre-registered model-download-lane A/B protocol: the mechanism is
+identical to the macOS/CLI code path whose interleaved controlled comparison measured the
+87.1% median improvement against this CDN's per-connection shaping, the 12-finding
+adversarial review of the background-specific surfaces was resolved with deterministic
+regression tests, and the deciding live observation was same-day canonical on-device
+delivery — the legacy stream crawling at the shaped 2–6 MB/s versus chunked multi-gigabyte
+installs completing in minutes on the same phone, network, and catalog. A lane-based
+device A/B (`scripts/ui_test.sh ios model-download --engine-profile legacy|chunked`)
+remains available for regression comparisons but is no longer a gate for this default.
 
 The chunked-transfer mechanism landed 2026-08-08 (download-throughput investigation:
 Hugging Face's CDN shapes throughput per connection — measured from the canonical Mac,
@@ -160,9 +177,11 @@ exact, and an optional per-worker-session mode defeats HTTP/2/3 connection coale
 (measured equivalent to the shared session on this CDN; kept as a diagnostic lever). The
 CLI A/B knob is `QVOICE_DOWNLOAD_ENGINE_PROFILE` (`legacy` | `chunked` |
 `chunked-multisession`, registered, inert without `QWENVOICE_DEBUG`).
-Known trade-off while chunking is enabled: a process death mid-file discards that file's
-chunk progress (the holey partial cannot be range-resumed), whereas a single stream resumes
-from its partial; in-process retries are unaffected.
+Since 2026-08-11 a chunked partial is crash-resumable: each landed range is recorded in a
+completed-range sidecar beside the partial (written atomically, after the bytes are in the
+partial), so a process death re-fetches only missing ranges; a missing or invalid sidecar
+fails closed to a clean restart of that file, and single-stream attempts invalidate any
+sidecar so the two resume schemes can never disagree about the bytes on disk.
 
 ## States, cancellation, and retry
 

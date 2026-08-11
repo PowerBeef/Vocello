@@ -480,12 +480,31 @@ final class IOSModelDownloadCoordinator {
     private func makeSharedDownloader() -> HuggingFaceDownloader {
         var engineConfig = HuggingFaceDownloader.Configuration()
         engineConfig.maxConcurrentFiles = 6
-        // Chunking stays off on iOS even though the macOS/CLI default flipped on
-        // (2026-08-08): background-session task adoption and the reconciler are keyed
-        // by relativePath, so N chunk tasks of one file would be reaped as duplicates
-        // on relaunch. Enabling it needs a range-qualified task-identity schema, a
-        // reconciler update, and a fresh device A/B through the model-download UI lane.
-        engineConfig.chunkLargeFiles = false
+        // Chunked transfers are the iOS default since 2026-08-11 (maintainer call,
+        // recorded in docs/reference/model-delivery.md: the macOS controlled
+        // comparison established the CDN's per-connection shaping and an 87% median
+        // improvement on the identical code path, and the live canonical on-device
+        // delivery confirmed multi-gigabyte installs completing in minutes where the
+        // legacy single stream crawled at 2-6 MB/s). Range-qualified schema-v2 task
+        // identities survive background relaunch adoption, chunk transfers fan out
+        // to the daemon up front, and the completed-range sidecar makes the sparse
+        // partial resumable across process death. 128 MiB ranges — larger than the
+        // foreground 64 MiB — bound per-task daemon overhead and the background
+        // scheduler's small-range throttling. The registered knob (inert without
+        // QWENVOICE_DEBUG) keeps `legacy` as the regression-comparison arm.
+        engineConfig.chunkLargeFiles = true
+        engineConfig.chunkTargetSize = 128 * 1024 * 1024
+        switch RuntimeDebugGate.value(for: "QVOICE_DOWNLOAD_ENGINE_PROFILE")?
+            .trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        case "legacy":
+            engineConfig.chunkLargeFiles = false
+        case "chunked", "chunked-multisession":
+            // The default; multisession has no meaning on a background session
+            // (every chunk task must ride the one persistent session).
+            break
+        default:
+            break
+        }
 
         let sessionConfig = URLSessionConfiguration.background(
             withIdentifier: configuration.backgroundSessionIdentifier

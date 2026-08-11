@@ -267,13 +267,22 @@ public final class ModelDownloadDiagnosticsStore: @unchecked Sendable {
         var retainedBytes: Int64 = 0
         for (index, file) in files.enumerated() {
             let size = Int64((try? file.resourceValues(forKeys: keys).fileSize) ?? 0)
-            if index >= 60 || retainedBytes + size > 5 * 1_024 * 1_024 {
+            if index >= Self.maxRetainedRecords || retainedBytes + size > 5 * 1_024 * 1_024 {
                 try? fileManager.removeItem(at: file)
             } else {
                 retainedBytes += size
             }
         }
     }
+
+    /// Sized for a full chunked three-artifact lifecycle: 128 MiB ranges over the Speed
+    /// artifacts emit one task-metrics record per chunk (~35 for the full-wire artifact
+    /// alone), plus per-file records, phase samples, and the three success summaries —
+    /// about 120 records. The prior cap of 60 silently pruned the first artifact's
+    /// metrics before the model-download lane could validate its byte-exact wire
+    /// accounting. The paired validator bound lives in scripts/ui_test.sh and must move
+    /// with this constant.
+    static let maxRetainedRecords = 200
 
     private func sanitizeRelativePath(_ value: String?) -> String? {
         guard let value,

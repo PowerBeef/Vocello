@@ -134,9 +134,9 @@ final class ModelDownloadLifecycleTests: XCTestCase {
             existing: [ModelDownloadExistingTask(taskID: 7, identity: expected)]
         )
 
-        XCTAssertEqual(plan.adoptedTaskByRelativePath, [expected.relativePath: 7])
+        XCTAssertEqual(plan.adoptedTaskByReconciliationKey, [expected.relativePath: 7])
         XCTAssertTrue(plan.cancelledTaskIDs.isEmpty)
-        XCTAssertTrue(plan.missingRelativePaths.isEmpty)
+        XCTAssertTrue(plan.missingReconciliationKeys.isEmpty)
     }
 
     func testUnknownStaleAndDuplicateTasksAreCancelled() {
@@ -152,9 +152,9 @@ final class ModelDownloadLifecycleTests: XCTestCase {
             ]
         )
 
-        XCTAssertEqual(plan.adoptedTaskByRelativePath, [expected.relativePath: 2])
+        XCTAssertEqual(plan.adoptedTaskByReconciliationKey, [expected.relativePath: 2])
         XCTAssertEqual(plan.cancelledTaskIDs, [3, 4, 8])
-        XCTAssertTrue(plan.missingRelativePaths.isEmpty)
+        XCTAssertTrue(plan.missingReconciliationKeys.isEmpty)
     }
 
     func testMissingTaskIsCreatedOnlyForMissingIdentity() {
@@ -164,7 +164,7 @@ final class ModelDownloadLifecycleTests: XCTestCase {
             expected: [first, second],
             existing: [ModelDownloadExistingTask(taskID: 1, identity: first)]
         )
-        XCTAssertEqual(plan.missingRelativePaths, ["b.safetensors"])
+        XCTAssertEqual(plan.missingReconciliationKeys, ["b.safetensors"])
     }
 
     func testProgressNeverRegressesAcrossRelaunchOrRetry() {
@@ -571,14 +571,15 @@ final class ModelDownloadLifecycleTests: XCTestCase {
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         defer { try? FileManager.default.removeItem(at: root) }
         let store = ModelDownloadDiagnosticsStore(directory: root)
-        for index in 0..<70 {
+        let cap = ModelDownloadDiagnosticsStore.maxRetainedRecords
+        for index in 0..<(cap + 10) {
             store.recordFailure(
                 classification: "network-\(index)",
                 message: "failed at https://example.invalid/private from /Users/example/private/file"
             )
         }
         let files = try FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: nil)
-        XCTAssertLessThanOrEqual(files.count, 60)
+        XCTAssertLessThanOrEqual(files.count, cap)
         let payload = try files.map { try String(contentsOf: $0, encoding: .utf8) }.joined()
         XCTAssertFalse(payload.contains("example.invalid"))
         XCTAssertFalse(payload.contains("/Users/example"))

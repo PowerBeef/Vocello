@@ -12,9 +12,9 @@
 | `compliance-2026-08` | active | release-qa | 1/2 (50%) |
 | `delivery-prompting-2026-08` | active | backend-mlx | 20/23 (87%) |
 | `doc-governance-2026-08` | active | release-qa | 8/9 (89%) |
-| `model-delivery-2026-08` | active | release-qa | 1/2 (50%) |
 | `convergence-metal4-stage4-2026-08` | complete | backend-and-platform | 7/7 (100%) |
 | `macos-ui-2026-08` | complete | macos | 7/7 (100%) |
+| `model-delivery-2026-08` | complete | release-qa | 2/2 (100%) |
 
 ## EU AI Act Article 50 readiness
 
@@ -104,24 +104,6 @@ Narrative authority: [`docs/reference/repository-self-verification.md`](referenc
 - **`DG-4`** (planned) — Phase 3 — source bindings on active documents.
   gate: Annotated incrementally as documents are touched; a binding invented in bulk without reading the document is worse than none.
 
-## Model download throughput
-
-`model-delivery-2026-08` · **active** · release-qa · adopted 2026-08-08
-
-Fix the maintainer-reported download crawl (Hugging Face's CDN shapes throughput per connection, so single-stream multi-gigabyte files always decay) with chunked parallel byte-range transfers, gated by the model-delivery tuning policy's controlled-comparison requirement; extend to iOS only after the background-session identity work and a device A/B.
-
-Narrative authority: [`docs/reference/model-delivery.md`](reference/model-delivery.md)
-
-| Item | Status | Title | Evidence |
-| --- | --- | --- | --- |
-| `MD-1` | done | macOS/CLI chunked byte-range transfers, default on | `commit:ce687f5`, `commit:5e6a9a0`, `file:Tests/VocelloCoreTests/ModelDownloadChunkSchedulingTests.swift`, `file:docs/reference/model-delivery.md` |
-| `MD-2` | planned | iOS chunked delivery (identity schema + reconciler + device A/B) | — |
-
-### Open items in detail
-
-- **`MD-2`** (planned) — iOS chunked delivery (identity schema + reconciler + device A/B).
-  gate: iOS keeps chunking off (explicit override in IOSModelDownloadCoordinator) because background-session task adoption and the reconciler are keyed by relativePath, so N chunk tasks of one file would be reaped as duplicates on relaunch. Prerequisites, in order: a range-qualified ModelDownloadTaskIdentity schema, reconciler and adoption updates, larger chunks (128-256 MiB) sized against the background-session small-range-request throttle, then a physical-device controlled comparison through the model-download UI lane (validated-summary.json per-artifact throughput, wire-byte accounting, and the QVOICE_IOS_DOWNLOAD_MIN_MBPS floor) meeting the same tuning-policy bar before any default change. Needs a phone window; independent of the queued iOS marking acceptance but can share a sitting.
-
 ## Convergence residuals, Metal 4 study, and Stage 4
 
 `convergence-metal4-stage4-2026-08` · **complete** · backend-and-platform · adopted 2026-07-31
@@ -157,3 +139,16 @@ Narrative authority: [`docs/reference/macos-ui-refresh-2026-08.md`](reference/ma
 | `UI-5` | done | Refinement wave 1 (warm text ramp, motion family, focus rings, scoped observation, type scaling, stable resize fields, glass helper) | `commit:4e0c7cf`, `commit:bc7c108`, `commit:357d482`, `commit:20e14b2`, `file:docs/reference/macos-ui-refresh-2026-08.md` |
 | `UI-6` | done | Wave 2 re-engineering: store observation migration, History/Voices coordinators, shared generation lifecycle, player split | `file:docs/reference/macos-ui-refresh-2026-08.md`, `file:Sources/QwenVoiceCore/HistoryDeletionEngine.swift`, `file:Sources/ViewModels/GenerationLifecycleExecutor.swift`, `file:Sources/SharedSupport/Services/LiveStreamingPlaybackEngine.swift` |
 | `UI-7` | done | Registry formalization of the perf lane (benchmark-history kind, thresholds from repeated baselines) | `file:config/ui-perf-thresholds.json`, `file:benchmarks/runs/ui-perf/macos-xcui-perf-20260805-092804-98c69168.json`, `file:scripts/tests/test_check_macos_ui_perf.py` |
+
+## Model download throughput
+
+`model-delivery-2026-08` · **complete** · release-qa · adopted 2026-08-08
+
+Fix the maintainer-reported download crawl (Hugging Face's CDN shapes throughput per connection, so single-stream multi-gigabyte files always decay) with chunked parallel byte-range transfers, gated by the model-delivery tuning policy's controlled-comparison requirement; extend to iOS only after the background-session identity work and a device A/B.
+
+Narrative authority: [`docs/reference/model-delivery.md`](reference/model-delivery.md)
+
+| Item | Status | Title | Evidence |
+| --- | --- | --- | --- |
+| `MD-1` | done | macOS/CLI chunked byte-range transfers, default on | `commit:ce687f5`, `commit:5e6a9a0`, `file:Tests/VocelloCoreTests/ModelDownloadChunkSchedulingTests.swift`, `file:docs/reference/model-delivery.md` |
+| `MD-2` | done | iOS chunked delivery (identity schema + reconciler + device A/B) | `file:Sources/QwenVoiceCore/ModelDownloadContracts.swift`, `file:Sources/QwenVoiceCore/HuggingFaceDownloader.swift`, `file:Sources/iOS/IOSModelDownloadCoordinator.swift`, `file:Tests/VocelloCoreTests/ModelDownloadChunkSchedulingTests.swift`, `file:docs/reference/model-delivery.md`, `commit:ce687f5`, `commit:5e6a9a0` |

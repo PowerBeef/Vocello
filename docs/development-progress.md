@@ -39,7 +39,31 @@ machine-readable status record and wins over any older prose.
 | 13 — Benchmark/history v3 | Live 2026-07-29: the first schema-v3 records are committed (three clean `phase0-cli-control-*` engine records plus one exploratory run that also exposed and fixed the summarizer's v3 pin). `benchmarks/schema-v3.json` adds the typed quality identity to generation takes (pass/warning only, five fast gates required, machine-code issues); v1/v2 records stay valid immutable history; the publisher stamps v3 only when every take carries the identity. The UI benchmark checkers folded the same identity 2026-08-01: ui-generation records now publish v3 (first: the focused `v3-fold-proof` record `macos-xcui-benchmark-20260801-003208-403989cf`); the canonical iOS matrix published its first v3 record 2026-08-01 (`ios-xcui-benchmark-20260801-132415-abbec96b`). |
 | 14 — Organization and retirement | Closed 2026-07-23 (14a + 14b): compatibility SPI retired, actor-owned loading/metadata/priming/clone artifacts, clone conditioning epoch-bound end to end. |
 
-## Resume here (2026-08-08)
+## Resume here (2026-08-11)
+
+**iOS chunked delivery + compliance close (2026-08-11, phone window):** both remaining
+arcs closed in one sitting. **MD-2 landed and default-flipped** (commit `f497fb8`): task
+identities are schema v2 with byte-range qualification (v1 fails decode closed),
+reconciliation/parking/adoption key per range slot, background sessions fan chunk tasks
+to the daemon up front at 128 MiB, and a completed-range sidecar makes the sparse
+partial crash-resumable. A 3-lens/16-agent adversarial review confirmed 12 findings
+(terminal-adoption hang, cancel leaving daemon tasks streaming, sparse-partial 416
+dead-end, identity-exact claims, diagnostics retention sized for per-range metrics) —
+all fixed with regression tests in the same commit; 373-test suite green. The iOS
+default flip is an explicit maintainer call recorded in `model-delivery.md` as a
+deviation from the pre-registered lane A/B (evidence: the macOS 87.1% controlled
+comparison on the identical code path plus same-day live canonical delivery — the
+legacy 2–6 MB/s crawl versus chunked multi-gigabyte installs in minutes on the same
+phone). **CP-2 closed — marking is proven live on both shipping platforms**: the
+re-pinned 2026.08.06.1 catalog delivered all three Speed artifacts to the iPhone
+through the fail-closed chunked path; headless marking acceptance passed (run
+`ios-engine-20260811-180909-307642b3`); the pulled shipping WAV carries the full
+provenance chunk (ISFT `Vocello 2.4.0`; ICMT with `version=2.4.0` and
+`marking=AudioSeal:0x56C0`) and the pinned reference detector reads prob 1.0000
+decoding `0x56C0`; the deterministic device gate passed
+(`ios-gate-20260811-141259`). Plans `model-delivery-2026-08` and `compliance-2026-08`
+are complete; the roadmap CP-2/MD-2 gates are the detailed authority. Paid-launch
+gates (C2PA, Code of Practice, legal review) remain recorded, not scheduled.
 
 **Download-throughput fix (2026-08-08, maintainer-requested investigation):** the
 "speeds all over the place, always slowing to a crawl" report root-caused to Hugging

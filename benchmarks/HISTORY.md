@@ -17,6 +17,12 @@ cross-project comparisons.
 |---|---|---|---|---|---|---:|---|---|---|---|
 | 2026-08-02 | [`ios-engine-20260802-010645-909ebdd4`](runs/engine-generation/ios-engine-20260802-010645-909ebdd4.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 1 | `b6b2a028f1eb` | `excluded` | baseline | i14p-floor-clone |
 
+## engine-generation / ios / iphone-17-pro / config `29c4eb5a89c3`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---|---|---|---|
+| 2026-08-11 | [`ios-gate-bench-20260811-181532-fa8e90e1`](runs/engine-generation/ios-gate-bench-20260811-181532-fa8e90e1.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 1 | `f497fb8bf477` | `29c4eb5a89c3` | baseline | ios-gate-bench |
+
 ## engine-generation / ios / iphone-17-pro / config `3abbfd2f50ea`
 
 | completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
@@ -64,6 +70,12 @@ cross-project comparisons.
 | completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
 |---|---|---|---|---|---|---:|---|---|---|---|
 | 2026-07-23 | [`ios-engine-20260723-121520-45ee4ab3`](runs/engine-generation/ios-engine-20260723-121520-45ee4ab3.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 1 | `bb4dae82d4be` | `f6a4d1af86a4` | baseline | ios-glass-check3 |
+
+## engine-generation / ios / iphone-17-pro / config `fc7d1a38082c`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---|---|---|---|
+| 2026-08-11 | [`ios-engine-20260811-180909-307642b3`](runs/engine-generation/ios-engine-20260811-180909-307642b3.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 1 | `f497fb8bf477` | `fc7d1a38082c` | baseline | marking-ios-acceptance |
 
 ## engine-generation / ios / iphone-17-pro / config `fd4b7152c9e4`
 

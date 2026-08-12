@@ -66,6 +66,7 @@ cannot publish as canonical). Simulator timing is not evidence.
 
 ## Landed in this arc
 
-- (pre-arc housekeeping, pending) `ui-ios-delivery-cohort` workflow registration in
-  `config/orchestration-contract.json` — the existing delivery-cohort lane was
-  unrunnable without it; found during this arc's exploration.
+- (pre-arc housekeeping, 2026-08-12) `ui-ios-delivery-cohort` workflow registration in
+  `config/orchestration-contract.json` — the existing delivery-cohort lane died at
+  required-step ledger init without it (`unknown workflow`); found during this arc's
+  exploration.

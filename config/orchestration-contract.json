@@ -250,6 +250,20 @@
         "result-retention"
       ]
     },
+    "ui-ios-perf": {
+      "producer": "scripts/ui_test.sh",
+      "requiredSteps": [
+        "source-provenance",
+        "crash-baseline",
+        "xcuitest",
+        "crash-delta",
+        "perf-validation"
+      ],
+      "optionalSteps": [
+        "history-publication",
+        "result-retention"
+      ]
+    },
     "ui-ios-smoke": {
       "producer": "scripts/ui_test.sh",
       "requiredSteps": [

@@ -108,6 +108,41 @@ public struct MetricKitMemoryExitCounts: Codable, Hashable, Sendable {
     }
 }
 
+/// Allowlisted UI-responsiveness aggregates (ios-ui-2026-08 advisory field
+/// evidence): MXAnimationMetric's scroll-hitch time ratio plus a compact
+/// reduction of MXAppResponsivenessMetric's hang-time histogram. Daily
+/// intervals, never run-correlated, never gating — the same field-diagnostic
+/// posture as the memory/exit aggregates in this file.
+public struct MetricKitUIResponsivenessAggregates: Codable, Hashable, Sendable {
+    /// Scroll hitch time ratio as MetricKit delivers it (ms of hitch per
+    /// second of scrolling).
+    public let scrollHitchTimeRatioMSPerS: Double?
+    /// Total hang events across the hang-time histogram's populated buckets.
+    public let hangEventCount: Int?
+    /// Bucket-midpoint-weighted total hang seconds (approximate by design —
+    /// MetricKit only delivers the histogram).
+    public let hangTimeTotalSecondsApprox: Double?
+    /// Upper bound of the worst populated hang bucket, in seconds.
+    public let hangTimeMaxBucketEndSeconds: Double?
+
+    public init(
+        scrollHitchTimeRatioMSPerS: Double? = nil,
+        hangEventCount: Int? = nil,
+        hangTimeTotalSecondsApprox: Double? = nil,
+        hangTimeMaxBucketEndSeconds: Double? = nil
+    ) {
+        self.scrollHitchTimeRatioMSPerS = scrollHitchTimeRatioMSPerS.map { max($0, 0) }
+        self.hangEventCount = hangEventCount.map { max($0, 0) }
+        self.hangTimeTotalSecondsApprox = hangTimeTotalSecondsApprox.map { max($0, 0) }
+        self.hangTimeMaxBucketEndSeconds = hangTimeMaxBucketEndSeconds.map { max($0, 0) }
+    }
+
+    public var isEmpty: Bool {
+        scrollHitchTimeRatioMSPerS == nil && hangEventCount == nil
+            && hangTimeTotalSecondsApprox == nil && hangTimeMaxBucketEndSeconds == nil
+    }
+}
+
 /// Allowlisted MetricKit aggregate. No raw payload JSON, call stack, process
 /// path, device identity, or user content is retained.
 public struct MetricKitMemoryExitSummaryRecord: Codable, Hashable, Sendable {
@@ -119,6 +154,7 @@ public struct MetricKitMemoryExitSummaryRecord: Codable, Hashable, Sendable {
     public let backgroundExitCounts: MetricKitBackgroundExitCounts?
     public let memoryExitCounts: MetricKitMemoryExitCounts?
     public let diagnosticCounts: MetricKitDiagnosticCounts?
+    public let uiResponsiveness: MetricKitUIResponsivenessAggregates?
 
     public init(
         kind: MetricKitMemoryExitRecordKind,
@@ -128,7 +164,8 @@ public struct MetricKitMemoryExitSummaryRecord: Codable, Hashable, Sendable {
         foregroundExitCounts: MetricKitForegroundExitCounts? = nil,
         backgroundExitCounts: MetricKitBackgroundExitCounts? = nil,
         memoryExitCounts: MetricKitMemoryExitCounts? = nil,
-        diagnosticCounts: MetricKitDiagnosticCounts? = nil
+        diagnosticCounts: MetricKitDiagnosticCounts? = nil,
+        uiResponsiveness: MetricKitUIResponsivenessAggregates? = nil
     ) {
         self.kind = kind
         self.intervalStart = String(intervalStart.prefix(40))
@@ -136,6 +173,7 @@ public struct MetricKitMemoryExitSummaryRecord: Codable, Hashable, Sendable {
         self.peakMemoryMB = peakMemoryMB.map { max($0, 0) }
         self.foregroundExitCounts = foregroundExitCounts
         self.backgroundExitCounts = backgroundExitCounts
+        self.uiResponsiveness = uiResponsiveness.flatMap { $0.isEmpty ? nil : $0 }
         self.memoryExitCounts = memoryExitCounts ?? {
             guard foregroundExitCounts != nil || backgroundExitCounts != nil else { return nil }
             return MetricKitMemoryExitCounts(

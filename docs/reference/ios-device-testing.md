@@ -64,6 +64,9 @@ scripts/ui_test.sh ios benchmark
 # Filtered benchmark example:
 scripts/ui_test.sh ios benchmark --modes custom --lengths short --warm 1 --label "focused"
 
+# UI-performance frame-health lane (ios-ui-2026-08):
+scripts/ui_test.sh ios perf [--label RUN_ID]
+
 # Explicit isolated background-transfer lifecycle proof, not a normal UI lane:
 scripts/ui_test.sh ios model-download
 ```
@@ -78,10 +81,15 @@ the extended >220-character long corpus; the iPhone lane never bypasses the user
 | Smoke | Two journeys. Standard: exact app launch, Studio mode and tab navigation, visible model and clone-reference readiness, one visible user cancellation, one run-scoped critical-memory cancellation with cancel-before-unload diagnostics, post-pressure engine reuse, no cancelled History rows, and one real completed Custom History row. Long-form: a >2,000-character script routes to a project, streams every segment with live narration, surfaces the joined output in the inline player, and History shows search-flattened rows plus the grouped project with its expandable per-segment map |
 | Benchmark | Ordered, configurable Studio matrix with pulled telemetry, readable audio, audio QC, thermal and timing evidence; the default is exactly 29 takes |
 | Model delivery | Isolated three-artifact lifecycle (Custom full-wire ~1.7 GB, then Design and Clone with shared-component reuse); background/process relaunch adoption, monotonic progress, integrity, wire-byte and throughput-floor validation, and visible cleanup |
+| Perf | Nine frame-health scenarios (`Tests/VocelloiOSUITests/VocelloiOSPerfUITests.swift`), each a fresh app launch with the in-app `CADisplayLink` probe pinned to the app's 60 Hz cap and one marked wall-clock window; `scripts/check_ios_ui_perf.py` joins windows to the pulled 500 ms probe rows |
 
 Every lane uses the paired physical-device destination. Tests use stable accessibility identifiers,
 condition-based waits, XCTest activities, screenshots, and failure attachments. Coordinate tables,
-OCR taps, alternate UI drivers, and fixed sleeps are not supported.
+OCR taps, alternate UI drivers, and fixed sleeps are not supported — the perf scenario file is the
+one recorded exemption (`scripts/check_test_workflows.sh`): its paced sleeps ARE the measured
+workload, and its sweep gestures anchor on the application root so deep per-event accessibility
+re-queries stay out of the measured windows.
+
 The smoke runner pulls its exact diagnostics and fails unless the one-shot event sequence is
 `debug_force_critical_once` → `critical_memory_action` → typed `memory_pressure` cancellation →
 `fullUnload`, followed by a successful generation from the same relaunched app process.
@@ -89,6 +97,26 @@ The smoke runner pulls its exact diagnostics and fails unless the one-shot event
 Benchmark accepts `--modes`, `--lengths`, `--warm`, and `--label`. Filters are explicit diagnostic
 runs; invoking the command without filters is the canonical 29-take matrix on the tracked iPhone 17
 Pro `iPhone18,1` profile. Dirty-source successes are exploratory even on that hardware.
+
+### UI-performance lane (`ios perf`)
+
+The probe writes `frames-<launchEpochMS>-<scenario>.jsonl` to the devicectl-pullable
+`Library/Caches/Vocello/diagnostics/ui-perf/` tree; markers travel through the on-device test
+runner's stdout into `xcodebuild.log`, so marker and probe share the device clock. The
+`perf-validation` step pulls diagnostics and runs `scripts/check_ios_ui_perf.py`, which
+fail-closes on a missing/duplicate scenario, probe coverage below 90% of a marked window,
+non-monotonic blocks, and non-canonical hardware (run-scoped device manifest + live `devicectl`
+inventory must resolve to the canonical iPhone profile). The 55–65 Hz median-block-cadence band
+fail-closes on `ios-idle-baseline` only — the quiet sentinel where cadence isolates whether the
+pinned 60 Hz link was honored (Low Power Mode, thermal caps, idle throttling); both Low Power
+Mode off and nominal thermals are run preconditions. On interactive scenarios an out-of-band
+cadence is recorded as a `uiperf.cadence:*` warning (`passedWithWarnings`), never a failure:
+block cadence there conflates system re-pacing with the main-thread stalls the lane exists to
+measure (the macOS history-scroll baseline of 456 ms/s hitch — ~33 Hz effective — is the
+canonical example). Artifacts: `ui-perf-report.json` and `ui-perf-gate.txt` under the run
+directory, probe JSONL under `diagnostics/ui-perf/`. There is no iOS warn-only threshold
+contract and no `ui-perf` registry publication yet — both are IUI-6, after repeated counted
+baselines ([`ios-ui-refresh-2026-08.md`](ios-ui-refresh-2026-08.md)).
 
 ## Headless device diagnostics
 

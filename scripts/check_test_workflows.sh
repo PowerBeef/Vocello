@@ -301,14 +301,17 @@ if not validator.is_file():
     raise SystemExit("clone-conditioning validator is missing")
 PY
 
-# VocelloMacPerfUITests is the one deliberate exemption: its fixed-interval
-# sleeps ARE the measured workload (paced scroll sweeps, a 15 s idle window),
-# not element synchronization — element waits still use VocelloUIWait — and
-# the bottom-right corner coordinate is the only window-resize mechanism
-# XCUITest offers on macOS (no resize API, no grabbable element).
+# The two perf-lane scenario files are the deliberate exemptions: their
+# fixed-interval sleeps ARE the measured workload (paced scroll sweeps, a
+# 15 s idle window), not element synchronization — element waits still use
+# VocelloUIWait — and their gesture coordinates are anchored on the window
+# (macOS) or application root (iOS) precisely so per-event accessibility
+# re-queries of deep elements stay out of the measured windows (the
+# 2026-08-05 history-scroll Time Profiler finding); macOS additionally has
+# no window-resize API other than the bottom-right corner drag.
 out="$(rg -n '\b(?:sleep|usleep)\s*\(|Thread\.sleep|coordinate\s*\(' \
   Tests/UIAutomationSupport Tests/VocelloMacUITests Tests/VocelloiOSUITests 2>/dev/null \
-  | rg -v '^Tests/VocelloMacUITests/VocelloMacPerfUITests\.swift:' || true)"
+  | rg -v '^Tests/Vocello(Mac|iOS)UITests/Vocello(Mac|iOS)PerfUITests\.swift:' || true)"
 [[ -z "$out" ]] || fail "UI tests must use condition waits and exact elements, not delays/coordinates:\n$out"
 
 out="$(rg -n 'matching\s*\(\s*NSPredicate\s*\(\s*format:\s*"label|buttons\s*\[\s*"(?:Generate|Custom|Design|Clone|Dismiss)' \
@@ -643,6 +646,7 @@ python3 -m unittest \
   scripts.tests.test_roadmap \
   scripts.tests.test_check_surface_coverage \
   scripts.tests.test_check_macos_ui_perf \
+  scripts.tests.test_check_ios_ui_perf \
   scripts.tests.test_publish_benchmark_history \
   scripts.tests.test_check_ios_clone_conditioning \
   scripts.tests.test_check_ios_smoke_acceptance \

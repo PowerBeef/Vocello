@@ -46,6 +46,12 @@ class IOSMemoryFieldReportTests(unittest.TestCase):
                                 "intervalEnd": "2026-07-11T00:00:00Z",
                                 "peakMemoryMB": 3500.5,
                                 "foregroundExitCounts": {"normal": 2, "memoryPressure": 1},
+                                "uiResponsiveness": {
+                                    "scrollHitchTimeRatioMSPerS": 4.5,
+                                    "hangEventCount": 2,
+                                    "hangTimeTotalSecondsApprox": 0.75,
+                                    "hangTimeMaxBucketEndSeconds": 0.5,
+                                },
                             }
                         ],
                     }
@@ -63,6 +69,13 @@ class IOSMemoryFieldReportTests(unittest.TestCase):
                         "foregroundExits": {"normal": 1},
                         "backgroundExitCounts": {"memoryResourceLimit": 2},
                         "diagnosticCounts": {"crash": 1, "hang": 3},
+                        "uiResponsiveness": {
+                            "scrollHitchTimeRatioMSPerS": 2.0,
+                            "hangEventCount": 1,
+                            "hangTimeTotalSecondsApprox": 0.25,
+                            "hangTimeMaxBucketEndSeconds": 1.0,
+                            "notAllowlisted": 99,
+                        },
                     }
                 )
                 + "\n",
@@ -78,6 +91,17 @@ class IOSMemoryFieldReportTests(unittest.TestCase):
         self.assertEqual(payload["foregroundExitCounts"], {"memoryPressure": 1, "normal": 3})
         self.assertEqual(payload["backgroundExitCounts"], {"memoryResourceLimit": 2})
         self.assertEqual(payload["diagnosticCounts"], {"crash": 1, "hang": 3})
+        # Sums accumulate hang counts/time; maxima keep the worst hitch ratio
+        # and bucket end; unknown keys are silently dropped by the allowlist.
+        self.assertEqual(
+            payload["uiResponsiveness"],
+            {
+                "hangEventCount": 3.0,
+                "hangTimeTotalSecondsApprox": 1.0,
+                "hangTimeMaxBucketEndSeconds": 1.0,
+                "scrollHitchTimeRatioMSPerS": 4.5,
+            },
+        )
         self.assertNotIn(str(root), completed.stdout)
 
     def test_malformed_selected_evidence_fails(self) -> None:

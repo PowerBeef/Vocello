@@ -39,6 +39,7 @@ Usage:
   scripts/ui_test.sh macos perf
   scripts/ui_test.sh ios smoke
   scripts/ui_test.sh ios benchmark [--modes custom,design,clone] [--lengths short,medium,long] [--warm 3] [--label RUN_ID]
+  scripts/ui_test.sh ios perf [--label RUN_ID]
   scripts/ui_test.sh ios delivery-cohort --text SCRIPT [--takes 20] [--label RUN_ID]
   scripts/ui_test.sh ios model-download [--engine-profile legacy|chunked|chunked-multisession]
 
@@ -62,7 +63,6 @@ shift 2
 [[ "$lane" == "smoke" || "$lane" == "benchmark" || "$lane" == "model-download" || "$lane" == "delivery-cohort" || "$lane" == "perf" ]] || usage
 [[ "$lane" != "model-download" || "$platform" == "ios" ]] || usage
 [[ "$lane" != "delivery-cohort" || "$platform" == "ios" ]] || usage
-[[ "$lane" != "perf" || "$platform" == "macos" ]] || usage
 
 modes="custom,design,clone"
 lengths="short,medium,long"
@@ -846,6 +846,32 @@ validate_ios_smoke() {
     --run-id "$run_id" | tee "$out/smoke-gate.txt"
 }
 
+validate_ios_ui_perf() {
+  # The probe writes to the devicectl-pullable caches tree, so the pull lands
+  # its JSONL at $out/diagnostics/ui-perf and the run-scoped device manifest
+  # at $out/diagnostics/$run_id/manifest.json (canonical-hardware evidence).
+  # No thresholds contract exists for iOS yet (IUI-6 derives warn-only
+  # ceilings from repeated counted baselines) and the checker never emits
+  # benchmark-evidence.json, so the perf publication block below no-ops —
+  # platform-aware ui-perf registry records are IUI-6.
+  local diagnostics="$out/diagnostics"
+  rm -rf "$diagnostics"
+  "$ROOT_DIR/scripts/ios_device.sh" pull "$diagnostics" >/dev/null \
+    || return 1
+  python3 "$ROOT_DIR/scripts/check_ios_ui_perf.py" \
+    --xcodebuild-log "$out/xcodebuild.log" \
+    --diagnostics "$diagnostics" \
+    --run-id "$run_id" \
+    --run-started-epoch-ms "$perf_run_started_epoch_ms" \
+    --output "$out/ui-perf-report.json" \
+    --label "$label" \
+    --require-canonical \
+    >"$out/ui-perf-gate.txt" 2>&1
+  local status=$?
+  cat "$out/ui-perf-gate.txt" >&2
+  return "$status"
+}
+
 preserve_ios_ui_dsym() {
   local products="$IOS_DERIVED/Build/Products/Release-iphoneos"
   local app="$products/Vocello.app"
@@ -1010,6 +1036,18 @@ else
     export TEST_RUNNER_QVOICE_IOS_COHORT_RUN_ID="$run_id"
     export TEST_RUNNER_QVOICE_IOS_COHORT_TAKES="$cohort_takes"
     export TEST_RUNNER_QVOICE_IOS_COHORT_TEXT="$cohort_text"
+  elif [[ "$lane" == "perf" ]]; then
+    # UI-performance scenarios (frame probe + marked windows) on the paired
+    # physical iPhone. The run ID reaches the app per scenario launch as
+    # QVOICE_IOS_DEVICE_RUN_ID so the run-scoped device manifest exists for
+    # canonical-hardware verification. Run preconditions: Low Power Mode off
+    # and nominal thermals — the checker's 55-65 Hz cadence band fail-closes
+    # on the quiet ios-idle-baseline sentinel when the pinned 60 Hz display
+    # link was not honored (warn-only on interactive scenarios, where block
+    # cadence conflates re-pacing with the stalls being measured).
+    only_test="VocelloiOSUITests/VocelloiOSPerfUITests"
+    perf_run_started_epoch_ms="$(($(date +%s) * 1000))"
+    export TEST_RUNNER_QVOICE_IOS_PERF_RUN_ID="$run_id"
   else
     only_test="VocelloiOSUITests/VocelloiOSModelDownloadUITests/testIsolatedBackgroundDownloadAdoptionAndCleanup"
     # A/B arm selection for the MD-2 device comparison: forwarded to the test
@@ -1057,6 +1095,9 @@ else
   [[ "$lane" != "benchmark" ]] || required_step_run "$step_ledger" \
     benchmark-validation validate_ios_benchmark \
     || die "iOS benchmark telemetry gate failed"
+  [[ "$lane" != "perf" ]] || required_step_run "$step_ledger" \
+    perf-validation validate_ios_ui_perf \
+    || die "iOS ui-perf evidence gate failed"
 fi
 
 finished_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"

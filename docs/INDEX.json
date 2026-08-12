@@ -161,6 +161,9 @@
       "summary": "The 2026-08 iOS UI review \u2014 the planned frame-health lane, measured baseline, ranked audit findings, maintainer pick-list, and fix waves. Roadmap authority for the ios-ui-2026-08 plan.",
       "sourceOfTruth": [
         "scripts/ui_test.sh",
+        "scripts/check_ios_ui_perf.py",
+        "Sources/iOSSupport/Services/IOSUIPerfFrameProbe.swift",
+        "Tests/VocelloiOSUITests/VocelloiOSPerfUITests.swift",
         "Tests/VocelloiOSUITests/VocelloiOSUITestCase.swift"
       ]
     },

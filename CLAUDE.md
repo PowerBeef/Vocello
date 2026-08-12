@@ -118,7 +118,7 @@ Read it before adding a gate.**
 | Website (`website/`) | [`website/CLAUDE.md`](website/CLAUDE.md); browser MCP for localhost verification |
 | Derived/generated inventories | [`.claude/rules/derived-artifacts.md`](.claude/rules/derived-artifacts.md) |
 | macOS frontend QA (explicit request only) | `scripts/ui_test.sh macos smoke|benchmark|perf`; native macOS target only |
-| iOS frontend QA (explicit request only) | `scripts/ui_test.sh ios smoke|benchmark`; paired physical iPhone only |
+| iOS frontend QA (explicit request only) | `scripts/ui_test.sh ios smoke|benchmark|perf`; paired physical iPhone only |
 | External systems and current APIs | sosumi / context7 / docs MCP when callable; otherwise primary vendor docs |
 
 <!-- BEGIN OPTIONAL ASSISTS -->
@@ -236,6 +236,7 @@ scripts/macos_test.sh gate
 scripts/ios_device.sh preflight
 scripts/ui_test.sh ios smoke
 scripts/ui_test.sh ios benchmark
+scripts/ui_test.sh ios perf       # frame-health lane; idle-anchored fail-closed cadence band, local-only report until IUI-6
 # Opt-in isolated background-delivery lifecycle proof; never an ordinary UI lane.
 scripts/ui_test.sh ios model-download
 scripts/ios_device.sh gate
@@ -334,6 +335,7 @@ scripts/ui_test.sh macos benchmark
 scripts/ui_test.sh macos perf
 scripts/ui_test.sh ios smoke
 scripts/ui_test.sh ios benchmark
+scripts/ui_test.sh ios perf
 scripts/ios_device.sh lang-bench --subset quick
 scripts/ios_device.sh speech-assets
 scripts/ios_device.sh profile --kind memory

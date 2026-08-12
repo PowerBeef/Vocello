@@ -76,6 +76,16 @@ scripts/ios_device.sh preflight
 # XCUITest verifies all Speed tiers visibly in Settings before generation.
 scripts/ui_test.sh ios smoke
 scripts/ui_test.sh ios benchmark
+# Frame-health lane (ios-ui-2026-08): in-app CADisplayLink probe pinned to the
+# app's 60 Hz cap + marked scenario windows, validated by
+# scripts/check_ios_ui_perf.py — fail-closed on missing scenarios, <90% probe
+# coverage, non-canonical hardware, and a median block cadence outside
+# 55–65 Hz on the quiet ios-idle-baseline sentinel (Low Power Mode off and
+# nominal thermals are run preconditions; interactive scenarios record
+# out-of-band cadence as a warn-only uiperf.cadence code instead, since block
+# cadence there conflates re-pacing with the stalls being measured). No
+# warn-only threshold contract or ui-perf registry publication yet (IUI-6).
+scripts/ui_test.sh ios perf
 # Opt-in iOS-only diagnostic lanes (never ordinary acceptance):
 scripts/ui_test.sh ios delivery-cohort   # delivery-consistency cohort (--text/--takes/--label)
 scripts/ui_test.sh ios model-download    # isolated background-delivery lifecycle proof

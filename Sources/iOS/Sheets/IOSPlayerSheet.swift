@@ -120,6 +120,7 @@ struct IOSPlayerSheet: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Close")
+            .accessibilityIdentifier("iosPlayer_close")
 
             Spacer()
 

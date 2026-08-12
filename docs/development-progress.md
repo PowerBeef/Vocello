@@ -39,7 +39,22 @@ machine-readable status record and wins over any older prose.
 | 13 — Benchmark/history v3 | Live 2026-07-29: the first schema-v3 records are committed (three clean `phase0-cli-control-*` engine records plus one exploratory run that also exposed and fixed the summarizer's v3 pin). `benchmarks/schema-v3.json` adds the typed quality identity to generation takes (pass/warning only, five fast gates required, machine-code issues); v1/v2 records stay valid immutable history; the publisher stamps v3 only when every take carries the identity. The UI benchmark checkers folded the same identity 2026-08-01: ui-generation records now publish v3 (first: the focused `v3-fold-proof` record `macos-xcui-benchmark-20260801-003208-403989cf`); the canonical iOS matrix published its first v3 record 2026-08-01 (`ios-xcui-benchmark-20260801-132415-abbec96b`). |
 | 14 — Organization and retirement | Closed 2026-07-23 (14a + 14b): compatibility SPI retired, actor-owned loading/metadata/priming/clone artifacts, clone conditioning epoch-bound end to end. |
 
-## Resume here (2026-08-11)
+## Resume here (2026-08-12)
+
+**IUI-1 authored — iOS frame-health harness (2026-08-12, desk work):** the
+`ios-ui-2026-08` arc's instrument is fully authored and wired: `IOSUIPerfFrameProbe`
+(CADisplayLink pinned to the app's 60 Hz cap, per-tick observed expectations, 500 ms
+JSONL blocks into the devicectl-pullable caches tree), `IOSUIPerfHistorySeeder`
+(production-model GRDB seeding, 30 s scrubbable fixture WAV), the nine-scenario
+`VocelloiOSPerfUITests` class, `scripts/check_ios_ui_perf.py` (structural gate +
+fail-closed 55–65 Hz cadence band + canonical-iPhone proof; no thresholds or registry
+publication until IUI-6) with offline self-tests, the `ui_test.sh ios perf` lane +
+`ui-ios-perf` workflow entry, and the MetricKit animation/responsiveness advisory
+aggregates. Pre-arc housekeeping registered the missing `ui-ios-delivery-cohort`
+workflow (the lane died at ledger init). **Next phone window (window 1): IUI-1 device
+acceptance (one clean 9/9 PASS + three scripted fail-closed refusals) back-to-back
+with the IUI-2 baseline (1 discarded warm-up + 5 counted runs).** IUI-3's audit is
+desk work and can start meanwhile. Authority: `docs/reference/ios-ui-refresh-2026-08.md`.
 
 **iOS chunked delivery + compliance close (2026-08-11, phone window):** both remaining
 arcs closed in one sitting. **MD-2 landed and default-flipped** (commit `f497fb8`): task

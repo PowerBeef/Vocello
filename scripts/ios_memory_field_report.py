@@ -120,6 +120,35 @@ def add_counts(total: dict[str, int], observed: dict[str, int]) -> None:
         total[key] = total.get(key, 0) + value
 
 
+# ios-ui-2026-08 advisory UI-responsiveness aggregates (MXAnimationMetric /
+# MXAppResponsivenessMetric reductions). Sums accumulate event counts and
+# approximate hang time across delivered intervals; maxima keep the worst
+# observed ratio/bucket. Advisory field evidence only — never gating.
+UI_RESPONSIVENESS_SUM_KEYS = {"hangEventCount", "hangTimeTotalSecondsApprox"}
+UI_RESPONSIVENESS_MAX_KEYS = {"scrollHitchTimeRatioMSPerS", "hangTimeMaxBucketEndSeconds"}
+
+
+def add_ui_responsiveness(total: dict[str, float], value: Any) -> None:
+    if value is None:
+        return
+    if not isinstance(value, dict):
+        raise ReportError("uiResponsiveness must be an object")
+    for key, observed in value.items():
+        if key not in UI_RESPONSIVENESS_SUM_KEYS and key not in UI_RESPONSIVENESS_MAX_KEYS:
+            continue
+        if observed is None:
+            continue
+        if isinstance(observed, bool) or not isinstance(observed, (int, float)):
+            raise ReportError(f"uiResponsiveness.{key} must be numeric")
+        number = float(observed)
+        if not math.isfinite(number) or number < 0:
+            raise ReportError(f"uiResponsiveness.{key} must be finite and nonnegative")
+        if key in UI_RESPONSIVENESS_SUM_KEYS:
+            total[key] = total.get(key, 0.0) + number
+        else:
+            total[key] = max(total.get(key, 0.0), number)
+
+
 def first_mapping(row: dict[str, Any], names: Iterable[str]) -> Any:
     for name in names:
         if name in row:
@@ -139,6 +168,7 @@ def build_report(source: Path) -> dict[str, Any]:
             "foregroundExitCounts": {},
             "backgroundExitCounts": {},
             "diagnosticCounts": {},
+            "uiResponsiveness": {},
         }
 
     starts: list[str] = []
@@ -147,6 +177,7 @@ def build_report(source: Path) -> dict[str, Any]:
     foreground: dict[str, int] = {}
     background: dict[str, int] = {}
     diagnostics: dict[str, int] = {}
+    ui_responsiveness: dict[str, float] = {}
     record_count = 0
     for path in paths:
         for row in load_rows(path):
@@ -177,6 +208,7 @@ def build_report(source: Path) -> dict[str, Any]:
                 diagnostics,
                 counter_map(row.get("diagnosticCounts"), DIAGNOSTIC_KEYS, "diagnosticCounts"),
             )
+            add_ui_responsiveness(ui_responsiveness, row.get("uiResponsiveness"))
 
     return {
         "schemaVersion": 1,
@@ -189,6 +221,7 @@ def build_report(source: Path) -> dict[str, Any]:
         "foregroundExitCounts": dict(sorted(foreground.items())),
         "backgroundExitCounts": dict(sorted(background.items())),
         "diagnosticCounts": dict(sorted(diagnostics.items())),
+        "uiResponsiveness": dict(sorted(ui_responsiveness.items())),
     }
 
 

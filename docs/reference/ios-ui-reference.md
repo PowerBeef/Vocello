@@ -122,6 +122,7 @@ product accessibility requirements, but are not claimed as coverage of the minim
 | Device/environment readiness | `scripts/ios_device.sh preflight` |
 | Physical-device UI regression | `scripts/ui_test.sh ios smoke` |
 | Full UI generation matrix | `scripts/ui_test.sh ios benchmark` |
+| UI frame-health scenarios | `scripts/ui_test.sh ios perf` |
 | Physical-device deterministic/runtime diagnostic | `scripts/ios_device.sh gate` |
 
 Never use an iOS Simulator, Simulator Browser, alternate desktop/mobile UI driver, or committed

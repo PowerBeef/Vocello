@@ -81,8 +81,45 @@ final class IOSMetricKitMemoryReporter: NSObject, MXMetricManagerSubscriber, @un
             peakMemoryMB: payload.memoryMetrics?.peakMemoryUsage
                 .converted(to: UnitInformationStorage.megabytes).value,
             foregroundExitCounts: foreground,
-            backgroundExitCounts: background
+            backgroundExitCounts: background,
+            uiResponsiveness: uiResponsivenessAggregates(payload)
         )
+    }
+
+    /// Compact allowlisted reduction of MXAnimationMetric /
+    /// MXAppResponsivenessMetric (ios-ui-2026-08 advisory field evidence;
+    /// daily aggregates, never run-correlated, never gating).
+    private static func uiResponsivenessAggregates(
+        _ payload: MXMetricPayload
+    ) -> MetricKitUIResponsivenessAggregates? {
+        var hangEventCount: Int?
+        var hangTotalSecondsApprox: Double?
+        var hangMaxBucketEndSeconds: Double?
+        if let histogram = payload.applicationResponsivenessMetrics?.histogrammedApplicationHangTime {
+            var count = 0
+            var totalSeconds = 0.0
+            var maxEndSeconds = 0.0
+            let enumerator = histogram.bucketEnumerator
+            while let bucket = enumerator.nextObject() as? MXHistogramBucket<UnitDuration> {
+                let bucketCount = bucket.bucketCount
+                guard bucketCount > 0 else { continue }
+                let start = bucket.bucketStart.converted(to: .seconds).value
+                let end = bucket.bucketEnd.converted(to: .seconds).value
+                count += bucketCount
+                totalSeconds += Double(bucketCount) * (start + end) / 2
+                maxEndSeconds = max(maxEndSeconds, end)
+            }
+            hangEventCount = count
+            hangTotalSecondsApprox = totalSeconds
+            hangMaxBucketEndSeconds = count > 0 ? maxEndSeconds : nil
+        }
+        let aggregates = MetricKitUIResponsivenessAggregates(
+            scrollHitchTimeRatioMSPerS: payload.animationMetrics?.scrollHitchTimeRatio.value,
+            hangEventCount: hangEventCount,
+            hangTimeTotalSecondsApprox: hangTotalSecondsApprox,
+            hangTimeMaxBucketEndSeconds: hangMaxBucketEndSeconds
+        )
+        return aggregates.isEmpty ? nil : aggregates
     }
 
     private static func diagnosticRecord(_ payload: MXDiagnosticPayload) -> MetricKitMemoryExitSummaryRecord {

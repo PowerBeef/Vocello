@@ -30,6 +30,11 @@ struct QVoiceiOSApp: App {
         configureNativeRuntimeMemoryCacheIfNeeded()
         IOSCrashObserver.shared.start()
         IOSMetricKitMemoryReporter.shared.start()
+        // UI-perf lane hooks (both inert without QWENVOICE_DEBUG + their
+        // registered knobs): seed History before any navigation can reach it,
+        // then start the frame probe so its display link spans the launch.
+        IOSUIPerfHistorySeeder.seedIfConfigured()
+        IOSUIPerfFrameProbe.startIfConfigured()
     }
 
     var body: some Scene {

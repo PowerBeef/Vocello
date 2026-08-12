@@ -41,6 +41,25 @@ machine-readable status record and wins over any older prose.
 
 ## Resume here (2026-08-12)
 
+**IUI-1 + IUI-2 closed — iOS frame-health instrument live with a measured
+baseline (2026-08-12, phone window):** the acceptance run
+`ios-xcui-perf-20260812-145449-41b82c87` passed 9/9 on the canonical iPhone
+(idle sentinel 60.0 Hz at 0.006 ms/s — the pin holds and the probe is
+near-silent at rest) and the three fail-closed refusals were demonstrated
+against doctored copies of its real pulled evidence; five counted baseline
+runs followed in the same sitting, all 9/9 with nominal thermals and tight
+spread (sheet-dismiss 99.9 ±0.4 ms/s IQR). The baseline table and its
+provenance live in `docs/reference/ios-ui-refresh-2026-08.md`. Standout
+targets for the IUI-3 audit: sheet present/dismiss (~100 ms/s, repeatable
+178 ms presentation stall), player scrub (~107 ms/s), history scroll
+(~80 ms/s @ 400 rows), tab navigation (76.5 ±1.5 ms/s — consistent with the
+unported macOS root-shell observation finding), and generation-active's
+engine/UI contention (132 ms worst gaps). Two device-window lessons recorded:
+the seeded-history sentinel keyboard race (fixed, `c0dba9c`) and the
+copy-reports-out retention protocol step. **Next: IUI-3 audit (desk work) —
+four lenses + these numbers into one ranked list ending at the maintainer
+pick-list gate.**
+
 **IUI-1 authored — iOS frame-health harness (2026-08-12, desk work):** the
 `ios-ui-2026-08` arc's instrument is fully authored and wired: `IOSUIPerfFrameProbe`
 (CADisplayLink pinned to the app's 60 Hz cap, per-tick observed expectations, 500 ms

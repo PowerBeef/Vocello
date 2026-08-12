@@ -65,12 +65,67 @@ Scenario set: confirmatory `ios-idle-baseline`, `ios-tab-navigation`,
 `ios-player-scrub` (element-anchored drags through the custom scrubber re-query
 per event), `ios-generation-active` (model-dependent duration).
 
-IUI-1 still owes its device acceptance: one clean 9/9 PASS on the canonical
-iPhone 17 Pro plus the three scripted fail-closed refusals exercised against
-real pulled evidence. Offline, the checker's self-tests
-(`scripts/tests/test_check_ios_ui_perf.py`) already cover those refusal
-branches. The baseline table lands here with IUI-2 (1 discarded warm-up + 5
-counted runs, medians + IQR).
+**IUI-1 device acceptance (2026-08-12, canonical iPhone 17 Pro):** run
+`ios-xcui-perf-20260812-145449-41b82c87` passed 9/9 scenarios with the checker
+gate green — the idle sentinel measured 60.0 Hz median cadence at 0.006 ms/s
+hitch (the pin is honored and the probe is near-silent at rest), every
+scenario ≥98% probe coverage, all thermal states nominal. The three scripted
+fail-closed refusals were then demonstrated against doctored copies of that
+run's real pulled evidence: a stripped marker (`missing scenario markers`),
+a truncated probe file (`probe coverage 0% below 90%`), and halved idle
+frame counts (`median block cadence 30.0 Hz outside the 55-65 Hz band on the
+idle sentinel`). The checker's offline self-tests
+(`scripts/tests/test_check_ios_ui_perf.py`) cover the same branches. Two
+acceptance attempts preceded the pass: the device-side UI Automation toggle
+had dropped (re-enabled by the maintainer), and the seeded-history sentinel
+typed into the search field before the software keyboard finished presenting
+— keystrokes drop silently there; fixed by waiting for the keyboard, a
+digits-only token (live autocorrection is active on the production search
+field — an IUI-3 audit candidate), and filter-recovery clear verification
+(an empty `TextField` reports its placeholder as `value`).
+
+## Baseline (IUI-2, 2026-08-12 — canonical iPhone 17 Pro)
+
+One sitting: the IUI-1 acceptance run served as the discarded warm-up, then
+five counted lane runs back-to-back
+(`ios-xcui-perf-20260812-150617-6f2622f1`, `…-151529-762c86ba`,
+`…-152444-f555f9ec`, `…-153408-8e55fe32`, `…-154331-9cb3d9f7`), each a full
+9/9 PASS with every scenario's thermal states nominal, Low Power Mode off,
+and zero warnings. Per-scenario medians (IQR) across the five counted runs:
+
+| Scenario | Designation | Hitch ms/s median (IQR) | Max gap ms median (IQR) | p95 gap ms median | Cadence Hz median | Coverage min |
+| --- | --- | --- | --- | --- | --- | --- |
+| `ios-idle-baseline` | confirmatory | 0.0 (0.0) | 17 (0) | 21 | 60.0 | 99% |
+| `ios-tab-navigation` | confirmatory | 76.5 (1.5) | 112 (1) | 29 | 58.0 | 99% |
+| `ios-history-scroll` | confirmatory | 79.5 (8.1) | 83 (9) | 29 | 59.9 | 98% |
+| `ios-voices-scroll` | confirmatory | 44.9 (4.8) | 59 (9) | 21 | 60.0 | 97% |
+| `ios-settings-scroll` | confirmatory | 58.0 (6.8) | 60 (2) | 21 | 60.0 | 97% |
+| `ios-composer-typing` | confirmatory | 27.3 (9.0) | 67 (0) | 21 | 60.0 | 96% |
+| `ios-sheet-present-dismiss` | confirmatory | 99.9 (0.4) | 178 (1) | 29 | 58.0 | 99% |
+| `ios-player-scrub` | exploratory | 106.5 (3.7) | 82 (9) | 46 | 59.9 | 98% |
+| `ios-generation-active` | exploratory | 51.1 (7.5) | 132 (15) | 21 | 60.0 | 96% |
+
+Reading, ahead of the IUI-3 audit: the idle floor is essentially silent
+(0.006 ms/s worst run) — every other number is real UI work. The heaviest
+confirmatory scenarios are sheet present/dismiss (~100 ms/s with an extremely
+stable 178 ms worst gap — a repeatable presentation stall) and history scroll
+(~80 ms/s over 400 seeded rows); tab navigation's 76.5 ms/s with ±1.5 IQR is
+a highly repeatable re-render cost consistent with the unported macOS
+root-shell observation finding. Generation-active shows the engine/UI
+contention signature (132 ms worst gaps at only ~51 ms/s average hitch).
+
+Provenance note: result retention (`--prune-ui-results --ui-keep 1`) removed
+runs 1–4's host artifact directories as later runs passed — the counted
+verdicts, run IDs, and thermal states were captured live by the runner chain,
+and the four missing `ui-perf-report.json`s were regenerated afterwards by
+re-running `scripts/check_ios_ui_perf.py` (deterministic) over the device's
+retained probe JSONL (re-pulled; all 63 files present under the 64-file
+retention cap) joined to the captured lane logs' marker lines, bucketed per
+run by lane-start epoch. Canonical-hardware verification ran live inside each
+counted lane's `perf-validation` step. Protocol correction recorded in
+[`ios-device-testing.md`](ios-device-testing.md): copy
+`ui-perf-report.json` out of the run directory after every counted run, as
+the macOS baseline protocol already instructed.
 
 ## Ranked findings and maintainer pick-list (IUI-3 — pending)
 

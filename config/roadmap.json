@@ -864,7 +864,7 @@
       "id": "IUI-1",
       "plan": "ios-ui-2026-08",
       "title": "Instrument: scripts/ui_test.sh ios perf frame-health harness",
-      "status": "in-flight",
+      "status": "done",
       "gate": "New IOSUIPerfFrameProbe (CADisplayLink pinned preferredFrameRateRange(60,60,60) per the IOSStudioInlinePlayerCard precedent; 500 ms JSONL blocks; expected frames computed from the OBSERVED per-tick cadence, never a hard-coded 16.67 ms; output under the devicectl-pullable Library/Caches/Vocello/diagnostics tree, not the App Group; launch hook in QVoiceiOSApp.init; both QWENVOICE_UIPERF_* knobs already registered). Nine scenarios in a new Tests/VocelloiOSUITests/VocelloiOSPerfUITests.swift using swipes/taps (VocelloUIScroll/Cursor are macOS-only; VocelloUIPerfScenarioMarker is already cross-platform): confirmatory ios-idle-baseline, ios-tab-navigation, ios-history-scroll, ios-voices-scroll, ios-settings-scroll, ios-composer-typing, ios-sheet-present-dismiss; exploratory ios-player-scrub, ios-generation-active. iOS port of UIPerfHistorySeeder (debug-knob-gated GRDB rows + one small bundled audio fixture, needed by history-scroll and player-scrub). New scripts/check_ios_ui_perf.py structural fail-closed gate: every scenario marked once, >=90% probe coverage, monotonic blocks, median block cadence within 55-65 Hz enforced fail-closed on the quiet ios-idle-baseline sentinel (catches Low Power Mode/thermal caps/idle throttling that ignored the pin; Low Power Mode off is a run precondition) and recorded as a warn-only uiperf.cadence code on interactive scenarios, where block cadence conflates system re-pacing with the main-thread stalls the lane measures, probe files from the PULLED diagnostics, canonical-hardware proof via verify_canonical_hardware('ios', ios_evidence=...) with the test setting QVOICE_IOS_DEVICE_RUN_ID. Wiring: lift the ui_test.sh platform guard, iOS perf dispatch + perf-validation required step, ui-ios-perf workflow in config/orchestration-contract.json, check_test_workflows.sh no-delays/no-coordinates exclusion for the perf test file with recorded justification, offline self-tests registered. Fold in MetricKit MXAnimationMetric/MXAppResponsivenessMetric collection (instrumentation, advisory-only, additive fields in IOSMetricKitMemoryReporter + ios_memory_field_report.py allowlists). NO behavioral riders - the instrument must not change what it measures; honesty limits stated in the authority doc (main-runloop CADisplayLink measures main-thread cadence at 60 Hz, not render-server-only hitches - same claim limits as macOS). GATE: one clean 9/9 PASS on the canonical iPhone 17 Pro plus three deliberate fail-closed refusals (missing scenario, coverage shortfall, cadence-band violation).",
       "sourceOfTruth": [
         "scripts/ui_test.sh",
@@ -873,13 +873,22 @@
         "scripts/benchmark_history.py"
       ],
       "updated": "2026-08-12",
-      "notes": "Authoring landed 2026-08-12 (probe, seeder, nine-scenario test class, check_ios_ui_perf.py + offline self-tests, lane/contract/gate wiring, MetricKit advisory aggregates); the gate's remaining obligation is the device acceptance — one clean 9/9 PASS on the canonical iPhone plus the three scripted fail-closed refusals against real pulled evidence. A 3-lens adversarial review (2026-08-12) confirmed and fixed the cadence-band conflation: the fail-closed band is idle-anchored, warn-only elsewhere."
+      "notes": "Gate satisfied 2026-08-12 on the canonical iPhone: run ios-xcui-perf-20260812-145449-41b82c87 passed 9/9 scenarios with the checker gate green (idle sentinel 60.0 Hz, 0.006 ms/s hitch), and the three scripted fail-closed refusals (missing marker; coverage 0%<90%; idle cadence 30 Hz) were demonstrated against doctored copies of that run's real pulled evidence. First device attempt failed on the UI Automation toggle (device-side), second on the seeded-history sentinel typing race fixed in c0dba9c. A 3-lens adversarial review (2026-08-12) confirmed and fixed the cadence-band conflation pre-landing: the fail-closed band is idle-anchored, warn-only elsewhere.",
+      "evidence": [
+        "commit:73dc9f8",
+        "commit:c0dba9c",
+        "file:scripts/check_ios_ui_perf.py",
+        "file:Sources/iOSSupport/Services/IOSUIPerfFrameProbe.swift",
+        "file:Tests/VocelloiOSUITests/VocelloiOSPerfUITests.swift",
+        "file:scripts/tests/test_check_ios_ui_perf.py",
+        "doc:docs/reference/ios-ui-refresh-2026-08.md"
+      ]
     },
     {
       "id": "IUI-2",
       "plan": "ios-ui-2026-08",
       "title": "Frame-health baseline (1 warm-up + 5 counted runs)",
-      "status": "planned",
+      "status": "done",
       "gate": "One discarded warm-up plus five counted runs on the canonical iPhone 17 Pro; per-scenario medians + IQR recorded in the authority doc. Preconditions per counted run: thermals nominal AND Low Power Mode off; a run violating either is discarded and replaced. Phone window shared with IUI-1 validation.",
       "sourceOfTruth": [
         "scripts/ui_test.sh",
@@ -887,7 +896,12 @@
         "Tests/VocelloiOSUITests/VocelloiOSUITestCase.swift",
         "scripts/benchmark_history.py"
       ],
-      "updated": "2026-08-11"
+      "updated": "2026-08-12",
+      "notes": "Closed 2026-08-12, same sitting as the IUI-1 acceptance (which served as the discarded warm-up). Five counted runs, all 9/9 PASS, all thermals nominal, zero warnings: ios-xcui-perf-20260812-{150617-6f2622f1, 151529-762c86ba, 152444-f555f9ec, 153408-8e55fe32, 154331-9cb3d9f7}. Medians+IQR table is in the authority doc. Provenance: result retention pruned runs 1-4's host dirs; their reports were deterministically regenerated from the device's retained probe JSONL + captured lane logs (recipe in the authority doc), and the copy-report-out protocol step is now recorded in ios-device-testing.md.",
+      "evidence": [
+        "doc:docs/reference/ios-ui-refresh-2026-08.md",
+        "commit:c0dba9c"
+      ]
     },
     {
       "id": "IUI-3",

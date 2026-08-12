@@ -114,7 +114,12 @@ cadence is recorded as a `uiperf.cadence:*` warning (`passedWithWarnings`), neve
 block cadence there conflates system re-pacing with the main-thread stalls the lane exists to
 measure (the macOS history-scroll baseline of 456 ms/s hitch — ~33 Hz effective — is the
 canonical example). Artifacts: `ui-perf-report.json` and `ui-perf-gate.txt` under the run
-directory, probe JSONL under `diagnostics/ui-perf/`. There is no iOS warn-only threshold
+directory, probe JSONL under `diagnostics/ui-perf/`. **Copy
+`ui-perf-report.json` out of the run directory after every counted baseline
+run** — result retention keeps only the latest passing result per lane, so a
+multi-run session otherwise loses its earlier reports (they remain
+deterministically regenerable from the device's probe files and the captured
+lane log, but copying is the protocol). There is no iOS warn-only threshold
 contract and no `ui-perf` registry publication yet — both are IUI-6, after repeated counted
 baselines ([`ios-ui-refresh-2026-08.md`](ios-ui-refresh-2026-08.md)).
 

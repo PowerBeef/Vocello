@@ -11,7 +11,7 @@
 | --- | --- | --- | --- |
 | `delivery-prompting-2026-08` | active | backend-mlx | 20/23 (87%) |
 | `doc-governance-2026-08` | active | release-qa | 8/9 (89%) |
-| `ios-ui-2026-08` | active | ios | 2/6 (33%) |
+| `ios-ui-2026-08` | active | ios | 3/6 (50%) |
 | `compliance-2026-08` | complete | release-qa | 2/2 (100%) |
 | `convergence-metal4-stage4-2026-08` | complete | backend-and-platform | 7/7 (100%) |
 | `macos-ui-2026-08` | complete | macos | 7/7 (100%) |
@@ -99,15 +99,12 @@ Narrative authority: [`docs/reference/ios-ui-refresh-2026-08.md`](reference/ios-
 | --- | --- | --- | --- |
 | `IUI-1` | done | Instrument: scripts/ui_test.sh ios perf frame-health harness | `commit:73dc9f8`, `commit:c0dba9c`, `file:scripts/check_ios_ui_perf.py`, `file:Sources/iOSSupport/Services/IOSUIPerfFrameProbe.swift`, `file:Tests/VocelloiOSUITests/VocelloiOSPerfUITests.swift`, `file:scripts/tests/test_check_ios_ui_perf.py`, `doc:docs/reference/ios-ui-refresh-2026-08.md` |
 | `IUI-2` | done | Frame-health baseline (1 warm-up + 5 counted runs) | `doc:docs/reference/ios-ui-refresh-2026-08.md`, `commit:c0dba9c` |
-| `IUI-3` | planned | Audit-first review: four lenses + measurements into one ranked list + maintainer pick-list | — |
+| `IUI-3` | done | Audit-first review: four lenses + measurements into one ranked list + maintainer pick-list | `doc:docs/reference/ios-ui-refresh-2026-08.md` |
 | `IUI-4` | planned | Wave 1: safe fixes with before/after measurement | — |
 | `IUI-5` | planned | Wave 2: refinements + re-engineering (macOS UI-5/UI-6 collapsed) | — |
 | `IUI-6` | planned | Registry formalization: platform-aware ui-perf kind + warn-only ceilings | — |
 
 ### Open items in detail
-
-- **`IUI-3`** (planned) — Audit-first review: four lenses + measurements into one ranked list + maintainer pick-list.
-  gate: Architecture/performance/accessibility/layout audits over the iOS surfaces, merged with the IUI-2 numbers and the nine pre-known candidates (root-shell whole-store observation in RootView.body - the unported macOS 158 ms/s finding; the un-migrated 30 fps IOSPlayerSheetController with per-tick karaoke AttributedString rebuild; IOSVoicesView O(n^2) catalog build; TabDock dead @EnvironmentObject; IOSEngineLifecycleToast redundant observation; IOSModelInstallerViewModel dictionary republish; dual theme namespaces + duplicate glass modifiers; 13 dead prefetch onChange handlers; the unmeasured 60 Hz glass-gate tier, annotated unmeasurable-on-canonical-hardware) into ONE ranked findings list spanning performance and design. Design items become a maintainer pick-list; wave-1/wave-2 scoping proposal published. THE MAINTAINER GATE SITS AT THIS ITEM'S EXIT: no fix lands until the pick-list and wave scope get an explicit go. Desk work, no phone. GATE: ranked synthesis + pick-list recorded in the authority doc with maintainer sign-off on wave scope.
 
 - **`IUI-4`** (planned) — Wave 1: safe fixes with before/after measurement.
   gate: Opens with the zero-risk removals (TabDock dead environment object, redundant toast observation, dead prefetch handlers) plus maintainer-picked low-risk items (candidates: IOSModelInstallerViewModel republish scoping, IOSVoicesView catalog memoization). ALL fixes wait for the baseline, including obviously-safe ones - the 2026-06 lesson. Before/after 5-run measurement on affected scenarios. GATE: wave-1 items landed after maintainer go; before/after table in the authority doc; both platform compiles and the smoke lane green.

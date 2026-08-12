@@ -907,7 +907,7 @@
       "id": "IUI-3",
       "plan": "ios-ui-2026-08",
       "title": "Audit-first review: four lenses + measurements into one ranked list + maintainer pick-list",
-      "status": "planned",
+      "status": "done",
       "gate": "Architecture/performance/accessibility/layout audits over the iOS surfaces, merged with the IUI-2 numbers and the nine pre-known candidates (root-shell whole-store observation in RootView.body - the unported macOS 158 ms/s finding; the un-migrated 30 fps IOSPlayerSheetController with per-tick karaoke AttributedString rebuild; IOSVoicesView O(n^2) catalog build; TabDock dead @EnvironmentObject; IOSEngineLifecycleToast redundant observation; IOSModelInstallerViewModel dictionary republish; dual theme namespaces + duplicate glass modifiers; 13 dead prefetch onChange handlers; the unmeasured 60 Hz glass-gate tier, annotated unmeasurable-on-canonical-hardware) into ONE ranked findings list spanning performance and design. Design items become a maintainer pick-list; wave-1/wave-2 scoping proposal published. THE MAINTAINER GATE SITS AT THIS ITEM'S EXIT: no fix lands until the pick-list and wave scope get an explicit go. Desk work, no phone. GATE: ranked synthesis + pick-list recorded in the authority doc with maintainer sign-off on wave scope.",
       "sourceOfTruth": [
         "scripts/ui_test.sh",
@@ -915,7 +915,11 @@
         "Tests/VocelloiOSUITests/VocelloiOSUITestCase.swift",
         "scripts/benchmark_history.py"
       ],
-      "updated": "2026-08-11"
+      "updated": "2026-08-12",
+      "notes": "Closed 2026-08-12: four-lens audit (8 agents, per-lens adversarial accuracy checks) merged with the IUI-2 baseline into a 30-item ranked list — 11 measured perf findings (P1-P11), 8 input/a11y defects (X1-X8), 10 design pick-list items (D1-D10), 1 annotation (the 60 Hz tier stays frozen/unmeasurable). Headlines: the 178 ms sheet stall is synchronous AVAudioSession activation + decode inside the presentation transition (P1); the unported macOS root-shell observation finding is confirmed at 11 subscription sites (P2); tab switches structurally remount screens and lose user state (P4). Wave scoping proposal published in the authority doc; the maintainer gate now holds until the pick-list and wave scope get an explicit go.",
+      "evidence": [
+        "doc:docs/reference/ios-ui-refresh-2026-08.md"
+      ]
     },
     {
       "id": "IUI-4",

@@ -28,7 +28,7 @@ not captured by decode telemetry"). The macOS arc proved the ordering that works
 instrument (UI-1), baseline (UI-2), audit-with-numbers (UI-3), then measured waves.
 This arc repeats that ordering on the canonical iPhone 17 Pro.
 
-## Measurement basis (IUI-1 authored; device validation and IUI-2 pending)
+## Measurement basis (IUI-1, accepted on-device 2026-08-12)
 
 `scripts/ui_test.sh ios perf` joins nine XCUITest scenarios
 (`Tests/VocelloiOSUITests/VocelloiOSPerfUITests.swift`; one fresh app launch and
@@ -190,9 +190,21 @@ model + `@Observable` migration, sheet-controller scoping, stable tab identity),
 P6 + P7 + P11, X3 + X6, plus whatever the design pick-list approves (D-items,
 X4/D9 Dynamic Type program, D10 theme unification).
 
-## Fix waves (IUI-4/IUI-5 — pending)
+**Maintainer decision (2026-08-12): wave 1 go as proposed, and all four design
+groups approved for wave 2** — copy & glyph fixes (D1–D5), interaction polish
+(D6–D8), the Dynamic Type program (X4+D9), and theme unification (D10).
 
-Before/after tables land here per wave.
+## Fix waves (IUI-4 landed, measurement pending; IUI-5 scoped)
+
+All ten wave-1 fixes landed 2026-08-12 (commit `2f76b8a`), each implementing
+its audited mechanism above. A 2-lens adversarial review of the diff confirmed
+one defect in the P1 rework — a dismissed-mid-load sheet's session release was
+load-bearing in one dismissal interleaving and could silence the next sheet's
+session in the other — fixed with an activation-epoch guard (a deactivation
+executes only while its own activation is still the newest). The wave-1
+before/after table lands here after the device close-out: the smoke lane plus
+five counted `ios perf` runs (the one pre-pause smoke attempt aborted
+device-side — cancelled biometry prompt, zero test cases ran).
 
 ## 60 Hz-tier posture
 
@@ -213,5 +225,11 @@ cannot publish as canonical). Simulator timing is not evidence.
   self-tests, the `ui-ios-perf` workflow entry, the `iosPlayer_close` stable
   identifier, and the MetricKit animation/responsiveness advisory aggregates
   (`MetricKitUIResponsivenessAggregates` + `scripts/ios_memory_field_report.py`
-  allowlist). Device acceptance (9/9 PASS + three live refusals) waits for the
-  next phone window.
+  allowlist). Device acceptance passed the same day (see the acceptance
+  section above).
+- (IUI-4 wave 1, 2026-08-12, commit `2f76b8a`) Ten audited fixes: the P1
+  sheet-stall rework (off-MainActor session activation + decode with an
+  activation-epoch session guard), P5 lazy History row menus, P8/P9/P10
+  dead-wiring removals, and the X1/X2/X5/X7/X8 input-trait + VoiceOver +
+  hit-target one-liners. Device close-out (smoke + five counted after-runs)
+  is the resume point.

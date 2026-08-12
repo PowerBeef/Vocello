@@ -10,7 +10,9 @@ sourceOfTruth:
 
 > **Living document.** A project-specific reference for the MLX runtime, the Qwen3-TTS backend, and the optimization decisions that shape Vocello's macOS/iOS engine. When this doc disagrees with the code, the code wins — fix this file.
 >
-> Last reviewed: 2026-08-05. Shipping pins: `mlx-swift` **0.31.6**, `mlx-swift-lm` **3.31.4**, `swift-transformers` **1.3.3** (direct since the lm 3.x Hub/Tokenizers externalization; 1.1.9 → 1.3.3 shipped 2026-08-05 with byte-identical English fixed-seed WAVs and the full §9.3 battery).
+> Last reviewed: 2026-08-12 (post-CP-2/MD-2 currency pass: the CP-2 marking seam only added
+> `AudioMarkingConfiguration` plumbing to the streaming-session factory, and the additive
+> `MLXAudioMark` package target changes nothing this document claims). Shipping pins: `mlx-swift` **0.31.6**, `mlx-swift-lm` **3.31.4**, `swift-transformers` **1.3.3** (direct since the lm 3.x Hub/Tokenizers externalization; 1.1.9 → 1.3.3 shipped 2026-08-05 with byte-identical English fixed-seed WAVs and the full §9.3 battery).
 
 ---
 

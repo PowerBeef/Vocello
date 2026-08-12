@@ -18,7 +18,7 @@ A living reference for the Qwen3-TTS models that power Vocello (formerly QwenVoi
 
 - Whenever `Sources/Resources/qwenvoice_contract.json` gains or changes a model variant, speaker, or generation default.
 - Whenever `EmotionPreset.swift`, `GenerationSemantics.swift`, `NativeCloneSupport.swift`, or `VoiceDesignBriefCatalog.swift` change the prompt contract, preset copy, clone pipeline, or design briefs.
-- Whenever we move the pinned `mlx-community` revisions or quantization tiers.
+- Whenever we move the pinned `PowerBeef02` artifact revisions or quantization tiers.
 - Whenever benchmarking reveals new quality/latency/artifact behaviors.
 
 **Source-of-truth hierarchy**
@@ -45,7 +45,7 @@ All three patterns generate **24 kHz mono PCM**. Vocello ships only the **12 Hz 
 
 ## 2. Model families and variants
 
-Vocello bundles three model families, each from the `mlx-community` Hugging Face organization and pinned to a specific revision in `qwenvoice_contract.json`.
+Vocello bundles three model families, served from Vocello's own `PowerBeef02` Hugging Face repos (originally converted from the `mlx-community` releases; re-pinned there since 2026-07-26) and pinned to exact revisions in `qwenvoice_contract.json` — currently artifactVersion `2026.08.06.1`.
 
 | Family (mode) | Folder suffix | MLX repo suffix | Size | Platforms | Notes |
 | --- | --- | --- | --- | --- | --- |
@@ -154,7 +154,7 @@ A Mimi-based neural codec decoder that converts the 16-code frames back to a 24 
 - 2 ConvNeXt upsampling blocks
 - Final tanh → float samples in `[-1, 1]`
 
-All speech-tokenizer weights are shipped as **F32**, even when the Talker is quantized to 4/8 bit.
+Since 2026-08-01 the speech-tokenizer weights ship as **F16** (unified half-precision codec on both platforms; the T-Mimi final two layers are excluded from the f16 cast), even when the Talker is quantized to 4/8 bit — see `benchmarks/OPTIMIZATION.md` §R.
 
 ### 3.5 Speaker encoding (voice cloning)
 
@@ -467,7 +467,7 @@ At 12.5 frames per second of audio:
 | --- | --- | --- |
 | Talker | 28 layers × 1 pass | Q/K RMSNorm, M-RoPE, GQA 2:1 |
 | Code Predictor | 5 layers × 15 passes | One pass per residual codebook |
-| Speech decoder | 8 pre-transform + 7 conv + 2 upsample | F32 weights; smaller matrices |
+| Speech decoder | 8 pre-transform + 7 conv + 2 upsample | F16 weights (since 2026-08-01); smaller matrices |
 | **Total** | **~103 layer evals/frame** | ~1,288 layer evals/second of audio |
 
 ### 10.2 Latency
@@ -491,8 +491,12 @@ Apple Silicon MLX numbers depend heavily on quantization tier, model size, text 
 
 Model download sizes (approximate, from `qwenvoice_contract.json`):
 
-- 4-bit: ~2.3 GB
-- 8-bit: ~3.1 GB
+- 4-bit: ~1.7 GB
+- 8-bit: ~2.5 GB (Base slightly larger due to the speaker encoder)
+
+The f16 tokenizer promotion (2026-08-01) cut ~341 MB per download, and since
+2026-08-08 every artifact also bundles the AudioSeal fp16 marking generator
+(~29 MB, artifactVersion `2026.08.06.1`).
 
 ---
 

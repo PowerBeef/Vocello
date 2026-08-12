@@ -308,8 +308,8 @@ gates. Listening remains optional independent annotation →
 | `config/language-bench-*.json` | Language hint bench corpus + matrix |
 | `scripts/delivery_*.py`, `scripts/*prosody*.py`, `scripts/emotion_advisory.py`, `scripts/build_emotion_reference_bank.py` | Audio delivery analysis harness → [`docs/reference/delivery-harness.md`](docs/reference/delivery-harness.md) |
 | `Tests/UIAutomationSupport/` | Shared XCUITest waits, fixtures, queries, and evidence helpers |
-| `Tests/VocelloMacUITests/` | macOS smoke and benchmark UI tests |
-| `Tests/VocelloiOSUITests/` | Physical-iPhone smoke and benchmark UI tests |
+| `Tests/VocelloMacUITests/` | macOS smoke, benchmark, and frame-health perf UI tests |
+| `Tests/VocelloiOSUITests/` | Physical-iPhone smoke, benchmark, and frame-health perf UI tests |
 | `Tests/VocelloiOSLogicTests/` | App-host-free iOS policy contracts; compile-only generic device-SDK coverage in CI |
 | `scripts/ui_test.sh` | Unified explicit XCUITest entry point |
 | `docs/reference/model-delivery.md` | Shared downloader, chunked-transfer defaults and download tuning policy, iOS restoration ledger, retry/cancel, diagnostics, and isolated live proof |

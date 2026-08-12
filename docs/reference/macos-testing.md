@@ -134,7 +134,9 @@ New publishable generation runs use telemetry schema v8 and evidence manifest v2
 load/stream/finalization boundaries, match summary counts, have zero capture failures, and retain at
 least 95% periodic coverage. macOS UI/XPC totals are calculated only from app and engine samples
 paired by absolute uptime within one 500 ms cadence; independent process maxima are never added.
-Critical pressure, app memory warning/exit, `hardTrim`, or `fullUnload` fails publication. Guarded
+Critical pressure, app memory warning/exit, `hardTrim`, or `fullUnload` fails publication, and so
+does a marking peak-equality breach (CP-2: within every take, no post-marking footprint sample may
+exceed the pre-marking peak beyond tolerance — `config/marking-peak-equality.json`). Guarded
 pressure, `softTrim`, or 95–<100% coverage publishes only as an explicit warning.
 
 Smoke is intentionally smaller: it asserts visible completion and History plus the runner's

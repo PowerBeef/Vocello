@@ -352,7 +352,8 @@
       "sourceOfTruth": [
         ".github/workflows/security.yml"
       ],
-      "updated": "2026-08-05"
+      "updated": "2026-08-12",
+      "notes": "Re-confirmed 2026-08-12: the 2026-08-06 security.yml change was the external-review quick-fix adoption (f4c72b7), not a scheduling change; the Security workflow has completed on every main push since, including 2026-08-12 — the starvation fix demonstrably holds."
     },
     {
       "id": "DG-7",
@@ -678,7 +679,7 @@
       "title": "Non-streaming CLI generation publishes no WAV while reporting success",
       "status": "done",
       "gate": "Found 2026-08-04 while generating calibration clips: `vocello generate --no-stream` prints the output path and a success line (finish=eos, plausible RTF) but no file exists at the path for any destination tried (scratch, app-support outputs, repo build/). The streaming path publishes correctly, so the defect sits in the non-streaming product-finalization/publication path of the owned runtime. Blast radius: every `--no-stream` CLI generate, and the clone-fixture bootstrap in scripts/lib/test_models.sh (`models ensure` regeneration would silently enroll nothing). Fix must include a regression guard that fails the CLI when the reported audioPath does not exist, so success can never again be claimed without a published file. FIXED 2026-08-04: root cause was the generation exit path's cleanup defer coupling the final WAV's fate to streaming-session retention — every completed non-streaming take wrote its file, then deleted it, then returned the path. The exit path now decides per artifact via the pure GenerationOutputAdapter.terminalCleanup table (completed keeps the WAV always; session directory retained only for streaming; unfinished removes both), pinned by GenerationTerminalCleanupTests. The CLI additionally fails closed at the product boundary: generate and batch refuse to claim success when no file exists at the reported audioPath. Live proof: --no-stream published a valid 24 kHz WAV whose duration matches the reported 3.68 s; the streaming control still publishes.",
-      "updated": "2026-08-04",
+      "updated": "2026-08-12",
       "evidence": [
         "file:Sources/QwenVoiceCore/GenerationOutputAdapter.swift",
         "file:Tests/VocelloCoreTests/GenerationTerminalCleanupTests.swift",
@@ -687,7 +688,8 @@
       ],
       "sourceOfTruth": [
         "Sources/QwenVoiceCore/GenerationOutputAdapter.swift"
-      ]
+      ],
+      "notes": "Re-confirmed 2026-08-12: the 2026-08-06 GenerationOutputAdapter change was CP-2's publication-marking seam (269a0f7), which rides the finalization path this item fixed; the deterministic suite covering non-streaming WAV publication has stayed green through 2026-08-12."
     },
     {
       "id": "UI-1",
@@ -829,13 +831,14 @@
         "Sources/QwenVoiceCore/HuggingFaceDownloader.swift",
         "docs/reference/model-delivery.md"
       ],
-      "updated": "2026-08-08",
+      "updated": "2026-08-12",
       "evidence": [
         "commit:ce687f5",
         "commit:5e6a9a0",
         "file:Tests/VocelloCoreTests/ModelDownloadChunkSchedulingTests.swift",
         "file:docs/reference/model-delivery.md"
-      ]
+      ],
+      "notes": "Re-confirmed 2026-08-12: the 2026-08-11 downloader/doc changes were MD-2 extending chunking to iOS background sessions; the macOS/CLI chunked defaults this item shipped are untouched, and the 2026-08-11 live canonical catalog re-delivery exercised them."
     },
     {
       "id": "MD-2",

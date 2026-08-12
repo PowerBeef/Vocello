@@ -88,6 +88,7 @@ UI heartbeat        —                       yes                    yes
 | **iOS device** | `scripts/ios_device.sh bench` | In-process | iPhone tier, Jetsam, on-device RTF (headless diagnostics, single take) |
 | **iOS UI benchmark** | `scripts/ui_test.sh ios benchmark` | In-process | Full UI matrix through XCUITest on the paired physical iPhone; telemetry gated per take |
 | **macOS UI frame health** | `scripts/ui_test.sh macos perf` | No engine claims (UI-only) | Nine scripted SwiftUI scenarios with the in-app frame probe; warn-only ceilings; canonical-hardware runs publish `ui-perf` registry records ([`macos-ui-refresh-2026-08.md`](macos-ui-refresh-2026-08.md)) |
+| **iOS UI frame health** | `scripts/ui_test.sh ios perf` | No engine claims (UI-only) | Nine scripted scenarios on the paired physical iPhone with the pinned-60 Hz in-app probe; `check_ios_ui_perf.py` structural + canonical-hardware gate; local-only reports — no thresholds contract or `ui-perf` registry publication until IUI-6 ([`ios-ui-refresh-2026-08.md`](ios-ui-refresh-2026-08.md)) |
 
 **Important:** CLI bench numbers are **not** identical to macOS XPC UI numbers. Compare like with
 like (CLI vs CLI, UI vs UI). Use CLI for backend optimization; use UI/XPC for integration regressions.
@@ -704,7 +705,7 @@ crash inspection, preflight, and standalone analysis tools do not publish benchm
 | `instrument-profile` | macOS/iOS profile commands | Memory-qualified target generation PASS, exact PID, tracer success, valid trace TOC, non-empty exported performance rows, and run/generation/take/cell-correlated signposts |
 | `memory-qualification` | macOS/iOS `memory` commands | Fixed policy topology, v8 sidecar qualification, output/QC success, and within-mode retained-footprint growth ≤5% of physical RAM |
 | `prosody-calibration` | `prosody_calibration.py` | Required corpus coverage with no analysis failure |
-| `ui-perf` | `ui_test.sh macos perf` via `check_macos_ui_perf.py` | Structural gate PASS (nine scenarios once each, coverage/refresh sanity), canonical hardware profile, and crash delta; threshold breaches are warn-only (`passedWithWarnings`) |
+| `ui-perf` | `ui_test.sh macos perf` via `check_macos_ui_perf.py` | Structural gate PASS (nine scenarios once each, coverage/refresh sanity), canonical hardware profile, and crash delta; threshold breaches are warn-only (`passedWithWarnings`). The iOS perf lane joins this kind only at IUI-6 (platform-aware relaxation); until then its reports stay local-only |
 
 `HISTORY.md` is a generated index grouped by kind, platform, hardware, and comparable
 configuration. It computes a delta against the nearest earlier compatible clean record; a delta is

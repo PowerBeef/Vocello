@@ -56,9 +56,24 @@ targets for the IUI-3 audit: sheet present/dismiss (~100 ms/s, repeatable
 unported macOS root-shell observation finding), and generation-active's
 engine/UI contention (132 ms worst gaps). Two device-window lessons recorded:
 the seeded-history sentinel keyboard race (fixed, `c0dba9c`) and the
-copy-reports-out retention protocol step. **Next: IUI-3 audit (desk work) —
-four lenses + these numbers into one ranked list ending at the maintainer
-pick-list gate.**
+copy-reports-out retention protocol step.
+
+**Same day, continued: IUI-3 closed and IUI-4 wave 1 landed (2026-08-12).**
+The four-lens audit ranked 30 verified findings into the maintainer
+pick-list (authority doc has the table); the maintainer gave wave 1 the go
+as proposed and approved all four design groups for wave 2. All ten wave-1
+fixes landed in `2f76b8a` (P1 sheet-stall rework with an activation-epoch
+session guard, P5 lazy History menus, P8/P9/P10 dead-wiring removals,
+X1/X2/X5/X7/X8 input + VoiceOver one-liners), adversarially reviewed, both
+iOS compiles and the UI test bundle green. **Resume here: IUI-4's device
+close-out — `scripts/ui_test.sh ios smoke` (the one attempt aborted
+device-side: biometry prompt cancelled/phone locked as the sitting ended —
+not a code failure; zero test cases ran), then five counted
+`scripts/ui_test.sh ios perf --label iui4-after-N` runs COPYING
+`ui-perf-report.json` out between runs, then the before/after table into
+the authority doc and IUI-4 → done.** Wave 2 (IUI-5) follows: core
+re-engineering P2/P3/P4 + P6/P7/P11 + X3/X6 plus the approved design picks
+(D1–D10, Dynamic Type program X4+D9, theme unification D10).
 
 **IUI-1 authored — iOS frame-health harness (2026-08-12, desk work):** the
 `ios-ui-2026-08` arc's instrument is fully authored and wired: `IOSUIPerfFrameProbe`

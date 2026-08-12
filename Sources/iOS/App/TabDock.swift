@@ -11,7 +11,6 @@ import QwenVoiceCore
 /// dock accents from `design_references/Vocello iOS/chrome.jsx`.
 struct TabDock: View {
     @Environment(AppModel.self) private var appModel
-    @EnvironmentObject private var ttsEngine: TTSEngineStore
 
     private var dockTint: Color {
         appModel.tab.dockAccent(studioMode: appModel.studioMode.mode)

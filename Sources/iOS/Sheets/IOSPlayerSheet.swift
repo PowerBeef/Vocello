@@ -1,5 +1,6 @@
 import AVFoundation
 import SwiftUI
+import Synchronization
 import QwenVoiceCore
 
 /// Full-screen Player sheet from design_references/Vocello iOS/player.jsx.
@@ -117,6 +118,10 @@ struct IOSPlayerSheet: View {
                 onDismiss()
             } label: {
                 IOSPlayerIconButtonChrome(symbol: "chevron.down", size: 40, symbolSize: 18)
+                    // 44 pt HIG hit target around the 40 pt visual (IUI-4 X8;
+                    // the History row menu's established pattern).
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Close")
@@ -135,7 +140,7 @@ struct IOSPlayerSheet: View {
             Spacer()
 
             Color.clear
-                .frame(width: 40, height: 40)
+                .frame(width: 44, height: 44)
         }
         .padding(.horizontal, 16)
         .padding(.top, 0)
@@ -549,6 +554,70 @@ struct IOSPlayerKaraokeText: View {
     }
 }
 
+// MARK: - Off-MainActor audio loading (IUI-4 P1)
+
+/// Serializes AVAudioSession activate/deactivate. Ordering alone is not
+/// enough — a deactivation can be *enqueued* after a newer presentation's
+/// activation (a dismissed-mid-load sheet releases its session only when the
+/// stale decode result arrives) — so every activation takes a fresh epoch and
+/// a deactivation executes only while its own activation is still the newest.
+/// Both interleavings matter: dismiss-before-activation must still release
+/// the orphaned session, and dismiss-then-reopen must never silence the new
+/// sheet's session (adversarial review of this change, 2026-08-12).
+private let iosPlayerAudioSessionQueue = DispatchQueue(
+    label: "com.qwenvoice.player-audio-session", qos: .userInitiated)
+private let iosPlayerSessionEpoch = Mutex(0)
+
+/// The off-MainActor product of a load. Not Sendable (AVAudioPlayer); crosses
+/// back to the MainActor as a `sending` disconnected value.
+private struct IOSPlayerLoadedAudio {
+    let player: AVAudioPlayer
+    let spans: [IOSWordSpan]
+    let sessionEpoch: Int
+}
+
+/// Session activation is a blocking IPC to mediaserverd (tens to hundreds of
+/// ms) and `AVAudioPlayer(contentsOf:)` reads + decodes the file — neither
+/// may run inside the sheet's presentation transaction (the metronomic
+/// 178 ms present stall the IUI-2 baseline measured).
+@concurrent
+private func iosPlayerLoadAudio(
+    url: URL, transcript: String
+) async throws -> sending IOSPlayerLoadedAudio {
+    let epoch = try iosPlayerAudioSessionQueue.sync {
+        let session = AVAudioSession.sharedInstance()
+        try session.setCategory(.playback, mode: .default, options: [])
+        try session.setActive(true, options: [])
+        return iosPlayerSessionEpoch.withLock { epoch in
+            epoch += 1
+            return epoch
+        }
+    }
+    do {
+        let player = try AVAudioPlayer(contentsOf: url)
+        player.prepareToPlay()
+        let spans = IOSWordTimingPlanner.plan(
+            transcript: transcript,
+            audioDuration: player.duration
+        )
+        return IOSPlayerLoadedAudio(player: player, spans: spans, sessionEpoch: epoch)
+    } catch {
+        // Activation succeeded but the decode failed: release the session
+        // unless someone newer has already claimed it.
+        iosPlayerDeactivateSession(ifCurrentEpoch: epoch)
+        throw error
+    }
+}
+
+private func iosPlayerDeactivateSession(ifCurrentEpoch epoch: Int?) {
+    guard let epoch else { return }
+    iosPlayerAudioSessionQueue.async {
+        guard iosPlayerSessionEpoch.withLock({ $0 }) == epoch else { return }
+        try? AVAudioSession.sharedInstance().setActive(
+            false, options: .notifyOthersOnDeactivation)
+    }
+}
+
 // MARK: - Controller
 
 @MainActor
@@ -561,6 +630,8 @@ final class IOSPlayerSheetController: NSObject, ObservableObject {
     private var player: AVAudioPlayer?
     private var displayLink: CADisplayLink?
     private var loadedItem: IOSPlayerSheetItem?
+    private var loadGeneration = 0
+    private var sessionEpoch: Int?
 
     var progress: Double {
         guard duration > 0 else { return 0 }
@@ -573,28 +644,41 @@ final class IOSPlayerSheetController: NSObject, ObservableObject {
             play()
             return
         }
-        loadedItem = item
+        loadGeneration += 1
+        let generation = loadGeneration
+        // The heavy half runs off the MainActor: session activation is a
+        // blocking IPC to mediaserverd (tens to hundreds of ms) and
+        // AVAudioPlayer(contentsOf:) reads + decodes the file. Keeping both
+        // out of the presentation transaction is the IUI-4 P1 fix for the
+        // metronomic 178 ms sheet-present stall the baseline measured.
+        let audioURL = item.audioURL
+        let transcript = item.transcript
         do {
-            let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playback, mode: .default, options: [])
-            try session.setActive(true, options: [])
-            let player = try AVAudioPlayer(contentsOf: item.audioURL)
-            player.delegate = self
-            player.prepareToPlay()
-            self.player = player
-            self.duration = player.duration
+            let loaded = try await iosPlayerLoadAudio(url: audioURL, transcript: transcript)
+            guard generation == loadGeneration else {
+                // Dismissed (or superseded) while loading: never adopt the
+                // stale player, and release the session it activated — unless
+                // a newer presentation has already re-activated it.
+                iosPlayerDeactivateSession(ifCurrentEpoch: loaded.sessionEpoch)
+                return
+            }
+            loadedItem = item
+            sessionEpoch = loaded.sessionEpoch
+            loaded.player.delegate = self
+            self.player = loaded.player
+            self.duration = loaded.player.duration
             self.currentTime = 0
-            self.spans = IOSWordTimingPlanner.plan(
-                transcript: item.transcript,
-                audioDuration: player.duration
-            )
+            self.spans = loaded.spans
             play()
         } catch {
+            guard generation == loadGeneration else { return }
+            loadedItem = item
             self.player = nil
             self.duration = 0
-            self.spans = IOSWordTimingPlanner.plan(transcript: item.transcript, audioDuration: 0)
+            self.spans = IOSWordTimingPlanner.plan(transcript: transcript, audioDuration: 0)
         }
     }
+
 
     func play() {
         guard let player else { return }
@@ -615,10 +699,16 @@ final class IOSPlayerSheetController: NSObject, ObservableObject {
     }
 
     func stop() {
+        loadGeneration += 1
         player?.stop()
         isPlaying = false
         stopDisplayLink()
-        try? AVAudioSession.sharedInstance().setActive(false)
+        // Deactivation blocks like activation does; run it off the dismiss
+        // transaction. Epoch-guarded: releases only the activation this
+        // controller adopted (nil while a load is still in flight — the
+        // stale-load guard releases that one with its own epoch).
+        iosPlayerDeactivateSession(ifCurrentEpoch: sessionEpoch)
+        sessionEpoch = nil
     }
 
     func skip(by seconds: TimeInterval) {

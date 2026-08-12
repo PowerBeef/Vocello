@@ -354,6 +354,9 @@ struct IOSVoicesView: View {
                 size: 40,
                 symbolSize: 16
             )
+            // 44 pt HIG hit target around the 40 pt visual (IUI-4 X8).
+            .frame(width: 44, height: 44)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(isPlaying ? "Stop preview" : "Preview voice")

@@ -542,6 +542,9 @@ struct IOSDeliveryPickerSheet: View {
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("deliveryPickerIntensity_\(level)")
+        // VoiceOver must hear which tier is active (IUI-4 X7; matches the
+        // preset cards above).
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
 

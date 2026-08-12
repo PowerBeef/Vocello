@@ -925,7 +925,7 @@
       "id": "IUI-4",
       "plan": "ios-ui-2026-08",
       "title": "Wave 1: safe fixes with before/after measurement",
-      "status": "planned",
+      "status": "in-flight",
       "gate": "Opens with the zero-risk removals (TabDock dead environment object, redundant toast observation, dead prefetch handlers) plus maintainer-picked low-risk items (candidates: IOSModelInstallerViewModel republish scoping, IOSVoicesView catalog memoization). ALL fixes wait for the baseline, including obviously-safe ones - the 2026-06 lesson. Before/after 5-run measurement on affected scenarios. GATE: wave-1 items landed after maintainer go; before/after table in the authority doc; both platform compiles and the smoke lane green.",
       "sourceOfTruth": [
         "scripts/ui_test.sh",
@@ -933,7 +933,8 @@
         "Tests/VocelloiOSUITests/VocelloiOSUITestCase.swift",
         "scripts/benchmark_history.py"
       ],
-      "updated": "2026-08-11"
+      "updated": "2026-08-12",
+      "notes": "Maintainer go 2026-08-12, scope as proposed: P1 (sheet-present stall — move AVAudioSession activation/decode off the presentation transaction), P5 (lazy History row menus + cached file-exists), P8/P9/P10 (dead-wiring removals), and the input/VoiceOver one-liners X1, X2, X5, X7, X8. Before/after five-run measurement on affected scenarios; both compiles + smoke green to close."
     },
     {
       "id": "IUI-5",
@@ -947,7 +948,8 @@
         "Tests/VocelloiOSUITests/VocelloiOSUITestCase.swift",
         "scripts/benchmark_history.py"
       ],
-      "updated": "2026-08-11"
+      "updated": "2026-08-12",
+      "notes": "Maintainer pick-list decision 2026-08-12: ALL four design groups approved to join wave 2's core re-engineering (P2/P3/P4, P6, P7, P11, X3, X6): copy & glyph fixes D1-D5, interaction polish D6-D8, the Dynamic Type program X4+D9, and theme unification D10."
     },
     {
       "id": "IUI-6",

@@ -65,7 +65,7 @@ struct RootView: View {
         // The dock is the only persistent bottom chrome. Playback is
         // presented inline in Studio or through IOSPlayerSheet.
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            IOSEngineLifecycleToast()
+            IOSEngineLifecycleToast(ttsEngine: ttsEngine)
                 .padding(.bottom, 6)
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {

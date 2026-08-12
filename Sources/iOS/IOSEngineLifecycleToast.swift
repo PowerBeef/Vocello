@@ -3,9 +3,15 @@ import Combine
 import QwenVoiceCore
 
 struct IOSEngineLifecycleToast: View {
-    @EnvironmentObject private var ttsEngine: TTSEngineStore
+    /// Plain (non-observing) reference: the toast's only genuine invalidation
+    /// source is the scoped `onReceive` below. An `@EnvironmentObject` here
+    /// additionally subscribed this persistent bottom-chrome view to every
+    /// store publish — generation progress ticks included — even while it
+    /// showed nothing (IUI-4 P10).
+    let ttsEngine: TTSEngineStore
 
     @State private var visibleState: EngineLifecycleState?
+    @State private var errorMessage: String?
     @State private var dismissTask: Task<Void, Never>?
 
     var body: some View {
@@ -30,8 +36,10 @@ struct IOSEngineLifecycleToast: View {
         // An error toast carries the engine's specific message when available, and
         // is the only one the user can act on (tap to dismiss). Transient states
         // (interrupted/recovering/restarted) stay informational + non-interactive.
+        // The message is captured at event time (handle(newState:)) so the body
+        // has no render-time store reads.
         let message = descriptor.isError
-            ? (ttsEngine.visibleErrorMessage ?? descriptor.message)
+            ? (errorMessage ?? descriptor.message)
             : descriptor.message
         HStack(spacing: 10) {
             Image(systemName: descriptor.symbol)
@@ -70,6 +78,7 @@ struct IOSEngineLifecycleToast: View {
         dismissTask?.cancel()
         ttsEngine.clearVisibleError()
         visibleState = nil
+        errorMessage = nil
     }
 
     private func handle(newState: EngineLifecycleState) {
@@ -84,6 +93,7 @@ struct IOSEngineLifecycleToast: View {
             visibleState = nil
             return
         }
+        errorMessage = ttsEngine.visibleErrorMessage
         visibleState = newState
         dismissTask?.cancel()
         // Error toasts persist until the engine state changes or the user taps to

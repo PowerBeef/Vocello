@@ -162,6 +162,7 @@ private struct IOSHistoryClearConfirmation: Identifiable {
 private struct IOSHistoryLibrarySection: View {
     @Environment(AppModel.self) private var appModel
     @State private var items: [Generation] = []
+    @State private var availableAudioPaths: Set<String> = []
     @State private var errorMessage: String?
     @State private var modeFilter: IOSHistoryModeFilter = .all
     @State private var searchQuery: String = ""
@@ -333,14 +334,26 @@ private struct IOSHistoryLibrarySection: View {
         reloadTask?.cancel()
         reloadTask = Task {
             do {
-                let loadedItems = try await Task.detached(priority: .userInitiated) {
+                let (loadedItems, availablePaths) = try await Task.detached(
+                    priority: .userInitiated
+                ) { () throws -> ([Generation], Set<String>) in
                     if reopenFailedStore {
                         try DatabaseService.shared.reopenIfNeeded()
                     }
-                    return try DatabaseService.shared.fetchAllGenerations()
+                    let loaded = try DatabaseService.shared.fetchAllGenerations()
+                    // Row menus need audio availability; resolving it here
+                    // keeps the per-row stat(2) off the main thread and out of
+                    // the scroll path (IUI-4 P5).
+                    let fileManager = FileManager.default
+                    let available = Set(
+                        loaded.map(\.audioPath)
+                            .filter { fileManager.fileExists(atPath: $0) }
+                    )
+                    return (loaded, available)
                 }.value
                 guard !Task.isCancelled else { return }
                 items = loadedItems
+                availableAudioPaths = availablePaths
                 databaseUnavailable = false
                 errorMessage = nil
                 recomputePresentation()
@@ -442,6 +455,7 @@ private struct IOSHistoryLibrarySection: View {
         IOSHistoryItemCard(
             item: item,
             allowsDeletion: !databaseUnavailable,
+            audioAvailable: availableAudioPaths.contains(item.audioPath),
             onDelete: { delete(item) },
             onPinSeed: item.samplingSeed.map { seedValue in
                 { pinSeed(seedValue, mode: item.mode) }
@@ -522,6 +536,9 @@ private struct IOSHistoryLibrarySection: View {
 private struct IOSHistoryItemCard: View {
     let item: Generation
     let allowsDeletion: Bool
+    /// Resolved off-main at reload time (IUI-4 P5) — the Menu content must
+    /// stay free of filesystem I/O because it's built per row body evaluation.
+    let audioAvailable: Bool
     let onDelete: () -> Void
     /// DP-15: pins this take's recorded sampling seed into its mode's draft.
     /// Nil (or a seedless pre-v6 row) hides the action.
@@ -602,6 +619,12 @@ private struct IOSHistoryItemCard: View {
                             IOSModeDot(tint: modeTint)
                             if let voice = item.voice, !voice.isEmpty {
                                 Text(voice)
+                                // The mode must not become color-only when the
+                                // voice name displaces its label (hard rule;
+                                // IUI-4 X5) — keep the textual cue paired with
+                                // the dot.
+                                Text("·")
+                                Text(modeText)
                             } else {
                                 Text(modeText)
                             }
@@ -616,6 +639,12 @@ private struct IOSHistoryItemCard: View {
                         .iosScaledFont(size: 12, relativeTo: .caption)
                         .foregroundStyle(IOSAppTheme.textSecondary)
                         .lineLimit(1)
+                        // VoiceOver hears the full metadata including the mode
+                        // (previously unspoken whenever a voice name was
+                        // present) as one element instead of dot-skipped
+                        // fragments (IUI-4 X5).
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel(accessibilityMetadata)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -629,7 +658,7 @@ private struct IOSHistoryItemCard: View {
                 } label: {
                     Label("Play", systemImage: "play.fill")
                 }
-                if FileManager.default.fileExists(atPath: item.audioPath) {
+                if audioAvailable {
                     ShareLink(item: URL(fileURLWithPath: item.audioPath)) {
                         Label("Save audio", systemImage: "square.and.arrow.down")
                     }
@@ -700,8 +729,10 @@ private struct IOSHistoryItemCard: View {
         presentPlayerSheet(playerItem)
     }
 
-    private var historyMetadata: String {
-        let parts = [modeText, durationText, item.formattedDate].compactMap { $0 }
-        return parts.joined(separator: " • ")
+    private var accessibilityMetadata: String {
+        let parts = [item.voice, modeText, item.formattedDate, durationText]
+            .compactMap { $0 }
+            .filter { !$0.isEmpty }
+        return parts.joined(separator: ", ")
     }
 }

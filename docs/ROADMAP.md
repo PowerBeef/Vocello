@@ -100,13 +100,13 @@ Narrative authority: [`docs/reference/ios-ui-refresh-2026-08.md`](reference/ios-
 | `IUI-1` | done | Instrument: scripts/ui_test.sh ios perf frame-health harness | `commit:73dc9f8`, `commit:c0dba9c`, `file:scripts/check_ios_ui_perf.py`, `file:Sources/iOSSupport/Services/IOSUIPerfFrameProbe.swift`, `file:Tests/VocelloiOSUITests/VocelloiOSPerfUITests.swift`, `file:scripts/tests/test_check_ios_ui_perf.py`, `doc:docs/reference/ios-ui-refresh-2026-08.md` |
 | `IUI-2` | done | Frame-health baseline (1 warm-up + 5 counted runs) | `doc:docs/reference/ios-ui-refresh-2026-08.md`, `commit:c0dba9c` |
 | `IUI-3` | done | Audit-first review: four lenses + measurements into one ranked list + maintainer pick-list | `doc:docs/reference/ios-ui-refresh-2026-08.md` |
-| `IUI-4` | planned | Wave 1: safe fixes with before/after measurement | — |
+| `IUI-4` | in-flight | Wave 1: safe fixes with before/after measurement | — |
 | `IUI-5` | planned | Wave 2: refinements + re-engineering (macOS UI-5/UI-6 collapsed) | — |
 | `IUI-6` | planned | Registry formalization: platform-aware ui-perf kind + warn-only ceilings | — |
 
 ### Open items in detail
 
-- **`IUI-4`** (planned) — Wave 1: safe fixes with before/after measurement.
+- **`IUI-4`** (in-flight) — Wave 1: safe fixes with before/after measurement.
   gate: Opens with the zero-risk removals (TabDock dead environment object, redundant toast observation, dead prefetch handlers) plus maintainer-picked low-risk items (candidates: IOSModelInstallerViewModel republish scoping, IOSVoicesView catalog memoization). ALL fixes wait for the baseline, including obviously-safe ones - the 2026-06 lesson. Before/after 5-run measurement on affected scenarios. GATE: wave-1 items landed after maintainer go; before/after table in the authority doc; both platform compiles and the smoke lane green.
 
 - **`IUI-5`** (planned) — Wave 2: refinements + re-engineering (macOS UI-5/UI-6 collapsed).

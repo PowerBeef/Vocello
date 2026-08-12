@@ -1222,6 +1222,9 @@ struct IOSFilterChipRow<Option: Hashable & Identifiable>: View {
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier(accessibilityIdentifier?(option) ?? "")
+        // VoiceOver must hear which filter is active — the visual state is
+        // brightness-only (IUI-4 X7; the delivery preset cards' pattern).
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
 
@@ -1245,6 +1248,10 @@ struct IOSSearchField: View {
             TextField(placeholder, text: $text)
                 .focused($isFocused)
                 .textInputAutocapitalization(.never)
+                // Search filters match existing text; live autocorrection
+                // rewrites the query as it's typed (reproduced on-device,
+                // IUI-1). IUI-4 X1.
+                .autocorrectionDisabled(true)
                 .submitLabel(.search)
                 .foregroundStyle(IOSAppTheme.textPrimary)
                 .iosScaledFont(size: 15, relativeTo: .subheadline)
@@ -1257,12 +1264,16 @@ struct IOSSearchField: View {
                     Image(systemName: "xmark.circle.fill")
                         .font(.system(size: 16))
                         .foregroundStyle(IOSAppTheme.textTertiary)
+                        // 44 pt HIG hit target around the 16 pt glyph (IUI-4 X8).
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Clear search")
             }
         }
         .padding(.horizontal, 14)
-        .frame(minHeight: 40)
+        .frame(minHeight: 44)
         .background {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .fill(Color.white.opacity(0.06))

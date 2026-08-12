@@ -367,6 +367,12 @@ struct IOSSaveVoiceSheet: View {
                         TextField("Name this voice", text: $suggestedName)
                             .focused($isNameFocused)
                             .foregroundStyle(IOSAppTheme.textPrimary)
+                            // Names are proper nouns; live autocorrection
+                            // rewrites them as typed and the rewritten name is
+                            // what persists (IUI-4 X2, sibling of the
+                            // search-field fix).
+                            .autocorrectionDisabled(true)
+                            .textInputAutocapitalization(.words)
                             .submitLabel(.done)
                             .onSubmit { dismissKeyboard() }
                             .accessibilityIdentifier("saveVoice_nameField")

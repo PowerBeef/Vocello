@@ -95,15 +95,53 @@ final class VocelloiOSPerfUITests: VocelloiOSUITestCase {
     /// Seeder-completion sentinel: the highest-index row must be present and
     /// findable through the production search UI before any seeded scenario
     /// measures (mirrors the macOS `assertHistoryRows` sentinel).
+    ///
+    /// Drives the search field directly rather than through
+    /// `replaceHistorySearch`: typing must wait for the software keyboard to
+    /// finish presenting (keystrokes fired during the presentation animation
+    /// drop silently — the first device run failed exactly there), the token
+    /// is digits-only so live autocorrection cannot rewrite it at a word
+    /// boundary, and clearing is proven by the filter dropping — an empty
+    /// `TextField` reports its placeholder as `value`, so `value == ""` can
+    /// never confirm a clear.
     private func assertSeededHistoryReady() {
-        replaceHistorySearch(
-            with: String(format: "uiperf-seed-%04d", Self.seededHistoryRows - 1))
+        select(tab: .history)
+        let searchField = app.textFields["historySearchField"].firstMatch
+        XCTAssertTrue(VocelloUIWait.exists(searchField, timeout: 30))
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: searchField, timeout: 20))
+        XCTAssertTrue(
+            VocelloUIWait.condition("software keyboard to present", timeout: 15) {
+                self.app.keyboards.firstMatch.exists
+            }
+        )
+        // "0399" appears only in the highest-index seeded row's transcript.
+        let token = String(format: "%04d", Self.seededHistoryRows - 1)
+        searchField.typeText(token)
+        XCTAssertTrue(
+            VocelloUIWait.condition("History search to match the sentinel token", timeout: 15) {
+                (searchField.value as? String) == token
+            }
+        )
         XCTAssertTrue(
             VocelloUIWait.condition("the seeded sentinel row to be visible", timeout: 30) {
                 self.historyRows().count >= 1
             }
         )
-        replaceHistorySearch(with: "")
+        searchField.typeText(
+            String(repeating: XCUIKeyboardKey.delete.rawValue, count: token.count))
+        XCTAssertTrue(
+            VocelloUIWait.condition("History filter to clear", timeout: 15) {
+                self.historyRows().count > 1
+            }
+        )
+        // Submit dismisses the keyboard (the field's submit label is Search),
+        // so no keyboard overlays the measured windows that follow.
+        searchField.typeText("\n")
+        XCTAssertTrue(
+            VocelloUIWait.condition("software keyboard to dismiss", timeout: 15) {
+                !self.app.keyboards.firstMatch.exists
+            }
+        )
     }
 
     // MARK: - Scenarios

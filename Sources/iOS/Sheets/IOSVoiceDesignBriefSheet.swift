@@ -59,7 +59,7 @@ struct IOSVoiceDesignBriefSheet: View {
         ) {
             VStack(alignment: .leading, spacing: 0) {
                 Text("Describe the voice. Combine character, age, accent, and texture.")
-                    .font(.system(size: 14, weight: .regular))
+                    .iosScaledFont(size: 14, weight: .regular, relativeTo: .footnote)
                     .lineSpacing(1)
                     .foregroundStyle(IOSAppTheme.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -107,7 +107,7 @@ struct IOSVoiceDesignBriefSheet: View {
                 HStack {
                     Spacer(minLength: 0)
                     Text("\(voiceDescription.count)/\(IOSGenerationTextLimitPolicy.descriptionLimit)")
-                        .font(.system(size: 12, weight: .medium).monospacedDigit())
+                        .iosScaledFont(size: 12, weight: .medium, monospacedDigit: true, relativeTo: .caption)
                         .foregroundStyle(
                             voiceDescription.count >= IOSGenerationTextLimitPolicy.descriptionLimit
                                 ? tint
@@ -120,7 +120,7 @@ struct IOSVoiceDesignBriefSheet: View {
                 .padding(.bottom, 18)
 
                 Text("Starting points".uppercased())
-                    .font(.system(size: 11, weight: .semibold))
+                    .iosScaledFont(size: 11, weight: .semibold, relativeTo: .caption2)
                     .tracking(0.88)
                     .foregroundStyle(IOSAppTheme.textSecondary)
                     .padding(.horizontal, 20)
@@ -134,7 +134,7 @@ struct IOSVoiceDesignBriefSheet: View {
                             closeSheet()
                         } label: {
                             Text(startingPoint)
-                                .font(.system(size: 14, weight: .regular))
+                                .iosScaledFont(size: 14, weight: .regular, relativeTo: .footnote)
                                 .lineSpacing(1)
                                 .foregroundStyle(IOSAppTheme.textPrimary)
                                 .lineLimit(2)

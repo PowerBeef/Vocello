@@ -439,7 +439,7 @@ struct IOSSaveVoiceSheet: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 6) {
                 Text(label)
-                    .font(.system(size: 13, weight: .semibold))
+                    .iosScaledFont(size: 13, weight: .semibold, relativeTo: .footnote)
                     .foregroundStyle(IOSAppTheme.textSecondary)
                 if let caption {
                     Text(caption)

@@ -682,9 +682,6 @@ struct IOSBottomEdgeSheet<Content: View>: View {
     let headerTrailing: AnyView?
     let content: Content
 
-    @Environment(\.iosReduceTransparencyEnabled) private var reduceTransparency
-    @Environment(\.iosGenerationPerformanceGate) private var performanceGate
-
     init(
         title: String,
         tint: Color = IOSBrandTheme.accent,
@@ -772,18 +769,13 @@ struct IOSBottomEdgeSheet<Content: View>: View {
             alignment: .top
         )
 
-        Group {
-            if reduceTransparency || performanceGate {
-                panel.background {
-                    shape.fill(Color(red: 20 / 255, green: 22 / 255, blue: 30 / 255))
-                }
-            } else {
-                panel.glassEffect(
-                    .regular.tint(IOSAppTheme.subtleGlassTint(tint, intensity: 0.45)),
-                    in: shape
-                )
-            }
-        }
+        // Gate decision shared with every other glass surface (IUI-5 D10a);
+        // the gated branch paints this panel's solid backing via gatedFill.
+        panel.iosGatedGlass(
+            tint: IOSAppTheme.subtleGlassTint(tint, intensity: 0.45),
+            in: shape,
+            gatedFill: Color(red: 20 / 255, green: 22 / 255, blue: 30 / 255)
+        )
         .clipShape(shape)
         .overlay {
             shape
@@ -825,7 +817,7 @@ struct IOSBottomEdgeSheet<Content: View>: View {
             }
 
             Text(title)
-                .font(.system(size: 22, weight: .bold))
+                .iosScaledFont(size: 22, weight: .bold, relativeTo: .title2)
                 .tracking(-0.44)
                 .foregroundStyle(IOSAppTheme.textPrimary)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -959,7 +951,7 @@ struct IOSBottomSheet<Content: View>: View {
             }
 
             Text(title)
-                .font(.system(size: 22, weight: .bold))
+                .iosScaledFont(size: 22, weight: .bold, relativeTo: .title2)
                 .tracking(-0.44)
                 .foregroundStyle(IOSAppTheme.textPrimary)
                 .frame(maxWidth: .infinity, alignment: .leading)

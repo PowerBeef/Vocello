@@ -4,67 +4,59 @@ import UIKit
 // View modifiers + reusable shape helpers that build on `Theme`. Kept
 // separate from `Theme.swift` so the token namespace stays scannable.
 
-// MARK: - Glass surface modifier
+// MARK: - Gated glass (the one condition)
 
-struct ThemeGlassSurfaceModifier<S: InsettableShape>: ViewModifier {
+/// iOS twin of the macOS `GatedGlass` container in `AppTheme.swift`
+/// (IUI-5 D10a): the ONE place that decides whether a Liquid Glass surface
+/// may render glass. Reduce Transparency and the fixed-refresh generation
+/// performance gate share the same solid-fallback branch; every glass
+/// surface routes here and never hand-rolls the condition. (Replaces the
+/// never-adopted `ThemeGlassSurfaceModifier` twin — the live surface chrome
+/// stays with `iosSubtleGlassSurface`, which now delegates its gate here.)
+struct IOSGatedGlassModifier<S: Shape>: ViewModifier {
+    let tint: Color
     let shape: S
-    let tint: Color?
-    let fill: Color
-    let strokeOpacity: Double
     let interactive: Bool
+    /// Painted only while gated, for surfaces whose base chrome does not
+    /// already include a solid backing.
+    let gatedFill: Color?
 
     @Environment(\.iosReduceTransparencyEnabled) private var reduceTransparency
     @Environment(\.iosGenerationPerformanceGate) private var performanceGate
 
     @ViewBuilder
     func body(content: Content) -> some View {
-        let base = content
-            .background { shape.fill(fill) }
-            .overlay {
-                shape
-                    .stroke(Color.white.opacity(strokeOpacity), lineWidth: 0.8)
-                    .allowsHitTesting(false)
-            }
-            .overlay {
-                shape
-                    .inset(by: 0.65)
-                    .stroke(Theme.Surface.glassInnerStroke, lineWidth: 0.55)
-                    .allowsHitTesting(false)
-            }
-
         if reduceTransparency || performanceGate {
-            base
+            if let gatedFill {
+                content.background { shape.fill(gatedFill) }
+            } else {
+                content
+            }
         } else if interactive {
-            base.glassEffect(
-                .regular.tint(Theme.glassTint(tint, intensity: 0.9)).interactive(),
-                in: shape
-            )
+            content.glassEffect(.regular.tint(tint).interactive(), in: shape)
         } else {
-            base.glassEffect(
-                .regular.tint(Theme.glassTint(tint, intensity: 0.9)),
-                in: shape
-            )
+            content.glassEffect(.regular.tint(tint), in: shape)
         }
     }
 }
 
 extension View {
-    /// Liquid Glass surface with subtle tint. Falls back to a flat fill
-    /// when Reduce Transparency is on.
-    func themeGlassSurface<S: InsettableShape>(
+    /// Apply Liquid Glass through the shared gate. `tint` is the final glass
+    /// tint (callers compose it from their token helpers); `gatedFill`
+    /// supplies a solid backing for the gated branch when the caller's own
+    /// chrome doesn't already paint one.
+    func iosGatedGlass<S: Shape>(
+        tint: Color,
         in shape: S,
-        tint: Color? = nil,
-        fill: Color = Theme.Surface.card.opacity(0.82),
-        strokeOpacity: Double = 0.12,
-        interactive: Bool = false
+        interactive: Bool = false,
+        gatedFill: Color? = nil
     ) -> some View {
         modifier(
-            ThemeGlassSurfaceModifier(
-                shape: shape,
+            IOSGatedGlassModifier(
                 tint: tint,
-                fill: fill,
-                strokeOpacity: strokeOpacity,
-                interactive: interactive
+                shape: shape,
+                interactive: interactive,
+                gatedFill: gatedFill
             )
         )
     }
@@ -81,28 +73,47 @@ private struct IOSScaledSystemFont: ViewModifier {
     @ScaledMetric private var scaledSize: CGFloat
     private let weight: Font.Weight
     private let design: Font.Design
+    private let monospacedDigit: Bool
 
-    init(size: CGFloat, weight: Font.Weight, design: Font.Design, relativeTo style: Font.TextStyle) {
+    init(
+        size: CGFloat,
+        weight: Font.Weight,
+        design: Font.Design,
+        monospacedDigit: Bool,
+        relativeTo style: Font.TextStyle
+    ) {
         _scaledSize = ScaledMetric(wrappedValue: size, relativeTo: style)
         self.weight = weight
         self.design = design
+        self.monospacedDigit = monospacedDigit
     }
 
     func body(content: Content) -> some View {
-        content.font(.system(size: scaledSize, weight: weight, design: design))
+        let font = Font.system(size: scaledSize, weight: weight, design: design)
+        content.font(monospacedDigit ? font.monospacedDigit() : font)
     }
 }
 
 extension View {
     /// Dynamic-Type-scaling replacement for `.font(.system(size:weight:))` on
-    /// content text.
+    /// content text (X4 program: `monospacedDigit` covers the
+    /// `.system(size:).monospacedDigit()` chains).
     func iosScaledFont(
         size: CGFloat,
         weight: Font.Weight = .regular,
         design: Font.Design = .default,
+        monospacedDigit: Bool = false,
         relativeTo style: Font.TextStyle = .body
     ) -> some View {
-        modifier(IOSScaledSystemFont(size: size, weight: weight, design: design, relativeTo: style))
+        modifier(
+            IOSScaledSystemFont(
+                size: size,
+                weight: weight,
+                design: design,
+                monospacedDigit: monospacedDigit,
+                relativeTo: style
+            )
+        )
     }
 }
 

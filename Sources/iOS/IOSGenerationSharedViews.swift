@@ -339,27 +339,10 @@ struct IOSCompactInlineNotice: View {
             // Transparency sees a real surface instead of a transparent gap.
             shape.fill(tint.opacity(reduceTransparency ? 0.18 : 0.06))
         }
-        .modifier(IOSConditionalGlassEffect(reduceTransparency: reduceTransparency, tint: tint, shape: shape))
+        .iosGatedGlass(tint: tint.opacity(0.06), in: shape)
         .overlay {
             shape
                 .stroke(Color.white.opacity(0.14), lineWidth: 0.75)
-        }
-    }
-}
-
-private struct IOSConditionalGlassEffect<S: Shape>: ViewModifier {
-    let reduceTransparency: Bool
-    let tint: Color
-    let shape: S
-
-    @Environment(\.iosGenerationPerformanceGate) private var performanceGate
-
-    @ViewBuilder
-    func body(content: Content) -> some View {
-        if reduceTransparency || performanceGate {
-            content
-        } else {
-            content.glassEffect(.regular.tint(tint.opacity(0.06)), in: shape)
         }
     }
 }

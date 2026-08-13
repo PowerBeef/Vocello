@@ -220,7 +220,7 @@ struct IOSStudioCanvas<SetupChips: View>: View {
 
             HStack {
                 Text(modeMetaLabel)
-                    .font(.system(size: 12, weight: .medium))
+                    .iosScaledFont(size: 12, weight: .medium, relativeTo: .caption)
                     .tracking(0.24)               // letter-spacing 0.02em ≈ 0.24pt at 12pt
                     .foregroundStyle(IOSAppTheme.textSecondary)
                     .accessibilityIdentifier("textInput_modeMetaLabel")
@@ -231,7 +231,7 @@ struct IOSStudioCanvas<SetupChips: View>: View {
                         isScriptFocused = false
                     } label: {
                         Text("Clear")
-                            .font(.system(size: 12, weight: .semibold))
+                            .iosScaledFont(size: 12, weight: .semibold, relativeTo: .caption)
                             .frame(minWidth: 44, minHeight: 44)
                     }
                     .buttonStyle(.plain)
@@ -240,7 +240,7 @@ struct IOSStudioCanvas<SetupChips: View>: View {
                     .accessibilityIdentifier(IOSAccessibilityIdentifier.TextInput.clearButton)
                 }
                 Text("\(script.count) / \(charLimit)")
-                    .font(.system(size: 12, weight: .medium).monospacedDigit())
+                    .iosScaledFont(size: 12, weight: .medium, monospacedDigit: true, relativeTo: .caption)
                     .foregroundStyle(script.count > charLimit ? Color.orange : IOSAppTheme.textSecondary)
                     .accessibilityIdentifier("textInput_lengthCount")
             }

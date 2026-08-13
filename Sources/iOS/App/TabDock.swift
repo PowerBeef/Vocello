@@ -83,7 +83,7 @@ private struct TabDockButton: View {
                 Image(systemName: tab.systemImage)
                     .font(.system(size: 22, weight: .semibold))
                 Text(tab.title)
-                    .font(.system(size: 10, weight: .semibold))
+                    .iosScaledFont(size: 10, weight: .semibold, relativeTo: .caption2)
                     .tracking(0.05)
                     .lineLimit(1)
             }

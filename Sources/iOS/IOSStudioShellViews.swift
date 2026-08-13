@@ -71,7 +71,7 @@ struct IOSStudioWorkspaceHeading: View {
 
     var body: some View {
         Text(title)
-            .font(.system(size: 28, weight: .bold))
+            .iosScaledFont(size: 28, weight: .bold, relativeTo: .largeTitle)
             .tracking(-0.56)
             .foregroundStyle(IOSAppTheme.textPrimary)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -104,7 +104,7 @@ struct IOSStudioSectionGroup<Content: View>: View {
         VStack(alignment: .leading, spacing: 0) {
             if let title, !title.isEmpty {
                 Text(title.uppercased())
-                    .font(.system(size: 11, weight: .semibold))
+                    .iosScaledFont(size: 11, weight: .semibold, relativeTo: .caption2)
                     .tracking(0.88)
                     .foregroundStyle(IOSAppTheme.textSecondary)
                     .padding(.horizontal, 20)

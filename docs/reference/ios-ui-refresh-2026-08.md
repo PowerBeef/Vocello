@@ -402,9 +402,51 @@ have stolen ~200 pt from the transcript on every open and shifted the
 scrubber the perf scenarios drive), plus the doc siblings and stale-copy
 sweep above.
 
-Remaining wave-2 scope: the X4+D9 Dynamic Type program and D10 theme
-unification — then the counted before/after measurement plus wave-level
-smoke at the next phone window.
+### Wave 2 sub-wave D — D10a glass-gate unification + X4/D9 Dynamic Type (2026-08-13, landed)
+
+**D10 split, recorded honestly.** The audit's D10 has two halves. The
+glass-gate half landed as **D10a**: a shared `IOSGatedGlassModifier`
+(`Theme/ThemeModifiers.swift`) — the macOS `GatedGlass` twin — is now the
+ONE place that applies `.glassEffect` and decides the gate (Reduce
+Transparency OR the fixed-refresh generation performance gate, one solid
+fallback branch). The three live hand-rolled sites delegate to it
+(`iosSubtleGlassSurface`, the generation status chip, the bottom-sheet
+chrome), the never-adopted `ThemeGlassSurfaceModifier` twin was deleted
+(zero callers — one of the "two systems" was dead on arrival), and
+`.claude/rules/ios.md` now names the container rule. An adversarial parity
+lens verified all four gate states identical at every site and that no raw
+`glassEffect` call remains outside the shared modifier. The **token
+namespace half stays open as D10b**: 403 `IOSAppTheme`/`IOSBrandTheme`
+references versus 21 canonical `Theme` ones, with dozens of tokens missing
+from `Theme` and real value drift — a migration that needs per-surface
+visual verification and is deliberately NOT landed blind; it remains
+recorded wave-2 scope.
+
+**X4+D9 Dynamic Type program.** A ten-agent fan-out classified all 132
+fixed `.system(size:)` sites under a keep-fixed-when-unsure policy and
+adopted **50** through `iosScaledFont` (which gained a `monospacedDigit`
+flag for the chained variants); ~80 sites are deliberately fixed with
+per-site recorded reasons — SF Symbol glyphs in fixed chrome, text pinned
+inside fixed-height capsules/pills/badges/detents (the delete sheet's 300 pt
+detent, the 56 pt CTA capsules, the inline player card's load-bearing
+height), and UIKit-bridge editors whose SwiftUI placeholders must match
+their fixed UIFont. The karaoke transcript scales via one `@ScaledMetric`
+driving both the base font and the active-word `AttributedString` run (the
+one place `iosScaledFont` can't reach). The safety verify lens added a
+shrink-to-fit guard on the recording overlay's scaled 56 pt timer and noted
+the retired (unreachable) intensity button as a future clipping site if
+restored. UIKit text-editor scaling (`UIFontMetrics`) is recorded as
+deferred follow-up scope alongside D10b.
+
+Device note: Dynamic Type adoption changes measured layout only when the
+user's type size differs from default — the counted wave measurement runs at
+default type size, so the baseline comparison stays valid; a large-type
+visual spot-check joins the next phone window's checklist (with the
+`scrollsToTop` question from sub-wave B).
+
+Remaining wave-2 scope: **D10b** (token-namespace unification, above) as
+deliberate follow-up desk work, then the counted before/after measurement
+plus wave-level smoke at the next phone window close the wave.
 
 ## 60 Hz-tier posture
 

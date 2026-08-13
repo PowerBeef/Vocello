@@ -119,18 +119,23 @@ struct IOSRecordingOverlay: View {
         VStack(spacing: 28) {
             VStack(spacing: 28) {
                 Text(phaseLabel.uppercased())
-                    .font(.system(size: 13, weight: .semibold))
+                    .iosScaledFont(size: 13, weight: .semibold, relativeTo: .footnote)
                     .tracking(1.56)
                     .foregroundStyle(IOSAppTheme.textSecondary)
 
                 Text(timeString)
-                    .font(.system(size: 56, weight: .bold, design: .monospaced))
+                    .iosScaledFont(size: 56, weight: .bold, design: .monospaced, relativeTo: .largeTitle)
                     .tracking(-1.12)
                     .foregroundStyle(progressColor)
                     .monospacedDigit()
+                    // At the largest accessibility sizes the scaled jumbo
+                    // numeral approaches full screen width; shrink-to-fit
+                    // beats wrapping a running timer onto two lines.
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
 
                 Text("Read 10-20 s of clean, natural speech. Quiet room. One voice.")
-                    .font(.system(size: 14, weight: .medium))
+                    .iosScaledFont(size: 14, weight: .medium, relativeTo: .footnote)
                     .foregroundStyle(IOSAppTheme.textSecondary)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
@@ -148,7 +153,7 @@ struct IOSRecordingOverlay: View {
             .opacity(recorder.isRecording ? 1 : (recorder.elapsed > 0 ? 0.8 : 0.4))
 
             Text(statusLabel)
-                .font(.system(size: 14, weight: .medium))
+                .iosScaledFont(size: 14, weight: .medium, relativeTo: .footnote)
                 .foregroundStyle(IOSAppTheme.textSecondary)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 280)

@@ -134,7 +134,7 @@ struct IOSPlayerSheet: View {
                 IOSModeDot(tint: item.modeTint)
                 Text(playerEyebrowLabel.uppercased())
             }
-            .font(.system(size: 11, weight: .semibold))
+            .iosScaledFont(size: 11, weight: .semibold, relativeTo: .caption2)
             .tracking(0.88)
             .foregroundStyle(IOSAppTheme.textPrimary)
 
@@ -161,13 +161,13 @@ struct IOSPlayerSheet: View {
     private var header: some View {
         VStack(spacing: 4) {
             Text(item.voiceName)
-                .font(.system(size: 22, weight: .bold))
+                .iosScaledFont(size: 22, weight: .bold, relativeTo: .title2)
                 .tracking(-0.44)
                 .foregroundStyle(IOSAppTheme.textPrimary)
                 .lineLimit(1)
 
             Text("\(item.subtitle ?? "Just now") · \(controller.formatted(time: controller.duration))")
-                .font(.system(size: 13))
+                .iosScaledFont(size: 13, relativeTo: .footnote)
                 .foregroundStyle(IOSAppTheme.textSecondary)
                 .monospacedDigit()
         }
@@ -336,7 +336,7 @@ struct IOSPlayerSheet: View {
                 Image(systemName: symbol)
                     .font(.system(size: 19, weight: .semibold))
                 Text(title)
-                    .font(.system(size: 11, weight: .semibold))
+                    .iosScaledFont(size: 11, weight: .semibold, relativeTo: .caption2)
                     .tracking(0.22)
             }
             .foregroundStyle(IOSAppTheme.textSecondary)
@@ -482,9 +482,14 @@ struct IOSPlayerKaraokeText: View {
     let tint: Color
     var alignment: TextAlignment = .leading
 
+    /// One scaled size drives both the base font and the active-word run
+    /// (X4+D9): an `AttributedString` run font cannot use `iosScaledFont`,
+    /// and a fixed 17 pt active word inside scaled prose would mismatch.
+    @ScaledMetric(relativeTo: .body) private var karaokeSize: CGFloat = 17
+
     var body: some View {
         Text(attributedTranscript)
-            .font(.system(size: 17, weight: .medium))
+            .font(.system(size: karaokeSize, weight: .medium))
             .tracking(-0.085)
             .lineSpacing(5)
             .multilineTextAlignment(alignment)
@@ -500,7 +505,7 @@ struct IOSPlayerKaraokeText: View {
             } else if let highlight {
                 if i == highlight.activeIndex {
                     run.foregroundColor = tint
-                    run.font = .system(size: 17, weight: .semibold)
+                    run.font = .system(size: karaokeSize, weight: .semibold)
                 } else if i < highlight.playedCount {
                     run.foregroundColor = IOSAppTheme.textPrimary
                 } else {

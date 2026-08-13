@@ -297,7 +297,7 @@ struct IOSSettingsBrandFooter: View {
                 .accessibilityHidden(true)
 
             Text("VERSION \(IOSSettingsSupportInfo.appVersionLabel)".uppercased())
-                .font(.system(size: 11, weight: .medium))
+                .iosScaledFont(size: 11, weight: .medium, relativeTo: .caption2)
                 .accessibilityIdentifier("iosSettings_versionLabel")
                 .tracking(0.66)
                 .foregroundStyle(IOSAppTheme.textTertiary)
@@ -658,16 +658,16 @@ struct IOSModelRow: View {
                     estimatedSecondsRemaining: estimatedSecondsRemaining,
                     suffix: message
                 ))
-                    .font(.system(size: 12))
+                    .iosScaledFont(size: 12, relativeTo: .caption)
                     .foregroundStyle(IOSAppTheme.textSecondary)
             }
         case .waitingForConnectivity(let downloadedBytes, let totalBytes):
             VStack(alignment: .leading, spacing: 6) {
                 Text("Waiting for connectivity")
-                    .font(.system(size: 12))
+                    .iosScaledFont(size: 12, relativeTo: .caption)
                     .foregroundStyle(IOSAppTheme.textSecondary)
                 Text(progressText(downloadedBytes: downloadedBytes, totalBytes: totalBytes))
-                    .font(.system(size: 12))
+                    .iosScaledFont(size: 12, relativeTo: .caption)
                     .foregroundStyle(IOSAppTheme.textSecondary)
             }
         case .retrying(let progress, let downloadedBytes, let totalBytes, let retryCount, let reason):
@@ -680,12 +680,12 @@ struct IOSModelRow: View {
                     totalBytes: totalBytes,
                     suffix: "Retry \(retryCount)\(reason.map { ": \($0)" } ?? "") · verified files will be reused"
                 ))
-                    .font(.system(size: 12))
+                    .iosScaledFont(size: 12, relativeTo: .caption)
                     .foregroundStyle(IOSAppTheme.textSecondary)
             }
         case .failed(let message):
             Text(message)
-                .font(.system(size: 12))
+                .iosScaledFont(size: 12, relativeTo: .caption)
                 .foregroundStyle(.red)
                 .fixedSize(horizontal: false, vertical: true)
         case .available, .queued, .verifying, .installing, .cancelling, .installed, .deleting, .unavailable, .idle:

@@ -266,9 +266,6 @@ struct IOSSubtleGlassSurfaceModifier<S: InsettableShape>: ViewModifier {
     let strokeOpacity: Double
     let interactive: Bool
 
-    @Environment(\.iosReduceTransparencyEnabled) private var reduceTransparency
-    @Environment(\.iosGenerationPerformanceGate) private var performanceGate
-
     @ViewBuilder
     func body(content: Content) -> some View {
         let base = content
@@ -288,22 +285,14 @@ struct IOSSubtleGlassSurfaceModifier<S: InsettableShape>: ViewModifier {
                     .allowsHitTesting(false)
             }
 
-        if reduceTransparency || performanceGate {
-            // Solid-fill fallback required by CLAUDE.md when Reduce Transparency
-            // is on, and reused by the fixed-refresh generation performance
-            // gate. `fill` already paints the base background; skip glassEffect.
-            base
-        } else if interactive {
-            base.glassEffect(
-                .regular.tint(IOSAppTheme.subtleGlassTint(tint, intensity: 0.9)).interactive(),
-                in: shape
-            )
-        } else {
-            base.glassEffect(
-                .regular.tint(IOSAppTheme.subtleGlassTint(tint, intensity: 0.9)),
-                in: shape
-            )
-        }
+        // The gate decision lives in the shared IOSGatedGlassModifier
+        // (IUI-5 D10a); `fill` above already paints the solid base, so the
+        // gated branch needs no extra backing here.
+        base.iosGatedGlass(
+            tint: IOSAppTheme.subtleGlassTint(tint, intensity: 0.9),
+            in: shape,
+            interactive: interactive
+        )
     }
 }
 
@@ -431,7 +420,7 @@ struct IOSSectionHeading: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(title.uppercased())
-                .font(.system(size: 11, weight: .semibold))
+                .iosScaledFont(size: 11, weight: .semibold, relativeTo: .caption2)
                 .tracking(0.88)
                 .foregroundStyle(IOSAppTheme.textSecondary)
             if let subtitle, !subtitle.isEmpty {

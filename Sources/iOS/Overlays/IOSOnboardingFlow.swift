@@ -140,13 +140,13 @@ private struct IOSOnboardingWelcomePage: View {
                 .padding(.bottom, 32)
 
             Text("Vocello")
-                .font(.system(size: 36, weight: .bold))
+                .iosScaledFont(size: 36, weight: .bold, relativeTo: .largeTitle)
                 .tracking(-0.90)
                 .foregroundStyle(IOSAppTheme.textPrimary)
                 .multilineTextAlignment(.center)
 
             Text("Studio-quality voice generation. Runs entirely on this iPhone.")
-                .font(.system(size: 17))
+                .iosScaledFont(size: 17, relativeTo: .body)
                 .foregroundStyle(IOSAppTheme.textSecondary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
@@ -186,13 +186,13 @@ private struct IOSOnboardingInstallPage: View {
                 .padding(.bottom, 32)
 
             Text("Install Custom Voice")
-                .font(.system(size: 36, weight: .bold))
+                .iosScaledFont(size: 36, weight: .bold, relativeTo: .largeTitle)
                 .tracking(-0.90)
                 .foregroundStyle(IOSAppTheme.textPrimary)
                 .multilineTextAlignment(.center)
 
             Text("Download the 4-bit Speed model to start generating. Voice Design and Voice Cloning each have their own model; install them later in Settings.")
-                .font(.system(size: 17))
+                .iosScaledFont(size: 17, relativeTo: .body)
                 .foregroundStyle(IOSAppTheme.textSecondary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
@@ -232,7 +232,7 @@ private struct IOSOnboardingReadyPage: View {
                 .padding(.bottom, 32)
 
             Text("You're ready")
-                .font(.system(size: 36, weight: .bold))
+                .iosScaledFont(size: 36, weight: .bold, relativeTo: .largeTitle)
                 .tracking(-0.90)
                 .foregroundStyle(IOSAppTheme.textPrimary)
                 .multilineTextAlignment(.center)
@@ -241,7 +241,7 @@ private struct IOSOnboardingReadyPage: View {
             // a fresh install — the closing copy names that first real step
             // instead of implying generation already works.
             Text("Download a voice model in Settings, then type a script, pick a voice, generate. Your audio stays here.")
-                .font(.system(size: 17))
+                .iosScaledFont(size: 17, relativeTo: .body)
                 .foregroundStyle(IOSAppTheme.textSecondary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
@@ -328,7 +328,7 @@ private struct IOSOnboardingBenefitRow: View {
                 // title-only) — secondary ink made the list read as fine
                 // print next to the page headline.
                 Text(title)
-                    .font(.system(size: 14, weight: .medium))
+                    .iosScaledFont(size: 14, weight: .medium, relativeTo: .footnote)
                     .foregroundStyle(IOSAppTheme.textPrimary)
                 if let detail {
                     Text(detail)

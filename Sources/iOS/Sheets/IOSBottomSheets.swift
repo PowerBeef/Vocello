@@ -177,7 +177,7 @@ struct IOSDeliveryPickerSheet: View {
                     }
 
                     Text(EmotionPreset.directionalHintAdvisory)
-                        .font(.system(size: 12))
+                        .iosScaledFont(size: 12, relativeTo: .caption)
                         .foregroundStyle(IOSAppTheme.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityIdentifier("deliveryPickerSheet_hintAdvisory")
@@ -270,7 +270,7 @@ struct IOSDeliveryPickerSheet: View {
 
     private var customToneGuidance: some View {
         Text("Be specific: combine emotion, pace, pitch, and timbre.")
-            .font(.system(size: 13, weight: .regular))
+            .iosScaledFont(size: 13, weight: .regular, relativeTo: .footnote)
             .foregroundStyle(IOSAppTheme.textSecondary)
             .fixedSize(horizontal: false, vertical: true)
     }
@@ -281,7 +281,7 @@ struct IOSDeliveryPickerSheet: View {
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(.orange)
             Text(DeliveryInstructionAdvisor.advisoryMessage)
-                .font(.system(size: 13, weight: .medium))
+                .iosScaledFont(size: 13, weight: .medium, relativeTo: .footnote)
                 .foregroundStyle(IOSAppTheme.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -334,17 +334,17 @@ struct IOSDeliveryPickerSheet: View {
     private var customToneExamples: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Examples")
-                .font(.system(size: 13, weight: .semibold))
+                .iosScaledFont(size: 13, weight: .semibold, relativeTo: .footnote)
                 .foregroundStyle(IOSAppTheme.textSecondary)
 
             VStack(alignment: .leading, spacing: 8) {
                 ForEach(customToneExamplesList, id: \.self) { example in
                     HStack(alignment: .top, spacing: 6) {
                         Text("•")
-                            .font(.system(size: 13, weight: .bold))
+                            .iosScaledFont(size: 13, weight: .bold, relativeTo: .footnote)
                             .foregroundStyle(tint)
                         Text(example)
-                            .font(.system(size: 13, weight: .medium))
+                            .iosScaledFont(size: 13, weight: .medium, relativeTo: .footnote)
                             .foregroundStyle(IOSAppTheme.textSecondary)
                             .fixedSize(horizontal: false, vertical: true)
                         Spacer(minLength: 0)
@@ -364,7 +364,7 @@ struct IOSDeliveryPickerSheet: View {
         let limit = IOSGenerationTextLimitPolicy.deliveryInstructionLimit
         let remaining = limit - customText.count
         return Text("\(customText.count)/\(limit)")
-            .font(.system(size: 12, weight: .medium).monospacedDigit())
+            .iosScaledFont(size: 12, weight: .medium, monospacedDigit: true, relativeTo: .caption)
             .foregroundStyle(
                 customText.count >= limit
                     ? tint
@@ -431,7 +431,7 @@ struct IOSDeliveryPickerSheet: View {
     /// keep the iOSSupport model layer untouched.
     private func sectionHeader(_ title: String) -> some View {
         Text(title.uppercased())
-            .font(.system(size: 11, weight: .semibold))
+            .iosScaledFont(size: 11, weight: .semibold, relativeTo: .caption2)
             .tracking(0.8)
             .foregroundStyle(IOSAppTheme.textSecondary)
     }
@@ -478,7 +478,7 @@ struct IOSDeliveryPickerSheet: View {
                         .fill(dot)
                         .frame(width: 8, height: 8)
                     Text(preset.label)
-                        .font(.system(size: 14, weight: .semibold))
+                        .iosScaledFont(size: 14, weight: .semibold, relativeTo: .footnote)
                         .foregroundStyle(IOSAppTheme.textPrimary)
                     Spacer(minLength: 0)
                     if isSelected {
@@ -489,7 +489,7 @@ struct IOSDeliveryPickerSheet: View {
                 }
 
                 Text(description(for: preset))
-                    .font(.system(size: 12, weight: .regular))
+                    .iosScaledFont(size: 12, weight: .regular, relativeTo: .caption)
                     .foregroundStyle(IOSAppTheme.textSecondary)
                     .multilineTextAlignment(.leading)
                     .lineLimit(2)
@@ -618,7 +618,7 @@ struct IOSQwenLanguagePickerSheet: View {
 
     private func sectionHeader(_ title: String) -> some View {
         Text(title.uppercased())
-            .font(.system(size: 10, weight: .semibold))
+            .iosScaledFont(size: 10, weight: .semibold, relativeTo: .caption2)
             .tracking(0.7)
             .foregroundStyle(IOSAppTheme.textTertiary)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -911,7 +911,7 @@ struct IOSVoicePickerSheet: View {
 
     private func sectionHeader(_ title: String) -> some View {
         Text(title.uppercased())
-            .font(.system(size: 10, weight: .semibold))
+            .iosScaledFont(size: 10, weight: .semibold, relativeTo: .caption2)
             .tracking(0.7)
             .foregroundStyle(IOSAppTheme.textTertiary)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -960,7 +960,7 @@ struct IOSVoicePickerSheet: View {
                     // placement; rows keep their language pill (no per-row "Recommended" badge).
                     if let tag = option.languageTag, !tag.isEmpty {
                         Text(tag.uppercased())
-                            .font(.system(size: 10, weight: .semibold))
+                            .iosScaledFont(size: 10, weight: .semibold, relativeTo: .caption2)
                             .tracking(0.4)
                             .foregroundStyle(IOSAppTheme.textSecondary)
                             .padding(.horizontal, 8)
@@ -1226,7 +1226,7 @@ struct IOSReferenceClipSheet: View {
 
     private func savedVoicesHeader(_ title: String) -> some View {
         Text(title.uppercased())
-            .font(.system(size: 10, weight: .semibold))
+            .iosScaledFont(size: 10, weight: .semibold, relativeTo: .caption2)
             .tracking(0.7)
             .foregroundStyle(IOSAppTheme.textTertiary)
             .padding(.top, 6)

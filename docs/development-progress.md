@@ -72,10 +72,16 @@ reduce-transparency, and the generation glass gate), X6 VoiceOver-adjustable
 inline scrub; P11 deferred with its recorded downgrade reason; two review
 minors fixed in-change. Sub-wave C (same day, desk): all seven small design
 picks D1–D5/D7/D8 landed with a stale-copy sweep and a five-finding review
-fixed in-change. **Resume here: the two remaining IUI-5 programs — the
-X4+D9 Dynamic Type adoption and D10 theme unification — then the counted
-five-run before/after measurement plus a wave-level smoke at the next phone
-window closes the wave.**
+fixed in-change. Sub-wave D (same day, desk): D10a glass-gate unification
+(the shared `IOSGatedGlassModifier` is now the sole `glassEffect` site;
+parity verified in all four gate states) and the X4+D9 Dynamic Type program
+(50 of 132 fixed-size sites adopted, ~80 kept fixed with recorded reasons,
+karaoke scales base + active-word run together). **Resume here: IUI-5's one
+remaining desk item is D10b — the token-namespace migration (403 legacy
+refs, missing `Theme` tokens, real drift; deliberately not landed blind, it
+needs per-surface visual verification) — then the counted five-run
+before/after measurement plus wave-level smoke (with large-type and
+scrollsToTop spot-checks) at the next phone window closes the wave.**
 
 **IUI-1 + IUI-2 closed — iOS frame-health instrument live with a measured
 baseline (2026-08-12, phone window):** the acceptance run

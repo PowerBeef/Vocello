@@ -69,15 +69,6 @@ struct RootView: View {
         }
         .iosAppAnimation(Theme.Motion.easeOut, value: appModel.tab)
         .iosAppAnimation(Theme.Motion.modePillSlide, value: appModel.studioMode)
-        .environment(\.iosReduceMotionEnabled, effectiveReduceMotion)
-        .environment(\.iosReduceTransparencyEnabled, effectiveReduceTransparency)
-        // Fixed-refresh (non-ProMotion) devices render glass with the shipped
-        // solid-fill fallback while a generation is active; see
-        // IOSGenerationPerformanceGateKey.
-        .environment(
-            \.iosGenerationPerformanceGate,
-            IOSDisplayCapability.isFixedRefreshDisplay && performanceGate.isActive
-        )
         // The dock is the only persistent bottom chrome. Playback is
         // presented inline in Studio or through IOSPlayerSheet.
         .safeAreaInset(edge: .bottom, spacing: 0) {
@@ -151,6 +142,20 @@ struct RootView: View {
             .presentationCornerRadius(28)
             .presentationBackground(Color(red: 13 / 255, green: 14 / 255, blue: 18 / 255).opacity(0.96))
         }
+        // Outermost on purpose (IUI-5 X3): environment set here reaches the
+        // tab screens AND every presentation attached above — sheets, covers,
+        // the bottom-panel overlays, the toast, and the dock. These modifiers
+        // previously sat inside the chain, so all of that chrome read the
+        // DEFAULT reduce-motion/transparency/performance-gate values.
+        .environment(\.iosReduceMotionEnabled, effectiveReduceMotion)
+        .environment(\.iosReduceTransparencyEnabled, effectiveReduceTransparency)
+        // Fixed-refresh (non-ProMotion) devices render glass with the shipped
+        // solid-fill fallback while a generation is active; see
+        // IOSGenerationPerformanceGateKey.
+        .environment(
+            \.iosGenerationPerformanceGate,
+            IOSDisplayCapability.isFixedRefreshDisplay && performanceGate.isActive
+        )
     }
 
     // MARK: - Tab routing

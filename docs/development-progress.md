@@ -65,11 +65,15 @@ review confirmed P2/P3 clean and caught the P4 keep-alive inline-player
 major (invisible audio + display-link leak after tab switch) before device
 time; smoke passed on both the pre-fix and fixed builds
 (`ios-xcui-smoke-20260813-182434-cb1e0832`,
-`…-183632-cbbd2bb7`). **Resume here: the rest of IUI-5 is desk work —
-P6/P7/P11, X3/X6, and the approved design groups (D1–D5, D7, D8, D10, and
-the X4+D9 Dynamic Type program; D6 landed) — then the counted five-run
-before/after measurement plus a smoke at the next phone window closes the
-wave.**
+`…-183632-cbbd2bb7`). Sub-wave B followed the same day at the desk: P6
+catalog memo, P7 scroll-indicator task churn, X3 root environment moved
+outermost (all bottom chrome and presentations now honor reduce-motion,
+reduce-transparency, and the generation glass gate), X6 VoiceOver-adjustable
+inline scrub; P11 deferred with its recorded downgrade reason; two review
+minors fixed in-change. **Resume here: the rest of IUI-5 is the design
+work — D1–D5, D7, D8 one-liners, the X4+D9 Dynamic Type program, and D10
+theme unification — then the counted five-run before/after measurement plus
+a wave-level smoke at the next phone window closes the wave.**
 
 **IUI-1 + IUI-2 closed — iOS frame-health instrument live with a measured
 baseline (2026-08-12, phone window):** the acceptance run

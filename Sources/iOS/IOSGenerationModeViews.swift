@@ -1392,8 +1392,17 @@ struct IOSVoiceCloningView: View {
     /// Emotion reference banks group by naming convention alone
     /// ("<Persona>" + "<Persona> (<Emotion>)"); the delivery chip swaps
     /// between members through the ordinary saved-voice apply path.
+    /// Cached (IUI-5 P6): this was rebuilt at every access — several times
+    /// per composer body evaluation. Sorted the same way the Voices list
+    /// sorts its input so both mounted clients share one cache key (a
+    /// freshly loaded, unsorted voices array would otherwise thrash the
+    /// single-entry memo every alternating body evaluation); grouping is
+    /// name-keyed, so input order doesn't change what is built.
     private var bankCatalog: VoiceBankCatalog {
-        VoiceBankCatalog.build(voices: savedVoices.map { (id: $0.id, name: $0.name) })
+        let sorted = savedVoices.sorted {
+            $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+        }
+        return IOSVoiceBankCatalogCache.catalog(for: sorted.map { (id: $0.id, name: $0.name) })
     }
 
     private var selectedBankPersona: VoiceBankCatalog.Persona? {

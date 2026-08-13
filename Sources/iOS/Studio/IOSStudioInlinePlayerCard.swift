@@ -441,6 +441,31 @@ struct InlineWaveformProgressRow: View {
                 .contentShape(Rectangle())
                 .gesture(scrubGesture(width: proxy.size.width), isEnabled: scrubEnabled)
                 .onTapGesture { onExpand?() }
+                // VoiceOver (IUI-5 X6): the drag scrub is unreachable by
+                // switch/VoiceOver users — the sheet scrubber's adjustable
+                // pattern, 5% steps; disabled while streaming like the drag.
+                .accessibilityElement()
+                .accessibilityLabel("Playback position")
+                .accessibilityValue(controller.formatted(time: controller.currentTime))
+                .accessibilityIdentifier("studio_inlinePlayer_scrubber")
+                // Explicit activate: don't rely on SwiftUI synthesizing the
+                // default action from the tap gesture on a collapsed element.
+                .accessibilityAction { onExpand?() }
+                .accessibilityAdjustableAction { direction in
+                    guard scrubEnabled else { return }
+                    // Step from the position currently shown BEFORE dropping
+                    // the morph hold — displayedPlayhead collapses to the
+                    // (lower) real playhead once holdFloor clears, and an
+                    // up-swipe must never move the bar backward.
+                    let current = displayedPlayhead
+                    holdFloor = 0
+                    let step = 0.05
+                    switch direction {
+                    case .increment: controller.scrub(to: min(1, current + step))
+                    case .decrement: controller.scrub(to: max(0, current - step))
+                    @unknown default: break
+                    }
+                }
             }
             .frame(height: 36)
             .onChange(of: isStreaming) { _, streaming in

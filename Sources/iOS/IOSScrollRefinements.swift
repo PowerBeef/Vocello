@@ -65,11 +65,24 @@ private struct IOSScrollMetrics: Equatable {
 /// comes from `.onScrollGeometryChange` (delegate-free), so SwiftUI keeps its scroll
 /// delegate.
 private struct IOSSubtleScrollIndicator: ViewModifier {
+    /// Deadline holder outside SwiftUI state (IUI-5 P7): scroll geometry
+    /// events arrive per frame while scrolling, and the previous
+    /// implementation cancelled + spawned a fresh hide `Task` per event.
+    /// Mutating this box does not invalidate the view; one task per
+    /// visibility burst sleeps until the extending deadline passes. (Like
+    /// the task it replaces, that task is not cancelled on view teardown —
+    /// it dies ≤1 s later writing into detached state, which is inert.)
+    @MainActor
+    private final class HideScheduler {
+        var lastEvent: ContinuousClock.Instant = .now
+        var task: Task<Void, Never>?
+    }
+
     @Environment(\.iosReduceMotionEnabled) private var reduceMotion
 
     @State private var metrics = IOSScrollMetrics()
     @State private var isVisible = false
-    @State private var hideTask: Task<Void, Never>?
+    @State private var scheduler = HideScheduler()
 
     func body(content: Content) -> some View {
         content
@@ -116,10 +129,19 @@ private struct IOSSubtleScrollIndicator: ViewModifier {
     }
 
     private func flash() {
-        isVisible = true
-        hideTask?.cancel()
-        hideTask = Task { @MainActor in
-            try? await Task.sleep(for: .seconds(1.0))
+        scheduler.lastEvent = .now
+        if !isVisible {
+            isVisible = true
+        }
+        guard scheduler.task == nil else { return }
+        let scheduler = scheduler
+        scheduler.task = Task { @MainActor in
+            while !Task.isCancelled {
+                let deadline = scheduler.lastEvent.advanced(by: .seconds(1.0))
+                if ContinuousClock.now >= deadline { break }
+                try? await Task.sleep(until: deadline, clock: .continuous)
+            }
+            scheduler.task = nil
             guard !Task.isCancelled else { return }
             isVisible = false
         }

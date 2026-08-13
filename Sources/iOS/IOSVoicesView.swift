@@ -43,12 +43,14 @@ struct IOSVoicesView: View {
 
     /// Bank membership by naming convention; every voice stays listed (each
     /// member has its own preview-worthy reference clip) — the caption just
-    /// tells the truth about which rows are one persona.
+    /// tells the truth about which rows are one persona. Cached (IUI-5 P6):
+    /// the catalog was previously rebuilt per saved-voice row, O(n²) as the
+    /// library grows.
     private var bankCatalog: VoiceBankCatalog {
-        VoiceBankCatalog.build(voices: saved.map { (id: $0.id, name: $0.name) })
+        IOSVoiceBankCatalogCache.catalog(for: saved.map { (id: $0.id, name: $0.name) })
     }
 
-    private func savedRowCaption(_ voice: Voice) -> String {
+    private func savedRowCaption(_ voice: Voice, bankCatalog: VoiceBankCatalog) -> String {
         guard let persona = bankCatalog.persona(containing: voice.id) else {
             return "Cloned reference"
         }
@@ -89,12 +91,16 @@ struct IOSVoicesView: View {
                     )
 
                     if filter != .builtIn {
+                        // One catalog lookup per body, threaded into the rows
+                        // (IUI-5 P6) instead of one rebuild per row.
+                        let bankCatalog = self.bankCatalog
+
                         voicesSectionHeading("Your saved voices")
 
                         VStack(spacing: 0) {
                             LazyVStack(spacing: 0) {
                             ForEach(filteredSaved, id: \.id) { voice in
-                                savedRow(voice)
+                                savedRow(voice, bankCatalog: bankCatalog)
                             }
                             }
                             saveACallCard
@@ -293,7 +299,7 @@ struct IOSVoicesView: View {
         .accessibilityIdentifier("voicesRow_\(speaker.id)")
     }
 
-    private func savedRow(_ voice: Voice) -> some View {
+    private func savedRow(_ voice: Voice, bankCatalog: VoiceBankCatalog) -> some View {
         HStack(spacing: 12) {
             Button {
                 IOSHaptics.selection()
@@ -310,7 +316,7 @@ struct IOSVoicesView: View {
                         Text(voice.name)
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(IOSAppTheme.textPrimary)
-                        Text(savedRowCaption(voice))
+                        Text(savedRowCaption(voice, bankCatalog: bankCatalog))
                             .font(.caption)
                             .foregroundStyle(IOSAppTheme.textSecondary)
                     }
@@ -390,6 +396,30 @@ struct IOSVoicesView: View {
     private func presentPreview(_ item: IOSPlayerSheetItem) {
         IOSHaptics.selection()
         presentPlayerSheet(item)
+    }
+}
+
+// MARK: - Bank catalog cache
+
+/// Single-entry memo for `VoiceBankCatalog.build` (IUI-5 P6). The catalog is
+/// a pure function of the saved-voice (id, name) list; the Voices list and
+/// the Studio clone composer each rebuilt it multiple times per body
+/// evaluation. Key comparison is a flat string-array equality — cheap next
+/// to the build's grouping — and the cache is MainActor-isolated state.
+@MainActor
+enum IOSVoiceBankCatalogCache {
+    private static var cachedKey: [String] = []
+    private static var cached: VoiceBankCatalog?
+
+    static func catalog(for voices: [(id: String, name: String)]) -> VoiceBankCatalog {
+        let key = voices.flatMap { [$0.id, $0.name] }
+        if let cached, key == cachedKey {
+            return cached
+        }
+        let built = VoiceBankCatalog.build(voices: voices)
+        cachedKey = key
+        cached = built
+        return built
     }
 }
 

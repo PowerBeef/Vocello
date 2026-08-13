@@ -317,10 +317,57 @@ generation (bounded; Voices is P6's target), a speculative status-bar-tap
 Device evidence for the sub-wave: smoke PASS on the pre-fix core build
 (`ios-xcui-smoke-20260813-182434-cb1e0832`) and smoke PASS on the
 review-fixed build (`ios-xcui-smoke-20260813-183632-cbbd2bb7`), both
-journeys, same phone window as the IUI-4 close-out. Remaining wave-2 scope:
-P6, P7, P11, X3, X6, and the approved design groups (D1–D5, D7, D8, D10,
-Dynamic Type program X4+D9 — D6 landed here), then the counted before/after
-measurement.
+journeys, same phone window as the IUI-4 close-out.
+
+### Wave 2 sub-wave B — refinements P6/P7 + a11y X3/X6 (2026-08-13, landed)
+
+Desk-only (no device lane; wave-level smoke + measurement close the wave):
+
+- **P6** — `VoiceBankCatalog.build` behind a single-entry MainActor memo
+  (`IOSVoiceBankCatalogCache`), with the Voices list additionally hoisting
+  one catalog per body and threading it into the rows (was one rebuild per
+  saved-voice row, O(n²) as the library grows; the clone composer rebuilt it
+  several times per body). Both clients feed the same canonically sorted
+  key so the mounted-together tabs (P4) can't thrash the memo.
+- **P7** — the shared scroll indicator no longer cancels + spawns a hide
+  `Task` per scroll-geometry event: a non-invalidating deadline box plus one
+  task per visibility burst, with the visibility write guarded. The
+  bottom-fade mask was already conditional (`bottomFadeHeight: 0` skips it);
+  the full-screen shells' mask stays as the accepted visual contract.
+- **X3** — the three root environment values (reduce motion, reduce
+  transparency, generation performance gate) moved to the outermost end of
+  `RootView`'s chain: the toast, dock, bottom panels, delete sheet,
+  onboarding, recorder, and player sheet previously read the key *defaults*
+  because every presentation modifier sat outside the environment scope.
+  The review enumerated each newly covered surface and its solid-fill /
+  reduced-motion fallback; two root-level animations (app-switcher privacy
+  cover, focus backdrop) now correctly honor Reduce Motion as well. On the
+  canonical ProMotion iPhone the gate value is constant-false, so no visual
+  change there.
+- **X6** — the Studio inline waveform gains the sheet scrubber's
+  VoiceOver-adjustable pattern (5% steps, streaming-disabled like the drag,
+  explicit activate action for expand, `studio_inlinePlayer_scrubber`).
+- **P11 — deferred, recorded**: the installer `states` dict granularity
+  stays as-is. The finding was downgraded in IUI-3 (the upstream ~4 Hz
+  snapshot throttle already bounds re-diff cadence), the baseline had no
+  active download to measure, and per-row installer models are real surgery
+  for an unmeasured cost.
+
+Two-lens adversarial review (correctness + behavior-parity) confirmed all
+four mechanisms and found two minors, fixed in the same change: the
+VoiceOver increment could step *backward* during the live→complete morph
+hold (displayed position read after the hold was dropped), and the memo's
+two clients used different key orderings after a fresh disk load (unsorted
+enumeration order vs the localized sort), which would thrash the
+single-entry cache while both tabs sit mounted. Accepted notes: the hide
+task survives view teardown by ≤1 s writing into detached state (exact
+parity with the code it replaced), and the adjustable trait stays exposed
+(silently no-op) while streaming.
+
+Remaining wave-2 scope: the approved design groups — D1–D5, D7, D8 (D6
+landed with sub-wave A), the X4+D9 Dynamic Type program, and D10 theme
+unification — then the counted before/after measurement plus wave-level
+smoke at the next phone window.
 
 ## 60 Hz-tier posture
 

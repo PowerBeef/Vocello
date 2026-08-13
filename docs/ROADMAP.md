@@ -101,12 +101,12 @@ Narrative authority: [`docs/reference/ios-ui-refresh-2026-08.md`](reference/ios-
 | `IUI-2` | done | Frame-health baseline (1 warm-up + 5 counted runs) | `doc:docs/reference/ios-ui-refresh-2026-08.md`, `commit:c0dba9c` |
 | `IUI-3` | done | Audit-first review: four lenses + measurements into one ranked list + maintainer pick-list | `doc:docs/reference/ios-ui-refresh-2026-08.md` |
 | `IUI-4` | done | Wave 1: safe fixes with before/after measurement | `doc:docs/reference/ios-ui-refresh-2026-08.md`, `commit:2f76b8a` |
-| `IUI-5` | planned | Wave 2: refinements + re-engineering (macOS UI-5/UI-6 collapsed) | — |
+| `IUI-5` | in-flight | Wave 2: refinements + re-engineering (macOS UI-5/UI-6 collapsed) | `doc:docs/reference/ios-ui-refresh-2026-08.md` |
 | `IUI-6` | planned | Registry formalization: platform-aware ui-perf kind + warn-only ceilings | — |
 
 ### Open items in detail
 
-- **`IUI-5`** (planned) — Wave 2: refinements + re-engineering (macOS UI-5/UI-6 collapsed).
+- **`IUI-5`** (in-flight) — Wave 2: refinements + re-engineering (macOS UI-5/UI-6 collapsed).
   gate: The store-observation port (RootView whole-store body observation -> iOS TTSEngineStore @Observable migration or a flip-scoped gate model), IOSPlayerSheetController @Observable migration + karaoke per-tick scoping, plus whatever re-engineering the IUI-3 pick-list approved (theme-namespace unification is design-scope, lands only if picked). Split into two sub-waves only if the findings justify it. GATE: landed after maintainer go with measured before/after deltas on the touched scenarios recorded in the authority doc.
 
 - **`IUI-6`** (planned) — Registry formalization: platform-aware ui-perf kind + warn-only ceilings.

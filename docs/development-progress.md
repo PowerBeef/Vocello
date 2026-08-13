@@ -52,13 +52,24 @@ Against the IUI-2 baseline: the P1 target moved (sheet-present worst gap
 settings scroll −9% hitch, tab-navigation worst gap −12%; history scroll was
 an honest null (flat within IQR — the remaining row cost is wave-2 P2
 scope); exploratory scenarios stayed within their designated variance. Full
-table and reading in `docs/reference/ios-ui-refresh-2026-08.md`. **Resume
-here: IUI-5 wave 2, desk authoring first — core re-engineering P2 (root-shell
-flip-scoped gate + `TTSEngineStore` observation port), P3 (sheet-controller
-scoping + karaoke per-tick cost), P4 (stable tab identity), P6/P7/P11,
-X3/X6, plus the approved design picks (D1–D10, Dynamic Type program X4+D9,
-theme unification D10); measured deltas per sub-wave at the next phone
-window.**
+table and reading in `docs/reference/ios-ui-refresh-2026-08.md`.
+
+**Same day, continued: IUI-5 sub-wave A landed (2026-08-13, second phone
+window).** The three core re-engineering mechanisms are in: P2 (flip-scoped
+`IOSGenerationPerformanceGateModel`; `RootView` fully non-observing), P4
+(stable-identity tab container — visited tabs keep their state; the new
+`\.iosTabIsActive` environment replaces remount-teardown semantics), P3
+(player per-tick publication split into a playback clock and a
+boundary-rate karaoke clock), plus design pick D6. The two-lens adversarial
+review confirmed P2/P3 clean and caught the P4 keep-alive inline-player
+major (invisible audio + display-link leak after tab switch) before device
+time; smoke passed on both the pre-fix and fixed builds
+(`ios-xcui-smoke-20260813-182434-cb1e0832`,
+`…-183632-cbbd2bb7`). **Resume here: the rest of IUI-5 is desk work —
+P6/P7/P11, X3/X6, and the approved design groups (D1–D5, D7, D8, D10, and
+the X4+D9 Dynamic Type program; D6 landed) — then the counted five-run
+before/after measurement plus a smoke at the next phone window closes the
+wave.**
 
 **IUI-1 + IUI-2 closed — iOS frame-health instrument live with a measured
 baseline (2026-08-12, phone window):** the acceptance run

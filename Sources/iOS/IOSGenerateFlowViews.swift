@@ -9,7 +9,7 @@ struct IOSGenerateContainerView: View {
     private let selectorRailHeight: CGFloat = 44
 
     @Binding var selectedTab: IOSAppTab
-    let isTabActive: Bool
+    @Environment(\.iosTabIsActive) private var isTabActive
     @Binding var selectedSection: IOSGenerationSection
     @Binding var customVoiceDraft: CustomVoiceDraft
     @Binding var voiceDesignDraft: VoiceDesignDraft
@@ -72,13 +72,16 @@ struct IOSGenerateContainerView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
-        .task {
+        .task(id: isTabActive) {
             // Model availability refresh, re-homed from the deleted prefetch
             // coordinator (IUI-4 P8): the proactive-prefetch policy has been
             // hard-disabled since it shipped, but its coordinator kept ten
             // onChange handlers and two whole-store subscriptions wired, so
             // every composer keystroke and every engine progress publish
-            // re-ran dead diffing.
+            // re-ran dead diffing. Keyed on the tab-active flag (IUI-5 P4):
+            // the stable-identity container no longer remounts this screen per
+            // visit, so re-fire the refresh on each return to the tab instead.
+            guard isTabActive else { return }
             await modelManager.refresh()
         }
     }

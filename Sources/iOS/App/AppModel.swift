@@ -204,6 +204,6 @@ final class AppModel {
     }
 }
 
-// Injection: `WindowGroup { RootView().environment(appModel) }` at the
-// app entry. Consumers read with `@Environment(AppModel.self) private
-// var appModel` — no key-path environment value needed.
+// Injection: `RootView(ttsEngine:).environment(appModel)` inside
+// `QVoiceiOSRootView`. Consumers read with `@Environment(AppModel.self)
+// private var appModel` — no key-path environment value needed.

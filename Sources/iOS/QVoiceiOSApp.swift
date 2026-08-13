@@ -57,7 +57,7 @@ struct QVoiceiOSApp: App {
                     .padding()
                 } else if let modelRegistry = deps.registry, let engine = deps.engine, let manager = deps.modelManager, let installer = deps.modelInstaller {
                     if IOSDeviceSupport.isSupportedHardware {
-                        QVoiceiOSRootView(modelRegistry: modelRegistry)
+                        QVoiceiOSRootView(modelRegistry: modelRegistry, ttsEngine: engine)
                             .environmentObject(engine)
                             .environmentObject(audioPlayer)
                             .environmentObject(audioPlayer.playbackProgress)

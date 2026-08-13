@@ -16,13 +16,30 @@ import QwenVoiceCore
 /// directly — the legacy per-tab container indirection is gone
 /// (AppModel migration Phases 2–6, see `AppModel`'s type comment).
 struct RootView: View {
+    /// Non-observing reference (IUI-5 P2): the root shell must not subscribe
+    /// to the whole store — per-publish invalidation here re-diffs every
+    /// mounted NavigationStack. Descendants that need engine state observe it
+    /// themselves via the injected `environmentObject`.
+    let ttsEngine: TTSEngineStore
+
     @Environment(AppModel.self) private var appModel
-    @EnvironmentObject private var ttsEngine: TTSEngineStore
+    @StateObject private var performanceGate: IOSGenerationPerformanceGateModel
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     @Environment(\.accessibilityReduceTransparency) private var systemReduceTransparency
     @AppStorage(IOSAppDefaults.reduceMotionEnabledKey) private var appReduceMotion = false
     @AppStorage(IOSAppDefaults.reduceTransparencyEnabledKey) private var appReduceTransparency = false
+    /// Tabs the user has visited. A visited tab stays mounted (IUI-5 P4) so
+    /// its search/filter/scroll `@State` and navigation path survive tab
+    /// switches; never-visited tabs cost nothing.
+    @State private var mountedTabs: Set<IOSAppTab> = []
+
+    init(ttsEngine: TTSEngineStore) {
+        self.ttsEngine = ttsEngine
+        _performanceGate = StateObject(
+            wrappedValue: IOSGenerationPerformanceGateModel(store: ttsEngine)
+        )
+    }
 
     var body: some View {
         @Bindable var appModel = appModel
@@ -59,8 +76,7 @@ struct RootView: View {
         // IOSGenerationPerformanceGateKey.
         .environment(
             \.iosGenerationPerformanceGate,
-            IOSDisplayCapability.isFixedRefreshDisplay
-                && (ttsEngine.hasActiveGeneration || ttsEngine.hasSustainedPerformanceActivity)
+            IOSDisplayCapability.isFixedRefreshDisplay && performanceGate.isActive
         )
         // The dock is the only persistent bottom chrome. Playback is
         // presented inline in Studio or through IOSPlayerSheet.
@@ -139,34 +155,57 @@ struct RootView: View {
 
     // MARK: - Tab routing
 
+    /// Stable-identity tab container (IUI-5 P4). The legacy `switch` gave
+    /// each tab a distinct structural identity, so every switch destroyed the
+    /// outgoing screen's `@State` (search text, filters, scroll position,
+    /// navigation path) and paid a full remount of the incoming one — the
+    /// baseline's highly repeatable 76.5 ms/s tab-navigation cost. Every
+    /// visited tab now keeps one stable position in a ZStack; the inactive
+    /// ones are fully transparent, untouchable, and invisible to VoiceOver.
     @ViewBuilder
     private var activeScreen: some View {
-        @Bindable var appModel = appModel
+        ZStack {
+            tabScreen(.studio)
+            tabScreen(.voices)
+            tabScreen(.history)
+            tabScreen(.settings)
+        }
+        .onAppear {
+            mountedTabs.insert(appModel.tab)
+        }
+        .onChange(of: appModel.tab) { _, newTab in
+            mountedTabs.insert(newTab)
+            // The switch-remount used to tear the keyboard down with the
+            // outgoing screen; a kept-alive screen would leave it floating
+            // over the new tab, so resign focus explicitly.
+            UIApplication.shared.sendAction(
+                #selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil
+            )
+        }
+    }
 
-        switch appModel.tab {
-        case .studio:
-            NavigationStack {
-                StudioScreen()
+    @ViewBuilder
+    private func tabScreen(_ tab: IOSAppTab) -> some View {
+        let isActive = appModel.tab == tab
+        if isActive || mountedTabs.contains(tab) {
+            Group {
+                switch tab {
+                case .studio:
+                    NavigationStack { StudioScreen() }
+                case .voices:
+                    NavigationStack { VoicesScreen() }
+                case .history:
+                    NavigationStack { HistoryScreen() }
+                case .settings:
+                    NavigationStack { SettingsScreen() }
+                }
             }
             .toolbar(.hidden, for: .navigationBar)
-
-        case .voices:
-            NavigationStack {
-                VoicesScreen()
-            }
-            .toolbar(.hidden, for: .navigationBar)
-
-        case .history:
-            NavigationStack {
-                HistoryScreen()
-            }
-            .toolbar(.hidden, for: .navigationBar)
-
-        case .settings:
-            NavigationStack {
-                SettingsScreen()
-            }
-            .toolbar(.hidden, for: .navigationBar)
+            .opacity(isActive ? 1 : 0)
+            .allowsHitTesting(isActive)
+            .accessibilityHidden(!isActive)
+            .zIndex(isActive ? 1 : 0)
+            .environment(\.iosTabIsActive, isActive)
         }
     }
 
@@ -268,6 +307,23 @@ private struct IOSAppSwitcherPrivacyCover: View {
         }
         .allowsHitTesting(false)
         .accessibilityHidden(true)
+    }
+}
+
+/// Whether the enclosing tab is the active (visible) one. Under the
+/// stable-identity tab container (IUI-5 P4) a visited tab stays mounted, so
+/// `.onDisappear` no longer fires on tab switches — screen content that used
+/// to rely on remount/teardown semantics (stopping playback, per-visit
+/// refreshes) keys off this value instead. Defaults to `true` so presentations
+/// outside the tab container (sheets, covers) are unaffected.
+struct IOSTabActiveKey: EnvironmentKey {
+    static let defaultValue = true
+}
+
+extension EnvironmentValues {
+    var iosTabIsActive: Bool {
+        get { self[IOSTabActiveKey.self] }
+        set { self[IOSTabActiveKey.self] = newValue }
     }
 }
 

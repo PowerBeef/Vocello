@@ -263,6 +263,65 @@ Verdict: wave 1 closes with both compiles green, smoke green, five counted
 nominal runs, targeted improvements on three confirmatory scenarios plus two
 worst-gap reductions, and no confirmatory regression outside IQR noise.
 
+### Wave 2 sub-wave A — core re-engineering (2026-08-13, landed)
+
+The three audited core mechanisms (P2, P3, P4) plus design pick D6, authored
+and device-smoked in one phone window; the counted five-run after-measurement
+waits for wave 2's remaining items so the scenarios are measured once per
+wave, not per sub-wave.
+
+- **P2 — root-shell observation scoping.** `RootView` no longer subscribes to
+  `TTSEngineStore` at all: a flip-scoped `IOSGenerationPerformanceGateModel`
+  (the direct port of the macOS W1-D gate model) feeds the fixed-refresh
+  glass gate from a new deduplicated `performanceActivityUpdates` publisher,
+  and the store reference threads App → shell → `RootView` as a plain
+  non-observing `let`. The root shell now invalidates at generation
+  start/stop instead of per engine publish.
+- **P4 — stable tab identity.** The `switch`-branch tab routing (which
+  destroyed each screen's search/filter/scroll `@State` and navigation path
+  on every switch) became a ZStack in which every *visited* tab keeps one
+  stable position; inactive tabs are transparent, hit-test-disabled, and
+  VoiceOver-hidden, and the keyboard is resigned explicitly on switch. A new
+  `\.iosTabIsActive` environment value replaces the teardown semantics that
+  screens previously inherited from remounting: the Studio inline player's
+  activation task is keyed on (phase, tab-active) — leaving the tab stops it
+  exactly as `.onDisappear` teardown did, a phase flip while hidden cannot
+  start its display link, returning re-adopts like a remount, and the
+  repeat-forever pulse pauses off-tab — and the Studio/Settings
+  model-availability refreshes re-fire per tab visit instead of once per
+  session (the dead hardcoded `isTabActive: true` parameter is gone).
+- **P3 — player sheet tick scoping.** The controller's per-tick `@Published
+  currentTime` is replaced by a non-published stored property feeding two
+  leaf-scoped observables: `IOSPlayerPlaybackClock` (per tick; observed only
+  by the waveform and scrub sections) and `IOSPlayerKaraokeClock`, which
+  publishes an `{activeIndex, playedCount}` highlight only when it changes
+  (word-boundary rate, ~2–4 Hz; the played set is provably a prefix because
+  the planner's span end times are non-decreasing). The karaoke
+  `AttributedString` now rebuilds when its output changes, not per
+  display-link tick; the Reduce Motion branch is fully static and observes
+  nothing. Design pick D6 rode along: pause fires the same selection haptic
+  as play.
+
+A two-lens adversarial review of the diff (interleaving-correctness +
+SwiftUI-semantics) confirmed P2/P3 clean and caught the P4 keep-alive
+consequences before device time: the corroborated-major inline-player defect
+(invisible audio + display-link leak after tab switch — the `.onDisappear`
+contract silently voided) and the mount-once refresh regressions, all fixed
+above. Accepted-with-notes, for the wave-2 measurement to observe: hidden
+History reloads per `generationSaved` (freshness preserved, cost moved
+off-visit), hidden Studio/Voices still re-render per store publish during
+generation (bounded; Voices is P6's target), a speculative status-bar-tap
+`scrollsToTop` eligibility question with multiple mounted scroll views
+(on-device check), and the karaoke clock's microsecond-scale O(N) walks.
+
+Device evidence for the sub-wave: smoke PASS on the pre-fix core build
+(`ios-xcui-smoke-20260813-182434-cb1e0832`) and smoke PASS on the
+review-fixed build (`ios-xcui-smoke-20260813-183632-cbbd2bb7`), both
+journeys, same phone window as the IUI-4 close-out. Remaining wave-2 scope:
+P6, P7, P11, X3, X6, and the approved design groups (D1–D5, D7, D8, D10,
+Dynamic Type program X4+D9 — D6 landed here), then the counted before/after
+measurement.
+
 ## 60 Hz-tier posture
 
 `iosGenerationPerformanceGate` engages only on fixed-refresh (60 Hz) devices, and

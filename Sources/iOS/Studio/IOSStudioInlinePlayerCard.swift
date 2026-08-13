@@ -66,6 +66,15 @@ struct IOSStudioPlayerCard: View {
     /// When provided (Voice Design), the completed card shows a "Save as voice" button.
     var onSaveAsVoice: (() -> Void)?
 
+    /// Identity for the activation task: phase drives adoption, and the
+    /// tab-active flag makes leaving/returning to the tab re-run it (the
+    /// stable-identity tab container no longer remounts this card per visit).
+    private struct CardActivation: Equatable {
+        var phaseKey: String
+        var isTabActive: Bool
+    }
+
+    @Environment(\.iosTabIsActive) private var isTabActive
     @State private var controller = IOSInlinePlaybackController()
     @State private var pulse = false
     @State private var showDismissConfirm = false
@@ -119,10 +128,36 @@ struct IOSStudioPlayerCard: View {
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(phase.accessibilityIdentifier)
         .transition(cardTransition)
-        .task(id: phase.taskKey) { await activateController() }
+        // Tab-scoped activation (IUI-5 P4 follow-up): the stable-identity tab
+        // container keeps a visited Studio mounted, so tab switches no longer
+        // fire `.onDisappear`. Folding the tab-active flag into the task
+        // identity restores the old contract exactly: leaving the tab stops
+        // this card the way teardown did (own player halted; shared-player
+        // mirroring stops without touching the shared player), a phase flip
+        // while hidden must NOT adopt or start the display link, and returning
+        // re-adopts the current phase the way a remount did.
+        .task(id: CardActivation(phaseKey: phase.taskKey, isTabActive: isTabActive)) {
+            if isTabActive {
+                await activateController()
+            } else {
+                controller.stop()
+            }
+        }
         .onAppear {
             guard !reduceMotion else { return }
             withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) { pulse = true }
+        }
+        // The repeat-forever pulse would keep animating the hidden subtree;
+        // pause it off-tab and restart on return.
+        .onChange(of: isTabActive) { _, active in
+            if active {
+                guard !reduceMotion else { return }
+                withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) { pulse = true }
+            } else {
+                var transaction = Transaction()
+                transaction.disablesAnimations = true
+                withTransaction(transaction) { pulse = false }
+            }
         }
         .onDisappear { controller.stop() }
         .confirmationDialog(

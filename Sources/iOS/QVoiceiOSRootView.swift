@@ -9,16 +9,20 @@ import QwenVoiceCore
 /// iOS is compile-safe only on `main` (see CLAUDE.md "What this is").
 struct QVoiceiOSRootView: View {
     let modelRegistry: ContractBackedModelRegistry
+    /// Passed through to `RootView` as a deliberately non-observing reference
+    /// (IUI-5 P2); this shell must not subscribe to the store either.
+    let ttsEngine: TTSEngineStore
 
     @State private var appModel: AppModel
 
-    init(modelRegistry: ContractBackedModelRegistry) {
+    init(modelRegistry: ContractBackedModelRegistry, ttsEngine: TTSEngineStore) {
         self.modelRegistry = modelRegistry
+        self.ttsEngine = ttsEngine
         _appModel = State(initialValue: AppModel(modelRegistry: modelRegistry))
     }
 
     var body: some View {
-        RootView()
+        RootView(ttsEngine: ttsEngine)
             .environment(appModel)
     }
 }

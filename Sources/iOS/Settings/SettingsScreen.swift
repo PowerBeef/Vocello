@@ -19,6 +19,7 @@ struct SettingsScreen: View {
     @EnvironmentObject private var modelManager: ModelManagerViewModel
     @EnvironmentObject private var modelInstaller: IOSModelInstallerViewModel
     @Environment(\.openURL) private var openURL
+    @Environment(\.iosTabIsActive) private var isTabActive
 
     @AppStorage("autoPlay") private var autoPlay = true
     @AppStorage("vocello.voiceCloningConsent.v1") private var cloneConsentAcknowledged = false
@@ -191,7 +192,12 @@ struct SettingsScreen: View {
             }
         }
         .toolbar(.hidden, for: .navigationBar)
-        .task {
+        // Keyed on the tab-active flag (IUI-5 P4): the stable-identity tab
+        // container no longer remounts Settings per visit, so re-fire the
+        // model refresh on each return — the visible readiness rows here are
+        // the state the device lanes assert before generation.
+        .task(id: isTabActive) {
+            guard isTabActive else { return }
             await modelManager.refresh()
         }
         .confirmationDialog(

@@ -49,6 +49,16 @@ final class TTSEngineStore: ObservableObject, TTSEngine {
     @Published private(set) var hasSustainedPerformanceActivity = false
     @Published private(set) var engineLifecycleState: EngineLifecycleState = .idle
 
+    /// Combined performance-activity signal for the flip-scoped root-shell
+    /// gate model (IUI-5 P2, mirroring the macOS `performanceActivityUpdates`).
+    /// Emits the new value on every underlying publish; subscribers dedupe.
+    var performanceActivityUpdates: AnyPublisher<Bool, Never> {
+        $hasActiveGeneration
+            .combineLatest($hasSustainedPerformanceActivity)
+            .map { $0 || $1 }
+            .eraseToAnyPublisher()
+    }
+
     let modelRegistry: any ModelRegistry
     let supportsSavedVoiceMutation: Bool
     let supportsModelManagementMutation: Bool

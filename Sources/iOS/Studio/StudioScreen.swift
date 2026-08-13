@@ -38,7 +38,6 @@ struct StudioScreen: View {
 
         IOSGenerateContainerView(
             selectedTab: $appModel.tab,
-            isTabActive: true,
             selectedSection: $appModel.studioMode,
             customVoiceDraft: $appModel.customVoiceDraft,
             voiceDesignDraft: $appModel.voiceDesignDraft,

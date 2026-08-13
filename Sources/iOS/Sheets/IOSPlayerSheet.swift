@@ -189,17 +189,14 @@ struct IOSPlayerSheet: View {
     /// <BigWaveform bars={42} />`. Was 38 bars at 72pt — too small to
     /// read as the "art" of the player sheet.
     private var waveform: some View {
-        IOSWaveformBars(
+        IOSPlayerWaveformSection(
+            clock: controller.clock,
             seed: item.waveformSeed,
-            barCount: 42,
             tint: item.modeTint,
-            progress: controller.progress,
+            duration: controller.duration,
             // Honor Reduce Motion (CLAUDE.md): freeze the perpetual waveform when on.
-            isAnimating: controller.isPlaying && !reduceMotion,
-            unplayedColor: Color.white.opacity(0.14),
-            style: .big
+            isAnimating: controller.isPlaying && !reduceMotion
         )
-        .frame(height: 96)
     }
 
     // MARK: - Scrubber
@@ -209,77 +206,12 @@ struct IOSPlayerSheet: View {
     /// previous version showed only "0:00 / 0:00" labels and made
     /// scrubbing depend on dragging the waveform — undiscoverable.
     private var scrubber: some View {
-        VStack(spacing: 8) {
-            GeometryReader { geo in
-                let width = geo.size.width
-                let progress = CGFloat(controller.progress)
-                let thumbX = max(0, min(width, width * progress))
-
-                ZStack(alignment: .leading) {
-                    // Track
-                    Capsule(style: .continuous)
-                        .fill(Color.white.opacity(0.10))
-                        .frame(height: 4)
-
-                    // Fill
-                    Capsule(style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    item.modeTint.mix(with: .black, by: 0.20, in: .perceptual),
-                                    item.modeTint,
-                                ],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
-                        .frame(width: thumbX, height: 4)
-
-                    // Thumb
-                    Circle()
-                        .fill(Color.white)
-                        .frame(width: 16, height: 16)
-                        .overlay {
-                            Circle().stroke(item.modeTint, lineWidth: 2)
-                        }
-                        .shadow(color: .black.opacity(0.25), radius: 3, x: 0, y: 2)
-                        .offset(x: thumbX - 8)
-                }
-                .frame(height: 24)
-                .contentShape(Rectangle())
-                .gesture(
-                    DragGesture(minimumDistance: 0)
-                        .onChanged { value in
-                            let ratio = max(0, min(1, value.location.x / width))
-                            controller.scrub(to: ratio)
-                        }
-                )
-                // VoiceOver: a draggable thumb is unreachable; expose it as an
-                // adjustable element so swipe-up/down scrubs in 5% steps.
-                .accessibilityElement()
-                .accessibilityLabel("Playback position")
-                .accessibilityValue(controller.formatted(time: controller.currentTime))
-                .accessibilityIdentifier("iosPlayer_scrubber")
-                .accessibilityAdjustableAction { direction in
-                    let step = 0.05
-                    switch direction {
-                    case .increment: controller.scrub(to: min(1, controller.progress + step))
-                    case .decrement: controller.scrub(to: max(0, controller.progress - step))
-                    @unknown default: break
-                    }
-                }
-            }
-            .frame(height: 24)
-
-            HStack {
-                Text(controller.formatted(time: controller.currentTime))
-                Spacer()
-                Text(controller.formatted(time: controller.duration))
-            }
-            .font(.system(.caption, design: .monospaced).monospacedDigit())
-            .fontWeight(.medium)
-            .foregroundStyle(IOSAppTheme.textSecondary)
-        }
+        IOSPlayerScrubSection(
+            clock: controller.clock,
+            controller: controller,
+            duration: controller.duration,
+            tint: item.modeTint
+        )
     }
 
     // MARK: - Transcript
@@ -290,14 +222,24 @@ struct IOSPlayerSheet: View {
     /// like the design — the player sheet itself is the surface.
     private var transcript: some View {
         IOSScrollView(bottomFadeHeight: 0) {
-            IOSPlayerKaraokeText(
-                spans: controller.spans,
-                currentTime: controller.currentTime,
-                tint: item.modeTint,
-                isPlaying: controller.isPlaying,
-                reduceMotion: reduceMotion,
-                alignment: .center
-            )
+            Group {
+                if reduceMotion {
+                    // Static prose; no highlighting and no clock observation.
+                    IOSPlayerKaraokeText(
+                        spans: controller.spans,
+                        highlight: nil,
+                        tint: item.modeTint,
+                        alignment: .center
+                    )
+                } else {
+                    IOSPlayerKaraokeLive(
+                        karaokeClock: controller.karaokeClock,
+                        spans: controller.spans,
+                        tint: item.modeTint,
+                        alignment: .center
+                    )
+                }
+            }
             .frame(maxWidth: .infinity)
             // VoiceOver: read the transcript as one prose element (the karaoke
             // spans are visual-only highlighting, not separate semantics).
@@ -514,12 +456,15 @@ extension EnvironmentValues {
 
 // MARK: - Karaoke renderer
 
+/// Index-driven karaoke renderer (IUI-5 P3). The transcript's
+/// `AttributedString` is a function of the *highlight state* (active word +
+/// played prefix), which changes at word-boundary rate (~2–4 Hz) — never of
+/// the raw playback time, which changes per display-link tick. `highlight`
+/// is nil for the static Reduce Motion presentation.
 struct IOSPlayerKaraokeText: View {
     let spans: [IOSWordSpan]
-    let currentTime: TimeInterval
+    let highlight: IOSKaraokeHighlight?
     let tint: Color
-    let isPlaying: Bool
-    let reduceMotion: Bool
     var alignment: TextAlignment = .leading
 
     var body: some View {
@@ -533,24 +478,157 @@ struct IOSPlayerKaraokeText: View {
 
     private var attributedTranscript: AttributedString {
         var attributed = AttributedString()
-        let activeIndex = reduceMotion ? nil : IOSWordTimingPlanner.activeIndex(in: spans, at: currentTime)
         for (i, span) in spans.enumerated() {
             var run = AttributedString(span.text)
             if span.isWhitespace {
                 run.foregroundColor = IOSAppTheme.textPrimary
-            } else if reduceMotion {
-                run.foregroundColor = IOSAppTheme.textPrimary
-            } else if i == activeIndex {
-                run.foregroundColor = tint
-                run.font = .system(size: 17, weight: .semibold)
-            } else if span.end <= currentTime {
-                run.foregroundColor = IOSAppTheme.textPrimary
+            } else if let highlight {
+                if i == highlight.activeIndex {
+                    run.foregroundColor = tint
+                    run.font = .system(size: 17, weight: .semibold)
+                } else if i < highlight.playedCount {
+                    run.foregroundColor = IOSAppTheme.textPrimary
+                } else {
+                    run.foregroundColor = IOSAppTheme.textTertiary
+                }
             } else {
-                run.foregroundColor = IOSAppTheme.textTertiary
+                run.foregroundColor = IOSAppTheme.textPrimary
             }
             attributed.append(run)
         }
         return attributed
+    }
+}
+
+/// Observes the boundary-rate karaoke clock so only this leaf re-renders as
+/// the highlight advances; the sheet body and scroll container stay still.
+private struct IOSPlayerKaraokeLive: View {
+    @ObservedObject var karaokeClock: IOSPlayerKaraokeClock
+    let spans: [IOSWordSpan]
+    let tint: Color
+    var alignment: TextAlignment = .leading
+
+    var body: some View {
+        IOSPlayerKaraokeText(
+            spans: spans,
+            highlight: karaokeClock.highlight,
+            tint: tint,
+            alignment: alignment
+        )
+    }
+}
+
+// MARK: - Per-tick leaf sections (IUI-5 P3)
+
+/// The waveform fill is the one upper-region element that moves every frame;
+/// it observes the playback clock directly so ticks stop invalidating the
+/// whole sheet body.
+private struct IOSPlayerWaveformSection: View {
+    @ObservedObject var clock: IOSPlayerPlaybackClock
+    let seed: Int
+    let tint: Color
+    let duration: TimeInterval
+    let isAnimating: Bool
+
+    var body: some View {
+        IOSWaveformBars(
+            seed: seed,
+            barCount: 42,
+            tint: tint,
+            progress: duration > 0 ? min(1, max(0, clock.currentTime / duration)) : 0,
+            isAnimating: isAnimating,
+            unplayedColor: Color.white.opacity(0.14),
+            style: .big
+        )
+        .frame(height: 96)
+    }
+}
+
+/// Scrub track + thumb + time labels: the other per-frame region. Holds the
+/// controller as a plain (non-observing) reference for actions; duration
+/// arrives as a value from the observing parent.
+private struct IOSPlayerScrubSection: View {
+    @ObservedObject var clock: IOSPlayerPlaybackClock
+    let controller: IOSPlayerSheetController
+    let duration: TimeInterval
+    let tint: Color
+
+    private var progress: Double {
+        guard duration > 0 else { return 0 }
+        return min(1.0, max(0.0, clock.currentTime / duration))
+    }
+
+    var body: some View {
+        VStack(spacing: 8) {
+            GeometryReader { geo in
+                let width = geo.size.width
+                let thumbX = max(0, min(width, width * CGFloat(progress)))
+
+                ZStack(alignment: .leading) {
+                    // Track
+                    Capsule(style: .continuous)
+                        .fill(Color.white.opacity(0.10))
+                        .frame(height: 4)
+
+                    // Fill
+                    Capsule(style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    tint.mix(with: .black, by: 0.20, in: .perceptual),
+                                    tint,
+                                ],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .frame(width: thumbX, height: 4)
+
+                    // Thumb
+                    Circle()
+                        .fill(Color.white)
+                        .frame(width: 16, height: 16)
+                        .overlay {
+                            Circle().stroke(tint, lineWidth: 2)
+                        }
+                        .shadow(color: .black.opacity(0.25), radius: 3, x: 0, y: 2)
+                        .offset(x: thumbX - 8)
+                }
+                .frame(height: 24)
+                .contentShape(Rectangle())
+                .gesture(
+                    DragGesture(minimumDistance: 0)
+                        .onChanged { value in
+                            let ratio = max(0, min(1, value.location.x / width))
+                            controller.scrub(to: ratio)
+                        }
+                )
+                // VoiceOver: a draggable thumb is unreachable; expose it as an
+                // adjustable element so swipe-up/down scrubs in 5% steps.
+                .accessibilityElement()
+                .accessibilityLabel("Playback position")
+                .accessibilityValue(controller.formatted(time: clock.currentTime))
+                .accessibilityIdentifier("iosPlayer_scrubber")
+                .accessibilityAdjustableAction { direction in
+                    let step = 0.05
+                    switch direction {
+                    case .increment: controller.scrub(to: min(1, progress + step))
+                    case .decrement: controller.scrub(to: max(0, progress - step))
+                    @unknown default: break
+                    }
+                }
+            }
+            .frame(height: 24)
+
+            HStack {
+                Text(controller.formatted(time: clock.currentTime))
+                Spacer()
+                Text(controller.formatted(time: duration))
+            }
+            .font(.system(.caption, design: .monospaced).monospacedDigit())
+            .fontWeight(.medium)
+            .foregroundStyle(IOSAppTheme.textSecondary)
+        }
     }
 }
 
@@ -620,12 +698,66 @@ private func iosPlayerDeactivateSession(ifCurrentEpoch epoch: Int?) {
 
 // MARK: - Controller
 
+/// Per-tick playback time, isolated from the sheet-level controller (IUI-5
+/// P3): only the leaf views that genuinely move every frame (waveform fill,
+/// scrub thumb, elapsed label) observe this clock, so the 20–60 Hz display
+/// link no longer invalidates the whole sheet body per tick.
+@MainActor
+final class IOSPlayerPlaybackClock: ObservableObject {
+    @Published fileprivate(set) var currentTime: TimeInterval = 0
+}
+
+/// Karaoke highlight state: the active word plus the played prefix (span end
+/// times are non-decreasing — `IOSWordTimingPlanner` distributes linearly and
+/// whitespace inherits the previous word's end — so the played set is always
+/// a prefix).
+struct IOSKaraokeHighlight: Equatable {
+    var activeIndex: Int?
+    var playedCount: Int
+}
+
+/// Publishes only when the visible highlighting changes (word boundaries,
+/// ~2–4 Hz), so the transcript rebuilds at the rate its output changes
+/// rather than per display-link tick.
+@MainActor
+final class IOSPlayerKaraokeClock: ObservableObject {
+    @Published fileprivate(set) var highlight = IOSKaraokeHighlight(activeIndex: nil, playedCount: 0)
+
+    fileprivate func update(spans: [IOSWordSpan], time: TimeInterval) {
+        let active = IOSWordTimingPlanner.activeIndex(in: spans, at: time)
+        var played = 0
+        for span in spans {
+            guard span.end <= time else { break }
+            played += 1
+        }
+        let next = IOSKaraokeHighlight(activeIndex: active, playedCount: played)
+        if next != highlight {
+            highlight = next
+        }
+    }
+}
+
 @MainActor
 final class IOSPlayerSheetController: NSObject, ObservableObject {
     @Published private(set) var isPlaying: Bool = false
-    @Published private(set) var currentTime: TimeInterval = 0
     @Published private(set) var duration: TimeInterval = 0
-    @Published private(set) var spans: [IOSWordSpan] = []
+    @Published private(set) var spans: [IOSWordSpan] = [] {
+        didSet { karaokeClock.update(spans: spans, time: currentTime) }
+    }
+
+    /// Deliberately NOT `@Published` (IUI-5 P3): per-tick publication through
+    /// this sheet-level object was the whole-body invalidation the baseline
+    /// measured at 106.5 ms/s during scrub. Per-frame consumers observe
+    /// `clock`; boundary-rate consumers observe `karaokeClock`.
+    private(set) var currentTime: TimeInterval = 0 {
+        didSet {
+            clock.currentTime = currentTime
+            karaokeClock.update(spans: spans, time: currentTime)
+        }
+    }
+
+    let clock = IOSPlayerPlaybackClock()
+    let karaokeClock = IOSPlayerKaraokeClock()
 
     private var player: AVAudioPlayer?
     private var displayLink: CADisplayLink?
@@ -692,6 +824,9 @@ final class IOSPlayerSheetController: NSObject, ObservableObject {
         player?.pause()
         isPlaying = false
         stopDisplayLink()
+        // Design pick D6: play and pause are the same class of transport action;
+        // the haptic fires on both (it previously marked only play/autoplay).
+        IOSHaptics.selection()
     }
 
     func togglePlayback() {

@@ -6,7 +6,8 @@ import QwenVoiceCore
 /// Full-screen Player sheet from design_references/Vocello iOS/player.jsx.
 /// Renders a mode-tinted waveform + scrubber, a karaoke transcript that
 /// follows playback under linear word-timing (per the approved plan), and
-/// Save / Download / Dismiss actions.
+/// Share / Dismiss actions (a Save action appears only when the caller
+/// supplies a distinct handler).
 ///
 /// Self-contained: uses its own AVAudioPlayer so it doesn't compete with
 /// the engine's live-preview state machine. Caller hands in an
@@ -257,18 +258,29 @@ struct IOSPlayerSheet: View {
 
     private var controls: some View {
         HStack(spacing: 16) {
-            playerSideButton(
-                title: "Save",
-                symbol: "bookmark",
-                action: {
-                    if let onSave {
-                        onSave()
-                    } else {
-                        controller.shareCurrent()
-                    }
-                }
-            )
-            .accessibilityIdentifier("iosPlayer_save")
+            // Design pick D1: without a distinct save handler, "Save" and
+            // "Download" were two labels for the identical share action. The
+            // Save slot renders only when a caller provides a real handler
+            // (none does today); a clear placeholder keeps the row balanced.
+            if let onSave {
+                playerSideButton(
+                    title: "Save",
+                    symbol: "bookmark",
+                    action: onSave
+                )
+                .accessibilityIdentifier("iosPlayer_save")
+            } else {
+                // Hidden mirror of the trailing button: identical intrinsic
+                // height, so the row cannot go height-flexible (a bare
+                // Color.clear accepts any proposed height and would split
+                // spare space away from the transcript).
+                playerSideButton(
+                    title: "Share",
+                    symbol: "square.and.arrow.up",
+                    action: {}
+                )
+                .hidden()
+            }
 
             Button {
                 guard controller.duration > 0 else { return }
@@ -301,9 +313,12 @@ struct IOSPlayerSheet: View {
             .accessibilityIdentifier("iosPlayer_playPause")
             .disabled(controller.duration <= 0)
 
+            // D1: the action presents the system share sheet, so the label
+            // says so ("Download" implied a direct file save). The stable
+            // identifier keeps its historical name.
             playerSideButton(
-                title: "Download",
-                symbol: "arrow.down.to.line",
+                title: "Share",
+                symbol: "square.and.arrow.up",
                 action: { controller.shareCurrent() }
             )
             .accessibilityIdentifier("iosPlayer_download")

@@ -130,8 +130,11 @@ struct SettingsScreen: View {
 
                         IOSSettingsReferenceDivider()
 
+                        // D5: glyphs match their rows — motion shows motion,
+                        // transparency shows layered surfaces (sparkles/lock
+                        // contradicted both).
                         IOSSettingsReferenceToggleRow(
-                            symbol: "sparkles",
+                            symbol: "figure.walk.motion",
                             title: "Reduce Motion",
                             accessibilityIdentifier: "iosSettings_reduceMotionToggle",
                             isOn: $reduceMotionEnabled,
@@ -141,7 +144,7 @@ struct SettingsScreen: View {
                         IOSSettingsReferenceDivider()
 
                         IOSSettingsReferenceToggleRow(
-                            symbol: "lock.fill",
+                            symbol: "rectangle.fill.on.rectangle.fill",
                             title: "Reduce Transparency",
                             accessibilityIdentifier: "iosSettings_reduceTransparencyToggle",
                             isOn: $reduceTransparencyEnabled,

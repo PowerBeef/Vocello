@@ -52,7 +52,7 @@ also checks the selected Xcode's iOS Platform Support, signing, and the existing
 readiness. `device-state` treats
 reachability as its only blocker. The XCUITest runner independently rejects a phone that
 CoreDevice reports as locked before invoking `xcodebuild`. Install or repair iOS models through the
-visible Settings → Model Downloads UI; neither device scripts nor normal UI tests install them.
+visible Settings → Voice models section; neither device scripts nor normal UI tests install them.
 The sole exception is the separately selected `scripts/ui_test.sh ios model-download` lifecycle
 diagnostic, which uses an isolated app-support root and is never part of smoke or benchmark.
 
@@ -162,7 +162,7 @@ app's aggregate score.
 
 Before generation, XCUITest visibly requires Custom, Design, and Clone Speed to report ready,
 Generate to be enabled, and the required clone voice to exist. iOS has no command-line model
-ensure/install path: repair missing models in visible Settings → Model Downloads, then restart the
+ensure/install path: repair missing models in the visible Settings → Voice models section, then restart the
 UI lane. Device scripts retain headless engine diagnostics, but normal acceptance never substitutes
 a headless inventory for the visible Settings state.
 

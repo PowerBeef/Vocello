@@ -745,13 +745,20 @@ struct IOSBottomEdgeSheet<Content: View>: View {
     var body: some View {
         let shape = IOSTopRoundedRectangle(cornerRadius: IOSBottomSheetChrome.cornerRadius)
         let panel = VStack(spacing: 0) {
-            grabber
-                .padding(.top, 8)
+            // D8: the grabber advertises drag-dismiss, so the grabber +
+            // header zone honors it (a committed downward drag or flick).
+            // The gesture stays off the content, whose scroll must win.
+            VStack(spacing: 0) {
+                grabber
+                    .padding(.top, 8)
 
-            header
-                .padding(.horizontal, 20)
-                .padding(.top, 12)
-                .padding(.bottom, 10)
+                header
+                    .padding(.horizontal, 20)
+                    .padding(.top, 12)
+                    .padding(.bottom, 10)
+            }
+            .contentShape(Rectangle())
+            .gesture(dismissDragGesture)
 
             content
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -796,6 +803,15 @@ struct IOSBottomEdgeSheet<Content: View>: View {
         Capsule(style: .continuous)
             .fill(Color.white.opacity(0.20))
             .frame(width: 36, height: 5)
+    }
+
+    private var dismissDragGesture: some Gesture {
+        DragGesture(minimumDistance: 12)
+            .onEnded { value in
+                if value.translation.height > 48 || value.predictedEndTranslation.height > 120 {
+                    onDismiss()
+                }
+            }
     }
 
     private var resolvedBottomSafeAreaInset: CGFloat {

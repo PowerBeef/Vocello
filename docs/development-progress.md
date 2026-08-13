@@ -70,10 +70,12 @@ catalog memo, P7 scroll-indicator task churn, X3 root environment moved
 outermost (all bottom chrome and presentations now honor reduce-motion,
 reduce-transparency, and the generation glass gate), X6 VoiceOver-adjustable
 inline scrub; P11 deferred with its recorded downgrade reason; two review
-minors fixed in-change. **Resume here: the rest of IUI-5 is the design
-work — D1–D5, D7, D8 one-liners, the X4+D9 Dynamic Type program, and D10
-theme unification — then the counted five-run before/after measurement plus
-a wave-level smoke at the next phone window closes the wave.**
+minors fixed in-change. Sub-wave C (same day, desk): all seven small design
+picks D1–D5/D7/D8 landed with a stale-copy sweep and a five-finding review
+fixed in-change. **Resume here: the two remaining IUI-5 programs — the
+X4+D9 Dynamic Type adoption and D10 theme unification — then the counted
+five-run before/after measurement plus a wave-level smoke at the next phone
+window closes the wave.**
 
 **IUI-1 + IUI-2 closed — iOS frame-health instrument live with a measured
 baseline (2026-08-12, phone window):** the acceptance run

@@ -237,7 +237,10 @@ private struct IOSOnboardingReadyPage: View {
                 .foregroundStyle(IOSAppTheme.textPrimary)
                 .multilineTextAlignment(.center)
 
-            Text("Type a script, pick a voice, generate. Your audio stays here.")
+            // Design pick D2: onboarding finishes before any model exists on
+            // a fresh install — the closing copy names that first real step
+            // instead of implying generation already works.
+            Text("Download a voice model in Settings, then type a script, pick a voice, generate. Your audio stays here.")
                 .font(.system(size: 17))
                 .foregroundStyle(IOSAppTheme.textSecondary)
                 .multilineTextAlignment(.center)
@@ -321,9 +324,12 @@ private struct IOSOnboardingBenefitRow: View {
             .frame(width: 38, height: 38)
 
             VStack(alignment: .leading, spacing: 2) {
+                // D7: benefit titles carry the row (every current row is
+                // title-only) — secondary ink made the list read as fine
+                // print next to the page headline.
                 Text(title)
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(IOSAppTheme.textSecondary)
+                    .foregroundStyle(IOSAppTheme.textPrimary)
                 if let detail {
                     Text(detail)
                         .font(.subheadline)

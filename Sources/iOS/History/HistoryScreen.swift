@@ -211,7 +211,9 @@ private struct IOSHistoryLibrarySection: View {
                     if errorMessage != nil, items.isEmpty {
                         IOSEmptyStateCard(
                             title: "Couldn't load history",
-                            message: "Something went wrong reading your history. Pull to retry.",
+                            // D4: there is no pull-to-refresh on this list —
+                            // the visible Retry button below is the recovery.
+                            message: "Something went wrong reading your history. Tap Retry below.",
                             symbolName: "exclamationmark.triangle",
                             tint: .orange
                         )

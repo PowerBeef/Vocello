@@ -364,8 +364,45 @@ task survives view teardown by ≤1 s writing into detached state (exact
 parity with the code it replaced), and the adjustable trait stays exposed
 (silently no-op) while streaming.
 
-Remaining wave-2 scope: the approved design groups — D1–D5, D7, D8 (D6
-landed with sub-wave A), the X4+D9 Dynamic Type program, and D10 theme
+### Wave 2 sub-wave C — design one-liners D1–D5, D7, D8 (2026-08-13, landed)
+
+Desk-only, all seven remaining small picks (D6 landed with sub-wave A):
+
+- **D1** — the player sheet's "Save" (which duplicated "Download" whenever no
+  distinct save handler existed — i.e. always, in production) renders only
+  with a real handler; a hidden mirror of the trailing button keeps the row's
+  intrinsic height, and "Download" is relabeled **"Share"** with the share
+  glyph (the action presents the system share sheet; the stable
+  `iosPlayer_download` identifier keeps its historical name).
+- **D2** — onboarding's closing copy names the first real step (download a
+  voice model in Settings) instead of implying generation already works on a
+  model-less fresh install.
+- **D3** — the failed-engine toast routes to the section that exists:
+  "Settings → Voice models". The same sweep corrected every stale
+  "Model Downloads" reference the reviewer traced: the two iOS testing docs,
+  the shared runbook, the iOS app guide, and the CLI preflight error (which
+  now matches the macOS section's exact "Model downloads" title).
+- **D4** — History's load-error copy points at the visible Retry button (no
+  pull-to-refresh exists).
+- **D5** — Settings glyphs match their rows: Reduce Motion
+  `figure.walk.motion`, Reduce Transparency `rectangle.fill.on.rectangle.fill`
+  (were sparkles/lock).
+- **D7** — onboarding benefit titles in primary ink (title-only rows read as
+  fine print in secondary).
+- **D8** — the bottom-panel grabber honors what it advertises: a committed
+  downward drag or flick on the grabber/header zone dismisses, scoped off the
+  content so picker scrolling wins; the reviewer traced every panel through
+  `IOSBottomSheetSurface` and confirmed the delete-model sheet maps dismissal
+  to **cancel**, so a drag can never silently confirm a destructive action.
+
+Adversarial review (single verifier with an empirical layout probe) returned
+five findings, all fixed in-change — most notably the D1 placeholder being
+height-greedy (a bare `Color.clear` accepts any proposed height, which would
+have stolen ~200 pt from the transcript on every open and shifted the
+scrubber the perf scenarios drive), plus the doc siblings and stale-copy
+sweep above.
+
+Remaining wave-2 scope: the X4+D9 Dynamic Type program and D10 theme
 unification — then the counted before/after measurement plus wave-level
 smoke at the next phone window.
 

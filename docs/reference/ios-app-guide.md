@@ -24,7 +24,7 @@ Four tabs across the bottom (`rootTab_*`), with **Studio** as the default surfac
 | Studio | `rootTab_studio` | Compose + generate (three modes — see below) |
 | Voices | `rootTab_voices` | Browse built-in speakers + saved (cloned/designed) voices |
 | History | `rootTab_history` | Past generations: replay, export, delete, search |
-| Settings | `rootTab_settings` | Model downloads, clone consent, playback/variation/accessibility prefs |
+| Settings | `rootTab_settings` | Voice models, clone consent, playback/variation/accessibility prefs |
 
 Three generation modes (Studio segmented control `generateSection_*`):
 
@@ -142,9 +142,10 @@ Voice Models rows `iosModelRow_<modelID>` (full lifecycle — see §3). Prefs:
 
 ### Player + overlays
 
-Full-screen player (`Sources/iOS/Sheets/IOSPlayerSheet.swift`): `iosPlayer_save`,
-`iosPlayer_playPause`, `iosPlayer_download`, `iosPlayer_scrubber`, and
-`iosPlayer_transcript`. Recording overlay (`Sources/iOS/Overlays/IOSRecordingOverlay.swift`):
+Full-screen player (`Sources/iOS/Sheets/IOSPlayerSheet.swift`):
+`iosPlayer_playPause`, `iosPlayer_download` (labeled "Share"),
+`iosPlayer_scrubber`, `iosPlayer_transcript`, and — only when a caller
+supplies a distinct save handler — `iosPlayer_save`. Recording overlay (`Sources/iOS/Overlays/IOSRecordingOverlay.swift`):
 `iosRecord_close`, `iosRecord_start` / `iosRecord_stop`, `iosRecord_retake`, `iosRecord_use`.
 Lifecycle toasts (`IOSEngineLifecycleToast.swift`) are transient ("Preparing runtime",
 "Model loading") and labeled with `engineLifecycleToast_<id>`.

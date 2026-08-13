@@ -146,7 +146,9 @@ struct IOSEngineLifecycleToast: View {
         case .failed:
             return ToastDescriptor(
                 identifier: "failed",
-                message: "Engine error. Try again, or open Settings → Model Downloads.",
+                // D3: the destination must exist — the Settings section is
+                // titled "Voice models" (there is no "Model Downloads").
+                message: "Engine error. Try again, or open Settings → Voice models.",
                 symbol: "exclamationmark.triangle",
                 tint: .red,
                 isError: true

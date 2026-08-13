@@ -1204,7 +1204,7 @@ enum BenchCommand {
         }
         guard missing.isEmpty else {
             let uniq = Array(Set(missing)).sorted().joined(separator: ", ")
-            throw CLIError("preflight: missing models — \(uniq). Install them in the app (Settings → Model Downloads), or point --data-dir at a populated models dir.")
+            throw CLIError("preflight: missing models — \(uniq). Install them in the app (Settings → Model downloads), or point --data-dir at a populated models dir.")
         }
     }
 

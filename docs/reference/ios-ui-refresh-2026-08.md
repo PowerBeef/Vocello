@@ -194,17 +194,74 @@ X4/D9 Dynamic Type program, D10 theme unification).
 groups approved for wave 2** — copy & glyph fixes (D1–D5), interaction polish
 (D6–D8), the Dynamic Type program (X4+D9), and theme unification (D10).
 
-## Fix waves (IUI-4 landed, measurement pending; IUI-5 scoped)
+## Fix waves (IUI-4 closed; IUI-5 scoped)
 
 All ten wave-1 fixes landed 2026-08-12 (commit `2f76b8a`), each implementing
 its audited mechanism above. A 2-lens adversarial review of the diff confirmed
 one defect in the P1 rework — a dismissed-mid-load sheet's session release was
 load-bearing in one dismissal interleaving and could silence the next sheet's
 session in the other — fixed with an activation-epoch guard (a deactivation
-executes only while its own activation is still the newest). The wave-1
-before/after table lands here after the device close-out: the smoke lane plus
-five counted `ios perf` runs (the one pre-pause smoke attempt aborted
-device-side — cancelled biometry prompt, zero test cases ran).
+executes only while its own activation is still the newest).
+
+### Wave-1 after-measurement (2026-08-13 — canonical iPhone 17 Pro)
+
+One sitting: `scripts/ui_test.sh ios smoke` PASS first
+(`ios-xcui-smoke-20260813-170127-e0f9c5be`; the one pre-pause attempt had
+aborted device-side on a cancelled biometry prompt with zero test cases run),
+then five counted `ios perf` runs back-to-back
+(`ios-xcui-perf-20260813-171216-3dba81a4`, `…-172154-a4c6966e`,
+`…-173129-9dc183af`, `…-174111-90338546`, `…-175056-d09be357`), every
+scenario's thermal states nominal and Low Power Mode off, each report copied
+out of the run directory before the next run started (the IUI-2 protocol
+correction). Runs 2–5 were clean passes; run 1 passed with the two expected
+warn-only interactive cadence codes
+(`uiperf.cadence:ios-sheet-present-dismiss(54/55-65)`,
+`uiperf.cadence:ios-player-scrub(39/55-65)`) — the re-pacing class the
+idle-anchored gate design deliberately does not fail on; the idle sentinel was
+in-band in all five runs. Medians (IQR) across the five counted runs, with
+deltas against the IUI-2 baseline medians:
+
+| Scenario | Designation | Hitch ms/s median (IQR) | Max gap ms median (IQR) | p95 gap ms median | Cadence Hz median | Coverage min | Δ hitch vs IUI-2 | Δ max gap |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `ios-idle-baseline` | confirmatory | 0.0 (0.0) | 17 (0) | 21 | 60.0 | 99% | +0.0 | 0 |
+| `ios-tab-navigation` | confirmatory | 78.2 (5.1) | 99 (7) | 29 | 58.0 | 99% | +1.7 (+2%) | −13 |
+| `ios-history-scroll` | confirmatory | 82.1 (7.7) | 83 (0) | 29 | 60.0 | 98% | +2.6 (+3%) | 0 |
+| `ios-voices-scroll` | confirmatory | 44.6 (3.0) | 59 (9) | 21 | 60.0 | 97% | −0.3 (−1%) | 0 |
+| `ios-settings-scroll` | confirmatory | 52.9 (2.2) | 58 (7) | 21 | 60.0 | 97% | −5.1 (−9%) | −2 |
+| `ios-composer-typing` | confirmatory | 24.3 (2.2) | 67 (0) | 21 | 60.0 | 96% | −3.0 (−11%) | 0 |
+| `ios-sheet-present-dismiss` | confirmatory | 104.0 (4.0) | 159 (3) | 29 | 57.0 | 99% | +4.1 (+4%) | −19 |
+| `ios-player-scrub` | exploratory | 114.1 (1.6) | 95 (1) | 46 | 59.1 | 98% | +7.6 (+7%) | +13 |
+| `ios-generation-active` | exploratory | 52.1 (10.7) | 179 (7) | 21 | 60.0 | 95% | +1.0 (+2%) | +47 |
+
+Reading. Wave 1 was scoped as *safe* fixes, and the measurement matches that
+scope: the wins land exactly where the audited mechanisms predicted, and
+nothing regressed beyond scenario noise. The targeted results:
+
+- **Sheet presentation stall (P1's target): worst gap 178 → 159 ms (−11%)**
+  on a metric whose IQR is ≤3 ms in both baselines — the repeatable
+  presentation stall genuinely shrank when session activation + decode left
+  the presentation transaction. Median hitch over the whole scenario moved
+  +4% (IQR widened 0.4 → 4.0), so the scenario's steady-state cost is
+  unchanged within noise; the stall was the fix's target and the stall is
+  what moved.
+- **Composer typing −11% hitch** (27.3 → 24.3 ms/s, tighter IQR) — the P8
+  removal took thirteen dead prefetch `onChange` handlers out of the generate
+  flow that fired on typing-adjacent state.
+- **Settings scroll −9% hitch** (58.0 → 52.9 ms/s) and **tab-navigation worst
+  gap −12%** (112 → 99 ms) — consistent with the P9/P10 dead-observer
+  removals thinning whole-store re-diffs during navigation-heavy work.
+- **History scroll flat** (+3%, inside its ~8 ms/s IQR): the P5 eager-menu
+  and per-row `fileExists` removal did not move this scenario measurably at
+  400 seeded rows. Honest null result — the row cost that remains is the P2
+  whole-object observation storm, which is wave-2 scope.
+- Exploratory scenarios stayed exploratory: player-scrub +7% hitch/+13 ms
+  gap and generation-active's worst gap 132 → 179 ms are within the
+  engine-contention variance those scenarios were designated exploratory
+  for; neither is a gate, and both remain wave-2/IUI-6 observation targets.
+
+Verdict: wave 1 closes with both compiles green, smoke green, five counted
+nominal runs, targeted improvements on three confirmatory scenarios plus two
+worst-gap reductions, and no confirmatory regression outside IQR noise.
 
 ## 60 Hz-tier posture
 
@@ -227,9 +284,10 @@ cannot publish as canonical). Simulator timing is not evidence.
   (`MetricKitUIResponsivenessAggregates` + `scripts/ios_memory_field_report.py`
   allowlist). Device acceptance passed the same day (see the acceptance
   section above).
-- (IUI-4 wave 1, 2026-08-12, commit `2f76b8a`) Ten audited fixes: the P1
-  sheet-stall rework (off-MainActor session activation + decode with an
-  activation-epoch session guard), P5 lazy History row menus, P8/P9/P10
-  dead-wiring removals, and the X1/X2/X5/X7/X8 input-trait + VoiceOver +
-  hit-target one-liners. Device close-out (smoke + five counted after-runs)
-  is the resume point.
+- (IUI-4 wave 1, 2026-08-12, commit `2f76b8a`; closed 2026-08-13) Ten audited
+  fixes: the P1 sheet-stall rework (off-MainActor session activation + decode
+  with an activation-epoch session guard), P5 lazy History row menus,
+  P8/P9/P10 dead-wiring removals, and the X1/X2/X5/X7/X8 input-trait +
+  VoiceOver + hit-target one-liners. Device close-out 2026-08-13: smoke PASS
+  plus five counted nominal after-runs; before/after table and reading in the
+  wave-1 measurement section above.

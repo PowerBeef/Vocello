@@ -11,7 +11,7 @@
 | --- | --- | --- | --- |
 | `delivery-prompting-2026-08` | active | backend-mlx | 20/23 (87%) |
 | `doc-governance-2026-08` | active | release-qa | 8/9 (89%) |
-| `ios-ui-2026-08` | active | ios | 3/6 (50%) |
+| `ios-ui-2026-08` | active | ios | 4/6 (67%) |
 | `compliance-2026-08` | complete | release-qa | 2/2 (100%) |
 | `convergence-metal4-stage4-2026-08` | complete | backend-and-platform | 7/7 (100%) |
 | `macos-ui-2026-08` | complete | macos | 7/7 (100%) |
@@ -100,14 +100,11 @@ Narrative authority: [`docs/reference/ios-ui-refresh-2026-08.md`](reference/ios-
 | `IUI-1` | done | Instrument: scripts/ui_test.sh ios perf frame-health harness | `commit:73dc9f8`, `commit:c0dba9c`, `file:scripts/check_ios_ui_perf.py`, `file:Sources/iOSSupport/Services/IOSUIPerfFrameProbe.swift`, `file:Tests/VocelloiOSUITests/VocelloiOSPerfUITests.swift`, `file:scripts/tests/test_check_ios_ui_perf.py`, `doc:docs/reference/ios-ui-refresh-2026-08.md` |
 | `IUI-2` | done | Frame-health baseline (1 warm-up + 5 counted runs) | `doc:docs/reference/ios-ui-refresh-2026-08.md`, `commit:c0dba9c` |
 | `IUI-3` | done | Audit-first review: four lenses + measurements into one ranked list + maintainer pick-list | `doc:docs/reference/ios-ui-refresh-2026-08.md` |
-| `IUI-4` | in-flight | Wave 1: safe fixes with before/after measurement | — |
+| `IUI-4` | done | Wave 1: safe fixes with before/after measurement | `doc:docs/reference/ios-ui-refresh-2026-08.md`, `commit:2f76b8a` |
 | `IUI-5` | planned | Wave 2: refinements + re-engineering (macOS UI-5/UI-6 collapsed) | — |
 | `IUI-6` | planned | Registry formalization: platform-aware ui-perf kind + warn-only ceilings | — |
 
 ### Open items in detail
-
-- **`IUI-4`** (in-flight) — Wave 1: safe fixes with before/after measurement.
-  gate: Opens with the zero-risk removals (TabDock dead environment object, redundant toast observation, dead prefetch handlers) plus maintainer-picked low-risk items (candidates: IOSModelInstallerViewModel republish scoping, IOSVoicesView catalog memoization). ALL fixes wait for the baseline, including obviously-safe ones - the 2026-06 lesson. Before/after 5-run measurement on affected scenarios. GATE: wave-1 items landed after maintainer go; before/after table in the authority doc; both platform compiles and the smoke lane green.
 
 - **`IUI-5`** (planned) — Wave 2: refinements + re-engineering (macOS UI-5/UI-6 collapsed).
   gate: The store-observation port (RootView whole-store body observation -> iOS TTSEngineStore @Observable migration or a flip-scoped gate model), IOSPlayerSheetController @Observable migration + karaoke per-tick scoping, plus whatever re-engineering the IUI-3 pick-list approved (theme-namespace unification is design-scope, lands only if picked). Split into two sub-waves only if the findings justify it. GATE: landed after maintainer go with measured before/after deltas on the touched scenarios recorded in the authority doc.

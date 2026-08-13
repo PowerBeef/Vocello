@@ -39,7 +39,26 @@ machine-readable status record and wins over any older prose.
 | 13 — Benchmark/history v3 | Live 2026-07-29: the first schema-v3 records are committed (three clean `phase0-cli-control-*` engine records plus one exploratory run that also exposed and fixed the summarizer's v3 pin). `benchmarks/schema-v3.json` adds the typed quality identity to generation takes (pass/warning only, five fast gates required, machine-code issues); v1/v2 records stay valid immutable history; the publisher stamps v3 only when every take carries the identity. The UI benchmark checkers folded the same identity 2026-08-01: ui-generation records now publish v3 (first: the focused `v3-fold-proof` record `macos-xcui-benchmark-20260801-003208-403989cf`); the canonical iOS matrix published its first v3 record 2026-08-01 (`ios-xcui-benchmark-20260801-132415-abbec96b`). |
 | 14 — Organization and retirement | Closed 2026-07-23 (14a + 14b): compatibility SPI retired, actor-owned loading/metadata/priming/clone artifacts, clone conditioning epoch-bound end to end. |
 
-## Resume here (2026-08-12)
+## Resume here (2026-08-13)
+
+**IUI-4 closed — wave 1 measured on device (2026-08-13, phone window):**
+smoke passed cleanly (`ios-xcui-smoke-20260813-170127-e0f9c5be`; the
+pause-time abort was confirmed as the locked-phone biometry cancel, not a
+code failure), then five counted `ios perf` runs
+(`ios-xcui-perf-20260813-171216-3dba81a4` … `-175056-d09be357`) ran
+back-to-back with nominal thermals and every report copied out between runs.
+Against the IUI-2 baseline: the P1 target moved (sheet-present worst gap
+178 → 159 ms, −11%, on a ≤3 ms-IQR metric), composer typing −11% and
+settings scroll −9% hitch, tab-navigation worst gap −12%; history scroll was
+an honest null (flat within IQR — the remaining row cost is wave-2 P2
+scope); exploratory scenarios stayed within their designated variance. Full
+table and reading in `docs/reference/ios-ui-refresh-2026-08.md`. **Resume
+here: IUI-5 wave 2, desk authoring first — core re-engineering P2 (root-shell
+flip-scoped gate + `TTSEngineStore` observation port), P3 (sheet-controller
+scoping + karaoke per-tick cost), P4 (stable tab identity), P6/P7/P11,
+X3/X6, plus the approved design picks (D1–D10, Dynamic Type program X4+D9,
+theme unification D10); measured deltas per sub-wave at the next phone
+window.**
 
 **IUI-1 + IUI-2 closed — iOS frame-health instrument live with a measured
 baseline (2026-08-12, phone window):** the acceptance run
@@ -65,13 +84,9 @@ as proposed and approved all four design groups for wave 2. All ten wave-1
 fixes landed in `2f76b8a` (P1 sheet-stall rework with an activation-epoch
 session guard, P5 lazy History menus, P8/P9/P10 dead-wiring removals,
 X1/X2/X5/X7/X8 input + VoiceOver one-liners), adversarially reviewed, both
-iOS compiles and the UI test bundle green. **Resume here: IUI-4's device
-close-out — `scripts/ui_test.sh ios smoke` (the one attempt aborted
-device-side: biometry prompt cancelled/phone locked as the sitting ended —
-not a code failure; zero test cases ran), then five counted
-`scripts/ui_test.sh ios perf --label iui4-after-N` runs COPYING
-`ui-perf-report.json` out between runs, then the before/after table into
-the authority doc and IUI-4 → done.** Wave 2 (IUI-5) follows: core
+iOS compiles and the UI test bundle green. The device close-out (smoke +
+five counted after-runs, reports copied out between runs) completed
+2026-08-13 — see the newest block above. Wave 2 (IUI-5) follows: core
 re-engineering P2/P3/P4 + P6/P7/P11 + X3/X6 plus the approved design picks
 (D1–D10, Dynamic Type program X4+D9, theme unification D10).
 

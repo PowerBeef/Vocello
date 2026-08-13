@@ -928,7 +928,7 @@
       "id": "IUI-4",
       "plan": "ios-ui-2026-08",
       "title": "Wave 1: safe fixes with before/after measurement",
-      "status": "in-flight",
+      "status": "done",
       "gate": "Opens with the zero-risk removals (TabDock dead environment object, redundant toast observation, dead prefetch handlers) plus maintainer-picked low-risk items (candidates: IOSModelInstallerViewModel republish scoping, IOSVoicesView catalog memoization). ALL fixes wait for the baseline, including obviously-safe ones - the 2026-06 lesson. Before/after 5-run measurement on affected scenarios. GATE: wave-1 items landed after maintainer go; before/after table in the authority doc; both platform compiles and the smoke lane green.",
       "sourceOfTruth": [
         "scripts/ui_test.sh",
@@ -936,8 +936,12 @@
         "Tests/VocelloiOSUITests/VocelloiOSUITestCase.swift",
         "scripts/benchmark_history.py"
       ],
-      "updated": "2026-08-12",
-      "notes": "Maintainer go 2026-08-12, scope as proposed: P1 (sheet-present stall — move AVAudioSession activation/decode off the presentation transaction), P5 (lazy History row menus + cached file-exists), P8/P9/P10 (dead-wiring removals), and the input/VoiceOver one-liners X1, X2, X5, X7, X8. Before/after five-run measurement on affected scenarios; both compiles + smoke green to close."
+      "updated": "2026-08-13",
+      "notes": "Maintainer go 2026-08-12, scope as proposed: P1 (sheet-present stall - move AVAudioSession activation/decode off the presentation transaction, with an activation-epoch session guard from the adversarial diff review), P5 (lazy History row menus + cached file-exists), P8/P9/P10 (dead-wiring removals), and the input/VoiceOver one-liners X1, X2, X5, X7, X8; all landed 2026-08-12 (commit 2f76b8a). Closed 2026-08-13 after the device window: smoke PASS (ios-xcui-smoke-20260813-170127-e0f9c5be) plus five counted nominal ios perf runs ios-xcui-perf-20260813-{171216-3dba81a4, 172154-a4c6966e, 173129-9dc183af, 174111-90338546, 175056-d09be357} with every report copied out between runs. Before/after vs the IUI-2 baseline (table in the authority doc): sheet-present worst gap -11% (P1's target), composer typing -11% and settings scroll -9% hitch, tab-navigation worst gap -12%; history scroll flat within IQR (honest null - the remaining row cost is wave-2 P2 scope); exploratory scenarios within their designated variance. No confirmatory regression outside IQR noise.",
+      "evidence": [
+        "doc:docs/reference/ios-ui-refresh-2026-08.md",
+        "commit:2f76b8a"
+      ]
     },
     {
       "id": "IUI-5",

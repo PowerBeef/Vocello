@@ -29,10 +29,6 @@ struct RootView: View {
     @Environment(\.accessibilityReduceTransparency) private var systemReduceTransparency
     @AppStorage(IOSAppDefaults.reduceMotionEnabledKey) private var appReduceMotion = false
     @AppStorage(IOSAppDefaults.reduceTransparencyEnabledKey) private var appReduceTransparency = false
-    /// Tabs the user has visited. A visited tab stays mounted (IUI-5 P4) so
-    /// its search/filter/scroll `@State` and navigation path survive tab
-    /// switches; never-visited tabs cost nothing.
-    @State private var mountedTabs: Set<IOSAppTab> = []
 
     init(ttsEngine: TTSEngineStore) {
         self.ttsEngine = ttsEngine
@@ -160,57 +156,46 @@ struct RootView: View {
 
     // MARK: - Tab routing
 
-    /// Stable-identity tab container (IUI-5 P4). The legacy `switch` gave
-    /// each tab a distinct structural identity, so every switch destroyed the
-    /// outgoing screen's `@State` (search text, filters, scroll position,
-    /// navigation path) and paid a full remount of the incoming one — the
-    /// baseline's highly repeatable 76.5 ms/s tab-navigation cost. Every
-    /// visited tab now keeps one stable position in a ZStack; the inactive
-    /// ones are fully transparent, untouchable, and invisible to VoiceOver.
+    /// Switch-branch tab routing (P4 keep-alive reverted, IUI-5 wave close).
+    /// The stable-identity ZStack container (visited tabs kept mounted at
+    /// `opacity(0)`) measured a wholesale frame-health regression on device —
+    /// +52% hitch on the tab-navigation scenario it targeted, +140% on
+    /// voices-scroll, and roughly double on generation-active — and taxed
+    /// even single-tab scenarios, so the wrapper itself (not just hidden
+    /// siblings) carried the cost. Reverted to the measured-healthy remount
+    /// container; per-tab state preservation is re-scoped as model-hoisted
+    /// state (survives remount without a persistent view hierarchy). The
+    /// `\.iosTabIsActive` environment stays at its default (`true`), which
+    /// under remount semantics makes the screens' activation wiring behave
+    /// exactly like plain `.task`/`.onDisappear`.
     @ViewBuilder
     private var activeScreen: some View {
-        ZStack {
-            tabScreen(.studio)
-            tabScreen(.voices)
-            tabScreen(.history)
-            tabScreen(.settings)
-        }
-        .onAppear {
-            mountedTabs.insert(appModel.tab)
-        }
-        .onChange(of: appModel.tab) { _, newTab in
-            mountedTabs.insert(newTab)
-            // The switch-remount used to tear the keyboard down with the
-            // outgoing screen; a kept-alive screen would leave it floating
-            // over the new tab, so resign focus explicitly.
-            UIApplication.shared.sendAction(
-                #selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil
-            )
-        }
-    }
+        @Bindable var appModel = appModel
 
-    @ViewBuilder
-    private func tabScreen(_ tab: IOSAppTab) -> some View {
-        let isActive = appModel.tab == tab
-        if isActive || mountedTabs.contains(tab) {
-            Group {
-                switch tab {
-                case .studio:
-                    NavigationStack { StudioScreen() }
-                case .voices:
-                    NavigationStack { VoicesScreen() }
-                case .history:
-                    NavigationStack { HistoryScreen() }
-                case .settings:
-                    NavigationStack { SettingsScreen() }
-                }
+        switch appModel.tab {
+        case .studio:
+            NavigationStack {
+                StudioScreen()
             }
             .toolbar(.hidden, for: .navigationBar)
-            .opacity(isActive ? 1 : 0)
-            .allowsHitTesting(isActive)
-            .accessibilityHidden(!isActive)
-            .zIndex(isActive ? 1 : 0)
-            .environment(\.iosTabIsActive, isActive)
+
+        case .voices:
+            NavigationStack {
+                VoicesScreen()
+            }
+            .toolbar(.hidden, for: .navigationBar)
+
+        case .history:
+            NavigationStack {
+                HistoryScreen()
+            }
+            .toolbar(.hidden, for: .navigationBar)
+
+        case .settings:
+            NavigationStack {
+                SettingsScreen()
+            }
+            .toolbar(.hidden, for: .navigationBar)
         }
     }
 
@@ -315,12 +300,13 @@ private struct IOSAppSwitcherPrivacyCover: View {
     }
 }
 
-/// Whether the enclosing tab is the active (visible) one. Under the
-/// stable-identity tab container (IUI-5 P4) a visited tab stays mounted, so
-/// `.onDisappear` no longer fires on tab switches — screen content that used
-/// to rely on remount/teardown semantics (stopping playback, per-visit
-/// refreshes) keys off this value instead. Defaults to `true` so presentations
-/// outside the tab container (sheets, covers) are unaffected.
+/// Whether the enclosing tab is the active (visible) one. Introduced for the
+/// IUI-5 P4 keep-alive container; with that container reverted (measured
+/// frame-health regression — see `activeScreen`), no view writes this key, so
+/// it always reads its default (`true`) and the screens' activation wiring
+/// (`.task(id:)`, activation-task identities) degenerates to plain
+/// remount/teardown semantics. Kept because a future model-hoisted
+/// state-preservation design reuses the same contract.
 struct IOSTabActiveKey: EnvironmentKey {
     static let defaultValue = true
 }

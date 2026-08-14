@@ -84,10 +84,25 @@ rewritten by a deterministic token map, value-identical by construction
 (the feared drift lived only in never-shipped aspirational tokens, now
 re-pointed to shipped truth with recorded deltas). The two-lens review
 mechanically reproduced all 401 hunks under the map — zero rendered
-deltas. **Resume here: IUI-5's desk work is done; the counted five-run
-before/after measurement plus wave-level smoke (with large-type,
-scrollsToTop, and D10b-confirmation spot-checks) at the next phone window
-closes the wave, then IUI-6 (registry formalization) is desk work.**
+deltas.
+
+**Wave-2 close, part 1 (2026-08-14, phone window): the counted
+measurement caught a wholesale regression and a same-day device bisect
+attributed all of it to P4's keep-alive tab container** (+56% on the
+tab-navigation scenario it targeted, +161% voices-scroll, generation-active
+doubled; the wrapper taxed even single-mounted-tab scenarios; pre-wave
+control reproduced baseline, container-only revert restored control
+everywhere — full diagnostic table in the authority doc). **P4 is reverted
+(`a7f22ad`)** per the wave's measured-delta discipline; state preservation
+is re-scoped as model-hoisted state on the backlog. Two fixed-build counted
+runs confirm recovery to baseline. Also recorded: the long-form runner's
+silent-project-reset on an environmental mid-segment memory-pressure
+cancellation (pre-existing UX gap, backlog) surfaced by the first smoke
+run; the rerun passed. **Resume here: at the next phone window restart the
+counted chain clean on the committed fix (one warm-up + five counted, one
+sitting), then wave-level smoke plus the large-type / scrollsToTop /
+D10b-confirmation spot-checks — that completes the wave-2 after-table and
+closes IUI-5; IUI-6 (registry formalization) is desk work.**
 
 **IUI-1 + IUI-2 closed — iOS frame-health instrument live with a measured
 baseline (2026-08-12, phone window):** the acceptance run

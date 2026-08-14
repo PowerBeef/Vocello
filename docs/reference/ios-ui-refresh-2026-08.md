@@ -481,10 +481,72 @@ had no callers, and found no token-identity comparisons that the
 finding was the doc-sync reminder closed by this change. iOS device-SDK
 foundation compile green.
 
-Remaining wave-2 scope: the counted before/after measurement plus
-wave-level smoke at the next phone window close the wave (checklist:
-large-type spot-check for X4, `scrollsToTop` question from sub-wave B, and
-a glance at the shipped-truth surfaces as D10b confirmation).
+### Wave-2 close, part 1 — the measurement that caught P4, and its revert (2026-08-14, phone window)
+
+**The wave-close measurement did its job: it caught a wholesale regression
+and attributed it.** The morning began with the wave-level smoke: the first
+run failed (`ios-xcui-smoke-20260814-151237-24ae7bff`) when an
+environmental `UIApplicationDidReceiveMemoryWarning` 7.9 s into the first
+long-form segment cancelled the engine stream (in-process pressure bands
+stayed `healthy`; take `6C4C524F`), and the long-form runner treated the
+`CancellationError` as a user-style quiet cancel — composer silently reset,
+no error control, so the test's completed-or-error wait ran out its 900 s.
+The failure screenshot confirms a healthy reset composer. Two findings
+recorded: **the silent-project-reset UX gap on memory-pressure cancellation
+mid-project** (runner behavior, pre-existing, outside wave scope — backlog)
+and the test blind spot that cannot distinguish quiet reset from hang. The
+rerun passed clean (`ios-xcui-smoke-20260814-153909-537b9d86`, long-form
+268 s).
+
+Then the counted five (warm-up `…-154938-927fa5ad` discarded; counted
+`…-160008-6af3246f`, `…-161041-ec1b0744`, `…-162122-24da37a6`,
+`…-163156-2672b751`, `…-164230-80b03d75`, thermals nominal throughout,
+generation-active carrying its warn-only `uiperf.cadence` code in three
+runs) measured wave 2 as landed — and it had **regressed nearly every
+interactive scenario**: tab-navigation 76.5 → 119.4 ms/s (+56%, the very
+scenario P4 targeted), voices-scroll 44.9 → 117.1 (+161%), settings-scroll
++38%, composer-typing +48%, history-scroll +25%, generation-active
+51.1 → 139.7 (+173%) with 300 ms worst gaps; idle stayed 0.0.
+
+A same-day on-device bisect attributed it (single diagnostic runs,
+hitch ms/s on voices-scroll / tab-navigation / generation-active):
+
+| Build | voices | tab-nav | gen-active | Verdict |
+| --- | --- | --- | --- | --- |
+| `e270b55` pre-wave control, today (`…-172141-c23a61cb`) | 49.2 | 77.9 | 64.8 | device + instrument healthy; baseline reproduces |
+| `6f67edb` sub-wave A (`…-170841-2a4123bc`) | 118.1 | 118.2 | 134.6 | full regression present |
+| `351eb79` sub-waves A+B+C (`…-165719-5257f52c`) | 115.0 | 120.3 | 123.1 | no further movement — B/C/D/E exonerated |
+| head + P4 container reverted, uncommitted (`…-173336-12ba3a92`) | 49.0 | 81.3 | 59.5 | **container-only revert restores control everywhere** |
+
+The P4 stable-identity ZStack container was the entire regression — and it
+taxed even single-mounted-tab scenarios (composer-typing and
+generation-active never leave Studio), so the wrapper itself (opacity /
+zIndex / accessibility modifiers around a ZStack-hosted NavigationStack),
+not just hidden siblings, carried the cost. **P4 is reverted** (`a7f22ad`)
+to the switch-branch remount container per the wave's own
+measured-delta discipline. The `\.iosTabIsActive` environment key and the
+screens' activation wiring stay: with no writer the key reads its default
+`true`, which under remount semantics degenerates exactly to plain
+task/teardown behavior. Per-tab state preservation (the UX half of P4)
+returns to the backlog re-scoped as **model-hoisted state** — search text,
+filters, and scroll anchors surviving remount in observable models rather
+than in a persistent view hierarchy.
+
+The fixed build's counted chain then began (warm-up `…-175945-4d041fa0`
+after one warm-up failure on the known seeded-history keyboard race,
+`…-175041-883fa756`): counted runs `…-181007-7647065b` and
+`…-182028-1a4ce622` restore every scenario to baseline/control levels
+(tab-nav 81.2/77.2, voices 47.1/51.4, composer-typing 25.1/28.9,
+generation-active 52.4/62.2 ms/s). The phone window closed at the
+maintainer's call after run 2.
+
+**Resume protocol for the next phone window:** restart the counted chain
+clean on the committed fix — one discarded warm-up plus five counted runs
+in one sitting (prefer restarting over mixing sittings so the IQR claim
+stays same-sitting), then the wave-level smoke, plus the checklist:
+large-type spot-check for X4, the `scrollsToTop` question from sub-wave B,
+and a glance at the shipped-truth surfaces as D10b confirmation. That
+completes the wave-2 after-table and closes IUI-5.
 
 ## 60 Hz-tier posture
 

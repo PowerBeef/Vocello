@@ -18,7 +18,7 @@ struct IOSOnboardingFlow: View {
 
     var body: some View {
         ZStack {
-            IOSModeBackdrop(tint: IOSBrandTheme.accent, intensity: .warm)
+            IOSModeBackdrop(tint: Theme.Brand.gold, intensity: .warm)
 
             VStack(spacing: 0) {
                 topBar
@@ -38,7 +38,7 @@ struct IOSOnboardingFlow: View {
 
     private var topBar: some View {
         HStack {
-            IOSProductTitleLockup(title: IOSBrandTheme.productName)
+            IOSProductTitleLockup(title: Theme.Branding.productName)
 
             Spacer()
 
@@ -47,7 +47,7 @@ struct IOSOnboardingFlow: View {
                     complete()
                 }
                 .font(.subheadline.weight(.medium))
-                .foregroundStyle(IOSAppTheme.textSecondary)
+                .foregroundStyle(Theme.Text.secondary)
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("onboarding_skip")
             }
@@ -72,7 +72,7 @@ struct IOSOnboardingFlow: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
         .transition(.opacity)
-        .iosAppAnimation(IOSDesignMotion.sheetReveal, value: page)
+        .iosAppAnimation(Theme.Motion.easeOut, value: page)
     }
 
     // MARK: - Pagination dots
@@ -81,9 +81,9 @@ struct IOSOnboardingFlow: View {
         HStack(spacing: 8) {
             ForEach(0..<totalPages, id: \.self) { i in
                 Capsule(style: .continuous)
-                    .fill(i == page ? IOSBrandTheme.accent : IOSAppTheme.textTertiary.opacity(0.4))
+                    .fill(i == page ? Theme.Brand.gold : Theme.Text.tertiary.opacity(0.4))
                     .frame(width: i == page ? 20 : 6, height: 6)
-                    .iosAppAnimation(IOSDesignMotion.stateChange, value: page)
+                    .iosAppAnimation(Theme.Motion.stateChange, value: page)
             }
         }
         .padding(.bottom, 24)
@@ -96,7 +96,7 @@ struct IOSOnboardingFlow: View {
     private var ctaButton: some View {
         IOSPrimaryCTAButton(
             title: ctaTitle,
-            tint: IOSBrandTheme.accent,
+            tint: Theme.Brand.gold,
             isEnabled: true,
             action: handleCTA
         )
@@ -114,7 +114,7 @@ struct IOSOnboardingFlow: View {
     private func handleCTA() {
         IOSHaptics.impact(.light)
         if page < totalPages - 1 {
-            IOSAccessibleAnimation.perform(IOSDesignMotion.sheetReveal) {
+            IOSAccessibleAnimation.perform(Theme.Motion.easeOut) {
                 page += 1
             }
         } else {
@@ -125,7 +125,7 @@ struct IOSOnboardingFlow: View {
     private func complete() {
         IOSAppDefaults.hasCompletedOnboarding = true
         IOSHaptics.success()
-        IOSAccessibleAnimation.perform(IOSDesignMotion.sheetSlideUp) {
+        IOSAccessibleAnimation.perform(Theme.Motion.sheetSlideUp) {
             isPresented = false
         }
     }
@@ -136,18 +136,18 @@ struct IOSOnboardingFlow: View {
 private struct IOSOnboardingWelcomePage: View {
     var body: some View {
         VStack(spacing: 0) {
-            IOSOnboardingIcon(symbol: "sparkles", colors: [IOSBrandTheme.accent, IOSBrandTheme.clone])
+            IOSOnboardingIcon(symbol: "sparkles", colors: [Theme.Brand.gold, Theme.Brand.modeClone])
                 .padding(.bottom, 32)
 
             Text("Vocello")
                 .iosScaledFont(size: 36, weight: .bold, relativeTo: .largeTitle)
                 .tracking(-0.90)
-                .foregroundStyle(IOSAppTheme.textPrimary)
+                .foregroundStyle(Theme.Text.primary)
                 .multilineTextAlignment(.center)
 
             Text("Studio-quality voice generation. Runs entirely on this iPhone.")
                 .iosScaledFont(size: 17, relativeTo: .body)
-                .foregroundStyle(IOSAppTheme.textSecondary)
+                .foregroundStyle(Theme.Text.secondary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: 320)
@@ -182,18 +182,18 @@ private struct IOSOnboardingWelcomePage: View {
 private struct IOSOnboardingInstallPage: View {
     var body: some View {
         VStack(spacing: 0) {
-            IOSOnboardingIcon(symbol: "arrow.down.circle.fill", colors: [IOSBrandTheme.design, IOSBrandTheme.accent])
+            IOSOnboardingIcon(symbol: "arrow.down.circle.fill", colors: [Theme.Brand.modeDesign, Theme.Brand.gold])
                 .padding(.bottom, 32)
 
             Text("Install Custom Voice")
                 .iosScaledFont(size: 36, weight: .bold, relativeTo: .largeTitle)
                 .tracking(-0.90)
-                .foregroundStyle(IOSAppTheme.textPrimary)
+                .foregroundStyle(Theme.Text.primary)
                 .multilineTextAlignment(.center)
 
             Text("Download the 4-bit Speed model to start generating. Voice Design and Voice Cloning each have their own model; install them later in Settings.")
                 .iosScaledFont(size: 17, relativeTo: .body)
-                .foregroundStyle(IOSAppTheme.textSecondary)
+                .foregroundStyle(Theme.Text.secondary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: 320)
@@ -201,17 +201,17 @@ private struct IOSOnboardingInstallPage: View {
 
             VStack(alignment: .leading, spacing: 14) {
                 IOSOnboardingModelHint(
-                    tint: IOSBrandTheme.custom,
+                    tint: Theme.Brand.modeCustom,
                     name: "Custom Voice",
                     detail: "Built-in speakers and delivery presets."
                 )
                 IOSOnboardingModelHint(
-                    tint: IOSBrandTheme.design,
+                    tint: Theme.Brand.modeDesign,
                     name: "Voice Design",
                     detail: "Describe a voice in natural language."
                 )
                 IOSOnboardingModelHint(
-                    tint: IOSBrandTheme.clone,
+                    tint: Theme.Brand.modeClone,
                     name: "Voice Cloning",
                     detail: "Use a 10-20 s reference clip you own."
                 )
@@ -228,13 +228,13 @@ private struct IOSOnboardingInstallPage: View {
 private struct IOSOnboardingReadyPage: View {
     var body: some View {
         VStack(spacing: 0) {
-            IOSOnboardingIcon(symbol: "checkmark.circle.fill", colors: [IOSBrandTheme.clone, IOSBrandTheme.design])
+            IOSOnboardingIcon(symbol: "checkmark.circle.fill", colors: [Theme.Brand.modeClone, Theme.Brand.modeDesign])
                 .padding(.bottom, 32)
 
             Text("You're ready")
                 .iosScaledFont(size: 36, weight: .bold, relativeTo: .largeTitle)
                 .tracking(-0.90)
-                .foregroundStyle(IOSAppTheme.textPrimary)
+                .foregroundStyle(Theme.Text.primary)
                 .multilineTextAlignment(.center)
 
             // Design pick D2: onboarding finishes before any model exists on
@@ -242,7 +242,7 @@ private struct IOSOnboardingReadyPage: View {
             // instead of implying generation already works.
             Text("Download a voice model in Settings, then type a script, pick a voice, generate. Your audio stays here.")
                 .iosScaledFont(size: 17, relativeTo: .body)
-                .foregroundStyle(IOSAppTheme.textSecondary)
+                .foregroundStyle(Theme.Text.secondary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: 320)
@@ -252,9 +252,9 @@ private struct IOSOnboardingReadyPage: View {
                 ForEach(0..<3, id: \.self) { i in
                     let tint: Color = {
                         switch i {
-                        case 0: return IOSBrandTheme.custom
-                        case 1: return IOSBrandTheme.design
-                        default: return IOSBrandTheme.clone
+                        case 0: return Theme.Brand.modeCustom
+                        case 1: return Theme.Brand.modeDesign
+                        default: return Theme.Brand.modeClone
                         }
                     }()
                     IOSWaveformBars(
@@ -267,11 +267,11 @@ private struct IOSOnboardingReadyPage: View {
                     .frame(height: 64)
                     .padding(12)
                     .background {
-                        RoundedRectangle(cornerRadius: IOSCornerRadius.card, style: .continuous)
-                            .fill(IOSAppTheme.glassSurfaceFillMuted.opacity(0.5))
+                        RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous)
+                            .fill(Theme.Surface.glassSurfaceMuted.opacity(0.5))
                     }
                     .overlay {
-                        RoundedRectangle(cornerRadius: IOSCornerRadius.card, style: .continuous)
+                        RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous)
                             .stroke(tint.opacity(0.32), lineWidth: 0.9)
                     }
                 }
@@ -303,7 +303,7 @@ private struct IOSOnboardingIcon: View {
                     .font(.system(size: 48, weight: .semibold))
                     .foregroundStyle(Color(red: 13 / 255, green: 14 / 255, blue: 18 / 255))
             }
-            .shadow(color: IOSBrandTheme.accent.opacity(0.30), radius: 18, x: 0, y: 12)
+            .shadow(color: Theme.Brand.gold.opacity(0.30), radius: 18, x: 0, y: 12)
     }
 }
 
@@ -316,10 +316,10 @@ private struct IOSOnboardingBenefitRow: View {
         HStack(alignment: .top, spacing: 14) {
             ZStack {
                 Circle()
-                    .fill(IOSBrandTheme.accent.opacity(0.18))
+                    .fill(Theme.Brand.gold.opacity(0.18))
                 Image(systemName: symbol)
                     .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(IOSBrandTheme.accent)
+                    .foregroundStyle(Theme.Brand.gold)
             }
             .frame(width: 38, height: 38)
 
@@ -329,11 +329,11 @@ private struct IOSOnboardingBenefitRow: View {
                 // print next to the page headline.
                 Text(title)
                     .iosScaledFont(size: 14, weight: .medium, relativeTo: .footnote)
-                    .foregroundStyle(IOSAppTheme.textPrimary)
+                    .foregroundStyle(Theme.Text.primary)
                 if let detail {
                     Text(detail)
                         .font(.subheadline)
-                        .foregroundStyle(IOSAppTheme.textSecondary)
+                        .foregroundStyle(Theme.Text.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -356,10 +356,10 @@ private struct IOSOnboardingModelHint: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(name)
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(IOSAppTheme.textPrimary)
+                    .foregroundStyle(Theme.Text.primary)
                 Text(detail)
                     .font(.subheadline)
-                    .foregroundStyle(IOSAppTheme.textSecondary)
+                    .foregroundStyle(Theme.Text.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }

@@ -21,7 +21,7 @@ struct IOSEngineLifecycleToast: View {
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
-        .iosAppAnimation(IOSSelectionMotion.miniPlayerSlide, value: visibleState)
+        .iosAppAnimation(Theme.Motion.miniPlayerSlide, value: visibleState)
         .onReceive(ttsEngine.$engineLifecycleState.removeDuplicates()) { newState in
             handle(newState: newState)
         }
@@ -47,13 +47,13 @@ struct IOSEngineLifecycleToast: View {
                 .foregroundStyle(descriptor.tint)
             Text(message)
                 .font(IOSTypeStyle.subhead.font)
-                .foregroundStyle(IOSAppTheme.textPrimary)
+                .foregroundStyle(Theme.Text.primary)
                 .lineLimit(3)
             Spacer(minLength: 0)
             if descriptor.isError {
                 Image(systemName: "xmark.circle.fill")
                     .font(.callout)
-                    .foregroundStyle(IOSAppTheme.textTertiary)
+                    .foregroundStyle(Theme.Text.tertiary)
             }
         }
         .padding(.horizontal, 14)
@@ -141,7 +141,7 @@ struct IOSEngineLifecycleToast: View {
                 identifier: "invalidated",
                 message: "Engine restarted.",
                 symbol: "arrow.clockwise.circle",
-                tint: IOSBrandTheme.accent
+                tint: Theme.Brand.gold
             )
         case .failed:
             return ToastDescriptor(

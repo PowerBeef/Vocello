@@ -209,7 +209,7 @@ struct IOSStudioPlayerCard: View {
             VStack(alignment: .leading, spacing: 1) {
                 Text(phase.voiceName)
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(IOSAppTheme.textPrimary)
+                    .foregroundStyle(Theme.Text.primary)
                     .lineLimit(1)
                 statusLine
             }
@@ -220,7 +220,7 @@ struct IOSStudioPlayerCard: View {
             trailingControls
         }
         // Card stays put; only the status line + trailing cluster cross-fade between phases.
-        .iosAppAnimation(IOSDesignMotion.stateChange, value: phase.isLive)
+        .iosAppAnimation(Theme.Motion.stateChange, value: phase.isLive)
     }
 
     /// Full-width "Save as voice" CTA on a completed Design card — enrolls the generated clip as a
@@ -253,7 +253,7 @@ struct IOSStudioPlayerCard: View {
         } label: {
             Image(systemName: controller.isPlaying ? "pause.fill" : "play.fill")
                 .font(.system(size: 20, weight: .semibold))
-                .foregroundStyle(IOSAppTheme.accentForeground)
+                .foregroundStyle(Theme.Text.onAccent)
                 .frame(width: 48, height: 48)
                 .background {
                     Circle()
@@ -287,14 +287,14 @@ struct IOSStudioPlayerCard: View {
                     .opacity(reduceMotion ? 1.0 : (pulse ? 1.0 : 0.3))
                 Text("Streaming preview")
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(IOSAppTheme.textSecondary)
+                    .foregroundStyle(Theme.Text.secondary)
                     .lineLimit(1)
             }
             .transition(.opacity)
         } else {
             Text("Just now · \(phase.modeLabel)")
                 .font(.system(size: 11))
-                .foregroundStyle(IOSAppTheme.textSecondary)
+                .foregroundStyle(Theme.Text.secondary)
                 .lineLimit(1)
                 .transition(.opacity)
         }
@@ -306,9 +306,9 @@ struct IOSStudioPlayerCard: View {
             Button(action: onCancel) {
                 Image(systemName: "stop.fill")
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(IOSAppTheme.textPrimary)
+                    .foregroundStyle(Theme.Text.primary)
                     .frame(width: 44, height: 44)
-                    .background { Circle().fill(IOSAppTheme.glassSurfaceFillMuted.opacity(0.7)) }
+                    .background { Circle().fill(Theme.Surface.glassSurfaceMuted.opacity(0.7)) }
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Cancel generation")
@@ -424,7 +424,7 @@ struct InlineWaveformProgressRow: View {
         HStack(spacing: 12) {
             Text(controller.formatted(time: controller.currentTime))
                 .font(.system(size: 13, weight: .semibold).monospacedDigit())
-                .foregroundStyle(IOSAppTheme.textSecondary)
+                .foregroundStyle(Theme.Text.secondary)
                 .frame(width: 36, alignment: .leading)
 
             GeometryReader { proxy in
@@ -493,7 +493,7 @@ struct InlineWaveformProgressRow: View {
             // internal (it only scales the streaming buffer-fill bands above).
             Text(controller.formatted(time: controller.duration))
                 .font(.system(size: 13, weight: .semibold).monospacedDigit())
-                .foregroundStyle(IOSAppTheme.textSecondary)
+                .foregroundStyle(Theme.Text.secondary)
                 .frame(width: 36, alignment: .trailing)
         }
     }

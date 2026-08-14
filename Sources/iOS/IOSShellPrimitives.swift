@@ -3,28 +3,6 @@ import SwiftUI
 import UIKit
 import QwenVoiceCore
 
-extension Color {
-    // The app is forced to `.preferredColorScheme(.dark)` at the window level
-    // (see `QVoiceiOSApp.swift`), so every theme token is defined in the dark
-    // variant only. If light mode is ever supported, replace this with a
-    // `UIColor { traits in ... }` dynamic initializer.
-    init(dark: UIColor) {
-        self.init(uiColor: dark)
-    }
-}
-
-enum IOSSelectionMotion {
-    static let selection = Animation.easeOut(duration: 0.14)
-    static let selectorPill = Animation.snappy(duration: 0.22, extraBounce: 0)
-    static let selectorLabel = Animation.easeOut(duration: 0.12)
-    static let highlight = Animation.easeOut(duration: 0.10)
-    static let disclosure = Animation.easeOut(duration: 0.12)
-    static let floatingPanel = Animation.spring(response: 0.30, dampingFraction: 0.84, blendDuration: 0.12)
-    static let press = Animation.easeOut(duration: 0.09)
-    static let modeCrossfade = Animation.easeInOut(duration: 0.18)
-    static let miniPlayerSlide = Animation.spring(response: 0.32, dampingFraction: 0.84, blendDuration: 0.12)
-}
-
 enum IOSHaptics {
     @MainActor
     static func selection() {
@@ -95,170 +73,6 @@ extension View {
     }
 }
 
-enum IOSBrandTheme {
-    static let productName = "Vocello"
-    static let headerMarkAssetName = "VocelloHeaderMark"
-
-    static let deepNav = Color(dark: UIColor(red: 0.055, green: 0.063, blue: 0.078, alpha: 1))
-    static let accent = Color(dark: UIColor(red: 0.93, green: 0.80, blue: 0.54, alpha: 1))
-    static let purple = Color(dark: UIColor(red: 0.73, green: 0.66, blue: 0.84, alpha: 1))
-    static let lavender = Color(dark: UIColor(red: 0.87, green: 0.82, blue: 0.93, alpha: 1))
-    static let silver = Color(dark: UIColor(red: 0.68, green: 0.71, blue: 0.76, alpha: 1))
-
-    static let custom = accent
-    // Mode color: #BFAADC per design_references/Vocello iOS/tokens.css (--mode-design).
-    // Was #BFABDB; this aligns with the iOS design reference token.
-    static let design = Color(dark: UIColor(red: 0.749, green: 0.667, blue: 0.863, alpha: 1))
-    // Mode color: #DBA887 per design system (--mode-cloning).
-    static let clone = Color(dark: UIColor(red: 0.859, green: 0.659, blue: 0.529, alpha: 1))
-    static let library = Color(dark: UIColor(red: 0.75, green: 0.74, blue: 0.71, alpha: 1))
-    static let settings = silver
-
-    // Matches design tokens.css --canvas-bg: #161823. The warm wash
-    // produced by IOSModeBackdrop needs this lighter base to read; a
-    // near-black canvas hides the mode tint below the threshold of
-    // perception.
-    static let canvasTop = Color(dark: UIColor(red: 0.086, green: 0.094, blue: 0.137, alpha: 1))
-    static let canvasBottom = Color(dark: UIColor(red: 0.038, green: 0.044, blue: 0.056, alpha: 1))
-    static let surface = Color(dark: UIColor(red: 0.105, green: 0.112, blue: 0.132, alpha: 0.86))
-    static let surfaceMuted = Color(dark: UIColor(red: 0.145, green: 0.152, blue: 0.174, alpha: 0.74))
-    static let surfaceStroke = Color(dark: UIColor(red: 0.97, green: 0.92, blue: 0.82, alpha: 0.10))
-    static let inputFill = Color(dark: UIColor(red: 0.120, green: 0.126, blue: 0.148, alpha: 1))
-    static let inputFillUIColor = UIColor(red: 0.120, green: 0.126, blue: 0.148, alpha: 1)
-    static let primaryTextUIColor = UIColor(red: 0.95, green: 0.94, blue: 0.92, alpha: 1)
-    // Lightened from (0.50,0.53,0.58) so placeholder text clears WCAG-AA 4.5:1 on the
-    // input/field fills (was ~3.8–4.4:1; now ≥5.3:1). Mirrors Theme.Text.placeholderUIColor.
-    static let placeholderUIColor = UIColor(red: 0.60, green: 0.63, blue: 0.68, alpha: 1)
-    static let primaryText = Color(uiColor: primaryTextUIColor)
-    // Warm-neutral secondary text. Drops the prior cool blue chroma so the
-    // palette tints toward the Vocello gold hue per the impeccable shared
-    // design law and PRODUCT.md "Warm without volume".
-    static let secondaryText = Color(dark: UIColor(red: 0.78, green: 0.76, blue: 0.72, alpha: 1))
-    static let mutedText = Color(dark: UIColor(red: 0.62, green: 0.60, blue: 0.55, alpha: 1))
-    static let inputStroke = Color(dark: UIColor(red: 0.96, green: 0.92, blue: 0.82, alpha: 0.12))
-    static let bannerFill = Color(dark: UIColor(red: 0.18, green: 0.19, blue: 0.22, alpha: 0.92))
-    static let tabBarBackground = Color(dark: UIColor(red: 0.075, green: 0.083, blue: 0.102, alpha: 0.93))
-    static let dockSmoke = Color(dark: UIColor(red: 0.075, green: 0.083, blue: 0.102, alpha: 0.62))
-    static let dockSmokeFallback = Color(dark: UIColor(red: 0.075, green: 0.083, blue: 0.102, alpha: 0.98))
-    static let modeSwitcherFill = Color(dark: UIColor(red: 0.135, green: 0.142, blue: 0.164, alpha: 0.82))
-    static let modeSwitcherStroke = Color(dark: UIColor(red: 0.97, green: 0.92, blue: 0.82, alpha: 0.08))
-    static let brandChipFill = Color(dark: UIColor(red: 0.14, green: 0.15, blue: 0.18, alpha: 0.94))
-    static let actionGlow = Color(dark: UIColor(red: 0.93, green: 0.80, blue: 0.54, alpha: 0.12))
-    static let highlightGlow = Color(dark: UIColor(red: 0.90, green: 0.84, blue: 0.72, alpha: 0.07))
-
-    static let memoryHealthy = Color(dark: UIColor(red: 0.55, green: 0.70, blue: 0.55, alpha: 1))
-    static let memoryGuarded = Color(dark: UIColor(red: 0.85, green: 0.70, blue: 0.45, alpha: 1))
-    static let memoryCritical = Color(dark: UIColor(red: 0.85, green: 0.50, blue: 0.50, alpha: 1))
-    static let primaryActionGradient = LinearGradient(
-        colors: [accent, accent.opacity(0.78)],
-        startPoint: .topLeading,
-        endPoint: .bottomTrailing
-    )
-    static let designAccentGradient = LinearGradient(
-        colors: [design, lavender],
-        startPoint: .topLeading,
-        endPoint: .bottomTrailing
-    )
-    static let cloneAccentGradient = LinearGradient(
-        colors: [accent, clone],
-        startPoint: .topLeading,
-        endPoint: .bottomTrailing
-    )
-
-    static func softGradient(for tint: Color) -> LinearGradient {
-        LinearGradient(
-            colors: [tint.opacity(0.92), tint.opacity(0.62)],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-    }
-
-    static func modeColor(for mode: GenerationMode) -> Color {
-        switch mode {
-        case .custom:
-            return custom
-        case .design:
-            return design
-        case .clone:
-            return clone
-        }
-    }
-}
-
-enum IOSAppTheme {
-    static let backgroundTop = IOSBrandTheme.canvasTop
-    static let backgroundBottom = IOSBrandTheme.canvasBottom
-    static let surfacePrimary = IOSBrandTheme.surface
-    static let surfaceSecondary = IOSBrandTheme.surfaceMuted
-    static let surfaceStroke = IOSBrandTheme.surfaceStroke
-    static let fieldFill = IOSBrandTheme.inputFill
-    static let fieldFillUIColor = IOSBrandTheme.inputFillUIColor
-    static let fieldStroke = IOSBrandTheme.inputStroke
-    static let textPrimary = IOSBrandTheme.primaryText
-    static let textSecondary = IOSBrandTheme.secondaryText
-    static let textTertiary = IOSBrandTheme.mutedText
-    static let textPrimaryUIColor = IOSBrandTheme.primaryTextUIColor
-    static let textPlaceholderUIColor = IOSBrandTheme.placeholderUIColor
-    static let tabBarBackground = IOSBrandTheme.tabBarBackground
-    static let selectorFill = IOSBrandTheme.modeSwitcherFill
-    static let selectorStroke = IOSBrandTheme.modeSwitcherStroke
-    static let bannerFill = IOSBrandTheme.bannerFill
-    static let accentGlow = IOSBrandTheme.actionGlow
-    static let highlightGlow = IOSBrandTheme.highlightGlow
-    static let glassClusterSpacing: CGFloat = 18
-    static let glassSurfaceFill = IOSBrandTheme.surface.opacity(0.82)
-    static let glassSurfaceFillMuted = IOSBrandTheme.surfaceMuted.opacity(0.74)
-    static let glassFloatingFill = IOSBrandTheme.tabBarBackground.opacity(0.66)
-    static let glassOuterStroke = Color.white.opacity(0.12)
-    static let glassInnerStroke = Color.white.opacity(0.04)
-    static let cardCornerRadius: CGFloat = 16
-    static let cardShadowRadius: CGFloat = 8
-    static let cardShadowOffset: CGFloat = 3
-
-    // Foreground ink for text sitting on top of accent-tinted fills.
-    static let accentForeground = Color(dark: UIColor(red: 0.10, green: 0.085, blue: 0.055, alpha: 0.82))
-    static let accentForegroundPressed = Color(dark: UIColor(red: 0.10, green: 0.085, blue: 0.055, alpha: 0.74))
-    // Subtle separator between rows on dark surfaces.
-    static let hairlineDivider = Color.white.opacity(0.08)
-
-    static func accentSurface(_ tint: Color) -> Color {
-        tint.opacity(0.10)
-    }
-
-    // Strong mode-tinted stroke. Matches macOS accentStroke (34% dark / 28%
-    // light); iOS is dark-only so we land at 34%.
-    static func accentStroke(_ tint: Color) -> Color {
-        tint.opacity(0.34)
-    }
-
-    // Whisper accent wash for selected chips and pills. Matches macOS
-    // accentWash (20% dark). Used by the mode selector and emotion chips.
-    static func accentWash(_ tint: Color) -> Color {
-        tint.opacity(0.20)
-    }
-
-    static func accentFill(_ tint: Color) -> LinearGradient {
-        LinearGradient(
-            colors: [tint.opacity(0.96), tint.opacity(0.82)],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-    }
-
-    static func mutedFill(for colorScheme: ColorScheme) -> Color {
-        Color.white.opacity(0.05)
-    }
-
-    // Mode-aware glass tint. Matches macOS surfaceGlassTint (14% dark) when
-    // a tint is supplied; falls back to a neutral smoked glass at 10% dark
-    // when nil. Tunes "warm without volume" per PRODUCT.md.
-    static func subtleGlassTint(_ tint: Color? = nil, intensity: Double = 1.0) -> Color {
-        let base = tint ?? IOSBrandTheme.silver
-        let opacity = (tint == nil) ? 0.10 : 0.14
-        return base.opacity(opacity * intensity)
-    }
-}
-
 struct IOSSubtleGlassSurfaceModifier<S: InsettableShape>: ViewModifier {
     let shape: S
     let tint: Color?
@@ -281,7 +95,7 @@ struct IOSSubtleGlassSurfaceModifier<S: InsettableShape>: ViewModifier {
             .overlay {
                 shape
                     .inset(by: 0.65)
-                    .stroke(IOSAppTheme.glassInnerStroke, lineWidth: 0.55)
+                    .stroke(Theme.Surface.glassInnerStroke, lineWidth: 0.55)
                     .allowsHitTesting(false)
             }
 
@@ -289,7 +103,7 @@ struct IOSSubtleGlassSurfaceModifier<S: InsettableShape>: ViewModifier {
         // (IUI-5 D10a); `fill` above already paints the solid base, so the
         // gated branch needs no extra backing here.
         base.iosGatedGlass(
-            tint: IOSAppTheme.subtleGlassTint(tint, intensity: 0.9),
+            tint: Theme.glassTint(tint, intensity: 0.9),
             in: shape,
             interactive: interactive
         )
@@ -300,7 +114,7 @@ extension View {
     func iosSubtleGlassSurface<S: InsettableShape>(
         in shape: S,
         tint: Color? = nil,
-        fill: Color = IOSAppTheme.glassSurfaceFill,
+        fill: Color = Theme.Surface.glassSurface,
         strokeOpacity: Double = 0.12,
         interactive: Bool = false
     ) -> some View {
@@ -318,7 +132,7 @@ extension View {
 
 struct IOSScreenBackdrop: View {
     var body: some View {
-        IOSBrandTheme.canvasBottom
+        Theme.Surface.canvasBottom
         .ignoresSafeArea()
     }
 }
@@ -393,7 +207,7 @@ struct IOSSurfaceCard<Content: View>: View {
     }
 
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: IOSAppTheme.cardCornerRadius, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous)
 
         VStack(alignment: .leading, spacing: contentSpacing) {
             content
@@ -422,11 +236,11 @@ struct IOSSectionHeading: View {
             Text(title.uppercased())
                 .iosScaledFont(size: 11, weight: .semibold, relativeTo: .caption2)
                 .tracking(0.88)
-                .foregroundStyle(IOSAppTheme.textSecondary)
+                .foregroundStyle(Theme.Text.secondary)
             if let subtitle, !subtitle.isEmpty {
                 Text(subtitle)
                     .font(.caption)
-                    .foregroundStyle(IOSAppTheme.textSecondary)
+                    .foregroundStyle(Theme.Text.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -459,7 +273,7 @@ struct IOSCompactCardHeader: View {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Text(title)
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(IOSAppTheme.textPrimary)
+                    .foregroundStyle(Theme.Text.primary)
 
                 Spacer(minLength: 8)
 
@@ -471,7 +285,7 @@ struct IOSCompactCardHeader: View {
             if let message, !message.isEmpty {
                 Text(message)
                     .font(.caption2)
-                    .foregroundStyle(IOSAppTheme.textSecondary)
+                    .foregroundStyle(Theme.Text.secondary)
                     .lineLimit(1)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -520,11 +334,11 @@ struct IOSPageHeader: View {
                 VStack(alignment: .leading, spacing: titleSpacing) {
                     Text(title)
                         .font(.system(.largeTitle, design: .default, weight: .bold))
-                        .foregroundStyle(IOSAppTheme.textPrimary)
+                        .foregroundStyle(Theme.Text.primary)
                         .multilineTextAlignment(.leading)
                     Text(subtitle)
                         .font(.body)
-                        .foregroundStyle(IOSAppTheme.textSecondary)
+                        .foregroundStyle(Theme.Text.secondary)
                         .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -580,13 +394,13 @@ struct IOSCompactPageHeader: View {
                 VStack(alignment: .leading, spacing: titleSpacing) {
                     Text(title)
                         .font(.system(.title2, design: .default, weight: .bold))
-                        .foregroundStyle(IOSAppTheme.textPrimary)
+                        .foregroundStyle(Theme.Text.primary)
                         .lineLimit(1)
                         .minimumScaleFactor(0.9)
 
                     Text(subtitle)
                         .font(.subheadline)
-                        .foregroundStyle(IOSAppTheme.textSecondary)
+                        .foregroundStyle(Theme.Text.secondary)
                         .lineLimit(1)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -610,13 +424,13 @@ struct IOSStudioHeaderChip: View {
 
         Text(title)
             .font(.caption2.weight(.medium))
-            .foregroundStyle(IOSAppTheme.textPrimary)
+            .foregroundStyle(Theme.Text.primary)
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
             .iosSubtleGlassSurface(
                 in: shape,
                 tint: tint,
-                fill: IOSAppTheme.glassSurfaceFillMuted.opacity(0.52),
+                fill: Theme.Surface.glassSurfaceMuted.opacity(0.52),
                 strokeOpacity: 0.10
             )
     }
@@ -663,7 +477,7 @@ struct IOSStudioUtilityHeader: View {
             if let subtitle, !subtitle.isEmpty {
                 Text(subtitle)
                     .font(.footnote)
-                    .foregroundStyle(IOSAppTheme.textSecondary.opacity(subtitleProminence))
+                    .foregroundStyle(Theme.Text.secondary.opacity(subtitleProminence))
                     .lineLimit(1)
                     .truncationMode(.tail)
                     .layoutPriority(0.5)
@@ -675,11 +489,11 @@ struct IOSStudioUtilityHeader: View {
             }
 
             if let runtimeLabel, !runtimeLabel.isEmpty {
-                IOSStudioHeaderChip(title: runtimeLabel, tint: IOSBrandTheme.accent)
+                IOSStudioHeaderChip(title: runtimeLabel, tint: Theme.Brand.gold)
             }
 
             if let modelLabel, !modelLabel.isEmpty {
-                IOSStudioHeaderChip(title: modelLabel, tint: IOSBrandTheme.library)
+                IOSStudioHeaderChip(title: modelLabel, tint: Theme.Brand.library)
             }
         }
     }
@@ -693,7 +507,7 @@ struct IOSStudioUtilityHeader: View {
         case .section:
             Text(title)
                 .font(titleFont)
-                .foregroundStyle(IOSAppTheme.textPrimary)
+                .foregroundStyle(Theme.Text.primary)
                 .lineLimit(1)
                 .tracking(titleTracking)
         }
@@ -730,7 +544,7 @@ struct IOSProductTitleLockup: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: lockupSpacing) {
-            Image(IOSBrandTheme.headerMarkAssetName)
+            Image(Theme.Branding.headerMarkAssetName)
                 .renderingMode(.original)
                 .resizable()
                 .interpolation(.high)
@@ -741,7 +555,7 @@ struct IOSProductTitleLockup: View {
 
             Text(title)
                 .font(.system(.title3, design: .rounded, weight: .semibold))
-                .foregroundStyle(IOSAppTheme.textPrimary)
+                .foregroundStyle(Theme.Text.primary)
                 .lineLimit(1)
                 .tracking(0)
         }
@@ -768,7 +582,7 @@ struct IOSStatusStrip: View {
         title: String,
         message: String? = nil,
         symbolName: String = "info.circle.fill",
-        tint: Color = IOSBrandTheme.accent
+        tint: Color = Theme.Brand.gold
     ) {
         self.title = title
         self.message = message
@@ -788,12 +602,12 @@ struct IOSStatusStrip: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(IOSAppTheme.textPrimary)
+                    .foregroundStyle(Theme.Text.primary)
 
                 if let message, !message.isEmpty {
                     Text(message)
                         .font(.caption)
-                        .foregroundStyle(IOSAppTheme.textSecondary)
+                        .foregroundStyle(Theme.Text.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -805,7 +619,7 @@ struct IOSStatusStrip: View {
         .iosSubtleGlassSurface(
             in: shape,
             tint: tint,
-            fill: IOSAppTheme.glassSurfaceFillMuted,
+            fill: Theme.Surface.glassSurfaceMuted,
             strokeOpacity: 0.16
         )
     }
@@ -824,7 +638,7 @@ struct IOSInfoBanner: View {
         title: String,
         message: String,
         symbolName: String = "info.circle.fill",
-        tint: Color = IOSBrandTheme.accent
+        tint: Color = Theme.Brand.gold
     ) {
         self.title = title
         self.message = message
@@ -844,10 +658,10 @@ struct IOSInfoBanner: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text(title)
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(IOSAppTheme.textPrimary)
+                    .foregroundStyle(Theme.Text.primary)
                 Text(message)
                     .font(.subheadline)
-                    .foregroundStyle(IOSAppTheme.textSecondary)
+                    .foregroundStyle(Theme.Text.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -855,7 +669,7 @@ struct IOSInfoBanner: View {
         .iosSubtleGlassSurface(
             in: shape,
             tint: tint,
-            fill: IOSAppTheme.glassSurfaceFill,
+            fill: Theme.Surface.glassSurface,
             strokeOpacity: 0.16
         )
     }
@@ -869,7 +683,7 @@ struct IOSScriptLengthStatusRow: View {
         HStack(alignment: .firstTextBaseline, spacing: 12) {
             Text(state.helperMessage)
                 .font(.caption)
-                .foregroundStyle(state.isOverLimit ? .orange : IOSAppTheme.textSecondary)
+                .foregroundStyle(state.isOverLimit ? .orange : Theme.Text.secondary)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier(IOSAccessibilityIdentifier.TextInput.limitMessage)
 
@@ -905,8 +719,8 @@ struct IOSFloatingTopBar<Content: View>: View {
         .background(
             LinearGradient(
                 colors: [
-                    IOSAppTheme.backgroundTop.opacity(0.96),
-                    IOSAppTheme.backgroundTop.opacity(0.90),
+                    Theme.Surface.canvas.opacity(0.96),
+                    Theme.Surface.canvas.opacity(0.90),
                     .clear
                 ],
                 startPoint: .top,
@@ -941,11 +755,11 @@ struct IOSStickyActionBar<Content: View>: View {
             .padding(.bottom, bottomPadding)
             .iosSubtleGlassSurface(
                 in: shape,
-                tint: IOSBrandTheme.accent,
-                fill: IOSAppTheme.glassFloatingFill,
+                tint: Theme.Brand.gold,
+                fill: Theme.Surface.glassFloating,
                 strokeOpacity: 0.14
             )
-            .shadow(color: IOSAppTheme.accentGlow.opacity(0.10), radius: 12, x: 0, y: 6)
+            .shadow(color: Theme.Brand.goldGlow.opacity(0.10), radius: 12, x: 0, y: 6)
         }
         .padding(.horizontal, 12)
         .padding(.top, 6)
@@ -979,10 +793,10 @@ struct IOSEmptyStateCard: View {
                     .foregroundStyle(tint)
                 Text(title)
                     .font(.headline.weight(.semibold))
-                    .foregroundStyle(IOSAppTheme.textPrimary)
+                    .foregroundStyle(Theme.Text.primary)
                 Text(message)
                     .font(.footnote)
-                    .foregroundStyle(IOSAppTheme.textSecondary)
+                    .foregroundStyle(Theme.Text.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -997,11 +811,11 @@ struct IOSHeaderMetricRow: View {
         HStack(alignment: .top, spacing: 16) {
             Text(label)
                 .font(.subheadline.weight(.medium))
-                .foregroundStyle(IOSAppTheme.textSecondary.opacity(0.92))
+                .foregroundStyle(Theme.Text.secondary.opacity(0.92))
             Spacer()
             Text(value)
                 .font(.subheadline)
-                .foregroundStyle(IOSAppTheme.textPrimary)
+                .foregroundStyle(Theme.Text.primary)
                 .multilineTextAlignment(.trailing)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -1022,8 +836,8 @@ private struct IOSFieldChromeModifier: ViewModifier {
         let strokeColor = isFocused ? Color.white.opacity(0.30) : Color.white.opacity(0.16)
         let strokeWidth = isFocused ? 1.0 : 0.8
         let fill = isFocused
-            ? IOSAppTheme.glassSurfaceFillMuted.opacity(0.90)
-            : IOSAppTheme.glassSurfaceFillMuted.opacity(0.74)
+            ? Theme.Surface.glassSurfaceMuted.opacity(0.90)
+            : Theme.Surface.glassSurfaceMuted.opacity(0.74)
 
         content
             .frame(minHeight: minimumHeight)
@@ -1031,7 +845,7 @@ private struct IOSFieldChromeModifier: ViewModifier {
             .padding(.vertical, verticalPadding)
             .iosSubtleGlassSurface(
                 in: shape,
-                tint: isFocused ? tint : IOSBrandTheme.silver,
+                tint: isFocused ? tint : Theme.Brand.silver,
                 fill: fill,
                 strokeOpacity: isFocused ? 0.18 : 0.12,
                 interactive: true
@@ -1044,7 +858,7 @@ private struct IOSFieldChromeModifier: ViewModifier {
                     )
                     .allowsHitTesting(false)
             }
-            .iosAppAnimation(IOSSelectionMotion.highlight, value: isFocused)
+            .iosAppAnimation(Theme.Motion.highlight, value: isFocused)
     }
 }
 
@@ -1059,8 +873,8 @@ private struct IOSSelectionFieldChromeModifier: ViewModifier {
     func body(content: Content) -> some View {
         let shape = RoundedRectangle(cornerRadius: 15, style: .continuous)
         let fill = isFocused
-            ? IOSAppTheme.glassSurfaceFillMuted.opacity(0.72)
-            : IOSAppTheme.glassSurfaceFillMuted.opacity(0.56)
+            ? Theme.Surface.glassSurfaceMuted.opacity(0.72)
+            : Theme.Surface.glassSurfaceMuted.opacity(0.56)
         let outerStroke = isFocused ? Color.white.opacity(0.20) : Color.white.opacity(0.10)
         let accentStroke = isFocused ? tint.opacity(0.22) : tint.opacity(0.10)
 
@@ -1104,7 +918,7 @@ private struct IOSSelectionFieldChromeModifier: ViewModifier {
                     .allowsHitTesting(false)
             }
             .shadow(color: tint.opacity(isFocused ? 0.12 : 0.05), radius: isFocused ? 14 : 10, x: 0, y: 4)
-            .iosAppAnimation(IOSSelectionMotion.highlight, value: isFocused)
+            .iosAppAnimation(Theme.Motion.highlight, value: isFocused)
     }
 }
 
@@ -1116,7 +930,7 @@ private struct IOSCompactTextProminentUtilityButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         let shape = Capsule(style: .continuous)
-        let foreground = configuration.isPressed ? IOSAppTheme.accentForegroundPressed : IOSAppTheme.accentForeground
+        let foreground = configuration.isPressed ? Theme.Text.onAccentPressed : Theme.Text.onAccent
 
         return configuration.label
             .foregroundStyle(foreground)
@@ -1134,17 +948,17 @@ private struct IOSCompactTextProminentUtilityButtonStyle: ButtonStyle {
                     .stroke(tint.opacity(configuration.isPressed ? 0.34 : 0.28), lineWidth: 0.9)
             }
             .opacity(configuration.isPressed ? 0.96 : 1.0)
-            .iosAppAnimation(IOSSelectionMotion.press, value: configuration.isPressed)
+            .iosAppAnimation(Theme.Motion.press, value: configuration.isPressed)
     }
 }
 
 extension View {
-    func iosFieldChrome(isFocused: Bool = false, tint: Color = IOSBrandTheme.accent) -> some View {
+    func iosFieldChrome(isFocused: Bool = false, tint: Color = Theme.Brand.gold) -> some View {
         modifier(IOSFieldChromeModifier(isFocused: isFocused, tint: tint))
     }
 
     func iosSelectionFieldChrome(
-        tint: Color = IOSBrandTheme.accent,
+        tint: Color = Theme.Brand.gold,
         isFocused: Bool = false
     ) -> some View {
         modifier(
@@ -1172,7 +986,7 @@ extension View {
             if compactTextProminent {
                 self.buttonStyle(
                     IOSCompactTextProminentUtilityButtonStyle(
-                        tint: tint ?? IOSBrandTheme.accent
+                        tint: tint ?? Theme.Brand.gold
                     )
                 )
             } else if prominent {
@@ -1236,8 +1050,8 @@ struct IOSBottomPrimaryActionInset<Accessory: View, Content: View>: View {
                 LinearGradient(
                     colors: [
                         .clear,
-                        IOSAppTheme.backgroundBottom.opacity(0.56),
-                        IOSAppTheme.backgroundBottom.opacity(0.94)
+                        Theme.Surface.canvasBottom.opacity(0.56),
+                        Theme.Surface.canvasBottom.opacity(0.94)
                     ],
                     startPoint: .top,
                     endPoint: .bottom
@@ -1265,7 +1079,7 @@ extension View {
         return self.iosSubtleGlassSurface(
             in: shape,
             tint: tint,
-            fill: IOSAppTheme.glassFloatingFill.opacity(0.68),
+            fill: Theme.Surface.glassFloating.opacity(0.68),
             strokeOpacity: 0.12,
             interactive: true
         )
@@ -1276,7 +1090,7 @@ extension View {
         return self.iosSubtleGlassSurface(
             in: shape,
             tint: tint,
-            fill: IOSAppTheme.glassSurfaceFill.opacity(0.58),
+            fill: Theme.Surface.glassSurface.opacity(0.58),
             strokeOpacity: 0.10
         )
     }

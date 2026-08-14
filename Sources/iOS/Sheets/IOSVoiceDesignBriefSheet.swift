@@ -39,7 +39,7 @@ struct IOSVoiceDesignBriefSheet: View {
                 } label: {
                     Text("Confirm")
                         .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(IOSAppTheme.textPrimary)
+                        .foregroundStyle(Theme.Text.primary)
                         .padding(.horizontal, 18)
                         .frame(height: 40)
                         .background {
@@ -61,7 +61,7 @@ struct IOSVoiceDesignBriefSheet: View {
                 Text("Describe the voice. Combine character, age, accent, and texture.")
                     .iosScaledFont(size: 14, weight: .regular, relativeTo: .footnote)
                     .lineSpacing(1)
-                    .foregroundStyle(IOSAppTheme.textSecondary)
+                    .foregroundStyle(Theme.Text.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.horizontal, 20)
                     .padding(.bottom, 16)
@@ -76,7 +76,7 @@ struct IOSVoiceDesignBriefSheet: View {
                     if voiceDescription.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                         Text("A warm, deep narrator with a subtle British accent.")
                             .font(.system(size: 16, weight: .medium))
-                            .foregroundStyle(IOSAppTheme.textTertiary)
+                            .foregroundStyle(Theme.Text.tertiary)
                             .padding(.horizontal, 16)
                             .padding(.vertical, 18)
                             .allowsHitTesting(false)
@@ -111,7 +111,7 @@ struct IOSVoiceDesignBriefSheet: View {
                         .foregroundStyle(
                             voiceDescription.count >= IOSGenerationTextLimitPolicy.descriptionLimit
                                 ? tint
-                                : IOSAppTheme.textTertiary
+                                : Theme.Text.tertiary
                         )
                         .accessibilityIdentifier("voiceBrief_charCount")
                 }
@@ -122,7 +122,7 @@ struct IOSVoiceDesignBriefSheet: View {
                 Text("Starting points".uppercased())
                     .iosScaledFont(size: 11, weight: .semibold, relativeTo: .caption2)
                     .tracking(0.88)
-                    .foregroundStyle(IOSAppTheme.textSecondary)
+                    .foregroundStyle(Theme.Text.secondary)
                     .padding(.horizontal, 20)
                     .padding(.bottom, 10)
 
@@ -136,7 +136,7 @@ struct IOSVoiceDesignBriefSheet: View {
                             Text(startingPoint)
                                 .iosScaledFont(size: 14, weight: .regular, relativeTo: .footnote)
                                 .lineSpacing(1)
-                                .foregroundStyle(IOSAppTheme.textPrimary)
+                                .foregroundStyle(Theme.Text.primary)
                                 .lineLimit(2)
                                 .multilineTextAlignment(.leading)
                                 .fixedSize(horizontal: false, vertical: true)
@@ -184,7 +184,7 @@ private struct IOSBriefTextEditor: UIViewRepresentable {
         view.accessibilityIdentifier = "voiceBrief_editor"
         view.backgroundColor = .clear
         view.font = .systemFont(ofSize: 16, weight: .medium)
-        view.textColor = IOSAppTheme.textPrimaryUIColor
+        view.textColor = Theme.Text.primaryUIColor
         view.tintColor = tintColor
         view.isScrollEnabled = true
         view.bounces = false               // no rubber-band, even when the brief overflows

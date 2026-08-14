@@ -121,7 +121,7 @@ struct IOSStudioCanvas<SetupChips: View>: View {
                 // generation is confusing). Re-enabled at .complete for the next take.
                 .disabled(isGenerationActive)
                 .opacity(isGenerationActive ? 0.5 : 1)
-                .iosAppAnimation(IOSDesignMotion.stateChange, value: isGenerationActive)
+                .iosAppAnimation(Theme.Motion.stateChange, value: isGenerationActive)
                 .layoutPriority(2)
             dockArea
                 .padding(.horizontal, 16)
@@ -141,7 +141,7 @@ struct IOSStudioCanvas<SetupChips: View>: View {
         // the whole canvas up into a cramped strip. The composer is the top,
         // flex element so the text you're typing stays visible above the keyboard.
         .ignoresSafeArea(.keyboard, edges: .bottom)
-        .iosAppAnimation(IOSDesignMotion.stateChange, value: genState)
+        .iosAppAnimation(Theme.Motion.stateChange, value: genState)
     }
 
     /// A take is actively generating (request in flight or live-streaming).
@@ -193,14 +193,14 @@ struct IOSStudioCanvas<SetupChips: View>: View {
                     Text(placeholder)
                         .font(.system(size: 22, weight: .medium))
                         .tracking(-0.22)            // letter-spacing -0.01em ≈ -0.22pt at 22pt
-                        .foregroundStyle(IOSAppTheme.textTertiary)
+                        .foregroundStyle(Theme.Text.tertiary)
                         .padding(.top, 8)
                         .allowsHitTesting(false)
                 }
                 IOSFlexibleTextEditor(
                     text: $script,
                     font: UIFont.systemFont(ofSize: 22, weight: .medium),
-                    textColor: IOSAppTheme.textPrimaryUIColor,
+                    textColor: Theme.Text.primaryUIColor,
                     tintColor: UIColor(tint),
                     isFocused: Binding(
                         get: { isScriptFocused },
@@ -222,7 +222,7 @@ struct IOSStudioCanvas<SetupChips: View>: View {
                 Text(modeMetaLabel)
                     .iosScaledFont(size: 12, weight: .medium, relativeTo: .caption)
                     .tracking(0.24)               // letter-spacing 0.02em ≈ 0.24pt at 12pt
-                    .foregroundStyle(IOSAppTheme.textSecondary)
+                    .foregroundStyle(Theme.Text.secondary)
                     .accessibilityIdentifier("textInput_modeMetaLabel")
                 Spacer()
                 if !script.isEmpty {
@@ -235,13 +235,13 @@ struct IOSStudioCanvas<SetupChips: View>: View {
                             .frame(minWidth: 44, minHeight: 44)
                     }
                     .buttonStyle(.plain)
-                    .foregroundStyle(IOSAppTheme.textSecondary)
+                    .foregroundStyle(Theme.Text.secondary)
                     .accessibilityLabel("Clear script")
                     .accessibilityIdentifier(IOSAccessibilityIdentifier.TextInput.clearButton)
                 }
                 Text("\(script.count) / \(charLimit)")
                     .iosScaledFont(size: 12, weight: .medium, monospacedDigit: true, relativeTo: .caption)
-                    .foregroundStyle(script.count > charLimit ? Color.orange : IOSAppTheme.textSecondary)
+                    .foregroundStyle(script.count > charLimit ? Color.orange : Theme.Text.secondary)
                     .accessibilityIdentifier("textInput_lengthCount")
             }
             .padding(.top, 4)
@@ -326,10 +326,10 @@ struct IOSStudioCanvas<SetupChips: View>: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Generation failed")
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(IOSAppTheme.textPrimary)
+                        .foregroundStyle(Theme.Text.primary)
                     Text(errorMessage ?? "Try again.")
                         .font(.system(size: 11))
-                        .foregroundStyle(IOSAppTheme.textSecondary)
+                        .foregroundStyle(Theme.Text.secondary)
                         .lineLimit(1)
                 }
 
@@ -337,7 +337,7 @@ struct IOSStudioCanvas<SetupChips: View>: View {
 
                 Image(systemName: "arrow.clockwise")
                     .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(IOSAppTheme.textPrimary.opacity(canGenerate ? 1 : 0.45))
+                    .foregroundStyle(Theme.Text.primary.opacity(canGenerate ? 1 : 0.45))
             }
             .padding(.horizontal, 14)
             .frame(maxWidth: .infinity)
@@ -384,10 +384,10 @@ struct IOSStudioCanvas<SetupChips: View>: View {
             VStack(alignment: .trailing, spacing: 2) {
                 Text("Generating")
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(IOSAppTheme.textPrimary)
+                    .foregroundStyle(Theme.Text.primary)
                 Text(generatingSubline)
                     .font(.system(size: 11))
-                    .foregroundStyle(IOSAppTheme.textSecondary)
+                    .foregroundStyle(Theme.Text.secondary)
             }
 
             Button {
@@ -395,10 +395,10 @@ struct IOSStudioCanvas<SetupChips: View>: View {
             } label: {
                 Image(systemName: "stop.fill")
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(IOSAppTheme.textPrimary)
+                    .foregroundStyle(Theme.Text.primary)
                     .frame(width: 44, height: 44)
                     .background {
-                        Circle().fill(IOSAppTheme.glassSurfaceFillMuted.opacity(0.7))
+                        Circle().fill(Theme.Surface.glassSurfaceMuted.opacity(0.7))
                     }
             }
             .buttonStyle(.plain)
@@ -491,7 +491,7 @@ struct IOSStudioInlinePlayerItem: Equatable {
             transcript: transcript,
             voiceName: voiceName,
             modeLabel: modeLabel,
-            modeTint: IOSBrandTheme.modeColor(for: mode),
+            modeTint: Theme.Brand.modeColor(mode),
             subtitle: "Just now",
             avatarSeed: voiceName,
             avatarInitials: voiceName,

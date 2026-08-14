@@ -193,7 +193,7 @@ struct IOSCustomVoiceView: View {
             placeholder: "Type or paste your script.",
             modeMetaLabel: "Built-in voice",
             charLimit: scriptLimitState.displayLimit,
-            tint: IOSBrandTheme.custom,
+            tint: Theme.Brand.modeCustom,
             genState: studioGenState,
             errorMessage: coordinator.errorMessage,
             canGenerate: canGenerateInCurrentRuntime,
@@ -217,7 +217,7 @@ struct IOSCustomVoiceView: View {
             onPlayerExpand: expandInlinePlayer
         )
         .opacity(chromeOpacity)
-        .iosAppAnimation(IOSSelectionMotion.modeCrossfade, value: isGenerationActive)
+        .iosAppAnimation(Theme.Motion.modeCrossfade, value: isGenerationActive)
     }
 
     @ViewBuilder
@@ -228,7 +228,7 @@ struct IOSCustomVoiceView: View {
                 value: "Resume project",
                 abbreviation: "LF",
                 leadingSymbol: "arrow.clockwise",
-                tint: IOSBrandTheme.custom,
+                tint: Theme.Brand.modeCustom,
                 accessibilityID: "longform_resumeChip",
                 action: {
                     appModel.longForm.resume(
@@ -278,7 +278,7 @@ struct IOSCustomVoiceView: View {
         longFormResumeChip
         IOSLongFormSegmentsMenuChip(
             mode: .custom,
-            tint: IOSBrandTheme.custom,
+            tint: Theme.Brand.modeCustom,
             appModel: appModel,
             ttsEngine: ttsEngine,
             audioPlayer: audioPlayer,
@@ -291,7 +291,7 @@ struct IOSCustomVoiceView: View {
             // Mirrors the macOS per-mode glyph (QwenVoiceCore GenerationMode.iconName =
             // "person.wave.2"), .fill variant to match the iOS pills' filled styling.
             leadingSymbol: "person.wave.2.fill",
-            tint: IOSBrandTheme.custom,
+            tint: Theme.Brand.modeCustom,
             accessibilityID: "studioChip_voice",
             action: presentVoicePicker
         )
@@ -319,11 +319,11 @@ struct IOSCustomVoiceView: View {
                 ).displayName
             ),
             leadingSymbol: "globe",
-            tint: IOSBrandTheme.custom,
+            tint: Theme.Brand.modeCustom,
             accessibilityID: "studioChip_language",
             action: presentLanguagePicker
         )
-        IOSSeedPinChip(pinnedSeed: $draft.pinnedSeed, tint: IOSBrandTheme.custom)
+        IOSSeedPinChip(pinnedSeed: $draft.pinnedSeed, tint: Theme.Brand.modeCustom)
     }
 
     private func presentVoicePicker() {
@@ -341,7 +341,7 @@ struct IOSCustomVoiceView: View {
                             draft.selectedSpeaker = newSpeaker
                         }
                     ),
-                    tint: IOSBrandTheme.custom,
+                    tint: Theme.Brand.modeCustom,
                     onDismiss: dismiss,
                     presentation: .edgeToEdge(
                         bottomSafeAreaInset: bottomSafeAreaInset,
@@ -357,7 +357,7 @@ struct IOSCustomVoiceView: View {
             AnyView(
                 IOSQwenLanguagePickerSheet(
                     selectedLanguage: $draft.selectedLanguage,
-                    tint: IOSBrandTheme.custom,
+                    tint: Theme.Brand.modeCustom,
                     recommended: detectedPromptLanguage,
                     onDismiss: dismiss,
                     presentation: .edgeToEdge(
@@ -383,7 +383,7 @@ struct IOSCustomVoiceView: View {
                     ),
                     intensity: $draft.delivery.selectedIntensity,
                     customText: $draft.delivery.customText,
-                    tint: IOSBrandTheme.custom,
+                    tint: Theme.Brand.modeCustom,
                     onUseCustomTone: { draft.delivery.mode = .custom },
                     onDismiss: dismiss,
                     presentation: .edgeToEdge(
@@ -845,7 +845,7 @@ struct IOSVoiceDesignView: View {
                         .transition(.move(edge: .top).combined(with: .opacity))
                 }
             }
-            .iosAppAnimation(IOSSelectionMotion.miniPlayerSlide, value: savedDesignedResult)
+            .iosAppAnimation(Theme.Motion.miniPlayerSlide, value: savedDesignedResult)
             .task(id: savedDesignedResult) {
                 guard savedDesignedResult != nil else { return }
                 try? await Task.sleep(for: .seconds(6))
@@ -897,16 +897,16 @@ struct IOSVoiceDesignView: View {
         HStack(spacing: 12) {
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(IOSBrandTheme.design)
+                .foregroundStyle(Theme.Brand.modeDesign)
 
             VStack(alignment: .leading, spacing: 1) {
                 Text("Saved “\(result.voice.name)”")
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(IOSAppTheme.textPrimary)
+                    .foregroundStyle(Theme.Text.primary)
                     .lineLimit(1)
                 Text("Now in your voices.")
                     .font(.caption)
-                    .foregroundStyle(IOSAppTheme.textSecondary)
+                    .foregroundStyle(Theme.Text.secondary)
             }
 
             Spacer(minLength: 8)
@@ -917,11 +917,11 @@ struct IOSVoiceDesignView: View {
             } label: {
                 Text("Use in Clone")
                     .font(.footnote.weight(.semibold))
-                    .foregroundStyle(IOSBrandTheme.clone)
+                    .foregroundStyle(Theme.Brand.modeClone)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 7)
-                    .background { Capsule(style: .continuous).fill(IOSBrandTheme.clone.opacity(0.16)) }
-                    .overlay { Capsule(style: .continuous).stroke(IOSBrandTheme.clone.opacity(0.32), lineWidth: 0.75) }
+                    .background { Capsule(style: .continuous).fill(Theme.Brand.modeClone.opacity(0.16)) }
+                    .overlay { Capsule(style: .continuous).stroke(Theme.Brand.modeClone.opacity(0.32), lineWidth: 0.75) }
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("design_savedVoice_useInClone")
@@ -929,11 +929,11 @@ struct IOSVoiceDesignView: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
         .background {
-            RoundedRectangle(cornerRadius: IOSCornerRadius.card, style: .continuous)
+            RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous)
                 .fill(IOSBottomSheetChrome.background)
         }
         .overlay {
-            RoundedRectangle(cornerRadius: IOSCornerRadius.card, style: .continuous)
+            RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous)
                 .stroke(Color.white.opacity(0.10), lineWidth: 0.5)
         }
         .shadow(color: Color.black.opacity(0.30), radius: 16, x: 0, y: 6)
@@ -949,7 +949,7 @@ struct IOSVoiceDesignView: View {
             placeholder: "Type the lines you want this designed voice to say.",
             modeMetaLabel: "Designed voice",
             charLimit: scriptLimitState.displayLimit,
-            tint: IOSBrandTheme.design,
+            tint: Theme.Brand.modeDesign,
             genState: studioGenState,
             errorMessage: coordinator.errorMessage,
             canGenerate: canGenerateInCurrentRuntime,
@@ -974,7 +974,7 @@ struct IOSVoiceDesignView: View {
             onSaveAsVoice: canSaveVoice ? { presentSaveDesignedVoice() } : nil
         )
         .opacity(chromeOpacity)
-        .iosAppAnimation(IOSSelectionMotion.modeCrossfade, value: isGenerationActive)
+        .iosAppAnimation(Theme.Motion.modeCrossfade, value: isGenerationActive)
     }
 
     @ViewBuilder
@@ -985,7 +985,7 @@ struct IOSVoiceDesignView: View {
                 value: "Resume project",
                 abbreviation: "LF",
                 leadingSymbol: "arrow.clockwise",
-                tint: IOSBrandTheme.design,
+                tint: Theme.Brand.modeDesign,
                 accessibilityID: "longform_resumeChip",
                 action: {
                     appModel.longForm.resume(
@@ -1035,7 +1035,7 @@ struct IOSVoiceDesignView: View {
         longFormResumeChip
         IOSLongFormSegmentsMenuChip(
             mode: .design,
-            tint: IOSBrandTheme.design,
+            tint: Theme.Brand.modeDesign,
             appModel: appModel,
             ttsEngine: ttsEngine,
             audioPlayer: audioPlayer,
@@ -1048,7 +1048,7 @@ struct IOSVoiceDesignView: View {
             // Mirrors the macOS Voice Design glyph (GenerationMode.iconName = "text.bubble"),
             // .fill to match the iOS pills' filled styling — a text bubble reads as "describe it".
             leadingSymbol: "text.bubble.fill",
-            tint: IOSBrandTheme.design,
+            tint: Theme.Brand.modeDesign,
             isPlaceholder: draft.voiceDescription.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
             accessibilityID: "studioChip_voiceBrief",
             action: presentBriefEditor
@@ -1075,11 +1075,11 @@ struct IOSVoiceDesignView: View {
                 ).displayName
             ),
             leadingSymbol: "globe",
-            tint: IOSBrandTheme.design,
+            tint: Theme.Brand.modeDesign,
             accessibilityID: "studioChip_language",
             action: presentDesignLanguagePicker
         )
-        IOSSeedPinChip(pinnedSeed: $draft.pinnedSeed, tint: IOSBrandTheme.design)
+        IOSSeedPinChip(pinnedSeed: $draft.pinnedSeed, tint: Theme.Brand.modeDesign)
     }
 
     private func presentBriefEditor() {
@@ -1087,7 +1087,7 @@ struct IOSVoiceDesignView: View {
             AnyView(
                 IOSVoiceDesignBriefSheet(
                     voiceDescription: $draft.voiceDescription,
-                    tint: IOSBrandTheme.design,
+                    tint: Theme.Brand.modeDesign,
                     presentation: .edgeToEdge(
                         bottomSafeAreaInset: bottomSafeAreaInset,
                         height: IOSBottomSheetChrome.expandedHeight(forScreenHeight: availableHeight)
@@ -1103,7 +1103,7 @@ struct IOSVoiceDesignView: View {
             AnyView(
                 IOSQwenLanguagePickerSheet(
                     selectedLanguage: $draft.selectedLanguage,
-                    tint: IOSBrandTheme.design,
+                    tint: Theme.Brand.modeDesign,
                     recommended: detectedPromptLanguage,
                     onDismiss: dismiss,
                     presentation: .edgeToEdge(
@@ -1128,7 +1128,7 @@ struct IOSVoiceDesignView: View {
                     ),
                     intensity: $draft.delivery.selectedIntensity,
                     customText: $draft.delivery.customText,
-                    tint: IOSBrandTheme.design,
+                    tint: Theme.Brand.modeDesign,
                     onUseCustomTone: { draft.delivery.mode = .custom },
                     onDismiss: dismiss,
                     presentation: .edgeToEdge(
@@ -1612,7 +1612,7 @@ struct IOSVoiceCloningView: View {
                 placeholder: "Type the new text. The reference voice will speak it.",
                 modeMetaLabel: cloneModeMetaLabel,
                 charLimit: scriptLimitState.displayLimit,
-                tint: IOSBrandTheme.clone,
+                tint: Theme.Brand.modeClone,
                 genState: studioGenState,
                 errorMessage: coordinator.errorMessage,
                 canGenerate: canGenerateInCurrentRuntime,
@@ -1647,7 +1647,7 @@ struct IOSVoiceCloningView: View {
                 value: "Resume project",
                 abbreviation: "LF",
                 leadingSymbol: "arrow.clockwise",
-                tint: IOSBrandTheme.clone,
+                tint: Theme.Brand.modeClone,
                 accessibilityID: "longform_resumeChip",
                 action: {
                     appModel.longForm.resume(
@@ -1697,7 +1697,7 @@ struct IOSVoiceCloningView: View {
         longFormResumeChip
         IOSLongFormSegmentsMenuChip(
             mode: .clone,
-            tint: IOSBrandTheme.clone,
+            tint: Theme.Brand.modeClone,
             appModel: appModel,
             ttsEngine: ttsEngine,
             audioPlayer: audioPlayer,
@@ -1711,7 +1711,7 @@ struct IOSVoiceCloningView: View {
             // the badge's "+" doesn't double up with the unset "+" placeholder (the placeholder is
             // the sole add cue). Constant across set/unset — the value slot conveys the state.
             leadingSymbol: "waveform",
-            tint: IOSBrandTheme.clone,
+            tint: Theme.Brand.modeClone,
             isPlaceholder: draft.referenceAudioPath == nil,
             accessibilityID: "studioChip_reference",
             action: presentReferencePicker
@@ -1722,7 +1722,7 @@ struct IOSVoiceCloningView: View {
                 value: bankDeliveryLabel(persona),
                 abbreviation: IOSStudioChipAbbreviation.initials(bankDeliveryLabel(persona)),
                 leadingSymbol: "theatermasks",
-                tint: IOSBrandTheme.clone,
+                tint: Theme.Brand.modeClone,
                 accessibilityID: "studioChip_bankDelivery",
                 action: { presentBankDeliveryPicker(persona) }
             )
@@ -1740,11 +1740,11 @@ struct IOSVoiceCloningView: View {
                 ).displayName
             ),
             leadingSymbol: "globe",
-            tint: IOSBrandTheme.clone,
+            tint: Theme.Brand.modeClone,
             accessibilityID: "studioChip_language",
             action: presentCloneLanguagePicker
         )
-        IOSSeedPinChip(pinnedSeed: $draft.pinnedSeed, tint: IOSBrandTheme.clone)
+        IOSSeedPinChip(pinnedSeed: $draft.pinnedSeed, tint: Theme.Brand.modeClone)
     }
 
     private func presentReferencePicker() {
@@ -1803,7 +1803,7 @@ struct IOSVoiceCloningView: View {
             AnyView(
                 IOSQwenLanguagePickerSheet(
                     selectedLanguage: $draft.selectedLanguage,
-                    tint: IOSBrandTheme.clone,
+                    tint: Theme.Brand.modeClone,
                     recommended: detectedPromptLanguage,
                     onDismiss: dismiss,
                     presentation: .edgeToEdge(

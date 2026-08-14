@@ -36,7 +36,7 @@ enum AppTheme {
     // Solid sheet-well fill (recording/save sheets). Kept beside
     // smokedGlassTint so near-duplicate greys stay one decision.
     static let sheetWellFill = Color(white: 0.16)
-    // Vocello mode palette (mirrors Sources/iOS/IOSShellPrimitives.swift:IOSBrandTheme).
+    // Vocello mode palette (mirrors Sources/iOS/Theme/Theme.swift `Theme.Brand`).
     // The app is dark-only (appearance pinned in QwenVoiceApplicationDelegate),
     // matching the iOS brand values exactly.
     static let customVoice = vocelloGold                                 // warm golden — Vocello primary

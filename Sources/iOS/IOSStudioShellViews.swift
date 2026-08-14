@@ -57,7 +57,7 @@ struct IOSStudioShellScreen<Content: View>: View {
             screenContent
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
-        .iosAppAnimation(IOSSelectionMotion.modeCrossfade, value: activeTab)
+        .iosAppAnimation(Theme.Motion.modeCrossfade, value: activeTab)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .toolbar(.hidden, for: .navigationBar)
     }
@@ -73,7 +73,7 @@ struct IOSStudioWorkspaceHeading: View {
         Text(title)
             .iosScaledFont(size: 28, weight: .bold, relativeTo: .largeTitle)
             .tracking(-0.56)
-            .foregroundStyle(IOSAppTheme.textPrimary)
+            .foregroundStyle(Theme.Text.primary)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 20)
             .padding(.top, 4)
@@ -106,7 +106,7 @@ struct IOSStudioSectionGroup<Content: View>: View {
                 Text(title.uppercased())
                     .iosScaledFont(size: 11, weight: .semibold, relativeTo: .caption2)
                     .tracking(0.88)
-                    .foregroundStyle(IOSAppTheme.textSecondary)
+                    .foregroundStyle(Theme.Text.secondary)
                     .padding(.horizontal, 20)
                     .padding(.top, 14)
                     .padding(.bottom, 6)

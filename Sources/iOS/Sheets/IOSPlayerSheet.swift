@@ -136,7 +136,7 @@ struct IOSPlayerSheet: View {
             }
             .iosScaledFont(size: 11, weight: .semibold, relativeTo: .caption2)
             .tracking(0.88)
-            .foregroundStyle(IOSAppTheme.textPrimary)
+            .foregroundStyle(Theme.Text.primary)
 
             Spacer()
 
@@ -163,12 +163,12 @@ struct IOSPlayerSheet: View {
             Text(item.voiceName)
                 .iosScaledFont(size: 22, weight: .bold, relativeTo: .title2)
                 .tracking(-0.44)
-                .foregroundStyle(IOSAppTheme.textPrimary)
+                .foregroundStyle(Theme.Text.primary)
                 .lineLimit(1)
 
             Text("\(item.subtitle ?? "Just now") · \(controller.formatted(time: controller.duration))")
                 .iosScaledFont(size: 13, relativeTo: .footnote)
-                .foregroundStyle(IOSAppTheme.textSecondary)
+                .foregroundStyle(Theme.Text.secondary)
                 .monospacedDigit()
         }
         .frame(maxWidth: .infinity)
@@ -289,7 +289,7 @@ struct IOSPlayerSheet: View {
                 Image(systemName: controller.isPlaying ? "pause.fill" : "play.fill")
                     .accessibilityLabel(controller.isPlaying ? "Pause" : "Play")
                     .font(.system(size: 28, weight: .bold))
-                    .foregroundStyle(IOSAppTheme.accentForeground)
+                    .foregroundStyle(Theme.Text.onAccent)
                     .frame(width: 72, height: 72)
                     .background {
                         Circle()
@@ -339,7 +339,7 @@ struct IOSPlayerSheet: View {
                     .iosScaledFont(size: 11, weight: .semibold, relativeTo: .caption2)
                     .tracking(0.22)
             }
-            .foregroundStyle(IOSAppTheme.textSecondary)
+            .foregroundStyle(Theme.Text.secondary)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 8)
             .contentShape(Rectangle())
@@ -375,16 +375,16 @@ struct IOSPlayerSheetItem: Equatable, Identifiable {
         let modeLabel: String
         switch history.mode.lowercased() {
         case "custom":
-            modeTint = IOSBrandTheme.custom
+            modeTint = Theme.Brand.modeCustom
             modeLabel = "Custom"
         case "design":
-            modeTint = IOSBrandTheme.design
+            modeTint = Theme.Brand.modeDesign
             modeLabel = "Design"
         case "clone":
-            modeTint = IOSBrandTheme.clone
+            modeTint = Theme.Brand.modeClone
             modeLabel = "Clone"
         default:
-            modeTint = IOSBrandTheme.library
+            modeTint = Theme.Brand.library
             modeLabel = history.mode.capitalized
         }
         let voiceName = history.voice ?? "Voice"
@@ -413,7 +413,7 @@ struct IOSPlayerSheetItem: Equatable, Identifiable {
             transcript: transcript,
             voiceName: voice.name,
             modeLabel: "Clone",
-            modeTint: IOSBrandTheme.clone,
+            modeTint: Theme.Brand.modeClone,
             subtitle: "Saved voice",
             avatarSeed: voice.id,
             avatarInitials: voice.name,
@@ -443,7 +443,7 @@ struct IOSPlayerSheetItem: Equatable, Identifiable {
             transcript: "Hi, I'm \(speaker.displayName). \(descriptor).",
             voiceName: speaker.displayName,
             modeLabel: "Custom",
-            modeTint: IOSBrandTheme.custom,
+            modeTint: Theme.Brand.modeCustom,
             subtitle: "Voice preview",
             avatarSeed: speaker.id,
             avatarInitials: speaker.displayName,
@@ -501,18 +501,18 @@ struct IOSPlayerKaraokeText: View {
         for (i, span) in spans.enumerated() {
             var run = AttributedString(span.text)
             if span.isWhitespace {
-                run.foregroundColor = IOSAppTheme.textPrimary
+                run.foregroundColor = Theme.Text.primary
             } else if let highlight {
                 if i == highlight.activeIndex {
                     run.foregroundColor = tint
                     run.font = .system(size: karaokeSize, weight: .semibold)
                 } else if i < highlight.playedCount {
-                    run.foregroundColor = IOSAppTheme.textPrimary
+                    run.foregroundColor = Theme.Text.primary
                 } else {
-                    run.foregroundColor = IOSAppTheme.textTertiary
+                    run.foregroundColor = Theme.Text.tertiary
                 }
             } else {
-                run.foregroundColor = IOSAppTheme.textPrimary
+                run.foregroundColor = Theme.Text.primary
             }
             attributed.append(run)
         }
@@ -647,7 +647,7 @@ private struct IOSPlayerScrubSection: View {
             }
             .font(.system(.caption, design: .monospaced).monospacedDigit())
             .fontWeight(.medium)
-            .foregroundStyle(IOSAppTheme.textSecondary)
+            .foregroundStyle(Theme.Text.secondary)
         }
     }
 }

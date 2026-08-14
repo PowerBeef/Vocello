@@ -67,7 +67,7 @@ private struct IOSHistoryFilterChips: View {
         IOSFilterChipRow(
             options: IOSHistoryModeFilter.allCases,
             selection: $selection,
-            tint: IOSBrandTheme.library,
+            tint: Theme.Brand.library,
             label: \.title,
             leading: { filter in
                 AnyView(IOSModeDot(tint: filter.dotColor, diameter: 7))
@@ -97,10 +97,10 @@ enum IOSHistoryModeFilter: String, CaseIterable, Identifiable, Hashable {
 
     var tint: Color {
         switch self {
-        case .all: return IOSBrandTheme.library
-        case .custom: return IOSBrandTheme.custom
-        case .design: return IOSBrandTheme.design
-        case .clone: return IOSBrandTheme.clone
+        case .all: return Theme.Brand.library
+        case .custom: return Theme.Brand.modeCustom
+        case .design: return Theme.Brand.modeDesign
+        case .clone: return Theme.Brand.modeClone
         }
     }
 
@@ -193,7 +193,7 @@ private struct IOSHistoryLibrarySection: View {
                 } label: {
                     Image(systemName: "trash.circle")
                         .font(.system(size: 20, weight: .medium))
-                        .foregroundStyle(items.isEmpty ? IOSAppTheme.textTertiary : IOSAppTheme.textSecondary)
+                        .foregroundStyle(items.isEmpty ? Theme.Text.tertiary : Theme.Text.secondary)
                         .frame(width: 34, height: 34)
                 }
                 .disabled(items.isEmpty || databaseUnavailable)
@@ -222,7 +222,7 @@ private struct IOSHistoryLibrarySection: View {
                         Button("Retry") {
                             reload(reopenFailedStore: true)
                         }
-                            .iosAdaptiveUtilityButtonStyle(tint: IOSBrandTheme.library)
+                            .iosAdaptiveUtilityButtonStyle(tint: Theme.Brand.library)
                             .padding(.horizontal, 20)
                             .accessibilityIdentifier("historyRetryButton")
                     } else if items.isEmpty {
@@ -230,7 +230,7 @@ private struct IOSHistoryLibrarySection: View {
                             title: "No takes yet",
                             message: "Generated audio shows up here once you create a voice or line.",
                             symbolName: "clock.arrow.circlepath",
-                            tint: IOSBrandTheme.library
+                            tint: Theme.Brand.library
                         )
                         .padding(.horizontal, 20)
                         .padding(.top, 16)
@@ -239,7 +239,7 @@ private struct IOSHistoryLibrarySection: View {
                             title: "No matches",
                             message: "Nothing matches this filter or search. Try widening it.",
                             symbolName: "line.3.horizontal.decrease.circle",
-                            tint: IOSBrandTheme.library
+                            tint: Theme.Brand.library
                         )
                         .padding(.horizontal, 20)
                         .padding(.top, 16)
@@ -485,7 +485,7 @@ private struct IOSHistoryLibrarySection: View {
                     Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
                 }
                 .font(.footnote.weight(.medium))
-                .foregroundStyle(IOSAppTheme.textSecondary)
+                .foregroundStyle(Theme.Text.secondary)
             }
             .buttonStyle(.plain)
             .padding(.horizontal, 28)
@@ -565,13 +565,13 @@ private struct IOSHistoryItemCard: View {
     private var modeTint: Color {
         switch item.mode.lowercased() {
         case "custom":
-            return IOSBrandTheme.custom
+            return Theme.Brand.modeCustom
         case "design":
-            return IOSBrandTheme.design
+            return Theme.Brand.modeDesign
         case "clone":
-            return IOSBrandTheme.clone
+            return Theme.Brand.modeClone
         default:
-            return IOSBrandTheme.library
+            return Theme.Brand.library
         }
     }
 
@@ -612,7 +612,7 @@ private struct IOSHistoryItemCard: View {
                         Text(item.textPreview)
                             .iosScaledFont(size: 15, weight: .medium)
                             .tracking(-0.15)
-                            .foregroundStyle(IOSAppTheme.textPrimary)
+                            .foregroundStyle(Theme.Text.primary)
                             .lineLimit(2)
                             .fixedSize(horizontal: false, vertical: true)
                             .multilineTextAlignment(.leading)
@@ -639,7 +639,7 @@ private struct IOSHistoryItemCard: View {
                             }
                         }
                         .iosScaledFont(size: 12, relativeTo: .caption)
-                        .foregroundStyle(IOSAppTheme.textSecondary)
+                        .foregroundStyle(Theme.Text.secondary)
                         .lineLimit(1)
                         // VoiceOver hears the full metadata including the mode
                         // (previously unspoken whenever a voice name was
@@ -681,7 +681,7 @@ private struct IOSHistoryItemCard: View {
             } label: {
                 Image(systemName: "ellipsis")
                     .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(IOSAppTheme.textPrimary)
+                    .foregroundStyle(Theme.Text.primary)
                     .frame(width: 32, height: 32)
                     .background {
                         Circle().fill(Color.white.opacity(0.06))

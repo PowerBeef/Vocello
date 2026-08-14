@@ -122,7 +122,7 @@ private struct IOSSubtleScrollIndicator: ViewModifier {
                     .frame(width: 3, height: thumbHeight)
                     .position(x: proxy.size.width - 5, y: centerY)
                     .opacity(isVisible ? 1 : 0)
-                    .iosAppAnimation(IOSDesignMotion.stateChange, value: isVisible)
+                    .iosAppAnimation(Theme.Motion.stateChange, value: isVisible)
             }
         }
         .allowsHitTesting(false)

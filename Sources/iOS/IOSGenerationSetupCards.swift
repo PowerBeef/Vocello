@@ -16,7 +16,7 @@ private struct IOSCompactSetupRow<Content: View>: View {
         HStack(alignment: .center, spacing: 10) {
             Text(title)
                 .font(.caption2.weight(.semibold))
-                .foregroundStyle(IOSAppTheme.textSecondary)
+                .foregroundStyle(Theme.Text.secondary)
                 .frame(minWidth: 54, alignment: .leading)
 
             Spacer(minLength: 8)
@@ -44,7 +44,7 @@ private struct IOSInlineSetupField<Content: View>: View {
         HStack(alignment: .center, spacing: 4) {
             Text(title)
                 .font(.footnote.weight(.medium))
-                .foregroundStyle(IOSAppTheme.textSecondary)
+                .foregroundStyle(Theme.Text.secondary)
                 .lineLimit(1)
                 .frame(width: titleWidth, alignment: .leading)
 
@@ -91,7 +91,7 @@ struct IOSCustomVoiceSetupCard: View {
                 IOSCompactInlineNotice(
                     message: message,
                     symbolName: "externaldrive.badge.exclamationmark",
-                    tint: IOSBrandTheme.custom
+                    tint: Theme.Brand.modeCustom
                 )
             }
         }
@@ -105,8 +105,8 @@ struct IOSCustomVoiceSetupCard: View {
                 }
             }
             .pickerStyle(.menu)
-            .tint(IOSBrandTheme.custom)
-            .iosSelectionFieldChrome(tint: IOSBrandTheme.custom)
+            .tint(Theme.Brand.modeCustom)
+            .iosSelectionFieldChrome(tint: Theme.Brand.modeCustom)
             // No fixed width — let the picker fill the IOSInlineSetupField
             // content cell so long speaker labels like "Aiden - English
             // native" render on one line. The 146pt cap was clipping them
@@ -120,7 +120,7 @@ struct IOSCustomVoiceSetupCard: View {
         IOSInlineSetupField(title: "Delivery") {
             IOSDeliveryPicker(
                 delivery: $delivery,
-                tint: IOSBrandTheme.custom,
+                tint: Theme.Brand.modeCustom,
                 customAccessibilityIdentifier: "customVoice_customDeliveryField"
             )
         }
@@ -147,7 +147,7 @@ struct IOSVoiceDesignSetupCard: View {
                 IOSCompactInlineNotice(
                     message: message,
                     symbolName: "externaldrive.badge.exclamationmark",
-                    tint: IOSBrandTheme.design
+                    tint: Theme.Brand.modeDesign
                 )
             }
         }
@@ -159,7 +159,7 @@ struct IOSVoiceDesignSetupCard: View {
                 TextField("Describe the voice you want", text: $voiceDescription)
                     .focused($isBriefFocused)
                     .padding(.trailing, voiceDescription.isEmpty ? 0 : 34)
-                    .iosFieldChrome(isFocused: isBriefFocused, tint: IOSBrandTheme.design)
+                    .iosFieldChrome(isFocused: isBriefFocused, tint: Theme.Brand.modeDesign)
                     .accessibilityIdentifier("voiceDesign_voiceDescriptionField")
 
                 if !voiceDescription.isEmpty {
@@ -178,7 +178,7 @@ struct IOSVoiceDesignSetupCard: View {
         IOSInlineSetupField(title: "Delivery") {
             IOSDeliveryPicker(
                 delivery: $delivery,
-                tint: IOSBrandTheme.design,
+                tint: Theme.Brand.modeDesign,
                 customAccessibilityIdentifier: "voiceDesign_customDeliveryField"
             )
         }
@@ -230,7 +230,7 @@ struct IOSVoiceCloningReferenceCard: View {
                     IOSCompactSetupRow(title: "Recording") {
                         Text(referenceFilename)
                             .font(.caption)
-                            .foregroundStyle(IOSAppTheme.textSecondary)
+                            .foregroundStyle(Theme.Text.secondary)
                             .lineLimit(1)
                     }
                 }
@@ -239,11 +239,11 @@ struct IOSVoiceCloningReferenceCard: View {
                     Button(action: toggleTranscriptExpansion) {
                         HStack(spacing: 10) {
                             Image(systemName: isTranscriptExpanded ? "chevron.down.circle.fill" : "chevron.right.circle.fill")
-                                .foregroundStyle(IOSBrandTheme.clone)
+                                .foregroundStyle(Theme.Brand.modeClone)
 
                             Text(isTranscriptExpanded ? "Hide transcript" : "Show transcript")
                                 .font(.footnote.weight(.semibold))
-                                .foregroundStyle(IOSAppTheme.textPrimary)
+                                .foregroundStyle(Theme.Text.primary)
 
                             Spacer(minLength: 0)
                         }
@@ -255,7 +255,7 @@ struct IOSVoiceCloningReferenceCard: View {
                     IOSMultilineTextView(
                         text: $referenceTranscript,
                         placeholder: "Add the transcript for this recording (optional)",
-                        tint: IOSBrandTheme.clone,
+                        tint: Theme.Brand.modeClone,
                         isScrollEnabled: false
                     )
                     .frame(height: 72)
@@ -275,7 +275,7 @@ struct IOSVoiceCloningReferenceCard: View {
                 IOSCompactInlineNotice(
                     message: message,
                     symbolName: "waveform.badge.exclamationmark",
-                    tint: IOSBrandTheme.clone
+                    tint: Theme.Brand.modeClone
                 )
             }
         }
@@ -291,8 +291,8 @@ struct IOSVoiceCloningReferenceCard: View {
                 }
             }
             .pickerStyle(.menu)
-            .tint(IOSBrandTheme.clone)
-            .iosFieldChrome(tint: IOSBrandTheme.clone)
+            .tint(Theme.Brand.modeClone)
+            .iosFieldChrome(tint: Theme.Brand.modeClone)
         }
     }
 
@@ -301,12 +301,12 @@ struct IOSVoiceCloningReferenceCard: View {
             Button(referenceAudioPath == nil ? "Add Audio" : "Replace Audio", action: onImportReference)
                 .iosAdaptiveUtilityButtonStyle(
                     compactTextProminent: true,
-                    tint: IOSBrandTheme.clone
+                    tint: Theme.Brand.modeClone
                 )
 
             if referenceAudioPath != nil {
                 Button("Remove", action: onClearReference)
-                    .iosAdaptiveUtilityButtonStyle(tint: IOSBrandTheme.clone)
+                    .iosAdaptiveUtilityButtonStyle(tint: Theme.Brand.modeClone)
             }
         }
     }
@@ -319,7 +319,7 @@ struct IOSVoiceCloningReferenceCard: View {
     }
 
     private func toggleTranscriptExpansion() {
-        IOSAccessibleAnimation.perform(IOSSelectionMotion.disclosure) {
+        IOSAccessibleAnimation.perform(Theme.Motion.disclosure) {
             isTranscriptExpanded.toggle()
         }
     }

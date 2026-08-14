@@ -138,8 +138,8 @@ struct IOSCapsuleSelector<Item: Identifiable & Hashable>: View {
                         .minimumScaleFactor(0.85)
                         .foregroundStyle(
                             item == selection
-                                ? IOSAppTheme.textPrimary
-                                : IOSAppTheme.textSecondary
+                                ? Theme.Text.primary
+                                : Theme.Text.secondary
                         )
                         .frame(minHeight: 36)
                         .padding(.horizontal, 20)
@@ -153,12 +153,12 @@ struct IOSCapsuleSelector<Item: Identifiable & Hashable>: View {
                 .buttonStyle(.plain)
                 .disabled(isSelectionDisabled && item != selection)
                 .opacity(isSelectionDisabled && item != selection ? 0.42 : 1)
-                .iosAppAnimation(IOSSelectionMotion.selectorLabel, value: selection)
+                .iosAppAnimation(Theme.Motion.selectorLabel, value: selection)
                 .accessibilityIdentifier(itemAccessibilityIdentifier(item))
                 .accessibilityAddTraits(item == selection ? .isSelected : [])
             }
         }
-        .iosAppAnimation(IOSDesignMotion.modePillSlide, value: selection)
+        .iosAppAnimation(Theme.Motion.modePillSlide, value: selection)
         .padding(4)
         .background {
             Capsule(style: .continuous)
@@ -219,6 +219,6 @@ extension IOSGenerationSection {
     }
 
     var primaryActionTint: Color {
-        IOSBrandTheme.modeColor(for: mode)
+        Theme.Brand.modeColor(mode)
     }
 }

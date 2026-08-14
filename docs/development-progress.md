@@ -76,12 +76,18 @@ fixed in-change. Sub-wave D (same day, desk): D10a glass-gate unification
 (the shared `IOSGatedGlassModifier` is now the sole `glassEffect` site;
 parity verified in all four gate states) and the X4+D9 Dynamic Type program
 (50 of 132 fixed-size sites adopted, ~80 kept fixed with recorded reasons,
-karaoke scales base + active-word run together). **Resume here: IUI-5's one
-remaining desk item is D10b — the token-namespace migration (403 legacy
-refs, missing `Theme` tokens, real drift; deliberately not landed blind, it
-needs per-surface visual verification) — then the counted five-run
-before/after measurement plus wave-level smoke (with large-type and
-scrollsToTop spot-checks) at the next phone window closes the wave.**
+karaoke scales base + active-word run together). Sub-wave E (2026-08-14,
+desk): D10b token-namespace unification — all five legacy namespaces
+(`IOSBrandTheme`, `IOSAppTheme`, `IOSCornerRadius`, `IOSDesignMotion`,
+`IOSSelectionMotion`) absorbed into the canonical `Theme`; ~440 call sites
+rewritten by a deterministic token map, value-identical by construction
+(the feared drift lived only in never-shipped aspirational tokens, now
+re-pointed to shipped truth with recorded deltas). The two-lens review
+mechanically reproduced all 401 hunks under the map — zero rendered
+deltas. **Resume here: IUI-5's desk work is done; the counted five-run
+before/after measurement plus wave-level smoke (with large-type,
+scrollsToTop, and D10b-confirmation spot-checks) at the next phone window
+closes the wave, then IUI-6 (registry formalization) is desk work.**
 
 **IUI-1 + IUI-2 closed — iOS frame-health instrument live with a measured
 baseline (2026-08-12, phone window):** the acceptance run

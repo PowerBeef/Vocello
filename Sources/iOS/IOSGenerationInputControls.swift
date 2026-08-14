@@ -53,13 +53,13 @@ struct IOSDeliveryPicker: View {
                 HStack(spacing: 10) {
                     Text(selectionLabel)
                         .lineLimit(1)
-                        .foregroundStyle(IOSAppTheme.textPrimary)
+                        .foregroundStyle(Theme.Text.primary)
 
                     Spacer(minLength: 8)
 
                     Image(systemName: delivery.mode == .custom ? "slider.horizontal.3" : "chevron.up.chevron.down")
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(delivery.mode == .custom ? tint : IOSAppTheme.textSecondary)
+                        .foregroundStyle(delivery.mode == .custom ? tint : Theme.Text.secondary)
                 }
                 .contentShape(Rectangle())
             }
@@ -155,7 +155,7 @@ struct IOSMultilineTextView: UIViewRepresentable {
     init(
         text: Binding<String>,
         placeholder: String,
-        tint: Color = IOSBrandTheme.accent,
+        tint: Color = Theme.Brand.gold,
         isFocused: Binding<Bool> = .constant(false),
         isEnabled: Bool = true,
         isScrollEnabled: Bool = true,
@@ -185,7 +185,7 @@ struct IOSMultilineTextView: UIViewRepresentable {
     func makeUIView(context: Context) -> UITextView {
         let textView = UITextView()
         textView.font = .preferredFont(forTextStyle: .body)
-        textView.backgroundColor = IOSAppTheme.fieldFillUIColor
+        textView.backgroundColor = Theme.Surface.fieldUIColor
         textView.layer.cornerRadius = 18
         textView.layer.borderWidth = 1
         textView.isEditable = isEnabled
@@ -195,7 +195,7 @@ struct IOSMultilineTextView: UIViewRepresentable {
         textView.textContainerInset = UIEdgeInsets(top: 16, left: 12, bottom: 16, right: 12)
         textView.delegate = context.coordinator
         textView.text = text.isEmpty ? placeholder : text
-        textView.textColor = text.isEmpty ? IOSAppTheme.textPlaceholderUIColor : IOSAppTheme.textPrimaryUIColor
+        textView.textColor = text.isEmpty ? Theme.Text.placeholderUIColor : Theme.Text.primaryUIColor
         textView.tintColor = UIColor(tint)
         textView.keyboardAppearance = textView.traitCollection.userInterfaceStyle == .dark ? .dark : .light
         textView.accessibilityIdentifier = accessibilityIdentifier
@@ -206,7 +206,7 @@ struct IOSMultilineTextView: UIViewRepresentable {
     func updateUIView(_ uiView: UITextView, context: Context) {
         guard !context.coordinator.isUpdating else { return }
 
-        uiView.backgroundColor = IOSAppTheme.fieldFillUIColor
+        uiView.backgroundColor = Theme.Surface.fieldUIColor
         uiView.tintColor = UIColor(tint)
         uiView.isScrollEnabled = isScrollEnabled
         uiView.isEditable = isEnabled
@@ -225,10 +225,10 @@ struct IOSMultilineTextView: UIViewRepresentable {
 
         if text.isEmpty, uiView.text != placeholder, !uiView.isFirstResponder {
             uiView.text = placeholder
-            uiView.textColor = IOSAppTheme.textPlaceholderUIColor
+            uiView.textColor = Theme.Text.placeholderUIColor
         } else if !text.isEmpty, uiView.text != text {
             uiView.text = text
-            uiView.textColor = IOSAppTheme.textPrimaryUIColor
+            uiView.textColor = Theme.Text.primaryUIColor
         }
     }
 
@@ -257,7 +257,7 @@ struct IOSMultilineTextView: UIViewRepresentable {
         }
 
         private func currentText(for textView: UITextView) -> String {
-            textView.textColor == IOSAppTheme.textPlaceholderUIColor ? "" : textView.text
+            textView.textColor == Theme.Text.placeholderUIColor ? "" : textView.text
         }
 
         private func updateBinding(with value: String) {
@@ -278,9 +278,9 @@ struct IOSMultilineTextView: UIViewRepresentable {
         func textViewDidBeginEditing(_ textView: UITextView) {
             isFocused = true
             applyChrome(to: textView, isFocused: true)
-            if textView.textColor == IOSAppTheme.textPlaceholderUIColor {
+            if textView.textColor == Theme.Text.placeholderUIColor {
                 textView.text = ""
-                textView.textColor = IOSAppTheme.textPrimaryUIColor
+                textView.textColor = Theme.Text.primaryUIColor
             }
         }
 
@@ -302,7 +302,7 @@ struct IOSMultilineTextView: UIViewRepresentable {
 
             let clampedText = existingText.replacingCharacters(in: swiftRange, with: truncatedReplacement)
             textView.text = clampedText
-            textView.textColor = IOSAppTheme.textPrimaryUIColor
+            textView.textColor = Theme.Text.primaryUIColor
             updateBinding(with: clampedText)
 
             let insertionLocation = range.location + (truncatedReplacement as NSString).length
@@ -321,7 +321,7 @@ struct IOSMultilineTextView: UIViewRepresentable {
             if textView.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 text = ""
                 textView.text = placeholder
-                textView.textColor = IOSAppTheme.textPlaceholderUIColor
+                textView.textColor = Theme.Text.placeholderUIColor
             }
         }
     }
@@ -348,7 +348,7 @@ struct IOSSaveVoiceSheet: View {
     // responder on every parent re-render (keystroke). The coordinator keeps it in sync.
     @State private var isTranscriptFocused = false
 
-    private let tint = IOSBrandTheme.clone
+    private let tint = Theme.Brand.modeClone
     private let transcriptHeight: CGFloat = 132
 
     private var trimmedName: String {
@@ -366,7 +366,7 @@ struct IOSSaveVoiceSheet: View {
                     fieldSection(label: "Name") {
                         TextField("Name this voice", text: $suggestedName)
                             .focused($isNameFocused)
-                            .foregroundStyle(IOSAppTheme.textPrimary)
+                            .foregroundStyle(Theme.Text.primary)
                             // Names are proper nouns; live autocorrection
                             // rewrites them as typed and the rewritten name is
                             // what persists (IUI-4 X2, sibling of the
@@ -440,11 +440,11 @@ struct IOSSaveVoiceSheet: View {
             HStack(spacing: 6) {
                 Text(label)
                     .iosScaledFont(size: 13, weight: .semibold, relativeTo: .footnote)
-                    .foregroundStyle(IOSAppTheme.textSecondary)
+                    .foregroundStyle(Theme.Text.secondary)
                 if let caption {
                     Text(caption)
                         .font(.caption)
-                        .foregroundStyle(IOSAppTheme.textTertiary)
+                        .foregroundStyle(Theme.Text.tertiary)
                 }
             }
             content()
@@ -484,7 +484,7 @@ struct IOSSaveVoiceSheet: View {
                     Text(durationLabel(clipPlayer.duration))
                         .font(.caption.weight(.medium))
                         .monospacedDigit()
-                        .foregroundStyle(IOSAppTheme.textSecondary)
+                        .foregroundStyle(Theme.Text.secondary)
                     Spacer(minLength: 8)
                     let hint = clipQualityHint(duration: clipPlayer.duration)
                     IOSStatusBadge(text: hint.label, tone: hint.tone)
@@ -495,11 +495,11 @@ struct IOSSaveVoiceSheet: View {
         .padding(.vertical, 12)
         .frame(maxWidth: .infinity)
         .background {
-            RoundedRectangle(cornerRadius: IOSCornerRadius.card, style: .continuous)
-                .fill(IOSAppTheme.glassSurfaceFillMuted.opacity(0.6))
+            RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous)
+                .fill(Theme.Surface.glassSurfaceMuted.opacity(0.6))
         }
         .overlay {
-            RoundedRectangle(cornerRadius: IOSCornerRadius.card, style: .continuous)
+            RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous)
                 .stroke(Color.white.opacity(0.08), lineWidth: 0.8)
         }
     }

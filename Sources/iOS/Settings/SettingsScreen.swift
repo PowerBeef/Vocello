@@ -63,14 +63,14 @@ struct SettingsScreen: View {
                             title: "I own or have permission to clone the voices I use",
                             accessibilityIdentifier: "voiceCloning_consentAcknowledgment",
                             isOn: $cloneConsentAcknowledged,
-                            tint: IOSBrandTheme.clone
+                            tint: Theme.Brand.modeClone
                         )
 
                         // CP-1 option D: the users' own EU AI Act Article
                         // 50(4) disclosure duty, beside the rights gate.
                         Text("If you publish audio of a cloned real voice, disclose that it is AI-generated. EU law may require this.")
                             .iosScaledFont(size: 12, relativeTo: .caption)
-                            .foregroundStyle(IOSAppTheme.textSecondary)
+                            .foregroundStyle(Theme.Text.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                             .padding(.horizontal, 16)
                             .padding(.bottom, 12)
@@ -100,7 +100,7 @@ struct SettingsScreen: View {
                             title: "Autoplay after generate",
                             accessibilityIdentifier: "iosSettings_autoPlayToggle",
                             isOn: $autoPlay,
-                            tint: IOSBrandTheme.accent
+                            tint: Theme.Brand.gold
                         )
 
                         IOSSettingsReferenceDivider()
@@ -138,7 +138,7 @@ struct SettingsScreen: View {
                             title: "Reduce Motion",
                             accessibilityIdentifier: "iosSettings_reduceMotionToggle",
                             isOn: $reduceMotionEnabled,
-                            tint: IOSBrandTheme.accent
+                            tint: Theme.Brand.gold
                         )
 
                         IOSSettingsReferenceDivider()
@@ -148,7 +148,7 @@ struct SettingsScreen: View {
                             title: "Reduce Transparency",
                             accessibilityIdentifier: "iosSettings_reduceTransparencyToggle",
                             isOn: $reduceTransparencyEnabled,
-                            tint: IOSBrandTheme.accent
+                            tint: Theme.Brand.gold
                         )
                     }
 

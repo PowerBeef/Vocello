@@ -8,15 +8,15 @@ struct IOSFirstRunOnboardingCard: View {
             HStack(spacing: 8) {
                 Image(systemName: "sparkles")
                     .font(.callout.weight(.semibold))
-                    .foregroundStyle(IOSBrandTheme.accent)
+                    .foregroundStyle(Theme.Brand.gold)
                 Text("Install your first voice")
                     .font(IOSTypeStyle.cardTitle.font)
-                    .foregroundStyle(IOSAppTheme.textPrimary)
+                    .foregroundStyle(Theme.Text.primary)
             }
 
             Text("Open Settings to download a Custom Voice, Voice Design, or Voice Cloning model. Every package runs on-device.")
                 .font(IOSTypeStyle.body.font)
-                .foregroundStyle(IOSAppTheme.textSecondary)
+                .foregroundStyle(Theme.Text.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
             Button {
@@ -29,7 +29,7 @@ struct IOSFirstRunOnboardingCard: View {
                     .padding(.vertical, 10)
             }
             .buttonStyle(.borderedProminent)
-            .tint(IOSBrandTheme.accent)
+            .tint(Theme.Brand.gold)
             .accessibilityIdentifier("onboarding_openSettings")
         }
         .padding(16)

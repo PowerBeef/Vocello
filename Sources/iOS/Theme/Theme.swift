@@ -4,10 +4,13 @@ import QwenVoiceCore
 
 /// Canonical iOS design tokens for the Vocello iOS app.
 ///
-/// The values mirror `design_references/Vocello iOS/tokens.css` exactly
-/// (which in turn mirrors the macOS `AppTheme.swift`). Anything that
-/// used to live in `IOSBrandTheme`, `IOSAppTheme`, `IOSCornerRadius`,
-/// `IOSDesignMotion`, or `IOSSelectionMotion` belongs here.
+/// The values derive from `design_references/Vocello iOS/tokens.css`
+/// (which in turn mirrors the macOS `AppTheme.swift`); where a shipped
+/// value diverged from tokens.css, the shipped value wins and the token's
+/// comment records the delta. The legacy `IOSBrandTheme`, `IOSAppTheme`,
+/// `IOSCornerRadius`, `IOSDesignMotion`, and `IOSSelectionMotion`
+/// namespaces were absorbed here (IUI-5 D10b); this is the ONE iOS token
+/// namespace — add new tokens here, never a parallel enum.
 ///
 /// The app is forced to `.preferredColorScheme(.dark)` at the window
 /// level, so all tokens are dark-mode variants. If light mode is ever
@@ -30,8 +33,17 @@ enum Theme {
         /// `#DBA887` — `--mode-cloning`.
         static let modeClone = Color(uiColor: UIColor(red: 0.859, green: 0.659, blue: 0.529, alpha: 1))
 
-        /// Neutral silver used for library / settings tabs.
+        /// Neutral silver used for the settings tab.
         static let silver = Color(uiColor: UIColor(red: 0.68, green: 0.71, blue: 0.76, alpha: 1))
+
+        /// Warm neutral used for the library (Voices) tab.
+        static let library = Color(uiColor: UIColor(red: 0.75, green: 0.74, blue: 0.71, alpha: 1))
+
+        /// 12% gold glow behind primary actions.
+        static let goldGlow = gold.opacity(0.12)
+
+        /// 7% warm-white sheen for highlighted chrome.
+        static let highlightGlow = Color(uiColor: UIColor(red: 0.90, green: 0.84, blue: 0.72, alpha: 0.07))
 
         static func modeColor(_ mode: GenerationMode) -> Color {
             switch mode {
@@ -61,14 +73,46 @@ enum Theme {
         /// `#11131A` — recessed surface between card + field. `--inline-fill`.
         static let inline = Color(uiColor: UIColor(red: 0.067, green: 0.075, blue: 0.102, alpha: 1))
 
-        /// `#2A2C36` — text input fill. `--field-fill`.
-        static let field = Color(uiColor: UIColor(red: 0.165, green: 0.173, blue: 0.212, alpha: 1))
-        static let fieldUIColor = UIColor(red: 0.165, green: 0.173, blue: 0.212, alpha: 1)
+        /// Text input fill. Shipped truth (D10b): the app has always rendered
+        /// this darker fill (was `IOSBrandTheme.inputFill`); the tokens.css
+        /// `--field-fill` value `#2A2C36` never shipped. Changing it is a
+        /// deliberate design decision, not a cleanup.
+        static let field = Color(uiColor: UIColor(red: 0.120, green: 0.126, blue: 0.148, alpha: 1))
+        static let fieldUIColor = UIColor(red: 0.120, green: 0.126, blue: 0.148, alpha: 1)
 
-        /// `#171A1F` — sidebar / dock rail. `--rail-bg`.
-        static let dock = Color(uiColor: UIColor(red: 0.090, green: 0.102, blue: 0.122, alpha: 0.93))
+        /// Warm hairline stroke on input fields (was `IOSBrandTheme.inputStroke`).
+        static let fieldStroke = Color(uiColor: UIColor(red: 0.96, green: 0.92, blue: 0.82, alpha: 0.12))
 
-        /// Glassy floating panel fill (`IOSAppTheme.glassFloatingFill`).
+        /// Elevated panel fill for cards over the canvas (was `IOSBrandTheme.surface`).
+        static let panel = Color(uiColor: UIColor(red: 0.105, green: 0.112, blue: 0.132, alpha: 0.86))
+
+        /// Muted sibling of `panel` (was `IOSBrandTheme.surfaceMuted`).
+        static let panelMuted = Color(uiColor: UIColor(red: 0.145, green: 0.152, blue: 0.174, alpha: 0.74))
+
+        /// Warm hairline stroke on panels (was `IOSBrandTheme.surfaceStroke`).
+        static let panelStroke = Color(uiColor: UIColor(red: 0.97, green: 0.92, blue: 0.82, alpha: 0.10))
+
+        /// Opaque banner / toast fill (was `IOSBrandTheme.bannerFill`).
+        static let banner = Color(uiColor: UIColor(red: 0.18, green: 0.19, blue: 0.22, alpha: 0.92))
+
+        /// Mode-switcher pill fill (was `IOSBrandTheme.modeSwitcherFill`).
+        static let selector = Color(uiColor: UIColor(red: 0.135, green: 0.142, blue: 0.164, alpha: 0.82))
+
+        /// Warm hairline on the mode-switcher pill (was `IOSBrandTheme.modeSwitcherStroke`).
+        static let selectorStroke = Color(uiColor: UIColor(red: 0.97, green: 0.92, blue: 0.82, alpha: 0.08))
+
+        /// Solid base under glassy card surfaces (was `IOSAppTheme.glassSurfaceFill`).
+        static let glassSurface = panel.opacity(0.82)
+
+        /// Muted sibling for secondary glass surfaces (was `IOSAppTheme.glassSurfaceFillMuted`).
+        static let glassSurfaceMuted = panelMuted.opacity(0.74)
+
+        /// Tab bar / dock smoke. Shipped truth (D10b): the app has always used
+        /// this darker smoke (was `IOSBrandTheme.tabBarBackground`); the
+        /// tokens.css `--rail-bg` value `#171A1F` never shipped.
+        static let dock = Color(uiColor: UIColor(red: 0.075, green: 0.083, blue: 0.102, alpha: 0.93))
+
+        /// Glassy floating panel fill (was `IOSAppTheme.glassFloatingFill`).
         static let glassFloating = dock.opacity(0.66)
 
         /// Hairline divider between rows on dark surfaces.
@@ -182,6 +226,23 @@ enum Theme {
         static let miniPlayerSlide = Animation.spring(response: 0.32, dampingFraction: 0.84, blendDuration: 0.12)
         /// Tap-press response.
         static let press = Animation.easeOut(duration: 0.09)
+
+        // Selection micro-motion (absorbed from `IOSSelectionMotion`, D10b).
+
+        /// 140ms ease-out for row / chip selection.
+        static let selection = Animation.easeOut(duration: 0.14)
+        /// Snappy slide for the selector pill thumb.
+        static let selectorPill = Animation.snappy(duration: 0.22, extraBounce: 0)
+        /// 120ms ease-out for selector label emphasis.
+        static let selectorLabel = Animation.easeOut(duration: 0.12)
+        /// 100ms ease-out for transient highlights.
+        static let highlight = Animation.easeOut(duration: 0.10)
+        /// 120ms ease-out for disclosure expand / collapse.
+        static let disclosure = Animation.easeOut(duration: 0.12)
+        /// Spring for floating panels (voice picker, popovers).
+        static let floatingPanel = Animation.spring(response: 0.30, dampingFraction: 0.84, blendDuration: 0.12)
+        /// 180ms ease-in-out crossfade between mode content.
+        static let modeCrossfade = Animation.easeInOut(duration: 0.18)
     }
 
     // MARK: - Branding

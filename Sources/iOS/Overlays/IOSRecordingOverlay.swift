@@ -24,7 +24,7 @@ struct IOSRecordingOverlay: View {
 
     var body: some View {
         ZStack {
-            IOSModeBackdrop(tint: IOSBrandTheme.clone, intensity: .warm)
+            IOSModeBackdrop(tint: Theme.Brand.modeClone, intensity: .warm)
             Color(red: 13 / 255, green: 14 / 255, blue: 18 / 255)
                 .opacity(0.70)
                 .ignoresSafeArea()
@@ -86,7 +86,7 @@ struct IOSRecordingOverlay: View {
             } label: {
                 Image(systemName: "xmark")
                     .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(IOSAppTheme.textPrimary)
+                    .foregroundStyle(Theme.Text.primary)
                     .frame(width: 40, height: 40)
                     .background {
                         Circle()
@@ -107,12 +107,12 @@ struct IOSRecordingOverlay: View {
 
     private var progressColor: Color {
         if recorder.elapsed >= ReferenceClipRecorder.minDuration && recorder.elapsed <= ReferenceClipRecorder.maxDuration {
-            return IOSBrandTheme.clone
+            return Theme.Brand.modeClone
         }
         if recorder.elapsed > ReferenceClipRecorder.maxDuration {
             return Color.orange
         }
-        return IOSAppTheme.textTertiary
+        return Theme.Text.tertiary
     }
 
     private var captureStage: some View {
@@ -121,7 +121,7 @@ struct IOSRecordingOverlay: View {
                 Text(phaseLabel.uppercased())
                     .iosScaledFont(size: 13, weight: .semibold, relativeTo: .footnote)
                     .tracking(1.56)
-                    .foregroundStyle(IOSAppTheme.textSecondary)
+                    .foregroundStyle(Theme.Text.secondary)
 
                 Text(timeString)
                     .iosScaledFont(size: 56, weight: .bold, design: .monospaced, relativeTo: .largeTitle)
@@ -136,7 +136,7 @@ struct IOSRecordingOverlay: View {
 
                 Text("Read 10-20 s of clean, natural speech. Quiet room. One voice.")
                     .iosScaledFont(size: 14, weight: .medium, relativeTo: .footnote)
-                    .foregroundStyle(IOSAppTheme.textSecondary)
+                    .foregroundStyle(Theme.Text.secondary)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: 280)
@@ -146,7 +146,7 @@ struct IOSRecordingOverlay: View {
             // and fall when silent, so you can see your voice is heard + recorded.
             IOSLiveLevelMeter(
                 levels: recorder.levels,
-                tint: IOSBrandTheme.clone,
+                tint: Theme.Brand.modeClone,
                 isActive: recorder.isRecording
             )
             .frame(height: 96)
@@ -154,7 +154,7 @@ struct IOSRecordingOverlay: View {
 
             Text(statusLabel)
                 .iosScaledFont(size: 14, weight: .medium, relativeTo: .footnote)
-                .foregroundStyle(IOSAppTheme.textSecondary)
+                .foregroundStyle(Theme.Text.secondary)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 280)
         }
@@ -196,7 +196,7 @@ struct IOSRecordingOverlay: View {
                 IOSPrimaryCTAButton(
                     title: "Stop",
                     symbol: "stop.fill",
-                    tint: IOSBrandTheme.clone,
+                    tint: Theme.Brand.modeClone,
                     isEnabled: true,
                     action: {
                         if let url = recorder.stopAndSave() {
@@ -210,12 +210,12 @@ struct IOSRecordingOverlay: View {
                     recorder.reset()
                 }
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(IOSAppTheme.textSecondary)
+                .foregroundStyle(Theme.Text.secondary)
                 .frame(maxWidth: .infinity)
                 .frame(height: 52)
                 .background {
                     Capsule(style: .continuous)
-                        .fill(IOSAppTheme.glassSurfaceFillMuted)
+                        .fill(Theme.Surface.glassSurfaceMuted)
                 }
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("iosRecord_retake")
@@ -224,7 +224,7 @@ struct IOSRecordingOverlay: View {
                 IOSPrimaryCTAButton(
                     title: canUse ? "Use this clip" : "Need 10 s",
                     symbol: canUse ? "checkmark" : nil,
-                    tint: IOSBrandTheme.clone,
+                    tint: Theme.Brand.modeClone,
                     isEnabled: canUse,
                     action: {
                         if let url = recorder.lastSavedURL {
@@ -237,7 +237,7 @@ struct IOSRecordingOverlay: View {
                 IOSPrimaryCTAButton(
                     title: "Record",
                     symbol: "mic.fill",
-                    tint: IOSBrandTheme.clone,
+                    tint: Theme.Brand.modeClone,
                     isEnabled: !recorder.permissionDenied,
                     action: {
                         Task { await recorder.start() }

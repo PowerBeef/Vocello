@@ -68,7 +68,7 @@ struct IOSRecordVoiceSheet: View {
                 )
             case .naming:
                 ZStack {
-                    IOSModeBackdrop(tint: IOSBrandTheme.clone, intensity: .warm)
+                    IOSModeBackdrop(tint: Theme.Brand.modeClone, intensity: .warm)
                     Color(red: 13 / 255, green: 14 / 255, blue: 18 / 255).opacity(0.70)
                         .ignoresSafeArea()
                 }

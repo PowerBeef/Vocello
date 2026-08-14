@@ -46,7 +46,7 @@ struct IOSSettingsReferenceSection<Content: View>: View {
             Text(title.uppercased())
                 .iosScaledFont(size: 11, weight: .semibold, relativeTo: .caption2)
                 .tracking(0.88)
-                .foregroundStyle(IOSAppTheme.textSecondary)
+                .foregroundStyle(Theme.Text.secondary)
                 .padding(.horizontal, 20)
                 .padding(.top, 14)
                 .padding(.bottom, 6)
@@ -83,7 +83,7 @@ private struct IOSSettingsUtilityIcon: View {
             .overlay {
                 Image(systemName: symbol)
                     .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(IOSAppTheme.textPrimary)
+                    .foregroundStyle(Theme.Text.primary)
             }
             .frame(width: 36, height: 36)
     }
@@ -163,7 +163,7 @@ struct IOSSettingsReferenceToggleRow: View {
 
                 Text(title)
                     .iosScaledFont(size: 16)
-                    .foregroundStyle(IOSAppTheme.textPrimary)
+                    .foregroundStyle(Theme.Text.primary)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
                 IOSSettingsReferenceSwitch(isOn: isOn, tint: tint)
@@ -204,18 +204,18 @@ struct IOSSettingsReferenceValueRow: View {
 
             Text(title)
                 .iosScaledFont(size: 16)
-                .foregroundStyle(IOSAppTheme.textPrimary)
+                .foregroundStyle(Theme.Text.primary)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
             Text(value)
                 .iosScaledFont(size: 14)
-                .foregroundStyle(IOSAppTheme.textSecondary)
+                .foregroundStyle(Theme.Text.secondary)
                 .lineLimit(1)
 
             if showsChevron {
                 Image(systemName: "chevron.right")
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(IOSAppTheme.textTertiary)
+                    .foregroundStyle(Theme.Text.tertiary)
                     .padding(.leading, 4)
             }
         }
@@ -257,17 +257,17 @@ struct IOSSettingsVariationRow: View {
 
                 Text("Variation")
                     .iosScaledFont(size: 16)
-                    .foregroundStyle(IOSAppTheme.textPrimary)
+                    .foregroundStyle(Theme.Text.primary)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
                 Text(currentDisplayName)
                     .iosScaledFont(size: 14)
-                    .foregroundStyle(IOSAppTheme.textSecondary)
+                    .foregroundStyle(Theme.Text.secondary)
                     .lineLimit(1)
 
                 Image(systemName: "chevron.up.chevron.down")
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(IOSAppTheme.textTertiary)
+                    .foregroundStyle(Theme.Text.tertiary)
                     .padding(.leading, 4)
             }
             .padding(.horizontal, 16)
@@ -293,14 +293,14 @@ struct IOSSettingsBrandFooter: View {
                 .antialiased(true)
                 .scaledToFit()
                 .frame(width: 180)
-                .shadow(color: IOSBrandTheme.accent.opacity(0.18), radius: 14, x: 0, y: 10)
+                .shadow(color: Theme.Brand.gold.opacity(0.18), radius: 14, x: 0, y: 10)
                 .accessibilityHidden(true)
 
             Text("VERSION \(IOSSettingsSupportInfo.appVersionLabel)".uppercased())
                 .iosScaledFont(size: 11, weight: .medium, relativeTo: .caption2)
                 .accessibilityIdentifier("iosSettings_versionLabel")
                 .tracking(0.66)
-                .foregroundStyle(IOSAppTheme.textTertiary)
+                .foregroundStyle(Theme.Text.tertiary)
         }
         .frame(maxWidth: .infinity)
         .padding(.horizontal, 20)
@@ -327,17 +327,17 @@ private struct IOSSettingsLinkRow: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(title)
                         .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(IOSAppTheme.textPrimary)
+                        .foregroundStyle(Theme.Text.primary)
                         .fixedSize(horizontal: false, vertical: true)
                     Text(subtitle)
                         .font(.footnote)
-                        .foregroundStyle(IOSAppTheme.textSecondary)
+                        .foregroundStyle(Theme.Text.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 10)
                 Image(systemName: "arrow.up.forward")
                     .font(.footnote.weight(.semibold))
-                    .foregroundStyle(IOSAppTheme.textSecondary)
+                    .foregroundStyle(Theme.Text.secondary)
             }
             .contentShape(Rectangle())
         }
@@ -358,17 +358,17 @@ private struct IOSSettingsSystemPreferencesRow: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Open iOS Settings")
                         .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(IOSAppTheme.textPrimary)
+                        .foregroundStyle(Theme.Text.primary)
                         .fixedSize(horizontal: false, vertical: true)
                     Text("Adjust permissions and system preferences for Vocello.")
                         .font(.footnote)
-                        .foregroundStyle(IOSAppTheme.textSecondary)
+                        .foregroundStyle(Theme.Text.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 10)
                 Image(systemName: "arrow.up.forward")
                     .font(.footnote.weight(.semibold))
-                    .foregroundStyle(IOSAppTheme.textSecondary)
+                    .foregroundStyle(Theme.Text.secondary)
             }
             .contentShape(Rectangle())
         }
@@ -385,17 +385,17 @@ private struct IOSSettingsPlaybackRow: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Auto-play generated audio")
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(IOSAppTheme.textPrimary)
+                    .foregroundStyle(Theme.Text.primary)
                     .fixedSize(horizontal: false, vertical: true)
 
                 Text("Play each finished take automatically.")
                     .font(.footnote)
-                    .foregroundStyle(IOSAppTheme.textSecondary)
+                    .foregroundStyle(Theme.Text.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
         .toggleStyle(.switch)
-        .tint(IOSBrandTheme.settings)
+        .tint(Theme.Brand.silver)
         .padding(.vertical, 2)
     }
 }
@@ -417,7 +417,7 @@ private struct IOSSettingsProminentActionButtonStyle: ButtonStyle {
                     .stroke(tint.opacity(configuration.isPressed ? 0.62 : 0.48), lineWidth: 0.5)
             }
             .opacity(configuration.isPressed ? 0.96 : 1.0)
-            .iosAppAnimation(IOSSelectionMotion.press, value: configuration.isPressed)
+            .iosAppAnimation(Theme.Motion.press, value: configuration.isPressed)
     }
 }
 
@@ -507,12 +507,12 @@ struct IOSModelRow: View {
         HStack(alignment: .center, spacing: 12) {
             ZStack {
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(IOSBrandTheme.modeColor(for: model.mode).opacity(0.16))
+                    .fill(Theme.Brand.modeColor(model.mode).opacity(0.16))
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .stroke(IOSBrandTheme.modeColor(for: model.mode).opacity(0.38), lineWidth: 0.5)
+                    .stroke(Theme.Brand.modeColor(model.mode).opacity(0.38), lineWidth: 0.5)
                 Image(systemName: modelIconName)
                     .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(IOSBrandTheme.modeColor(for: model.mode))
+                    .foregroundStyle(Theme.Brand.modeColor(model.mode))
             }
             .frame(width: 36, height: 36)
 
@@ -520,7 +520,7 @@ struct IOSModelRow: View {
                 Text(model.mode.displayName)
                     .iosScaledFont(size: 15, weight: .semibold, relativeTo: .subheadline)
                     .tracking(-0.075)
-                    .foregroundStyle(IOSAppTheme.textPrimary)
+                    .foregroundStyle(Theme.Text.primary)
 
                 modelSubtitle
             }
@@ -543,15 +543,15 @@ struct IOSModelRow: View {
                 Text(statusSummaryText)
                     .fontWeight(statusSummaryText == "Active" ? .semibold : .regular)
                     .foregroundStyle(statusSummaryText == "Active"
-                                     ? IOSBrandTheme.modeColor(for: model.mode)
-                                     : IOSAppTheme.textSecondary)
+                                     ? Theme.Brand.modeColor(model.mode)
+                                     : Theme.Text.secondary)
                     .accessibilityLabel("\(model.mode.displayName) model status")
                     .accessibilityValue(statusSummaryText)
                     .accessibilityIdentifier("iosModelStatus_\(model.id)")
             }
         }
         .iosScaledFont(size: 12, relativeTo: .caption)
-        .foregroundStyle(IOSAppTheme.textSecondary)
+        .foregroundStyle(Theme.Text.secondary)
         .lineLimit(1)
     }
 
@@ -614,7 +614,7 @@ struct IOSModelRow: View {
             Button(role: .destructive, action: requestDelete) {
                 Image(systemName: "trash")
                     .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(IOSAppTheme.textSecondary)
+                    .foregroundStyle(Theme.Text.secondary)
                     .frame(width: 36, height: 36)
                     .background {
                         Circle()
@@ -636,7 +636,7 @@ struct IOSModelRow: View {
         accessibilityIdentifier: String
     ) -> some View {
         Button(title, action: action ?? requestInstall)
-            .iosSettingsProminentActionButtonStyle(tint: IOSBrandTheme.modeColor(for: model.mode))
+            .iosSettingsProminentActionButtonStyle(tint: Theme.Brand.modeColor(model.mode))
             .accessibilityIdentifier(accessibilityIdentifier)
     }
 
@@ -649,7 +649,7 @@ struct IOSModelRow: View {
         ):
             VStack(alignment: .leading, spacing: 6) {
                 ProgressView(value: progress ?? 0)
-                    .tint(IOSBrandTheme.modeColor(for: model.mode))
+                    .tint(Theme.Brand.modeColor(model.mode))
                     .accessibilityIdentifier("iosModelProgress_\(model.id)")
                 Text(progressText(
                     downloadedBytes: downloadedBytes,
@@ -659,21 +659,21 @@ struct IOSModelRow: View {
                     suffix: message
                 ))
                     .iosScaledFont(size: 12, relativeTo: .caption)
-                    .foregroundStyle(IOSAppTheme.textSecondary)
+                    .foregroundStyle(Theme.Text.secondary)
             }
         case .waitingForConnectivity(let downloadedBytes, let totalBytes):
             VStack(alignment: .leading, spacing: 6) {
                 Text("Waiting for connectivity")
                     .iosScaledFont(size: 12, relativeTo: .caption)
-                    .foregroundStyle(IOSAppTheme.textSecondary)
+                    .foregroundStyle(Theme.Text.secondary)
                 Text(progressText(downloadedBytes: downloadedBytes, totalBytes: totalBytes))
                     .iosScaledFont(size: 12, relativeTo: .caption)
-                    .foregroundStyle(IOSAppTheme.textSecondary)
+                    .foregroundStyle(Theme.Text.secondary)
             }
         case .retrying(let progress, let downloadedBytes, let totalBytes, let retryCount, let reason):
             VStack(alignment: .leading, spacing: 6) {
                 ProgressView(value: progress ?? 0)
-                    .tint(IOSBrandTheme.modeColor(for: model.mode))
+                    .tint(Theme.Brand.modeColor(model.mode))
                     .accessibilityIdentifier("iosModelProgress_\(model.id)")
                 Text(progressText(
                     downloadedBytes: downloadedBytes,
@@ -681,7 +681,7 @@ struct IOSModelRow: View {
                     suffix: "Retry \(retryCount)\(reason.map { ": \($0)" } ?? "") · verified files will be reused"
                 ))
                     .iosScaledFont(size: 12, relativeTo: .caption)
-                    .foregroundStyle(IOSAppTheme.textSecondary)
+                    .foregroundStyle(Theme.Text.secondary)
             }
         case .failed(let message):
             Text(message)

@@ -32,7 +32,7 @@ struct IOSGenerateModeViewport<Custom: View, Design: View, Clone: View>: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .clipped()
-        .iosAppAnimation(IOSSelectionMotion.modeCrossfade, value: selection)
+        .iosAppAnimation(Theme.Motion.modeCrossfade, value: selection)
     }
 
     private func layer<Content: View>(_ content: Content) -> some View {
@@ -153,7 +153,7 @@ struct IOSStudioComposerCard<Accessory: View, Setup: View>: View {
                             Text(title)
                                 .font(.subheadline.weight(.semibold))
                                 .tracking(0.05)
-                                .foregroundStyle(IOSAppTheme.textPrimary)
+                                .foregroundStyle(Theme.Text.primary)
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.8)
                                 .fixedSize(horizontal: false, vertical: true)
@@ -161,14 +161,14 @@ struct IOSStudioComposerCard<Accessory: View, Setup: View>: View {
                             if hasSubtitle {
                                 Text(subtitle)
                                     .font(.caption)
-                                    .foregroundStyle(IOSAppTheme.textSecondary)
+                                    .foregroundStyle(Theme.Text.secondary)
                                     .lineLimit(2)
                                     .fixedSize(horizontal: false, vertical: true)
                             }
                         } else if hasSubtitle {
                             Text(subtitle)
                                 .font(.headline.weight(.semibold))
-                                .foregroundStyle(IOSAppTheme.textPrimary)
+                                .foregroundStyle(Theme.Text.primary)
                                 .lineLimit(2)
                                 .fixedSize(horizontal: false, vertical: true)
 
@@ -253,7 +253,7 @@ private struct IOSComposerSectionHeader: View {
         Text(title.uppercased())
             .font(.caption2.weight(.semibold))
             .tracking(0.8)
-            .foregroundStyle(IOSAppTheme.textSecondary.opacity(0.95))
+            .foregroundStyle(Theme.Text.secondary.opacity(0.95))
             .frame(maxWidth: .infinity, alignment: .leading)
             .accessibilityLabel(title)
             .accessibilityAddTraits(.isHeader)
@@ -277,7 +277,7 @@ struct IOSCompactPromptCard: View {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Text(title)
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(IOSAppTheme.textPrimary)
+                    .foregroundStyle(Theme.Text.primary)
 
                 Spacer(minLength: 8)
 
@@ -327,7 +327,7 @@ struct IOSCompactInlineNotice: View {
 
             Text(message)
                 .font(.caption)
-                .foregroundStyle(IOSAppTheme.textSecondary)
+                .foregroundStyle(Theme.Text.secondary)
                 .lineLimit(2)
 
             Spacer(minLength: 0)
@@ -361,7 +361,7 @@ private struct IOSGenerateMiniPlayerTimeline: View {
         HStack(alignment: .center, spacing: itemSpacing) {
             Text(playbackProgress.formattedCurrentTime)
                 .font(.caption2.monospacedDigit().weight(.medium))
-                .foregroundStyle(IOSAppTheme.textSecondary)
+                .foregroundStyle(Theme.Text.secondary)
                 .contentTransition(.numericText())
 
             IOSGenerateMiniPlayerProgressRail(
@@ -373,7 +373,7 @@ private struct IOSGenerateMiniPlayerTimeline: View {
 
             Text(durationText)
                 .font(.caption2.monospacedDigit().weight(.medium))
-                .foregroundStyle(IOSAppTheme.textTertiary)
+                .foregroundStyle(Theme.Text.tertiary)
                 .contentTransition(.numericText())
         }
     }
@@ -437,7 +437,7 @@ private struct IOSGenerateMiniPlayerProgressRail: View {
                     LinearGradient(
                         colors: [
                             Color.white.opacity(0.88),
-                            IOSBrandTheme.silver.opacity(0.62)
+                            Theme.Brand.silver.opacity(0.62)
                         ],
                         startPoint: .leading,
                         endPoint: .trailing
@@ -487,7 +487,7 @@ private struct IOSGenerateMiniPlayerProgressChrome: View {
     var body: some View {
         ProgressView()
             .progressViewStyle(.circular)
-            .tint(IOSBrandTheme.silver)
+            .tint(Theme.Brand.silver)
             .frame(width: controlSize, height: controlSize)
             .background {
                 Circle()

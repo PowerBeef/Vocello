@@ -85,7 +85,7 @@ struct IOSVoicesView: View {
                     IOSFilterChipRow(
                         options: VoiceFilter.allCases,
                         selection: $filter,
-                        tint: IOSBrandTheme.library,
+                        tint: Theme.Brand.library,
                         label: \.label,
                         accessibilityIdentifier: { "voicesFilter_\($0.rawValue)" }
                     )
@@ -122,7 +122,7 @@ struct IOSVoicesView: View {
                             title: "Nothing matches",
                             message: "Try a different search term or switch the filter back to All.",
                             symbolName: "magnifyingglass",
-                            tint: IOSBrandTheme.library
+                            tint: Theme.Brand.library
                         )
                         .padding(.horizontal, 20)
                         .padding(.top, 12)
@@ -145,7 +145,7 @@ struct IOSVoicesView: View {
         Text(title.uppercased())
             .iosScaledFont(size: 11, weight: .semibold, relativeTo: .caption2)
             .tracking(0.88)
-            .foregroundStyle(IOSAppTheme.textSecondary)
+            .foregroundStyle(Theme.Text.secondary)
             .padding(.horizontal, 20)
             .padding(.top, 14)
             .padding(.bottom, 6)
@@ -157,7 +157,7 @@ struct IOSVoicesView: View {
         VStack(alignment: .leading, spacing: 0) {
             Text("Save a new voice")
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(IOSAppTheme.textPrimary)
+                .foregroundStyle(Theme.Text.primary)
                 .padding(.horizontal, 14)
                 .padding(.top, 14)
                 .padding(.bottom, 8)
@@ -196,20 +196,20 @@ struct IOSVoicesView: View {
             HStack(spacing: 12) {
                 ZStack {
                     Circle()
-                        .fill(IOSBrandTheme.clone.opacity(0.16))
+                        .fill(Theme.Brand.modeClone.opacity(0.16))
                     Image(systemName: symbol)
                         .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(IOSBrandTheme.clone)
+                        .foregroundStyle(Theme.Brand.modeClone)
                 }
                 .frame(width: 40, height: 40)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
                         .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(IOSAppTheme.textPrimary)
+                        .foregroundStyle(Theme.Text.primary)
                     Text(detail)
                         .font(.caption)
-                        .foregroundStyle(IOSAppTheme.textSecondary)
+                        .foregroundStyle(Theme.Text.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
@@ -217,7 +217,7 @@ struct IOSVoicesView: View {
 
                 Image(systemName: "chevron.right")
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(IOSAppTheme.textTertiary)
+                    .foregroundStyle(Theme.Text.tertiary)
             }
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -246,11 +246,11 @@ struct IOSVoicesView: View {
                     VStack(alignment: .leading, spacing: 1) {
                         Text(speaker.displayName)
                             .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(IOSAppTheme.textPrimary)
+                            .foregroundStyle(Theme.Text.primary)
                         if let detail = builtInSubtitle(for: speaker) {
                             Text(detail)
                                 .font(.caption)
-                                .foregroundStyle(IOSAppTheme.textSecondary)
+                                .foregroundStyle(Theme.Text.secondary)
                                 .lineLimit(1)
                         }
                     }
@@ -264,7 +264,7 @@ struct IOSVoicesView: View {
                 Text(tag)
                     .font(.system(size: 10, weight: .semibold))
                     .tracking(0.4)
-                    .foregroundStyle(IOSAppTheme.textSecondary)
+                    .foregroundStyle(Theme.Text.secondary)
                     .padding(.horizontal, 8)
                     .frame(height: 20)
                     .background {
@@ -315,10 +315,10 @@ struct IOSVoicesView: View {
                     VStack(alignment: .leading, spacing: 1) {
                         Text(voice.name)
                             .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(IOSAppTheme.textPrimary)
+                            .foregroundStyle(Theme.Text.primary)
                         Text(savedRowCaption(voice, bankCatalog: bankCatalog))
                             .font(.caption)
-                            .foregroundStyle(IOSAppTheme.textSecondary)
+                            .foregroundStyle(Theme.Text.secondary)
                     }
                 }
             }

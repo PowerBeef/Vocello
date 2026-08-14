@@ -419,8 +419,8 @@ lens verified all four gate states identical at every site and that no raw
 namespace half stays open as D10b**: 403 `IOSAppTheme`/`IOSBrandTheme`
 references versus 21 canonical `Theme` ones, with dozens of tokens missing
 from `Theme` and real value drift — a migration that needs per-surface
-visual verification and is deliberately NOT landed blind; it remains
-recorded wave-2 scope.
+visual verification and is deliberately NOT landed blind; it landed the
+next day as sub-wave E (below).
 
 **X4+D9 Dynamic Type program.** A ten-agent fan-out classified all 132
 fixed `.system(size:)` sites under a keep-fixed-when-unsure policy and
@@ -444,9 +444,47 @@ default type size, so the baseline comparison stays valid; a large-type
 visual spot-check joins the next phone window's checklist (with the
 `scrollsToTop` question from sub-wave B).
 
-Remaining wave-2 scope: **D10b** (token-namespace unification, above) as
-deliberate follow-up desk work, then the counted before/after measurement
-plus wave-level smoke at the next phone window close the wave.
+### Wave 2 sub-wave E — D10b token-namespace unification (2026-08-14, landed)
+
+All five legacy token namespaces — `IOSBrandTheme`, `IOSAppTheme`,
+`IOSCornerRadius`, `IOSDesignMotion`, `IOSSelectionMotion` — are absorbed
+into the canonical `Theme` (`Sources/iOS/Theme/Theme.swift`), which is now
+the ONE iOS token namespace (its header says so). ~440 call sites across
+23 files were rewritten by a deterministic longest-first token map
+(net −152 lines; the entire `IOSAppTheme` alias layer deleted, along with
+the dead `Color(dark:)` wrapper and thirteen zero-reference tokens).
+
+**The feared per-surface visual verification dissolved under the
+inventory.** Every *live* legacy token maps value-identically to its
+canonical target — `accent`→`Brand.gold` differs by 0.001 in float but
+quantizes to the same 8-bit `#EDCC8A`, converging on the canonical
+tokens.css hex; every absorbed animation is byte-identical. The "real
+drift" flagged in sub-wave D lived entirely in canonical tokens with
+**zero call sites**: `Theme.Surface.field` (`#2A2C36`, tokens.css
+`--field-fill`) and `Theme.Surface.dock` (`#171A1F`, `--rail-bg`) were
+aspirational values that never shipped. Both were re-pointed to shipped
+truth with the tokens.css delta recorded in their doc comments — changing
+them to the reference values is now a *visible, deliberate* design
+decision instead of a silent landmine. Missing tokens gained canonical
+homes: the panel family (`panel`/`panelMuted`/`panelStroke`), field and
+selector fills + warm strokes, `banner`, the glass fills
+(`glassSurface`/`glassSurfaceMuted`), `Brand.library`, `Brand.goldGlow`,
+`Brand.highlightGlow`, and seven selection-motion curves under
+`Theme.Motion`.
+
+Two-lens adversarial review (value-parity + completeness) mechanically
+reproduced **all 401 diff hunks** under the expected map with zero
+unexplained mismatches, confirmed zero rendered-value or animation deltas
+at 8-bit RGBA, verified the re-pointed tokens and every deleted dead token
+had no callers, and found no token-identity comparisons that the
+`settings`/`silver` and `accent`/`custom` collapses could perturb. The only
+finding was the doc-sync reminder closed by this change. iOS device-SDK
+foundation compile green.
+
+Remaining wave-2 scope: the counted before/after measurement plus
+wave-level smoke at the next phone window close the wave (checklist:
+large-type spot-check for X4, `scrollsToTop` question from sub-wave B, and
+a glance at the shipped-truth surfaces as D10b confirmation).
 
 ## 60 Hz-tier posture
 

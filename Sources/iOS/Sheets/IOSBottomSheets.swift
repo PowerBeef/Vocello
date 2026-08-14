@@ -103,13 +103,13 @@ struct IOSDeliveryPickerSheet: View {
             headerLeading: {
                 if isCustomToneEditorVisible {
                     Button {
-                        IOSAccessibleAnimation.perform(IOSDesignMotion.stateChange) {
+                        IOSAccessibleAnimation.perform(Theme.Motion.stateChange) {
                             isCustomToneEditorVisible = false
                         }
                     } label: {
                         Image(systemName: "chevron.left")
                             .font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(IOSAppTheme.textPrimary)
+                            .foregroundStyle(Theme.Text.primary)
                             .frame(width: 40, height: 40)
                             .background {
                                 Circle()
@@ -130,7 +130,7 @@ struct IOSDeliveryPickerSheet: View {
                 } label: {
                     Text("Confirm")
                         .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(IOSAppTheme.textPrimary)
+                        .foregroundStyle(Theme.Text.primary)
                         .padding(.horizontal, 18)
                         .frame(height: 40)
                         .background {
@@ -178,7 +178,7 @@ struct IOSDeliveryPickerSheet: View {
 
                     Text(EmotionPreset.directionalHintAdvisory)
                         .iosScaledFont(size: 12, relativeTo: .caption)
-                        .foregroundStyle(IOSAppTheme.textSecondary)
+                        .foregroundStyle(Theme.Text.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityIdentifier("deliveryPickerSheet_hintAdvisory")
                 }
@@ -193,7 +193,7 @@ struct IOSDeliveryPickerSheet: View {
                 if let onUseCustomTone {
                     Button {
                         onUseCustomTone()
-                        IOSAccessibleAnimation.perform(IOSDesignMotion.stateChange) {
+                        IOSAccessibleAnimation.perform(Theme.Motion.stateChange) {
                             isCustomToneEditorVisible = true
                         }
                     } label: {
@@ -208,7 +208,7 @@ struct IOSDeliveryPickerSheet: View {
                         .padding(.vertical, 12)
                         .background {
                             Capsule(style: .continuous)
-                                .fill(IOSAppTheme.accentWash(tint).opacity(0.6))
+                                .fill(Theme.accentWash(tint).opacity(0.6))
                         }
                         .overlay {
                             Capsule(style: .continuous)
@@ -271,7 +271,7 @@ struct IOSDeliveryPickerSheet: View {
     private var customToneGuidance: some View {
         Text("Be specific: combine emotion, pace, pitch, and timbre.")
             .iosScaledFont(size: 13, weight: .regular, relativeTo: .footnote)
-            .foregroundStyle(IOSAppTheme.textSecondary)
+            .foregroundStyle(Theme.Text.secondary)
             .fixedSize(horizontal: false, vertical: true)
     }
 
@@ -282,7 +282,7 @@ struct IOSDeliveryPickerSheet: View {
                 .foregroundStyle(.orange)
             Text(DeliveryInstructionAdvisor.advisoryMessage)
                 .iosScaledFont(size: 13, weight: .medium, relativeTo: .footnote)
-                .foregroundStyle(IOSAppTheme.textSecondary)
+                .foregroundStyle(Theme.Text.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .accessibilityIdentifier("deliveryPickerSheet_customTone_durationAdvisory")
@@ -304,7 +304,7 @@ struct IOSDeliveryPickerSheet: View {
             if customText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 Text(placeholderExamples[placeholderExampleIndex])
                     .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(IOSAppTheme.textTertiary)
+                    .foregroundStyle(Theme.Text.tertiary)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 14)
                     .allowsHitTesting(false)
@@ -313,7 +313,7 @@ struct IOSDeliveryPickerSheet: View {
         .frame(height: 120)
         .background {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(IOSAppTheme.accentWash(tint).opacity(0.22))
+                .fill(Theme.accentWash(tint).opacity(0.22))
         }
         .overlay {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
@@ -335,7 +335,7 @@ struct IOSDeliveryPickerSheet: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Examples")
                 .iosScaledFont(size: 13, weight: .semibold, relativeTo: .footnote)
-                .foregroundStyle(IOSAppTheme.textSecondary)
+                .foregroundStyle(Theme.Text.secondary)
 
             VStack(alignment: .leading, spacing: 8) {
                 ForEach(customToneExamplesList, id: \.self) { example in
@@ -345,7 +345,7 @@ struct IOSDeliveryPickerSheet: View {
                             .foregroundStyle(tint)
                         Text(example)
                             .iosScaledFont(size: 13, weight: .medium, relativeTo: .footnote)
-                            .foregroundStyle(IOSAppTheme.textSecondary)
+                            .foregroundStyle(Theme.Text.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                         Spacer(minLength: 0)
                     }
@@ -354,7 +354,7 @@ struct IOSDeliveryPickerSheet: View {
             .padding(12)
             .background {
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(IOSAppTheme.accentWash(tint).opacity(0.18))
+                    .fill(Theme.accentWash(tint).opacity(0.18))
             }
         }
         .accessibilityIdentifier("deliveryPickerSheet_customTone_examples")
@@ -370,7 +370,7 @@ struct IOSDeliveryPickerSheet: View {
                     ? tint
                     : remaining <= 50
                         ? .orange
-                        : IOSAppTheme.textTertiary
+                        : Theme.Text.tertiary
             )
             .accessibilityIdentifier("deliveryPickerSheet_customTone_charCount")
     }
@@ -393,7 +393,7 @@ struct IOSDeliveryPickerSheet: View {
             view.accessibilityIdentifier = "deliveryPickerSheet_customTone_editor"
             view.backgroundColor = .clear
             view.font = .systemFont(ofSize: 16, weight: .medium)
-            view.textColor = IOSAppTheme.textPrimaryUIColor
+            view.textColor = Theme.Text.primaryUIColor
             view.tintColor = tintColor
             view.isScrollEnabled = true
             view.bounces = false
@@ -433,7 +433,7 @@ struct IOSDeliveryPickerSheet: View {
         Text(title.uppercased())
             .iosScaledFont(size: 11, weight: .semibold, relativeTo: .caption2)
             .tracking(0.8)
-            .foregroundStyle(IOSAppTheme.textSecondary)
+            .foregroundStyle(Theme.Text.secondary)
     }
 
     private func description(for preset: EmotionPreset) -> String {
@@ -479,7 +479,7 @@ struct IOSDeliveryPickerSheet: View {
                         .frame(width: 8, height: 8)
                     Text(preset.label)
                         .iosScaledFont(size: 14, weight: .semibold, relativeTo: .footnote)
-                        .foregroundStyle(IOSAppTheme.textPrimary)
+                        .foregroundStyle(Theme.Text.primary)
                     Spacer(minLength: 0)
                     if isSelected {
                         Image(systemName: "checkmark")
@@ -490,7 +490,7 @@ struct IOSDeliveryPickerSheet: View {
 
                 Text(description(for: preset))
                     .iosScaledFont(size: 12, weight: .regular, relativeTo: .caption)
-                    .foregroundStyle(IOSAppTheme.textSecondary)
+                    .foregroundStyle(Theme.Text.secondary)
                     .multilineTextAlignment(.leading)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
@@ -528,12 +528,12 @@ struct IOSDeliveryPickerSheet: View {
         } label: {
             Text(level.label)
                 .font(.subheadline.weight(.medium))
-                .foregroundStyle(isSelected ? IOSAppTheme.textPrimary : IOSAppTheme.textSecondary)
+                .foregroundStyle(isSelected ? Theme.Text.primary : Theme.Text.secondary)
                 .frame(maxWidth: .infinity)
                 .frame(height: 36)
                 .background {
                     Capsule(style: .continuous)
-                        .fill(isSelected ? IOSAppTheme.accentWash(tint) : IOSAppTheme.glassSurfaceFillMuted.opacity(0.55))
+                        .fill(isSelected ? Theme.accentWash(tint) : Theme.Surface.glassSurfaceMuted.opacity(0.55))
                 }
                 .overlay {
                     Capsule(style: .continuous)
@@ -582,7 +582,7 @@ struct IOSQwenLanguagePickerSheet: View {
                 } label: {
                     Text("Confirm")
                         .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(IOSAppTheme.textPrimary)
+                        .foregroundStyle(Theme.Text.primary)
                         .padding(.horizontal, 18)
                         .frame(height: 40)
                         .background {
@@ -620,7 +620,7 @@ struct IOSQwenLanguagePickerSheet: View {
         Text(title.uppercased())
             .iosScaledFont(size: 10, weight: .semibold, relativeTo: .caption2)
             .tracking(0.7)
-            .foregroundStyle(IOSAppTheme.textTertiary)
+            .foregroundStyle(Theme.Text.tertiary)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.top, 8)
             .padding(.bottom, 2)
@@ -663,10 +663,10 @@ struct IOSQwenLanguagePickerSheet: View {
                     // subtitle.
                     Text(autoRowTitle(language))
                         .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(IOSAppTheme.textPrimary)
+                        .foregroundStyle(Theme.Text.primary)
                     Text(rowSubtitle(language))
                         .font(.caption)
-                        .foregroundStyle(IOSAppTheme.textSecondary)
+                        .foregroundStyle(Theme.Text.secondary)
                         .lineLimit(1)
                 }
 
@@ -687,8 +687,8 @@ struct IOSQwenLanguagePickerSheet: View {
             .padding(.vertical, 10)
             .contentShape(Rectangle())
             .background {
-                RoundedRectangle(cornerRadius: IOSCornerRadius.card, style: .continuous)
-                    .fill(isSelected ? IOSAppTheme.accentWash(tint) : Color.clear)
+                RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous)
+                    .fill(isSelected ? Theme.accentWash(tint) : Color.clear)
             }
             .overlay(alignment: .bottom) {
                 Rectangle()
@@ -836,7 +836,7 @@ struct IOSVoicePickerSheet: View {
                 } label: {
                     Text("Confirm")
                         .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(IOSAppTheme.textPrimary)
+                        .foregroundStyle(Theme.Text.primary)
                         .padding(.horizontal, 18)
                         .frame(height: 40)
                         .background {
@@ -913,7 +913,7 @@ struct IOSVoicePickerSheet: View {
         Text(title.uppercased())
             .iosScaledFont(size: 10, weight: .semibold, relativeTo: .caption2)
             .tracking(0.7)
-            .foregroundStyle(IOSAppTheme.textTertiary)
+            .foregroundStyle(Theme.Text.tertiary)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.top, 8)
             .padding(.bottom, 2)
@@ -940,11 +940,11 @@ struct IOSVoicePickerSheet: View {
                     VStack(alignment: .leading, spacing: 1) {
                         Text(option.name)
                             .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(IOSAppTheme.textPrimary)
+                            .foregroundStyle(Theme.Text.primary)
                         if let subtitle = option.subtitle {
                             Text(subtitle)
                                 .font(.caption)
-                                .foregroundStyle(IOSAppTheme.textSecondary)
+                                .foregroundStyle(Theme.Text.secondary)
                                 .lineLimit(1)
                         }
                     }
@@ -962,7 +962,7 @@ struct IOSVoicePickerSheet: View {
                         Text(tag.uppercased())
                             .iosScaledFont(size: 10, weight: .semibold, relativeTo: .caption2)
                             .tracking(0.4)
-                            .foregroundStyle(IOSAppTheme.textSecondary)
+                            .foregroundStyle(Theme.Text.secondary)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
                             .background {
@@ -1007,8 +1007,8 @@ struct IOSVoicePickerSheet: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
         .background {
-            RoundedRectangle(cornerRadius: IOSCornerRadius.card, style: .continuous)
-                .fill(isSelected ? IOSAppTheme.accentWash(tint) : Color.clear)
+            RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous)
+                .fill(isSelected ? Theme.accentWash(tint) : Color.clear)
         }
         .overlay(alignment: .bottom) {
             Rectangle()
@@ -1042,7 +1042,7 @@ private struct IOSVoicePickerFilterChip: View {
         Button(action: action) {
             Text(label)
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(isActive ? IOSAppTheme.textPrimary : IOSAppTheme.textSecondary)
+                .foregroundStyle(isActive ? Theme.Text.primary : Theme.Text.secondary)
                 .lineLimit(1)
                 .padding(.horizontal, 12)
                 .frame(height: 32)
@@ -1138,7 +1138,7 @@ struct IOSReferenceClipSheet: View {
     var body: some View {
         IOSBottomSheetSurface(
             title: "Reference clip",
-            tint: IOSBrandTheme.clone,
+            tint: Theme.Brand.modeClone,
             presentation: presentation,
             onDismiss: onDismiss
         ) {
@@ -1187,37 +1187,37 @@ struct IOSReferenceClipSheet: View {
             HStack(alignment: .center, spacing: 14) {
                 ZStack {
                     Circle()
-                        .fill(IOSBrandTheme.clone.opacity(0.2))
+                        .fill(Theme.Brand.modeClone.opacity(0.2))
                     Image(systemName: symbol)
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(IOSBrandTheme.clone)
+                        .foregroundStyle(Theme.Brand.modeClone)
                 }
                 .frame(width: 40, height: 40)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
                         .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(IOSAppTheme.textPrimary)
+                        .foregroundStyle(Theme.Text.primary)
                     Text(detail)
                         .font(.caption)
-                        .foregroundStyle(IOSAppTheme.textSecondary)
+                        .foregroundStyle(Theme.Text.secondary)
                 }
 
                 Spacer(minLength: 8)
 
                 Image(systemName: "chevron.right")
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(IOSAppTheme.textTertiary)
+                    .foregroundStyle(Theme.Text.tertiary)
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background {
-                RoundedRectangle(cornerRadius: IOSCornerRadius.card, style: .continuous)
-                    .fill(IOSAppTheme.glassSurfaceFillMuted.opacity(0.6))
+                RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous)
+                    .fill(Theme.Surface.glassSurfaceMuted.opacity(0.6))
             }
             .overlay {
-                RoundedRectangle(cornerRadius: IOSCornerRadius.card, style: .continuous)
+                RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous)
                     .stroke(Color.white.opacity(0.08), lineWidth: 0.8)
             }
         }
@@ -1228,7 +1228,7 @@ struct IOSReferenceClipSheet: View {
         Text(title.uppercased())
             .iosScaledFont(size: 10, weight: .semibold, relativeTo: .caption2)
             .tracking(0.7)
-            .foregroundStyle(IOSAppTheme.textTertiary)
+            .foregroundStyle(Theme.Text.tertiary)
             .padding(.top, 6)
     }
 
@@ -1244,11 +1244,11 @@ struct IOSReferenceClipSheet: View {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(option.name)
                         .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(IOSAppTheme.textPrimary)
+                        .foregroundStyle(Theme.Text.primary)
                     if let subtitle = option.subtitle {
                         Text(subtitle)
                             .font(.caption)
-                            .foregroundStyle(IOSAppTheme.textSecondary)
+                            .foregroundStyle(Theme.Text.secondary)
                     }
                 }
 
@@ -1260,7 +1260,7 @@ struct IOSReferenceClipSheet: View {
                 // rows stay aligned across selected and unselected rows.
                 Image(systemName: "checkmark.circle.fill")
                     .font(.system(size: 16))
-                    .foregroundStyle(IOSBrandTheme.clone)
+                    .foregroundStyle(Theme.Brand.modeClone)
                     .opacity(isSelected ? 1 : 0)
                     .frame(width: 20)
                     .accessibilityHidden(true)
@@ -1268,8 +1268,8 @@ struct IOSReferenceClipSheet: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 9)
             .background {
-                RoundedRectangle(cornerRadius: IOSCornerRadius.card, style: .continuous)
-                    .fill(isSelected ? IOSAppTheme.accentWash(IOSBrandTheme.clone) : Color.clear)
+                RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous)
+                    .fill(isSelected ? Theme.accentWash(Theme.Brand.modeClone) : Color.clear)
             }
         }
         .buttonStyle(.plain)
@@ -1301,7 +1301,7 @@ struct IOSBankDeliveryPickerSheet: View {
     var body: some View {
         IOSBottomSheetSurface(
             title: "Delivery",
-            tint: IOSBrandTheme.clone,
+            tint: Theme.Brand.modeClone,
             presentation: presentation,
             onDismiss: onDismiss
         ) {
@@ -1309,7 +1309,7 @@ struct IOSBankDeliveryPickerSheet: View {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("\(personaName) is a voice bank: the same voice with curated emotion references. Each delivery clones its measured reference clip.")
                         .font(.caption)
-                        .foregroundStyle(IOSAppTheme.textSecondary)
+                        .foregroundStyle(Theme.Text.secondary)
                         .fixedSize(horizontal: false, vertical: true)
 
                     ForEach(options) { row(for: $0) }
@@ -1331,13 +1331,13 @@ struct IOSBankDeliveryPickerSheet: View {
 
                 Text(option.label)
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(IOSAppTheme.textPrimary)
+                    .foregroundStyle(Theme.Text.primary)
 
                 Spacer(minLength: 8)
 
                 Image(systemName: "checkmark.circle.fill")
                     .font(.system(size: 16))
-                    .foregroundStyle(IOSBrandTheme.clone)
+                    .foregroundStyle(Theme.Brand.modeClone)
                     .opacity(isSelected ? 1 : 0)
                     .frame(width: 20)
                     .accessibilityHidden(true)
@@ -1345,8 +1345,8 @@ struct IOSBankDeliveryPickerSheet: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 9)
             .background {
-                RoundedRectangle(cornerRadius: IOSCornerRadius.card, style: .continuous)
-                    .fill(isSelected ? IOSAppTheme.accentWash(IOSBrandTheme.clone) : Color.clear)
+                RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous)
+                    .fill(isSelected ? Theme.accentWash(Theme.Brand.modeClone) : Color.clear)
             }
         }
         .buttonStyle(.plain)
@@ -1419,12 +1419,12 @@ struct IOSDeleteModelSheet: View {
                 Text(modelName)
                     .font(.system(size: 16, weight: .semibold))
                     .tracking(-0.08)
-                    .foregroundStyle(IOSAppTheme.textPrimary)
+                    .foregroundStyle(Theme.Text.primary)
                     .lineLimit(1)
 
                 Text("Frees \(sizeLabel). You can reinstall later from Settings.")
                     .font(.system(size: 13, weight: .regular))
-                    .foregroundStyle(IOSAppTheme.textSecondary)
+                    .foregroundStyle(Theme.Text.secondary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.82)
             }
@@ -1471,7 +1471,7 @@ struct IOSDeleteModelSheet: View {
         } label: {
             Text("Cancel")
                 .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(IOSAppTheme.textPrimary)
+                .foregroundStyle(Theme.Text.primary)
                 .frame(maxWidth: .infinity)
                 .frame(height: 56)
                 .background {

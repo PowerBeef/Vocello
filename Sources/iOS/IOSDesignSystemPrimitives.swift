@@ -13,33 +13,6 @@ import QwenVoiceCore
 // - design_references/Vocello Design System/colors_and_type.css (colors,
 //   shadows, surface ramp, stroke values)
 
-// MARK: - Corner radii
-
-enum IOSCornerRadius {
-    static let chip: CGFloat = 8
-    static let input: CGFloat = 10
-    static let card: CGFloat = 16
-    static let stage: CGFloat = 22
-    static let sheetGrabber: CGFloat = 3
-    // Pill / capsule shape uses Capsule(); 999 in design = continuous capsule.
-}
-
-// MARK: - Motion timing
-
-enum IOSDesignMotion {
-    /// 220ms ease-out (cubic-bezier 0.22, 1, 0.36, 1). Default sheet + state
-    /// transition timing per `tokens.css` --dur-default / --ease-out.
-    static let sheetReveal = Animation.timingCurve(0.22, 1.0, 0.36, 1.0, duration: 0.22)
-    /// 360ms ease-out for bottom-sheet slide-up.
-    static let sheetSlideUp = Animation.timingCurve(0.22, 1.0, 0.36, 1.0, duration: 0.36)
-    /// 420ms ease-out for full-screen Player sheet slide-up.
-    static let playerSheetSlideUp = Animation.timingCurve(0.22, 1.0, 0.36, 1.0, duration: 0.42)
-    /// 320ms for mode-segmented pill slide.
-    static let modePillSlide = Animation.timingCurve(0.22, 1.0, 0.36, 1.0, duration: 0.32)
-    /// 150ms ease-out for state changes (chip selection, focus).
-    static let stateChange = Animation.easeOut(duration: 0.15)
-}
-
 // MARK: - Mode backdrop
 
 /// Warm mode-tinted wash behind the Studio + Player sheet. Anchored to
@@ -80,14 +53,14 @@ struct IOSModeBackdrop: View {
     var body: some View {
         if reduceTransparency {
             // Flat fallback — design system requires opaque alternatives.
-            IOSBrandTheme.canvasTop
+            Theme.Surface.canvas
                 .ignoresSafeArea()
         } else {
             GeometryReader { proxy in
                 let radius = max(proxy.size.width * 0.72, proxy.size.height * 0.52)
 
                 ZStack {
-                    IOSBrandTheme.canvasTop
+                    Theme.Surface.canvas
                     RadialGradient(
                         stops: [
                             .init(color: tint.opacity(intensity.topOpacity), location: 0.0),
@@ -410,7 +383,7 @@ struct IOSPlayerIconButtonChrome: View {
     var body: some View {
         Image(systemName: symbol)
             .font(.system(size: symbolSize, weight: .semibold))
-            .foregroundStyle(IOSAppTheme.textPrimary)
+            .foregroundStyle(Theme.Text.primary)
             .frame(width: size, height: size)
             .background {
                 Circle()
@@ -463,7 +436,7 @@ struct IOSVoiceAvatar: View {
                 .stroke(Color.white.opacity(0.10), lineWidth: 0.75)
             Text(initials)
                 .font(.system(size: diameter * 0.36, weight: .semibold, design: .rounded))
-                .foregroundStyle(IOSAppTheme.textPrimary)
+                .foregroundStyle(Theme.Text.primary)
         }
         .frame(width: diameter, height: diameter)
     }
@@ -530,7 +503,7 @@ struct IOSBottomSheetSurface<Content: View>: View {
 
     init(
         title: String,
-        tint: Color = IOSBrandTheme.accent,
+        tint: Color = Theme.Brand.gold,
         presentation: IOSBottomSheetPresentationStyle = .system,
         onDismiss: (() -> Void)? = nil,
         @ViewBuilder content: () -> Content
@@ -546,7 +519,7 @@ struct IOSBottomSheetSurface<Content: View>: View {
 
     init<Trailing: View>(
         title: String,
-        tint: Color = IOSBrandTheme.accent,
+        tint: Color = Theme.Brand.gold,
         presentation: IOSBottomSheetPresentationStyle = .system,
         onDismiss: (() -> Void)? = nil,
         @ViewBuilder headerTrailing: () -> Trailing,
@@ -563,7 +536,7 @@ struct IOSBottomSheetSurface<Content: View>: View {
 
     init<Leading: View, Trailing: View>(
         title: String,
-        tint: Color = IOSBrandTheme.accent,
+        tint: Color = Theme.Brand.gold,
         presentation: IOSBottomSheetPresentationStyle = .system,
         onDismiss: (() -> Void)? = nil,
         @ViewBuilder headerLeading: () -> Leading,
@@ -684,7 +657,7 @@ struct IOSBottomEdgeSheet<Content: View>: View {
 
     init(
         title: String,
-        tint: Color = IOSBrandTheme.accent,
+        tint: Color = Theme.Brand.gold,
         bottomSafeAreaInset: CGFloat,
         height: CGFloat? = nil,
         onDismiss: @escaping () -> Void,
@@ -702,7 +675,7 @@ struct IOSBottomEdgeSheet<Content: View>: View {
 
     init<Trailing: View>(
         title: String,
-        tint: Color = IOSBrandTheme.accent,
+        tint: Color = Theme.Brand.gold,
         bottomSafeAreaInset: CGFloat,
         height: CGFloat? = nil,
         onDismiss: @escaping () -> Void,
@@ -721,7 +694,7 @@ struct IOSBottomEdgeSheet<Content: View>: View {
 
     init<Leading: View, Trailing: View>(
         title: String,
-        tint: Color = IOSBrandTheme.accent,
+        tint: Color = Theme.Brand.gold,
         bottomSafeAreaInset: CGFloat,
         height: CGFloat? = nil,
         onDismiss: @escaping () -> Void,
@@ -772,7 +745,7 @@ struct IOSBottomEdgeSheet<Content: View>: View {
         // Gate decision shared with every other glass surface (IUI-5 D10a);
         // the gated branch paints this panel's solid backing via gatedFill.
         panel.iosGatedGlass(
-            tint: IOSAppTheme.subtleGlassTint(tint, intensity: 0.45),
+            tint: Theme.glassTint(tint, intensity: 0.45),
             in: shape,
             gatedFill: Color(red: 20 / 255, green: 22 / 255, blue: 30 / 255)
         )
@@ -819,7 +792,7 @@ struct IOSBottomEdgeSheet<Content: View>: View {
             Text(title)
                 .iosScaledFont(size: 22, weight: .bold, relativeTo: .title2)
                 .tracking(-0.44)
-                .foregroundStyle(IOSAppTheme.textPrimary)
+                .foregroundStyle(Theme.Text.primary)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
             if let headerTrailing {
@@ -830,7 +803,7 @@ struct IOSBottomEdgeSheet<Content: View>: View {
                 } label: {
                     Image(systemName: "xmark")
                         .font(.system(size: 18, weight: .regular))
-                        .foregroundStyle(IOSAppTheme.textPrimary)
+                        .foregroundStyle(Theme.Text.primary)
                         .frame(width: 40, height: 40)
                         .background {
                             Circle()
@@ -868,7 +841,7 @@ struct IOSBottomSheet<Content: View>: View {
 
     init(
         title: String,
-        tint: Color = IOSBrandTheme.accent,
+        tint: Color = Theme.Brand.gold,
         onDismiss: (() -> Void)? = nil,
         @ViewBuilder content: () -> Content
     ) {
@@ -882,7 +855,7 @@ struct IOSBottomSheet<Content: View>: View {
 
     init<Trailing: View>(
         title: String,
-        tint: Color = IOSBrandTheme.accent,
+        tint: Color = Theme.Brand.gold,
         onDismiss: (() -> Void)? = nil,
         @ViewBuilder headerTrailing: () -> Trailing,
         @ViewBuilder content: () -> Content
@@ -897,7 +870,7 @@ struct IOSBottomSheet<Content: View>: View {
 
     init<Leading: View, Trailing: View>(
         title: String,
-        tint: Color = IOSBrandTheme.accent,
+        tint: Color = Theme.Brand.gold,
         onDismiss: (() -> Void)? = nil,
         @ViewBuilder headerLeading: () -> Leading,
         @ViewBuilder headerTrailing: () -> Trailing,
@@ -953,7 +926,7 @@ struct IOSBottomSheet<Content: View>: View {
             Text(title)
                 .iosScaledFont(size: 22, weight: .bold, relativeTo: .title2)
                 .tracking(-0.44)
-                .foregroundStyle(IOSAppTheme.textPrimary)
+                .foregroundStyle(Theme.Text.primary)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
             if let headerTrailing {
@@ -965,7 +938,7 @@ struct IOSBottomSheet<Content: View>: View {
                 } label: {
                     Image(systemName: "xmark")
                         .font(.system(size: 18, weight: .regular))
-                        .foregroundStyle(IOSAppTheme.textPrimary)
+                        .foregroundStyle(Theme.Text.primary)
                         .frame(width: 40, height: 40)
                         .background {
                             Circle()
@@ -1051,7 +1024,7 @@ struct IOSStudioSetupChip: View {
         value: String,
         abbreviation: String,
         leadingSymbol: String,
-        tint: Color = IOSBrandTheme.accent,
+        tint: Color = Theme.Brand.gold,
         isPlaceholder: Bool = false,
         accessibilityID: String? = nil,
         action: @escaping () -> Void
@@ -1201,7 +1174,7 @@ struct IOSFilterChipRow<Option: Hashable & Identifiable>: View {
         let isSelected = option == selection
 
         return Button {
-            IOSAccessibleAnimation.perform(IOSDesignMotion.stateChange) {
+            IOSAccessibleAnimation.perform(Theme.Motion.stateChange) {
                 selection = option
             }
             IOSHaptics.selection()
@@ -1215,7 +1188,7 @@ struct IOSFilterChipRow<Option: Hashable & Identifiable>: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)
             }
-            .foregroundStyle(isSelected ? IOSAppTheme.textPrimary : IOSAppTheme.textSecondary)
+            .foregroundStyle(isSelected ? Theme.Text.primary : Theme.Text.secondary)
             .frame(maxWidth: .infinity)
             .frame(minHeight: 32)
             .padding(.horizontal, 12)
@@ -1251,7 +1224,7 @@ struct IOSSearchField: View {
         HStack(alignment: .center, spacing: 8) {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 16, weight: .medium))
-                .foregroundStyle(IOSAppTheme.textTertiary)
+                .foregroundStyle(Theme.Text.tertiary)
 
             TextField(placeholder, text: $text)
                 .focused($isFocused)
@@ -1261,7 +1234,7 @@ struct IOSSearchField: View {
                 // IUI-1). IUI-4 X1.
                 .autocorrectionDisabled(true)
                 .submitLabel(.search)
-                .foregroundStyle(IOSAppTheme.textPrimary)
+                .foregroundStyle(Theme.Text.primary)
                 .iosScaledFont(size: 15, relativeTo: .subheadline)
 
             if !text.isEmpty {
@@ -1271,7 +1244,7 @@ struct IOSSearchField: View {
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .font(.system(size: 16))
-                        .foregroundStyle(IOSAppTheme.textTertiary)
+                        .foregroundStyle(Theme.Text.tertiary)
                         // 44 pt HIG hit target around the 16 pt glyph (IUI-4 X8).
                         .frame(width: 44, height: 44)
                         .contentShape(Rectangle())
@@ -1286,7 +1259,7 @@ struct IOSSearchField: View {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .fill(Color.white.opacity(0.06))
         }
-        .iosAppAnimation(IOSDesignMotion.stateChange, value: isFocused)
+        .iosAppAnimation(Theme.Motion.stateChange, value: isFocused)
     }
 }
 
@@ -1313,7 +1286,7 @@ struct IOSPrimaryCTAButton: View {
     // app text-primary). Under Reduce Transparency the fill is a deep opaque
     // tint, so the same off-white stays legible.
     private var foregroundInk: Color {
-        IOSAppTheme.textPrimary
+        Theme.Text.primary
     }
 
     private var backgroundFill: AnyShapeStyle {
@@ -1399,6 +1372,6 @@ struct IOSPrimaryCTAButton: View {
         }
         .buttonStyle(.plain)
         .opacity(isEnabled ? 1.0 : 0.42)
-        .iosAppAnimation(IOSDesignMotion.stateChange, value: isEnabled)
+        .iosAppAnimation(Theme.Motion.stateChange, value: isEnabled)
     }
 }

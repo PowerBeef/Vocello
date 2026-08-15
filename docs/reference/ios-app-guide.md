@@ -120,7 +120,9 @@ Container `screen_voices`. Filter chips `voicesFilter_all|builtIn|saved`. Built-
 emotion-bank member's caption reads "Voice bank · <Delivery>"; standalone voices read "Cloned
 reference" — every member stays listed because each reference clip is individually previewable).
 The Save a New Voice card has one visible action: `voices_saveNewVoice` starts the recorder
-(iPhone deliberately offers no file import; a saved Voice Design voice can also serve as the
+(iPhone also imports reference files — the "Import audio file" row, `voices_importAudioFile`,
+presents a native `fileImporter` for WAV/MP3/AIFF/M4A and continues through the same
+name → enroll sheet, restored 2026-08-15; a saved Voice Design voice can also serve as the
 clone reference through the Studio handoff). The enrollment sheet exposes `saveVoice_nameField`,
 `saveVoice_transcriptEditor`, and `saveVoice_saveButton`; a successful save creates
 `voicesRow_saved_<id>` and hands the reference to Studio Clone. Search is `voicesSearchField`.

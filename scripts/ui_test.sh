@@ -42,13 +42,16 @@ Usage:
   scripts/ui_test.sh ios perf [--label RUN_ID]
   scripts/ui_test.sh ios delivery-cohort --text SCRIPT [--takes 20] [--label RUN_ID]
   scripts/ui_test.sh ios model-download [--engine-profile legacy|chunked|chunked-multisession]
+  scripts/ui_test.sh ios enroll-clone-fixture
 
 The iOS destination is the paired physical iPhone only. Simulator destinations are unsupported.
 `model-download` is an opt-in isolated lifecycle proof and never runs in smoke, benchmark, CI, or release.
 `delivery-cohort` is a diagnostic delivery-consistency lane (N identical Neutral Custom takes through
 the production UI); it never publishes benchmark history and never runs in smoke, benchmark, CI, or release.
-Benchmark clone-fixture enrollment moved to the headless diagnostics runner:
-`scripts/ios_device.sh enroll-clone-fixture` (the iPhone app no longer ships a Files-import UI).
+`enroll-clone-fixture` is an opt-in helper that enrolls the benchmark clone voice through the genuine
+visible Files-import flow; stage the reference WAV and .txt sidecar in the app's Documents first
+(devicectl appDataContainer copy). It never runs in smoke, benchmark, CI, or release. The headless
+`scripts/ios_device.sh enroll-clone-fixture` remains the wipe-recovery route (no UI, hash-pinned).
 No lane retries automatically. A failed run keeps its log, xcresult, screenshots, and diagnostics.
 RUN_ID is an opaque 1-96 character identifier using letters, digits, dot, underscore, or hyphen.
 EOF
@@ -60,9 +63,10 @@ platform="$1"
 lane="$2"
 shift 2
 [[ "$platform" == "macos" || "$platform" == "ios" ]] || usage
-[[ "$lane" == "smoke" || "$lane" == "benchmark" || "$lane" == "model-download" || "$lane" == "delivery-cohort" || "$lane" == "perf" ]] || usage
+[[ "$lane" == "smoke" || "$lane" == "benchmark" || "$lane" == "model-download" || "$lane" == "delivery-cohort" || "$lane" == "perf" || "$lane" == "enroll-clone-fixture" ]] || usage
 [[ "$lane" != "model-download" || "$platform" == "ios" ]] || usage
 [[ "$lane" != "delivery-cohort" || "$platform" == "ios" ]] || usage
+[[ "$lane" != "enroll-clone-fixture" || "$platform" == "ios" ]] || usage
 
 modes="custom,design,clone"
 lengths="short,medium,long"
@@ -1049,6 +1053,8 @@ else
     only_test="VocelloiOSUITests/VocelloiOSPerfUITests"
     perf_run_started_epoch_ms="$(($(date +%s) * 1000))"
     export TEST_RUNNER_QVOICE_IOS_PERF_RUN_ID="$run_id"
+  elif [[ "$lane" == "enroll-clone-fixture" ]]; then
+    only_test="VocelloiOSUITests/VocelloiOSFixtureEnrollmentUITests/testEnrollBenchmarkCloneFixtureFromDocuments"
   else
     only_test="VocelloiOSUITests/VocelloiOSModelDownloadUITests/testIsolatedBackgroundDownloadAdoptionAndCleanup"
     # A/B arm selection for the MD-2 device comparison: forwarded to the test

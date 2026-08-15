@@ -239,6 +239,8 @@ scripts/ui_test.sh ios benchmark
 scripts/ui_test.sh ios perf       # frame-health lane; idle-anchored fail-closed cadence band; canonical-iPhone PASS publishes a ui-perf record
 # Opt-in isolated background-delivery lifecycle proof; never an ordinary UI lane.
 scripts/ui_test.sh ios model-download
+# Opt-in benchmark clone-voice enrollment through the visible Files-import flow.
+scripts/ui_test.sh ios enroll-clone-fixture
 scripts/ios_device.sh gate
 ```
 

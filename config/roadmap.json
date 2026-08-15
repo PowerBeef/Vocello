@@ -64,6 +64,15 @@
       "adopted": "2026-08-11",
       "goal": "Mirror the macOS UI arc on the iPhone: build a deterministic frame-health lane (scripts/ui_test.sh ios perf) on the canonical iPhone 17 Pro, baseline the real UI costs, run a four-lens audit merged with the numbers into ONE ranked findings list spanning performance and design (maintainer chose audit-first: design items become a maintainer pick-list, never pre-committed work), land fixes in measured waves, and close by making the ui-perf benchmark kind platform-aware. Instrument-first ordering is mandatory - the 2026-06 iOS fix wave shipped unmeasured and its own commit messages say so. Pre-arc housekeeping (standalone commit): add the missing ui-ios-delivery-cohort workflow to config/orchestration-contract.json (existing lane unrunnable without it).",
       "authority": "docs/reference/ios-ui-refresh-2026-08.md"
+    },
+    {
+      "id": "ios-clone-import-2026-08",
+      "title": "iOS clone-reference file import restored",
+      "status": "active",
+      "owner": "ios",
+      "adopted": "2026-08-15",
+      "goal": "Restore the iPhone file-import clone-reference route removed 2026-08-01 for App Store review-posture caution (no rejection ever occurred; build 23 carried the feature and passed beta review): the Voices-tab Files picker, the open-from-Files document route, and the import mode of the record-voice sheet, re-landed with the recorded fixes rather than a blind revert.",
+      "authority": "docs/reference/ios-app-guide.md"
     }
   ],
   "items": [
@@ -185,7 +194,7 @@
       "sourceOfTruth": [
         "Sources/QwenVoiceCore/EmotionPreset.swift"
       ],
-      "updated": "2026-08-04"
+      "updated": "2026-08-15"
     },
     {
       "id": "DP-2",
@@ -214,7 +223,7 @@
       "sourceOfTruth": [
         "Sources/QwenVoiceCore/EmotionPreset.swift"
       ],
-      "updated": "2026-08-04",
+      "updated": "2026-08-15",
       "evidence": [
         "doc:docs/reference/qwen3-tts-prompting-guide.md",
         "file:config/runtime-debug-knobs.json"
@@ -266,7 +275,7 @@
         "Sources/QwenVoiceCore/EmotionPreset.swift",
         "scripts/prosody_profile.py"
       ],
-      "updated": "2026-08-05",
+      "updated": "2026-08-15",
       "evidence": [
         "doc:docs/reference/qwen3-tts-prompting-guide.md",
         "file:config/delivery-instruction-contract.json"
@@ -430,7 +439,7 @@
       "sourceOfTruth": [
         "Sources/QwenVoiceCore/EmotionPreset.swift"
       ],
-      "updated": "2026-08-04"
+      "updated": "2026-08-15"
     },
     {
       "id": "DP-9",
@@ -466,7 +475,7 @@
       "sourceOfTruth": [
         "Sources/QwenVoiceCore/EmotionPreset.swift"
       ],
-      "updated": "2026-08-04"
+      "updated": "2026-08-15"
     },
     {
       "id": "DP-11",
@@ -537,7 +546,7 @@
       "sourceOfTruth": [
         "Sources/QwenVoiceCore/EmotionPreset.swift"
       ],
-      "updated": "2026-08-04"
+      "updated": "2026-08-15"
     },
     {
       "id": "DP-15",
@@ -1025,6 +1034,37 @@
         "file:benchmarks/runs/ui-perf/ios-xcui-perf-20260815-173719-6e425c28.json",
         "file:config/ui-perf-thresholds-ios.json"
       ]
+    },
+    {
+      "id": "ICI-1",
+      "plan": "ios-clone-import-2026-08",
+      "title": "Full restore of the Files-import clone-reference route",
+      "status": "done",
+      "gate": "Restore from 07a3c17b^: the voices_importAudioFile picker row (fileImporter, WAV/MP3/AIFF/M4A only - the supportedSavedVoiceAudioExtensions set), the RootView.onOpenURL open-from-Files route with the ImportedVoicePresentation cover, the IOSRecordVoiceSheet importedReference mode, and the Info.plist public.audio document type plus in-place-opening keys. Apply the recorded deltas: cleanup guard (imported references in the fingerprinted cache are never deleted by the sheet), conditional discard label for the import-only >60s hard block, on-device auto-transcription when no .txt sidecar arrived (macOS SavedVoiceSheet parity), and a duplicate-name pre-check before enrollment. Restore the opt-in ui_test.sh ios enroll-clone-fixture lane and VocelloiOSFixtureEnrollmentUITests (the ui-ios-enroll-clone-fixture orchestration workflow was never removed); keep the headless ios_device.sh enroll-clone-fixture wipe-recovery route. GATE: iOS device-SDK app compile and UI-test-bundle build-for-testing green; full deterministic gate green; docs/README/website platform-split claims updated in the same change.",
+      "sourceOfTruth": [
+        "Sources/iOS/IOSVoicesView.swift",
+        "Sources/iOS/Voices/IOSRecordVoiceSheet.swift",
+        "Sources/iOS/App/RootView.swift",
+        "scripts/ui_test.sh"
+      ],
+      "updated": "2026-08-15",
+      "notes": "Landed 2026-08-15. Backend seam was intact throughout (TTSEngineStore/LocalDocumentIO importReferenceAudio, AppPaths.importedReferenceAudioDir). Device acceptance recorded as the remaining explicit QA for the next phone window: the restored enroll-clone-fixture UI lane end to end plus an ios smoke pass; the open-from-Files route is a manual maintainer spot-check (XCUITest cannot drive the Files app). Missing device evidence never blocks commit/push per the publishing-is-deterministic rule.",
+      "evidence": [
+        "doc:docs/reference/ios-app-guide.md",
+        "file:Tests/VocelloiOSUITests/VocelloiOSFixtureEnrollmentUITests.swift"
+      ]
+    },
+    {
+      "id": "ICI-2",
+      "plan": "ios-clone-import-2026-08",
+      "title": "Device acceptance of the restored import route",
+      "status": "planned",
+      "gate": "Next phone window, explicit QA (never a publishing prerequisite): run the restored opt-in lane end to end - stage the benchmark fixture WAV+txt into the app's Documents (devicectl appDataContainer copy) and run scripts/ui_test.sh ios enroll-clone-fixture (drives voices_importAudioFile through the system picker to a saved voicesRow_saved_* row) - plus scripts/ui_test.sh ios smoke to confirm the Voices-tab changes leave the standing journeys green. The open-from-Files route (tapping an audio file in the Files app) is a manual maintainer spot-check since XCUITest cannot drive the Files app. GATE: enroll-clone-fixture lane PASS + smoke PASS recorded in docs/development-progress.md.",
+      "sourceOfTruth": [
+        "scripts/ui_test.sh",
+        "Tests/VocelloiOSUITests/VocelloiOSFixtureEnrollmentUITests.swift"
+      ],
+      "updated": "2026-08-15"
     }
   ]
 }

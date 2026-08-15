@@ -180,8 +180,9 @@ a headless inventory for the visible Settings state.
 
 When a device wipe removes the benchmark clone voice,
 `scripts/ios_device.sh enroll-clone-fixture --wav A_warm_elderly_woman.wav --transcript A_warm_elderly_woman.txt`
-re-enrolls it through the headless diagnostics runner (the iPhone app no longer ships a
-Files-import UI; the visible reference sources are the microphone and saved Voice Design voices).
+re-enrolls it through the headless diagnostics runner. (The visible Files-import flow returned
+2026-08-15 and has its own opt-in `scripts/ui_test.sh ios enroll-clone-fixture` UI lane; the
+headless command remains the no-UI, hash-pinned wipe-recovery route.)
 The command stages the exact WAV plus the mandatory `.txt` transcript sidecar (from the macOS
 fixture store `~/Library/Application Support/QwenVoice-Debug/voices/`) into the app's Documents,
 launches with `QVOICE_IOS_DEVICE_ENROLL_VOICE_NAME`, and validates the enrollment sentinel

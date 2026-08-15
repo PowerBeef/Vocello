@@ -41,7 +41,7 @@
 
 - **Custom Voice:** choose one of nine built-in Qwen3 speakers, then set language and delivery.
 - **Voice Design:** describe a voice in plain language and generate it from that brief.
-- **Voice Cloning:** capture a reference you have permission to use, affirm consent, and save it to your voice library. On the Mac, record a clip or import an audio file; on iPhone, record with the microphone or reuse a saved Voice Design voice as the reference (the iPhone app deliberately has no file import).
+- **Voice Cloning:** capture a reference you have permission to use, affirm consent, and save it to your voice library. On both platforms, record a clip or import an audio file; on iPhone you can also reuse a saved Voice Design voice as the reference.
 
 Scripts past 900 characters become **long-form projects**: planned segments stream one after another while you listen along, then join into a single finished file with a per-segment map in History. Ten languages are supported (Chinese, English, Japanese, Korean, German, French, Russian, Portuguese, Spanish, and Italian) with automatic detection, and everything (scripts, references, history, audio) stays in local app storage unless you export it.
 

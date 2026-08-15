@@ -49,6 +49,26 @@ machine-readable status record and wins over any older prose.
 
 ## Resume here (2026-08-15)
 
+**iOS clone-reference file import restored (2026-08-15, maintainer call,
+desk):** the full route removed on 2026-08-01 for review-posture caution is
+back — the Voices-tab "Import audio file" row (`voices_importAudioFile`,
+`fileImporter` for WAV/MP3/AIFF/M4A), the open-from-Files document route
+(`RootView.onOpenURL` + restored `public.audio` document type and
+in-place-opening Info.plist keys), and the `IOSRecordVoiceSheet` import mode
+(name from filename stem, transcript from the `.txt` sidecar). The backend
+seam never left (`importReferenceAudio` / `LocalDocumentIO`). Restored with
+recorded improvements: imports with no sidecar now auto-transcribe on-device
+(macOS parity), a friendly duplicate-name pre-check before enrollment, the
+cleanup guard that must not delete fingerprinted cache entries, and the
+conditional discard label for the import-only >60 s hard-block alert. The
+`ui_test.sh ios enroll-clone-fixture` opt-in UI lane and its
+`VocelloiOSFixtureEnrollmentUITests` returned (the orchestration-contract
+workflow entry had never been removed); the headless
+`ios_device.sh enroll-clone-fixture` stays as the wipe-recovery route.
+**Device acceptance pending the next phone window:** run the restored
+enroll-clone-fixture UI lane end to end plus an `ios smoke` pass; the
+open-from-Files route is a manual maintainer spot-check.
+
 **DP-24 shipped — per-preset delivery tiers (2026-08-15, maintainer call,
 desk):** the intensity selector stays retired on both platforms (as it has
 been since 2026-08-02), and each preset now ships its measured-best tier:
@@ -464,7 +484,11 @@ performance block after the fixture rebind, Tier 4 carryover). Immediate specifi
    (`QVOICE_IOS_DEVICE_ENROLL_VOICE_NAME`, registered knob; staged inputs are deleted
    after a clean enrollment). Ships in the next TestFlight build cut after 23 (no bump
    exists yet as of 2026-08-04 — build numbers are a maintainer call); build 23 in
-   review still carries the import UI.
+   review still carries the import UI. **Reversed 2026-08-15 (maintainer call):** the
+   full import route returned — the review-risk concern never materialized (build 23,
+   carrying the import UI, passed beta review and remains the approved TestFlight
+   build). The headless fixture command stays as the wipe-recovery route. See the
+   resume block for the restore details.
 8. **Intensity tiers collapsed to two (2026-08-01, maintainer decision):** "subtle"
    retired — its calibrated delivery-gate minimum effect was zero (below the prosody
    noise floor), an unverifiable control. Normal/strong remain (both ≥0.85 adherence,

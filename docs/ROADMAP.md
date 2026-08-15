@@ -10,6 +10,7 @@
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
 | `delivery-prompting-2026-08` | active | backend-mlx | 23/25 (92%) |
+| `ios-clone-import-2026-08` | active | ios | 1/2 (50%) |
 | `compliance-2026-08` | complete | release-qa | 2/2 (100%) |
 | `convergence-metal4-stage4-2026-08` | complete | backend-and-platform | 7/7 (100%) |
 | `doc-governance-2026-08` | complete | release-qa | 9/9 (100%) |
@@ -60,6 +61,24 @@ Narrative authority: [`docs/reference/qwen3-tts-prompting-guide.md`](reference/q
 
 - **`DP-25`** (planned) — Measured normal-tier gate floors (prosody profile v4) for the normal-shipping presets.
   gate: ["The DP-23-step-3 mechanics remainder, now live because DP-24 makes the shipped tier non-uniform: replace the prosody profile's derived normal minima (strong floors divided by the doubly-refuted 1.15 intensity_scale - scripts/prosody_profile.py) with floors calibrated from DP-22's banked measured normal-tier paired rows, at least for the shipping normal cells (happy, angry); retire or annotate the 1.15 constant; bump the profile schema so records carry the new digest. DP-21's calibration protocol is the template (floors at the noise decile; genuine misses kept warning). Desk work, no phone; needs the banked DP-22 sidecars under outputs/bench-archive."]
+
+## iOS clone-reference file import restored
+
+`ios-clone-import-2026-08` · **active** · ios · adopted 2026-08-15
+
+Restore the iPhone file-import clone-reference route removed 2026-08-01 for App Store review-posture caution (no rejection ever occurred; build 23 carried the feature and passed beta review): the Voices-tab Files picker, the open-from-Files document route, and the import mode of the record-voice sheet, re-landed with the recorded fixes rather than a blind revert.
+
+Narrative authority: [`docs/reference/ios-app-guide.md`](reference/ios-app-guide.md)
+
+| Item | Status | Title | Evidence |
+| --- | --- | --- | --- |
+| `ICI-1` | done | Full restore of the Files-import clone-reference route | `doc:docs/reference/ios-app-guide.md`, `file:Tests/VocelloiOSUITests/VocelloiOSFixtureEnrollmentUITests.swift` |
+| `ICI-2` | planned | Device acceptance of the restored import route | — |
+
+### Open items in detail
+
+- **`ICI-2`** (planned) — Device acceptance of the restored import route.
+  gate: Next phone window, explicit QA (never a publishing prerequisite): run the restored opt-in lane end to end - stage the benchmark fixture WAV+txt into the app's Documents (devicectl appDataContainer copy) and run scripts/ui_test.sh ios enroll-clone-fixture (drives voices_importAudioFile through the system picker to a saved voicesRow_saved_* row) - plus scripts/ui_test.sh ios smoke to confirm the Voices-tab changes leave the standing journeys green. The open-from-Files route (tapping an audio file in the Files app) is a manual maintainer spot-check since XCUITest cannot drive the Files app. GATE: enroll-clone-fixture lane PASS + smoke PASS recorded in docs/development-progress.md.
 
 ## EU AI Act Article 50 readiness
 

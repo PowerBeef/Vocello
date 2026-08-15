@@ -50,7 +50,7 @@ Before changing iOS UI or behavior, read:
   - `scripts/ios_device.sh profile [--kind cpu|memory] [--keep-trace] [spec]`
   - `scripts/ios_device.sh memory --voice-id ID [--label ID]` (one-process retained-memory sequence)
   - `scripts/ios_device.sh clone-conditioning [--label ID]` (compile-gated, local-only transcript-backed versus x-vector proof; no history publication)
-  - `scripts/ios_device.sh enroll-clone-fixture --wav W.wav --transcript W.txt` (headless benchmark-fixture voice enrollment; the iPhone app ships no file-import UI)
+  - `scripts/ios_device.sh enroll-clone-fixture --wav W.wav --transcript W.txt` (headless benchmark-fixture voice enrollment for wipe recovery; the visible Files-import flow returned 2026-08-15 and has its own opt-in `ui_test.sh ios enroll-clone-fixture` lane)
   - `scripts/ios_device.sh memory-field-report [pulled-diagnostics]` (local-only; never contacts the phone)
   - `scripts/ios_device.sh crashes`
   - `scripts/ios_device.sh gate`
@@ -101,6 +101,7 @@ scripts/ui_test.sh ios perf
 # Opt-in iOS-only diagnostic lanes (never ordinary acceptance):
 scripts/ui_test.sh ios delivery-cohort   # delivery-consistency cohort (--text/--takes/--label)
 scripts/ui_test.sh ios model-download    # isolated background-delivery lifecycle proof
+scripts/ui_test.sh ios enroll-clone-fixture  # benchmark clone voice through the visible Files-import flow
 scripts/ios_device.sh gate            # deterministic physical-device/runtime proof
 ```
 

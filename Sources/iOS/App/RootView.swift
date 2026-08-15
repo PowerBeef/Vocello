@@ -29,6 +29,8 @@ struct RootView: View {
     @Environment(\.accessibilityReduceTransparency) private var systemReduceTransparency
     @AppStorage(IOSAppDefaults.reduceMotionEnabledKey) private var appReduceMotion = false
     @AppStorage(IOSAppDefaults.reduceTransparencyEnabledKey) private var appReduceTransparency = false
+    @State private var importedVoicePresentation: ImportedVoicePresentation?
+    @State private var externalImportErrorMessage: String?
 
     init(ttsEngine: TTSEngineStore) {
         self.ttsEngine = ttsEngine
@@ -128,6 +130,26 @@ struct RootView: View {
                 }
             )
         }
+        .fullScreenCover(item: $importedVoicePresentation) { presentation in
+            IOSRecordVoiceSheet(
+                importedReference: presentation.reference,
+                onEnrolled: { voice, transcript, language in
+                    importedVoicePresentation = nil
+                    appModel.pendingVoiceCloningHandoff = PendingVoiceCloningHandoff(
+                        savedVoiceID: voice.id,
+                        wavPath: voice.wavPath,
+                        transcript: transcript,
+                        transcriptLoadError: nil,
+                        language: language
+                    )
+                    appModel.studioMode = .clone
+                    appModel.tab = .studio
+                },
+                onDismiss: {
+                    importedVoicePresentation = nil
+                }
+            )
+        }
         .sheet(item: $appModel.playerSheetItem) { item in
             IOSPlayerSheet(
                 item: item,
@@ -137,6 +159,18 @@ struct RootView: View {
             .presentationDragIndicator(.hidden)
             .presentationCornerRadius(28)
             .presentationBackground(Color(red: 13 / 255, green: 14 / 255, blue: 18 / 255).opacity(0.96))
+        }
+        .onOpenURL(perform: openExternalAudio)
+        .alert(
+            "Couldn't import audio",
+            isPresented: Binding(
+                get: { externalImportErrorMessage != nil },
+                set: { if !$0 { externalImportErrorMessage = nil } }
+            )
+        ) {
+            Button("OK", role: .cancel) { externalImportErrorMessage = nil }
+        } message: {
+            Text(externalImportErrorMessage ?? "Choose another audio file and try again.")
         }
         // Outermost on purpose (IUI-5 X3): environment set here reaches the
         // tab screens AND every presentation attached above — sheets, covers,
@@ -271,6 +305,29 @@ struct RootView: View {
         appModel.dismissBottomPanel()
     }
 
+    private func openExternalAudio(_ sourceURL: URL) {
+        let supportedExtensions: Set<String> = ["wav", "mp3", "aiff", "m4a"]
+        guard supportedExtensions.contains(sourceURL.pathExtension.lowercased()) else {
+            externalImportErrorMessage = "Vocello can import WAV, MP3, AIFF, and M4A reference audio."
+            return
+        }
+
+        do {
+            // Keep the URL supplied by the system intact so LocalDocumentIO can consume the
+            // security-scoped grant before copying audio and any adjacent transcript sidecar.
+            let imported = try ttsEngine.importReferenceAudio(from: sourceURL)
+            externalImportErrorMessage = nil
+            appModel.playerSheetItem = nil
+            appModel.cancelCloneReferenceRecording()
+            appModel.dismissBottomPanel()
+            appModel.dismissDeleteModelSheet()
+            appModel.tab = .voices
+            importedVoicePresentation = ImportedVoicePresentation(reference: imported)
+        } catch {
+            externalImportErrorMessage = error.localizedDescription
+        }
+    }
+
     private var effectiveReduceMotion: Bool {
         systemReduceMotion || appReduceMotion
     }
@@ -278,6 +335,11 @@ struct RootView: View {
     private var effectiveReduceTransparency: Bool {
         systemReduceTransparency || appReduceTransparency
     }
+}
+
+private struct ImportedVoicePresentation: Identifiable {
+    let id = UUID()
+    let reference: ImportedReferenceAudio
 }
 
 

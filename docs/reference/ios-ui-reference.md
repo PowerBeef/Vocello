@@ -86,7 +86,9 @@ shows a Seed chip (`studioChip_seedPin`) whose tap offers the unpin confirmation
 Voices exposes saved rows (`voicesRow_saved_*`; a bank member's caption reads
 "Voice bank · <Delivery>" while standalone voices read "Cloned reference"), built-in speakers,
 separate row and preview actions, search, filters, and one visible Save a New Voice action: `voices_saveNewVoice` records a
-reference with the microphone (there is deliberately no file-import control on iPhone).
+reference with the microphone, or imports one from Files ("Import audio file",
+`voices_importAudioFile`, restored 2026-08-15 — WAV/MP3/AIFF/M4A; audio files opened from the
+Files app route through the same flow via `RootView.onOpenURL`).
 `saveVoice_nameField`, `saveVoice_transcriptEditor`, and `saveVoice_saveButton` complete
 enrollment. A saved voice hands off to Studio Clone; a built-in speaker hands off to Studio
 Custom. Benchmark-fixture enrollment is script-owned via

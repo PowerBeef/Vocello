@@ -77,8 +77,9 @@ download it automatically.
 > "Custom Voice"; it downloads a ~1.7 GB 4-bit Speed model from Hugging Face over Wi-Fi). After the model
 > shows **Active**, open Studio, type a short line, pick a built-in speaker, and tap Generate to hear on-device
 > synthesis. Voice Design and Voice Cloning each install their own model the same way. No account or login is
-> required. Voice Cloning records its reference with the in-app microphone (there is no file import on
-> iPhone); Microphone + Speech permissions are only requested for that recording/transcription flow.
+> required. Voice Cloning records its reference with the in-app microphone or imports an audio file
+> the user already has rights to (Files picker on the Voices tab, or opening an audio file from the
+> Files app); Microphone + Speech permissions are only requested for the recording/transcription flow.
 
 No demo account is needed (no login). Note the model download requirement so the app is not judged
 non-functional under Guideline 2.1.

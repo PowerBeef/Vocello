@@ -13,7 +13,8 @@ export const IphoneBeta = () => (
         <p className="section-sub">
           The iPhone app runs the same local engine in-process on the phone: Custom Voice,
           Voice Design, and Voice Cloning with the memory-conscious Speed model, microphone
-          recording or a saved Voice Design reference for cloning, and local history.
+          recording, audio file import, or a saved Voice Design reference for cloning, and
+          local history.
         </p>
         <div className="hero-ctas">
           <a className="btn btn-primary" href={TESTFLIGHT} target="_blank" rel="noreferrer">

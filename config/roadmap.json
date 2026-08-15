@@ -836,7 +836,7 @@
         "Sources/QwenVoiceCore/HuggingFaceDownloader.swift",
         "docs/reference/model-delivery.md"
       ],
-      "updated": "2026-08-12",
+      "updated": "2026-08-15",
       "evidence": [
         "commit:ce687f5",
         "commit:5e6a9a0",
@@ -857,7 +857,7 @@
         "Sources/iOS/IOSModelDownloadCoordinator.swift",
         "docs/reference/model-delivery.md"
       ],
-      "updated": "2026-08-11",
+      "updated": "2026-08-15",
       "evidence": [
         "file:Sources/QwenVoiceCore/ModelDownloadContracts.swift",
         "file:Sources/QwenVoiceCore/HuggingFaceDownloader.swift",

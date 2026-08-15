@@ -15,7 +15,7 @@ export const SAMPLES = [
   },
   {
     id: "host",
-    mode: "Custom Voice",
+    mode: "Built-in Voice",
     color: "var(--gold-300)",
     voice: "Aiden, English native",
     quote: "Hey, welcome back to Field Notes. Today we're walking through the demo build, end to end.",
@@ -26,7 +26,7 @@ export const SAMPLES = [
   },
   {
     id: "japanese",
-    mode: "Custom Voice",
+    mode: "Built-in Voice",
     color: "var(--gold-300)",
     voice: "Ono Anna, Japanese native",
     quote: "音声はすべて、このMacの上で生成されます。台本も声も、どこにもアップロードされません。",
@@ -48,7 +48,7 @@ export const SAMPLES = [
   },
   {
     id: "narration",
-    mode: "Custom Voice",
+    mode: "Built-in Voice",
     color: "var(--gold-300)",
     voice: "Ryan, English native",
     quote: "Chapter one. The harbor was quiet at that hour, and the water held the last of the light. She walked the length of the pier with her notes in one hand…",

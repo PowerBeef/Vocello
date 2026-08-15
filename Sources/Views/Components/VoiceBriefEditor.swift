@@ -8,7 +8,7 @@ import AppKit
 /// points" menu in the caption row, drawn from the shared catalog. (The
 /// starters were previously a 4-row chip grid that inflated the Voice Design
 /// panel past the viewport at the default window size; the menu keeps the
-/// mode's layout in line with Custom Voice / Voice Cloning and the card
+/// mode's layout in line with Built-in Voice / Voice Cloning and the card
 /// height stable between empty and typed states.)
 struct VoiceBriefEditor: View {
     @Binding var text: String

@@ -33,7 +33,7 @@ the contract needs a same-named WAV in this directory.
 ## Generation recipe
 
 For each speaker, generate one sample via the macOS Vocello.app (Debug
-build) in **Custom Voice** mode:
+build) in **Built-in Voice** mode (internal mode id `custom`):
 
 | Speaker | Mode | Delivery | Prompt |
 |---|---|---|---|

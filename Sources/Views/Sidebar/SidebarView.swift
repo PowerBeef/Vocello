@@ -96,7 +96,7 @@ private struct SidebarRow: View {
                         RoundedRectangle(cornerRadius: 8, style: .continuous)
                             .strokeBorder(
                                 // Per-mode selection edge — golden for
-                                // Custom Voice / Library, lavender for
+                                // Built-in Voice / Library, lavender for
                                 // Voice Design, terracotta for Voice
                                 // Cloning. Matches the non-liquid
                                 // fallback in `borderColor`.

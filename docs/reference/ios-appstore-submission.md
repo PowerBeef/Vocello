@@ -74,7 +74,7 @@ download it automatically.
 
 > Vocello generates speech entirely on-device. It ships with **no bundled model weights** to keep the app
 > small; on first launch you install a voice model from Settings → Voice models (tap **Install** on
-> "Custom Voice"; it downloads a ~1.7 GB 4-bit Speed model from Hugging Face over Wi-Fi). After the model
+> "Built-in Voice"; it downloads a ~1.7 GB 4-bit Speed model from Hugging Face over Wi-Fi). After the model
 > shows **Active**, open Studio, type a short line, pick a built-in speaker, and tap Generate to hear on-device
 > synthesis. Voice Design and Voice Cloning each install their own model the same way. No account or login is
 > required. Voice Cloning records its reference with the in-app microphone or imports an audio file

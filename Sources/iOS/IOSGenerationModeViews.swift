@@ -428,7 +428,7 @@ struct IOSCustomVoiceView: View {
         let seed = IOSStableVisualHash.int(promptText)
         coordinator.start(live: IOSStudioLivePreviewItem(
             voiceName: speakerDisplayName,
-            modeLabel: "Custom",
+            modeLabel: "Built-in",
             mode: .custom,
             transcript: promptText,
             waveformSeed: seed,
@@ -533,7 +533,7 @@ struct IOSCustomVoiceView: View {
                             generationID: generationID,
                             audioURL: URL(fileURLWithPath: result.audioPath),
                             voiceName: speakerDisplayName,
-                            modeLabel: "Custom",
+                            modeLabel: "Built-in",
                             mode: .custom,
                             transcript: promptText,
                             waveformSeed: seed,

@@ -1565,7 +1565,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         // clone model is loaded, skip — the prebuild is a
         // background optimization, not a correctness
         // requirement, and we don't want to evict the user's
-        // currently-loaded Custom Voice / Voice Design model
+        // currently-loaded Built-in Voice / Voice Design model
         // just to warm a clone prompt. The first generation
         // after enrollment will prime the prompt explicitly via
         // `ensureCloneReferencePrimed`, so user-perceived

@@ -225,11 +225,11 @@ private extension VoiceDesignView {
 
     /// One merged line: Language + Delivery + Intensity columns share the
     /// row (Custom tone spans full width below, inside the delivery
-    /// controls) — mirrors the Custom Voice panel.
+    /// controls) — mirrors the Built-in Voice panel.
     var languageAndDeliverySettings: some View {
         // Empty-label setup row: joins the same left rail as the Voice brief
         // control instead of hugging the card edge (same grid fix as the
-        // Custom Voice panel).
+        // Built-in Voice panel).
         GenerationSetupRow(
             label: "",
             accessibilityIdentifier: "voiceDesign_toneSpeed"

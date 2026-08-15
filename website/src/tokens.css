@@ -15,7 +15,7 @@
 
   /* ---------- Brand palette (raw) ------------------------------------- */
 
-  /* Vocello gold — the primary brand accent. Custom Voice mode resolves
+  /* Vocello gold — the primary brand accent. Built-in Voice mode resolves
      here, as do Library / Settings (so non-generation chrome reads as
      one coherent app). */
   --gold-50:  #F8EFDC;
@@ -72,7 +72,7 @@
   --status-danger:  #E5483B;
   --status-info:    var(--gold-300);
 
-  /* Emotion palette — for the Custom Voice / Voice Design delivery
+  /* Emotion palette — for the Built-in Voice / Voice Design delivery
      chips. Same chroma/lightness band so chips don't look like stickers
      on a card; hue carries the meaning. (See AppTheme.emotionColor.) */
   --emotion-neutral:  #8C8F9B;
@@ -275,7 +275,7 @@
 }
 
 .vc-title-screen {
-  /* Generation-screen page titles ("Custom Voice", "Voice Design"). */
+  /* Generation-screen page titles ("Built-in Voice", "Voice Design"). */
   font-family: var(--font-text);
   font-weight: 600;
   font-size: var(--type-title-2);

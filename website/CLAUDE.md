@@ -79,7 +79,7 @@ The product's ground truth lives in the parent QwenVoice app repo. When making p
 - `../config/public-product-facts.json` — public release, platform status, minimum support, and
   canonical benchmark-profile references.
 - `../Sources/Resources/qwenvoice_contract.json` — model registry, speakerMetadata, Hugging Face revisions.
-- `../Sources/QwenVoiceCore/EmotionPreset.swift` — actual emotion presets (9 non-Neutral × 2 intensities, normal/strong, + Neutral = 10 total).
+- `../Sources/QwenVoiceCore/EmotionPreset.swift` — actual emotion presets (8 total since the 2026-08-03 roster cut: Neutral plus 7 others; two tiers normal/strong remain internal, the user-facing intensity selector is retired, and each preset ships its per-preset measured-best tier).
 - Voice Cloning has no controllable delivery — the engine path doesn't accept emotion/intensity for clone.
 
 The site has drifted from ground truth multiple times during iteration. Don't trust the existing copy — verify against the upstream.
@@ -94,7 +94,7 @@ The site has drifted from ground truth multiple times during iteration. Don't tr
 
 ## Brand tokens (in `tokens.css`)
 
-- **Gold** = Custom Voice (`--gold-300: #EDCC8A`, `--mode-custom`).
+- **Gold** = Built-in Voice (`--gold-300: #EDCC8A`, `--mode-custom`; the mode's user-facing name was Custom Voice until 2026-08-15, internal identity stays `custom`).
 - **Lavender** = Voice Design (`--lavender-300: #BFAADB`, `--mode-design`).
 - **Terracotta** = Voice Cloning (`--terracotta-300: #DBA887`, `--mode-clone`).
 - **Canvas** = charcoal (`--charcoal-900: #16181E`).

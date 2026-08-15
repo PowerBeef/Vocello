@@ -14,7 +14,7 @@ import React from "react";
   single-release billboard.
 */
 const MODES = [
-  { name: "Custom Voice", tone: "var(--mode-custom)", takes: [1.66, 1.94, 2.02] },
+  { name: "Built-in Voice", tone: "var(--mode-custom)", takes: [1.66, 1.94, 2.02] },
   { name: "Voice Design", tone: "var(--mode-design)", takes: [1.95, 2.00, 2.13] },
   { name: "Voice Cloning", tone: "var(--mode-clone)", takes: [1.50, 1.85, 2.02] },
 ];
@@ -100,7 +100,7 @@ const RtfChart = () => {
       className="perf-chart"
       viewBox={`0 0 ${width} ${plotBottom + 30}`}
       role="img"
-      aria-label="Warm generation speed by mode and script length, as a multiple of realtime. Custom Voice 1.66× to 2.02×, Voice Design 1.95× to 2.13×, Voice Cloning 1.50× to 2.02×. Every bar passes the realtime line at 1.0×."
+      aria-label="Warm generation speed by mode and script length, as a multiple of realtime. Built-in Voice 1.66× to 2.02×, Voice Design 1.95× to 2.13×, Voice Cloning 1.50× to 2.02×. Every bar passes the realtime line at 1.0×."
     >
       {gridlines}
       {rows}

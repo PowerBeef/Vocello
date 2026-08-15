@@ -841,7 +841,7 @@ The shipped model ids:
 
 | Model ID | Mode | Speed repo (4-bit) | Quality repo (8-bit) |
 | --- | --- | --- | --- |
-| `pro_custom` | Custom Voice | `mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit` | `…-8bit` |
+| `pro_custom` | Built-in Voice | `mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit` | `…-8bit` |
 | `pro_design` | Voice Design | `mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-4bit` | `…-8bit` |
 | `pro_clone` | Voice Cloning | `mlx-community/Qwen3-TTS-12Hz-1.7B-Base-4bit` | `…-8bit` |
 

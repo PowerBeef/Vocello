@@ -79,7 +79,7 @@ struct CLIRuntime {
         return base.variantScopedID(for: variant)
     }
 
-    /// Default Custom Voice speaker id from the contract (e.g. Aiden).
+    /// Default Built-in Voice speaker id from the contract (e.g. Aiden).
     var defaultSpeakerID: String { registry.defaultSpeaker.id }
 
     // MARK: - Manifest / version

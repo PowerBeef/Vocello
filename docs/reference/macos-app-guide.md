@@ -27,7 +27,7 @@ or retire independently.
 
 | Sidebar | Identifier | Shortcut |
 |---------|------------|----------|
-| Custom Voice | `sidebar_customVoice` | Cmd+1 |
+| Built-in Voice | `sidebar_customVoice` | Cmd+1 |
 | Voice Design | `sidebar_voiceDesign` | Cmd+2 |
 | Voice Cloning | `sidebar_voiceCloning` | Cmd+3 |
 | History | `sidebar_history` | Cmd+4 |
@@ -47,7 +47,7 @@ XCUITest inspects the real accessibility state. Destination containers use `scre
 controls expose stable identifiers, and `{mode}_readiness` values report `ready=true/false`.
 Tests assert these visible production surfaces directly.
 
-### Custom Voice (`sidebar_customVoice` → `screen_customVoice`)
+### Built-in Voice (`sidebar_customVoice` → `screen_customVoice`)
 
 | Element | Identifier |
 |---|---|

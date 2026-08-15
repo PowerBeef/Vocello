@@ -214,7 +214,7 @@ baseline comparisons keep the higher-is-better metric and name.
 
 ## Known-cosmetic non-bugs (do not file)
 
-- Post-retirement readiness note briefly shows "Preparing Custom Voice" (§G residual; no connection
+- Post-retirement readiness note briefly shows "Preparing Built-in Voice" (§G residual; no connection
   is made and generation is unaffected).
 - Enroll sheet: the first click on "Record…" immediately after typing in the Name field can be
   consumed by the field's focus-commit — a second click opens the sheet (observed v2.1.0 QA).

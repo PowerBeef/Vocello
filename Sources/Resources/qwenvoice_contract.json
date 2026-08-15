@@ -72,7 +72,7 @@
   "models": [
     {
       "id": "pro_custom",
-      "name": "Custom Voice",
+      "name": "Built-in Voice",
       "tier": "pro",
       "mode": "custom",
       "folder": "Qwen3-TTS-12Hz-1.7B-CustomVoice-8bit",

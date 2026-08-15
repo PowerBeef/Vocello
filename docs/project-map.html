@@ -1277,7 +1277,7 @@ table.matrix .note {
 
     <div class="mode-strip" aria-label="Generation modes">
       <article class="mode-panel" data-mode="custom">
-        <h3>Custom Voice</h3>
+        <h3>Built-in Voice</h3>
         <p>Built-in speakers with controllable delivery. Nine voices across English, Chinese, Japanese, and Korean.</p>
       </article>
       <article class="mode-panel" data-mode="design">
@@ -1640,7 +1640,7 @@ scripts/macos_test.sh test
     ]
   },
   "features": [
-    {"name":"Custom Voice","macos":"yes","ios":"yes","cli":"yes","note":"9 built-in speakers; delivery and language control"},
+    {"name":"Built-in Voice","macos":"yes","ios":"yes","cli":"yes","note":"9 built-in speakers; delivery and language control"},
     {"name":"Voice Design","macos":"yes","ios":"yes","cli":"yes","note":"Natural-language brief; result can become a Saved Voice"},
     {"name":"Voice Cloning","macos":"yes","ios":"yes","cli":"yes","note":"Transcript-backed or genuine audio-only x-vector conditioning; app generation requires visible Settings consent"},
     {"name":"Delivery presets / custom tone","macos":"yes","ios":"yes","cli":"yes","note":"8 presets (4 distinct + 4 directional hints), one instruction each; Clone follows its reference, with a bank delivery choice for personas"},
@@ -2112,7 +2112,7 @@ scripts/macos_test.sh test
   },
   "contracts": [
     {
-      "id":"pro_custom","mode":"custom","title":"Custom Voice · pro_custom",
+      "id":"pro_custom","mode":"custom","title":"Built-in Voice · pro_custom",
       "speed":"mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit · 2,312,057,897 B",
       "quality":"mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-8bit · 3,080,141,538 B",
       "ios":"Speed eligible; Quality macOS only","notes":"instruction control · 9 speakers · 24 kHz / 12.5 Hz tokenizer",

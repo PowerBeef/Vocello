@@ -39,11 +39,11 @@ Vocello controls tone and emotion through natural-language instructions, not SSM
 
 Current app behavior:
 
-- **Custom Voice** uses one of the shipped speakers plus an optional delivery instruction prompt
+- **Built-in Voice** uses one of the shipped speakers plus an optional delivery instruction prompt
 - **Voice Design** has its own generation screen and prompt flow using a natural-language voice/design instruction
 - **Voice Cloning** uses reference audio and can optionally use a transcript for better preparation quality, but it does not expose a separate instruction-only tone surface
 - single generations produce a complete final take, and the app does not expose temperature or max-token controls
-- **Neutral** is a real instructed preset since 2026-08-01 (`EmotionPreset.neutralPresetInstruction`), not an absent instruction — see the sourced guide's §6.3. Only the typed-synonym path ("neutral", "default") drops the instruction entirely. Custom Voice and Voice Design prompts use direct natural language rather than `Delivery style:` fields.
+- **Neutral** is a real instructed preset since 2026-08-01 (`EmotionPreset.neutralPresetInstruction`), not an absent instruction — see the sourced guide's §6.3. Only the typed-synonym path ("neutral", "default") drops the instruction entirely. Built-in Voice and Voice Design prompts use direct natural language rather than `Delivery style:` fields.
 
 Useful instruction patterns:
 
@@ -89,15 +89,15 @@ If you need a longer beat, end the sentence with a period and start a new one. F
 
 ## Examples
 
-Custom Voice:
+Built-in Voice:
 
 > Calm, soothing, and reassuring, with smooth pacing and gentle confidence.
 
-Custom Voice, strong emotion (historical example — this is the then-shipped Excited Strong preset copy; the Excited preset was retired 2026-08-03, so this survives only as a wording pattern, not current preset copy):
+Built-in Voice, strong emotion (historical example — this is the then-shipped Excited Strong preset copy; the Excited preset was retired 2026-08-03, so this survives only as a wording pattern, not current preset copy):
 
 > Very excited and animated, energetic and anticipatory, with lively emphasis, controlled pacing, and clear pronunciation.
 
-Custom Voice, whisper:
+Built-in Voice, whisper:
 
 > Subtle audible whisper, close-mic and quiet, with gentle breath, hushed tone, and clear words.
 

@@ -185,7 +185,7 @@ private struct IOSOnboardingInstallPage: View {
             IOSOnboardingIcon(symbol: "arrow.down.circle.fill", colors: [Theme.Brand.modeDesign, Theme.Brand.gold])
                 .padding(.bottom, 32)
 
-            Text("Install Custom Voice")
+            Text("Install Built-in Voice")
                 .iosScaledFont(size: 36, weight: .bold, relativeTo: .largeTitle)
                 .tracking(-0.90)
                 .foregroundStyle(Theme.Text.primary)
@@ -202,7 +202,7 @@ private struct IOSOnboardingInstallPage: View {
             VStack(alignment: .leading, spacing: 14) {
                 IOSOnboardingModelHint(
                     tint: Theme.Brand.modeCustom,
-                    name: "Custom Voice",
+                    name: "Built-in Voice",
                     detail: "Built-in speakers and delivery presets."
                 )
                 IOSOnboardingModelHint(

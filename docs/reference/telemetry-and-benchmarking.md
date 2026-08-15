@@ -481,7 +481,7 @@ This document is the telemetry schema and interpretation reference. The sole ope
 benchmark preflight, model and clone-fixture preparation, exact matrices, commands, UI lanes,
 artifact handling, and troubleshooting is
 [`benchmarking-procedure.md`](benchmarking-procedure.md). In particular, do not derive a Clone
-fixture from a Custom Voice output: the canonical fixture is generated through Voice Design and its
+fixture from a Built-in Voice output: the canonical fixture is generated through Voice Design and its
 provenance is verified by the repository model-preparation helper.
 
 Each engine row identifies its cell through `mode`, variant-specific `modelID`, and `warmState`.
@@ -544,7 +544,7 @@ diagnostic evidence, not proof for that physical device.
 **Watch for OOM regressions** when optimizing the backend: a rising `physFoot` peak, GPU‑stage peak,
 or any `hardTrim` in `trims` means a run is shedding model state under pressure — the early OOM signal.
 
-**Verify attribution:** for Custom Voice and Voice Design, each accepted cold row must show
+**Verify attribution:** for Built-in Voice and Voice Design, each accepted cold row must show
 `warmState":"cold"` and carry `upstreamModelLoad`; warm rows show `"warm"`. Clone rows are normally
 warm by design.
 

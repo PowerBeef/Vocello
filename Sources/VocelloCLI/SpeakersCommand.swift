@@ -1,7 +1,7 @@
 import Foundation
 import QwenVoiceCore
 
-/// `vocello speakers` — list the built-in Custom Voice speakers from the contract,
+/// `vocello speakers` — list the Built-in Voice speakers from the contract,
 /// so users don't have to guess `--speaker` ids. Read-only: uses the lightweight
 /// registry bootstrap (no engine boot, returns instantly).
 enum SpeakersCommand {
@@ -49,7 +49,7 @@ enum SpeakersCommand {
 
     static func printHelp() {
         print("""
-        vocello speakers — list built-in Custom Voice speakers
+        vocello speakers — list Built-in Voice speakers
 
         Usage:
           vocello speakers list [--json]

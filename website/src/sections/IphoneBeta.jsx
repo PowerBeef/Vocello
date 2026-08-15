@@ -11,7 +11,7 @@ export const IphoneBeta = () => (
           The same studio, in your pocket.
         </h2>
         <p className="section-sub">
-          The iPhone app runs the same local engine in-process on the phone: Custom Voice,
+          The iPhone app runs the same local engine in-process on the phone: Built-in Voice,
           Voice Design, and Voice Cloning with the memory-conscious Speed model, microphone
           recording, audio file import, or a saved Voice Design reference for cloning, and
           local history.

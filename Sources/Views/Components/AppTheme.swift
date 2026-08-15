@@ -578,7 +578,7 @@ extension View {
 
 // MARK: - Mode-aware Liquid Glass tinting
 
-/// Environment key injected by each generation screen (Custom Voice,
+/// Environment key injected by each generation screen (Built-in Voice,
 /// Voice Design, Voice Cloning) so downstream card surfaces
 /// (`StudioSectionCard`, `CompactConfigurationSection`) pick up a
 /// Vocello-mode-colored glass tint without every view taking an
@@ -598,7 +598,7 @@ extension EnvironmentValues {
 
 extension View {
     /// Tag a subtree so every Liquid-Glass card surface underneath uses a
-    /// subtle mode-colored tint (warm golden on Custom Voice, lavender
+    /// subtle mode-colored tint (warm golden on Built-in Voice, lavender
     /// purple on Voice Design, terracotta on Voice Cloning). Resolves to
     /// the neutral smoked tint when unset or when mode color is nil.
     func modeGlassTint(_ color: Color?) -> some View {

@@ -80,8 +80,8 @@ struct CustomVoiceReadinessPresentation: Equatable {
         case .modelWarming, .modelActivePrep:
             return CustomVoiceReadinessPresentation(
                 isReady: true,
-                title: "Preparing Custom Voice",
-                detail: "Loading the Custom Voice path. You can generate now; preparation finishes in the background.",
+                title: "Preparing Built-in Voice",
+                detail: "Loading the Built-in Voice path. You can generate now; preparation finishes in the background.",
                 trailingText: "Preparing",
                 isBusy: true
             )
@@ -89,7 +89,7 @@ struct CustomVoiceReadinessPresentation: Equatable {
             return CustomVoiceReadinessPresentation(
                 isReady: false,
                 title: "Engine busy",
-                detail: "Finishing another engine task before Custom Voice can be ready.",
+                detail: "Finishing another engine task before Built-in Voice can be ready.",
                 trailingText: nil,
                 isBusy: true
             )
@@ -97,7 +97,7 @@ struct CustomVoiceReadinessPresentation: Equatable {
             return CustomVoiceReadinessPresentation(
                 isReady: true,
                 title: "Ready to generate",
-                detail: "A different model is loaded. The engine switches to Custom Voice on generate.",
+                detail: "A different model is loaded. The engine switches to Built-in Voice on generate.",
                 trailingText: "Ready",
                 isBusy: false
             )
@@ -432,7 +432,7 @@ private extension CustomVoiceView {
 
     var deliveryUnsupportedHint: some View {
         GenerationSetupNotice(
-            message: "Delivery controls are available with the active 1.7B Custom Voice models.",
+            message: "Delivery controls are available with the active 1.7B Built-in Voice models.",
             iconName: "slider.horizontal.3",
             accentColor: AppTheme.customVoice,
             accessibilityIdentifier: "customVoice_deliveryUnsupported"

@@ -41,7 +41,7 @@ acceptance, not a population estimate of language quality.
 
 ## iOS (on-device)
 
-Requires Custom Voice and Voice Design **Speed** installed on the paired iPhone.
+Requires Built-in Voice and Voice Design **Speed** installed on the paired iPhone.
 
 **Speech Recognition (app):** Phase 3 transcribes each output WAV in the app process. Grant
 **Settings → Privacy → Speech Recognition → Vocello** once before the first output-gated run.

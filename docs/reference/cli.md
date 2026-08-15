@@ -11,7 +11,7 @@ sourceOfTruth:
 `vocello` is a headless macOS command-line surface over the same in-process MLX engine the app uses.
 It serves two roles:
 
-- **User-facing generation** — synthesize speech from the terminal (Custom Voice / Voice Design /
+- **User-facing generation** — synthesize speech from the terminal (Built-in Voice / Voice Design /
   Voice Cloning), one clip or many, scriptable with JSON output and stdin piping.
 - **Deterministic benchmark/test driver** — drive the perf/quality matrix in-process (cold/warm
   controlled exactly via load/unload, no UI waits), aggregate run-scoped telemetry, and publish a
@@ -117,7 +117,7 @@ vocello voices enroll --name <name> --audio <wav> [--transcript "…"]
 vocello voices delete --id <id>
 ```
 
-### `speakers` — list built-in Custom Voice speakers
+### `speakers` — list built-in Built-in Voice speakers
 
 ```sh
 vocello speakers list [--json]
@@ -241,7 +241,7 @@ If publication alone fails, rerun the printed idempotent
 ## Examples
 
 ```sh
-# Custom Voice, speed, save to a path
+# Built-in Voice, speed, save to a path
 vocello generate --mode custom --variant speed --text "The train left at dawn." --out /tmp/clip.wav
 
 # Pipe a script in, stream it, get JSON with first-chunk latency

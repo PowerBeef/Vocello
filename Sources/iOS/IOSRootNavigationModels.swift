@@ -35,7 +35,7 @@ enum IOSGenerationSection: String, CaseIterable, Identifiable {
         // the setup-chip pattern; the segmented control itself stays terse.
         switch self {
         case .custom:
-            return "Custom"
+            return "Built-in"
         case .design:
             return "Design"
         case .clone:

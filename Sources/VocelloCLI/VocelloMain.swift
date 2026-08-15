@@ -63,7 +63,7 @@ enum VocelloMain {
           custom|design|clone synthesize in that mode (shortcut for generate --mode)
           batch               synthesize many clips, one model load (vocello batch --help)
           voices              manage saved clone voices    (vocello voices help)
-          speakers            list built-in Custom Voice speakers (vocello speakers help)
+          speakers            list Built-in Voice speakers (vocello speakers help)
           modes               list the generation modes    (vocello modes --help)
           deliveries          list delivery presets + instruction text (vocello deliveries --help)
           models              inventory installed models   (vocello models help)

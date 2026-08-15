@@ -558,7 +558,7 @@ Defined in `BenchMatrixSpec` (`Sources/QwenVoiceCore/BenchMatrixSpec.swift`; sha
 
 | Mode | Payload |
 |------|---------|
-| Custom Voice | Default speaker + optional delivery |
+| Built-in Voice | Default speaker + optional delivery |
 | Voice Design | Fixed brief: *"A warm, calm middle-aged male narrator with a clear, measured pace."* |
 | Voice Cloning | Saved voice `A_warm_elderly_woman` (or `--voice`) |
 

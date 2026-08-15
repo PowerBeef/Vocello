@@ -49,6 +49,23 @@ machine-readable status record and wins over any older prose.
 
 ## Resume here (2026-08-15)
 
+**Custom Voice renamed to Built-in Voice in all user-facing copy
+(2026-08-15, maintainer call, desk):** the mode was named after upstream's
+CustomVoice checkpoint and confused end users; it speaks with the built-in
+speakers, so the label is now "Built-in Voice" (full name) and "Built-in"
+in the iOS mode selection bar. **Every internal identity is unchanged**:
+mode rawValue `custom`, model ID `pro_custom`, bench cells `custom:*`,
+telemetry `mode: custom`, accessibility identifiers
+(`generateSection_custom`, `sidebar_customVoice`, `iosModelStatus_pro_*`),
+the CLI `vocello custom` subcommand, and benchmark history. Surfaces
+updated: both apps' labels and error strings, the contract JSON model
+display name (catalog rebuilt), CLI help text, README, website copy plus
+its stale ten-preset delivery claim (corrected to the measured 8-preset
+roster), README chart labels (regenerated), and every active doc;
+`qwen3-tts-guide.md` keeps upstream checkpoint terminology with a naming
+note. Verified: core-test, macOS build, iOS device-SDK compile, website
+check, full deterministic gate.
+
 **iOS clone-reference file import restored (2026-08-15, maintainer call,
 desk):** the full route removed on 2026-08-01 for review-posture caution is
 back — the Voices-tab "Import audio file" row (`voices_importAudioFile`,

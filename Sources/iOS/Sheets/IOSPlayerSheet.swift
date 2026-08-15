@@ -176,7 +176,7 @@ struct IOSPlayerSheet: View {
 
     private var playerEyebrowLabel: String {
         switch item.modeLabel.lowercased() {
-        case "custom": return "Custom Voice"
+        case "custom": return "Built-in Voice"
         case "design": return "Voice Design"
         case "clone": return "Voice Cloning"
         default: return item.modeLabel
@@ -376,7 +376,7 @@ struct IOSPlayerSheetItem: Equatable, Identifiable {
         switch history.mode.lowercased() {
         case "custom":
             modeTint = Theme.Brand.modeCustom
-            modeLabel = "Custom"
+            modeLabel = "Built-in"
         case "design":
             modeTint = Theme.Brand.modeDesign
             modeLabel = "Design"
@@ -442,7 +442,7 @@ struct IOSPlayerSheetItem: Equatable, Identifiable {
             audioURL: audioURL,
             transcript: "Hi, I'm \(speaker.displayName). \(descriptor).",
             voiceName: speaker.displayName,
-            modeLabel: "Custom",
+            modeLabel: "Built-in",
             modeTint: Theme.Brand.modeCustom,
             subtitle: "Voice preview",
             avatarSeed: speaker.id,

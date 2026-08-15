@@ -688,7 +688,7 @@ actor NativeEngineRuntime {
                     capabilities: loadResult.qwen3Capabilities
                 )
             } else {
-                // For short Custom Voice prompts (~one sentence or less),
+                // For short Built-in Voice prompts (~one sentence or less),
                 // skip the decoder-bucket precompile inside prewarm. The
                 // vendor exposes three depths — `.full`,
                 // `.skipDecoderBucket`, `.skipStreamStep` — and the
@@ -1444,7 +1444,7 @@ actor NativeEngineRuntime {
     /// time at that scale (warm-short bench cell has ~0.9 s of
     /// fixed overhead per the May 2026 baseline).
     ///
-    /// Only Custom Voice today; Voice Design and Voice Cloning use a
+    /// Only Built-in Voice today; Voice Design and Voice Cloning use a
     /// different prewarm entry point that doesn't surface this depth
     /// parameter to the public API.
     private static func customPrewarmDepth(for request: GenerationRequest) -> String? {

@@ -43,7 +43,7 @@ export const Hero = () => (
         <div className="window hero-window">
           <img
             src="assets/screens/custom-voice.png"
-            alt="Vocello Custom Voice screen showing speaker, delivery, model, and script controls"
+            alt="Vocello Built-in Voice screen showing speaker, delivery, model, and script controls"
           />
         </div>
       </div>

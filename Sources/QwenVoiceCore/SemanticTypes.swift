@@ -8,7 +8,8 @@ public enum GenerationMode: String, CaseIterable, Codable, Hashable, Sendable {
     public var displayName: String {
         switch self {
         case .custom:
-            return "Custom Voice"
+            // User-facing rename 2026-08-15: internal identity stays `custom`.
+            return "Built-in Voice"
         case .design:
             return "Voice Design"
         case .clone:

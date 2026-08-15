@@ -35,7 +35,7 @@ A living reference for the Qwen3-TTS models that power Vocello (formerly QwenVoi
 
 Qwen3-TTS is an open-weights text-to-speech family from Alibaba Cloud's Qwen team. It is built around a single neural audio tokenizer (a Mimi-style RVQ codec) and an autoregressive "Talker" language model. The same family supports three distinct usage patterns:
 
-- **Custom Voice** — 9 built-in preset speakers with optional natural-language style instructions.
+- **Custom Voice** — 9 built-in preset speakers with optional natural-language style instructions. (Upstream checkpoint name; the app's user-facing label for this mode is **Built-in Voice** since 2026-08-15. Internal mode id stays `custom`.)
 - **Voice Design** — describe a voice in plain text and synthesize speech in that voice.
 - **Voice Cloning** — clone a speaker from a short reference audio clip (≈3 s is enough; 10–20 s is the sweet spot).
 

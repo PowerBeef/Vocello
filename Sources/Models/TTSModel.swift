@@ -33,7 +33,7 @@ enum TTSModelVariantKind: String, CaseIterable, Codable, Hashable, Sendable {
 /// Represents a TTS model that can be downloaded and used for generation.
 struct TTSModel: Identifiable, Hashable, Sendable, Codable {
     let id: String          // e.g. "pro_custom"
-    let name: String        // e.g. "Custom Voice"
+    let name: String        // e.g. "Built-in Voice"
     let tier: String        // e.g. "pro"
     let folder: String      // e.g. "Qwen3-TTS-12Hz-1.7B-CustomVoice-8bit"
     let mode: GenerationMode
@@ -164,7 +164,12 @@ enum GenerationMode: String, CaseIterable, Codable, Hashable, Sendable {
 
     var displayName: String {
         switch self {
-        case .custom: return "Custom Voice"
+        // User-facing rename 2026-08-15 (maintainer call): the mode named after
+        // upstream's CustomVoice checkpoint reads as "Built-in Voice" — it
+        // speaks with the built-in speakers, and "Custom" confused end users.
+        // Every internal identity stays `custom` (mode rawValue, model ID
+        // pro_custom, bench cells, telemetry, accessibility identifiers).
+        case .custom: return "Built-in Voice"
         case .design: return "Voice Design"
         case .clone: return "Voice Cloning"
         }

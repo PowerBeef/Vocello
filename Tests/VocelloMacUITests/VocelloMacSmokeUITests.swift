@@ -109,7 +109,7 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
 
         let nonce = "smoke-complete-\(Self.pronounceableNonce())"
         prepare(mode: .custom)
-        replaceScript(with: "Automated Custom Voice smoke generation \(nonce).")
+        replaceScript(with: "Automated Built-in Voice smoke generation \(nonce).")
         generateAndWaitForCompletion(mode: .custom, timeout: 240)
         VocelloUIScreenshot.attach(app, named: "mac-smoke-custom-complete")
 

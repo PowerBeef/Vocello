@@ -54,7 +54,7 @@ LONGFORM_SEGMENTS = (
 )
 
 MODES = ("custom", "design", "clone")
-MODE_LABELS = {"custom": "Custom Voice", "design": "Voice Design", "clone": "Voice Cloning"}
+MODE_LABELS = {"custom": "Built-in Voice", "design": "Voice Design", "clone": "Voice Cloning"}
 LENGTHS = ("short", "medium", "long")
 
 # Palette validated with the dataviz six-checks validator against each

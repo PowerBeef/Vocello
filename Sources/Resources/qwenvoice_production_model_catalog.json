@@ -593,7 +593,7 @@
     }
   ],
   "sourceDigests": {
-    "Sources/Resources/qwenvoice_contract.json": "066bc51138d62397c6ae3133bf879c43ad496c7dda1e213e2d08c240722563f5",
+    "Sources/Resources/qwenvoice_contract.json": "ac5c76af58bb43bc928a2adc47b3f8aa178497c5bf1b6b50fe2c11dc0c0627e3",
     "Sources/Resources/qwenvoice_ios_model_catalog.json": "2966e8368d0935f3df71f45f721ca0fe0417cc08e364631304487ca3227c1430",
     "config/model-artifact-receipts.json": "c5ef8f4acd83a09cf62d1f99a7bc657ec6c594dccd5f768be96c15c357925042",
     "config/model-catalog-schema-v2.json": "17b1a7518060be8ded86473a9be8cc9f734a77e02c29446004947a014b83f693"

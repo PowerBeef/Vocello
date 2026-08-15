@@ -43,7 +43,7 @@ export const Capabilities = () => (
         <div className="window">
           <img
             src="assets/screens/history.png"
-            alt="Vocello Generation History listing past takes across Custom Voice, Voice Design, and Voice Cloning"
+            alt="Vocello Generation History listing past takes across Built-in Voice, Voice Design, and Voice Cloning"
           />
         </div>
         <figcaption className="caps-shot-caption">

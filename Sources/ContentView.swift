@@ -9,7 +9,9 @@ struct SavedVoiceCloneHandoffPlan: Equatable {
 }
 
 enum SidebarItem: String, CaseIterable, Identifiable {
-    case customVoice = "Custom Voice"
+    // rawValue is the visible sidebar label only (never persisted); the
+    // accessibilityID derives from the case name and stays sidebar_customVoice.
+    case customVoice = "Built-in Voice"
     case voiceDesign = "Voice Design"
     case voiceCloning = "Voice Cloning"
     case history = "History"

@@ -757,7 +757,7 @@ public enum GenerationSemantics {
                    normalizedConditioningCacheKeyText(deliveryStyle)
                ) {
                 throw MLXTTSEngineError.unsupportedRequest(
-                    "Custom Voice delivery instructions cannot request celebrity imitation or voice impersonation."
+                    "Built-in Voice delivery instructions cannot request celebrity imitation or voice impersonation."
                 )
             }
         case .design(let voiceDescription, let deliveryStyle):
@@ -1060,7 +1060,7 @@ public enum GenerationSemantics {
         // Latin scripts are indistinguishable by Unicode range — resolve
         // French/German/Spanish/Portuguese/Italian/English via the shared
         // NLLanguageRecognizer detector (confidence-gated; .auto when
-        // ambiguous). Without this, Custom Voice fell back to the english
+        // ambiguous). Without this, Built-in Voice fell back to the english
         // language token for ANY Latin-script text under Auto — misdirecting
         // e.g. French text AND wrongly appending the English diction
         // reinforcement to its delivery instruction. (Official guidance:

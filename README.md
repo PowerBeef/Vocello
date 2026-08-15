@@ -39,7 +39,7 @@
 
 ## What Vocello does
 
-- **Custom Voice:** choose one of nine built-in Qwen3 speakers, then set language and delivery.
+- **Built-in Voice:** choose one of nine built-in Qwen3 speakers, then set language and delivery.
 - **Voice Design:** describe a voice in plain language and generate it from that brief.
 - **Voice Cloning:** capture a reference you have permission to use, affirm consent, and save it to your voice library. On both platforms, record a clip or import an audio file; on iPhone you can also reuse a saved Voice Design voice as the reference.
 
@@ -54,7 +54,7 @@ Vocello is not a wrapper around a Python server: generation runs through a first
 | ![Vocello Voice Design screen](docs/screenshots/vocello-voice-design.png) | ![Vocello Voice Cloning screen](docs/screenshots/vocello-voice-cloning.png) |
 | Describe character, age, accent, texture, and delivery. Save a successful design as a reusable voice reference. | Record in the app; the Mac additionally imports WAV, MP3, AIFF, M4A, FLAC, OGG, or WebM files. A transcript improves conditioning but is optional. Generation requires the visible consent acknowledgment in Settings; only clone voices you own or are authorized to use. |
 
-Custom Voice and Voice Design support eight delivery presets plus a free-text delivery description. The picker is honest about what each preset can promise: four distinct deliveries (Neutral, Calm, Whisper, Sad) come through reliably, and the other four are directional hints that shape energy and pace while the named emotion may not land on every take. Voice Cloning follows the reference voice; with a curated emotion reference bank, a cloned persona additionally offers a delivery choice, with each delivery backed by its own verified reference clip.
+Built-in Voice and Voice Design support eight delivery presets plus a free-text delivery description. The picker is honest about what each preset can promise: four distinct deliveries (Neutral, Calm, Whisper, Sad) come through reliably, and the other four are directional hints that shape energy and pace while the named emotion may not land on every take. Voice Cloning follows the reference voice; with a curated emotion reference bank, a cloned persona additionally offers a delivery choice, with each delivery backed by its own verified reference clip.
 
 | Models | History |
 | --- | --- |
@@ -88,7 +88,7 @@ Storage locations and deletion behavior are documented in [`docs/reference/priva
 1. Download [`Vocello-macos26.dmg`](https://github.com/PowerBeef/Vocello/releases/download/v2.4.0/Vocello-macos26.dmg).
 2. Open the DMG and drag `Vocello.app` to `/Applications`.
 3. Open Vocello, then install models from **Settings > Model downloads**.
-4. Generate from Custom Voice, Voice Design, or Voice Cloning.
+4. Generate from Built-in Voice, Voice Design, or Voice Cloning.
 
 The current DMG is signed with an Apple Developer ID certificate, notarized, and stapled. The attached [`release-metadata.txt`](https://github.com/PowerBeef/Vocello/releases/download/v2.4.0/release-metadata.txt) records source and toolchain provenance.
 
@@ -113,7 +113,7 @@ Macs on macOS 15 can use the legacy [QwenVoice 1.2.3 release](https://github.com
 
 | | |
 | --- | --- |
-| ![Vocello Studio running on iPhone](docs/screenshots/vocello-ios-studio.png) | The iPhone app uses the same local Qwen3-TTS and MLX foundation with an iPhone-specific in-process runtime. It provides Custom Voice, Voice Design, Voice Cloning with microphone recording or a saved Voice Design reference, local history, and the memory-conscious Speed models. On-device generation, physical-iPhone XCUITest, and an optional signed archive/TestFlight lane are implemented. A fresh full multilingual physical-iPhone run passed all 19 hint/QC and 18 output gates with policy-accepted warnings; its exploratory record is excluded from clean performance trends. A public TestFlight beta is open: [join here](https://testflight.apple.com/join/Cvp6yCv7). App Store distribution remains a separate maintainer-owned release decision. |
+| ![Vocello Studio running on iPhone](docs/screenshots/vocello-ios-studio.png) | The iPhone app uses the same local Qwen3-TTS and MLX foundation with an iPhone-specific in-process runtime. It provides Built-in Voice, Voice Design, Voice Cloning with microphone recording or a saved Voice Design reference, local history, and the memory-conscious Speed models. On-device generation, physical-iPhone XCUITest, and an optional signed archive/TestFlight lane are implemented. A fresh full multilingual physical-iPhone run passed all 19 hint/QC and 18 output gates with policy-accepted warnings; its exploratory record is excluded from clean performance trends. A public TestFlight beta is open: [join here](https://testflight.apple.com/join/Cvp6yCv7). App Store distribution remains a separate maintainer-owned release decision. |
 
 Current implementation and acceptance status: [`docs/development-progress.md`](docs/development-progress.md).
 
@@ -153,7 +153,7 @@ Every number below comes from a tracked, privacy-safe benchmark record in this r
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/charts/rtf-by-mode-dark.svg">
-  <img alt="Grouped bar chart: warm generation speed for Custom Voice (1.85× to 2.02× realtime), Voice Design (1.92× to 2.12×), and Voice Cloning (1.55× to 2.03×), all beyond the realtime line at 1.0×" src="docs/charts/rtf-by-mode-light.svg">
+  <img alt="Grouped bar chart: warm generation speed for Built-in Voice (1.85× to 2.02× realtime), Voice Design (1.92× to 2.12×), and Voice Cloning (1.55× to 2.03×), all beyond the realtime line at 1.0×" src="docs/charts/rtf-by-mode-light.svg">
 </picture>
 
 That speed is the sum of an evergreen optimization ledger, not one trick. Section letters cite `benchmarks/OPTIMIZATION.md`:

@@ -34,7 +34,7 @@ handoffs may change the in-session Studio mode.
 
 ## Studio states
 
-### Custom Voice
+### Built-in Voice
 
 - Script editor and count: `textInput_textEditor`, `textInput_lengthCount`.
 - Voice, delivery, language, and variation controls.

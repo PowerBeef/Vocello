@@ -253,7 +253,7 @@ struct Qwen3TTSRuntimeProfile: Hashable, Codable, Sendable {
     func validateSpeaker(_ speaker: String) throws {
         let normalized = Self.normalizedCacheText(speaker)
         guard !normalized.isEmpty else {
-            throw Qwen3TTSRuntimeProfileError.invalidMetadata("Custom Voice requires a non-empty Qwen3 speaker.")
+            throw Qwen3TTSRuntimeProfileError.invalidMetadata("Built-in Voice requires a non-empty Qwen3 speaker.")
         }
         guard supportedSpeakers.isEmpty || supportedSpeakers.contains(normalized) else {
             throw Qwen3TTSRuntimeProfileError.invalidMetadata(

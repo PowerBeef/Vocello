@@ -36,7 +36,7 @@ Four tabs across the bottom (`rootTab_*`), with **Studio** as the default surfac
 
 Three generation modes (Studio segmented control `generateSection_*`):
 
-- **Custom Voice** (`generateSection_custom`) — pick a built-in speaker + optional delivery.
+- **Built-in Voice** (`generateSection_custom`) — pick a built-in speaker + optional delivery.
 - **Voice Design** (`generateSection_design`) — describe a voice in natural language.
 - **Voice Cloning** (`generateSection_clone`) — use a reference clip (record on-device or a saved voice).
 
@@ -224,7 +224,7 @@ Generate rather than Install. Destructive install/cancel/delete actions are outs
 
 ### Modes
 
-- **Custom Voice** — a built-in Qwen3 speaker reads your script, with an optional delivery
+- **Built-in Voice** — a built-in Qwen3 speaker reads your script, with an optional delivery
   style. Fastest, most consistent path.
 - **Voice Design** — describe a voice in plain language (character, age, accent, gender,
   pitch); the model invents a new voice from that brief each call. Name gender + concrete
@@ -242,7 +242,7 @@ Generate rather than Install. Destructive install/cancel/delete actions are outs
   selecting the persona in Clone offers a Delivery chip that swaps between its verified
   per-emotion references ([emotion-reference-banks.md](emotion-reference-banks.md)).
 
-### Speakers (Custom Voice) — `qwenvoice_contract.json`
+### Speakers (Built-in Voice) — `qwenvoice_contract.json`
 
 9 built-in: **Aiden, Ryan** (English) · **Vivian, Serena, Uncle Fu, Dylan, Eric** (Chinese) ·
 **Ono Anna** (Japanese) · **Sohee** (Korean). Default: Aiden. Speakers carry baked-in

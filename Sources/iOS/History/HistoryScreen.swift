@@ -89,7 +89,7 @@ enum IOSHistoryModeFilter: String, CaseIterable, Identifiable, Hashable {
     var title: String {
         switch self {
         case .all: return "All"
-        case .custom: return "Custom"
+        case .custom: return "Built-in"
         case .design: return "Design"
         case .clone: return "Clone"
         }
@@ -552,7 +552,7 @@ private struct IOSHistoryItemCard: View {
     private var modeText: String {
         switch item.mode.lowercased() {
         case "custom":
-            return "Custom"
+            return "Built-in"
         case "design":
             return "Design"
         case "clone":

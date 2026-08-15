@@ -61,7 +61,7 @@ struct QwenVoiceApp: App {
             }
 
             CommandMenu("Navigate") {
-                Button("Custom Voice") {
+                Button("Built-in Voice") {
                     appCommandRouter.navigate(to: .customVoice)
                 }
                 .keyboardShortcut("1", modifiers: .command)

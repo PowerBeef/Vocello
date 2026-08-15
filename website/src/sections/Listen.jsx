@@ -82,7 +82,7 @@ export const Listen = () => {
         <div className="listen-deliveries">
           <div className="vc-label" id="delivery-vocab-label">Delivery presets</div>
           <p className="listen-deliveries-sub">
-            Custom Voice and Voice Design shape a take with one of ten delivery
+            Built-in Voice and Voice Design shape a take with one of ten delivery
             presets, each at normal or strong intensity.
           </p>
           <div className="try-chips" role="list" aria-labelledby="delivery-vocab-label">

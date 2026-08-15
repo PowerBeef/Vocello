@@ -637,6 +637,56 @@ unification — all at measured baseline-or-better frame health, with P4
 reverted by the instrument this arc was built around. IUI-6 (registry
 formalization) is desk work.
 
+## IUI-6 — registry formalization (2026-08-15, landed)
+
+**One `ui-perf` kind, platform-aware.** `benchmark_history.py` now keys the
+probe scenario set per platform (`UI_PERF_SCENARIOS_BY_PLATFORM`) and
+`validate_ui_perf_semantics` accepts canonical-matrix macOS *or* iOS
+records; the metric allowlist stays shared — a second kind would have
+forked enums, validators, and ceiling machinery for identical semantics.
+All 268 pre-existing records still validate.
+
+**iOS warn-only ceilings** live in
+[`config/ui-perf-thresholds-ios.json`](../../config/ui-perf-thresholds-ios.json),
+derived from the three counted five-run sessions (IUI-2 baseline, IUI-4
+wave-1 after, IUI-5 wave-2 after): hitch ceilings ~1.5–2× the worst
+session median, gap ceilings ~2× the worst clean observation, tightened so
+the P4 keep-alive regression must breach (tab-navigation 115 against its
+119–155 regressed range; voices-scroll 90 against 115–118). Exploratory
+scenarios carry no ceilings. `check_ios_ui_perf.py` binds the contract by
+default; breaches stay warn-only (`passedWithWarnings`, never failed) —
+the macOS UI-7 posture exactly.
+
+**Registry publication.** `--emit-evidence` writes
+`benchmark-evidence.json` on a canonical-iPhone PASS, and the perf lane's
+existing publication block records it — no new publication machinery. The
+registry's hardware block needs device-truth load/storage/uptime no
+host-side capture can see, so `IOSUIPerfFrameProbe` now writes one
+privacy-safe environment snapshot row per launch (the diagnostics runner's
+`RunEnvironmentSnapshot` twin, inert to the cadence measurement) and the
+checker harvests it — fail-closed when evidence is requested but the
+installed app predates the snapshot. That guard was found live, not in
+review: the first publication attempt (`…-170208-89766d44`) failed exactly
+on the missing hardware schema fields, in the same arc that fixed it.
+
+**Warn path, end to end.** Live: that same `…-170208-89766d44` run breached
+the sheet-present hitch ceiling on a noisy just-unlocked-phone first run
+(`uiperf.hitch:ios-sheet-present-dismiss(209/180)` plus two warn-only
+cadence codes) and correctly reported `passedWithWarnings` while the gate
+stayed PASS. Offline: the checker self-tests drive a ceiling breach
+through the evidence manifest and assert run/take `passedWithWarnings`
+with registry-exact take identity and complete required metrics.
+
+**First canonical record:**
+[`benchmarks/runs/ui-perf/ios-xcui-perf-20260815-171707-8af6ffde.json`](../../benchmarks/runs/ui-perf/ios-xcui-perf-20260815-171707-8af6ffde.json)
+— platform `ios`, canonical scope, nine takes, zero warnings, thermals
+nominal, device-truth hardware complete; `validate --all` passes at 269
+records. The harness-hash source list now pins the iOS probe, seeder,
+checker, perf test class, and threshold contract beside their macOS twins.
+Warn-only ceilings promote to hard ceilings only after repeated stable
+sessions (macOS UI-7 precedent). **IUI-6 is closed, and with it the
+`ios-ui-2026-08` plan.**
+
 ## 60 Hz-tier posture
 
 `iosGenerationPerformanceGate` engages only on fixed-refresh (60 Hz) devices, and

@@ -82,7 +82,16 @@ class IOSUIPerfFixture(unittest.TestCase):
             window_end = window_start + 5_000
             log_lines.append(make_marker(scenario, window_start, window_end))
             per_block = hitch_by_scenario.get(scenario, 0.0) * 0.5  # ms/s -> ms per 500 ms block
-            rows = [{"kind": "meta", "scenario": scenario}]
+            rows = [{
+                "kind": "environment",
+                "scenario": scenario,
+                "capturedEpochMS": launch + offset * 20_000,
+                "uptimeSeconds": 3_600.0 + offset,
+                "lowPowerModeEnabled": False,
+                "loadAverage1Minute": 1.5 + offset * 0.1,
+                "freeStorageBytes": 40_000_000_000 + offset,
+                "thermalState": "nominal",
+            }]
             rows += [dict(block, scenario=scenario) for block in make_blocks(
                 window_start - 1_000,
                 block_count_by_scenario.get(scenario, 16),
@@ -95,7 +104,8 @@ class IOSUIPerfFixture(unittest.TestCase):
         return log
 
     def run_checker(self, log: Path, *, thresholds: Path | None = None,
-                    require_canonical: bool = False) -> tuple[int, dict | None]:
+                    require_canonical: bool = False,
+                    emit_evidence: bool = False) -> tuple[int, dict | None]:
         output = self.root / "ui-perf-report.json"
         argv = [
             "check_ios_ui_perf.py",
@@ -109,6 +119,8 @@ class IOSUIPerfFixture(unittest.TestCase):
             argv += ["--thresholds", str(thresholds)]
         if require_canonical:
             argv.append("--require-canonical")
+        if emit_evidence:
+            argv.append("--emit-evidence")
         old_argv = sys.argv
         sys.argv = argv
         try:
@@ -118,13 +130,14 @@ class IOSUIPerfFixture(unittest.TestCase):
         report = json.loads(output.read_text()) if output.is_file() else None
         return status, report
 
-    def test_clean_run_passes_without_a_thresholds_contract(self):
+    def test_clean_run_passes_under_the_default_contract(self):
         log = self.write_run()
         status, report = self.run_checker(log)
         self.assertEqual(status, 0)
         self.assertEqual(report["platform"], "ios")
         self.assertEqual(report["status"], "passed")
-        self.assertIsNone(report["thresholds"]["path"])
+        self.assertTrue(
+            report["thresholds"]["path"].endswith("ui-perf-thresholds-ios.json"))
         self.assertEqual(report["thresholds"]["warnings"], [])
         self.assertEqual(len(report["scenarios"]), len(checker.EXPECTED_SCENARIOS))
         for scenario in report["scenarios"]:
@@ -185,6 +198,112 @@ class IOSUIPerfFixture(unittest.TestCase):
         self.assertEqual(report["status"], "passedWithWarnings")
         self.assertEqual(
             report["thresholds"]["warnings"], ["uiperf.hitch:ios-idle-baseline(50/5)"])
+
+    def test_shipped_contract_binds_exactly_the_confirmatory_scenarios(self):
+        contract = json.loads(
+            (Path(checker.REPO_ROOT) / "config" / "ui-perf-thresholds-ios.json").read_text())
+        self.assertEqual(contract["schemaVersion"], 1)
+        self.assertTrue(contract["warnOnly"])
+        confirmatory = set(checker.EXPECTED_SCENARIOS) - checker.EXPLORATORY
+        self.assertEqual(set(contract["confirmatoryScenarios"]), confirmatory)
+        self.assertEqual(set(contract["hitchCeilingMSPerS"]), confirmatory)
+        self.assertEqual(set(contract["maxGapCeilingMS"]), confirmatory)
+
+    def test_scenario_set_matches_the_registry_contract(self):
+        import benchmark_history
+        self.assertEqual(
+            benchmark_history.UI_PERF_SCENARIOS_BY_PLATFORM["ios"],
+            set(checker.EXPECTED_SCENARIOS))
+
+    def test_emit_evidence_writes_a_registry_manifest_including_the_warn_path(self):
+        # A hitch breach on a confirmatory scenario must flow warn-only from
+        # the checker through the evidence manifest: run and take status
+        # passedWithWarnings, gate still PASS — the offline half of the
+        # IUI-6 end-to-end warn-path proof.
+        log = self.write_run(hitch_by_scenario={"ios-voices-scroll": 500.0})
+        original = checker.verify_canonical_iphone
+        checker.verify_canonical_iphone = lambda diagnostics, run_id: "iphone-17-pro"
+        try:
+            status, report = self.run_checker(
+                log, require_canonical=True, emit_evidence=True)
+        finally:
+            checker.verify_canonical_iphone = original
+        self.assertEqual(status, 0)
+        self.assertEqual(report["status"], "passedWithWarnings")
+        self.assertEqual(report["evidence"], "registry")
+        self.assertEqual(
+            report["thresholds"]["warnings"], ["uiperf.hitch:ios-voices-scroll(500/90)"])
+        manifest = json.loads((self.root / "benchmark-evidence.json").read_text())
+        self.assertEqual(manifest["benchmarkKind"], "ui-perf")
+        self.assertEqual(manifest["platform"], "ios")
+        self.assertEqual(manifest["status"], "passedWithWarnings")
+        record = manifest["historyRecord"]
+        self.assertEqual(record["run"]["matrixScope"], "canonical")
+        self.assertEqual(record["run"]["platform"], "ios")
+        self.assertEqual(
+            record["run"]["warnings"], ["uiperf.hitch:ios-voices-scroll(500/90)"])
+        self.assertEqual(record["hardware"], {"profileID": "iphone-17-pro"})
+        self.assertEqual(record["models"], [])
+        hardware = manifest["hardware"]
+        self.assertEqual(hardware["profileID"], "iphone-17-pro")
+        self.assertEqual(hardware["thermalState"], "nominal")
+        self.assertFalse(hardware["lowPowerMode"])
+        self.assertEqual(hardware["uptimeSeconds"], 3_600.0)
+        self.assertEqual(hardware["freeStorageBytes"], 40_000_000_000)
+        self.assertAlmostEqual(hardware["loadAverage1M"], 2.3)
+        self.assertEqual(record["evidence"]["telemetrySchemaVersion"], "not-applicable")
+        self.assertEqual(record["evidence"]["qcAlgorithmVersion"], "not-applicable")
+        takes = record["takes"]
+        self.assertEqual(len(takes), len(checker.EXPECTED_SCENARIOS))
+        import benchmark_history
+        for take, scenario in zip(takes, checker.EXPECTED_SCENARIOS):
+            self.assertEqual(take["cell"], f"ui-perf/{scenario}")
+            self.assertEqual(
+                take["generationID"], f"ios-xcui-perf-fixture-0001-{scenario}")
+            self.assertEqual(take["mode"], "not-applicable")
+            self.assertEqual(take["finishReason"], "completed")
+            missing = benchmark_history.UI_PERF_REQUIRED_METRICS - set(take["metrics"])
+            self.assertEqual(sorted(missing), [])
+        breached = next(
+            t for t in takes if t["cell"] == "ui-perf/ios-voices-scroll")
+        self.assertEqual(breached["status"], "passedWithWarnings")
+
+    def test_emit_evidence_fails_closed_without_an_environment_snapshot(self):
+        # A stale installed app (pre-IUI-6 probe) writes no environment row;
+        # publishing without device-truth hardware would mint a
+        # schema-incomplete record, so the gate must refuse instead.
+        log = self.write_run()
+        for probe in (self.diagnostics / "ui-perf").glob("frames-*.jsonl"):
+            rows = [
+                line for line in probe.read_text().splitlines()
+                if '"environment"' not in line
+            ]
+            probe.write_text("\n".join(rows) + "\n")
+        original = checker.verify_canonical_iphone
+        checker.verify_canonical_iphone = lambda diagnostics, run_id: "iphone-17-pro"
+        try:
+            status, _ = self.run_checker(
+                log, require_canonical=True, emit_evidence=True)
+        finally:
+            checker.verify_canonical_iphone = original
+        self.assertEqual(status, 1)
+        self.assertFalse((self.root / "benchmark-evidence.json").exists())
+
+    def test_emit_evidence_skips_gracefully_off_canonical_hardware(self):
+        log = self.write_run()
+
+        def failing_verify(diagnostics, run_id):
+            raise checker.GateError("canonical iPhone verification failed: fixture")
+
+        original = checker.verify_canonical_iphone
+        checker.verify_canonical_iphone = failing_verify
+        try:
+            status, report = self.run_checker(log, emit_evidence=True)
+        finally:
+            checker.verify_canonical_iphone = original
+        self.assertEqual(status, 0)
+        self.assertEqual(report["evidence"], "local-only")
+        self.assertFalse((self.root / "benchmark-evidence.json").exists())
 
     def test_require_canonical_records_the_verified_profile(self):
         log = self.write_run()

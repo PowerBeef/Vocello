@@ -119,9 +119,12 @@ directory, probe JSONL under `diagnostics/ui-perf/`. **Copy
 run** — result retention keeps only the latest passing result per lane, so a
 multi-run session otherwise loses its earlier reports (they remain
 deterministically regenerable from the device's probe files and the captured
-lane log, but copying is the protocol). There is no iOS warn-only threshold
-contract and no `ui-perf` registry publication yet — both are IUI-6, after repeated counted
-baselines ([`ios-ui-refresh-2026-08.md`](ios-ui-refresh-2026-08.md)).
+lane log, but copying is the protocol). Warn-only ceilings live in
+`config/ui-perf-thresholds-ios.json` (IUI-6, derived from the three counted
+sessions; a breach marks the scenario and run `passedWithWarnings`, never
+failed), and on the canonical iPhone profile a PASS emits registry evidence
+and publishes a platform-`ios` `ui-perf` record — the macOS UI-7 twin
+([`ios-ui-refresh-2026-08.md`](ios-ui-refresh-2026-08.md)).
 
 ## Headless device diagnostics
 

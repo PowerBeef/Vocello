@@ -59,7 +59,7 @@
     {
       "id": "ios-ui-2026-08",
       "title": "iOS UI performance harness, measured review, and fix waves",
-      "status": "active",
+      "status": "complete",
       "owner": "ios",
       "adopted": "2026-08-11",
       "goal": "Mirror the macOS UI arc on the iPhone: build a deterministic frame-health lane (scripts/ui_test.sh ios perf) on the canonical iPhone 17 Pro, baseline the real UI costs, run a four-lens audit merged with the numbers into ONE ranked findings list spanning performance and design (maintainer chose audit-first: design items become a maintainer pick-list, never pre-committed work), land fixes in measured waves, and close by making the ui-perf benchmark kind platform-aware. Instrument-first ordering is mandatory - the 2026-06 iOS fix wave shipped unmeasured and its own commit messages say so. Pre-arc housekeeping (standalone commit): add the missing ui-ios-delivery-cohort workflow to config/orchestration-contract.json (existing lane unrunnable without it).",
@@ -966,7 +966,7 @@
       "id": "IUI-6",
       "plan": "ios-ui-2026-08",
       "title": "Registry formalization: platform-aware ui-perf kind + warn-only ceilings",
-      "status": "planned",
+      "status": "done",
       "gate": "One ui-perf kind, platform-aware: relax validate_ui_perf_semantics' macOS bind and make the scenario table per-platform in benchmark_history.py (schema already permits platform ios; the metric allowlist is platform-neutral - a second kind would fork enums, validators, and ceiling machinery for identical semantics). Publish the baselines; derive warn-only ceilings for the confirmatory scenarios from repeated counted baselines (macOS UI-7 precedent - promotion to hard ceilings needs ~3 stable sessions); harness-hash source list gains the iOS probe/checker/test files. 60 Hz-tier posture recorded in the authority doc: the tier stays behaviorally frozen through the fix waves; a physical 60 Hz device, if available, runs the lane as recorded non-canonical evidence only. GATE: a canonical platform-ios ui-perf record validates, publishes, and exercises the warn path end-to-end; benchmark_history.py validate --all green.",
       "sourceOfTruth": [
         "scripts/ui_test.sh",
@@ -974,7 +974,13 @@
         "Tests/VocelloiOSUITests/VocelloiOSUITestCase.swift",
         "scripts/benchmark_history.py"
       ],
-      "updated": "2026-08-11"
+      "updated": "2026-08-15",
+      "notes": "Landed 2026-08-15 across two phone windows the same day as the IUI-5 close. One platform-aware ui-perf kind: per-platform scenario tables + relaxed validate_ui_perf_semantics in benchmark_history.py (268 pre-existing records unaffected). iOS warn-only ceilings in config/ui-perf-thresholds-ios.json, derived from the three counted sessions and tightened so the P4 keep-alive regression must breach; exploratory scenarios carry none. check_ios_ui_perf.py binds the contract by default and --emit-evidence publishes through the lane's existing publication block on a canonical-iPhone PASS. IOSUIPerfFrameProbe gained a one-per-launch privacy-safe device-environment snapshot row (registry hardware needs device-truth load/storage/uptime) with a fail-closed stale-app guard, found live when the first publication attempt (ios-xcui-perf-20260815-170208-89766d44) failed on exactly those schema fields. Warn path proven live (that run reported passedWithWarnings on a real sheet-present ceiling breach) and offline (checker self-tests drive a breach through the evidence manifest). First canonical platform-ios record published: benchmarks/runs/ui-perf/ios-xcui-perf-20260815-171707-8af6ffde.json; validate --all passes at 269 records; harness-hash list pins the iOS probe/seeder/checker/perf-test/contract files. Warn-only promotes to hard ceilings only after repeated stable sessions (macOS UI-7 precedent). Details: docs/reference/ios-ui-refresh-2026-08.md 'IUI-6 - registry formalization'.",
+      "evidence": [
+        "doc:docs/reference/ios-ui-refresh-2026-08.md",
+        "file:benchmarks/runs/ui-perf/ios-xcui-perf-20260815-171707-8af6ffde.json",
+        "file:config/ui-perf-thresholds-ios.json"
+      ]
     }
   ]
 }

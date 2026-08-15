@@ -11,9 +11,9 @@
 | --- | --- | --- | --- |
 | `delivery-prompting-2026-08` | active | backend-mlx | 20/23 (87%) |
 | `doc-governance-2026-08` | active | release-qa | 8/9 (89%) |
-| `ios-ui-2026-08` | active | ios | 5/6 (83%) |
 | `compliance-2026-08` | complete | release-qa | 2/2 (100%) |
 | `convergence-metal4-stage4-2026-08` | complete | backend-and-platform | 7/7 (100%) |
+| `ios-ui-2026-08` | complete | ios | 6/6 (100%) |
 | `macos-ui-2026-08` | complete | macos | 7/7 (100%) |
 | `model-delivery-2026-08` | complete | release-qa | 2/2 (100%) |
 
@@ -87,28 +87,6 @@ Narrative authority: [`docs/reference/repository-self-verification.md`](referenc
 - **`DG-4`** (planned) — Phase 3 — source bindings on active documents.
   gate: Annotated incrementally as documents are touched; a binding invented in bulk without reading the document is worse than none.
 
-## iOS UI performance harness, measured review, and fix waves
-
-`ios-ui-2026-08` · **active** · ios · adopted 2026-08-11
-
-Mirror the macOS UI arc on the iPhone: build a deterministic frame-health lane (scripts/ui_test.sh ios perf) on the canonical iPhone 17 Pro, baseline the real UI costs, run a four-lens audit merged with the numbers into ONE ranked findings list spanning performance and design (maintainer chose audit-first: design items become a maintainer pick-list, never pre-committed work), land fixes in measured waves, and close by making the ui-perf benchmark kind platform-aware. Instrument-first ordering is mandatory - the 2026-06 iOS fix wave shipped unmeasured and its own commit messages say so. Pre-arc housekeeping (standalone commit): add the missing ui-ios-delivery-cohort workflow to config/orchestration-contract.json (existing lane unrunnable without it).
-
-Narrative authority: [`docs/reference/ios-ui-refresh-2026-08.md`](reference/ios-ui-refresh-2026-08.md)
-
-| Item | Status | Title | Evidence |
-| --- | --- | --- | --- |
-| `IUI-1` | done | Instrument: scripts/ui_test.sh ios perf frame-health harness | `commit:73dc9f8`, `commit:c0dba9c`, `file:scripts/check_ios_ui_perf.py`, `file:Sources/iOSSupport/Services/IOSUIPerfFrameProbe.swift`, `file:Tests/VocelloiOSUITests/VocelloiOSPerfUITests.swift`, `file:scripts/tests/test_check_ios_ui_perf.py`, `doc:docs/reference/ios-ui-refresh-2026-08.md` |
-| `IUI-2` | done | Frame-health baseline (1 warm-up + 5 counted runs) | `doc:docs/reference/ios-ui-refresh-2026-08.md`, `commit:c0dba9c` |
-| `IUI-3` | done | Audit-first review: four lenses + measurements into one ranked list + maintainer pick-list | `doc:docs/reference/ios-ui-refresh-2026-08.md` |
-| `IUI-4` | done | Wave 1: safe fixes with before/after measurement | `doc:docs/reference/ios-ui-refresh-2026-08.md`, `commit:2f76b8a` |
-| `IUI-5` | done | Wave 2: refinements + re-engineering (macOS UI-5/UI-6 collapsed) | `doc:docs/reference/ios-ui-refresh-2026-08.md`, `commit:a7f22ad` |
-| `IUI-6` | planned | Registry formalization: platform-aware ui-perf kind + warn-only ceilings | — |
-
-### Open items in detail
-
-- **`IUI-6`** (planned) — Registry formalization: platform-aware ui-perf kind + warn-only ceilings.
-  gate: One ui-perf kind, platform-aware: relax validate_ui_perf_semantics' macOS bind and make the scenario table per-platform in benchmark_history.py (schema already permits platform ios; the metric allowlist is platform-neutral - a second kind would fork enums, validators, and ceiling machinery for identical semantics). Publish the baselines; derive warn-only ceilings for the confirmatory scenarios from repeated counted baselines (macOS UI-7 precedent - promotion to hard ceilings needs ~3 stable sessions); harness-hash source list gains the iOS probe/checker/test files. 60 Hz-tier posture recorded in the authority doc: the tier stays behaviorally frozen through the fix waves; a physical 60 Hz device, if available, runs the lane as recorded non-canonical evidence only. GATE: a canonical platform-ios ui-perf record validates, publishes, and exercises the warn path end-to-end; benchmark_history.py validate --all green.
-
 ## EU AI Act Article 50 readiness
 
 `compliance-2026-08` · **complete** · release-qa · adopted 2026-08-06
@@ -139,6 +117,23 @@ Narrative authority: [`docs/reference/roadmap-2026-08.md`](reference/roadmap-202
 | `CM-5` | done | Phone-gated evidence battery remainder | `doc:docs/reference/roadmap-2026-08.md`, `file:benchmarks/runs/engine-generation/macos-engine-20260806-142908-12599e2c.json`, `file:benchmarks/runs/engine-generation/macos-engine-20260806-143035-941b0ea5.json`, `file:benchmarks/runs/engine-generation/macos-engine-20260806-143201-f3512027.json`, `file:benchmarks/runs/ui-generation/ios-xcui-benchmark-20260806-135457-1d545686.json`, `file:benchmarks/runs/ui-generation/ios-xcui-benchmark-20260806-141150-97c286b1.json`, `file:benchmarks/runs/memory-qualification/mac-memory-qualification-20260806-143414-d4284646.json`, `file:config/characterization-fixtures.json`, `file:Sources/iOS/IOSDeviceDiagnosticsRunner.swift` |
 | `CM-6` | done | MOS-proxy advisory column (UTMOSv2) | `file:scripts/mos_advisory.py`, `file:scripts/tests/test_mos_advisory.py`, `file:docs/reference/testing-runbook.md` |
 | `CM-7` | done | Non-streaming CLI generation publishes no WAV while reporting success | `file:Sources/QwenVoiceCore/GenerationOutputAdapter.swift`, `file:Tests/VocelloCoreTests/GenerationTerminalCleanupTests.swift`, `file:Sources/VocelloCLI/GenerateCommand.swift`, `file:Sources/VocelloCLI/BatchCommand.swift` |
+
+## iOS UI performance harness, measured review, and fix waves
+
+`ios-ui-2026-08` · **complete** · ios · adopted 2026-08-11
+
+Mirror the macOS UI arc on the iPhone: build a deterministic frame-health lane (scripts/ui_test.sh ios perf) on the canonical iPhone 17 Pro, baseline the real UI costs, run a four-lens audit merged with the numbers into ONE ranked findings list spanning performance and design (maintainer chose audit-first: design items become a maintainer pick-list, never pre-committed work), land fixes in measured waves, and close by making the ui-perf benchmark kind platform-aware. Instrument-first ordering is mandatory - the 2026-06 iOS fix wave shipped unmeasured and its own commit messages say so. Pre-arc housekeeping (standalone commit): add the missing ui-ios-delivery-cohort workflow to config/orchestration-contract.json (existing lane unrunnable without it).
+
+Narrative authority: [`docs/reference/ios-ui-refresh-2026-08.md`](reference/ios-ui-refresh-2026-08.md)
+
+| Item | Status | Title | Evidence |
+| --- | --- | --- | --- |
+| `IUI-1` | done | Instrument: scripts/ui_test.sh ios perf frame-health harness | `commit:73dc9f8`, `commit:c0dba9c`, `file:scripts/check_ios_ui_perf.py`, `file:Sources/iOSSupport/Services/IOSUIPerfFrameProbe.swift`, `file:Tests/VocelloiOSUITests/VocelloiOSPerfUITests.swift`, `file:scripts/tests/test_check_ios_ui_perf.py`, `doc:docs/reference/ios-ui-refresh-2026-08.md` |
+| `IUI-2` | done | Frame-health baseline (1 warm-up + 5 counted runs) | `doc:docs/reference/ios-ui-refresh-2026-08.md`, `commit:c0dba9c` |
+| `IUI-3` | done | Audit-first review: four lenses + measurements into one ranked list + maintainer pick-list | `doc:docs/reference/ios-ui-refresh-2026-08.md` |
+| `IUI-4` | done | Wave 1: safe fixes with before/after measurement | `doc:docs/reference/ios-ui-refresh-2026-08.md`, `commit:2f76b8a` |
+| `IUI-5` | done | Wave 2: refinements + re-engineering (macOS UI-5/UI-6 collapsed) | `doc:docs/reference/ios-ui-refresh-2026-08.md`, `commit:a7f22ad` |
+| `IUI-6` | done | Registry formalization: platform-aware ui-perf kind + warn-only ceilings | `doc:docs/reference/ios-ui-refresh-2026-08.md`, `file:benchmarks/runs/ui-perf/ios-xcui-perf-20260815-171707-8af6ffde.json`, `file:config/ui-perf-thresholds-ios.json` |
 
 ## macOS UI performance harness, measured review, and staged refresh
 

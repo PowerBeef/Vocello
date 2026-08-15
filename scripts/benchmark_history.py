@@ -362,10 +362,19 @@ UI_PERF_REQUIRED_METRICS = {
     "uiProbeCoverage", "uiRefreshIntervalMS", "uiWindowDurationMS", "uiActionCount",
     "cpuUserSeconds", "cpuSystemSeconds",
 }
-UI_PERF_SCENARIOS = {
-    "idle-baseline", "sidebar-navigation", "history-scroll", "history-filter",
-    "delivery-menu", "settings-scroll", "composer-typing", "window-resize",
-    "generation-active",
+# One ui-perf kind, platform-aware (IUI-6): the metric allowlist is shared;
+# only the probe scenario set differs per platform.
+UI_PERF_SCENARIOS_BY_PLATFORM = {
+    "macos": {
+        "idle-baseline", "sidebar-navigation", "history-scroll", "history-filter",
+        "delivery-menu", "settings-scroll", "composer-typing", "window-resize",
+        "generation-active",
+    },
+    "ios": {
+        "ios-idle-baseline", "ios-tab-navigation", "ios-history-scroll",
+        "ios-voices-scroll", "ios-settings-scroll", "ios-composer-typing",
+        "ios-sheet-present-dismiss", "ios-player-scrub", "ios-generation-active",
+    },
 }
 MEMORY_REQUIRED_METRICS = {
     "residentStartMB", "residentEndMB", "residentDeltaMB", "peakResidentMB",
@@ -867,12 +876,18 @@ def default_inputs(record: dict[str, Any]) -> dict[str, Any]:
         REPO_ROOT / "Tests" / "VocelloMacUITests" / "VocelloMacBenchmarkUITests.swift",
         REPO_ROOT / "Tests" / "VocelloMacUITests" / "VocelloMacPerfUITests.swift",
         REPO_ROOT / "Tests" / "VocelloiOSUITests" / "VocelloiOSBenchmarkUITests.swift",
-        # ui-perf (UI-7): the frame probe, history seeder, gate checker, and
-        # threshold contract shape published frame-health evidence.
+        # ui-perf (UI-7 macOS, IUI-6 iOS): the frame probes, history seeders,
+        # gate checkers, perf test classes, and per-platform threshold
+        # contracts shape published frame-health evidence.
         REPO_ROOT / "scripts" / "check_macos_ui_perf.py",
         REPO_ROOT / "Sources" / "Services" / "UIPerfFrameProbe.swift",
         REPO_ROOT / "Sources" / "Services" / "UIPerfHistorySeeder.swift",
         REPO_ROOT / "config" / "ui-perf-thresholds.json",
+        REPO_ROOT / "scripts" / "check_ios_ui_perf.py",
+        REPO_ROOT / "Sources" / "iOSSupport" / "Services" / "IOSUIPerfFrameProbe.swift",
+        REPO_ROOT / "Sources" / "iOSSupport" / "Services" / "IOSUIPerfHistorySeeder.swift",
+        REPO_ROOT / "Tests" / "VocelloiOSUITests" / "VocelloiOSPerfUITests.swift",
+        REPO_ROOT / "config" / "ui-perf-thresholds-ios.json",
         REPO_ROOT / "Sources" / "QwenVoiceCore" / "BenchMatrixSpec.swift",
         REPO_ROOT / "Sources" / "VocelloCLI" / "BenchCommand.swift",
         REPO_ROOT / "Sources" / "QwenVoiceCore" / "GenerationTelemetryRecord.swift",
@@ -1784,13 +1799,14 @@ def validate_prosody_semantics(record: dict[str, Any]) -> None:
 
 
 def validate_ui_perf_semantics(record: dict[str, Any]) -> None:
-    """ui-perf (UI-7): one SwiftUI frame-health take per scenario, no model,
-    engine-telemetry, or audio-QC claims — the probe measures main-run-loop
-    cadence, not generation. Threshold breaches are warn-only and surface as
-    take/run warnings, never as a failed status."""
+    """ui-perf (UI-7 macOS, IUI-6 platform-aware): one frame-health take per
+    scenario, no model, engine-telemetry, or audio-QC claims — the probe
+    measures main-run-loop cadence, not generation. Threshold breaches are
+    warn-only and surface as take/run warnings, never as a failed status."""
     run = record["run"]
-    if run.get("platform") != "macos" or run.get("matrixScope") != "canonical":
-        raise HistoryError("ui-perf must be a canonical-matrix macOS benchmark")
+    expected_scenarios = UI_PERF_SCENARIOS_BY_PLATFORM.get(run.get("platform"))
+    if expected_scenarios is None or run.get("matrixScope") != "canonical":
+        raise HistoryError("ui-perf must be a canonical-matrix macOS or iOS benchmark")
     if record.get("models"):
         raise HistoryError("ui-perf must not claim a generation model")
     if (
@@ -1800,7 +1816,7 @@ def validate_ui_perf_semantics(record: dict[str, Any]) -> None:
         raise HistoryError("ui-perf must not claim generation telemetry or audio-QC")
     takes = record["takes"]
     scenarios = [str(take.get("cell", "")).removeprefix("ui-perf/") for take in takes]
-    if len(takes) != len(UI_PERF_SCENARIOS) or set(scenarios) != UI_PERF_SCENARIOS:
+    if len(takes) != len(expected_scenarios) or set(scenarios) != expected_scenarios:
         raise HistoryError("ui-perf requires exactly one take per probe scenario")
     for take, scenario in zip(takes, scenarios):
         expected_identity = {

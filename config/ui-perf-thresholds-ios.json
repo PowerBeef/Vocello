@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "basis": "Warn-only first cut derived from the three counted five-run sessions on the canonical iPhone 17 Pro (IUI-2 baseline 2026-08-12, IUI-4 wave-1 after 2026-08-13, IUI-5 wave-2 after 2026-08-15; tables in docs/reference/ios-ui-refresh-2026-08.md): hitch ceilings sit ~1.5-2x the worst session median and gap ceilings ~2x the worst clean observation, tightened where the P4 keep-alive regression (IUI-5 part-1 bisect) must breach (tab-navigation 119-155 ms/s and voices-scroll 115-118 ms/s both warn). Warn-only: a breach marks the scenario and run passedWithWarnings and never blocks publication; promotion to hard ceilings requires repeated baseline sessions showing stable spread (macOS UI-7 precedent). Exploratory scenarios (ios-player-scrub, ios-generation-active) carry no ceilings by design.",
+  "warnOnly": true,
+  "confirmatoryScenarios": [
+    "ios-idle-baseline",
+    "ios-tab-navigation",
+    "ios-history-scroll",
+    "ios-voices-scroll",
+    "ios-settings-scroll",
+    "ios-composer-typing",
+    "ios-sheet-present-dismiss"
+  ],
+  "hitchCeilingMSPerS": {
+    "ios-idle-baseline": 5.0,
+    "ios-tab-navigation": 115.0,
+    "ios-history-scroll": 140.0,
+    "ios-voices-scroll": 90.0,
+    "ios-settings-scroll": 110.0,
+    "ios-composer-typing": 60.0,
+    "ios-sheet-present-dismiss": 180.0
+  },
+  "maxGapCeilingMS": {
+    "ios-idle-baseline": 40.0,
+    "ios-tab-navigation": 220.0,
+    "ios-history-scroll": 170.0,
+    "ios-voices-scroll": 120.0,
+    "ios-settings-scroll": 130.0,
+    "ios-composer-typing": 140.0,
+    "ios-sheet-present-dismiss": 320.0
+  }
+}

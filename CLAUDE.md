@@ -236,7 +236,7 @@ scripts/macos_test.sh gate
 scripts/ios_device.sh preflight
 scripts/ui_test.sh ios smoke
 scripts/ui_test.sh ios benchmark
-scripts/ui_test.sh ios perf       # frame-health lane; idle-anchored fail-closed cadence band, local-only report until IUI-6
+scripts/ui_test.sh ios perf       # frame-health lane; idle-anchored fail-closed cadence band; canonical-iPhone PASS publishes a ui-perf record
 # Opt-in isolated background-delivery lifecycle proof; never an ordinary UI lane.
 scripts/ui_test.sh ios model-download
 scripts/ios_device.sh gate

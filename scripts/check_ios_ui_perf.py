@@ -31,11 +31,14 @@ IUI-1 posture (mirrors the macOS UI-7 checker, with iOS deltas):
   with ``QVOICE_IOS_DEVICE_RUN_ID``) plus a live ``devicectl`` inventory must
   resolve to the canonical iPhone profile via
   ``publish_benchmark_history.verify_canonical_hardware("ios", ...)``.
-* **No thresholds contract yet**: warn-only ceilings are an IUI-6 decision
-  after repeated counted baselines; ``--thresholds`` is optional and absent
-  by default.
-* **No registry publication yet**: platform-aware ``ui-perf`` records are
-  IUI-6; this checker never writes ``benchmark-evidence.json``.
+* **Thresholds are warn-only** (``config/ui-perf-thresholds-ios.json``,
+  IUI-6: derived from the three counted five-run sessions): a ceiling breach
+  marks the scenario and run ``passedWithWarnings``, never failed.
+* **Registry publication** (IUI-6): with ``--emit-evidence`` a canonical-
+  hardware PASS writes ``benchmark-evidence.json`` beside the report for
+  ``benchmark_history.py record`` (kind ``ui-perf``, platform ``ios``, one
+  take per scenario, canonical matrix scope). Non-canonical hosts keep
+  local-only reports by design.
 * The probe measures main-run-loop display-link cadence — a proxy for
   UI-thread hitching, not render-server presents (stated in the report).
 """
@@ -52,6 +55,7 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_THRESHOLDS_PATH = REPO_ROOT / "config" / "ui-perf-thresholds-ios.json"
 
 EXPECTED_SCENARIOS = [
     "ios-idle-baseline",
@@ -281,9 +285,9 @@ def load_thresholds(path: Path) -> dict:
 
 def evaluate_thresholds(summary: dict, thresholds: dict | None) -> list[str]:
     """Warn-only ceilings: a breach never fails the gate; it marks the
-    scenario and run passedWithWarnings. No iOS ceiling contract exists yet
-    (IUI-6 derives one from repeated counted baselines), so this is inert
-    until --thresholds is supplied."""
+    scenario and run passedWithWarnings. The default contract is
+    config/ui-perf-thresholds-ios.json (IUI-6, derived from the three
+    counted five-run sessions); exploratory scenarios carry no ceilings."""
     if thresholds is None:
         return []
     scenario = summary["scenario"]
@@ -301,6 +305,150 @@ def evaluate_thresholds(summary: dict, thresholds: dict | None) -> list[str]:
             f"({round(summary['maxGapMS'])}/{round(gap_ceiling)})"
         )
     return warnings
+
+
+THERMAL_RANK = {"nominal": 0, "fair": 1, "serious": 2, "critical": 3}
+
+
+def run_hardware_context(
+    environment_rows: list[dict], scenarios: list[dict], profile_id: str
+) -> dict:
+    """Device-truth runtime hardware for the registry record, harvested from
+    the probes' one-per-launch environment snapshots (the record schema's
+    load/storage/uptime fields cannot be captured host-side for a physical
+    device). Fail-closed: publication without the snapshot would mint a
+    schema-incomplete record, so a stale installed app must fail the gate."""
+    if not environment_rows:
+        raise GateError(
+            "probe files carry no environment snapshot; the installed app "
+            "predates the IUI-6 probe (rebuild/reinstall — probe and checker "
+            "move together)"
+        )
+    hardware: dict = {"profileID": profile_id}
+    loads = [
+        row["loadAverage1Minute"] for row in environment_rows
+        if isinstance(row.get("loadAverage1Minute"), (int, float))
+    ]
+    free = [
+        row["freeStorageBytes"] for row in environment_rows
+        if isinstance(row.get("freeStorageBytes"), int)
+    ]
+    uptime = [
+        row["uptimeSeconds"] for row in environment_rows
+        if isinstance(row.get("uptimeSeconds"), (int, float))
+    ]
+    low_power = [
+        row["lowPowerModeEnabled"] for row in environment_rows
+        if isinstance(row.get("lowPowerModeEnabled"), bool)
+    ]
+    if loads: hardware["loadAverage1M"] = max(loads)
+    if free: hardware["freeStorageBytes"] = min(free)
+    if uptime: hardware["uptimeSeconds"] = min(uptime)
+    if low_power: hardware["lowPowerMode"] = any(low_power)
+    thermal = [
+        str(row.get("thermalState", "")).lower() for row in environment_rows
+    ] + [
+        state for summary in scenarios for state in summary.get("thermalStates", [])
+    ]
+    known = [state for state in thermal if state in THERMAL_RANK]
+    if known:
+        hardware["thermalState"] = max(known, key=THERMAL_RANK.get)
+    return hardware
+
+
+def take_metrics(summary: dict) -> dict:
+    metrics = {
+        "uiHitchTimeMSPerS": summary["hitchTimeMSPerS"],
+        "uiMaxGapMS": summary["maxGapMS"],
+        "uiFramesDelivered": summary["framesDelivered"],
+        "uiExpectedFrames": summary["expectedFrames"],
+        "uiProbeCoverage": summary["probeCoverage"],
+        "uiRefreshIntervalMS": summary["refreshIntervalMS"],
+        "uiWindowDurationMS": summary["durationMS"],
+        "uiActionCount": summary["actionCount"],
+        "cpuUserSeconds": round(summary["cpuUserMS"] / 1000.0, 3),
+        "cpuSystemSeconds": round(summary["cpuSystemMS"] / 1000.0, 3),
+    }
+    optional = {
+        "uiP95GapMSApprox": summary.get("p95GapMSApprox"),
+        "physicalFootprintStartMB": summary.get("footprintStartMB"),
+        "peakPhysicalFootprintMB": summary.get("footprintPeakMB"),
+        "physicalFootprintDeltaMB": summary.get("footprintDeltaMB"),
+        "uiMaximumDelayedHeartbeatMS": summary.get("launchMaxStallMS"),
+        "delayedHeartbeatCount": summary.get("launchStalls50"),
+    }
+    metrics.update({key: value for key, value in optional.items() if value is not None})
+    return metrics
+
+
+def build_evidence_manifest(
+    run_id: str,
+    label: str,
+    scenarios: list[dict],
+    scenario_warnings: dict[str, list[str]],
+    probe_digest: str,
+    profile_id: str,
+    hardware: dict,
+) -> dict:
+    """Registry-ready evidence (IUI-6): the platform-ios twin of the macOS
+    UI-7 manifest — kind ui-perf, canonical matrix scope, one take per
+    scenario, take identity exactly what validate_ui_perf_semantics checks."""
+    takes = []
+    for index, summary in enumerate(scenarios, start=1):
+        scenario = summary["scenario"]
+        warnings = scenario_warnings.get(scenario, [])
+        takes.append({
+            "takeIndex": index,
+            "generationID": f"{run_id}-{scenario}",
+            "cell": f"ui-perf/{scenario}",
+            "mode": "not-applicable",
+            "modelID": "not-applicable",
+            "variant": "not-applicable",
+            "warmState": "not-applicable",
+            "length": "not-applicable",
+            "finishReason": "completed",
+            "status": "passedWithWarnings" if warnings else "passed",
+            "thermalState": (summary.get("thermalStates") or ["unknown"])[-1],
+            "metrics": take_metrics(summary),
+            "warnings": warnings,
+        })
+    run_warnings = sorted({code for codes in scenario_warnings.values() for code in codes})
+    status = "passedWithWarnings" if run_warnings else "passed"
+    return {
+        "schemaVersion": 1,
+        "benchmarkKind": "ui-perf",
+        "platform": "ios",
+        "runID": run_id,
+        "status": status,
+        "label": label or run_id,
+        # Device-truth runtime hardware; benchmark_history.py record merges
+        # this over the profile defaults and host-side devicectl enrichment.
+        "hardware": hardware,
+        "historyRecord": {
+            "run": {
+                "id": run_id,
+                "kind": "ui-perf",
+                "platform": "ios",
+                "status": status,
+                "label": label or run_id,
+                "matrixScope": "canonical",
+                "warnings": run_warnings,
+            },
+            "hardware": {"profileID": profile_id},
+            "models": [],
+            "evidence": {
+                "validatorPassed": True,
+                "crashDeltaPassed": True,
+                "crashCount": 0,
+                "expectedTakeCount": len(EXPECTED_SCENARIOS),
+                "actualTakeCount": len(takes),
+                "telemetrySchemaVersion": "not-applicable",
+                "qcAlgorithmVersion": "not-applicable",
+                "rawTelemetryDigest": probe_digest,
+            },
+            "takes": takes,
+        },
+    }
 
 
 def verify_canonical_iphone(diagnostics: Path, run_id: str) -> str:
@@ -329,15 +477,20 @@ def main() -> int:
         help="directory receiving copies of the matched probe JSONL files",
     )
     parser.add_argument(
-        "--thresholds", type=Path, default=None,
-        help="optional warn-only ceiling contract (none exists for iOS yet; "
-        "IUI-6 derives one from repeated counted baselines)",
+        "--thresholds", type=Path, default=DEFAULT_THRESHOLDS_PATH,
+        help="warn-only ceiling contract (config/ui-perf-thresholds-ios.json)",
     )
     parser.add_argument("--label", default="")
     parser.add_argument(
         "--require-canonical", action="store_true",
         help="fail closed unless the pulled run manifest and the live paired "
         "device resolve to the canonical iPhone hardware profile",
+    )
+    parser.add_argument(
+        "--emit-evidence", action="store_true",
+        help="write benchmark-evidence.json beside the report when the run "
+        "resolves to the canonical iPhone profile (registry publication; "
+        "non-canonical hardware keeps a local-only report)",
     )
     args = parser.parse_args()
 
@@ -358,10 +511,12 @@ def main() -> int:
 
         scenarios = []
         scenario_warnings: dict[str, list[str]] = {}
+        environment_rows: list[dict] = []
         probe_hash = hashlib.sha256()
         for name in EXPECTED_SCENARIOS:
             probe_path = find_probe_file(ui_perf_dir, name, args.run_started_epoch_ms)
             rows = load_probe_rows(probe_path)
+            environment_rows += [r for r in rows if r.get("kind") == "environment"]
             env_scenarios = {r.get("scenario") for r in rows}
             if env_scenarios - {name}:
                 raise GateError(
@@ -388,11 +543,29 @@ def main() -> int:
         print(f"ios ui-perf gate FAILED: {error}", file=sys.stderr)
         return 1
 
+    evidence_profile = None
+    hardware_context = None
+    if args.emit_evidence:
+        if profile_id is not None:
+            evidence_profile = profile_id
+        else:
+            try:
+                evidence_profile = verify_canonical_iphone(diagnostics, args.run_id)
+            except GateError as error:
+                print(f"ios ui-perf evidence skipped (non-canonical hardware): {error}")
+        if evidence_profile is not None:
+            try:
+                hardware_context = run_hardware_context(
+                    environment_rows, scenarios, evidence_profile)
+            except GateError as error:
+                print(f"ios ui-perf gate FAILED: {error}", file=sys.stderr)
+                return 1
+
     run_warnings = sorted({code for codes in scenario_warnings.values() for code in codes})
     report = {
         "schemaVersion": 1,
         "platform": "ios",
-        "evidence": "local-only",
+        "evidence": "registry" if evidence_profile else "local-only",
         "runID": args.run_id,
         "label": args.label or args.run_id,
         "status": "passedWithWarnings" if run_warnings else "passed",
@@ -420,6 +593,22 @@ def main() -> int:
             f"maxGap {row['maxGapMS']:>8} ms  cadence {row['medianBlockCadenceHz']:>6} Hz  "
             f"coverage {row['probeCoverage']:.0%}  [{row['designation']}]{flag}"
         )
+
+    if evidence_profile is not None:
+        manifest = build_evidence_manifest(
+            run_id=args.run_id,
+            label=args.label,
+            scenarios=scenarios,
+            scenario_warnings=scenario_warnings,
+            probe_digest=probe_hash.hexdigest(),
+            profile_id=evidence_profile,
+            hardware=hardware_context,
+        )
+        evidence_path = output.parent / "benchmark-evidence.json"
+        evidence_path.write_text(
+            json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+        print(f"ios ui-perf evidence -> {evidence_path}")
 
     print(f"ios ui-perf gate PASS: {len(scenarios)} scenarios -> {output}")
     return 0

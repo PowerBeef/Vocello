@@ -83,8 +83,11 @@ scripts/ui_test.sh ios benchmark
 # 55–65 Hz on the quiet ios-idle-baseline sentinel (Low Power Mode off and
 # nominal thermals are run preconditions; interactive scenarios record
 # out-of-band cadence as a warn-only uiperf.cadence code instead, since block
-# cadence there conflates re-pacing with the stalls being measured). No
-# warn-only threshold contract or ui-perf registry publication yet (IUI-6).
+# cadence there conflates re-pacing with the stalls being measured).
+# Warn-only ceilings live in config/ui-perf-thresholds-ios.json (IUI-6,
+# derived from the three counted sessions; breaches mark passedWithWarnings,
+# never fail the lane), and on the canonical iPhone profile a PASS publishes
+# a platform-ios ui-perf registry record — the macOS UI-7 twin.
 scripts/ui_test.sh ios perf
 # Opt-in iOS-only diagnostic lanes (never ordinary acceptance):
 scripts/ui_test.sh ios delivery-cohort   # delivery-consistency cohort (--text/--takes/--label)

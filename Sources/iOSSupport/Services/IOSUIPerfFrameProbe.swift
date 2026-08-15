@@ -86,6 +86,7 @@ final class IOSUIPerfFrameProbe: NSObject {
             "frames-\(launchEpochMS)-\(scenario).jsonl")
         FileManager.default.createFile(atPath: fileURL.path, contents: nil)
         writer = try? FileHandle(forWritingTo: fileURL)
+        appendEnvironmentSnapshot()
         watchdog.begin()
         blockStartEpochMS = Int64(Date().timeIntervalSince1970 * 1000)
 
@@ -167,6 +168,35 @@ final class IOSUIPerfFrameProbe: NSObject {
         sumExcessMS = 0
         maxGapMS = 0
         gapHistogram = [0, 0, 0, 0, 0, 0, 0]
+    }
+
+    /// One privacy-safe device-environment row per launch (IUI-6): the same
+    /// fields the diagnostics runner's RunEnvironmentSnapshot publishes — no
+    /// host names, device names, paths, or hardware IDs. The registry's
+    /// hardware block needs device-truth load/storage/uptime that no
+    /// host-side capture can see, and a one-time snapshot at probe start is
+    /// inert to the cadence measurement.
+    private func appendEnvironmentSnapshot() {
+        var loadValues = [Double](repeating: 0, count: 3)
+        let loadCount = loadValues.withUnsafeMutableBufferPointer { buffer -> Int in
+            guard let baseAddress = buffer.baseAddress else { return 0 }
+            return Int(getloadavg(baseAddress, Int32(buffer.count)))
+        }
+        let freeStorageBytes = (try? FileManager.default.attributesOfFileSystem(
+            forPath: NSHomeDirectory()
+        )).flatMap { ($0[.systemFreeSize] as? NSNumber)?.uint64Value }
+        let processInfo = ProcessInfo.processInfo
+        var row: [String: Any] = [
+            "kind": "environment",
+            "scenario": scenario,
+            "capturedEpochMS": launchEpochMS,
+            "uptimeSeconds": processInfo.systemUptime,
+            "lowPowerModeEnabled": processInfo.isLowPowerModeEnabled,
+            "thermalState": thermalStateName(),
+        ]
+        if loadCount > 0 { row["loadAverage1Minute"] = loadValues[0] }
+        if let freeStorageBytes { row["freeStorageBytes"] = freeStorageBytes }
+        append(row)
     }
 
     @objc private func willTerminate(_ notification: Notification) {

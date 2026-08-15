@@ -850,10 +850,10 @@ validate_ios_ui_perf() {
   # The probe writes to the devicectl-pullable caches tree, so the pull lands
   # its JSONL at $out/diagnostics/ui-perf and the run-scoped device manifest
   # at $out/diagnostics/$run_id/manifest.json (canonical-hardware evidence).
-  # No thresholds contract exists for iOS yet (IUI-6 derives warn-only
-  # ceilings from repeated counted baselines) and the checker never emits
-  # benchmark-evidence.json, so the perf publication block below no-ops —
-  # platform-aware ui-perf registry records are IUI-6.
+  # Warn-only ceilings come from config/ui-perf-thresholds-ios.json (the
+  # checker's default), and --emit-evidence writes benchmark-evidence.json
+  # on a canonical-iPhone PASS so the perf publication block below records
+  # a platform-ios ui-perf registry entry (IUI-6) — the same flow as macOS.
   local diagnostics="$out/diagnostics"
   rm -rf "$diagnostics"
   "$ROOT_DIR/scripts/ios_device.sh" pull "$diagnostics" >/dev/null \
@@ -866,6 +866,7 @@ validate_ios_ui_perf() {
     --output "$out/ui-perf-report.json" \
     --label "$label" \
     --require-canonical \
+    --emit-evidence \
     >"$out/ui-perf-gate.txt" 2>&1
   local status=$?
   cat "$out/ui-perf-gate.txt" >&2
@@ -1114,8 +1115,9 @@ if [[ "$lane" == "benchmark" ]]; then
   note "tracked benchmark record → $history_record"
 fi
 
-# UI-7: perf runs publish only when the checker emitted evidence (canonical
-# hardware); non-canonical hosts keep local-only reports by design.
+# UI-7 (macOS) / IUI-6 (iOS): perf runs publish only when the checker emitted
+# evidence (canonical hardware); non-canonical hosts keep local-only reports
+# by design.
 if [[ "$lane" == "perf" && -f "$out/benchmark-evidence.json" ]]; then
   if ! history_record="$(required_step_run "$step_ledger" history-publication \
       python3 "$ROOT_DIR/scripts/benchmark_history.py" record --artifact-dir "$out")"; then

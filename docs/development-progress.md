@@ -41,6 +41,27 @@ machine-readable status record and wins over any older prose.
 
 ## Resume here (2026-08-15)
 
+**IUI-6 closed — the `ios-ui-2026-08` plan is complete (2026-08-15, same
+day, second phone window):** the `ui-perf` registry kind is platform-aware
+(one kind, per-platform scenario tables in `benchmark_history.py`), iOS
+warn-only ceilings live in `config/ui-perf-thresholds-ios.json` (derived
+from the three counted sessions, tightened so the P4 regression must
+breach), and the `ios perf` lane publishes on a canonical-iPhone PASS
+through the existing publication block. The frame probe gained a one-time
+privacy-safe device-environment snapshot row (the registry's hardware
+block needs device-truth load/storage/uptime) with a fail-closed stale-app
+guard — found live when the first publication attempt failed on exactly
+those schema fields. Warn path proven live
+(`ios-xcui-perf-20260815-170208-89766d44` reported `passedWithWarnings` on
+a real ceiling breach) and offline (checker self-tests). First canonical
+record: `benchmarks/runs/ui-perf/ios-xcui-perf-20260815-171707-8af6ffde.json`,
+269-record registry validates. The iOS UI arc is done end to end:
+instrument → baseline → audit → two measured fix waves (one revert by
+measurement) → formalized registry. **Next: maintainer's call** — backlog
+holds model-hoisted per-tab state, the long-form silent-reset UX gap, the
+AX-XXXL cosmetic findings, P11, and UIKit text-editor `UIFontMetrics`
+scaling; release timing stays an explicit maintainer decision.
+
 **IUI-5 closed — wave 2 measured at baseline on the committed fix
 (2026-08-15, phone window):** the counted chain restarted clean per the
 recorded resume protocol — warm-up discarded, five counted `ios perf` runs

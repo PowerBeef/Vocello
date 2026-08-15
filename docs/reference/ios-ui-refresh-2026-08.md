@@ -548,6 +548,95 @@ large-type spot-check for X4, the `scrollsToTop` question from sub-wave B,
 and a glance at the shipped-truth surfaces as D10b confirmation. That
 completes the wave-2 after-table and closes IUI-5.
 
+### Wave-2 close, part 2 — clean counted chain, wave smoke, checklist (2026-08-15, phone window)
+
+The resume protocol executed exactly as recorded, on the committed fix
+(head `aa0ab03`, CI green). Warm-up `ios-xcui-perf-20260815-144330-1db58237`
+discarded per protocol. The first counted attempt
+(`ios-xcui-perf-20260815-145408-61c8e400`) failed on the generation-active
+scenario with one transient on-device generation failure — take `854D4BF5`
+streamed 16 chunks, `streamGenerationEnded` at 4.9 s, then `streamFailed`
+at 5.3 s with an 82-char digested error (`ce0c014e…`); memory bands
+healthy, thermals nominal, and the identical build passed the same
+scenario in the warm-up and in all five subsequent counted runs. Engine
+transient, not a wave or instrument regression; the attempt was excluded
+and the chain continued in the same sitting.
+
+**Counted five** (all `passed`, zero threshold warnings, thermals nominal
+throughout): `ios-xcui-perf-20260815-150607-5bcff66e`,
+`…-151644-7ffd02aa`, `…-152711-e0a9fc48`, `…-153742-9196fc28`,
+`…-154816-52e87368`.
+
+**Wave-2 after-table** (medians of 5; deltas vs the IUI-2 baseline and the
+IUI-4 wave-1 medians):
+
+| Scenario | Designation | Hitch ms/s median (IQR) | Max gap ms median (IQR) | p95 gap ms median | Cadence Hz median | Coverage min | Δ hitch vs IUI-2 | Δ hitch vs IUI-4 | Δ max gap vs IUI-4 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `ios-idle-baseline` | confirmatory | 0.0 (0.0) | 17 (0) | 21 | 60.0 | 99% | +0.0 | +0.0 | −0.3 |
+| `ios-tab-navigation` | confirmatory | 79.1 (2.5) | 107 (2) | 29 | 57.9 | 99% | +2.6 (+3%) | +0.9 (+1%) | +7.6 |
+| `ios-history-scroll` | confirmatory | 89.1 (13.6) | 83 (0) | 29 | 59.9 | 98% | +9.6 (+12%) | +7.0 (+8%) | +0.3 |
+| `ios-voices-scroll` | confirmatory | 43.4 (8.7) | 59 (6) | 21 | 60.0 | 99% | −1.5 (−3%) | −1.2 (−3%) | −0.2 |
+| `ios-settings-scroll` | confirmatory | 48.7 (25.7) | 61 (1) | 21 | 60.0 | 98% | −9.3 (−16%) | −4.2 (−8%) | +3.4 |
+| `ios-composer-typing` | confirmatory | 27.3 (6.7) | 67 (14) | 21 | 60.0 | 96% | −0.0 (−0%) | +3.0 (+12%) | −0.3 |
+| `ios-sheet-present-dismiss` | confirmatory | 101.9 (3.7) | 157 (3) | 29 | 57.5 | 99% | +2.0 (+2%) | −2.1 (−2%) | −2.4 |
+| `ios-player-scrub` | exploratory | 114.1 (6.4) | 86 (7) | 46 | 59.9 | 99% | +7.6 (+7%) | +0.0 (+0%) | −9.4 |
+| `ios-generation-active` | exploratory | 62.6 (9.1) | 309 (19) | 21 | 60.0 | 96% | +11.5 (+23%) | +10.5 (+20%) | +129.8 |
+
+**Reading.** Wave 2 as committed (with P4 reverted) holds the baseline on
+every confirmatory scenario: tab-navigation +3%, voices-scroll −3%,
+composer-typing flat, sheet-present +2% — all within run-to-run noise —
+and settings-scroll improved 16%. History-scroll's +12% sits inside its
+own 13.6 IQR with an identical 83 ms max gap (the scenario has been the
+noisiest confirmatory metric since IUI-2). The generation-active deltas
+are **not** wave effects: the same-day pre-wave control from the part-1
+bisect (`e270b55`, run `…-172141-c23a61cb`) measured 64.8 ms/s hitch and a
+270 ms max gap — today's 62.6 / 309 median matches the pre-wave build in
+the same era, so the movement vs the IUI-2 table is cross-sitting drift on
+the engine-dominated exploratory scenario, anchored by that control. The
+~300 ms worst gap during generation start (cold engine load each take)
+appears identically on pre-wave, regressed, revert-diagnostic, and
+fixed-build runs from 2026-08-14 onward.
+
+**Wave-level smoke:** PASS first try
+(`ios-xcui-smoke-20260815-155935-0de9a61f`) — both journeys, including the
+long-form journey (278 s) whose 08-14 first run had hit the environmental
+memory-warning quiet-reset; memory-pressure sentinel clean
+(`fullUnload` drill, post-pressure generation completed).
+
+**Checklist closure:**
+
+- **X4 large-type spot-check.** A one-off XCUITest diagnostic (temporary
+  uncommitted test class run via `-only-testing`, launching the production
+  UI with the standard `UIPreferredContentSizeCategoryName`
+  argument-domain override) walked all four tabs at AccessibilityL and
+  AccessibilityXXXL; both walks passed, so every tab, toggle, and row
+  stayed reachable. At AX-L the layout is clean (one minor "Settings" dock
+  label truncation). At the AX-XXXL torture size the X4 clamps held — no
+  clipped text inside capsules, the consent toggle row wraps correctly,
+  voice rows grow to fit — with four cosmetic findings recorded to the
+  backlog: the Studio Generate capsule sits partially behind the grown tab
+  dock; dock labels truncate to two-three characters; the History mode
+  filter chips truncate to color-dot + ellipsis (leaving color and
+  position as the only cues at that size); and the history row metadata
+  line degrades to fragments. Screenshots are local-only evidence
+  (untracked), per policy.
+- **`scrollsToTop` question (sub-wave A note).** Dissolved by the P4
+  revert: the question's premise was multiple hidden mounted tabs' scroll
+  views under the keep-alive container. Remount semantics restore the
+  pre-wave scroll-view population exactly, so wave 2 introduces no new
+  status-bar-tap eligibility ambiguity.
+- **D10b shipped-truth glance.** The spot-check and smoke screenshots on
+  the unified-namespace build show dock, field, panel, and accent
+  surfaces rendering as shipped — no visible delta after the token
+  unification, consistent with the review's zero-rendered-delta proof.
+
+**IUI-5 is closed.** Wave 2's landed value: P2 root-shell de-observation,
+P3 player clock split, P6/P7 list-cost fixes, X3/X4/X6/D9 accessibility
+and Dynamic Type adoption, D1–D8 design picks, D10a/D10b theme
+unification — all at measured baseline-or-better frame health, with P4
+reverted by the instrument this arc was built around. IUI-6 (registry
+formalization) is desk work.
+
 ## 60 Hz-tier posture
 
 `iosGenerationPerformanceGate` engages only on fixed-refresh (60 Hz) devices, and

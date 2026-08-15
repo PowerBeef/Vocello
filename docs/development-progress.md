@@ -39,7 +39,28 @@ machine-readable status record and wins over any older prose.
 | 13 — Benchmark/history v3 | Live 2026-07-29: the first schema-v3 records are committed (three clean `phase0-cli-control-*` engine records plus one exploratory run that also exposed and fixed the summarizer's v3 pin). `benchmarks/schema-v3.json` adds the typed quality identity to generation takes (pass/warning only, five fast gates required, machine-code issues); v1/v2 records stay valid immutable history; the publisher stamps v3 only when every take carries the identity. The UI benchmark checkers folded the same identity 2026-08-01: ui-generation records now publish v3 (first: the focused `v3-fold-proof` record `macos-xcui-benchmark-20260801-003208-403989cf`); the canonical iOS matrix published its first v3 record 2026-08-01 (`ios-xcui-benchmark-20260801-132415-abbec96b`). |
 | 14 — Organization and retirement | Closed 2026-07-23 (14a + 14b): compatibility SPI retired, actor-owned loading/metadata/priming/clone artifacts, clone conditioning epoch-bound end to end. |
 
-## Resume here (2026-08-13)
+## Resume here (2026-08-15)
+
+**IUI-5 closed — wave 2 measured at baseline on the committed fix
+(2026-08-15, phone window):** the counted chain restarted clean per the
+recorded resume protocol — warm-up discarded, five counted `ios perf` runs
+in one sitting (`ios-xcui-perf-20260815-150607-5bcff66e` …
+`-154816-52e87368`, zero threshold warnings, thermals nominal; one
+excluded transient on-device generation failure before run 1, engine-side,
+healthy memory). Every confirmatory scenario holds the IUI-2 baseline
+(settings-scroll −16%; the generation-active exploratory deltas match the
+same-day pre-wave control from the part-1 bisect — cross-sitting drift,
+not wave effect). Wave-level smoke passed first try
+(`ios-xcui-smoke-20260815-155935-0de9a61f`, both journeys). Checklist
+closed: the X4 large-type spot-check passed at AX-L and AX-XXXL via a
+one-off XCUITest walk (clean at AX-L; four cosmetic extreme-size findings
+recorded to backlog, headlined by the Generate capsule slipping behind the
+grown dock at AX-XXXL), the `scrollsToTop` question dissolved with the P4
+revert, and the D10b shipped-truth glance confirmed no visible delta.
+Full after-table and reading in `docs/reference/ios-ui-refresh-2026-08.md`.
+**Next: IUI-6 registry formalization — pure desk work** (platform-aware
+`ui-perf` kind in `benchmark_history.py`, iOS thresholds contract,
+harness-hash source list, warn-path exercise).
 
 **IUI-4 closed — wave 1 measured on device (2026-08-13, phone window):**
 smoke passed cleanly (`ios-xcui-smoke-20260813-170127-e0f9c5be`; the

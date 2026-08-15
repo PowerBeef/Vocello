@@ -53,9 +53,12 @@ block needs device-truth load/storage/uptime) with a fail-closed stale-app
 guard — found live when the first publication attempt failed on exactly
 those schema fields. Warn path proven live
 (`ios-xcui-perf-20260815-170208-89766d44` reported `passedWithWarnings` on
-a real ceiling breach) and offline (checker self-tests). First canonical
-record: `benchmarks/runs/ui-perf/ios-xcui-perf-20260815-171707-8af6ffde.json`,
-269-record registry validates. The iOS UI arc is done end to end:
+a real ceiling breach) and offline (checker self-tests). The first mint
+was honestly flagged dirty-source/exploratory (publication code
+necessarily uncommitted); the clean-source follow-up on the committed arc
+is the canonical record:
+`benchmarks/runs/ui-perf/ios-xcui-perf-20260815-173719-6e425c28.json`,
+270-record registry validates. The iOS UI arc is done end to end:
 instrument → baseline → audit → two measured fix waves (one revert by
 measurement) → formalized registry. **Next: maintainer's call** — backlog
 holds model-hoisted per-tab state, the long-form silent-reset UX gap, the

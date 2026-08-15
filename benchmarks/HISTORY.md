@@ -1342,6 +1342,7 @@ cross-project comparisons.
 | completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
 |---|---|---|---|---|---|---:|---|---|---|---|
 | 2026-08-15 | [`ios-xcui-perf-20260815-171707-8af6ffde`](runs/ui-perf/ios-xcui-perf-20260815-171707-8af6ffde.json) | canonical | exploratory | passed | not-applicable | 9 | `e82e1162298d` dirty | `excluded` | baseline | ios-xcui-perf-20260815-171707-8af6ffde |
+| 2026-08-15 | [`ios-xcui-perf-20260815-173719-6e425c28`](runs/ui-perf/ios-xcui-perf-20260815-173719-6e425c28.json) | canonical | canonical | passed | not-applicable | 9 | `07cb4411f7aa` | `9a7f6e403e06` | baseline | ios-xcui-perf-20260815-173719-6e425c28 |
 
 ## ui-perf / macos / mac-mini-m2-8gb / config `c6729d972efe`
 

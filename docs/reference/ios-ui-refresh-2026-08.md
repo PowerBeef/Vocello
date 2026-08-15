@@ -677,15 +677,21 @@ stayed PASS. Offline: the checker self-tests drive a ceiling breach
 through the evidence manifest and assert run/take `passedWithWarnings`
 with registry-exact take identity and complete required metrics.
 
-**First canonical record:**
-[`benchmarks/runs/ui-perf/ios-xcui-perf-20260815-171707-8af6ffde.json`](../../benchmarks/runs/ui-perf/ios-xcui-perf-20260815-171707-8af6ffde.json)
-— platform `ios`, canonical scope, nine takes, zero warnings, thermals
-nominal, device-truth hardware complete; `validate --all` passes at 269
-records. The harness-hash source list now pins the iOS probe, seeder,
-checker, perf test class, and threshold contract beside their macOS twins.
-Warn-only ceilings promote to hard ceilings only after repeated stable
-sessions (macOS UI-7 precedent). **IUI-6 is closed, and with it the
-`ios-ui-2026-08` plan.**
+**First records.** The first mint
+([`…-171707-8af6ffde.json`](../../benchmarks/runs/ui-perf/ios-xcui-perf-20260815-171707-8af6ffde.json))
+necessarily ran with the publication code still uncommitted — the
+first-publication chicken-and-egg — and the registry recorded that
+truthfully: `source.dirty`, classification `exploratory`, retained as
+evidence but excluded from canonical trends. With the arc committed
+(`07cb441`) and the tree clean, the follow-up run minted the real thing:
+[`benchmarks/runs/ui-perf/ios-xcui-perf-20260815-173719-6e425c28.json`](../../benchmarks/runs/ui-perf/ios-xcui-perf-20260815-173719-6e425c28.json)
+— platform `ios`, **classification `canonical`**, clean source, nine takes
+at baseline, zero warnings, thermals nominal, device-truth hardware
+complete; `validate --all` passes at 270 records. The harness-hash source
+list now pins the iOS probe, seeder, checker, perf test class, and
+threshold contract beside their macOS twins. Warn-only ceilings promote to
+hard ceilings only after repeated stable sessions (macOS UI-7 precedent).
+**IUI-6 is closed, and with it the `ios-ui-2026-08` plan.**
 
 ## 60 Hz-tier posture
 

@@ -133,7 +133,7 @@ Narrative authority: [`docs/reference/ios-ui-refresh-2026-08.md`](reference/ios-
 | `IUI-3` | done | Audit-first review: four lenses + measurements into one ranked list + maintainer pick-list | `doc:docs/reference/ios-ui-refresh-2026-08.md` |
 | `IUI-4` | done | Wave 1: safe fixes with before/after measurement | `doc:docs/reference/ios-ui-refresh-2026-08.md`, `commit:2f76b8a` |
 | `IUI-5` | done | Wave 2: refinements + re-engineering (macOS UI-5/UI-6 collapsed) | `doc:docs/reference/ios-ui-refresh-2026-08.md`, `commit:a7f22ad` |
-| `IUI-6` | done | Registry formalization: platform-aware ui-perf kind + warn-only ceilings | `doc:docs/reference/ios-ui-refresh-2026-08.md`, `file:benchmarks/runs/ui-perf/ios-xcui-perf-20260815-171707-8af6ffde.json`, `file:config/ui-perf-thresholds-ios.json` |
+| `IUI-6` | done | Registry formalization: platform-aware ui-perf kind + warn-only ceilings | `doc:docs/reference/ios-ui-refresh-2026-08.md`, `file:benchmarks/runs/ui-perf/ios-xcui-perf-20260815-173719-6e425c28.json`, `file:config/ui-perf-thresholds-ios.json` |
 
 ## macOS UI performance harness, measured review, and staged refresh
 

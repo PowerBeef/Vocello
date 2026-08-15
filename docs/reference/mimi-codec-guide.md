@@ -1,3 +1,10 @@
+---
+status: active
+owner: backend-mlx
+summary: The Mimi-style neural audio codec as owned in the Qwen3 speech tokenizer — architecture, streaming overlap-and-discard semantics, and Vocello deltas from canonical Mimi.
+sourceOfTruth:
+  - Packages/VocelloQwen3Core/Sources/MLXAudioCodecs
+---
 # Mimi Codec Guide for Vocello
 
 > **Living document.** A project-specific reference for the Mimi-style neural audio codec used by Vocello's Qwen3-TTS backend. It focuses on the Qwen3-TTS speech tokenizer owned in `Packages/VocelloQwen3Core/`, with Kyutai's canonical Mimi as architectural background. When this doc disagrees with the code, the code wins — fix this file.

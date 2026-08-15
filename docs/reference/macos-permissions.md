@@ -1,3 +1,11 @@
+---
+status: active
+owner: macos
+summary: macOS TCC permissions, code signing, and the dev loop — what users experience, why the historical friction is gone, and permissions_doctor.sh diagnosis.
+sourceOfTruth:
+  - scripts/permissions_doctor.sh
+  - Sources/QwenVoice.entitlements
+---
 # macOS permissions (TCC), code signing, and the dev loop
 
 The single source of truth for how Vocello interacts with macOS privacy

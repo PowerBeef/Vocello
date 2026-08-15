@@ -1,3 +1,11 @@
+---
+status: active
+owner: ios
+summary: Standing record of iPhone engine bring-up and optimization — measured memory/latency work, shipped changes, Jetsam posture, and the prioritized future items.
+sourceOfTruth:
+  - config/runtime-debug-knobs.json
+  - config/memory-qualification-policy.json
+---
 # iOS Engine Optimization — Progress & Roadmap
 
 The standing record of how Vocello's **iPhone** TTS engine was made to run on-device, what has

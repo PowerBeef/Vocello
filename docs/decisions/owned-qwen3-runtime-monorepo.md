@@ -1,3 +1,9 @@
+---
+status: historical
+owner: backend-mlx
+summary: ADR (accepted 2026-07-14): the Qwen3 runtime is a first-party monorepo package at Packages/VocelloQwen3Core, not a patch stack; compatibility identities preserved behind the facade.
+contentDigest: sha256:bd44fd793b3436e3613088e4688789a6bcbfd1606d52932220fc886867f5fb04
+---
 # ADR: Own the Qwen3 runtime as a monorepo core package
 
 - **Status:** Accepted

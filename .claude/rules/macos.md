@@ -1,3 +1,12 @@
+---
+status: active
+owner: macos
+summary: Domain rule for the macOS app and XPC stack — boundaries, XPC lifecycle invariants, gated Liquid Glass, accessibility rules, and the macOS test lanes.
+sourceOfTruth:
+  - scripts/macos_test.sh
+  - scripts/ui_test.sh
+  - scripts/build.sh
+---
 # macOS domain rule
 
 > Domain rule for the macOS app target `QwenVoice`, the XPC stack

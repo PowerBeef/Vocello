@@ -1,3 +1,9 @@
+---
+status: historical
+owner: backend-mlx
+summary: Adopted 2026-08-01: long-form planner v2 text-first design — lookahead boundary scoring over the greedy v1 scan, fixtures-first, with generation-time context explicitly out of scope.
+contentDigest: sha256:5e58c3a966e0bf3e0f42ff7d9079b6ec7d1895b4f126f854e787ccc04b4c8915
+---
 # Long-form context-aware planning (planner v2) — Tier 4 text-first design
 
 - **Status:** adopted and implemented 2026-08-01 (maintainer-directed Tier-4 start);

@@ -1,3 +1,13 @@
+---
+status: active
+owner: release-qa
+summary: The cross-platform testing runbook — deterministic lanes as the routine contract, explicit XCUITest acceptance, model readiness, and the authority order for test guidance.
+sourceOfTruth:
+  - scripts/check_project_inputs.sh
+  - scripts/macos_test.sh
+  - scripts/ios_device.sh
+  - scripts/ui_test.sh
+---
 # Testing runbook
 
 Authority is `Sources/` → `project.yml` → repository scripts → this document. Deterministic checks

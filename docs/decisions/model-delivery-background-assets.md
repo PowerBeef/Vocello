@@ -1,3 +1,9 @@
+---
+status: historical
+owner: ios
+summary: ADR (accepted 2026-07-14): retain the repaired background URLSession model-delivery path; Background Assets rejected for a second lifecycle and unvalidated store semantics.
+contentDigest: sha256:29f146ca88f0624bb9b448a3939da3283716148d18f118e2b1607fbba6c57fc9
+---
 # ADR: retain background URLSession model delivery
 
 - Status: accepted

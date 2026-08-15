@@ -1,3 +1,10 @@
+---
+status: active
+owner: backend-and-platform
+summary: Local-first privacy and on-disk storage layout on both platforms — what lives where, what never leaves the device, and deletion semantics.
+sourceOfTruth:
+  - Sources/SharedSupport
+---
 # Privacy And Local Storage
 
 QwenVoice/Vocello is local-first. Prompts, recorded or imported reference clips, transcripts, saved voices, generated audio, model files, and history stay on the user's device unless the user explicitly exports, shares, or uploads them elsewhere.

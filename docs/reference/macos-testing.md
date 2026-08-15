@@ -66,7 +66,11 @@ in [`config/ui-perf-thresholds.json`](../../config/ui-perf-thresholds.json)
 only — emits `benchmark-evidence.json`, which the lane publishes as a
 PASS-only `ui-perf` registry record (one take per scenario, no
 model/telemetry/QC claims). Non-canonical hosts keep local-only reports, and
-dirty-source or late publications classify `exploratory` as usual. The probe
+dirty-source or late publications classify `exploratory` as usual. Since
+IUI-6 the `ui-perf` kind is platform-aware: the iOS twin lane
+(`scripts/ui_test.sh ios perf`) publishes through the same plumbing against
+its own contract (`config/ui-perf-thresholds-ios.json`; see
+[`ios-device-testing.md`](ios-device-testing.md)). The probe
 measures main-run-loop display-link cadence, a UI-thread hitch proxy;
 compositor ground truth remains an Instruments Hitches/Core Animation trace.
 

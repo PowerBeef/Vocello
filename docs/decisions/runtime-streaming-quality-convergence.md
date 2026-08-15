@@ -1,3 +1,10 @@
+---
+status: active
+owner: backend-and-platform
+summary: The living convergence ADR — interprets config/runtime-refactor-contract.json (the sole phase-status authority), records the promotion history, and defines the streaming/quality invariants.
+sourceOfTruth:
+  - config/runtime-refactor-contract.json
+---
 # Runtime, streaming, and quality convergence
 
 - **Status:** Accepted; Phase 4 overall promotion passed (Phases 0–6 closed 2026-07-20; Phases 7, 8, and 14 closed 2026-07-23 by amendment). Phases 9–13 remain open.

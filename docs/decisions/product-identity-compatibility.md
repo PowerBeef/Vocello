@@ -1,3 +1,10 @@
+---
+status: active
+owner: release-qa
+summary: Standing policy: Vocello is the public name; QwenVoice/QVoice remain compatibility identities wherever change would break imports, signatures, persisted data, or evidence — with the compatibility map and migration bar.
+sourceOfTruth:
+  - project.yml
+---
 # Product identity compatibility
 
 **Status:** Accepted

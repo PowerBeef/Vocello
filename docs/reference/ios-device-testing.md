@@ -1,3 +1,12 @@
+---
+status: active
+owner: ios
+summary: iOS physical-device testing — deterministic compile lanes, explicit on-device acceptance (smoke/benchmark/perf with the frame-health protocol), headless diagnostics, and burn-in safety.
+sourceOfTruth:
+  - scripts/ios_device.sh
+  - scripts/ui_test.sh
+  - scripts/check_ios_ui_perf.py
+---
 # iOS physical-device testing
 
 Vocello's iOS runtime and UI acceptance run on a paired physical iPhone. Simulator build, launch,

@@ -1,3 +1,13 @@
+---
+status: active
+owner: backend-mlx
+summary: Domain rule for the engine core, owned Qwen3 runtime package, model catalog, telemetry semantics, and backend invariants (prewarm, cancellation, sampling, memory policy, MLX-only).
+sourceOfTruth:
+  - scripts/build_foundation_targets.sh
+  - config/runtime-refactor-contract.json
+  - Sources/Resources/qwenvoice_contract.json
+  - config/runtime-debug-knobs.json
+---
 # Backend / MLX domain rule
 
 > Domain rule for `QwenVoiceBackendCore`, `QwenVoiceCore`, the owned Qwen3 core package

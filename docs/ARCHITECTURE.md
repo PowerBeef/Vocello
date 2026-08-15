@@ -1,3 +1,12 @@
+---
+status: active
+owner: backend-and-platform
+summary: System architecture — engine core, macOS XPC request lifecycle, iOS in-process lifecycle, model management, telemetry layers, and the engine invariants each surface must preserve.
+sourceOfTruth:
+  - project.yml
+  - config/runtime-refactor-contract.json
+  - Sources/Resources/qwenvoice_contract.json
+---
 # Vocello (QwenVoice) — Architecture Reference
 
 > **Living document.** This is the code-verified architecture reference for how Vocello fits

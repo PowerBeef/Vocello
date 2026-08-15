@@ -1,3 +1,11 @@
+---
+status: active
+owner: release-qa
+summary: The evidence-impact contract — mapping changed repository paths to proportionate deterministic merge and release evidence via scripts/evidence_impact.py.
+sourceOfTruth:
+  - scripts/evidence_impact.py
+  - config/evidence-impact.json
+---
 # Evidence impact contract
 
 `config/evidence-impact.json` maps changed repository paths to proportionate deterministic merge

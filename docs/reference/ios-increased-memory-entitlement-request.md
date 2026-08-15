@@ -1,3 +1,11 @@
+---
+status: active
+owner: ios
+summary: Enablement and readiness guide for the increased-memory entitlement on the in-process iOS app, with verification steps and the kept-for-fallback justification text.
+sourceOfTruth:
+  - Sources/iOS/VocelloiOS.entitlements
+  - project.yml
+---
 # iOS Increased-Memory Entitlement — Enablement & Readiness Guide
 
 This is the source of truth for enabling Apple's increased-memory entitlement on the iOS app, verifying it,

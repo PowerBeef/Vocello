@@ -1,3 +1,10 @@
+---
+status: active
+owner: release-qa
+summary: Assistive computer-use policy for exploratory UI QA and lane-failure diagnosis — never a driver, gate, or replacement for the XCUITest lanes.
+sourceOfTruth:
+  - scripts/ui_test.sh
+---
 # Exploratory UI QA and failure diagnosis (computer use, assistive)
 
 An assistive companion to the autonomous XCUITest lanes — never a replacement for them. An AI

@@ -1,3 +1,12 @@
+---
+status: active
+owner: ios
+summary: Domain rule for the VocelloiOS target — boundaries, physical-device-only testing, typed cancellation, Dynamic Type/Reduce Motion invariants, stable identifiers, and the frame-health perf lane.
+sourceOfTruth:
+  - scripts/ios_device.sh
+  - scripts/ui_test.sh
+  - scripts/build_foundation_targets.sh
+---
 # iOS domain rule
 
 > Domain rule for the `VocelloiOS` target, `Sources/iOS/`, `Sources/iOSSupport/`, and the

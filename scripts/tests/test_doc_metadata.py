@@ -158,10 +158,12 @@ class IndexTests(unittest.TestCase):
             os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         ))
         self.assertGreaterEqual(payload["annotatedDocuments"], 3)
-        self.assertGreater(payload["unannotatedDocuments"], 0)
+        # DG-4 closed 2026-08-15: coverage is complete and stays complete —
+        # a new document must be annotated at creation, not queued as a gap.
+        self.assertEqual(payload["unannotatedDocuments"], 0)
         statuses = {d["status"] for d in payload["documents"]}
         self.assertTrue({"active", "historical", "superseded"} <= statuses,
-                        "the prototype must exercise every mode")
+                        "the corpus must exercise every mode")
         for document in payload["documents"]:
             self.assertTrue(document["summary"], f"{document['path']} needs a summary")
             if document["status"] in ("historical", "superseded"):

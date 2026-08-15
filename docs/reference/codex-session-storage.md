@@ -1,3 +1,11 @@
+---
+status: active
+owner: release-qa
+summary: Operator runbook for the optional Codex task/session storage workflow — inventory, checksummed plan, exact approval, supported deletion, verification; live user state never enters the repository.
+sourceOfTruth:
+  - scripts/codex_session_storage.py
+  - config/codex-session-storage-policy.json
+---
 # Codex Task And Session Storage
 
 This is the operator runbook for keeping QwenVoice Codex work bounded without making private Codex

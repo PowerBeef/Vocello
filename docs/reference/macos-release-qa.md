@@ -1,3 +1,12 @@
+---
+status: active
+owner: release-qa
+summary: The standing macOS release-QA checklist — deterministic gates, the per-candidate smoke step, release-notes and performance-surface obligations, packaging and verification.
+sourceOfTruth:
+  - scripts/release.sh
+  - .github/workflows/release.yml
+  - scripts/macos_test.sh
+---
 # macOS Release QA — the desktop release gate
 
 > Before starting a release run, confirm the active acceptance state in

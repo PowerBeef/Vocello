@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Per-file documentation metadata: freshness, pinning, and a generated index.
 
-PROTOTYPE. Applied to three documents that exercise every mode; the remaining
-docs are unannotated and are reported as coverage gaps rather than failures, so
-this can land without a 60-file sweep.
+Coverage is complete (DG-4, 2026-08-15): every governed document carries
+frontmatter, and the self-test suite holds the unannotated count at zero — a
+new document is annotated at creation, not queued as a gap. The
+reported-not-failed posture below remains for the transient window where a
+doc lands ahead of its annotation in a working tree.
 
 Why three layers instead of one
 -------------------------------

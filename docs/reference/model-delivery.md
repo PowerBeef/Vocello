@@ -1,3 +1,12 @@
+---
+status: active
+owner: backend-and-platform
+summary: The shared model downloader — chunked-transfer defaults, iOS background session and restoration ledger, retry/cancel, verification, diagnostics, and the isolated live proof lane.
+sourceOfTruth:
+  - Sources/QwenVoiceCore/HuggingFaceDownloader.swift
+  - Sources/QwenVoiceCore/IOSModelDownloadLedger.swift
+  - Sources/Resources/qwenvoice_production_model_catalog.json
+---
 # Model delivery
 
 Vocello uses one shared native downloader, `HuggingFaceDownloader`, for pinned Hugging Face model

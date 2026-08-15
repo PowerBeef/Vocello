@@ -201,9 +201,11 @@ class ProgressTests(unittest.TestCase):
         report = roadmap.validate(REPO_ROOT)
         self.assertTrue(report["ok"], "; ".join(report["errors"]))
         summary = roadmap.progress(REPO_ROOT)
+        self.assertGreaterEqual(len(summary["plans"]), 2,
+                                "the system exists to track several plans")
         active = [p for p in summary["plans"] if p["status"] == "active"]
-        self.assertGreaterEqual(len(active), 2,
-                                "the system exists to track concurrent plans")
+        self.assertGreaterEqual(len(active), 1,
+                                "at least one plan should be in flight")
         for plan in summary["plans"]:
             if plan["items"]:
                 self.assertIsNotNone(plan["percent"])

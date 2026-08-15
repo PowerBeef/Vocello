@@ -1,3 +1,11 @@
+---
+status: active
+owner: ios
+summary: Compact iOS screen and accessibility-identifier map for physical-device XCUITest — states, stable identifiers, and expectations per screen.
+sourceOfTruth:
+  - Sources/iOS
+  - Tests/VocelloiOSUITests/VocelloiOSUITestCase.swift
+---
 # iOS UI reference
 
 This is the compact screen and accessibility map for physical-device Vocello UI tests. XCUITest is

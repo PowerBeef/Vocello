@@ -88,7 +88,7 @@ UI heartbeat        —                       yes                    yes
 | **iOS device** | `scripts/ios_device.sh bench` | In-process | iPhone tier, Jetsam, on-device RTF (headless diagnostics, single take) |
 | **iOS UI benchmark** | `scripts/ui_test.sh ios benchmark` | In-process | Full UI matrix through XCUITest on the paired physical iPhone; telemetry gated per take |
 | **macOS UI frame health** | `scripts/ui_test.sh macos perf` | No engine claims (UI-only) | Nine scripted SwiftUI scenarios with the in-app frame probe; warn-only ceilings; canonical-hardware runs publish `ui-perf` registry records ([`macos-ui-refresh-2026-08.md`](macos-ui-refresh-2026-08.md)) |
-| **iOS UI frame health** | `scripts/ui_test.sh ios perf` | No engine claims (UI-only) | Nine scripted scenarios on the paired physical iPhone with the pinned-60 Hz in-app probe; `check_ios_ui_perf.py` structural + canonical-hardware gate; local-only reports — no thresholds contract or `ui-perf` registry publication until IUI-6 ([`ios-ui-refresh-2026-08.md`](ios-ui-refresh-2026-08.md)) |
+| **iOS UI frame health** | `scripts/ui_test.sh ios perf` | No engine claims (UI-only) | Nine scripted scenarios on the paired physical iPhone with the pinned-60 Hz in-app probe; `check_ios_ui_perf.py` structural + canonical-hardware gate with warn-only ceilings from [`config/ui-perf-thresholds-ios.json`](../../config/ui-perf-thresholds-ios.json); canonical-iPhone runs publish platform-`ios` `ui-perf` registry records (IUI-6, [`ios-ui-refresh-2026-08.md`](ios-ui-refresh-2026-08.md)) |
 
 **Important:** CLI bench numbers are **not** identical to macOS XPC UI numbers. Compare like with
 like (CLI vs CLI, UI vs UI). Use CLI for backend optimization; use UI/XPC for integration regressions.

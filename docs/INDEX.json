@@ -2,9 +2,75 @@
   "schemaVersion": 1,
   "generated": "python3 scripts/doc_metadata.py rebuild-index",
   "note": "Machine-readable documentation map. Query this instead of globbing docs/.",
-  "annotatedDocuments": 49,
-  "unannotatedDocuments": 39,
+  "annotatedDocuments": 88,
+  "unannotatedDocuments": 0,
   "documents": [
+    {
+      "path": ".claude/rules/backend-mlx.md",
+      "status": "active",
+      "owner": "backend-mlx",
+      "summary": "Domain rule for the engine core, owned Qwen3 runtime package, model catalog, telemetry semantics, and backend invariants (prewarm, cancellation, sampling, memory policy, MLX-only).",
+      "sourceOfTruth": [
+        "scripts/build_foundation_targets.sh",
+        "config/runtime-refactor-contract.json",
+        "Sources/Resources/qwenvoice_contract.json",
+        "config/runtime-debug-knobs.json"
+      ]
+    },
+    {
+      "path": ".claude/rules/derived-artifacts.md",
+      "status": "active",
+      "owner": "release-qa",
+      "summary": "Domain rule for generated-inventory freshness \u2014 which paths require refresh_derived_artifacts.py in the same change, and the manual narrative-sync exception.",
+      "sourceOfTruth": [
+        "scripts/refresh_derived_artifacts.py"
+      ]
+    },
+    {
+      "path": ".claude/rules/ios.md",
+      "status": "active",
+      "owner": "ios",
+      "summary": "Domain rule for the VocelloiOS target \u2014 boundaries, physical-device-only testing, typed cancellation, Dynamic Type/Reduce Motion invariants, stable identifiers, and the frame-health perf lane.",
+      "sourceOfTruth": [
+        "scripts/ios_device.sh",
+        "scripts/ui_test.sh",
+        "scripts/build_foundation_targets.sh"
+      ]
+    },
+    {
+      "path": ".claude/rules/macos.md",
+      "status": "active",
+      "owner": "macos",
+      "summary": "Domain rule for the macOS app and XPC stack \u2014 boundaries, XPC lifecycle invariants, gated Liquid Glass, accessibility rules, and the macOS test lanes.",
+      "sourceOfTruth": [
+        "scripts/macos_test.sh",
+        "scripts/ui_test.sh",
+        "scripts/build.sh"
+      ]
+    },
+    {
+      "path": ".claude/rules/release-qa.md",
+      "status": "active",
+      "owner": "release-qa",
+      "summary": "Domain rule for scripts, CI, packaging, signing, benchmarks, and release gates \u2014 build-output ownership, registry rules, release-evidence invariants, and the deterministic-only publishing posture.",
+      "sourceOfTruth": [
+        "scripts/check_project_inputs.sh",
+        ".github/workflows/ci.yml",
+        ".github/workflows/release.yml",
+        "config/build-output-policy.json"
+      ]
+    },
+    {
+      "path": "docs/ARCHITECTURE.md",
+      "status": "active",
+      "owner": "backend-and-platform",
+      "summary": "System architecture \u2014 engine core, macOS XPC request lifecycle, iOS in-process lifecycle, model management, telemetry layers, and the engine invariants each surface must preserve.",
+      "sourceOfTruth": [
+        "project.yml",
+        "config/runtime-refactor-contract.json",
+        "Sources/Resources/qwenvoice_contract.json"
+      ]
+    },
     {
       "path": "docs/audits/archive/2026-07-10/01_Evidence_Method_and_Corrections.md",
       "status": "historical",
@@ -69,6 +135,91 @@
       "contentDigest": "sha256:4d50a0e11eceb00a1579bb3a7c654118579eae8b29b119a8c11a4809b52bab8f"
     },
     {
+      "path": "docs/decisions/ios-6gb-floor-feasibility.md",
+      "status": "active",
+      "owner": "ios",
+      "summary": "Staged evidence plan for whether the iPhone hardware floor can drop to 6 GB devices \u2014 kill-cheap steps, step-1 clamp result (2026-08-02), and the gates any floor move must pass.",
+      "sourceOfTruth": [
+        "Sources/iOS/IOSAppBootstrap.swift",
+        "config/runtime-debug-knobs.json"
+      ]
+    },
+    {
+      "path": "docs/decisions/long-form-acoustic-carryover-experiment.md",
+      "status": "historical",
+      "owner": "backend-mlx",
+      "summary": "Pre-registered stage-2 acoustic-carryover experiment and its recorded outcome: joins did not improve under gate; stage 2 parked with a register/pitch-conditioning unpark condition.",
+      "contentDigest": "sha256:e1aeed5d39a9568a9b2e684f4a5348adf581086860c62e7a2cf6593d3b6335f6"
+    },
+    {
+      "path": "docs/decisions/long-form-context-planning-v2.md",
+      "status": "historical",
+      "owner": "backend-mlx",
+      "summary": "Adopted 2026-08-01: long-form planner v2 text-first design \u2014 lookahead boundary scoring over the greedy v1 scan, fixtures-first, with generation-time context explicitly out of scope.",
+      "contentDigest": "sha256:5e58c3a966e0bf3e0f42ff7d9079b6ec7d1895b4f126f854e787ccc04b4c8915"
+    },
+    {
+      "path": "docs/decisions/model-delivery-background-assets.md",
+      "status": "historical",
+      "owner": "ios",
+      "summary": "ADR (accepted 2026-07-14): retain the repaired background URLSession model-delivery path; Background Assets rejected for a second lifecycle and unvalidated store semantics.",
+      "contentDigest": "sha256:29f146ca88f0624bb9b448a3939da3283716148d18f118e2b1607fbba6c57fc9"
+    },
+    {
+      "path": "docs/decisions/owned-qwen3-runtime-monorepo.md",
+      "status": "historical",
+      "owner": "backend-mlx",
+      "summary": "ADR (accepted 2026-07-14): the Qwen3 runtime is a first-party monorepo package at Packages/VocelloQwen3Core, not a patch stack; compatibility identities preserved behind the facade.",
+      "contentDigest": "sha256:bd44fd793b3436e3613088e4688789a6bcbfd1606d52932220fc886867f5fb04"
+    },
+    {
+      "path": "docs/decisions/product-identity-compatibility.md",
+      "status": "active",
+      "owner": "release-qa",
+      "summary": "Standing policy: Vocello is the public name; QwenVoice/QVoice remain compatibility identities wherever change would break imports, signatures, persisted data, or evidence \u2014 with the compatibility map and migration bar.",
+      "sourceOfTruth": [
+        "project.yml"
+      ]
+    },
+    {
+      "path": "docs/decisions/runtime-hardening-and-trust-boundary.md",
+      "status": "active",
+      "owner": "backend-and-platform",
+      "summary": "Standing policy: why the macOS engine stays outside the App Sandbox, the constrained entitlement exceptions, and the trust boundary those exceptions must never widen.",
+      "sourceOfTruth": [
+        "Sources/QwenVoice.entitlements",
+        "Sources/QwenVoiceEmbeddedRuntime.entitlements"
+      ]
+    },
+    {
+      "path": "docs/decisions/runtime-streaming-quality-convergence.md",
+      "status": "active",
+      "owner": "backend-and-platform",
+      "summary": "The living convergence ADR \u2014 interprets config/runtime-refactor-contract.json (the sole phase-status authority), records the promotion history, and defines the streaming/quality invariants.",
+      "sourceOfTruth": [
+        "config/runtime-refactor-contract.json"
+      ]
+    },
+    {
+      "path": "docs/development-progress.md",
+      "status": "active",
+      "owner": "backend-and-platform",
+      "summary": "The active narrative checkpoint \u2014 current resume block, per-arc history, and the phase table; cites config/roadmap.json and the runtime contract as the status authorities it never overrides.",
+      "sourceOfTruth": [
+        "config/roadmap.json",
+        "config/runtime-refactor-contract.json"
+      ]
+    },
+    {
+      "path": "docs/qwen_tone.md",
+      "status": "active",
+      "owner": "backend-mlx",
+      "summary": "App-facing quick guide to tone and emotion control; the sourced qwen3-tts-prompting-guide wins on any disagreement.",
+      "sourceOfTruth": [
+        "Sources/QwenVoiceCore/EmotionPreset.swift"
+      ]
+    },
+    {
       "path": "docs/reference/backend-optimization-research-report.md",
       "status": "historical",
       "owner": "backend-mlx",
@@ -84,6 +235,26 @@
         "scripts/macos_test.sh",
         "scripts/ios_device.sh",
         "scripts/ui_test.sh"
+      ]
+    },
+    {
+      "path": "docs/reference/cli.md",
+      "status": "active",
+      "owner": "backend-mlx",
+      "summary": "The vocello CLI \u2014 user-facing generation surface and deterministic benchmark/test driver over the same in-process MLX engine as the app.",
+      "sourceOfTruth": [
+        "Sources/VocelloCLI",
+        "scripts/build.sh"
+      ]
+    },
+    {
+      "path": "docs/reference/codex-session-storage.md",
+      "status": "active",
+      "owner": "release-qa",
+      "summary": "Operator runbook for the optional Codex task/session storage workflow \u2014 inventory, checksummed plan, exact approval, supported deletion, verification; live user state never enters the repository.",
+      "sourceOfTruth": [
+        "scripts/codex_session_storage.py",
+        "config/codex-session-storage-policy.json"
       ]
     },
     {
@@ -145,6 +316,35 @@
       ]
     },
     {
+      "path": "docs/reference/evidence-impact.md",
+      "status": "active",
+      "owner": "release-qa",
+      "summary": "The evidence-impact contract \u2014 mapping changed repository paths to proportionate deterministic merge and release evidence via scripts/evidence_impact.py.",
+      "sourceOfTruth": [
+        "scripts/evidence_impact.py",
+        "config/evidence-impact.json"
+      ]
+    },
+    {
+      "path": "docs/reference/interactive-ui-qa.md",
+      "status": "active",
+      "owner": "release-qa",
+      "summary": "Assistive computer-use policy for exploratory UI QA and lane-failure diagnosis \u2014 never a driver, gate, or replacement for the XCUITest lanes.",
+      "sourceOfTruth": [
+        "scripts/ui_test.sh"
+      ]
+    },
+    {
+      "path": "docs/reference/ios-app-guide.md",
+      "status": "active",
+      "owner": "ios",
+      "summary": "Consolidated iPhone app map \u2014 every screen, element, and option from the user view, and how XCUITest drives each via stable identifiers on the paired physical device.",
+      "sourceOfTruth": [
+        "Sources/iOS",
+        "Tests/VocelloiOSUITests/VocelloiOSUITestCase.swift"
+      ]
+    },
+    {
       "path": "docs/reference/ios-appstore-submission.md",
       "status": "active",
       "owner": "release-qa",
@@ -152,6 +352,47 @@
       "sourceOfTruth": [
         "project.yml",
         "docs/reference/eu-ai-act-article50-assessment.md"
+      ]
+    },
+    {
+      "path": "docs/reference/ios-device-testing.md",
+      "status": "active",
+      "owner": "ios",
+      "summary": "iOS physical-device testing \u2014 deterministic compile lanes, explicit on-device acceptance (smoke/benchmark/perf with the frame-health protocol), headless diagnostics, and burn-in safety.",
+      "sourceOfTruth": [
+        "scripts/ios_device.sh",
+        "scripts/ui_test.sh",
+        "scripts/check_ios_ui_perf.py"
+      ]
+    },
+    {
+      "path": "docs/reference/ios-engine-optimization.md",
+      "status": "active",
+      "owner": "ios",
+      "summary": "Standing record of iPhone engine bring-up and optimization \u2014 measured memory/latency work, shipped changes, Jetsam posture, and the prioritized future items.",
+      "sourceOfTruth": [
+        "config/runtime-debug-knobs.json",
+        "config/memory-qualification-policy.json"
+      ]
+    },
+    {
+      "path": "docs/reference/ios-increased-memory-entitlement-request.md",
+      "status": "active",
+      "owner": "ios",
+      "summary": "Enablement and readiness guide for the increased-memory entitlement on the in-process iOS app, with verification steps and the kept-for-fallback justification text.",
+      "sourceOfTruth": [
+        "Sources/iOS/VocelloiOS.entitlements",
+        "project.yml"
+      ]
+    },
+    {
+      "path": "docs/reference/ios-ui-reference.md",
+      "status": "active",
+      "owner": "ios",
+      "summary": "Compact iOS screen and accessibility-identifier map for physical-device XCUITest \u2014 states, stable identifiers, and expectations per screen.",
+      "sourceOfTruth": [
+        "Sources/iOS",
+        "Tests/VocelloiOSUITests/VocelloiOSUITestCase.swift"
       ]
     },
     {
@@ -179,6 +420,48 @@
       ]
     },
     {
+      "path": "docs/reference/long-form-generation.md",
+      "status": "active",
+      "owner": "backend-and-platform",
+      "summary": "The shipping long-form v4 path on both platforms \u2014 planner-owned segmentation, sequential streaming execution, manifest/resume, grouped History \u2014 and what remains open.",
+      "sourceOfTruth": [
+        "Sources/QwenVoiceCore/LongFormPlanning.swift",
+        "Sources/iOS/Studio/IOSLongFormProject.swift",
+        "config/runtime-refactor-contract.json"
+      ]
+    },
+    {
+      "path": "docs/reference/macos-app-guide.md",
+      "status": "active",
+      "owner": "macos",
+      "summary": "Consolidated macOS app map \u2014 screens, elements, and options, and how XCUITest addresses each through the stable accessibility surface.",
+      "sourceOfTruth": [
+        "Sources/Views",
+        "Sources/ContentView.swift"
+      ]
+    },
+    {
+      "path": "docs/reference/macos-permissions.md",
+      "status": "active",
+      "owner": "macos",
+      "summary": "macOS TCC permissions, code signing, and the dev loop \u2014 what users experience, why the historical friction is gone, and permissions_doctor.sh diagnosis.",
+      "sourceOfTruth": [
+        "scripts/permissions_doctor.sh",
+        "Sources/QwenVoice.entitlements"
+      ]
+    },
+    {
+      "path": "docs/reference/macos-release-qa.md",
+      "status": "active",
+      "owner": "release-qa",
+      "summary": "The standing macOS release-QA checklist \u2014 deterministic gates, the per-candidate smoke step, release-notes and performance-surface obligations, packaging and verification.",
+      "sourceOfTruth": [
+        "scripts/release.sh",
+        ".github/workflows/release.yml",
+        "scripts/macos_test.sh"
+      ]
+    },
+    {
       "path": "docs/reference/macos-testing.md",
       "status": "active",
       "owner": "macos",
@@ -199,11 +482,39 @@
       ]
     },
     {
+      "path": "docs/reference/metal-guide.md",
+      "status": "active",
+      "owner": "backend-mlx",
+      "summary": "Project-specific Metal reference \u2014 how MLX uses Metal for the Qwen3 engine, memory/latency implications, and direct-Metal patterns for potential future custom kernels.",
+      "sourceOfTruth": [
+        "project.yml"
+      ]
+    },
+    {
       "path": "docs/reference/metal4-tensor-feasibility-2026-07-31.md",
       "status": "historical",
       "owner": "backend-mlx",
       "summary": "Metal 4 tensors + MPP in MLX custom kernels \u2014 feasibility study (2026-07-31). Recorded the Gate 0 micro-benchmark rider and the OS-floor policy; Gate 0 returned no-go 2026-08-01, closing the fused-kernel candidate.",
       "contentDigest": "sha256:6a56bc6fc4d872f1812f589789b5f66a1e7b50ef048d0675a3e808d4813cbb9b"
+    },
+    {
+      "path": "docs/reference/mimi-codec-guide.md",
+      "status": "active",
+      "owner": "backend-mlx",
+      "summary": "The Mimi-style neural audio codec as owned in the Qwen3 speech tokenizer \u2014 architecture, streaming overlap-and-discard semantics, and Vocello deltas from canonical Mimi.",
+      "sourceOfTruth": [
+        "Packages/VocelloQwen3Core/Sources/MLXAudioCodecs"
+      ]
+    },
+    {
+      "path": "docs/reference/mlx-audio-swift-patching.md",
+      "status": "active",
+      "owner": "backend-mlx",
+      "summary": "Maintaining the owned Qwen3 core package \u2014 first-party monorepo posture, facade vs compatibility identities, and the vendor-runtime contract that guards the boundary.",
+      "sourceOfTruth": [
+        "Packages/VocelloQwen3Core/Package.swift",
+        "scripts/vendor_runtime_contract.py"
+      ]
     },
     {
       "path": "docs/reference/mlx-guide.md",
@@ -216,11 +527,31 @@
       ]
     },
     {
+      "path": "docs/reference/model-delivery.md",
+      "status": "active",
+      "owner": "backend-and-platform",
+      "summary": "The shared model downloader \u2014 chunked-transfer defaults, iOS background session and restoration ledger, retry/cancel, verification, diagnostics, and the isolated live proof lane.",
+      "sourceOfTruth": [
+        "Sources/QwenVoiceCore/HuggingFaceDownloader.swift",
+        "Sources/QwenVoiceCore/IOSModelDownloadLedger.swift",
+        "Sources/Resources/qwenvoice_production_model_catalog.json"
+      ]
+    },
+    {
       "path": "docs/reference/optimization-report-review-2026-07-25.md",
       "status": "historical",
       "owner": "backend-and-platform",
       "summary": "Counter-verification of the imported optimization research and the staged plan adopted from it (2026-07-25). The stage-closure evidence and falsifiability rails for Stages 0-4, all closed by 2026-08-01.",
       "contentDigest": "sha256:a6eef3de350836f763837524655ac0734ea36dca0900437c72c1596c08c73905"
+    },
+    {
+      "path": "docs/reference/privacy-storage.md",
+      "status": "active",
+      "owner": "backend-and-platform",
+      "summary": "Local-first privacy and on-disk storage layout on both platforms \u2014 what lives where, what never leaves the device, and deletion semantics.",
+      "sourceOfTruth": [
+        "Sources/SharedSupport"
+      ]
     },
     {
       "path": "docs/reference/prosody-qa-research.md",
@@ -254,6 +585,16 @@
       ]
     },
     {
+      "path": "docs/reference/qwen3-tts-prompting-guide.md",
+      "status": "active",
+      "owner": "backend-mlx",
+      "summary": "Sourced reference for the three model-facing text surfaces (script, delivery instruction, voice description) \u2014 every claim labeled OFFICIAL/RESEARCH/MEASURED-HERE/COMMUNITY/UNVERIFIED.",
+      "sourceOfTruth": [
+        "config/delivery-instruction-contract.json",
+        "Sources/QwenVoiceCore/EmotionPreset.swift"
+      ]
+    },
+    {
       "path": "docs/reference/repository-self-verification.md",
       "status": "active",
       "owner": "release-qa",
@@ -270,11 +611,51 @@
       ]
     },
     {
+      "path": "docs/reference/roadmap-2026-08.md",
+      "status": "superseded",
+      "owner": "backend-and-platform",
+      "summary": "The adopted 2026-07-31 working order for the convergence-residuals x Metal-4 x Stage-4 arc; that plan completed and current work status lives in the rendered roadmap.",
+      "supersededBy": "docs/ROADMAP.md",
+      "contentDigest": "sha256:b277433e467e42c56051470e18630865f97b2256d5ccd6076045298b0ae21025"
+    },
+    {
       "path": "docs/reference/runtime-refactor-status-report.md",
       "status": "historical",
       "owner": "backend-and-platform",
       "summary": "Maintainer status report for the staged convergence program as reviewed 2026-07-20 after overallPromotion passed. Point-in-time interpretation; the living phase summary is the table in docs/development-progress.md, and config/runtime-refactor-contract.json stays the status authority.",
       "contentDigest": "sha256:b9dc43c56fda8fb45609df13a8e4c417b8a40d85ffacf07e262da3704cba1629"
+    },
+    {
+      "path": "docs/reference/swift-performance-guide.md",
+      "status": "active",
+      "owner": "backend-and-platform",
+      "summary": "Swift 6 language and runtime performance reference for the apps and CLI \u2014 ARC, generics, isolation, and allocation patterns as they apply to this codebase.",
+      "sourceOfTruth": [
+        "project.yml"
+      ]
+    },
+    {
+      "path": "docs/reference/telemetry-and-benchmarking.md",
+      "status": "active",
+      "owner": "release-qa",
+      "summary": "The single telemetry and benchmarking reference \u2014 per-generation typed telemetry across frontend/transport/backend, schema versions, knobs, artifacts, and how evidence stays cheap.",
+      "sourceOfTruth": [
+        "Sources/QwenVoiceCore/NativeTelemetrySampler.swift",
+        "scripts/benchmark_history.py",
+        "config/memory-qualification-policy.json"
+      ]
+    },
+    {
+      "path": "docs/reference/testing-runbook.md",
+      "status": "active",
+      "owner": "release-qa",
+      "summary": "The cross-platform testing runbook \u2014 deterministic lanes as the routine contract, explicit XCUITest acceptance, model readiness, and the authority order for test guidance.",
+      "sourceOfTruth": [
+        "scripts/check_project_inputs.sh",
+        "scripts/macos_test.sh",
+        "scripts/ios_device.sh",
+        "scripts/ui_test.sh"
+      ]
     },
     {
       "path": "docs/releases/v1.2.1.md",

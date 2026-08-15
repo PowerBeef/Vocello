@@ -1,3 +1,10 @@
+---
+status: active
+owner: backend-mlx
+summary: App-facing quick guide to tone and emotion control; the sourced qwen3-tts-prompting-guide wins on any disagreement.
+sourceOfTruth:
+  - Sources/QwenVoiceCore/EmotionPreset.swift
+---
 # Tone and Emotion in Vocello
 
 _Last reviewed: 2026-06-11. Provenance pass 2026-08-02._

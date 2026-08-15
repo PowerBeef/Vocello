@@ -1,3 +1,13 @@
+---
+status: active
+owner: release-qa
+summary: Domain rule for scripts, CI, packaging, signing, benchmarks, and release gates — build-output ownership, registry rules, release-evidence invariants, and the deterministic-only publishing posture.
+sourceOfTruth:
+  - scripts/check_project_inputs.sh
+  - .github/workflows/ci.yml
+  - .github/workflows/release.yml
+  - config/build-output-policy.json
+---
 # Release / QA domain rule
 
 > Domain rule for build scripts, CI workflow, packaging, signing, notarization,

@@ -1,3 +1,11 @@
+---
+status: active
+owner: backend-and-platform
+summary: The active narrative checkpoint — current resume block, per-arc history, and the phase table; cites config/roadmap.json and the runtime contract as the status authorities it never overrides.
+sourceOfTruth:
+  - config/roadmap.json
+  - config/runtime-refactor-contract.json
+---
 # Vocello development checkpoint
 
 > Current maintainer checkpoint. Confirm this summary against the checkout before acting; source,
@@ -40,6 +48,20 @@ machine-readable status record and wins over any older prose.
 | 14 — Organization and retirement | Closed 2026-07-23 (14a + 14b): compatibility SPI retired, actor-owned loading/metadata/priming/clone artifacts, clone conditioning epoch-bound end to end. |
 
 ## Resume here (2026-08-15)
+
+**DG-4 closed — the `doc-governance-2026-08` plan is complete (2026-08-15,
+desk):** all 39 remaining documents were read and annotated in one
+maintainer-directed sweep (5 domain rules, 8 ADRs, 26 reference/narrative
+docs) — standing policies and living authorities are `active` with honest
+`sourceOfTruth` bindings, decided ADRs and completed experiment records are
+sealed `historical`, and the completed 2026-08 working order is
+`superseded` → the rendered roadmap. Coverage: 88 annotated, 0 unannotated.
+The sweep also cleared the two live freshness warnings by fixing real drift
+(`benchmarking-procedure.md` still described the iOS perf lane as
+pre-IUI-6 local-only; `macos-testing.md` gained the platform-aware
+`ui-perf` note), and re-confirmed IUI-1–4 against today's script changes.
+Five of seven roadmap plans are now complete; `delivery-prompting-2026-08`
+holds only parked items.
 
 **IUI-6 closed — the `ios-ui-2026-08` plan is complete (2026-08-15, same
 day, second phone window):** the `ui-perf` registry kind is platform-aware

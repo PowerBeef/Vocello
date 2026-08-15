@@ -1,3 +1,10 @@
+---
+status: active
+owner: backend-and-platform
+summary: Swift 6 language and runtime performance reference for the apps and CLI — ARC, generics, isolation, and allocation patterns as they apply to this codebase.
+sourceOfTruth:
+  - project.yml
+---
 # Swift Performance Guide for Vocello
 
 > **Living document.** A project-specific reference for Swift 6 language and runtime performance decisions that affect Vocello's macOS app, iOS app, and `vocello` CLI. It is meant to complement the backend-focused [`mlx-guide.md`](mlx-guide.md) and the model-focused [`qwen3-tts-guide.md`](qwen3-tts-guide.md). When this doc disagrees with the code, the code wins — fix this file.

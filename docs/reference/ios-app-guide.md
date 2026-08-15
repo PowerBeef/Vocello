@@ -1,3 +1,11 @@
+---
+status: active
+owner: ios
+summary: Consolidated iPhone app map — every screen, element, and option from the user view, and how XCUITest drives each via stable identifiers on the paired physical device.
+sourceOfTruth:
+  - Sources/iOS
+  - Tests/VocelloiOSUITests/VocelloiOSUITestCase.swift
+---
 # Vocello for iPhone — app guide + test-driving reference
 
 A consolidated map of the Vocello iOS app: what every screen/element/option does (user

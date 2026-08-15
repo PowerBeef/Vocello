@@ -1,3 +1,11 @@
+---
+status: active
+owner: macos
+summary: Consolidated macOS app map — screens, elements, and options, and how XCUITest addresses each through the stable accessibility surface.
+sourceOfTruth:
+  - Sources/Views
+  - Sources/ContentView.swift
+---
 # Vocello for Mac — app guide + test-driving reference
 
 A consolidated map of the Vocello macOS app: what every screen/element/option does and how

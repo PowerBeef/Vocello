@@ -23,7 +23,7 @@
     {
       "id": "doc-governance-2026-08",
       "title": "Documentation governance and staleness control",
-      "status": "active",
+      "status": "complete",
       "owner": "release-qa",
       "adopted": "2026-08-02",
       "goal": "Make documentation state machine-checkable: pin historical records against accidental modification, derive facts from code so prose cannot silently contradict them, and give agents a queryable index instead of a directory to glob.",
@@ -319,12 +319,17 @@
       "id": "DG-4",
       "plan": "doc-governance-2026-08",
       "title": "Phase 3 — source bindings on active documents",
-      "status": "planned",
+      "status": "done",
       "gate": "Annotated incrementally as documents are touched; a binding invented in bulk without reading the document is worse than none.",
       "blockedBy": [
         "DG-1"
       ],
-      "updated": "2026-08-02"
+      "updated": "2026-08-15",
+      "notes": "Closed 2026-08-15 in one maintainer-directed sweep executed per the gate's quality bar: every one of the 39 remaining documents was read before annotation (5 domain rules, 8 ADRs, 26 reference/narrative docs). Standing policies and living authorities are active with honest sourceOfTruth bindings; decided ADRs and completed experiment records are sealed historical; the completed 2026-08 working order is superseded -> docs/ROADMAP.md. Coverage: 88 annotated, 0 unannotated. The sweep also cleared the two live freshness warnings by fixing real drift (benchmarking-procedure.md still described the iOS perf lane as local-only pre-IUI-6; macos-testing.md gained the platform-aware ui-perf note).",
+      "evidence": [
+        "file:docs/INDEX.json",
+        "file:scripts/doc_metadata.py"
+      ]
     },
     {
       "id": "DG-5",
@@ -875,7 +880,7 @@
         "Tests/VocelloiOSUITests/VocelloiOSUITestCase.swift",
         "scripts/benchmark_history.py"
       ],
-      "updated": "2026-08-12",
+      "updated": "2026-08-15",
       "notes": "Gate satisfied 2026-08-12 on the canonical iPhone: run ios-xcui-perf-20260812-145449-41b82c87 passed 9/9 scenarios with the checker gate green (idle sentinel 60.0 Hz, 0.006 ms/s hitch), and the three scripted fail-closed refusals (missing marker; coverage 0%<90%; idle cadence 30 Hz) were demonstrated against doctored copies of that run's real pulled evidence. First device attempt failed on the UI Automation toggle (device-side), second on the seeded-history sentinel typing race fixed in c0dba9c. A 3-lens adversarial review (2026-08-12) confirmed and fixed the cadence-band conflation pre-landing: the fail-closed band is idle-anchored, warn-only elsewhere.",
       "evidence": [
         "commit:73dc9f8",
@@ -899,7 +904,7 @@
         "Tests/VocelloiOSUITests/VocelloiOSUITestCase.swift",
         "scripts/benchmark_history.py"
       ],
-      "updated": "2026-08-12",
+      "updated": "2026-08-15",
       "notes": "Closed 2026-08-12, same sitting as the IUI-1 acceptance (which served as the discarded warm-up). Five counted runs, all 9/9 PASS, all thermals nominal, zero warnings: ios-xcui-perf-20260812-{150617-6f2622f1, 151529-762c86ba, 152444-f555f9ec, 153408-8e55fe32, 154331-9cb3d9f7}. Medians+IQR table is in the authority doc. Provenance: result retention pruned runs 1-4's host dirs; their reports were deterministically regenerated from the device's retained probe JSONL + captured lane logs (recipe in the authority doc), and the copy-report-out protocol step is now recorded in ios-device-testing.md.",
       "evidence": [
         "doc:docs/reference/ios-ui-refresh-2026-08.md",
@@ -918,7 +923,7 @@
         "Tests/VocelloiOSUITests/VocelloiOSUITestCase.swift",
         "scripts/benchmark_history.py"
       ],
-      "updated": "2026-08-12",
+      "updated": "2026-08-15",
       "notes": "Closed 2026-08-12: four-lens audit (8 agents, per-lens adversarial accuracy checks) merged with the IUI-2 baseline into a 30-item ranked list — 11 measured perf findings (P1-P11), 8 input/a11y defects (X1-X8), 10 design pick-list items (D1-D10), 1 annotation (the 60 Hz tier stays frozen/unmeasurable). Headlines: the 178 ms sheet stall is synchronous AVAudioSession activation + decode inside the presentation transition (P1); the unported macOS root-shell observation finding is confirmed at 11 subscription sites (P2); tab switches structurally remount screens and lose user state (P4). Wave scoping proposal published in the authority doc; the maintainer gate now holds until the pick-list and wave scope get an explicit go.",
       "evidence": [
         "doc:docs/reference/ios-ui-refresh-2026-08.md"
@@ -936,7 +941,7 @@
         "Tests/VocelloiOSUITests/VocelloiOSUITestCase.swift",
         "scripts/benchmark_history.py"
       ],
-      "updated": "2026-08-13",
+      "updated": "2026-08-15",
       "notes": "Maintainer go 2026-08-12, scope as proposed: P1 (sheet-present stall - move AVAudioSession activation/decode off the presentation transaction, with an activation-epoch session guard from the adversarial diff review), P5 (lazy History row menus + cached file-exists), P8/P9/P10 (dead-wiring removals), and the input/VoiceOver one-liners X1, X2, X5, X7, X8; all landed 2026-08-12 (commit 2f76b8a). Closed 2026-08-13 after the device window: smoke PASS (ios-xcui-smoke-20260813-170127-e0f9c5be) plus five counted nominal ios perf runs ios-xcui-perf-20260813-{171216-3dba81a4, 172154-a4c6966e, 173129-9dc183af, 174111-90338546, 175056-d09be357} with every report copied out between runs. Before/after vs the IUI-2 baseline (table in the authority doc): sheet-present worst gap -11% (P1's target), composer typing -11% and settings scroll -9% hitch, tab-navigation worst gap -12%; history scroll flat within IQR (honest null - the remaining row cost is wave-2 P2 scope); exploratory scenarios within their designated variance. No confirmatory regression outside IQR noise.",
       "evidence": [
         "doc:docs/reference/ios-ui-refresh-2026-08.md",

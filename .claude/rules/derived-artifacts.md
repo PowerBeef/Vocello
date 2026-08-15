@@ -1,3 +1,10 @@
+---
+status: active
+owner: release-qa
+summary: Domain rule for generated-inventory freshness — which paths require refresh_derived_artifacts.py in the same change, and the manual narrative-sync exception.
+sourceOfTruth:
+  - scripts/refresh_derived_artifacts.py
+---
 # Derived artifacts freshness
 
 CI fail-closes on stale generated inventories. Refresh them in the **same change** as the source edit. Do **not** auto-rewrite narrative progress prose — but do keep it current by hand: the companion working norm (root `CLAUDE.md` "Before you edit") is that narrative docs land in the same change as the work they describe, with a `docs: currency pass` commit closing any dense workstream.

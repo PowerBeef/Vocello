@@ -1,3 +1,10 @@
+---
+status: active
+owner: backend-mlx
+summary: Project-specific Metal reference — how MLX uses Metal for the Qwen3 engine, memory/latency implications, and direct-Metal patterns for potential future custom kernels.
+sourceOfTruth:
+  - project.yml
+---
 # Metal Guide for Vocello
 
 > **Living document.** A project-specific reference for Apple's Metal API and Metal performance optimization as it applies to Vocello's Qwen3-TTS engine on Apple Silicon macOS and iOS. Most GPU work today is abstracted by MLX; this doc explains how MLX uses Metal, what that means for memory and latency, and the direct-Metal patterns that would matter if future work adds custom kernels or DSP. When this doc disagrees with the code, the code wins — fix this file.

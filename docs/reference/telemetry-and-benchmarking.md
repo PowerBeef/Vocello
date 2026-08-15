@@ -1,3 +1,12 @@
+---
+status: active
+owner: release-qa
+summary: The single telemetry and benchmarking reference — per-generation typed telemetry across frontend/transport/backend, schema versions, knobs, artifacts, and how evidence stays cheap.
+sourceOfTruth:
+  - Sources/QwenVoiceCore/NativeTelemetrySampler.swift
+  - scripts/benchmark_history.py
+  - config/memory-qualification-policy.json
+---
 # Telemetry & benchmarking
 
 How Vocello measures itself. This is the single reference for the per‑generation

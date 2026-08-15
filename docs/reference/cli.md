@@ -1,3 +1,11 @@
+---
+status: active
+owner: backend-mlx
+summary: The vocello CLI — user-facing generation surface and deterministic benchmark/test driver over the same in-process MLX engine as the app.
+sourceOfTruth:
+  - Sources/VocelloCLI
+  - scripts/build.sh
+---
 # The `vocello` CLI
 
 `vocello` is a headless macOS command-line surface over the same in-process MLX engine the app uses.

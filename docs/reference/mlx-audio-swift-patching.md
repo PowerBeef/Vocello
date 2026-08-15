@@ -1,3 +1,11 @@
+---
+status: active
+owner: backend-mlx
+summary: Maintaining the owned Qwen3 core package — first-party monorepo posture, facade vs compatibility identities, and the vendor-runtime contract that guards the boundary.
+sourceOfTruth:
+  - Packages/VocelloQwen3Core/Package.swift
+  - scripts/vendor_runtime_contract.py
+---
 # Maintaining Vocello Qwen3 Core
 
 The source under `Packages/VocelloQwen3Core/` is an owned, specialized product runtime, not a thin

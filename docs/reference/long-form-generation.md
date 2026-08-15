@@ -1,3 +1,12 @@
+---
+status: active
+owner: backend-and-platform
+summary: The shipping long-form v4 path on both platforms — planner-owned segmentation, sequential streaming execution, manifest/resume, grouped History — and what remains open.
+sourceOfTruth:
+  - Sources/QwenVoiceCore/LongFormPlanning.swift
+  - Sources/iOS/Studio/IOSLongFormProject.swift
+  - config/runtime-refactor-contract.json
+---
 # Long-form generation
 
 This reference describes the shipping long-form v4 path — macOS since 2026-07-23 (stages A–E),

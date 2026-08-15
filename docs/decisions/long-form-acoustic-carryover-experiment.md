@@ -1,3 +1,9 @@
+---
+status: historical
+owner: backend-mlx
+summary: Pre-registered stage-2 acoustic-carryover experiment and its recorded outcome: joins did not improve under gate; stage 2 parked with a register/pitch-conditioning unpark condition.
+contentDigest: sha256:e1aeed5d39a9568a9b2e684f4a5348adf581086860c62e7a2cf6593d3b6335f6
+---
 # Long-form acoustic carryover — stage-2 experiment pre-registration
 
 - **Status:** pre-registered 2026-08-01 (Tier-4 stage 2, maintainer-directed); probe

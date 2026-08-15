@@ -10,9 +10,9 @@
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
 | `delivery-prompting-2026-08` | active | backend-mlx | 20/23 (87%) |
-| `doc-governance-2026-08` | active | release-qa | 8/9 (89%) |
 | `compliance-2026-08` | complete | release-qa | 2/2 (100%) |
 | `convergence-metal4-stage4-2026-08` | complete | backend-and-platform | 7/7 (100%) |
+| `doc-governance-2026-08` | complete | release-qa | 9/9 (100%) |
 | `ios-ui-2026-08` | complete | ios | 6/6 (100%) |
 | `macos-ui-2026-08` | complete | macos | 7/7 (100%) |
 | `model-delivery-2026-08` | complete | release-qa | 2/2 (100%) |
@@ -62,31 +62,6 @@ Narrative authority: [`docs/reference/qwen3-tts-prompting-guide.md`](reference/q
 - **`DP-23`** (parked) — Ship happy at its normal copy (cross-tier pairing candidate from DP-22).
   gate: DP-22's exploratory cross-tier probe found angry.strong-vs-happy.normal is the widest measured happy/angry separation (2.424 vs 1.469 shipped) and happy.normal the only FDR-clear happy cell ever measured (happy.strong fails FDR in every arm of DP-18). Before any copy ships: (1) a small pre-registered confirmatory probe of the exact candidate pairing (angry.strong vs happy.normal, fresh seeds, both variants — the cross-tier finding is currently exploratory and 4-bit); (2) the maintainer's listening check that happy.normal does not reintroduce the heard-as-Surprised confusion (DP-12 heard happy.strong as Surprised); (3) if it ships, per-preset tier selection lands under DP-8's measured-better-copy rule, the delivery-instruction contract re-checks tier parity, and per-tier gate floors (profile schema v4) come with it since the shipped tier would no longer be uniform. Maintainer-gated at step 2; step 1 is machine-only and can run in any free window. STEP-1 PRE-REGISTRATION 2026-08-05 (before any generation): fresh seeds 20260921-20260938 (18; none overlap DP-18/DP-21/DP-22 ranges), cells angry.strong and happy.normal only, speed and quality variants, medium text, one invocation per seed, label dp23-crosstier. Scoring: delivery_separability.py 2-cell probe per arm, label-mode cell, 1000 permutation iterations, confirmatory designation. DECISION RULE: the 4-bit arm's probe UAR must clear the 0.5 floor at permutation p <= 0.05 to CONFIRM the exploratory 2.424 pairing; the 8-bit arm is descriptive (DP-22 showed the channel is 4-bit-specific, so an 8-bit null does not refute). Deterministic QC seed casualties drop-and-record per protocol. Confirmation advances this item to step 2 (maintainer listening); a null sends the cross-tier candidate back to exploratory status and the item re-parks pending a new lead. STEP-1 RESULTS 2026-08-06 (run exactly as registered; 18/18 seeds, zero QC casualties): NULL on the registered primary — the 4-bit arm's angry.strong-vs-happy.normal probe reached UAR 0.639 (perm p=0.1229, 1000 iterations), directionally positive but below the registered p<=0.05 bar; the fresh-seed pair distance is 2.213 versus the exploratory 2.424. The descriptive 8-bit arm cleared (UAR 0.694, p=0.045) — recorded as hypothesis-generating only, and deliberately NOT promoted: elevating the non-registered arm after the primary missed is the exact selective-inference move the pre-registration exists to prevent, and the arm ordering reverses DP-22's (4-bit strong there, 8-bit here), which reads as instability at n=18, not signal. Per the registered decision rule the cross-tier candidate returns to exploratory status and this item re-parks. DP-22's confirmed normal-vs-normal finding and DP-9's parking are unaffected. 18 PASS registry records committed with this closure.
 
-## Documentation governance and staleness control
-
-`doc-governance-2026-08` · **active** · release-qa · adopted 2026-08-02
-
-Make documentation state machine-checkable: pin historical records against accidental modification, derive facts from code so prose cannot silently contradict them, and give agents a queryable index instead of a directory to glob.
-
-Narrative authority: [`docs/reference/repository-self-verification.md`](reference/repository-self-verification.md)
-
-| Item | Status | Title | Evidence |
-| --- | --- | --- | --- |
-| `DG-1` | done | Per-file documentation metadata with derived-fact scanning | `commit:3ed09cb`, `file:scripts/doc_metadata.py` |
-| `DG-2` | done | Phase 1 — pin every historical document | `commit:3ed09cb`, `file:docs/INDEX.json` |
-| `DG-3` | done | Phase 2 — reclassify the nine misfiled point-in-time reports | `file:docs/reference/backend-optimization-research-report.md`, `file:docs/reference/metal4-tensor-feasibility-2026-07-31.md`, `file:docs/reference/optimization-report-review-2026-07-25.md`, `file:docs/reference/qwen3-apple-silicon-roadmap-review.md`, `file:docs/reference/runtime-refactor-status-report.md`, `file:docs/reference/codex-storage-ballooning-incident.md` |
-| `DG-4` | planned | Phase 3 — source bindings on active documents | — |
-| `DG-5` | done | Single-source-of-truth roadmap system | `commit:346dba7`, `file:scripts/roadmap.py`, `file:docs/ROADMAP.md` |
-| `DG-6` | done | Security workflow starvation on main | `commit:6e8f8b2`, `file:.github/workflows/security.yml` |
-| `DG-7` | done | Surface-coverage omission gate and the optional-assists guard | `commit:6283e65`, `commit:ca1eafd`, `file:scripts/check_surface_coverage.py` |
-| `DG-8` | done | Deep build-output ownership and storage remediation | `commit:e83ebef`, `file:scripts/build_output_policy.py` |
-| `DG-9` | done | Document the self-verification system and its failure classes | `doc:docs/reference/repository-self-verification.md` |
-
-### Open items in detail
-
-- **`DG-4`** (planned) — Phase 3 — source bindings on active documents.
-  gate: Annotated incrementally as documents are touched; a binding invented in bulk without reading the document is worse than none.
-
 ## EU AI Act Article 50 readiness
 
 `compliance-2026-08` · **complete** · release-qa · adopted 2026-08-06
@@ -117,6 +92,26 @@ Narrative authority: [`docs/reference/roadmap-2026-08.md`](reference/roadmap-202
 | `CM-5` | done | Phone-gated evidence battery remainder | `doc:docs/reference/roadmap-2026-08.md`, `file:benchmarks/runs/engine-generation/macos-engine-20260806-142908-12599e2c.json`, `file:benchmarks/runs/engine-generation/macos-engine-20260806-143035-941b0ea5.json`, `file:benchmarks/runs/engine-generation/macos-engine-20260806-143201-f3512027.json`, `file:benchmarks/runs/ui-generation/ios-xcui-benchmark-20260806-135457-1d545686.json`, `file:benchmarks/runs/ui-generation/ios-xcui-benchmark-20260806-141150-97c286b1.json`, `file:benchmarks/runs/memory-qualification/mac-memory-qualification-20260806-143414-d4284646.json`, `file:config/characterization-fixtures.json`, `file:Sources/iOS/IOSDeviceDiagnosticsRunner.swift` |
 | `CM-6` | done | MOS-proxy advisory column (UTMOSv2) | `file:scripts/mos_advisory.py`, `file:scripts/tests/test_mos_advisory.py`, `file:docs/reference/testing-runbook.md` |
 | `CM-7` | done | Non-streaming CLI generation publishes no WAV while reporting success | `file:Sources/QwenVoiceCore/GenerationOutputAdapter.swift`, `file:Tests/VocelloCoreTests/GenerationTerminalCleanupTests.swift`, `file:Sources/VocelloCLI/GenerateCommand.swift`, `file:Sources/VocelloCLI/BatchCommand.swift` |
+
+## Documentation governance and staleness control
+
+`doc-governance-2026-08` · **complete** · release-qa · adopted 2026-08-02
+
+Make documentation state machine-checkable: pin historical records against accidental modification, derive facts from code so prose cannot silently contradict them, and give agents a queryable index instead of a directory to glob.
+
+Narrative authority: [`docs/reference/repository-self-verification.md`](reference/repository-self-verification.md)
+
+| Item | Status | Title | Evidence |
+| --- | --- | --- | --- |
+| `DG-1` | done | Per-file documentation metadata with derived-fact scanning | `commit:3ed09cb`, `file:scripts/doc_metadata.py` |
+| `DG-2` | done | Phase 1 — pin every historical document | `commit:3ed09cb`, `file:docs/INDEX.json` |
+| `DG-3` | done | Phase 2 — reclassify the nine misfiled point-in-time reports | `file:docs/reference/backend-optimization-research-report.md`, `file:docs/reference/metal4-tensor-feasibility-2026-07-31.md`, `file:docs/reference/optimization-report-review-2026-07-25.md`, `file:docs/reference/qwen3-apple-silicon-roadmap-review.md`, `file:docs/reference/runtime-refactor-status-report.md`, `file:docs/reference/codex-storage-ballooning-incident.md` |
+| `DG-4` | done | Phase 3 — source bindings on active documents | `file:docs/INDEX.json`, `file:scripts/doc_metadata.py` |
+| `DG-5` | done | Single-source-of-truth roadmap system | `commit:346dba7`, `file:scripts/roadmap.py`, `file:docs/ROADMAP.md` |
+| `DG-6` | done | Security workflow starvation on main | `commit:6e8f8b2`, `file:.github/workflows/security.yml` |
+| `DG-7` | done | Surface-coverage omission gate and the optional-assists guard | `commit:6283e65`, `commit:ca1eafd`, `file:scripts/check_surface_coverage.py` |
+| `DG-8` | done | Deep build-output ownership and storage remediation | `commit:e83ebef`, `file:scripts/build_output_policy.py` |
+| `DG-9` | done | Document the self-verification system and its failure classes | `doc:docs/reference/repository-self-verification.md` |
 
 ## iOS UI performance harness, measured review, and fix waves
 

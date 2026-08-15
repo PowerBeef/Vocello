@@ -1,3 +1,11 @@
+---
+status: active
+owner: backend-mlx
+summary: Sourced reference for the three model-facing text surfaces (script, delivery instruction, voice description) — every claim labeled OFFICIAL/RESEARCH/MEASURED-HERE/COMMUNITY/UNVERIFIED.
+sourceOfTruth:
+  - config/delivery-instruction-contract.json
+  - Sources/QwenVoiceCore/EmotionPreset.swift
+---
 # Qwen3-TTS Prompting Guide
 
 A sourced reference for the three text surfaces that reach the model: the **script text**, the

@@ -1,3 +1,10 @@
+---
+status: superseded
+owner: backend-and-platform
+summary: The adopted 2026-07-31 working order for the convergence-residuals x Metal-4 x Stage-4 arc; that plan completed and current work status lives in the rendered roadmap.
+supersededBy: docs/ROADMAP.md
+contentDigest: sha256:b277433e467e42c56051470e18630865f97b2256d5ccd6076045298b0ae21025
+---
 # Roadmap 2026-08 — convergence residuals × Metal 4 study × Stage 4
 
 > Adopted 2026-07-31 (maintainer call: interleave by cost; recorded in-repo as the resume

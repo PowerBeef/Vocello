@@ -16,13 +16,13 @@ struct EmotionPickerView: View {
     var leadingColumns: AnyView? = nil
 
     @State private var selectedPreset: EmotionPreset?
-    /// Every selection ships the `strong` copy. DP-3 (2026-08-02) measured it at
-    /// nearly double the recognisability of `normal` — mean per-preset recall
-    /// 0.278 against 0.157, chance 0.053 — and the same run showed the two tiers
-    /// are not separable from each other: for five presets the nearest cell in
-    /// the whole space is its own other tier, and seven of nine moved *less* at
-    /// strong than at normal, with dramatic reversing outright. A control that
-    /// cannot be heard is not a control.
+    /// Every selection ships its preset's shipped tier
+    /// (`EmotionPreset.shippedIntensity`): the DP-8 strong anchor — DP-3
+    /// (2026-08-02) measured `strong` at nearly double the recognisability of
+    /// `normal` — except happy/angry, which ship their normal copy (DP-22
+    /// branch (a): the only measured channel carrying the happy/angry
+    /// distinction; maintainer call 2026-08-15). `selectPreset` resolves the
+    /// tier per pick; this default only covers the pre-selection state.
     @State private var intensity: EmotionIntensity = .strong
     @State private var isCustomMode = false
     @State private var customText = ""
@@ -286,10 +286,13 @@ struct EmotionPickerView: View {
 
     private func selectPreset(_ preset: EmotionPreset) {
         selectedPreset = preset
-        // A new selection always ships the strong copy (DP-8). Without this
-        // reset, a `.normal` tier synced from an older draft leaked into every
-        // subsequent pick (2026-08-04 audit, F4).
-        intensity = .strong
+        // A new selection always ships the preset's shipped tier — the DP-8
+        // strong anchor, except the presets in
+        // `EmotionPreset.normalTierShippedIDs` (happy/angry ship normal;
+        // DP-22 branch (a), maintainer call 2026-08-15). Without this reset,
+        // a tier synced from an older draft leaked into every subsequent
+        // pick (2026-08-04 audit, F4).
+        intensity = preset.shippedIntensity
         isCustomMode = false
         customText = ""
         applyCurrentSelection()

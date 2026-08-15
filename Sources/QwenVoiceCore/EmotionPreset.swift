@@ -178,11 +178,13 @@ public struct EmotionPreset: Identifiable, Sendable {
 
     /// Resolve a stored instruction string back to the preset and tier that
     /// produced it, checking the `strong` tier first. Tiers with identical copy
-    /// (Neutral) must resolve to `.strong`, the shipped tier: resolving the tie
-    /// to `.normal` is the defect that made every macOS preset pick silently
-    /// emit the normal-tier copy after the Neutral draft default synced
-    /// (found by the 2026-08-04 delivery-control audit, F4 — DP-8's
-    /// ship-strong decision never actually took effect on macOS).
+    /// (Neutral) must resolve to `.strong` — Neutral's shipped tier: resolving
+    /// the tie to `.normal` is the defect that made every macOS preset pick
+    /// silently emit the normal-tier copy after the Neutral draft default
+    /// synced (found by the 2026-08-04 delivery-control audit, F4 — DP-8's
+    /// ship-strong decision never actually took effect on macOS). Distinct-copy
+    /// tiers resolve to exactly what was stored, which is what keeps legacy
+    /// drafts stable across shipped-tier changes (`shippedIntensity`).
     public static func matchInstruction(
         _ text: String
     ) -> (preset: EmotionPreset, intensity: EmotionIntensity)? {
@@ -218,6 +220,36 @@ public struct EmotionPreset: Identifiable, Sendable {
 
     public var isDirectionalHint: Bool {
         !EmotionPreset.distinctDeliveryIDs.contains(id)
+    }
+
+    /// Presets whose shipped copy is the `normal` tier (maintainer call
+    /// 2026-08-15, executing DP-22's pre-registered branch (a): per-preset
+    /// tier selection under DP-8's ship-the-measured-better-copy rule).
+    /// The user-facing intensity control stays retired; this set is the one
+    /// place the shipped tier deviates from the DP-8 strong anchor.
+    ///
+    /// Evidence: the normal tier is the only channel ever measured to carry
+    /// the happy/angry distinction — DP-22's confirmatory acoustic probe
+    /// (UAR 0.765 vs the 0.5 floor, perm p=0.007, 4-bit arm) replicating
+    /// DP-12's blind 2AFC (0.75 at normal, chance at strong). happy.normal
+    /// is the only FDR-clear happy cell in any arm (happy.strong fails FDR
+    /// everywhere and was heard as Surprised); instruct angry.strong was
+    /// never identified in listening (0/11) despite roster-level acoustic
+    /// clearance, and DP-6's angry.strong feature-power edge measures copy
+    /// adherence, not the valence separation this selection optimizes.
+    /// DP-23's cross-tier candidate (angry.strong + happy.normal) failed
+    /// its confirmatory probe, so the pair ships the confirmed
+    /// both-at-normal configuration. Everything else keeps the strong
+    /// anchor: the distinct set clears FDR in both DP-18 arms at strong and
+    /// DP-12's 2AFC found control pairs MORE discriminable at strong.
+    /// Membership changes require a new measurement, not taste.
+    public static let normalTierShippedIDs: Set<String> = ["happy", "angry"]
+
+    /// The tier a fresh preset selection ships. Legacy drafts keep resolving
+    /// to exactly the tier string they stored (`matchInstruction` /
+    /// `DeliveryInputState(legacyEmotion:)` contracts are unchanged).
+    public var shippedIntensity: EmotionIntensity {
+        EmotionPreset.normalTierShippedIDs.contains(id) ? .normal : .strong
     }
 
     /// The Neutral preset's real instruction (adopted 2026-08-01, maintainer

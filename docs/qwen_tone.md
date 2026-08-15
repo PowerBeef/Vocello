@@ -15,10 +15,13 @@ _Last reviewed: 2026-06-11. Provenance pass 2026-08-02._
 > guide. Where the two disagree, the prompting guide wins — several rules below were traced in
 > August 2026 to no source at all, and are flagged inline.
 
-> **Roster change (editor's note, 2026-08-04).** The delivery preset roster changed after this
-> guide was written: `excited` was folded into `happy` and `dramatic` dropped on 2026-08-03, and
-> the user-facing intensity tiers were retired on 2026-08-02. The current roster is 8 presets,
-> each shipping its `strong` copy. Preset references below predate that change; see
+> **Roster change (editor's note, 2026-08-04; tier note updated 2026-08-15).** The delivery
+> preset roster changed after this guide was written: `excited` was folded into `happy` and
+> `dramatic` dropped on 2026-08-03, and the user-facing intensity tiers were retired on
+> 2026-08-02. The current roster is 8 presets, each shipping its per-preset measured-best tier
+> (`EmotionPreset.shippedIntensity`): the `strong` anchor, except `happy` and `angry`, which ship
+> their `normal` copy (DP-22 branch (a), maintainer call 2026-08-15). Preset references below
+> predate that change; see
 > [`reference/qwen3-tts-prompting-guide.md`](reference/qwen3-tts-prompting-guide.md) and
 > [`reference/delivery-control-audit-2026-08.md`](reference/delivery-control-audit-2026-08.md)
 > for the corrected record.
@@ -117,4 +120,4 @@ Voice Cloning support text:
 - [`../README.md`](../README.md)
 - [`../CLAUDE.md`](../CLAUDE.md) — repo architecture, build, and conventions
 - [`reference/qwen3-tts-prompting-guide.md`](reference/qwen3-tts-prompting-guide.md) — the sourced prompting reference this file defers to
-- `Sources/QwenVoiceCore/EmotionPreset.swift` — the shipped 8 preset instructions (roster cut from ten on 2026-08-03; the user-facing intensity control was retired 2026-08-02; every preset ships its measured-better `strong` copy, and the tier survives only for the delivery matrix harness) (single source for macOS + iOS + the CLI's `bench --delivery` cells); `Sources/QwenVoiceCore/GenerationSemantics.swift` assembles the Voice Design "Voice character / Delivery" framing.
+- `Sources/QwenVoiceCore/EmotionPreset.swift` — the shipped 8 preset instructions (roster cut from ten on 2026-08-03; the user-facing intensity control was retired 2026-08-02; every preset ships its per-preset measured-best tier — the `strong` anchor, except `happy`/`angry` at `normal` since 2026-08-15 — and both tiers survive for the delivery matrix harness) (single source for macOS + iOS + the CLI's `bench --delivery` cells); `Sources/QwenVoiceCore/GenerationSemantics.swift` assembles the Voice Design "Voice character / Delivery" framing.

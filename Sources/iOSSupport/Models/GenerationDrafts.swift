@@ -19,13 +19,16 @@ struct DeliveryInputState: Equatable {
     init(
         mode: DeliveryInputMode = .preset,
         selectedPresetID: String = DeliveryInputState.neutralPresetID,
-        // DP-3 (2026-08-02) measured the `strong` copy at nearly double the
-        // recognisability of `normal` -- mean per-preset recall 0.278 against
-        // 0.157, chance 0.053 -- so it is now what every new selection ships.
-        // The user-facing intensity control is gone; the tier survives only so
-        // the delivery matrix harness can still address both texts, and so
-        // drafts saved before this change keep resolving to exactly what they
-        // stored.
+        // Every new selection ships its preset's shipped tier
+        // (`EmotionPreset.shippedIntensity`, written by the delivery sheet on
+        // each pick): the DP-8 strong anchor -- DP-3 (2026-08-02) measured
+        // `strong` at nearly double the recognisability of `normal` -- except
+        // happy/angry, which ship their normal copy (DP-22 branch (a),
+        // maintainer call 2026-08-15). This default only covers the fresh
+        // draft (Neutral, whose shipped tier is strong). The user-facing
+        // intensity control stays retired; the tier survives so the delivery
+        // matrix harness can address both texts, and drafts saved before any
+        // shipped-tier change keep resolving to exactly what they stored.
         selectedIntensity: EmotionIntensity = .strong,
         customText: String = ""
     ) {

@@ -9,7 +9,7 @@
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `delivery-prompting-2026-08` | active | backend-mlx | 20/23 (87%) |
+| `delivery-prompting-2026-08` | active | backend-mlx | 23/25 (92%) |
 | `compliance-2026-08` | complete | release-qa | 2/2 (100%) |
 | `convergence-metal4-stage4-2026-08` | complete | backend-and-platform | 7/7 (100%) |
 | `doc-governance-2026-08` | complete | release-qa | 9/9 (100%) |
@@ -35,7 +35,7 @@ Narrative authority: [`docs/reference/qwen3-tts-prompting-guide.md`](reference/q
 | `DP-6` | done | Angry pitch-axis contradiction | `doc:docs/reference/qwen3-tts-prompting-guide.md`, `file:config/delivery-instruction-contract.json` |
 | `DP-7` | done | On-device delivery-consistency cohort lane | `file:Tests/VocelloiOSUITests/VocelloiOSDeliveryCohortUITests.swift`, `file:scripts/ui_test.sh` |
 | `DP-8` | done | Retire the user-facing intensity control (scoped) | `doc:docs/reference/qwen3-tts-guide.md`, `file:Sources/Views/Components/EmotionPickerView.swift` |
-| `DP-9` | parked | Remove EmotionIntensity outright, after DP-4/5/6 | — |
+| `DP-9` | declined | Remove EmotionIntensity outright, after DP-4/5/6 | — |
 | `DP-10` | done | Cut the delivery roster to the presets that separate | `doc:docs/reference/qwen3-tts-prompting-guide.md`, `doc:docs/development-progress.md`, `file:Sources/QwenVoiceCore/EmotionPreset.swift`, `file:scripts/delivery_separability.py` |
 | `DP-11` | done | Delivery-control audit: adversarial re-examination and external research sweep | `doc:docs/reference/delivery-control-audit-2026-08.md`, `doc:docs/development-progress.md`, `doc:docs/reference/qwen3-tts-prompting-guide.md` |
 | `DP-12` | done | Move 1: fix the found defects, harden the harness, run the calibration session | `file:Sources/QwenVoiceCore/EmotionPreset.swift`, `file:Sources/Views/Components/EmotionPickerView.swift`, `file:Tests/VocelloCoreTests/EmotionPresetResolutionTests.swift`, `file:scripts/delivery_separability.py`, `file:scripts/bench_delivery_prosody.py`, `file:scripts/delivery_listening_session.py`, `doc:docs/reference/delivery-control-audit-2026-08.md` |
@@ -49,18 +49,17 @@ Narrative authority: [`docs/reference/qwen3-tts-prompting-guide.md`](reference/q
 | `DP-20` | parked | External delivery-control lever watch list (audit R8) | — |
 | `DP-21` | done | Delivery-adherence thresholds calibrated from the banked seed matrix | `file:scripts/prosody_profile.py`, `file:scripts/delivery_quality_gate.py`, `file:scripts/tests/test_delivery_quality_gate.py`, `file:docs/reference/delivery-harness.md` |
 | `DP-22` | done | Normal-tier acoustic arm: does the normal tier carry the happy/angry distinction (DP-12 follow-up) | `file:scripts/delivery_separability.py`, `file:benchmarks/HISTORY.md`, `file:docs/reference/delivery-harness.md` |
-| `DP-23` | parked | Ship happy at its normal copy (cross-tier pairing candidate from DP-22) | — |
+| `DP-23` | declined | Ship happy at its normal copy (cross-tier pairing candidate from DP-22) | — |
+| `DP-24` | done | Per-preset shipped tier: happy/angry ship their normal copy (DP-22 branch (a)) | `doc:docs/reference/delivery-harness.md`, `file:Sources/QwenVoiceCore/EmotionPreset.swift` |
+| `DP-25` | planned | Measured normal-tier gate floors (prosody profile v4) for the normal-shipping presets | — |
 
 ### Open items in detail
-
-- **`DP-9`** (parked) — Remove EmotionIntensity outright, after DP-4/5/6.
-  gate: Delete the enum, collapse bench cells to one per preset, retire intensity_scale and the per-tier delivery expectations, update the tier-parity check and the derived deliveryIntensityTiers fact.
 
 - **`DP-20`** (parked) — External delivery-control lever watch list (audit R8).
   unparkWhen: Only when a watched lever becomes runnable on-device at the 8 GB floor: a Qwen3-TTS VoiceEditing/instruct variant that combines ICL with instructions, CosyVoice 3-class instruct control in an MLX-portable form, emotion-vector steering (IndexTTS-2/EmoSteer-class) with published weights, or a quantization-robust valence result. The pinned audit's R8 section is the source list; re-verify claims against primary sources at unpark time rather than trusting the 2026-08 snapshot.
 
-- **`DP-23`** (parked) — Ship happy at its normal copy (cross-tier pairing candidate from DP-22).
-  gate: DP-22's exploratory cross-tier probe found angry.strong-vs-happy.normal is the widest measured happy/angry separation (2.424 vs 1.469 shipped) and happy.normal the only FDR-clear happy cell ever measured (happy.strong fails FDR in every arm of DP-18). Before any copy ships: (1) a small pre-registered confirmatory probe of the exact candidate pairing (angry.strong vs happy.normal, fresh seeds, both variants — the cross-tier finding is currently exploratory and 4-bit); (2) the maintainer's listening check that happy.normal does not reintroduce the heard-as-Surprised confusion (DP-12 heard happy.strong as Surprised); (3) if it ships, per-preset tier selection lands under DP-8's measured-better-copy rule, the delivery-instruction contract re-checks tier parity, and per-tier gate floors (profile schema v4) come with it since the shipped tier would no longer be uniform. Maintainer-gated at step 2; step 1 is machine-only and can run in any free window. STEP-1 PRE-REGISTRATION 2026-08-05 (before any generation): fresh seeds 20260921-20260938 (18; none overlap DP-18/DP-21/DP-22 ranges), cells angry.strong and happy.normal only, speed and quality variants, medium text, one invocation per seed, label dp23-crosstier. Scoring: delivery_separability.py 2-cell probe per arm, label-mode cell, 1000 permutation iterations, confirmatory designation. DECISION RULE: the 4-bit arm's probe UAR must clear the 0.5 floor at permutation p <= 0.05 to CONFIRM the exploratory 2.424 pairing; the 8-bit arm is descriptive (DP-22 showed the channel is 4-bit-specific, so an 8-bit null does not refute). Deterministic QC seed casualties drop-and-record per protocol. Confirmation advances this item to step 2 (maintainer listening); a null sends the cross-tier candidate back to exploratory status and the item re-parks pending a new lead. STEP-1 RESULTS 2026-08-06 (run exactly as registered; 18/18 seeds, zero QC casualties): NULL on the registered primary — the 4-bit arm's angry.strong-vs-happy.normal probe reached UAR 0.639 (perm p=0.1229, 1000 iterations), directionally positive but below the registered p<=0.05 bar; the fresh-seed pair distance is 2.213 versus the exploratory 2.424. The descriptive 8-bit arm cleared (UAR 0.694, p=0.045) — recorded as hypothesis-generating only, and deliberately NOT promoted: elevating the non-registered arm after the primary missed is the exact selective-inference move the pre-registration exists to prevent, and the arm ordering reverses DP-22's (4-bit strong there, 8-bit here), which reads as instability at n=18, not signal. Per the registered decision rule the cross-tier candidate returns to exploratory status and this item re-parks. DP-22's confirmed normal-vs-normal finding and DP-9's parking are unaffected. 18 PASS registry records committed with this closure.
+- **`DP-25`** (planned) — Measured normal-tier gate floors (prosody profile v4) for the normal-shipping presets.
+  gate: ["The DP-23-step-3 mechanics remainder, now live because DP-24 makes the shipped tier non-uniform: replace the prosody profile's derived normal minima (strong floors divided by the doubly-refuted 1.15 intensity_scale - scripts/prosody_profile.py) with floors calibrated from DP-22's banked measured normal-tier paired rows, at least for the shipping normal cells (happy, angry); retire or annotate the 1.15 constant; bump the profile schema so records carry the new digest. DP-21's calibration protocol is the template (floors at the noise decile; genuine misses kept warning). Desk work, no phone; needs the banked DP-22 sidecars under outputs/bench-archive."]
 
 ## EU AI Act Article 50 readiness
 

@@ -55,6 +55,46 @@ final class EmotionPresetResolutionTests: XCTestCase {
         XCTAssertNil(EmotionPreset.matchInstruction(""))
     }
 
+    func testShippedTierIsPerPreset() {
+        // The measured mapping (DP-22 branch (a), maintainer call 2026-08-15):
+        // happy and angry ship their normal copy — the only channel ever
+        // measured to carry the happy/angry distinction — and everything else
+        // keeps the DP-8 strong anchor. Membership changes require a new
+        // measurement, not taste.
+        let rosterIDs = Set(EmotionPreset.all.map(\.id))
+        XCTAssertEqual(EmotionPreset.normalTierShippedIDs, ["happy", "angry"])
+        XCTAssertTrue(EmotionPreset.normalTierShippedIDs.isSubset(of: rosterIDs))
+        for preset in EmotionPreset.all {
+            let expected: EmotionIntensity =
+                EmotionPreset.normalTierShippedIDs.contains(preset.id) ? .normal : .strong
+            XCTAssertEqual(preset.shippedIntensity, expected, preset.id)
+        }
+    }
+
+    func testShippedTierProfileEmitsTheShippedCopy() {
+        // A pick made through either platform's selection path resolves the
+        // preset's shipped tier; the profile's final instruction must be that
+        // tier's copy verbatim (and, for the normal-shipping presets, must
+        // differ from the strong copy the pair used to ship).
+        for preset in EmotionPreset.all {
+            let profile = DeliveryProfile.preset(preset, intensity: preset.shippedIntensity)
+            XCTAssertEqual(
+                profile.finalInstruction,
+                preset.instruction(for: preset.shippedIntensity),
+                preset.id
+            )
+        }
+        for id in EmotionPreset.normalTierShippedIDs {
+            guard let preset = EmotionPreset.preset(id: id) else {
+                return XCTFail("\(id) missing from roster")
+            }
+            XCTAssertNotEqual(
+                preset.instruction(for: .normal), preset.instruction(for: .strong),
+                "\(id) tiers must stay distinct for the shipped-tier change to mean anything"
+            )
+        }
+    }
+
     func testMeasuredRosterSplitStaysCoherent() {
         // The distinct/hint split is measured (DP-12), not taste: every
         // distinct id must exist in the roster, and the two halves must

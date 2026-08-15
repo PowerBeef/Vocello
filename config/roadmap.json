@@ -436,7 +436,7 @@
       "id": "DP-9",
       "plan": "delivery-prompting-2026-08",
       "title": "Remove EmotionIntensity outright, after DP-4/5/6",
-      "status": "parked",
+      "status": "declined",
       "gate": "Delete the enum, collapse bench cells to one per preset, retire intensity_scale and the per-tier delivery expectations, update the tier-parity check and the derived deliveryIntensityTiers fact.",
       "blockedBy": [
         "DP-4",
@@ -446,8 +446,10 @@
       "sourceOfTruth": [
         "Sources/QwenVoiceCore/EmotionPreset.swift"
       ],
-      "updated": "2026-08-05",
-      "unparkWhen": "Parked 2026-08-04 (maintainer call during the sync audit): DP-12's blind session contradicts this item's premise — the 2AFC verdict was no_measured_strong_tier_collapse, control pairs were MORE discriminable at strong (+0.50 [0.001, 0.812]), and angry-vs-happy discriminated at 0.75 at the normal tier versus chance at strong, so the tier machinery may yet carry product value. Unpark only after a dedicated measurement shows the tiers carry no exploitable product difference. Execution note: deleting the enum also retires the derived deliveryIntensityTiers fact, whose value feeds the doc staleness scanner's rule set (scripts/doc_metadata.py), so the scanner rules change in the same arc. That dedicated measurement is now registered as DP-22 (normal-tier acoustic arm, pre-registered 2026-08-05): its null branch unparks this item; its positive branch keeps the tier machinery as a product lever via per-preset tier selection. DP-22 RAN 2026-08-05: the normal tier separates angry-vs-happy in the 4-bit arm (UAR 0.765, p=0.007, replicating DP-12) — the tiers carry measured product value, so this item remains parked on DP-22's positive branch; see DP-23 for the shipping candidate."
+      "updated": "2026-08-15",
+      "unparkWhen": "Parked 2026-08-04 (maintainer call during the sync audit): DP-12's blind session contradicts this item's premise — the 2AFC verdict was no_measured_strong_tier_collapse, control pairs were MORE discriminable at strong (+0.50 [0.001, 0.812]), and angry-vs-happy discriminated at 0.75 at the normal tier versus chance at strong, so the tier machinery may yet carry product value. Unpark only after a dedicated measurement shows the tiers carry no exploitable product difference. Execution note: deleting the enum also retires the derived deliveryIntensityTiers fact, whose value feeds the doc staleness scanner's rule set (scripts/doc_metadata.py), so the scanner rules change in the same arc. That dedicated measurement is now registered as DP-22 (normal-tier acoustic arm, pre-registered 2026-08-05): its null branch unparks this item; its positive branch keeps the tier machinery as a product lever via per-preset tier selection. DP-22 RAN 2026-08-05: the normal tier separates angry-vs-happy in the 4-bit arm (UAR 0.765, p=0.007, replicating DP-12) — the tiers carry measured product value, so this item remains parked on DP-22's positive branch; see DP-23 for the shipping candidate.",
+      "notes": " DECLINED 2026-08-15 (maintainer call: no deletion). The intensity SEMANTICS are refuted (1.15 scale doubly refuted; strong is not more separable) but the tier MACHINERY carries replicated value in the opposite direction (angry/happy separate at normal: DP-12 perceptual 0.75 + DP-22 acoustic UAR 0.765 p=0.007) and is both the product lever and the measurement surface. Deleting it would destroy the normal-tier bench cells where the only happy-adjacent signal lives. The user-facing selector stays retired; per-preset shipped tiers land under DP-24.",
+      "reason": "Maintainer call 2026-08-15: no deletion. The intensity semantics are refuted, but the tier machinery carries replicated value in the opposite direction (angry/happy separate at normal: DP-12 0.75, DP-22 UAR 0.765 p=0.007) and is both the product lever and the measurement surface; deleting it would destroy the normal-tier bench cells where the only happy-adjacent signal lives. Per-preset shipped tiers land under DP-24 instead."
     },
     {
       "id": "DP-10",
@@ -670,13 +672,50 @@
       "id": "DP-23",
       "plan": "delivery-prompting-2026-08",
       "title": "Ship happy at its normal copy (cross-tier pairing candidate from DP-22)",
-      "status": "parked",
+      "status": "declined",
       "gate": "DP-22's exploratory cross-tier probe found angry.strong-vs-happy.normal is the widest measured happy/angry separation (2.424 vs 1.469 shipped) and happy.normal the only FDR-clear happy cell ever measured (happy.strong fails FDR in every arm of DP-18). Before any copy ships: (1) a small pre-registered confirmatory probe of the exact candidate pairing (angry.strong vs happy.normal, fresh seeds, both variants — the cross-tier finding is currently exploratory and 4-bit); (2) the maintainer's listening check that happy.normal does not reintroduce the heard-as-Surprised confusion (DP-12 heard happy.strong as Surprised); (3) if it ships, per-preset tier selection lands under DP-8's measured-better-copy rule, the delivery-instruction contract re-checks tier parity, and per-tier gate floors (profile schema v4) come with it since the shipped tier would no longer be uniform. Maintainer-gated at step 2; step 1 is machine-only and can run in any free window. STEP-1 PRE-REGISTRATION 2026-08-05 (before any generation): fresh seeds 20260921-20260938 (18; none overlap DP-18/DP-21/DP-22 ranges), cells angry.strong and happy.normal only, speed and quality variants, medium text, one invocation per seed, label dp23-crosstier. Scoring: delivery_separability.py 2-cell probe per arm, label-mode cell, 1000 permutation iterations, confirmatory designation. DECISION RULE: the 4-bit arm's probe UAR must clear the 0.5 floor at permutation p <= 0.05 to CONFIRM the exploratory 2.424 pairing; the 8-bit arm is descriptive (DP-22 showed the channel is 4-bit-specific, so an 8-bit null does not refute). Deterministic QC seed casualties drop-and-record per protocol. Confirmation advances this item to step 2 (maintainer listening); a null sends the cross-tier candidate back to exploratory status and the item re-parks pending a new lead. STEP-1 RESULTS 2026-08-06 (run exactly as registered; 18/18 seeds, zero QC casualties): NULL on the registered primary — the 4-bit arm's angry.strong-vs-happy.normal probe reached UAR 0.639 (perm p=0.1229, 1000 iterations), directionally positive but below the registered p<=0.05 bar; the fresh-seed pair distance is 2.213 versus the exploratory 2.424. The descriptive 8-bit arm cleared (UAR 0.694, p=0.045) — recorded as hypothesis-generating only, and deliberately NOT promoted: elevating the non-registered arm after the primary missed is the exact selective-inference move the pre-registration exists to prevent, and the arm ordering reverses DP-22's (4-bit strong there, 8-bit here), which reads as instability at n=18, not signal. Per the registered decision rule the cross-tier candidate returns to exploratory status and this item re-parks. DP-22's confirmed normal-vs-normal finding and DP-9's parking are unaffected. 18 PASS registry records committed with this closure.",
       "sourceOfTruth": [
         "scripts/delivery_separability.py"
       ],
-      "updated": "2026-08-06",
-      "unparkWhen": "A new measured lead on the cross-tier pairing: either a higher-power confirmatory design (the 2-cell probe at n=18 had modest power for UAR ~0.64), a replication of the 8-bit descriptive clearance under pre-registration, or a listening result that re-motivates the tier switch. Re-park recorded 2026-08-06 after the step-1 null."
+      "updated": "2026-08-15",
+      "unparkWhen": "A new measured lead on the cross-tier pairing: either a higher-power confirmatory design (the 2-cell probe at n=18 had modest power for UAR ~0.64), a replication of the 8-bit descriptive clearance under pre-registration, or a listening result that re-motivates the tier switch. Re-park recorded 2026-08-06 after the step-1 null.",
+      "notes": "DECLINED 2026-08-15: made moot by DP-24. This item's cross-tier candidate (angry.strong + happy.normal) failed its pre-registered step-1 confirmation (4-bit UAR 0.639, p=0.12), while the maintainer's per-preset shipped-tier call executes DP-22's registered branch (a) instead - BOTH happy and angry ship their normal copy, the configuration whose separation is confirmed (UAR 0.765, p=0.007). With both-at-normal shipped there is no cross-tier pairing to candidate. The step-1 null and its 18 PASS registry records stand as recorded.",
+      "reason": "Made moot by DP-24 (maintainer call 2026-08-15): both happy and angry ship their normal copy per DP-22's registered branch (a), so there is no cross-tier pairing to candidate. This item's own step-1 confirmatory probe had already nulled (4-bit UAR 0.639, p=0.12); that null and its 18 PASS registry records stand as recorded."
+    },
+    {
+      "id": "DP-24",
+      "plan": "delivery-prompting-2026-08",
+      "title": "Per-preset shipped tier: happy/angry ship their normal copy (DP-22 branch (a))",
+      "status": "done",
+      "gate": [
+        "Execute DP-22's pre-registered decision-rule branch (a) under DP-8's ship-the-measured-better-copy rule, per the maintainer's 2026-08-15 call: keep the user-facing intensity selector retired on both platforms (retired 2026-08-02; confirmed still absent), add EmotionPreset.shippedIntensity with normalTierShippedIDs = {happy, angry} as the single source of truth, and make every fresh preset pick resolve the preset's shipped tier (macOS EmotionPickerView.selectPreset; the iOS delivery sheet's pick handler writes the tier through to the draft). Legacy drafts keep resolving to exactly the tier string they stored (matchInstruction / DeliveryInputState(legacyEmotion:) contracts unchanged; identical-copy ties still resolve strong, Neutral's shipped tier). Both tiers stay addressable for the delivery matrix harness and CLI deliveries list. GATE: core resolution tests cover the mapping and the shipped-copy emission; deterministic gates green on both platform compiles."
+      ],
+      "sourceOfTruth": [
+        "Sources/QwenVoiceCore/EmotionPreset.swift",
+        "Sources/Views/Components/EmotionPickerView.swift",
+        "Sources/iOS/Sheets/IOSBottomSheets.swift",
+        "Sources/iOSSupport/Models/GenerationDrafts.swift"
+      ],
+      "updated": "2026-08-15",
+      "notes": "Landed 2026-08-15. Evidence basis per preset: happy.normal is the only FDR-clear happy cell in any arm (happy.strong fails FDR everywhere and was heard as Surprised in DP-12); angry ships normal because the confirmed angry/happy separation exists only with both at normal (DP-22 4-bit UAR 0.765 p=0.007 + DP-12 perceptual 0.75) and instruct angry.strong was never identified in listening (0/11) - DP-6's angry.strong feature-power edge measures copy adherence, not valence separation. The distinct set and fearful/surprised keep the strong anchor (DP-18 FDR-clear both arms at strong; DP-12 2AFC controls MORE discriminable at strong). DP-23's listening check on happy.normal-vs-Surprised confusion was superseded by the direct maintainer call; it remains a recommended informal check before the next release (releases are separately maintainer-called). The 4-bit-specificity caveat stands: the 8-bit/quality arm is null at both tiers, so the Quality variant expects no audible happy/angry gain from this change.",
+      "evidence": [
+        "doc:docs/reference/delivery-harness.md",
+        "file:Sources/QwenVoiceCore/EmotionPreset.swift"
+      ]
+    },
+    {
+      "id": "DP-25",
+      "plan": "delivery-prompting-2026-08",
+      "title": "Measured normal-tier gate floors (prosody profile v4) for the normal-shipping presets",
+      "status": "planned",
+      "gate": [
+        "The DP-23-step-3 mechanics remainder, now live because DP-24 makes the shipped tier non-uniform: replace the prosody profile's derived normal minima (strong floors divided by the doubly-refuted 1.15 intensity_scale - scripts/prosody_profile.py) with floors calibrated from DP-22's banked measured normal-tier paired rows, at least for the shipping normal cells (happy, angry); retire or annotate the 1.15 constant; bump the profile schema so records carry the new digest. DP-21's calibration protocol is the template (floors at the noise decile; genuine misses kept warning). Desk work, no phone; needs the banked DP-22 sidecars under outputs/bench-archive."
+      ],
+      "sourceOfTruth": [
+        "scripts/prosody_profile.py",
+        "scripts/delivery_quality_gate.py"
+      ],
+      "updated": "2026-08-15"
     },
     {
       "id": "CM-7",

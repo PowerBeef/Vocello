@@ -470,6 +470,12 @@ struct IOSDeliveryPickerSheet: View {
         return Button {
             localPresetID = preset.id      // drive the sheet UI instantly
             selectedPresetID = preset.id   // write through to the draft (chip + generation)
+            // A new pick ships the preset's shipped tier (DP-8 strong anchor;
+            // happy/angry ship normal per DP-22 branch (a), maintainer call
+            // 2026-08-15) — same reset contract as macOS selectPreset, so a
+            // tier from an older draft never leaks into a new pick.
+            localIntensity = preset.shippedIntensity
+            intensity = preset.shippedIntensity
             IOSHaptics.selection()
         } label: {
             VStack(alignment: .leading, spacing: 4) {

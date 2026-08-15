@@ -49,6 +49,25 @@ machine-readable status record and wins over any older prose.
 
 ## Resume here (2026-08-15)
 
+**DP-24 shipped — per-preset delivery tiers (2026-08-15, maintainer call,
+desk):** the intensity selector stays retired on both platforms (as it has
+been since 2026-08-02), and each preset now ships its measured-best tier:
+`happy` and `angry` ship their `normal` copy — executing DP-22's
+pre-registered branch (a), the only channel ever measured to carry the
+happy/angry distinction (acoustic UAR 0.765 p=0.007 replicating the blind
+2AFC 0.75) — while everything else keeps the DP-8 `strong` anchor.
+`EmotionPreset.shippedIntensity` is the single source of truth; fresh picks
+resolve it on both platforms; legacy drafts keep resolving exactly what
+they stored. Known caveats recorded in DP-24's notes: the channel is
+4-bit-specific (no expected audible gain on Quality), and DP-23's informal
+happy-vs-Surprised listening check is recommended before the next release.
+Dispositions: DP-9 and DP-23 **declined** with reasons (no deletion — the
+tier machinery is the lever and the measurement surface; the cross-tier
+candidate is moot under both-at-normal); **DP-25 registered** (measured
+normal-tier gate floors, prosody profile v4, from DP-22's banked rows —
+desk work). Core resolution tests cover the mapping; both platform
+compiles and core-test green.
+
 **DG-4 closed — the `doc-governance-2026-08` plan is complete (2026-08-15,
 desk):** all 39 remaining documents were read and annotated in one
 maintainer-directed sweep (5 domain rules, 8 ADRs, 26 reference/narrative

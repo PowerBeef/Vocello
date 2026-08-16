@@ -49,6 +49,26 @@ machine-readable status record and wins over any older prose.
 
 ## Resume here (2026-08-15)
 
+**ICI-2 closed — import restore device-accepted; `ios-clone-import-2026-08`
+complete (2026-08-15, evening phone window):** the restored Files-import
+flow passed end to end on the paired iPhone. Because the benchmark voice
+already existed and **iOS ships no saved-voice deletion UI** (newly
+recorded backlog gap — `deletePreparedVoice` is reachable only through the
+enrollment warning-alert discard paths; macOS has library deletion, iPhone
+has none), a one-off test variant drove the full flow with a distinctly
+named staged copy: picker → "Import voice" sheet with name and sidecar
+transcript prefilled ("Good length" review card) → save → saved-voice row
+(PASS, 47 s, screenshots local-only; the throwaway voice stays on the
+device until a delete UI ships). The shipped
+`ui_test.sh ios enroll-clone-fixture` lane passed via its idempotent exit
+on the real fixture (`ios-xcui-enroll-clone-fixture-20260816-000822-4871903c`)
+and smoke passed first try
+(`ios-xcui-smoke-20260816-001059-4be45687`, both journeys, memory-pressure
+sentinel clean) on the build carrying the import restore and the Built-in
+Voice rename. The open-from-Files route remains a manual maintainer
+spot-check. **Backlog additions: iOS saved-voice deletion UI** (the gap the
+maintainer hit live during acceptance) alongside the existing items.
+
 **Custom Voice renamed to Built-in Voice in all user-facing copy
 (2026-08-15, maintainer call, desk):** the mode was named after upstream's
 CustomVoice checkpoint and confused end users; it speaks with the built-in

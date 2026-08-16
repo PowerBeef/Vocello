@@ -68,7 +68,7 @@
     {
       "id": "ios-clone-import-2026-08",
       "title": "iOS clone-reference file import restored",
-      "status": "active",
+      "status": "complete",
       "owner": "ios",
       "adopted": "2026-08-15",
       "goal": "Restore the iPhone file-import clone-reference route removed 2026-08-01 for App Store review-posture caution (no rejection ever occurred; build 23 carried the feature and passed beta review): the Voices-tab Files picker, the open-from-Files document route, and the import mode of the record-voice sheet, re-landed with the recorded fixes rather than a blind revert.",
@@ -209,7 +209,7 @@
       "sourceOfTruth": [
         "Sources/QwenVoiceCore/GenerationSemantics.swift"
       ],
-      "updated": "2026-08-04"
+      "updated": "2026-08-15"
     },
     {
       "id": "DP-3",
@@ -241,7 +241,7 @@
       "sourceOfTruth": [
         "Sources/QwenVoiceCore/GenerationSemantics.swift"
       ],
-      "updated": "2026-08-04",
+      "updated": "2026-08-15",
       "evidence": [
         "doc:docs/reference/qwen3-tts-prompting-guide.md",
         "file:config/runtime-debug-knobs.json"
@@ -259,7 +259,7 @@
       "sourceOfTruth": [
         "Sources/QwenVoiceCore/GenerationSemantics.swift"
       ],
-      "updated": "2026-08-03",
+      "updated": "2026-08-15",
       "evidence": [
         "doc:docs/reference/qwen3-tts-prompting-guide.md",
         "file:config/runtime-debug-knobs.json"
@@ -843,7 +843,7 @@
         "Sources/QwenVoiceCore/WAVProvenanceChunk.swift",
         "docs/reference/ios-appstore-submission.md"
       ],
-      "updated": "2026-08-08",
+      "updated": "2026-08-15",
       "evidence": [
         "file:Sources/QwenVoiceCore/WAVProvenanceChunk.swift",
         "file:Tests/VocelloCoreTests/WAVProvenanceChunkTests.swift",
@@ -1058,13 +1058,17 @@
       "id": "ICI-2",
       "plan": "ios-clone-import-2026-08",
       "title": "Device acceptance of the restored import route",
-      "status": "planned",
+      "status": "done",
       "gate": "Next phone window, explicit QA (never a publishing prerequisite): run the restored opt-in lane end to end - stage the benchmark fixture WAV+txt into the app's Documents (devicectl appDataContainer copy) and run scripts/ui_test.sh ios enroll-clone-fixture (drives voices_importAudioFile through the system picker to a saved voicesRow_saved_* row) - plus scripts/ui_test.sh ios smoke to confirm the Voices-tab changes leave the standing journeys green. The open-from-Files route (tapping an audio file in the Files app) is a manual maintainer spot-check since XCUITest cannot drive the Files app. GATE: enroll-clone-fixture lane PASS + smoke PASS recorded in docs/development-progress.md.",
       "sourceOfTruth": [
         "scripts/ui_test.sh",
         "Tests/VocelloiOSUITests/VocelloiOSFixtureEnrollmentUITests.swift"
       ],
-      "updated": "2026-08-15"
+      "updated": "2026-08-15",
+      "notes": "Closed 2026-08-15 (evening phone window). Full picker-driven proof: because the benchmark voice already existed and iOS ships no saved-voice deletion UI (gap recorded to backlog), a one-off uncommitted test variant drove the restored flow end to end with a distinctly named staged copy (Import_acceptance_test): voices_importAudioFile -> system picker -> Import voice sheet with name and sidecar transcript prefilled ('Good length' review card) -> save -> voicesRow_saved_ row; PASS in 47s with screenshots (local-only). The throwaway voice remains on the device until a delete UI ships. Shipped lane PASS via its idempotent exit on the real fixture (ios-xcui-enroll-clone-fixture-20260816-000822-4871903c), proving dispatch, ledger, and wiring. Smoke PASS first try (ios-xcui-smoke-20260816-001059-4be45687, both journeys, memory-pressure sentinel clean) on the build carrying the import restore and the Built-in Voice rename. One automation-session transient ('Timed out while enabling automation mode') was retried per the recorded triage pattern. The open-from-Files route stays a manual maintainer spot-check (XCUITest cannot drive the Files app).",
+      "evidence": [
+        "doc:docs/development-progress.md"
+      ]
     }
   ]
 }

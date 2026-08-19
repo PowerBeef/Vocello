@@ -90,11 +90,12 @@ def validate(root: Path, installed: str | None = None) -> list[str]:
         "Reset draft Release assets",
         "Upload verified assets to draft Release",
         "Verify downloaded Release assets",
-        "Publish verified GitHub Release",
     ]
     positions = [release.find(value) for value in ordered]
     if any(value < 0 for value in positions) or positions != sorted(positions):
-        errors.append("release workflow does not preserve verify -> draft -> upload -> remote verify -> publish ordering")
+        errors.append("release workflow does not preserve verify -> draft -> upload -> remote verify ordering")
+    if "Publish verified GitHub Release" in release or re.search(r"--draft=false", release):
+        errors.append("release candidate workflow must stop at a verified draft")
     for required in (
         "gh release delete-asset",
         'gh release view "$RELEASE_TAG" --json assets',
@@ -102,6 +103,25 @@ def validate(root: Path, installed: str | None = None) -> list[str]:
     ):
         if required not in release:
             errors.append(f"release workflow does not enforce an exact draft asset set: {required}")
+
+    promotion_path = root / ".github/workflows/promote-release.yml"
+    promotion = promotion_path.read_text(encoding="utf-8") if promotion_path.is_file() else ""
+    if not re.search(r"workflow_dispatch:\s*\n\s*inputs:", promotion):
+        errors.append("promotion workflow must be manual-only")
+    promotion_order = [
+        "Verify tag and draft state",
+        "Download and validate candidate plus promotion evidence",
+        "python3 scripts/release_evidence.py validate",
+        "python3 scripts/quality_promotion.py validate",
+        "Publish source-bound verified Release",
+        "gh release edit \"$RELEASE_TAG\"",
+    ]
+    promotion_positions = [promotion.find(value) for value in promotion_order]
+    if any(value < 0 for value in promotion_positions) or promotion_positions != sorted(promotion_positions):
+        errors.append("promotion workflow does not preserve draft -> release evidence -> quality evidence -> publish ordering")
+    for required in ("quality-promotion.json", "--platform macos", "--draft=false"):
+        if required not in promotion:
+            errors.append(f"promotion workflow is missing source-bound publication control: {required}")
 
     ios_release_order = re.compile(
         r"Run process-bound iOS release readiness.*Archive VocelloiOS.*"

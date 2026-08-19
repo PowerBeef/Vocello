@@ -32,14 +32,14 @@ sourceOfTruth:
   overrides and explicit concurrency-safety exceptions
 
 **Does NOT own:**
-- macOS SwiftUI / XPC client wiring (`.claude/rules/macos.md`)
-- iOS app UI / on-device coordination (`.claude/rules/ios.md`)
-- Build scripts, CI, signing, release packaging (`.claude/rules/release-qa.md`)
+- macOS SwiftUI / XPC client wiring (`.agents/rules/macos.md`)
+- iOS app UI / on-device coordination (`.agents/rules/ios.md`)
+- Build scripts, CI, signing, release packaging (`.agents/rules/release-qa.md`)
 
 **Consults:**
 - `docs/ARCHITECTURE.md` §4 (engine core), §11 (model management), §12 (telemetry)
 - `docs/reference/{mlx-guide,qwen3-tts-guide,mimi-codec-guide,metal-guide,swift-performance-guide,ios-engine-optimization,telemetry-and-benchmarking}.md`
-- Root `CLAUDE.md` (Hard rules) + [`docs/ARCHITECTURE.md`](../../docs/ARCHITECTURE.md) (engine invariants)
+- Root `AGENTS.md` (Hard rules) + [`docs/ARCHITECTURE.md`](../../docs/ARCHITECTURE.md) (engine invariants)
 - Delivery/emotion quality measurement: [`docs/reference/delivery-harness.md`](../../docs/reference/delivery-harness.md)
   (tools, `bench --delivery` protocol, instruction-receipt provenance, statistics semantics,
   pre-registration discipline, and the DP results ledger)
@@ -66,7 +66,7 @@ Before changing anything in this layer, read:
 - Generated output must use `config/build-output-policy.json`. Backend work may consume the
   canonical macOS/iOS caches and the dedicated owned-runtime SwiftPM scratch path, but must not create
   another DerivedData root or a `.build` directory below `Packages/VocelloQwen3Core/`. Route policy
-  changes through `.claude/rules/release-qa.md`.
+  changes through `.agents/rules/release-qa.md`.
 - XCUITest is the sole autonomous app UI driver. Smoke and benchmark UI lanes are explicit
   frontend acceptance only and never a prerequisite for a commit, push, pull request, ordinary
   merge, ordinary CI, or release package. Frontend observations do not prove backend completion;
@@ -145,7 +145,8 @@ warning.
 - **Decoder drift.** The owned `Qwen3TTSSpeechTokenizer` uses input-side overlap-and-discard.
   Do not "fix" drift by changing the output side.
 - **SPM pins move in lockstep.** `mlx-swift` and `mlx-swift-lm` are bumped together, never
-  alone, and only after a benchmark-gated review on a throwaway branch. Since mlx-swift-lm
+  alone, and only after explicit maintainer authorization and a benchmark-gated review performed
+  directly on `main`. Since mlx-swift-lm
   3.x, `swift-transformers` is the app-supplied Hub/Tokenizers implementation and a direct
   dependency of `MLXAudioTTS` — review its pin in the same change as the mlx pair. mlx-swift
   ≥0.31 ships a `CudaBuild` build-tool plugin that cannot be fingerprint-approved headlessly;

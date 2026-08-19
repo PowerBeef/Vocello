@@ -5,36 +5,41 @@
 
 - Current source identity and dirty state: local JSON report only (kept out of the tracked snapshot to avoid self-referential drift)
 - Swift tests: 538 cases in 74 files
-- Python tests: 958 cases in 73 files
+- Python tests: 987 cases in 76 files
 - Required-step assurance: 72 steps across 16 workflows, all covered by forced-failure fixtures
 - Unsafe-concurrency annotations: 49 (49 registered with owner and invariant; contract complete)
 
-## Canonical hardware evidence
+## Hardware evidence by domain selector
 
-| Platform | Latest canonical run | Captured |
-| --- | --- | --- |
-| macos | `macos-xcui-benchmark-20260801-182943-b0b5a448` | 2026-08-01T18:43:00Z |
-| ios | `ios-xcui-benchmark-20260801-132415-abbec96b` | 2026-08-01T13:38:28Z |
+| Selector | Platform / kind | Latest qualifying run | Captured |
+| --- | --- | --- | --- |
+| ios-memory-qualification | ios / memory-qualification | `ios-memory-qualification-20260802-004801-03ebafe1` | 2026-08-02T00:49:27Z |
+| ios-ui-generation | ios / ui-generation | `ios-xcui-benchmark-20260801-132415-abbec96b` | 2026-08-01T13:38:28Z |
+| ios-ui-performance | ios / ui-perf | `ios-xcui-perf-20260815-173719-6e425c28` | 2026-08-15T17:47:07Z |
+| macos-memory-qualification | macos / memory-qualification | `mac-memory-qualification-20260807-022819-3eb4d25b` | 2026-08-07T02:29:39Z |
+| macos-ui-generation | macos / ui-generation | `macos-xcui-benchmark-20260801-182943-b0b5a448` | 2026-08-01T18:43:00Z |
+| macos-ui-performance | macos / ui-perf | `macos-xcui-perf-20260805-202246-f7d85c1e` | 2026-08-05T20:30:14Z |
 
 ## Critical-domain coverage and freshness
 
 | Domain | Owner | Production files | Direct test files / cases | Hardware evidence |
 | --- | --- | ---: | ---: | --- |
-| generation-terminal | backend | 4 | 2 / 16 | macos: stale, ios: stale |
-| clone-conditioning | backend | 33 | 2 / 32 | macos: stale, ios: stale |
-| event-delivery | backend | 3 | 2 / 10 | macos: stale, ios: stale |
-| memory-policy | backend-platform | 6 | 2 / 25 | macos: stale, ios: stale |
-| model-delivery | backend-platform | 17 | 3 / 37 | macos: stale, ios: stale |
-| xpc-transport | macos | 3 | 3 / 15 | macos: fresh |
-| benchmark-validation | release-qa | 6 | 4 / 118 | macos: stale, ios: stale |
+| generation-terminal | backend | 4 | 2 / 16 | macos-ui-generation: stale, ios-ui-generation: stale |
+| clone-conditioning | backend | 33 | 2 / 32 | macos-ui-generation: stale, ios-ui-generation: stale |
+| event-delivery | backend | 3 | 2 / 10 | macos-ui-generation: stale, ios-ui-generation: stale |
+| memory-policy | backend-platform | 6 | 2 / 25 | macos-memory-qualification: stale, ios-memory-qualification: stale |
+| model-delivery | backend-platform | 17 | 3 / 37 | external promotion: macos-model-download-lifecycle, ios-model-download-lifecycle |
+| ui-performance | platform | 75 | 15 / 54 | macos-ui-performance: stale, ios-ui-performance: stale |
+| xpc-transport | macos | 3 | 3 / 15 | macos-ui-generation: fresh |
+| benchmark-validation | release-qa | 6 | 4 / 118 | macos-ui-generation: stale, ios-ui-generation: stale |
 | orchestration-assurance | release-qa | 3 | 1 / 12 | not hardware-gated |
-| release-supply-chain | release-qa | 6 | 3 / 51 | macos: stale |
+| release-supply-chain | release-qa | 9 | 4 / 63 | not hardware-gated |
 | persistence-privacy | platform-release-qa | 4 | 2 / 7 | not hardware-gated |
-| runtime-hardening | backend-release-qa | 5 | 2 / 17 | not hardware-gated |
+| runtime-hardening | backend-release-qa | 7 | 3 / 28 | not hardware-gated |
 
 ## Interpretation
 
-- `stale` means a production path owned by that domain changed after the latest canonical hardware record; it does not block ordinary development publishing.
+- `stale` means a production path owned by that domain changed after its latest qualifying hardware record; `missing` means no record matches that domain's selector. Neither blocks ordinary development publishing.
 - Test inventory proves discoverable direct coverage, not that those tests passed in this invocation.
 - Dependency age and open P0/P1 issue state require authoritative online sources and are intentionally not guessed offline.
 - Run `python3 scripts/project_health.py report --output build/artifacts/project-health/` for the complete local JSON inventory.

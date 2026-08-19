@@ -182,8 +182,8 @@ func humanBytes(_ bytes: Int64) -> String {
 }
 
 /// Marketing version, preferring the built bundle's CFBundleShortVersionString so
-/// `version` and the store-version seed track the packaged binary; falls back to
-/// the literal for `-target` dev builds where the key may be unset.
+/// `version` and the store-version seed track the packaged binary. Unsupported
+/// bare `swiftc` builds have no embedded metadata and report an honest unknown.
 let vocelloCLIVersion: String =
     (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String)
-        .flatMap { $0.isEmpty ? nil : $0 } ?? "0.1.0"
+        .flatMap { $0.isEmpty ? nil : $0 } ?? "unknown"

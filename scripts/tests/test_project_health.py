@@ -52,10 +52,27 @@ class ProjectHealthTests(unittest.TestCase):
             result = self.run_tool("report", "--output", directory)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             payload = json.loads((Path(directory) / "project-health.json").read_text(encoding="utf-8"))
-            self.assertEqual(set(payload["canonicalEvidence"]), {"macos", "ios"})
-            for platform in ("macos", "ios"):
-                self.assertEqual(payload["canonicalEvidence"][platform]["status"], "available")
-                self.assertTrue(payload["canonicalEvidence"][platform]["runID"])
+            catalog = payload["hardwareEvidenceCatalog"]
+            self.assertEqual(catalog["macos-ui-generation"]["status"], "available")
+            self.assertEqual(catalog["ios-ui-generation"]["status"], "available")
+            self.assertEqual(catalog["macos-ui-performance"]["kind"], "ui-perf")
+            self.assertEqual(catalog["ios-ui-performance"]["kind"], "ui-perf")
+            self.assertTrue(catalog["ios-ui-performance"]["runID"])
+
+    def test_domains_select_evidence_that_matches_their_risk(self) -> None:
+        contract = json.loads(
+            (ROOT / "config/project-health-contract.json").read_text(encoding="utf-8")
+        )
+        domains = {item["id"]: item for item in contract["criticalDomains"]}
+        self.assertEqual(
+            {item["kind"] for item in domains["memory-policy"]["hardwareEvidence"]},
+            {"memory-qualification"},
+        )
+        self.assertEqual(
+            {item["kind"] for item in domains["ui-performance"]["hardwareEvidence"]},
+            {"ui-perf"},
+        )
+        self.assertEqual(domains["release-supply-chain"]["hardwareEvidence"], [])
 
     def test_tracked_summary_omits_self_referential_source_state(self) -> None:
         source = __import__("importlib.util").util.spec_from_file_location("project_health", TOOL)

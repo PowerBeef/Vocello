@@ -351,8 +351,10 @@ def validate_release_contract() -> list[str]:
     contract = load_json(ROOT / "config/release-evidence-contract.json")
     if contract.get("schemaVersion") != 1:
         errors.append("release-evidence-contract schemaVersion must be 1")
-    if contract.get("publicationPolicy") != "draft-build-verify-attest-publish":
-        errors.append("release evidence must use draft-build-verify-attest-publish")
+    if contract.get("publicationPolicy") != "draft-build-verify-attest-await-source-bound-promotion":
+        errors.append(
+            "release evidence must use draft-build-verify-attest-await-source-bound-promotion"
+        )
     for key in ("sourceIdentity", "artifacts"):
         value = contract.get(key)
         if not isinstance(value, list) or not value or len(value) != len(set(value)):
@@ -389,10 +391,18 @@ def validate_release_contract() -> list[str]:
                     f"release-evidence-contract {platform} steps differ from managed orchestration"
                 )
     workflow = (ROOT / ".github/workflows/release.yml").read_text(encoding="utf-8")
+    promotion_workflow = (ROOT / ".github/workflows/promote-release.yml").read_text(encoding="utf-8")
     if "release.published" in workflow:
         errors.append("release workflow must not trigger after public release publication")
-    if "--draft" not in workflow or "--latest" not in workflow:
-        errors.append("release workflow must create a draft and publish it only after verification")
+    if "--draft" not in workflow or "--latest" in workflow or "--draft=false" in workflow:
+        errors.append("release workflow must create and verify a draft without publishing it")
+    if (
+        "scripts/release_evidence.py validate" not in promotion_workflow
+        or "scripts/quality_promotion.py validate" not in promotion_workflow
+        or "--draft=false" not in promotion_workflow
+        or "--latest" not in promotion_workflow
+    ):
+        errors.append("promotion workflow must validate both evidence layers before publication")
     if "release_evidence.py" not in workflow:
         errors.append("release workflow does not invoke release_evidence.py")
     for required in (

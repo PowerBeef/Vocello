@@ -70,7 +70,11 @@ class IOSModelDownloadCancelContractTests(unittest.TestCase):
             "private func rollbackRacedInstallationIfNeeded(", 1
         )[1].split("\n    private func reconcileInstalledAfterCancellationCleanupFailure", 1)[0]
         self.assertIn("!active.targetWasAvailableAtStart", rollback_body)
-        self.assertIn("fileManager.removeItem(at: active.targetDir)", rollback_body)
+        self.assertIn(
+            "SharedModelComponentStore(modelsRoot: AppPaths.modelsDir).deleteModel(",
+            rollback_body,
+        )
+        self.assertIn("modelFolder: active.targetDir.lastPathComponent", rollback_body)
 
     def test_failed_install_rollback_reconciles_ledger_before_visible_success(self) -> None:
         rollback_failure = self.cancel_body.index(

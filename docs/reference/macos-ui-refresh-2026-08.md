@@ -228,7 +228,7 @@ the confirmatory warn ceilings to hard.
 ## 2026-08-06 dual-agent critique — polish landed, questions parked
 
 A dual-agent design critique (isolated design-director review + mechanical
-detector/evidence pass; snapshot in `.impeccable/critique/`) scored the shipped UI
+detector/evidence pass, preserved as a local critique snapshot) scored the shipped UI
 31/40 and confirmed the system as product-authored. Its actionable findings landed
 the same day as the maintainer-approved polish pass (Generate-CTA `ControlGroup`
 collapse fix, gold/blue accent unification, scaled-display robustness — 1 pt

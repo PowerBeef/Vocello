@@ -95,7 +95,7 @@ struct IOSStudioCanvas<SetupChips: View>: View {
     // immediately called resignFirstResponder — the keyboard never stayed up.
     // The sibling composers in IOSGenerationModeViews use the same @State pattern.
     @State private var isScriptFocused = false
-    // Honor Reduce Motion for the generating waveform (CLAUDE.md animation rule);
+    // Honor Reduce Motion for the generating waveform (AGENTS.md animation rule);
     // injected at RootView. When on, the dock waveform renders frozen.
     @Environment(\.iosReduceMotionEnabled) private var reduceMotion
 

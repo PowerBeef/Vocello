@@ -225,7 +225,7 @@ resolution and never downloads or runs a Simulator component automatically.
 These checks are sufficient for normal commits, pull requests, and merges. XCUITest is explicit frontend acceptance: native macOS or a paired physical iPhone, never Simulator. Models, a phone, and UI evidence are not prerequisites for sharing development work.
 
 Start with [`CONTRIBUTING.md`](CONTRIBUTING.md) for the human contribution flow. Maintainers and
-Coding agents should also read [`CLAUDE.md`](CLAUDE.md). Deeper references:
+Coding agents should also read [`AGENTS.md`](AGENTS.md). Deeper references:
 
 - [`docs/development-progress.md`](docs/development-progress.md): current implementation checkpoint and open acceptance work
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md): runtime topology and engine invariants

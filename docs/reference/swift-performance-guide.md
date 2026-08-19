@@ -113,7 +113,7 @@ public final class TTSEngineStore: ObservableObject {
 
 - Every `await` on the actor is a potential suspension point.
 - The actor's executor is a single serial queue; long synchronous work inside it blocks all other callers.
-- The prewarm slot gate (`acquirePrewarmSlot` / `releasePrewarmSlot`) exists because the actor mutex alone is not enough: the prewarm body itself `await`s inside MLX, releasing actor access while the KV-cache is still mutating. See the invariant in `.claude/rules/backend-mlx.md`.
+- The prewarm slot gate (`acquirePrewarmSlot` / `releasePrewarmSlot`) exists because the actor mutex alone is not enough: the prewarm body itself `await`s inside MLX, releasing actor access while the KV-cache is still mutating. See the invariant in `.agents/rules/backend-mlx.md`.
 
 Rule: keep actor-isolated methods short. Move heavy MLX work off the actor when possible, or design explicit gates when MLX calls suspend but must remain mutually exclusive.
 
@@ -361,7 +361,7 @@ Swift performance change, complete the deeper checklist:
 - [`qwen3-tts-guide.md`](qwen3-tts-guide.md) — model architecture, generation modes, parameters.
 - [`ios-engine-optimization.md`](ios-engine-optimization.md) — iPhone memory and streaming specifics.
 - [`telemetry-and-benchmarking.md`](telemetry-and-benchmarking.md) — telemetry schema and benchmark procedure.
-- [`CLAUDE.md`](../../CLAUDE.md) — build system, architecture, and critical invariants.
+- [`AGENTS.md`](../../AGENTS.md) — build system, architecture, and critical invariants.
 - Apple: [Explore Swift performance (WWDC 2024)](https://developer.apple.com/videos/play/wwdc2024/10217)
 - Apple: [Improve memory usage and performance with Swift (WWDC 2025)](https://developer.apple.com/videos/play/wwdc2025/312)
 - Apple: [Consume noncopyable types in Swift (WWDC 2024)](https://developer.apple.com/videos/play/wwdc2024/10170)

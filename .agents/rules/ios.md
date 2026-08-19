@@ -21,14 +21,14 @@ sourceOfTruth:
 - iOS entitlements, Info.plist, App Store submission materials
 
 **Does NOT own:**
-- macOS app / XPC service (`.claude/rules/macos.md`)
-- Engine core / MLX internals (`.claude/rules/backend-mlx.md`)
-- Build scripts / CI / release (`.claude/rules/release-qa.md`)
+- macOS app / XPC service (`.agents/rules/macos.md`)
+- Engine core / MLX internals (`.agents/rules/backend-mlx.md`)
+- Build scripts / CI / release (`.agents/rules/release-qa.md`)
 
 **Consults:**
 - `docs/ARCHITECTURE.md` §6 (iOS request lifecycle)
 - `docs/reference/{ios-app-guide,ios-device-testing,ios-engine-optimization,ios-appstore-submission,ios-increased-memory-entitlement-request}.md`
-- Root `CLAUDE.md` (Hard rules) + [`docs/project-map.html`](../../docs/project-map.html)
+- Root `AGENTS.md` (Hard rules) + [`docs/project-map.html`](../../docs/project-map.html)
 
 ## Required pre-read
 
@@ -61,7 +61,7 @@ Before changing iOS UI or behavior, read:
   crash proof.
 - Generated output must use `config/build-output-policy.json`. Do not add an iOS DerivedData,
   package, evidence, symbol, or archive root outside the manifest; route policy changes through
-  `.claude/rules/release-qa.md`.
+  `.agents/rules/release-qa.md`.
 - Use authoritative Apple documentation (docs MCP when callable) for current framework APIs. Use a
   GitHub integration when callable, otherwise `gh`, for repository context; scripts remain the test
   interface.

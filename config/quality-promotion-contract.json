@@ -1,0 +1,129 @@
+{
+  "schemaVersion": 1,
+  "owner": "release-qa",
+  "publicPromotionPolicy": "source-bound-quality-evidence",
+  "maxEvidenceAgeSeconds": 604800,
+  "allowedWarnings": [
+    "memory.pressure.soft_trim"
+  ],
+  "platformMinimumEvidence": {
+    "macos": [
+      "macos-ui-benchmark"
+    ],
+    "ios": [
+      "ios-ui-benchmark"
+    ]
+  },
+  "evidence": {
+    "macos-ui-benchmark": {
+      "platform": "macos",
+      "type": "benchmark-record",
+      "kind": "ui-generation",
+      "matrixScope": "canonical",
+      "classifications": [
+        "canonical"
+      ]
+    },
+    "ios-ui-benchmark": {
+      "platform": "ios",
+      "type": "benchmark-record",
+      "kind": "ui-generation",
+      "matrixScope": "canonical",
+      "classifications": [
+        "canonical"
+      ]
+    },
+    "macos-engine-benchmark": {
+      "platform": "macos",
+      "type": "benchmark-record",
+      "kind": "engine-generation",
+      "matrixScope": "focused",
+      "classifications": [
+        "focused",
+        "canonical"
+      ]
+    },
+    "ios-engine-benchmark": {
+      "platform": "ios",
+      "type": "benchmark-record",
+      "kind": "engine-generation",
+      "matrixScope": "focused",
+      "classifications": [
+        "focused",
+        "canonical"
+      ]
+    },
+    "macos-retained-memory": {
+      "platform": "macos",
+      "type": "benchmark-record",
+      "kind": "memory-qualification",
+      "matrixScope": "focused",
+      "classifications": [
+        "focused",
+        "canonical"
+      ]
+    },
+    "ios-retained-memory": {
+      "platform": "ios",
+      "type": "benchmark-record",
+      "kind": "memory-qualification",
+      "matrixScope": "focused",
+      "classifications": [
+        "focused",
+        "canonical"
+      ]
+    },
+    "macos-ui-performance": {
+      "platform": "macos",
+      "type": "benchmark-record",
+      "kind": "ui-perf",
+      "matrixScope": "canonical",
+      "classifications": [
+        "canonical"
+      ]
+    },
+    "ios-ui-performance": {
+      "platform": "ios",
+      "type": "benchmark-record",
+      "kind": "ui-perf",
+      "matrixScope": "canonical",
+      "classifications": [
+        "canonical"
+      ]
+    },
+    "macos-model-download-lifecycle": {
+      "platform": "macos",
+      "type": "managed-command",
+      "command": [
+        "./scripts/build.sh",
+        "cli",
+        "models",
+        "install",
+        "pro_custom_speed",
+        "--data-dir",
+        "build/scratch/transient/model-download-acceptance",
+        "--verbose"
+      ]
+    },
+    "ios-model-download-lifecycle": {
+      "platform": "ios",
+      "type": "managed-command",
+      "command": [
+        "scripts/ui_test.sh",
+        "ios",
+        "model-download"
+      ]
+    }
+  },
+  "privacy": {
+    "deviceIdentity": "canonical-hardware-profile-only",
+    "forbiddenKeys": [
+      "deviceIdentifier",
+      "deviceName",
+      "hostName",
+      "serialNumber",
+      "udid",
+      "userName"
+    ]
+  }
+}

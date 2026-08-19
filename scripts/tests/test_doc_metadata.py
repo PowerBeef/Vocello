@@ -82,7 +82,7 @@ class FactScanTests(unittest.TestCase):
 
 
 class ReleaseFactTests(unittest.TestCase):
-    """CLAUDE.md and README.md are fact-scanned; these are the claims that drift."""
+    """AGENTS.md and README.md are fact-scanned; these are the claims that drift."""
 
     def test_a_stale_current_release_claim_is_caught(self):
         self.assertTrue(matched("macOS **2.3.0** is the current release"))

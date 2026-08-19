@@ -18,6 +18,7 @@ from check_surface_coverage import (  # noqa: E402
     CoverageError,
     assists_findings,
     evaluate,
+    guidance_size_findings,
     main,
 )
 
@@ -47,13 +48,15 @@ python3 "$SCRIPT_DIR/undocumented_gate.py"
 
 
 class Harness(unittest.TestCase):
-    def build(self, claude_text, exemptions=None, gate=GATE, contracts=("kept.json",)):
+    def build(self, agents_text, exemptions=None, gate=GATE, contracts=("kept.json",)):
         root = pathlib.Path(tempfile.mkdtemp())
         (root / "scripts").mkdir()
         (root / "config").mkdir()
-        (root / ".claude" / "rules").mkdir(parents=True)
+        (root / ".agents" / "rules").mkdir(parents=True)
+        (root / "website").mkdir()
         (root / "scripts" / "check_project_inputs.sh").write_text(gate)
-        (root / "CLAUDE.md").write_text(claude_text + ASSISTS)
+        (root / "AGENTS.md").write_text(agents_text + ASSISTS)
+        (root / "website" / "AGENTS.md").write_text("# Website guidance\n")
         for name in contracts:
             (root / "config" / name).write_text("{}")
         if exemptions is not None:
@@ -88,13 +91,13 @@ class CoverageTests(Harness):
 
     def test_a_domain_rule_counts_as_documentation(self):
         root = self.build("scripts/documented_gate.py and config/kept.json")
-        (root / ".claude" / "rules" / "backend.md").write_text(
+        (root / ".agents" / "rules" / "backend.md").write_text(
             "the gate is scripts/undocumented_gate.py"
         )
         self.assertTrue(evaluate(root)["ok"])
 
     def test_a_glob_documents_a_whole_family(self):
-        # CLAUDE.md names `config/language-bench-*.json` for three real files.
+        # AGENTS.md names `config/language-bench-*.json` for three real files.
         root = self.build(
             "gates: documented_gate.py undocumented_gate.py; data: `config/bench-*.json`",
             contracts=("bench-corpus.json", "bench-matrix.json"),
@@ -141,7 +144,7 @@ class SafetyTests(Harness):
 
     def test_missing_guidance_is_an_error(self):
         root = self.build("x")
-        (root / "CLAUDE.md").unlink()
+        (root / "AGENTS.md").unlink()
         with self.assertRaises(CoverageError):
             evaluate(root)
 
@@ -152,7 +155,7 @@ class AssistsSectionTests(unittest.TestCase):
 
     def write(self, body):
         root = pathlib.Path(tempfile.mkdtemp())
-        (root / "CLAUDE.md").write_text(body)
+        (root / "AGENTS.md").write_text(body)
         return root
 
     def test_a_complete_section_passes(self):
@@ -190,6 +193,26 @@ class AssistsSectionTests(unittest.TestCase):
         # User tooling changes; the rows should follow it without ceremony.
         body = ASSISTS.replace("| a | one |", "| a | something entirely different |")
         self.assertEqual(assists_findings(self.write(body)), [])
+
+
+class GuidanceSizeTests(Harness):
+    def test_root_and_nested_guidance_below_budget_pass(self):
+        root = self.build("documented_gate.py undocumented_gate.py kept.json")
+        findings, sizes = guidance_size_findings(root)
+        self.assertEqual(findings, [])
+        self.assertIn("website/AGENTS.md", sizes)
+
+    def test_combined_root_and_nested_guidance_above_budget_fails(self):
+        root = self.build("documented_gate.py undocumented_gate.py kept.json")
+        (root / "website" / "AGENTS.md").write_text("x" * (30 * 1024))
+        findings, _ = guidance_size_findings(root)
+        self.assertTrue(any("exceeding" in finding for finding in findings))
+
+    def test_missing_nested_guidance_fails(self):
+        root = self.build("documented_gate.py undocumented_gate.py kept.json")
+        (root / "website" / "AGENTS.md").unlink()
+        findings, _ = guidance_size_findings(root)
+        self.assertTrue(any("missing nested" in finding for finding in findings))
 
 
 class RepositoryTests(unittest.TestCase):

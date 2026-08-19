@@ -31,7 +31,7 @@ This guide is a supplemental prompt-writing reference for the shipped macOS app.
 For current repo truth about app structure, workflows, or supported behavior, trust:
 
 1. `README.md`
-2. `CLAUDE.md` (repo guide: architecture, build, conventions)
+2. `AGENTS.md` (repo guide: architecture, build, conventions)
 
 ## What the App Exposes
 
@@ -118,6 +118,6 @@ Voice Cloning support text:
 ## Related Docs
 
 - [`../README.md`](../README.md)
-- [`../CLAUDE.md`](../CLAUDE.md) — repo architecture, build, and conventions
+- [`../AGENTS.md`](../AGENTS.md) — repo architecture, build, and conventions
 - [`reference/qwen3-tts-prompting-guide.md`](reference/qwen3-tts-prompting-guide.md) — the sourced prompting reference this file defers to
 - `Sources/QwenVoiceCore/EmotionPreset.swift` — the shipped 8 preset instructions (roster cut from ten on 2026-08-03; the user-facing intensity control was retired 2026-08-02; every preset ships its per-preset measured-best tier — the `strong` anchor, except `happy`/`angry` at `normal` since 2026-08-15 — and both tiers survive for the delivery matrix harness) (single source for macOS + iOS + the CLI's `bench --delivery` cells); `Sources/QwenVoiceCore/GenerationSemantics.swift` assembles the Voice Design "Voice character / Delivery" framing.

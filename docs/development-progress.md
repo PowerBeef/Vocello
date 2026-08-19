@@ -33,7 +33,7 @@ machine-readable status record and wins over any older prose.
 | --- | --- |
 | 0 — Characterization | Closed 2026-07-20. Clean-tree Mac CLI/UI and iPhone UI controls bound in `config/characterization-fixtures.json` (`status: closed`, `controlSessions` recorded). |
 | 1 — Correctness prerequisites | Shipping: XPC reserves before side effects, synchronized pressure snapshots, continuous critical-relief admission. |
-| 2 — Plans and actor | The actor is the shipping generation-mutation authority and, since 14b, owns every product-reachable runtime lifecycle operation (loading, facts, diagnostics, priming, schema-3 clone artifacts). Immutable plans stay in shadow comparison. Invariant detail: ADR + `.claude/rules/backend-mlx.md`. |
+| 2 — Plans and actor | The actor is the shipping generation-mutation authority and, since 14b, owns every product-reachable runtime lifecycle operation (loading, facts, diagnostics, priming, schema-3 clone artifacts). Immutable plans stay in shadow comparison. Invariant detail: ADR + `.agents/rules/backend-mlx.md`. |
 | 3 — Classified sessions | Shipping through Phase 4: `[Float]` materialized before the awaited frame-bounded single-consumer channel send; typed terminal outcomes; stale-safe product finalization. |
 | 4 — Product adapter and mode cutover | Closed 2026-07-20 (`overallPromotion: passed`). `GenerationOutputAdapter` is the shipping product session. |
 | 5 — Request-local sampling | Closed 2026-07-20. Fail-closed promotion packaging (`samplingPromotionPackaged=true`) live on the shipping path. |
@@ -47,7 +47,34 @@ machine-readable status record and wins over any older prose.
 | 13 — Benchmark/history v3 | Live 2026-07-29: the first schema-v3 records are committed (three clean `phase0-cli-control-*` engine records plus one exploratory run that also exposed and fixed the summarizer's v3 pin). `benchmarks/schema-v3.json` adds the typed quality identity to generation takes (pass/warning only, five fast gates required, machine-code issues); v1/v2 records stay valid immutable history; the publisher stamps v3 only when every take carries the identity. The UI benchmark checkers folded the same identity 2026-08-01: ui-generation records now publish v3 (first: the focused `v3-fold-proof` record `macos-xcui-benchmark-20260801-003208-403989cf`); the canonical iOS matrix published its first v3 record 2026-08-01 (`ios-xcui-benchmark-20260801-132415-abbec96b`). |
 | 14 — Organization and retirement | Closed 2026-07-23 (14a + 14b): compatibility SPI retired, actor-owned loading/metadata/priming/clone artifacts, clone conditioning epoch-bound end to end. |
 
-## Resume here (2026-08-15)
+## Resume here (2026-08-19)
+
+**F-04 closed in governance; fresh release evidence remains candidate-bound work (2026-08-19,
+desk):** release candidate production and public promotion are now separate. `release.yml` always
+stops at a deterministically verified, signed, notarized, attested draft; candidate packaging and
+internal TestFlight upload still never depend on models, XCUITest, or a paired phone. The new
+`quality-promotion.json` contract binds public macOS publication and external iOS/App Review
+submission to the exact tag, release-evidence bytes, changed-path classification, clean benchmark
+record digests, build identity, canonical hardware profile, toolchain, executable hashes/UUIDs, and
+explicit warning acceptance. `promote-release.yml` is the sole GitHub draft-to-public action and
+revalidates both evidence layers. Project health now selects `ui-generation`,
+`memory-qualification`, and `ui-perf` per domain instead of treating one generation matrix as proof
+for memory, UI performance, model delivery, and supply-chain code. The next public candidate must
+still run its exact-source lanes; this implementation does not relabel the August 1 records as
+fresh.
+
+**F-11 closed — CLI version identity is single-sourced (2026-08-19, desk):** the `VocelloCLI`
+tool now embeds `project.yml`'s marketing version and build number in its Mach-O Info.plist section,
+so all three version aliases report the product version instead of the retired `0.1.0` fallback.
+A deterministic source-and-binary contract guards the target settings and exact output locally and
+in macOS CI; unsupported bare `swiftc` builds report `unknown`. GitHub issue #86 remains
+maintainer-owned and was not changed automatically.
+
+**Development workflow is now strictly `main`-only (2026-08-19):** root and backend guidance no
+longer permit alternate local development branches. Every agent task begins by proving the local
+symbolic branch is `main`, and the trusted Codex pre-commit hook rejects commits from any other
+branch before the deterministic gate runs. The emergency gate-skip flag cannot bypass this branch
+check; pull-request and detached GitHub CI refs remain valid execution contexts only.
 
 **ICI-2 closed — import restore device-accepted; `ios-clone-import-2026-08`
 complete (2026-08-15, evening phone window):** the restored Files-import
@@ -896,7 +923,7 @@ performance block after the fixture rebind, Tier 4 carryover). Immediate specifi
 28. **Dual-agent UI critique → maintainer-approved polish pass
    (2026-08-06):** an isolated design-director review plus a mechanical
    detector/evidence pass scored the shipped macOS UI 31/40
-   (product-authored; snapshot in `.impeccable/critique/`) and surfaced
+   (product-authored; retained as a local critique snapshot) and surfaced
    one real regression-class defect: the composer's `ControlGroup`
    collapsed the designed gold Generate/Cancel CTA into an unlabeled icon
    sliver on macOS 26 — confirmed in code, smoke screenshots, and a live
@@ -972,8 +999,8 @@ Stage-by-stage details, closure evidence, and falsifiability criteria live in th
    which also adds a cheap pre-registered MPP-on-M2 micro-benchmark rider, parks any
    custom fused tensor kernel behind P1b, and records the adopted OS-floor policy: hold
    26.0 with runtime-gated capability ladders; the first pin bump vendoring mlx core
-   ≥ 0.32.0 triggers the 26.2 floor raise, per the study's F7) on a
-   throwaway branch (contract invariant), long-form carryover (text context first), with
+   ≥ 0.32.0 triggers the 26.2 floor raise, per the study's F7), with all work performed directly on
+   `main` under explicit maintainer authorization; long-form carryover (text context first), with
    speculative/PCG, CFG, and KV quantization parked. Working order and dependency rules:
    [roadmap-2026-08](reference/roadmap-2026-08.md).
 6. **Smaller open threads**: a 60 Hz-device measurement of the iOS fixed-refresh glass
@@ -1071,7 +1098,7 @@ Status report: [`docs/reference/runtime-refactor-status-report.md`](reference/ru
   product-reachable runtime lifecycle operation, clone conditioning stays tensor-opaque behind
   epoch-bound handles, and sampling algorithm v2 plus the request-owned memory policy are
   shipping contracts (every request has its own seed and `MLXRandom.RandomState`). Invariant
-  detail: the ADR, `docs/ARCHITECTURE.md` §4, and `.claude/rules/backend-mlx.md`.
+  detail: the ADR, `docs/ARCHITECTURE.md` §4, and `.agents/rules/backend-mlx.md`.
 - Clone conditioning is typed as transcript-backed or genuine audio-only x-vector. Both apps own
   the visible `voiceCloning_consentAcknowledgment` in Settings, persist the choice locally, and
   keep Clone Generate disabled until consent is acknowledged. Smoke and benchmark enable it through
@@ -1187,7 +1214,7 @@ explicit macOS fixture repair/bootstrap step. XCUITest is the sole autonomous ap
   `PowerBeef/QwenVoice` → `PowerBeef/Vocello` before tagging; old URLs redirect and the old name
   must never be re-occupied. macOS 2.1.0 was released 2026-06-12. Future releases start from a
   protected version tag; the workflow verifies identity, signs/notarizes, emits SBOMs/checksums/
-  evidence/provenance, and verifies draft assets before publication.
+  evidence/provenance, and verifies draft assets before the separate source-bound promotion step.
 - **First TestFlight build is uploaded**: the v2.2.2 dispatch (run `30177386286`) went green
   end-to-end on 2026-07-25 — archive, export, IPA verification, schema-v2 evidence, provenance
   attestation, TestFlight upload — making Vocello 2.2.2 (build 21) the first uploaded build.

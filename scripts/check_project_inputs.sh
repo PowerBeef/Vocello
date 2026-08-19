@@ -22,9 +22,11 @@ REQUIRED_SURFACES=(
     "scripts/build_foundation_targets.sh"
     "scripts/build_output_policy.py"
     "scripts/codex_session_storage.py"
+    "scripts/cli_version_contract.py"
     "scripts/documentation_contract.py"
     "scripts/model_catalog_contract.py"
     "scripts/evidence_impact.py"
+    "scripts/quality_promotion.py"
     "scripts/required_step_ledger.py"
     "scripts/project_health.py"
     "scripts/refresh_derived_artifacts.py"
@@ -63,9 +65,11 @@ REQUIRED_SURFACES=(
     "scripts/test_clone_speaker_similarity.py"
     "scripts/tests/test_build_output_policy.py"
     "scripts/tests/test_codex_session_storage.py"
+    "scripts/tests/test_codex_hook_contract.py"
     "scripts/tests/test_documentation_contract.py"
     "scripts/tests/test_model_catalog_contract.py"
     "scripts/tests/test_evidence_impact.py"
+    "scripts/tests/test_quality_promotion.py"
     "scripts/tests/test_required_step_ledger.py"
     "scripts/tests/test_project_health.py"
     "scripts/tests/test_refresh_derived_artifacts.py"
@@ -75,6 +79,7 @@ REQUIRED_SURFACES=(
     "scripts/tests/test_swift_dependency_snapshot.py"
     "scripts/tests/test_release_evidence.py"
     "scripts/tests/test_build_routing_contract.py"
+    "scripts/tests/test_cli_version_contract.py"
     "scripts/tests/test_generate_cli_scheme.py"
     "scripts/tests/test_generate_ios_logic_scheme.py"
     "scripts/tests/test_clean_build_caches.py"
@@ -114,6 +119,7 @@ REQUIRED_SURFACES=(
     "config/codex-session-storage-policy.json"
     "config/documentation-contract.json"
     "config/evidence-impact.json"
+    "config/quality-promotion-contract.json"
     "config/model-catalog-schema-v1.json"
     "config/model-catalog-schema-v2.json"
     "config/model-artifact-receipts.json"
@@ -140,14 +146,17 @@ REQUIRED_SURFACES=(
     "docs/decisions/runtime-streaming-quality-convergence.md"
     "SECURITY.md"
     ".github/CODEOWNERS"
+    ".github/workflows/promote-release.yml"
     ".github/dependabot.yml"
     "Tests/UIAutomationSupport"
     "Tests/VocelloMacUITests"
     "Tests/VocelloiOSUITests"
     "Tests/VocelloiOSLogicTests"
     ".xcodebuildmcp/config.yaml"
-    "CLAUDE.md"
-    ".claude/rules"
+    "AGENTS.md"
+    ".agents/rules"
+    "website/AGENTS.md"
+    ".codex/hooks.json"
     "project.yml"
 )
 
@@ -164,9 +173,11 @@ python3 "$SCRIPT_DIR/build_output_policy.py" validate
 python3 "$SCRIPT_DIR/codex_session_storage.py" validate
 python3 "$SCRIPT_DIR/generate_cli_scheme.py" --check
 python3 "$SCRIPT_DIR/generate_ios_logic_scheme.py" --check
+python3 "$SCRIPT_DIR/cli_version_contract.py" validate
 python3 "$SCRIPT_DIR/model_catalog_contract.py" rebuild --check
 python3 "$SCRIPT_DIR/model_catalog_contract.py" validate
 python3 "$SCRIPT_DIR/evidence_impact.py" validate
+python3 "$SCRIPT_DIR/quality_promotion.py" validate-contract
 
 # iOS device tooling and explicit XCUITest are first-class. `scripts/ios_device.sh` owns
 # physical-device operations; `scripts/ui_test.sh` is the sole app-UI entry point.

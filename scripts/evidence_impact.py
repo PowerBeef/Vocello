@@ -17,7 +17,12 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 CONTRACT_PATH = Path("config/evidence-impact.json")
 SCHEMA_VERSION = 1
 KINDS = {"deterministic", "model-dependent", "model-ui", "device-ui"}
-LIST_FIELDS = ("mergeRequiredEvidence", "releaseRequiredEvidence", "qualityEvidence")
+LIST_FIELDS = (
+    "mergeRequiredEvidence",
+    "releaseRequiredEvidence",
+    "qualityEvidence",
+    "promotionRequiredEvidence",
+)
 
 
 class EvidenceImpactError(RuntimeError):
@@ -88,8 +93,9 @@ def validate_contract(contract: dict[str, Any]) -> list[str]:
         errors.extend(_validate_references(fallback, str(fallback["id"]), evidence))
 
     # Ordinary merge/release evidence is deliberately deterministic. Device,
-    # UI, and model-dependent checks may guide explicit quality acceptance but
-    # cannot become publication blockers through this contract.
+    # UI, and model-dependent checks may block an explicit public promotion,
+    # but never ordinary source publication, packaging, signing, notarization,
+    # candidate creation, or internal TestFlight upload.
     for item in [*classes, fallback] if isinstance(fallback, dict) else classes:
         if not isinstance(item, dict):
             continue
@@ -100,6 +106,11 @@ def validate_contract(contract: dict[str, Any]) -> list[str]:
         for reference in item.get("qualityEvidence") or []:
             if reference in evidence and evidence[reference].get("kind") == "deterministic":
                 errors.append(f"{item.get('id')}.qualityEvidence redundantly lists deterministic evidence {reference}")
+        for reference in item.get("promotionRequiredEvidence") or []:
+            if reference in evidence and evidence[reference].get("kind") == "deterministic":
+                errors.append(
+                    f"{item.get('id')}.promotionRequiredEvidence redundantly lists deterministic evidence {reference}"
+                )
     return errors
 
 
@@ -159,7 +170,9 @@ def classify(contract: dict[str, Any], paths: list[str]) -> dict[str, Any]:
         "mergeRequiredEvidence": union("mergeRequiredEvidence"),
         "releaseRequiredEvidence": union("releaseRequiredEvidence"),
         "qualityEvidence": union("qualityEvidence"),
+        "promotionRequiredEvidence": union("promotionRequiredEvidence"),
         "qualityEvidenceBlocksOrdinaryPublication": False,
+        "promotionEvidenceBlocksPublicPromotion": True,
     }
 
 

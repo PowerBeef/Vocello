@@ -1,0 +1,79 @@
+name: Promote verified release
+
+# Public macOS promotion is intentionally separate from candidate production.
+# The candidate workflow may build, sign, notarize, attest, and upload a draft
+# without models or devices. This workflow alone can make that draft public,
+# and only after an exact-tag quality-promotion manifest validates.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing verified draft v* tag to publish'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  RELEASE_TAG: ${{ inputs.tag }}
+
+jobs:
+  promote-macos:
+    name: Validate quality evidence + publish draft
+    runs-on: macos-26
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout exact tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.tag }}
+
+      - name: Verify tag and draft state
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?$ ]] \
+            || { echo "::error::invalid release tag"; exit 1; }
+          commit="$(git rev-parse HEAD)"
+          python3 scripts/release_evidence.py verify-source --tag "$RELEASE_TAG" --commit "$commit"
+          gh release view "$RELEASE_TAG" --json isDraft > "$RUNNER_TEMP/release-state.json"
+          python3 - "$RUNNER_TEMP/release-state.json" <<'PY'
+          import json, sys
+          if json.load(open(sys.argv[1], encoding="utf-8")).get("isDraft") is not True:
+              raise SystemExit("error: quality promotion requires an existing draft Release")
+          PY
+
+      - name: Download and validate candidate plus promotion evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          remote="$RUNNER_TEMP/release-assets"
+          mkdir -p "$remote"
+          gh release download "$RELEASE_TAG" --dir "$remote"
+          test -f "$remote/quality-promotion.json" \
+            || { echo "::error::draft is missing quality-promotion.json"; exit 1; }
+          python3 scripts/release_evidence.py validate --output-dir "$remote"
+          python3 scripts/quality_promotion.py validate \
+            --platform macos \
+            --tag "$RELEASE_TAG" \
+            --release-evidence "$remote/release-evidence.json" \
+            --manifest "$remote/quality-promotion.json"
+
+      - name: Publish source-bound verified Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          publish_flags=(--draft=false)
+          if [[ "$RELEASE_TAG" == *-* ]]; then
+            publish_flags+=(--prerelease)
+          else
+            publish_flags+=(--latest)
+          fi
+          gh release edit "$RELEASE_TAG" "${publish_flags[@]}"

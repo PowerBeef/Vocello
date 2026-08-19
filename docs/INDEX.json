@@ -2,11 +2,11 @@
   "schemaVersion": 1,
   "generated": "python3 scripts/doc_metadata.py rebuild-index",
   "note": "Machine-readable documentation map. Query this instead of globbing docs/.",
-  "annotatedDocuments": 88,
+  "annotatedDocuments": 90,
   "unannotatedDocuments": 0,
   "documents": [
     {
-      "path": ".claude/rules/backend-mlx.md",
+      "path": ".agents/rules/backend-mlx.md",
       "status": "active",
       "owner": "backend-mlx",
       "summary": "Domain rule for the engine core, owned Qwen3 runtime package, model catalog, telemetry semantics, and backend invariants (prewarm, cancellation, sampling, memory policy, MLX-only).",
@@ -18,7 +18,7 @@
       ]
     },
     {
-      "path": ".claude/rules/derived-artifacts.md",
+      "path": ".agents/rules/derived-artifacts.md",
       "status": "active",
       "owner": "release-qa",
       "summary": "Domain rule for generated-inventory freshness \u2014 which paths require refresh_derived_artifacts.py in the same change, and the manual narrative-sync exception.",
@@ -27,7 +27,7 @@
       ]
     },
     {
-      "path": ".claude/rules/ios.md",
+      "path": ".agents/rules/ios.md",
       "status": "active",
       "owner": "ios",
       "summary": "Domain rule for the VocelloiOS target \u2014 boundaries, physical-device-only testing, typed cancellation, Dynamic Type/Reduce Motion invariants, stable identifiers, and the frame-health perf lane.",
@@ -38,7 +38,7 @@
       ]
     },
     {
-      "path": ".claude/rules/macos.md",
+      "path": ".agents/rules/macos.md",
       "status": "active",
       "owner": "macos",
       "summary": "Domain rule for the macOS app and XPC stack \u2014 boundaries, XPC lifecycle invariants, gated Liquid Glass, accessibility rules, and the macOS test lanes.",
@@ -49,7 +49,7 @@
       ]
     },
     {
-      "path": ".claude/rules/release-qa.md",
+      "path": ".agents/rules/release-qa.md",
       "status": "active",
       "owner": "release-qa",
       "summary": "Domain rule for scripts, CI, packaging, signing, benchmarks, and release gates \u2014 build-output ownership, registry rules, release-evidence invariants, and the deterministic-only publishing posture.",
@@ -57,6 +57,7 @@
         "scripts/check_project_inputs.sh",
         ".github/workflows/ci.yml",
         ".github/workflows/release.yml",
+        ".github/workflows/promote-release.yml",
         "config/build-output-policy.json"
       ]
     },
@@ -243,9 +244,18 @@
       "owner": "backend-mlx",
       "summary": "The vocello CLI \u2014 user-facing generation surface and deterministic benchmark/test driver over the same in-process MLX engine as the app.",
       "sourceOfTruth": [
+        "project.yml",
         "Sources/VocelloCLI",
-        "scripts/build.sh"
+        "scripts/build.sh",
+        "scripts/cli_version_contract.py"
       ]
+    },
+    {
+      "path": "docs/reference/codex-handover-review-2026-08-19.md",
+      "status": "historical",
+      "owner": "backend-and-platform",
+      "summary": "Point-in-time Codex takeover review of Vocello architecture, repository governance, validation health, delivery state, engineering risks, and optional capability routing on 2026-08-19.",
+      "contentDigest": "sha256:192d48f91df3ea613eb88ff94743d5b9c69821589e68994ce73bbc4258e45bfa"
     },
     {
       "path": "docs/reference/codex-session-storage.md",
@@ -564,6 +574,18 @@
       ]
     },
     {
+      "path": "docs/reference/quality-promotion.md",
+      "status": "active",
+      "owner": "release-qa",
+      "summary": "Source-bound quality promotion for making a verified macOS draft public or submitting an iOS candidate for external App Store review.",
+      "sourceOfTruth": [
+        "config/quality-promotion-contract.json",
+        "config/evidence-impact.json",
+        "scripts/quality_promotion.py",
+        ".github/workflows/promote-release.yml"
+      ]
+    },
+    {
       "path": "docs/reference/qwen3-apple-silicon-roadmap-review.md",
       "status": "historical",
       "owner": "backend-and-platform",
@@ -690,7 +712,7 @@
       "status": "historical",
       "owner": "release-qa",
       "summary": "Vocello 2.0.0. Published release notes, copied verbatim into the GitHub Release. Pinned: the shipped text of a release cannot change retroactively.",
-      "contentDigest": "sha256:10f45c757583f844ded0dafffd5c6f51537494c36fb454865e9ca87abe03650d"
+      "contentDigest": "sha256:7f51e6c444dffa808073992210bcd2d564170475a71d3d11ca50d279a1eb0992"
     },
     {
       "path": "docs/releases/v2.1.0.md",

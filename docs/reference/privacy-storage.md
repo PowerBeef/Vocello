@@ -163,6 +163,7 @@ block byte-for-byte, so a manifest change cannot silently leave documentation st
 | `build/artifacts/ui-tests/` | Unified macOS and physical-device XCUITest runner | `artifact` | `prune-ui-results` | Keep policy-selected passing and failure result bundles |
 | `build/artifacts/diagnostics/` | Cross-platform logs, crash deltas, and local diagnostics | `artifact` | `governed` | Validator-owned; preserve unresolved failure and publication-repair evidence |
 | `build/artifacts/project-health/` | Generated project-health inventory and release-readiness diagnostics | `artifact` | `routine` | Local detailed reports are disposable; the compact reproducible snapshot is tracked under docs |
+| `build/artifacts/quality-promotion/` | Source-bound public-promotion manifests and managed quality receipts | `artifact` | `preserve` | Preserve the current candidate manifest until promotion or explicit candidate retirement |
 | `build/artifacts/symbols/macos/` | macOS build and release identity checks | `artifact` | `preserve` | Keep only symbols whose UUIDs match the current macOS app and XPC products |
 | `build/artifacts/symbols/ios/` | Physical-device iOS build and archive identity checks | `artifact` | `preserve` | Keep only symbols whose UUIDs match the current iOS app product |
 | `build/artifacts/foundation/` | Foundation compile-safety result bundles and logs | `artifact` | `routine` | Compile-safety result bundles and logs are disposable after the command verdict |

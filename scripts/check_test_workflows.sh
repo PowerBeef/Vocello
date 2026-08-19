@@ -27,12 +27,15 @@ for required_policy_surface in \
   config/public-product-facts.json \
   config/orchestration-contract.json \
   config/project-health-contract.json \
+  config/quality-promotion-contract.json \
   docs/project-health.md \
   scripts/build_output_policy.py \
   scripts/codex_session_storage.py \
+  scripts/cli_version_contract.py \
   scripts/documentation_contract.py \
   scripts/model_catalog_contract.py \
   scripts/evidence_impact.py \
+  scripts/quality_promotion.py \
   scripts/vendor_runtime_contract.py \
   scripts/supply_chain_contract.py \
   scripts/swift_dependency_snapshot.py \
@@ -51,9 +54,12 @@ for required_policy_surface in \
   scripts/lib/ios_platform_preflight.py \
   scripts/tests/test_build_output_policy.py \
   scripts/tests/test_codex_session_storage.py \
+  scripts/tests/test_codex_hook_contract.py \
+  scripts/tests/test_cli_version_contract.py \
   scripts/tests/test_documentation_contract.py \
   scripts/tests/test_model_catalog_contract.py \
   scripts/tests/test_evidence_impact.py \
+  scripts/tests/test_quality_promotion.py \
   scripts/tests/test_vendor_runtime_contract.py \
   scripts/tests/test_supply_chain_contract.py \
   scripts/tests/test_swift_dependency_snapshot.py \
@@ -132,7 +138,7 @@ for retired in \
   [[ ! -e "$retired" ]] || fail "retired UI harness artifact still exists: $retired"
 done
 
-active=(CLAUDE.md README.md .gitignore .claude benchmarks docs scripts config .github project.yml QwenVoice.xcodeproj/project.pbxproj Sources Tests website Packages/VocelloQwen3Core)
+active=(AGENTS.md README.md .gitignore .agents .codex benchmarks docs scripts config .github project.yml QwenVoice.xcodeproj/project.pbxproj Sources Tests website Packages/VocelloQwen3Core)
 excludes=(
   --glob '!scripts/check_test_workflows.sh'
   --glob '!scripts/clean_build_caches.sh'
@@ -161,7 +167,7 @@ out="$(rg -n --pcre2 "$retired_alias_pattern" "${active[@]}" "${excludes[@]}" 2>
 
 # UI acceptance is explicit and independent; packaging/readiness may not reacquire a UI-result gate.
 release_ui_gate_pattern='(?i:gated by fresh (?:macOS|iOS|frontend|UI)|requires fresh .*XCUITest|XCUITest .* prerequisite.*(?:release|packag|archive)|(?:release|packag|archive).*(?:requires|required).*XCUITest)'
-out="$(rg -n --pcre2 "$release_ui_gate_pattern" CLAUDE.md README.md .claude docs scripts .github \
+out="$(rg -n --pcre2 "$release_ui_gate_pattern" AGENTS.md README.md .agents .codex docs scripts .github \
   "${excludes[@]}" 2>/dev/null || true)"
 [[ -z "$out" ]] || fail "release packaging must remain independent of XCUITest evidence:\n$out"
 
@@ -181,13 +187,13 @@ from pathlib import Path
 import re
 
 files = [
-    Path("CLAUDE.md"),
+    Path("AGENTS.md"),
     Path("README.md"),
     Path("benchmarks/README.md"),
     Path("docs/project-map.html"),
     Path("Sources/VocelloCLI/BenchCommand.swift"),  # built-in `vocello bench --help`
 ]
-files.extend(Path(".claude/rules").rglob("*.md"))
+files.extend(Path(".agents/rules").rglob("*.md"))
 files.extend(
     path
     for path in Path("docs").rglob("*.md")
@@ -433,7 +439,11 @@ ci_error="$(python3 - <<'PY'
 from pathlib import Path
 import re
 
-paths = (Path('.github/workflows/ci.yml'), Path('.github/workflows/release.yml'))
+paths = (
+    Path('.github/workflows/ci.yml'),
+    Path('.github/workflows/release.yml'),
+    Path('.github/workflows/promote-release.yml'),
+)
 patterns = {
     r'\btest-without-building\b': 'executes XCUITest',
     r'\bscripts/ui_test\.sh\b': 'invokes an app UI lane',
@@ -455,7 +465,7 @@ rg -q 'CODE_SIGNING_ALLOWED=NO' .github/workflows/ci.yml \
 
 # No simulator destination is supported for Vocello app UI automation.
 out="$(rg -n -i 'platform=iOS Simulator|build_run_sim|test_sim|launch_sim' \
-  CLAUDE.md README.md .claude docs scripts project.yml .github \
+  AGENTS.md README.md .agents .codex docs scripts project.yml .github \
   --glob '!scripts/check_test_workflows.sh' 2>/dev/null || true)"
 [[ -z "$out" ]] || fail "active Simulator workflow returned:\n$out"
 
@@ -467,8 +477,8 @@ python3 - <<'PY'
 from pathlib import Path
 import re
 
-files = [Path("CLAUDE.md"), Path("README.md"), Path("benchmarks/README.md"), Path("website/CLAUDE.md")]
-files.extend(Path(".claude/rules").rglob("*.md"))
+files = [Path("AGENTS.md"), Path("README.md"), Path("benchmarks/README.md"), Path("website/AGENTS.md")]
+files.extend(Path(".agents/rules").rglob("*.md"))
 files.extend(
     path
     for path in Path("docs").rglob("*.md")
@@ -519,9 +529,9 @@ from pathlib import Path
 import re
 
 roots = [
-    Path("CLAUDE.md"),
+    Path("AGENTS.md"),
     Path("README.md"),
-    Path(".claude/rules"),
+    Path(".agents/rules"),
     Path("docs/reference"),
     Path("benchmarks/README.md"),
     Path("docs/project-map.html"),
@@ -564,9 +574,9 @@ import glob
 import re
 
 roots = [
-    Path("CLAUDE.md"),
+    Path("AGENTS.md"),
     Path("README.md"),
-    Path(".claude/rules"),
+    Path(".agents/rules"),
     Path("docs/reference"),
     Path("benchmarks/README.md"),
     Path("docs/project-map.html"),
@@ -620,9 +630,12 @@ else
 python3 -m unittest \
   scripts.tests.test_build_output_policy \
   scripts.tests.test_codex_session_storage \
+  scripts.tests.test_codex_hook_contract \
+  scripts.tests.test_cli_version_contract \
   scripts.tests.test_documentation_contract \
   scripts.tests.test_model_catalog_contract \
   scripts.tests.test_evidence_impact \
+  scripts.tests.test_quality_promotion \
   scripts.tests.test_required_step_ledger \
   scripts.tests.test_project_health \
   scripts.tests.test_refresh_derived_artifacts \

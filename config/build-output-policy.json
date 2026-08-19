@@ -255,6 +255,15 @@
       "env": "QVOICE_ARTIFACTS_PROJECT_HEALTH"
     },
     {
+      "id": "artifacts-quality-promotion",
+      "path": "build/artifacts/quality-promotion",
+      "class": "artifact",
+      "owner": "Source-bound public-promotion manifests and managed quality receipts",
+      "cleanup": "preserve",
+      "retention": "Preserve the current candidate manifest until promotion or explicit candidate retirement",
+      "env": "QVOICE_ARTIFACTS_QUALITY_PROMOTION"
+    },
+    {
       "id": "symbols-macos",
       "path": "build/artifacts/symbols/macos",
       "class": "artifact",
@@ -614,8 +623,9 @@
   ],
   "referencePolicy": {
     "scanRoots": [
-      "CLAUDE.md",
-      ".claude",
+      "AGENTS.md",
+      ".agents",
+      ".codex",
       ".github",
       ".xcodebuildmcp",
       "README.md",

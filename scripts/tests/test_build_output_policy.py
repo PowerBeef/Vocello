@@ -48,6 +48,7 @@ REQUIRED_EXPORTS = {
     "QVOICE_ARTIFACTS_UI_TESTS",
     "QVOICE_ARTIFACTS_DIAGNOSTICS",
     "QVOICE_ARTIFACTS_PROJECT_HEALTH",
+    "QVOICE_ARTIFACTS_QUALITY_PROMOTION",
     "QVOICE_SYMBOLS_MACOS",
     "QVOICE_SYMBOLS_IOS",
     "QVOICE_ARTIFACTS_FOUNDATION",
@@ -452,11 +453,11 @@ class BuildOutputPolicyTests(unittest.TestCase):
 
     def test_validate_rejects_retired_tracked_reference_and_absolute_build_path(self) -> None:
         self.initialize_git()
-        agents = self.root / "CLAUDE.md"
+        agents = self.root / "AGENTS.md"
         agents.write_text(
             f"legacy build/DerivedData and {self.root}/build/private\n", encoding="utf-8"
         )
-        subprocess.run(["git", "-C", str(self.root), "add", "CLAUDE.md"], check=True)
+        subprocess.run(["git", "-C", str(self.root), "add", "AGENTS.md"], check=True)
         result = self.command("validate", "--json")
         self.assertEqual(result.returncode, 1)
         violations = json.loads(result.stdout)["violations"]
@@ -486,20 +487,20 @@ class BuildOutputPolicyTests(unittest.TestCase):
     def test_reference_validation_covers_benchmark_and_website_guidance(self) -> None:
         self.initialize_git()
         benchmark = self.root / "benchmarks/README.md"
-        website = self.root / "website/CLAUDE.md"
+        website = self.root / "website/AGENTS.md"
         benchmark.parent.mkdir(parents=True)
         website.parent.mkdir(parents=True)
         benchmark.write_text("legacy build/DerivedData benchmark path\n", encoding="utf-8")
         website.write_text("legacy build/ios/Build website path\n", encoding="utf-8")
         subprocess.run(
-            ["git", "-C", str(self.root), "add", "benchmarks/README.md", "website/CLAUDE.md"],
+            ["git", "-C", str(self.root), "add", "benchmarks/README.md", "website/AGENTS.md"],
             check=True,
         )
         result = self.command("validate", "--json")
         self.assertEqual(result.returncode, 1)
         violations = "\n".join(json.loads(result.stdout)["violations"])
         self.assertIn("benchmarks/README.md", violations)
-        self.assertIn("website/CLAUDE.md", violations)
+        self.assertIn("website/AGENTS.md", violations)
 
     def test_reference_validation_excludes_immutable_benchmark_records(self) -> None:
         self.initialize_git()

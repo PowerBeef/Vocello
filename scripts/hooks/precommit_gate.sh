@@ -1,16 +1,18 @@
 #!/usr/bin/env bash
-# Claude Code PreToolUse hook: the automatic T1 commit gate.
+# Codex PreToolUse hook: the automatic T1 commit gate.
 #
 # Fired for every Bash tool call; exits instantly unless the command contains
-# `git commit`. For commits it runs the quick project-inputs gate
-# (QVOICE_GATES=quick ./scripts/check_project_inputs.sh) and blocks the commit
-# on failure. A fingerprint of the current tree state is cached under
+# `git commit`. For commits it first requires the symbolic branch to be exactly
+# `main`, then runs the quick project-inputs gate
+# (QVOICE_GATES=quick ./scripts/check_project_inputs.sh). Either violation blocks
+# the commit. A fingerprint of the current tree state is cached under
 # build/scratch/gate-fingerprint (scratch-class output) so repeat commits on
 # an already-validated tree are a no-op.
 #
-# Escape hatch (emergencies only): QVOICE_SKIP_COMMIT_GATE=1 skips the gate
-# for that one invocation. CI never uses this hook; the full suite on GitHub
-# remains the backstop for every push.
+# Escape hatch (emergencies only): QVOICE_SKIP_COMMIT_GATE=1 skips validation
+# for that one invocation, but never bypasses the main-branch requirement. CI
+# never uses this hook; the full suite on GitHub remains the backstop for every
+# push.
 
 set -euo pipefail
 
@@ -27,13 +29,21 @@ case "$command_text" in
   *) exit 0 ;;
 esac
 
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+cd "$ROOT_DIR"
+
+current_branch="$(git symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
+if [[ "$current_branch" != "main" ]]; then
+  branch_label="${current_branch:-detached HEAD}"
+  echo "commit gate: BLOCKED — development commits must be made directly on main (current: $branch_label)." >&2
+  echo "Return to main without discarding work; do not continue implementation on another branch." >&2
+  exit 2
+fi
+
 if [[ "${QVOICE_SKIP_COMMIT_GATE:-0}" == "1" ]]; then
   echo "commit gate: skipped once (QVOICE_SKIP_COMMIT_GATE=1)" >&2
   exit 0
 fi
-
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-cd "$ROOT_DIR"
 
 marker_dir="build/scratch/gate-fingerprint"
 marker="$marker_dir/last-pass"

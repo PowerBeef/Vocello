@@ -5,10 +5,11 @@ name: Release
 #
 # Triggers:
 #   - protected v* tag push: verify the tag/source/version identity, build and
-#     verify all assets, create a draft Release, verify uploaded bytes, and only
-#     then make the Release public.
-#   - workflow_dispatch: explicit existing tag. The same transaction may stop
-#     at a verified draft when publish_release=false.
+#     verify all assets, create a draft Release, and verify uploaded bytes.
+#   - workflow_dispatch: explicit existing tag, with the same draft-candidate result.
+#
+# Public publication is deliberately separate: promote-release.yml requires a
+# source-bound quality-promotion manifest before changing the verified draft to public.
 #
 # Jobs:
 #   - package: macOS DMG production (signed + notarized + stapled), gated by current macOS
@@ -72,11 +73,6 @@ on:
         required: false
         type: boolean
         default: false
-      publish_release:
-        description: 'Publish after draft assets download and verify successfully'
-        required: false
-        type: boolean
-        default: true
       upload_to_testflight:
         description: 'After export, upload the IPA to TestFlight (requires ASC API key secrets)'
         required: false
@@ -442,20 +438,6 @@ jobs:
           PY
           gh release download "$RELEASE_TAG" --dir "$remote"
           python3 scripts/release_evidence.py validate --output-dir "$remote"
-
-      - name: Publish verified GitHub Release
-        if: ${{ github.event_name == 'push' || inputs.publish_release }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          publish_flags=(--draft=false)
-          if [[ "$RELEASE_TAG" == *-* ]]; then
-            publish_flags+=(--prerelease)
-          else
-            publish_flags+=(--latest)
-          fi
-          gh release edit "$RELEASE_TAG" "${publish_flags[@]}"
 
       - name: Cleanup signing material
         # Always run, even on prior-step failure, so the signing

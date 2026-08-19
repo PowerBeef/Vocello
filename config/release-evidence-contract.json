@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "owner": "release-qa",
-  "publicationPolicy": "draft-build-verify-attest-publish",
+  "publicationPolicy": "draft-build-verify-attest-await-source-bound-promotion",
   "sourceIdentity": [
     "gitCommit",
     "treeDirty",
@@ -13,6 +13,7 @@
     "compatibilityDigest",
     "modelCatalogDigest",
     "evidenceImpactDigest",
+    "qualityPromotionContractDigest",
     "orchestrationContractDigest",
     "releaseContractDigest"
   ],
@@ -26,6 +27,7 @@
       "Sources/Resources/qwenvoice_production_model_catalog.json",
       "config/toolchain.json",
       "config/evidence-impact.json",
+      "config/quality-promotion-contract.json",
       "config/orchestration-contract.json"
     ],
     "toolchainDigest": ["config/toolchain.json"],
@@ -43,6 +45,7 @@
       "Sources/Resources/qwenvoice_production_model_catalog.json"
     ],
     "evidenceImpactDigest": ["config/evidence-impact.json"],
+    "qualityPromotionContractDigest": ["config/quality-promotion-contract.json"],
     "orchestrationContractDigest": ["config/orchestration-contract.json"],
     "releaseContractDigest": ["config/release-evidence-contract.json"]
   },
@@ -63,7 +66,7 @@
       ]
     }
   },
-  "qualityEvidencePolicy": "Path-classified UI, device, model, and benchmark evidence is recorded with freshness and exceptions but never blocks ordinary source publication or packaging.",
+  "qualityEvidencePolicy": "Path-classified UI, device, model, and benchmark evidence never blocks ordinary source publication, packaging, signing, notarization, draft upload, or internal TestFlight upload; exact-tag quality-promotion evidence separately blocks public macOS publication and external iOS/App Review submission.",
   "artifacts": [
     "notarizedDMG",
     "sha256Checksums",

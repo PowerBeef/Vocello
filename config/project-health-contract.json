@@ -16,7 +16,10 @@
         "Tests/VocelloCoreTests/ActiveGenerationCoordinatorTests.swift",
         "Tests/VocelloEngineIntegrationTests/EngineServiceTransportAccumulatorTests.swift"
       ],
-      "hardwarePlatforms": ["macos", "ios"]
+      "hardwareEvidence": [
+        {"id": "macos-ui-generation", "platform": "macos", "kind": "ui-generation", "matrixScope": "canonical", "classifications": ["canonical"]},
+        {"id": "ios-ui-generation", "platform": "ios", "kind": "ui-generation", "matrixScope": "canonical", "classifications": ["canonical"]}
+      ]
     },
     {
       "id": "clone-conditioning",
@@ -29,7 +32,10 @@
         "Tests/VocelloCoreTests/CloneConditioningContractTests.swift",
         "Packages/VocelloQwen3Core/Tests/**/*Clone*.swift"
       ],
-      "hardwarePlatforms": ["macos", "ios"]
+      "hardwareEvidence": [
+        {"id": "macos-ui-generation", "platform": "macos", "kind": "ui-generation", "matrixScope": "canonical", "classifications": ["canonical"]},
+        {"id": "ios-ui-generation", "platform": "ios", "kind": "ui-generation", "matrixScope": "canonical", "classifications": ["canonical"]}
+      ]
     },
     {
       "id": "event-delivery",
@@ -43,7 +49,10 @@
         "Tests/VocelloCoreTests/GenerationEventDeliveryProbeTests.swift",
         "Tests/VocelloCoreTests/AtomicWAVPublicationTests.swift"
       ],
-      "hardwarePlatforms": ["macos", "ios"]
+      "hardwareEvidence": [
+        {"id": "macos-ui-generation", "platform": "macos", "kind": "ui-generation", "matrixScope": "canonical", "classifications": ["canonical"]},
+        {"id": "ios-ui-generation", "platform": "ios", "kind": "ui-generation", "matrixScope": "canonical", "classifications": ["canonical"]}
+      ]
     },
     {
       "id": "memory-policy",
@@ -56,7 +65,10 @@
         "Tests/VocelloCoreTests/MemoryTelemetryV8Tests.swift",
         "Tests/VocelloiOSLogicTests/*.swift"
       ],
-      "hardwarePlatforms": ["macos", "ios"]
+      "hardwareEvidence": [
+        {"id": "macos-memory-qualification", "platform": "macos", "kind": "memory-qualification", "matrixScope": "focused", "classifications": ["focused", "canonical"]},
+        {"id": "ios-memory-qualification", "platform": "ios", "kind": "memory-qualification", "matrixScope": "focused", "classifications": ["focused", "canonical"]}
+      ]
     },
     {
       "id": "model-delivery",
@@ -84,7 +96,30 @@
         "Tests/VocelloiOSLogicTests/*.swift",
         "Tests/VocelloiOSUITests/VocelloiOSModelDownloadUITests.swift"
       ],
-      "hardwarePlatforms": ["macos", "ios"]
+      "hardwareEvidence": [],
+      "externalPromotionEvidence": [
+        "macos-model-download-lifecycle",
+        "ios-model-download-lifecycle"
+      ]
+    },
+    {
+      "id": "ui-performance",
+      "owner": "platform",
+      "productionGlobs": [
+        "Sources/Views/**/*.swift",
+        "Sources/iOS/**/*.swift",
+        "Sources/iOSSupport/Services/*UIPerf*.swift",
+        "config/ui-perf-thresholds*.json"
+      ],
+      "testGlobs": [
+        "Tests/VocelloMacUITests/*.swift",
+        "Tests/VocelloiOSUITests/*.swift",
+        "scripts/tests/test_check_*ui_perf.py"
+      ],
+      "hardwareEvidence": [
+        {"id": "macos-ui-performance", "platform": "macos", "kind": "ui-perf", "matrixScope": "canonical", "classifications": ["canonical"]},
+        {"id": "ios-ui-performance", "platform": "ios", "kind": "ui-perf", "matrixScope": "canonical", "classifications": ["canonical"]}
+      ]
     },
     {
       "id": "xpc-transport",
@@ -97,7 +132,9 @@
       "testGlobs": [
         "Tests/VocelloEngineIntegrationTests/*.swift"
       ],
-      "hardwarePlatforms": ["macos"]
+      "hardwareEvidence": [
+        {"id": "macos-ui-generation", "platform": "macos", "kind": "ui-generation", "matrixScope": "canonical", "classifications": ["canonical"]}
+      ]
     },
     {
       "id": "benchmark-validation",
@@ -115,7 +152,10 @@
         "scripts/tests/test_benchmark*.py",
         "scripts/tests/test_publish_benchmark_history.py"
       ],
-      "hardwarePlatforms": ["macos", "ios"]
+      "hardwareEvidence": [
+        {"id": "macos-ui-generation", "platform": "macos", "kind": "ui-generation", "matrixScope": "canonical", "classifications": ["canonical"]},
+        {"id": "ios-ui-generation", "platform": "ios", "kind": "ui-generation", "matrixScope": "canonical", "classifications": ["canonical"]}
+      ]
     },
     {
       "id": "orchestration-assurance",
@@ -128,25 +168,29 @@
       "testGlobs": [
         "scripts/tests/test_required_step_ledger.py"
       ],
-      "hardwarePlatforms": []
+      "hardwareEvidence": []
     },
     {
       "id": "release-supply-chain",
       "owner": "release-qa",
       "productionGlobs": [
         ".github/workflows/release.yml",
+        ".github/workflows/promote-release.yml",
         ".github/workflows/security.yml",
+        "config/quality-promotion-contract.json",
+        "scripts/quality_promotion.py",
         "scripts/release_evidence.py",
         "scripts/release_sbom.py",
         "scripts/swift_dependency_snapshot.py",
         "scripts/supply_chain_contract.py"
       ],
       "testGlobs": [
+        "scripts/tests/test_quality_promotion.py",
         "scripts/tests/test_release_evidence.py",
         "scripts/tests/test_swift_dependency_snapshot.py",
         "scripts/tests/test_supply_chain_contract.py"
       ],
-      "hardwarePlatforms": ["macos"]
+      "hardwareEvidence": []
     },
     {
       "id": "persistence-privacy",
@@ -161,7 +205,7 @@
         "Tests/VocelloCoreTests/GenerationFailureDiagnosticLoggerTests.swift",
         "Tests/VocelloCoreTests/HistoryPersistenceErrorTests.swift"
       ],
-      "hardwarePlatforms": []
+      "hardwareEvidence": []
     },
     {
       "id": "runtime-hardening",
@@ -170,14 +214,17 @@
         "config/runtime-debug-knobs.json",
         "config/concurrency-safety.json",
         "config/release-evidence-contract.json",
+        "config/quality-promotion-contract.json",
+        "scripts/quality_promotion.py",
         "scripts/runtime_security_contract.py",
         "Sources/QwenVoiceCore/RuntimeDebugGate.swift"
       ],
       "testGlobs": [
+        "scripts/tests/test_quality_promotion.py",
         "scripts/tests/test_runtime_security_contract.py",
         "Tests/VocelloCoreTests/RuntimeDebugGateTests.swift"
       ],
-      "hardwarePlatforms": []
+      "hardwareEvidence": []
     }
   ]
 }

@@ -10,7 +10,7 @@ sourceOfTruth:
 
 > **Living document.** A project-specific reference for the MLX runtime, the Qwen3-TTS backend, and the optimization decisions that shape Vocello's macOS/iOS engine. When this doc disagrees with the code, the code wins — fix this file.
 >
-> Last reviewed: 2026-08-12 (post-CP-2/MD-2 currency pass: the CP-2 marking seam only added
+> Last reviewed: 2026-08-19 (main-only development-policy pass; post-CP-2/MD-2 currency pass: the CP-2 marking seam only added
 > `AudioMarkingConfiguration` plumbing to the streaming-session factory, and the additive
 > `MLXAudioMark` package target changes nothing this document claims). Shipping pins: `mlx-swift` **0.31.6**, `mlx-swift-lm` **3.31.4**, `swift-transformers` **1.3.3** (direct since the lm 3.x Hub/Tokenizers externalization; 1.1.9 → 1.3.3 shipped 2026-08-05 with byte-identical English fixed-seed WAVs and the full §9.3 battery).
 
@@ -136,7 +136,7 @@ let mode: QuantizationMode
 - `quantize(model:groupSize:bits:)` moved to a top-level function with a `mode:` argument.
 - The `biases` result from `quantized()` became optional.
 
-Vocello Qwen3 Core was written against the 0.30.x API. The 2026-08-01 sanctioned bump to **0.31.6 / 3.31.4** followed the required process — throwaway branch, lockstep across `project.yml` and `Packages/VocelloQwen3Core/Package.swift`, fixed-seed `vocello bench` A/B against a same-day 0.30.6 control, clean audioQC — and measured warm RTF inside the noise band with byte-equal clone durations (`benchmarks/OPTIMIZATION.md` §Q). Any future upgrade repeats that process; the quantization call sites compiled unchanged across the 0.31 API revision.
+Vocello Qwen3 Core was written against the 0.30.x API. The 2026-08-01 sanctioned bump to **0.31.6 / 3.31.4** followed the required process — lockstep across `project.yml` and `Packages/VocelloQwen3Core/Package.swift`, fixed-seed `vocello bench` A/B against a same-day 0.30.6 control, clean audioQC — and measured warm RTF inside the noise band with byte-equal clone durations (`benchmarks/OPTIMIZATION.md` §Q). Any future upgrade repeats that evidence process directly on `main`; the quantization call sites compiled unchanged across the 0.31 API revision.
 
 ### 3.4 Loading weights
 
@@ -442,7 +442,8 @@ Only upgrade when:
 
 ### 9.3 Upgrade procedure
 
-1. Create a throwaway branch from `main`.
+1. Obtain explicit maintainer authorization, confirm the checkout is on `main`, and require the
+   pin-owned files to be clean. Do not create or use another branch for the experiment.
 2. Update both pin sites simultaneously:
    - `project.yml` → `mlx-swift` pin
    - `Packages/VocelloQwen3Core/Package.swift` → `mlx-swift-lm` and `mlx-swift` pins

@@ -10,7 +10,7 @@ sourceOfTruth:
 
 > The consolidated operator's reference for measuring delivery/emotion quality without
 > human listening. Everything here is deterministic and scriptable; human listening is
-> optional calibration, never a gate (root `CLAUDE.md`, "Audio QA is autonomous").
+> optional calibration, never a gate (root `AGENTS.md`, "Audio QA is autonomous").
 > The program's item-by-item status and pre-registered results live in
 > [`config/roadmap.json`](../../config/roadmap.json) (`delivery-prompting-2026-08` plan);
 > the adversarial audit that shaped this harness is pinned at

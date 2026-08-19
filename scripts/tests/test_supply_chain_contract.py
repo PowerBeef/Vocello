@@ -29,8 +29,24 @@ class SupplyChainContractTests(unittest.TestCase):
             "native": {}, "release": {}, "website": {},
             "actions": {"actions/checkout": {"version": "v4", "sha": self.sha}},
         }), encoding="utf-8")
-        workflow = """on:\n  push:\n    tags: ['v*']\nsteps:\n  - name: Verify release tag and source identity\n    uses: actions/checkout@%s # v4\n  - name: Generate and validate release evidence\n  - name: Attest verified DMG provenance\n  - name: Create or reuse draft GitHub Release\n  - name: Reset draft Release assets\n    run: gh release view \"$RELEASE_TAG\" --json assets && gh release delete-asset \"$RELEASE_TAG\" stale --yes\n  - name: Upload verified assets to draft Release\n  - name: Verify downloaded Release assets\n    run: echo \"unexpected or missing draft Release assets\"\n  - name: Run process-bound iOS release readiness\n    run: python3 scripts/required_step_ledger.py run --step platform-readiness -- bash -euo pipefail -c 'scripts/macos_test.sh gate && ./scripts/build_foundation_targets.sh ios'\n  - name: Archive VocelloiOS\n  - name: Export App Store IPA\n  - name: Verify exported IPA identity and signing contract\n    run: python3 scripts/required_step_ledger.py run --step ipa-verification -- python3 scripts/verify_ios_release_artifacts.py --output ios-release-artifact-verification.json\n  - name: Generate and validate iOS release evidence\n  - name: Publish verified GitHub Release\n""" % self.sha
+        workflow = """on:\n  push:\n    tags: ['v*']\nsteps:\n  - name: Verify release tag and source identity\n    uses: actions/checkout@%s # v4\n  - name: Generate and validate release evidence\n  - name: Attest verified DMG provenance\n  - name: Create or reuse draft GitHub Release\n  - name: Reset draft Release assets\n    run: gh release view \"$RELEASE_TAG\" --json assets && gh release delete-asset \"$RELEASE_TAG\" stale --yes\n  - name: Upload verified assets to draft Release\n  - name: Verify downloaded Release assets\n    run: echo \"unexpected or missing draft Release assets\"\n  - name: Run process-bound iOS release readiness\n    run: python3 scripts/required_step_ledger.py run --step platform-readiness -- bash -euo pipefail -c 'scripts/macos_test.sh gate && ./scripts/build_foundation_targets.sh ios'\n  - name: Archive VocelloiOS\n  - name: Export App Store IPA\n  - name: Verify exported IPA identity and signing contract\n    run: python3 scripts/required_step_ledger.py run --step ipa-verification -- python3 scripts/verify_ios_release_artifacts.py --output ios-release-artifact-verification.json\n  - name: Generate and validate iOS release evidence\n""" % self.sha
         (self.root / ".github/workflows/release.yml").write_text(workflow, encoding="utf-8")
+        promotion = """on:
+  workflow_dispatch:
+    inputs:
+      tag:
+steps:
+  - name: Verify tag and draft state
+    uses: actions/checkout@%s # v4
+  - name: Download and validate candidate plus promotion evidence
+    run: |
+      test -f quality-promotion.json
+      python3 scripts/release_evidence.py validate --output-dir remote
+      python3 scripts/quality_promotion.py validate --platform macos
+  - name: Publish source-bound verified Release
+    run: gh release edit "$RELEASE_TAG" --draft=false
+""" % self.sha
+        (self.root / ".github/workflows/promote-release.yml").write_text(promotion, encoding="utf-8")
         security = """name: Security
 on:
   pull_request:
@@ -187,17 +203,27 @@ jobs:
         path.write_text(path.read_text() + "\nrelease:\n  types: [published]\n", encoding="utf-8")
         self.assertTrue(any("must not trigger" in value for value in module.validate(self.root)))
 
-    def test_publish_before_remote_verification_fails(self) -> None:
-        path = self.root / ".github/workflows/release.yml"
+    def test_publish_before_quality_verification_fails(self) -> None:
+        path = self.root / ".github/workflows/promote-release.yml"
         text = path.read_text()
-        text = text.replace("  - name: Publish verified GitHub Release\n", "")
+        text = text.replace("  - name: Publish source-bound verified Release\n", "")
         text = text.replace(
-            "  - name: Verify downloaded Release assets\n",
-            "  - name: Publish verified GitHub Release\n"
-            "  - name: Verify downloaded Release assets\n",
+            "  - name: Download and validate candidate plus promotion evidence\n",
+            "  - name: Publish source-bound verified Release\n"
+            "    run: gh release edit \"$RELEASE_TAG\" --draft=false\n"
+            "  - name: Download and validate candidate plus promotion evidence\n",
         )
         path.write_text(text, encoding="utf-8")
         self.assertTrue(any("ordering" in value for value in module.validate(self.root)))
+
+    def test_candidate_workflow_cannot_publish_directly(self) -> None:
+        path = self.root / ".github/workflows/release.yml"
+        path.write_text(
+            path.read_text(encoding="utf-8")
+            + "\n  - name: Publish verified GitHub Release\n    run: gh release edit --draft=false\n",
+            encoding="utf-8",
+        )
+        self.assertTrue(any("verified draft" in value for value in module.validate(self.root)))
 
     def test_draft_asset_set_must_be_reset_and_checked_exactly(self) -> None:
         path = self.root / ".github/workflows/release.yml"

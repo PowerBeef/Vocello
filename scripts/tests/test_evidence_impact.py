@@ -38,9 +38,11 @@ class EvidenceImpactTests(unittest.TestCase):
         self.assertIn("engine-runtime", result["classes"])
         self.assertIn("model-catalog-contract", result["mergeRequiredEvidence"])
         self.assertIn("ios-model-download-lifecycle", result["qualityEvidence"])
+        self.assertIn("ios-model-download-lifecycle", result["promotionRequiredEvidence"])
         self.assertNotIn("ios-model-download-lifecycle", result["mergeRequiredEvidence"])
         self.assertNotIn("ios-model-download-lifecycle", result["releaseRequiredEvidence"])
         self.assertFalse(result["qualityEvidenceBlocksOrdinaryPublication"])
+        self.assertTrue(result["promotionEvidenceBlocksPublicPromotion"])
 
     def test_every_catalog_routing_surface_requires_complete_catalog_and_live_quality_proofs(self) -> None:
         paths = [
@@ -59,6 +61,8 @@ class EvidenceImpactTests(unittest.TestCase):
                 self.assertIn("model-catalog-complete", result["releaseRequiredEvidence"])
                 self.assertIn("macos-model-download-lifecycle", result["qualityEvidence"])
                 self.assertIn("ios-model-download-lifecycle", result["qualityEvidence"])
+                self.assertIn("macos-model-download-lifecycle", result["promotionRequiredEvidence"])
+                self.assertIn("ios-model-download-lifecycle", result["promotionRequiredEvidence"])
                 self.assertFalse(result["qualityEvidenceBlocksOrdinaryPublication"])
 
     def test_unknown_path_uses_deterministic_fallback(self) -> None:
@@ -66,6 +70,17 @@ class EvidenceImpactTests(unittest.TestCase):
         self.assertEqual(result["classes"], ["repository-other"])
         self.assertEqual(result["mergeRequiredEvidence"], ["project-inputs"])
         self.assertEqual(result["qualityEvidence"], [])
+        self.assertEqual(result["promotionRequiredEvidence"], [])
+
+    def test_memory_and_ui_changes_route_to_domain_specific_promotion_evidence(self) -> None:
+        memory = IMPACT.classify(self.contract, ["Sources/QwenVoiceCore/WiredMemoryCoordinator.swift"])
+        self.assertIn("memory-runtime", memory["classes"])
+        self.assertIn("macos-retained-memory", memory["promotionRequiredEvidence"])
+        self.assertIn("ios-retained-memory", memory["promotionRequiredEvidence"])
+
+        ui = IMPACT.classify(self.contract, ["Sources/iOS/IOSStudioCanvas.swift"])
+        self.assertIn("platform-ui", ui["classes"])
+        self.assertIn("ios-ui-performance", ui["promotionRequiredEvidence"])
 
     def test_dot_prefixed_repository_paths_keep_their_identity(self) -> None:
         result = IMPACT.classify(self.contract, [".github/workflows/ci.yml"])
@@ -88,6 +103,7 @@ class EvidenceImpactTests(unittest.TestCase):
                 self.assertIn("project-inputs", result["releaseRequiredEvidence"])
                 self.assertIn("documentation-contract", result["releaseRequiredEvidence"])
                 self.assertEqual(result["qualityEvidence"], [])
+                self.assertEqual(result["promotionRequiredEvidence"], [])
                 if path.startswith("docs/"):
                     self.assertIn("documentation-and-governance", result["classes"])
 
@@ -96,6 +112,12 @@ class EvidenceImpactTests(unittest.TestCase):
         broken["pathClasses"][0]["mergeRequiredEvidence"].append("ios-model-download-lifecycle")
         errors = IMPACT.validate_contract(broken)
         self.assertTrue(any("non-deterministic" in error for error in errors))
+
+    def test_promotion_evidence_must_remain_non_deterministic(self) -> None:
+        broken = copy.deepcopy(self.contract)
+        broken["pathClasses"][0]["promotionRequiredEvidence"].append("project-inputs")
+        errors = IMPACT.validate_contract(broken)
+        self.assertTrue(any("promotionRequiredEvidence" in error for error in errors))
 
     def test_unknown_evidence_reference_and_missing_fallback_fail(self) -> None:
         broken = copy.deepcopy(self.contract)

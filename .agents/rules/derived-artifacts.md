@@ -7,7 +7,7 @@ sourceOfTruth:
 ---
 # Derived artifacts freshness
 
-CI fail-closes on stale generated inventories. Refresh them in the **same change** as the source edit. Do **not** auto-rewrite narrative progress prose — but do keep it current by hand: the companion working norm (root `CLAUDE.md` "Before you edit") is that narrative docs land in the same change as the work they describe, with a `docs: currency pass` commit closing any dense workstream.
+CI fail-closes on stale generated inventories. Refresh them in the **same change** as the source edit. Do **not** auto-rewrite narrative progress prose — but do keep it current by hand: the companion working norm (root `AGENTS.md` "Before you edit") is that narrative docs land in the same change as the work they describe, with a `docs: currency pass` commit closing any dense workstream.
 
 ## Before commit/push after touching these paths
 
@@ -28,4 +28,4 @@ python3 scripts/refresh_derived_artifacts.py refresh   # stale only
 python3 scripts/refresh_derived_artifacts.py validate
 ```
 
-Authority: `CLAUDE.md` hard rule **Derived catalogs stay fresh**. Scripts win over this rule.
+Authority: `AGENTS.md` hard rule **Derived catalogs stay fresh**. Scripts win over this rule.

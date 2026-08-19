@@ -12,9 +12,11 @@ The end-to-end steps to ship **Vocello for iPhone** (`com.patricedery.vocello`) 
 
 Source-of-truth rule: if this disagrees with the code, the code wins.
 
-This runbook is release-only. Commits, pushes, pull requests, merges, CI, archive, and TestFlight
-packaging use deterministic verification and do not require a phone, models, or XCUITest evidence.
-Physical-device UI results are optional explicit frontend QA artifacts.
+This runbook is release-only. Commits, pushes, pull requests, merges, CI, archive, and internal
+TestFlight packaging/upload use deterministic verification and do not require a phone, models, or
+XCUITest evidence. External TestFlight distribution, App Review submission, and public App Store
+release require the exact-tag iOS manifest in
+[`quality-promotion.md`](quality-promotion.md).
 
 **Historical device checkpoint (2026-06-13, iPhone 17 Pro):** the development build signed, installed, and ran
 end-to-end. `scripts/ios_device.sh` now **auto-derives the signing team** from the keychain's Apple
@@ -127,6 +129,11 @@ normal two-phase local archive/export route. The schema-v2 compact summary omits
 prefix. It and the IPA are both hashed into the release evidence before SPDX/CycloneDX
 inventories, checksums, provenance attestation, candidate upload, or the optional TestFlight upload
 can proceed.
+
+The optional upload is an internal candidate step. Before assigning that build to external testers,
+submitting it for App Review, or releasing it publicly, produce and validate the iOS
+`quality-promotion.json` against this exact release evidence. This preserves TestFlight as a useful
+validation environment without allowing a source-stale phone verdict to authorize public promotion.
 
 ### B. Local (Xcode-logged-in maintainer)
 

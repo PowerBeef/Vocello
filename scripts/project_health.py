@@ -110,30 +110,72 @@ def validate_contract(path: Path) -> dict[str, Any]:
                 raise HealthError(f"{identifier}.{key} must be a non-empty string array")
             if not matching_paths(patterns):
                 raise HealthError(f"{identifier}.{key} matches no current files")
-        platforms = domain.get("hardwarePlatforms")
-        if not isinstance(platforms, list) or set(platforms) - {"macos", "ios"}:
-            raise HealthError(f"{identifier}.hardwarePlatforms is invalid")
+        selectors = domain.get("hardwareEvidence")
+        if not isinstance(selectors, list):
+            raise HealthError(f"{identifier}.hardwareEvidence must be an array")
+        selector_ids: set[str] = set()
+        for selector in selectors:
+            if not isinstance(selector, dict) or set(selector) != {
+                "id", "platform", "kind", "matrixScope", "classifications"
+            }:
+                raise HealthError(f"{identifier}.hardwareEvidence selector is malformed")
+            selector_id = selector.get("id")
+            if not isinstance(selector_id, str) or not re.fullmatch(r"[a-z][a-z0-9-]{1,63}", selector_id):
+                raise HealthError(f"{identifier} has invalid hardware-evidence id")
+            if selector_id in selector_ids:
+                raise HealthError(f"{identifier} has duplicate hardware-evidence id {selector_id}")
+            selector_ids.add(selector_id)
+            if selector.get("platform") not in {"macos", "ios"}:
+                raise HealthError(f"{identifier}.{selector_id} has invalid platform")
+            if selector.get("kind") not in {"ui-generation", "engine-generation", "memory-qualification", "ui-perf"}:
+                raise HealthError(f"{identifier}.{selector_id} has invalid evidence kind")
+            if selector.get("matrixScope") not in {"canonical", "focused"}:
+                raise HealthError(f"{identifier}.{selector_id} has invalid matrix scope")
+            classifications = selector.get("classifications")
+            if not isinstance(classifications, list) or not classifications or set(classifications) - {"canonical", "focused"}:
+                raise HealthError(f"{identifier}.{selector_id} has invalid classifications")
+        external = domain.get("externalPromotionEvidence", [])
+        if not isinstance(external, list) or len(external) != len(set(external)) or any(
+            not isinstance(value, str) or not re.fullmatch(r"[a-z][a-z0-9-]{1,63}", value)
+            for value in external
+        ):
+            raise HealthError(f"{identifier}.externalPromotionEvidence is invalid")
     return contract
 
 
-def latest_canonical_records() -> dict[str, dict[str, Any]]:
+def evidence_selectors(contract: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    result: dict[str, dict[str, Any]] = {}
+    for domain in contract["criticalDomains"]:
+        for selector in domain["hardwareEvidence"]:
+            identity = selector["id"]
+            current = result.get(identity)
+            if current is not None and current != selector:
+                raise HealthError(f"hardware-evidence selector {identity} has conflicting definitions")
+            result[identity] = selector
+    return result
+
+
+def latest_hardware_records(contract: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    selectors = evidence_selectors(contract)
     result: dict[str, dict[str, Any]] = {}
     for path in (ROOT / "benchmarks" / "runs").rglob("*.json"):
         record = read_json(path)
         run = record.get("run") or {}
         source = record.get("source") or {}
-        platform = run.get("platform")
-        if (
-            platform not in {"macos", "ios"}
-            or run.get("kind") != "ui-generation"
-            or run.get("classification") != "canonical"
-            or run.get("status") not in {"passed", "passedWithWarnings"}
-            or source.get("dirty") is not False
-        ):
-            continue
-        current = result.get(platform)
-        if current is None or run.get("finishedAt", "") > (current.get("run") or {}).get("finishedAt", ""):
-            result[platform] = record
+        for identity, selector in selectors.items():
+            if (
+                run.get("platform") != selector["platform"]
+                or run.get("kind") != selector["kind"]
+                or run.get("matrixScope") != selector["matrixScope"]
+                or run.get("classification") not in selector["classifications"]
+                or run.get("status") not in {"passed", "passedWithWarnings"}
+                or source.get("dirty") is not False
+                or source.get("fingerprintsMatch") is not True
+            ):
+                continue
+            current = result.get(identity)
+            if current is None or run.get("finishedAt", "") > (current.get("run") or {}).get("finishedAt", ""):
+                result[identity] = record
     return result
 
 
@@ -223,21 +265,28 @@ def file_digest(path: Path) -> str | None:
 
 
 def build_report(contract: dict[str, Any]) -> dict[str, Any]:
-    records = latest_canonical_records()
+    selectors = evidence_selectors(contract)
+    records = latest_hardware_records(contract)
     evidence: dict[str, Any] = {}
-    changes_by_platform: dict[str, tuple[str, list[str], int | None]] = {}
-    for platform in ("macos", "ios"):
-        record = records.get(platform)
+    changes_by_selector: dict[str, tuple[str, list[str], int | None]] = {}
+    for identity, selector in selectors.items():
+        record = records.get(identity)
         if record is None:
-            evidence[platform] = {"status": "missing"}
-            changes_by_platform[platform] = ("unknown", [], None)
+            evidence[identity] = {
+                "status": "missing",
+                "platform": selector["platform"],
+                "kind": selector["kind"],
+            }
+            changes_by_selector[identity] = ("unknown", [], None)
             continue
         run = record["run"]
         source = record["source"]
         state, paths, distance = changed_paths_since(source["commit"])
-        changes_by_platform[platform] = (state, paths, distance)
-        evidence[platform] = {
+        changes_by_selector[identity] = (state, paths, distance)
+        evidence[identity] = {
             "status": "available",
+            "platform": selector["platform"],
+            "kind": selector["kind"],
             "runID": run["id"],
             "finishedAt": run["finishedAt"],
             "sourceCommit": source["commit"],
@@ -249,15 +298,23 @@ def build_report(contract: dict[str, Any]) -> dict[str, Any]:
     for domain in contract["criticalDomains"]:
         production = matching_paths(domain["productionGlobs"])
         tests = matching_paths(domain["testGlobs"])
-        platform_freshness: dict[str, Any] = {}
-        for platform in domain["hardwarePlatforms"]:
-            state, changed, distance = changes_by_platform[platform]
+        hardware_freshness: dict[str, Any] = {}
+        for selector in domain["hardwareEvidence"]:
+            identity = selector["id"]
+            state, changed, distance = changes_by_selector[identity]
             if state != "known":
-                platform_freshness[platform] = {"status": "unknown", "commitDistance": distance}
+                hardware_freshness[identity] = {
+                    "status": "missing" if evidence[identity]["status"] == "missing" else "unknown",
+                    "platform": selector["platform"],
+                    "kind": selector["kind"],
+                    "commitDistance": distance,
+                }
                 continue
             impacted = [path for path in changed if path_matches(path, domain["productionGlobs"])]
-            platform_freshness[platform] = {
+            hardware_freshness[identity] = {
                 "status": "stale" if impacted else "fresh",
+                "platform": selector["platform"],
+                "kind": selector["kind"],
                 "commitDistance": distance,
                 "impactingPathCount": len(impacted),
             }
@@ -267,7 +324,8 @@ def build_report(contract: dict[str, Any]) -> dict[str, Any]:
             "productionFileCount": len(production),
             "directTestFileCount": len(tests),
             "directTestCaseCount": count_test_cases(tests),
-            "hardwareEvidence": platform_freshness,
+            "hardwareEvidence": hardware_freshness,
+            "externalPromotionEvidence": domain.get("externalPromotionEvidence", []),
         })
 
     orchestration = read_json(DEFAULT_ORCHESTRATION)
@@ -303,7 +361,7 @@ def build_report(contract: dict[str, Any]) -> dict[str, Any]:
             "requiredStepCount": required_count,
             "forcedFailureCoverage": "all-declared-steps",
         },
-        "canonicalEvidence": evidence,
+        "hardwareEvidenceCatalog": evidence,
         "criticalDomains": domains,
         "unsafeConcurrency": unsafe_concurrency_inventory(),
         "dependencyFreshness": {
@@ -331,18 +389,17 @@ def markdown(report: dict[str, Any]) -> str:
         f"- Required-step assurance: {report['requiredStepAssurance']['requiredStepCount']} steps across {report['requiredStepAssurance']['workflowCount']} workflows, all covered by forced-failure fixtures",
         f"- Unsafe-concurrency annotations: {report['unsafeConcurrency']['count']} ({report['unsafeConcurrency']['registeredCount']} registered with owner and invariant; contract {'complete' if report['unsafeConcurrency']['fullyRegistered'] else 'incomplete'})",
         "",
-        "## Canonical hardware evidence",
+        "## Hardware evidence by domain selector",
         "",
-        "| Platform | Latest canonical run | Captured |",
-        "| --- | --- | --- |",
+        "| Selector | Platform / kind | Latest qualifying run | Captured |",
+        "| --- | --- | --- | --- |",
     ]
-    for platform in ("macos", "ios"):
-        value = report["canonicalEvidence"][platform]
+    for identity, value in sorted(report["hardwareEvidenceCatalog"].items()):
         if value["status"] == "missing":
-            lines.append(f"| {platform} | missing | - |")
+            lines.append(f"| {identity} | {value['platform']} / {value['kind']} | missing | - |")
         else:
             lines.append(
-                f"| {platform} | `{value['runID']}` | {value['finishedAt']} |"
+                f"| {identity} | {value['platform']} / {value['kind']} | `{value['runID']}` | {value['finishedAt']} |"
             )
     lines.extend([
         "",
@@ -353,7 +410,11 @@ def markdown(report: dict[str, Any]) -> str:
     ])
     for domain in report["criticalDomains"]:
         freshness = domain["hardwareEvidence"]
-        summary = ", ".join(f"{platform}: {value['status']}" for platform, value in freshness.items()) or "not hardware-gated"
+        summary = ", ".join(f"{identity}: {value['status']}" for identity, value in freshness.items())
+        if not summary and domain["externalPromotionEvidence"]:
+            summary = "external promotion: " + ", ".join(domain["externalPromotionEvidence"])
+        if not summary:
+            summary = "not hardware-gated"
         lines.append(
             f"| {domain['id']} | {domain['owner']} | {domain['productionFileCount']} | "
             f"{domain['directTestFileCount']} / {domain['directTestCaseCount']} | {summary} |"
@@ -362,7 +423,7 @@ def markdown(report: dict[str, Any]) -> str:
         "",
         "## Interpretation",
         "",
-        "- `stale` means a production path owned by that domain changed after the latest canonical hardware record; it does not block ordinary development publishing.",
+        "- `stale` means a production path owned by that domain changed after its latest qualifying hardware record; `missing` means no record matches that domain's selector. Neither blocks ordinary development publishing.",
         "- Test inventory proves discoverable direct coverage, not that those tests passed in this invocation.",
         "- Dependency age and open P0/P1 issue state require authoritative online sources and are intentionally not guessed offline.",
         "- Run `python3 scripts/project_health.py report --output build/artifacts/project-health/` for the complete local JSON inventory.",

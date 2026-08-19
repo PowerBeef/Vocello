@@ -6,6 +6,7 @@ sourceOfTruth:
   - scripts/check_project_inputs.sh
   - .github/workflows/ci.yml
   - .github/workflows/release.yml
+  - .github/workflows/promote-release.yml
   - config/build-output-policy.json
 ---
 # Release / QA domain rule
@@ -17,20 +18,23 @@ sourceOfTruth:
 
 **Owns:**
 - `scripts/*.sh` and `scripts/lib/`
-- `.github/workflows/ci.yml`, `.github/workflows/release.yml`, and
+- `.github/workflows/ci.yml`, `.github/workflows/release.yml`,
+  `.github/workflows/promote-release.yml`, and
   `.github/workflows/security.yml`
 - `config/build-output-policy.json`, `config/documentation-contract.json`,
   `config/codex-session-storage-policy.json`,
   `config/public-product-facts.json`, `config/toolchain.json`,
   `config/orchestration-contract.json`, `config/evidence-impact.json`,
   `config/project-health-contract.json`, `config/release-evidence-contract.json`,
+  `config/quality-promotion-contract.json`,
   and `config/marking-peak-equality.json`
 - `benchmarks/` schema-v1 compatibility, schema-v2 memory-qualified, and schema-v3
   quality-identity records, generated history, and preserved reference baselines
 - `docs/releases/`
-- Release verification, evidence-impact, required-step, project-health, supply-chain, and packaging
+- Release verification, evidence-impact, quality-promotion, required-step, project-health, supply-chain, and packaging
   scripts (`scripts/verify_*.sh`, `scripts/release_evidence.py`, `scripts/required_step_ledger.py`,
-  `scripts/project_health.py`, `scripts/supply_chain_contract.py`, `scripts/create_dmg.sh`, etc.)
+  `scripts/quality_promotion.py`, `scripts/project_health.py`, `scripts/supply_chain_contract.py`,
+  `scripts/create_dmg.sh`, etc.)
 - Codex task/session storage governance: `scripts/codex_session_storage.py`, its synthetic test,
   and `docs/reference/codex-session-storage.md`. Live user state remains operator-owned and outside
   repository evidence.
@@ -41,19 +45,19 @@ sourceOfTruth:
   deterministic validation, and explicit delivery evidence pass.
 
 **Does NOT own:**
-- App source code (`.claude/rules/backend-mlx.md`, `.claude/rules/ios.md`, `.claude/rules/macos.md`)
-- Marketing site (`website/CLAUDE.md`)
+- App source code (`.agents/rules/backend-mlx.md`, `.agents/rules/ios.md`, `.agents/rules/macos.md`)
+- Marketing site (`website/AGENTS.md`)
 
 **Consults:**
 - `docs/reference/{macos-release-qa,telemetry-and-benchmarking,cli,macos-testing,ios-device-testing}.md`
 - `docs/ARCHITECTURE.md` §12 (telemetry)
-- Root `CLAUDE.md` (Workflows, Commands) + [`docs/project-map.html`](../../docs/project-map.html)
+- Root `AGENTS.md` (Workflows, Commands) + [`docs/project-map.html`](../../docs/project-map.html)
 
 ## Required pre-read
 
 Before changing scripts or CI, read:
 1. The script you are modifying (header comments encode intent and env vars).
-2. `.github/workflows/release.yml` if touching CI.
+2. `.github/workflows/release.yml` and `.github/workflows/promote-release.yml` if touching release CI.
 3. `docs/reference/macos-release-qa.md` for the full macOS release QA checklist.
 4. `docs/reference/benchmarking-procedure.md` for the operator runbook (when to bench, platform lanes, preflight).
 5. `docs/reference/telemetry-and-benchmarking.md` for benchmark/telemetry schema and knobs.
@@ -65,8 +69,8 @@ Before changing scripts or CI, read:
   otherwise use `gh`. User-scoped installation state is not a repository prerequisite.
 - Optional skills may assist with test triage, performance, signing, packaging, or
   telemetry after their instructions are read. Start from script output and generated artifacts.
-  Triage failing UI lanes with the Axiom `test-runner`/`test-debugger` agents (xcresult parsing)
-  and crashes with `crash-analyzer` before manual log digging; computer use stays assistive
+  Triage failing UI lanes with `axiom-testing` and focused repository commands, and symbolicate
+  crashes with `xcsym` through `axiom-tools` before manual log digging; computer use stays assistive
   (exploratory QA/diagnosis per `docs/reference/interactive-ui-qa.md`), never a driver or gate.
 - XCUITest is the sole autonomous app UI driver. It runs against the native macOS app or a paired
   physical iPhone and provides smoke and benchmark lanes; iOS adds pulled on-device
@@ -83,6 +87,12 @@ Before changing scripts or CI, read:
   Exception to "optional" in cadence only: the macOS smoke lane is a standing per-candidate step —
   run it and record the verdict (or a deliberate skip) in the release notes; it still never blocks
   packaging (`docs/reference/macos-release-qa.md` step 2b).
+- Public promotion is a separate operation. Candidate builds, signing, notarization, draft upload,
+  and internal TestFlight upload remain deterministic-only. A public macOS release or external
+  iOS/App Review submission requires `quality-promotion.json` bound to the exact tag, release
+  evidence bytes, path-classified lanes, and privacy-safe canonical hardware profiles. The
+  promotion manifest is an external draft asset because recording exact-tag device evidence after
+  the tag must not create a self-referential source commit.
 - **Generated-output contract:** `config/build-output-policy.json` owns the persistent caches,
   scratch DerivedData, untracked evidence, current symbols, and distribution outputs. Do not add an
   ad hoc build root or allow an Xcode/SwiftPM invocation to choose its own cache. XcodeBuildMCP
@@ -221,7 +231,7 @@ scripts/clean_build_caches.sh --compact-profile-failure <run-id> --dry-run
   doc-metadata, surface-coverage, and roadmap validators), so a docs-only push can never green
   `CI required` without the contract suite — the T1 commit-gate hook
   (`scripts/hooks/precommit_gate.sh`, owned here) provides the same coverage locally but is
-  Claude-session tooling, not a universal git hook. Both heavy macOS jobs cache SwiftPM checkouts.
+  Codex-session tooling, not a universal git hook. Both heavy macOS jobs cache SwiftPM checkouts.
 - **Ordinary CI is deterministic-only.** GitHub CI compiles the `VocelloiOS` app and standalone
   `VocelloiOSLogicTests` bundle with `generic/platform=iOS`, runs macOS deterministic verification,
   and never executes XCUITest. Xcode 26 cannot execute the app-host-free tool-hosted policy bundle

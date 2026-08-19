@@ -21,7 +21,6 @@ OPTIONAL_CAPABILITY_CLAIMS = {
     "The plugin supplies the one shared XcodeBuildMCP": "describe the shared XcodeBuildMCP route as conditional when callable",
     "Codex/ChatGPT Desktop only": "describe scripts-first agents; optional MCP tooling is never a prerequisite",
     "Development is Codex-first": "describe scripts-first development with optional MCP assists",
-    "impeccable:impeccable": "use the current impeccable skill name",
 }
 SCRIPT_HELP_SURFACES = {
     "scripts/ui_test.sh",
@@ -69,13 +68,13 @@ def active_markdown_paths(root: Path) -> list[Path]:
     if not (root / CONTRACT_PATH).is_file():
         # Small fixture fallback. Production inventory is always manifest-owned.
         candidates = [
-            root / "CLAUDE.md",
+            root / "AGENTS.md",
             root / "README.md",
             root / "CONTRIBUTING.md",
             root / "PRODUCT.md",
-            root / "website/CLAUDE.md",
+            root / "website/AGENTS.md",
         ]
-        candidates.extend((root / ".claude/rules").glob("*.md"))
+        candidates.extend((root / ".agents/rules").glob("*.md"))
         candidates.extend((root / "docs/reference").glob("*.md"))
         return sorted(
             path for path in candidates if path.is_file()
@@ -170,7 +169,7 @@ def validate_script_references(root: Path, paths: list[Path]) -> list[str]:
 
 
 def validate_repository_paths(root: Path, paths: list[Path]) -> list[str]:
-    prefixes = ("Sources/", "Tests/", "scripts/", "config/", ".github/", ".claude/", "docs/", "benchmarks/", "website/", "Packages/")
+    prefixes = ("Sources/", "Tests/", "scripts/", "config/", ".github/", ".agents/", ".codex/", "docs/", "benchmarks/", "website/", "Packages/")
     generated_roots: set[str] = set()
     contract_path = root / CONTRACT_PATH
     if contract_path.is_file():
@@ -277,12 +276,12 @@ def validate_current_runtime_guidance(root: Path, paths: list[Path]) -> list[str
         if "config/concurrency-safety.json" not in architecture:
             errors.append("docs/ARCHITECTURE.md: concurrency-safety registry is missing from active architecture")
 
-    claude_path = root / "CLAUDE.md"
-    if claude_path.is_file():
-        claude = claude_path.read_text(encoding="utf-8")
+    agents_path = root / "AGENTS.md"
+    if agents_path.is_file():
+        agents = agents_path.read_text(encoding="utf-8")
         for required in ("config/runtime-debug-knobs.json", "config/concurrency-safety.json"):
-            if required not in claude:
-                errors.append(f"CLAUDE.md: missing authoritative runtime contract {required}")
+            if required not in agents:
+                errors.append(f"AGENTS.md: missing authoritative runtime contract {required}")
 
     errors.extend(validate_model_catalog_guidance(root))
     return errors
@@ -297,9 +296,9 @@ def validate_model_catalog_guidance(root: Path) -> list[str]:
     state = catalog.get("activationState")
     errors: list[str] = []
     critical_docs = (
-        "CLAUDE.md",
-        ".claude/rules/backend-mlx.md",
-        ".claude/rules/release-qa.md",
+        "AGENTS.md",
+        ".agents/rules/backend-mlx.md",
+        ".agents/rules/release-qa.md",
         "docs/ARCHITECTURE.md",
         "docs/development-progress.md",
         "docs/reference/model-delivery.md",

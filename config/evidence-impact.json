@@ -71,6 +71,26 @@
       "id": "ios-engine-benchmark",
       "kind": "device-ui",
       "command": "scripts/ios_device.sh bench"
+    },
+    {
+      "id": "macos-retained-memory",
+      "kind": "model-ui",
+      "command": "scripts/macos_test.sh memory"
+    },
+    {
+      "id": "ios-retained-memory",
+      "kind": "device-ui",
+      "command": "scripts/ios_device.sh memory"
+    },
+    {
+      "id": "macos-ui-performance",
+      "kind": "model-ui",
+      "command": "scripts/ui_test.sh macos perf"
+    },
+    {
+      "id": "ios-ui-performance",
+      "kind": "device-ui",
+      "command": "scripts/ui_test.sh ios perf"
     }
   ],
   "pathClasses": [
@@ -116,6 +136,74 @@
       "qualityEvidence": [
         "macos-model-download-lifecycle",
         "ios-model-download-lifecycle"
+      ],
+      "promotionRequiredEvidence": [
+        "macos-model-download-lifecycle",
+        "ios-model-download-lifecycle"
+      ]
+    },
+    {
+      "id": "memory-runtime",
+      "include": [
+        "Sources/QwenVoiceCore/*Memory*.swift",
+        "Sources/iOS/TTSEngineStore.swift",
+        "config/memory-qualification-policy.json",
+        "scripts/benchmark_memory.py",
+        "scripts/ios_memory_field_report.py"
+      ],
+      "mergeRequiredEvidence": [
+        "project-inputs",
+        "macos-deterministic-tests",
+        "ios-device-sdk-compile"
+      ],
+      "releaseRequiredEvidence": [
+        "project-inputs",
+        "macos-deterministic-tests",
+        "ios-device-sdk-compile"
+      ],
+      "qualityEvidence": [
+        "macos-retained-memory",
+        "ios-retained-memory"
+      ],
+      "promotionRequiredEvidence": [
+        "macos-retained-memory",
+        "ios-retained-memory"
+      ]
+    },
+    {
+      "id": "platform-ui",
+      "include": [
+        "Sources/Views/**",
+        "Sources/iOS/Studio/**",
+        "Sources/iOS/Sheets/**",
+        "Sources/iOS/*View.swift",
+        "Sources/iOS/*Canvas.swift",
+        "Sources/iOS/IOSAccessibility.swift",
+        "Sources/iOSSupport/Services/*UIPerf*.swift",
+        "Tests/VocelloMacUITests/**",
+        "Tests/VocelloiOSUITests/**",
+        "config/ui-perf-thresholds.json",
+        "config/ui-perf-thresholds-ios.json",
+        "scripts/check_macos_ui_perf.py",
+        "scripts/check_ios_ui_perf.py"
+      ],
+      "mergeRequiredEvidence": [
+        "project-inputs",
+        "macos-deterministic-tests",
+        "ios-device-sdk-compile"
+      ],
+      "releaseRequiredEvidence": [
+        "project-inputs",
+        "macos-deterministic-tests",
+        "ios-device-sdk-compile"
+      ],
+      "qualityEvidence": [
+        "macos-ui-performance",
+        "ios-ui-performance"
+      ],
+      "promotionRequiredEvidence": [
+        "macos-ui-performance",
+        "ios-ui-performance"
       ]
     },
     {
@@ -143,6 +231,12 @@
         "ios-ui-benchmark",
         "macos-engine-benchmark",
         "ios-engine-benchmark"
+      ],
+      "promotionRequiredEvidence": [
+        "macos-ui-benchmark",
+        "ios-ui-benchmark",
+        "macos-engine-benchmark",
+        "ios-engine-benchmark"
       ]
     },
     {
@@ -165,7 +259,8 @@
         "project-inputs",
         "supply-chain-contract"
       ],
-      "qualityEvidence": []
+      "qualityEvidence": [],
+      "promotionRequiredEvidence": []
     },
     {
       "id": "evidence-governance",
@@ -183,7 +278,8 @@
         "project-inputs",
         "documentation-contract"
       ],
-      "qualityEvidence": []
+      "qualityEvidence": [],
+      "promotionRequiredEvidence": []
     },
     {
       "id": "codex-session-storage-governance",
@@ -201,7 +297,8 @@
         "project-inputs",
         "documentation-contract"
       ],
-      "qualityEvidence": []
+      "qualityEvidence": [],
+      "promotionRequiredEvidence": []
     },
     {
       "id": "website",
@@ -216,13 +313,15 @@
         "documentation-contract",
         "website-build"
       ],
-      "qualityEvidence": []
+      "qualityEvidence": [],
+      "promotionRequiredEvidence": []
     },
     {
       "id": "documentation-and-governance",
       "include": [
-        "CLAUDE.md",
-        ".claude/**",
+        "AGENTS.md",
+        ".agents/**",
+        ".codex/**",
         "CONTRIBUTING.md",
         "README.md",
         "config/documentation-contract.json",
@@ -235,7 +334,8 @@
       "releaseRequiredEvidence": [
         "documentation-contract"
       ],
-      "qualityEvidence": []
+      "qualityEvidence": [],
+      "promotionRequiredEvidence": []
     }
   ],
   "fallbackClass": {
@@ -246,6 +346,7 @@
     "releaseRequiredEvidence": [
       "project-inputs"
     ],
-    "qualityEvidence": []
+    "qualityEvidence": [],
+    "promotionRequiredEvidence": []
   }
 }

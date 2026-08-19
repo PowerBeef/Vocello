@@ -220,6 +220,13 @@ targets:
         PRODUCT_MODULE_NAME: VocelloCLI
         SWIFT_VERSION: "6"
         MACOSX_DEPLOYMENT_TARGET: "26.0"
+        # Command-line tools have no bundle Info.plist by default. Embed the
+        # project-owned version settings in the Mach-O so Bundle.main and every
+        # `vocello version` alias resolve the same product identity.
+        GENERATE_INFOPLIST_FILE: YES
+        CREATE_INFOPLIST_SECTION_IN_BINARY: YES
+        INFOPLIST_KEY_CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        INFOPLIST_KEY_CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         # Ad-hoc signed, no hardened runtime: a plain CLI runs Metal/MLX fine
         # without the app's allow-unsigned-memory entitlement.
         CODE_SIGN_IDENTITY: "-"
@@ -351,7 +358,7 @@ targets:
   VocelloiOS:
     type: application
     platform: iOS
-    # XcodeGen 2.45.4 gotcha (see .claude/rules/ios.md "XcodeGen iOS-resource gotcha" + commit
+    # XcodeGen 2.45.4 gotcha (see .agents/rules/ios.md "XcodeGen iOS-resource gotcha" + commit
     # 287c969): the bundled resources below MUST be listed under `sources:` with an
     # explicit `buildPhase: resources` override. Listing them under `resources:`
     # silently drops them from the VocelloiOS Resources phase, so iOS builds compile

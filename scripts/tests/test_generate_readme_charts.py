@@ -34,8 +34,8 @@ class GenerateReadmeChartsTests(unittest.TestCase):
 
     def test_charts_cite_their_data_provenance(self) -> None:
         rendered = MODULE.render_all()
-        self.assertIn(MODULE.RECORDS["post"][-8:], rendered["rtf-by-mode-dark.svg"])
-        self.assertIn(MODULE.RECORDS["pre"][-8:], rendered["gate-delta-dark.svg"])
+        self.assertIn(MODULE.RTF_RECORD[-8:], rendered["rtf-by-mode-dark.svg"])
+        self.assertIn("benchmarks/HISTORY.md", rendered["rtf-by-mode-dark.svg"])
         self.assertIn(MODULE.LONGFORM_RUN_ID[-8:], rendered["longform-memory-dark.svg"])
 
     def test_committed_charts_are_fresh(self) -> None:

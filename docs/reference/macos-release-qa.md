@@ -119,9 +119,9 @@ upload depend on deterministic release-readiness and artifact checks.
    `SHA256SUMS` plus `release-evidence.json`, and attests the DMG. Only then does it create or reuse
    a draft GitHub Release, upload the candidate, download every asset, and verify the digests.
    Reusing a draft first removes every prior asset; the workflow then requires the remote asset-name
-   set to match the current candidate exactly before downloading and validating it. Publication is
-   the final step. A failure leaves only an Actions artifact or draft Release, never a public
-   placeholder or a stale extra asset.
+   set to match the current candidate exactly before downloading and validating it. The workflow
+   always stops at that verified draft. A failure leaves only an Actions artifact or draft Release,
+   never a public placeholder or a stale extra asset.
 
    `release-evidence.json` is schema v2. It embeds a clean full-tree source identity and hashes a
    `release-verification.json` bundle containing the platform required-step ledger and its individual
@@ -129,6 +129,15 @@ upload depend on deterministic release-readiness and artifact checks.
    subprocesses in the same invocation, all digests match the captured source, and completion is
    within the contract's six-hour freshness window. A manually written PASS file, stale ledger,
    missing step, changed untracked source file, or mixed invocation fails before publication.
+
+8. **Source-bound public promotion**: follow
+   [`quality-promotion.md`](quality-promotion.md) on the clean tag checkout. Produce the canonical
+   Mac generation matrix and every path-classified engine, retained-memory, UI-performance, or
+   model-delivery lane; assemble and validate `quality-promotion.json`; then upload it to the draft.
+   Dispatch `promote-release.yml` with the exact tag. That workflow revalidates the downloaded
+   deterministic candidate and the promotion manifest before changing the draft to public. Device
+   or model availability can delay public promotion, but never candidate building, signing,
+   notarization, attestation, or draft upload.
 
 ## Release notes are a release artifact (both stores, fail-closed)
 

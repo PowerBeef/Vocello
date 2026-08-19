@@ -6,7 +6,7 @@ import os
 ///
 /// Subscribes to MetricKit diagnostic payloads (crash + hang) and writes them to the
 /// pullable diagnostics dir (`Library/Caches/Vocello/diagnostics/crashes/`) so
-/// `scripts/ios_device.sh crashes` can pull them and `xcsym` / Axiom `crash-analyzer`
+/// `scripts/ios_device.sh crashes` can pull them and `xcsym` / `axiom-tools`
 /// can symbolicate against the build's preserved dSYM. Also installs an
 /// `NSSetUncaughtExceptionHandler` as a fast path for Obj-C exceptions (MetricKit
 /// covers signal faults and delivers them on the next launch). Best-effort; MetricKit

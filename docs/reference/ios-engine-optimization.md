@@ -24,7 +24,7 @@ decode-loop + output-quality work, shared by both platforms — the deep §A–�
 entitlement), [`ios-device-testing.md`](ios-device-testing.md) (how to build/bench on device),
 [`telemetry-and-benchmarking.md`](telemetry-and-benchmarking.md) (the telemetry schema).
 
-**Source-of-truth rule (from `CLAUDE.md`): if this doc disagrees with the code, the code wins — fix
+**Source-of-truth rule (from `AGENTS.md`): if this doc disagrees with the code, the code wins — fix
 this doc.** All claims below are cited to a file or commit; re-verify before relying on a number.
 
 ---
@@ -367,8 +367,9 @@ without a new maintainer decision.
 **P3 — mlx-swift 0.31.x / mlx-swift-lm 2.31.x bump (gated).** Deferred — **stay pinned at 0.30.6 /
 2.30.6**. 0.31 changes the quantization API (`Quantizable.toQuantized` gains a `QuantizationMode`;
 quantize moves to a top-level fn), which lands on the 4-bit/8-bit model-load path, so it's not a free
-bump. Procedure (OPTIMIZATION.md §E, `.claude/rules/backend-mlx.md` "SPM pins move in lockstep"): throwaway branch → bump all pin
-sites in lockstep (`project.yml` *and* owned `Packages/VocelloQwen3Core/Package.swift`) →
+bump. Procedure (OPTIMIZATION.md §E, `.agents/rules/backend-mlx.md` "SPM pins move in lockstep"):
+obtain explicit maintainer authorization on `main` → bump all pin sites in lockstep (`project.yml`
+*and* owned `Packages/VocelloQwen3Core/Package.swift`) →
 `regenerate_project.sh` → both `build_foundation_targets.sh` → fixed-seed `vocello bench` vs the
 committed baseline + applicable automated language/prosody gates → keep only if RTF/quality/QC are
 unchanged.

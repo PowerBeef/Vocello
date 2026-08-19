@@ -53,7 +53,7 @@ enum IOSDisplayCapability {
 // iOS counterpart to the macOS `appAnimation` helper at
 // Sources/Views/Components/AppTheme.swift. Honors Reduce Motion via the
 // SwiftUI environment so animations are skipped when the user has the
-// accessibility setting enabled. CLAUDE.md requires Reduce Motion to be
+// accessibility setting enabled. AGENTS.md requires Reduce Motion to be
 // honored across the app.
 
 extension View {

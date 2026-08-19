@@ -35,7 +35,7 @@ substantive claim below carries a provenance label:
 
 **This is a reference, not canon.** Nothing here is a normative repository rule yet. Rules get
 promoted into [`../../Sources/QwenVoiceCore/EmotionPreset.swift`](../../Sources/QwenVoiceCore/EmotionPreset.swift)
-or a domain rule under [`../../.claude/rules/`](../../.claude/rules/) only after they are validated
+or a domain rule under [`../../.agents/rules/`](../../.agents/rules/) only after they are validated
 against our own model, because the alternative — shipping unvalidated guidance — is how the current
 preset copy came to be.
 

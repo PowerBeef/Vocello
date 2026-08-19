@@ -340,9 +340,12 @@ build_cli() {
     # binary — copying it elsewhere breaks metallib lookup. Expose a convenience
     # symlink at build/vocello; macOS resolves it to the real path, so the
     # bundles stay adjacent.
+    assert_macho_arm64_only "$CLI_BUILT" "vocello CLI"
+    python3 "$SCRIPT_DIR/cli_version_contract.py" validate \
+        --root "$ROOT_DIR" --binary "$CLI_BUILT"
+    # Publish the convenience symlink only after the binary's identity passes.
     rm -f "$CLI_BINARY"
     ln -s "${CLI_BUILT#"$BUILD_DIR"/}" "$CLI_BINARY"
-    assert_macho_arm64_only "$CLI_BUILT" "vocello CLI"
     write_build_provenance "$DERIVED_DATA/last-build.json" \
         "scripts/build.sh cli" "$CLI_TARGET" Release "$DESTINATION" arm64 \
         Onone ad-hoc "$DERIVED_DATA" "$SOURCE_PACKAGES_DIR"

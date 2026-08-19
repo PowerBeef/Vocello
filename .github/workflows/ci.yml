@@ -28,7 +28,7 @@ jobs:
   # skip for docs-only pushes. Any native change re-runs the full suite here,
   # and `docs-contracts` below runs unconditionally so a docs-only push can
   # never green `CI required` without the documentation/link/roadmap
-  # contracts (the local T1 hook is Claude-session tooling, not a universal
+  # contracts (the local T1 hook is Codex-session tooling, not a universal
   # git hook). `ci-required` aggregates results (skipped counts as pass) and
   # is the single branch-protection context.
   changes:
@@ -252,6 +252,9 @@ jobs:
 
       - name: Run deterministic macOS tests
         run: scripts/macos_test.sh test
+
+      - name: Verify source-built CLI version identity
+        run: ./scripts/build.sh cli --version
 
       - name: Upload xcresult on failure
         if: failure()

@@ -413,7 +413,7 @@ fallback branch). The three live hand-rolled sites delegate to it
 (`iosSubtleGlassSurface`, the generation status chip, the bottom-sheet
 chrome), the never-adopted `ThemeGlassSurfaceModifier` twin was deleted
 (zero callers — one of the "two systems" was dead on arrival), and
-`.claude/rules/ios.md` now names the container rule. An adversarial parity
+`.agents/rules/ios.md` now names the container rule. An adversarial parity
 lens verified all four gate states identical at every site and that no raw
 `glassEffect` call remains outside the shared modifier. The **token
 namespace half stays open as D10b**: 403 `IOSAppTheme`/`IOSBrandTheme`

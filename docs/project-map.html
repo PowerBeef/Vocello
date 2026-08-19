@@ -1507,7 +1507,7 @@ table.matrix .note {
     <p class="section-label">08 · Tooling</p>
     <h2 class="section-title">Scripts, tests &amp; CI</h2>
     <p class="section-lede">
-      Development is Claude Code + scripts-first; optional MCP tools assist only when callable.
+      Development is Codex + scripts-first; optional MCP tools assist only when callable.
       Native builds are the typecheck. Commits, pushes, pull requests, ordinary merges, CI, and release packaging use deterministic checks only. XCUITest smoke, benchmark, and perf lanes are explicit frontend acceptance work.
     </p>
 
@@ -1601,7 +1601,7 @@ scripts/macos_test.sh test
           <h4>Where to go deeper</h4>
           <p class="reading-links">
             <a href="ARCHITECTURE.md">Architecture</a>
-            <a href="../CLAUDE.md">Agent onboarding</a>
+            <a href="../AGENTS.md">Agent onboarding</a>
             <a href="reference/macos-app-guide.md">macOS app</a>
             <a href="reference/ios-app-guide.md">iOS app</a>
             <a href="reference/cli.md">CLI</a>
@@ -2002,7 +2002,8 @@ scripts/macos_test.sh test
       "children":[
         {"name":"ci.yml","desc":"Project inputs, website checks, generic iOS app plus logic-bundle compile safety, and macOS deterministic tests"},
         {"name":"security.yml","desc":"Dependency review and scheduled CodeQL security analysis"},
-        {"name":"release.yml","desc":"Identity-bound DMG candidate, SBOM/checksum/attestation evidence, draft verification, final publication, and optional iOS archive"}
+        {"name":"release.yml","desc":"Identity-bound DMG candidate, SBOM/checksum/attestation evidence, verified draft creation, and optional iOS archive"},
+        {"name":"promote-release.yml","desc":"Exact-tag quality-manifest validation and the sole verified-draft-to-public transition"}
       ]
     }
   ],
@@ -2040,7 +2041,7 @@ scripts/macos_test.sh test
   ],
   "externalSystems": [
     {"name":"Hugging Face","role":"Pinned model repository downloads over HTTPS","boundary":"No inference or user-script upload"},
-    {"name":"GitHub Actions / Releases","role":"Deterministic CI, security analysis, verified candidate/SBOM/provenance, and draft-last release publication","boundary":"UI acceptance remains explicit and local"},
+    {"name":"GitHub Actions / Releases","role":"Deterministic CI, security analysis, verified candidate/SBOM/provenance, then source-bound public promotion","boundary":"Models/devices never block candidate production; exact-tag quality evidence gates only public promotion"},
     {"name":"Apple Developer services","role":"Developer ID signing, notarytool, App Store Connect, optional TestFlight","boundary":"Secrets stay in CI or local keychains"},
     {"name":"Xcode iOS Platform Support","role":"Makes generic/platform=iOS and physical-device destinations eligible","boundary":"Read-only preflight; repository cleanup never removes or downloads components, and no Simulator execution is authorized"},
     {"name":"CoreDevice and paired iPhone","role":"Physical-device install, launch, diagnostics, XCUITest, and profiling","boundary":"Simulator is prohibited"},
@@ -2058,7 +2059,7 @@ scripts/macos_test.sh test
       {"cmd":"python3 scripts/build_output_policy.py status|validate","desc":"Inventory and enforce the two-cache classified output contract"},
       {"cmd":"python3 scripts/roadmap.py status|validate|render","desc":"Plans, items, and progress; validate resolves every evidence reference against the repository"},
       {"cmd":"python3 scripts/doc_metadata.py validate","desc":"Per-file doc status, pinned-body digests, and contradictions against facts derived from code"},
-      {"cmd":"python3 scripts/check_surface_coverage.py","desc":"Every enforced gate and contract is named in CLAUDE.md or a domain rule"},
+      {"cmd":"python3 scripts/check_surface_coverage.py","desc":"Every enforced gate and contract is named in AGENTS.md or a domain rule"},
       {"cmd":"python3 scripts/check_delivery_instructions.py","desc":"Delivery-copy tier parity, repeated intensifiers, and direction conflicts"}
     ],
     "macOS test":[
@@ -2095,12 +2096,13 @@ scripts/macos_test.sh test
       {"cmd":".github/workflows/ci.yml · ios-compile-check","desc":"Generic iOS device-SDK app plus standalone logic-test bundle compile"},
       {"cmd":".github/workflows/ci.yml · macos-deterministic-tests","desc":"Headless tests and app build; no UI driving"},
       {"cmd":".github/workflows/security.yml","desc":"Dependency review and scheduled CodeQL"},
-      {"cmd":".github/workflows/release.yml · package","desc":"Signed/notarized candidate, SBOM/checksum/provenance evidence, draft asset verification, then final publication"},
+      {"cmd":".github/workflows/release.yml · package","desc":"Signed/notarized candidate, SBOM/checksum/provenance evidence, and verified draft asset upload"},
+      {"cmd":".github/workflows/promote-release.yml","desc":"Validate exact-tag quality-promotion.json and publish the verified draft"},
       {"cmd":".github/workflows/release.yml · compile-ios|archive-ios","desc":"iOS compile safety and optional manual signed archive"}
     ],
     "Agent workflow":[
-      {"cmd":"CLAUDE.md → .claude/rules/<domain>.md","desc":"Durable repo rules first, then the domain rule"},
-      {"cmd":".claude/settings.json","desc":"Project tool permissions; MCP servers (XcodeBuildMCP, Axiom, sosumi) are user-scoped"},
+      {"cmd":"AGENTS.md → .agents/rules/<domain>.md","desc":"Durable repo rules first, then the domain rule"},
+      {"cmd":".codex/hooks.json","desc":"Project tool permissions; MCP servers (XcodeBuildMCP, Axiom, sosumi) are user-scoped"},
       {"cmd":"Optional Axiom / docs MCP","desc":"Read selected skill instructions completely before acting; never a packaging prerequisite"},
       {"cmd":"Optional shared XcodeBuildMCP","desc":"When installed and callable, one server for macOS and physical-device iOS profiles; repository scripts remain authoritative"},
       {"cmd":"scripts/ui_test.sh macos|ios smoke|benchmark","desc":"Sole autonomous app UI stack; iOS requires the paired physical phone"},

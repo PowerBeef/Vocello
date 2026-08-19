@@ -3,8 +3,10 @@ status: active
 owner: backend-mlx
 summary: The vocello CLI — user-facing generation surface and deterministic benchmark/test driver over the same in-process MLX engine as the app.
 sourceOfTruth:
+  - project.yml
   - Sources/VocelloCLI
   - scripts/build.sh
+  - scripts/cli_version_contract.py
 ---
 # The `vocello` CLI
 
@@ -30,6 +32,7 @@ bench in debug context, see [`testing-runbook.md`](testing-runbook.md) "Model re
 
 ```sh
 ./scripts/build.sh cli                 # build build/vocello (single config, -Onone)
+./scripts/build.sh cli --version       # prints the project MARKETING_VERSION
 ./scripts/build.sh cli generate --text "Hello." --variant speed   # build + run with args
 build/vocello <command> [options]      # run the already-built binary
 ```
@@ -40,6 +43,12 @@ build/vocello <command> [options]      # run the already-built binary
 it must run in place. The contract (`qwenvoice_contract.json`) is bundled into the tool, and is also
 discovered repo-relative, so the CLI works from the repo root or any subdirectory; pass `--manifest`
 to override.
+
+The CLI target embeds `project.yml`'s `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` in its
+Mach-O Info.plist section. `vocello --version`, `vocello version`, and `vocello -v` therefore share
+the product's single version authority. `scripts/cli_version_contract.py` validates both the target
+settings and the built executable; an unsupported bare `swiftc` build without embedded metadata
+reports `unknown` rather than a stale numeric version.
 
 By default the CLI uses the app's runtime data directory
 (`~/Library/Application Support/QwenVoice`, or `QwenVoice-Debug` when `QWENVOICE_DEBUG` is truthy);

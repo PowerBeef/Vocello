@@ -54,7 +54,7 @@ class ReleaseEvidenceTests(unittest.TestCase):
         source_inputs["releaseContractDigest"] = ["config/release-evidence-contract.json"]
         self.release_contract.write_text(json.dumps({
             "schemaVersion": 1,
-            "publicationPolicy": "draft-build-verify-attest-publish",
+            "publicationPolicy": "draft-build-verify-attest-await-source-bound-promotion",
             "sourceIdentity": ["gitCommit", "treeDirty", *IDENTITY_DIGESTS],
             "sourceIdentityInputs": source_inputs,
             "verificationFreshnessSeconds": 3600,

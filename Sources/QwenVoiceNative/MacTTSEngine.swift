@@ -18,6 +18,14 @@ public protocol MacTTSEngine: AnyObject, Sendable {
     func generate(_ request: GenerationRequest) async throws -> GenerationResult
     func cancelActiveGeneration() async throws
     func listPreparedVoices() async throws -> [PreparedVoice]
+    func preparePreparedVoiceCandidate(
+        name: String,
+        audioPath: String,
+        transcript: String?,
+        replacingVoiceID: String?
+    ) async throws -> PreparedVoiceCandidate
+    func commitPreparedVoiceCandidate(id: UUID) async throws -> PreparedVoice
+    func discardPreparedVoiceCandidate(id: UUID) async throws
     func enrollPreparedVoice(name: String, audioPath: String, transcript: String?) async throws -> PreparedVoice
     func deletePreparedVoice(id: String) async throws
     func clearGenerationActivity()

@@ -423,6 +423,33 @@ final class TTSEngineStore: ObservableObject, TTSEngine {
         return voices
     }
 
+    func preparePreparedVoiceCandidate(
+        name: String,
+        audioPath: String,
+        transcript: String?,
+        replacingVoiceID: String?
+    ) async throws -> PreparedVoiceCandidate {
+        let candidate = try await backend.preparePreparedVoiceCandidate(
+            name: name,
+            audioPath: audioPath,
+            transcript: transcript,
+            replacingVoiceID: replacingVoiceID
+        )
+        syncFromBackend()
+        return candidate
+    }
+
+    func commitPreparedVoiceCandidate(id: UUID) async throws -> PreparedVoice {
+        let voice = try await backend.commitPreparedVoiceCandidate(id: id)
+        syncFromBackend()
+        return voice
+    }
+
+    func discardPreparedVoiceCandidate(id: UUID) async throws {
+        try await backend.discardPreparedVoiceCandidate(id: id)
+        syncFromBackend()
+    }
+
     func enrollPreparedVoice(name: String, audioPath: String, transcript: String?) async throws -> PreparedVoice {
         let voice = try await backend.enrollPreparedVoice(name: name, audioPath: audioPath, transcript: transcript)
         syncFromBackend()
@@ -1026,6 +1053,9 @@ final class AnyTTSEngineBackend {
     private let cancelActiveGenerationBlock: (GenerationCancellationReason) async throws -> Void
     private let generateBlock: (GenerationRequest) async throws -> GenerationResult
     private let listPreparedVoicesBlock: () async throws -> [PreparedVoice]
+    private let preparePreparedVoiceCandidateBlock: (String, String, String?, String?) async throws -> PreparedVoiceCandidate
+    private let commitPreparedVoiceCandidateBlock: (UUID) async throws -> PreparedVoice
+    private let discardPreparedVoiceCandidateBlock: (UUID) async throws -> Void
     private let enrollPreparedVoiceBlock: (String, String, String?) async throws -> PreparedVoice
     private let deletePreparedVoiceBlock: (String) async throws -> Void
     private let exportGeneratedAudioBlock: (URL, URL) throws -> ExportedDocument
@@ -1106,6 +1136,16 @@ final class AnyTTSEngineBackend {
         }
         self.generateBlock = { try await engine.generate($0) }
         self.listPreparedVoicesBlock = { try await engine.listPreparedVoices() }
+        self.preparePreparedVoiceCandidateBlock = {
+            try await engine.preparePreparedVoiceCandidate(
+                name: $0,
+                audioPath: $1,
+                transcript: $2,
+                replacingVoiceID: $3
+            )
+        }
+        self.commitPreparedVoiceCandidateBlock = { try await engine.commitPreparedVoiceCandidate(id: $0) }
+        self.discardPreparedVoiceCandidateBlock = { try await engine.discardPreparedVoiceCandidate(id: $0) }
         self.enrollPreparedVoiceBlock = { try await engine.enrollPreparedVoice(name: $0, audioPath: $1, transcript: $2) }
         self.deletePreparedVoiceBlock = { try await engine.deletePreparedVoice(id: $0) }
         self.exportGeneratedAudioBlock = { try engine.exportGeneratedAudio(from: $0, to: $1) }
@@ -1183,6 +1223,20 @@ final class AnyTTSEngineBackend {
     }
     func generate(_ request: GenerationRequest) async throws -> GenerationResult { try await generateBlock(request) }
     func listPreparedVoices() async throws -> [PreparedVoice] { try await listPreparedVoicesBlock() }
+    func preparePreparedVoiceCandidate(
+        name: String,
+        audioPath: String,
+        transcript: String?,
+        replacingVoiceID: String?
+    ) async throws -> PreparedVoiceCandidate {
+        try await preparePreparedVoiceCandidateBlock(name, audioPath, transcript, replacingVoiceID)
+    }
+    func commitPreparedVoiceCandidate(id: UUID) async throws -> PreparedVoice {
+        try await commitPreparedVoiceCandidateBlock(id)
+    }
+    func discardPreparedVoiceCandidate(id: UUID) async throws {
+        try await discardPreparedVoiceCandidateBlock(id)
+    }
     func enrollPreparedVoice(name: String, audioPath: String, transcript: String?) async throws -> PreparedVoice {
         try await enrollPreparedVoiceBlock(name, audioPath, transcript)
     }

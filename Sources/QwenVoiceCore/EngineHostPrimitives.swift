@@ -157,7 +157,7 @@ public struct EngineCapabilities: Codable, Equatable, Sendable {
 }
 
 public enum QwenVoiceWireSchema {
-    public static let currentVersion = 1
+    public static let currentVersion = 2
     public static let legacyMissingVersion = 1
 
     public static func validate(version: Int, codingPath: [CodingKey]) throws {

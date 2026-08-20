@@ -81,6 +81,10 @@
         "requiredFreeBytes": 12884901888,
         "cleanupHint": "scripts/clean_build_caches.sh --prune-ui-results"
       },
+      "ui-saved-voice-lifecycle": {
+        "requiredFreeBytes": 12884901888,
+        "cleanupHint": "scripts/clean_build_caches.sh --prune-ui-results"
+      },
       "release": {
         "requiredFreeBytes": 21474836480,
         "cleanupHint": "scripts/clean_build_caches.sh --routine"

@@ -4,9 +4,9 @@
 > execute models, devices, UI tests, signing, or network checks.
 
 - Current source identity and dirty state: local JSON report only (kept out of the tracked snapshot to avoid self-referential drift)
-- Swift tests: 538 cases in 74 files
-- Python tests: 987 cases in 76 files
-- Required-step assurance: 72 steps across 16 workflows, all covered by forced-failure fixtures
+- Swift tests: 552 cases in 77 files
+- Python tests: 993 cases in 77 files
+- Required-step assurance: 76 steps across 17 workflows, all covered by forced-failure fixtures
 - Unsafe-concurrency annotations: 49 (49 registered with owner and invariant; contract complete)
 
 ## Hardware evidence by domain selector
@@ -29,8 +29,8 @@
 | event-delivery | backend | 3 | 2 / 10 | macos-ui-generation: stale, ios-ui-generation: stale |
 | memory-policy | backend-platform | 6 | 2 / 25 | macos-memory-qualification: stale, ios-memory-qualification: stale |
 | model-delivery | backend-platform | 17 | 3 / 37 | external promotion: macos-model-download-lifecycle, ios-model-download-lifecycle |
-| ui-performance | platform | 75 | 15 / 54 | macos-ui-performance: stale, ios-ui-performance: stale |
-| xpc-transport | macos | 3 | 3 / 15 | macos-ui-generation: fresh |
+| ui-performance | platform | 75 | 16 / 55 | macos-ui-performance: stale, ios-ui-performance: stale |
+| xpc-transport | macos | 3 | 4 / 18 | macos-ui-generation: stale |
 | benchmark-validation | release-qa | 6 | 4 / 118 | macos-ui-generation: stale, ios-ui-generation: stale |
 | orchestration-assurance | release-qa | 3 | 1 / 12 | not hardware-gated |
 | release-supply-chain | release-qa | 9 | 4 / 63 | not hardware-gated |

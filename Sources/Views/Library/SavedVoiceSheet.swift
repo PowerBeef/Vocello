@@ -156,11 +156,12 @@ struct SavedVoiceSheet: View {
     @State private var isSaving = false
     @State private var errorMessage: String?
     @State private var existingNormalizedNames: Set<String> = []
-    /// When non-nil, the just-enrolled voice has quality warnings and the
-    /// user is being asked whether to keep it or delete + re-record.
+    /// When non-nil, the staged voice has quality warnings and the user is
+    /// being asked whether to publish it or discard the private candidate.
     /// Driven by `MLXTTSEngine.savedReferenceQualityWarnings(forAudioAt:)`
     /// at enrollment time.
-    @State private var pendingVoiceForReview: Voice?
+    @State private var pendingVoiceForReview: PreparedVoiceCandidate?
+    @State private var isReviewDecisionInFlight = false
     @State private var isRecordSheetPresented = false
     @State private var isTranscribing = false
     @State private var transcriptionTask: Task<Void, Never>?
@@ -384,32 +385,38 @@ struct SavedVoiceSheet: View {
             }
         }
         .alert(
-            "Reference outside recommended range",
+            reviewAlertTitle,
             isPresented: Binding(
-                get: { pendingVoiceForReview != nil },
-                set: { if !$0 { pendingVoiceForReview = nil } }
+                get: { pendingVoiceForReview != nil && !isReviewDecisionInFlight },
+                set: { isPresented in
+                    if !isPresented,
+                       !isReviewDecisionInFlight,
+                       let candidate = pendingVoiceForReview {
+                        discardPendingVoice(candidate)
+                    }
+                }
             ),
             presenting: pendingVoiceForReview
-        ) { voice in
+        ) { candidate in
             // Hard-block tier (>60 s) hides the "Keep voice" button so
             // the user has to discard or cancel; soft-warn tier keeps
             // all three buttons.
-            if !PreparedVoiceQualityWarning.isHardBlocking(voice.qualityWarnings) {
+            if !PreparedVoiceQualityWarning.isHardBlocking(candidate.qualityWarnings) {
                 Button("Keep voice") {
-                    acceptPendingVoice()
+                    acceptPendingVoice(candidate)
                 }
                 .accessibilityIdentifier("voicesEnroll_keepDespiteWarning")
             }
             Button("Discard and re-record", role: .destructive) {
-                discardPendingVoice()
+                discardPendingVoice(candidate)
             }
             .accessibilityIdentifier("voicesEnroll_discardOnWarning")
             Button("Cancel", role: .cancel) {
-                pendingVoiceForReview = nil
+                discardPendingVoice(candidate)
             }
             .accessibilityIdentifier("voicesEnroll_cancelOnWarning")
-        } message: { voice in
-            Text(PreparedVoiceQualityWarning.summary(for: voice.qualityWarnings))
+        } message: { candidate in
+            Text(reviewAlertMessage(for: candidate))
         }
     }
 
@@ -495,25 +502,29 @@ struct SavedVoiceSheet: View {
 
         Task {
             do {
-                let savedVoice = try await ttsEngineStore.enrollPreparedVoice(
+                let candidate = try await ttsEngineStore.preparePreparedVoiceCandidate(
                     name: trimmedName,
                     audioPath: audioPath.trimmingCharacters(in: .whitespacesAndNewlines),
                     transcript: transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                         ? nil
-                        : transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+                        : transcript.trimmingCharacters(in: .whitespacesAndNewlines),
+                    replacingVoiceID: configuration.replacingNormalizedName
                 )
-                let voice = Voice(preparedVoice: savedVoice)
                 await MainActor.run {
-                    if voice.qualityWarnings.isEmpty {
-                        onComplete(voice)
-                        dismiss()
-                    } else {
-                        // Soft warning: keep the voice on disk, but ask the
-                        // user before adding it to the active selection.
-                        // "Discard" deletes the just-enrolled voice; the
-                        // sheet stays open so they can pick a different
-                        // reference.
-                        pendingVoiceForReview = voice
+                    pendingVoiceForReview = candidate.qualityWarnings.isEmpty ? nil : candidate
+                }
+                if candidate.qualityWarnings.isEmpty {
+                    do {
+                        let savedVoice = try await ttsEngineStore.commitPreparedVoiceCandidate(id: candidate.id)
+                        await MainActor.run {
+                            onComplete(Voice(preparedVoice: savedVoice))
+                            dismiss()
+                        }
+                    } catch {
+                        await MainActor.run {
+                            pendingVoiceForReview = candidate
+                            errorMessage = error.localizedDescription
+                        }
                     }
                 }
             } catch {
@@ -527,18 +538,42 @@ struct SavedVoiceSheet: View {
         }
     }
 
-    private func acceptPendingVoice() {
-        guard let voice = pendingVoiceForReview else { return }
-        pendingVoiceForReview = nil
-        onComplete(voice)
-        dismiss()
+    private func acceptPendingVoice(_ candidate: PreparedVoiceCandidate) {
+        guard !isReviewDecisionInFlight else { return }
+        isReviewDecisionInFlight = true
+        Task {
+            do {
+                let savedVoice = try await ttsEngineStore.commitPreparedVoiceCandidate(id: candidate.id)
+                pendingVoiceForReview = nil
+                isReviewDecisionInFlight = false
+                onComplete(Voice(preparedVoice: savedVoice))
+                dismiss()
+            } catch {
+                errorMessage = error.localizedDescription
+                isReviewDecisionInFlight = false
+            }
+        }
     }
 
-    private func discardPendingVoice() {
-        guard let voice = pendingVoiceForReview else { return }
-        pendingVoiceForReview = nil
+    private func discardPendingVoice(_ candidate: PreparedVoiceCandidate) {
+        guard !isReviewDecisionInFlight else { return }
+        isReviewDecisionInFlight = true
         Task {
-            try? await ttsEngineStore.deletePreparedVoice(id: voice.id)
+            do {
+                try await ttsEngineStore.discardPreparedVoiceCandidate(id: candidate.id)
+                pendingVoiceForReview = nil
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+            isReviewDecisionInFlight = false
         }
+    }
+
+    private var reviewAlertTitle: String {
+        errorMessage == nil ? "Reference outside recommended range" : "Couldn't save voice"
+    }
+
+    private func reviewAlertMessage(for candidate: PreparedVoiceCandidate) -> String {
+        errorMessage ?? PreparedVoiceQualityWarning.summary(for: candidate.qualityWarnings)
     }
 }

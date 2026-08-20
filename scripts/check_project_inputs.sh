@@ -23,6 +23,7 @@ REQUIRED_SURFACES=(
     "scripts/build_output_policy.py"
     "scripts/codex_session_storage.py"
     "scripts/cli_version_contract.py"
+    "scripts/saved_voice_lifecycle_contract.py"
     "scripts/documentation_contract.py"
     "scripts/model_catalog_contract.py"
     "scripts/evidence_impact.py"
@@ -80,6 +81,7 @@ REQUIRED_SURFACES=(
     "scripts/tests/test_release_evidence.py"
     "scripts/tests/test_build_routing_contract.py"
     "scripts/tests/test_cli_version_contract.py"
+    "scripts/tests/test_saved_voice_lifecycle_contract.py"
     "scripts/tests/test_generate_cli_scheme.py"
     "scripts/tests/test_generate_ios_logic_scheme.py"
     "scripts/tests/test_clean_build_caches.py"
@@ -174,6 +176,7 @@ python3 "$SCRIPT_DIR/codex_session_storage.py" validate
 python3 "$SCRIPT_DIR/generate_cli_scheme.py" --check
 python3 "$SCRIPT_DIR/generate_ios_logic_scheme.py" --check
 python3 "$SCRIPT_DIR/cli_version_contract.py" validate
+python3 "$SCRIPT_DIR/saved_voice_lifecycle_contract.py" validate
 python3 "$SCRIPT_DIR/model_catalog_contract.py" rebuild --check
 python3 "$SCRIPT_DIR/model_catalog_contract.py" validate
 python3 "$SCRIPT_DIR/evidence_impact.py" validate

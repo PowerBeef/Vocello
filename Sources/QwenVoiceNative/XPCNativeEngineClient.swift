@@ -913,6 +913,38 @@ public final class XPCNativeEngineClient: MacTTSEngine, @unchecked Sendable {
         return voices
     }
 
+    public func preparePreparedVoiceCandidate(
+        name: String,
+        audioPath: String,
+        transcript: String?,
+        replacingVoiceID: String?
+    ) async throws -> PreparedVoiceCandidate {
+        let reply = try await coordinator.send(
+            .preparePreparedVoiceCandidate(
+                name: name,
+                audioPath: audioPath,
+                transcript: transcript,
+                replacingVoiceID: replacingVoiceID
+            )
+        )
+        guard case .preparedVoiceCandidate(let candidate) = reply else {
+            throw EngineTransportError.invalidReply
+        }
+        return candidate
+    }
+
+    public func commitPreparedVoiceCandidate(id: UUID) async throws -> PreparedVoice {
+        let reply = try await coordinator.send(.commitPreparedVoiceCandidate(id: id))
+        guard case .preparedVoice(let voice) = reply else {
+            throw EngineTransportError.invalidReply
+        }
+        return voice
+    }
+
+    public func discardPreparedVoiceCandidate(id: UUID) async throws {
+        _ = try await coordinator.send(.discardPreparedVoiceCandidate(id: id))
+    }
+
     public func enrollPreparedVoice(name: String, audioPath: String, transcript: String?) async throws -> PreparedVoice {
         let reply = try await coordinator.send(
             .enrollPreparedVoice(name: name, audioPath: audioPath, transcript: transcript)
@@ -989,6 +1021,12 @@ private extension EngineCommand {
             "cancelActiveGeneration"
         case .listPreparedVoices:
             "listPreparedVoices"
+        case .preparePreparedVoiceCandidate:
+            "preparePreparedVoiceCandidate"
+        case .commitPreparedVoiceCandidate:
+            "commitPreparedVoiceCandidate"
+        case .discardPreparedVoiceCandidate:
+            "discardPreparedVoiceCandidate"
         case .enrollPreparedVoice:
             "enrollPreparedVoice"
         case .deletePreparedVoice:
@@ -1010,7 +1048,9 @@ private extension EngineCommand {
              .prewarmModelIfNeeded, .prefetchInteractiveReadinessIfNeeded, .ensureCloneReferencePrimed:
             .seconds(180)
         case .ping, .cancelClonePreparationIfNeeded, .cancelActiveGeneration,
-             .listPreparedVoices, .enrollPreparedVoice, .deletePreparedVoice,
+             .listPreparedVoices, .preparePreparedVoiceCandidate,
+             .commitPreparedVoiceCandidate, .discardPreparedVoiceCandidate,
+             .enrollPreparedVoice, .deletePreparedVoice,
              .clearGenerationActivity, .clearVisibleError, .shutdownWhenIdle:
             .seconds(10)
         }

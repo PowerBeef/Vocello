@@ -32,6 +32,7 @@ for required_policy_surface in \
   scripts/build_output_policy.py \
   scripts/codex_session_storage.py \
   scripts/cli_version_contract.py \
+  scripts/saved_voice_lifecycle_contract.py \
   scripts/documentation_contract.py \
   scripts/model_catalog_contract.py \
   scripts/evidence_impact.py \
@@ -56,6 +57,7 @@ for required_policy_surface in \
   scripts/tests/test_codex_session_storage.py \
   scripts/tests/test_codex_hook_contract.py \
   scripts/tests/test_cli_version_contract.py \
+  scripts/tests/test_saved_voice_lifecycle_contract.py \
   scripts/tests/test_documentation_contract.py \
   scripts/tests/test_model_catalog_contract.py \
   scripts/tests/test_evidence_impact.py \
@@ -632,6 +634,7 @@ python3 -m unittest \
   scripts.tests.test_codex_session_storage \
   scripts.tests.test_codex_hook_contract \
   scripts.tests.test_cli_version_contract \
+  scripts.tests.test_saved_voice_lifecycle_contract \
   scripts.tests.test_documentation_contract \
   scripts.tests.test_model_catalog_contract \
   scripts.tests.test_evidence_impact \

@@ -59,6 +59,14 @@ public enum EngineCommand: Codable, Equatable, Sendable {
     case generate(request: GenerationRequest)
     case cancelActiveGeneration
     case listPreparedVoices
+    case preparePreparedVoiceCandidate(
+        name: String,
+        audioPath: String,
+        transcript: String?,
+        replacingVoiceID: String?
+    )
+    case commitPreparedVoiceCandidate(id: UUID)
+    case discardPreparedVoiceCandidate(id: UUID)
     case enrollPreparedVoice(name: String, audioPath: String, transcript: String?)
     case deletePreparedVoice(id: String)
     case clearGenerationActivity
@@ -109,6 +117,7 @@ public enum EngineReply: Codable, Equatable, Sendable {
     case bool(Bool)
     case capabilities(EngineCapabilities)
     case generationResult(GenerationResult)
+    case preparedVoiceCandidate(PreparedVoiceCandidate)
     case preparedVoice(PreparedVoice)
     case preparedVoices([PreparedVoice])
     case interactivePrefetchDiagnostics(InteractivePrefetchDiagnostics)

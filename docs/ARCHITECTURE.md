@@ -563,9 +563,19 @@ a single envelope method —
 `unloadModel`, `ensureModelLoadedIfNeeded`, `prewarmModelIfNeeded`,
 `prefetchInteractiveReadinessIfNeeded`, `ensureCloneReferencePrimed`,
 `cancelClonePreparationIfNeeded`, `generate`,
-`cancelActiveGeneration`, `listPreparedVoices`, `enrollPreparedVoice`,
+`cancelActiveGeneration`, `listPreparedVoices`, `preparePreparedVoiceCandidate`,
+`commitPreparedVoiceCandidate`, `discardPreparedVoiceCandidate`, `enrollPreparedVoice`,
 `deletePreparedVoice`, `clearGenerationActivity`, `clearVisibleError`,
 `shutdownWhenIdle`.
+
+Saved-voice mutation is serialized by `PreparedVoiceRepository`. Interactive enrollment first
+copies audio, transcript, warnings, and replacement intent into an opaque, private candidate; the
+candidate is absent from `listPreparedVoices` until an explicit commit moves audio across the
+publication boundary. Discard is idempotent. Commit/replacement and delete use journaled
+transaction directories so startup reconciliation can roll an interrupted pre-publication commit
+back, complete a post-publication commit, or finish a user-confirmed delete without reviving it.
+The legacy `enrollPreparedVoice` entry remains only as a prepare-plus-commit compatibility route
+for noninteractive CLI and diagnostics.
 
 **Service retirement**: under memory pressure the app calls `shutdownWhenIdle`;
 the service refuses while a generation is active, then exits. The client marks
@@ -693,7 +703,10 @@ goes to stderr. Full reference: [`reference/cli.md`](reference/cli.md).
   `RootView.onOpenURL` routes supported documents opened from Files through the same production
   flow. `TTSEngineStore.importReferenceAudio` / `LocalDocumentIO` materializes the security-scoped
   audio and adjacent `.txt` transcript sidecar into app-owned storage. `IOSRecordVoiceSheet` then
-  collects the visible name/transcript, enrolls the saved voice, and hands it to Studio Clone.
+  collects the visible name/transcript, prepares a private review candidate, and commits it only
+  after the user accepts any quality warning; Cancel, Discard, and outside dismissal discard it.
+  The Voices row menu deletes one confirmed saved voice through the engine transaction and clears
+  matching preview and Studio draft state without cascading to other voice-bank members.
   `Info.plist` declares `public.audio`, in-place document opening, and Files sharing for this route.
 - iOS UI conventions: `IOSScrollView` (not raw `ScrollView`) for vertical
   surfaces, `TabDock`, voice previews from `Resources/voice-previews/`.
@@ -758,7 +771,8 @@ uses a GRDB `DatabaseQueue` with async, off-main writes (`saveGenerationAsync`).
 
 Layout under the root: `models/` (downloaded HF weights, staged in
 `.qwenvoice-downloads/`), `outputs/{CustomVoice,VoiceDesign,VoiceCloning}/`,
-`voices/`, `history.sqlite`, and `cache/` (`prepared_audio`,
+`voices/`, private `voice-candidates/`, journaled `voice-transactions/`, `history.sqlite`, and
+`cache/` (`prepared_audio`,
 `imported_references`, `normalized_clone_refs`, `stream_sessions`). Full detail:
 [`reference/privacy-storage.md`](reference/privacy-storage.md).
 

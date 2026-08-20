@@ -189,6 +189,18 @@ launches with `QVOICE_IOS_DEVICE_ENROLL_VOICE_NAME`, and validates the enrollmen
 (staged digests, voice ID, quality warnings). The runner deletes the staged inputs after a clean
 enrollment. The command is opt-in and never runs in smoke, benchmark, CI, or release.
 
+F-01 saved-voice lifecycle acceptance is separately opt-in:
+
+```sh
+scripts/ui_test.sh ios saved-voice-lifecycle
+```
+
+Before running it, stage `F01 Saved Voice Lifecycle.wav` and an optional matching `.txt` sidecar
+in the app's Documents directory. The XCUITest uses only visible production controls to import the
+throwaway reference, resolve a possible soft warning, preview it, hand it to Clone, confirm the
+exact named deletion, verify the row disappears, and verify the matching Studio draft is cleared.
+It does not run in smoke, benchmark, CI, or release.
+
 **Bench spec syntax:** the `ios_device.sh bench` positional argument is the full
 `mode:variant:text` spec; a bare argument is treated as *text* (wrapped as
 `custom:speed:<arg>`), so `bench custom` generates the literal word "custom" — a

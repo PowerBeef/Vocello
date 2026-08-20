@@ -104,6 +104,7 @@ Details for runtime, lifecycle, and event-channel invariants live in `docs/ARCHI
 | --- | --- |
 | `build_output_policy.py` | output ownership and storage floors |
 | `cli_version_contract.py` | embedded CLI build identity and exact source-built version output |
+| `saved_voice_lifecycle_contract.py` | transactional review, deletion, XPC, cache, and iOS accessibility surfaces |
 | `documentation_contract.py`, `doc_metadata.py`, `check_surface_coverage.py` | links, lifecycle, facts, pinned bodies, and guidance completeness |
 | `roadmap.py`, `project_health.py`, `evidence_impact.py` | work authority, health, and change-to-evidence mapping |
 | `check_delivery_instructions.py` | delivery-copy parity and conflicts |
@@ -200,6 +201,7 @@ scripts/macos_test.sh gate
 
 scripts/ios_device.sh preflight
 scripts/ui_test.sh ios smoke|benchmark|perf
+scripts/ui_test.sh ios saved-voice-lifecycle
 scripts/ios_device.sh gate
 ```
 

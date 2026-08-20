@@ -339,6 +339,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
     private var isInitialized = false
     private var appSupportDirectoryURL: URL?
     private var voicesDirectory: URL?
+    private var preparedVoiceRepository: PreparedVoiceRepository?
     private var allowsProactiveWarmOperations = true
     private var idleUnloadTask: Task<Void, Never>?
     private var idleUnloadToken: UUID?
@@ -605,6 +606,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         appSupportDirectoryURL = nil
         diagnosticAppSupportBox.url = nil
         voicesDirectory = nil
+        preparedVoiceRepository = nil
         latestEvent = nil
         loadState = .idle
         visibleErrorMessage = nil
@@ -662,6 +664,10 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         }
 
         let voicesDirectory = appSupportDirectory.appendingPathComponent("voices", isDirectory: true)
+        let preparedVoiceRepository = PreparedVoiceRepository(
+            appSupportDirectory: appSupportDirectory,
+            supportedAudioExtensions: Self.supportedSavedVoiceAudioExtensions
+        )
         let normalizedCloneReferenceDirectory = appSupportDirectory.appendingPathComponent(
             "cache/normalized_clone_refs",
             isDirectory: true
@@ -682,9 +688,12 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
             )
         }.value
 
+        try await preparedVoiceRepository.reconcile()
+
         appSupportDirectoryURL = appSupportDirectory
         diagnosticAppSupportBox.url = appSupportDirectory
         self.voicesDirectory = voicesDirectory
+        self.preparedVoiceRepository = preparedVoiceRepository
         await runtime.configure(
             normalizedCloneReferenceDirectory: normalizedCloneReferenceDirectory,
             voicesDirectory: voicesDirectory
@@ -1412,37 +1421,13 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
 
     public func listPreparedVoices() async throws -> [PreparedVoice] {
         try ensureInitialized()
-        let voicesDirectory = try requireVoicesDirectory()
-        return await Task.detached(priority: .utility) {
-            let fileManager = FileManager.default
-            guard let enumerator = fileManager.enumerator(
-                at: voicesDirectory,
-                includingPropertiesForKeys: nil
-            ) else {
-                return [PreparedVoice]()
-            }
-
-            var voices: [PreparedVoice] = []
-            for fileURL in (enumerator.allObjects as? [URL]) ?? [] {
-                guard Self.supportedSavedVoiceAudioExtensions.contains(fileURL.pathExtension.lowercased()) else {
-                    continue
-                }
-                let transcriptURL = fileURL.deletingPathExtension().appendingPathExtension("txt")
-                voices.append(
-                    PreparedVoice(
-                        id: fileURL.deletingPathExtension().lastPathComponent,
-                        name: fileURL.deletingPathExtension().lastPathComponent,
-                        audioPath: fileURL.path,
-                        hasTranscript: fileManager.fileExists(atPath: transcriptURL.path),
-                        qualityWarnings: Self.savedReferenceQualityWarnings(forAudioAt: fileURL.path)
-                    )
-                )
-            }
-
-            return voices.sorted { lhs, rhs in
-                lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
-            }
-        }.value
+        let repository = try requirePreparedVoiceRepository()
+        do {
+            let records = try await repository.list()
+            return records.map(Self.preparedVoice(from:))
+        } catch {
+            throw Self.preparedVoiceEngineError(error)
+        }
     }
 
     /// Cheap duration-only probe of a saved-voice reference WAV used at
@@ -1480,164 +1465,133 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         return Double(file.length) / sampleRate
     }
 
+    public func preparePreparedVoiceCandidate(
+        name: String,
+        audioPath: String,
+        transcript: String?,
+        replacingVoiceID: String?
+    ) async throws -> PreparedVoiceCandidate {
+        try ensureInitialized()
+        let sourceURL = URL(fileURLWithPath: audioPath)
+        let repository = try requirePreparedVoiceRepository()
+        let warnings = Self.savedReferenceQualityWarnings(forAudioAt: sourceURL.path)
+        do {
+            return try await repository.prepare(
+                name: name,
+                audioURL: sourceURL,
+                transcript: transcript,
+                qualityWarnings: warnings,
+                replacingVoiceID: replacingVoiceID
+            )
+        } catch {
+            throw Self.preparedVoiceEngineError(error)
+        }
+    }
+
+    public func commitPreparedVoiceCandidate(id: UUID) async throws -> PreparedVoice {
+        try ensureInitialized()
+        let repository = try requirePreparedVoiceRepository()
+        let record: PreparedVoiceStorageRecord
+        do {
+            record = try await repository.commit(id: id)
+        } catch {
+            throw Self.preparedVoiceEngineError(error)
+        }
+        let voice = Self.preparedVoice(from: record)
+        prebuildClonePromptIfPossible(for: voice)
+        return voice
+    }
+
+    public func discardPreparedVoiceCandidate(id: UUID) async throws {
+        try ensureInitialized()
+        do {
+            try await requirePreparedVoiceRepository().discard(id: id)
+        } catch {
+            throw Self.preparedVoiceEngineError(error)
+        }
+    }
+
+    /// Compatibility route for non-interactive callers such as the CLI and
+    /// device diagnostics. Interactive UI must prepare, review, then commit.
     public func enrollPreparedVoice(
         name: String,
         audioPath: String,
         transcript: String?
     ) async throws -> PreparedVoice {
-        try ensureInitialized()
-        let voicesDirectory = try requireVoicesDirectory()
-        let fileManager = FileManager.default
-        let sourceURL = URL(fileURLWithPath: audioPath)
-        guard fileManager.fileExists(atPath: sourceURL.path) else {
-            throw MLXTTSEngineError.generationFailed("Reference audio file not found.")
-        }
-
-        let safeName = NativeSavedVoiceNaming.normalizedName(name)
-        guard !safeName.isEmpty else {
-            throw MLXTTSEngineError.generationFailed("Invalid saved voice name.")
-        }
-
-        let (audioDestinationURL, _, normalizedTranscript) = try await Task.detached(priority: .utility) {
-            let fileManager = FileManager.default
-            try fileManager.createDirectory(at: voicesDirectory, withIntermediateDirectories: true)
-
-            // Preserve the source extension so MP3 / AIFF / M4A bytes don't
-            // end up stored under a `.wav` filename. Falls back to `wav` for
-            // inputs whose extension is empty or outside the supported set —
-            // this preserves the pre-existing behavior for the seed/bootstrap
-            // fixtures and matches the fallback the UI pickers expose.
-            let sourceExtension = sourceURL.pathExtension.lowercased()
-            let destinationExtension = Self.supportedSavedVoiceAudioExtensions.contains(sourceExtension)
-                ? sourceExtension
-                : "wav"
-            let audioDestinationURL = voicesDirectory.appendingPathComponent("\(safeName).\(destinationExtension)")
-            let transcriptDestinationURL = voicesDirectory.appendingPathComponent("\(safeName).txt")
-
-            // Disallow the new save if a voice with this `safeName` already
-            // exists in ANY supported audio format — otherwise the user could
-            // double-up an entry that the list path would render as a single
-            // ambiguous row.
-            let nameConflictExists = Self.supportedSavedVoiceAudioExtensions.contains { ext in
-                fileManager.fileExists(
-                    atPath: voicesDirectory.appendingPathComponent("\(safeName).\(ext)").path
-                )
-            } || fileManager.fileExists(atPath: transcriptDestinationURL.path)
-            if nameConflictExists {
-                throw MLXTTSEngineError.generationFailed(
-                    "A saved voice named \"\(safeName)\" already exists. Choose a different name."
-                )
-            }
-
-            try fileManager.copyItem(at: sourceURL, to: audioDestinationURL)
-            let normalizedTranscript = NativePreparedCloneConditioningCache.normalizedTranscript(transcript)
-            if let normalizedTranscript {
-                try normalizedTranscript.write(
-                    to: transcriptDestinationURL,
-                    atomically: true,
-                    encoding: .utf8
-                )
-            }
-            return (audioDestinationURL, transcriptDestinationURL, normalizedTranscript)
-        }.value
-
-        // Audit Finding A (May 2026 dual-variant cleanup): the
-        // prior code used `modelRegistry.model(for: .clone)?.id`
-        // here, which with the macOS expanded registry returns
-        // the BASE alias `pro_clone`. Base alias resolves to the
-        // hardware-recommended variant — so on a mid-memory Mac
-        // where the user manually selected Speed for clone via
-        // the Use button, the prebuild fired with `modelID =
-        // "pro_clone"` (alias → Quality folder) while the
-        // runtime had `activeModelID = "pro_clone_speed"` from
-        // the user's last generation. The runtime's
-        // `prebuildSavedVoiceClonePrompt` guards on
-        // `activeModelID != modelID` and silently bailed,
-        // disabling the optimization entirely for users who
-        // picked the non-recommended variant.
-        //
-        // Fix: read the runtime's currently-loaded model ID from
-        // `loadState.currentModelID`. If a clone-mode model is
-        // loaded, prebuild for THAT model — which is the user's
-        // selected variant by construction (the runtime got
-        // there via prewarm / generate, both of which carry
-        // variant-scoped IDs from the UI generate path). If no
-        // clone model is loaded, skip — the prebuild is a
-        // background optimization, not a correctness
-        // requirement, and we don't want to evict the user's
-        // currently-loaded Built-in Voice / Voice Design model
-        // just to warm a clone prompt. The first generation
-        // after enrollment will prime the prompt explicitly via
-        // `ensureCloneReferencePrimed`, so user-perceived
-        // latency stays bounded regardless.
-        if let normalizedTranscript,
-           let activeCloneModelID = loadState.currentModelID,
-           modelRegistry.model(id: activeCloneModelID)?.mode == .clone {
-            let cloneReference = CloneReference(
-                audioPath: audioDestinationURL.path,
-                transcript: normalizedTranscript,
-                preparedVoiceID: safeName
-            )
-            if allowsProactiveWarmOperations {
-                Task { @MainActor [weak self] in
-                    guard let self,
-                          let operationID = self.beginProactiveModelOperation(.clonePriming) else {
-                        return
-                    }
-                    defer { self.finishModelOperation(id: operationID) }
-                    await self.runtime.prebuildSavedVoiceClonePrompt(
-                        modelID: activeCloneModelID,
-                        reference: cloneReference
-                    )
-                }
-            }
-        }
-
-        return PreparedVoice(
-            id: safeName,
-            name: safeName,
-            audioPath: audioDestinationURL.path,
-            hasTranscript: normalizedTranscript != nil,
-            qualityWarnings: Self.savedReferenceQualityWarnings(forAudioAt: audioDestinationURL.path)
+        let candidate = try await preparePreparedVoiceCandidate(
+            name: name,
+            audioPath: audioPath,
+            transcript: transcript,
+            replacingVoiceID: nil
         )
+        do {
+            return try await commitPreparedVoiceCandidate(id: candidate.id)
+        } catch {
+            try? await discardPreparedVoiceCandidate(id: candidate.id)
+            throw error
+        }
     }
 
     public func deletePreparedVoice(id: String) async throws {
         try ensureInitialized()
-        let voicesDirectory = try requireVoicesDirectory()
-        try await Task.detached(priority: .utility) {
-            let fileManager = FileManager.default
-
-            // Voices may now be stored under any supported audio extension
-            // (see `supportedSavedVoiceAudioExtensions`). Find whichever
-            // extension this voice's file uses on disk; if no audio file
-            // exists in any supported format, the voice doesn't exist.
-            let candidateAudioURLs = Self.supportedSavedVoiceAudioExtensions.map { ext in
-                voicesDirectory.appendingPathComponent("\(id).\(ext)")
-            }
-            let existingAudioURLs = candidateAudioURLs.filter {
-                fileManager.fileExists(atPath: $0.path)
-            }
-            let transcriptURL = voicesDirectory.appendingPathComponent("\(id).txt")
-
-            guard !existingAudioURLs.isEmpty else {
-                throw MLXTTSEngineError.generationFailed("Voice '\(id)' does not exist.")
-            }
-
-            for audioURL in existingAudioURLs {
-                try fileManager.removeItem(at: audioURL)
-            }
-            if fileManager.fileExists(atPath: transcriptURL.path) {
-                try? fileManager.removeItem(at: transcriptURL)
-            }
-            let clonePromptRootDirectory = NativePreparedCloneConditioningCache.preparedVoiceClonePromptRootDirectory(
-                in: voicesDirectory,
-                voiceID: id
+        guard !(await activeGenerationCoordinator.hasActiveGeneration) else {
+            throw MLXTTSEngineError.generationFailed(
+                "Wait for the current generation to finish before deleting this voice."
             )
-            if fileManager.fileExists(atPath: clonePromptRootDirectory.path) {
-                try? fileManager.removeItem(at: clonePromptRootDirectory)
+        }
+        await cancelClonePreparationIfNeeded()
+        await runtime.invalidatePreparedVoiceCaches()
+        do {
+            try await requirePreparedVoiceRepository().delete(id: id)
+        } catch {
+            throw Self.preparedVoiceEngineError(error)
+        }
+    }
+
+    private static func preparedVoice(from record: PreparedVoiceStorageRecord) -> PreparedVoice {
+        PreparedVoice(
+            id: record.id,
+            name: record.name,
+            audioPath: record.audioURL.path,
+            hasTranscript: record.hasTranscript,
+            qualityWarnings: savedReferenceQualityWarnings(forAudioAt: record.audioURL.path)
+        )
+    }
+
+    private static func preparedVoiceEngineError(_ error: Error) -> TTSEngineError {
+        if let engineError = error as? TTSEngineError {
+            return engineError
+        }
+        return .generationFailed(error.localizedDescription)
+    }
+
+    private func prebuildClonePromptIfPossible(for voice: PreparedVoice) {
+        guard voice.hasTranscript,
+              let transcript = try? String(
+                contentsOf: voice.audioURL.deletingPathExtension().appendingPathExtension("txt"),
+                encoding: .utf8
+              ),
+              let activeCloneModelID = loadState.currentModelID,
+              modelRegistry.model(id: activeCloneModelID)?.mode == .clone,
+              allowsProactiveWarmOperations else {
+            return
+        }
+        let cloneReference = CloneReference(
+            audioPath: voice.audioPath,
+            transcript: transcript,
+            preparedVoiceID: voice.id
+        )
+        Task { @MainActor [weak self] in
+            guard let self,
+                  let operationID = self.beginProactiveModelOperation(.clonePriming) else {
+                return
             }
-        }.value
+            defer { self.finishModelOperation(id: operationID) }
+            await self.runtime.prebuildSavedVoiceClonePrompt(
+                modelID: activeCloneModelID,
+                reference: cloneReference
+            )
+        }
     }
 
     public func importReferenceAudio(from sourceURL: URL) throws -> ImportedReferenceAudio {
@@ -1725,6 +1679,13 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
             throw MLXTTSEngineError.notInitialized
         }
         return voicesDirectory
+    }
+
+    private func requirePreparedVoiceRepository() throws -> PreparedVoiceRepository {
+        guard let preparedVoiceRepository else {
+            throw MLXTTSEngineError.notInitialized
+        }
+        return preparedVoiceRepository
     }
 
     private func ensureInitialized() throws {

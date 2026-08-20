@@ -47,7 +47,35 @@ machine-readable status record and wins over any older prose.
 | 13 — Benchmark/history v3 | Live 2026-07-29: the first schema-v3 records are committed (three clean `phase0-cli-control-*` engine records plus one exploratory run that also exposed and fixed the summarizer's v3 pin). `benchmarks/schema-v3.json` adds the typed quality identity to generation takes (pass/warning only, five fast gates required, machine-code issues); v1/v2 records stay valid immutable history; the publisher stamps v3 only when every take carries the identity. The UI benchmark checkers folded the same identity 2026-08-01: ui-generation records now publish v3 (first: the focused `v3-fold-proof` record `macos-xcui-benchmark-20260801-003208-403989cf`); the canonical iOS matrix published its first v3 record 2026-08-01 (`ios-xcui-benchmark-20260801-132415-abbec96b`). |
 | 14 — Organization and retirement | Closed 2026-07-23 (14a + 14b): compatibility SPI retired, actor-owned loading/metadata/priming/clone artifacts, clone conditioning epoch-bound end to end. |
 
-## Resume here (2026-08-19)
+## Resume here (2026-08-20)
+
+**Engineering-review remediation is now tracked in the roadmap (2026-08-19, desk):**
+`config/roadmap.json` is the sole status authority for the 14 findings in
+`VOCELLO_ENGINEERING_REVIEW_2026-08-19.md`. F-01, F-04, and F-11 are closed by the current tree;
+eleven items remain: F-02, F-03, F-05, F-06, F-07, F-08, F-09, F-10, F-12, F-13, and F-14. Each
+roadmap item records the current source evidence and a concrete closure gate. F-05 is the remaining
+packaged-macOS release blocker. F-13 is continuous entitlement-risk hardening rather than a newly
+discovered runtime defect. The external review stays descriptive and does not override the
+roadmap, source, contracts, or release gates.
+
+**F-01 closed — saved-voice review is transactional and iOS deletion ships (2026-08-20,
+desk + phone):** `PreparedVoiceRepository` now owns a private 24-hour candidate tree, a committed voice
+tree, and journaled commit/replacement/delete transactions. Interactive macOS and iOS flows prepare
+an opaque candidate before review; Keep/Save commits it, while Discard, Cancel, and outside
+dismissal remove it without publishing a catalog voice. Startup reconciliation expires incomplete
+candidates, rolls a replacement interrupted before audio publication back to the old voice, and
+finishes commits that crossed the audio publication boundary. Individual iOS saved rows now expose
+an accessible, named delete confirmation; deletion stops a matching preview, clears runtime prompt
+caches and matching Studio draft/handoff state, and leaves sibling voice-bank members untouched.
+The wire schema is v2 with explicit prepare/commit/discard commands. Core recovery tests, XPC wire
+tests, the saved-voice lifecycle machine contract, the full macOS deterministic test route, macOS
+Release build, generic iOS device-SDK compile, and generic-device UI-test-bundle compile are the
+closure evidence. The dedicated `scripts/ui_test.sh ios saved-voice-lifecycle` lane subsequently
+passed on the paired phone (`ios-xcui-saved-voice-lifecycle-20260820-061924-73065027`, one test,
+82.362 s): the genuine picker flow imported the staged reference, previewed the committed voice,
+handed it to Clone, deleted the exact named row, and proved the matching Studio state was cleared.
+Source provenance, crash baseline, XCUITest, crash delta, and result retention all passed. This
+phone lane remains explicit QA rather than a deterministic publishing prerequisite.
 
 **F-04 closed in governance; fresh release evidence remains candidate-bound work (2026-08-19,
 desk):** release candidate production and public promotion are now separate. `release.yml` always
@@ -78,23 +106,19 @@ check; pull-request and detached GitHub CI refs remain valid execution contexts 
 
 **ICI-2 closed — import restore device-accepted; `ios-clone-import-2026-08`
 complete (2026-08-15, evening phone window):** the restored Files-import
-flow passed end to end on the paired iPhone. Because the benchmark voice
-already existed and **iOS ships no saved-voice deletion UI** (newly
-recorded backlog gap — `deletePreparedVoice` is reachable only through the
-enrollment warning-alert discard paths; macOS has library deletion, iPhone
-has none), a one-off test variant drove the full flow with a distinctly
+flow passed end to end on the paired iPhone. At that checkpoint the benchmark voice
+already existed and iOS did not yet ship saved-voice deletion (the gap later closed by F-01), so a
+one-off test variant drove the full flow with a distinctly
 named staged copy: picker → "Import voice" sheet with name and sidecar
 transcript prefilled ("Good length" review card) → save → saved-voice row
-(PASS, 47 s, screenshots local-only; the throwaway voice stays on the
-device until a delete UI ships). The shipped
+(PASS, 47 s, screenshots local-only). The shipped
 `ui_test.sh ios enroll-clone-fixture` lane passed via its idempotent exit
 on the real fixture (`ios-xcui-enroll-clone-fixture-20260816-000822-4871903c`)
 and smoke passed first try
 (`ios-xcui-smoke-20260816-001059-4be45687`, both journeys, memory-pressure
 sentinel clean) on the build carrying the import restore and the Built-in
 Voice rename. The open-from-Files route remains a manual maintainer
-spot-check. **Backlog additions: iOS saved-voice deletion UI** (the gap the
-maintainer hit live during acceptance) alongside the existing items.
+spot-check. The saved-voice deletion backlog addition from that session is closed by F-01.
 
 **Custom Voice renamed to Built-in Voice in all user-facing copy
 (2026-08-15, maintainer call, desk):** the mode was named after upstream's

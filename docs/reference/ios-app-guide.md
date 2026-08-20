@@ -122,10 +122,21 @@ reference" — every member stays listed because each reference clip is individu
 The Save a New Voice card has one visible action: `voices_saveNewVoice` starts the recorder
 (iPhone also imports reference files — the "Import audio file" row, `voices_importAudioFile`,
 presents a native `fileImporter` for WAV/MP3/AIFF/M4A and continues through the same
-name → enroll sheet, restored 2026-08-15; a saved Voice Design voice can also serve as the
+name → review sheet, restored 2026-08-15; a saved Voice Design voice can also serve as the
 clone reference through the Studio handoff). The enrollment sheet exposes `saveVoice_nameField`,
-`saveVoice_transcriptEditor`, and `saveVoice_saveButton`; a successful save creates
-`voicesRow_saved_<id>` and hands the reference to Studio Clone. Search is `voicesSearchField`.
+`saveVoice_transcriptEditor`, and `saveVoice_saveButton`; Save prepares an opaque candidate that
+does not enter the catalog until any quality warning is explicitly kept. Cancel, Discard, and
+outside dismissal discard the candidate. A successful commit creates `voicesRow_saved_<id>` and
+hands the reference to Studio Clone. Each saved row exposes `voicesRowMenu_<id>` with
+`voicesDelete_<id>`; confirmation `voicesDeleteConfirm_<id>` names the exact voice and explains
+that deleting one voice-bank member leaves the others. Delete stops a matching preview, removes
+the engine assets and prepared prompt caches, and clears a matching Studio draft/handoff; failures
+remain visible and retryable. Search is `voicesSearchField`.
+
+Explicit F-01 device acceptance is `scripts/ui_test.sh ios saved-voice-lifecycle`. It requires a
+throwaway `F01 Saved Voice Lifecycle.wav` (optional matching `.txt`) staged in the app Documents
+directory and drives the genuine import, preview, Clone handoff, confirmation, deletion, and draft
+cleanup surfaces. It never runs in ordinary CI or release work.
 
 ### History tab — `Sources/iOS/History/HistoryScreen.swift`
 

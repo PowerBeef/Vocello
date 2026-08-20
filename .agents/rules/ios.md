@@ -102,6 +102,7 @@ scripts/ui_test.sh ios perf
 scripts/ui_test.sh ios delivery-cohort   # delivery-consistency cohort (--text/--takes/--label)
 scripts/ui_test.sh ios model-download    # isolated background-delivery lifecycle proof
 scripts/ui_test.sh ios enroll-clone-fixture  # benchmark clone voice through the visible Files-import flow
+scripts/ui_test.sh ios saved-voice-lifecycle # opt-in F-01 import/preview/handoff/delete acceptance
 scripts/ios_device.sh gate            # deterministic physical-device/runtime proof
 ```
 

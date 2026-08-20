@@ -602,7 +602,8 @@ struct IOSVoiceDesignView: View {
     /// Voice that was just enrolled but has quality warnings; user is
     /// being asked whether to keep or discard. Mirrors the macOS
     /// SavedVoiceSheet flow.
-    @State private var pendingVoiceForReview: PreparedVoice?
+    @State private var pendingVoiceForReview: PreparedVoiceCandidate?
+    @State private var isVoiceReviewDecisionInFlight = false
     /// A designed voice that was just saved → drives the "Saved ✓ · Use in Clone" confirmation banner.
     @State private var savedDesignedResult: IOSDesignedVoiceSaveResult?
 
@@ -763,31 +764,26 @@ struct IOSVoiceDesignView: View {
                         },
                         onSave: {
                             Task {
+                                saveError = nil
                                 do {
-                                    let voice = try await ttsEngine.enrollPreparedVoice(
+                                    let candidate = try await ttsEngine.preparePreparedVoiceCandidate(
                                         name: saveSheetSuggestedName,
                                         audioPath: saveSheetAudioPath,
-                                        transcript: saveSheetTranscript.isEmpty ? nil : saveSheetTranscript
+                                        transcript: saveSheetTranscript.isEmpty ? nil : saveSheetTranscript,
+                                        replacingVoiceID: nil
                                     )
-                                    await MainActor.run {
-                                        if voice.qualityWarnings.isEmpty {
-                                            savedVoicesViewModel.insertOrReplace(voice)
-                                            let usedTranscript = saveSheetTranscript
-                                            isSaveSheetPresented = false
-                                            saveSheetSuggestedName = ""
-                                            saveSheetTranscript = ""
-                                            saveError = nil
-                                            savedDesignedResult = IOSDesignedVoiceSaveResult(
-                                                voice: voice, transcript: usedTranscript
-                                            )
-                                        } else {
-                                            // Soft warning: voice is on disk
-                                            // but pending user confirmation.
-                                            pendingVoiceForReview = voice
+                                    if candidate.qualityWarnings.isEmpty {
+                                        do {
+                                            let voice = try await ttsEngine.commitPreparedVoiceCandidate(id: candidate.id)
+                                            completeDesignedVoiceSave(voice)
+                                            await savedVoicesViewModel.refresh(using: ttsEngine)
+                                        } catch {
+                                            pendingVoiceForReview = candidate
+                                            saveError = error.localizedDescription
                                         }
-                                    }
-                                    if voice.qualityWarnings.isEmpty {
-                                        await savedVoicesViewModel.refresh(using: ttsEngine)
+                                    } else {
+                                        // Warning candidates stay outside the permanent library.
+                                        pendingVoiceForReview = candidate
                                     }
                                 } catch {
                                     await MainActor.run {
@@ -800,44 +796,38 @@ struct IOSVoiceDesignView: View {
                 }
             }
             .alert(
-                "Reference outside recommended range",
+                designedVoiceReviewAlertTitle,
                 isPresented: Binding(
-                    get: { pendingVoiceForReview != nil },
-                    set: { if !$0 { pendingVoiceForReview = nil } }
+                    get: { pendingVoiceForReview != nil && !isVoiceReviewDecisionInFlight },
+                    set: { isPresented in
+                        if !isPresented,
+                           !isVoiceReviewDecisionInFlight,
+                           let candidate = pendingVoiceForReview {
+                            discardDesignedVoiceCandidate(candidate)
+                        }
+                    }
                 ),
                 presenting: pendingVoiceForReview
-            ) { voice in
+            ) { candidate in
                 // Hard-block tier (>60 s) hides the "Keep voice" button
                 // so the user has to discard or cancel; soft-warn tier
                 // keeps all three buttons.
-                if !PreparedVoiceQualityWarning.isHardBlocking(voice.qualityWarnings) {
+                if !PreparedVoiceQualityWarning.isHardBlocking(candidate.qualityWarnings) {
                     Button("Keep voice") {
-                        pendingVoiceForReview = nil
-                        savedVoicesViewModel.insertOrReplace(voice)
-                        let usedTranscript = saveSheetTranscript
-                        isSaveSheetPresented = false
-                        saveSheetSuggestedName = ""
-                        saveSheetTranscript = ""
-                        saveError = nil
-                        Task { await savedVoicesViewModel.refresh(using: ttsEngine) }
-                        savedDesignedResult = IOSDesignedVoiceSaveResult(voice: voice, transcript: usedTranscript)
+                        commitDesignedVoiceCandidate(candidate)
                     }
                     .accessibilityIdentifier("voicesEnroll_keepDespiteWarning")
                 }
                 Button("Discard and re-record", role: .destructive) {
-                    let voiceID = voice.id
-                    pendingVoiceForReview = nil
-                    Task {
-                        try? await ttsEngine.deletePreparedVoice(id: voiceID)
-                    }
+                    discardDesignedVoiceCandidate(candidate)
                 }
                 .accessibilityIdentifier("voicesEnroll_discardOnWarning")
                 Button("Cancel", role: .cancel) {
-                    pendingVoiceForReview = nil
+                    discardDesignedVoiceCandidate(candidate)
                 }
                 .accessibilityIdentifier("voicesEnroll_cancelOnWarning")
-            } message: { voice in
-                Text(PreparedVoiceQualityWarning.summary(for: voice.qualityWarnings))
+            } message: { candidate in
+                Text(designedVoiceReviewAlertMessage(for: candidate))
             }
             .overlay(alignment: .top) {
                 if let result = savedDesignedResult {
@@ -855,6 +845,55 @@ struct IOSVoiceDesignView: View {
     }
 
     // MARK: - Save designed voice → reuse in Clone
+
+    private func commitDesignedVoiceCandidate(_ candidate: PreparedVoiceCandidate) {
+        guard !isVoiceReviewDecisionInFlight else { return }
+        isVoiceReviewDecisionInFlight = true
+        Task {
+            do {
+                let voice = try await ttsEngine.commitPreparedVoiceCandidate(id: candidate.id)
+                pendingVoiceForReview = nil
+                isVoiceReviewDecisionInFlight = false
+                completeDesignedVoiceSave(voice)
+                await savedVoicesViewModel.refresh(using: ttsEngine)
+            } catch {
+                saveError = error.localizedDescription
+                isVoiceReviewDecisionInFlight = false
+            }
+        }
+    }
+
+    private func discardDesignedVoiceCandidate(_ candidate: PreparedVoiceCandidate) {
+        guard !isVoiceReviewDecisionInFlight else { return }
+        isVoiceReviewDecisionInFlight = true
+        Task {
+            do {
+                try await ttsEngine.discardPreparedVoiceCandidate(id: candidate.id)
+                pendingVoiceForReview = nil
+            } catch {
+                saveError = error.localizedDescription
+            }
+            isVoiceReviewDecisionInFlight = false
+        }
+    }
+
+    private func completeDesignedVoiceSave(_ voice: PreparedVoice) {
+        let usedTranscript = saveSheetTranscript
+        savedVoicesViewModel.insertOrReplace(voice)
+        isSaveSheetPresented = false
+        saveSheetSuggestedName = ""
+        saveSheetTranscript = ""
+        saveError = nil
+        savedDesignedResult = IOSDesignedVoiceSaveResult(voice: voice, transcript: usedTranscript)
+    }
+
+    private var designedVoiceReviewAlertTitle: String {
+        saveError == nil ? "Reference outside recommended range" : "Couldn't save voice"
+    }
+
+    private func designedVoiceReviewAlertMessage(for candidate: PreparedVoiceCandidate) -> String {
+        saveError ?? PreparedVoiceQualityWarning.summary(for: candidate.qualityWarnings)
+    }
 
     /// Open the (existing) save-voice sheet for the just-generated designed clip, prefilled with a
     /// name suggestion from the brief + the script as the transcript.

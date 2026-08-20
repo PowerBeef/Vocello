@@ -108,6 +108,13 @@ Retry button.
 | Row | `voicesRow_<voiceID>` / `voicesRow_play_<voiceID>` / `voicesRow_use_<voiceID>` / `voicesRow_delete_<voiceID>` |
 | Enrollment sheet | `voicesEnroll_nameField` / `_audioPathField` / `_browseButton` / `_recordButton` / `_transcriptField` / `_confirmButton` / `_cancelButton` |
 
+Confirm prepares a private candidate first. A clean candidate commits immediately; a warned
+candidate commits only on Keep, while Discard, Cancel, and outside dismissal discard it. Editing a
+voice supplies replacement intent to the same transaction, so the old assets remain recoverable
+until the new audio crosses the publication boundary. Row deletion stops a matching preview before
+the engine atomically removes that voice's audio, transcript, and prepared prompt artifacts.
+Voice-bank siblings are independent and never cascade.
+
 ### Settings (`sidebar_settings` → `screen_settings`)
 
 | Element | Identifier |

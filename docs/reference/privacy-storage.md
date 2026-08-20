@@ -40,8 +40,9 @@ Maintained macOS subtrees and preferences:
 - `diagnostics/model-downloads/` stores allowlisted transfer/failure summaries, capped at 60 records and 5 MB; raw URLs and absolute paths are excluded.
 - `outputs/CustomVoice/`, `outputs/VoiceDesign/`, and `outputs/Clones/` store generated audio unless the user chooses a different output directory. If a user-chosen directory becomes missing or unwritable, new audio falls back to these default folders and Settings shows a warning — a generation is never lost to a vanished folder.
 - `outputs/bench-archive/<runID>/` (debug-store only; created by `vocello bench --delivery`) retains each delivery benchmark run's take WAVs and result/prosody/quality manifests as the durable measurement evidence. Local-only, never tracked or uploaded; unbounded, prune manually ([`delivery-harness.md`](delivery-harness.md) §3).
-- `voices/` stores saved voice reference assets (the reference WAV plus an optional `.txt` transcript sidecar).
-- Reference-clip **recording** (macOS, 2026-06) uses two short-lived directories under the system temporary directory: `voice-clone-references/` holds the in-progress capture and `voice-enroll/` holds a stable copy during enrollment. Both are deleted as part of enrollment/cancel; the kept copy is the one in `voices/`.
+- `voices/` stores committed saved-voice reference assets (the source audio format plus an optional `.txt` transcript sidecar). Each voice is individually deletable; deleting a voice-bank member does not delete its siblings.
+- `voice-candidates/` privately stages saved-voice review candidates. Candidates are not listed or usable as saved voices, expire after 24 hours, and are removed on Cancel, Discard, or outside dismissal. `voice-transactions/` holds short-lived commit/replacement/delete journals; startup reconciliation restores a pre-publication replacement, completes a post-publication commit, and completes a user-confirmed delete without resurrecting it.
+- Reference-clip **recording** (macOS, 2026-06) uses two short-lived directories under the system temporary directory: `voice-clone-references/` holds the in-progress capture and `voice-enroll/` holds a stable copy while the private candidate is prepared. Both are deleted as part of enrollment/cancel; only an explicitly committed candidate moves into `voices/`.
 - `history.sqlite` stores local generation history. Database initialization, migration, read,
   write, or delete failures are typed and fail closed: the UI shows a degraded state and disables
   destructive history actions instead of presenting an unavailable database as empty. macOS retries
@@ -89,10 +90,11 @@ Maintained iPhone subtrees:
 - `downloads/staging/` is the only iPhone delivery staging tree; it holds durable delegate files plus per-model verified files, partials, and resume data.
 - `diagnostics/model-downloads/` stores allowlisted local transfer/failure summaries, capped at 60 records and 5 MB. It excludes raw URLs, absolute paths, device identity, and user data.
 - `outputs/` stores generated audio. The user can optionally also copy each new clip to an external Files/iCloud folder via Settings → "Saved outputs" (a user-granted security-scoped bookmark; no new entitlement). The internal copy here is always kept and is what History plays from.
-- `voices/` stores saved voice reference assets.
+- `voices/` stores committed saved-voice reference assets. Each row can delete only its own audio, transcript, and prepared prompt artifacts after an explicit confirmation; other voice-bank members remain intact.
+- `voice-candidates/` privately stages review candidates for at most 24 hours. They are invisible to the saved-voice catalog until Keep/Save commits them; Cancel, Discard, and outside dismissal remove them. `voice-transactions/` is the bounded recovery journal for commit/replacement/delete operations.
 - `cache/imported_references/` stores app-owned materializations of WAV, MP3, AIFF, or M4A files
-  selected or opened through Files, plus an adjacent `.txt` sidecar when supplied. Enrollment copies
-  the kept reference into `voices/`.
+  selected or opened through Files, plus an adjacent `.txt` sidecar when supplied. Enrollment stages
+  the selected reference as a private candidate and copies it into `voices/` only on commit.
 - Other `cache/` subtrees store required runtime cache data.
 - `history.sqlite` stores local generation history. Database initialization, migration, read,
   write, or delete failures are typed and fail closed: the UI shows a degraded state with a visible

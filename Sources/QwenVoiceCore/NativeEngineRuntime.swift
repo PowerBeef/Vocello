@@ -1035,6 +1035,16 @@ actor NativeEngineRuntime {
         activeClonePrimeToken = nil
     }
 
+    /// A saved reference is about to disappear or be replaced. Clear every
+    /// clone-derived in-memory identity before the filesystem mutation so no
+    /// later request can reuse conditioning or a clone handle backed by stale
+    /// bytes. The cache is intentionally cleared as one isolation-domain
+    /// operation; its small bounded capacity makes this safer than attempting
+    /// partial identity reconstruction from a user-facing voice ID.
+    func invalidatePreparedVoiceCaches() async {
+        await clearCloneState()
+    }
+
     func prebuildSavedVoiceClonePrompt(
         modelID: String,
         reference: CloneReference

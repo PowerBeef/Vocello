@@ -5,7 +5,7 @@ import SwiftUI
 /// Recordings are auto-transcribed; imported clips preserve a neighboring `.txt` sidecar when
 /// `LocalDocumentIO` materializes one, and are auto-transcribed when no sidecar arrived
 /// (macOS `SavedVoiceSheet` parity — the transcriber decodes any AVFoundation-readable format).
-/// Both sources reuse `IOSSaveVoiceSheet` and `enrollPreparedVoice`, then hand the saved voice
+/// Both sources reuse `IOSSaveVoiceSheet` and the transactional candidate lifecycle, then hand the saved voice
 /// back to Clone mode through `onEnrolled`.
 ///
 /// Presented as a `.fullScreenCover`. Phase 1 renders the recorder inline; phase 2 shows a warm
@@ -28,7 +28,8 @@ struct IOSRecordVoiceSheet: View {
     @State private var detectedLanguage: Qwen3SupportedLanguage
     @State private var isNamingPresented: Bool
     @State private var enrollError: String?
-    @State private var pendingVoiceForReview: PreparedVoice?
+    @State private var pendingVoiceForReview: PreparedVoiceCandidate?
+    @State private var isReviewDecisionInFlight = false
 
     private enum Phase { case recording, naming }
 
@@ -110,46 +111,35 @@ struct IOSRecordVoiceSheet: View {
             )
         }
         .alert(
-            "Reference outside recommended range",
+            reviewAlertTitle,
             isPresented: Binding(
-                get: { pendingVoiceForReview != nil },
-                set: { if !$0 { pendingVoiceForReview = nil } }
+                get: { pendingVoiceForReview != nil && !isReviewDecisionInFlight },
+                set: { isPresented in
+                    if !isPresented,
+                       !isReviewDecisionInFlight,
+                       let candidate = pendingVoiceForReview {
+                        discardPendingCandidate(candidate, closesFlow: false)
+                    }
+                }
             ),
             presenting: pendingVoiceForReview
-        ) { voice in
-            if !PreparedVoiceQualityWarning.isHardBlocking(voice.qualityWarnings) {
+        ) { candidate in
+            if !PreparedVoiceQualityWarning.isHardBlocking(candidate.qualityWarnings) {
                 Button("Keep voice") {
-                    pendingVoiceForReview = nil
-                    savedVoicesViewModel.insertOrReplace(voice)
-                    cleanupCapturedFile()
-                    isNamingPresented = false
-                    let confirmed = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
-                    let language = detectedLanguage
-                    Task {
-                        await savedVoicesViewModel.refresh(using: ttsEngine)
-                        onEnrolled(voice, confirmed, language)
-                    }
+                    commitPendingCandidate(candidate)
                 }
                 .accessibilityIdentifier("recordVoice_keepDespiteWarning")
             }
             Button(importedReference == nil ? "Discard and re-record" : "Discard imported voice", role: .destructive) {
-                let voiceID = voice.id
-                pendingVoiceForReview = nil
-                Task { try? await ttsEngine.deletePreparedVoice(id: voiceID) }
-                cleanupCapturedFile()
-                isNamingPresented = false
-                if importedReference == nil {
-                    // Back to the recorder for another take.
-                    phase = .recording
-                } else {
-                    onDismiss()
-                }
+                discardPendingCandidate(candidate, closesFlow: true)
             }
             .accessibilityIdentifier("recordVoice_discardOnWarning")
-            Button("Cancel", role: .cancel) { pendingVoiceForReview = nil }
+            Button("Cancel", role: .cancel) {
+                discardPendingCandidate(candidate, closesFlow: false)
+            }
                 .accessibilityIdentifier("recordVoice_cancelOnWarning")
-        } message: { voice in
-            Text(PreparedVoiceQualityWarning.summary(for: voice.qualityWarnings))
+        } message: { candidate in
+            Text(reviewAlertMessage(for: candidate))
         }
     }
 
@@ -185,24 +175,89 @@ struct IOSRecordVoiceSheet: View {
         }
         let trimmedTranscript = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
         do {
-            let voice = try await ttsEngine.enrollPreparedVoice(
+            let candidate = try await ttsEngine.preparePreparedVoiceCandidate(
                 name: name,
                 audioPath: url.path,
-                transcript: trimmedTranscript.isEmpty ? nil : trimmedTranscript
+                transcript: trimmedTranscript.isEmpty ? nil : trimmedTranscript,
+                replacingVoiceID: nil
             )
-            if voice.qualityWarnings.isEmpty {
-                savedVoicesViewModel.insertOrReplace(voice)
-                await savedVoicesViewModel.refresh(using: ttsEngine)
-                cleanupCapturedFile()
-                isNamingPresented = false
-                onEnrolled(voice, trimmedTranscript, detectedLanguage)
+            if candidate.qualityWarnings.isEmpty {
+                do {
+                    let voice = try await ttsEngine.commitPreparedVoiceCandidate(id: candidate.id)
+                    completeEnrollment(voice)
+                } catch {
+                    pendingVoiceForReview = candidate
+                    enrollError = error.localizedDescription
+                }
             } else {
-                // Soft/hard warning: the voice is on disk; let the user confirm or re-record.
-                pendingVoiceForReview = voice
+                // Soft/hard warnings remain private candidates until Keep.
+                pendingVoiceForReview = candidate
             }
         } catch {
             enrollError = error.localizedDescription
         }
+    }
+
+    private func commitPendingCandidate(_ candidate: PreparedVoiceCandidate) {
+        guard !isReviewDecisionInFlight else { return }
+        isReviewDecisionInFlight = true
+        Task {
+            do {
+                let voice = try await ttsEngine.commitPreparedVoiceCandidate(id: candidate.id)
+                pendingVoiceForReview = nil
+                isReviewDecisionInFlight = false
+                completeEnrollment(voice)
+            } catch {
+                enrollError = error.localizedDescription
+                isReviewDecisionInFlight = false
+            }
+        }
+    }
+
+    private func discardPendingCandidate(
+        _ candidate: PreparedVoiceCandidate,
+        closesFlow: Bool
+    ) {
+        guard !isReviewDecisionInFlight else { return }
+        isReviewDecisionInFlight = true
+        Task {
+            do {
+                try await ttsEngine.discardPreparedVoiceCandidate(id: candidate.id)
+                pendingVoiceForReview = nil
+                isReviewDecisionInFlight = false
+                guard closesFlow else { return }
+                cleanupCapturedFile()
+                isNamingPresented = false
+                if importedReference == nil {
+                    phase = .recording
+                } else {
+                    onDismiss()
+                }
+            } catch {
+                enrollError = error.localizedDescription
+                isReviewDecisionInFlight = false
+            }
+        }
+    }
+
+    private func completeEnrollment(_ voice: PreparedVoice) {
+        let confirmed = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+        let language = detectedLanguage
+        savedVoicesViewModel.insertOrReplace(voice)
+        cleanupCapturedFile()
+        isNamingPresented = false
+        Task {
+            await savedVoicesViewModel.refresh(using: ttsEngine)
+            onEnrolled(voice, confirmed, language)
+        }
+    }
+
+    private var reviewAlertTitle: String {
+        enrollError == nil ? "Reference outside recommended range" : "Couldn't save voice"
+    }
+
+    private func reviewAlertMessage(for candidate: PreparedVoiceCandidate) -> String {
+        enrollError ?? PreparedVoiceQualityWarning.summary(for: candidate.qualityWarnings)
     }
 
     private func cleanupCapturedFile() {

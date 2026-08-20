@@ -43,6 +43,7 @@ Usage:
   scripts/ui_test.sh ios delivery-cohort --text SCRIPT [--takes 20] [--label RUN_ID]
   scripts/ui_test.sh ios model-download [--engine-profile legacy|chunked|chunked-multisession]
   scripts/ui_test.sh ios enroll-clone-fixture
+  scripts/ui_test.sh ios saved-voice-lifecycle
 
 The iOS destination is the paired physical iPhone only. Simulator destinations are unsupported.
 `model-download` is an opt-in isolated lifecycle proof and never runs in smoke, benchmark, CI, or release.
@@ -52,6 +53,9 @@ the production UI); it never publishes benchmark history and never runs in smoke
 visible Files-import flow; stage the reference WAV and .txt sidecar in the app's Documents first
 (devicectl appDataContainer copy). It never runs in smoke, benchmark, CI, or release. The headless
 `scripts/ios_device.sh enroll-clone-fixture` remains the wipe-recovery route (no UI, hash-pinned).
+`saved-voice-lifecycle` is an opt-in F-01 acceptance lane. Stage
+`F01 Saved Voice Lifecycle.wav` (and optionally its `.txt` sidecar) in the app Documents directory;
+the lane imports, previews, hands off, and deletes that throwaway voice through visible production UI.
 No lane retries automatically. A failed run keeps its log, xcresult, screenshots, and diagnostics.
 RUN_ID is an opaque 1-96 character identifier using letters, digits, dot, underscore, or hyphen.
 EOF
@@ -63,10 +67,11 @@ platform="$1"
 lane="$2"
 shift 2
 [[ "$platform" == "macos" || "$platform" == "ios" ]] || usage
-[[ "$lane" == "smoke" || "$lane" == "benchmark" || "$lane" == "model-download" || "$lane" == "delivery-cohort" || "$lane" == "perf" || "$lane" == "enroll-clone-fixture" ]] || usage
+[[ "$lane" == "smoke" || "$lane" == "benchmark" || "$lane" == "model-download" || "$lane" == "delivery-cohort" || "$lane" == "perf" || "$lane" == "enroll-clone-fixture" || "$lane" == "saved-voice-lifecycle" ]] || usage
 [[ "$lane" != "model-download" || "$platform" == "ios" ]] || usage
 [[ "$lane" != "delivery-cohort" || "$platform" == "ios" ]] || usage
 [[ "$lane" != "enroll-clone-fixture" || "$platform" == "ios" ]] || usage
+[[ "$lane" != "saved-voice-lifecycle" || "$platform" == "ios" ]] || usage
 
 modes="custom,design,clone"
 lengths="short,medium,long"
@@ -1055,6 +1060,8 @@ else
     export TEST_RUNNER_QVOICE_IOS_PERF_RUN_ID="$run_id"
   elif [[ "$lane" == "enroll-clone-fixture" ]]; then
     only_test="VocelloiOSUITests/VocelloiOSFixtureEnrollmentUITests/testEnrollBenchmarkCloneFixtureFromDocuments"
+  elif [[ "$lane" == "saved-voice-lifecycle" ]]; then
+    only_test="VocelloiOSUITests/VocelloiOSSavedVoiceLifecycleUITests/testImportPreviewHandoffAndDeleteSavedVoice"
   else
     only_test="VocelloiOSUITests/VocelloiOSModelDownloadUITests/testIsolatedBackgroundDownloadAdoptionAndCleanup"
     # A/B arm selection for the MD-2 device comparison: forwarded to the test

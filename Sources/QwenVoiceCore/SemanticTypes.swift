@@ -763,6 +763,31 @@ public struct PreparedVoice: Identifiable, Hashable, Codable, Sendable {
     }
 }
 
+/// An enrolled reference that is still awaiting the user's review decision.
+///
+/// Candidates are deliberately opaque: the UI receives the display metadata
+/// and quality observations it needs, but never a path into the private
+/// staging tree. A candidate is not a saved voice until
+/// `commitPreparedVoiceCandidate(id:)` returns a `PreparedVoice`.
+public struct PreparedVoiceCandidate: Identifiable, Hashable, Codable, Sendable {
+    public let id: UUID
+    public let name: String
+    public let hasTranscript: Bool
+    public let qualityWarnings: [String]
+
+    public init(
+        id: UUID,
+        name: String,
+        hasTranscript: Bool,
+        qualityWarnings: [String]
+    ) {
+        self.id = id
+        self.name = name
+        self.hasTranscript = hasTranscript
+        self.qualityWarnings = qualityWarnings
+    }
+}
+
 /// Human-readable summaries of `PreparedVoice.qualityWarnings` tokens.
 /// Used by enrollment dialogs and library badges across macOS + iOS.
 /// Unknown tokens fall through to `nil` so callers can choose whether to
@@ -1767,4 +1792,3 @@ public struct TTSEngineSnapshot: Hashable, Codable, Sendable {
         self.visibleErrorMessage = visibleErrorMessage
     }
 }
-

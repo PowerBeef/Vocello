@@ -23,12 +23,16 @@ struct IOSVoicesView: View {
 
     @EnvironmentObject private var ttsEngine: TTSEngineStore
     @EnvironmentObject private var savedVoicesViewModel: SavedVoicesViewModel
+    @Environment(AppModel.self) private var appModel
     @Environment(\.presentIOSPlayerSheet) private var presentPlayerSheet
 
     @State private var search: String = ""
     @State private var filter: VoiceFilter = .all
     @State private var isAudioImporterPresented = false
     @State private var importErrorMessage: String?
+    @State private var voiceToDelete: Voice?
+    @State private var deletingVoiceID: String?
+    @State private var deleteErrorMessage: String?
 
     // The built-in speaker list is a static constant — sort it once, not on
     // every body evaluation (iOS readiness audit, fix #25).
@@ -163,6 +167,33 @@ struct IOSVoicesView: View {
             Button("OK", role: .cancel) { importErrorMessage = nil }
         } message: {
             Text(importErrorMessage ?? "Choose another audio file and try again.")
+        }
+        .alert(
+            "Delete saved voice?",
+            isPresented: Binding(
+                get: { voiceToDelete != nil },
+                set: { if !$0 { voiceToDelete = nil } }
+            ),
+            presenting: voiceToDelete
+        ) { voice in
+            Button("Cancel", role: .cancel) { voiceToDelete = nil }
+            Button("Delete", role: .destructive) {
+                deleteSavedVoice(voice)
+            }
+            .accessibilityIdentifier("voicesDeleteConfirm_\(voice.id)")
+        } message: { voice in
+            Text(deleteConfirmationMessage(for: voice))
+        }
+        .alert(
+            "Delete failed",
+            isPresented: Binding(
+                get: { deleteErrorMessage != nil },
+                set: { if !$0 { deleteErrorMessage = nil } }
+            )
+        ) {
+            Button("OK", role: .cancel) { deleteErrorMessage = nil }
+        } message: {
+            Text(deleteErrorMessage ?? "The saved voice was not removed. Try again.")
         }
     }
 
@@ -341,6 +372,7 @@ struct IOSVoicesView: View {
                     presentPreview(item)
                 }
             )
+
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
@@ -395,6 +427,9 @@ struct IOSVoicesView: View {
                     presentPreview(item)
                 }
             )
+            .accessibilityIdentifier("voicesPreview_saved_\(voice.id)")
+
+            savedVoiceActionsMenu(voice)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
@@ -425,6 +460,87 @@ struct IOSVoicesView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(isPlaying ? "Stop preview" : "Preview voice")
+    }
+
+    @ViewBuilder
+    private func savedVoiceActionsMenu(_ voice: Voice) -> some View {
+        if deletingVoiceID == voice.id {
+            ProgressView()
+                .controlSize(.small)
+                .frame(width: 44, height: 44)
+                .accessibilityLabel("Deleting \(voice.name)")
+        } else {
+            Menu {
+                Button(role: .destructive) {
+                    voiceToDelete = voice
+                } label: {
+                    Label("Delete voice", systemImage: "trash")
+                }
+                .disabled(ttsEngine.hasActiveGeneration)
+                .accessibilityIdentifier("voicesDelete_\(voice.id)")
+            } label: {
+                IOSPlayerIconButtonChrome(
+                    symbol: "ellipsis",
+                    isActive: false,
+                    size: 40,
+                    symbolSize: 16
+                )
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+            }
+            .accessibilityIdentifier("voicesRowMenu_\(voice.id)")
+            .accessibilityLabel("Actions for \(voice.name)")
+            .accessibilityHint(
+                ttsEngine.hasActiveGeneration
+                    ? "Wait for generation to finish before deleting this voice."
+                    : "Opens actions for this saved voice."
+            )
+        }
+    }
+
+    private func deleteConfirmationMessage(for voice: Voice) -> String {
+        guard let persona = bankCatalog.persona(containing: voice.id) else {
+            return "Delete \"\(voice.name)\" from this iPhone? This cannot be undone."
+        }
+        if persona.baseVoiceID == voice.id {
+            return "Delete \"\(voice.name)\"? Its voice-bank variants will remain as individual saved voices."
+        }
+        return "Delete \"\(voice.name)\"? The rest of this voice bank will remain available."
+    }
+
+    private func deleteSavedVoice(_ voice: Voice) {
+        guard deletingVoiceID == nil else { return }
+        guard !ttsEngine.hasActiveGeneration else {
+            voiceToDelete = nil
+            deleteErrorMessage = "Wait for the current generation to finish before deleting this voice."
+            return
+        }
+        voiceToDelete = nil
+        deletingVoiceID = voice.id
+
+        if appModel.playerSheetItem?.audioURL.standardizedFileURL
+            == URL(fileURLWithPath: voice.wavPath).standardizedFileURL {
+            appModel.playerSheetItem = nil
+        }
+
+        Task {
+            do {
+                try await ttsEngine.deletePreparedVoice(id: voice.id)
+                if appModel.voiceCloningDraft.selectedSavedVoiceID == voice.id {
+                    appModel.voiceCloningDraft.clearReference()
+                }
+                if appModel.pendingVoiceCloningHandoff?.savedVoiceID == voice.id {
+                    appModel.pendingVoiceCloningHandoff = nil
+                }
+                savedVoicesViewModel.removeVoiceFromVisibleState(id: voice.id)
+                await savedVoicesViewModel.refresh(using: ttsEngine)
+                IOSHaptics.success()
+            } catch {
+                deleteErrorMessage = error.localizedDescription
+                IOSHaptics.warning()
+            }
+            deletingVoiceID = nil
+        }
     }
 
     // MARK: - Helpers

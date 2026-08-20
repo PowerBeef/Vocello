@@ -26,8 +26,8 @@ struct VoicesView: View {
     @State private var highlightedVoiceID: String?
     @State private var highlightResetTask: Task<Void, Never>?
     /// Set when the user starts a "Replace reference" flow from a
-    /// flagged saved voice. The old voice is deleted on successful
-    /// completion of the enrollment sheet (see
+    /// flagged saved voice. The repository replaces the old assets in the
+    /// same commit that publishes the new reference (see
     /// `handleSavedVoiceSheetCompletion`). Nil for normal add flows.
     @State private var voiceBeingReplaced: Voice?
 
@@ -217,18 +217,12 @@ private extension VoicesView {
         pendingRevealVoiceID = voice.id
         savedVoicesViewModel.insertOrReplace(voice)
 
-        // If this was a replace flow and the new voice landed on a
-        // different on-disk slot (different normalized id), delete the
-        // old voice. When the ids match, enrollment overwrote the
-        // existing slot — nothing to clean up.
+        // Replacement is one repository transaction. If the normalized ID
+        // changed, remove only the old row from the visible cache; its files
+        // were already tombstoned before the new voice was published.
         if let replacedVoice, replacedVoice.id != voice.id {
-            Task {
-                try? await ttsEngineStore.deletePreparedVoice(id: replacedVoice.id)
-                await MainActor.run {
-                    savedVoicesViewModel.removeVoiceFromVisibleState(id: replacedVoice.id)
-                }
-                await savedVoicesViewModel.refresh(using: ttsEngineStore)
-            }
+            savedVoicesViewModel.removeVoiceFromVisibleState(id: replacedVoice.id)
+            Task { await savedVoicesViewModel.refresh(using: ttsEngineStore) }
         } else {
             Task { await savedVoicesViewModel.refresh(using: ttsEngineStore) }
         }
@@ -274,6 +268,9 @@ private extension VoicesView {
     }
 
     func deleteVoice(_ voice: Voice) {
+        if audioPlayer.currentFilePath == voice.wavPath {
+            audioPlayer.stop()
+        }
         Task {
             do {
                 try await ttsEngineStore.deletePreparedVoice(id: voice.id)

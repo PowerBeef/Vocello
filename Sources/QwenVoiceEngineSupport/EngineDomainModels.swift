@@ -7,6 +7,7 @@ public typealias ClonePreparationPhase = QwenVoiceCore.ClonePreparationPhase
 public typealias ClonePreparationState = QwenVoiceCore.ClonePreparationState
 public typealias CloneReference = QwenVoiceCore.CloneReference
 public typealias PreparedVoice = QwenVoiceCore.PreparedVoice
+public typealias PreparedVoiceCandidate = QwenVoiceCore.PreparedVoiceCandidate
 public typealias PreparedVoiceQualityWarning = QwenVoiceCore.PreparedVoiceQualityWarning
 public typealias NativeTelemetryStageMark = QwenVoiceCore.NativeTelemetryStageMark
 public typealias GenerationEvent = QwenVoiceCore.GenerationEvent

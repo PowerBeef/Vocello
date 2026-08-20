@@ -89,6 +89,7 @@ HEAVY_LANE_IDS = {
     "ui-delivery-cohort",
     "ui-model-download",
     "ui-enroll-clone-fixture",
+    "ui-saved-voice-lifecycle",
     "release",
 }
 

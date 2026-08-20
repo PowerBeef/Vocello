@@ -105,12 +105,30 @@ successful read. Destructive History actions are outside the minimal smoke and b
 
 ## Settings
 
-iOS has one Speed model for each generation mode. Rows expose stable install, progress, cancel,
-ready, repair, and delete states. Normal smoke and benchmark lanes do not install or delete models;
-they visibly assert that Custom, Design, and Clone Speed are ready before generation.
+iOS Settings is a title-free landing surface (`screen_settings`); the selected tab-dock item is the
+sole location indicator. Its order is Audio, Models & Files, Accessibility, Privacy, and About.
+Compact solid groups reuse the app canvas, eyebrow headings, headline/caption row hierarchy, tinted
+utility tiles, panel stroke, spacing grid, and shared dock clearance established by Voices and
+History. Neutral controls use the Settings silver accent; model and Clone semantics retain their
+mode colors. The Audio group owns a semantic `Toggle` with custom compact switch chrome and the Take
+variation menu picker. Models & Files summarizes model
+readiness as `N of 3 ready` through `iosSettings_voiceModelsRow` and keeps the Saved outputs value
+multi-line. Accessibility owns the app-level Reduce Motion and Reduce Transparency switches.
+Privacy owns clone consent, disclosure guidance, the Privacy Policy, and Permissions (explicitly
+labeled as opening iOS Settings). About contains Open Source & Licenses and the compact version/build
+row; there is no oversized logo footer.
+
+`iosSettings_voiceModelsRow` pushes `screen_voiceModels`, whose compact
+`iosSettings_voiceModelsBackButton` is the only Settings-specific contextual header. iOS has one
+Speed model for each generation mode. The destination summarizes managed model bytes in
+`iosSettings_storageRow`, then exposes stable install, progress, cancel, ready, repair, retry,
+update, and overflow states. `iosModelStatus_<id>` reads `Ready` when usable; removal lives under
+`iosModelMenu_<id>` as `iosModelDelete_<id>` and retains the named confirmation. Normal smoke and
+benchmark lanes do not install or delete models; they visibly assert that Custom, Design, and Clone
+Speed are ready before generation.
 
 Settings also owns the persistent Clone consent row
-`voiceCloning_consentAcknowledgment`. Smoke and benchmark enable it through that visible row when
+`voiceCloning_consentAcknowledgment` under Settings → Privacy. Smoke and benchmark enable it through that visible row when
 needed so Clone acceptance starts from an explicit consent state; this preference intentionally
 remains enabled for later testing. The benchmark may temporarily enable Auto-play and restores its
 prior value. System permission enrollment is attended setup.

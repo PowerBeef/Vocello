@@ -126,23 +126,68 @@ class VocelloiOSUITestCase: XCTestCase {
         XCTAssertTrue(VocelloUIWait.exists(element(modeVisibleControlIdentifier(mode)), timeout: 20))
     }
 
-    /// Settings exposes each model's visible status as an accessibility value.
-    /// `Active` is the readiness contract; the trash control additionally proves
-    /// the installed package can be managed through genuine production UI.
-    func assertVisibleModelReadiness() {
+    func openVoiceModels() {
         select(tab: .settings)
+        if element("screen_voiceModels").exists { return }
+
+        let row = element("iosSettings_voiceModelsRow")
+        XCTAssertTrue(VocelloUIWait.exists(row, timeout: 20))
+        XCTAssertTrue(revealSettingsElement(row, swipingUp: false))
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: row, timeout: 20))
+        XCTAssertTrue(VocelloUIWait.exists(element("screen_voiceModels"), timeout: 20))
+        XCTAssertTrue(VocelloUIWait.exists(element("iosSettings_voiceModelsBackButton"), timeout: 20))
+    }
+
+    func leaveVoiceModels() {
+        guard element("screen_voiceModels").exists else { return }
+        let back = element("iosSettings_voiceModelsBackButton")
+        XCTAssertTrue(VocelloUIWait.exists(back, timeout: 20))
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: back, timeout: 20))
+        XCTAssertTrue(VocelloUIWait.exists(element("screen_settings"), timeout: 20))
+        XCTAssertTrue(VocelloUIWait.exists(element("iosSettings_voiceModelsRow"), timeout: 20))
+    }
+
+    func assertSettingsLandingArchitecture() {
+        select(tab: .settings)
+        XCTAssertTrue(VocelloUIWait.exists(element("screen_settings"), timeout: 20))
+
+        for identifier in [
+            "iosSettings_autoPlayToggle",
+            "iosSettings_variationRow",
+            "iosSettings_voiceModelsRow",
+            "iosSettings_savedOutputsRow",
+        ] {
+            XCTAssertTrue(VocelloUIWait.exists(element(identifier), timeout: 20))
+        }
+        VocelloUIScreenshot.attach(app, named: "ios-settings-landing-audio-models")
+
+        let consent = element("voiceCloning_consentAcknowledgment")
+        XCTAssertTrue(VocelloUIWait.exists(consent, timeout: 20))
+        XCTAssertTrue(revealSettingsElement(consent, swipingUp: true))
+        for identifier in [
+            "iosSettings_privacyPolicyRow",
+            "iosSettings_openIOSSettingsRow",
+            "iosSettings_openSourceRow",
+            "iosSettings_versionLabel",
+        ] {
+            XCTAssertTrue(VocelloUIWait.exists(element(identifier), timeout: 20))
+        }
+        VocelloUIScreenshot.attach(app, named: "ios-settings-landing-privacy-about")
+
+        XCTAssertTrue(revealSettingsElement(element("iosSettings_autoPlayToggle"), swipingUp: false))
+    }
+
+    /// Voice Models exposes each installed package with one non-color-dependent `Ready` status
+    /// and a 44-point overflow menu for lifecycle management.
+    func assertVisibleModelReadiness() {
+        openVoiceModels()
         for modelID in ["pro_custom", "pro_design", "pro_clone"] {
             let status = element("iosModelStatus_\(modelID)")
             XCTAssertTrue(VocelloUIWait.exists(status, timeout: 60))
-            XCTAssertTrue(VocelloUIWait.value(status, contains: "Active", timeout: 20))
+            XCTAssertTrue(VocelloUIWait.value(status, contains: "Ready", timeout: 20))
 
-            let installedControl = element("iosModelDelete_\(modelID)")
+            let installedControl = element("iosModelMenu_\(modelID)")
             XCTAssertTrue(VocelloUIWait.exists(installedControl, timeout: 60))
-            XCTAssertTrue(
-                VocelloUIWait.condition("installed model control \(modelID) to be visible", timeout: 20) {
-                    installedControl.exists && installedControl.isHittable
-                }
-            )
 
             for unavailableState in ["Download", "Repair", "Cancel", "Retry"] {
                 XCTAssertFalse(
@@ -151,6 +196,8 @@ class VocelloiOSUITestCase: XCTestCase {
                 )
             }
         }
+        VocelloUIScreenshot.attach(app, named: "ios-settings-voice-models-ready")
+        leaveVoiceModels()
     }
 
     /// Benchmarks require a real `play()` scheduling event so the typed
@@ -162,6 +209,7 @@ class VocelloiOSUITestCase: XCTestCase {
         select(tab: .settings)
         let toggle = element("iosSettings_autoPlayToggle")
         XCTAssertTrue(VocelloUIWait.exists(toggle, timeout: 20))
+        XCTAssertTrue(revealSettingsElement(toggle, swipingUp: false))
         guard let wasEnabled = VocelloUIToggle.state(of: toggle) else {
             XCTFail("Auto-play toggle exposed an unknown value; refusing to mutate it")
             return true
@@ -195,6 +243,7 @@ class VocelloiOSUITestCase: XCTestCase {
         select(tab: .settings)
         let consent = element("voiceCloning_consentAcknowledgment")
         XCTAssertTrue(VocelloUIWait.exists(consent, timeout: 20))
+        XCTAssertTrue(revealSettingsElement(consent, swipingUp: true))
         guard let consentState = VocelloUIToggle.state(of: consent) else {
             XCTFail("Clone consent exposed an unknown value; refusing to mutate it")
             return
@@ -217,6 +266,7 @@ class VocelloiOSUITestCase: XCTestCase {
         select(tab: .settings)
         let toggle = element("iosSettings_autoPlayToggle")
         XCTAssertTrue(VocelloUIWait.exists(toggle, timeout: 20))
+        XCTAssertTrue(revealSettingsElement(toggle, swipingUp: false))
         guard let currentState = VocelloUIToggle.state(of: toggle) else {
             XCTFail("Auto-play toggle exposed an unknown value; refusing to restore it blindly")
             return
@@ -232,6 +282,21 @@ class VocelloiOSUITestCase: XCTestCase {
         if VocelloUIToggle.state(of: toggle) == false {
             pendingAutoplayPreferenceRestore = nil
         }
+    }
+
+    func revealSettingsElement(_ target: XCUIElement, swipingUp: Bool) -> Bool {
+        // Accessibility sizes make Settings substantially taller than the
+        // ordinary layout. Keep the bound finite while allowing the complete
+        // AX-XXXL surface to move above the floating tab dock.
+        for _ in 0..<20 {
+            if target.exists && target.isHittable { return true }
+            if swipingUp {
+                app.swipeUp()
+            } else {
+                app.swipeDown()
+            }
+        }
+        return target.exists && target.isHittable
     }
 
     @discardableResult

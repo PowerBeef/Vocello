@@ -341,6 +341,7 @@
 		C7EA4540816D2346C2B603B8 /* GenerationQualityReport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88B053E8CDEBE21AC420E4B5 /* GenerationQualityReport.swift */; };
 		C838C6E3E59717F67F49C45C /* SidebarPlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C317D7467D26FD09704CFD81 /* SidebarPlayerView.swift */; };
 		C8B7F513336ADCF7C6508D74 /* HuggingFace in Frameworks */ = {isa = PBXBuildFile; productRef = 357F5CA9E28DE9CA8F48905E /* HuggingFace */; };
+		C9FBC35551E6CDEC763E65EC /* VoiceModelsScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1011AA81653BEFF317EAF4B5 /* VoiceModelsScreen.swift */; };
 		CA7B7BFA9AC2DE7A6B9B8C4A /* QwenVoiceEngineSupport.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = E1F796BD7F461844DF75A7EE /* QwenVoiceEngineSupport.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		CAC104EFF8BBD01F0674A3FD /* IOSAccessibility.swift in Sources */ = {isa = PBXBuildFile; fileRef = 473C7A803F9F31801C56EDE1 /* IOSAccessibility.swift */; };
 		CAE5016FA22E3B09634BB66F /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 955EAA47F1E723B2D9DED7AD /* README.md */; };
@@ -667,6 +668,7 @@
 		0F45C532854D962580423BF6 /* CustomVoiceCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomVoiceCoordinator.swift; sourceTree = "<group>"; };
 		0F5D3ADAE3566B96C3337BAB /* GenerationSemanticsLanguageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GenerationSemanticsLanguageTests.swift; sourceTree = "<group>"; };
 		10028722B3EF49EE7370838D /* RuntimeDebugGateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeDebugGateTests.swift; sourceTree = "<group>"; };
+		1011AA81653BEFF317EAF4B5 /* VoiceModelsScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceModelsScreen.swift; sourceTree = "<group>"; };
 		101AFE7CFE754BDF26AD5CD4 /* GenerationDrafts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GenerationDrafts.swift; sourceTree = "<group>"; };
 		101E07E9855715109A0EEFE6 /* IOSBottomSheets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSBottomSheets.swift; sourceTree = "<group>"; };
 		10CE8FC9B1A2B580ED62408D /* IOSGenerationSetupCards.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSGenerationSetupCards.swift; sourceTree = "<group>"; };
@@ -1767,6 +1769,7 @@
 			isa = PBXGroup;
 			children = (
 				C1208FA55F0C73C515E9B9CF /* SettingsScreen.swift */,
+				1011AA81653BEFF317EAF4B5 /* VoiceModelsScreen.swift */,
 			);
 			path = Settings;
 			sourceTree = "<group>";
@@ -2440,6 +2443,7 @@
 				D27D60A56143986204A2D592 /* Voice.swift in Sources */,
 				4B05B3B2FBEF9F096EDE8F97 /* VoiceClipTranscriber.swift in Sources */,
 				F0CC6975C1D11B689135F15B /* VoiceDesignBriefCatalog.swift in Sources */,
+				C9FBC35551E6CDEC763E65EC /* VoiceModelsScreen.swift in Sources */,
 				8062AEFEB19B05DED148EB6D /* VoicesScreen.swift in Sources */,
 				30609C65E67479598357E64F /* WaveformService.swift in Sources */,
 			);

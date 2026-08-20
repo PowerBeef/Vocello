@@ -15,6 +15,7 @@
 | `convergence-metal4-stage4-2026-08` | complete | backend-and-platform | 7/7 (100%) |
 | `doc-governance-2026-08` | complete | release-qa | 9/9 (100%) |
 | `ios-clone-import-2026-08` | complete | ios | 2/2 (100%) |
+| `ios-settings-2026-08` | complete | ios | 2/2 (100%) |
 | `ios-ui-2026-08` | complete | ios | 6/6 (100%) |
 | `macos-ui-2026-08` | complete | macos | 7/7 (100%) |
 | `model-delivery-2026-08` | complete | release-qa | 2/2 (100%) |
@@ -186,6 +187,19 @@ Narrative authority: [`docs/reference/ios-app-guide.md`](reference/ios-app-guide
 | --- | --- | --- | --- |
 | `ICI-1` | done | Full restore of the Files-import clone-reference route | `doc:docs/reference/ios-app-guide.md`, `file:Tests/VocelloiOSUITests/VocelloiOSFixtureEnrollmentUITests.swift` |
 | `ICI-2` | done | Device acceptance of the restored import route | `doc:docs/development-progress.md` |
+
+## iOS Settings information architecture and visual alignment
+
+`ios-settings-2026-08` · **complete** · ios · adopted 2026-08-20
+
+Reorganize the title-free Settings tab around user tasks, move model lifecycle management into a dedicated destination, and align the resulting controls with Vocello's compact custom iOS design language without weakening native semantics, Dynamic Type, VoiceOver, or physical-device acceptance.
+
+Narrative authority: [`docs/reference/ios-ui-reference.md`](reference/ios-ui-reference.md)
+
+| Item | Status | Title | Evidence |
+| --- | --- | --- | --- |
+| `ISU-1` | done | Rebuild Settings information architecture and model lifecycle destination | `file:Sources/iOS/Settings/SettingsScreen.swift`, `file:Sources/iOS/Settings/VoiceModelsScreen.swift`, `file:Tests/VocelloiOSUITests/VocelloiOSModelDownloadUITests.swift`, `file:scripts/tests/test_check_ios_smoke_acceptance.py`, `doc:docs/reference/ios-app-guide.md` |
+| `ISU-2` | done | Compact visual alignment and physical-device accessibility acceptance | `file:Sources/iOS/IOSSettingsViews.swift`, `file:Tests/VocelloiOSUITests/VocelloiOSSmokeUITests.swift`, `doc:docs/development-progress.md`, `doc:docs/reference/ios-ui-reference.md` |
 
 ## iOS UI performance harness, measured review, and fix waves
 

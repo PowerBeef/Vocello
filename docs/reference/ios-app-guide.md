@@ -152,14 +152,26 @@ Yesterday / Previous 7/30 Days / Earlier.
 Database failures are typed and fail closed. The error state does not masquerade as empty History;
 destructive actions remain disabled until `historyRetryButton` completes a successful read.
 
-### Settings tab — `Sources/iOS/IOSSettingsViews.swift`
+### Settings tab — `Sources/iOS/Settings/SettingsScreen.swift`
 
-Voice Models rows `iosModelRow_<modelID>` (full lifecycle — see §3). Prefs:
-`iosSettings_autoPlayToggle`, `iosSettings_variationRow` (Expressive/Balanced/Consistent),
-`iosSettings_savedOutputsRow`, `iosSettings_storageRow`, `iosSettings_reduceMotionToggle`,
-`iosSettings_reduceTransparencyToggle`. About: `iosSettings_privacyPolicyRow`,
-`iosSettings_openSourceRow`, `iosSettings_openIOSSettingsRow`, `iosSettings_versionLabel`
-(read-only version label; the 7-tap debug toggle is macOS-only).
+The landing surface is deliberately title-free: the selected Settings item in the shared tab dock
+is its location indicator. Its compact grouped sections are ordered Audio, Models & Files,
+Accessibility, Privacy, and About. Eyebrow headings, dense headline/caption rows, tinted utility
+tiles, quiet panel fills, and dock clearance match the established Voices and History language;
+neutral controls use the Settings silver accent while mode-specific model and Clone semantics keep
+their mode colors. `iosSettings_autoPlayToggle` is a semantic SwiftUI `Toggle` with compact custom
+chrome; `iosSettings_variationRow` is a menu picker (Expressive/Balanced/Consistent). The landing
+page also owns `iosSettings_savedOutputsRow`, `iosSettings_reduceMotionToggle`,
+`iosSettings_reduceTransparencyToggle`, `voiceCloning_consentAcknowledgment`,
+`iosSettings_privacyPolicyRow`, `iosSettings_openIOSSettingsRow`, `iosSettings_openSourceRow`, and
+the compact read-only `iosSettings_versionLabel`.
+
+`iosSettings_voiceModelsRow` pushes the dedicated `screen_voiceModels` destination. That screen
+keeps the system navigation bar hidden and provides the compact 44-point
+`iosSettings_voiceModelsBackButton`, the `iosSettings_storageRow` summary, and the three
+`iosModelRow_<modelID>` lifecycle rows (full state contract below). Both surfaces derive their
+bottom content clearance from the shared tab-dock fade metric and reflow values/actions vertically
+at accessibility Dynamic Type sizes.
 
 ### Player + overlays
 
@@ -188,8 +200,8 @@ comes from `qwenvoice_ios_model_catalog.json`.
 | Queued / waiting / downloading / retrying | `iosModelCancel_<id>` ("Cancel") plus phase/progress detail | Durable request awaiting its turn or connectivity, actively transferring, or applying a typed retry |
 | Verifying / installing / cancelling | Progress indicator | Hash/receipt validation, atomic install, or the cancellation barrier is in progress |
 | Failed/incomplete | `iosModelRetry_<id>` ("Retry") / `iosModelRepair_<id>` ("Repair") | Retry preserves verified files; Repair revalidates an incomplete installed package |
-| Installed | `iosModelDelete_<id>` (trash) | Ready to generate |
-| Update available | `iosModelUpdate_<id>` ("Update") plus the installed controls | Installed and still usable, but the pinned catalog identity moved on; Update re-downloads the changed files through the authenticated delivery path |
+| Installed | `iosModelStatus_<id>` ("Ready") plus `iosModelMenu_<id>` | Ready to generate; Remove Model is inside the overflow menu as `iosModelDelete_<id>` |
+| Update available | `iosModelUpdate_<id>` ("Update") plus `iosModelMenu_<id>` | Installed and still usable, but the pinned catalog identity moved on; Update re-downloads the changed files through the authenticated delivery path |
 
 Cancel opens a confirmation dialog: `iosModelCancelDownloadConfirmButton` (cancel, deletes staged
 data). There is no paused state or Resume control. Waiting for connectivity comes from URLSession;
@@ -221,13 +233,14 @@ Generate rather than Install. Destructive install/cancel/delete actions are outs
 
 ### Model lifecycle sequence
 
-- **Install:** Settings → `iosModelDownload_<id>`.tap() → (wait for complete → `iosModelDelete_<id>`).
+- **Install:** Settings → Voice Models → `iosModelDownload_<id>`.tap() → (wait for complete → `iosModelStatus_<id>` = "Ready").
 - **Cancel:** `iosModelDownload_<id>`.tap() → `iosModelCancel_<id>`.tap() →
   `waitForConfirmationButton("iosModelCancelDownloadConfirmButton")` → tap it → Install reappears.
 - **Retry/cancel:** Retry a failed request with `iosModelRetry_<id>` to reuse verified files. Cancel
   an active request with `iosModelCancel_<id>`, then confirm `iosModelCancelDownloadConfirmButton`;
   staging is removed only after URLSession cancellation callbacks and tasks are terminal.
-- **Delete:** `iosModelDelete_<id>`.tap() → `deleteModelSheet_confirm`.tap() → Install reappears.
+- **Delete:** `iosModelMenu_<id>`.tap() → `iosModelDelete_<id>`.tap() →
+  `deleteModelSheet_confirm`.tap() → Install reappears.
 
 ---
 

@@ -273,6 +273,75 @@ class IOSSmokeAcceptanceTests(unittest.TestCase):
         self.assertIn("ensureCloneConsentEnabled()", benchmark)
         self.assertIn("ensureCloneConsentEnabled()", smoke)
 
+    def test_settings_information_architecture_and_model_lifecycle_contract(self) -> None:
+        settings = (
+            ROOT / "Sources" / "iOS" / "Settings" / "SettingsScreen.swift"
+        ).read_text(encoding="utf-8")
+        models = (
+            ROOT / "Sources" / "iOS" / "Settings" / "VoiceModelsScreen.swift"
+        ).read_text(encoding="utf-8")
+        rows = (ROOT / "Sources" / "iOS" / "IOSSettingsViews.swift").read_text(
+            encoding="utf-8"
+        )
+        test_case = (
+            ROOT / "Tests" / "VocelloiOSUITests" / "VocelloiOSUITestCase.swift"
+        ).read_text(encoding="utf-8")
+
+        section_markers = [
+            'IOSSettingsSection(title: "Audio",',
+            'IOSSettingsSection(title: "Models & Files")',
+            'IOSSettingsSection(title: "Accessibility")',
+            'IOSSettingsSection(title: "Privacy")',
+            'IOSSettingsSection(title: "About")',
+        ]
+        positions = [settings.index(marker) for marker in section_markers]
+        self.assertEqual(positions, sorted(positions))
+        self.assertNotIn("IOSStudioWorkspaceHeading", settings)
+        self.assertNotIn(".navigationTitle", settings)
+        self.assertIn(
+            'IOSSettingsSection(title: "Audio", accessibilityIdentifier: "screen_settings")',
+            settings,
+        )
+        self.assertIn('.accessibilityIdentifier("iosSettings_voiceModelsRow")', settings)
+        self.assertIn(
+            "IOSStudioShellMetrics.dockFadeHeight + Theme.Spacing.lg", settings
+        )
+
+        self.assertIn('.accessibilityIdentifier("screen_voiceModels")', models)
+        self.assertIn('Text("Voice Models")', models)
+        self.assertIn(
+            '.accessibilityIdentifier("iosSettings_voiceModelsBackButton")', models
+        )
+        self.assertIn('accessibilityIdentifier: "iosSettings_storageRow"', models)
+        self.assertNotIn('accessibilityIdentifier: "iosSettings_storageRow"', settings)
+
+        self.assertIn("Toggle(isOn: $isOn)", rows)
+        self.assertIn("IOSSettingsCompactToggleStyle(tint: tint)", rows)
+        self.assertIn('Picker("Take variation", selection: $selection)', rows)
+        self.assertIn("Text(title.uppercased())", rows)
+        self.assertIn(".font(.subheadline.weight(.semibold))", rows)
+        self.assertNotIn(".toggleStyle(.switch)", rows)
+        self.assertIn("var tint: Color = Theme.Brand.silver", rows)
+        self.assertIn(".fill(Theme.Surface.hairline)", rows)
+        self.assertIn(".stroke(Theme.Surface.panelStroke", rows)
+        self.assertNotIn("IOSSettingsReferenceSwitch", rows)
+        for state in [
+            'return "Ready"',
+            'return "Not Installed"',
+            'return "Downloading"',
+            'return "Update Available"',
+            'return "Repair Needed"',
+            'return "Retry Needed"',
+        ]:
+            self.assertIn(state, rows)
+        self.assertIn('Label("Remove Model", systemImage: "trash")', rows)
+        self.assertIn('.accessibilityIdentifier("iosModelMenu_\\(model.id)")', rows)
+        self.assertIn(".frame(width: 44, height: 44)", rows)
+
+        self.assertIn("func openVoiceModels()", test_case)
+        self.assertIn("func leaveVoiceModels()", test_case)
+        self.assertIn('contains: "Ready"', test_case)
+
     def test_successful_ios_ui_build_preserves_matching_symbols(self) -> None:
         runner = (ROOT / "scripts" / "ui_test.sh").read_text(encoding="utf-8")
         test_start = runner.rindex(

@@ -12,7 +12,7 @@ final class VocelloiOSModelDownloadUITests: VocelloiOSUITestCase {
     func testIsolatedBackgroundDownloadAdoptionAndCleanup() {
         beginSession()
         defer { endSession() }
-        select(tab: .settings)
+        openVoiceModels()
         let canonicalSnapshot = snapshotQuiescentCanonicalDelivery()
 
         var environment = ["QVOICE_APP_SUPPORT_DIR": isolatedSupportRoot]
@@ -26,14 +26,15 @@ final class VocelloiOSModelDownloadUITests: VocelloiOSUITestCase {
         }
         launchApp(additionalEnvironment: environment)
 
-        select(tab: .settings)
+        openVoiceModels()
         XCTAssertFalse(
-            element("iosModelDelete_\(modelID)").exists,
+            element("iosModelMenu_\(modelID)").exists,
             "The isolated root must begin without Custom installed; refusing to delete an ambiguous model"
         )
 
         let install = element("iosModelDownload_\(modelID)")
         XCTAssertTrue(VocelloUIWait.exists(install, timeout: 60))
+        XCTAssertTrue(revealSettingsElement(install, swipingUp: true))
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: install, timeout: 20))
 
         let progress = element("iosModelProgress_\(modelID)")
@@ -50,9 +51,9 @@ final class VocelloiOSModelDownloadUITests: VocelloiOSUITestCase {
         })
         app.terminate()
         launchApp(additionalEnvironment: environment)
-        select(tab: .settings)
+        openVoiceModels()
 
-        let installed = element("iosModelDelete_\(modelID)")
+        let installed = element("iosModelMenu_\(modelID)")
         let restoredProgress = element("iosModelProgress_\(modelID)")
         XCTAssertTrue(VocelloUIWait.condition("adopted download progress or completed install", timeout: 120) {
             if installed.exists { return true }
@@ -69,15 +70,20 @@ final class VocelloiOSModelDownloadUITests: VocelloiOSUITestCase {
         for reusedModelID in ["pro_design", "pro_clone"] {
             let download = element("iosModelDownload_\(reusedModelID)")
             XCTAssertTrue(VocelloUIWait.exists(download, timeout: 60))
+            XCTAssertTrue(revealSettingsElement(download, swipingUp: true))
             XCTAssertTrue(VocelloUIPrimaryAction.perform(on: download, timeout: 20))
             XCTAssertTrue(
-                VocelloUIWait.exists(element("iosModelDelete_\(reusedModelID)"), timeout: 3_600),
+                VocelloUIWait.exists(element("iosModelMenu_\(reusedModelID)"), timeout: 3_600),
                 "isolated \(reusedModelID) must reach installed through the shared-component plan"
             )
             VocelloUIScreenshot.attach(app, named: "ios-model-download-installed-\(reusedModelID)")
         }
 
         for cleanupModelID in ["pro_clone", "pro_design", modelID] {
+            let menu = element("iosModelMenu_\(cleanupModelID)")
+            XCTAssertTrue(VocelloUIWait.exists(menu, timeout: 60))
+            XCTAssertTrue(revealSettingsElement(menu, swipingUp: cleanupModelID == "pro_clone"))
+            XCTAssertTrue(VocelloUIPrimaryAction.perform(on: menu, timeout: 20))
             let delete = element("iosModelDelete_\(cleanupModelID)")
             XCTAssertTrue(VocelloUIWait.exists(delete, timeout: 60))
             XCTAssertTrue(VocelloUIPrimaryAction.perform(on: delete, timeout: 20))
@@ -91,7 +97,7 @@ final class VocelloiOSModelDownloadUITests: VocelloiOSUITestCase {
         // Leave the isolated root, then prove the user's canonical installation
         // state is exactly what it was through the same genuine Settings surface.
         launchApp()
-        select(tab: .settings)
+        openVoiceModels()
         assertCanonicalDeliveryMatches(canonicalSnapshot)
         VocelloUIScreenshot.attach(app, named: "ios-model-download-canonical-preserved")
     }
@@ -106,7 +112,7 @@ final class VocelloiOSModelDownloadUITests: VocelloiOSUITestCase {
     private func snapshotQuiescentCanonicalDelivery() -> [String: Bool] {
         var installedByModelID: [String: Bool] = [:]
         for canonicalModelID in ["pro_custom", "pro_design", "pro_clone"] {
-            let installed = element("iosModelDelete_\(canonicalModelID)")
+            let installed = element("iosModelMenu_\(canonicalModelID)")
             let downloadable = element("iosModelDownload_\(canonicalModelID)")
             XCTAssertTrue(
                 VocelloUIWait.condition(
@@ -133,7 +139,7 @@ final class VocelloiOSModelDownloadUITests: VocelloiOSUITestCase {
         for (canonicalModelID, wasInstalled) in snapshot.sorted(by: { $0.key < $1.key }) {
             let expected = element(
                 wasInstalled
-                    ? "iosModelDelete_\(canonicalModelID)"
+                    ? "iosModelMenu_\(canonicalModelID)"
                     : "iosModelDownload_\(canonicalModelID)"
             )
             XCTAssertTrue(

@@ -49,6 +49,34 @@ machine-readable status record and wins over any older prose.
 
 ## Resume here (2026-08-20)
 
+**iOS Settings information architecture rebuilt and visually compacted (2026-08-20; focused device
+acceptance PASS):** the title-free landing page keeps the task-first Audio, Models & Files,
+Accessibility, Privacy, and About organization, but a screenshot-driven follow-up removed the
+oversized system-list presentation. Settings now follows the same compact hierarchy as Voices and
+History: tracked 11-point section eyebrows, 36-point tinted utility tiles, subheadline labels,
+caption details and values, 52-point minimum rows, quiet single-layer panels, and the shared floating
+dock. Real semantic `Toggle` controls use branded 44-by-26-point switch chrome inside 44-point hit
+regions; variation remains a menu-style `Picker` with a verified 44-point target. The compact
+version/build row replaces the old oversized logo footer. Model lifecycle management lives behind
+the readiness summary in a dedicated Voice Models destination with a circular 44-point Back control,
+accurate managed-byte storage, wrapping metadata/progress, one non-color-dependent `Ready` status,
+accessible 44-point actions, and Remove Model inside a labeled overflow menu. Landing values and
+model controls reflow at accessibility Dynamic Type sizes, bottom clearance derives from the shared
+dock metric, and Clone guidance points to Settings → Privacy. Source/XCUITest contracts, the iOS app
+guide, and the UI reference were updated together. The targeted 16-test Settings contract and generic
+iPhoneOS app/logic compile pass. Physical-device smoke run
+`ios-xcui-smoke-20260820-175509-27fb5f81` captured the compact landing, About/dock-clearance, and
+Voice Models screens at Default, AX-L, and AX-XXXL sizes; the focused Settings layout walk passed in
+179.020 seconds and the long-form journey passed in 288.487 seconds. The broader smoke journey's
+Settings traversal also passed, but that method later failed because the phone did not contain its
+required saved clone fixture `A_warm_elderly_woman` (2/3 methods passed; the lane therefore remains
+red). The earlier performance lane `ios-xcui-perf-20260820-171602-051a70d8` passed all 9 scenarios,
+including Settings scrolling and active on-device generation. The isolated model-download lane
+`ios-xcui-model-download-20260820-171400-5d11dc29` reached Voice Models, then failed closed before
+deletion because its fixed test-owned support root already contained Custom; no model was removed.
+A clean isolated root remains required for the full download, background-adoption,
+shared-component-reuse, and cleanup proof.
+
 **Engineering-review remediation is now tracked in the roadmap (2026-08-19, desk):**
 `config/roadmap.json` is the sole status authority for the 14 findings in
 `VOCELLO_ENGINEERING_REVIEW_2026-08-19.md`. F-01, F-04, and F-11 are closed by the current tree;

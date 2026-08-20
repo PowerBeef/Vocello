@@ -75,6 +75,15 @@
       "authority": "docs/reference/ios-ui-refresh-2026-08.md"
     },
     {
+      "id": "ios-settings-2026-08",
+      "title": "iOS Settings information architecture and visual alignment",
+      "status": "complete",
+      "owner": "ios",
+      "adopted": "2026-08-20",
+      "goal": "Reorganize the title-free Settings tab around user tasks, move model lifecycle management into a dedicated destination, and align the resulting controls with Vocello's compact custom iOS design language without weakening native semantics, Dynamic Type, VoiceOver, or physical-device acceptance.",
+      "authority": "docs/reference/ios-ui-reference.md"
+    },
+    {
       "id": "ios-clone-import-2026-08",
       "title": "iOS clone-reference file import restored",
       "status": "complete",
@@ -1258,6 +1267,48 @@
         "file:benchmarks/runs/ui-perf/ios-xcui-perf-20260815-173719-6e425c28.json",
         "file:config/ui-perf-thresholds-ios.json"
       ]
+    },
+    {
+      "id": "ISU-1",
+      "plan": "ios-settings-2026-08",
+      "title": "Rebuild Settings information architecture and model lifecycle destination",
+      "status": "done",
+      "gate": "Keep the Settings landing page title-free; organize Audio, Models & Files, Accessibility, Privacy, and About in task order; move the three model lifecycle rows and managed-byte storage summary into a dedicated Voice Models destination; preserve preference keys, model operations, confirmations, stable accessibility identifiers, and bottom-dock clearance. Update Clone guidance, XCUITest navigation helpers, documentation, generated project inputs, and deterministic contracts together.",
+      "evidence": [
+        "file:Sources/iOS/Settings/SettingsScreen.swift",
+        "file:Sources/iOS/Settings/VoiceModelsScreen.swift",
+        "file:Tests/VocelloiOSUITests/VocelloiOSModelDownloadUITests.swift",
+        "file:scripts/tests/test_check_ios_smoke_acceptance.py",
+        "doc:docs/reference/ios-app-guide.md"
+      ],
+      "sourceOfTruth": [
+        "Sources/iOS/Settings/SettingsScreen.swift",
+        "Sources/iOS/Settings/VoiceModelsScreen.swift",
+        "Sources/iOS/IOSSettingsViews.swift",
+        "Tests/VocelloiOSUITests/VocelloiOSUITestCase.swift"
+      ],
+      "updated": "2026-08-20",
+      "notes": "Closed 2026-08-20. The landing page keeps the shared title-free tab convention and presents the five task-oriented groups; Voice Models is a pushed destination with a compact custom Back header, managed storage summary, truthful lifecycle states, accessible actions, and removal in labeled overflow menus. Project regeneration, generic iPhoneOS app/logic compilation, the 16-test Settings contract, derived-artifact validation, and the 906-test quick gate passed."
+    },
+    {
+      "id": "ISU-2",
+      "plan": "ios-settings-2026-08",
+      "title": "Compact visual alignment and physical-device accessibility acceptance",
+      "status": "done",
+      "gate": "Review the rebuilt Settings screen beside Studio, Voices, and History on the physical iPhone; replace oversized system-list presentation with the app's compact hierarchy while retaining semantic Toggle and Picker controls, 44-point targets, multiline reflow, VoiceOver meaning, and Default/AX-L/AX-XXXL layout coverage. Record the focused Settings verdict separately from unrelated smoke-fixture availability.",
+      "evidence": [
+        "file:Sources/iOS/IOSSettingsViews.swift",
+        "file:Tests/VocelloiOSUITests/VocelloiOSSmokeUITests.swift",
+        "doc:docs/development-progress.md",
+        "doc:docs/reference/ios-ui-reference.md"
+      ],
+      "sourceOfTruth": [
+        "Sources/iOS/IOSSettingsViews.swift",
+        "Sources/iOS/Settings/SettingsScreen.swift",
+        "Tests/VocelloiOSUITests/VocelloiOSSmokeUITests.swift"
+      ],
+      "updated": "2026-08-20",
+      "notes": "Closed 2026-08-20 after screenshot-driven refinement. Settings now uses tracked 11-point section eyebrows, 36-point tinted utility tiles, subheadline labels, caption details and values, 52-point minimum rows, quiet panels, and branded 44-by-26 switch chrome around semantic Toggles. Physical run ios-xcui-smoke-20260820-175509-27fb5f81 passed the focused Settings walk at Default, AX-L, and AX-XXXL and passed the long-form journey. The broad smoke method traversed Settings successfully, then failed only because the phone lacked its pre-existing A_warm_elderly_woman saved-clone fixture; that unrelated fixture keeps the aggregate lane red and is not relabeled as a Settings failure."
     },
     {
       "id": "ICI-1",

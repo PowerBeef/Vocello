@@ -1536,7 +1536,7 @@ struct IOSVoiceCloningView: View {
 
     private var setupMessage: String? {
         if !cloneConsentAcknowledged {
-            return "Enable voice-cloning consent in Settings before generating."
+            return "Enable voice-cloning consent in Settings → Privacy before generating."
         }
         if !isModelAvailable, let cloneModel {
             return "Install \(cloneModel.name) in Settings."
@@ -1950,7 +1950,7 @@ struct IOSVoiceCloningView: View {
     private func generate() {
         guard !scriptLimitState.trimmedIsEmpty, ttsEngine.isReady, !ttsEngine.hasActiveGeneration else { return }
         guard cloneConsentAcknowledged else {
-            coordinator.fail("Enable voice-cloning consent in Settings before generating.")
+            coordinator.fail("Enable voice-cloning consent in Settings → Privacy before generating.")
             return
         }
         guard !scriptLimitState.isOverLimit else {

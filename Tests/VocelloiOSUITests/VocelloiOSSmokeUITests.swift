@@ -5,6 +5,53 @@ import XCTest
 /// and then completes exactly one Custom generation.
 @MainActor
 final class VocelloiOSSmokeUITests: VocelloiOSUITestCase {
+    func testSettingsAccessibilityLayoutWalk() {
+        defer {
+            if session != nil { endSession() }
+        }
+        let categories = [
+            (name: "Default", value: "UICTContentSizeCategoryL"),
+            (name: "AX-L", value: "UICTContentSizeCategoryAccessibilityL"),
+            (name: "AX-XXXL", value: "UICTContentSizeCategoryAccessibilityXXXL"),
+        ]
+
+        for category in categories {
+            beginSession(additionalArguments: [
+                "-UIPreferredContentSizeCategoryName", category.value,
+            ])
+
+            select(tab: .settings)
+            let settings = element("screen_settings")
+            let autoplay = element("iosSettings_autoPlayToggle")
+            let variation = element("iosSettings_variationRow")
+            XCTAssertTrue(VocelloUIWait.exists(settings, timeout: 20))
+            XCTAssertTrue(VocelloUIWait.exists(autoplay, timeout: 20))
+            XCTAssertTrue(VocelloUIWait.exists(variation, timeout: 20))
+            assertAccessibilityControl(autoplay, named: "Play generated audio", category: category.name)
+            assertAccessibilityControl(variation, named: "Take variation", category: category.name)
+            VocelloUIScreenshot.attach(app, named: "ios-settings-\(category.name)-landing")
+
+            let version = element("iosSettings_versionLabel")
+            XCTAssertTrue(VocelloUIWait.exists(version, timeout: 20))
+            XCTAssertTrue(revealSettingsElement(version, swipingUp: true))
+            assertAboveTabDock(version, named: "Version", category: category.name)
+            VocelloUIScreenshot.attach(app, named: "ios-settings-\(category.name)-about")
+
+            openVoiceModels()
+            XCTAssertTrue(VocelloUIWait.exists(element("iosSettings_storageRow"), timeout: 20))
+            let back = element("iosSettings_voiceModelsBackButton")
+            assertAccessibilityControl(back, named: "Voice Models Back", category: category.name)
+
+            let cloneStatus = element("iosModelStatus_pro_clone")
+            XCTAssertTrue(VocelloUIWait.exists(cloneStatus, timeout: 60))
+            XCTAssertTrue(revealSettingsElement(cloneStatus, swipingUp: true))
+            assertAboveTabDock(cloneStatus, named: "Voice Cloning status", category: category.name)
+            VocelloUIScreenshot.attach(app, named: "ios-settings-\(category.name)-voice-models")
+
+            endSession()
+        }
+    }
+
     func testPhysicalDeviceSmokeJourney() {
         let runnerEnvironment = ProcessInfo.processInfo.environment
         // Xcode forwards inherited TEST_RUNNER_* variables to the remote test
@@ -32,6 +79,7 @@ final class VocelloiOSSmokeUITests: VocelloiOSUITestCase {
             select(tab: tab)
         }
 
+        assertSettingsLandingArchitecture()
         assertVisibleModelReadiness()
         ensureCloneConsentEnabled()
         VocelloUIScreenshot.attach(app, named: "ios-smoke-models-ready")
@@ -102,6 +150,42 @@ final class VocelloiOSSmokeUITests: VocelloiOSUITestCase {
             "A memory-pressure-cancelled take must never be committed to History"
         )
         VocelloUIScreenshot.attach(app, named: "ios-smoke-history")
+    }
+
+    private func assertAccessibilityControl(
+        _ control: XCUIElement,
+        named name: String,
+        category: String
+    ) {
+        XCTAssertGreaterThanOrEqual(
+            control.frame.height + 0.01,
+            44,
+            "\(name) must retain a 44-point target at \(category)"
+        )
+        XCTAssertGreaterThanOrEqual(control.frame.minX, app.frame.minX)
+        XCTAssertLessThanOrEqual(control.frame.maxX, app.frame.maxX)
+    }
+
+    private func assertAboveTabDock(
+        _ element: XCUIElement,
+        named name: String,
+        category: String
+    ) {
+        let settingsTab = self.element(VocelloiOSTab.settings.identifier)
+        XCTAssertTrue(VocelloUIWait.exists(settingsTab, timeout: 20))
+        // XCUITest can report an element as hittable while the floating dock
+        // still overlaps its frame. Continue scrolling until the visual
+        // clearance contract itself is satisfied.
+        for _ in 0..<20 where element.exists && element.frame.maxY > settingsTab.frame.minY {
+            app.swipeUp()
+        }
+        XCTAssertLessThanOrEqual(
+            element.frame.maxY,
+            settingsTab.frame.minY,
+            "\(name) must scroll fully above the floating tab dock at \(category)"
+        )
+        XCTAssertGreaterThanOrEqual(element.frame.minX, app.frame.minX)
+        XCTAssertLessThanOrEqual(element.frame.maxX, app.frame.maxX)
     }
 
     /// Long-form project journey: a script above the 900-character single-take

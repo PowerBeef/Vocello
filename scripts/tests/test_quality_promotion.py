@@ -129,10 +129,60 @@ class QualityPromotionTests(unittest.TestCase):
         validated = PROMOTION.validate_manifest(self.validation_args(path))
         self.assertEqual(validated["sourceCommit"], self.commit)
         self.assertEqual(validated["requiredEvidence"], ["macos-ui-benchmark"])
+        self.assertEqual(validated["capabilityCoverage"], {})
+        self.assertEqual(validated["unsupportedDimensions"], [])
         self.assertEqual(
             validated["lanes"]["macos-ui-benchmark"]["hardwareProfileID"],
             "mac-mini-m2-8gb",
         )
+
+    def test_capability_matrix_derives_platform_specific_evidence_and_limitations(self) -> None:
+        contract = PROMOTION.load_contract(self.root)
+        impact = {
+            "promotionRequiredEvidence": [],
+            "promotionCapabilities": [
+                "quality-generation", "multilingual-output", "delivery-evaluation"
+            ],
+        }
+        required = PROMOTION.required_evidence(contract, impact, "macos")
+        self.assertEqual(required, [
+            "macos-delivery-benchmark",
+            "macos-language-benchmark",
+            "macos-quality-engine-benchmark",
+            "macos-ui-benchmark",
+        ])
+        self.assertFalse(any(identity.startswith("ios-") for identity in required))
+        coverage, unsupported = PROMOTION.capability_coverage(contract, impact, "macos")
+        self.assertEqual(
+            coverage["quality-generation"]["requiredEvidence"],
+            ["macos-quality-engine-benchmark"],
+        )
+        self.assertIn("multilingual-output:independent-generation-cohorts", unsupported)
+        self.assertIn("delivery-evaluation:independent-holdout-calibration", unsupported)
+
+    def test_speed_record_cannot_substitute_for_quality_evidence(self) -> None:
+        contract = PROMOTION.load_contract(self.root)
+        definition = contract["evidence"]["macos-quality-engine-benchmark"]
+        with self.assertRaisesRegex(PROMOTION.PromotionError, "variants: quality"):
+            PROMOTION.validate_take_coverage("macos-quality-engine-benchmark", self.record, definition)
+
+    def test_partial_language_record_cannot_claim_complete_language_capability(self) -> None:
+        contract = PROMOTION.load_contract(self.root)
+        definition = contract["evidence"]["macos-language-benchmark"]
+        partial = copy.deepcopy(self.record)
+        partial["takes"] = [{
+            **partial["takes"][0],
+            "cell": "custom-en-pinned",
+            "variant": "speed",
+        }]
+        with self.assertRaisesRegex(PROMOTION.PromotionError, "custom-zh"):
+            PROMOTION.validate_take_coverage("macos-language-benchmark", partial, definition)
+
+    def test_non_delivery_record_cannot_claim_delivery_evaluation(self) -> None:
+        contract = PROMOTION.load_contract(self.root)
+        definition = contract["evidence"]["macos-delivery-benchmark"]
+        with self.assertRaisesRegex(PROMOTION.PromotionError, "delivery"):
+            PROMOTION.validate_take_coverage("macos-delivery-benchmark", self.record, definition)
 
     def test_missing_required_lane_is_rejected(self) -> None:
         with self.assertRaisesRegex(PROMOTION.PromotionError, "missing=.*macos-ui-benchmark"):

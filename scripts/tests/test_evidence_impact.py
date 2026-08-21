@@ -28,6 +28,7 @@ class EvidenceImpactTests(unittest.TestCase):
         first = IMPACT.contract_digest(self.contract)
         round_tripped = json.loads(json.dumps(self.contract))
         self.assertEqual(first, IMPACT.contract_digest(round_tripped))
+        self.assertEqual(IMPACT.validate_repository_coverage(self.contract, REPO_ROOT), [])
 
     def test_model_delivery_change_has_deterministic_blockers_and_nonblocking_live_proofs(self) -> None:
         result = IMPACT.classify(
@@ -71,6 +72,55 @@ class EvidenceImpactTests(unittest.TestCase):
         self.assertEqual(result["mergeRequiredEvidence"], ["project-inputs"])
         self.assertEqual(result["qualityEvidence"], [])
         self.assertEqual(result["promotionRequiredEvidence"], [])
+
+    def test_unknown_critical_path_is_rejected_instead_of_falling_back(self) -> None:
+        broken = copy.deepcopy(self.contract)
+        for item in broken["pathClasses"]:
+            item["include"] = [
+                pattern for pattern in item["include"] if pattern not in {"Sources/**", "scripts/**"}
+            ]
+        with self.assertRaisesRegex(IMPACT.EvidenceImpactError, "critical paths use"):
+            IMPACT.classify(broken, ["Sources/NewProductionAuthority.swift"])
+        with self.assertRaisesRegex(IMPACT.EvidenceImpactError, "critical paths use"):
+            IMPACT.classify(broken, ["scripts/new_quality_analyzer.py"])
+
+    def test_quality_and_promotion_authorities_request_detecting_evidence(self) -> None:
+        cases = {
+            "Sources/Services/AudioQualityGate.swift": "audio-quality-and-evaluation",
+            "Sources/iOS/Settings/VoiceModelsScreen.swift": "platform-ui",
+            "Sources/VocelloCLI/BenchCommand.swift": "repository-product-source",
+            "scripts/analyze_prosody.py": "audio-quality-and-evaluation",
+            "scripts/quality_promotion.py": "benchmark-and-promotion-authority",
+            "config/quality-promotion-contract.json": "benchmark-and-promotion-authority",
+        }
+        for path, expected_class in cases.items():
+            with self.subTest(path=path):
+                result = IMPACT.classify(self.contract, [path])
+                self.assertIn(expected_class, result["classes"])
+                self.assertNotIn("repository-other", result["classes"])
+                if expected_class != "repository-product-source":
+                    self.assertTrue(result["promotionRequiredEvidence"])
+
+    def test_capability_sensitive_paths_expose_promotion_dimensions(self) -> None:
+        cases = {
+            "Sources/Resources/qwenvoice_production_model_catalog.json": {
+                "speed-generation", "quality-generation", "model-lifecycle",
+            },
+            "scripts/analyze_prosody.py": {"delivery-evaluation", "multilingual-output"},
+            "scripts/quality_promotion.py": {
+                "speed-generation", "quality-generation", "studio-modes",
+                "multilingual-output", "delivery-evaluation", "model-lifecycle",
+            },
+        }
+        for path, required in cases.items():
+            with self.subTest(path=path):
+                result = IMPACT.classify(self.contract, [path])
+                self.assertTrue(required <= set(result["promotionCapabilities"]))
+
+    def test_malformed_capability_list_is_rejected(self) -> None:
+        broken = copy.deepcopy(self.contract)
+        broken["pathClasses"][0]["promotionCapabilities"] = ["speed-generation", "speed-generation"]
+        self.assertTrue(any("promotionCapabilities" in error for error in IMPACT.validate_contract(broken)))
 
     def test_memory_and_ui_changes_route_to_domain_specific_promotion_evidence(self) -> None:
         memory = IMPACT.classify(self.contract, ["Sources/QwenVoiceCore/WiredMemoryCoordinator.swift"])

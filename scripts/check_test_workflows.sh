@@ -53,6 +53,7 @@ for required_policy_surface in \
   scripts/lib/build_artifact_retention.py \
   scripts/lib/storage_preflight.py \
   scripts/lib/ios_platform_preflight.py \
+  scripts/python_test_contract.py \
   scripts/tests/test_build_output_policy.py \
   scripts/tests/test_codex_session_storage.py \
   scripts/tests/test_codex_hook_contract.py \
@@ -73,7 +74,8 @@ for required_policy_surface in \
   scripts/tests/test_clean_build_caches.py \
   scripts/tests/test_profile_trace_retention.py \
   scripts/tests/test_storage_preflight.py \
-  scripts/tests/test_ios_platform_preflight.py; do
+  scripts/tests/test_ios_platform_preflight.py \
+  scripts/tests/test_python_test_contract.py; do
   [[ -f "$required_policy_surface" ]] \
     || fail "required build-output policy surface is missing: $required_policy_surface"
 done
@@ -625,77 +627,14 @@ python3 scripts/validate_backend_risk_spine.py
 # config/ has pending changes — the fast wiring/privacy/contract scans above
 # always run. Default (unset) behavior is unchanged; ordinary CI and release
 # lanes never set this and therefore always run the full suite.
+python3 scripts/python_test_contract.py validate \
+  || fail "Python test inventory/discovery contract failed"
 if [[ "${QVOICE_GATES:-}" == "quick" ]] \
     && [[ -z "$(git status --porcelain -- scripts config 2>/dev/null)" ]]; then
   echo "==> quick gate mode: scripts/config unchanged — skipping script self-tests" >&2
 else
-python3 -m unittest \
-  scripts.tests.test_build_output_policy \
-  scripts.tests.test_codex_session_storage \
-  scripts.tests.test_codex_hook_contract \
-  scripts.tests.test_cli_version_contract \
-  scripts.tests.test_saved_voice_lifecycle_contract \
-  scripts.tests.test_documentation_contract \
-  scripts.tests.test_model_catalog_contract \
-  scripts.tests.test_evidence_impact \
-  scripts.tests.test_quality_promotion \
-  scripts.tests.test_required_step_ledger \
-  scripts.tests.test_project_health \
-  scripts.tests.test_refresh_derived_artifacts \
-  scripts.tests.test_vendor_runtime_contract \
-  scripts.tests.test_supply_chain_contract \
-  scripts.tests.test_swift_dependency_snapshot \
-  scripts.tests.test_build_routing_contract \
-  scripts.tests.test_clean_build_caches \
-  scripts.tests.test_profile_trace_retention \
-  scripts.tests.test_storage_preflight \
-  scripts.tests.test_ios_platform_preflight \
-  scripts.tests.test_benchmark_memory \
-  scripts.tests.test_benchmark_history \
-  scripts.tests.test_convergence_promotion_gate \
-  scripts.tests.test_sampling_promotion_evidence \
-  scripts.tests.test_streaming_telemetry_v9_history \
-  scripts.tests.test_bench_command_contract \
-  scripts.tests.test_check_release_notes \
-  scripts.tests.test_check_delivery_instructions \
-  scripts.tests.test_doc_metadata \
-  scripts.tests.test_roadmap \
-  scripts.tests.test_check_surface_coverage \
-  scripts.tests.test_check_macos_ui_perf \
-  scripts.tests.test_check_ios_ui_perf \
-  scripts.tests.test_publish_benchmark_history \
-  scripts.tests.test_check_ios_clone_conditioning \
-  scripts.tests.test_check_ios_smoke_acceptance \
-  scripts.tests.test_ios_device_benchmark_contract \
-  scripts.tests.test_ios_memory_field_report \
-  scripts.tests.test_profile_capture_contract \
-  scripts.tests.test_telemetry_overhead \
-  scripts.tests.test_summarize_generation_telemetry \
-  scripts.tests.test_analyze_prosody \
-  scripts.tests.test_analyze_delivery \
-  scripts.tests.test_prosody_quality_gate \
-  scripts.tests.test_delivery_quality_gate \
-  scripts.tests.test_delivery_separability \
-  scripts.tests.test_delivery_statistics \
-  scripts.tests.test_delivery_matrix_report \
-  scripts.tests.test_separability_listening_check \
-  scripts.tests.test_delivery_identification_check \
-  scripts.tests.test_delivery_listening_session \
-  scripts.tests.test_build_emotion_reference_bank \
-  scripts.tests.test_emotion_advisory \
-  scripts.tests.test_mos_advisory \
-  scripts.tests.test_clone_prosody_fidelity \
-  scripts.tests.test_clone_fidelity_lane \
-  scripts.tests.test_prosody_calibration \
-  scripts.test_check_macos_xpc_bench \
-  scripts.test_check_ios_ui_benchmark \
-  scripts.test_language_bench_evidence \
-  scripts.test_check_ios_speech_assets \
-  scripts.test_check_language_hints \
-  scripts.test_check_language_output \
-  scripts.test_clone_speaker_similarity \
-  scripts.test_device_state_classifier \
-  scripts.test_validate_backend_risk_spine
+python3 -m unittest discover -s scripts -p 'test_*.py'
+python3 -m unittest discover -s scripts/tests -p 'test_*.py'
 fi
 
 echo "==> XCUITest workflow consistency check passed" >&2

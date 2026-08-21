@@ -9,16 +9,59 @@
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
+| `autonomous-validation-remediation-2026-08` | active | release-qa | 5/11 (45%) |
 | `delivery-prompting-2026-08` | active | backend-mlx | 23/25 (92%) |
 | `engineering-review-remediation-2026-08` | active | backend-and-platform | 3/14 (21%) |
 | `compliance-2026-08` | complete | release-qa | 2/2 (100%) |
 | `convergence-metal4-stage4-2026-08` | complete | backend-and-platform | 7/7 (100%) |
 | `doc-governance-2026-08` | complete | release-qa | 9/9 (100%) |
 | `ios-clone-import-2026-08` | complete | ios | 2/2 (100%) |
-| `ios-settings-2026-08` | complete | ios | 2/2 (100%) |
+| `ios-settings-2026-08` | complete | ios | 3/3 (100%) |
 | `ios-ui-2026-08` | complete | ios | 6/6 (100%) |
 | `macos-ui-2026-08` | complete | macos | 7/7 (100%) |
 | `model-delivery-2026-08` | complete | release-qa | 2/2 (100%) |
+
+## Autonomous validation audit remediation
+
+`autonomous-validation-remediation-2026-08` · **active** · release-qa · adopted 2026-08-21
+
+Close the independent test-discovery, evidence-routing, promotion-coverage, benchmark-validity, voice-analysis, device-isolation, website, and test-hygiene findings confirmed by the 2026-08-21 repository-wide audit without weakening fail-closed evidence or requiring models and devices for ordinary publication.
+
+Narrative authority: [`docs/reference/autonomous-validation-audit-2026-08-21.md`](reference/autonomous-validation-audit-2026-08-21.md)
+
+| Item | Status | Title | Evidence |
+| --- | --- | --- | --- |
+| `AV-01` | done | P1 — make Python test execution discovery-complete | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md`, `file:scripts/python_test_contract.py`, `file:scripts/tests/test_python_test_contract.py`, `file:scripts/check_test_workflows.sh` |
+| `AV-02` | done | P1 — close evidence-impact critical-path fallbacks | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md`, `file:config/evidence-impact.json`, `file:docs/project-health.md` |
+| `AV-03` | done | P1 — make promotion evidence capability-complete | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md`, `file:config/quality-promotion-contract.json`, `file:docs/reference/quality-promotion.md` |
+| `AV-04` | done | P2 — make baseline coverage changes fail closed | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md`, `file:config/benchmark-baseline-migrations.json`, `file:scripts/tests/test_compare_baseline.py` |
+| `AV-05` | planned | P2 — bind engine performance evidence to shipping optimization | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md`, `file:scripts/build.sh`, `file:scripts/publish_benchmark_history.py` |
+| `AV-06` | planned | P2 — establish stable powered benchmark trends | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md` |
+| `AV-07` | planned | P2 — independently validate prosody thresholds | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md` |
+| `AV-08` | planned | P2 — qualify multilingual output beyond a single cohort | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md` |
+| `AV-09` | planned | P2 — make stateful physical-device lanes independently repeatable | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md` |
+| `AV-10` | planned | P3 — add deterministic real-browser website smoke | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md` |
+| `AV-11` | done | P3 — make marking-equality resource hygiene enforceable | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md`, `file:scripts/check_marking_peak_equality.py`, `file:scripts/tests/test_check_marking_peak_equality.py` |
+
+### Open items in detail
+
+- **`AV-05`** (planned) — P2 — bind engine performance evidence to shipping optimization.
+  gate: Engine performance records and baselines must either come from an explicitly source-bound -O executable or be contractually limited to correctness/memory semantics; cross-optimization comparison must fail. Required closure evidence: executable/optimization identity fixtures, one clean optimized focused run on canonical macOS hardware, comparison rejection across -Onone/-O, and updated benchmark claims.
+
+- **`AV-06`** (planned) — P2 — establish stable powered benchmark trends.
+  gate: Define a small stable clean trend matrix per platform with controlled order, warmup, thermal/load/power qualification, minimum repeated history, variance reporting, practical thresholds, and an explicit no-baseline state. Required closure evidence: at least two comparable clean records per canonical key, robust interval/threshold fixtures, history validation, and generated trend output that cannot imply comparison when no baseline exists.
+
+- **`AV-07`** (planned) — P2 — independently validate prosody thresholds.
+  gate: Prosody calibration must freeze on a source-bound labeled training corpus and pass predeclared confusion/noise targets on an untouched holdout spanning speakers, scripts, lengths, languages, and defect severities before becoming promotion authority. Required closure evidence: corpus manifests and digests, annotation protocol, frozen profile, holdout report with uncertainty, analyzer noise-floor/repeatability evidence, and negative threshold-leakage fixtures.
+
+- **`AV-08`** (planned) — P2 — qualify multilingual output beyond a single cohort.
+  gate: Language evidence must separate ASR repeatability from independent generation variance and cover multiple scripts, lengths, speakers/voices, and seeds per claimed language/tier/mode or label the dimension advisory. Required closure evidence: privacy-safe corpus/matrix manifests, independent generated cohorts, WER/CER/language-ID uncertainty, ignored-sample accounting, and language record validation on every claimed cell.
+
+- **`AV-09`** (planned) — P2 — make stateful physical-device lanes independently repeatable.
+  gate: Each stateful iOS UI lane must declare and preflight exact prerequisites, use a non-destructive test-owned run namespace, and keep fixture-dependent journeys separate from generic smoke; download scheduling unit tests must use a controllable clock while retaining one real-throttle integration proof. Required closure evidence: missing/present/stale prerequisite fixtures, isolated reruns without residual-state failures, unchanged fail-closed no-retry policy, and physical-device XCUITest evidence for affected lanes.
+
+- **`AV-10`** (planned) — P3 — add deterministic real-browser website smoke.
+  gate: Website CI must load the hydrated production build in a real browser and verify representative keyboard navigation, links/menus, narrow/wide viewports, and a clean console without turning pixel approval into a merge prerequisite. Required closure evidence: deterministic local and CI browser tests, hydration-failure and keyboard-trap negative fixtures, and npm --prefix website run check PASS.
 
 ## Delivery instruction quality and Qwen3-TTS prompting
 
@@ -200,6 +243,7 @@ Narrative authority: [`docs/reference/ios-ui-reference.md`](reference/ios-ui-ref
 | --- | --- | --- | --- |
 | `ISU-1` | done | Rebuild Settings information architecture and model lifecycle destination | `file:Sources/iOS/Settings/SettingsScreen.swift`, `file:Sources/iOS/Settings/VoiceModelsScreen.swift`, `file:Tests/VocelloiOSUITests/VocelloiOSModelDownloadUITests.swift`, `file:scripts/tests/test_check_ios_smoke_acceptance.py`, `doc:docs/reference/ios-app-guide.md` |
 | `ISU-2` | done | Compact visual alignment and physical-device accessibility acceptance | `file:Sources/iOS/IOSSettingsViews.swift`, `file:Tests/VocelloiOSUITests/VocelloiOSSmokeUITests.swift`, `doc:docs/development-progress.md`, `doc:docs/reference/ios-ui-reference.md` |
+| `ISU-3` | done | Make model status and lifecycle actions immediately discoverable | `file:Sources/iOS/IOSSettingsViews.swift`, `file:Sources/iOS/Settings/VoiceModelsScreen.swift`, `file:Tests/VocelloiOSUITests/VocelloiOSModelDownloadUITests.swift`, `file:scripts/tests/test_check_ios_smoke_acceptance.py`, `doc:docs/reference/ios-app-guide.md`, `doc:docs/reference/ios-ui-reference.md` |
 
 ## iOS UI performance harness, measured review, and fix waves
 

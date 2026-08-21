@@ -113,6 +113,7 @@ Details for runtime, lifecycle, and event-channel invariants live in `docs/ARCHI
 | `check_convergence_promotion_gate.py` | convergence promotion preconditions |
 | `check_qwen3_backend_only.sh`, `check_backend_resource_contract.sh` | MLX-only and native resource wiring |
 | `check_test_workflows.sh` | one UI stack, retired-harness exclusion, and script self-tests |
+| `python_test_contract.py` | discovery-complete Python inventory, runner compatibility, and zero-test rejection |
 | `benchmark_history.py`, `supply_chain_contract.py`, `required_step_ledger.py`, `codex_session_storage.py`, `check_release_notes.py` | history, supply chain, release steps, task storage, and release-note contracts |
 
 Exemptions require a reason in `config/surface-coverage-exemptions.json`. Read

@@ -1097,7 +1097,38 @@ def build_summary(cells):
     return summary
 
 
-def compare_summaries(baseline, current, threshold=0.05):
+def load_baseline_migrations(path):
+    """Load reviewed cell-key migrations used by baseline comparison."""
+    with open(path, "r", encoding="utf-8") as stream:
+        document = json.load(stream)
+    if set(document) != {"schemaVersion", "migrations"} or document["schemaVersion"] != 1:
+        raise ValueError("baseline migration contract must use schemaVersion 1")
+    migrations = document["migrations"]
+    if not isinstance(migrations, list):
+        raise ValueError("baseline migrations must be an array")
+    old_keys = set()
+    new_keys = set()
+    for index, migration in enumerate(migrations):
+        if not isinstance(migration, dict) or set(migration) != {
+            "baselineCellKey", "currentCellKey", "reason"
+        }:
+            raise ValueError(f"baseline migration {index} is malformed")
+        old_key = tuple(migration["baselineCellKey"])
+        new_key = tuple(migration["currentCellKey"])
+        if len(old_key) != 4 or len(new_key) != 4 or not all(
+            isinstance(value, str) and value for value in (*old_key, *new_key)
+        ):
+            raise ValueError(f"baseline migration {index} has an invalid cell key")
+        if not isinstance(migration["reason"], str) or not migration["reason"].strip():
+            raise ValueError(f"baseline migration {index} requires a reason")
+        if old_key in old_keys or new_key in new_keys:
+            raise ValueError("baseline migrations must be one-to-one")
+        old_keys.add(old_key)
+        new_keys.add(new_key)
+    return migrations
+
+
+def compare_summaries(baseline, current, threshold=0.05, migrations=()):
     """Return regression entries where current is worse than baseline by > threshold.
 
     A regression is:
@@ -1109,7 +1140,35 @@ def compare_summaries(baseline, current, threshold=0.05):
     """
     baseline_by_key = {tuple(b["cellKey"]): b for b in baseline}
     current_by_key = {tuple(c["cellKey"]): c for c in current}
+    for migration in migrations:
+        old_key = tuple(migration["baselineCellKey"])
+        new_key = tuple(migration["currentCellKey"])
+        if old_key not in baseline_by_key:
+            continue
+        if new_key in baseline_by_key and new_key != old_key:
+            raise ValueError(f"baseline migration collides with existing cell: {new_key}")
+        migrated = dict(baseline_by_key.pop(old_key))
+        migrated["cellKey"] = list(new_key)
+        baseline_by_key[new_key] = migrated
     regressions = []
+    for key in sorted(baseline_by_key.keys() - current_by_key.keys()):
+        regressions.append(
+            {
+                "cellKey": key,
+                "metric": "coverage.cell",
+                "baseline": "present",
+                "current": "missing",
+            }
+        )
+    for key in sorted(current_by_key.keys() - baseline_by_key.keys()):
+        regressions.append(
+            {
+                "cellKey": key,
+                "metric": "coverage.cell",
+                "baseline": "missing",
+                "current": "present",
+            }
+        )
     for key, cur in current_by_key.items():
         base = baseline_by_key.get(key)
         if base is None:
@@ -1122,7 +1181,17 @@ def compare_summaries(baseline, current, threshold=0.05):
         ]:
             b = base.get(metric)
             c = cur.get(metric)
+            if b is None and c is None:
+                continue
             if b is None or c is None or b == 0:
+                regressions.append(
+                    {
+                        "cellKey": key,
+                        "metric": f"coverage.{metric}",
+                        "baseline": b,
+                        "current": c,
+                    }
+                )
                 continue
             delta = (c - b) / b
             is_regression = (
@@ -1141,6 +1210,16 @@ def compare_summaries(baseline, current, threshold=0.05):
                 )
         b_qc = base.get("qcVerdict")
         c_qc = cur.get("qcVerdict")
+        if b_qc is None or c_qc is None:
+            regressions.append(
+                {
+                    "cellKey": key,
+                    "metric": "coverage.qcVerdict",
+                    "baseline": b_qc,
+                    "current": c_qc,
+                }
+            )
+            continue
         if b_qc and c_qc and b_qc != "-":
             b_sev = _QC_SEVERITY.get(b_qc.split(":")[0], 0)
             c_sev = _QC_SEVERITY.get(c_qc.split(":")[0], 0)
@@ -1228,6 +1307,12 @@ def main():
                         help="write current summary as JSON baseline")
     parser.add_argument("--compare-baseline", metavar="PATH",
                         help="compare to saved baseline and highlight regressions")
+    parser.add_argument(
+        "--baseline-migrations",
+        metavar="PATH",
+        default=os.path.join(os.path.dirname(__file__), "..", "config", "benchmark-baseline-migrations.json"),
+        help="reviewed schema-v1 cell-key migration contract",
+    )
     parser.add_argument("--regress-threshold", type=float, default=0.05,
                         help="relative delta threshold for regression (default 0.05)")
     args = parser.parse_args()
@@ -1519,10 +1604,17 @@ def main():
             print("\nNo generations-merged.jsonl found; cross-layer table skipped.")
 
     if args.compare_baseline:
-        with open(args.compare_baseline, "r", encoding="utf-8") as f:
-            baseline = json.load(f)
-        current = build_summary(cells)
-        regressions = compare_summaries(baseline, current, threshold=args.regress_threshold)
+        try:
+            with open(args.compare_baseline, "r", encoding="utf-8") as f:
+                baseline = json.load(f)
+            migrations = load_baseline_migrations(args.baseline_migrations)
+            current = build_summary(cells)
+            regressions = compare_summaries(
+                baseline, current, threshold=args.regress_threshold, migrations=migrations
+            )
+        except (OSError, ValueError, json.JSONDecodeError) as error:
+            print(f"FAIL: baseline comparison contract is invalid: {error}")
+            return 1
         print_regressions(regressions)
         if regressions:
             return 2

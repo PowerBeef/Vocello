@@ -264,6 +264,25 @@ def file_digest(path: Path) -> str | None:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def evidence_routing_inventory() -> dict[str, Any]:
+    contract = read_json(ROOT / "config/evidence-impact.json")
+    critical_patterns = contract.get("criticalPathPatterns") or []
+    classes = contract.get("pathClasses") or []
+    tracked = sorted(filter(None, git("ls-files").splitlines()))
+    critical = [path for path in tracked if path_matches(path, critical_patterns)]
+    fallback = [
+        path
+        for path in critical
+        if not any(path_matches(path, item.get("include") or []) for item in classes)
+    ]
+    return {
+        "criticalPathCount": len(critical),
+        "explicitlyClassifiedCount": len(critical) - len(fallback),
+        "criticalFallbackCount": len(fallback),
+        "criticalFallbackPaths": fallback,
+    }
+
+
 def build_report(contract: dict[str, Any]) -> dict[str, Any]:
     selectors = evidence_selectors(contract)
     records = latest_hardware_records(contract)
@@ -364,6 +383,7 @@ def build_report(contract: dict[str, Any]) -> dict[str, Any]:
         "hardwareEvidenceCatalog": evidence,
         "criticalDomains": domains,
         "unsafeConcurrency": unsafe_concurrency_inventory(),
+        "evidenceRouting": evidence_routing_inventory(),
         "dependencyFreshness": {
             "status": "not-evaluated-offline",
             "identityPinsPresent": (ROOT / "config/toolchain.json").is_file(),
@@ -388,6 +408,7 @@ def markdown(report: dict[str, Any]) -> str:
         f"- Python tests: {report['testInventory']['pythonCases']} cases in {report['testInventory']['pythonFiles']} files",
         f"- Required-step assurance: {report['requiredStepAssurance']['requiredStepCount']} steps across {report['requiredStepAssurance']['workflowCount']} workflows, all covered by forced-failure fixtures",
         f"- Unsafe-concurrency annotations: {report['unsafeConcurrency']['count']} ({report['unsafeConcurrency']['registeredCount']} registered with owner and invariant; contract {'complete' if report['unsafeConcurrency']['fullyRegistered'] else 'incomplete'})",
+        f"- Evidence routing: {report['evidenceRouting']['explicitlyClassifiedCount']}/{report['evidenceRouting']['criticalPathCount']} critical paths explicit; {report['evidenceRouting']['criticalFallbackCount']} use repository-other fallback",
         "",
         "## Hardware evidence by domain selector",
         "",

@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "generated": "python3 scripts/doc_metadata.py rebuild-index",
   "note": "Machine-readable documentation map. Query this instead of globbing docs/.",
-  "annotatedDocuments": 90,
+  "annotatedDocuments": 91,
   "unannotatedDocuments": 0,
   "documents": [
     {
@@ -219,6 +219,13 @@
       "sourceOfTruth": [
         "Sources/QwenVoiceCore/EmotionPreset.swift"
       ]
+    },
+    {
+      "path": "docs/reference/autonomous-validation-audit-2026-08-21.md",
+      "status": "historical",
+      "owner": "release-qa",
+      "summary": "Point-in-time repository-wide audit of Vocello autonomous tests, benchmarks, voice-output analysis, evidence promotion, website validation, and release verification on 2026-08-21.",
+      "contentDigest": "sha256:d2f6b05d044e602215f3c436ff3802ff42bfa9b54c07439e38a49bc9b26f8eae"
     },
     {
       "path": "docs/reference/backend-optimization-research-report.md",

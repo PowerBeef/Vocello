@@ -163,6 +163,7 @@ Review when: link repair or archive classification only.
 - [`docs/audits/archive/2026-07-10/README.md`](../docs/audits/archive/2026-07-10/README.md)
 - [`docs/audits/archive/2026-07-10/SOURCE_MAP.md`](../docs/audits/archive/2026-07-10/SOURCE_MAP.md)
 - [`docs/audits/archive/2026-07-14/RESOLUTION.md`](../docs/audits/archive/2026-07-14/RESOLUTION.md)
+- [`docs/reference/autonomous-validation-audit-2026-08-21.md`](../docs/reference/autonomous-validation-audit-2026-08-21.md)
 - [`docs/reference/backend-optimization-research-report.md`](../docs/reference/backend-optimization-research-report.md)
 - [`docs/reference/codex-handover-review-2026-08-19.md`](../docs/reference/codex-handover-review-2026-08-19.md)
 - [`docs/reference/codex-storage-ballooning-incident.md`](../docs/reference/codex-storage-ballooning-incident.md)

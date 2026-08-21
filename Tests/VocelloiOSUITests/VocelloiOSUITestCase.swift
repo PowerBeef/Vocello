@@ -178,7 +178,7 @@ class VocelloiOSUITestCase: XCTestCase {
     }
 
     /// Voice Models exposes each installed package with one non-color-dependent `Ready` status
-    /// and a 44-point overflow menu for lifecycle management.
+    /// and a visible 44-point Remove action.
     func assertVisibleModelReadiness() {
         openVoiceModels()
         for modelID in ["pro_custom", "pro_design", "pro_clone"] {
@@ -186,8 +186,9 @@ class VocelloiOSUITestCase: XCTestCase {
             XCTAssertTrue(VocelloUIWait.exists(status, timeout: 60))
             XCTAssertTrue(VocelloUIWait.value(status, contains: "Ready", timeout: 20))
 
-            let installedControl = element("iosModelMenu_\(modelID)")
+            let installedControl = element("iosModelDelete_\(modelID)")
             XCTAssertTrue(VocelloUIWait.exists(installedControl, timeout: 60))
+            XCTAssertTrue(installedControl.isHittable)
 
             for unavailableState in ["Download", "Repair", "Cancel", "Retry"] {
                 XCTAssertFalse(

@@ -54,7 +54,8 @@ def check_take(take: dict, sidecar: Path, pct: float, floor: float,
     if not sidecar.is_file():
         errors.append(f"{label}: sample sidecar missing: {sidecar.name}")
         return
-    rows = [json.loads(line) for line in sidecar.open()]
+    with sidecar.open(encoding="utf-8") as stream:
+        rows = [json.loads(line) for line in stream]
     rows = [r for r in rows if "capturedUptimeNS" in r and footprint(r) is not None]
     rows.sort(key=lambda r: r["capturedUptimeNS"])
     marks = {r["boundary"]: r["capturedUptimeNS"]

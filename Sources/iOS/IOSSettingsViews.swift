@@ -392,22 +392,55 @@ struct IOSSettingsVersionRow: View {
     }
 }
 
+private enum IOSSettingsActionButtonProminence {
+    case primary
+    case secondary
+    case destructive
+}
+
 private struct IOSSettingsActionButtonStyle: ButtonStyle {
     let tint: Color
+    let prominence: IOSSettingsActionButtonProminence
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.caption.weight(.semibold))
-            .foregroundStyle(tint)
+            .foregroundStyle(foregroundColor)
             .padding(.horizontal, 12)
             .frame(minWidth: 44, minHeight: 44)
-            .background(Theme.Surface.inline)
+            .background(backgroundColor(configuration: configuration))
             .clipShape(Capsule(style: .continuous))
             .overlay {
                 Capsule(style: .continuous)
-                    .stroke(tint.opacity(configuration.isPressed ? 0.65 : 0.40), lineWidth: 0.5)
+                    .stroke(strokeColor(configuration: configuration), lineWidth: 0.5)
             }
             .opacity(configuration.isPressed ? 0.82 : 1)
+    }
+
+    private var foregroundColor: Color {
+        switch prominence {
+        case .primary: Theme.Text.onAccent
+        case .secondary: tint
+        case .destructive: Theme.Status.critical
+        }
+    }
+
+    private func backgroundColor(configuration: Configuration) -> Color {
+        switch prominence {
+        case .primary:
+            tint.opacity(configuration.isPressed ? 0.72 : 0.92)
+        case .secondary, .destructive:
+            Theme.Surface.inline
+        }
+    }
+
+    private func strokeColor(configuration: Configuration) -> Color {
+        let opacity = configuration.isPressed ? 0.68 : 0.42
+        return switch prominence {
+        case .primary: Color.white.opacity(configuration.isPressed ? 0.12 : 0.18)
+        case .secondary: tint.opacity(opacity)
+        case .destructive: Theme.Status.critical.opacity(opacity)
+        }
     }
 }
 
@@ -424,20 +457,15 @@ struct IOSModelRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            if dynamicTypeSize.isAccessibilitySize {
-                VStack(alignment: .leading, spacing: 8) {
-                    header
-                    controls.frame(maxWidth: .infinity, alignment: .leading)
-                }
-            } else {
-                HStack(alignment: .top, spacing: 10) {
-                    header
-                    controls
-                }
-            }
+            header
 
             if showsStatusDetail {
                 statusDetailView.padding(.leading, dynamicTypeSize.isAccessibilitySize ? 0 : 46)
+            }
+
+            if hasVisibleActions {
+                controls
+                    .padding(.leading, dynamicTypeSize.isAccessibilitySize ? 0 : 46)
             }
         }
         .padding(.horizontal, 12)
@@ -461,7 +489,15 @@ struct IOSModelRow: View {
                     .fixedSize(horizontal: false, vertical: true)
                 Label(statusText, systemImage: statusSymbol)
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(Theme.Text.secondary)
+                    .foregroundStyle(statusTint)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 5)
+                    .background(statusTint.opacity(0.10))
+                    .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 9, style: .continuous)
+                            .stroke(statusTint.opacity(0.28), lineWidth: 0.5)
+                    }
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityLabel("\(model.mode.displayName) model status")
                     .accessibilityValue(statusText)
@@ -471,64 +507,135 @@ struct IOSModelRow: View {
         }
     }
 
-    @ViewBuilder
     private var controls: some View {
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+            : AnyLayout(HStackLayout(spacing: 8))
+
+        return layout {
+            actionControls
+        }
+    }
+
+    @ViewBuilder
+    private var actionControls: some View {
         switch operationState {
         case .idle:
             switch status {
             case .installed:
-                removalMenu
+                removalAction
             case .updateAvailable:
-                HStack(spacing: 8) {
-                    actionButton("Update", id: "iosModelUpdate_\(model.id)", action: requestInstall)
-                    removalMenu
-                }
+                actionButton(
+                    "Update",
+                    symbol: "arrow.triangle.2.circlepath",
+                    id: "iosModelUpdate_\(model.id)",
+                    action: requestInstall
+                )
+                removalAction
             case .checking:
-                ProgressView().frame(minWidth: 44, minHeight: 44)
+                EmptyView()
             case .notInstalled:
-                actionButton("Install", id: "iosModelDownload_\(model.id)", action: requestInstall)
+                actionButton(
+                    "Install",
+                    symbol: "arrow.down.circle.fill",
+                    id: "iosModelDownload_\(model.id)",
+                    action: requestInstall
+                )
             case .incomplete:
-                actionButton("Repair", id: "iosModelRepair_\(model.id)", action: requestInstall)
+                actionButton(
+                    "Repair",
+                    symbol: "wrench.and.screwdriver.fill",
+                    id: "iosModelRepair_\(model.id)",
+                    action: requestInstall
+                )
+                removalAction
             case .error:
-                actionButton("Retry", id: "iosModelRetry_\(model.id)", action: requestInstall)
+                actionButton(
+                    "Retry",
+                    symbol: "arrow.clockwise",
+                    id: "iosModelRetry_\(model.id)",
+                    action: requestInstall
+                )
             }
         case .installed:
-            removalMenu
+            removalAction
         case .available:
-            actionButton("Install", id: "iosModelDownload_\(model.id)", action: requestInstall)
+            actionButton(
+                "Install",
+                symbol: "arrow.down.circle.fill",
+                id: "iosModelDownload_\(model.id)",
+                action: requestInstall
+            )
         case .queued, .waitingForConnectivity, .downloading, .retrying:
-            actionButton("Cancel", id: "iosModelCancel_\(model.id)", action: requestCancelOptions)
+            actionButton(
+                "Cancel download",
+                symbol: "xmark",
+                id: "iosModelCancel_\(model.id)",
+                prominence: .secondary,
+                action: requestCancelOptions
+            )
         case .verifying, .installing, .cancelling, .deleting:
-            ProgressView().frame(minWidth: 44, minHeight: 44)
+            EmptyView()
         case .unavailable:
-            if case .incomplete = status { removalMenu }
+            if case .incomplete = status { removalAction }
         case .failed:
-            actionButton("Retry", id: "iosModelRetry_\(model.id)", action: requestInstall)
+            actionButton(
+                "Retry",
+                symbol: "arrow.clockwise",
+                id: "iosModelRetry_\(model.id)",
+                action: requestInstall
+            )
         }
     }
 
-    private var removalMenu: some View {
-        Menu {
-            Button(role: .destructive, action: requestDelete) {
-                Label("Remove Model", systemImage: "trash")
-            }
-            .accessibilityIdentifier("iosModelDelete_\(model.id)")
-        } label: {
-            Image(systemName: "ellipsis.circle")
-                .font(.body.weight(.semibold))
-                .foregroundStyle(Theme.Text.secondary)
-                .frame(width: 44, height: 44)
-                .contentShape(Rectangle())
+    /// Keep the legacy `iosModelMenu_*` container identifier on the visible action so existing
+    /// automation can still recognize an installed model after the overflow menu is retired.
+    private var removalAction: some View {
+        HStack(spacing: 0) {
+            actionButton(
+                "Remove",
+                symbol: "trash",
+                id: "iosModelDelete_\(model.id)",
+                prominence: .destructive,
+                action: requestDelete
+            )
         }
-        .accessibilityLabel("More options for \(model.mode.displayName)")
-        .accessibilityHint("Contains Remove Model")
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("iosModelMenu_\(model.id)")
     }
 
-    private func actionButton(_ title: String, id: String, action: @escaping () -> Void) -> some View {
-        Button(title, action: action)
-            .buttonStyle(IOSSettingsActionButtonStyle(tint: Theme.Brand.modeColor(model.mode)))
-            .accessibilityIdentifier(id)
+    private func actionButton(
+        _ title: String,
+        symbol: String,
+        id: String,
+        prominence: IOSSettingsActionButtonProminence = .primary,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Label(title, systemImage: symbol)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .buttonStyle(IOSSettingsActionButtonStyle(
+            tint: Theme.Brand.modeColor(model.mode),
+            prominence: prominence
+        ))
+        .accessibilityLabel("\(title) \(model.mode.displayName) model")
+        .accessibilityIdentifier(id)
+    }
+
+    private var hasVisibleActions: Bool {
+        switch operationState {
+        case .idle:
+            if case .checking = status { return false }
+            return true
+        case .installed, .available, .queued, .waitingForConnectivity, .downloading, .retrying, .failed:
+            return true
+        case .verifying, .installing, .cancelling, .deleting:
+            return false
+        case .unavailable:
+            if case .incomplete = status { return true }
+            return false
+        }
     }
 
     private func requestInstall() {
@@ -611,13 +718,49 @@ struct IOSModelRow: View {
     }
 
     private var statusSymbol: String {
-        switch statusText {
-        case "Ready": return "checkmark.circle"
-        case "Not Installed": return "arrow.down.circle"
-        case "Update Available": return "arrow.triangle.2.circlepath.circle"
-        case "Repair Needed": return "wrench.and.screwdriver"
-        case "Retry Needed": return "exclamationmark.arrow.triangle.2.circlepath"
-        default: return "clock"
+        switch operationState {
+        case .queued: return "clock"
+        case .waitingForConnectivity: return "wifi.exclamationmark"
+        case .downloading: return "arrow.down.circle"
+        case .retrying: return "arrow.clockwise"
+        case .verifying: return "checkmark.shield"
+        case .installing: return "shippingbox"
+        case .cancelling: return "xmark.circle"
+        case .deleting: return "trash"
+        case .failed: return "exclamationmark.arrow.triangle.2.circlepath"
+        case .installed: return "checkmark.circle"
+        case .available: return "arrow.down.circle"
+        case .unavailable: return "wrench.and.screwdriver"
+        case .idle:
+            switch status {
+            case .checking: return "magnifyingglass"
+            case .notInstalled: return "arrow.down.circle"
+            case .installed: return "checkmark.circle"
+            case .updateAvailable: return "arrow.triangle.2.circlepath.circle"
+            case .incomplete: return "wrench.and.screwdriver"
+            case .error: return "exclamationmark.arrow.triangle.2.circlepath"
+            }
+        }
+    }
+
+    private var statusTint: Color {
+        switch operationState {
+        case .installed:
+            return Theme.Status.healthy
+        case .queued, .waitingForConnectivity, .downloading, .retrying,
+             .verifying, .installing, .cancelling, .deleting:
+            return Theme.Brand.modeColor(model.mode)
+        case .failed, .unavailable:
+            return Theme.Status.critical
+        case .available:
+            return Theme.Brand.silver
+        case .idle:
+            switch status {
+            case .installed: return Theme.Status.healthy
+            case .updateAvailable: return Theme.Status.guarded
+            case .incomplete, .error: return Theme.Status.critical
+            case .checking, .notInstalled: return Theme.Brand.silver
+            }
         }
     }
 

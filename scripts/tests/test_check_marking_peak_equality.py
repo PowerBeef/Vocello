@@ -11,6 +11,8 @@ from __future__ import annotations
 import importlib.util
 import json
 import pathlib
+import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -98,6 +100,50 @@ class MarkingPeakEqualityTests(unittest.TestCase):
 
     def test_empty_record_fails_closed(self) -> None:
         self.assertEqual(self.run_checker([]), 1)
+
+    def test_checker_is_clean_under_resource_warning_errors(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            engine = root / "runtime" / "diagnostics" / "engine"
+            engine.mkdir(parents=True)
+            generation_id = "WARNING-STRICT"
+            rows = sidecar_rows(pre_peaks=[800], mark_peaks=[810])
+            (engine / f"samples-{generation_id}.jsonl").write_text(
+                "".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8"
+            )
+            manifest = root / "benchmark-evidence.json"
+            manifest.write_text(
+                json.dumps(
+                    {
+                        "historyRecord": {
+                            "takes": [
+                                {
+                                    "cell": "custom/warm#warning-strict",
+                                    "generationID": generation_id,
+                                    "status": "success",
+                                }
+                            ]
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            completed = subprocess.run(
+                [
+                    sys.executable,
+                    "-W",
+                    "error::ResourceWarning",
+                    str(ROOT / "scripts/check_marking_peak_equality.py"),
+                    str(manifest),
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            self.assertNotIn("ResourceWarning", completed.stderr)
 
 
 if __name__ == "__main__":

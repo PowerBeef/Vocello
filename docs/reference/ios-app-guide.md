@@ -197,11 +197,12 @@ comes from `qwenvoice_ios_model_catalog.json`.
 | State | Visible control | What it means |
 |---|---|---|
 | Not installed | `iosModelDownload_<id>` ("Install") | Default; nothing staged |
-| Queued / waiting / downloading / retrying | `iosModelCancel_<id>` ("Cancel") plus phase/progress detail | Durable request awaiting its turn or connectivity, actively transferring, or applying a typed retry |
-| Verifying / installing / cancelling | Progress indicator | Hash/receipt validation, atomic install, or the cancellation barrier is in progress |
-| Failed/incomplete | `iosModelRetry_<id>` ("Retry") / `iosModelRepair_<id>` ("Repair") | Retry preserves verified files; Repair revalidates an incomplete installed package |
-| Installed | `iosModelStatus_<id>` ("Ready") plus `iosModelMenu_<id>` | Ready to generate; Remove Model is inside the overflow menu as `iosModelDelete_<id>` |
-| Update available | `iosModelUpdate_<id>` ("Update") plus `iosModelMenu_<id>` | Installed and still usable, but the pinned catalog identity moved on; Update re-downloads the changed files through the authenticated delivery path |
+| Queued / waiting / downloading / retrying | `iosModelCancel_<id>` ("Cancel download") plus phase/progress detail | Durable request awaiting its turn or connectivity, actively transferring, or applying a typed retry |
+| Verifying / installing / cancelling / deleting | Status badge plus phase detail | Hash/receipt validation, atomic install, cancellation barrier, or removal is in progress; no invalid competing action is shown |
+| Failed | `iosModelRetry_<id>` ("Retry") | Retry preserves verified files |
+| Incomplete | `iosModelRepair_<id>` ("Repair") plus `iosModelDelete_<id>` ("Remove") | Repair revalidates the incomplete package; Remove discards it through the named confirmation |
+| Installed | `iosModelStatus_<id>` ("Ready") plus `iosModelDelete_<id>` ("Remove") | Ready to generate; removal is visible without opening an overflow menu |
+| Update available | `iosModelUpdate_<id>` ("Update") plus `iosModelDelete_<id>` ("Remove") | Installed and still usable, but the pinned catalog identity moved on; Update re-downloads the changed files through the authenticated delivery path |
 
 Cancel opens a confirmation dialog: `iosModelCancelDownloadConfirmButton` (cancel, deletes staged
 data). There is no paused state or Resume control. Waiting for connectivity comes from URLSession;
@@ -239,8 +240,9 @@ Generate rather than Install. Destructive install/cancel/delete actions are outs
 - **Retry/cancel:** Retry a failed request with `iosModelRetry_<id>` to reuse verified files. Cancel
   an active request with `iosModelCancel_<id>`, then confirm `iosModelCancelDownloadConfirmButton`;
   staging is removed only after URLSession cancellation callbacks and tasks are terminal.
-- **Delete:** `iosModelMenu_<id>`.tap() → `iosModelDelete_<id>`.tap() →
-  `deleteModelSheet_confirm`.tap() → Install reappears.
+- **Delete:** `iosModelDelete_<id>`.tap() → `deleteModelSheet_confirm`.tap() → Install reappears.
+  The compatibility container identifier `iosModelMenu_<id>` remains around the visible Remove
+  action for older automation; new tests drive `iosModelDelete_<id>` directly.
 
 ---
 

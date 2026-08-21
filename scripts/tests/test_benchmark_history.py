@@ -794,6 +794,20 @@ class BenchmarkHistoryTests(unittest.TestCase):
         self.assertAlmostEqual(rtf_delta["percent"], 10.0)
         self.assertIn("RTF +10.0%", self.index.read_text())
 
+    def test_cross_optimization_records_are_never_compared(self) -> None:
+        baseline = record_fixture(run_id="optimization-onone")
+        baseline["toolchain"]["optimization"] = "-Onone"
+        self.publish(baseline, "optimization-onone")
+
+        optimized = record_fixture(run_id="optimization-o")
+        optimized["takes"][0]["metrics"]["rtf"] = 2.1
+        optimized["run"]["startedAt"] = "2026-07-12T12:10:00Z"
+        optimized["run"]["finishedAt"] = "2026-07-12T12:11:00Z"
+        path = self.publish(optimized, "optimization-o")
+        comparison = json.loads(path.read_text())["comparison"]
+        self.assertIsNone(comparison["baselineRunID"])
+        self.assertEqual(comparison["deltas"], {})
+
     def test_all_record_kinds_validate(self) -> None:
         for index, kind in enumerate(sorted(history.KINDS), start=1):
             takes = [generation_take()]

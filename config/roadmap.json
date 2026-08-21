@@ -91,6 +91,15 @@
       "adopted": "2026-08-15",
       "goal": "Restore the iPhone file-import clone-reference route removed 2026-08-01 for App Store review-posture caution (no rejection ever occurred; build 23 carried the feature and passed beta review): the Voices-tab Files picker, the open-from-Files document route, and the import mode of the record-voice sheet, re-landed with the recorded fixes rather than a blind revert.",
       "authority": "docs/reference/ios-app-guide.md"
+    },
+    {
+      "id": "autonomous-validation-remediation-2026-08",
+      "title": "Autonomous validation audit remediation",
+      "status": "active",
+      "owner": "release-qa",
+      "adopted": "2026-08-21",
+      "goal": "Close the independent test-discovery, evidence-routing, promotion-coverage, benchmark-validity, voice-analysis, device-isolation, website, and test-hygiene findings confirmed by the 2026-08-21 repository-wide audit without weakening fail-closed evidence or requiring models and devices for ordinary publication.",
+      "authority": "docs/reference/autonomous-validation-audit-2026-08-21.md"
     }
   ],
   "items": [
@@ -1287,8 +1296,8 @@
         "Sources/iOS/IOSSettingsViews.swift",
         "Tests/VocelloiOSUITests/VocelloiOSUITestCase.swift"
       ],
-      "updated": "2026-08-20",
-      "notes": "Closed 2026-08-20. The landing page keeps the shared title-free tab convention and presents the five task-oriented groups; Voice Models is a pushed destination with a compact custom Back header, managed storage summary, truthful lifecycle states, accessible actions, and removal in labeled overflow menus. Project regeneration, generic iPhoneOS app/logic compilation, the 16-test Settings contract, derived-artifact validation, and the 906-test quick gate passed."
+      "updated": "2026-08-21",
+      "notes": "Closed 2026-08-20 and refined 2026-08-21. The landing page keeps the shared title-free tab convention and presents the five task-oriented groups; Voice Models is a pushed destination with a compact custom Back header, readiness-plus-storage overview, truthful status badges, and visible state-dependent lifecycle actions. Project regeneration, generic iPhoneOS app/logic compilation, the 16-test Settings contract, derived-artifact validation, and the 906-test quick gate passed for the original close; the follow-up evidence is recorded by ISU-3."
     },
     {
       "id": "ISU-2",
@@ -1309,6 +1318,28 @@
       ],
       "updated": "2026-08-20",
       "notes": "Closed 2026-08-20 after screenshot-driven refinement. Settings now uses tracked 11-point section eyebrows, 36-point tinted utility tiles, subheadline labels, caption details and values, 52-point minimum rows, quiet panels, and branded 44-by-26 switch chrome around semantic Toggles. Physical run ios-xcui-smoke-20260820-175509-27fb5f81 passed the focused Settings walk at Default, AX-L, and AX-XXXL and passed the long-form journey. The broad smoke method traversed Settings successfully, then failed only because the phone lacked its pre-existing A_warm_elderly_woman saved-clone fixture; that unrelated fixture keeps the aggregate lane red and is not relabeled as a Settings failure."
+    },
+    {
+      "id": "ISU-3",
+      "plan": "ios-settings-2026-08",
+      "title": "Make model status and lifecycle actions immediately discoverable",
+      "status": "done",
+      "gate": "Lead Voice Models with readiness plus managed storage; give every model one text-and-symbol status badge; expose only lifecycle actions valid for the current state, including direct Install or Remove without an overflow discovery step; preserve model operations, named confirmations, stable identifiers, 44-point targets, accessibility-size reflow, and physical-device-only UI policy. Update XCUITest and documentation contracts and pass the generic iPhoneOS compile plus deterministic repository gate.",
+      "evidence": [
+        "file:Sources/iOS/IOSSettingsViews.swift",
+        "file:Sources/iOS/Settings/VoiceModelsScreen.swift",
+        "file:Tests/VocelloiOSUITests/VocelloiOSModelDownloadUITests.swift",
+        "file:scripts/tests/test_check_ios_smoke_acceptance.py",
+        "doc:docs/reference/ios-app-guide.md",
+        "doc:docs/reference/ios-ui-reference.md"
+      ],
+      "sourceOfTruth": [
+        "Sources/iOS/IOSSettingsViews.swift",
+        "Sources/iOS/Settings/VoiceModelsScreen.swift",
+        "Tests/VocelloiOSUITests/VocelloiOSModelDownloadUITests.swift"
+      ],
+      "updated": "2026-08-21",
+      "notes": "Closed 2026-08-21. Voice Models now summarizes N of 3 ready beside managed bytes, renders compact non-color-dependent state badges, and places valid Install, Update, Repair, Retry, Cancel download, and Remove actions directly beneath each model. Direct Remove retains the existing named confirmation and legacy container identifier while eliminating the ellipsis discovery step. Deterministic verification results are recorded in the development checkpoint."
     },
     {
       "id": "ICI-1",
@@ -1344,6 +1375,212 @@
       "evidence": [
         "doc:docs/development-progress.md"
       ]
+    },
+    {
+      "id": "AV-01",
+      "plan": "autonomous-validation-remediation-2026-08",
+      "title": "P1 — make Python test execution discovery-complete",
+      "status": "done",
+      "gate": "T1/T2 must execute every tracked Python test through its actual runner or an explicit machine-readable classification, reject unexpected zero-test discovery, and mechanically detect an unlisted module. Required closure evidence: full unittest discovery, the pytest baseline module, a synthetic unlisted-module negative fixture, and ./scripts/check_project_inputs.sh all pass with one reconciled inventory and no silently omitted tests.",
+      "evidence": [
+        "doc:docs/reference/autonomous-validation-audit-2026-08-21.md",
+        "file:scripts/python_test_contract.py",
+        "file:scripts/tests/test_python_test_contract.py",
+        "file:scripts/check_test_workflows.sh"
+      ],
+      "sourceOfTruth": [
+        "scripts/check_test_workflows.sh",
+        "scripts/check_project_inputs.sh",
+        "scripts/tests/test_compare_baseline.py",
+        "scripts/python_test_contract.py"
+      ],
+      "notes": "Closed 2026-08-21. T1/T2 now run recursive unittest discovery in both Python roots; a structural inventory rejects zero-test modules and free-function tests without an explicit unittest adapter. The former pytest-only baseline module has a load_tests adapter and corrected stale RTF fixtures. Contract fixtures prove that a newly added module is discovered without a curated-list edit.",
+      "updated": "2026-08-21"
+    },
+    {
+      "id": "AV-02",
+      "plan": "autonomous-validation-remediation-2026-08",
+      "title": "P1 — close evidence-impact critical-path fallbacks",
+      "status": "done",
+      "gate": "Every production UI, engine, audio-quality, analyzer, benchmark, evidence, and promotion-authority path must resolve to an explicit evidence class; designated critical roots must reject unexplained repository-other fallback. Required closure evidence: representative source/config/script positive and negative fixtures, a zero-unexplained-critical-fallback inventory, evidence-impact contract PASS, and project-health reporting of residual fallback counts.",
+      "evidence": [
+        "doc:docs/reference/autonomous-validation-audit-2026-08-21.md",
+        "file:config/evidence-impact.json",
+        "file:docs/project-health.md"
+      ],
+      "sourceOfTruth": [
+        "config/evidence-impact.json",
+        "scripts/evidence_impact.py",
+        "scripts/tests/test_evidence_impact.py",
+        "scripts/project_health.py"
+      ],
+      "notes": "Closed 2026-08-21. Designated critical roots fail if they reach repository-other; the tracked inventory reports zero critical fallbacks. UI, audio/evaluation, benchmark/promotion authority, product source, and validation surfaces now have explicit classes, with residual counts surfaced in project health.",
+      "updated": "2026-08-21"
+    },
+    {
+      "id": "AV-03",
+      "plan": "autonomous-validation-remediation-2026-08",
+      "title": "P1 — make promotion evidence capability-complete",
+      "status": "done",
+      "gate": "Public promotion must derive the smallest complete evidence set for the changed model tier, mode, language, delivery, analyzer, and lifecycle capabilities and must label unsupported dimensions. Required closure evidence: a machine-readable capability/change matrix, path-tamper fixtures proving each authority demands detecting evidence, Speed/Quality and language/delivery negative cases, and quality-promotion validation against exact source and canonical hardware identities.",
+      "evidence": [
+        "doc:docs/reference/autonomous-validation-audit-2026-08-21.md",
+        "file:config/quality-promotion-contract.json",
+        "file:docs/reference/quality-promotion.md"
+      ],
+      "sourceOfTruth": [
+        "config/quality-promotion-contract.json",
+        "config/evidence-impact.json",
+        "scripts/quality_promotion.py",
+        "scripts/tests/test_quality_promotion.py",
+        "scripts/tests/test_evidence_impact.py"
+      ],
+      "notes": "Closed 2026-08-21. Promotion schema v2 derives platform-specific evidence from a capability/change matrix covering Speed, Quality, Studio modes, multilingual output, delivery evaluation, and model lifecycle. Record coverage is checked from take modes, variants, cells, and analyzer metrics; manifests label unsupported combinations. Negative fixtures reject Speed-as-Quality, partial-language, and non-delivery substitutions.",
+      "updated": "2026-08-21"
+    },
+    {
+      "id": "AV-04",
+      "plan": "autonomous-validation-remediation-2026-08",
+      "title": "P2 — make baseline coverage changes fail closed",
+      "status": "done",
+      "gate": "Baseline comparison must distinguish regression, coverage/schema change, and intentional reviewed migration; missing baseline cells, current cells, or required metrics may not produce an unqualified no-regression verdict. Required closure evidence: runner-wired CLI fixtures for removed/added cells, missing metrics, RTF direction, QC worsening, and a versioned migration map, plus documentation parity.",
+      "evidence": [
+        "doc:docs/reference/autonomous-validation-audit-2026-08-21.md",
+        "file:config/benchmark-baseline-migrations.json",
+        "file:scripts/tests/test_compare_baseline.py"
+      ],
+      "sourceOfTruth": [
+        "scripts/summarize_generation_telemetry.py",
+        "scripts/tests/test_compare_baseline.py",
+        "docs/reference/benchmarking-procedure.md",
+        "config/benchmark-baseline-migrations.json"
+      ],
+      "notes": "Closed 2026-08-21. Added/removed cells, one-sided required metrics, QC worsening, and true RTF regressions now fail as coverage/regression results. Intentional cell renames require a versioned one-to-one migration with a non-empty review reason; baseline CLI tests execute through unittest discovery.",
+      "updated": "2026-08-21"
+    },
+    {
+      "id": "AV-05",
+      "plan": "autonomous-validation-remediation-2026-08",
+      "title": "P2 — bind engine performance evidence to shipping optimization",
+      "status": "planned",
+      "gate": "Engine performance records and baselines must either come from an explicitly source-bound -O executable or be contractually limited to correctness/memory semantics; cross-optimization comparison must fail. Required closure evidence: executable/optimization identity fixtures, one clean optimized focused run on canonical macOS hardware, comparison rejection across -Onone/-O, and updated benchmark claims.",
+      "evidence": [
+        "doc:docs/reference/autonomous-validation-audit-2026-08-21.md",
+        "file:scripts/build.sh",
+        "file:scripts/publish_benchmark_history.py"
+      ],
+      "sourceOfTruth": [
+        "scripts/build.sh",
+        "scripts/macos_test.sh",
+        "scripts/benchmark_history.py",
+        "docs/reference/benchmarking-procedure.md",
+        "scripts/publish_benchmark_history.py"
+      ],
+      "notes": "Implementation landed 2026-08-21 but the item remains planned until its live closure evidence exists. All macOS CLI benchmark/profile routes now use -O whole-module compilation, publication requires a hash-matched adjacent optimized-build provenance sidecar, and comparison keys isolate optimization identities. The canonical Mac successfully built the new route, the sidecar resolved to -O, and the embedded CLI identity returned vocello 2.4.0. A clean focused -O benchmark record is still required because the retained Settings work keeps this checkout dirty.",
+      "updated": "2026-08-21"
+    },
+    {
+      "id": "AV-06",
+      "plan": "autonomous-validation-remediation-2026-08",
+      "title": "P2 — establish stable powered benchmark trends",
+      "status": "planned",
+      "gate": "Define a small stable clean trend matrix per platform with controlled order, warmup, thermal/load/power qualification, minimum repeated history, variance reporting, practical thresholds, and an explicit no-baseline state. Required closure evidence: at least two comparable clean records per canonical key, robust interval/threshold fixtures, history validation, and generated trend output that cannot imply comparison when no baseline exists.",
+      "evidence": [
+        "doc:docs/reference/autonomous-validation-audit-2026-08-21.md"
+      ],
+      "sourceOfTruth": [
+        "scripts/benchmark_history.py",
+        "benchmarks/schema-v3.json",
+        "benchmarks/README.md"
+      ],
+      "updated": "2026-08-21"
+    },
+    {
+      "id": "AV-07",
+      "plan": "autonomous-validation-remediation-2026-08",
+      "title": "P2 — independently validate prosody thresholds",
+      "status": "planned",
+      "gate": "Prosody calibration must freeze on a source-bound labeled training corpus and pass predeclared confusion/noise targets on an untouched holdout spanning speakers, scripts, lengths, languages, and defect severities before becoming promotion authority. Required closure evidence: corpus manifests and digests, annotation protocol, frozen profile, holdout report with uncertainty, analyzer noise-floor/repeatability evidence, and negative threshold-leakage fixtures.",
+      "evidence": [
+        "doc:docs/reference/autonomous-validation-audit-2026-08-21.md"
+      ],
+      "sourceOfTruth": [
+        "scripts/prosody_calibration.py",
+        "scripts/prosody_profile.py",
+        "scripts/analyze_prosody.py",
+        "scripts/tests/test_prosody_calibration.py"
+      ],
+      "updated": "2026-08-21"
+    },
+    {
+      "id": "AV-08",
+      "plan": "autonomous-validation-remediation-2026-08",
+      "title": "P2 — qualify multilingual output beyond a single cohort",
+      "status": "planned",
+      "gate": "Language evidence must separate ASR repeatability from independent generation variance and cover multiple scripts, lengths, speakers/voices, and seeds per claimed language/tier/mode or label the dimension advisory. Required closure evidence: privacy-safe corpus/matrix manifests, independent generated cohorts, WER/CER/language-ID uncertainty, ignored-sample accounting, and language record validation on every claimed cell.",
+      "evidence": [
+        "doc:docs/reference/autonomous-validation-audit-2026-08-21.md"
+      ],
+      "sourceOfTruth": [
+        "config/language-bench-corpus.json",
+        "config/language-bench-matrix.json",
+        "scripts/ios_device.sh",
+        "scripts/macos_test.sh"
+      ],
+      "updated": "2026-08-21"
+    },
+    {
+      "id": "AV-09",
+      "plan": "autonomous-validation-remediation-2026-08",
+      "title": "P2 — make stateful physical-device lanes independently repeatable",
+      "status": "planned",
+      "gate": "Each stateful iOS UI lane must declare and preflight exact prerequisites, use a non-destructive test-owned run namespace, and keep fixture-dependent journeys separate from generic smoke; download scheduling unit tests must use a controllable clock while retaining one real-throttle integration proof. Required closure evidence: missing/present/stale prerequisite fixtures, isolated reruns without residual-state failures, unchanged fail-closed no-retry policy, and physical-device XCUITest evidence for affected lanes.",
+      "evidence": [
+        "doc:docs/reference/autonomous-validation-audit-2026-08-21.md"
+      ],
+      "sourceOfTruth": [
+        "scripts/ui_test.sh",
+        "Tests/VocelloiOSUITests/VocelloiOSUITestCase.swift",
+        "Tests/VocelloiOSUITests/VocelloiOSModelDownloadUITests.swift",
+        "Tests/VocelloCoreTests/ModelDownloadChunkSchedulingTests.swift"
+      ],
+      "updated": "2026-08-21"
+    },
+    {
+      "id": "AV-10",
+      "plan": "autonomous-validation-remediation-2026-08",
+      "title": "P3 — add deterministic real-browser website smoke",
+      "status": "planned",
+      "gate": "Website CI must load the hydrated production build in a real browser and verify representative keyboard navigation, links/menus, narrow/wide viewports, and a clean console without turning pixel approval into a merge prerequisite. Required closure evidence: deterministic local and CI browser tests, hydration-failure and keyboard-trap negative fixtures, and npm --prefix website run check PASS.",
+      "evidence": [
+        "doc:docs/reference/autonomous-validation-audit-2026-08-21.md"
+      ],
+      "sourceOfTruth": [
+        "website/package.json",
+        "website/scripts/rendered-contract.mjs",
+        "website/scripts/site-contract.mjs",
+        ".github/workflows/ci.yml"
+      ],
+      "updated": "2026-08-21"
+    },
+    {
+      "id": "AV-11",
+      "plan": "autonomous-validation-remediation-2026-08",
+      "title": "P3 — make marking-equality resource hygiene enforceable",
+      "status": "done",
+      "gate": "The marking-equality validator must close every sidecar handle and its test must fail on ResourceWarning rather than allowing ignored finalizer warnings. Required closure evidence: warning-strict subprocess PASS, all existing equality pass/fail fixtures unchanged, and the full curated Python/project gate green.",
+      "evidence": [
+        "doc:docs/reference/autonomous-validation-audit-2026-08-21.md",
+        "file:scripts/check_marking_peak_equality.py",
+        "file:scripts/tests/test_check_marking_peak_equality.py"
+      ],
+      "sourceOfTruth": [
+        "scripts/check_marking_peak_equality.py",
+        "scripts/tests/test_check_marking_peak_equality.py",
+        "config/marking-peak-equality.json"
+      ],
+      "notes": "Closed 2026-08-21. Sidecars are read through context-managed UTF-8 handles and the suite launches the validator under -W error::ResourceWarning, preserving all existing equality success and failure fixtures.",
+      "updated": "2026-08-21"
     }
   ]
 }

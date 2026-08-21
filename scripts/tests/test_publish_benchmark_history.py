@@ -381,6 +381,40 @@ class PublisherTests(unittest.TestCase):
             stream.setframerate(24_000)
             stream.writeframes(b"\0\0" * 240)
 
+    def write_cli_provenance(self, binary: Path, *, optimization: str = "O") -> Path:
+        binary.parent.mkdir(parents=True, exist_ok=True)
+        binary.write_bytes(b"optimized-vocello-fixture")
+        path = binary.with_name(binary.name + ".provenance.json")
+        path.write_text(json.dumps({
+            "schemaVersion": 1,
+            "producer": "scripts/build.sh cli-optimized",
+            "status": "passed",
+            "scheme": "VocelloCLI",
+            "configuration": "Release",
+            "architecture": "arm64",
+            "optimization": optimization,
+            "executableRelativePath": binary.resolve().relative_to(self.root.resolve()).as_posix(),
+            "executableSHA256": publisher.digest_file(binary),
+        }), encoding="utf-8")
+        return path
+
+    def test_macos_cli_optimization_requires_exact_hash_bound_provenance(self) -> None:
+        binary = self.root / "build" / "vocello"
+        self.write_cli_provenance(binary)
+        with mock.patch.object(publisher, "ROOT", self.root):
+            self.assertEqual(publisher.validated_macos_cli_optimization(binary), "-O")
+
+            binary.write_bytes(b"different-binary")
+            with self.assertRaisesRegex(publisher.PublicationError, "executableSHA256"):
+                publisher.validated_macos_cli_optimization(binary)
+
+    def test_macos_cli_optimization_rejects_unoptimized_build(self) -> None:
+        binary = self.root / "build" / "vocello"
+        self.write_cli_provenance(binary, optimization="Onone")
+        with mock.patch.object(publisher, "ROOT", self.root):
+            with self.assertRaisesRegex(publisher.PublicationError, "optimization"):
+                publisher.validated_macos_cli_optimization(binary)
+
     def test_engine_uses_only_ordered_manifest_generations(self) -> None:
         diagnostics = self.root / "diagnostics"
         output_dir = self.root / "outputs"
@@ -436,6 +470,7 @@ class PublisherTests(unittest.TestCase):
             ),
             mock.patch.object(publisher, "source_from_snapshot", return_value=source_fixture()),
             mock.patch.object(publisher, "crash_delta_from_snapshot", return_value={"passed": True, "count": 0}),
+            mock.patch.object(publisher, "validated_macos_cli_optimization", return_value="-O"),
             self.hardware_patch(),
             write_patch,
         ):
@@ -447,7 +482,7 @@ class PublisherTests(unittest.TestCase):
             record["takes"][0]["runtimeProfileSignature"],
             "pro_custom_speed:fixture-v1",
         )
-        self.assertEqual(record["toolchain"]["optimization"], "-Onone")
+        self.assertEqual(record["toolchain"]["optimization"], "-O")
         self.assertEqual(record["evidence"]["actualTakeCount"], 1)
 
     def test_ios_app_correlation_is_exact_completed_and_engine_memory_owned(self) -> None:

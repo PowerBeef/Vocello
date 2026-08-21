@@ -1,6 +1,16 @@
 {
   "schemaVersion": 1,
   "ordinaryPublicationPolicy": "deterministic-only",
+  "criticalPathPatterns": [
+    "Sources/**",
+    "Packages/**",
+    "Tests/**",
+    "scripts/**",
+    "config/**",
+    ".github/**",
+    "website/**",
+    "project.yml"
+  ],
   "evidence": [
     {
       "id": "project-inputs",
@@ -140,6 +150,12 @@
       "promotionRequiredEvidence": [
         "macos-model-download-lifecycle",
         "ios-model-download-lifecycle"
+      ],
+      "promotionCapabilities": [
+        "speed-generation",
+        "quality-generation",
+        "studio-modes",
+        "model-lifecycle"
       ]
     },
     {
@@ -168,17 +184,18 @@
       "promotionRequiredEvidence": [
         "macos-retained-memory",
         "ios-retained-memory"
+      ],
+      "promotionCapabilities": [
+        "speed-generation",
+        "quality-generation",
+        "studio-modes"
       ]
     },
     {
       "id": "platform-ui",
       "include": [
         "Sources/Views/**",
-        "Sources/iOS/Studio/**",
-        "Sources/iOS/Sheets/**",
-        "Sources/iOS/*View.swift",
-        "Sources/iOS/*Canvas.swift",
-        "Sources/iOS/IOSAccessibility.swift",
+        "Sources/iOS/**",
         "Sources/iOSSupport/Services/*UIPerf*.swift",
         "Tests/VocelloMacUITests/**",
         "Tests/VocelloiOSUITests/**",
@@ -204,7 +221,149 @@
       "promotionRequiredEvidence": [
         "macos-ui-performance",
         "ios-ui-performance"
+      ],
+      "promotionCapabilities": [
+        "speed-generation",
+        "quality-generation",
+        "studio-modes"
       ]
+    },
+    {
+      "id": "audio-quality-and-evaluation",
+      "include": [
+        "Sources/**/AudioQuality*.swift",
+        "Sources/**/GenerationOutputVerifier.swift",
+        "Sources/**/GenerationQuality*.swift",
+        "scripts/analyze_*.py",
+        "scripts/*prosody*.py",
+        "scripts/*delivery*.py",
+        "scripts/*language*.py",
+        "scripts/*speaker_similarity*.py",
+        "scripts/*fidelity*.py",
+        "scripts/check_marking_peak_equality.py",
+        "config/language-bench-*.json",
+        "config/delivery-*.json",
+        "config/*prosody*.json",
+        "config/marking-peak-equality.json"
+      ],
+      "mergeRequiredEvidence": [
+        "project-inputs",
+        "macos-deterministic-tests",
+        "ios-device-sdk-compile"
+      ],
+      "releaseRequiredEvidence": [
+        "project-inputs",
+        "macos-deterministic-tests",
+        "ios-device-sdk-compile"
+      ],
+      "qualityEvidence": [
+        "macos-ui-benchmark",
+        "ios-ui-benchmark",
+        "macos-engine-benchmark",
+        "ios-engine-benchmark"
+      ],
+      "promotionRequiredEvidence": [
+        "macos-ui-benchmark",
+        "ios-ui-benchmark",
+        "macos-engine-benchmark",
+        "ios-engine-benchmark"
+      ],
+      "promotionCapabilities": [
+        "speed-generation",
+        "quality-generation",
+        "studio-modes",
+        "multilingual-output",
+        "delivery-evaluation"
+      ]
+    },
+    {
+      "id": "benchmark-and-promotion-authority",
+      "include": [
+        "scripts/benchmark*.py",
+        "scripts/publish_benchmark_history.py",
+        "scripts/check_*benchmark.py",
+        "scripts/check_*ui_perf.py",
+        "scripts/evidence_impact.py",
+        "scripts/quality_promotion.py",
+        "scripts/release_evidence.py",
+        "scripts/ios_device.sh",
+        "scripts/macos_test.sh",
+        "scripts/ui_test.sh",
+        "config/evidence-impact.json",
+        "config/quality-promotion-contract.json",
+        "config/memory-qualification-policy.json",
+        "config/ui-perf-thresholds*.json"
+      ],
+      "mergeRequiredEvidence": [
+        "project-inputs"
+      ],
+      "releaseRequiredEvidence": [
+        "project-inputs"
+      ],
+      "qualityEvidence": [
+        "macos-ui-benchmark",
+        "ios-ui-benchmark",
+        "macos-engine-benchmark",
+        "ios-engine-benchmark",
+        "macos-retained-memory",
+        "ios-retained-memory",
+        "macos-ui-performance",
+        "ios-ui-performance"
+      ],
+      "promotionRequiredEvidence": [
+        "macos-ui-benchmark",
+        "ios-ui-benchmark",
+        "macos-engine-benchmark",
+        "ios-engine-benchmark",
+        "macos-retained-memory",
+        "ios-retained-memory",
+        "macos-ui-performance",
+        "ios-ui-performance"
+      ],
+      "promotionCapabilities": [
+        "speed-generation",
+        "quality-generation",
+        "studio-modes",
+        "multilingual-output",
+        "delivery-evaluation",
+        "model-lifecycle"
+      ]
+    },
+    {
+      "id": "repository-product-source",
+      "include": [
+        "Sources/**",
+        "Packages/**"
+      ],
+      "mergeRequiredEvidence": [
+        "project-inputs",
+        "macos-deterministic-tests",
+        "ios-device-sdk-compile"
+      ],
+      "releaseRequiredEvidence": [
+        "project-inputs",
+        "macos-deterministic-tests",
+        "ios-device-sdk-compile"
+      ],
+      "qualityEvidence": [],
+      "promotionRequiredEvidence": []
+    },
+    {
+      "id": "repository-validation-surface",
+      "include": [
+        "Tests/**",
+        "scripts/**",
+        "config/**",
+        "project.yml"
+      ],
+      "mergeRequiredEvidence": [
+        "project-inputs"
+      ],
+      "releaseRequiredEvidence": [
+        "project-inputs"
+      ],
+      "qualityEvidence": [],
+      "promotionRequiredEvidence": []
     },
     {
       "id": "engine-runtime",
@@ -237,6 +396,13 @@
         "ios-ui-benchmark",
         "macos-engine-benchmark",
         "ios-engine-benchmark"
+      ],
+      "promotionCapabilities": [
+        "speed-generation",
+        "quality-generation",
+        "studio-modes",
+        "multilingual-output",
+        "delivery-evaluation"
       ]
     },
     {

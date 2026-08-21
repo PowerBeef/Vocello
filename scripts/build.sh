@@ -12,6 +12,7 @@
 #
 # usage:
 #   scripts/build.sh build            # fast local build, no launch (alias: debug)
+#   scripts/build.sh cli-optimized    # shipping-optimization CLI for benchmarks
 #   scripts/build.sh codeql-prepare   # CI-only: native dependency/Metal prebuild before tracing
 #   scripts/build.sh codeql           # CI-only: traced owned-Swift arm64 rebuild
 #   scripts/build.sh run [--logs|--telemetry|--verify|--debug]
@@ -60,6 +61,8 @@ commands:
                         Build, then launch $APP_NAME.app.
   release [args...]     Run scripts/release.sh (optimized DMG) with the shared regen/SPM cache.
   cli [args...]         Build the headless vocello CLI (build/vocello); runs it if args are given.
+  cli-optimized [args...]
+                        Build vocello with -O for shipping-performance evidence; runs args if given.
   clean                 Bounded cache cleanup (equivalent to --aggressive).
   clobber --yes         Remove all ignored repository-local generated state.
   help                  Show this message.
@@ -303,6 +306,20 @@ CLI_BINARY="$BUILD_DIR/vocello"
 CLI_BUILT="$DERIVED_DATA/Build/Products/Release/vocello"
 
 build_cli() {
+    local optimization="${1:-Onone}"
+    local swift_optimization="-Onone"
+    local compilation_mode="incremental"
+    local gcc_optimization="0"
+    local command_identity="scripts/build.sh cli"
+    if [ "$optimization" = "O" ]; then
+        swift_optimization="-O"
+        compilation_mode="wholemodule"
+        gcc_optimization="s"
+        command_identity="scripts/build.sh cli-optimized"
+    elif [ "$optimization" != "Onone" ]; then
+        echo "error: unsupported CLI optimization identity: $optimization" >&2
+        return 2
+    fi
     ensure_project_regenerated
     ensure_spm_resolved "$QVOICE_SCRATCH_PACKAGE_RESOLUTION" "$SOURCE_PACKAGES_DIR" \
         dev QwenVoice Release "$DESTINATION"
@@ -311,7 +328,7 @@ build_cli() {
     # product. regenerate_project.sh renders the checked-in CLI scheme template
     # after generation, letting this lane share the canonical macOS DerivedData
     # without leaking module/index state into Xcode's global cache.
-    echo "==> Building $CLI_TARGET (vocello, single config, -Onone)..."
+    echo "==> Building $CLI_TARGET (vocello, single config, $swift_optimization)..."
     xcb_run \
         -project "$ROOT_DIR/QwenVoice.xcodeproj" \
         -scheme "$CLI_TARGET" \
@@ -326,9 +343,9 @@ build_cli() {
         CODE_SIGN_STYLE=Manual \
         CODE_SIGN_IDENTITY="-" \
         CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION=YES \
-        SWIFT_OPTIMIZATION_LEVEL="-Onone" \
-        SWIFT_COMPILATION_MODE="incremental" \
-        GCC_OPTIMIZATION_LEVEL="0" \
+        SWIFT_OPTIMIZATION_LEVEL="$swift_optimization" \
+        SWIFT_COMPILATION_MODE="$compilation_mode" \
+        GCC_OPTIMIZATION_LEVEL="$gcc_optimization" \
         build
 
     if [ ! -x "$CLI_BUILT" ]; then
@@ -347,16 +364,27 @@ build_cli() {
     rm -f "$CLI_BINARY"
     ln -s "${CLI_BUILT#"$BUILD_DIR"/}" "$CLI_BINARY"
     write_build_provenance "$DERIVED_DATA/last-build.json" \
-        "scripts/build.sh cli" "$CLI_TARGET" Release "$DESTINATION" arm64 \
-        Onone ad-hoc "$DERIVED_DATA" "$SOURCE_PACKAGES_DIR"
+        "$command_identity" "$CLI_TARGET" Release "$DESTINATION" arm64 \
+        "$optimization" ad-hoc "$DERIVED_DATA" "$SOURCE_PACKAGES_DIR"
+    write_build_provenance "$CLI_BUILT.provenance.json" \
+        "$command_identity" "$CLI_TARGET" Release "$DESTINATION" arm64 \
+        "$optimization" ad-hoc "$DERIVED_DATA" "$SOURCE_PACKAGES_DIR" "$CLI_BUILT"
     echo "==> CLI ready: $CLI_BINARY → $CLI_BUILT"
 }
 
 cmd_cli() {
-    build_cli
+    build_cli Onone
     # Invoke the in-place binary (bundles adjacent) — pass args straight through.
     if [ "$#" -gt 0 ]; then
         echo "==> Running: vocello $*"
+        "$CLI_BUILT" "$@"
+    fi
+}
+
+cmd_cli_optimized() {
+    build_cli O
+    if [ "$#" -gt 0 ]; then
+        echo "==> Running optimized: vocello $*"
         "$CLI_BUILT" "$@"
     fi
 }
@@ -403,6 +431,10 @@ main() {
         cli)
             require_build_free_space development-build
             cmd_cli "$@"
+            ;;
+        cli-optimized)
+            require_build_free_space development-build
+            cmd_cli_optimized "$@"
             ;;
         release)
             cmd_release "$@"

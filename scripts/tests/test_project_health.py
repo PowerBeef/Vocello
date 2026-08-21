@@ -43,6 +43,11 @@ class ProjectHealthTests(unittest.TestCase):
                 payload["unsafeConcurrency"]["count"],
                 payload["unsafeConcurrency"]["registeredCount"],
             )
+            self.assertEqual(payload["evidenceRouting"]["criticalFallbackCount"], 0)
+            self.assertEqual(
+                payload["evidenceRouting"]["criticalPathCount"],
+                payload["evidenceRouting"]["explicitlyClassifiedCount"],
+            )
             serialized = json.dumps(payload)
             self.assertNotIn(str(Path.home()), serialized)
             self.assertNotIn(str(ROOT), serialized)
@@ -82,6 +87,7 @@ class ProjectHealthTests(unittest.TestCase):
         source.loader.exec_module(module)
         report = module.build_report(module.validate_contract(module.DEFAULT_CONTRACT))
         rendered = module.markdown(report)
+        self.assertIn("0 use repository-other fallback", rendered)
         self.assertNotIn(report["source"]["commit"], rendered)
         self.assertNotIn("dirty working tree", rendered)
         self.assertNotIn("Commit distance", rendered)

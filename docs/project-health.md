@@ -5,9 +5,10 @@
 
 - Current source identity and dirty state: local JSON report only (kept out of the tracked snapshot to avoid self-referential drift)
 - Swift tests: 553 cases in 77 files
-- Python tests: 994 cases in 77 files
+- Python tests: 1009 cases in 77 files
 - Required-step assurance: 76 steps across 17 workflows, all covered by forced-failure fixtures
 - Unsafe-concurrency annotations: 49 (49 registered with owner and invariant; contract complete)
+- Evidence routing: 744/744 critical paths explicit; 0 use repository-other fallback
 
 ## Hardware evidence by domain selector
 
@@ -31,11 +32,11 @@
 | model-delivery | backend-platform | 17 | 3 / 37 | external promotion: macos-model-download-lifecycle, ios-model-download-lifecycle |
 | ui-performance | platform | 76 | 16 / 56 | macos-ui-performance: stale, ios-ui-performance: stale |
 | xpc-transport | macos | 3 | 4 / 18 | macos-ui-generation: stale |
-| benchmark-validation | release-qa | 6 | 4 / 118 | macos-ui-generation: stale, ios-ui-generation: stale |
+| benchmark-validation | release-qa | 6 | 4 / 121 | macos-ui-generation: stale, ios-ui-generation: stale |
 | orchestration-assurance | release-qa | 3 | 1 / 12 | not hardware-gated |
-| release-supply-chain | release-qa | 9 | 4 / 63 | not hardware-gated |
+| release-supply-chain | release-qa | 9 | 4 / 67 | not hardware-gated |
 | persistence-privacy | platform-release-qa | 4 | 2 / 7 | not hardware-gated |
-| runtime-hardening | backend-release-qa | 7 | 3 / 28 | not hardware-gated |
+| runtime-hardening | backend-release-qa | 7 | 3 / 32 | not hardware-gated |
 
 ## Interpretation
 

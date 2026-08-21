@@ -23,6 +23,7 @@ LIST_FIELDS = (
     "qualityEvidence",
     "promotionRequiredEvidence",
 )
+CAPABILITY_FIELD = "promotionCapabilities"
 
 
 class EvidenceImpactError(RuntimeError):
@@ -47,6 +48,14 @@ def validate_contract(contract: dict[str, Any]) -> list[str]:
         errors.append(f"schemaVersion must be {SCHEMA_VERSION}")
     if contract.get("ordinaryPublicationPolicy") != "deterministic-only":
         errors.append("ordinaryPublicationPolicy must remain deterministic-only")
+    critical_patterns = contract.get("criticalPathPatterns")
+    if (
+        not isinstance(critical_patterns, list)
+        or not critical_patterns
+        or len(critical_patterns) != len(set(critical_patterns))
+        or any(not isinstance(value, str) or not value for value in critical_patterns)
+    ):
+        errors.append("criticalPathPatterns must be a non-empty unique string array")
 
     evidence_items = contract.get("evidence")
     if not isinstance(evidence_items, list) or not evidence_items:
@@ -85,12 +94,14 @@ def validate_contract(contract: dict[str, Any]) -> list[str]:
         if not isinstance(includes, list) or not includes or any(not isinstance(value, str) or not value for value in includes):
             errors.append(f"path class {identity} has invalid include patterns")
         errors.extend(_validate_references(item, identity, evidence))
+        errors.extend(_validate_capabilities(item, identity))
 
     fallback = contract.get("fallbackClass")
     if not isinstance(fallback, dict) or not fallback.get("id"):
         errors.append("fallbackClass must be an object with an id")
     else:
         errors.extend(_validate_references(fallback, str(fallback["id"]), evidence))
+        errors.extend(_validate_capabilities(fallback, str(fallback["id"])))
 
     # Ordinary merge/release evidence is deliberately deterministic. Device,
     # UI, and model-dependent checks may block an explicit public promotion,
@@ -129,6 +140,17 @@ def _validate_references(item: dict[str, Any], identity: str, evidence: dict[str
     return errors
 
 
+def _validate_capabilities(item: dict[str, Any], identity: str) -> list[str]:
+    values = item.get(CAPABILITY_FIELD, [])
+    if (
+        not isinstance(values, list)
+        or any(not isinstance(value, str) or not value for value in values)
+        or len(values) != len(set(values))
+    ):
+        return [f"{identity}.{CAPABILITY_FIELD} must be a unique string array"]
+    return []
+
+
 def contract_digest(contract: dict[str, Any]) -> str:
     return hashlib.sha256(canonical_bytes(contract)).hexdigest()
 
@@ -139,10 +161,44 @@ def _matches(path: str, pattern: str) -> bool:
     )
 
 
+def critical_fallback_paths(contract: dict[str, Any], paths: list[str]) -> list[str]:
+    classes = contract.get("pathClasses") or []
+    critical_patterns = contract.get("criticalPathPatterns") or []
+    fallback_paths: list[str] = []
+    for raw_path in sorted(set(paths)):
+        path = raw_path.replace("\\", "/")
+        while path.startswith("./"):
+            path = path[2:]
+        path = path.lstrip("/")
+        if not any(_matches(path, pattern) for pattern in critical_patterns):
+            continue
+        if not any(any(_matches(path, pattern) for pattern in item["include"]) for item in classes):
+            fallback_paths.append(path)
+    return fallback_paths
+
+
+def tracked_paths(root: Path = REPO_ROOT) -> list[str]:
+    completed = subprocess.run(
+        ["git", "ls-files"], cwd=root, check=False, capture_output=True, text=True
+    )
+    if completed.returncode != 0:
+        raise EvidenceImpactError(completed.stderr.strip() or "git ls-files failed")
+    return sorted(line for line in completed.stdout.splitlines() if line)
+
+
+def validate_repository_coverage(contract: dict[str, Any], root: Path = REPO_ROOT) -> list[str]:
+    return critical_fallback_paths(contract, tracked_paths(root))
+
+
 def classify(contract: dict[str, Any], paths: list[str]) -> dict[str, Any]:
     errors = validate_contract(contract)
     if errors:
         raise EvidenceImpactError("; ".join(errors))
+    unexplained = critical_fallback_paths(contract, paths)
+    if unexplained:
+        raise EvidenceImpactError(
+            "critical paths use repository-other fallback: " + ", ".join(unexplained)
+        )
     classes: list[dict[str, Any]] = contract["pathClasses"]
     fallback: dict[str, Any] = contract["fallbackClass"]
     matched_classes: dict[str, dict[str, Any]] = {}
@@ -160,7 +216,11 @@ def classify(contract: dict[str, Any], paths: list[str]) -> dict[str, Any]:
         path_results.append({"path": path, "classes": sorted(item["id"] for item in matches)})
 
     def union(field: str) -> list[str]:
-        return sorted({reference for item in matched_classes.values() for reference in item[field]})
+        return sorted({
+            reference
+            for item in matched_classes.values()
+            for reference in item.get(field, [])
+        })
 
     return {
         "schemaVersion": SCHEMA_VERSION,
@@ -171,6 +231,7 @@ def classify(contract: dict[str, Any], paths: list[str]) -> dict[str, Any]:
         "releaseRequiredEvidence": union("releaseRequiredEvidence"),
         "qualityEvidence": union("qualityEvidence"),
         "promotionRequiredEvidence": union("promotionRequiredEvidence"),
+        "promotionCapabilities": union(CAPABILITY_FIELD),
         "qualityEvidenceBlocksOrdinaryPublication": False,
         "promotionEvidenceBlocksPublicPromotion": True,
     }
@@ -208,7 +269,16 @@ def main(argv: list[str] | None = None) -> int:
         if errors:
             raise EvidenceImpactError("\n".join(errors))
         if args.command == "validate":
-            print(f"PASS: evidence impact contract {contract_digest(contract)}")
+            fallback_paths = validate_repository_coverage(contract, root)
+            if fallback_paths:
+                raise EvidenceImpactError(
+                    "tracked critical paths use repository-other fallback: "
+                    + ", ".join(fallback_paths)
+                )
+            print(
+                f"PASS: evidence impact contract {contract_digest(contract)} "
+                "(0 critical fallback paths)"
+            )
         elif args.command == "digest":
             print(contract_digest(contract))
         else:

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 from datetime import datetime, timezone
+import fnmatch
 import hashlib
 import json
 import os
@@ -21,7 +22,7 @@ import evidence_impact
 
 ROOT = Path(__file__).resolve().parents[1]
 CONTRACT_PATH = Path("config/quality-promotion-contract.json")
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 DIGEST_RE = re.compile(r"[0-9a-f]{64}")
 COMMIT_RE = re.compile(r"[0-9a-f]{40}")
 TAG_RE = re.compile(r"v\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?")
@@ -103,6 +104,19 @@ def validate_contract(contract: dict[str, Any], impact: dict[str, Any] | None = 
             classifications = definition.get("classifications")
             if not isinstance(classifications, list) or not classifications or set(classifications) - benchmark_history.CLASSIFICATIONS:
                 raise PromotionError(f"{identity} has invalid classifications")
+            coverage = definition.get("requiredTakeCoverage", {})
+            if not isinstance(coverage, dict) or set(coverage) - {
+                "modes", "variants", "cellPatterns", "metricKeys"
+            }:
+                raise PromotionError(f"{identity} has invalid requiredTakeCoverage")
+            for field, values in coverage.items():
+                if (
+                    not isinstance(values, list)
+                    or not values
+                    or len(values) != len(set(values))
+                    or any(not isinstance(value, str) or not value for value in values)
+                ):
+                    raise PromotionError(f"{identity}.{field} must be a non-empty unique string array")
         elif evidence_type == "managed-command":
             command = definition.get("command")
             if not isinstance(command, list) or not command or any(not isinstance(item, str) or not item for item in command):
@@ -118,6 +132,32 @@ def validate_contract(contract: dict[str, Any], impact: dict[str, Any] | None = 
         for identity in identities:
             if identity not in definitions or definitions[identity].get("platform") != platform:
                 raise PromotionError(f"{platform} promotion minimum references invalid evidence {identity}")
+    capabilities = contract.get("capabilities")
+    if not isinstance(capabilities, dict) or not capabilities:
+        raise PromotionError("quality promotion capabilities are missing")
+    for capability, definition in capabilities.items():
+        if not isinstance(capability, str) or re.fullmatch(r"[a-z][a-z0-9-]+", capability) is None:
+            raise PromotionError(f"invalid promotion capability id: {capability!r}")
+        if not isinstance(definition, dict) or set(definition) != {
+            "evidenceByPlatform", "unsupportedDimensions"
+        }:
+            raise PromotionError(f"{capability} capability definition is malformed")
+        by_platform = definition["evidenceByPlatform"]
+        if not isinstance(by_platform, dict) or set(by_platform) != {"macos", "ios"}:
+            raise PromotionError(f"{capability} must map evidence for macos and ios")
+        for platform, identities in by_platform.items():
+            if not isinstance(identities, list) or not identities or len(identities) != len(set(identities)):
+                raise PromotionError(f"{capability}.{platform} evidence is invalid")
+            for identity in identities:
+                if identity not in definitions or definitions[identity].get("platform") != platform:
+                    raise PromotionError(f"{capability}.{platform} references invalid evidence {identity}")
+        unsupported = definition["unsupportedDimensions"]
+        if (
+            not isinstance(unsupported, list)
+            or len(unsupported) != len(set(unsupported))
+            or any(not isinstance(value, str) or not value for value in unsupported)
+        ):
+            raise PromotionError(f"{capability}.unsupportedDimensions is invalid")
     privacy = contract.get("privacy")
     if not isinstance(privacy, dict) or privacy.get("deviceIdentity") != "canonical-hardware-profile-only":
         raise PromotionError("quality promotion privacy policy is invalid")
@@ -132,6 +172,18 @@ def validate_contract(contract: dict[str, Any], impact: dict[str, Any] | None = 
         unknown = sorted(references - definitions.keys())
         if unknown:
             raise PromotionError("evidence-impact promotion references are undefined: " + ", ".join(unknown))
+        capability_references = {
+            capability
+            for item in [*impact.get("pathClasses", []), impact.get("fallbackClass", {})]
+            if isinstance(item, dict)
+            for capability in item.get("promotionCapabilities", [])
+        }
+        unknown_capabilities = sorted(capability_references - capabilities.keys())
+        if unknown_capabilities:
+            raise PromotionError(
+                "evidence-impact promotion capabilities are undefined: "
+                + ", ".join(unknown_capabilities)
+            )
 
 
 def git(root: Path, *arguments: str) -> str:
@@ -216,7 +268,57 @@ def required_evidence(
     definitions = contract["evidence"]
     identities = set(contract["platformMinimumEvidence"][platform])
     identities.update(impact_result.get("promotionRequiredEvidence") or [])
+    for capability in impact_result.get("promotionCapabilities") or []:
+        identities.update(contract["capabilities"][capability]["evidenceByPlatform"][platform])
     return sorted(identity for identity in identities if definitions.get(identity, {}).get("platform") == platform)
+
+
+def capability_coverage(
+    contract: dict[str, Any], impact_result: dict[str, Any], platform: str
+) -> tuple[dict[str, Any], list[str]]:
+    result: dict[str, Any] = {}
+    unsupported: set[str] = set()
+    for capability in sorted(impact_result.get("promotionCapabilities") or []):
+        definition = contract["capabilities"][capability]
+        dimensions = sorted(definition["unsupportedDimensions"])
+        unsupported.update(f"{capability}:{dimension}" for dimension in dimensions)
+        result[capability] = {
+            "requiredEvidence": sorted(definition["evidenceByPlatform"][platform]),
+            "unsupportedDimensions": dimensions,
+        }
+    return result, sorted(unsupported)
+
+
+def validate_take_coverage(identity: str, record: dict[str, Any], definition: dict[str, Any]) -> None:
+    coverage = definition.get("requiredTakeCoverage") or {}
+    if not coverage:
+        return
+    takes = record.get("takes") or []
+    for field in ("modes", "variants"):
+        required = set(coverage.get(field) or [])
+        take_key = field[:-1]
+        observed = {str(take.get(take_key)) for take in takes}
+        missing = sorted(required - observed)
+        if missing:
+            raise PromotionError(f"{identity} lacks required {field}: {', '.join(missing)}")
+    cells = [str(take.get("cell", "")) for take in takes]
+    missing_patterns = [
+        pattern for pattern in coverage.get("cellPatterns", [])
+        if not any(fnmatch.fnmatchcase(cell, pattern) for cell in cells)
+    ]
+    if missing_patterns:
+        raise PromotionError(
+            f"{identity} lacks required cell coverage: {', '.join(missing_patterns)}"
+        )
+    metric_keys = set(coverage.get("metricKeys") or [])
+    observed_metrics = {
+        key for take in takes for key in (take.get("metrics") or {})
+    }
+    missing_metrics = sorted(metric_keys - observed_metrics)
+    if missing_metrics:
+        raise PromotionError(
+            f"{identity} lacks required analyzer metrics: {', '.join(missing_metrics)}"
+        )
 
 
 def validate_record(
@@ -237,6 +339,7 @@ def validate_record(
         or run.get("classification") not in definition["classifications"]
     ):
         raise PromotionError(f"{identity} benchmark record has the wrong lane identity")
+    validate_take_coverage(identity, record, definition)
     if source.get("commit") != commit or source.get("dirty") is not False or source.get("fingerprintsMatch") is not True:
         raise PromotionError(f"{identity} benchmark record is dirty or cross-source")
     if source.get("changedPaths") != []:
@@ -322,6 +425,9 @@ def create(args: argparse.Namespace) -> dict[str, Any]:
     base_commit, paths = changed_paths(root, args.base, commit)
     impact_result = evidence_impact.classify(impact_contract, paths)
     required = required_evidence(contract, impact_result, args.platform)
+    capabilities, unsupported_dimensions = capability_coverage(
+        contract, impact_result, args.platform
+    )
     record_paths = assignments(args.record, "--record")
     receipt_paths = assignments(args.receipt, "--receipt")
     supplied = set(record_paths) | set(receipt_paths)
@@ -373,7 +479,10 @@ def create(args: argparse.Namespace) -> dict[str, Any]:
             "changedPathsDigest": digest_value(paths),
             "classes": impact_result["classes"],
             "promotionRequiredEvidence": impact_result["promotionRequiredEvidence"],
+            "promotionCapabilities": impact_result["promotionCapabilities"],
         },
+        "capabilityCoverage": capabilities,
+        "unsupportedDimensions": unsupported_dimensions,
         "requiredEvidence": required,
         "acceptedWarnings": sorted(accepted),
         "lanes": lanes,
@@ -393,7 +502,7 @@ def validate_manifest(args: argparse.Namespace) -> dict[str, Any]:
     expected_top_level = {
         "schemaVersion", "platform", "tag", "sourceCommit", "baseCommit", "createdAt",
         "release", "contractDigest", "impact", "requiredEvidence", "acceptedWarnings",
-        "lanes", "privacy", "digest",
+        "capabilityCoverage", "unsupportedDimensions", "lanes", "privacy", "digest",
     }
     if set(manifest) != expected_top_level:
         raise PromotionError("quality promotion manifest top-level fields are malformed")
@@ -430,9 +539,17 @@ def validate_manifest(args: argparse.Namespace) -> dict[str, Any]:
         "changedPathsDigest": digest_value(paths),
         "classes": impact_result["classes"],
         "promotionRequiredEvidence": impact_result["promotionRequiredEvidence"],
+        "promotionCapabilities": impact_result["promotionCapabilities"],
     }
     required = required_evidence(contract, impact_result, args.platform)
-    if base_commit != manifest.get("baseCommit") or impact != expected_impact or manifest.get("requiredEvidence") != required:
+    capabilities, unsupported_dimensions = capability_coverage(contract, impact_result, args.platform)
+    if (
+        base_commit != manifest.get("baseCommit")
+        or impact != expected_impact
+        or manifest.get("requiredEvidence") != required
+        or manifest.get("capabilityCoverage") != capabilities
+        or manifest.get("unsupportedDimensions") != unsupported_dimensions
+    ):
         raise PromotionError("quality promotion impact classification is stale or incomplete")
     accepted = manifest.get("acceptedWarnings")
     if not isinstance(accepted, list) or accepted != sorted(set(accepted)):

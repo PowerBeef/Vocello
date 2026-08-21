@@ -47,7 +47,57 @@ machine-readable status record and wins over any older prose.
 | 13 — Benchmark/history v3 | Live 2026-07-29: the first schema-v3 records are committed (three clean `phase0-cli-control-*` engine records plus one exploratory run that also exposed and fixed the summarizer's v3 pin). `benchmarks/schema-v3.json` adds the typed quality identity to generation takes (pass/warning only, five fast gates required, machine-code issues); v1/v2 records stay valid immutable history; the publisher stamps v3 only when every take carries the identity. The UI benchmark checkers folded the same identity 2026-08-01: ui-generation records now publish v3 (first: the focused `v3-fold-proof` record `macos-xcui-benchmark-20260801-003208-403989cf`); the canonical iOS matrix published its first v3 record 2026-08-01 (`ios-xcui-benchmark-20260801-132415-abbec96b`). |
 | 14 — Organization and retirement | Closed 2026-07-23 (14a + 14b): compatibility SPI retired, actor-owned loading/metadata/priming/clone artifacts, clone conditioning epoch-bound end to end. |
 
-## Resume here (2026-08-20)
+## Resume here (2026-08-21)
+
+**Autonomous-validation remediation first pass closed five items (2026-08-21, desk):** AV-01,
+AV-02, AV-03, AV-04, and AV-11 are now done in the roadmap. Python T1/T2 execution is recursive
+and discovery-complete (with a structural zero-test/free-function contract); designated critical
+paths can no longer fall through to `repository-other`; promotion schema v2 derives exact
+platform evidence from Speed, Quality, mode, language, delivery, and lifecycle capabilities and
+labels unsupported combinations; baseline comparison fails on added/removed cells and one-sided
+metrics unless a reviewed versioned migration maps them; and marking-equality runs warning-strict
+with context-managed sidecars. AV-05 implementation also landed: every macOS CLI benchmark path
+builds whole-module `-O`, and publication verifies a hash-bound optimized-build sidecar while
+history comparisons remain optimization-specific. The new route was live-built successfully on
+the canonical Mac, its provenance resolved to `-O`, and its embedded version check returned exactly
+`vocello 2.4.0`; AV-05 stays open until a clean focused benchmark record is captured because the
+current checkout also contains the retained Settings work. AV-06 through AV-10 also remain open because their gates
+require repeated clean trend records, independently labeled holdout/cohort evidence, isolated
+physical-device reruns, or a new real-browser CI lane; none was relabeled complete from source-only
+work. The authoritative plan is `autonomous-validation-remediation-2026-08` in
+`config/roadmap.json`. The final full project-input run passed both recursive Python roots (105 +
+908 tests; 1,013 declarations reconciled by the inventory), all governance/benchmark-history
+validators, and the XCUITest workflow contract.
+
+**Autonomous-validation audit completed and remediation registered (2026-08-21, desk):** the
+repository-wide source/fixture/live review is pinned at
+[`docs/reference/autonomous-validation-audit-2026-08-21.md`](reference/autonomous-validation-audit-2026-08-21.md).
+It inventories the complete test, benchmark, voice-analysis, promotion, website, and release
+evidence chain and records an aggregate 82/100 assessment with no P0. The three P1 roots are an
+incomplete curated Python lane (78 unittest cases omitted plus one pytest-only module that
+unittest discovers as zero; direct pytest reproduced 3 stale-test failures), broad critical-path
+fallback to `repository-other` in evidence-impact routing, and promotion minima narrower than the
+Quality/language/delivery/analyzer capabilities they can sometimes authorize. Six P2 and two P3
+roots cover baseline completeness, shipping optimization identity, trend fragmentation, prosody
+holdout validity, multilingual cohort breadth, stateful device-lane isolation, real-browser web
+coverage, and one resource leak. `config/roadmap.json` now owns AV-01..AV-11 under
+`autonomous-validation-remediation-2026-08`; existing F-03, F-05, and F-14 are cross-referenced
+rather than duplicated. Full project inputs (906 curated tests), macOS deterministic tests/build,
+generic iPhoneOS app/logic compilation, and website checks pass. The native routes required their
+normal SwiftPM/Clang cache and Xcode runtime-service access outside the managed sandbox; no cache,
+dependency, model, device state, benchmark history, product source, or uncommitted Settings work
+was changed by the audit.
+
+**Voice Models lifecycle controls made explicit (2026-08-21, desk):** the dedicated model
+destination now leads with an `N of 3 ready` overview beside the managed storage total. Each model
+uses one compact text-and-symbol status badge, then exposes only the actions valid for that state:
+Install, Update plus Remove, Repair plus Remove, Retry, Cancel download, or direct Remove for a
+ready package. Removal no longer requires discovering an ellipsis menu; the visible destructive
+action still opens the existing named confirmation. Controls retain 44-point targets, reflow at
+accessibility sizes, and preserve all lifecycle identifiers and model-operation behavior. The
+source contract, model-download XCUITest, iOS app guide, and UI reference were updated together.
+The targeted 16-test Settings contract and generic iPhoneOS app/logic compilation pass on the
+final source.
 
 **iOS Settings information architecture rebuilt and visually compacted (2026-08-20; focused device
 acceptance PASS):** the title-free landing page keeps the task-first Audio, Models & Files,
@@ -60,7 +110,7 @@ regions; variation remains a menu-style `Picker` with a verified 44-point target
 version/build row replaces the old oversized logo footer. Model lifecycle management lives behind
 the readiness summary in a dedicated Voice Models destination with a circular 44-point Back control,
 accurate managed-byte storage, wrapping metadata/progress, one non-color-dependent `Ready` status,
-accessible 44-point actions, and Remove Model inside a labeled overflow menu. Landing values and
+and accessible 44-point lifecycle actions. Landing values and
 model controls reflow at accessibility Dynamic Type sizes, bottom clearance derives from the shared
 dock metric, and Clone guidance points to Settings → Privacy. Source/XCUITest contracts, the iOS app
 guide, and the UI reference were updated together. The targeted 16-test Settings contract and generic

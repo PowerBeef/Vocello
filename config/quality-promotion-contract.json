@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "owner": "release-qa",
   "publicPromotionPolicy": "source-bound-quality-evidence",
   "maxEvidenceAgeSeconds": 604800,
@@ -22,7 +22,11 @@
       "matrixScope": "canonical",
       "classifications": [
         "canonical"
-      ]
+      ],
+      "requiredTakeCoverage": {
+        "modes": ["custom", "design", "clone"],
+        "variants": ["speed"]
+      }
     },
     "ios-ui-benchmark": {
       "platform": "ios",
@@ -31,7 +35,11 @@
       "matrixScope": "canonical",
       "classifications": [
         "canonical"
-      ]
+      ],
+      "requiredTakeCoverage": {
+        "modes": ["custom", "design", "clone"],
+        "variants": ["speed"]
+      }
     },
     "macos-engine-benchmark": {
       "platform": "macos",
@@ -91,6 +99,82 @@
         "canonical"
       ]
     },
+    "macos-quality-engine-benchmark": {
+      "platform": "macos",
+      "type": "benchmark-record",
+      "kind": "engine-generation",
+      "matrixScope": "focused",
+      "classifications": ["focused", "canonical"],
+      "requiredTakeCoverage": {
+        "modes": ["custom", "design", "clone"],
+        "variants": ["quality"]
+      }
+    },
+    "ios-quality-engine-benchmark": {
+      "platform": "ios",
+      "type": "benchmark-record",
+      "kind": "engine-generation",
+      "matrixScope": "focused",
+      "classifications": ["focused", "canonical"],
+      "requiredTakeCoverage": {
+        "modes": ["custom", "design", "clone"],
+        "variants": ["quality"]
+      }
+    },
+    "macos-language-benchmark": {
+      "platform": "macos",
+      "type": "benchmark-record",
+      "kind": "language",
+      "matrixScope": "focused",
+      "classifications": ["focused", "canonical"],
+      "requiredTakeCoverage": {
+        "variants": ["speed"],
+        "cellPatterns": [
+          "custom-en-*", "custom-zh-*", "custom-de-*", "custom-fr-*",
+          "custom-ru-*", "custom-pt-*", "custom-es-*", "custom-it-*",
+          "custom-ja-*", "custom-ko-*"
+        ]
+      }
+    },
+    "ios-language-benchmark": {
+      "platform": "ios",
+      "type": "benchmark-record",
+      "kind": "language",
+      "matrixScope": "focused",
+      "classifications": ["focused", "canonical"],
+      "requiredTakeCoverage": {
+        "variants": ["speed"],
+        "cellPatterns": [
+          "custom-en-*", "custom-zh-*", "custom-de-*", "custom-fr-*",
+          "custom-ru-*", "custom-pt-*", "custom-es-*", "custom-it-*",
+          "custom-ja-*", "custom-ko-*"
+        ]
+      }
+    },
+    "macos-delivery-benchmark": {
+      "platform": "macos",
+      "type": "benchmark-record",
+      "kind": "engine-generation",
+      "matrixScope": "focused",
+      "classifications": ["focused", "canonical"],
+      "requiredTakeCoverage": {
+        "variants": ["speed"],
+        "cellPatterns": ["*#delivery-*"],
+        "metricKeys": ["deliveryProsodyEffect"]
+      }
+    },
+    "ios-delivery-benchmark": {
+      "platform": "ios",
+      "type": "benchmark-record",
+      "kind": "engine-generation",
+      "matrixScope": "focused",
+      "classifications": ["focused", "canonical"],
+      "requiredTakeCoverage": {
+        "variants": ["speed"],
+        "cellPatterns": ["*#delivery-*"],
+        "metricKeys": ["deliveryProsodyEffect"]
+      }
+    },
     "macos-model-download-lifecycle": {
       "platform": "macos",
       "type": "managed-command",
@@ -113,6 +197,50 @@
         "ios",
         "model-download"
       ]
+    }
+  },
+  "capabilities": {
+    "speed-generation": {
+      "evidenceByPlatform": {
+        "macos": ["macos-ui-benchmark"],
+        "ios": ["ios-ui-benchmark"]
+      },
+      "unsupportedDimensions": []
+    },
+    "quality-generation": {
+      "evidenceByPlatform": {
+        "macos": ["macos-quality-engine-benchmark"],
+        "ios": ["ios-quality-engine-benchmark"]
+      },
+      "unsupportedDimensions": ["multilingual-quality", "delivery-quality"]
+    },
+    "studio-modes": {
+      "evidenceByPlatform": {
+        "macos": ["macos-ui-benchmark"],
+        "ios": ["ios-ui-benchmark"]
+      },
+      "unsupportedDimensions": []
+    },
+    "multilingual-output": {
+      "evidenceByPlatform": {
+        "macos": ["macos-language-benchmark"],
+        "ios": ["ios-language-benchmark"]
+      },
+      "unsupportedDimensions": ["clone-mode", "quality-tier", "independent-generation-cohorts"]
+    },
+    "delivery-evaluation": {
+      "evidenceByPlatform": {
+        "macos": ["macos-delivery-benchmark"],
+        "ios": ["ios-delivery-benchmark"]
+      },
+      "unsupportedDimensions": ["quality-tier", "independent-holdout-calibration"]
+    },
+    "model-lifecycle": {
+      "evidenceByPlatform": {
+        "macos": ["macos-model-download-lifecycle"],
+        "ios": ["ios-model-download-lifecycle"]
+      },
+      "unsupportedDimensions": []
     }
   },
   "privacy": {

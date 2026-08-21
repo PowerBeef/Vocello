@@ -340,7 +340,7 @@ cmd_profile() {
   command -v xctrace >/dev/null 2>&1 || die "xctrace not found — install Xcode and use Instruments for native profiling"
   # Rebuild immediately before provenance capture so the recorded source and
   # executable identity cannot describe a stale CLI binary.
-  "$SCRIPT_DIR/build.sh" cli >/dev/null
+  "$SCRIPT_DIR/build.sh" cli-optimized >/dev/null
   require_profile_model "$mode" "$variant"
   local run_id
   run_id="mac-${kind}-profile-$(date -u +%Y%m%d-%H%M%S)-$(benchmark_nonce)"
@@ -539,7 +539,7 @@ cmd_memory() {
   validate_benchmark_label "$label"
   local policy="$ROOT_DIR/config/memory-qualification-policy.json"
   [[ -f "$policy" ]] || die "memory qualification policy is missing: $policy"
-  "$SCRIPT_DIR/build.sh" cli >/dev/null
+  "$SCRIPT_DIR/build.sh" cli-optimized >/dev/null
   require_mac_benchmark_models pro_custom_speed pro_design_speed pro_clone_speed
   require_mac_benchmark_clone_fixture
 
@@ -711,7 +711,7 @@ cmd_lang_bench() {
   local corpus="$ROOT_DIR/config/language-bench-corpus.json"
   [[ -f "$matrix" && -f "$corpus" ]] || die "missing language bench config"
 
-  "$SCRIPT_DIR/build.sh" cli >/dev/null
+  "$SCRIPT_DIR/build.sh" cli-optimized >/dev/null
 
   # Resolve the exact model set selected by this language matrix before the
   # first generation. The check is read-only; downloads remain an explicit
@@ -916,7 +916,7 @@ cmd_telemetry_overhead() {
   # Explicit model-dependent diagnostic. UI readiness is checked separately by
   # scripts/ui_test.sh before every UI-driven generation.
   check_mac_test_models --strict
-  "$SCRIPT_DIR/build.sh" cli >/dev/null
+  "$SCRIPT_DIR/build.sh" cli-optimized >/dev/null
   local verdict_path
   note "telemetry-overhead: 3 counterbalanced rotations; warm-up×1 + measured×2 per mode/rotation"
   verdict_path="$(python3 "$SCRIPT_DIR/telemetry_overhead.py" "$@")" \
@@ -939,7 +939,7 @@ run_gate_bench() {
   local runtime="$artifacts/runtime"
   local run_diag="$runtime/diagnostics"
   note "gate bench: custom/speed/medium warm×1 (engine in-process)"
-  "$ROOT_DIR/scripts/build.sh" cli >>"$log" 2>&1 || return 1
+  "$ROOT_DIR/scripts/build.sh" cli-optimized >>"$log" 2>&1 || return 1
   require_mac_benchmark_models pro_custom_speed >>"$log" 2>&1 || return 1
   mkdir -p "$runtime"
   ln -s "$(debug_models_dir)" "$runtime/models"

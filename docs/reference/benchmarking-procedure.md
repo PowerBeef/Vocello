@@ -116,9 +116,15 @@ Run before any benchmark session:
 ### Build and CLI
 
 ```sh
-./scripts/build.sh cli          # produces build/vocello
+./scripts/build.sh cli-optimized # produces the hash-bound -O build/vocello used by benchmarks
 ./scripts/check_project_inputs.sh
 ```
+
+`scripts/macos_test.sh` uses this optimized route for every CLI-backed benchmark and profile
+lane. The publisher reads the adjacent build-provenance sidecar, verifies that its executable
+SHA-256 matches the exact `vocello` bytes, and rejects publication unless the producer is
+`scripts/build.sh cli-optimized` with optimization identity `-O`. The ordinary `build.sh cli`
+route remains useful for development but cannot authorize macOS engine performance evidence.
 
 ### Models and clone fixture (macOS)
 
@@ -604,7 +610,8 @@ Useful flags:
 | `--show-variance` | IQR / outlier hints per cell |
 | `--merged` | Cross-layer first-chunk table from `generations-merged.jsonl` |
 | `--save-baseline PATH` | Write the current per-cell summary as a **JSON** baseline |
-| `--compare-baseline BASELINE.json` | Regression compare vs a **JSON** baseline from `--save-baseline` (exit 2 on >5% regression; RTF **drop**, tok/s drop, TTFC/physFoot rise, QC worsening). Markdown snapshots cannot be fed to this flag — diff those with `git diff`. |
+| `--compare-baseline BASELINE.json` | Fail-closed regression/coverage comparison against a **JSON** baseline from `--save-baseline` (exit 2 on >5% regression, removed/added cells, missing required metrics, or QC worsening; RTF **drop**, tok/s drop, TTFC/physFoot rise). Markdown snapshots cannot be fed to this flag — diff those with `git diff`. |
+| `--baseline-migrations PATH` | Use a reviewed schema-v1 old-cell → new-cell migration map. Defaults to `config/benchmark-baseline-migrations.json`; ambiguous mappings and empty reasons fail. |
 | `--run-id ID` | Reject rows from other benchmark runs. |
 | `--evidence-manifest PATH` | Select the manifest's exact ordered generations and cells. |
 
@@ -754,11 +761,16 @@ regression signal:
 
 | Lane | Build | Topology | Headline custom/speed/medium warm |
 |------|-------|----------|-----------------------------------|
-| `build.sh` CLI bench | `-Onone` | in-process | RTF ≈ 1.0 |
+| `build.sh cli-optimized` CLI bench | hash-bound `-O` | in-process | Shipping-optimization backend result; compare only with the same optimization identity |
 | local release / `-O` CLI | optimized | in-process | RTF ≈ 1.7 |
 | macOS `ui_test.sh macos benchmark` | Release app | app + XPC service | RTF ≈ 1.7 |
 | iOS `ios_device.sh bench` | `-Onone` device | in-process on iPhone | RTF ≈ 1.6–1.9 |
 | iOS `ui_test.sh ios benchmark` | `-O` Release app | in-process, real Studio UI | optimized frontend/device result; do not compare with the `-Onone` headless lane |
+
+Tracked comparison keys include the exact optimization identity, executable UUID/hash, toolchain,
+source inputs, model identity, matrix, and hardware profile. Consequently a historical `-Onone`
+record cannot become the baseline for a new `-O` record; the first clean optimized record reports
+an explicit no-baseline state.
 
 Compare a record only against one with the same generated comparison key. That key includes lane,
 platform/hardware, matrix (including CLI streaming/seed and overhead rotation settings),

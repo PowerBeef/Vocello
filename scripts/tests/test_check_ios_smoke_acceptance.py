@@ -334,9 +334,16 @@ class IOSSmokeAcceptanceTests(unittest.TestCase):
             'return "Retry Needed"',
         ]:
             self.assertIn(state, rows)
-        self.assertIn('Label("Remove Model", systemImage: "trash")', rows)
+        self.assertIn('"Cancel download"', rows)
+        self.assertIn('"Remove"', rows)
+        self.assertIn('id: "iosModelDelete_\\(model.id)"', rows)
         self.assertIn('.accessibilityIdentifier("iosModelMenu_\\(model.id)")', rows)
-        self.assertIn(".frame(width: 44, height: 44)", rows)
+        self.assertIn(".frame(minWidth: 44, minHeight: 44)", rows)
+        self.assertIn(".background(statusTint.opacity(0.10))", rows)
+        self.assertNotIn('Image(systemName: "ellipsis.circle")', rows)
+
+        self.assertIn('IOSSettingsSection(title: "Overview")', models)
+        self.assertIn('title: "\\(readyModelCount) of \\(TTSModel.all.count) ready"', models)
 
         self.assertIn("func openVoiceModels()", test_case)
         self.assertIn("func leaveVoiceModels()", test_case)

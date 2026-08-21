@@ -61,6 +61,29 @@ class BuildRoutingContractTests(unittest.TestCase):
             (ROOT / "QwenVoice.xcodeproj/xcshareddata/xcschemes/VocelloCLI.xcscheme").is_file()
         )
 
+    def test_benchmark_cli_is_shipping_optimized_and_hash_bound(self) -> None:
+        build = self.text("scripts/build.sh")
+        self.assertIn("cli-optimized [args...]", build)
+        self.assertIn('SWIFT_OPTIMIZATION_LEVEL="$swift_optimization"', build)
+        self.assertIn('swift_optimization="-O"', build)
+        self.assertIn('compilation_mode="wholemodule"', build)
+        self.assertIn('write_build_provenance "$CLI_BUILT.provenance.json"', build)
+        self.assertIn('"$SOURCE_PACKAGES_DIR" "$CLI_BUILT"', build)
+
+        macos = self.text("scripts/macos_test.sh")
+        self.assertNotIn('"$SCRIPT_DIR/build.sh" cli >/dev/null', macos)
+        self.assertNotIn('"$ROOT_DIR/scripts/build.sh" cli >>"$log"', macos)
+        self.assertGreaterEqual(macos.count('build.sh" cli-optimized'), 5)
+
+        publisher = self.text("scripts/publish_benchmark_history.py")
+        for token in (
+            "validated_macos_cli_optimization",
+            '"producer": "scripts/build.sh cli-optimized"',
+            '"optimization": "O"',
+            'provenance.get("executableSHA256") != digest_file(resolved)',
+        ):
+            self.assertIn(token, publisher)
+
     def test_macos_lanes_are_arm64_only(self) -> None:
         for relative in (
             "scripts/build.sh",

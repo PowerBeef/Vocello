@@ -25,6 +25,8 @@ App Store release require a validated iOS promotion manifest.
 
 - the tag commit, clean release source identity, exact `release-evidence.json` bytes, version, and build;
 - the evidence-impact contract and the exact paths changed since the previous release commit;
+- the capability/change matrix for Speed, Quality, Studio modes, multilingual output, delivery
+  evaluation, and model lifecycle, including dimensions the current evidence does not support;
 - the required platform lanes, record or receipt digests, and explicitly accepted warnings;
 - benchmark hardware profile, OS, toolchain, executable hashes, and Mach-O UUIDs already validated
   by `scripts/benchmark_history.py`.
@@ -34,10 +36,18 @@ the exact tag commit. The manifest never contains a UDID, serial number, persona
 username, hostname, or absolute path. “Device identity” means the checked-in canonical hardware
 profile only.
 
-Every platform requires its canonical 29-take `ui-generation` matrix. Changed engine paths add the
-focused engine lane; memory paths add `memory-qualification`; UI paths add `ui-perf`; and catalog or
-delivery paths add the managed model-download lifecycle. `python3 scripts/evidence_impact.py
+Every platform requires its canonical 29-take Speed `ui-generation` matrix. Capability-sensitive
+changes add the smallest platform-specific set declared by the contract: Quality requires a
+Quality-tier engine record across Custom, Design, and Clone; multilingual changes require every
+declared language cell; delivery changes require delivery cells carrying the governed prosody
+metric; and model-catalog changes require the managed lifecycle receipt. Memory paths add
+`memory-qualification`, and UI paths add `ui-perf`. `python3 scripts/evidence_impact.py
 classify --base <previous-tag>` shows the conditional evidence before capture.
+
+The manifest records `capabilityCoverage` and `unsupportedDimensions`. Unsupported combinations
+such as multilingual Quality/Clone cohorts and independently held-out delivery calibration are
+never silently implied by a successful Speed record. The research and device-evidence roadmap
+items remain the authority for removing those labels.
 
 ## Capture after the candidate is frozen
 

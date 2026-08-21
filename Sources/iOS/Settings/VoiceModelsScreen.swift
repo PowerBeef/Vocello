@@ -26,6 +26,23 @@ struct VoiceModelsScreen: View {
         managedModelBytes > 0 ? "\(IOSSettingsFormatters.fileSize(managedModelBytes)) used" : "No model files"
     }
 
+    private var readyModelCount: Int {
+        TTSModel.all.reduce(into: 0) { count, model in
+            switch effectiveStatus(for: model) {
+            case .installed, .updateAvailable:
+                count += 1
+            case .checking, .notInstalled, .incomplete, .error:
+                break
+            }
+        }
+    }
+
+    private var overviewSubtitle: String {
+        readyModelCount == TTSModel.all.count
+            ? "Every Studio mode is available offline."
+            : "Install a model to enable its Studio mode."
+    }
+
     var body: some View {
         @Bindable var appModel = appModel
 
@@ -44,11 +61,13 @@ struct VoiceModelsScreen: View {
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.horizontal, 4)
 
-                    IOSSettingsSection(title: "Storage") {
+                    IOSSettingsSection(title: "Overview") {
                         IOSSettingsValueRow(
-                            symbol: "internaldrive",
-                            title: "Model storage",
-                            subtitle: "Installed, update-available, and incomplete packages.",
+                            symbol: readyModelCount == TTSModel.all.count
+                                ? "checkmark.circle.fill"
+                                : "internaldrive",
+                            title: "\(readyModelCount) of \(TTSModel.all.count) ready",
+                            subtitle: overviewSubtitle,
                             accessibilityIdentifier: "iosSettings_storageRow",
                             value: storageSummary
                         )

@@ -299,11 +299,12 @@ PY
 write_build_provenance() {
     local output="$1" producer="$2" scheme="$3" configuration="$4"
     local destination="$5" architecture="$6" optimization="$7" signing="$8"
-    local derived_data="$9" source_packages="${10}"
+    local derived_data="$9" source_packages="${10}" executable="${11:-}"
     mkdir -p "$(dirname "$output")"
     python3 - "$output" "$ROOT_DIR" "$producer" "$scheme" "$configuration" \
         "$destination" "$architecture" "$optimization" "$signing" \
-        "$derived_data" "$source_packages" <<'PY'
+        "$derived_data" "$source_packages" "$executable" <<'PY'
+import hashlib
 import json
 import os
 import subprocess
@@ -352,6 +353,16 @@ payload = {
     "xcodeVersion": xcode_version,
     "finishedAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
 }
+executable = Path(sys.argv[12]).resolve() if sys.argv[12] else None
+if executable is not None:
+    if root not in executable.parents or not executable.is_file():
+        raise SystemExit(f"build provenance executable is invalid: {executable}")
+    digest = hashlib.sha256()
+    with executable.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    payload["executableRelativePath"] = executable.relative_to(root).as_posix()
+    payload["executableSHA256"] = digest.hexdigest()
 temporary = output.with_name(output.name + f".tmp.{os.getpid()}")
 temporary.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 os.replace(temporary, output)

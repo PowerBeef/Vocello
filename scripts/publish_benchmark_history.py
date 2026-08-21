@@ -269,6 +269,40 @@ def digest_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def validated_macos_cli_optimization(binary: Path | None = None) -> str:
+    """Return the optimization identity only when it is bound to the exact CLI bytes."""
+    resolved = (binary or (ROOT / "build" / "vocello")).resolve()
+    provenance_path = resolved.with_name(resolved.name + ".provenance.json")
+    provenance = load_json(provenance_path)
+    required = {
+        "schemaVersion": 1,
+        "producer": "scripts/build.sh cli-optimized",
+        "status": "passed",
+        "scheme": "VocelloCLI",
+        "configuration": "Release",
+        "architecture": "arm64",
+        "optimization": "O",
+    }
+    mismatches = [
+        key for key, expected in required.items()
+        if provenance.get(key) != expected
+    ]
+    try:
+        relative = resolved.relative_to(ROOT.resolve()).as_posix()
+    except ValueError as error:
+        raise PublicationError("macOS benchmark CLI must remain inside the repository") from error
+    if provenance.get("executableRelativePath") != relative:
+        mismatches.append("executableRelativePath")
+    if provenance.get("executableSHA256") != digest_file(resolved):
+        mismatches.append("executableSHA256")
+    if mismatches:
+        raise PublicationError(
+            "macOS engine benchmark requires a hash-bound optimized CLI build; "
+            f"invalid provenance fields: {', '.join(sorted(set(mismatches)))}"
+        )
+    return "-O"
+
+
 def utc_now() -> str:
     return dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
@@ -1438,6 +1472,10 @@ def engine_command(args: argparse.Namespace, *, kind: str = "engine-generation",
     if not isinstance(fixture_digests, dict):
         raise PublicationError("bench-results fixtureDigests must be an object")
     require_fixture_cross_check(takes, fixture_digests, source="bench-results")
+    optimization = (
+        validated_macos_cli_optimization()
+        if args.platform == "macos" else "-Onone"
+    )
     manifest = record_shell(
         kind=kind, platform=args.platform, run_id=args.run_id,
         label=str(results.get("label") or args.label or args.run_id),
@@ -1467,7 +1505,7 @@ def engine_command(args: argparse.Namespace, *, kind: str = "engine-generation",
             diagnostics=args.diagnostics if args.platform == "ios" else None,
         ),
         executable_paths={"vocello": "build/vocello"} if args.platform == "macos" else {"Vocello": "build/cache/xcode/ios-device/Build/Products/Release-iphoneos/Vocello.app/Vocello"},
-        optimization="-Onone",
+        optimization=optimization,
         classification=(
             "instrumented" if kind == "instrument-profile"
             else "exploratory" if uses_forced_memory_profile(selected)

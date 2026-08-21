@@ -27,7 +27,7 @@ sourceOfTruth:
   `config/orchestration-contract.json`, `config/evidence-impact.json`,
   `config/project-health-contract.json`, `config/release-evidence-contract.json`,
   `config/quality-promotion-contract.json`,
-  and `config/marking-peak-equality.json`
+  `config/benchmark-baseline-migrations.json`, and `config/marking-peak-equality.json`
 - `benchmarks/` schema-v1 compatibility, schema-v2 memory-qualified, and schema-v3
   quality-identity records, generated history, and preserved reference baselines
 - `docs/releases/`
@@ -211,7 +211,11 @@ scripts/clean_build_caches.sh --compact-profile-failure <run-id> --dry-run
 ## Invariants (do not regress)
 
 - **Single shippable config: `Release` only.** There is no `Debug` config or generic `DEBUG` symbol.
-  `build.sh` compiles `-Onone`; `release.sh` compiles optimized.
+  The ordinary app/development CLI route compiles `-Onone`; `release.sh` and the
+  `build.sh cli-optimized` benchmark route compile optimized. macOS engine-performance publication
+  requires the optimized CLI's hash-bound provenance sidecar. Baseline cell renames require a
+  reviewed one-to-one entry in `config/benchmark-baseline-migrations.json`; missing/added cells or
+  metrics otherwise fail closed.
 - **XcodeGen project generation.** `project.yml` is the source of truth; never edit
   `QwenVoice.xcodeproj/project.pbxproj` directly. There are two narrow post-XcodeGen scheme
   renderers: `scripts/generate_cli_scheme.py` for the tool product and

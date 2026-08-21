@@ -120,10 +120,12 @@ row; there is no oversized logo footer.
 
 `iosSettings_voiceModelsRow` pushes `screen_voiceModels`, whose compact
 `iosSettings_voiceModelsBackButton` is the only Settings-specific contextual header. iOS has one
-Speed model for each generation mode. The destination summarizes managed model bytes in
-`iosSettings_storageRow`, then exposes stable install, progress, cancel, ready, repair, retry,
-update, and overflow states. `iosModelStatus_<id>` reads `Ready` when usable; removal lives under
-`iosModelMenu_<id>` as `iosModelDelete_<id>` and retains the named confirmation. Normal smoke and
+Speed model for each generation mode. The destination combines `N of 3 ready` with managed model
+bytes in `iosSettings_storageRow`, then gives every model one non-color-dependent status badge and
+only the lifecycle actions valid for its current state. Install, Update, Repair, Retry, Cancel
+download, and Remove appear directly below the model metadata with 44-point targets; installed and
+update-available models expose `iosModelDelete_<id>` without an overflow-menu discovery step and
+retain the named confirmation. `iosModelStatus_<id>` reads `Ready` when usable. Normal smoke and
 benchmark lanes do not install or delete models; they visibly assert that Custom, Design, and Clone
 Speed are ready before generation.
 

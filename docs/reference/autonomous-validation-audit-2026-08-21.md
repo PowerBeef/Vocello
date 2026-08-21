@@ -2,7 +2,7 @@
 status: historical
 owner: release-qa
 summary: Point-in-time repository-wide audit of Vocello autonomous tests, benchmarks, voice-output analysis, evidence promotion, website validation, and release verification on 2026-08-21.
-contentDigest: sha256:d2f6b05d044e602215f3c436ff3802ff42bfa9b54c07439e38a49bc9b26f8eae
+contentDigest: sha256:89285b8114c1db89bf735a16c83837a6caf6f33d63ea276d58bdbe45dd1921fd
 ---
 # Vocello Autonomous Validation Audit — 2026-08-21
 
@@ -436,8 +436,8 @@ journeys independently repeatable.
 | `./scripts/build_foundation_targets.sh ios` | PASS for app and logic-test bundle on generic iPhoneOS; no Simulator selected or launched |
 | `npm --prefix website run check` | PASS; seven Node tests, rendered contract, client/SSR builds, prerender |
 
-The initial macOS and iPhoneOS sandbox failures were environmental, not source failures:
-`/Users/patricedery/.cache/clang/ModuleCache` and SwiftPM manifest caches were not writable, and the
+The initial macOS and iPhoneOS sandbox failures were environmental, not source failures: the
+user-scoped Clang module cache and SwiftPM manifest caches were not writable, and the
 Xcode runtime service was unavailable inside the sandbox. Approved unsandboxed reruns used the
 existing locked caches and passed. No cache was deleted and no dependency pin changed.
 

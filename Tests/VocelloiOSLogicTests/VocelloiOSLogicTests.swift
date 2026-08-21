@@ -539,6 +539,48 @@ final class VocelloiOSLogicTests: XCTestCase {
         XCTAssertTrue(text.contains("redacted-path"))
     }
 
+    func testModelProgressPresentationUsesExactDurableByteFraction() {
+        let presentation = IOSModelProgressPresentation.transfer(
+            durableBytes: 25,
+            catalogBytes: 100,
+            bytesPerSecond: 5,
+            estimatedSecondsRemaining: 15,
+            formatBytes: { "\($0) B" }
+        )
+
+        XCTAssertEqual(
+            presentation.indicator,
+            .determinate(fraction: 0.25, accessibilityValue: "25% — 25 of 100 bytes")
+        )
+        XCTAssertEqual(presentation.detail, "25% · 25 B of 100 B · 5 B/s · about 15s remaining")
+    }
+
+    func testModelProgressPresentationNeverCountsBytesBeyondCatalogTotal() {
+        let presentation = IOSModelProgressPresentation.transfer(
+            durableBytes: 125,
+            catalogBytes: 100,
+            bytesPerSecond: 20,
+            estimatedSecondsRemaining: 1,
+            formatBytes: { "\($0) B" }
+        )
+
+        XCTAssertEqual(presentation.indicator, .indeterminate)
+        XCTAssertEqual(presentation.detail, "Download complete — finishing setup.")
+    }
+
+    func testModelProgressFinalizationPhasesAreIndeterminate() {
+        XCTAssertEqual(IOSModelProgressPresentation.verification.indicator, .indeterminate)
+        XCTAssertEqual(
+            IOSModelProgressPresentation.verification.detail,
+            "Checking downloaded files."
+        )
+        XCTAssertEqual(IOSModelProgressPresentation.installation.indicator, .indeterminate)
+        XCTAssertEqual(
+            IOSModelProgressPresentation.installation.detail,
+            "Making the model available offline."
+        )
+    }
+
     private func snapshot(headroom: UInt64, footprint: UInt64) -> IOSMemorySnapshot {
         IOSMemorySnapshot(
             processRole: .app,

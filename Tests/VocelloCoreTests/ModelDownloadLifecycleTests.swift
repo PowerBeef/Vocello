@@ -3,6 +3,37 @@ import Foundation
 import XCTest
 
 final class ModelDownloadLifecycleTests: XCTestCase {
+    private var ledgerVerifiedFile: IOSModelDownloadLedger.VerifiedFile {
+        .init(
+            relativePath: "weights/model.safetensors",
+            expectedSize: 42,
+            sha256: String(repeating: "b", count: 64)
+        )
+    }
+
+    private func ledgerRequest(
+        logicalRequestID: String,
+        artifactVersion: String = "v1",
+        status: IOSModelDownloadLedger.Status,
+        receivedBytes: Int64,
+        verifiedFiles: [IOSModelDownloadLedger.VerifiedFile]
+    ) -> IOSModelDownloadLedger.Request {
+        .init(
+            logicalRequestID: logicalRequestID,
+            modelID: "model-a",
+            artifactVersion: artifactVersion,
+            repo: "org/model",
+            revision: String(repeating: "a", count: 40),
+            targetFolder: "model-a",
+            expectedFiles: ["weights/model.safetensors"],
+            verifiedFiles: verifiedFiles,
+            retryCount: 0,
+            receivedBytes: receivedBytes,
+            totalBytes: 42,
+            status: status
+        )
+    }
+
     private actor EventRecorder {
         private var values: [String] = []
 
@@ -180,6 +211,73 @@ final class ModelDownloadLifecycleTests: XCTestCase {
             ModelDownloadProgressReconciler.visibleBytes(current: 120, persisted: 40, total: 100),
             100
         )
+    }
+
+    func testExplicitInstallStartsFreshAfterTerminalTombstone() {
+        let replacement = ledgerRequest(
+            logicalRequestID: "new-request",
+            status: .queued,
+            receivedBytes: 0,
+            verifiedFiles: []
+        )
+
+        for status in [
+            IOSModelDownloadLedger.Status.cancelRequested,
+            .installed,
+            .deleted,
+        ] {
+            let terminal = ledgerRequest(
+                logicalRequestID: "old-request",
+                status: status,
+                receivedBytes: 42,
+                verifiedFiles: [ledgerVerifiedFile]
+            )
+            XCTAssertEqual(
+                terminal.queuedForExplicitInstall(replacing: replacement),
+                replacement,
+                "\(status) must not carry terminal bytes into a fresh install"
+            )
+        }
+    }
+
+    func testExplicitRetryPreservesSameArtifactResumeEvidence() {
+        let failed = ledgerRequest(
+            logicalRequestID: "retained-request",
+            status: .failed,
+            receivedBytes: 21,
+            verifiedFiles: [ledgerVerifiedFile]
+        )
+        let replacement = ledgerRequest(
+            logicalRequestID: "new-request",
+            status: .queued,
+            receivedBytes: 0,
+            verifiedFiles: []
+        )
+
+        let resumed = failed.queuedForExplicitInstall(replacing: replacement)
+        XCTAssertEqual(resumed.logicalRequestID, "retained-request")
+        XCTAssertEqual(resumed.status, .queued)
+        XCTAssertEqual(resumed.receivedBytes, 21)
+        XCTAssertEqual(resumed.verifiedFiles, [ledgerVerifiedFile])
+    }
+
+    func testExplicitRetryRejectsResumeEvidenceFromAnotherArtifact() {
+        let failed = ledgerRequest(
+            logicalRequestID: "retained-request",
+            artifactVersion: "v1",
+            status: .failed,
+            receivedBytes: 21,
+            verifiedFiles: [ledgerVerifiedFile]
+        )
+        let replacement = ledgerRequest(
+            logicalRequestID: "new-request",
+            artifactVersion: "v2",
+            status: .queued,
+            receivedBytes: 0,
+            verifiedFiles: []
+        )
+
+        XCTAssertEqual(failed.queuedForExplicitInstall(replacing: replacement), replacement)
     }
 
     func testDelegateProgressGateBoundsIngressAndAlwaysForwardsTerminalBytes() {
@@ -583,6 +681,71 @@ final class ModelDownloadLifecycleTests: XCTestCase {
         let payload = try files.map { try String(contentsOf: $0, encoding: .utf8) }.joined()
         XCTAssertFalse(payload.contains("example.invalid"))
         XCTAssertFalse(payload.contains("/Users/example"))
+    }
+
+    func testModelManagementTraceIsCorrelatedOrderedAndRedacted() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = ModelDownloadDiagnosticsStore(
+            directory: root,
+            diagnosticTraceRunID: "ios-run-1"
+        )
+        store.recordEvent(
+            layer: "url-session",
+            event: "task-completed",
+            modelID: "pro_custom",
+            logicalRequestID: "request-1",
+            operationGeneration: 7,
+            artifactVersion: "speed-v1",
+            durableBytes: 42,
+            totalBytes: 100,
+            errorMessage: "failed at https://example.invalid/private in /private/var/mobile/fixture"
+        )
+        store.recordEvent(
+            layer: "ledger",
+            event: "write",
+            modelID: "pro_custom",
+            logicalRequestID: "request-1",
+            operationGeneration: 7,
+            artifactVersion: "speed-v1",
+            durableBytes: 100,
+            totalBytes: 100,
+            ledgerStatus: "verifying"
+        )
+
+        let traceRoot = root.appendingPathComponent("trace", isDirectory: true)
+        let files = try FileManager.default.contentsOfDirectory(
+            at: traceRoot,
+            includingPropertiesForKeys: nil
+        ).sorted { $0.lastPathComponent < $1.lastPathComponent }
+        XCTAssertEqual(files.count, 2)
+        let rows = try files.map {
+            try JSONDecoder().decode(
+                ModelDownloadDiagnosticsStore.DeliveryEvent.self,
+                from: Data(contentsOf: $0)
+            )
+        }
+        XCTAssertEqual(rows.map(\.runID), ["ios-run-1", "ios-run-1"])
+        XCTAssertEqual(rows.map(\.sequence), [1, 2])
+        XCTAssertEqual(Set(rows.map(\.processInstanceID)).count, 1)
+        XCTAssertEqual(rows.last?.ledgerStatus, "verifying")
+        XCTAssertFalse(rows.first?.errorMessage?.contains("example.invalid") ?? true)
+        XCTAssertFalse(rows.first?.errorMessage?.contains("/private/var") ?? true)
+    }
+
+    func testModelManagementTraceRetentionCoversOneWorstCaseTransferAndStaysBounded() {
+        let oneHourLedgerWrites = 60 * 60 * 2
+        let oneHourHeartbeats = 60 * 60 / 5
+        XCTAssertGreaterThanOrEqual(
+            ModelDownloadDiagnosticsStore.maxRetainedTraceEvents,
+            oneHourLedgerWrites + oneHourHeartbeats
+        )
+        XCTAssertGreaterThan(ModelDownloadDiagnosticsStore.maxRetainedTraceBytes, 0)
+        XCTAssertLessThanOrEqual(
+            ModelDownloadDiagnosticsStore.maxRetainedTraceBytes,
+            40 * 1_024 * 1_024
+        )
     }
 
     func testDiagnosticsSummarizePhaseTimingWireBytesAndFinalIntegrity() throws {

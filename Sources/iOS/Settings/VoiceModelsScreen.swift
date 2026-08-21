@@ -37,12 +37,6 @@ struct VoiceModelsScreen: View {
         }
     }
 
-    private var overviewSubtitle: String {
-        readyModelCount == TTSModel.all.count
-            ? "Every Studio mode is available offline."
-            : "Install a model to enable its Studio mode."
-    }
-
     var body: some View {
         @Bindable var appModel = appModel
 
@@ -52,7 +46,7 @@ struct VoiceModelsScreen: View {
             tint: IOSAppTab.settings.dockAccent(studioMode: .custom)
         ) {
             IOSScrollView {
-                VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
+                VStack(alignment: .leading, spacing: Theme.Spacing.md) {
                     compactHeader
 
                     Text("One private, on-device model powers each Studio mode. Install only the modes you use.")
@@ -67,7 +61,7 @@ struct VoiceModelsScreen: View {
                                 ? "checkmark.circle.fill"
                                 : "internaldrive",
                             title: "\(readyModelCount) of \(TTSModel.all.count) ready",
-                            subtitle: overviewSubtitle,
+                            subtitle: nil,
                             accessibilityIdentifier: "iosSettings_storageRow",
                             value: storageSummary
                         )

@@ -465,6 +465,7 @@ targets:
       - path: Tests/VocelloiOSLogicTests
       - path: Sources/iOSSupport/Services/AppPaths.swift
       - path: Sources/iOSSupport/Services/IOSModelDeliverySupport.swift
+      - path: Sources/iOSSupport/Services/IOSModelProgressPresentation.swift
       - path: Sources/iOSSupport/Services/RuntimeReleaseCoordinator.swift
     dependencies:
       - target: QwenVoiceCore

@@ -109,6 +109,7 @@
       "include": [
         "Sources/QwenVoiceCore/HuggingFaceDownloader.swift",
         "Sources/QwenVoiceCore/IOSModelDownloadLedger.swift",
+        "Sources/QwenVoiceCore/ModelDownloadDiagnosticsStore.swift",
         "Sources/QwenVoiceCore/ModelDownloadContracts.swift",
         "Sources/QwenVoiceCore/ProductionModelCatalog.swift",
         "Sources/Models/TTSContract.swift",
@@ -117,7 +118,10 @@
         "Sources/Resources/qwenvoice_ios_model_catalog.json",
         "Sources/Resources/qwenvoice_production_model_catalog.json",
         "Sources/iOS/IOSModelDownloadCoordinator.swift",
+        "Sources/iOS/IOSModelInstallerViewModel.swift",
+        "Sources/iOS/IOSSettingsViews.swift",
         "Sources/iOSSupport/Services/IOSModelDeliverySupport.swift",
+        "Sources/iOSSupport/Services/IOSModelProgressPresentation.swift",
         "Sources/ViewModels/ModelManagerViewModel.swift",
         "Sources/VocelloCLI/CLIRuntime.swift",
         "Sources/VocelloCLI/ModelsCommand.swift",
@@ -126,9 +130,12 @@
         "config/model-catalog-schema-v1.json",
         "config/model-catalog-schema-v2.json",
         "config/model-artifact-receipts.json",
+        "config/model-management-diagnostics-schema-v1.json",
         "scripts/check_ios_catalog.sh",
+        "scripts/check_ios_model_management.py",
         "scripts/model_catalog_contract.py",
-        "scripts/tests/test_model_catalog_contract.py"
+        "scripts/tests/test_model_catalog_contract.py",
+        "scripts/tests/test_check_ios_model_management.py"
       ],
       "mergeRequiredEvidence": [
         "project-inputs",

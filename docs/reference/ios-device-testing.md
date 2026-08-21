@@ -6,6 +6,7 @@ sourceOfTruth:
   - scripts/ios_device.sh
   - scripts/ui_test.sh
   - scripts/check_ios_ui_perf.py
+  - scripts/check_ios_model_management.py
 ---
 # iOS physical-device testing
 
@@ -76,8 +77,12 @@ scripts/ui_test.sh ios benchmark --modes custom --lengths short --warm 1 --label
 # UI-performance frame-health lane (ios-ui-2026-08):
 scripts/ui_test.sh ios perf [--label RUN_ID]
 
-# Explicit isolated background-transfer lifecycle proof, not a normal UI lane:
-scripts/ui_test.sh ios model-download
+# Explicit isolated background-transfer diagnostics, not a normal UI lane:
+scripts/ui_test.sh ios model-download --scenario diagnose
+scripts/ui_test.sh ios model-download --scenario queue
+scripts/ui_test.sh ios model-download --scenario acceptance
+scripts/ui_test.sh ios model-download --scenario soak --iterations 3
+scripts/ui_test.sh ios model-download --scenario recover
 ```
 
 The iPhone matrix keeps the shared short/medium/long ordering; its long script is the historical
@@ -89,7 +94,7 @@ the extended >220-character long corpus; the iPhone lane never bypasses the user
 | --- | --- |
 | Smoke | Two journeys. Standard: exact app launch, Studio mode and tab navigation, visible model and clone-reference readiness, one visible user cancellation, one run-scoped critical-memory cancellation with cancel-before-unload diagnostics, post-pressure engine reuse, no cancelled History rows, and one real completed Custom History row. Long-form: a >2,000-character script routes to a project, streams every segment with live narration, surfaces the joined output in the inline player, and History shows search-flattened rows plus the grouped project with its expandable per-segment map |
 | Benchmark | Ordered, configurable Studio matrix with pulled telemetry, readable audio, audio QC, thermal and timing evidence; the default is exactly 29 takes |
-| Model delivery | Isolated three-artifact lifecycle (Custom full-wire ~1.7 GB, then Design and Clone with shared-component reuse); background/process relaunch adoption, monotonic progress, integrity, wire-byte and throughput-floor validation, and visible cleanup |
+| Model delivery | Fixed test-owned root normalized through visible state-appropriate controls. `diagnose` covers Custom cancel/restart/process adoption/Ready/remove; `queue` proves independent active/queued cancellation; `acceptance` adds Design/Clone shared-component reuse and all-model removal; `soak` repeats the lifecycle; `recover` inspects and visibly clears retained failure state without starting a transfer. Every transfer records exact logical bytes, milestone row/bar screenshots, phase activity, action exclusivity, five-minute advancement bounds, correlated delivery events, and exact canonical-state preservation |
 | Perf | Nine frame-health scenarios (`Tests/VocelloiOSUITests/VocelloiOSPerfUITests.swift`), each a fresh app launch with the in-app `CADisplayLink` probe pinned to the app's 60 Hz cap and one marked wall-clock window; `scripts/check_ios_ui_perf.py` joins windows to the pulled 500 ms probe rows |
 
 Every lane uses the paired physical-device destination. Tests use stable accessibility identifiers,
@@ -98,6 +103,15 @@ OCR taps, alternate UI drivers, and fixed sleeps are not supported — the perf 
 one recorded exemption (`scripts/check_test_workflows.sh`): its paced sleeps ARE the measured
 workload, and its sweep gestures anchor on the application root so deep per-event accessibility
 re-queries stay out of the measured windows.
+
+The model-delivery runner always exports the `.xcresult`, attachments, diagnostics journal,
+delivery summaries, ledger copy, sanitized storage inventories, crash delta, and host diagnosis even
+when XCTest fails. Determinate bar observations include raw and total bytes, expected and
+accessibility fractions, visible copy, status, phase, action set, frames, and screenshot names.
+`scripts/check_ios_model_management.py` identifies the first inconsistent layer and emits a timeline,
+machine-readable diagnosis/summary, visual measurements, and a milestone contact sheet. A failed
+isolated root remains available to the next `diagnose` or `recover` run; ordinary app data and
+canonical model state are never used as the test root.
 
 The smoke runner pulls its exact diagnostics and fails unless the one-shot event sequence is
 `debug_force_critical_once` → `critical_memory_action` → typed `memory_pressure` cancellation →

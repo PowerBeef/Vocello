@@ -177,8 +177,12 @@ final class ModelDownloadChunkSchedulingTests: XCTestCase {
         // per-worker session strategy produces).
         let keys = [7, 1_000_000_007]
         var completions: [Task<Void, Never>] = []
-        for key in keys {
+        for (index, key) in keys.enumerated() {
             let dummy = makeDummyTask(session: session)
+            dummy.taskDescription = chunkIdentity(
+                start: index == 0 ? 0 : 500,
+                end: index == 0 ? 499 : 999
+            ).encodedTaskDescription
             let completion = Task {
                 _ = try? await withCheckedThrowingContinuation { (continuation: CheckedContinuation<HuggingFaceDownloader.DownloadedTemporaryFile, Error>) in
                     Task {
@@ -223,6 +227,66 @@ final class ModelDownloadChunkSchedulingTests: XCTestCase {
             await registry.resumeFailure(taskID: key, error: HuggingFaceDownloader.DownloadError.cancelled)
         }
         for completion in completions { await completion.value }
+    }
+
+    func testReplacementTaskForSameRangeCannotDoubleCountLogicalBytes() async throws {
+        let sink = ProgressSink()
+        let registry = HuggingFaceDownloader.DownloadStateRegistry(
+            repositoryProgressHandler: HuggingFaceDownloader.RepositoryProgressHandlerBox { sink.append($0) }
+        )
+        let session = URLSession(configuration: .ephemeral)
+        defer { session.invalidateAndCancel() }
+        await registry.beginRepositoryDownload(totalBytes: 1_000, totalFiles: 1)
+        let identity = chunkIdentity(start: 0, end: 499)
+
+        func register(taskID: Int) async -> Task<Void, Never> {
+            let task = makeDummyTask(session: session)
+            task.taskDescription = identity.encodedTaskDescription
+            let registered = XCTestExpectation(description: "logical replacement task \(taskID) registered")
+            let completion = Task {
+                _ = try? await withCheckedThrowingContinuation {
+                    (continuation: CheckedContinuation<HuggingFaceDownloader.DownloadedTemporaryFile, Error>) in
+                    Task {
+                        _ = await registry.register(
+                            taskKey: taskID,
+                            task: task,
+                            destination: URL(string: "https://chunk-tests.invalid/blob")!,
+                            continuation: continuation,
+                            resumeDataURL: nil,
+                            fileIndex: 0
+                        )
+                        registered.fulfill()
+                    }
+                }
+            }
+            await fulfillment(of: [registered], timeout: 1)
+            return completion
+        }
+
+        let firstCompletion = await register(taskID: 71)
+        // The registry intentionally coalesces UI progress publications to 4 Hz. Wait
+        // past that production throttle before each assertion so this test observes a
+        // newly published snapshot rather than the initial zero-byte snapshot.
+        try await Task.sleep(for: .milliseconds(300))
+        await registry.reportProgress(taskID: 71, totalBytesWritten: 300)
+        XCTAssertEqual(try XCTUnwrap(sink.last).downloadedBytes, 300)
+        await registry.resumeFailure(taskID: 71, error: HuggingFaceDownloader.DownloadError.cancelled)
+        await firstCompletion.value
+
+        let replacementCompletion = await register(taskID: 72)
+        try await Task.sleep(for: .milliseconds(300))
+        await registry.reportProgress(taskID: 72, totalBytesWritten: 100)
+        XCTAssertEqual(
+            try XCTUnwrap(sink.last).downloadedBytes,
+            300,
+            "replacement callbacks below the durable logical slot must not add duplicate bytes"
+        )
+        try await Task.sleep(for: .milliseconds(300))
+        await registry.reportProgress(taskID: 72, totalBytesWritten: 400)
+        XCTAssertEqual(try XCTUnwrap(sink.last).downloadedBytes, 400)
+
+        await registry.resumeFailure(taskID: 72, error: HuggingFaceDownloader.DownloadError.cancelled)
+        await replacementCompletion.value
     }
 
     func testSkippedFilesAndResumedPartialsNeverInflateMeasuredSpeed() async throws {

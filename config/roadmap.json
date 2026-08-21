@@ -59,7 +59,7 @@
     {
       "id": "model-delivery-2026-08",
       "title": "Model download throughput",
-      "status": "complete",
+      "status": "active",
       "owner": "release-qa",
       "adopted": "2026-08-08",
       "goal": "Fix the maintainer-reported download crawl (Hugging Face's CDN shapes throughput per connection, so single-stream multi-gigabyte files always decay) with chunked parallel byte-range transfers, gated by the model-delivery tuning policy's controlled-comparison requirement; extend to iOS only after the background-session identity work and a device A/B.",
@@ -1156,6 +1156,34 @@
         "file:docs/reference/model-delivery.md",
         "commit:ce687f5",
         "commit:5e6a9a0"
+      ]
+    },
+    {
+      "id": "MD-3",
+      "plan": "model-delivery-2026-08",
+      "title": "P1 — fix iOS model-management progress and adopted finalization",
+      "status": "planned",
+      "gate": "An explicit install after Delete/Cancel must begin a new zero-byte logical request rather than reusing terminal ledger counters. An isolated physical-iPhone Custom transfer that is cancelled, restarted, backgrounded, process-terminated, and adopted after relaunch must transition from Downloading to Ready after authenticated publication rather than remaining indefinitely with logical bytes equal to the catalog total. The deterministic regression must cover terminal-ledger replacement, retryable resume preservation, adopted background-task retry/finalization with every catalog identity and byte complete, prove the large payload is durably published before Ready, and fail on a non-terminal ledger. Determinate UI progress must equal unique durable logical catalog bytes without retry duplication; transfer completion, verification, and installation are indeterminate until Ready. Required closure evidence: two consecutive `scripts/ui_test.sh ios model-download --scenario diagnose` passes followed by one `--scenario acceptance` pass covering Design/Clone shared-component installs, visible removal of all three isolated models, quantitative row/bar checkpoints within five percentage points and 3:1 contrast, exact canonical-state preservation, no leaked tasks or crashes, and no weakening of fail-closed cancellation or integrity policies.",
+      "sourceOfTruth": [
+        "Sources/QwenVoiceCore/HuggingFaceDownloader.swift",
+        "Sources/QwenVoiceCore/IOSModelDownloadLedger.swift",
+        "Sources/QwenVoiceCore/ModelDownloadDiagnosticsStore.swift",
+        "Sources/iOS/IOSModelDownloadCoordinator.swift",
+        "Sources/iOS/IOSSettingsViews.swift",
+        "Sources/iOSSupport/Services/IOSModelProgressPresentation.swift",
+        "Tests/VocelloCoreTests/ModelDownloadChunkSchedulingTests.swift",
+        "Tests/VocelloiOSUITests/VocelloiOSModelDownloadUITests.swift",
+        "scripts/check_ios_model_management.py",
+        "config/model-management-diagnostics-schema-v1.json",
+        "docs/reference/model-delivery.md"
+      ],
+      "updated": "2026-08-21",
+      "notes": "Opened from live physical-device runs ios-xcui-model-download-20260821-154031-2a32aa4c and ios-xcui-model-download-20260821-161217-41fab182. Both reached adopted Custom logical completion without Ready; read-only container evidence from the first run showed a downloading ledger with retryCount 1, receivedBytes equal to the 1,708,583,689-byte total, all 14 identities verified, and the 1.33 GB payload absent from staging. The second run proved the five-minute watchdog, visible isolated cleanup, and exact canonical Ready-state preservation before failing. On 2026-08-21 a correlated diagnostic harness was implemented: stable logical-slot byte accounting, exact determinate transfer plus indeterminate finalization UI, schema-v1 cross-process event journal, five scenarios, milestone screenshots, quantitative visual analysis, unconditional failure forensics, and first-divergence host reports. Its first physical-device diagnose run (ios-xcui-model-download-20260821-184903-1b372030) captured 786 events and isolated an earlier coordinator defect: a fresh request recorded zero bytes but its queued snapshot reused a deleted terminal ledger's full 1,708,583,689 bytes. Transfer, verification, publication, installed ledger, and installed snapshots later completed; the old test emitted no UI observation before timing out. Terminal explicit installs now replace the request while interrupted/failed retries preserve resume evidence; failure paths capture state and use the 300-second policy bound. Host replay correctly reports queued-ledger-progress-mismatch plus the evidence gap. This checkpoint does not close MD-3; the required post-fix physical-device pass sequence remains pending.",
+      "evidence": [
+        "doc:docs/development-progress.md",
+        "file:Tests/VocelloiOSUITests/VocelloiOSModelDownloadUITests.swift",
+        "file:scripts/check_ios_model_management.py",
+        "file:docs/reference/model-delivery.md"
       ]
     },
     {

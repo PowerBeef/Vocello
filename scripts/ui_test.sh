@@ -41,7 +41,7 @@ Usage:
   scripts/ui_test.sh ios benchmark [--modes custom,design,clone] [--lengths short,medium,long] [--warm 3] [--label RUN_ID]
   scripts/ui_test.sh ios perf [--label RUN_ID]
   scripts/ui_test.sh ios delivery-cohort --text SCRIPT [--takes 20] [--label RUN_ID]
-  scripts/ui_test.sh ios model-download [--engine-profile legacy|chunked|chunked-multisession]
+  scripts/ui_test.sh ios model-download [--scenario diagnose|queue|acceptance|soak|recover] [--iterations 3] [--engine-profile legacy|chunked|chunked-multisession]
   scripts/ui_test.sh ios enroll-clone-fixture
   scripts/ui_test.sh ios saved-voice-lifecycle
 
@@ -82,8 +82,14 @@ perf_run_started_epoch_ms=0
 cohort_takes=20
 cohort_text=""
 engine_profile=""
+model_scenario="acceptance"
+model_iterations=3
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --scenario) model_scenario="${2:?--scenario requires a value}"; shift 2 ;;
+    --scenario=*) model_scenario="${1#*=}"; shift ;;
+    --iterations) model_iterations="${2:?--iterations requires a value}"; shift 2 ;;
+    --iterations=*) model_iterations="${1#*=}"; shift ;;
     --engine-profile) engine_profile="${2:?--engine-profile requires a value}"; shift 2 ;;
     --engine-profile=*) engine_profile="${1#*=}"; shift ;;
     --modes) modes="${2:?--modes requires a value}"; shift 2 ;;
@@ -119,6 +125,17 @@ if [[ -n "$engine_profile" ]]; then
   [[ "$lane" == "model-download" ]] || die "--engine-profile is accepted only by the model-download lane"
   [[ "$engine_profile" == "legacy" || "$engine_profile" == "chunked" || "$engine_profile" == "chunked-multisession" ]] \
     || die "--engine-profile must be legacy, chunked, or chunked-multisession"
+fi
+if [[ "$model_scenario" != "acceptance" || "$model_iterations" != 3 ]]; then
+  [[ "$lane" == "model-download" ]] || die "--scenario and --iterations are accepted only by the model-download lane"
+fi
+if [[ "$lane" == "model-download" ]]; then
+  [[ "$model_scenario" == "diagnose" || "$model_scenario" == "queue" || "$model_scenario" == "acceptance" || "$model_scenario" == "soak" || "$model_scenario" == "recover" ]] \
+    || die "--scenario must be diagnose, queue, acceptance, soak, or recover"
+  [[ "$model_iterations" =~ ^[1-9][0-9]*$ ]] && (( model_iterations <= 20 )) \
+    || die "--iterations must be an integer between 1 and 20"
+  [[ "$model_scenario" == "soak" || "$model_iterations" == 3 ]] \
+    || die "--iterations applies only to the soak scenario"
 fi
 if [[ "$lane" == "delivery-cohort" ]]; then
   [[ "$cohort_takes" =~ ^[0-9]+$ ]] && (( cohort_takes >= 1 && cohort_takes <= 60 )) \
@@ -459,11 +476,12 @@ pull_ios_model_download_diagnostics() {
     --source "Library/Application Support/Q-Voice/model-download-acceptance/diagnostics/model-downloads" \
     --destination "$destination" >"$out/model-download-diagnostics-pull.log" 2>&1 \
     || return 1
-  python3 - "$destination" "$ROOT_DIR/Sources/Resources/qwenvoice_production_model_catalog.json" <<'PY'
+  python3 - "$destination" "$ROOT_DIR/Sources/Resources/qwenvoice_production_model_catalog.json" "$model_scenario" <<'PY'
 import json, os, pathlib, sys
 
 root = pathlib.Path(sys.argv[1])
 catalog = json.loads(pathlib.Path(sys.argv[2]).read_text(encoding="utf-8"))
+scenario = sys.argv[3]
 shared_component_bytes = sum(
     file.get("byteCount", 0)
     for component in catalog.get("sharedComponents", [])
@@ -480,6 +498,8 @@ if not files or len(files) > 200:
 if sum(path.stat().st_size for path in files) > 5 * 1024 * 1024:
     raise SystemExit("model-download diagnostics exceed the 5 MiB retention contract")
 records = [json.loads(path.read_text(encoding="utf-8")) for path in files]
+if scenario != "acceptance":
+    raise SystemExit(0)
 successes = sorted(
     (
         record for record in records
@@ -612,6 +632,13 @@ summary = {
     encoding="utf-8",
 )
 PY
+
+  mkdir -p "$destination/forensics"
+  xcrun devicectl device copy from --device "$device" \
+    --domain-type appDataContainer --domain-identifier "$BUNDLE_ID_IOS" \
+    --source "Library/Application Support/Q-Voice/model-download-acceptance/downloads/ios_model_delivery_state.json" \
+    --destination "$destination/forensics" \
+    >>"$out/model-download-diagnostics-pull.log" 2>&1 || true
 }
 
 # Combine the smoke journey's wall-clock line with the newest long-form v4
@@ -1063,7 +1090,10 @@ else
   elif [[ "$lane" == "saved-voice-lifecycle" ]]; then
     only_test="VocelloiOSUITests/VocelloiOSSavedVoiceLifecycleUITests/testImportPreviewHandoffAndDeleteSavedVoice"
   else
-    only_test="VocelloiOSUITests/VocelloiOSModelDownloadUITests/testIsolatedBackgroundDownloadAdoptionAndCleanup"
+    only_test="VocelloiOSUITests/VocelloiOSModelDownloadUITests/testConfiguredModelManagementScenario"
+    export TEST_RUNNER_QVOICE_IOS_MODEL_MANAGEMENT_RUN_ID="$run_id"
+    export TEST_RUNNER_QVOICE_IOS_MODEL_MANAGEMENT_SCENARIO="$model_scenario"
+    export TEST_RUNNER_QVOICE_IOS_MODEL_MANAGEMENT_ITERATIONS="$model_iterations"
     # A/B arm selection for the MD-2 device comparison: forwarded to the test
     # runner, which passes it into the app as the registered
     # QVOICE_DOWNLOAD_ENGINE_PROFILE debug knob (inert without QWENVOICE_DEBUG,
@@ -1074,29 +1104,55 @@ else
   fi
 
   note "physical-iPhone XCUITest $lane on $device → $out"
-  required_step_run "$step_ledger" xcuitest run_xcodebuild xcb_run test \
-    -project "$PROJECT" -scheme VocelloiOSUI -configuration Release \
-    -destination "id=$device" -derivedDataPath "$IOS_DERIVED" \
-    -clonedSourcePackagesDirPath "$QVOICE_XCODE_SOURCE_PACKAGES" \
-    -disableAutomaticPackageResolution \
-    -onlyUsePackageVersionsFromResolvedFile \
-    -resultBundlePath "$result" -collect-test-diagnostics never \
-    -only-testing:"$only_test" \
-    -allowProvisioningUpdates DEVELOPMENT_TEAM="$team" CODE_SIGN_STYLE=Automatic \
-    ARCHS=arm64 ONLY_ACTIVE_ARCH=YES \
-    SWIFT_OPTIMIZATION_LEVEL=-O \
-    || die "physical-iPhone XCUITest failed (see $out/xcodebuild.log)"
-  preserve_ios_ui_dsym \
-    || die "physical-iPhone XCUITest passed, but its current dSYM could not be preserved"
-
-  if [[ "$lane" == "model-download" ]]; then
-    required_step_run "$step_ledger" model-download-diagnostics \
-      pull_ios_model_download_diagnostics "$device" "$out/model-download-diagnostics" \
-      || die "could not collect or validate compact model-download diagnostics (see $out/model-download-diagnostics-pull.log)"
+  xcuitest_status=0
+  if ! required_step_run "$step_ledger" xcuitest run_xcodebuild xcb_run test \
+      -project "$PROJECT" -scheme VocelloiOSUI -configuration Release \
+      -destination "id=$device" -derivedDataPath "$IOS_DERIVED" \
+      -clonedSourcePackagesDirPath "$QVOICE_XCODE_SOURCE_PACKAGES" \
+      -disableAutomaticPackageResolution \
+      -onlyUsePackageVersionsFromResolvedFile \
+      -resultBundlePath "$result" -collect-test-diagnostics never \
+      -only-testing:"$only_test" \
+      -allowProvisioningUpdates DEVELOPMENT_TEAM="$team" CODE_SIGN_STYLE=Automatic \
+      ARCHS=arm64 ONLY_ACTIVE_ARCH=YES \
+      SWIFT_OPTIMIZATION_LEVEL=-O; then
+    xcuitest_status=1
+    warn "physical-iPhone XCUITest failed; collecting forensics before returning failure"
+  fi
+  dsym_status=0
+  if ! preserve_ios_ui_dsym; then
+    dsym_status=1
+    warn "the physical-iPhone XCUITest dSYM could not be preserved"
   fi
 
-  required_step_run "$step_ledger" crash-delta check_ios_crash_delta \
-    || die "could not establish a clean post-run iPhone crash delta"
+  model_diagnostics_status=0
+  if [[ "$lane" == "model-download" ]]; then
+    if ! required_step_run "$step_ledger" model-download-diagnostics \
+        pull_ios_model_download_diagnostics "$device" "$out/model-download-diagnostics"; then
+      model_diagnostics_status=1
+      warn "could not collect complete model-download diagnostics (see $out/model-download-diagnostics-pull.log)"
+    fi
+    if ! python3 "$ROOT_DIR/scripts/check_ios_model_management.py" \
+        --artifact-dir "$out" \
+        --diagnostics "$out/model-download-diagnostics" \
+        --xcodebuild-log "$out/xcodebuild.log" \
+        --attachments "$out/attachments" \
+        --run-id "$run_id" \
+        --scenario "$model_scenario" \
+        >"$out/model-management-validator.log" 2>&1; then
+      model_diagnostics_status=1
+      warn "model-management diagnosis reported incomplete or inconsistent evidence"
+    fi
+  fi
+
+  crash_delta_status=0
+  if ! required_step_run "$step_ledger" crash-delta check_ios_crash_delta; then
+    crash_delta_status=1
+    warn "could not establish a clean post-run iPhone crash delta"
+  fi
+  if (( xcuitest_status != 0 || dsym_status != 0 || model_diagnostics_status != 0 || crash_delta_status != 0 )); then
+    die "physical-iPhone $lane failed; complete available forensics are preserved in $out"
+  fi
   [[ "$lane" != "smoke" ]] || required_step_run "$step_ledger" \
     smoke-diagnostics validate_ios_smoke \
     || die "iOS smoke memory-pressure diagnostics gate failed"

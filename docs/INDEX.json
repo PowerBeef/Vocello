@@ -225,7 +225,7 @@
       "status": "historical",
       "owner": "release-qa",
       "summary": "Point-in-time repository-wide audit of Vocello autonomous tests, benchmarks, voice-output analysis, evidence promotion, website validation, and release verification on 2026-08-21.",
-      "contentDigest": "sha256:d2f6b05d044e602215f3c436ff3802ff42bfa9b54c07439e38a49bc9b26f8eae"
+      "contentDigest": "sha256:89285b8114c1db89bf735a16c83837a6caf6f33d63ea276d58bdbe45dd1921fd"
     },
     {
       "path": "docs/reference/backend-optimization-research-report.md",
@@ -379,7 +379,8 @@
       "sourceOfTruth": [
         "scripts/ios_device.sh",
         "scripts/ui_test.sh",
-        "scripts/check_ios_ui_perf.py"
+        "scripts/check_ios_ui_perf.py",
+        "scripts/check_ios_model_management.py"
       ]
     },
     {

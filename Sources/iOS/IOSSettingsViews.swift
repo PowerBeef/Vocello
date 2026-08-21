@@ -399,6 +399,8 @@ private enum IOSSettingsActionButtonProminence {
 }
 
 private struct IOSSettingsActionButtonStyle: ButtonStyle {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
     let tint: Color
     let prominence: IOSSettingsActionButtonProminence
 
@@ -406,8 +408,9 @@ private struct IOSSettingsActionButtonStyle: ButtonStyle {
         configuration.label
             .font(.caption.weight(.semibold))
             .foregroundStyle(foregroundColor)
-            .padding(.horizontal, 12)
+            .padding(.horizontal, 10)
             .frame(minWidth: 44, minHeight: 44)
+            .frame(width: dynamicTypeSize.isAccessibilitySize ? nil : 112)
             .background(backgroundColor(configuration: configuration))
             .clipShape(Capsule(style: .continuous))
             .overlay {
@@ -444,6 +447,38 @@ private struct IOSSettingsActionButtonStyle: ButtonStyle {
     }
 }
 
+/// A fixed-geometry transfer indicator whose rendered fill and accessibility value share the
+/// same exact fraction. The opaque recessed track keeps every mode tint above the diagnostic
+/// lane's 3:1 non-text contrast floor and gives screenshot analysis a stable six-point frame.
+private struct IOSModelTransferProgressBar: View {
+    let fraction: Double
+    let tint: Color
+    let accessibilityLabel: String
+    let accessibilityValue: String
+    let accessibilityIdentifier: String
+
+    var body: some View {
+        GeometryReader { proxy in
+            let clamped = min(max(fraction, 0), 1)
+            let filledWidth = clamped == 0
+                ? 0
+                : min(proxy.size.width, max(proxy.size.height, proxy.size.width * clamped))
+            ZStack(alignment: .leading) {
+                Capsule(style: .continuous)
+                    .fill(Theme.Surface.inline)
+                Capsule(style: .continuous)
+                    .fill(tint)
+                    .frame(width: filledWidth)
+            }
+        }
+        .frame(height: 6)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilityLabel)
+        .accessibilityValue(accessibilityValue)
+        .accessibilityIdentifier(accessibilityIdentifier)
+    }
+}
+
 struct IOSModelRow: View {
     @Environment(AppModel.self) private var appModel
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -456,14 +491,14 @@ struct IOSModelRow: View {
     let onDelete: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 6) {
             header
 
             if showsStatusDetail {
                 statusDetailView.padding(.leading, dynamicTypeSize.isAccessibilitySize ? 0 : 46)
             }
 
-            if hasVisibleActions {
+            if hasVisibleActions, !usesInlineControls {
                 controls
                     .padding(.leading, dynamicTypeSize.isAccessibilitySize ? 0 : 46)
             }
@@ -475,10 +510,10 @@ struct IOSModelRow: View {
     }
 
     private var header: some View {
-        HStack(alignment: .top, spacing: 10) {
+        HStack(alignment: .center, spacing: 10) {
             IOSSettingsIcon(symbol: modelIconName, tint: Theme.Brand.modeColor(model.mode))
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(model.mode.displayName)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(Theme.Text.primary)
@@ -487,24 +522,25 @@ struct IOSModelRow: View {
                     .font(.caption)
                     .foregroundStyle(Theme.Text.secondary)
                     .fixedSize(horizontal: false, vertical: true)
-                Label(statusText, systemImage: statusSymbol)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(statusTint)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 5)
-                    .background(statusTint.opacity(0.10))
-                    .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 9, style: .continuous)
-                            .stroke(statusTint.opacity(0.28), lineWidth: 0.5)
-                    }
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityLabel("\(model.mode.displayName) model status")
-                    .accessibilityValue(statusText)
-                    .accessibilityIdentifier("iosModelStatus_\(model.id)")
+                statusLabel
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+
+            if usesInlineControls {
+                actionControls
+                    .fixedSize(horizontal: true, vertical: false)
+            }
         }
+    }
+
+    private var statusLabel: some View {
+        Label(statusText, systemImage: statusSymbol)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(statusTint)
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityLabel("\(model.mode.displayName) model status")
+            .accessibilityValue(statusText)
+            .accessibilityIdentifier("iosModelStatus_\(model.id)")
     }
 
     private var controls: some View {
@@ -568,10 +604,11 @@ struct IOSModelRow: View {
             )
         case .queued, .waitingForConnectivity, .downloading, .retrying:
             actionButton(
-                "Cancel download",
+                "Cancel",
                 symbol: "xmark",
                 id: "iosModelCancel_\(model.id)",
                 prominence: .secondary,
+                accessibilityTitle: "Cancel download",
                 action: requestCancelOptions
             )
         case .verifying, .installing, .cancelling, .deleting:
@@ -609,17 +646,18 @@ struct IOSModelRow: View {
         symbol: String,
         id: String,
         prominence: IOSSettingsActionButtonProminence = .primary,
+        accessibilityTitle: String? = nil,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
             Label(title, systemImage: symbol)
-                .fixedSize(horizontal: false, vertical: true)
+                .fixedSize(horizontal: !dynamicTypeSize.isAccessibilitySize, vertical: true)
         }
         .buttonStyle(IOSSettingsActionButtonStyle(
             tint: Theme.Brand.modeColor(model.mode),
             prominence: prominence
         ))
-        .accessibilityLabel("\(title) \(model.mode.displayName) model")
+        .accessibilityLabel("\(accessibilityTitle ?? title) \(model.mode.displayName) model")
         .accessibilityIdentifier(id)
     }
 
@@ -636,6 +674,31 @@ struct IOSModelRow: View {
             if case .incomplete = status { return true }
             return false
         }
+    }
+
+    private var visibleActionCount: Int {
+        switch operationState {
+        case .idle:
+            switch status {
+            case .checking: return 0
+            case .updateAvailable, .incomplete: return 2
+            case .installed, .notInstalled, .error: return 1
+            }
+        case .installed, .available, .queued, .waitingForConnectivity,
+             .downloading, .retrying, .failed:
+            return 1
+        case .unavailable:
+            if case .incomplete = status { return 1 }
+            return 0
+        case .verifying, .installing, .cancelling, .deleting:
+            return 0
+        }
+    }
+
+    /// Ordinary text sizes keep the single state-appropriate action beside the model summary.
+    /// Accessibility sizes and the two-action repair/update states retain a vertical reflow.
+    private var usesInlineControls: Bool {
+        !dynamicTypeSize.isAccessibilitySize && visibleActionCount == 1
     }
 
     private func requestInstall() {
@@ -704,13 +767,13 @@ struct IOSModelRow: View {
             }
         case .installed: return "Ready"
         case .available: return "Not Installed"
-        case .queued: return "Downloading · Queued"
-        case .waitingForConnectivity: return "Downloading · Waiting for Network"
-        case .downloading: return "Downloading"
-        case .retrying: return "Downloading · Retrying"
-        case .verifying: return "Downloading · Verifying"
-        case .installing: return "Downloading · Installing"
-        case .cancelling: return "Downloading · Cancelling"
+        case .queued: return "Queued"
+        case .waitingForConnectivity: return "Waiting for Network"
+        case .downloading: return transferIsComplete ? "Finishing" : "Downloading"
+        case .retrying: return transferIsComplete ? "Finishing" : "Retrying"
+        case .verifying: return "Verifying"
+        case .installing: return "Installing"
+        case .cancelling: return "Cancelling"
         case .deleting: return "Removing"
         case .unavailable: return "Repair Needed"
         case .failed: return "Retry Needed"
@@ -766,7 +829,8 @@ struct IOSModelRow: View {
 
     private var showsStatusDetail: Bool {
         switch operationState {
-        case .waitingForConnectivity, .downloading, .retrying, .failed: return true
+        case .waitingForConnectivity, .downloading, .retrying, .verifying, .installing, .failed:
+            return true
         default:
             if case .incomplete = status { return true }
             if case .error = status { return true }
@@ -778,25 +842,32 @@ struct IOSModelRow: View {
     private var statusDetailView: some View {
         switch operationState {
         case .downloading(let progress, let downloaded, let total, let speed, let eta, let message):
-            VStack(alignment: .leading, spacing: 6) {
-                ProgressView(value: progress ?? 0)
-                    .tint(Theme.Brand.modeColor(model.mode))
-                    .accessibilityIdentifier("iosModelProgress_\(model.id)")
-                detailText(progressText(downloaded: downloaded, total: total, speed: speed, eta: eta, suffix: message))
-            }
+            modelProgressPresentation(.transfer(
+                durableBytes: downloaded,
+                catalogBytes: total,
+                bytesPerSecond: speed,
+                estimatedSecondsRemaining: eta,
+                suffix: message,
+                formatBytes: IOSSettingsFormatters.fileSize
+            ))
         case .waitingForConnectivity(let downloaded, let total):
-            detailText(progressText(downloaded: downloaded, total: total, suffix: "Waiting for connectivity"))
+            modelProgressPresentation(.transfer(
+                durableBytes: downloaded,
+                catalogBytes: total,
+                suffix: "Waiting for connectivity",
+                formatBytes: IOSSettingsFormatters.fileSize
+            ))
         case .retrying(let progress, let downloaded, let total, let retryCount, let reason):
-            VStack(alignment: .leading, spacing: 6) {
-                ProgressView(value: progress ?? 0)
-                    .tint(Theme.Brand.modeColor(model.mode))
-                    .accessibilityIdentifier("iosModelProgress_\(model.id)")
-                detailText(progressText(
-                    downloaded: downloaded,
-                    total: total,
-                    suffix: "Retry \(retryCount)\(reason.map { ": \($0)" } ?? "") · verified files will be reused"
-                ))
-            }
+            modelProgressPresentation(.transfer(
+                durableBytes: downloaded,
+                catalogBytes: total,
+                suffix: "Retry \(retryCount)\(reason.map { ": \($0)" } ?? "") · verified files will be reused",
+                formatBytes: IOSSettingsFormatters.fileSize
+            ))
+        case .verifying:
+            modelProgressPresentation(.verification)
+        case .installing:
+            modelProgressPresentation(.installation)
         case .failed(let message):
             detailText(message, color: .red)
         default:
@@ -807,6 +878,40 @@ struct IOSModelRow: View {
         }
     }
 
+    @ViewBuilder
+    private func modelProgressPresentation(_ presentation: IOSModelProgressPresentation) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            switch presentation.indicator {
+            case .determinate(let fraction, let accessibilityValue):
+                IOSModelTransferProgressBar(
+                    fraction: fraction,
+                    tint: Theme.Brand.modeColor(model.mode),
+                    accessibilityLabel: "\(model.mode.displayName) model download progress",
+                    accessibilityValue: accessibilityValue,
+                    accessibilityIdentifier: "iosModelProgress_\(model.id)"
+                )
+            case .indeterminate:
+                ProgressView()
+                    .tint(Theme.Brand.modeColor(model.mode))
+                    .accessibilityLabel("\(model.mode.displayName) model setup in progress")
+                    .accessibilityIdentifier("iosModelPhaseActivity_\(model.id)")
+            }
+            detailText(presentation.detail)
+                .accessibilityIdentifier("iosModelProgressDetail_\(model.id)")
+        }
+    }
+
+    private var transferIsComplete: Bool {
+        switch operationState {
+        case .downloading(_, let downloaded, let total, _, _, _),
+             .retrying(_, let downloaded, let total, _, _):
+            guard let total, total > 0 else { return false }
+            return downloaded >= total
+        default:
+            return false
+        }
+    }
+
     private func detailText(_ text: String, color: Color = Theme.Text.secondary) -> some View {
         Text(text)
             .font(.caption)
@@ -814,22 +919,4 @@ struct IOSModelRow: View {
             .fixedSize(horizontal: false, vertical: true)
     }
 
-    private func progressText(
-        downloaded: Int64,
-        total: Int64?,
-        speed: Int64? = nil,
-        eta: Double? = nil,
-        suffix: String? = nil
-    ) -> String {
-        var details: [String] = []
-        if let total {
-            details.append("\(IOSSettingsFormatters.fileSize(downloaded)) / \(IOSSettingsFormatters.fileSize(total))")
-        } else {
-            details.append("\(IOSSettingsFormatters.fileSize(downloaded)) downloaded")
-        }
-        if let speed, speed > 0 { details.append("\(IOSSettingsFormatters.fileSize(speed))/s") }
-        if let eta, eta.isFinite { details.append("about \(max(1, Int(eta.rounded())))s remaining") }
-        if let suffix, !suffix.isEmpty { details.append(suffix) }
-        return details.joined(separator: " · ")
-    }
 }

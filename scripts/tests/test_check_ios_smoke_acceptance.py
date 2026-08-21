@@ -244,6 +244,22 @@ class IOSSmokeAcceptanceTests(unittest.TestCase):
             'runnerEnvironment["TEST_RUNNER_QVOICE_IOS_SMOKE_RUN_ID"]',
             smoke,
         )
+        model_download = (
+            ROOT / "Tests" / "VocelloiOSUITests" / "VocelloiOSModelDownloadUITests.swift"
+        ).read_text(encoding="utf-8")
+        for name in ["RUN_ID", "SCENARIO", "ITERATIONS"]:
+            self.assertIn(
+                f'export TEST_RUNNER_QVOICE_IOS_MODEL_MANAGEMENT_{name}=',
+                runner,
+            )
+            self.assertIn(
+                f'"QVOICE_IOS_MODEL_MANAGEMENT_{name}"',
+                model_download,
+            )
+            self.assertNotIn(
+                f'ProcessInfo.processInfo.environment["TEST_RUNNER_QVOICE_IOS_MODEL_MANAGEMENT_{name}"]',
+                model_download,
+            )
 
     def test_clone_consent_is_settings_owned_and_visibly_enabled_by_ui_lanes(self) -> None:
         settings = (
@@ -285,6 +301,12 @@ class IOSSmokeAcceptanceTests(unittest.TestCase):
         )
         test_case = (
             ROOT / "Tests" / "VocelloiOSUITests" / "VocelloiOSUITestCase.swift"
+        ).read_text(encoding="utf-8")
+        model_download_test = (
+            ROOT
+            / "Tests"
+            / "VocelloiOSUITests"
+            / "VocelloiOSModelDownloadUITests.swift"
         ).read_text(encoding="utf-8")
 
         section_markers = [
@@ -328,18 +350,30 @@ class IOSSmokeAcceptanceTests(unittest.TestCase):
         for state in [
             'return "Ready"',
             'return "Not Installed"',
-            'return "Downloading"',
             'return "Update Available"',
             'return "Repair Needed"',
             'return "Retry Needed"',
         ]:
             self.assertIn(state, rows)
-        self.assertIn('"Cancel download"', rows)
+        self.assertIn('? "Finishing" : "Downloading"', rows)
+        self.assertIn('"Cancel"', rows)
+        self.assertIn('accessibilityTitle: "Cancel download"', rows)
         self.assertIn('"Remove"', rows)
         self.assertIn('id: "iosModelDelete_\\(model.id)"', rows)
         self.assertIn('.accessibilityIdentifier("iosModelMenu_\\(model.id)")', rows)
         self.assertIn(".frame(minWidth: 44, minHeight: 44)", rows)
-        self.assertIn(".background(statusTint.opacity(0.10))", rows)
+        self.assertIn(
+            ".frame(width: dynamicTypeSize.isAccessibilitySize ? nil : 112)",
+            rows,
+        )
+        self.assertNotIn(".background(statusTint.opacity(0.10))", rows)
+        self.assertIn("visibleActionCount == 1", rows)
+        self.assertNotIn("* 0.90", rows)
+        self.assertNotIn("modelProgressView(value: 0.94)", rows)
+        self.assertNotIn("modelProgressView(value: 0.98)", rows)
+        self.assertIn("IOSModelProgressPresentation", rows)
+        self.assertIn('accessibilityIdentifier("iosModelPhaseActivity_\\(model.id)")', rows)
+        self.assertIn('accessibilityIdentifier("iosModelProgressDetail_\\(model.id)")', rows)
         self.assertNotIn('Image(systemName: "ellipsis.circle")', rows)
 
         self.assertIn('IOSSettingsSection(title: "Overview")', models)
@@ -348,15 +382,38 @@ class IOSSmokeAcceptanceTests(unittest.TestCase):
         self.assertIn("func openVoiceModels()", test_case)
         self.assertIn("func leaveVoiceModels()", test_case)
         self.assertIn('contains: "Ready"', test_case)
+        self.assertIn("resetIsolatedDeliveryForFreshLifecycle()", model_download_test)
+        self.assertIn("cancelDownload(modelID: modelID)", model_download_test)
+        self.assertIn("assertModelActionContract(", model_download_test)
+        self.assertIn('status: "Not Installed"', model_download_test)
+        self.assertIn('status: "Downloading"', model_download_test)
+        self.assertIn('status: "Ready"', model_download_test)
+        self.assertIn('element("iosModelCancelDownloadConfirmButton")', model_download_test)
+        self.assertIn('element("deleteModelSheet_confirm")', model_download_test)
+        self.assertIn("waitForInstalledModel(", model_download_test)
+        self.assertIn("stallTimeout: TimeInterval = 300", model_download_test)
+        self.assertNotIn("currentProgress >= 0.999", model_download_test)
+        self.assertNotIn("progress claimed completion before", model_download_test)
+        self.assertNotIn("restoreCanonicalAfterFailedIsolatedRun", model_download_test)
+        self.assertIn("observeIndeterminatePhase(modelID: modelID)", model_download_test)
+        self.assertIn("runDiagnosticScenario", model_download_test)
+        self.assertIn("runQueueScenario", model_download_test)
+        self.assertIn("runRecoveryScenario", model_download_test)
+        wait_helper = model_download_test[
+            model_download_test.index("private func waitForInstalledModel(") :
+            model_download_test.index("private func modelManagementEnvironment")
+        ]
+        self.assertNotIn("XCTFail", wait_helper)
+        self.assertNotIn("VocelloUIWait.exists(installed, timeout: 3_600)", model_download_test)
 
     def test_successful_ios_ui_build_preserves_matching_symbols(self) -> None:
         runner = (ROOT / "scripts" / "ui_test.sh").read_text(encoding="utf-8")
         test_start = runner.rindex(
             'required_step_run "$step_ledger" xcuitest run_xcodebuild xcb_run test'
         )
-        preserve_index = runner.index("\n  preserve_ios_ui_dsym", test_start)
+        preserve_index = runner.index("\n  if ! preserve_ios_ui_dsym", test_start)
         crash_delta_index = runner.index(
-            "\n  required_step_run \"$step_ledger\" crash-delta",
+            "\n  if ! required_step_run \"$step_ledger\" crash-delta",
             preserve_index,
         )
         self.assertLess(test_start, preserve_index)

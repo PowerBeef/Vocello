@@ -55,6 +55,25 @@ public struct IOSModelDownloadLedger: Codable, Equatable, Sendable {
                 && expectedFiles == other.expectedFiles
         }
 
+        /// Returns the durable request that should back an explicit Install/Retry action.
+        ///
+        /// Interrupted and failed requests retain their logical identity and verified work so
+        /// URLSession restoration can resume them. Terminal tombstones do not: Delete and
+        /// cancellation deliberately retain their final counters for diagnosis, and reusing
+        /// those counters made a subsequent fresh install appear 100% complete before any new
+        /// bytes arrived. An installed ledger whose target has disappeared is likewise a new
+        /// request rather than resumable work.
+        public func queuedForExplicitInstall(replacing replacement: Request) -> Request {
+            guard hasSameArtifactIdentity(as: replacement),
+                  ![.cancelRequested, .installed, .deleted].contains(status) else {
+                return replacement
+            }
+            var resumed = self
+            resumed.status = .queued
+            resumed.totalBytes = replacement.totalBytes
+            return resumed
+        }
+
         public init(
             logicalRequestID: String,
             modelID: String,

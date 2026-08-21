@@ -49,6 +49,33 @@ machine-readable status record and wins over any older prose.
 
 ## Resume here (2026-08-21)
 
+**MD-3 autonomous model-management diagnostics implemented and first live divergence isolated
+(2026-08-21, desk + physical iPhone):** the opt-in physical-iPhone lane now has `diagnose`,
+`queue`, `acceptance`, `soak`, and
+`recover` scenarios over one bounded isolated root. A debug-gated schema-v1 journal correlates
+URLSession adoption and completion parking, logical request and operation generations, verified
+files, staging/ledger/publication state, model-manager refreshes, deletion, and five-second
+heartbeats across app relaunches. Transfer progress now uses stable whole-file/range slots, so a
+replacement task cannot double-count retried bytes; the visible custom bar renders the exact
+logical byte fraction, then switches to honest indeterminate finalization, verification, and
+installation activity. XCUITest captures row and bar milestones, and the host emits a correlated
+timeline, first-divergence diagnosis, quantitative visual measurements, and contact sheet even
+after failure. The first correlated device run,
+`ios-xcui-model-download-20260821-184903-1b372030`, collected 786 cross-layer events and proved the
+first divergence at the coordinator: after visible removal, the new logical request recorded zero
+durable bytes but its first queued snapshot reused the deleted tombstone's complete
+1,708,583,689-byte count. The network transfer, all 14 verifications, atomic publication, installed
+ledger, and installed view-model snapshot subsequently completed; the test nonetheless waited for
+a determinate bar that was correctly absent at the falsely reported 100% and failed to emit a
+structured timeout observation. The fix now starts a new zero-byte logical request after deleted,
+cancel-requested, or installed terminal ledger state while preserving resumable evidence for
+interrupted/failed work. The test uses the specified 300-second no-advance bound, records the row
+before failing, returns immediately to preserve the exact isolated state, and the host no longer
+infers a Ready failure without a post-install UI observation. Mac deterministic tests, generic iOS
+compilation, the full quick gate, and the correlated host replay pass. No second phone run was
+started after the maintainer took the device. MD-3 remains planned; closure still requires two
+consecutive diagnostic passes and one complete three-model acceptance pass.
+
 **Autonomous-validation remediation first pass closed five items (2026-08-21, desk):** AV-01,
 AV-02, AV-03, AV-04, and AV-11 are now done in the roadmap. Python T1/T2 execution is recursive
 and discovery-complete (with a structural zero-test/free-function contract); designated critical
@@ -90,7 +117,7 @@ was changed by the audit.
 
 **Voice Models lifecycle controls made explicit (2026-08-21, desk):** the dedicated model
 destination now leads with an `N of 3 ready` overview beside the managed storage total. Each model
-uses one compact text-and-symbol status badge, then exposes only the actions valid for that state:
+uses one compact text-and-symbol status, then exposes only the actions valid for that state:
 Install, Update plus Remove, Repair plus Remove, Retry, Cancel download, or direct Remove for a
 ready package. Removal no longer requires discovering an ellipsis menu; the visible destructive
 action still opens the existing named confirmation. Controls retain 44-point targets, reflow at
@@ -98,6 +125,42 @@ accessibility sizes, and preserve all lifecycle identifiers and model-operation 
 source contract, model-download XCUITest, iOS app guide, and UI reference were updated together.
 The targeted 16-test Settings contract and generic iPhoneOS app/logic compilation pass on the
 final source.
+
+**Voice Models density and progress truthfulness refined (2026-08-21, desk + paired iPhone):** screenshot review
+showed that the first explicit-action layout still stacked the status and every action vertically,
+and that an adopted transfer could render a full bar while remaining non-terminal. Ordinary text
+sizes now keep a sole state-valid action beside the icon/name/metadata/status summary; only
+two-action and accessibility layouts stack controls. The overview drops its redundant multi-line
+helper, while ordinary-size actions share one 112-point capsule width and retain 44-point hit
+regions. The initial progress refinement reserved symbolic lifecycle fractions below Ready; the
+subsequent MD-3 diagnostic work above supersedes that presentation with exact determinate transfer
+bytes and indeterminate finalization phases. Only `Ready` is terminal, and MD-3 remains open until
+adopted background work publishes the authenticated payload and reaches it.
+The physical-device Settings layout walk passed at Default, AX-L, and AX-XXXL and captured both
+Settings surfaces; its Default Voice Models evidence fits all three rows in one viewport and shows
+logical transfer completion at the staged 90% `Finishing` state. The encompassing smoke run's
+Settings walk and long-form journey passed, while its general journey remained red when the known
+MD-3 adopted Design transfer moved from `Finishing` to `Retry Needed` (`NSURLErrorDomain -999`)
+before a later launch restored all three rows to Ready.
+
+**Redesigned Voice Models device procedure exercised; adoption/finalization stall reproduced
+(2026-08-21, physical iPhone):** the dedicated lane now normalizes stale isolated state through the
+current visible Cancel/Retry/Remove controls, verifies each textual status has exactly its valid
+action, and adds a real cancel-confirm-restart journey before background/process relaunch. Run
+`ios-xcui-model-download-20260821-154031-2a32aa4c` passed navigation, stale Custom removal,
+Not Installed/Install, Downloading/Cancel, cancellation confirmation, clean restart, and relaunch
+adoption. It then stalled after retry with ledger bytes equal to the 1,708,583,689-byte total and all
+14 identities recorded as verified, but without the 1.33 GB payload in staging or a terminal
+diagnostic. Two read-only device snapshots showed no movement for more than ten minutes, so the run
+was stopped as a live-reproduced failure rather than left in its previous one-hour blind poll. The
+XCUITest now fails after five minutes without visible progress, captures the stalled row, visibly
+normalizes the isolated root, and restores the canonical snapshot. Follow-up run
+`ios-xcui-model-download-20260821-161217-41fab182` compiled and exercised that revised procedure on
+the paired phone: after the 300-second no-advance verdict at visible progress `1.0`, it confirmed
+Cancel Download, returned the isolated Custom row to Install, relaunched without the test root, and
+verified all three canonical rows still Ready before emitting the expected failure. The full
+three-model install/reuse/delete acceptance remains red under MD-3 pending the delivery
+finalization fix and a fresh PASS.
 
 **iOS Settings information architecture rebuilt and visually compacted (2026-08-20; focused device
 acceptance PASS):** the title-free landing page keeps the task-first Audio, Models & Files,
@@ -121,11 +184,11 @@ Voice Models screens at Default, AX-L, and AX-XXXL sizes; the focused Settings l
 Settings traversal also passed, but that method later failed because the phone did not contain its
 required saved clone fixture `A_warm_elderly_woman` (2/3 methods passed; the lane therefore remains
 red). The earlier performance lane `ios-xcui-perf-20260820-171602-051a70d8` passed all 9 scenarios,
-including Settings scrolling and active on-device generation. The isolated model-download lane
+including Settings scrolling and active on-device generation. The earlier isolated model-download lane
 `ios-xcui-model-download-20260820-171400-5d11dc29` reached Voice Models, then failed closed before
 deletion because its fixed test-owned support root already contained Custom; no model was removed.
-A clean isolated root remains required for the full download, background-adoption,
-shared-component-reuse, and cleanup proof.
+The updated procedure now visibly normalizes that fixed root instead of requiring it to be empty;
+the subsequent 2026-08-21 live result and remaining blocker are recorded above.
 
 **Engineering-review remediation is now tracked in the roadmap (2026-08-19, desk):**
 `config/roadmap.json` is the sole status authority for the 14 findings in

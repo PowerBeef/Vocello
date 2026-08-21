@@ -3,6 +3,37 @@ import Foundation
 /// Compact local-only diagnostics for model delivery. The allowlisted schema cannot contain
 /// request URLs, filesystem paths, device identity, model prompts, or user content.
 public final class ModelDownloadDiagnosticsStore: @unchecked Sendable {
+    /// Schema-versioned, privacy-safe event used by the model-management diagnostic lane. The
+    /// schema deliberately has no URL or filesystem-path field.
+    public struct DeliveryEvent: Codable, Equatable, Sendable {
+        public let schemaVersion: Int
+        public let runID: String
+        public let processInstanceID: String
+        public let sequence: UInt64
+        public let capturedAtUTC: String
+        public let uptimeSeconds: Double
+        public let layer: String
+        public let event: String
+        public let modelID: String?
+        public let logicalRequestID: String?
+        public let operationGeneration: UInt64?
+        public let artifactVersion: String?
+        public let phase: String?
+        public let durableBytes: Int64?
+        public let totalBytes: Int64?
+        public let expectedFileCount: Int?
+        public let verifiedFileCount: Int?
+        public let taskCount: Int?
+        public let taskID: Int?
+        public let stagingFileCount: Int?
+        public let stagingBytes: Int64?
+        public let targetAvailable: Bool?
+        public let ledgerStatus: String?
+        public let outcome: String?
+        public let errorClassification: String?
+        public let errorMessage: String?
+    }
+
     private struct Record: Codable, Sendable {
         let schemaVersion: Int
         let capturedAtUTC: String
@@ -115,15 +146,99 @@ public final class ModelDownloadDiagnosticsStore: @unchecked Sendable {
     private var accumulatedControlBytes: Int64 = 0
     private var observedProtocols: Set<String> = []
     private var terminalRecorded = false
+    private let processInstanceID = UUID().uuidString.lowercased()
+    private var traceRunID: String?
+    private var traceSequence: UInt64 = 0
 
-    public init(
+    public convenience init(
         directory: URL,
         mirrorDirectory: URL? = nil,
         fileManager: FileManager = .default
     ) {
+        self.init(
+            directory: directory,
+            mirrorDirectory: mirrorDirectory,
+            fileManager: fileManager,
+            diagnosticTraceRunID: RuntimeDebugGate.value(
+                for: "QVOICE_IOS_MODEL_MANAGEMENT_RUN_ID"
+            )
+        )
+    }
+
+    init(
+        directory: URL,
+        mirrorDirectory: URL? = nil,
+        fileManager: FileManager = .default,
+        diagnosticTraceRunID: String?
+    ) {
         self.directory = directory
         self.mirrorDirectory = mirrorDirectory
         self.fileManager = fileManager
+        self.traceRunID = Self.safeIdentifier(diagnosticTraceRunID)
+    }
+
+    /// Records one correlated lifecycle event only when the registered, debug-gated run ID is
+    /// present. Diagnostics are best-effort and can never fail model delivery.
+    public func recordEvent(
+        layer: String,
+        event: String,
+        modelID: String? = nil,
+        logicalRequestID: String? = nil,
+        operationGeneration: UInt64? = nil,
+        artifactVersion: String? = nil,
+        phase: String? = nil,
+        durableBytes: Int64? = nil,
+        totalBytes: Int64? = nil,
+        expectedFileCount: Int? = nil,
+        verifiedFileCount: Int? = nil,
+        taskCount: Int? = nil,
+        taskID: Int? = nil,
+        stagingFileCount: Int? = nil,
+        stagingBytes: Int64? = nil,
+        targetAvailable: Bool? = nil,
+        ledgerStatus: String? = nil,
+        outcome: String? = nil,
+        errorClassification: String? = nil,
+        errorMessage: String? = nil
+    ) {
+        lock.lock()
+        guard let runID = traceRunID else {
+            lock.unlock()
+            return
+        }
+        traceSequence &+= 1
+        let sequence = traceSequence
+        lock.unlock()
+
+        let record = DeliveryEvent(
+            schemaVersion: 1,
+            runID: runID,
+            processInstanceID: processInstanceID,
+            sequence: sequence,
+            capturedAtUTC: ISO8601DateFormatter().string(from: Date()),
+            uptimeSeconds: ProcessInfo.processInfo.systemUptime,
+            layer: Self.safeIdentifier(layer) ?? "unknown",
+            event: Self.safeIdentifier(event) ?? "unknown",
+            modelID: Self.safeIdentifier(modelID),
+            logicalRequestID: Self.safeIdentifier(logicalRequestID),
+            operationGeneration: operationGeneration,
+            artifactVersion: Self.safeIdentifier(artifactVersion),
+            phase: Self.safeIdentifier(phase),
+            durableBytes: durableBytes.map { max(0, $0) },
+            totalBytes: totalBytes.map { max(0, $0) },
+            expectedFileCount: expectedFileCount.map { max(0, $0) },
+            verifiedFileCount: verifiedFileCount.map { max(0, $0) },
+            taskCount: taskCount.map { max(0, $0) },
+            taskID: taskID.map { max(0, $0) },
+            stagingFileCount: stagingFileCount.map { max(0, $0) },
+            stagingBytes: stagingBytes.map { max(0, $0) },
+            targetAvailable: targetAvailable,
+            ledgerStatus: Self.safeIdentifier(ledgerStatus),
+            outcome: Self.safeIdentifier(outcome),
+            errorClassification: Self.safeIdentifier(errorClassification),
+            errorMessage: errorMessage.map(sanitizeMessage)
+        )
+        persistTrace(record)
     }
 
     public func record(metrics: HuggingFaceDownloader.TransferMetrics) {
@@ -252,6 +367,51 @@ public final class ModelDownloadDiagnosticsStore: @unchecked Sendable {
         }
     }
 
+    private func persistTrace(_ record: DeliveryEvent) {
+        lock.lock()
+        defer { lock.unlock() }
+        let sequenceToken = String(format: "%020llu", record.sequence)
+        let fileName = "event-\(record.processInstanceID)-\(sequenceToken).json"
+        for root in [directory, mirrorDirectory].compactMap({ $0 }) {
+            let traceRoot = root.appendingPathComponent("trace", isDirectory: true)
+            do {
+                try fileManager.createDirectory(at: traceRoot, withIntermediateDirectories: true)
+                let encoder = JSONEncoder()
+                encoder.outputFormatting = [.sortedKeys]
+                try encoder.encode(record).write(
+                    to: traceRoot.appendingPathComponent(fileName),
+                    options: [.atomic]
+                )
+                try pruneTrace(in: traceRoot)
+            } catch {
+                // Diagnostics must never interfere with model delivery.
+            }
+        }
+    }
+
+    private func pruneTrace(in directory: URL) throws {
+        let keys: Set<URLResourceKey> = [.contentModificationDateKey, .fileSizeKey]
+        let files = try fileManager.contentsOfDirectory(
+            at: directory,
+            includingPropertiesForKeys: Array(keys),
+            options: [.skipsHiddenFiles]
+        ).filter { $0.pathExtension == "json" }.sorted {
+            let lhs = (try? $0.resourceValues(forKeys: keys).contentModificationDate) ?? .distantPast
+            let rhs = (try? $1.resourceValues(forKeys: keys).contentModificationDate) ?? .distantPast
+            return lhs > rhs
+        }
+        var retainedBytes: Int64 = 0
+        for (index, file) in files.enumerated() {
+            let size = Int64((try? file.resourceValues(forKeys: keys).fileSize) ?? 0)
+            if index >= Self.maxRetainedTraceEvents
+                || retainedBytes + size > Self.maxRetainedTraceBytes {
+                try? fileManager.removeItem(at: file)
+            } else {
+                retainedBytes += size
+            }
+        }
+    }
+
     private func prune(in directory: URL) throws {
         let keys: Set<URLResourceKey> = [.contentModificationDateKey, .fileSizeKey]
         let files = try fileManager.contentsOfDirectory(
@@ -283,6 +443,11 @@ public final class ModelDownloadDiagnosticsStore: @unchecked Sendable {
     /// accounting. The paired validator bound lives in scripts/ui_test.sh and must move
     /// with this constant.
     static let maxRetainedRecords = 200
+    /// One worst-case one-hour diagnostic transfer persists the durable ledger twice per second,
+    /// plus five-second heartbeats and bounded task events. Retain that complete causality chain
+    /// without allowing repeated failed runs to grow without limit.
+    static let maxRetainedTraceEvents = 15_000
+    static let maxRetainedTraceBytes: Int64 = 40 * 1_024 * 1_024
 
     private func sanitizeRelativePath(_ value: String?) -> String? {
         guard let value,
@@ -299,6 +464,15 @@ public final class ModelDownloadDiagnosticsStore: @unchecked Sendable {
             CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "._-")).contains($0)
         }
         return String(String.UnicodeScalarView(allowed).prefix(100))
+    }
+
+    private static func safeIdentifier(_ value: String?) -> String? {
+        guard let value else { return nil }
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, trimmed.count <= 160 else { return nil }
+        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "._-"))
+        guard trimmed.unicodeScalars.allSatisfy({ allowed.contains($0) }) else { return nil }
+        return trimmed
     }
 
     private func sanitizeMessage(_ value: String) -> String {

@@ -413,6 +413,20 @@ public enum VocelloUIScreenshot {
             activity.add(attachment)
         }
     }
+
+    public static func attach(
+        _ element: XCUIElement,
+        named name: String,
+        lifetime: XCTAttachment.Lifetime = .keepAlways
+    ) {
+        guard element.exists else { return }
+        XCTContext.runActivity(named: "Screenshot: \(name)") { activity in
+            let attachment = XCTAttachment(screenshot: element.screenshot())
+            attachment.name = name
+            attachment.lifetime = lifetime
+            activity.add(attachment)
+        }
+    }
 }
 
 /// Canonical UI-driven benchmark corpus and ordering shared by Apple UI-test targets.

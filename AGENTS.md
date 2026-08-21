@@ -222,6 +222,7 @@ isolated opt-ins documented in the platform rules.
 | `Tests/UIAutomationSupport/`, `Tests/VocelloMacUITests/`, `Tests/VocelloiOSUITests/` | checked-in XCUITest stack |
 | `Tests/VocelloiOSLogicTests/` | compile-only generic device-SDK policy contracts |
 | `config/runtime-debug-knobs.json`, `config/concurrency-safety.json` | debug and concurrency exception registries |
+| `config/model-management-diagnostics-schema-v1.json`, `scripts/check_ios_model_management.py` | correlated physical-iPhone model-delivery and progress diagnosis contract |
 | `config/runtime-refactor-contract.json`, `config/roadmap.json` | convergence and work-state authorities |
 | `config/language-bench-*.json` | language corpus and matrices |
 | `benchmarks/`, `scripts/benchmark_history.py` | privacy-safe PASS registry and generated history |

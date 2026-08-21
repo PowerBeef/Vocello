@@ -116,6 +116,11 @@ final class IOSModelDownloadCoordinator {
     /// Prevents already-enqueued progress callbacks from weakening a durable
     /// cancellation while its URLSession task barrier is still draining.
     private var cancellationBarriers: Set<String> = []
+    private var diagnosticsHeartbeat: Task<Void, Never>?
+    private var lastDiagnosticProgressTrace:
+        [String: (uptime: TimeInterval, phase: IOSModelDeliverySnapshot.Phase, bytes: Int64)] = [:]
+    private var lastDiagnosticSnapshotTrace:
+        [String: (uptime: TimeInterval, phase: IOSModelDeliverySnapshot.Phase, bytes: Int64)] = [:]
 
     private lazy var downloader: HuggingFaceDownloader = makeSharedDownloader()
 
@@ -169,25 +174,32 @@ final class IOSModelDownloadCoordinator {
 
         var ledger = try ledgerStore.load()
         let replacement = makeLedgerRequest(model: model, entry: entry, totalBytes: totalBytes)
+        let queuedRequest: IOSModelDownloadLedger.Request
         if let index = ledger.requests.firstIndex(where: { $0.modelID == model.id }) {
             let existing = ledger.requests[index]
-            if existing.hasSameArtifactIdentity(as: replacement) {
-                ledger.requests[index].status = .queued
-                ledger.requests[index].totalBytes = totalBytes
-            } else {
-                // Artifact update: resume state from the superseded identity is
-                // meaningless and can even invalidate the ledger (an already
-                // fully received larger artifact leaves receivedBytes above the
-                // smaller replacement's totalBytes). Replace the request whole.
-                ledger.requests[index] = replacement
-            }
+            queuedRequest = existing.queuedForExplicitInstall(replacing: replacement)
+            ledger.requests[index] = queuedRequest
         } else {
-            ledger.requests.append(replacement)
+            queuedRequest = replacement
+            ledger.requests.append(queuedRequest)
         }
         try ledgerStore.save(ledger)
+        diagnosticsStore.recordEvent(
+            layer: "coordinator",
+            event: "request-queued",
+            modelID: model.id,
+            logicalRequestID: queuedRequest.logicalRequestID,
+            artifactVersion: queuedRequest.artifactVersion,
+            phase: IOSModelDeliverySnapshot.Phase.queued.rawValue,
+            durableBytes: queuedRequest.receivedBytes,
+            totalBytes: queuedRequest.totalBytes,
+            expectedFileCount: queuedRequest.expectedFiles.count,
+            verifiedFileCount: queuedRequest.verifiedFiles.count,
+            ledgerStatus: queuedRequest.status.rawValue
+        )
         cancellationBarriers.remove(model.id)
         pending.append(model)
-        publishSnapshot(for: model, phase: .queued, downloadedBytes: ledgerRequest(model.id, in: ledger)?.receivedBytes ?? 0)
+        publishSnapshot(for: model, phase: .queued, downloadedBytes: queuedRequest.receivedBytes)
         await startPendingDownloads()
     }
 
@@ -196,6 +208,7 @@ final class IOSModelDownloadCoordinator {
     /// cancellation that a later launch could undo.
     @discardableResult
     func cancel(modelID: String) async -> Bool {
+        traceCurrentState(layer: "coordinator", event: "cancellation-requested", modelID: modelID)
         if let pendingIndex = pending.firstIndex(where: { $0.id == modelID }) {
             cancellationBarriers.insert(modelID)
             guard persistCancellationStatus(modelID: modelID, status: .cancelRequested) else {
@@ -210,6 +223,7 @@ final class IOSModelDownloadCoordinator {
             }
             discardStaging(modelID: modelID)
             publishTerminal(modelID: modelID, phase: .deleted)
+            stopDiagnosticsHeartbeat()
             cancellationBarriers.remove(modelID)
             return true
         }
@@ -252,12 +266,15 @@ final class IOSModelDownloadCoordinator {
         }
         try? fileManager.removeItem(at: active.stagingRoot)
         publishTerminal(modelID: modelID, phase: .deleted)
+        traceCurrentState(layer: "coordinator", event: "cancellation-completed", modelID: modelID, outcome: "deleted")
+        stopDiagnosticsHeartbeat()
         cancellationBarriers.remove(modelID)
         await startPendingDownloads()
         return true
     }
 
     func delete(model: ModelDescriptor) async throws {
+        traceCurrentState(layer: "coordinator", event: "delete-requested", modelID: model.id)
         if inflight[model.id] != nil || pending.contains(where: { $0.id == model.id }) {
             guard await cancel(modelID: model.id) else {
                 throw CancellationPersistenceError()
@@ -279,6 +296,7 @@ final class IOSModelDownloadCoordinator {
         discardStaging(modelID: model.id)
         markLedgerTerminal(modelID: model.id, status: .deleted)
         publishTerminal(modelID: model.id, phase: .deleted)
+        traceCurrentState(layer: "filesystem", event: "delete-completed", modelID: model.id, outcome: "target-absent")
     }
 
     func restoreInFlightDownloadsIfNeeded() async {
@@ -411,6 +429,13 @@ final class IOSModelDownloadCoordinator {
                     fileManager: fileManager
                 )
             )
+            traceCurrentState(
+                layer: "coordinator",
+                event: "request-started",
+                modelID: model.id,
+                generation: generation
+            )
+            startDiagnosticsHeartbeat(modelID: model.id, generation: generation)
         } catch {
             markLedgerTerminal(modelID: model.id, status: .failed)
             publishFailed(modelID: model.id, message: error.localizedDescription)
@@ -447,6 +472,13 @@ final class IOSModelDownloadCoordinator {
                   !cancellationBarriers.contains(model.id) else { return }
             inflight.removeValue(forKey: model.id)
             markLedgerTerminal(modelID: model.id, status: .installed, receivedBytes: totalBytes)
+            traceCurrentState(
+                layer: "filesystem",
+                event: "atomic-publication-completed",
+                modelID: model.id,
+                generation: generation,
+                outcome: "installed"
+            )
             diagnosticsStore.recordSuccess(expectedBytes: totalBytes)
             publishSnapshot(
                 modelID: model.id,
@@ -456,7 +488,10 @@ final class IOSModelDownloadCoordinator {
                 message: nil,
                 generation: generation
             )
+            stopDiagnosticsHeartbeat()
         } catch is CancellationError {
+            traceCurrentState(layer: "coordinator", event: "request-cancelled", modelID: model.id, generation: generation)
+            stopDiagnosticsHeartbeat()
             return
         } catch let error as HuggingFaceDownloader.DownloadError {
             if case .cancelled = error { return }
@@ -465,14 +500,36 @@ final class IOSModelDownloadCoordinator {
             inflight.removeValue(forKey: model.id)
             markLedgerTerminal(modelID: model.id, status: .failed)
             diagnosticsStore.recordFailure(classification: "transfer", message: error.localizedDescription)
+            diagnosticsStore.recordEvent(
+                layer: "downloader",
+                event: "request-failed",
+                modelID: model.id,
+                logicalRequestID: request.logicalRequestID,
+                operationGeneration: generation,
+                artifactVersion: request.artifactVersion,
+                errorClassification: "transfer",
+                errorMessage: error.localizedDescription
+            )
             publishFailed(modelID: model.id, message: error.localizedDescription)
+            stopDiagnosticsHeartbeat()
         } catch {
             guard inflight[model.id]?.operationGeneration == generation,
                   !cancellationBarriers.contains(model.id) else { return }
             inflight.removeValue(forKey: model.id)
             markLedgerTerminal(modelID: model.id, status: .failed)
             diagnosticsStore.recordFailure(classification: "filesystem", message: error.localizedDescription)
+            diagnosticsStore.recordEvent(
+                layer: "filesystem",
+                event: "request-failed",
+                modelID: model.id,
+                logicalRequestID: request.logicalRequestID,
+                operationGeneration: generation,
+                artifactVersion: request.artifactVersion,
+                errorClassification: "filesystem",
+                errorMessage: error.localizedDescription
+            )
             publishFailed(modelID: model.id, message: error.localizedDescription)
+            stopDiagnosticsHeartbeat()
         }
         await startPendingDownloads()
     }
@@ -536,6 +593,19 @@ final class IOSModelDownloadCoordinator {
             verifiedArtifactHandler: { [weak self] receipt in
                 await MainActor.run { [weak self] in self?.recordVerifiedFile(receipt) }
             },
+            lifecycleEventHandler: { [diagnosticsStore] event in
+                diagnosticsStore.recordEvent(
+                    layer: "url-session",
+                    event: event.event,
+                    modelID: event.identity?.modelID,
+                    logicalRequestID: event.identity?.logicalRequestID,
+                    artifactVersion: event.identity?.artifactVersion,
+                    durableBytes: event.transferredBytes,
+                    totalBytes: event.identity?.expectedSize,
+                    taskCount: event.taskCount,
+                    taskID: event.taskID
+                )
+            },
             backgroundSessionCompletionHandler: { identifier in
                 Task { @MainActor in
                     guard identifier == backgroundSessionIdentifier else { return }
@@ -579,6 +649,36 @@ final class IOSModelDownloadCoordinator {
             persisted: ledgerReceivedBytes(modelID: active.modelID),
             total: active.totalBytes
         )
+        let visibleTotalBytes = progress.totalBytes > 0 ? progress.totalBytes : active.totalBytes
+        let visibleSpeed: Int64? = {
+            guard phase == .downloading,
+                  visibleBytes < visibleTotalBytes,
+                  let speed = progress.bytesPerSecond,
+                  speed > 0 else { return nil }
+            return speed
+        }()
+        let visibleETA = visibleSpeed.map { speed in
+            Double(max(visibleTotalBytes - visibleBytes, 0)) / Double(speed)
+        }
+        if shouldTraceDiagnosticProgress(
+            modelID: active.modelID,
+            phase: phase,
+            bytes: visibleBytes,
+            totalBytes: visibleTotalBytes
+        ) {
+            diagnosticsStore.recordEvent(
+                layer: "downloader",
+                event: "progress",
+                modelID: active.modelID,
+                logicalRequestID: active.logicalRequestID,
+                operationGeneration: active.operationGeneration,
+                artifactVersion: descriptor.artifactVersion,
+                phase: phase.rawValue,
+                durableBytes: visibleBytes,
+                totalBytes: visibleTotalBytes,
+                verifiedFileCount: progress.completedFiles
+            )
+        }
         guard persistProgressIfNeeded(
             modelID: active.modelID,
             status: ledgerStatus,
@@ -589,14 +689,32 @@ final class IOSModelDownloadCoordinator {
             modelID: active.modelID,
             phase: phase,
             downloadedBytes: visibleBytes,
-            totalBytes: progress.totalBytes > 0 ? progress.totalBytes : active.totalBytes,
-            bytesPerSecond: progress.phase == .downloading ? progress.bytesPerSecond : nil,
-            estimatedSecondsRemaining: progress.estimatedSecondsRemaining,
+            totalBytes: visibleTotalBytes,
+            bytesPerSecond: visibleSpeed,
+            estimatedSecondsRemaining: visibleETA,
             retryCount: progress.retryCount,
             message: progress.isStalled ? "No progress for 20 seconds" : progress.statusMessage,
             generation: active.operationGeneration,
             estimatedBytes: descriptor.estimatedDownloadBytes
         )
+    }
+
+    private func shouldTraceDiagnosticProgress(
+        modelID: String,
+        phase: IOSModelDeliverySnapshot.Phase,
+        bytes: Int64,
+        totalBytes: Int64
+    ) -> Bool {
+        let now = ProcessInfo.processInfo.systemUptime
+        let previous = lastDiagnosticProgressTrace[modelID]
+        let shouldRecord = previous == nil
+            || previous?.phase != phase
+            || bytes >= totalBytes
+            || now - (previous?.uptime ?? 0) >= 5
+        if shouldRecord {
+            lastDiagnosticProgressTrace[modelID] = (now, phase, bytes)
+        }
+        return shouldRecord
     }
 
     private func resolveFiles(entry: IOSModelCatalogEntry) -> [HuggingFaceDownloader.RepoFile] {
@@ -753,6 +871,21 @@ final class IOSModelDownloadCoordinator {
             ledger.requests[index].receivedBytes = max(ledger.requests[index].receivedBytes, bytes)
             ledger.requests[index].retryCount = max(ledger.requests[index].retryCount, retryCount)
             try ledgerStore.save(ledger)
+            let request = ledger.requests[index]
+            diagnosticsStore.recordEvent(
+                layer: "ledger",
+                event: "write",
+                modelID: modelID,
+                logicalRequestID: request.logicalRequestID,
+                artifactVersion: request.artifactVersion,
+                phase: status.rawValue,
+                durableBytes: request.receivedBytes,
+                totalBytes: request.totalBytes,
+                expectedFileCount: request.expectedFiles.count,
+                verifiedFileCount: request.verifiedFiles.count,
+                ledgerStatus: request.status.rawValue,
+                outcome: "saved"
+            )
             lastLedgerProgressWrite[modelID] = now
             return true
         } catch {
@@ -772,6 +905,7 @@ final class IOSModelDownloadCoordinator {
             ))
             request.verifiedFiles.sort { $0.relativePath < $1.relativePath }
         }
+        traceCurrentState(layer: "verification", event: "file-verified", modelID: modelID)
     }
 
     private func updateLedger(
@@ -980,7 +1114,7 @@ final class IOSModelDownloadCoordinator {
         generation: UInt64,
         estimatedBytes: Int64? = nil
     ) {
-        snapshotSink(.init(
+        let snapshot = IOSModelDeliverySnapshot(
             modelID: modelID,
             phase: phase,
             downloadedBytes: downloadedBytes,
@@ -991,7 +1125,101 @@ final class IOSModelDownloadCoordinator {
             retryCount: retryCount,
             message: message,
             operationGeneration: generation
-        ))
+        )
+        let now = ProcessInfo.processInfo.systemUptime
+        let previousTrace = lastDiagnosticSnapshotTrace[modelID]
+        if previousTrace == nil
+            || previousTrace?.phase != phase
+            || phase == .installed || phase == .failed || phase == .deleted
+            || now - (previousTrace?.uptime ?? 0) >= 5 {
+            lastDiagnosticSnapshotTrace[modelID] = (now, phase, downloadedBytes)
+            diagnosticsStore.recordEvent(
+                layer: "coordinator",
+                event: "snapshot-published",
+                modelID: modelID,
+                logicalRequestID: inflight[modelID]?.logicalRequestID,
+                operationGeneration: generation,
+                artifactVersion: modelAssetStore.descriptor(id: modelID)?.model.artifactVersion,
+                phase: phase.rawValue,
+                durableBytes: downloadedBytes,
+                totalBytes: totalBytes
+            )
+        }
+        snapshotSink(snapshot)
+    }
+
+    private func startDiagnosticsHeartbeat(modelID: String, generation: UInt64) {
+        diagnosticsHeartbeat?.cancel()
+        diagnosticsHeartbeat = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                guard let self,
+                      self.inflight[modelID]?.operationGeneration == generation else { return }
+                let activeTaskCount = await self.downloader.diagnosticActiveTaskCount()
+                self.traceCurrentState(
+                    layer: "coordinator",
+                    event: "heartbeat",
+                    modelID: modelID,
+                    generation: generation,
+                    taskCount: activeTaskCount
+                )
+                try? await Task.sleep(for: .seconds(5))
+            }
+        }
+    }
+
+    private func stopDiagnosticsHeartbeat() {
+        diagnosticsHeartbeat?.cancel()
+        diagnosticsHeartbeat = nil
+    }
+
+    private func traceCurrentState(
+        layer: String,
+        event: String,
+        modelID: String,
+        generation: UInt64? = nil,
+        outcome: String? = nil,
+        taskCount: Int? = nil
+    ) {
+        let request = try? ledgerStore.load().requests.first { $0.modelID == modelID }
+        let staging = stagingInventory(modelID: modelID)
+        let model = modelAssetStore.descriptor(id: modelID)?.model
+        diagnosticsStore.recordEvent(
+            layer: layer,
+            event: event,
+            modelID: modelID,
+            logicalRequestID: request?.logicalRequestID ?? inflight[modelID]?.logicalRequestID,
+            operationGeneration: generation ?? inflight[modelID]?.operationGeneration,
+            artifactVersion: request?.artifactVersion ?? model?.artifactVersion,
+            phase: request?.status.rawValue,
+            durableBytes: request?.receivedBytes,
+            totalBytes: request?.totalBytes,
+            expectedFileCount: request?.expectedFiles.count,
+            verifiedFileCount: request?.verifiedFiles.count,
+            taskCount: taskCount ?? (inflight[modelID] == nil ? 0 : 1),
+            stagingFileCount: staging.fileCount,
+            stagingBytes: staging.bytes,
+            targetAvailable: model?.isAvailable(in: AppPaths.modelsDir, fileManager: fileManager),
+            ledgerStatus: request?.status.rawValue,
+            outcome: outcome
+        )
+    }
+
+    private func stagingInventory(modelID: String) -> (fileCount: Int, bytes: Int64) {
+        let root = stagingRoot(modelID: modelID)
+        guard let enumerator = fileManager.enumerator(
+            at: root,
+            includingPropertiesForKeys: [.isRegularFileKey, .fileSizeKey],
+            options: [.skipsHiddenFiles]
+        ) else { return (0, 0) }
+        var count = 0
+        var bytes: Int64 = 0
+        for case let file as URL in enumerator {
+            guard let values = try? file.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey]),
+                  values.isRegularFile == true else { continue }
+            count += 1
+            bytes += Int64(values.fileSize ?? 0)
+        }
+        return (count, bytes)
     }
 
     private func publishTerminal(modelID: String, phase: IOSModelDeliverySnapshot.Phase) {

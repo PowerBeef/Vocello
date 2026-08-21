@@ -30,8 +30,11 @@ final class IOSModelInstallerViewModel: ObservableObject {
     private let modelAssetStore: LocalModelAssetStore?
     private let modelManager: ModelManagerViewModel
     private let backgroundSessionIdentifier: String
+    private let diagnosticsStore: ModelDownloadDiagnosticsStore
     private var coordinator: IOSModelDownloadCoordinator?
     private var lastAcceptedGeneration: [String: UInt64] = [:]
+    private var lastDiagnosticSnapshotTrace:
+        [String: (uptime: TimeInterval, phase: IOSModelDeliverySnapshot.Phase, bytes: Int64)] = [:]
 
     /// Called after a model install completes so the engine can preload it in the background.
     var onModelInstalled: ((_ modelID: String) -> Void)?
@@ -44,6 +47,11 @@ final class IOSModelInstallerViewModel: ObservableObject {
         self.modelManager = modelManager
         let deliveryConfiguration = IOSModelDeliveryConfiguration.default()
         self.backgroundSessionIdentifier = deliveryConfiguration.backgroundSessionIdentifier
+        self.diagnosticsStore = ModelDownloadDiagnosticsStore(
+            directory: AppPaths.modelDownloadDiagnosticsDir,
+            mirrorDirectory: IOSPullableDiagnosticsMirror.pullableRoot?
+                .appendingPathComponent("model-downloads", isDirectory: true)
+        )
 
         guard let modelAssetStore else {
             return
@@ -59,7 +67,7 @@ final class IOSModelInstallerViewModel: ObservableObject {
         self.coordinator = coordinator
 
         Task {
-            await modelManager.refresh()
+            await refreshModelInventory(modelID: nil, event: "initial-refresh")
             await coordinator.restoreInFlightDownloadsIfNeeded()
         }
     }
@@ -141,7 +149,7 @@ final class IOSModelInstallerViewModel: ObservableObject {
         guard let coordinator else { return }
         Task {
             await coordinator.cancel(modelID: model.id)
-            await modelManager.refresh()
+            await refreshModelInventory(modelID: model.id, event: "cancel-refresh")
         }
     }
 
@@ -157,7 +165,7 @@ final class IOSModelInstallerViewModel: ObservableObject {
         Task {
             do {
                 try await coordinator.delete(model: model)
-                await modelManager.refresh()
+                await refreshModelInventory(modelID: model.id, event: "delete-refresh")
                 states.removeValue(forKey: model.id)
             } catch {
                 let generation = (lastAcceptedGeneration[model.id] ?? 0) + 1
@@ -203,7 +211,19 @@ final class IOSModelInstallerViewModel: ObservableObject {
 
     private func apply(_ snapshot: IOSModelDeliverySnapshot) {
         let previousGeneration = lastAcceptedGeneration[snapshot.modelID] ?? 0
-        guard snapshot.operationGeneration >= previousGeneration else { return }
+        guard snapshot.operationGeneration >= previousGeneration else {
+            diagnosticsStore.recordEvent(
+                layer: "view-model",
+                event: "stale-snapshot-rejected",
+                modelID: snapshot.modelID,
+                operationGeneration: snapshot.operationGeneration,
+                phase: snapshot.phase.rawValue,
+                durableBytes: snapshot.downloadedBytes,
+                totalBytes: snapshot.totalBytes,
+                outcome: "rejected"
+            )
+            return
+        }
         lastAcceptedGeneration[snapshot.modelID] = snapshot.operationGeneration
 
         switch snapshot.phase {
@@ -217,7 +237,7 @@ final class IOSModelInstallerViewModel: ObservableObject {
         case .downloading:
             let progress: Double?
             if let totalBytes = snapshot.totalBytes, totalBytes > 0 {
-                progress = Double(snapshot.downloadedBytes) / Double(totalBytes)
+                progress = min(max(Double(snapshot.downloadedBytes) / Double(totalBytes), 0), 1)
             } else {
                 progress = nil
             }
@@ -232,7 +252,7 @@ final class IOSModelInstallerViewModel: ObservableObject {
         case .retrying:
             let progress: Double?
             if let totalBytes = snapshot.totalBytes, totalBytes > 0 {
-                progress = Double(snapshot.downloadedBytes) / Double(totalBytes)
+                progress = min(max(Double(snapshot.downloadedBytes) / Double(totalBytes), 0), 1)
             } else {
                 progress = nil
             }
@@ -253,7 +273,7 @@ final class IOSModelInstallerViewModel: ObservableObject {
             states[snapshot.modelID] = .installed
             let modelID = snapshot.modelID
             Task {
-                await modelManager.refresh()
+                await refreshModelInventory(modelID: modelID, event: "installed-refresh")
                 onModelInstalled?(modelID)
             }
         case .deleting:
@@ -261,14 +281,50 @@ final class IOSModelInstallerViewModel: ObservableObject {
         case .failed:
             states[snapshot.modelID] = .failed(snapshot.message ?? "Model delivery failed.")
             Task {
-                await modelManager.refresh()
+                await refreshModelInventory(modelID: snapshot.modelID, event: "failed-refresh")
             }
         case .deleted:
             states.removeValue(forKey: snapshot.modelID)
             lastAcceptedGeneration.removeValue(forKey: snapshot.modelID)
             Task {
-                await modelManager.refresh()
+                await refreshModelInventory(modelID: snapshot.modelID, event: "deleted-refresh")
             }
         }
+        let now = ProcessInfo.processInfo.systemUptime
+        let previousTrace = lastDiagnosticSnapshotTrace[snapshot.modelID]
+        if previousTrace == nil
+            || previousTrace?.phase != snapshot.phase
+            || snapshot.phase == .installed || snapshot.phase == .failed || snapshot.phase == .deleted
+            || now - (previousTrace?.uptime ?? 0) >= 5 {
+            lastDiagnosticSnapshotTrace[snapshot.modelID] = (
+                now,
+                snapshot.phase,
+                snapshot.downloadedBytes
+            )
+            diagnosticsStore.recordEvent(
+                layer: "view-model",
+                event: "snapshot-applied",
+                modelID: snapshot.modelID,
+                operationGeneration: snapshot.operationGeneration,
+                phase: snapshot.phase.rawValue,
+                durableBytes: snapshot.downloadedBytes,
+                totalBytes: snapshot.totalBytes,
+                outcome: "applied"
+            )
+        }
+    }
+
+    private func refreshModelInventory(modelID: String?, event: String) async {
+        await modelManager.refresh()
+        let targetAvailable = modelID.flatMap { id in
+            TTSModel.all.first(where: { $0.id == id }).map(modelManager.isAvailable)
+        }
+        diagnosticsStore.recordEvent(
+            layer: "model-manager",
+            event: event,
+            modelID: modelID,
+            targetAvailable: targetAvailable,
+            outcome: "completed"
+        )
     }
 }

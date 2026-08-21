@@ -197,7 +197,15 @@ sidecar so the two resume schemes can never disagree about the bytes on disk.
 Visible states are: queued, waiting for connectivity, downloading, retrying, verifying, installing,
 cancelling, installed, failed, deleting, and deleted. Speed and ETA are shown only during active
 transfer. A separate no-progress message appears after 20 seconds of an actively running task;
-waiting-for-connectivity comes from the URLSession delegate.
+waiting-for-connectivity comes from the URLSession delegate. On iPhone, the determinate bar means
+exactly `durable logical catalog bytes / catalog bytes` during transfer. Stable whole-file and
+byte-range identities, rather than URLSession task IDs, own those bytes, so a replacement task
+cannot count a retried range twice. Reused and restored bytes remain monotonic, while duplicate or
+transient callbacks do not inflate the fraction. Once transfer reaches the catalog total, the bar
+is replaced by indeterminate `Download complete — finishing setup`, `Checking downloaded files`,
+or `Making the model available offline` activity. Ready is the only terminal success. This
+presentation contract does not weaken or close MD-3: authenticated publication still has to reach
+Ready.
 
 Explicit **Cancel** is a discard operation. The coordinator first persists `cancelRequested`, stops
 new task registration, awaits all resume-data cancellation callbacks and terminal tasks, persists
@@ -205,7 +213,9 @@ the final deleted tombstone, and only then removes staging or reports deletion. 
 ledger write fails, cancellation fails closed: tasks or staging are preserved as applicable, the UI
 shows a privacy-safe storage error, and relaunch cannot silently reinterpret the request as queued.
 **Retry** preserves already verified files and reconstructs progress from the ledger, staged
-partials, and adopted task byte counts.
+partials, and adopted task byte counts. An explicit install after a terminal `deleted`,
+`cancelRequested`, or target-missing `installed` ledger starts a new logical request at zero bytes;
+terminal counters remain available for diagnosis but can never seed the next progress bar.
 
 Transient connection failures and HTTP 408, 429, and 5xx responses retry up to three times. A
 `Retry-After` value is honored up to five minutes. One integrity mismatch receives one clean retry.
@@ -214,7 +224,8 @@ and permanent 4xx responses do not retry.
 
 ## Diagnostics and acceptance
 
-Local diagnostic summaries retain at most 60 records and 5 MB (raised from 20 in Phase 8 so one three-artifact shared-component lifecycle keeps every per-file record). Their allowlisted fields cover
+Local diagnostic summaries retain at most 200 records and 5 MB (sized so one three-artifact
+shared-component lifecycle keeps every per-range and per-file record). Their allowlisted fields cover
 timing, protocol, redirect/reuse and constrained/expensive-network flags, transferred bytes, and a
 sanitized failure class. A successful attempt also records expected and wire bytes, duplicate bytes,
 retry count, protocol set, thermal state, phase timings, and final-integrity status. Task completion
@@ -224,6 +235,32 @@ completion, and high-frequency byte callbacks are reduced to bounded cumulative 
 plus the exact terminal byte count. This prevents a completed transfer from being stranded behind
 its own progress backlog without sacrificing final byte accuracy.
 Diagnostic summaries never contain a raw URL, absolute path, device identity, or user data.
+
+The explicit physical-device diagnostic adds a schema-v1 correlated event journal when the
+registered `QVOICE_IOS_MODEL_MANAGEMENT_RUN_ID` debug knob is active. Events join one run across
+process instances with monotonic process sequence numbers, logical request and operation
+generations, artifact identity, task lifecycle, ledger writes, staging inventories, publication,
+model-manager refresh, deletion, and a five-second active-work heartbeat. The one fixed isolated
+support root and background-session identifier are reused across runs; a failed run retains that
+bounded root for the next `diagnose` or `recover` scenario, while a pass cleans through visible UI
+controls.
+
+```sh
+scripts/ui_test.sh ios model-download --scenario diagnose
+scripts/ui_test.sh ios model-download --scenario queue
+scripts/ui_test.sh ios model-download --scenario acceptance
+scripts/ui_test.sh ios model-download --scenario soak --iterations 3
+scripts/ui_test.sh ios model-download --scenario recover
+```
+
+XCUITest captures the full row and exact progress element at first movement and the first samples
+at or above 25%, 50%, 75%, and 95%, plus finalization, Ready, and removal when observable. The host
+checker correlates those observations with raw bytes and journal events, measures leading-edge fill,
+fraction error (five percentage-point maximum), 3:1 fill/track contrast, monotonic growth, stable
+geometry, and writes `model-management-diagnosis.json`, `model-management-timeline.md`,
+`model-management-summary.json`, `progress-visual-summary.json`, and a contact sheet beside the
+`.xcresult`. Forensic collection runs even after XCTest fails. Acceptance requires no inconsistent
+layer; `diagnose` may succeed as a diagnostic collection while truthfully classifying MD-3.
 
 Deterministic tests are model-free and Simulator-free. Live delivery is an explicit diagnostic:
 
@@ -237,9 +274,15 @@ Deterministic tests are model-free and Simulator-free. Live delivery is an expli
 scripts/ui_test.sh ios model-download
 ```
 
-The iPhone proof backgrounds and terminates the app during transfer, relaunches it, requires
-non-regressing adopted progress, and waits for exact verified installation of Custom. With Custom
-retained in the isolated root it then delivers Design and Clone, whose plans must reuse the
+The iPhone proof first snapshots the quiescent canonical model surface, then normalizes only the
+fixed `model-download-acceptance` root through the redesigned screen's visible Cancel, Retry, and
+Remove controls. This makes a failed prior run recoverable without creating an unbounded family of
+background-session identifiers or touching the user's canonical models. From the resulting fresh
+state it starts Custom, requires measurable progress, confirms Cancel Download, proves the row
+returns to `Not Installed` with Install as its sole action, and starts the transfer again. It then
+backgrounds and terminates the app during transfer, relaunches it, requires non-regressing adopted
+progress, and waits for exact verified installation of Custom. With Custom retained in the
+isolated root it delivers Design and Clone, whose plans must reuse the
 verified shared speech-tokenizer component — the pulled diagnostics validator requires each of the
 three newest successes to account for its full catalog bytes either entirely on the wire or with
 exactly the shared-component bytes reused, and at least two artifacts to show reuse. The same
@@ -252,9 +295,54 @@ genuine collapse fails — with per-artifact and per-transfer rates written into
 surface: each production model installed or plainly downloadable with no active transfer, and the
 identical snapshot must be visible again after the isolated cleanup, so the proof also runs on a
 freshly restored device. All three
-isolated models are then deleted through the visible UI. It is not part of smoke, benchmark, CI, release, or packaging.
+isolated models are then deleted through the visible Remove actions and named confirmations. At
+each stable state XCUITest checks the row's textual status and rejects every action that is invalid
+for that state. A progress watchdog also fails closed after five minutes without visible movement;
+the overall one-hour bound remains available for a genuinely slow but advancing multi-gigabyte
+transfer. On watchdog failure the test records the current row/action/progress state and returns
+immediately, leaving the one bounded isolated root intact for `recover` or the next `diagnose` run;
+forensic collection still runs unconditionally. It is not
+part of smoke, benchmark, CI, release, or packaging.
 Crash-delta snapshots retain hashes rather than duplicating the device's historical diagnostics;
 the lane pulls only its bounded model-download summaries into the local untracked result artifact.
+
+The 2026-08-21 physical-iPhone run
+`ios-xcui-model-download-20260821-154031-2a32aa4c` live-reproduced a post-relaunch Custom
+finalization stall before this watchdog was added. The redesigned UI correctly exposed Install,
+Downloading/Cancel, cancellation confirmation, return to Not Installed, restart, and adopted
+progress. Two read-only app-container snapshots more than ten minutes apart then remained
+unchanged: the schema-v2 ledger reported `downloading`, retry count 1, all 14 expected files
+verified, and received bytes equal to total bytes, while the 1.33 GB model payload was absent from
+staging and no diagnostic followed the retry's `downloading` phase. The run was stopped rather than
+waiting out an evidence-free one-hour poll. It is a failure record, not delivery acceptance.
+
+Follow-up run `ios-xcui-model-download-20260821-161217-41fab182` validated the revised procedure
+end to end. The signed physical-device test compiled against the redesigned Voice Models screen,
+normalized the prior isolated request through Cancel Download, repeated the fresh install,
+cancel-confirm-restart, and process-relaunch journey, then failed after exactly 300 seconds without
+visible progress at `1.0` rather than waiting for the one-hour outer bound. Before recording that
+failure, it used the visible Cancel action and confirmation again, proved Custom returned to Install,
+left the isolated root, and verified Built-in Voice, Voice Design, and Voice Cloning were still Ready
+in the canonical root with no visible progress operation. This proves the fail-closed watchdog and
+cleanup behavior; it does not clear the adopted-transfer finalization defect or provide the still-
+required three-model install/reuse/delete PASS.
+
+The first schema-v1 correlated run,
+`ios-xcui-model-download-20260821-184903-1b372030`, then isolated a distinct progress-accounting
+root before it reached the restart/adoption step. Visible preparation deleted the retained Custom
+model, and event 1 recorded a new queued request with `0 / 1,708,583,689` bytes; the immediately
+following queued snapshot reported the deleted tombstone's old complete byte count. The row
+therefore switched directly to indeterminate finishing activity and never exposed the determinate
+bar the test was awaiting. The underlying transfer was healthy: 786 retained events show range
+chunks landing, all 14 files verifying, atomic publication at event 758, an installed ledger with
+no staging or live tasks, and the installed coordinator/view-model snapshots. This was not an
+adopted-finalization failure. It exposed two actionable defects now covered deterministically: an
+explicit install of the same artifact reused terminal ledger counters, and the XCUITest failure
+path emitted no structured UI observation. Terminal installs now replace the ledger request while
+retryable interrupted work still resumes; the no-advance wait is 300 seconds, captures the row,
+and returns without mutating the failed state. Host replay classifies the original first divergence
+as `queued-ledger-progress-mismatch` and records the missing observation separately instead of
+inventing an installed-but-not-Ready result. A new device run remains required for acceptance.
 
 The 2026-07-14 isolated Custom Speed acceptance passed on the Mac mini M2 8 GB and physical iPhone
 17 Pro. Both transfers moved the exact 2,312,057,897 expected bytes without retry or duplicate

@@ -171,7 +171,9 @@ keeps the system navigation bar hidden and provides the compact 44-point
 `iosSettings_voiceModelsBackButton`, the `iosSettings_storageRow` summary, and the three
 `iosModelRow_<modelID>` lifecycle rows (full state contract below). Both surfaces derive their
 bottom content clearance from the shared tab-dock fade metric and reflow values/actions vertically
-at accessibility Dynamic Type sizes.
+at accessibility Dynamic Type sizes. At ordinary text sizes each model keeps its icon, name,
+metadata, textual status, and sole valid action in one compact summary row; two-action states and
+accessibility sizes reflow below the summary without reducing the 44-point control targets.
 
 ### Player + overlays
 
@@ -197,8 +199,8 @@ comes from `qwenvoice_ios_model_catalog.json`.
 | State | Visible control | What it means |
 |---|---|---|
 | Not installed | `iosModelDownload_<id>` ("Install") | Default; nothing staged |
-| Queued / waiting / downloading / retrying | `iosModelCancel_<id>` ("Cancel download") plus phase/progress detail | Durable request awaiting its turn or connectivity, actively transferring, or applying a typed retry |
-| Verifying / installing / cancelling / deleting | Status badge plus phase detail | Hash/receipt validation, atomic install, cancellation barrier, or removal is in progress; no invalid competing action is shown |
+| Queued / waiting / downloading / retrying | `iosModelCancel_<id>` (visible "Cancel"; VoiceOver "Cancel download") plus phase/progress detail | Durable request awaiting its turn or connectivity, actively transferring, or applying a typed retry |
+| Verifying / installing / cancelling / deleting | Text-and-symbol status plus phase detail | Hash/receipt validation, atomic install, cancellation barrier, or removal is in progress; no invalid competing action is shown |
 | Failed | `iosModelRetry_<id>` ("Retry") | Retry preserves verified files |
 | Incomplete | `iosModelRepair_<id>` ("Repair") plus `iosModelDelete_<id>` ("Remove") | Repair revalidates the incomplete package; Remove discards it through the named confirmation |
 | Installed | `iosModelStatus_<id>` ("Ready") plus `iosModelDelete_<id>` ("Remove") | Ready to generate; removal is visible without opening an overflow menu |
@@ -207,8 +209,12 @@ comes from `qwenvoice_ios_model_catalog.json`.
 Cancel opens a confirmation dialog: `iosModelCancelDownloadConfirmButton` (cancel, deletes staged
 data). There is no paused state or Resume control. Waiting for connectivity comes from URLSession;
 an active task separately reports no progress after 20 seconds. `iosModelProgress_<id>` exposes
-download/retry progress, while the visible detail reports bytes, smoothed speed, ETA, retry reason,
-and verified-file reuse.
+the complete installation journey rather than raw transfer completion: file transfer owns 0–90%,
+verification reports 94%, installation reports 98%, and only the terminal `Ready` state is complete.
+The visible detail reports an unrounded percentage plus bytes, smoothed speed, a remaining-time
+estimate derived from those same visible bytes, retry reason, and verified-file reuse. A logically
+complete transfer awaiting publication says `Finishing` instead of displaying a full bar. This UI
+honesty rule does not substitute for the MD-3 adopted-download finalization gate.
 
 One bundle-aware background URLSession lives for the app lifetime. On launch, the atomic v2 ledger
 and current catalog adopt exactly matching tasks, cancel stale/unknown/duplicate tasks, and create
@@ -216,6 +222,16 @@ only missing tasks. Progress remains monotonic through backgrounding, process re
 Delegate files move into durable App Group staging before the callback returns, and UIKit's
 background completion waits for durable install/failure postprocessing. Full contract:
 [`model-delivery.md`](model-delivery.md).
+
+The explicit `scripts/ui_test.sh ios model-download` procedure follows this redesigned state model
+instead of assuming an empty screen: it snapshots canonical readiness, normalizes only its fixed
+test-owned root through visible Cancel/Retry/Remove controls, verifies the `Not Installed` →
+`Downloading` → `Ready` action contract, confirms one real cancellation and restart, adopts the
+restarted Custom transfer across termination/relaunch, installs Design and Clone, removes all three
+through their named confirmations, and finally proves the canonical snapshot is unchanged. A
+five-minute no-advance watchdog now distinguishes an advancing slow transfer from a stuck adopted
+request, captures the stalled row, and drives isolated visible cleanup before restoring the
+canonical snapshot.
 
 ### The Studio gates generation on the installed model
 

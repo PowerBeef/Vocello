@@ -1,0 +1,86 @@
+{
+  "schemaVersion": 1,
+  "owner": "ios-model-delivery",
+  "privacyBoundary": "Allowlisted identifiers, phases, counts, sizes, timing, and sanitized errors only. URLs, absolute paths, device identity, model contents, prompts, and transcripts are forbidden.",
+  "schemas": {
+    "deliveryEvent": {
+      "required": [
+        "schemaVersion",
+        "runID",
+        "processInstanceID",
+        "sequence",
+        "capturedAtUTC",
+        "uptimeSeconds",
+        "layer",
+        "event"
+      ],
+      "correlation": [
+        "runID",
+        "processInstanceID",
+        "sequence",
+        "modelID",
+        "logicalRequestID",
+        "operationGeneration",
+        "artifactVersion"
+      ]
+    },
+    "stateSnapshot": {
+      "required": ["layer", "event", "modelID"],
+      "fields": [
+        "phase",
+        "durableBytes",
+        "totalBytes",
+        "expectedFileCount",
+        "verifiedFileCount",
+        "taskCount",
+        "taskID",
+        "stagingFileCount",
+        "stagingBytes",
+        "targetAvailable",
+        "ledgerStatus",
+        "outcome"
+      ]
+    },
+    "uiObservation": {
+      "required": [
+        "schemaVersion",
+        "capturedAtUTC",
+        "modelID",
+        "milestone",
+        "phase",
+        "actions",
+        "elementFrame",
+        "rowFrame",
+        "rowScreenshot"
+      ]
+    },
+    "visualMeasurement": {
+      "required": [
+        "screenshot",
+        "width",
+        "height",
+        "reportedFraction",
+        "measuredFillFraction",
+        "fractionDelta",
+        "leadingEdgeAnchored",
+        "finiteAndUnclipped",
+        "contrastRatio",
+        "passesFractionTolerance",
+        "passesContrast"
+      ]
+    },
+    "diagnosis": {
+      "required": [
+        "schemaVersion",
+        "runID",
+        "scenario",
+        "capturedAtUTC",
+        "eventCount",
+        "observationCount",
+        "result",
+        "findings"
+      ],
+      "results": ["passed", "diagnosedFailure"]
+    }
+  }
+}

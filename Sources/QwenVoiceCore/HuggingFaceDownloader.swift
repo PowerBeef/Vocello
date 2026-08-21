@@ -40,6 +40,28 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         public let durationSeconds: Double
     }
 
+    public struct LifecycleEvent: Sendable {
+        public let event: String
+        public let taskID: Int?
+        public let identity: ModelDownloadTaskIdentity?
+        public let transferredBytes: Int64?
+        public let taskCount: Int?
+
+        public init(
+            event: String,
+            taskID: Int? = nil,
+            identity: ModelDownloadTaskIdentity? = nil,
+            transferredBytes: Int64? = nil,
+            taskCount: Int? = nil
+        ) {
+            self.event = event
+            self.taskID = taskID
+            self.identity = identity
+            self.transferredBytes = transferredBytes
+            self.taskCount = taskCount
+        }
+    }
+
     /// How byte-range chunk downloads map onto URLSessions. HTTP/2 and HTTP/3 prefer
     /// multiplexing every task for a host onto one connection, which would leave all
     /// chunks sharing a single connection's CDN throughput shaping. `.perWorker` gives
@@ -183,6 +205,14 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         }
     }
 
+    final class LifecycleEventHandlerBox: Sendable {
+        let handler: @Sendable (LifecycleEvent) -> Void
+
+        init(_ handler: @escaping @Sendable (LifecycleEvent) -> Void) {
+            self.handler = handler
+        }
+    }
+
     /// Foundation has not annotated FileManager as Sendable. Confine that compatibility gap to
     /// one immutable adapter instead of making the downloader broadly unchecked.
     final class FileManagerBox: @unchecked Sendable {
@@ -231,13 +261,17 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         // Maps a URLSession taskID -> the index of the file it is downloading, so the
         // delegate's per-task progress callbacks aggregate into per-file byte counters.
         private var taskFileIndex: [Int: Int] = [:]
-        // Per-task bytes written (monotonic per URLSession task). A single-stream file has
-        // one entry; a byte-range chunked file has one entry per in-flight chunk. The
-        // repository total is the sum across all live tasks plus completed-file sizes, so
-        // N chunks of one file aggregate correctly (a per-file monotonic max would not).
+        // Per-task bytes written drive speed deltas. Repository progress is instead
+        // aggregated by stable logical transfer slot: one whole-file identity or one
+        // byte-range identity. A retry gets a new URLSession task ID but the same slot,
+        // so duplicate callbacks can never count the same catalog bytes twice.
         private var taskBytes: [Int: Int64] = [:]
+        private var taskLogicalSlot: [Int: String] = [:]
+        private var logicalSlotBytes: [String: Int64] = [:]
+        private var logicalSlotFileIndex: [String: Int] = [:]
         private var completedFilesBytes: Int64 = 0
         private let repositoryProgressHandler: RepositoryProgressHandlerBox?
+        private let lifecycleEventHandler: LifecycleEventHandlerBox?
         private var repositoryTotalBytes: Int64 = 0
         private var repositoryTotalFiles = 0
         private var repositoryCompletedFiles = 0
@@ -275,15 +309,19 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         private var backgroundCompletionGate = ModelDownloadBackgroundCompletionGate()
         private var verifiedReceiptsByPath: [String: VerifiedArtifactReceipt] = [:]
 
-        /// Bytes counted so far: completed files (at their exact size) plus the live sum of
-        /// in-flight task bytes (single-stream or chunk). Recomputed so retries and chunks
-        /// both stay exact without a separate accumulated counter.
+        /// Bytes counted so far: completed files (at their exact size) plus unique logical
+        /// transfer slots. Retried URLSession tasks share a slot and therefore cannot
+        /// inflate visible progress with transient duplicate wire bytes.
         private var repositoryDownloadedBytes: Int64 {
-            completedFilesBytes + taskBytes.values.reduce(0, +)
+            completedFilesBytes + logicalSlotBytes.values.reduce(0, +)
         }
 
-        init(repositoryProgressHandler: RepositoryProgressHandlerBox?) {
+        init(
+            repositoryProgressHandler: RepositoryProgressHandlerBox?,
+            lifecycleEventHandler: LifecycleEventHandlerBox? = nil
+        ) {
             self.repositoryProgressHandler = repositoryProgressHandler
+            self.lifecycleEventHandler = lifecycleEventHandler
         }
 
         func resetForNewRepositoryDownload(preserveUnclaimedCompletions: Bool) {
@@ -293,6 +331,9 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             destinations.removeAll()
             taskFileIndex.removeAll()
             taskBytes.removeAll()
+            taskLogicalSlot.removeAll()
+            logicalSlotBytes.removeAll()
+            logicalSlotFileIndex.removeAll()
             completedFilesBytes = 0
             repositoryTotalBytes = 0
             repositoryTotalFiles = 0
@@ -342,6 +383,9 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             completedFilesBytes = max(0, min(preverifiedBytes, repositoryTotalBytes))
             taskFileIndex.removeAll()
             taskBytes.removeAll()
+            taskLogicalSlot.removeAll()
+            logicalSlotBytes.removeAll()
+            logicalSlotFileIndex.removeAll()
             self.phase = phase
             let now = ProcessInfo.processInfo.systemUptime
             lastProgressAdvanceTime = now
@@ -372,6 +416,12 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
                let parked = unclaimedCompletionsByKey[identity.reconciliationKey] {
                 if parked.identity == identity {
                     unclaimedCompletionsByKey.removeValue(forKey: identity.reconciliationKey)
+                    lifecycleEventHandler?.handler(.init(
+                        event: "parked-completion-claimed",
+                        taskID: taskID,
+                        identity: identity,
+                        transferredBytes: Self.logicalTransferBytes(identity)
+                    ))
                     task.cancel()
                     continuation.resume(returning: parked.file)
                     return false
@@ -399,6 +449,17 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             destinations[taskID] = destination
             taskFileIndex[taskID] = fileIndex
             taskBytes[taskID] = existingBytes
+            let logicalSlot: String
+            if let identity = ModelDownloadTaskIdentity.decode(taskDescription: task.taskDescription) {
+                logicalSlot = identity.reconciliationKey
+            } else if let range = task.originalRequest?.value(forHTTPHeaderField: "Range"), !range.isEmpty {
+                logicalSlot = "file-\(fileIndex)-\(range)"
+            } else {
+                logicalSlot = "file-\(fileIndex)"
+            }
+            taskLogicalSlot[taskID] = logicalSlot
+            logicalSlotFileIndex[logicalSlot] = fileIndex
+            logicalSlotBytes[logicalSlot] = max(logicalSlotBytes[logicalSlot] ?? 0, existingBytes)
             if existingBytes > 0 {
                 // A resumed partial's bytes are progress, not fresh network throughput:
                 // fold them into the speed baseline instead of injecting them as one
@@ -415,9 +476,14 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             phase = .cancelling
             statusMessage = nil
             emitRepositoryProgress(isStalled: false, force: true)
-            let cancellations = Array(activeCancellations.values)
+            let cancellations = Array(activeCancellations)
             await withTaskGroup(of: Void.self) { group in
-                for cancellation in cancellations {
+                for (taskID, cancellation) in cancellations {
+                    lifecycleEventHandler?.handler(.init(
+                        event: "task-cancellation-requested",
+                        taskID: taskID,
+                        transferredBytes: taskBytes[taskID]
+                    ))
                     group.addTask {
                         await cancellation.cancelAndWait()
                     }
@@ -441,12 +507,24 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             // Adopted-but-unconsumed tasks are live daemon transfers with no
             // registered continuation; without this drain a user cancel would leave
             // them streaming (bandwidth and battery) until the next app launch.
-            for task in adoptedTasksByKey.values { task.cancel() }
+            for task in adoptedTasksByKey.values {
+                lifecycleEventHandler?.handler(.init(
+                    event: "adopted-task-cancellation-requested",
+                    taskID: task.taskIdentifier,
+                    identity: ModelDownloadTaskIdentity.decode(taskDescription: task.taskDescription),
+                    transferredBytes: task.countOfBytesReceived
+                ))
+                task.cancel()
+            }
             adoptedTasksByKey.removeAll()
         }
 
         func cancellationRequested() -> Bool {
             isCancelled
+        }
+
+        func activeTaskCount() -> Int {
+            activeCancellations.count + adoptedTasksByKey.count
         }
 
         func setPhase(_ phase: DownloadPhase) {
@@ -489,6 +567,13 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
                 values.map { ($0.1.reconciliationKey, (url: $0.0, identity: $0.1)) },
                 uniquingKeysWith: { first, _ in first }
             )
+            for entry in expectedEntriesByKey.values {
+                lifecycleEventHandler?.handler(.init(
+                    event: "task-expected",
+                    identity: entry.identity,
+                    transferredBytes: Self.logicalTransferBytes(entry.identity)
+                ))
+            }
             for task in adoptedTasksByKey.values { task.cancel() }
             adoptedTasksByKey.removeAll()
             // Parked completions no expected slot can claim (an older artifact
@@ -515,7 +600,20 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
                 return false
             }
             adoptedTasksByKey[identity.reconciliationKey] = task
+            lifecycleEventHandler?.handler(.init(
+                event: "task-adopted",
+                taskID: task.taskIdentifier,
+                identity: identity,
+                transferredBytes: task.countOfBytesReceived
+            ))
             return true
+        }
+
+        private static func logicalTransferBytes(_ identity: ModelDownloadTaskIdentity) -> Int64 {
+            guard let start = identity.rangeStart, let end = identity.rangeEnd else {
+                return identity.expectedSize
+            }
+            return max(0, end - start + 1)
         }
 
         func takeAdoptedTask(for url: URL) -> URLSessionDownloadTask? {
@@ -543,17 +641,20 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             verifiedReceiptsByPath
         }
 
-        /// Per-task progress from the URLSession delegate. Monotonic per task, so a
-        /// resume->fresh fallback never moves a task's counter backward. Works for both a
-        /// single-stream file (1 task) and a chunked file (N tasks) because the repository
-        /// total is the sum of all task bytes.
+        /// Per-task progress from the URLSession delegate. Raw task bytes remain monotonic
+        /// for speed sampling, while the repository counter advances only the stable
+        /// logical slot. Replacing a failed task therefore never double-counts a range.
         func reportProgress(taskID: Int, totalBytesWritten: Int64) {
-            guard taskFileIndex[taskID] != nil else { return }
-            let previous = taskBytes[taskID] ?? 0
-            let updated = max(previous, totalBytesWritten)
-            let delta = updated - previous
+            guard taskFileIndex[taskID] != nil,
+                  let logicalSlot = taskLogicalSlot[taskID] else { return }
+            let previousTaskBytes = taskBytes[taskID] ?? 0
+            let updatedTaskBytes = max(previousTaskBytes, totalBytesWritten)
+            taskBytes[taskID] = updatedTaskBytes
+            let previousLogicalBytes = logicalSlotBytes[logicalSlot] ?? 0
+            let updatedLogicalBytes = max(previousLogicalBytes, updatedTaskBytes)
+            let delta = updatedLogicalBytes - previousLogicalBytes
             guard delta != 0 else { return }
-            taskBytes[taskID] = updated
+            logicalSlotBytes[logicalSlot] = updatedLogicalBytes
             let now = ProcessInfo.processInfo.systemUptime
             applySpeedMeasurement(now: now, totalDownloaded: repositoryDownloadedBytes, advancedDelta: delta)
             emitRepositoryProgress(isStalled: false)
@@ -567,6 +668,14 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             for taskID in staleTaskIDs {
                 taskBytes.removeValue(forKey: taskID)
                 taskFileIndex.removeValue(forKey: taskID)
+                taskLogicalSlot.removeValue(forKey: taskID)
+            }
+            let staleSlots = logicalSlotFileIndex.keys.filter {
+                logicalSlotFileIndex[$0] == fileIndex
+            }
+            for slot in staleSlots {
+                logicalSlotBytes.removeValue(forKey: slot)
+                logicalSlotFileIndex.removeValue(forKey: slot)
             }
         }
 
@@ -578,9 +687,9 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         /// progress, not fresh network throughput.
         func reportPreexistingFileBytes(fileIndex: Int, bytes: Int64) {
             guard bytes > 0 else { return }
-            let syntheticKey = -(fileIndex + 1)
-            taskFileIndex[syntheticKey] = fileIndex
-            taskBytes[syntheticKey] = (taskBytes[syntheticKey] ?? 0) + bytes
+            let logicalSlot = "recovered-file-\(fileIndex)"
+            logicalSlotFileIndex[logicalSlot] = fileIndex
+            logicalSlotBytes[logicalSlot] = max(logicalSlotBytes[logicalSlot] ?? 0, bytes)
             lastSpeedSampleBytes += bytes
             emitRepositoryProgress(isStalled: false)
         }
@@ -593,10 +702,20 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         /// of injecting its whole size as one spurious "instantaneous" speed sample.
         func reportFileCompleted(fileIndex: Int, expectedSize: Int64, wasTransferred: Bool = true) {
             let fileTaskIDs = taskFileIndex.keys.filter { taskFileIndex[$0] == fileIndex }
-            var liveForFile: Int64 = 0
+            let fileSlots = logicalSlotFileIndex.keys.filter {
+                logicalSlotFileIndex[$0] == fileIndex
+            }
+            let liveForFile = fileSlots.reduce(Int64(0)) {
+                $0 + (logicalSlotBytes[$1] ?? 0)
+            }
             for taskID in fileTaskIDs {
-                liveForFile += taskBytes.removeValue(forKey: taskID) ?? 0
+                taskBytes.removeValue(forKey: taskID)
                 taskFileIndex.removeValue(forKey: taskID)
+                taskLogicalSlot.removeValue(forKey: taskID)
+            }
+            for slot in fileSlots {
+                logicalSlotBytes.removeValue(forKey: slot)
+                logicalSlotFileIndex.removeValue(forKey: slot)
             }
             completedFilesBytes += expectedSize
             repositoryCompletedFiles += 1
@@ -673,6 +792,12 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
                 ) {
                     try? FileManager.default.removeItem(at: superseded.file.url)
                 }
+                lifecycleEventHandler?.handler(.init(
+                    event: "completion-parked",
+                    taskID: taskID,
+                    identity: identity,
+                    transferredBytes: Self.logicalTransferBytes(identity)
+                ))
             } else {
                 try? FileManager.default.removeItem(at: temporaryFile.url)
             }
@@ -916,6 +1041,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
     private let backgroundSessionCompletionHandler: (@Sendable (String) -> Void)?
     private let transferMetricsHandler: TransferMetricsHandlerBox?
     private let verifiedArtifactHandler: VerifiedArtifactHandlerBox?
+    private let lifecycleEventHandler: LifecycleEventHandlerBox?
     private let artifactURLPolicy: ModelArtifactURLPolicy?
 
     // MARK: - Transfer sessions and task keys
@@ -1139,11 +1265,16 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         durableTemporaryDirectory: URL? = nil,
         transferMetricsHandler: (@Sendable (TransferMetrics) -> Void)? = nil,
         verifiedArtifactHandler: (@Sendable (VerifiedArtifactReceipt) async -> Void)? = nil,
+        lifecycleEventHandler: (@Sendable (LifecycleEvent) -> Void)? = nil,
         backgroundSessionCompletionHandler: (@Sendable (String) -> Void)? = nil,
         artifactURLPolicy: ModelArtifactURLPolicy? = nil
     ) {
         let progressBox = progressHandler.map(RepositoryProgressHandlerBox.init)
-        state = DownloadStateRegistry(repositoryProgressHandler: progressBox)
+        let lifecycleBox = lifecycleEventHandler.map(LifecycleEventHandlerBox.init)
+        state = DownloadStateRegistry(
+            repositoryProgressHandler: progressBox,
+            lifecycleEventHandler: lifecycleBox
+        )
         self.apiBaseURL = apiBaseURL
         self.resolveBaseURL = resolveBaseURL
         self.fileManagerBox = FileManagerBox(fileManager)
@@ -1151,6 +1282,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         self.backgroundSessionCompletionHandler = backgroundSessionCompletionHandler
         self.transferMetricsHandler = transferMetricsHandler.map(TransferMetricsHandlerBox.init)
         self.verifiedArtifactHandler = verifiedArtifactHandler.map(VerifiedArtifactHandlerBox.init)
+        self.lifecycleEventHandler = lifecycleBox
         self.artifactURLPolicy = artifactURLPolicy
         self.isBackgroundSession = sessionConfiguration.identifier != nil
         self.durableTemporaryDirectory = durableTemporaryDirectory ?? fileManager.temporaryDirectory
@@ -1432,6 +1564,12 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         await state.requestCancellation()
     }
 
+    /// Privacy-safe active-task count for the opt-in physical-device diagnostic heartbeat.
+    /// It exposes no task requests, URLs, paths, or session identifiers.
+    public func diagnosticActiveTaskCount() async -> Int {
+        await state.activeTaskCount()
+    }
+
     private func throwIfCancellationRequested() async throws {
         if Task.isCancelled {
             throw DownloadError.cancelled
@@ -1492,12 +1630,28 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             expected: Array(expected.values),
             existing: existing
         )
+        lifecycleEventHandler?.handler(.init(
+            event: "tasks-reconciled",
+            taskCount: tasks.count
+        ))
+        for key in plan.missingReconciliationKeys {
+            lifecycleEventHandler?.handler(.init(
+                event: "task-missing-after-reconciliation",
+                identity: expected[key]
+            ))
+        }
         let cancelled = Set(plan.cancelledTaskIDs)
         for task in tasks {
             guard !cancelled.contains(task.taskIdentifier),
                   let downloadTask = task as? URLSessionDownloadTask,
                   let identity = validIdentityByTaskID[task.taskIdentifier],
                   await state.adopt(task: downloadTask, identity: identity) else {
+                lifecycleEventHandler?.handler(.init(
+                    event: "task-cancelled-during-reconciliation",
+                    taskID: task.taskIdentifier,
+                    identity: validIdentityByTaskID[task.taskIdentifier],
+                    transferredBytes: task.countOfBytesReceived
+                ))
                 task.cancel()
                 continue
             }
@@ -2248,6 +2402,12 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         // Bytes are in the partial before the sidecar records them; a crash between
         // the two only re-fetches this range (idempotent rewrite).
         await assembly.recordCompleted(range: range)
+        lifecycleEventHandler?.handler(.init(
+            event: "chunk-assembled",
+            taskID: key,
+            identity: ModelDownloadTaskIdentity.decode(taskDescription: task.taskDescription),
+            transferredBytes: range.end - range.start + 1
+        ))
     }
 
     /// Partition `[0, total)` into uniform `chunkSize` ranges, except the final
@@ -2816,6 +2976,12 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         didFinishDownloadingTo location: URL
     ) {
         let taskID = taskKey(for: downloadTask, in: session)
+        lifecycleEventHandler?.handler(.init(
+            event: "chunk-landed",
+            taskID: taskID,
+            identity: ModelDownloadTaskIdentity.decode(taskDescription: downloadTask.taskDescription),
+            transferredBytes: downloadTask.countOfBytesReceived
+        ))
 
         let response = downloadTask.response as? HTTPURLResponse
         let statusCode = response?.statusCode
@@ -2897,6 +3063,12 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         didCompleteWithError error: Error?
     ) {
         let taskID = taskKey(for: task, in: session)
+        lifecycleEventHandler?.handler(.init(
+            event: error == nil ? "task-completed" : "task-failed",
+            taskID: taskID,
+            identity: ModelDownloadTaskIdentity.decode(taskDescription: task.taskDescription),
+            transferredBytes: task.countOfBytesReceived
+        ))
         delegateProgressGate.withLock { gate in
             gate.finish(taskID: taskID)
         }

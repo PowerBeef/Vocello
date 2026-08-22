@@ -47,7 +47,29 @@ machine-readable status record and wins over any older prose.
 | 13 — Benchmark/history v3 | Live 2026-07-29: the first schema-v3 records are committed (three clean `phase0-cli-control-*` engine records plus one exploratory run that also exposed and fixed the summarizer's v3 pin). `benchmarks/schema-v3.json` adds the typed quality identity to generation takes (pass/warning only, five fast gates required, machine-code issues); v1/v2 records stay valid immutable history; the publisher stamps v3 only when every take carries the identity. The UI benchmark checkers folded the same identity 2026-08-01: ui-generation records now publish v3 (first: the focused `v3-fold-proof` record `macos-xcui-benchmark-20260801-003208-403989cf`); the canonical iOS matrix published its first v3 record 2026-08-01 (`ios-xcui-benchmark-20260801-132415-abbec96b`). |
 | 14 — Organization and retirement | Closed 2026-07-23 (14a + 14b): compatibility SPI retired, actor-owned loading/metadata/priming/clone artifacts, clone conditioning epoch-bound end to end. |
 
-## Resume here (2026-08-21)
+## Resume here (2026-08-22)
+
+**MD-3 progress rendering and observer races isolated on the physical iPhone (2026-08-22):** a
+complete Custom cancel/restart/relaunch-adoption/Ready/remove diagnostic first proved exact
+determinate measurements at 19%, 36%, 50%, 82%, and 96%, about 12:1 fill/track contrast, stable
+900×18-pixel crops, clean deletion, and no lifecycle divergence. A subsequent run exposed a real
+rendering edge case: at 99.95% exact bytes, a six-point rounded capsule was pixel-indistinguishable
+from full. `IOSModelProgressPresentation` now reserves one rail-thickness segment at the trailing
+edge until byte completion, while the accessibility value and copy continue to report the exact
+fraction. Host analysis compares pixels against raw-byte fraction, rejects a visually full
+incomplete bar, and handles rounded capsule caps rather than averaging them into the background.
+Later run `ios-xcui-model-download-20260822-065527-14a7597e` again completed cancellation,
+adoption, authenticated installation, removal, and relaunch persistence with four accurate visual
+samples; its journal proved durable progress jumped from 94.06% directly to 100%, so the original
+strict at-or-above-95 capture rule correctly produced `missing-progress-milestones`. The procedure
+now records the first exact incomplete sample in the five-point band below 95 instead of inventing
+an intermediate value. Run `ios-xcui-model-download-20260822-071543-b7080a04` then exposed an
+XCUITest-only observer race when one 71.98% sample crossed two thresholds and the row became Ready
+between repeated mutable-element queries. Crossed milestones now reuse one immutable byte/frame/
+accessibility/action/screenshot sample. The phone became temporarily unavailable while failure
+forensics were being collected, so no run from this refinement sequence counts toward the final
+two-consecutive-diagnose plus acceptance gate. Focused host contracts, Swift parsing, and shell
+validation pass; MD-3 remains open pending the physical-device sequence.
 
 **MD-3 autonomous model-management diagnostics implemented and first live divergence isolated
 (2026-08-21, desk + physical iPhone):** the opt-in physical-iPhone lane now has `diagnose`,

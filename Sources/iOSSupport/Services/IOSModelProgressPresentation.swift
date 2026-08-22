@@ -71,6 +71,26 @@ struct IOSModelProgressPresentation: Equatable, Sendable {
         detail: "Making the model available offline."
     )
 
+    /// Keeps an incomplete determinate rail visibly incomplete after pixel quantization while
+    /// preserving the exact byte fraction in the presentation and accessibility contract.
+    /// A segment no thicker than the rail itself is reserved at either end, so the rendered
+    /// geometry remains within two percentage points on the 300-point model-management rail.
+    static func visibleDeterminateFillWidth(
+        fraction: Double,
+        width: Double,
+        thickness: Double
+    ) -> Double {
+        guard width.isFinite, width > 0 else { return 0 }
+        let clamped = min(max(fraction.isFinite ? fraction : 0, 0), 1)
+        guard clamped > 0 else { return 0 }
+        guard clamped < 1 else { return width }
+        let minimumSegment = min(max(thickness, 0), width / 2)
+        return min(
+            max(width * clamped, minimumSegment),
+            width - minimumSegment
+        )
+    }
+
     private static func appendOptionalTransferDetails(
         to details: inout [String],
         bytesPerSecond: Int64?,

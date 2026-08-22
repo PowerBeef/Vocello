@@ -581,6 +581,33 @@ final class VocelloiOSLogicTests: XCTestCase {
         )
     }
 
+    func testModelProgressIncompleteRailRetainsVisibleTrackAtPixelBoundary() {
+        XCTAssertEqual(
+            IOSModelProgressPresentation.visibleDeterminateFillWidth(
+                fraction: 0.9995,
+                width: 300,
+                thickness: 6
+            ),
+            294
+        )
+        XCTAssertEqual(
+            IOSModelProgressPresentation.visibleDeterminateFillWidth(
+                fraction: 0.5,
+                width: 300,
+                thickness: 6
+            ),
+            150
+        )
+        XCTAssertEqual(
+            IOSModelProgressPresentation.visibleDeterminateFillWidth(
+                fraction: 1,
+                width: 300,
+                thickness: 6
+            ),
+            300
+        )
+    }
+
     private func snapshot(headroom: UInt64, footprint: UInt64) -> IOSMemorySnapshot {
         IOSMemorySnapshot(
             processRole: .app,

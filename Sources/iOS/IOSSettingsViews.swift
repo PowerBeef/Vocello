@@ -460,9 +460,11 @@ private struct IOSModelTransferProgressBar: View {
     var body: some View {
         GeometryReader { proxy in
             let clamped = min(max(fraction, 0), 1)
-            let filledWidth = clamped == 0
-                ? 0
-                : min(proxy.size.width, max(proxy.size.height, proxy.size.width * clamped))
+            let filledWidth = CGFloat(IOSModelProgressPresentation.visibleDeterminateFillWidth(
+                fraction: clamped,
+                width: Double(proxy.size.width),
+                thickness: Double(proxy.size.height)
+            ))
             ZStack(alignment: .leading) {
                 Capsule(style: .continuous)
                     .fill(Theme.Surface.inline)

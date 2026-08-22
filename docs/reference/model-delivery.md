@@ -254,13 +254,20 @@ scripts/ui_test.sh ios model-download --scenario recover
 ```
 
 XCUITest captures the full row and exact progress element at first movement and the first samples
-at or above 25%, 50%, 75%, and 95%, plus finalization, Ready, and removal when observable. The host
-checker correlates those observations with raw bytes and journal events, measures leading-edge fill,
-fraction error (five percentage-point maximum), 3:1 fill/track contrast, monotonic growth, stable
-geometry, and writes `model-management-diagnosis.json`, `model-management-timeline.md`,
+at or above 25%, 50%, and 75%. The late-transfer checkpoint uses the first exact incomplete sample
+in the 90%–under-100% band: catalog-byte callbacks can truthfully jump from 94% directly to complete,
+so the harness neither invents a 95% value nor leaves a determinate full bar visible. One observed
+sample can satisfy multiple crossed milestones; its bytes, fraction, frame, accessibility value,
+action state, and app screenshot are captured once and reused immutably so finalization cannot race
+later evidence queries. Finalization, Ready, and removal are captured separately when observable.
+The host checker correlates those observations with raw bytes and journal events, measures
+leading-edge fill, fraction error (five percentage-point maximum), 3:1 fill/track contrast,
+monotonic growth, stable geometry, and writes `model-management-diagnosis.json`,
+`model-management-timeline.md`,
 `model-management-summary.json`, `progress-visual-summary.json`, and a contact sheet beside the
 `.xcresult`. Forensic collection runs even after XCTest fails. Acceptance requires no inconsistent
-layer; `diagnose` may succeed as a diagnostic collection while truthfully classifying MD-3.
+layer; `diagnose` may complete as a diagnostic collection while truthfully classifying MD-3. Such a
+run is recorded as `diagnosedFailure`, not as a passing acceptance result.
 
 Deterministic tests are model-free and Simulator-free. Live delivery is an explicit diagnostic:
 

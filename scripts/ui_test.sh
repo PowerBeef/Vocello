@@ -476,6 +476,12 @@ pull_ios_model_download_diagnostics() {
     --source "Library/Application Support/Q-Voice/model-download-acceptance/diagnostics/model-downloads" \
     --destination "$destination" >"$out/model-download-diagnostics-pull.log" 2>&1 \
     || return 1
+  python3 "$ROOT_DIR/scripts/check_ios_model_management.py" \
+    --partition-prior-traces \
+    --diagnostics "$destination" \
+    --run-id "$run_id" \
+    >>"$out/model-download-diagnostics-pull.log" 2>&1 \
+    || return 1
   python3 - "$destination" "$ROOT_DIR/Sources/Resources/qwenvoice_production_model_catalog.json" "$model_scenario" <<'PY'
 import json, os, pathlib, sys
 
@@ -1126,6 +1132,7 @@ else
   fi
 
   model_diagnostics_status=0
+  model_diagnosis_result="passed"
   if [[ "$lane" == "model-download" ]]; then
     if ! required_step_run "$step_ledger" model-download-diagnostics \
         pull_ios_model_download_diagnostics "$device" "$out/model-download-diagnostics"; then
@@ -1142,6 +1149,23 @@ else
         >"$out/model-management-validator.log" 2>&1; then
       model_diagnostics_status=1
       warn "model-management diagnosis reported incomplete or inconsistent evidence"
+    fi
+    if [[ -f "$out/model-management-summary.json" ]]; then
+      if ! model_diagnosis_result="$(python3 - "$out/model-management-summary.json" <<'PY'
+import json, pathlib, sys
+
+result = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8")).get("result")
+if result not in {"passed", "diagnosedFailure"}:
+    raise SystemExit(f"unsupported model-management diagnosis result: {result!r}")
+print(result)
+PY
+)"; then
+        model_diagnostics_status=1
+        warn "could not read the model-management diagnosis result"
+      fi
+    else
+      model_diagnostics_status=1
+      warn "model-management diagnosis summary is missing"
     fi
   fi
 
@@ -1173,7 +1197,14 @@ fi
 finished_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 note "per-test results:"
 write_test_summary || true
-write_run_metadata passed "$finished_at" 0
+final_run_status="passed"
+if [[ "$platform" == "ios" && "$lane" == "model-download" \
+    && "$model_scenario" == "diagnose" && "${model_diagnosis_result:-passed}" == "diagnosedFailure" ]]; then
+  final_run_status="diagnosedFailure"
+  write_run_metadata diagnosedFailure "$finished_at" 0
+else
+  write_run_metadata passed "$finished_at" 0
+fi
 run_finalized=1
 
 if [[ "$lane" == "benchmark" ]]; then
@@ -1199,7 +1230,9 @@ fi
 # run is durably marked as passed (and, for benchmarks, after history
 # publication). Cleanup failure must not rewrite an otherwise valid UI verdict.
 retention_status=0
-if "$ROOT_DIR/scripts/clean_build_caches.sh" --prune-ui-results --ui-keep 1 \
+if [[ "$final_run_status" == "diagnosedFailure" ]]; then
+  note "retained correctly classified diagnostic failure evidence"
+elif "$ROOT_DIR/scripts/clean_build_caches.sh" --prune-ui-results --ui-keep 1 \
     >"$out/result-retention.log" 2>&1; then
   note "pruned superseded XCUITest results (latest passing result retained per platform/lane)"
 else
@@ -1211,4 +1244,8 @@ required_step_record "$step_ledger" result-retention "$retention_status"
 required_steps_finalize "$step_ledger" \
   || die "$platform $lane required-step ledger did not pass"
 
-note "$platform $lane PASS · $out"
+if [[ "$final_run_status" == "diagnosedFailure" ]]; then
+  note "$platform $lane DIAGNOSTIC COMPLETE (diagnosedFailure) · $out"
+else
+  note "$platform $lane PASS · $out"
+fi

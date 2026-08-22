@@ -38,6 +38,14 @@ final class VocelloiOSModelDownloadUITests: VocelloiOSUITestCase {
             height = rect.size.height
         }
     }
+
+    private struct ProgressSample {
+        let rawBytes: Int64?
+        let totalBytes: Int64?
+        let fraction: Double
+        let frame: CGRect
+        let visibleText: String
+    }
     private let isolatedSupportRoot = "model-download-acceptance"
     private let modelID = "pro_custom"
     private let modelIDs = ["pro_custom", "pro_design", "pro_clone"]
@@ -426,13 +434,13 @@ final class VocelloiOSModelDownloadUITests: VocelloiOSUITestCase {
             "isolated \(modelID) to install or expose a \(Int(stallTimeout))s progress stall",
             timeout: timeout
         ) {
-            if installed.exists { return true }
             let currentProgress = self.observeProgress(modelID: modelID)
             if currentProgress > highestProgress + 0.000_1 {
                 highestProgress = currentProgress
                 lastAdvance = Date()
             }
             self.observeIndeterminatePhase(modelID: modelID)
+            if installed.exists { return true }
             return Date().timeIntervalSince(lastAdvance) >= stallTimeout
         }
         guard reachedInstalledOrStalled else {
@@ -449,17 +457,33 @@ final class VocelloiOSModelDownloadUITests: VocelloiOSUITestCase {
     @discardableResult
     private func observeProgress(modelID: String) -> Double {
         let progress = element("iosModelProgress_\(modelID)")
-        guard progress.exists else { return 0 }
-        let fraction = progressFraction(progress)
-        for threshold in [1, 25, 50, 75, 95] {
-            let target = threshold == 1 ? 0.000_1 : Double(threshold) / 100
-            guard fraction >= target,
-                  capturedProgressMilestones[modelID, default: []].insert(threshold).inserted else {
-                continue
+        guard let sample = progressSample(progress) else { return 0 }
+        let crossedThresholds = [1, 25, 50, 75, 95].filter { threshold in
+            // Catalog-byte progress can jump directly from an incomplete sample to 100% when
+            // the final range lands. Capture the 95% visual checkpoint from the first honest
+            // incomplete sample in its five-point band instead of inventing a determinate value
+            // or missing the checkpoint when there is no callback in [0.95, 1.0).
+            let target = switch threshold {
+            case 1: 0.000_1
+            case 95: 0.90
+            default: Double(threshold) / 100
             }
-            recordObservation(modelID: modelID, milestone: "transfer-\(threshold)")
+            return sample.fraction >= target
+                && sample.fraction < 1
+                && !capturedProgressMilestones[modelID, default: []].contains(threshold)
         }
-        return fraction
+        guard !crossedThresholds.isEmpty else { return sample.fraction }
+        let screenshot = app.screenshot()
+        for threshold in crossedThresholds {
+            capturedProgressMilestones[modelID, default: []].insert(threshold)
+            recordObservation(
+                modelID: modelID,
+                milestone: "transfer-\(threshold)",
+                progressSample: sample,
+                screenshot: screenshot
+            )
+        }
+        return sample.fraction
     }
 
     private func observeIndeterminatePhase(modelID: String) {
@@ -470,33 +494,70 @@ final class VocelloiOSModelDownloadUITests: VocelloiOSUITestCase {
         recordObservation(modelID: modelID, milestone: phase)
     }
 
-    private func recordObservation(modelID: String, milestone: String) {
+    private func recordObservation(
+        modelID: String,
+        milestone: String,
+        progressSample suppliedProgressSample: ProgressSample? = nil,
+        screenshot suppliedScreenshot: XCUIScreenshot? = nil
+    ) {
         let progress = element("iosModelProgress_\(modelID)")
         let activity = element("iosModelPhaseActivity_\(modelID)")
-        let measured = progress.exists ? progress : activity
         let row = element("iosModelRow_\(modelID)")
-        let detail = accessibilityText(element("iosModelProgressDetail_\(modelID)"))
-        let status = accessibilityText(element("iosModelStatus_\(modelID)"))
-        let byteValues = parseByteAccessibilityValue(progress.exists ? accessibilityText(progress) : nil)
-        let accessibilityFraction = progress.exists ? progressFraction(progress) : nil
+        let sampledProgress = suppliedProgressSample ?? progressSample(progress)
+        let progressExists = sampledProgress != nil
+        let activityExists = !progressExists && activity.exists
+        let measuredFrame = sampledProgress?.frame
+            ?? (activityExists ? activity.frame : .zero)
+        let rowFrame = row.exists ? row.frame : .zero
+        // A supplied transfer sample is an immutable observation of UI state that may already
+        // have advanced to finalization while screenshots are attached. Never re-query mutable
+        // progress-detail, status, or action elements for each crossed milestone: a fast transfer
+        // can remove those elements between otherwise identical records.
+        let detail = sampledProgress?.visibleText
+            ?? accessibilityText(element("iosModelProgressDetail_\(modelID)"))
+        let status = sampledProgress == nil
+            ? accessibilityText(element("iosModelStatus_\(modelID)"))
+            : "Downloading"
+        let byteValues = (
+            raw: sampledProgress?.rawBytes,
+            total: sampledProgress?.totalBytes
+        )
+        let accessibilityFraction = sampledProgress?.fraction
         let expectedFraction: Double? = {
             guard let raw = byteValues.raw, let total = byteValues.total, total > 0 else { return nil }
             return min(max(Double(raw) / Double(total), 0), 1)
         }()
-        let actionNames = ["Download", "Update", "Cancel", "Repair", "Retry", "Delete"]
-        let actions = actionNames.filter { element("iosModel\($0)_\(modelID)").exists }
+        let actions: [String]
+        if sampledProgress != nil {
+            actions = ["Cancel"]
+        } else {
+            let actionNames = ["Download", "Update", "Cancel", "Repair", "Retry", "Delete"]
+            actions = actionNames.filter { element("iosModel\($0)_\(modelID)").exists }
+        }
         let safeMilestone = milestone.replacingOccurrences(of: " ", with: "-")
         let rowScreenshot = "ios-model-row-\(modelID)-\(safeMilestone)"
-        let progressScreenshot = measured.exists
+        let progressScreenshot = measuredFrame.width > 0 && measuredFrame.height > 0
             ? "ios-model-progress-\(modelID)-\(safeMilestone)"
             : nil
-        if row.exists {
-            VocelloUIScreenshot.attach(row, named: rowScreenshot)
-        } else {
+        let screenshot = suppliedScreenshot ?? app.screenshot()
+        let appFrame = app.frame
+        if rowFrame.width > 0 && rowFrame.height > 0 {
+            _ = VocelloUIScreenshot.attach(
+                screenshot,
+                appFrame: appFrame,
+                cropping: rowFrame,
+                named: rowScreenshot
+            )
+        } else if suppliedScreenshot == nil {
             VocelloUIScreenshot.attach(app, named: rowScreenshot)
         }
-        if measured.exists, let progressScreenshot {
-            VocelloUIScreenshot.attach(measured, named: progressScreenshot)
+        if let progressScreenshot {
+            _ = VocelloUIScreenshot.attach(
+                screenshot,
+                appFrame: appFrame,
+                cropping: measuredFrame,
+                named: progressScreenshot
+            )
         }
         let observation = UIObservation(
             schemaVersion: 1,
@@ -509,10 +570,10 @@ final class VocelloiOSModelDownloadUITests: VocelloiOSUITestCase {
             accessibilityFraction: accessibilityFraction,
             visibleText: detail,
             status: status,
-            phase: progress.exists ? "transfer" : (status ?? "terminal").lowercased(),
+            phase: progressExists ? "transfer" : (status ?? "terminal").lowercased(),
             actions: actions,
-            elementFrame: Frame(measured.exists ? measured.frame : .zero),
-            rowFrame: Frame(row.exists ? row.frame : .zero),
+            elementFrame: Frame(measuredFrame),
+            rowFrame: Frame(rowFrame),
             progressScreenshot: progressScreenshot,
             rowScreenshot: rowScreenshot
         )
@@ -531,6 +592,24 @@ final class VocelloiOSModelDownloadUITests: VocelloiOSUITestCase {
         let numbers = value.split(whereSeparator: { !$0.isNumber }).compactMap { Int64($0) }
         guard numbers.count >= 3 else { return (nil, nil) }
         return (numbers[numbers.count - 2], numbers[numbers.count - 1])
+    }
+
+    private func progressSample(_ element: XCUIElement) -> ProgressSample? {
+        guard element.exists else { return nil }
+        guard let value = element.value as? String else { return nil }
+        let byteValues = parseByteAccessibilityValue(value)
+        guard let rawBytes = byteValues.raw,
+              let totalBytes = byteValues.total,
+              totalBytes > 0 else {
+            return nil
+        }
+        return ProgressSample(
+            rawBytes: rawBytes,
+            totalBytes: totalBytes,
+            fraction: progressFraction(value),
+            frame: element.frame,
+            visibleText: value
+        )
     }
 
     private func modelManagementEnvironment() -> [String: String] {
@@ -620,10 +699,14 @@ final class VocelloiOSModelDownloadUITests: VocelloiOSUITestCase {
 
     private func progressFraction(_ element: XCUIElement) -> Double {
         guard element.exists else { return 0 }
-        if let number = element.value as? NSNumber {
+        return progressFraction(element.value)
+    }
+
+    private func progressFraction(_ value: Any?) -> Double {
+        if let number = value as? NSNumber {
             return number.doubleValue
         }
-        guard let value = element.value as? String else { return 0 }
+        guard let value = value as? String else { return 0 }
         let firstToken = value.split(separator: "—", maxSplits: 1).first.map(String.init) ?? value
         let numeric = firstToken
             .replacingOccurrences(of: "%", with: "")

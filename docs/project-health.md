@@ -4,8 +4,8 @@
 > execute models, devices, UI tests, signing, or network checks.
 
 - Current source identity and dirty state: local JSON report only (kept out of the tracked snapshot to avoid self-referential drift)
-- Swift tests: 562 cases in 77 files
-- Python tests: 1033 cases in 79 files
+- Swift tests: 563 cases in 77 files
+- Python tests: 1042 cases in 79 files
 - Required-step assurance: 76 steps across 17 workflows, all covered by forced-failure fixtures
 - Unsafe-concurrency annotations: 49 (49 registered with owner and invariant; contract complete)
 - Evidence routing: 751/751 critical paths explicit; 0 use repository-other fallback
@@ -28,8 +28,8 @@
 | generation-terminal | backend | 4 | 2 / 16 | macos-ui-generation: stale, ios-ui-generation: stale |
 | clone-conditioning | backend | 33 | 2 / 32 | macos-ui-generation: stale, ios-ui-generation: stale |
 | event-delivery | backend | 3 | 2 / 10 | macos-ui-generation: stale, ios-ui-generation: stale |
-| memory-policy | backend-platform | 6 | 2 / 28 | macos-memory-qualification: stale, ios-memory-qualification: stale |
-| model-delivery | backend-platform | 17 | 3 / 45 | external promotion: macos-model-download-lifecycle, ios-model-download-lifecycle |
+| memory-policy | backend-platform | 6 | 2 / 29 | macos-memory-qualification: stale, ios-memory-qualification: stale |
+| model-delivery | backend-platform | 17 | 3 / 46 | external promotion: macos-model-download-lifecycle, ios-model-download-lifecycle |
 | ui-performance | platform | 76 | 16 / 56 | macos-ui-performance: stale, ios-ui-performance: stale |
 | xpc-transport | macos | 3 | 4 / 18 | macos-ui-generation: stale |
 | benchmark-validation | release-qa | 6 | 4 / 121 | macos-ui-generation: stale, ios-ui-generation: stale |

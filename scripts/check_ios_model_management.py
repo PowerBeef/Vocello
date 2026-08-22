@@ -24,6 +24,7 @@ from typing import Any, Iterable
 
 OBSERVATION_PREFIX = "VOCELLO_MODEL_OBSERVATION="
 PASS_SCENARIOS = {"acceptance", "queue", "recover", "soak"}
+REQUIRED_PROGRESS_MILESTONES = {"transfer-1", "transfer-25", "transfer-50", "transfer-75", "transfer-95"}
 
 
 def load_json(path: pathlib.Path) -> Any:
@@ -69,6 +70,69 @@ def read_trace(root: pathlib.Path, run_id: str) -> list[dict[str, Any]]:
     return events
 
 
+def partition_prior_trace_events(root: pathlib.Path, run_id: str) -> dict[str, int]:
+    """Move older retained-run events out of the active trace input without discarding them.
+
+    A failed physical-device run deliberately leaves one bounded support root for the next
+    diagnostic. The pull therefore contains prior journal files by design. Keep those files in the
+    host artifact for comparison, but ensure the current run's validator sees one run identity.
+    `read_trace` remains fail-closed if a mismatched event is left in the active trace directory.
+    """
+    trace_root = root / "trace"
+    prior_root = root / "prior-traces"
+    current = prior = 0
+    for path in sorted(trace_root.glob("event-*.json")):
+        value = load_json(path)
+        if value.get("schemaVersion") != 1:
+            raise SystemExit(f"unsupported delivery trace schema in {path}")
+        event_run_id = value.get("runID")
+        if event_run_id == run_id:
+            current += 1
+            continue
+        safe_run_id = re.sub(r"[^A-Za-z0-9._-]+", "-", str(event_run_id or "unknown"))[:96]
+        destination = prior_root / safe_run_id / path.name
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        path.replace(destination)
+        prior += 1
+    return {"currentEventCount": current, "priorEventCount": prior}
+
+
+def missing_progress_milestones(
+    observations: Iterable[dict[str, Any]],
+    scenario: str,
+) -> list[str]:
+    if scenario not in {"diagnose", "acceptance"}:
+        return []
+    captured = {
+        observation.get("milestone")
+        for observation in observations
+        if observation.get("modelID") == "pro_custom"
+    }
+    return sorted(REQUIRED_PROGRESS_MILESTONES - captured)
+
+
+def invalid_progress_milestone_ranges(
+    observations: Iterable[dict[str, Any]],
+    scenario: str,
+) -> list[str]:
+    """Reject a nominal late-transfer checkpoint that is not genuinely near 95%.
+
+    Exact durable catalog-byte updates may jump from an incomplete sample to completion. The UI
+    harness therefore captures the first real sample in the five-point band below 95%; it never
+    manufactures a percentage or leaves a full determinate bar on screen during finalization.
+    """
+    if scenario not in {"diagnose", "acceptance"}:
+        return []
+    invalid: list[str] = []
+    for observation in observations:
+        if observation.get("modelID") != "pro_custom" or observation.get("milestone") != "transfer-95":
+            continue
+        fraction = observation.get("expectedFraction")
+        if not isinstance(fraction, (int, float)) or not math.isfinite(fraction) or not 0.90 <= fraction < 1:
+            invalid.append("transfer-95")
+    return sorted(set(invalid))
+
+
 def attachment_map(attachments: pathlib.Path) -> dict[str, pathlib.Path]:
     manifest = attachments / "manifest.json"
     if not manifest.is_file():
@@ -81,7 +145,18 @@ def attachment_map(attachments: pathlib.Path) -> dict[str, pathlib.Path]:
             name = attachment.get("suggestedHumanReadableName")
             exported = attachment.get("exportedFileName")
             if name and exported:
-                result[name] = attachments / exported
+                path = attachments / exported
+                result[name] = path
+                # Xcode 26 decorates explicit XCTAttachment names during export with an
+                # occurrence counter and UUID. UI observations intentionally record the stable
+                # source name, so also expose that canonical key without weakening exact-name
+                # lookup for ordinary attachments.
+                canonical = re.sub(
+                    r"_\d+_[0-9A-Fa-f-]{36}(?:\.[A-Za-z0-9]+)?$",
+                    "",
+                    name,
+                )
+                result.setdefault(canonical, path)
     return result
 
 
@@ -166,23 +241,53 @@ def color_distance(first: tuple[float, float, float], second: tuple[float, float
 
 def analyze_bar(path: pathlib.Path, reported_fraction: float) -> dict[str, Any]:
     width, height, pixels = png_pixels(path)
-    columns = [average(pixels[column::width]) for column in range(width)]
-    edge = max(1, width // 20)
-    fill_color = average(columns[:edge])
-    track_color = average(columns[-edge:])
+    # Inspect the capsule's central band. Averaging its full height makes the rounded leading
+    # cap look like background in the first columns and previously measured every real bar as
+    # zero-width. The reported fraction is used only to choose samples that are safely inside the
+    # expected fill and track; the transition itself is independently measured from pixels.
+    first_row = height // 3
+    last_row = max(first_row + 1, height - height // 3)
+    columns = [
+        average(pixels[row * width + column] for row in range(first_row, last_row))
+        for column in range(width)
+    ]
+    inset = min(max(1, height // 2), max(1, width // 20))
+    # The central band is fully inside the capsule, so only discard one edge pixel when
+    # sampling the trailing track. Reusing the full cap-radius inset here made a truthful 99%
+    # bar sample the fill immediately before its narrow remaining track and falsely report
+    # 1:1 contrast. Keep the larger leading inset for the rounded-cap anchor check below.
+    edge_guard = 1
+    sample_limit = max(2, width // 20)
+    fill_sample_width = max(2, min(sample_limit, int(max(reported_fraction, 0.01) * width / 2)))
+    track_sample_width = max(2, min(sample_limit, int(max(1 - reported_fraction, 0.01) * width / 2)))
+    fill_color = average(columns[inset : min(width, inset + fill_sample_width)])
+    track_end = max(inset + 1, width - edge_guard)
+    track_color = average(columns[max(inset, track_end - track_sample_width) : track_end])
     separation = color_distance(fill_color, track_color)
-    threshold = max(12.0, separation * 0.45)
-    fill_columns = 0
-    for column in columns:
-        if color_distance(column, fill_color) <= threshold:
-            fill_columns += 1
-        else:
+    sustain = max(2, height // 4)
+    endpoint = width - edge_guard
+    for column in range(inset, width - edge_guard):
+        stop = min(width - edge_guard, column + sustain)
+        if stop - column < sustain:
             break
-    measured = fill_columns / width
+        if all(
+            color_distance(columns[index], track_color)
+            < color_distance(columns[index], fill_color)
+            for index in range(column, stop)
+        ):
+            endpoint = column
+            break
+    measured = endpoint / width
     ratio = contrast_ratio(fill_color, track_color)
     fill_chroma = max(fill_color) - min(fill_color)
     track_chroma = max(track_color) - min(track_color)
-    leading_edge_anchored = fill_columns > 0 and fill_chroma > track_chroma + 5
+    leading_edge_anchored = (
+        endpoint > inset
+        and separation >= 12
+        and fill_chroma > track_chroma + 5
+        and color_distance(columns[inset], fill_color)
+        < color_distance(columns[inset], track_color)
+    )
     return {
         "image": str(path),
         "width": width,
@@ -299,17 +404,21 @@ def diagnose(events: list[dict[str, Any]], observations: list[dict[str, Any]]) -
         if ordered != list(range(ordered[0], ordered[-1] + 1)):
             findings.append(Finding("trace-sequence-gap", "harness", f"Trace process {process[:8]} has missing or duplicate sequence numbers."))
 
-    progress_by_model: dict[str, tuple[int, int]] = {}
+    progress_by_request: dict[tuple[str, str], tuple[int, int]] = {}
     for event in events:
+        if event.get("event") != "progress":
+            continue
         model_id = event.get("modelID")
+        request_id = event.get("logicalRequestID")
         durable, total = event.get("durableBytes"), event.get("totalBytes")
-        if model_id and isinstance(durable, int) and isinstance(total, int) and total > 0:
-            previous = progress_by_model.get(model_id)
+        if model_id and request_id and isinstance(durable, int) and isinstance(total, int) and total > 0:
+            key = (model_id, request_id)
+            previous = progress_by_request.get(key)
             if durable > total:
                 findings.append(Finding("bytes-exceed-total", "downloader", f"{model_id} durable bytes exceed catalog bytes.", previous and {"durableBytes": previous[0], "totalBytes": previous[1]}, event))
-            if previous and durable < previous[0] and event.get("event") == "progress":
+            if previous and durable < previous[0]:
                 findings.append(Finding("progress-regressed", "downloader", f"{model_id} durable progress regressed.", {"durableBytes": previous[0], "totalBytes": previous[1]}, event))
-            progress_by_model[model_id] = (max(durable, previous[0] if previous else 0), total)
+            progress_by_request[key] = (max(durable, previous[0] if previous else 0), total)
 
     task_events: dict[tuple[str, int], list[dict[str, Any]]] = {}
     for event in events:
@@ -366,7 +475,11 @@ def diagnose(events: list[dict[str, Any]], observations: list[dict[str, Any]]) -
                 last,
             ))
         published = next((event for event in model_events if event.get("event") == "atomic-publication-completed"), None)
-        installed_ledger = next((event for event in model_events if event.get("ledgerStatus") == "installed"), None)
+        installed_ledger = next((
+            event for event in reversed(model_events)
+            if event.get("ledgerStatus") == "installed"
+            and event.get("event") in {"write", "snapshot-published", "atomic-publication-completed"}
+        ), None)
         if published and not installed_ledger:
             findings.append(Finding("publication-without-installed-ledger", "ledger", f"{model_id} was published without an installed ledger.", published, model_events[-1]))
         model_observations = [obs for obs in observations if obs.get("modelID") == model_id]
@@ -473,13 +586,22 @@ def timeline_markdown(events: list[dict[str, Any]], observations: list[dict[str,
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--artifact-dir", type=pathlib.Path, required=True)
+    parser.add_argument("--artifact-dir", type=pathlib.Path)
     parser.add_argument("--diagnostics", type=pathlib.Path)
     parser.add_argument("--xcodebuild-log", type=pathlib.Path)
     parser.add_argument("--attachments", type=pathlib.Path)
     parser.add_argument("--run-id", required=True)
-    parser.add_argument("--scenario", choices=["diagnose", "queue", "acceptance", "soak", "recover"], required=True)
+    parser.add_argument("--scenario", choices=["diagnose", "queue", "acceptance", "soak", "recover"])
+    parser.add_argument("--partition-prior-traces", action="store_true")
     args = parser.parse_args()
+
+    if args.partition_prior_traces:
+        if args.diagnostics is None:
+            parser.error("--partition-prior-traces requires --diagnostics")
+        print(json.dumps(partition_prior_trace_events(args.diagnostics, args.run_id), sort_keys=True))
+        return 0
+    if args.artifact_dir is None or args.scenario is None:
+        parser.error("diagnosis requires --artifact-dir and --scenario")
 
     artifact_dir = args.artifact_dir
     artifact_dir.mkdir(parents=True, exist_ok=True)
@@ -493,8 +615,14 @@ def main() -> int:
     visual_findings: list[Finding] = []
     for observation in observations:
         screenshot = observation.get("progressScreenshot")
-        fraction = observation.get("accessibilityFraction")
-        if not screenshot or not isinstance(fraction, (int, float)):
+        expected_fraction = observation.get("expectedFraction")
+        accessibility_fraction = observation.get("accessibilityFraction")
+        reference_fraction = (
+            expected_fraction
+            if isinstance(expected_fraction, (int, float))
+            else accessibility_fraction
+        )
+        if not screenshot or not isinstance(reference_fraction, (int, float)):
             continue
         path = attachments.get(screenshot)
         if path is None or not path.is_file():
@@ -502,7 +630,7 @@ def main() -> int:
             visual_findings.append(Finding("missing-progress-screenshot", "visual-evidence", f"Missing exported progress screenshot {screenshot}."))
             continue
         try:
-            measurement = analyze_bar(path, fraction)
+            measurement = analyze_bar(path, reference_fraction)
         except (OSError, ValueError, zlib.error) as error:
             measurement = {"screenshot": screenshot, "status": "unreadable", "error": str(error)}
             visual_findings.append(Finding("unreadable-progress-screenshot", "visual-evidence", f"Could not analyze {screenshot}: {error}"))
@@ -510,11 +638,38 @@ def main() -> int:
             measurement["screenshot"] = screenshot
             measurement["modelID"] = observation.get("modelID")
             measurement["milestone"] = observation.get("milestone")
+            measurement["expectedFraction"] = expected_fraction
+            measurement["accessibilityFraction"] = accessibility_fraction
             if not measurement["passesFractionTolerance"]:
                 visual_findings.append(Finding("rendered-fill-disagrees", "progress-rendering", f"{screenshot} differs from the reported fraction by more than five points."))
             if not measurement["passesContrast"]:
                 visual_findings.append(Finding("progress-contrast-low", "progress-rendering", f"{screenshot} has under 3:1 fill/track contrast."))
+            if (
+                isinstance(expected_fraction, (int, float))
+                and expected_fraction < 1
+                and measurement["measuredFillFraction"] >= 0.995
+            ):
+                visual_findings.append(Finding(
+                    "rendered-premature-full-bar",
+                    "progress-rendering",
+                    f"{screenshot} appears full before the durable byte transfer completed.",
+                ))
         visual_rows.append(measurement)
+    missing_milestones = missing_progress_milestones(observations, args.scenario)
+    if missing_milestones:
+        visual_findings.append(Finding(
+            "missing-progress-milestones",
+            "visual-evidence",
+            "Missing required Custom progress observations: " + ", ".join(missing_milestones),
+        ))
+    invalid_milestones = invalid_progress_milestone_ranges(observations, args.scenario)
+    if invalid_milestones:
+        visual_findings.append(Finding(
+            "progress-milestone-out-of-range",
+            "visual-evidence",
+            "Progress observations were captured outside their real-byte milestone band: "
+            + ", ".join(invalid_milestones),
+        ))
     sizes = {(row.get("width"), row.get("height")) for row in visual_rows if row.get("width")}
     if len(sizes) > 1:
         visual_findings.append(Finding("progress-frame-unstable", "progress-rendering", "Progress screenshot dimensions changed across transfer samples."))

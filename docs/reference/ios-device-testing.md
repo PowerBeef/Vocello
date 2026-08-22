@@ -108,6 +108,12 @@ The model-delivery runner always exports the `.xcresult`, attachments, diagnosti
 delivery summaries, ledger copy, sanitized storage inventories, crash delta, and host diagnosis even
 when XCTest fails. Determinate bar observations include raw and total bytes, expected and
 accessibility fractions, visible copy, status, phase, action set, frames, and screenshot names.
+The 95% visual checkpoint is an honest late-transfer band: the first exact incomplete sample from
+90% through under 100% is used because durable catalog-byte progress can jump directly from 94% to
+complete. Crossed milestones share one immutable UI sample and screenshot, preventing Ready or
+finalization from removing controls while the evidence is being serialized. A completed diagnostic
+that isolates a defect is retained and labelled `diagnosedFailure`; only a clean diagnosis is an
+MD-3 closure pass.
 `scripts/check_ios_model_management.py` identifies the first inconsistent layer and emits a timeline,
 machine-readable diagnosis/summary, visual measurements, and a milestone contact sheet. A failed
 isolated root remains available to the next `diagnose` or `recover` run; ordinary app data and

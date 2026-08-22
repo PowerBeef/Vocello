@@ -1,5 +1,8 @@
 import Foundation
 @preconcurrency import XCTest
+#if os(iOS)
+import UIKit
+#endif
 
 /// A per-test application session. Callers own the instance and must not share it
 /// across test methods.
@@ -427,6 +430,78 @@ public enum VocelloUIScreenshot {
             activity.add(attachment)
         }
     }
+
+    #if os(iOS)
+    /// Captures a previously sampled element frame from a fresh app screenshot. Long-running
+    /// model-delivery phases can transition between an `exists` check and `element.screenshot()`;
+    /// cropping the stable application screenshot avoids turning that honest state transition
+    /// into an XCUITest snapshot failure while preserving quantitative pixels for host analysis.
+    @discardableResult
+    public static func attach(
+        _ app: XCUIApplication,
+        cropping frame: CGRect,
+        named name: String,
+        lifetime: XCTAttachment.Lifetime = .keepAlways
+    ) -> Bool {
+        let appFrame = app.frame
+        let screenshot = app.screenshot()
+        return attach(
+            screenshot,
+            appFrame: appFrame,
+            cropping: frame,
+            named: name,
+            lifetime: lifetime
+        )
+    }
+
+    /// Crops multiple evidence attachments from one immutable application screenshot. Reusing
+    /// the same pixels keeps row and progress evidence temporally aligned even when the transfer
+    /// completes while XCTest is exporting attachments.
+    @discardableResult
+    public static func attach(
+        _ screenshot: XCUIScreenshot,
+        appFrame: CGRect,
+        cropping frame: CGRect,
+        named name: String,
+        lifetime: XCTAttachment.Lifetime = .keepAlways
+    ) -> Bool {
+        guard frame.width > 0,
+              frame.height > 0,
+              appFrame.width > 0,
+              appFrame.height > 0 else {
+            return false
+        }
+
+        guard let source = screenshot.image.cgImage else { return false }
+        let scaleX = CGFloat(source.width) / appFrame.width
+        let scaleY = CGFloat(source.height) / appFrame.height
+        let sourceBounds = CGRect(x: 0, y: 0, width: source.width, height: source.height)
+        let requested = CGRect(
+            x: (frame.minX - appFrame.minX) * scaleX,
+            y: (frame.minY - appFrame.minY) * scaleY,
+            width: frame.width * scaleX,
+            height: frame.height * scaleY
+        ).integral.intersection(sourceBounds)
+        guard requested.width >= 1,
+              requested.height >= 1,
+              let cropped = source.cropping(to: requested) else {
+            return false
+        }
+
+        let image = UIImage(
+            cgImage: cropped,
+            scale: screenshot.image.scale,
+            orientation: screenshot.image.imageOrientation
+        )
+        XCTContext.runActivity(named: "Screenshot: \(name)") { activity in
+            let attachment = XCTAttachment(image: image)
+            attachment.name = name
+            attachment.lifetime = lifetime
+            activity.add(attachment)
+        }
+        return true
+    }
+    #endif
 }
 
 /// Canonical UI-driven benchmark corpus and ordering shared by Apple UI-test targets.

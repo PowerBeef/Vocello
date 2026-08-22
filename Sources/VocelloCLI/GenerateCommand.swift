@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import QwenVoiceCore
 
@@ -5,6 +6,7 @@ import QwenVoiceCore
 enum GenerateCommand {
     /// Machine-readable result emitted under `--json`.
     struct GenerateJSON: Encodable {
+        let generationID: String
         let audioPath: String
         let durationSeconds: Double
         let wallSeconds: Double
@@ -13,6 +15,8 @@ enum GenerateCommand {
         let mode: String
         let variant: String
         let modelID: String
+        let deliveryInstructionChars: Int?
+        let deliveryInstructionDigest: String?
         let firstChunkMS: Double?
         let chunks: Int?
     }
@@ -106,6 +110,7 @@ enum GenerateCommand {
         note("loading \(modelID)…")
         try await runtime.engine.loadModel(id: modelID)
 
+        let generationID = UUID()
         let request = GenerationRequest(
             mode: mode, modelID: modelID, text: text, outputPath: outputPath,
             shouldStream: streaming,
@@ -113,7 +118,7 @@ enum GenerateCommand {
             // the same engine chunk path the UI uses (CustomVoiceCoordinator et al.).
             streamingInterval: streaming ? GenerationSemantics.appStreamingInterval : nil,
             languageHint: args.string("language"),
-            payload: payload, generationID: UUID(),
+            payload: payload, generationID: generationID,
             seed: try parseSeed(args),
             variation: try parseVariation(args))
 
@@ -133,12 +138,22 @@ enum GenerateCommand {
 
         let rtf = wall > 0 ? result.durationSeconds / wall : 0
         if args.flag("json") {
+            let deliveryInstruction = payload.deliveryInstructionText?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let deliveryInstructionChars = deliveryInstruction.flatMap { $0.isEmpty ? nil : $0.count }
+            let deliveryInstructionDigest = deliveryInstruction.flatMap { instruction in
+                instruction.isEmpty ? nil : Self.sha256(Data(instruction.utf8))
+            }
             emitJSON(GenerateJSON(
+                generationID: generationID.uuidString.lowercased(),
                 audioPath: result.audioPath, durationSeconds: result.durationSeconds,
                 wallSeconds: wall, realtimeFactor: rtf,
                 finishReason: result.finishReason?.rawValue,
                 mode: mode.rawValue, variant: quality ? "quality" : "speed",
-                modelID: modelID, firstChunkMS: firstChunkMS, chunks: chunkCount))
+                modelID: modelID,
+                deliveryInstructionChars: deliveryInstructionChars,
+                deliveryInstructionDigest: deliveryInstructionDigest,
+                firstChunkMS: firstChunkMS, chunks: chunkCount))
         } else {
             // stdout = machine-readable (the path). stderr = human notes.
             print(result.audioPath)
@@ -153,6 +168,10 @@ enum GenerateCommand {
             p.arguments = [result.audioPath]
             try? p.run(); p.waitUntilExit()
         }
+    }
+
+    private static func sha256(_ data: Data) -> String {
+        SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
     }
 
     // MARK: - Reusable request building (shared with `batch`)

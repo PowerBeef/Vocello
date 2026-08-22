@@ -94,6 +94,19 @@ REQUIRED_SURFACES=(
     "scripts/tests/test_check_release_notes.py"
     "scripts/check_delivery_instructions.py"
     "scripts/tests/test_check_delivery_instructions.py"
+    "scripts/delivery_experiment.py"
+    "scripts/delivery_experiment_runner.py"
+    "scripts/delivery_calibration_session.py"
+    "scripts/delivery_evaluator.py"
+    "scripts/delivery_promotion_decision.py"
+    "scripts/tests/test_delivery_experiment.py"
+    "scripts/tests/test_delivery_experiment_runner.py"
+    "scripts/tests/test_delivery_calibration_session.py"
+    "scripts/tests/test_delivery_evaluator.py"
+    "scripts/tests/test_delivery_promotion_decision.py"
+    "config/delivery-experiment-contract.json"
+    "config/delivery-evaluation-corpus.json"
+    "docs/reference/qwen3-tts-emotion-tone-research-2026-08-22.md"
     "scripts/check_surface_coverage.py"
     "scripts/tests/test_check_surface_coverage.py"
     "config/surface-coverage-exemptions.json"
@@ -399,6 +412,7 @@ python3 "$SCRIPT_DIR/check_convergence_promotion_gate.py"
 # this checks those: append parity across a preset's intensity tiers, repeated
 # intensifiers, and direction conflicts against config/delivery-instruction-contract.json.
 python3 "$SCRIPT_DIR/check_delivery_instructions.py"
+python3 "$SCRIPT_DIR/delivery_experiment.py" validate
 # Per-file documentation metadata: pinned historical bodies cannot change without
 # an explicit re-pin, active docs are scanned for contradictions with facts derived
 # from code, and source bindings warn on drift. Non-strict during rollout: the

@@ -1,0 +1,231 @@
+{
+  "schemaVersion": 1,
+  "status": "operator-local-research",
+  "splitPolicy": "translation-group-and-script-id-disjoint",
+  "boundary": "Scripts are checked-in text only. Generated audio and listener responses remain untracked. Non-English text is provisional until a fluent listener records review in the run manifest.",
+  "seedPartitions": {
+    "calibration": {"minimum": 31000000, "maximum": 31999999},
+    "development": {"minimum": 32000000, "maximum": 32999999},
+    "confirmation": {"minimum": 33000000, "maximum": 33999999}
+  },
+  "nativeSpeakerLanguages": {
+    "aiden": "English",
+    "ryan": "English",
+    "vivian": "Chinese",
+    "serena": "Chinese",
+    "uncle_fu": "Chinese",
+    "dylan": "Chinese",
+    "eric": "Chinese",
+    "ono_anna": "Japanese",
+    "sohee": "Korean"
+  },
+  "crossLanguageSentinels": [
+    {"speakerID": "aiden", "outputLanguage": "Chinese"},
+    {"speakerID": "vivian", "outputLanguage": "English"},
+    {"speakerID": "ono_anna", "outputLanguage": "English"},
+    {"speakerID": "sohee", "outputLanguage": "English"}
+  ],
+  "splitAffixes": {
+    "English": {
+      "calibration": {
+        "short": {"prefix": "Yesterday,", "suffix": "That is the complete message."},
+        "medium": {"prefix": "During the morning update,", "suffix": "Please remember that detail."},
+        "long": {"prefix": "When the first report arrived yesterday,", "suffix": "Everyone was asked to remember the full account before responding."}
+      },
+      "development": {
+        "short": {"prefix": "Today,", "suffix": "That is what happened."},
+        "medium": {"prefix": "In today's afternoon briefing,", "suffix": "The team will respond after reviewing it."},
+        "long": {"prefix": "At the scheduled afternoon briefing today,", "suffix": "The team will review every detail carefully before deciding what happens next."}
+      },
+      "confirmation": {
+        "short": {"prefix": "Tomorrow,", "suffix": "Please keep that in mind."},
+        "medium": {"prefix": "Before tomorrow's final meeting,", "suffix": "No further announcement will be made until then."},
+        "long": {"prefix": "Before the final meeting begins tomorrow evening,", "suffix": "No one will issue another announcement until the independent review has finished."}
+      }
+    },
+    "Chinese": {
+      "calibration": {
+        "short": {"prefix": "昨天，", "suffix": "这就是完整消息。"},
+        "medium": {"prefix": "在昨天上午的通报中，", "suffix": "请记住这个细节。"},
+        "long": {"prefix": "昨天第一份报告送达时，", "suffix": "大家被要求先记住完整情况，再作出回应。"}
+      },
+      "development": {
+        "short": {"prefix": "今天，", "suffix": "事情就是这样。"},
+        "medium": {"prefix": "在今天下午的简报会上，", "suffix": "团队会在审阅后作出回应。"},
+        "long": {"prefix": "在今天按计划举行的下午简报会上，", "suffix": "团队会仔细审阅每个细节，然后再决定下一步。"}
+      },
+      "confirmation": {
+        "short": {"prefix": "明天，", "suffix": "请记住这一点。"},
+        "medium": {"prefix": "在明天的最终会议之前，", "suffix": "在那之前不会再发布公告。"},
+        "long": {"prefix": "在明天晚上的最终会议开始之前，", "suffix": "独立审查结束前，任何人都不会再发布公告。"}
+      }
+    },
+    "Japanese": {
+      "calibration": {
+        "short": {"prefix": "昨日、", "suffix": "以上がすべてです。"},
+        "medium": {"prefix": "昨日の午前の報告で、", "suffix": "その点を覚えておいてください。"},
+        "long": {"prefix": "昨日、最初の報告が届いたとき、", "suffix": "返答する前に全体の内容を覚えておくよう全員に伝えられました。"}
+      },
+      "development": {
+        "short": {"prefix": "今日、", "suffix": "起きたことは以上です。"},
+        "medium": {"prefix": "今日の午後の説明会で、", "suffix": "チームは確認してから返答します。"},
+        "long": {"prefix": "今日予定されていた午後の説明会で、", "suffix": "チームはすべての詳細を慎重に確認してから次の対応を決めます。"}
+      },
+      "confirmation": {
+        "short": {"prefix": "明日、", "suffix": "その点を覚えておいてください。"},
+        "medium": {"prefix": "明日の最終会議の前に、", "suffix": "それまでは追加の発表はありません。"},
+        "long": {"prefix": "明日の夕方に最終会議が始まる前に、", "suffix": "独立した確認が終わるまで新しい発表は行われません。"}
+      }
+    },
+    "Korean": {
+      "calibration": {
+        "short": {"prefix": "어제,", "suffix": "이것이 전체 소식입니다."},
+        "medium": {"prefix": "어제 오전 보고에서,", "suffix": "그 세부 사항을 기억해 주세요."},
+        "long": {"prefix": "어제 첫 보고가 도착했을 때,", "suffix": "모두가 대응하기 전에 전체 내용을 기억해 달라는 요청을 받았습니다."}
+      },
+      "development": {
+        "short": {"prefix": "오늘,", "suffix": "일어난 일은 이것이 전부입니다."},
+        "medium": {"prefix": "오늘 오후 설명회에서,", "suffix": "팀은 검토한 뒤 대응할 것입니다."},
+        "long": {"prefix": "오늘 예정된 오후 설명회에서,", "suffix": "팀은 모든 세부 사항을 주의 깊게 검토한 뒤 다음 단계를 결정할 것입니다."}
+      },
+      "confirmation": {
+        "short": {"prefix": "내일,", "suffix": "그 점을 기억해 주세요."},
+        "medium": {"prefix": "내일 최종 회의 전에,", "suffix": "그때까지 추가 발표는 없습니다."},
+        "long": {"prefix": "내일 저녁 최종 회의가 시작되기 전에,", "suffix": "독립적인 검토가 끝날 때까지 누구도 추가 발표를 하지 않을 것입니다."}
+      }
+    }
+  },
+  "semanticFrames": [
+    {
+      "id": "en-neutral", "language": "English", "targetPreset": "neutral", "translationConcept": "neutral-schedule", "reviewStatus": "maintainer-reviewed",
+      "texts": {"short": "The office opens at nine.", "medium": "The office opens at nine, and the first appointment begins at nine thirty.", "long": "The office opens at nine, the first appointment begins at nine thirty, and the public desk closes at five."}
+    },
+    {
+      "id": "en-happy", "language": "English", "targetPreset": "happy", "translationConcept": "happy-success", "reviewStatus": "maintainer-reviewed",
+      "texts": {"short": "We finally did it.", "medium": "We finally received the approval, and everyone can celebrate the result together.", "long": "After months of careful work, we finally received the approval, and everyone can celebrate the wonderful result together."}
+    },
+    {
+      "id": "en-sad", "language": "English", "targetPreset": "sad", "translationConcept": "sad-farewell", "reviewStatus": "maintainer-reviewed",
+      "texts": {"short": "She will not be coming back.", "medium": "She will not be coming back, and the quiet room already feels painfully empty.", "long": "She will not be coming back, and the quiet room already feels painfully empty without the familiar voice we expected to hear."}
+    },
+    {
+      "id": "en-angry", "language": "English", "targetPreset": "angry", "translationConcept": "angry-error", "reviewStatus": "maintainer-reviewed",
+      "texts": {"short": "This mistake is unacceptable.", "medium": "This repeated mistake is unacceptable, and it must be corrected before anyone proceeds.", "long": "This repeated and entirely avoidable mistake is unacceptable, and it must be corrected before anyone is asked to proceed again."}
+    },
+    {
+      "id": "en-fearful", "language": "English", "targetPreset": "fearful", "translationConcept": "fearful-warning", "reviewStatus": "maintainer-reviewed",
+      "texts": {"short": "Something is moving outside.", "medium": "Something is moving outside, and it is getting closer to the door every second.", "long": "Something is moving outside in the darkness, and the sound is getting closer to the locked door with every passing second."}
+    },
+    {
+      "id": "en-surprised", "language": "English", "targetPreset": "surprised", "translationConcept": "surprised-discovery", "reviewStatus": "maintainer-reviewed",
+      "texts": {"short": "You found the missing letter.", "medium": "You found the missing letter inside the old clock after all these years.", "long": "You found the missing letter hidden inside the old clock after all these years, and the signature is still perfectly clear."}
+    },
+    {
+      "id": "en-calm", "language": "English", "targetPreset": "calm", "translationConcept": "calm-reassurance", "reviewStatus": "maintainer-reviewed",
+      "texts": {"short": "Everything is under control.", "medium": "Everything is under control, and we have plenty of time to handle each step carefully.", "long": "Everything is under control, and we have plenty of time to handle each step carefully without rushing or worrying."}
+    },
+    {
+      "id": "en-whisper", "language": "English", "targetPreset": "whisper", "translationConcept": "whisper-secret", "reviewStatus": "maintainer-reviewed",
+      "texts": {"short": "Keep this between us.", "medium": "Keep this between us, because nobody else knows where the small key is hidden.", "long": "Keep this between us, because nobody else knows where the small brass key is hidden behind the library shelf."}
+    },
+
+    {
+      "id": "zh-neutral", "language": "Chinese", "targetPreset": "neutral", "translationConcept": "neutral-schedule", "reviewStatus": "provisional",
+      "texts": {"short": "办公室九点开门。", "medium": "办公室九点开门，第一个预约九点半开始。", "long": "办公室九点开门，第一个预约九点半开始，公共服务台五点关闭。"}
+    },
+    {
+      "id": "zh-happy", "language": "Chinese", "targetPreset": "happy", "translationConcept": "happy-success", "reviewStatus": "provisional",
+      "texts": {"short": "我们终于成功了。", "medium": "我们终于得到了批准，大家可以一起庆祝这个结果。", "long": "经过几个月的认真努力，我们终于得到了批准，大家可以一起庆祝这个美好的结果。"}
+    },
+    {
+      "id": "zh-sad", "language": "Chinese", "targetPreset": "sad", "translationConcept": "sad-farewell", "reviewStatus": "provisional",
+      "texts": {"short": "她不会再回来了。", "medium": "她不会再回来了，安静的房间已经让人感到痛苦的空荡。", "long": "她不会再回来了，没有那熟悉而期待的声音，安静的房间显得格外空荡而悲伤。"}
+    },
+    {
+      "id": "zh-angry", "language": "Chinese", "targetPreset": "angry", "translationConcept": "angry-error", "reviewStatus": "provisional",
+      "texts": {"short": "这个错误无法接受。", "medium": "这个反复出现的错误无法接受，任何人继续之前都必须纠正。", "long": "这个反复出现而且完全可以避免的错误无法接受，在要求任何人继续之前必须彻底纠正。"}
+    },
+    {
+      "id": "zh-fearful", "language": "Chinese", "targetPreset": "fearful", "translationConcept": "fearful-warning", "reviewStatus": "provisional",
+      "texts": {"short": "外面有东西在动。", "medium": "外面有东西在动，而且每一秒都在靠近门口。", "long": "黑暗中有东西在外面移动，那个声音正随着每一秒不断靠近锁着的门。"}
+    },
+    {
+      "id": "zh-surprised", "language": "Chinese", "targetPreset": "surprised", "translationConcept": "surprised-discovery", "reviewStatus": "provisional",
+      "texts": {"short": "你找到了那封失踪的信。", "medium": "这么多年以后，你竟然在旧钟里找到了那封失踪的信。", "long": "这么多年以后，你竟然在旧钟里找到了那封隐藏的信，而且上面的签名仍然清晰可见。"}
+    },
+    {
+      "id": "zh-calm", "language": "Chinese", "targetPreset": "calm", "translationConcept": "calm-reassurance", "reviewStatus": "provisional",
+      "texts": {"short": "一切都在控制之中。", "medium": "一切都在控制之中，我们有足够的时间认真处理每一步。", "long": "一切都在控制之中，我们有足够的时间认真处理每一步，不需要着急或担心。"}
+    },
+    {
+      "id": "zh-whisper", "language": "Chinese", "targetPreset": "whisper", "translationConcept": "whisper-secret", "reviewStatus": "provisional",
+      "texts": {"short": "这件事只有我们知道。", "medium": "这件事只有我们知道，因为别人都不知道那把小钥匙藏在哪里。", "long": "这件事只有我们知道，因为别人都不知道那把小铜钥匙藏在图书架后面。"}
+    },
+
+    {
+      "id": "ja-neutral", "language": "Japanese", "targetPreset": "neutral", "translationConcept": "neutral-schedule", "reviewStatus": "provisional",
+      "texts": {"short": "事務所は九時に開きます。", "medium": "事務所は九時に開き、最初の予約は九時半に始まります。", "long": "事務所は九時に開き、最初の予約は九時半に始まり、受付は五時に閉まります。"}
+    },
+    {
+      "id": "ja-happy", "language": "Japanese", "targetPreset": "happy", "translationConcept": "happy-success", "reviewStatus": "provisional",
+      "texts": {"short": "ついに成功しました。", "medium": "ついに承認を受け、みんなでこの結果を祝えます。", "long": "何か月もの丁寧な努力の末、ついに承認を受け、みんなで素晴らしい結果を祝えます。"}
+    },
+    {
+      "id": "ja-sad", "language": "Japanese", "targetPreset": "sad", "translationConcept": "sad-farewell", "reviewStatus": "provisional",
+      "texts": {"short": "彼女はもう戻りません。", "medium": "彼女はもう戻らず、静かな部屋はすでにとても寂しく感じられます。", "long": "彼女はもう戻らず、聞けると思っていた懐かしい声のない静かな部屋は、とても寂しく感じられます。"}
+    },
+    {
+      "id": "ja-angry", "language": "Japanese", "targetPreset": "angry", "translationConcept": "angry-error", "reviewStatus": "provisional",
+      "texts": {"short": "この間違いは許されません。", "medium": "繰り返されたこの間違いは許されず、先へ進む前に直す必要があります。", "long": "繰り返された避けられたはずの間違いは許されず、誰かに再び進ませる前に必ず直す必要があります。"}
+    },
+    {
+      "id": "ja-fearful", "language": "Japanese", "targetPreset": "fearful", "translationConcept": "fearful-warning", "reviewStatus": "provisional",
+      "texts": {"short": "外で何かが動いています。", "medium": "外で何かが動いていて、一秒ごとにドアへ近づいています。", "long": "暗闇の外で何かが動いていて、その音は一秒ごとに鍵のかかったドアへ近づいています。"}
+    },
+    {
+      "id": "ja-surprised", "language": "Japanese", "targetPreset": "surprised", "translationConcept": "surprised-discovery", "reviewStatus": "provisional",
+      "texts": {"short": "なくした手紙を見つけたのですね。", "medium": "何年もたってから、古い時計の中でなくした手紙を見つけたのですね。", "long": "何年もたってから、古い時計の中に隠された手紙を見つけ、署名まではっきり残っていたのですね。"}
+    },
+    {
+      "id": "ja-calm", "language": "Japanese", "targetPreset": "calm", "translationConcept": "calm-reassurance", "reviewStatus": "provisional",
+      "texts": {"short": "すべて順調です。", "medium": "すべて順調で、一つずつ丁寧に対応する時間は十分あります。", "long": "すべて順調で、急いだり心配したりせず、一つずつ丁寧に対応する時間は十分あります。"}
+    },
+    {
+      "id": "ja-whisper", "language": "Japanese", "targetPreset": "whisper", "translationConcept": "whisper-secret", "reviewStatus": "provisional",
+      "texts": {"short": "これは二人だけの秘密です。", "medium": "これは二人だけの秘密です。小さな鍵の隠し場所は誰も知りません。", "long": "これは二人だけの秘密です。図書棚の後ろにある小さな真鍮の鍵の隠し場所は誰も知りません。"}
+    },
+
+    {
+      "id": "ko-neutral", "language": "Korean", "targetPreset": "neutral", "translationConcept": "neutral-schedule", "reviewStatus": "provisional",
+      "texts": {"short": "사무실은 아홉 시에 엽니다.", "medium": "사무실은 아홉 시에 열고 첫 예약은 아홉 시 반에 시작합니다.", "long": "사무실은 아홉 시에 열고 첫 예약은 아홉 시 반에 시작하며 안내 창구는 다섯 시에 닫습니다."}
+    },
+    {
+      "id": "ko-happy", "language": "Korean", "targetPreset": "happy", "translationConcept": "happy-success", "reviewStatus": "provisional",
+      "texts": {"short": "드디어 해냈습니다.", "medium": "드디어 승인을 받아서 모두가 함께 이 결과를 축하할 수 있습니다.", "long": "몇 달 동안 정성껏 노력한 끝에 드디어 승인을 받아 모두가 함께 멋진 결과를 축하할 수 있습니다."}
+    },
+    {
+      "id": "ko-sad", "language": "Korean", "targetPreset": "sad", "translationConcept": "sad-farewell", "reviewStatus": "provisional",
+      "texts": {"short": "그녀는 다시 돌아오지 않습니다.", "medium": "그녀는 다시 돌아오지 않고 조용한 방은 벌써 너무 텅 빈 것처럼 느껴집니다.", "long": "그녀는 다시 돌아오지 않고 익숙한 목소리를 들을 수 없는 조용한 방은 너무 텅 비고 슬프게 느껴집니다."}
+    },
+    {
+      "id": "ko-angry", "language": "Korean", "targetPreset": "angry", "translationConcept": "angry-error", "reviewStatus": "provisional",
+      "texts": {"short": "이 실수는 받아들일 수 없습니다.", "medium": "반복된 이 실수는 받아들일 수 없으며 누구든 계속하기 전에 바로잡아야 합니다.", "long": "반복되었고 충분히 피할 수 있었던 이 실수는 받아들일 수 없으며 다시 진행하기 전에 반드시 바로잡아야 합니다."}
+    },
+    {
+      "id": "ko-fearful", "language": "Korean", "targetPreset": "fearful", "translationConcept": "fearful-warning", "reviewStatus": "provisional",
+      "texts": {"short": "밖에서 무언가 움직이고 있습니다.", "medium": "밖에서 무언가 움직이고 있고 매초 문 가까이 다가오고 있습니다.", "long": "어둠 속 밖에서 무언가 움직이고 있고 그 소리는 매초 잠긴 문 가까이 다가오고 있습니다."}
+    },
+    {
+      "id": "ko-surprised", "language": "Korean", "targetPreset": "surprised", "translationConcept": "surprised-discovery", "reviewStatus": "provisional",
+      "texts": {"short": "잃어버린 편지를 찾았군요.", "medium": "오랜 세월이 지난 뒤 낡은 시계 안에서 잃어버린 편지를 찾았군요.", "long": "오랜 세월이 지난 뒤 낡은 시계 안에 숨겨진 편지를 찾았고 서명까지 또렷하게 남아 있었군요."}
+    },
+    {
+      "id": "ko-calm", "language": "Korean", "targetPreset": "calm", "translationConcept": "calm-reassurance", "reviewStatus": "provisional",
+      "texts": {"short": "모든 것이 잘 통제되고 있습니다.", "medium": "모든 것이 잘 통제되고 있고 각 단계를 차분히 처리할 시간도 충분합니다.", "long": "모든 것이 잘 통제되고 있고 서두르거나 걱정하지 않고 각 단계를 차분히 처리할 시간도 충분합니다."}
+    },
+    {
+      "id": "ko-whisper", "language": "Korean", "targetPreset": "whisper", "translationConcept": "whisper-secret", "reviewStatus": "provisional",
+      "texts": {"short": "이건 우리 둘만의 비밀입니다.", "medium": "이건 우리 둘만의 비밀이고 작은 열쇠가 어디에 숨겨졌는지 아무도 모릅니다.", "long": "이건 우리 둘만의 비밀이고 작은 황동 열쇠가 도서관 선반 뒤에 숨겨졌다는 사실은 아무도 모릅니다."}
+    }
+  ]
+}

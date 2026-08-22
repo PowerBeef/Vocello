@@ -19,6 +19,8 @@ This module supplies what the acceptance decision actually needs:
   wilson_interval       win-rate with an interval that behaves at the extremes
                         where the normal approximation fails
   benjamini_hochberg    false-discovery control across a wide feature sweep
+  holm_bonferroni       family-wise correction for confirmatory preset claims
+  paired_bootstrap_delta paired candidate-minus-baseline confidence interval
   required_pairs        the n a given effect size needs, so a sweep is sized
                         before it runs rather than explained afterwards
 
@@ -263,6 +265,77 @@ def benjamini_hochberg(p_values, false_discovery_rate=0.10):
         results[index]["adjusted"] = round(adjusted, 6)
         results[index]["significant"] = adjusted <= false_discovery_rate
     return results
+
+
+def holm_bonferroni(p_values, alpha=0.05):
+    """Holm step-down family-wise error correction in caller order.
+
+    ``None`` entries remain explicitly untested. Once one ordered hypothesis
+    fails, all less-significant hypotheses fail as required by Holm's method.
+    """
+    if not 0.0 < alpha < 1.0:
+        raise ValueError("alpha must fall strictly inside (0, 1)")
+    entries = []
+    results = [
+        {"pValue": value, "adjusted": None, "significant": False}
+        for value in p_values
+    ]
+    for index, value in enumerate(p_values):
+        if value is None:
+            continue
+        number = float(value)
+        if not 0.0 <= number <= 1.0 or not math.isfinite(number):
+            raise ValueError("p-values must be finite values in [0, 1] or None")
+        entries.append((index, number))
+    entries.sort(key=lambda item: item[1])
+    count = len(entries)
+    running_adjusted = 0.0
+    family_open = True
+    for position, (index, value) in enumerate(entries):
+        adjusted = max(running_adjusted, min(1.0, value * (count - position)))
+        running_adjusted = adjusted
+        threshold = alpha / (count - position)
+        significant = family_open and value <= threshold
+        if not significant:
+            family_open = False
+        results[index] = {
+            "pValue": value,
+            "adjusted": round(adjusted, 6),
+            "significant": significant,
+        }
+    return results
+
+
+def paired_bootstrap_delta(
+    candidate, baseline, confidence=0.95, resamples=10_000, seed=20260822
+):
+    """Paired candidate-minus-baseline mean with a reproducible percentile CI.
+
+    This routine is suitable for paired binary listener correctness as well as
+    bounded ratings. Pair identity is preserved during every resample.
+    """
+    first = np.asarray([float(value) for value in candidate], dtype=np.float64)
+    second = np.asarray([float(value) for value in baseline], dtype=np.float64)
+    if first.size != second.size:
+        raise ValueError("paired inputs must be the same length")
+    if first.size < 2:
+        return None
+    if not (np.isfinite(first).all() and np.isfinite(second).all()):
+        raise ValueError("paired inputs must be finite")
+    differences = first - second
+    generator = np.random.default_rng(seed)
+    indices = generator.integers(0, differences.size, size=(resamples, differences.size))
+    replicates = differences[indices].mean(axis=1)
+    alpha = (1.0 - confidence) / 2.0
+    return {
+        "meanDifference": float(differences.mean()),
+        "lower": float(np.quantile(replicates, alpha)),
+        "upper": float(np.quantile(replicates, 1.0 - alpha)),
+        "confidence": confidence,
+        "resamples": resamples,
+        "n": int(differences.size),
+        "seed": seed,
+    }
 
 
 def required_pairs(effect_size, power=0.80, alpha=0.05):

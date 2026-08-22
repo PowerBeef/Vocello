@@ -2214,15 +2214,15 @@ struct StreamingExecutionContext: Sendable {
         let clipFailFrac = 0.001, clickFailFrac = 0.005
         let clickWarnFrac = 0.0005, hotWarnFrac = 0.02
         let dcOffsetWarn = 0.05, dcOffsetFail = 0.20
-        // Dropout (punctuation-aware). The model emits a prosodic pause at each
-        // sentence/clause boundary; on long, slow content these legitimately reach
-        // ~800 ms — verified that EVERY long-content interior silence maps to a
-        // punctuation mark, so the old fixed 400 ms fail line cried wolf on natural
-        // delivery. Instead: count "long pauses" against the text's pause budget
-        // (punctuation boundaries) and flag only an EXCESS beyond it, or a single
-        // EGREGIOUS gap no natural pause reaches. A mid-phrase gap that merely
-        // replaces a punctuation pause cannot be classified by amplitude alone;
-        // fixed-seed exact-WAV, ASR-consensus, and prosody evidence own that gate.
+        // Dropout (punctuation-aware). This fast, amplitude-only tripwire cannot
+        // decide that an ordinary cadence pause is missing speech. The 2026-08-22
+        // cross-speaker delivery screen proved the old rule could: it rejected 38
+        // complete clips for having several >=350 ms pauses, while the independent
+        // bounded analyzer found no >=1.2 s gap in any of them. Count those cadence
+        // pauses as warnings for downstream inspection. Fail only on an egregious
+        // single gap, or repeated suspicious-scale gaps beyond the text's pause
+        // budget. Fixed-seed exact-WAV, ASR-consensus, and prosody evidence own the
+        // finer missing-speech decision.
         // Long-content calibration (2026-07-23): ~60 s narration segments show
         // sentence/comma pauses up to ~1.45 s (retained failed-qc evidence,
         // gap positions correlated with text boundaries). The short-form
@@ -2230,11 +2230,22 @@ struct StreamingExecutionContext: Sendable {
         // (natural max ~810 ms) and misclassified narration pacing as
         // dropouts when extrapolated to minute-scale takes.
         let longContent = durationSeconds >= 45
-        let longPauseMS = longContent ? 600 : 350
-        let egregiousMS = longContent ? 2_000 : 1_200
-        let suspiciousSingleMS = longContent ? 1_500 : 900
-        let longPauseCount = interiorSilencesMS.filter { $0 >= longPauseMS }.count
-        let excessLongPauses = max(0, longPauseCount - max(0, expectedPauseCount))
+        let cadencePauseMS = longContent ? 600 : 350
+        // A delivery instruction can legitimately stretch the one pause the
+        // script actually contains. The cross-speaker 2026-08-22 matrix found
+        // Vivian's corrected Sad rendering produced one 1.506 s pause at the
+        // medium corpus' comma: treating that as an unconditional dropout
+        // rejected a complete, audible take. Keep a no-punctuation utterance's
+        // 1.2 s hard line, but when the text declares a pause budget classify
+        // 1.2–2.0 s as a warning. Excess pauses still fail below, and any gap
+        // at or above 2 s remains an unconditional failure.
+        let hasDeclaredPause = expectedPauseCount > 0
+        let egregiousMS = longContent || hasDeclaredPause ? 2_000 : 1_200
+        let suspiciousSingleMS = longContent ? 1_500 : (hasDeclaredPause ? 1_200 : 900)
+        let cadencePauseCount = interiorSilencesMS.filter { $0 >= cadencePauseMS }.count
+        let excessCadencePauses = max(0, cadencePauseCount - max(0, expectedPauseCount))
+        let suspiciousPauseCount = interiorSilencesMS.filter { $0 >= suspiciousSingleMS }.count
+        let excessSuspiciousPauses = max(0, suspiciousPauseCount - max(0, expectedPauseCount))
 
         var flags: [String] = []
         var instabilityVerdict: AudioQCReport.Verdict = .pass
@@ -2262,12 +2273,12 @@ struct StreamingExecutionContext: Sendable {
         } else if n > 0 { flags.append("silent"); raise(.fail, &writtenOutputVerdict) }
         if longestSilenceMS >= egregiousMS {
             flags.append("dropout:\(longestSilenceMS)ms"); raise(.fail, &writtenOutputVerdict)
-        } else if excessLongPauses >= 2 {
-            flags.append("dropout:excess\(excessLongPauses)(\(longPauseCount)/\(expectedPauseCount))"); raise(.fail, &writtenOutputVerdict)
-        } else if excessLongPauses == 1 {
-            flags.append("dropout:excess1(\(longPauseCount)/\(expectedPauseCount))"); raise(.warn, &writtenOutputVerdict)
+        } else if excessSuspiciousPauses >= 2 {
+            flags.append("dropout:excess\(excessSuspiciousPauses)(\(suspiciousPauseCount)/\(expectedPauseCount))"); raise(.fail, &writtenOutputVerdict)
         } else if longestSilenceMS >= suspiciousSingleMS {
             flags.append("dropout:\(longestSilenceMS)ms"); raise(.warn, &writtenOutputVerdict)
+        } else if excessCadencePauses > 0 {
+            flags.append("cadence:excess\(excessCadencePauses)(\(cadencePauseCount)/\(expectedPauseCount))"); raise(.warn, &writtenOutputVerdict)
         }
         if clippedFrac > clipFailFrac { flags.append("clipping"); raise(.fail, &instabilityVerdict) }
         else if clipped > 0 { flags.append("clipping"); raise(.warn, &instabilityVerdict) }

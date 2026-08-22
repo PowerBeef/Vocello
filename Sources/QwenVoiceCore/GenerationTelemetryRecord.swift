@@ -956,8 +956,10 @@ public struct GenerationTelemetryRecord: Hashable, Codable, Sendable {
 public struct AudioQCReport: Hashable, Codable, Sendable {
     /// v2 fixed cross-chunk interior-silence localization. v3 derives the
     /// written-output verdict from the atomically published WAV frames rather
-    /// than assuming the pre-write limited buffer and persisted file agree.
-    public static let currentAlgorithmVersion = 3
+    /// than assuming the pre-write limited buffer and persisted file agree. v4
+    /// separates ordinary cadence warnings from repeated suspicious-scale or
+    /// context-sensitive egregious dead-air failures.
+    public static let currentAlgorithmVersion = 4
 
     public enum Verdict: String, Hashable, Codable, Sendable {
         case pass

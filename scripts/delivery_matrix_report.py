@@ -48,7 +48,7 @@ from delivery_statistics import (
 )
 from prosody_profile import builtin_profile, load_profile
 
-MATRIX_REPORT_VERSION = 1
+MATRIX_REPORT_VERSION = 2
 
 # Summary axes and composites are reported, but expectation candidates are
 # drawn from the primitive deltas: binding a composite hides which acoustic
@@ -65,17 +65,19 @@ _NON_MEASUREMENT_FEATURES = frozenset({"intensity_factor"})
 
 
 def load_matrix(paths):
-    """Merge bench sidecars into separability records, one seed per file."""
+    """Merge bench sidecars while preserving real seed/speaker identities.
+
+    Historical sidecars without a seed fall back to the filename. Current
+    speaker-matrix rows must keep the engine-observed seed: replacing it with
+    one filename per speaker would put another speaker's take with the same
+    random seed in a training fold and overstate generalization.
+    """
     records = []
     for path in paths:
         with open(path, "r", encoding="utf-8") as handle:
             rows = json.load(handle)
-        seed = os.path.splitext(os.path.basename(path))[0]
-        for record in records_from_sidecar(rows):
-            # The sidecar's own seed field is the generation id, which is unique
-            # per take; grouping folds by *run* is what keeps a take out of its
-            # own training fold.
-            record["seed"] = seed
+        fallback_seed = os.path.splitext(os.path.basename(path))[0]
+        for record in records_from_sidecar(rows, fallback_seed=fallback_seed):
             records.append(record)
     return records
 
@@ -265,15 +267,84 @@ def build_report(records, profile=None, false_discovery_rate=0.10):
     profile = profile or builtin_profile()
     statistics = per_preset_statistics(records, false_discovery_rate)
     candidates = expectation_candidates(statistics)
+    speakers = sorted({
+        str(record["speakerID"])
+        for record in records
+        if isinstance(record.get("speakerID"), str) and record["speakerID"]
+    })
+    per_speaker = {}
+    for speaker in speakers:
+        cohort = [record for record in records if record.get("speakerID") == speaker]
+        per_speaker[speaker] = {
+            "takeCount": len(cohort),
+            "seedCount": len({record["seed"] for record in cohort}),
+            "separabilityByPreset": evaluate_separability(
+                cohort, profile, label_mode="preset"
+            ),
+        }
+
+    held_out_speaker_records = [
+        {**record, "seed": record.get("speakerID")}
+        for record in records
+        if record.get("speakerID")
+    ]
+    speaker_generalization = (
+        evaluate_separability(
+            held_out_speaker_records, profile, label_mode="preset"
+        )
+        if len(speakers) >= 2 else None
+    )
+    if speaker_generalization is not None:
+        speaker_generalization.setdefault("metrics", {})["foldGrouping"] = "speaker-grouped"
+        speaker_generalization["metrics"]["speakerCount"] = len(speakers)
+
+    # Treat each speaker, rather than every take, as one independent unit for
+    # feature-discovery statistics. This prevents five seeds from one voice
+    # being counted as five independent speakers (pseudo-replication).
+    speaker_balanced = []
+    if speakers:
+        by_speaker_cell = {}
+        for record in records:
+            speaker = record.get("speakerID")
+            if not speaker:
+                continue
+            cell = (speaker, record["preset"], record.get("intensity") or "normal")
+            by_speaker_cell.setdefault(cell, []).append(record["features"])
+        for (speaker, preset, intensity), feature_rows in sorted(by_speaker_cell.items()):
+            shared = set.intersection(*(set(row) for row in feature_rows)) if feature_rows else set()
+            medians = {}
+            for name in shared:
+                values = sorted(
+                    float(row[name]) for row in feature_rows
+                    if isinstance(row.get(name), (int, float)) and not isinstance(row.get(name), bool)
+                )
+                if values:
+                    medians[name] = values[len(values) // 2]
+            speaker_balanced.append({
+                "preset": preset,
+                "intensity": intensity,
+                "seed": speaker,
+                "speakerID": speaker,
+                "features": medians,
+            })
+
     return {
         "reportVersion": MATRIX_REPORT_VERSION,
         "takeCount": len(records),
         "seedCount": len({record["seed"] for record in records}),
+        "speakerCount": len(speakers),
+        "speakers": speakers,
         "cellCount": len(statistics),
         "falseDiscoveryRate": false_discovery_rate,
         "separabilityByCell": evaluate_separability(records, profile, label_mode="cell"),
         "separabilityByPreset": evaluate_separability(records, profile, label_mode="preset"),
+        "separabilityHeldOutSpeaker": speaker_generalization,
+        "perSpeaker": per_speaker,
         "statistics": statistics,
+        "speakerBalancedStatistics": (
+            per_preset_statistics(speaker_balanced, false_discovery_rate)
+            if speaker_balanced else {}
+        ),
         "intensityLadder": intensity_ladder(statistics),
         "expectationCandidates": candidates,
         "derivedExpectations": emit_expectations(candidates),

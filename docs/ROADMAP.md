@@ -10,7 +10,7 @@
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
 | `autonomous-validation-remediation-2026-08` | active | release-qa | 5/11 (45%) |
-| `delivery-prompting-2026-08` | active | backend-mlx | 23/25 (92%) |
+| `delivery-prompting-2026-08` | active | backend-mlx | 25/32 (78%) |
 | `engineering-review-remediation-2026-08` | active | backend-and-platform | 3/14 (21%) |
 | `model-delivery-2026-08` | active | release-qa | 2/3 (67%) |
 | `compliance-2026-08` | complete | release-qa | 2/2 (100%) |
@@ -98,6 +98,13 @@ Narrative authority: [`docs/reference/qwen3-tts-prompting-guide.md`](reference/q
 | `DP-23` | declined | Ship happy at its normal copy (cross-tier pairing candidate from DP-22) | — |
 | `DP-24` | done | Per-preset shipped tier: happy/angry ship their normal copy (DP-22 branch (a)) | `doc:docs/reference/delivery-harness.md`, `file:Sources/QwenVoiceCore/EmotionPreset.swift` |
 | `DP-25` | planned | Measured normal-tier gate floors (prosody profile v4) for the normal-shipping presets | — |
+| `DP-26` | done | Cross-speaker Custom Voice delivery screen and Fast-QC correction | `file:Tests/VocelloCoreTests/GenerationTelemetrySchemaTests.swift`, `file:scripts/tests/test_custom_delivery_matrix.py`, `doc:docs/reference/delivery-harness.md` |
+| `DP-27` | done | Pin Qwen3-TTS delivery research and structured experiment contract | `file:scripts/tests/test_delivery_experiment.py`, `file:scripts/tests/test_delivery_experiment_runner.py`, `doc:docs/reference/delivery-harness.md` |
+| `DP-28` | planned | Calibrate the layered local delivery evaluator | `file:scripts/tests/test_delivery_calibration_session.py`, `file:scripts/tests/test_delivery_evaluator.py`, `file:scripts/tests/test_emotion_advisory.py`, `doc:docs/reference/autonomous-validation-audit-2026-08-21.md` |
+| `DP-29` | planned | Qualify the native-language delivery corpus and cross-language sentinels | `file:scripts/tests/test_delivery_experiment.py`, `doc:docs/reference/autonomous-validation-audit-2026-08-21.md` |
+| `DP-30` | planned | Run prompt, sampling, instruction-language and script-interaction screens | — |
+| `DP-31` | planned | Confirm Speed and Quality candidates with untouched blinded listening | `file:scripts/tests/test_delivery_listening_session.py`, `file:scripts/tests/test_delivery_promotion_decision.py`, `file:scripts/tests/test_delivery_statistics.py` |
+| `DP-32` | planned | Promote only qualifying delivery changes and revalidate all modes | — |
 
 ### Open items in detail
 
@@ -106,6 +113,21 @@ Narrative authority: [`docs/reference/qwen3-tts-prompting-guide.md`](reference/q
 
 - **`DP-25`** (planned) — Measured normal-tier gate floors (prosody profile v4) for the normal-shipping presets.
   gate: ["The DP-23-step-3 mechanics remainder, now live because DP-24 makes the shipped tier non-uniform: replace the prosody profile's derived normal minima (strong floors divided by the doubly-refuted 1.15 intensity_scale - scripts/prosody_profile.py) with floors calibrated from DP-22's banked measured normal-tier paired rows, at least for the shipping normal cells (happy, angry); retire or annotate the 1.15 constant; bump the profile schema so records carry the new digest. DP-21's calibration protocol is the template (floors at the noise decile; genuine misses kept warning). Desk work, no phone; needs the banked DP-22 sidecars under outputs/bench-archive."]
+
+- **`DP-28`** (planned) — Calibrate the layered local delivery evaluator.
+  gate: Infrastructure landed with full SER posteriors, entropy/margin abstention, sequential acoustic/ASR/identity/UTMOS/SER composition, and a lightweight dimensional VAD model with nested speaker/script-grouped validation. The blinded calibration workflow now requires exact complete planned-row coverage, verifies every WAV, binds its private key, withholds preset/speaker/script/seed/features from listeners, requires at least three independent complete listeners plus fluent language coverage and per-dimension mean pairwise CCC >= 0.60, and rejects target-derived or otherwise unqualified label provenance at evaluator training. A first untracked 27-clip English packet completed without retained generation failures across Aiden/Ryan/Vivian, three script lengths and Happy/Angry/Sad; it remains deliberately unqualified pending real listener responses. Closure still requires AV-07's frozen blinded-label training manifest, independent untouched multi-speaker/script/language holdout, declared feature normalization and noise floors, calibration and out-of-distribution metrics, immutable coefficients/provenance, challenger license and memory checks, and negative fixtures proving threshold leakage or a missing scorer cannot authorize promotion.
+
+- **`DP-29`** (planned) — Qualify the native-language delivery corpus and cross-language sentinels.
+  gate: Corpus structure is landed for nine native speaker-language cells, four fixed cross-language sentinels, three lengths and neutral/congruent/conflicting semantics across calibration/development/confirmation splits. Closure requires fluent review of every Mandarin, Japanese and Korean script, immutable review provenance and digests, no speaker/script/seed or translated-equivalent leakage, independent generated cohorts, ASR/CER/language-ID uncertainty and ignored-sample accounting, and AV-08-compliant evidence before any locale is promoted beyond provisional.
+
+- **`DP-30`** (planned) — Run prompt, sampling, instruction-language and script-interaction screens.
+  gate: The source-bound runner now supports named development-only subsets, refuses subset selection for confirmation, seals CLI/runner/analyzer/gate/profile bytes, retains privacy-safe typed failures and compares exactly one controlled factor. Exploratory prompt screens rejected a global official-minimal rewrite: shipped versus minimal advisory acoustic pass counts were 10/24 versus 5/24 across Ryan plus Vivian/Ono Anna/Sohee English sentinels. Three-seed Aiden sampling screens changed ranking by seed; consistent-matched led the two-seed extension 10/12, three alternatives reached 9/12, and the first seed produced a three-way 4/6 tie. Happy and Surprised were recurrent weak cells, so production copy and the Expressive default remain unchanged. Closure still requires speaker-diverse per-preset prompt/sampling screens, English versus Mandarin instruction wording with output fixed, neutral/congruent/conflicting script interactions, and an 8-20 seed power result before confirmation. Automatic layers may reject candidates but cannot select on an untouched listener holdout or relax an underpowered result into a positive claim.
+
+- **`DP-31`** (planned) — Confirm Speed and Quality candidates with untouched blinded listening.
+  gate: Run surviving candidates on both 4-bit Speed and 8-bit Quality, then open one untouched holdout per candidate family across all nine speakers, eight presets, native-language corpus and fixed sentinels. Require at least three independent metadata-blinded listeners and one fluent listener per output language, same-speaker/text/seed instructed-versus-neutral 2AFC, eight-way identification, perceived VAD/naturalness ratings, paired bootstrap intervals, Holm correction, speaker/script-balanced gains, and all automatic PCM, WER/CER, identity, UTMOS, memory, cancellation, seed and receipt guardrails.
+
+- **`DP-32`** (planned) — Promote only qualifying delivery changes and revalidate all modes.
+  gate: A global or per-preset prompt/compiler change may land only when DP-31 emits a qualifying fail-closed decision: positive paired listener-improvement lower bound, corrected above-chance 2AFC, distributed speaker/script improvement, no corrected per-preset regression, zero new hard PCM failures, WER/CER delta <= 0.01, median speaker-similarity delta >= -0.02, relative UTMOS delta >= -0.10 and valid runtime identities. Revalidate CustomVoice, VoiceDesign identity plus delivery, and clone emotion reference banks separately. If no candidate qualifies, preserve current prompts and directional-hint UI. No hidden best-of-N, cloud evaluator, app-bundled evaluator or automatic publication.
 
 ## 2026-08 engineering review remediation
 

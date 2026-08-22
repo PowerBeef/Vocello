@@ -21,6 +21,7 @@ from delivery_listening_session import (
     IDENTIFY_PRESETS,
     REPEAT_COUNT,
     build_session,
+    score_listener_cohort,
     score_session,
 )
 
@@ -175,6 +176,62 @@ class SessionBuildTests(unittest.TestCase):
         agreement = reports["identification"]["selfAgreement"]
         self.assertEqual(agreement["n"], REPEAT_COUNT)
         self.assertEqual(agreement["agreement"], 1.0)
+
+    def test_listener_cohort_requires_three_people_and_fluent_coverage(self) -> None:
+        self.populate()
+        out, _ = self.build()
+        responses = self.root / "responses"
+        responses.mkdir()
+        keys = {
+            stem: json.loads((out / f"key-{stem}.json").read_text(encoding="utf-8"))
+            for stem in ("identification", "clone", "2afc")
+        }
+        for index in range(3):
+            answers = {
+                "identification": {
+                    entry["id"]: entry["cell"].split(".")[0].capitalize()
+                    for entry in keys["identification"]
+                },
+                "clone": {
+                    entry["id"]: entry["cell"].split(".")[0].capitalize()
+                    for entry in keys["clone"]
+                },
+                "2afc": {
+                    entry["id"]: entry["correctSide"] for entry in keys["2afc"]
+                },
+            }
+            first_trial = keys["identification"][0]["id"]
+            (responses / f"listener-{index}.json").write_text(
+                json.dumps({
+                    "schemaVersion": 1,
+                    "listenerID": f"listener-{index}",
+                    "fluentLanguages": ["English"] if index == 0 else [],
+                    "answers": answers,
+                    "ratings": {
+                        first_trial: {"valence": 0.5, "arousal": 0.25, "naturalness": 4}
+                    },
+                }),
+                encoding="utf-8",
+            )
+        report = score_listener_cohort(
+            out, responses, required_languages=["English"]
+        )
+        self.assertEqual(report["listenerCount"], 3)
+        self.assertTrue(report["semanticPromotionEligible"])
+        self.assertEqual(report["fluentLanguageCoverage"]["English"], 1)
+        self.assertTrue(
+            all(
+                entry["significant"]
+                for entry in report["identificationPerPresetHolm"].values()
+            )
+        )
+        self.assertTrue((out / "listener-cohort-report.json").is_file())
+
+        report = score_listener_cohort(
+            out, responses, required_languages=["English", "Japanese"]
+        )
+        self.assertFalse(report["semanticPromotionEligible"])
+        self.assertIn("no-fluent-listener:Japanese", report["authorityLimitations"])
 
 
 if __name__ == "__main__":

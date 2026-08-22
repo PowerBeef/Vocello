@@ -1,0 +1,221 @@
+{
+  "schemaVersion": 1,
+  "compilerVersion": 1,
+  "status": "experimental-only",
+  "boundary": "This contract plans operator-local delivery experiments. It never changes EmotionPreset.swift or authorizes production copy.",
+  "promptArms": [
+    {"id": "current", "components": ["production-source"]},
+    {"id": "official-minimal", "components": ["minimal"]},
+    {"id": "acoustic-only", "components": ["acoustics"]},
+    {"id": "emotion-acoustic", "components": ["emotion", "acoustics"]},
+    {"id": "emotion-acoustic-scene", "components": ["emotion", "acoustics", "scene"]},
+    {"id": "emotion-acoustic-scene-constraint", "components": ["emotion", "acoustics", "scene", "constraint"]}
+  ],
+  "presets": {
+    "neutral": {
+      "dimensions": {"valence": 0, "arousal": 0, "dominance": 0},
+      "conflictingPreset": "surprised",
+      "prohibitedPhrases": ["highly emotional", "wildly excited"],
+      "instructionLanguages": {
+        "english": {
+          "minimal": "Say it in a neutral tone.",
+          "emotion": "Sound completely neutral and matter-of-fact.",
+          "acoustics": "Use an even pitch, steady measured pace, moderate energy, and plain articulation.",
+          "scene": "Deliver it like an objective factual announcement.",
+          "constraint": "Do not add noticeable excitement, sadness, anger, or surprise."
+        },
+        "mandarin": {
+          "minimal": "用中性的语气说。",
+          "emotion": "语气要完全中性、客观。",
+          "acoustics": "音高保持平稳，语速均匀适中，能量适中，吐字朴素清楚。",
+          "scene": "像在客观播报事实一样表达。",
+          "constraint": "不要加入明显的兴奋、悲伤、愤怒或惊讶。"
+        }
+      }
+    },
+    "happy": {
+      "dimensions": {"valence": 1, "arousal": 1, "dominance": 0},
+      "conflictingPreset": "sad",
+      "prohibitedPhrases": ["grief-stricken", "deeply sorrowful"],
+      "instructionLanguages": {
+        "english": {
+          "minimal": "Very happy.",
+          "emotion": "Sound unmistakably happy and delighted.",
+          "acoustics": "Use a bright slightly higher pitch, lively upward melody, smiling resonance, and buoyant pacing.",
+          "scene": "Speak as if sharing genuinely wonderful news with someone you care about.",
+          "constraint": "Keep the joy natural and intelligible rather than laughing or shouting."
+        },
+        "mandarin": {
+          "minimal": "用非常开心的语气说。",
+          "emotion": "语气要明显开心、充满喜悦。",
+          "acoustics": "使用明亮而略高的音高、活泼上扬的旋律、带笑意的共鸣和轻快节奏。",
+          "scene": "像在向亲近的人分享真正的好消息。",
+          "constraint": "保持自然清晰的喜悦，不要大笑或喊叫。"
+        }
+      }
+    },
+    "sad": {
+      "dimensions": {"valence": -1, "arousal": -1, "dominance": -1},
+      "conflictingPreset": "happy",
+      "prohibitedPhrases": ["bright high pitch", "buoyant pacing"],
+      "instructionLanguages": {
+        "english": {
+          "minimal": "Very sad.",
+          "emotion": "Sound deeply sad and sorrowful.",
+          "acoustics": "Use a low subdued pitch, restrained energy, reduced melodic range, and slow weighted pacing.",
+          "scene": "Speak as if carefully sharing a painful loss.",
+          "constraint": "Keep the sentence flowing and every word clear without theatrical sobbing."
+        },
+        "mandarin": {
+          "minimal": "用非常悲伤的语气说。",
+          "emotion": "语气要深深悲伤、充满哀痛。",
+          "acoustics": "使用低沉克制的音高、较弱能量、较窄旋律范围和缓慢沉重的节奏。",
+          "scene": "像在谨慎地告诉别人一个令人痛苦的损失。",
+          "constraint": "保持句子连贯和字词清楚，不要夸张哭泣。"
+        }
+      }
+    },
+    "angry": {
+      "dimensions": {"valence": -1, "arousal": 1, "dominance": 1},
+      "conflictingPreset": "calm",
+      "prohibitedPhrases": ["gentle even phrasing", "deeply calm"],
+      "instructionLanguages": {
+        "english": {
+          "minimal": "Say it in a very angry tone.",
+          "emotion": "Sound fiercely angry and frustrated.",
+          "acoustics": "Use a tense forceful voice, hard consonants, clipped emphasis, strong energy, and fast emphatic pacing.",
+          "scene": "Speak while confronting a serious and unfair mistake.",
+          "constraint": "Stay controlled and intelligible rather than shouting."
+        },
+        "mandarin": {
+          "minimal": "用特别愤怒的语气说。",
+          "emotion": "语气要强烈愤怒、充满挫败感。",
+          "acoustics": "使用紧张有力的声音、硬朗辅音、短促重音、强能量和快速强调的节奏。",
+          "scene": "像在直面一个严重而不公平的错误。",
+          "constraint": "保持克制和清晰，不要喊叫。"
+        }
+      }
+    },
+    "fearful": {
+      "dimensions": {"valence": -1, "arousal": 1, "dominance": -1},
+      "conflictingPreset": "calm",
+      "prohibitedPhrases": ["settled pitch", "serenely calm"],
+      "instructionLanguages": {
+        "english": {
+          "minimal": "Very frightened.",
+          "emotion": "Sound frightened, anxious, and close to panic.",
+          "acoustics": "Use a high tight shaky voice, trembling pitch, uneven urgent pacing, and brief hesitant catches.",
+          "scene": "Speak as if warning someone about a danger that may be approaching.",
+          "constraint": "Keep every word audible without gasping or screaming."
+        },
+        "mandarin": {
+          "minimal": "用非常害怕的语气说。",
+          "emotion": "语气要害怕、焦虑，接近惊慌。",
+          "acoustics": "使用偏高、紧绷而颤抖的声音，音高发颤，节奏急促不均，并有短暂迟疑。",
+          "scene": "像在警告别人一个正在逼近的危险。",
+          "constraint": "每个字都要听清，不要喘叫或尖叫。"
+        }
+      }
+    },
+    "surprised": {
+      "dimensions": {"valence": 0, "arousal": 1, "dominance": 0},
+      "conflictingPreset": "neutral",
+      "prohibitedPhrases": ["flat melody", "no noticeable emotion"],
+      "instructionLanguages": {
+        "english": {
+          "minimal": "Very surprised.",
+          "emotion": "Sound unmistakably surprised and astonished.",
+          "acoustics": "Use a sudden pitch lift, sharply rising key words, wide pitch movement, and quick startled pacing.",
+          "scene": "Speak at the instant an entirely unexpected fact is revealed.",
+          "constraint": "Keep the reaction natural and clear rather than turning it into a shout."
+        },
+        "mandarin": {
+          "minimal": "用非常惊讶的语气说。",
+          "emotion": "语气要明显惊讶、感到震惊。",
+          "acoustics": "突然抬高音高，关键词明显上扬，扩大音高变化，并使用快速惊愕的节奏。",
+          "scene": "像在一个完全意外的事实刚刚揭晓时说话。",
+          "constraint": "反应要自然清晰，不要变成喊叫。"
+        }
+      }
+    },
+    "calm": {
+      "dimensions": {"valence": 1, "arousal": -1, "dominance": 0},
+      "conflictingPreset": "fearful",
+      "prohibitedPhrases": ["urgent pacing", "close to panic"],
+      "instructionLanguages": {
+        "english": {
+          "minimal": "Very calm.",
+          "emotion": "Sound deeply calm, safe, and reassuring.",
+          "acoustics": "Use a low settled pitch, soft steady energy, smooth unhurried pacing, and gentle even phrasing.",
+          "scene": "Speak while reassuring someone that the situation is under control.",
+          "constraint": "Remain attentive and clear rather than flat or sleepy."
+        },
+        "mandarin": {
+          "minimal": "用非常平静的语气说。",
+          "emotion": "语气要深深平静、安全而令人安心。",
+          "acoustics": "使用低而稳定的音高、柔和稳定的能量、平顺从容的节奏和温和均匀的措辞。",
+          "scene": "像在安慰别人情况已经得到控制。",
+          "constraint": "保持专注和清晰，不要显得平淡或困倦。"
+        }
+      }
+    },
+    "whisper": {
+      "dimensions": {"valence": 0, "arousal": -1, "dominance": -1},
+      "conflictingPreset": "angry",
+      "prohibitedPhrases": ["forceful voice", "shouting"],
+      "instructionLanguages": {
+        "english": {
+          "minimal": "Whisper it very quietly.",
+          "emotion": "Whisper the entire passage in a close confidential voice.",
+          "acoustics": "Use airy breathy phonation, minimal voicing, very low energy, and quiet flowing articulation.",
+          "scene": "Speak as if sharing a secret without waking someone nearby.",
+          "constraint": "Stay whispered throughout while keeping every word intelligible."
+        },
+        "mandarin": {
+          "minimal": "用很轻的耳语说。",
+          "emotion": "整段都用贴近、私密的耳语表达。",
+          "acoustics": "使用轻盈有气息的发声、尽量少的声带振动、很低的能量和安静连贯的吐字。",
+          "scene": "像在不惊醒旁人的情况下分享一个秘密。",
+          "constraint": "全程保持耳语，同时让每个字都能听清。"
+        }
+      }
+    }
+  },
+  "samplingProfiles": {
+    "official": {"temperature": 0.9, "topP": 1.0, "topK": 50},
+    "balanced": {"temperature": 0.8, "topP": 0.95, "topK": 50},
+    "consistent": {"temperature": 0.7, "topP": 0.9, "topK": 50}
+  },
+  "samplingCombinations": [
+    {"id": "official-official", "talker": "official", "subtalker": "official"},
+    {"id": "balanced-official", "talker": "balanced", "subtalker": "official"},
+    {"id": "balanced-matched", "talker": "balanced", "subtalker": "matched"},
+    {"id": "consistent-official", "talker": "consistent", "subtalker": "official"},
+    {"id": "consistent-matched", "talker": "consistent", "subtalker": "matched"}
+  ],
+  "promotionGuardrails": {
+    "listenerMacroImprovementLower95Above": 0.0,
+    "holmAlpha": 0.05,
+    "maximumAbsoluteWEROrCERRegression": 0.01,
+    "maximumMedianSpeakerSimilarityRegression": 0.02,
+    "maximumMedianRelativeUTMOSRegression": 0.1,
+    "maximumNewHardAudioQCFailures": 0,
+    "minimumIndependentListeners": 3,
+    "minimumFluentListenersPerLanguage": 1
+  },
+  "externalModelPolicy": {
+    "required": [
+      "commercially-compatible-license",
+      "immutable-revision-and-weight-digest",
+      "declared-training-data-and-label-map",
+      "untouched-holdout-calibration-improvement",
+      "measured-eight-gigabyte-memory-compatibility",
+      "offline-after-approved-acquisition",
+      "sequential-subprocess-memory-release"
+    ],
+    "excludedPendingReview": [
+      {"id": "audeering-dimensional-models", "reason": "research/non-commercial license"},
+      {"id": "emotion2vec-plus", "reason": "checkpoint license and training-data disclosure unresolved"}
+    ]
+  }
+}

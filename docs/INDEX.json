@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "generated": "python3 scripts/doc_metadata.py rebuild-index",
   "note": "Machine-readable documentation map. Query this instead of globbing docs/.",
-  "annotatedDocuments": 91,
+  "annotatedDocuments": 92,
   "unannotatedDocuments": 0,
   "documents": [
     {
@@ -14,7 +14,14 @@
         "scripts/build_foundation_targets.sh",
         "config/runtime-refactor-contract.json",
         "Sources/Resources/qwenvoice_contract.json",
-        "config/runtime-debug-knobs.json"
+        "config/runtime-debug-knobs.json",
+        "config/delivery-experiment-contract.json",
+        "config/delivery-evaluation-corpus.json",
+        "scripts/delivery_experiment.py",
+        "scripts/delivery_experiment_runner.py",
+        "scripts/delivery_calibration_session.py",
+        "scripts/delivery_evaluator.py",
+        "scripts/delivery_promotion_decision.py"
       ]
     },
     {
@@ -301,8 +308,17 @@
       "owner": "backend-mlx",
       "summary": "Operator's reference for the audio delivery analysis harness \u2014 the tools, the bench --delivery measurement protocol, evidence and provenance conventions, the statistics the separability scorer reports, the pre-registration discipline, the DP results ledger, and re-run recipes.",
       "sourceOfTruth": [
+        "scripts/custom_delivery_matrix.py",
+        "scripts/delivery_experiment.py",
+        "scripts/delivery_experiment_runner.py",
+        "scripts/delivery_calibration_session.py",
+        "scripts/delivery_evaluator.py",
+        "scripts/delivery_promotion_decision.py",
         "scripts/delivery_separability.py",
-        "scripts/bench_delivery_prosody.py"
+        "scripts/bench_delivery_prosody.py",
+        "scripts/analyze_prosody.py",
+        "config/delivery-experiment-contract.json",
+        "config/delivery-evaluation-corpus.json"
       ]
     },
     {
@@ -601,6 +617,13 @@
       "contentDigest": "sha256:33fd92b0ce213fac47c016f74d96fd80f444c09ca51f3247b270dd356bc8b5fa"
     },
     {
+      "path": "docs/reference/qwen3-tts-emotion-tone-research-2026-08-22.md",
+      "status": "historical",
+      "owner": "backend-mlx",
+      "summary": "Point-in-time research and code audit of Qwen3-TTS emotion and tone control, Vocello delivery wiring, evaluation limits, and the governed remediation adopted on 2026-08-22.",
+      "contentDigest": "sha256:0d4f2841b0d88118c64b6f5ac2c9dece1b2e06681b9274a989509980a7c1a352"
+    },
+    {
       "path": "docs/reference/qwen3-tts-guide.md",
       "status": "active",
       "owner": "backend-mlx",
@@ -621,7 +644,11 @@
       "summary": "Sourced reference for the three model-facing text surfaces (script, delivery instruction, voice description) \u2014 every claim labeled OFFICIAL/RESEARCH/MEASURED-HERE/COMMUNITY/UNVERIFIED.",
       "sourceOfTruth": [
         "config/delivery-instruction-contract.json",
-        "Sources/QwenVoiceCore/EmotionPreset.swift"
+        "config/delivery-experiment-contract.json",
+        "config/delivery-evaluation-corpus.json",
+        "Sources/QwenVoiceCore/EmotionPreset.swift",
+        "scripts/delivery_experiment.py",
+        "scripts/delivery_experiment_runner.py"
       ]
     },
     {
@@ -684,7 +711,9 @@
         "scripts/check_project_inputs.sh",
         "scripts/macos_test.sh",
         "scripts/ios_device.sh",
-        "scripts/ui_test.sh"
+        "scripts/ui_test.sh",
+        "scripts/delivery_evaluator.py",
+        "scripts/delivery_promotion_decision.py"
       ]
     },
     {

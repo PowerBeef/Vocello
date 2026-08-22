@@ -53,8 +53,10 @@ from delivery_identification_check import (
     evaluate_discrimination,
     evaluate_identification,
 )
+from delivery_statistics import holm_bonferroni
 
 SESSION_VERSION = 1
+COHORT_RESPONSE_VERSION = 1
 DEFAULT_SESSION_SEED = 20260804
 DEFAULT_ARCHIVE_ROOT = (
     Path.home() / "Library" / "Application Support" / "QwenVoice-Debug"
@@ -437,6 +439,164 @@ def score_session(session_dir: Path) -> dict:
     return reports
 
 
+def _load_cohort_response(path: Path) -> dict:
+    try:
+        response = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise ValueError(f"cannot load listener response {path}: {error}") from error
+    if not isinstance(response, dict) or response.get("schemaVersion") != COHORT_RESPONSE_VERSION:
+        raise ValueError(f"{path.name}: invalid listener response schemaVersion")
+    listener_id = response.get("listenerID")
+    if (
+        not isinstance(listener_id, str)
+        or not listener_id
+        or any(character not in "abcdefghijklmnopqrstuvwxyz0123456789-_" for character in listener_id)
+    ):
+        raise ValueError(f"{path.name}: listenerID must be a lowercase pseudonymous token")
+    fluent = response.get("fluentLanguages")
+    if not isinstance(fluent, list) or any(
+        not isinstance(language, str) or not language for language in fluent
+    ):
+        raise ValueError(f"{path.name}: fluentLanguages must be a string array")
+    answers = response.get("answers")
+    if not isinstance(answers, dict) or any(
+        not isinstance(answers.get(stem, {}), dict)
+        for stem in ("identification", "clone", "2afc")
+    ):
+        raise ValueError(f"{path.name}: answers must contain task dictionaries")
+    ratings = response.get("ratings", {})
+    if not isinstance(ratings, dict):
+        raise ValueError(f"{path.name}: ratings must be an object")
+    for trial_id, row in ratings.items():
+        if not isinstance(row, dict) or set(row) != {"valence", "arousal", "naturalness"}:
+            raise ValueError(f"{path.name}: {trial_id} needs valence/arousal/naturalness")
+        for name in ("valence", "arousal"):
+            value = row[name]
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or not -1 <= value <= 1:
+                raise ValueError(f"{path.name}: {trial_id}.{name} must be in [-1, 1]")
+        naturalness = row["naturalness"]
+        if (
+            isinstance(naturalness, bool)
+            or not isinstance(naturalness, (int, float))
+            or not 1 <= naturalness <= 5
+        ):
+            raise ValueError(f"{path.name}: {trial_id}.naturalness must be in [1, 5]")
+    return response
+
+
+def score_listener_cohort(
+    session_dir: Path, responses_dir: Path, *, required_languages: list[str]
+) -> dict:
+    """Aggregate pseudonymous independent responses with semantic authority checks."""
+    paths = sorted(responses_dir.glob("*.json")) if responses_dir.is_dir() else []
+    if not paths:
+        raise ValueError("listener cohort has no response files")
+    responses = [_load_cohort_response(path) for path in paths]
+    listener_ids = [response["listenerID"] for response in responses]
+    if len(listener_ids) != len(set(listener_ids)):
+        raise ValueError("listener cohort contains duplicate listenerID values")
+
+    keys = {
+        stem: json.loads((session_dir / f"key-{stem}.json").read_text(encoding="utf-8"))
+        for stem in ("identification", "clone", "2afc")
+        if (session_dir / f"key-{stem}.json").is_file()
+    }
+    known_ids = {entry["id"] for entries in keys.values() for entry in entries}
+    pooled_keys = {stem: [] for stem in keys}
+    pooled_answers = {stem: {} for stem in keys}
+    ratings_by_preset: dict[str, dict[str, list[float]]] = {}
+    identification_by_id = {
+        entry["id"]: entry for entry in keys.get("identification", [])
+    }
+    for response in responses:
+        listener = response["listenerID"]
+        for stem, entries in keys.items():
+            answers = response["answers"].get(stem, {})
+            unknown = set(answers) - {entry["id"] for entry in entries}
+            if unknown:
+                raise ValueError(f"{listener}: {stem} answers unknown trial ids")
+            for entry in entries:
+                trial_id = entry["id"]
+                if trial_id not in answers:
+                    continue
+                pooled_id = f"{listener}::{trial_id}"
+                pooled_entry = {**entry, "id": pooled_id}
+                if isinstance(entry.get("repeatOf"), str):
+                    pooled_entry["repeatOf"] = f"{listener}::{entry['repeatOf']}"
+                pooled_keys[stem].append(pooled_entry)
+                pooled_answers[stem][pooled_id] = answers[trial_id]
+        unknown_ratings = set(response["ratings"]) - known_ids
+        if unknown_ratings:
+            raise ValueError(f"{listener}: ratings contain unknown trial ids")
+        for trial_id, rating in response["ratings"].items():
+            key = identification_by_id.get(trial_id)
+            if key is None:
+                continue
+            preset = key["cell"].split(".", 1)[0]
+            bucket = ratings_by_preset.setdefault(
+                preset, {"valence": [], "arousal": [], "naturalness": []}
+            )
+            for name, value in rating.items():
+                bucket[name].append(float(value))
+
+    identification = evaluate_identification(
+        pooled_keys.get("identification", []), pooled_answers.get("identification", {})
+    )
+    discrimination = None
+    if pooled_keys.get("2afc"):
+        discrimination = evaluate_discrimination(
+            pooled_keys["2afc"], pooled_answers["2afc"]
+        )
+    chance = 1.0 / len(IDENTIFY_PRESETS)
+    preset_names = sorted(identification["perPreset"])
+    raw_p_values = []
+    for preset in preset_names:
+        entry = identification["perPreset"][preset]
+        hits = round(entry["recall"] * entry["n"])
+        raw_p_values.append(_binomial_sf(hits, entry["n"], chance) if entry["n"] else None)
+    holm = holm_bonferroni(raw_p_values, alpha=0.05)
+    corrected = {preset: row for preset, row in zip(preset_names, holm)}
+
+    ratings = {
+        preset: {
+            name: {
+                "n": len(values),
+                "mean": sum(values) / len(values) if values else None,
+            }
+            for name, values in dimensions.items()
+        }
+        for preset, dimensions in sorted(ratings_by_preset.items())
+    }
+    fluent_coverage = {
+        language: sum(language in response["fluentLanguages"] for response in responses)
+        for language in required_languages
+    }
+    authority_reasons = []
+    if len(responses) < 3:
+        authority_reasons.append("fewer-than-three-independent-listeners")
+    for language, count in fluent_coverage.items():
+        if count < 1:
+            authority_reasons.append(f"no-fluent-listener:{language}")
+    report = {
+        "schemaVersion": COHORT_RESPONSE_VERSION,
+        "kind": "blind-delivery-listener-cohort",
+        "listenerCount": len(responses),
+        "listenerIDs": sorted(listener_ids),
+        "requiredLanguages": required_languages,
+        "fluentLanguageCoverage": fluent_coverage,
+        "semanticPromotionEligible": not authority_reasons,
+        "authorityLimitations": authority_reasons,
+        "identification": identification,
+        "identificationPerPresetHolm": corrected,
+        "discrimination": discrimination,
+        "ratings": ratings,
+    }
+    (session_dir / "listener-cohort-report.json").write_text(
+        json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    return report
+
+
 def _print_score(reports: dict) -> None:
     decisions = reports["decisions"]
     pooled = decisions["identificationPooled"]
@@ -497,6 +657,13 @@ def main() -> int:
 
     score = commands.add_parser("score", help="score recorded answers")
     score.add_argument("--session", required=True, type=Path)
+    cohort = commands.add_parser("score-cohort", help="score independent blinded listeners")
+    cohort.add_argument("--session", required=True, type=Path)
+    cohort.add_argument("--responses-dir", required=True, type=Path)
+    cohort.add_argument(
+        "--required-languages", default="English",
+        help="comma-separated output languages requiring a fluent listener",
+    )
 
     arguments = parser.parse_args()
     if arguments.command == "build":
@@ -514,6 +681,17 @@ def main() -> int:
         return 0
     if arguments.command == "run":
         run_session(arguments.session)
+        return 0
+    if arguments.command == "score-cohort":
+        languages = [value.strip() for value in arguments.required_languages.split(",") if value.strip()]
+        reports = score_listener_cohort(
+            arguments.session, arguments.responses_dir, required_languages=languages
+        )
+        print(json.dumps({
+            "listenerCount": reports["listenerCount"],
+            "semanticPromotionEligible": reports["semanticPromotionEligible"],
+            "authorityLimitations": reports["authorityLimitations"],
+        }, indent=2))
         return 0
     reports = score_session(arguments.session)
     _print_score(reports)

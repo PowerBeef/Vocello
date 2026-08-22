@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import resource
 import sys
@@ -54,12 +55,18 @@ PRESET_ALLOWED_EMOTIONS = {
     "angry": {"angry"},
     "fearful": {"fearful"},
     "surprised": {"surprised"},
-    "calm": {"neutral"},
     "neutral": {"neutral"},
 }
+# Calm is not a category exposed by the checkpoint. Treating ``neutral`` as a
+# semantic match overstates what the model measured; keep the mapping visible
+# as a hypothesis for calibration reports, never as an agreement verdict.
+HYPOTHESIS_PRESET_EMOTIONS = {"calm": {"neutral"}}
 ABSTAIN_PRESETS = {"whisper"}
 
-ADVISORY_VERSION = 1
+ADVISORY_VERSION = 2
+LAYER_SCHEMA_VERSION = 1
+MINIMUM_TOP_PROBABILITY = 0.40
+MINIMUM_TOP_TWO_MARGIN = 0.10
 
 
 def evaluate_agreement(probabilities, delivery_id):
@@ -71,19 +78,46 @@ def evaluate_agreement(probabilities, delivery_id):
             "preset": preset,
             "topEmotion": None,
             "topProbability": None,
+            "topTwoMargin": None,
+            "normalizedEntropy": None,
+            "probabilities": {},
+            "abstained": True,
             "allowedEmotions": [],
             "agreement": None,
             "note": "classification_unavailable",
         }
-    top_emotion, top_probability = max(probabilities.items(), key=lambda item: item[1])
+    if set(probabilities) != set(EMOTION_LABELS):
+        raise ValueError("emotion posterior labels drifted from the pinned checkpoint")
+    normalized = {
+        label: float(probabilities[label]) for label in EMOTION_LABELS
+    }
+    if any(not math.isfinite(value) or value < 0 for value in normalized.values()):
+        raise ValueError("emotion posterior must contain finite non-negative values")
+    total = sum(normalized.values())
+    if total <= 0:
+        raise ValueError("emotion posterior has zero mass")
+    normalized = {label: value / total for label, value in normalized.items()}
+    ranked = sorted(normalized.items(), key=lambda item: item[1], reverse=True)
+    top_emotion, top_probability = ranked[0]
+    top_two_margin = top_probability - ranked[1][1]
+    entropy = -sum(value * math.log(value) for value in normalized.values() if value > 0)
+    normalized_entropy = entropy / math.log(len(normalized))
+    uncertain = (
+        top_probability < MINIMUM_TOP_PROBABILITY
+        or top_two_margin < MINIMUM_TOP_TWO_MARGIN
+    )
     if preset in ABSTAIN_PRESETS:
         allowed: set[str] = set()
         agreement = None
         note = "preset_abstains"
+    elif preset in HYPOTHESIS_PRESET_EMOTIONS:
+        allowed = HYPOTHESIS_PRESET_EMOTIONS[preset]
+        agreement = None
+        note = "hypothesis_only"
     elif preset in PRESET_ALLOWED_EMOTIONS:
         allowed = PRESET_ALLOWED_EMOTIONS[preset]
-        agreement = top_emotion in allowed
-        note = None
+        agreement = None if uncertain else top_emotion in allowed
+        note = "classifier_uncertain" if uncertain else None
     else:
         allowed = set()
         agreement = None
@@ -93,6 +127,12 @@ def evaluate_agreement(probabilities, delivery_id):
         "preset": preset,
         "topEmotion": top_emotion,
         "topProbability": round(float(top_probability), 4),
+        "topTwoMargin": round(float(top_two_margin), 4),
+        "normalizedEntropy": round(float(normalized_entropy), 4),
+        "probabilities": {
+            label: round(normalized[label], 6) for label in EMOTION_LABELS
+        },
+        "abstained": agreement is None,
         "allowedEmotions": sorted(allowed),
         "agreement": agreement,
     }
@@ -193,10 +233,12 @@ def analyze_sidecar(sidecar_path, outputs_dir, classify):
     judged = [report for report in reports if report["agreement"] is not None]
     agreed = sum(1 for report in judged if report["agreement"])
     return {
+        "schemaVersion": LAYER_SCHEMA_VERSION,
         "advisoryVersion": ADVISORY_VERSION,
         "modelSource": EMOTION_MODEL_SOURCE,
         "modelRevision": EMOTION_MODEL_REVISION,
         "takes": reports,
+        "rows": reports,
         "aggregate": {
             "count": len(reports),
             "judged": len(judged),

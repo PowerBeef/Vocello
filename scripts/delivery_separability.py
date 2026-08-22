@@ -637,7 +637,7 @@ def evaluate_separability(
     }
 
 
-def records_from_sidecar(rows):
+def records_from_sidecar(rows, fallback_seed=None):
     """Build separability records from ``bench-prosody.json`` rows."""
     records = []
     for row in rows or []:
@@ -655,12 +655,17 @@ def records_from_sidecar(rows):
         # reports rather than silently claiming seed-grouped CV.
         seed = row.get("seed")
         if seed in (None, ""):
+            seed = fallback_seed
+        if seed in (None, ""):
             seed = row.get("generationID") or row.get("deliveryWav") or delivery
         records.append({
             "preset": gate.get("preset") or preset,
             "intensity": gate.get("intensity") or (intensity if separator else "normal"),
             "seed": seed,
+            "speakerID": row.get("speakerID"),
             "features": features,
+            "deliveryPassed": gate.get("passed"),
+            "deliveryFlags": list(gate.get("flags") or []),
         })
     return records
 

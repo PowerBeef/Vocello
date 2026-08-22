@@ -188,6 +188,22 @@ class AnalyzeProsodyTests(unittest.TestCase):
             flat_report["f0_range_semitones"] + 0.5,
         )
 
+    def test_f0_median_tracks_ground_truth_across_supported_voice_range(self) -> None:
+        # Harmonic fixtures resemble voiced speech more closely than a pure
+        # sine. Cover low through high Built-in Voice fundamentals so octave
+        # errors or a speaker-biased pitch anchor fail deterministically.
+        for frequency in (80.0, 100.0, 150.0, 220.0, 300.0, 390.0):
+            path = self.directory / f"f0-{int(frequency)}.wav"
+            write_pcm16(path, harmonic_tone(2.0, frequency=frequency))
+            report = analyze(str(path))
+            self.assertNotIn("error", report)
+            self.assertAlmostEqual(
+                report["f0_median_hz"],
+                frequency,
+                delta=max(1.0, frequency * 0.01),
+                msg=f"pitch tracking drifted at {frequency} Hz",
+            )
+
     def test_stereo_downmix_remains_supported(self) -> None:
         path = self.directory / "stereo.wav"
         write_pcm16(path, sine(2.0), channels=2)

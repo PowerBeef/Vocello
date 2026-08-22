@@ -969,6 +969,126 @@
       "updated": "2026-08-15"
     },
     {
+      "id": "DP-26",
+      "plan": "delivery-prompting-2026-08",
+      "title": "Cross-speaker Custom Voice delivery screen and Fast-QC correction",
+      "status": "done",
+      "gate": "Completed 2026-08-22 on the macOS/CLI production path. The autonomous matrix exercised all 9 checked-in Custom Voice speakers x all 8 shipped preset/tier cells x 5 fixed seeds (360 instructed attempts), required exact engine instruction receipts, retained typed failures and rejected WAVs, used same-speaker/same-seed uninstructed references, and reported speaker-balanced effects plus held-one-speaker-out separability. Baseline result: product 169/360, acoustic 182/360, held-speaker UAR 0.342. Source-proven QC defect: 29 delivery and 9 reference clips failed only because multiple ordinary >=350 ms cadence pauses exceeded the punctuation count; the independent analyzer found no >=1.2 s pause in any rejected clip and 13 rejected deliveries otherwise passed the acoustic gate. Audio QC v4 now warns on ordinary excess cadence, still fails a >=1.2/2.0 s egregious gap according to context or repeated suspicious-scale gaps, and passed the exact Uncle Fu seed whose three baseline references all failed. A same-seed candidate-v2 prompt arm completed all 360 outcomes with 2 genuine ~2.0 s Sad gaps and zero reference failures, but was rejected for production: acoustic adherence stayed exactly 182/360 and held-speaker UAR regressed 0.342 to 0.306. No shipped prompt changed; surprised.strong (+4/45 adherence, +0.200 recall, paired exact p=0.289) is exploratory and needs a fresh pre-registered holdout before any copy change. The harness now separates product acceptance from acoustic adherence, preserves rejected-audio identity, records limitations, and emits a paired comparison artifact.",
+      "sourceOfTruth": [
+        "Sources/QwenVoiceCore/GenerationOutputAdapter.swift",
+        "Sources/QwenVoiceCore/EmotionPreset.swift",
+        "scripts/custom_delivery_matrix.py",
+        "scripts/bench_delivery_prosody.py",
+        "scripts/delivery_matrix_report.py"
+      ],
+      "evidence": [
+        "file:Tests/VocelloCoreTests/GenerationTelemetrySchemaTests.swift",
+        "file:scripts/tests/test_custom_delivery_matrix.py",
+        "doc:docs/reference/delivery-harness.md"
+      ],
+      "updated": "2026-08-22"
+    },
+    {
+      "id": "DP-27",
+      "plan": "delivery-prompting-2026-08",
+      "title": "Pin Qwen3-TTS delivery research and structured experiment contract",
+      "status": "done",
+      "gate": "Completed 2026-08-22. The pinned primary-source report records official checkpoint capabilities, exact instruction syntax and published instruction-following results; audits Vocello's CustomVoice, VoiceDesign and Clone flows; preserves the DP-26 360-take result; inventories evaluator validity, memory, license and calibration limits; and states that live source/contracts/roadmap remain authoritative. The versioned experiment contract compiles six attributable English/Mandarin prompt arms, target VAD and acoustic movements, scene and anti-exaggeration factors, contradiction checks, five independent talker/subtalker sampler combinations, stable digests and bounded seed-power outcomes. A split-safe corpus and serial source-bound CLI runner seal binary, exact production instruction, speaker, script, language, seed, sampler, receipt, audio and failure identities without changing production copy or publishing evidence.",
+      "sourceOfTruth": [
+        "docs/reference/qwen3-tts-emotion-tone-research-2026-08-22.md",
+        "config/delivery-experiment-contract.json",
+        "config/delivery-evaluation-corpus.json",
+        "scripts/delivery_experiment.py",
+        "scripts/delivery_experiment_runner.py"
+      ],
+      "evidence": [
+        "file:scripts/tests/test_delivery_experiment.py",
+        "file:scripts/tests/test_delivery_experiment_runner.py",
+        "doc:docs/reference/delivery-harness.md"
+      ],
+      "updated": "2026-08-22"
+    },
+    {
+      "id": "DP-28",
+      "plan": "delivery-prompting-2026-08",
+      "title": "Calibrate the layered local delivery evaluator",
+      "status": "planned",
+      "gate": "Infrastructure landed with full SER posteriors, entropy/margin abstention, sequential acoustic/ASR/identity/UTMOS/SER composition, and a lightweight dimensional VAD model with nested speaker/script-grouped validation. The blinded calibration workflow now requires exact complete planned-row coverage, verifies every WAV, binds its private key, withholds preset/speaker/script/seed/features from listeners, requires at least three independent complete listeners plus fluent language coverage and per-dimension mean pairwise CCC >= 0.60, and rejects target-derived or otherwise unqualified label provenance at evaluator training. A first untracked 27-clip English packet completed without retained generation failures across Aiden/Ryan/Vivian, three script lengths and Happy/Angry/Sad; it remains deliberately unqualified pending real listener responses. Closure still requires AV-07's frozen blinded-label training manifest, independent untouched multi-speaker/script/language holdout, declared feature normalization and noise floors, calibration and out-of-distribution metrics, immutable coefficients/provenance, challenger license and memory checks, and negative fixtures proving threshold leakage or a missing scorer cannot authorize promotion.",
+      "sourceOfTruth": [
+        "scripts/delivery_calibration_session.py",
+        "scripts/delivery_evaluator.py",
+        "scripts/emotion_advisory.py",
+        "scripts/analyze_prosody.py"
+      ],
+      "evidence": [
+        "file:scripts/tests/test_delivery_calibration_session.py",
+        "file:scripts/tests/test_delivery_evaluator.py",
+        "file:scripts/tests/test_emotion_advisory.py",
+        "doc:docs/reference/autonomous-validation-audit-2026-08-21.md"
+      ],
+      "updated": "2026-08-22"
+    },
+    {
+      "id": "DP-29",
+      "plan": "delivery-prompting-2026-08",
+      "title": "Qualify the native-language delivery corpus and cross-language sentinels",
+      "status": "planned",
+      "gate": "Corpus structure is landed for nine native speaker-language cells, four fixed cross-language sentinels, three lengths and neutral/congruent/conflicting semantics across calibration/development/confirmation splits. Closure requires fluent review of every Mandarin, Japanese and Korean script, immutable review provenance and digests, no speaker/script/seed or translated-equivalent leakage, independent generated cohorts, ASR/CER/language-ID uncertainty and ignored-sample accounting, and AV-08-compliant evidence before any locale is promoted beyond provisional.",
+      "sourceOfTruth": [
+        "config/delivery-evaluation-corpus.json",
+        "scripts/delivery_experiment.py"
+      ],
+      "evidence": [
+        "file:scripts/tests/test_delivery_experiment.py",
+        "doc:docs/reference/autonomous-validation-audit-2026-08-21.md"
+      ],
+      "updated": "2026-08-22"
+    },
+    {
+      "id": "DP-30",
+      "plan": "delivery-prompting-2026-08",
+      "title": "Run prompt, sampling, instruction-language and script-interaction screens",
+      "status": "planned",
+      "gate": "The source-bound runner now supports named development-only subsets, refuses subset selection for confirmation, seals CLI/runner/analyzer/gate/profile bytes, retains privacy-safe typed failures and compares exactly one controlled factor. Exploratory prompt screens rejected a global official-minimal rewrite: shipped versus minimal advisory acoustic pass counts were 10/24 versus 5/24 across Ryan plus Vivian/Ono Anna/Sohee English sentinels. Three-seed Aiden sampling screens changed ranking by seed; consistent-matched led the two-seed extension 10/12, three alternatives reached 9/12, and the first seed produced a three-way 4/6 tie. Happy and Surprised were recurrent weak cells, so production copy and the Expressive default remain unchanged. Closure still requires speaker-diverse per-preset prompt/sampling screens, English versus Mandarin instruction wording with output fixed, neutral/congruent/conflicting script interactions, and an 8-20 seed power result before confirmation. Automatic layers may reject candidates but cannot select on an untouched listener holdout or relax an underpowered result into a positive claim.",
+      "sourceOfTruth": [
+        "scripts/delivery_experiment_runner.py",
+        "scripts/delivery_evaluator.py",
+        "config/delivery-experiment-contract.json"
+      ],
+      "updated": "2026-08-22"
+    },
+    {
+      "id": "DP-31",
+      "plan": "delivery-prompting-2026-08",
+      "title": "Confirm Speed and Quality candidates with untouched blinded listening",
+      "status": "planned",
+      "gate": "Run surviving candidates on both 4-bit Speed and 8-bit Quality, then open one untouched holdout per candidate family across all nine speakers, eight presets, native-language corpus and fixed sentinels. Require at least three independent metadata-blinded listeners and one fluent listener per output language, same-speaker/text/seed instructed-versus-neutral 2AFC, eight-way identification, perceived VAD/naturalness ratings, paired bootstrap intervals, Holm correction, speaker/script-balanced gains, and all automatic PCM, WER/CER, identity, UTMOS, memory, cancellation, seed and receipt guardrails.",
+      "sourceOfTruth": [
+        "scripts/delivery_listening_session.py",
+        "scripts/delivery_promotion_decision.py",
+        "scripts/delivery_statistics.py"
+      ],
+      "evidence": [
+        "file:scripts/tests/test_delivery_listening_session.py",
+        "file:scripts/tests/test_delivery_promotion_decision.py",
+        "file:scripts/tests/test_delivery_statistics.py"
+      ],
+      "updated": "2026-08-22"
+    },
+    {
+      "id": "DP-32",
+      "plan": "delivery-prompting-2026-08",
+      "title": "Promote only qualifying delivery changes and revalidate all modes",
+      "status": "planned",
+      "gate": "A global or per-preset prompt/compiler change may land only when DP-31 emits a qualifying fail-closed decision: positive paired listener-improvement lower bound, corrected above-chance 2AFC, distributed speaker/script improvement, no corrected per-preset regression, zero new hard PCM failures, WER/CER delta <= 0.01, median speaker-similarity delta >= -0.02, relative UTMOS delta >= -0.10 and valid runtime identities. Revalidate CustomVoice, VoiceDesign identity plus delivery, and clone emotion reference banks separately. If no candidate qualifies, preserve current prompts and directional-hint UI. No hidden best-of-N, cloud evaluator, app-bundled evaluator or automatic publication.",
+      "sourceOfTruth": [
+        "Sources/QwenVoiceCore/EmotionPreset.swift",
+        "scripts/delivery_promotion_decision.py",
+        "scripts/build_emotion_reference_bank.py"
+      ],
+      "updated": "2026-08-22"
+    },
+    {
       "id": "CM-7",
       "plan": "convergence-metal4-stage4-2026-08",
       "title": "Non-streaming CLI generation publishes no WAV while reporting success",
@@ -1538,7 +1658,8 @@
         "scripts/analyze_prosody.py",
         "scripts/tests/test_prosody_calibration.py"
       ],
-      "updated": "2026-08-21"
+      "updated": "2026-08-22",
+      "notes": "The 2026-08-22 DP-26 screen materially hardens exploratory delivery analysis: full speaker/preset outcome coverage, rejected-WAV analysis, exact instruction receipts, speaker-balanced statistics, held-speaker folds, product-vs-acoustic separation, and synthetic F0/pause validation. DP-28 adds the layered evaluator infrastructure and owns its delivery-specific calibration. Neither closes AV-07: the profile was calibrated on prior generation data, the screen uses one fixed English medium script and Speed model, separability predicts request labels rather than perceived emotion, and no independently labelled multi-script/language defect holdout exists. Thresholds therefore remain explicitly unvalidated for promotion authority."
     },
     {
       "id": "AV-08",
@@ -1555,7 +1676,8 @@
         "scripts/ios_device.sh",
         "scripts/macos_test.sh"
       ],
-      "updated": "2026-08-21"
+      "updated": "2026-08-22",
+      "notes": "DP-29 adds the split-safe native-language delivery corpus structure and fixed cross-language sentinels. AV-08 remains open until fluent review, independent generated cohorts, ASR/CER/language-ID uncertainty, and ignored-sample accounting satisfy this item's broader language-evidence gate."
     },
     {
       "id": "AV-09",

@@ -361,8 +361,9 @@ final class GenerationTelemetrySchemaTests: XCTestCase {
     }
 
     func testDropoutThresholdsAreDurationCalibrated() {
-        // A 1.4 s interior gap: hard "dropout" fail on short-form content,
-        // within natural narration pacing on long content (2026-07-23
+        // A 1.4 s interior gap: hard "dropout" fail on short-form content
+        // with no punctuation budget, warning-only when it consumes one real
+        // script boundary, and within natural narration pacing on long content (2026-07-23
         // calibration from a retained failed-qc long-form segment whose gaps
         // position-correlated with sentence/comma boundaries).
         var limiter = PCM16StreamLimiter()
@@ -372,14 +373,23 @@ final class GenerationTelemetrySchemaTests: XCTestCase {
         limiter.append([Float](repeating: 0, count: 1_400), into: &destination)
         limiter.append([0.2], into: &destination)
 
-        let shortForm = StreamingExecutionContext.makeAudioQCReport(
+        let unbudgetedShortForm = StreamingExecutionContext.makeAudioQCReport(
             metrics: limiter.metrics,
             sampleRate: sampleRate,
             durationSeconds: 10,
-            expectedPauseCount: 8
+            expectedPauseCount: 0
         )
-        XCTAssertEqual(shortForm.verdict, .fail)
-        XCTAssertTrue(shortForm.flags.contains(where: { $0.hasPrefix("dropout:") }))
+        XCTAssertEqual(unbudgetedShortForm.verdict, .fail)
+        XCTAssertTrue(unbudgetedShortForm.flags.contains(where: { $0.hasPrefix("dropout:") }))
+
+        let punctuationBudgetedShortForm = StreamingExecutionContext.makeAudioQCReport(
+            metrics: limiter.metrics,
+            sampleRate: sampleRate,
+            durationSeconds: 10,
+            expectedPauseCount: 1
+        )
+        XCTAssertEqual(punctuationBudgetedShortForm.verdict, .warn)
+        XCTAssertTrue(punctuationBudgetedShortForm.flags.contains("dropout:1400ms"))
 
         let longContent = StreamingExecutionContext.makeAudioQCReport(
             metrics: limiter.metrics,
@@ -403,6 +413,56 @@ final class GenerationTelemetrySchemaTests: XCTestCase {
         XCTAssertEqual(longDeadAir.verdict, .fail)
     }
 
+    func testOrdinaryCrossSpeakerCadencePausesWarnInsteadOfFailing() {
+        // The full 9-speaker delivery screen observed this shape in 38 complete
+        // outputs: several ordinary 350-800 ms pauses, but no 1.2 s dropout.
+        // Fast QC is a gross-defect tripwire, so it must retain the evidence
+        // without turning a cadence classification into a failed generation.
+        var limiter = PCM16StreamLimiter()
+        var destination: [Int16] = []
+        let sampleRate = 24_000
+        for pauseMS in [420, 510, 780] {
+            limiter.append([Float](repeating: 0.2, count: 6_000), into: &destination)
+            limiter.append(
+                [Float](repeating: 0, count: pauseMS * sampleRate / 1_000),
+                into: &destination
+            )
+        }
+        limiter.append([Float](repeating: 0.2, count: 6_000), into: &destination)
+
+        let report = StreamingExecutionContext.makeAudioQCReport(
+            metrics: limiter.metrics,
+            sampleRate: sampleRate,
+            durationSeconds: 10,
+            expectedPauseCount: 1
+        )
+
+        XCTAssertEqual(report.writtenOutputVerdict, .warn)
+        XCTAssertTrue(report.flags.contains("cadence:excess2(3/1)"))
+        XCTAssertFalse(report.flags.contains(where: { $0.hasPrefix("dropout:excess") }))
+    }
+
+    func testRepeatedSuspiciousGapsStillFailFastQC() {
+        var limiter = PCM16StreamLimiter()
+        var destination: [Int16] = []
+        let sampleRate = 24_000
+        for _ in 0..<2 {
+            limiter.append([Float](repeating: 0.2, count: 6_000), into: &destination)
+            limiter.append([Float](repeating: 0, count: 950 * sampleRate / 1_000), into: &destination)
+        }
+        limiter.append([Float](repeating: 0.2, count: 6_000), into: &destination)
+
+        let report = StreamingExecutionContext.makeAudioQCReport(
+            metrics: limiter.metrics,
+            sampleRate: sampleRate,
+            durationSeconds: 10,
+            expectedPauseCount: 0
+        )
+
+        XCTAssertEqual(report.writtenOutputVerdict, .fail)
+        XCTAssertTrue(report.flags.contains("dropout:excess2(2/0)"))
+    }
+
     func testCrossChunkSilenceAndMergeCompleteness() throws {
         var limiter = PCM16StreamLimiter()
         var destination: [Int16] = []
@@ -416,7 +476,7 @@ final class GenerationTelemetrySchemaTests: XCTestCase {
             durationSeconds: 0.006,
             expectedPauseCount: 0
         )
-        XCTAssertEqual(report.algorithmVersion, 3)
+        XCTAssertEqual(report.algorithmVersion, 4)
         XCTAssertEqual(report.longestSilenceMS, 4)
         XCTAssertEqual(report.longestSilenceStartMS, 1)
 

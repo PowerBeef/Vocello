@@ -29,6 +29,7 @@ from build_emotion_reference_bank import (
     voice_name,
     write_manifest,
 )
+from emotion_advisory import EMOTION_LABELS
 
 
 def plan(work_dir: pathlib.Path, emotions=("happy", "whisper"), candidates=2):
@@ -148,7 +149,10 @@ class SelectionTests(unittest.TestCase):
         scored = score_candidates(
             "/work/anchor.wav",
             candidates,
-            classify=lambda path: {"happy": 0.9, "sad": 0.1},
+            classify=lambda path: {
+                label: (0.9 if label == "happy" else 0.1 / (len(EMOTION_LABELS) - 1))
+                for label in EMOTION_LABELS
+            },
             embed=lambda path: embeddings[path],
             analyze=lambda path: metrics[path],
         )

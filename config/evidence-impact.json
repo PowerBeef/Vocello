@@ -241,6 +241,7 @@
         "Sources/**/AudioQuality*.swift",
         "Sources/**/GenerationOutputVerifier.swift",
         "Sources/**/GenerationQuality*.swift",
+        "Sources/VocelloCLI/GenerateCommand.swift",
         "scripts/analyze_*.py",
         "scripts/*prosody*.py",
         "scripts/*delivery*.py",

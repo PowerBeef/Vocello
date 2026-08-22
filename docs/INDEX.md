@@ -173,6 +173,7 @@ Review when: link repair or archive classification only.
 - [`docs/reference/metal4-tensor-feasibility-2026-07-31.md`](../docs/reference/metal4-tensor-feasibility-2026-07-31.md)
 - [`docs/reference/optimization-report-review-2026-07-25.md`](../docs/reference/optimization-report-review-2026-07-25.md)
 - [`docs/reference/qwen3-apple-silicon-roadmap-review.md`](../docs/reference/qwen3-apple-silicon-roadmap-review.md)
+- [`docs/reference/qwen3-tts-emotion-tone-research-2026-08-22.md`](../docs/reference/qwen3-tts-emotion-tone-research-2026-08-22.md)
 - [`docs/reference/runtime-refactor-status-report.md`](../docs/reference/runtime-refactor-status-report.md)
 - [`docs/releases/v1.2.1.md`](../docs/releases/v1.2.1.md)
 - [`docs/releases/v1.2.2.md`](../docs/releases/v1.2.2.md)

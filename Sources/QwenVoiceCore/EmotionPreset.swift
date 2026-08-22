@@ -134,8 +134,9 @@ public struct EmotionPreset: Identifiable, Sendable {
     /// DP-3 experiment arm. Returns nil in production.
     ///
     /// `QWENVOICE_DELIVERY_INSTRUCTION_SET=short` swaps every preset for an
-    /// official-style short form so the shipped long form can be measured
-    /// against it on identical seeds. Registered in
+    /// official-style short form. `candidate-v2` selects the multi-speaker
+    /// remediation arm. Both are measurement-only alternatives to the shipped
+    /// copy and can be compared on identical seeds. Registered in
     /// `config/runtime-debug-knobs.json` and inert without the `QWENVOICE_DEBUG`
     /// master gate, so production resolution is unchanged.
     ///
@@ -144,17 +145,24 @@ public struct EmotionPreset: Identifiable, Sendable {
     /// angry and disappointed tone`), while the shipped copy is ten to twenty
     /// times longer, avoids naming the emotion in favour of acoustic
     /// specification, and adds negative constraints. That contrast is documented
-    /// in `docs/reference/qwen3-tts-prompting-guide.md` §9.1 and has never been
-    /// measured. Whichever way it lands, the answer is worth having.
+    /// in `docs/reference/qwen3-tts-prompting-guide.md` §9.1; DP-3 measured and
+    /// retained the long register. The candidate-v2 arm therefore stays long and
+    /// tests clearer target naming and fewer conflicting clauses instead.
     static func experimentalInstruction(id: String, intensity: EmotionIntensity) -> String? {
-        guard shortInstructionSetEnabled else { return nil }
-        return shortInstructions[id]?[intensity]
+        switch experimentalInstructionSet {
+        case "short":
+            return shortInstructions[id]?[intensity]
+        case "candidate-v2":
+            return candidateV2Instructions[id]?[intensity]
+        default:
+            return nil
+        }
     }
 
-    private static let shortInstructionSetEnabled: Bool = {
+    private static let experimentalInstructionSet: String? = {
         RuntimeDebugGate.value(for: "QWENVOICE_DELIVERY_INSTRUCTION_SET")?
             .trimmingCharacters(in: .whitespacesAndNewlines)
-            .lowercased() == "short"
+            .lowercased()
     }()
 
     /// Modelled directly on the documented upstream examples: a bare adjective
@@ -169,6 +177,56 @@ public struct EmotionPreset: Identifiable, Sendable {
         "surprised": [.normal: "Surprised.", .strong: "Very surprised."],
         "calm": [.normal: "Calm.", .strong: "Very calm."],
         "whisper": [.normal: "Whisper it.", .strong: "Whisper it very quietly."],
+    ]
+
+    /// Multi-speaker candidate arm written after the 2026-08-22 9-voice ×
+    /// 8-preset × 5-seed screen. It keeps the long explicit register that beat
+    /// the upstream-style short prompts in DP-3, removes unsupported negative
+    /// clauses where possible, names each target unmistakably, and avoids
+    /// wording that asks the model to manufacture long silences. This is not
+    /// production copy until a same-seed matrix shows a speaker-generalized
+    /// improvement without a QC or separability regression.
+    ///
+    /// RESULT 2026-08-22: rejected as a production set after an exact same-seed
+    /// 9-speaker × 8-preset × 5-seed comparison. Acoustic adherence was unchanged
+    /// (182/360 in both arms) and held-speaker UAR regressed 0.342 → 0.306.
+    /// `surprised.strong` is the only cell that improved both profile adherence
+    /// (+4/45) and held-speaker recall (+0.200), but its paired exact p=0.289 and
+    /// exploratory selection require a fresh pre-registered holdout before any
+    /// copy change. The arm remains debug-only so the null is reproducible.
+    private static let candidateV2Instructions: [String: [EmotionIntensity: String]] = [
+        "neutral": [
+            .normal: "Sound completely neutral and matter-of-fact, with an even level pitch, steady measured pace, and no noticeable emotion.",
+            .strong: "Sound completely neutral and matter-of-fact, with an even level pitch, steady measured pace, and no noticeable emotion.",
+        ],
+        "happy": [
+            .normal: "Sound unmistakably happy and delighted: smile through the words, with a brighter higher pitch, lively upward melody, and quick buoyant pacing.",
+            .strong: "Sound intensely joyful and delighted: smile broadly through the words, with a bright high pitch, lively upward melody, and fast buoyant pacing.",
+        ],
+        "sad": [
+            .normal: "Sound unmistakably sad and grief-stricken, with a low subdued pitch, reduced energy, flattened melody, and slow weighted pacing; keep the sentence flowing and clear.",
+            .strong: "Sound deeply sorrowful and grief-stricken, with a very low subdued pitch, restrained energy, flattened melody, and slow weighted pacing; keep the sentence flowing and clear.",
+        ],
+        "angry": [
+            .normal: "Sound unmistakably angry and frustrated, with a tense forceful voice, hard consonants, clipped emphasis, and quick emphatic pacing; stay controlled rather than shouting.",
+            .strong: "Sound fiercely angry and frustrated, with an intensely tense forceful voice, biting consonants, hard clipped emphasis, and fast emphatic pacing; stay controlled rather than shouting.",
+        ],
+        "fearful": [
+            .normal: "Sound unmistakably frightened and anxious, with a high tight shaky voice, trembling pitch, uneven urgent pacing, and brief hesitant catches; keep every word audible.",
+            .strong: "Sound terrified and panicked, with a very high tight shaky voice, strongly trembling pitch, uneven urgent pacing, and brief startled catches; keep every word audible.",
+        ],
+        "surprised": [
+            .normal: "Sound unmistakably surprised and astonished, with a sudden pitch lift, key words jumping sharply upward, wide pitch movement, and quick startled pacing.",
+            .strong: "Sound intensely astonished, with a sudden high pitch lift, key words leaping sharply upward, very wide pitch movement, and quick startled pacing.",
+        ],
+        "calm": [
+            .normal: "Sound deeply calm and reassuring, with a low settled pitch, soft steady energy, smooth unhurried pacing, and gentle even phrasing.",
+            .strong: "Sound serenely calm and reassuring, with a very low settled pitch, quiet steady energy, very smooth unhurried pacing, and gentle even phrasing.",
+        ],
+        "whisper": [
+            .normal: "Whisper every word in an airy breathy voice with very little voicing, close and confidential; keep the sentence flowing and intelligible without returning to normal speech.",
+            .strong: "Whisper every word at the edge of breath with minimal voicing, very airy and close; keep the sentence flowing and intelligible without returning to normal speech.",
+        ],
     ]
 
     public static func preset(id: String?) -> EmotionPreset? {

@@ -86,12 +86,14 @@ class MatrixReportTests(unittest.TestCase):
         self.assertIn("always", names)
         self.assertNotIn("only_once", names)
 
-    def test_load_matrix_labels_each_sidecar_as_one_seed(self):
+    def test_load_matrix_preserves_engine_seed_across_speakers(self):
         with tempfile.TemporaryDirectory() as directory:
-            for name in ("seed-1.json", "seed-2.json"):
+            for name, speaker in (("aiden.json", "aiden"), ("vivian.json", "vivian")):
                 rows = [{
                     "delivery": "angry.strong",
                     "generationID": f"gen-{name}",
+                    "seed": 20261001,
+                    "speakerID": speaker,
                     "deliveryGate": {
                         "preset": "angry", "intensity": "strong",
                         "metrics": {"pitch_shift_semitones": 1.0},
@@ -99,13 +101,25 @@ class MatrixReportTests(unittest.TestCase):
                 }]
                 Path(directory, name).write_text(json.dumps(rows))
             loaded = load_matrix([
-                os.path.join(directory, "seed-1.json"),
-                os.path.join(directory, "seed-2.json"),
+                os.path.join(directory, "aiden.json"),
+                os.path.join(directory, "vivian.json"),
             ])
         self.assertEqual(len(loaded), 2)
-        # Grouping folds by run, not by take, is what keeps a take out of its
-        # own training fold during cross-validation.
-        self.assertEqual({record["seed"] for record in loaded}, {"seed-1", "seed-2"})
+        self.assertEqual({record["seed"] for record in loaded}, {20261001})
+        self.assertEqual({record["speakerID"] for record in loaded}, {"aiden", "vivian"})
+
+    def test_load_matrix_uses_filename_only_for_legacy_rows(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory, "legacy-seed.json")
+            path.write_text(json.dumps([{
+                "delivery": "calm.strong",
+                "deliveryGate": {
+                    "preset": "calm", "intensity": "strong",
+                    "metrics": {"rate_delta_hz": -0.5},
+                },
+            }]))
+            loaded = load_matrix([str(path)])
+        self.assertEqual(loaded[0]["seed"], "legacy-seed")
 
     def test_derived_expectations_validate_against_the_profile_schema(self):
         data = records({
@@ -176,6 +190,28 @@ class MatrixReportTests(unittest.TestCase):
         self.assertIn("separabilityByPreset", report)
         self.assertEqual(report["seedCount"], 12)
         self.assertEqual(report["cellCount"], 4)
+
+    def test_report_exposes_speaker_balanced_and_held_out_speaker_results(self):
+        data = []
+        for speaker_index, speaker in enumerate(("aiden", "vivian", "ryan")):
+            for seed in range(4):
+                for preset, base in (("happy", 2.0), ("sad", -2.0)):
+                    data.append({
+                        "preset": preset,
+                        "intensity": "strong",
+                        "seed": f"seed-{seed}",
+                        "speakerID": speaker,
+                        "features": {
+                            "pitch_shift_semitones": base + speaker_index * 0.1,
+                            "rate_delta_hz": base / 2 + seed * 0.01,
+                        },
+                    })
+        report = build_report(data)
+        self.assertEqual(report["speakerCount"], 3)
+        self.assertEqual(report["speakers"], ["aiden", "ryan", "vivian"])
+        self.assertEqual(set(report["perSpeaker"]), {"aiden", "ryan", "vivian"})
+        self.assertIsNotNone(report["separabilityHeldOutSpeaker"])
+        self.assertTrue(report["speakerBalancedStatistics"])
 
 
 if __name__ == "__main__":

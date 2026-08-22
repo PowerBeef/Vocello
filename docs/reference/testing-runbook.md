@@ -7,6 +7,8 @@ sourceOfTruth:
   - scripts/macos_test.sh
   - scripts/ios_device.sh
   - scripts/ui_test.sh
+  - scripts/delivery_evaluator.py
+  - scripts/delivery_promotion_decision.py
 ---
 # Testing runbook
 
@@ -141,7 +143,20 @@ Treat the column as relative signal only (take-vs-take, instructed-vs-neutral,
 build-vs-build): a synthetic-speech MOS predictor is domain-shifted for this
 engine's audio, and the score is never a gate or a publication input.
 
-## Listening calibration session (operator-local)
+## Layered delivery evaluation and listening (operator-local)
+
+Generate the sealed matrix first and let the TTS process exit. Then run deterministic PCM/prosody
+analysis, ASR, ECAPA identity, UTMOS, categorical SER, and the locally calibrated dimensional model
+as separate sequential processes. `scripts/delivery_evaluator.py` composes these layers, records
+missing or disagreeing scorers explicitly, and abstains when uncertainty or out-of-distribution
+features make a categorical answer unsafe. No analyzer model may share memory with the engine or
+another ML analyzer on the 8 GB host.
+
+The SER checkpoint's full posterior, entropy and top-two margin are evidence; its top class is not
+semantic truth. Calm-to-neutral is a testable hypothesis and whisper has no categorical class, so
+it uses breathiness, HNR, CPP, voicing, and energy instead. The dimensional layer remains advisory
+until it is fitted to blinded local labels and clears grouped speaker/script validation plus an
+untouched holdout.
 
 `scripts/delivery_listening_session.py` builds, runs, and scores the blind
 delivery listening session recommended by the 2026-08-04 delivery-control
@@ -149,9 +164,13 @@ audit: `build` assembles opaque-ID trials from `vocello bench` evidence
 archives (`outputs/bench-archive/<runID>`) plus optional clone-transfer
 clips, `run` plays them with `afplay` and records answers resumably, and
 `score` feeds the answers through `scripts/delivery_identification_check.py`
-and evaluates the pre-registered exact-binomial decision rules. Listening
-stays calibration, never a gate: no CI lane, benchmark record, or promotion
-decision consumes the session report automatically.
+and evaluates the pre-registered exact-binomial decision rules. `score-cohort` combines at least
+three pseudonymous independent listeners, checks fluent-listener coverage per output language, and
+keeps free-text notes outside the score. `scripts/delivery_promotion_decision.py` consumes this
+untouched cohort together with the automatic guardrails and fails closed on listener, statistical,
+identity, naturalness, intelligibility, receipt, cancellation, or seed-identity regressions.
+Listening is never an ordinary CI, packaging, or release gate; it is required only to authorize a
+new semantic delivery claim or prompt promotion.
 
 ## Fail-closed orchestration
 

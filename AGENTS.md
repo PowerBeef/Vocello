@@ -76,7 +76,7 @@ and UI evidence are never prerequisites for preserving ordinary work.
 | **Benchmark history is PASS-only** | Publish only privacy-safe, qualified PASS records under `benchmarks/runs/` and regenerate `benchmarks/HISTORY.md`. Raw audio, telemetry, screenshots, traces, and `.xcresult` bundles stay untracked. Publishing must never stage, commit, or push automatically. |
 | **Profile traces are ephemeral** | Exact-PID traces are hashed, validated, summarized, and published before raw trace removal. Keep a trace only for an explicit Instruments session. Routine cleanup must not touch current apps, canonical caches, dSYMs, models, source, or tracked history. |
 | **Memory evidence is qualified** | `config/memory-qualification-policy.json` owns thresholds. Publishable generation evidence requires telemetry schema v8 and benchmark manifest v2, run-scoped sidecars, lifecycle boundaries, zero capture failures, at least 95% sampler coverage, and no critical-pressure or forced-unload event. Do not add independent app and engine peaks. |
-| **Audio QA is autonomous** | Promotion uses deterministic PCM QC, fixed seeds, locale-locked ASR consensus, and applicable prosody/delivery gates. Listening is optional annotation. `passedWithWarnings` is not promotion quality until a deterministic rule or implementation fix clears it. |
+| **Audio QA is autonomous** | Ordinary promotion uses deterministic PCM QC, fixed seeds, locale-locked ASR consensus, and applicable prosody/delivery gates. Listening never waives a deterministic failure. A prompt change claiming improved semantic emotion/tone additionally needs the local blinded holdout in `config/delivery-experiment-contract.json`; this research decision is not an ordinary release prerequisite. `passedWithWarnings` is not promotion quality until a deterministic rule or implementation fix clears it. |
 | **Documentation is governed** | Markdown under `docs/` and `.agents/rules/` carries metadata validated by `python3 scripts/doc_metadata.py validate`. Historical/superseded bodies are digest-pinned. Active facts come from `config/derived-doc-facts.json`. Delivery copy is checked by `scripts/check_delivery_instructions.py` against `config/delivery-instruction-contract.json`. Every enforced surface must be named in this file or a domain rule. |
 | **Derived catalogs stay fresh** | Run `python3 scripts/refresh_derived_artifacts.py refresh` then `validate` when registered inputs change. This includes owned-runtime inventories/baselines, `docs/project-health.md`, `docs/INDEX.md`, `docs/INDEX.json`, `docs/ROADMAP.md`, derived facts, README charts, and the production model catalog. Narrative progress remains a deliberate manual update. |
 
@@ -228,7 +228,8 @@ isolated opt-ins documented in the platform rules.
 | `benchmarks/`, `scripts/benchmark_history.py` | privacy-safe PASS registry and generated history |
 | `scripts/ui_test.sh`, `scripts/macos_test.sh`, `scripts/ios_device.sh` | native test and diagnostic entry points |
 | `docs/reference/model-delivery.md` | download/restoration/retry diagnostics and live-proof rules |
-| `docs/reference/delivery-harness.md` | delivery/emotion protocol, provenance, statistics, and results |
+| `config/delivery-experiment-contract.json`, `config/delivery-evaluation-corpus.json` | pre-registered prompt arms, sampling, multilingual scripts, holdouts, and semantic-promotion limits |
+| `docs/reference/delivery-harness.md` | delivery/emotion protocol, provenance, layered evaluation, statistics, and results |
 | `website/` | marketing site governed by `website/AGENTS.md` |
 
 Full lanes: `docs/reference/macos-testing.md`, `docs/reference/ios-device-testing.md`,

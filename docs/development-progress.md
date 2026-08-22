@@ -49,6 +49,86 @@ machine-readable status record and wins over any older prose.
 
 ## Resume here (2026-08-22)
 
+**DP-27 foundation completed and DP-28/DP-30 screening underway; production copy unchanged
+(2026-08-22, macOS/CLI):** the pinned primary-source report confirms that Vocello's
+CustomVoice path matches upstream ChatML and sends the resolved delivery instruction, while
+VoiceDesign combines identity and delivery and Base cloning has no supported instruction channel.
+Official 1.7B CustomVoice English instruction-following scores (77.3 APS / 77.1 description /
+63.7 role play) and the local DP-26 null prompt comparison establish probabilistic adherence rather
+than a missing wire or a universal wording fix. A versioned experiment contract now compiles six
+attributable prompt arms, English/Mandarin wording, five independent talker/subtalker sampler
+combinations, VAD/acoustic expectations, contradiction checks and stable digests. The split-safe
+corpus covers nine native speaker-language cells plus four cross-language sentinels across three
+lengths and neutral/congruent/conflicting text; non-English copy is explicitly provisional pending
+fluent review.
+
+The new serial CLI runner binds every experiment to the binary, exact shipped instruction, script,
+speaker, seed, model variant, sampler, receipt and audio digest, retains failures, resumes safely,
+and never publishes. CLI generation JSON now exposes the exact instruction character count and
+digest used by the request. An actual built-binary plan smoke produced the expected 936 paired
+rows for one seed (648 native and 288 sentinel). Its first one-row run exposed a false green: a
+managed-sandbox model abort was retained in state but the command exited success. The runner now
+fails on any failed/blocked row or zero completions; the approved native-MLX retry passed in 11.9
+seconds with an exact instruction receipt, paired neutral reference, WAV digests, and acoustic
+layer. The layered local evaluator composes deterministic
+acoustics, ASR, identity, relative UTMOS, full SER posterior and a grouped-validation dimensional
+model with uncertainty/abstention; listener cohorts and the fail-closed promotion decision add
+paired bootstrap, Holm correction, locale fluency and speaker/script distribution rules. Focused
+Swift compilation and 131 Python tests passed while landing this foundation. DP-28 through DP-32
+retain the blinded calibration, fluent corpus review, real factorial screens, untouched
+Speed/Quality listening, and any qualifying prompt promotion. No iPhone work is required for this
+macOS/CLI arc. See
+[`qwen3-tts-emotion-tone-research-2026-08-22.md`](reference/qwen3-tts-emotion-tone-research-2026-08-22.md)
+and the authoritative roadmap.
+
+The screened runner now seals the CLI plus runner/analyzer/gate/profile source bytes, allows only
+named development subsets, refuses every confirmation subset, summarizes one controlled factor,
+and retains privacy-safe failure classes. A blinded calibration-session tool randomizes audio and
+withholds speaker, script, preset, seed and features; the evaluator accepts dimensional labels only
+from complete cohorts of at least three independent listeners with fluent-language coverage and
+measured inter-rater concordance. Real DP-30 screens rejected two tempting global changes. Across
+Ryan and three English sentinel voices, shipped prompt copy achieved 10/24 advisory acoustic passes
+versus 5/24 for the official-minimal arm. Across three Aiden seeds, sampler rankings changed by seed:
+consistent-matched led the two-seed extension at 10/12, three alternatives reached 9/12, and the
+first seed had a three-way 4/6 tie. Happy and Surprised remained the recurrent weak cells. This is
+enough to preserve the shipped prompts and Expressive default and move to per-preset,
+speaker-diverse screens; it is not enough to promote any change or close DP-28/DP-30.
+The first blinded DP-28 packet is also generated locally: 27/27 instructed clips and all nine
+paired neutral references completed across Aiden, Ryan and Vivian, three script lengths, and
+Happy/Angry/Sad. Its public manifest exposes no requested label or speaker/script/seed identity.
+It remains intentionally unqualified until three independent listeners supply complete ratings;
+no synthetic or requested-preset labels can substitute for that evidence.
+
+**DP-26 Custom Voice delivery screen completed; QC fixed, prompt candidate rejected
+(2026-08-22, macOS/CLI):** the new resumable matrix exercised every checked-in Built-in
+Voice speaker (9) against every shipped delivery preset/tier (8) over five fixed seeds,
+for 360 instructed attempts. Exact telemetry digests matched every requested instruction,
+proving the macOS/CLI product path sends the selected delivery text into the engine. The
+baseline accepted 169/360 product takes; analysis of preserved rejected WAVs measured
+182/360 acoustic-adherence passes and held-one-speaker-out UAR 0.342. The gap exposed an
+independent Fast-QC defect: 29 delivery and 9 neutral-reference clips were rejected because
+ordinary 350 ms cadence pauses exceeded a punctuation-derived count, even though none had
+an analyzer pause of at least 1.2 seconds and 13 rejected deliveries otherwise passed the
+delivery gate. Audio QC algorithm v4 now reports excess ordinary cadence as a warning and
+retains hard failure for repeated suspicious-scale gaps or a context-sensitive egregious
+gap (1.2/2.0 seconds). The exact previously failing Uncle Fu reference seed passed live.
+
+A debug-only `candidate-v2` prompt set then ran the identical 360 cells. It cleared every
+neutral reference and left only two genuine Sad clips with approximately two-second gaps,
+but did not improve acoustic adherence (182/360 in both arms) and reduced held-speaker UAR
+from 0.342 to 0.306. The candidate is therefore rejected and all shipped instructions stay
+unchanged. `surprised.strong` was the only exploratory cell to improve both adherence
+(+4/45) and held-speaker recall (+0.200), with paired exact p=0.289; it may only advance
+through a fresh pre-registered holdout. The harness now distinguishes product acceptance
+from acoustic diagnostics, preserves every typed failure in the denominator, validates
+speaker/seed/instruction identity, records speaker-balanced and held-speaker results, and
+emits paired comparison artifacts. Its deterministic PCM/F0/pause contracts pass, but the
+screen is Speed-only, one English medium script, and predicts request labels rather than
+human-recognized emotion. AV-07 remains open for an independently labelled, frozen
+multi-speaker/script/language holdout before the analyzer can become promotion authority.
+See [`docs/reference/delivery-harness.md`](reference/delivery-harness.md) and DP-26 in the
+authoritative roadmap.
+
 **MD-3 progress rendering and observer races isolated on the physical iPhone (2026-08-22):** a
 complete Custom cancel/restart/relaunch-adoption/Ready/remove diagnostic first proved exact
 determinate measurements at 19%, 36%, 50%, 82%, and 96%, about 12:1 fill/track contrast, stable

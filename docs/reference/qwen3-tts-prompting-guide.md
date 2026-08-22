@@ -4,7 +4,11 @@ owner: backend-mlx
 summary: Sourced reference for the three model-facing text surfaces (script, delivery instruction, voice description) — every claim labeled OFFICIAL/RESEARCH/MEASURED-HERE/COMMUNITY/UNVERIFIED.
 sourceOfTruth:
   - config/delivery-instruction-contract.json
+  - config/delivery-experiment-contract.json
+  - config/delivery-evaluation-corpus.json
   - Sources/QwenVoiceCore/EmotionPreset.swift
+  - scripts/delivery_experiment.py
+  - scripts/delivery_experiment_runner.py
 ---
 # Qwen3-TTS Prompting Guide
 
@@ -352,6 +356,14 @@ correctly by ear (`angry` 0/11; `fearful` heard as sad). Acoustic separability i
 recognizability; the UI's distinct-versus-directional-hint split follows the listener. Corrected
 record and follow-up program:
 [`delivery-control-audit-2026-08.md`](delivery-control-audit-2026-08.md).
+
+`MEASURED-HERE`, **DP-26, 2026-08-22 — a comprehensive rewrite is not a general cure.** A
+same-seed 9-speaker × 8-preset × 5-seed screen retained the shipped baseline's acoustic adherence
+at 182/360 while held-speaker UAR fell from 0.342 to 0.306. The candidate reduced false hard audio
+rejections, which led to a separate Fast-QC correction, but it did not qualify as better delivery
+copy. This result makes speaker, script semantics, language, seed, and the independently sampled
+talker/subtalker settings first-class experimental factors rather than noise to hide behind one
+aggregate score.
 
 ### 4.4 Instruction language: Chinese leads on our checkpoint
 
@@ -719,6 +731,29 @@ It reports that the two disagree and that one of them is wrong, without presumin
 findings are acknowledged today, both on `angry`: its tiers invert the pitch axis, and its `normal`
 copy contradicts a `required` pitch expectation.
 
+### 8.4 The controlled experiment layer
+
+`MEASURED-HERE`, 2026-08-22. Vocello now compiles experiments through
+[`delivery-experiment-contract.json`](../../config/delivery-experiment-contract.json) rather than
+editing shipped copy. The six isolated arms progress from current copy through an official-minimal
+emotion phrase, acoustic attributes, emotion plus attributes, one compatible scene, and one
+anti-exaggeration constraint. No tags, SSML, prompt weights, negative-prompt channel, system turn,
+or classifier-free-guidance syntax is invented.
+
+[`delivery-evaluation-corpus.json`](../../config/delivery-evaluation-corpus.json) separates
+calibration, development, and untouched confirmation text; varies neutral, congruent, and
+conflicting semantics at three lengths; covers the nine speakers natively; and adds fixed
+cross-language sentinels. [`delivery_experiment_runner.py`](../../scripts/delivery_experiment_runner.py)
+binds a plan to exact production instructions, binary digest, sampling parameters, seeds, script
+identities, instruction receipts, and output hashes. It is serial, resumable, local-only, and never
+publishes evidence automatically.
+
+The current production instructions remain unchanged until an untouched candidate passes the
+automatic integrity/intelligibility/identity/naturalness guardrails and blinded listener rules in
+[`delivery-harness.md`](delivery-harness.md). Concise and multidimensional prompts remain separate
+arms because official examples support both and this repository has not shown either to dominate
+across speakers and scripts.
+
 ---
 
 ## 9. Adjudicating the claims already in this repository
@@ -902,6 +937,7 @@ Community, quality varies:
 
 ## Related documents
 
+- [`qwen3-tts-emotion-tone-research-2026-08-22.md`](qwen3-tts-emotion-tone-research-2026-08-22.md) — pinned current research, evaluator audit, coverage gaps, and remediation boundary
 - [`qwen3-tts-guide.md`](qwen3-tts-guide.md) — architecture, model variants, speaker roster, parameters
 - [`../qwen_tone.md`](../qwen_tone.md) — the earlier app-facing tone guide this document supersedes for provenance questions
 - [`benchmarking-procedure.md`](benchmarking-procedure.md) — how to run the matrix the §10 experiments need

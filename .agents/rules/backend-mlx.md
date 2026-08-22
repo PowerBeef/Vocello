@@ -7,6 +7,13 @@ sourceOfTruth:
   - config/runtime-refactor-contract.json
   - Sources/Resources/qwenvoice_contract.json
   - config/runtime-debug-knobs.json
+  - config/delivery-experiment-contract.json
+  - config/delivery-evaluation-corpus.json
+  - scripts/delivery_experiment.py
+  - scripts/delivery_experiment_runner.py
+  - scripts/delivery_calibration_session.py
+  - scripts/delivery_evaluator.py
+  - scripts/delivery_promotion_decision.py
 ---
 # Backend / MLX domain rule
 
@@ -41,7 +48,8 @@ sourceOfTruth:
 - `docs/reference/{mlx-guide,qwen3-tts-guide,mimi-codec-guide,metal-guide,swift-performance-guide,ios-engine-optimization,telemetry-and-benchmarking}.md`
 - Root `AGENTS.md` (Hard rules) + [`docs/ARCHITECTURE.md`](../../docs/ARCHITECTURE.md) (engine invariants)
 - Delivery/emotion quality measurement: [`docs/reference/delivery-harness.md`](../../docs/reference/delivery-harness.md)
-  (tools, `bench --delivery` protocol, instruction-receipt provenance, statistics semantics,
+  (tools, `bench --delivery` protocol, multilingual experiment compiler/runner, layered evaluator,
+  instruction-receipt provenance, statistics semantics, blinded-listener authority,
   pre-registration discipline, and the DP results ledger)
 
 ## Required pre-read
@@ -57,6 +65,12 @@ Before changing anything in this layer, read:
   - `scripts/build_foundation_targets.sh macos|ios` for compile-safety.
   - `scripts/build.sh cli` to build `vocello`.
   - `QWENVOICE_DEBUG=1 ./build/vocello bench …` for perf/quality gates.
+- Delivery research is operator-local and source-bound: `scripts/delivery_experiment.py` validates
+  and compiles the contract, `scripts/delivery_experiment_runner.py` runs it serially,
+  `scripts/delivery_calibration_session.py` builds and merges metadata-blinded independent-listener
+  calibration sessions,
+  `scripts/delivery_evaluator.py` composes post-generation layers, and
+  `scripts/delivery_promotion_decision.py` fails closed over automatic and blinded evidence.
 - When callable, use Swift/concurrency/performance skills (for example the Axiom skills) and
   authoritative MLX / Hugging Face documentation for language, isolation, and profiling decisions.
   Read each selected skill before use.
@@ -95,10 +109,12 @@ QWENVOICE_DEBUG=1 ./build/vocello bench --modes clone --variants speed \
 
 A successful in-repository benchmark publishes a compact, allowlisted record automatically. Do
 not append to `benchmarks/HISTORY.md`; it is generated from `benchmarks/runs/`. Raw JSONL, audio,
-screenshots, result bundles, and traces remain in the untracked artifact directory. Dirty-source
-runs are retained as exploratory evidence and excluded from canonical trends. Human listening is
-optional annotation; promotion requires clean deterministic QC rather than a manual waiver for a
-warning.
+screenshots, result bundles, listener responses, and traces remain in the untracked artifact
+directory. Dirty-source runs are exploratory. Deterministic quality gates remain the ordinary
+release authority. A change claiming improved semantic delivery additionally requires the local,
+blinded, multi-listener holdout defined by `config/delivery-experiment-contract.json`; that
+research evidence can authorize delivery copy, but never waive a deterministic failure or become
+an ordinary build/release prerequisite.
 
 ## Invariants (do not regress)
 

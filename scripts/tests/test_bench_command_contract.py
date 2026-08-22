@@ -22,6 +22,9 @@ class BenchCommandSourceContractTests(unittest.TestCase):
         cls.source = (REPO / "Sources" / "VocelloCLI" / "BenchCommand.swift").read_text(
             encoding="utf-8"
         )
+        cls.deliveries_source = (
+            REPO / "Sources" / "VocelloCLI" / "DeliveriesCommand.swift"
+        ).read_text(encoding="utf-8")
 
     def test_matrix_axes_use_strict_allowlist_validation(self) -> None:
         for option in ("modes", "variants", "lengths"):
@@ -121,6 +124,32 @@ class BenchCommandSourceContractTests(unittest.TestCase):
             '["happy.strong", "calm.strong", "whisper.strong"]', self.source
         )
 
+    def test_custom_speaker_is_validated_and_recorded_before_generation(self) -> None:
+        self.assertIn('args.string("speaker")', self.source)
+        self.assertIn("knownCustomSpeakerIDs.contains(customSpeakerID)", self.source)
+        self.assertIn("customSpeakerID: modes.contains(\"custom\")", self.source)
+        self.assertIn('"customSpeaker": sha256(Data(customSpeakerID.utf8))', self.source)
+        self.assertNotIn(
+            "payload(for: mode, customSpeaker: runtime.defaultSpeakerID", self.source
+        )
+
+    def test_delivery_diagnostic_retains_typed_failures_and_continues(self) -> None:
+        self.assertIn('args.flag("continue-delivery-failures")', self.source)
+        self.assertIn("--continue-delivery-failures requires --no-summary", self.source)
+        self.assertIn("let deliveryFailures: [BenchDeliveryFailure]", self.source)
+        self.assertIn("let referenceFailures: [BenchReferenceFailure]", self.source)
+        self.assertIn("deliveryFailures.append(captured)", self.source)
+        self.assertIn("referenceFailures.append(referenceFailure(", self.source)
+        self.assertIn("deliveryInstructionDigest", self.source)
+        self.assertIn('reasonCode = "fast_qc_dropout"', self.source)
+        self.assertIn("diagnostic only, never eligible for history publication", self.source)
+
+    def test_shipped_delivery_roster_comes_from_product_tier_policy(self) -> None:
+        self.assertIn('args.flag("shipped-only")', self.deliveries_source)
+        self.assertIn("for preset in EmotionPreset.all", self.deliveries_source)
+        self.assertIn("let intensity = preset.shippedIntensity", self.deliveries_source)
+        self.assertIn("including Neutral", self.deliveries_source)
+
 
 class BenchDeliveryProsodyTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -161,13 +190,19 @@ class BenchDeliveryProsodyTests(unittest.TestCase):
             )
         return row
 
-    def write_manifest(self, takes: list[dict[str, object]]) -> None:
+    def write_manifest(
+        self,
+        takes: list[dict[str, object]],
+        *,
+        custom_speaker_id: str | None = "aiden",
+    ) -> None:
         self.manifest.write_text(
             json.dumps(
                 {
                     "schemaVersion": 1,
                     "runID": "run-current",
                     "label": "unit",
+                    "customSpeakerID": custom_speaker_id,
                     "seed": 9320,
                     "takes": takes,
                 }
@@ -176,6 +211,41 @@ class BenchDeliveryProsodyTests(unittest.TestCase):
         )
         for take in takes:
             (self.bench_dir / str(take["outputFileName"])).touch()
+
+    def test_analysis_preserves_custom_speaker_identity(self) -> None:
+        takes = [
+            self.take(1, "neutral-gen", "custom_pro_custom_speed_medium_warm_0.wav", delivery=None),
+            self.take(
+                2,
+                "delivery-gen",
+                "custom_pro_custom_speed_medium_warm_d-happy.strong_0.wav",
+                delivery="happy.strong",
+            ),
+        ]
+        self.write_manifest(takes, custom_speaker_id="vivian")
+        self.write_engine_rows(takes)
+        with mock.patch.object(prosody, "analyze", side_effect=self.metrics):
+            rows = prosody.analyze_run(self.diagnostics, self.manifest)
+        self.assertEqual(rows[0]["speakerID"], "vivian")
+
+    def test_historical_manifest_without_speaker_remains_readable(self) -> None:
+        takes = [
+            self.take(1, "neutral-gen", "custom_pro_custom_speed_medium_warm_0.wav", delivery=None),
+            self.take(
+                2,
+                "delivery-gen",
+                "custom_pro_custom_speed_medium_warm_d-calm.strong_0.wav",
+                delivery="calm.strong",
+            ),
+        ]
+        self.write_manifest(takes, custom_speaker_id=None)
+        manifest = json.loads(self.manifest.read_text(encoding="utf-8"))
+        manifest.pop("customSpeakerID")
+        self.manifest.write_text(json.dumps(manifest), encoding="utf-8")
+        self.write_engine_rows(takes)
+        with mock.patch.object(prosody, "analyze", side_effect=self.metrics):
+            rows = prosody.analyze_run(self.diagnostics, self.manifest)
+        self.assertIsNone(rows[0]["speakerID"])
 
     def write_engine_rows(
         self,
@@ -434,6 +504,63 @@ class BenchDeliveryProsodyTests(unittest.TestCase):
         self.write_manifest([take])
         with self.assertRaisesRegex(ValueError, "disagrees with manifest fields"):
             prosody.collect_run_outputs(self.bench_dir, self.manifest)
+
+    def test_manifest_allows_take_gaps_only_when_typed_failures_fill_them(self) -> None:
+        import hashlib as _hashlib
+
+        neutral = "custom_pro_custom_speed_medium_warm_0.wav"
+        delivery = "custom_pro_custom_speed_medium_warm_d-happy.strong_0.wav"
+        takes = [
+            self.take(1, "neutral-current", neutral, delivery=None),
+            self.take(3, "delivery-current", delivery, delivery="happy.strong"),
+        ]
+        self.write_manifest(takes)
+        payload = json.loads(self.manifest.read_text(encoding="utf-8"))
+        payload["deliveryFailures"] = [{
+            "takeIndex": 2,
+            "generationID": "failed-current",
+            "delivery": "sad.strong",
+            "reasonCode": "fast_qc_dropout",
+            "deliveryInstructionDigest": _hashlib.sha256(b"Speak sadly.").hexdigest(),
+            "errorDigest": "a" * 64,
+        }]
+        self.manifest.write_text(json.dumps(payload), encoding="utf-8")
+        manifest, outputs = prosody.collect_run_outputs(self.bench_dir, self.manifest)
+        self.assertEqual(len(outputs), 2)
+        self.assertEqual(manifest["deliveryFailures"][0]["takeIndex"], 2)
+
+        payload["deliveryFailures"] = []
+        self.manifest.write_text(json.dumps(payload), encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "attempt indices must be contiguous"):
+            prosody.collect_run_outputs(self.bench_dir, self.manifest)
+
+    def test_rejected_warm_reference_remains_an_explicit_acoustic_pair(self) -> None:
+        delivery = "custom_pro_custom_speed_medium_warm_d-happy.strong_0.wav"
+        takes = [self.take(2, "delivery-current", delivery, delivery="happy.strong")]
+        self.write_manifest(takes)
+        rejected = "rejected_reference_warm0_attempt1.wav"
+        (self.bench_dir / rejected).touch()
+        payload = json.loads(self.manifest.read_text(encoding="utf-8"))
+        payload["referenceFailures"] = [{
+            "takeIndex": 1,
+            "generationID": "neutral-rejected",
+            "mode": "custom",
+            "modelID": "pro_custom_speed",
+            "length": "medium",
+            "warmState": "warm",
+            "repetition": 0,
+            "reasonCode": "fast_qc_dropout",
+            "qualityFlags": ["dropout:excess2(3/1)"],
+            "errorDigest": "b" * 64,
+            "rejectedOutputFileName": rejected,
+        }]
+        self.manifest.write_text(json.dumps(payload), encoding="utf-8")
+        _, outputs = prosody.collect_run_outputs(self.bench_dir, self.manifest)
+        instructed = next(row for row in outputs if row["delivery"])
+        neutral = prosody.find_neutral(outputs, instructed)
+        self.assertIsNotNone(neutral)
+        self.assertTrue(neutral["referenceRejected"])
+        self.assertEqual(neutral["referenceQualityFlags"], ["dropout:excess2(3/1)"])
 
     def test_sidecar_write_replaces_stale_content_atomically(self) -> None:
         self.diagnostics.mkdir(parents=True, exist_ok=True)

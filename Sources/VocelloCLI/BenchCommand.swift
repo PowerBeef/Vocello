@@ -44,10 +44,65 @@ enum BenchCommand {
         let environment: BenchTakeEnvironment
     }
 
+    /// One delivery attempt that reached generation but did not produce an
+    /// analyzable WAV. This is intentionally allowlisted and digest-only: the
+    /// autonomous roster lane needs to count the failure in its denominator
+    /// without persisting model errors, prompts, or local paths.
+    private struct BenchDeliveryFailure: Codable {
+        let takeIndex: Int
+        let generationID: String
+        let cell: String
+        let mode: String
+        let modelID: String
+        let variant: String
+        let length: String
+        let warmState: String
+        let repetition: Int
+        let delivery: String
+        let deliveryInstructionDigest: String
+        let reasonCode: String
+        let qualityFlags: [String]
+        let errorDigest: String
+        let rejectedOutputFileName: String?
+    }
+
+    /// A plain neutral reference attempt that did not produce product-accepted
+    /// audio. It is retained separately because it is not a delivery outcome
+    /// and must never enter the preset adherence denominator.
+    private struct BenchReferenceFailure: Codable {
+        let takeIndex: Int
+        let generationID: String
+        let cell: String
+        let mode: String
+        let modelID: String
+        let variant: String
+        let length: String
+        let warmState: String
+        let repetition: Int
+        let reasonCode: String
+        let qualityFlags: [String]
+        let errorDigest: String
+        let rejectedOutputFileName: String?
+    }
+
+    /// Carries the request identity out of `take` without exposing the raw
+    /// generation error in retained evidence.
+    private struct BenchTakeExecutionFailure: Error, LocalizedError {
+        let generationID: String
+        let underlyingDescription: String
+
+        var errorDescription: String? { underlyingDescription }
+    }
+
     private struct BenchResultsManifest: Codable {
         let schemaVersion: Int
         let runID: String
         let label: String
+        /// Exact Built-in Voice speaker selected for Custom rows. Historical
+        /// schema-v1 manifests omitted this field and therefore cannot support
+        /// speaker-generalization claims; the Python sidecar keeps them
+        /// readable but the roster harness requires this receipt.
+        let customSpeakerID: String?
         let startedAt: String
         let finishedAt: String
         let telemetryMode: String
@@ -56,6 +111,10 @@ enum BenchCommand {
         let fixtureDigests: [String: String]
         let memoryQualification: BenchMemoryQualification?
         let takes: [BenchTakeResult]
+        let referenceFailures: [BenchReferenceFailure]
+        /// Present for new manifests. Non-empty values are permitted only for
+        /// the explicit no-summary diagnostic continuation route.
+        let deliveryFailures: [BenchDeliveryFailure]
     }
 
     /// Declares the exact retained-memory protocol selected by the caller. The
@@ -165,6 +224,13 @@ enum BenchCommand {
         )
         let noSummary = args.flag("no-summary")
         let label = try validatedBenchmarkLabel(args.string("label"))
+        if args.flag("speaker") {
+            throw CLIError("--speaker requires a speaker id")
+        }
+        let requestedCustomSpeakerID = args.string("speaker")
+        if requestedCustomSpeakerID != nil, !modes.contains("custom") {
+            throw CLIError("--speaker applies only when --modes includes custom")
+        }
 
         // Published schema-v2 benchmarks require the exact raw sampler sidecars.
         // `--no-summary` diagnostic parents may still choose lightweight; a normal
@@ -244,6 +310,13 @@ enum BenchCommand {
         if warm == 0, !deliveryItems.isEmpty {
             throw CLIError("--warm 0 cannot be used with --delivery because delivery analysis requires a neutral warm cell")
         }
+        let continueDeliveryFailures = args.flag("continue-delivery-failures")
+        if continueDeliveryFailures, deliveryItems.isEmpty {
+            throw CLIError("--continue-delivery-failures requires --delivery")
+        }
+        if continueDeliveryFailures, !noSummary {
+            throw CLIError("--continue-delivery-failures requires --no-summary")
+        }
         let prosodyProfilePath = args.string("prosody-profile")
         let memoryQualification = try memoryQualificationDeclaration(
             rawPolicy: args.string("memory-qualification"),
@@ -257,6 +330,9 @@ enum BenchCommand {
             noStream: noStream,
             hasDeliveryCells: !deliveryItems.isEmpty
         )
+        if memoryQualification != nil, requestedCustomSpeakerID != nil {
+            throw CLIError("--speaker cannot alter the fixed retained-memory qualification fixture")
+        }
 
         // Bench path isolation is independent of telemetry. In particular,
         // `--telemetry off` must not resolve the default through production
@@ -265,6 +341,20 @@ enum BenchCommand {
             explicitOverride: args.string("data-dir"),
             applicationSupportBase: Self.applicationSupportBaseDirectory()
         )
+        let manifestOverride = args.string("manifest").map {
+            URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath)
+        }
+        let registryContext = try CLIRuntime.bootstrapRegistryOnly(
+            dataDirectory: resolvedDataDir,
+            manifestOverride: manifestOverride
+        )
+        let customSpeakerID = requestedCustomSpeakerID ?? registryContext.registry.defaultSpeaker.id
+        let knownCustomSpeakerIDs = Set(registryContext.registry.allSpeakers.map(\.id))
+        guard knownCustomSpeakerIDs.contains(customSpeakerID) else {
+            throw CLIError(
+                "unknown --speaker '\(customSpeakerID)' (use `vocello speakers list`)"
+            )
+        }
         if !args.flag("keep") {
             try clearDiagnosticsIfSafe(dataDir: resolvedDataDir, force: args.flag("force"))
         }
@@ -292,7 +382,8 @@ enum BenchCommand {
         note("bench • data: \(resolvedDataDir.path)")
         let runtime = try await CLIRuntime.bootstrap(
             dataDirectory: resolvedDataDir,
-            manifestOverride: args.string("manifest").map { URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath) })
+            manifestOverride: manifestOverride
+        )
 
         let outDir = resolvedDataDir.appendingPathComponent("outputs/bench", isDirectory: true)
         try FileManager.default.createDirectory(at: outDir, withIntermediateDirectories: true)
@@ -309,7 +400,10 @@ enum BenchCommand {
                 throw CLIError("clone bench needs saved voice '\(cloneVoiceName)' (have: \(have.isEmpty ? "none" : have))")
             }
         }
-        var fixtureDigests = ["design": sha256(Data(designBrief.utf8))]
+        var fixtureDigests = [
+            "design": sha256(Data(designBrief.utf8)),
+            "customSpeaker": sha256(Data(customSpeakerID.utf8)),
+        ]
         if let audioPath = cloneReference?.audioPath,
            let audioData = try? Data(contentsOf: URL(fileURLWithPath: audioPath)) {
             fixtureDigests["clone"] = sha256(audioData)
@@ -320,6 +414,8 @@ enum BenchCommand {
         let coldLen = lengths.contains("medium") ? "medium" : lengths.first
         var total = 0
         var takeResults: [BenchTakeResult] = []
+        var referenceFailures: [BenchReferenceFailure] = []
+        var deliveryFailures: [BenchDeliveryFailure] = []
         let started = Date()
         let startedAt = ISO8601DateFormatter().string(from: started)
 
@@ -331,7 +427,7 @@ enum BenchCommand {
                 let quality = variantStr.lowercased() == "quality"
                 let modelID = try runtime.modelID(mode: mode, quality: quality)
 
-                let payload = try payload(for: mode, customSpeaker: runtime.defaultSpeakerID,
+                let payload = try payload(for: mode, customSpeaker: customSpeakerID,
                                           designBrief: designBrief, cloneReference: cloneReference)
 
                 // Force cold for this cell: unload whatever's loaded so the next
@@ -346,11 +442,25 @@ enum BenchCommand {
                     try BenchRunContext.writeCurrentTakeFile(
                         takeIndex: total, cell: cell, intendedWarmState: "cold"
                     )
-                    takeResults.append(try await take(
-                        runtime, mode: mode, modelID: modelID, payload: payload,
-                        len: coldLen, text: coldText, state: "cold", n: 0, outDir: outDir,
-                        takeIndex: total, cell: cell, shouldStream: !noStream, seed: seed
-                    ))
+                    do {
+                        takeResults.append(try await take(
+                            runtime, mode: mode, modelID: modelID, payload: payload,
+                            len: coldLen, text: coldText, state: "cold", n: 0, outDir: outDir,
+                            takeIndex: total, cell: cell, shouldStream: !noStream, seed: seed
+                        ))
+                    } catch {
+                        guard continueDeliveryFailures else { throw error }
+                        let rejected = preserveRejectedWAV(
+                            dataDir: resolvedDataDir,
+                            outDir: outDir,
+                            fileName: "rejected_reference_cold_attempt\(total).wav"
+                        )
+                        referenceFailures.append(referenceFailure(
+                            error: error, takeIndex: total, cell: cell, mode: mode,
+                            modelID: modelID, length: coldLen, warmState: "cold",
+                            repetition: 0, rejectedOutputFileName: rejected
+                        ))
+                    }
                 }
                 // Warm samples per requested length.
                 for len in lengths {
@@ -369,11 +479,25 @@ enum BenchCommand {
                         try BenchRunContext.writeCurrentTakeFile(
                             takeIndex: total, cell: cell, intendedWarmState: retainedWarmState
                         )
-                        takeResults.append(try await take(
-                            runtime, mode: mode, modelID: modelID, payload: payload,
-                            len: len, text: t, state: retainedWarmState, n: n, outDir: outDir,
-                            takeIndex: total, cell: cell, shouldStream: !noStream, seed: seed
-                        ))
+                        do {
+                            takeResults.append(try await take(
+                                runtime, mode: mode, modelID: modelID, payload: payload,
+                                len: len, text: t, state: retainedWarmState, n: n, outDir: outDir,
+                                takeIndex: total, cell: cell, shouldStream: !noStream, seed: seed
+                            ))
+                        } catch {
+                            guard continueDeliveryFailures else { throw error }
+                            let rejected = preserveRejectedWAV(
+                                dataDir: resolvedDataDir,
+                                outDir: outDir,
+                                fileName: "rejected_reference_warm\(n)_attempt\(total).wav"
+                            )
+                            referenceFailures.append(referenceFailure(
+                                error: error, takeIndex: total, cell: cell, mode: mode,
+                                modelID: modelID, length: len, warmState: retainedWarmState,
+                                repetition: n, rejectedOutputFileName: rejected
+                            ))
+                        }
                     }
                 }
 
@@ -394,7 +518,7 @@ enum BenchCommand {
                             throw CLIError("delivery cell \(item.id) resolved an empty instruction")
                         }
                         let deliveryPayload = try Self.payload(
-                            for: mode, customSpeaker: runtime.defaultSpeakerID,
+                            for: mode, customSpeaker: customSpeakerID,
                             designBrief: designBrief, cloneReference: cloneReference,
                             deliveryStyle: item.instruction)
                         total += 1
@@ -402,25 +526,46 @@ enum BenchCommand {
                         try BenchRunContext.writeCurrentTakeFile(
                             takeIndex: total, cell: cell, intendedWarmState: "warm"
                         )
-                        takeResults.append(try await take(
-                            runtime, mode: mode, modelID: modelID, payload: deliveryPayload,
-                            len: "medium", text: deliveryText, state: "warm", n: 0,
-                            outDir: outDir, takeIndex: total, cell: cell, delivery: item.id,
-                            deliveryInstruction: item.instruction,
-                            shouldStream: !noStream, seed: seed
-                        ))
+                        do {
+                            takeResults.append(try await take(
+                                runtime, mode: mode, modelID: modelID, payload: deliveryPayload,
+                                len: "medium", text: deliveryText, state: "warm", n: 0,
+                                outDir: outDir, takeIndex: total, cell: cell, delivery: item.id,
+                                deliveryInstruction: item.instruction,
+                                shouldStream: !noStream, seed: seed
+                            ))
+                        } catch {
+                            guard continueDeliveryFailures else { throw error }
+                            let rejectedOutputFileName = preserveRejectedWAV(
+                                dataDir: resolvedDataDir,
+                                outDir: outDir,
+                                fileName: "rejected_delivery_\(item.id)_attempt\(total).wav"
+                            )
+                            let captured = deliveryFailure(
+                                error: error,
+                                takeIndex: total,
+                                cell: cell,
+                                mode: mode,
+                                modelID: modelID,
+                                delivery: item,
+                                rejectedOutputFileName: rejectedOutputFileName
+                            )
+                            deliveryFailures.append(captured)
+                            note("  retained \(item.id) failure: \(captured.reasonCode)")
+                        }
                     }
                 }
             }
         }
 
-        note("✓ \(total) takes in \(String(format: "%.0f", Date().timeIntervalSince(started)))s")
+        note("✓ \(takeResults.count)/\(total) analyzable takes in \(String(format: "%.0f", Date().timeIntervalSince(started)))s")
 
         try writeResultsManifest(
             BenchResultsManifest(
                 schemaVersion: 1,
                 runID: runID,
                 label: label.isEmpty ? runID : label,
+                customSpeakerID: modes.contains("custom") ? customSpeakerID : nil,
                 startedAt: startedAt,
                 finishedAt: ISO8601DateFormatter().string(from: Date()),
                 telemetryMode: telemetryRaw,
@@ -428,7 +573,9 @@ enum BenchCommand {
                 streaming: !noStream,
                 fixtureDigests: fixtureDigests,
                 memoryQualification: memoryQualification,
-                takes: takeResults
+                takes: takeResults,
+                referenceFailures: referenceFailures,
+                deliveryFailures: deliveryFailures
             ),
             artifactDirectory: historyArtifactDir
         )
@@ -468,7 +615,9 @@ enum BenchCommand {
         if !deliveryItems.isEmpty {
             try archiveDeliveryEvidence(
                 dataDir: resolvedDataDir, outputs: outDir, diagnostics: diagDir,
-                artifactDirectory: historyArtifactDir, takes: takeResults, runID: runID
+                artifactDirectory: historyArtifactDir, takes: takeResults,
+                referenceFailures: referenceFailures,
+                deliveryFailures: deliveryFailures, runID: runID
             )
         }
         // Optional engine first-chunk-latency probe. Runs after the main matrix but
@@ -490,7 +639,7 @@ enum BenchCommand {
                         throw CLIError("benchmark matrix has no lengths")
                     }
                     let probeText = try requiredText(for: probeLen)
-                    let payload = try payload(for: mode, customSpeaker: runtime.defaultSpeakerID,
+                    let payload = try payload(for: mode, customSpeaker: customSpeakerID,
                                               designBrief: designBrief, cloneReference: cloneReference)
                     try await runtime.engine.loadModel(id: modelID)  // warm
                     let out = outDir.appendingPathComponent("\(mode.rawValue)_\(modelID)_ttfcprobe.wav").path
@@ -574,14 +723,21 @@ enum BenchCommand {
         let t0 = Date()
         let result: GenerationResult
         var firstChunkMS: Double?
-        if shouldStream {
-            // Drain engine.events so the bounded macOS stream does not retain preview/chunk
-            // events across matrix takes (see GenerateCommand.generateObservingFirstChunk).
-            let (genResult, observedFirstChunkMS, _) = try await GenerateCommand.generateObservingFirstChunk(runtime, request)
-            result = genResult
-            firstChunkMS = observedFirstChunkMS
-        } else {
-            result = try await runtime.engine.generate(request)
+        do {
+            if shouldStream {
+                // Drain engine.events so the bounded macOS stream does not retain preview/chunk
+                // events across matrix takes (see GenerateCommand.generateObservingFirstChunk).
+                let (genResult, observedFirstChunkMS, _) = try await GenerateCommand.generateObservingFirstChunk(runtime, request)
+                result = genResult
+                firstChunkMS = observedFirstChunkMS
+            } else {
+                result = try await runtime.engine.generate(request)
+            }
+        } catch {
+            throw BenchTakeExecutionFailure(
+                generationID: generationID.uuidString,
+                underlyingDescription: String(describing: error)
+            )
         }
         let wall = Date().timeIntervalSince(t0)
         let deliveryTag = delivery.map { "/\($0)" } ?? ""
@@ -659,6 +815,123 @@ enum BenchCommand {
 
     private static func sha256(_ data: Data) -> String {
         SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+    }
+
+    private static func deliveryFailure(
+        error: Error,
+        takeIndex: Int,
+        cell: String,
+        mode: GenerationMode,
+        modelID: String,
+        delivery: DeliveryItem,
+        rejectedOutputFileName: String?
+    ) -> BenchDeliveryFailure {
+        let classified = classifyGenerationFailure(error)
+        return BenchDeliveryFailure(
+            takeIndex: takeIndex,
+            generationID: classified.generationID,
+            cell: cell,
+            mode: mode.rawValue,
+            modelID: modelID,
+            variant: modelID.hasSuffix("quality") ? "quality" : "speed",
+            length: "medium",
+            warmState: "warm",
+            repetition: 0,
+            delivery: delivery.id,
+            deliveryInstructionDigest: sha256(Data(delivery.instruction.utf8)),
+            reasonCode: classified.reasonCode,
+            qualityFlags: classified.qualityFlags,
+            errorDigest: classified.errorDigest,
+            rejectedOutputFileName: rejectedOutputFileName
+        )
+    }
+
+    private static func referenceFailure(
+        error: Error,
+        takeIndex: Int,
+        cell: String,
+        mode: GenerationMode,
+        modelID: String,
+        length: String,
+        warmState: String,
+        repetition: Int,
+        rejectedOutputFileName: String?
+    ) -> BenchReferenceFailure {
+        let classified = classifyGenerationFailure(error)
+        return BenchReferenceFailure(
+            takeIndex: takeIndex,
+            generationID: classified.generationID,
+            cell: cell,
+            mode: mode.rawValue,
+            modelID: modelID,
+            variant: modelID.hasSuffix("quality") ? "quality" : "speed",
+            length: length,
+            warmState: warmState,
+            repetition: repetition,
+            reasonCode: classified.reasonCode,
+            qualityFlags: classified.qualityFlags,
+            errorDigest: classified.errorDigest,
+            rejectedOutputFileName: rejectedOutputFileName
+        )
+    }
+
+    private static func classifyGenerationFailure(
+        _ error: Error
+    ) -> (generationID: String, reasonCode: String, qualityFlags: [String], errorDigest: String) {
+        let execution = error as? BenchTakeExecutionFailure
+        let description = execution?.underlyingDescription ?? String(describing: error)
+        let normalized = description.lowercased()
+        let reasonCode: String
+        if normalized.contains("dropout:") {
+            reasonCode = "fast_qc_dropout"
+        } else if normalized.contains("mandatory fast audio qc") {
+            reasonCode = "fast_qc_failure"
+        } else if normalized.contains("cancel") {
+            reasonCode = "cancelled"
+        } else if normalized.contains("token") && normalized.contains("limit") {
+            reasonCode = "generation_token_limit"
+        } else {
+            reasonCode = "generation_failed"
+        }
+        return (
+            execution?.generationID ?? "unavailable",
+            reasonCode,
+            allowlistedQualityFlags(in: description),
+            sha256(Data(description.utf8))
+        )
+    }
+
+    private static func allowlistedQualityFlags(in description: String) -> [String] {
+        let pattern = #"dropout:(?:[0-9]+ms|excess[0-9]+\([0-9]+/[0-9]+\))|nonfinite|empty|near_silent|low_level|silent|clipping|clicks|hot|dc_offset"#
+        guard let expression = try? NSRegularExpression(pattern: pattern) else { return [] }
+        let range = NSRange(description.startIndex..<description.endIndex, in: description)
+        var observed: [String] = []
+        for match in expression.matches(in: description, range: range) {
+            guard let swiftRange = Range(match.range, in: description) else { continue }
+            let flag = String(description[swiftRange])
+            if !observed.contains(flag) { observed.append(flag) }
+        }
+        return observed
+    }
+
+    private static func preserveRejectedWAV(
+        dataDir: URL,
+        outDir: URL,
+        fileName: String
+    ) -> String? {
+        let source = dataDir
+            .appendingPathComponent("cache/stream_sessions/failed-audio-qc", isDirectory: true)
+            .appendingPathComponent("failed-qc-latest.wav", isDirectory: false)
+        let destination = outDir.appendingPathComponent(fileName, isDirectory: false)
+        let fileManager = FileManager.default
+        guard fileManager.fileExists(atPath: source.path) else { return nil }
+        do {
+            try? fileManager.removeItem(at: destination)
+            try fileManager.copyItem(at: source, to: destination)
+            return fileName
+        } catch {
+            return nil
+        }
     }
 
     private static func payload(for mode: GenerationMode, customSpeaker: String, designBrief: String,
@@ -1001,6 +1274,8 @@ enum BenchCommand {
         diagnostics: URL,
         artifactDirectory: URL,
         takes: [BenchTakeResult],
+        referenceFailures: [BenchReferenceFailure],
+        deliveryFailures: [BenchDeliveryFailure],
         runID: String
     ) throws {
         let archive = dataDir
@@ -1025,6 +1300,16 @@ enum BenchCommand {
 
         for take in takes {
             try copy(outputs.appendingPathComponent(take.outputFileName), required: true)
+        }
+        for failure in referenceFailures {
+            if let fileName = failure.rejectedOutputFileName {
+                try copy(outputs.appendingPathComponent(fileName), required: true)
+            }
+        }
+        for failure in deliveryFailures {
+            if let fileName = failure.rejectedOutputFileName {
+                try copy(outputs.appendingPathComponent(fileName), required: true)
+            }
         }
         try copy(artifactDirectory.appendingPathComponent("bench-results.json"), required: true)
         try copy(diagnostics.appendingPathComponent("bench-prosody.json"), required: false)
@@ -1293,6 +1578,8 @@ enum BenchCommand {
                          allowed for a Custom/Design cold-only diagnostic;
                          Clone and --delivery require at least one warm take.
           --voice        (clone) saved voice name; default \(defaultCloneVoice)
+          --speaker      (custom) exact Built-in Voice speaker id; default contract speaker
+                         (discover with `vocello speakers list`)
           --voice-brief  (design) brief; default the standard narrator brief
           --delivery [list]  add instruct-bearing cells (Custom/Design, warm, medium
                          text, 1 take each): comma list of <preset>[.<intensity>]
@@ -1312,6 +1599,10 @@ enum BenchCommand {
           --prosody-profile <path>
                          use a calibrated prosody profile for the delivery analysis
                          (default: built-in profile)
+          --continue-delivery-failures
+                         with --delivery and --no-summary, retain typed failed
+                         neutral references and delivery cells, then continue;
+                         diagnostic only, never eligible for history publication
           --label <id>   opaque 1-96 character run label using letters, digits, ._- only
           --force-class  run a constrained tier on any Mac: 8gb|16gb|high|iphone
           --telemetry    off | lightweight | verbose (default; raw memory sidecars)

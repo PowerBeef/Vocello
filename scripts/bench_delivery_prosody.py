@@ -87,18 +87,34 @@ def collect_run_outputs(
     if not isinstance(manifest, dict) or manifest.get("schemaVersion") != 1:
         raise ValueError("results manifest must be a schema-v1 object")
     run_id = manifest.get("runID")
+    custom_speaker_id = manifest.get("customSpeakerID")
+    if custom_speaker_id is not None and (
+        not isinstance(custom_speaker_id, str) or not custom_speaker_id.strip()
+    ):
+        raise ValueError("results manifest has an invalid customSpeakerID")
     takes = manifest.get("takes")
+    reference_failures = manifest.get("referenceFailures", [])
+    failures = manifest.get("deliveryFailures", [])
     if not isinstance(run_id, str) or not run_id:
         raise ValueError("results manifest has no runID")
     if not isinstance(takes, list) or not takes:
         raise ValueError("results manifest has no takes")
+    if not isinstance(failures, list):
+        raise ValueError("results manifest deliveryFailures must be an array")
+    if not isinstance(reference_failures, list):
+        raise ValueError("results manifest referenceFailures must be an array")
 
     parsed_outputs: list[dict[str, Any]] = []
     names: set[str] = set()
     generation_ids: set[str] = set()
-    for index, take in enumerate(takes, start=1):
-        if not isinstance(take, dict) or take.get("takeIndex") != index:
-            raise ValueError("results manifest take indices must be contiguous and one-based")
+    attempt_indices: set[int] = set()
+    for take in takes:
+        index = take.get("takeIndex") if isinstance(take, dict) else None
+        if not isinstance(index, int) or isinstance(index, bool) or index < 1:
+            raise ValueError("results manifest take indices must be positive integers")
+        if index in attempt_indices:
+            raise ValueError(f"results manifest repeats attempt index {index}")
+        attempt_indices.add(index)
         name = take.get("outputFileName")
         generation_id = take.get("generationID")
         if (
@@ -132,9 +148,98 @@ def collect_run_outputs(
         parsed["path"] = str(output_path)
         parsed["generationID"] = generation_id
         parsed["deliveryInstruction"] = take.get("deliveryInstruction")
+        parsed["speakerID"] = custom_speaker_id if parsed["mode"] == "custom" else None
         parsed_outputs.append(parsed)
         names.add(name)
         generation_ids.add(generation_id)
+
+    allowed_reasons = {
+        "fast_qc_dropout",
+        "fast_qc_failure",
+        "cancelled",
+        "generation_token_limit",
+        "generation_failed",
+    }
+    for failure in reference_failures:
+        index = failure.get("takeIndex") if isinstance(failure, dict) else None
+        if not isinstance(index, int) or isinstance(index, bool) or index < 1:
+            raise ValueError("reference failure indices must be positive integers")
+        if index in attempt_indices:
+            raise ValueError(f"results manifest repeats attempt index {index}")
+        attempt_indices.add(index)
+        generation_id = failure.get("generationID")
+        if (
+            not isinstance(generation_id, str)
+            or not generation_id
+            or generation_id in generation_ids
+        ):
+            raise ValueError(f"reference failure {index} has an invalid generation ID")
+        generation_ids.add(generation_id)
+        if failure.get("reasonCode") not in allowed_reasons:
+            raise ValueError(f"reference failure {index} has an invalid reason code")
+        digest = failure.get("errorDigest")
+        if not isinstance(digest, str) or re.fullmatch(r"[0-9a-f]{64}", digest) is None:
+            raise ValueError(f"reference failure {index} has an invalid errorDigest")
+        name = failure.get("rejectedOutputFileName")
+        if (
+            not isinstance(name, str)
+            or not name
+            or Path(name).name != name
+            or name in names
+        ):
+            raise ValueError(f"reference failure {index} has no unique rejected WAV")
+        output_path = bench_dir / name
+        if not output_path.is_file():
+            raise ValueError(f"reference failure {index} rejected WAV is missing: {name}")
+        quality_flags = failure.get("qualityFlags")
+        if not isinstance(quality_flags, list) or any(
+            not isinstance(flag, str) or not flag for flag in quality_flags
+        ):
+            raise ValueError(f"reference failure {index} has invalid qualityFlags")
+        parsed_outputs.append({
+            "name": name,
+            "path": str(output_path),
+            "generationID": generation_id,
+            "mode": failure.get("mode"),
+            "model": failure.get("modelID"),
+            "length": failure.get("length"),
+            "state": failure.get("warmState"),
+            "n": failure.get("repetition"),
+            "delivery": None,
+            "deliveryInstruction": None,
+            "speakerID": custom_speaker_id if failure.get("mode") == "custom" else None,
+            "referenceRejected": True,
+            "referenceQualityFlags": quality_flags,
+        })
+        names.add(name)
+    for failure in failures:
+        index = failure.get("takeIndex") if isinstance(failure, dict) else None
+        if not isinstance(index, int) or isinstance(index, bool) or index < 1:
+            raise ValueError("delivery failure indices must be positive integers")
+        if index in attempt_indices:
+            raise ValueError(f"results manifest repeats attempt index {index}")
+        attempt_indices.add(index)
+        generation_id = failure.get("generationID")
+        if (
+            not isinstance(generation_id, str)
+            or not generation_id
+            or generation_id in generation_ids
+        ):
+            raise ValueError(f"delivery failure {index} has an invalid generation ID")
+        generation_ids.add(generation_id)
+        if failure.get("reasonCode") not in allowed_reasons:
+            raise ValueError(f"delivery failure {index} has an invalid reason code")
+        if not isinstance(failure.get("delivery"), str) or not failure["delivery"]:
+            raise ValueError(f"delivery failure {index} has no delivery id")
+        for key in ("deliveryInstructionDigest", "errorDigest"):
+            digest = failure.get(key)
+            if not isinstance(digest, str) or re.fullmatch(r"[0-9a-f]{64}", digest) is None:
+                raise ValueError(f"delivery failure {index} has an invalid {key}")
+
+    if sorted(attempt_indices) != list(range(1, len(attempt_indices) + 1)):
+        raise ValueError(
+            "results manifest attempt indices must be contiguous and one-based across takes and failures"
+        )
     return manifest, parsed_outputs
 
 
@@ -206,6 +311,7 @@ def find_neutral(parsed: list[dict[str, Any]], target: dict[str, Any]) -> dict[s
         if item["delivery"] is None
         and item["mode"] == target["mode"]
         and item["model"] == target["model"]
+        and item.get("speakerID") == target.get("speakerID")
         and item["length"] == target["length"]
         and item["state"] == target["state"]
     ]
@@ -215,6 +321,7 @@ def find_neutral(parsed: list[dict[str, Any]], target: dict[str, Any]) -> dict[s
         if item["delivery"] is None
         and item["mode"] == target["mode"]
         and item["model"] == target["model"]
+        and item.get("speakerID") == target.get("speakerID")
         and item["state"] == target["state"]
     ]
     if not candidates:
@@ -328,8 +435,13 @@ def analyze_run(
                 "neutralPromptDigest": neutral_provenance.get("promptDigest"),
                 "generationID": delivery["generationID"],
                 "neutralGenerationID": neutral["generationID"],
+                "neutralReferenceAccepted": not neutral.get("referenceRejected", False),
+                "neutralReferenceQualityFlags": list(
+                    neutral.get("referenceQualityFlags") or []
+                ),
                 "mode": delivery["mode"],
                 "model": delivery["model"],
+                "speakerID": delivery.get("speakerID"),
                 "length": delivery["length"],
                 "delivery": delivery["delivery"],
                 "profileDigest": profile_digest,

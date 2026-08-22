@@ -81,7 +81,7 @@ final class AtomicWAVPublicationTests: XCTestCase {
         )
 
         let persistedOnly = try PersistedWAVAudioQCAnalyzer.evaluate(url: output)
-        XCTAssertEqual(persistedOnly.algorithmVersion, 3)
+        XCTAssertEqual(persistedOnly.algorithmVersion, 4)
         XCTAssertEqual(persistedOnly.writtenOutputVerdict, .pass)
 
         var unstable = PCM16StreamLimiter()

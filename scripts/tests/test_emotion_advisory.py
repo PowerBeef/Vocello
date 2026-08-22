@@ -15,6 +15,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from emotion_advisory import (
     ABSTAIN_PRESETS,
     EMOTION_LABELS,
+    HYPOTHESIS_PRESET_EMOTIONS,
     PRESET_ALLOWED_EMOTIONS,
     analyze_sidecar,
     evaluate_agreement,
@@ -37,7 +38,11 @@ class EmotionAdvisoryTests(unittest.TestCase):
         root = pathlib.Path(__file__).resolve().parents[2]
         presets = set(load_presets(root))
         self.assertTrue(presets, "parsed zero presets; the check must not pass vacuously")
-        covered = set(PRESET_ALLOWED_EMOTIONS) | ABSTAIN_PRESETS
+        covered = (
+            set(PRESET_ALLOWED_EMOTIONS)
+            | set(HYPOTHESIS_PRESET_EMOTIONS)
+            | ABSTAIN_PRESETS
+        )
         self.assertEqual(presets - covered, set())
 
     def test_matching_emotion_agrees(self):
@@ -45,11 +50,12 @@ class EmotionAdvisoryTests(unittest.TestCase):
         self.assertTrue(report["agreement"])
         self.assertEqual(report["topEmotion"], "happy")
 
-    def test_preset_may_map_to_a_differently_named_emotion(self):
-        # `calm` counts the SER label "neutral" as agreement: the allowed set is
-        # not required to equal the preset id.
-        self.assertTrue(evaluate_agreement(probabilities("neutral"), "calm.normal")["agreement"])
-        self.assertFalse(evaluate_agreement(probabilities("sad"), "calm.normal")["agreement"])
+    def test_calm_to_neutral_mapping_is_a_hypothesis_not_a_verdict(self):
+        report = evaluate_agreement(probabilities("neutral"), "calm.normal")
+        self.assertIsNone(report["agreement"])
+        self.assertTrue(report["abstained"])
+        self.assertEqual(report["note"], "hypothesis_only")
+        self.assertEqual(report["allowedEmotions"], ["neutral"])
 
     def test_whisper_abstains(self):
         report = evaluate_agreement(probabilities("neutral"), "whisper.normal")
@@ -65,6 +71,22 @@ class EmotionAdvisoryTests(unittest.TestCase):
         report = evaluate_agreement({}, "happy.normal")
         self.assertIsNone(report["agreement"])
         self.assertEqual(report["note"], "classification_unavailable")
+        self.assertTrue(report["abstained"])
+
+    def test_uncertain_posterior_abstains_and_preserves_full_distribution(self):
+        report = evaluate_agreement(
+            {
+                "angry": 0.24, "disgust": 0.02, "fearful": 0.02,
+                "happy": 0.25, "neutral": 0.23, "sad": 0.02,
+                "surprised": 0.22,
+            },
+            "happy.normal",
+        )
+        self.assertIsNone(report["agreement"])
+        self.assertEqual(report["note"], "classifier_uncertain")
+        self.assertEqual(set(report["probabilities"]), set(EMOTION_LABELS))
+        self.assertLess(report["topTwoMargin"], 0.1)
+        self.assertGreater(report["normalizedEntropy"], 0.0)
 
     def test_sidecar_mode_aggregates_agreement_rate(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -98,6 +120,8 @@ class EmotionAdvisoryTests(unittest.TestCase):
         self.assertEqual(report["aggregate"]["judged"], 2)  # whisper abstains
         self.assertEqual(report["aggregate"]["agreed"], 1)  # sad got happy
         self.assertEqual(report["aggregate"]["agreementRate"], 0.5)
+        self.assertEqual(report["schemaVersion"], 1)
+        self.assertEqual(report["rows"], report["takes"])
         self.assertIn("peakRSSBytes", report)
 
     def test_sidecar_mode_fails_closed_on_missing_output(self):

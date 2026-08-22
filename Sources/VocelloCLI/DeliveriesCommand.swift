@@ -29,17 +29,36 @@ enum DeliveriesCommand {
         CLIOutput.configure(args)
 
         var rows: [DeliveryJSON] = []
-        for preset in EmotionPreset.all where preset.id != "neutral" {
-            for intensity in EmotionIntensity.allCases {
+        if args.flag("shipped-only") {
+            // One row per product-visible preset, including instructed
+            // Neutral, at the exact tier fresh selections ship. This is the
+            // machine-readable roster used by the autonomous speaker matrix;
+            // it must not duplicate the tier policy in Python.
+            for preset in EmotionPreset.all {
+                let intensity = preset.shippedIntensity
                 let instr = preset.instruction(for: intensity)
                     .trimmingCharacters(in: .whitespacesAndNewlines)
-                if instr.isEmpty { continue }
+                guard !instr.isEmpty else { continue }
                 rows.append(DeliveryJSON(
                     id: "\(preset.id).\(intensity.rpcValue)",
                     preset: preset.id,
                     intensity: intensity.rpcValue,
                     label: preset.label,
                     instruction: instr))
+            }
+        } else {
+            for preset in EmotionPreset.all where preset.id != "neutral" {
+                for intensity in EmotionIntensity.allCases {
+                    let instr = preset.instruction(for: intensity)
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                    if instr.isEmpty { continue }
+                    rows.append(DeliveryJSON(
+                        id: "\(preset.id).\(intensity.rpcValue)",
+                        preset: preset.id,
+                        intensity: intensity.rpcValue,
+                        label: preset.label,
+                        instruction: instr))
+                }
             }
         }
 
@@ -61,7 +80,9 @@ enum DeliveriesCommand {
         — see scripts/delivery_adherence.py + scripts/analyze_delivery.py.
 
         Options:
-          --json   emit JSON instead of a table
+          --json           emit JSON instead of a table
+          --shipped-only   emit one row for each of the eight product presets,
+                           including Neutral, at its shipped tier
         """)
     }
 }

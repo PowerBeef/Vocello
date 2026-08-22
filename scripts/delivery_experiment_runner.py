@@ -568,7 +568,20 @@ def _comparison_key(row: dict[str, Any]) -> str:
     })
 
 
-def summarize_screen(runs: dict[str, Path]) -> dict[str, Any]:
+def _paired_exact_p(improved: int, regressed: int) -> float:
+    discordant = improved + regressed
+    if discordant == 0:
+        return 1.0
+    tail = sum(
+        math.comb(discordant, value)
+        for value in range(min(improved, regressed) + 1)
+    ) / (2 ** discordant)
+    return min(1.0, 2.0 * tail)
+
+
+def summarize_screen(
+    runs: dict[str, Path], *, baseline_label: str | None = None,
+) -> dict[str, Any]:
     """Summarize one-factor development screens without claiming promotion."""
     if len(runs) < 2:
         raise RunnerError("screen summary requires at least two labeled runs")
@@ -577,6 +590,8 @@ def summarize_screen(runs: dict[str, Path]) -> dict[str, Any]:
     selection_identity: dict[str, Any] | None = None
     comparison_keys: set[str] | None = None
     harness_identity: dict[str, str] | None = None
+    outcomes_by_label: dict[str, dict[str, bool]] = {}
+    metadata_by_key: dict[str, dict[str, str]] = {}
     for label, run_dir in sorted(runs.items()):
         plan_path = run_dir / "execution-plan.json"
         state_path = run_dir / "execution-state.json"
@@ -625,6 +640,26 @@ def summarize_screen(runs: dict[str, Path]) -> dict[str, Any]:
         passed = sum(
             row.get("deliveryVerdict", {}).get("passed") is True for row in rows
         )
+        key_by_take = {
+            row["takeID"]: _comparison_key(row) for row in plan["rows"]
+        }
+        outcomes = {key: False for key in keys}
+        for row in rows:
+            take_id = row.get("takeID")
+            if take_id not in key_by_take:
+                raise RunnerError(f"{label}: acoustic row has an unknown take identity")
+            outcomes[key_by_take[take_id]] = (
+                row.get("deliveryVerdict", {}).get("passed") is True
+            )
+        outcomes_by_label[label] = outcomes
+        for row in plan["rows"]:
+            key = _comparison_key(row)
+            metadata = {
+                "preset": row["preset"], "speakerID": row["speakerID"],
+            }
+            previous = metadata_by_key.setdefault(key, metadata)
+            if previous != metadata:
+                raise RunnerError("screen comparison-cell metadata differ")
         per_preset: dict[str, dict[str, int]] = {}
         feature_values: dict[str, list[float]] = {}
         for row in rows:
@@ -666,6 +701,35 @@ def summarize_screen(runs: dict[str, Path]) -> dict[str, Any]:
             -entry["acousticPassRate"], entry["failedOrBlocked"], entry["label"]
         ),
     )
+    paired_comparisons: dict[str, Any] = {}
+    if baseline_label is not None:
+        if baseline_label not in outcomes_by_label:
+            raise RunnerError(f"unknown baseline label {baseline_label}")
+        baseline = outcomes_by_label[baseline_label]
+        for label, candidate in sorted(outcomes_by_label.items()):
+            if label == baseline_label:
+                continue
+            groups = {"overall": sorted(baseline)}
+            groups.update({
+                f"preset:{preset}": sorted(
+                    key for key in baseline if metadata_by_key[key]["preset"] == preset
+                )
+                for preset in sorted({value["preset"] for value in metadata_by_key.values()})
+            })
+            comparisons = {}
+            for group, keys in groups.items():
+                improved = sum(not baseline[key] and candidate[key] for key in keys)
+                regressed = sum(baseline[key] and not candidate[key] for key in keys)
+                comparisons[group] = {
+                    "cellCount": len(keys),
+                    "improved": improved,
+                    "regressed": regressed,
+                    "bothPassed": sum(baseline[key] and candidate[key] for key in keys),
+                    "bothFailed": sum(not baseline[key] and not candidate[key] for key in keys),
+                    "discordant": improved + regressed,
+                    "twoSidedExactP": _paired_exact_p(improved, regressed),
+                }
+            paired_comparisons[label] = comparisons
     return {
         "schemaVersion": SCHEMA_VERSION,
         "kind": "delivery-development-screen-summary",
@@ -676,8 +740,11 @@ def summarize_screen(runs: dict[str, Path]) -> dict[str, Any]:
         "comparisonCellCount": len(comparison_keys or ()),
         "rankingBasis": "advisory-acoustic-pass-rate-with-failures-in-denominator",
         "harnessIdentity": harness_identity,
+        "summarizerSHA256": file_sha256(Path(__file__).resolve()),
         "ranking": [entry["label"] for entry in ranked],
         "runs": entries,
+        "pairedAgainst": baseline_label,
+        "pairedComparisons": paired_comparisons,
     }
 
 
@@ -731,6 +798,9 @@ def main() -> int:
         "--runs", required=True, help="comma-separated label=run-directory entries"
     )
     summarize_parser.add_argument("--out", type=Path, required=True)
+    summarize_parser.add_argument(
+        "--baseline", help="label used for paired advisory pass/fail comparisons"
+    )
     args = parser.parse_args()
     try:
         if args.command == "plan":
@@ -759,7 +829,9 @@ def main() -> int:
             else:
                 result = analyze_execution(plan, args.run_dir)
         else:
-            result = summarize_screen(_parse_labeled_paths(args.runs))
+            result = summarize_screen(
+                _parse_labeled_paths(args.runs), baseline_label=args.baseline,
+            )
             atomic_json(args.out, result)
         verdict = (
             execution_verdict(result)

@@ -171,13 +171,16 @@ python3 scripts/delivery_experiment_runner.py plan \
   --out build/artifacts/macos/delivery-experiment/prompt-plan.json
 python3 scripts/delivery_experiment_runner.py summarize \
   --runs current=build/artifacts/macos/delivery-experiment/current/run,candidate=build/artifacts/macos/delivery-experiment/candidate/run \
+  --baseline current \
   --out build/artifacts/macos/delivery-experiment/screen-summary.json
 ```
 
 Every new plan seals SHA-256 identities for the CLI, runner, analyzer, delivery gate and prosody
 profile. Resume and comparison fail if any of those bytes drift. Failed CLI invocations retain only
 an allowlisted failure class, line count and hashes; diagnostic prose and local paths never enter
-the manifest.
+the manifest. When `--baseline` is supplied, the summary also reports paired improvements,
+regressions, ties and a two-sided exact sign-test probability overall and per preset. This prevents
+a one-cell aggregate lead from being presented as a stable improvement.
 
 ### 2.2 Blinded dimensional calibration
 
@@ -226,9 +229,16 @@ open the confirmation split.
   seeds, consistent-matched led at 10/12, while balanced-matched, balanced-official and official-
   official each reached 9/12; the earlier seed had a three-way 4/6 tie. Happy and Surprised were
   the recurring weak cells. Lower sampling temperature is therefore not a universal adherence fix.
+- A fresh source-bound Happy/Surprised screen then compared shipped copy, acoustic attributes only,
+  and the constrained scene arm over Aiden, Ryan, Vivian-English and Sohee-English with two new
+  seeds. All 48 instructed takes completed. Aggregate advisory passes were 10/16, 9/16 and 8/16.
+  Against shipped copy, acoustic-only improved two cells and regressed one (`p=1.0`): both gains
+  were Happy (`2-0`, `p=0.5`), while Surprised regressed `0-1`. The constrained arm improved one and
+  regressed two (`p=1.0`). No global arm advances. Acoustic-only remains an exploratory Happy-only
+  candidate; Surprised retains shipped copy until a different candidate is supported.
 
-Production instructions and the default Expressive sampler remain unchanged. The next screen is
-per-preset and speaker-diverse, with Happy and Surprised as the first candidates; semantic
+Production instructions and the default Expressive sampler remain unchanged. The next automatic
+screen may expand the Happy-only acoustic arm to the pre-registered 8-20 seed range, but semantic
 promotion still requires the blinded calibration and untouched listening gates below.
 
 ## 3. Evidence conventions

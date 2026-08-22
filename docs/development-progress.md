@@ -99,6 +99,15 @@ Happy/Angry/Sad. Its public manifest exposes no requested label or speaker/scrip
 It remains intentionally unqualified until three independent listeners supply complete ratings;
 no synthetic or requested-preset labels can substitute for that evidence.
 
+A subsequent source-bound DP-30 screen focused on the recurrent Happy and Surprised weaknesses.
+Across Aiden, Ryan, Vivian-English and Sohee-English and two fresh development seeds, all 48 takes
+completed. Acoustic-only, shipped and constrained-scene prompts scored 10/16, 9/16 and 8/16 on the
+advisory gate. The new paired summary showed acoustic-only improved two shipped failures but
+regressed one shipped pass overall (`p=1.0`); its two gains were both Happy (`2-0`, `p=0.5`) while
+Surprised regressed `0-1`. The constrained arm improved one and regressed two. No global prompt
+change advances. Acoustic-only is retained only as an exploratory Happy-specific candidate for a
+larger development screen; Surprised and all production copy remain unchanged.
+
 **DP-26 Custom Voice delivery screen completed; QC fixed, prompt candidate rejected
 (2026-08-22, macOS/CLI):** the new resumable matrix exercised every checked-in Built-in
 Voice speaker (9) against every shipped delivery preset/tier (8) over five fixed seeds,

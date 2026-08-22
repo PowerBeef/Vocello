@@ -231,11 +231,20 @@ class DeliveryExperimentRunnerTests(unittest.TestCase):
             run_execution_plan(plan=plan, binary=self.binary, data_dir=None, run_dir=run_dir)
             analyze_execution(plan, run_dir)
             runs[label] = run_dir
-        report = summarize_screen(runs)
+        report = summarize_screen(runs, baseline_label="baseline")
         self.assertEqual(report["controlledFactor"], "arm")
         self.assertEqual(report["comparisonCellCount"], 2)
         self.assertFalse(report["promotionAuthority"])
         self.assertEqual(len(report["ranking"]), 2)
+        paired = report["pairedComparisons"]["candidate"]["overall"]
+        self.assertEqual(paired["cellCount"], 2)
+        self.assertEqual(
+            paired["improved"] + paired["regressed"]
+            + paired["bothPassed"] + paired["bothFailed"],
+            2,
+        )
+        self.assertGreaterEqual(paired["twoSidedExactP"], 0.0)
+        self.assertLessEqual(paired["twoSidedExactP"], 1.0)
 
 
 if __name__ == "__main__":

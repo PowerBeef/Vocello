@@ -13,6 +13,10 @@ sourceOfTruth:
   - scripts/delivery_analysis_cache.py
   - scripts/delivery_temporal_features.py
   - scripts/delivery_compact_model_adapter.py
+  - scripts/delivery_compact_model_runtime.py
+  - scripts/prepare_delivery_compact_model_config.py
+  - scripts/qualify_delivery_compact_models.py
+  - scripts/prepare_delivery_listener_anchors.py
   - scripts/delivery_resource_supervisor.py
   - scripts/run_local_delivery_cascade.py
   - scripts/delivery_promotion_decision.py
@@ -21,6 +25,7 @@ sourceOfTruth:
   - scripts/analyze_prosody.py
   - config/delivery-experiment-contract.json
   - config/delivery-evaluator-v2-contract.json
+  - config/delivery-evaluator-v2-candidates.json
   - config/delivery-evaluation-corpus.json
 ---
 # The audio delivery analysis harness
@@ -52,6 +57,10 @@ the script self-test suite via `scripts/check_test_workflows.sh`.
 | `scripts/delivery_analysis_cache.py` | Content-addressed, atomic analysis cache keyed by original and canonical audio plus exact analyzer/model/preprocessing provenance; cache hits launch no model | `test_delivery_analysis_cache.py` |
 | `scripts/delivery_temporal_features.py` | Two-pass bounded-memory five-region contour analyzer plus same-identity instructed-minus-neutral deltas | `test_delivery_temporal_features.py` |
 | `scripts/delivery_compact_model_adapter.py` | Contract-first CPU subprocess adapter for fully pinned SenseVoiceSmall Q8 or DistilHuBERT candidates; neither candidate is adopted or downloaded by the repository | `test_delivery_compact_model_adapter.py` |
+| `scripts/delivery_compact_model_runtime.py` | Offline CPU DistilHuBERT executor; emits one deterministic, normalized 128-dimensional frozen representation and never receives a requested label | `test_delivery_compact_model_runtime.py` |
+| `scripts/prepare_delivery_compact_model_config.py` | Validates the tracked candidate contract and exact local weights/runtime/dependencies, then emits an untracked path-bearing adapter configuration | `test_prepare_delivery_compact_model_config.py` |
+| `scripts/qualify_delivery_compact_models.py` | Runs exactly two cache-cold probes, retains sanitized resource evidence, and refuses holdout bake-off on any unqualified run | `test_qualify_delivery_compact_models.py` |
+| `scripts/prepare_delivery_listener_anchors.py` | Builds label-blind naturalness/attention anchors by pairing a real clip with a deterministic dropout control; audio and manifest remain untracked | `test_prepare_delivery_listener_anchors.py` |
 | `scripts/delivery_resource_supervisor.py` | Single-process lock, peak RSS/pressure/swap/timeout capture, and post-exit memory-recovery qualification for heavy local analyzers | `test_delivery_resource_supervisor.py` |
 | `scripts/run_local_delivery_cascade.py` | Existing-harness post-generation composer for always-on, ambiguous-only, finalist-only, abstention, rejection, and manual-listening routes | `test_run_local_delivery_cascade.py` |
 | `scripts/delivery_promotion_decision.py` | Fail-closed decision over blinded listener evidence, paired statistics, multiplicity correction, acoustic guardrails, and runtime invariants | `test_delivery_promotion_decision.py` |
@@ -256,6 +265,30 @@ corruption or drift fails closed and a cache hit launches no model. Reports cont
 measurements, never local paths or audio. Always-on acoustics can reject a broken row, but absent a
 qualified compact adapter and calibrated tiny head the honest result is `abstained`.
 
+External candidates are governed separately by
+[`config/delivery-evaluator-v2-candidates.json`](../../config/delivery-evaluator-v2-candidates.json).
+The tracked contract pins the exact SenseVoiceSmall Q8 model revision, GGUF and runtime archive/
+binary digests, and the exact DistilHuBERT revision, safetensors/support-file digests and Python,
+Torch, Transformers, safetensors and NumPy versions. The local configuration additionally binds
+the adapter layer and resource-supervisor source bytes into the preprocessing/cache identity.
+No model file or absolute path is tracked:
+
+```sh
+python3 scripts/prepare_delivery_compact_model_config.py --validate-only
+python3 scripts/prepare_delivery_compact_model_config.py sensevoice-small-q8 \
+  --output build/artifacts/macos/delivery-evaluator-v2/candidate-configs/sensevoice.json
+python3 scripts/prepare_delivery_compact_model_config.py distilhubert \
+  --output build/artifacts/macos/delivery-evaluator-v2/candidate-configs/distilhubert.json
+```
+
+Qualification uses two byte-distinct real clips, one candidate at a time. It records peak process
+RSS, wall time, pressure before/after, swap delta, clean exit and bounded post-exit recovery. An
+unqualified result is returned for forensics but never cached and the next heavy layer does not
+start. Post-exit recovery samples for up to 15 seconds because one immediate host-free-percentage
+sample proved too noisy; the five-point recovery threshold itself remains fail closed. The runner
+does not accept a caller-authored host label: it checks `hw.model` and `hw.memsize` against the
+tracked canonical macOS hardware profile and binds the qualifier source in its report.
+
 The versioned listener workflow remains under `delivery_calibration_session.py`:
 
 ```sh
@@ -278,21 +311,54 @@ uncertainty/confidence/replay/latency fields, target-versus-neutral and candidat
 2AFC, and naturalness/intensity ratings. The merged report retains listener rows and reports repeat
 agreement, pairwise CCC, free-identification agreement, anchor accuracy, order bias, uncertain
 rate, and fluent-language coverage. Requested preset labels remain outside the public dimensional
-block.
+block. A response file is written atomically after every trial; rerunning the same listener/session
+identity verifies and resumes its exact retained prefix instead of replaying completed trials.
+
+Calibration and confirmation use distinct plan seed partitions and session kinds. Model fitting
+rejects confirmation labels; holdout scoring rejects calibration labels. Once listener labels are
+qualified, blind compact deltas join only by exact generation identity and cannot change any label:
+
+```sh
+python3 scripts/delivery_evaluator.py attach-v2-compact \
+  --input build/artifacts/macos/delivery-experiment/calibration/labels-v2.json \
+  --cascade build/artifacts/macos/delivery-experiment/calibration/cascade-distilhubert.json \
+  --out build/artifacts/macos/delivery-experiment/calibration/labels-v2-distilhubert.json
+python3 scripts/delivery_evaluator.py calibrate-v2 \
+  --input build/artifacts/macos/delivery-experiment/calibration/labels-v2-distilhubert.json \
+  --out build/artifacts/macos/delivery-experiment/calibration/evaluator-v2.json
+python3 scripts/delivery_evaluator.py score-v2-holdout \
+  --input build/artifacts/macos/delivery-experiment/confirmation/labels-v2-distilhubert.json \
+  --model build/artifacts/macos/delivery-experiment/calibration/evaluator-v2.json \
+  --out build/artifacts/macos/delivery-experiment/confirmation/holdout-scores.json
+```
+
+Calibration blocked-validation metrics deterministically preselect at most one challenger before
+the confirmation labels are opened. Holdout scoring refuses a model with no preselection and emits
+scores only for ridge-v1 plus that one challenger; it never exposes the other challenger for
+post-hoc selection. `compare-v2-holdout` verifies the sealed score digest and exact two-model set.
 
 Ridge-v1 remains the adopted baseline. V2 adds per-preset regularized logistic heads, elastic-net
 and PLS VAD challengers, fold-local reduction across speaker/translation/seed/language blocks,
 blocked split-conformal intervals, robust Mahalanobis/nearest-neighbor OOD, and typed contradiction
 or abstention reasons. No challenger is adopted until it improves an untouched qualified human
-holdout without regressing any VAD dimension or preset. SenseVoiceSmall Q8 and DistilHuBERT are
-adapter candidates only: no weights are downloaded or accepted until license/training provenance,
-immutable digests, two clean serial M2/8 GB runs, post-exit memory release, and human-holdout gain
-all pass. UTMOS remains finalist-only and legacy SER remains a bake-off comparator.
+holdout without regressing any VAD dimension, preset, speaker or script group, with gains present
+across both speaker and script groupings. SenseVoiceSmall Q8 and DistilHuBERT remain unadopted
+adapter candidates until license/training provenance, immutable digests, two clean serial M2/8 GB
+runs, post-exit memory release, and human-holdout gain all pass. UTMOS remains finalist-only and
+legacy SER remains a bake-off comparator.
 
-The deterministic infrastructure and compatibility tests are landed. The six-speaker,
-three-script, eight-preset blinded calibration cohort, two heavy-adapter host qualifications, and
-untouched-human-label improvement are still DP-28/DP-31 acceptance work. No production delivery
-copy or `EmotionPreset` changed.
+Live status on 2026-08-23: both exact candidate configurations passed two cache-cold probes on the
+attested Mac14,3 / 8 GiB host. SenseVoice used 275-293 MB peak RSS and DistilHuBERT used 677-874 MB;
+all four probes recorded zero swap growth, no pressure warning and clean post-exit recovery. A
+balanced source-bound cohort completed 64 instructed rows plus eight shared neutral controls over
+all eight presets, eight speakers, six scripts/three translation groups and three languages. A
+prior cohort is retained but excluded because one fixed-seed cell reproducibly failed Fast QC with
+a 4.613-second dropout. The accepted run's 64-row acoustic/temporal analysis and both compact
+cascades passed; the cascades abstain pending human calibration. Its source-bound listener packet
+contains 64 dimensional trials, 56 non-neutral 2AFC trials and three multilingual anchors. The
+remaining gate is three independent qualified listeners with English/Chinese/Japanese fluency
+coverage, followed by calibration-only preselection and a separately generated untouched holdout.
+No production delivery copy or `EmotionPreset` changed.
 
 ### 2.4 Development-screen findings (2026-08-22)
 

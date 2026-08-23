@@ -1,0 +1,92 @@
+{
+  "schemaVersion": 1,
+  "kind": "delivery-evaluator-v2-external-candidates",
+  "status": "experimental",
+  "promotionAuthority": false,
+  "normalCIPrerequisite": false,
+  "candidateOrder": [
+    "sensevoice-small-q8",
+    "distilhubert"
+  ],
+  "candidates": {
+    "sensevoice-small-q8": {
+      "modelID": "FunAudioLLM/SenseVoiceSmall-GGUF:q8",
+      "sourceRevision": "90c1c61912018b70ada0fcc024ea24aca62f2e63",
+      "sourceURI": "https://huggingface.co/FunAudioLLM/SenseVoiceSmall-GGUF/tree/90c1c61912018b70ada0fcc024ea24aca62f2e63",
+      "weightsFile": "sensevoice-small-q8.gguf",
+      "weightsSHA256": "4ae45c94422de949b387e2e0fb10d7e14e4c42c69db30c3444ecc7d4b844b7c5",
+      "runtime": {
+        "release": "QwenAudio/SenseVoice:runtime-llamacpp-v0.1.9",
+        "sourceURI": "https://github.com/QwenAudio/SenseVoice/releases/tag/runtime-llamacpp-v0.1.9",
+        "archiveFile": "funasr-llamacpp-macos-arm64.tar.gz",
+        "archiveSHA256": "2d5786784ad09d8f4def1d942f678728638fe601d00acf0dad7cf094a9328363",
+        "binaryFile": "llama-funasr-sensevoice",
+        "binarySHA256": "49d66b2f79d439e2db7933627e1deb9eb7f3ebf0d708473757828130f3619435"
+      },
+      "license": "Apache-2.0 GGUF model card; upstream official weights additionally retain FunASR Model License v1.1 attribution and model-name obligations",
+      "commercialUseCompatible": true,
+      "trainingDataDeclaration": "Official SenseVoice documentation declares more than 400,000 hours across more than 50 languages; the Small checkpoint exposes Mandarin, Cantonese, English, Japanese, and Korean recognition plus coarse emotion and event labels.",
+      "trainingDataSourceURI": "https://github.com/FunAudioLLM/SenseVoice",
+      "labelMap": {
+        "languages": ["zh", "en", "yue", "ja", "ko", "nospeech"],
+        "emotions": ["HAPPY", "SAD", "ANGRY", "NEUTRAL", "FEARFUL", "DISGUSTED", "SURPRISED", "EMO_UNKNOWN"],
+        "events": ["BGM", "Speech", "Applause", "Laughter", "Cry", "Sneeze", "Breath", "Cough", "Sing", "Speech_Noise", "Event_UNK"],
+        "textNormalization": ["withitn", "woitn"]
+      },
+      "preprocessingConfig": {
+        "sampleRateHz": 16000,
+        "channels": 1,
+        "format": "pcm-s16le",
+        "normalization": "none",
+        "backend": "cpu",
+        "keepTags": true
+      }
+    },
+    "distilhubert": {
+      "modelID": "ntu-spml/distilhubert",
+      "sourceRevision": "fa87d96265d6b7af66e112faff6ff44df419cec9",
+      "sourceURI": "https://huggingface.co/ntu-spml/distilhubert/tree/fa87d96265d6b7af66e112faff6ff44df419cec9",
+      "weightsFile": "model.safetensors",
+      "weightsSHA256": "77ad8f985c97750d8d27d6950c917800d80732a141370bf316058bded71a6cbe",
+      "supportingFiles": {
+        "config.json": "0427043d1c4c8d58298d2050420a0c2ce85c8b92ec3865eaecc62c3fc5a97006",
+        "preprocessor_config.json": "7a8f0fc8ee1272ed28a8b468e183c56a19329a92babd3ca8d4d21ae02ba511cd"
+      },
+      "license": "Apache-2.0",
+      "commercialUseCompatible": true,
+      "trainingDataDeclaration": "The model card identifies 16 kHz English LibriSpeech as the pretraining dataset and describes layer-wise distillation from HuBERT across ten speech tasks.",
+      "trainingDataSourceURI": "https://huggingface.co/ntu-spml/distilhubert",
+      "labelMap": {
+        "type": "frozen-continuous-speech-representation",
+        "projectionDimensions": 128,
+        "projectionVersion": "signed-gaussian-mean-std-five-region-v1"
+      },
+      "runtimeDependencies": {
+        "numpy": "2.5.2",
+        "python": "3.14.4",
+        "safetensors": "0.7.0",
+        "torch": "2.13.0",
+        "transformers": "4.57.6"
+      },
+      "preprocessingConfig": {
+        "sampleRateHz": 16000,
+        "channels": 1,
+        "format": "pcm-s16le",
+        "normalization": "divide-by-32768",
+        "pooling": "global-mean-std-plus-five-equal-frame-region-means",
+        "projectionSeed": 20260823,
+        "projectionDimensions": 128,
+        "projectionVersion": "signed-gaussian-mean-std-five-region-v1",
+        "backend": "cpu"
+      }
+    }
+  },
+  "adoptionRequirements": [
+    "two-clean-eight-gib-host-runs",
+    "serial-process-isolation",
+    "post-exit-memory-recovery",
+    "untouched-human-holdout-gain",
+    "no-vad-dimension-regression",
+    "no-preset-regression"
+  ]
+}

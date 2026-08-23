@@ -86,6 +86,11 @@ class LocalDeliveryCascadeTests(unittest.TestCase):
             manifest=self.manifest, cache=self.cache, lock_root=self.root / "lock",
         )
         self.assertEqual(first["rowCount"], 2)
+        self.assertEqual(len(first["composerSHA256"]), 64)
+        self.assertEqual(
+            first["reportDigest"],
+            digest({key: value for key, value in first.items() if key != "reportDigest"}),
+        )
         self.assertTrue(all(row["route"] == "abstained" for row in first["rows"]))
         self.assertGreater(first["cache"]["hits"], 0)
         self.assertTrue(all(

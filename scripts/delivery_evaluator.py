@@ -592,6 +592,14 @@ def main() -> int:
     compare_v2_command.add_argument("--out", required=True, type=Path)
     validate_v2_contract_command = commands.add_parser("validate-v2-contract")
     validate_v2_contract_command.add_argument("--contract", required=True, type=Path)
+    attach_v2_command = commands.add_parser("attach-v2-compact")
+    attach_v2_command.add_argument("--input", required=True, type=Path)
+    attach_v2_command.add_argument("--cascade", required=True, type=Path)
+    attach_v2_command.add_argument("--out", required=True, type=Path)
+    score_v2_command = commands.add_parser("score-v2-holdout")
+    score_v2_command.add_argument("--input", required=True, type=Path)
+    score_v2_command.add_argument("--model", required=True, type=Path)
+    score_v2_command.add_argument("--out", required=True, type=Path)
     compose = commands.add_parser("compose")
     compose.add_argument("--acoustic", required=True, type=Path)
     compose.add_argument("--asr", type=Path)
@@ -604,10 +612,12 @@ def main() -> int:
     args = parser.parse_args()
     try:
         if args.command in {
-            "calibrate-v2", "evaluate-v2", "compare-v2-holdout", "validate-v2-contract"
+            "calibrate-v2", "evaluate-v2", "compare-v2-holdout", "validate-v2-contract",
+            "attach-v2-compact", "score-v2-holdout",
         }:
             from delivery_evaluator_v2 import (
-                calibrate_v2, compare_untouched_holdout, evaluate_v2, validate_v2_contract,
+                attach_compact_features, calibrate_v2, compare_untouched_holdout,
+                evaluate_v2, score_untouched_holdout, validate_v2_contract,
             )
             if args.command == "calibrate-v2":
                 result = calibrate_v2(_read(args.input))
@@ -617,6 +627,10 @@ def main() -> int:
                 validate_v2_contract(_read(args.contract))
                 print(json.dumps({"status": "PASS", "contract": str(args.contract)}))
                 return 0
+            elif args.command == "attach-v2-compact":
+                result = attach_compact_features(_read(args.input), _read(args.cascade))
+            elif args.command == "score-v2-holdout":
+                result = score_untouched_holdout(_read(args.input), _read(args.model))
             else:
                 result = compare_untouched_holdout(_read(args.input))
             atomic_json(args.out, result)

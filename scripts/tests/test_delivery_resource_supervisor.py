@@ -71,11 +71,28 @@ class DeliveryResourceSupervisorTests(unittest.TestCase):
             [sys.executable, "-c", "import time; time.sleep(.1)"],
             lock_root=self.root, snapshotter=lambda: next(snapshots),
             rss_sampler=lambda _pid: 12 * 1024**2,
+            recovery_timeout_seconds=0,
         )
         failures = set(result.report["qualificationFailures"])
         self.assertIn("host-pressure-not-clean", failures)
         self.assertIn("swap-recovery-unqualified", failures)
         self.assertIn("post-exit-memory-recovery-unqualified", failures)
+
+    def test_transient_post_exit_drop_is_sampled_until_recovered(self) -> None:
+        snapshots = iter((
+            HostSnapshot(60.0, 0, False),
+            HostSnapshot(52.0, 0, False),
+            HostSnapshot(56.0, 0, False),
+        ))
+        result = run_supervised(
+            [sys.executable, "-c", "import time; time.sleep(.1)"],
+            lock_root=self.root, snapshotter=lambda: next(snapshots),
+            rss_sampler=lambda _pid: 12 * 1024**2,
+            recovery_timeout_seconds=1,
+        )
+        self.assertTrue(result.report["postExitMemoryRecovered"])
+        self.assertEqual(result.report["recoverySnapshotCount"], 2)
+        self.assertTrue(result.report["qualified"])
 
 
 if __name__ == "__main__":

@@ -126,6 +126,61 @@ def _numeric_delta(left: Any, right: Any) -> Any:
     return None
 
 
+def _compact_delta(
+    config: dict[str, Any], instructed: dict[str, Any], neutral: dict[str, Any],
+) -> dict[str, Any]:
+    adapter_id = config.get("adapterID")
+    instructed_output = instructed.get("outputs", {})
+    neutral_output = neutral.get("outputs", {})
+    features: dict[str, float] = {}
+    if adapter_id == "distilhubert":
+        left = instructed_output.get("embedding")
+        right = neutral_output.get("embedding")
+        if (
+            not isinstance(left, list) or not isinstance(right, list)
+            or len(left) != len(right) or not left
+        ):
+            raise CascadeError("DistilHuBERT pair has incompatible embeddings")
+        for index, (lhs, rhs) in enumerate(zip(left, right)):
+            if (
+                isinstance(lhs, bool) or isinstance(rhs, bool)
+                or not isinstance(lhs, (int, float)) or not isinstance(rhs, (int, float))
+            ):
+                raise CascadeError("DistilHuBERT embedding contains a non-numeric value")
+            value = float(lhs) - float(rhs)
+            if not math.isfinite(value):
+                raise CascadeError("DistilHuBERT embedding delta is non-finite")
+            features[f"embedding.{index:03d}"] = value
+    elif adapter_id == "sensevoice-small-q8":
+        label_map = config.get("labelMap", {})
+        for output_field, labels_key in (
+            ("languageTag", "languages"), ("emotionTag", "emotions"),
+            ("eventTag", "events"), ("textNormalizationTag", "textNormalization"),
+        ):
+            labels = label_map.get(labels_key)
+            if not isinstance(labels, list):
+                raise CascadeError("SenseVoice label map is incomplete")
+            for label in labels:
+                features[f"{labels_key}.{label}"] = float(
+                    (1 if instructed_output.get(output_field) == label else 0)
+                    - (1 if neutral_output.get(output_field) == label else 0)
+                )
+    else:
+        raise CascadeError("compact adapter is not recognized by the cascade")
+    return {
+        "schemaVersion": 1,
+        "kind": "compact-instructed-minus-neutral-delta",
+        "adapterID": adapter_id,
+        "modelID": config.get("modelID"),
+        "sourceRevision": config.get("sourceRevision"),
+        "weightsSHA256": config.get("weightsSHA256"),
+        "preprocessingConfigDigest": config.get("preprocessingConfigDigest"),
+        "adapterLayerSHA256": config.get("adapterLayerSHA256"),
+        "resourceSupervisorSHA256": config.get("resourceSupervisorSHA256"),
+        "featureVector": features,
+    }
+
+
 def _flatten_numeric(value: Any, prefix: str, output: dict[str, float]) -> None:
     if isinstance(value, dict):
         for key in sorted(value):
@@ -326,11 +381,20 @@ def run_cascade(
             if all(per_audio[role]["temporal"].get("status") == "complete" for role in ("instructed", "neutral"))
             else {"schemaVersion": 1, "kind": "temporal-delta-unavailable"}
         )
+        compact_delta = None
+        if compact_config is not None:
+            compact_delta = _compact_delta(
+                compact_config,
+                per_audio["instructed"]["compact"],
+                per_audio["neutral"]["compact"],
+            )
         evaluation = None
         if route != "rejected" and evaluator_model is not None:
             flat_features: dict[str, float] = {}
             _flatten_numeric(global_delta, "global", flat_features)
             _flatten_numeric(temporal_delta, "temporal", flat_features)
+            if compact_delta is not None:
+                _flatten_numeric(compact_delta["featureVector"], "compact", flat_features)
             expected_features = evaluator_model.get("featureNames", [])
             missing_features = sorted(set(expected_features) - set(flat_features))
             if missing_features:
@@ -383,7 +447,7 @@ def run_cascade(
                 },
                 "globalAcoustics": global_delta,
                 "temporalAcoustics": temporal_delta,
-                "compactRepresentation": "complete" if compact_config is not None else "unavailable",
+                "compactRepresentation": compact_delta if compact_delta is not None else "unavailable",
                 "tinyLocalHeads": evaluation,
             },
             "ambiguousLayers": {
@@ -395,15 +459,18 @@ def run_cascade(
                 "requested": ["utmos", "complete-multilingual-asr-cer", "human-holdout"] if finalist else [],
             },
         })
-    return {
+    report = {
         "schemaVersion": SCHEMA_VERSION,
         "kind": "local-delivery-cascade",
         "promotionAuthority": False,
         "inputManifestDigest": manifest["manifestDigest"],
+        "composerSHA256": file_sha256(CASCADE_SOURCE),
         "cache": {"hits": cache_hits, "misses": cache_misses},
         "rowCount": len(output_rows),
         "rows": output_rows,
     }
+    report["reportDigest"] = digest(report)
+    return report
 
 
 def main() -> int:

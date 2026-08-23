@@ -1013,9 +1013,10 @@
       "plan": "delivery-prompting-2026-08",
       "title": "Calibrate the layered local delivery evaluator",
       "status": "planned",
-      "gate": "V1 remains valid with full SER posteriors, entropy/margin abstention, sequential acoustic/ASR/identity/UTMOS/SER composition, and ridge-v1. The versioned v2 foundation extends the same source-bound harness: an atomic content-addressed cache binds original/canonical audio to analyzer/model/preprocessing provenance; a bounded five-region contour layer emits same-identity instructed-minus-neutral deltas; v2 listener packets add independent order, 12.5% repeats, anchors, uncertainty/confidence/replay/latency, target-neutral and candidate-baseline 2AFC, naturalness/intensity, retained listener rows, pairwise CCC, free-identification agreement, order bias and fluent coverage; v2 evaluation adds preset-local regularized logistic heads, elastic-net/PLS challengers, fold-local speaker/translation/seed/language validation, blocked conformal intervals, robust Mahalanobis/nearest-neighbor OOD and typed contradictions/abstention. A serial supervisor and cascade require generator exit before heavy analyzers and explain rejection, abstention and manual-listening routes. SenseVoiceSmall Q8 and DistilHuBERT are unadopted contract candidates; no weights were acquired. The first untracked 27-clip English v1 packet remains deliberately unqualified. Closure still requires AV-07's frozen six-speaker/three-script/eight-preset blinded labels, anchors and qualified listeners, independent untouched multi-speaker/script/language holdout, two clean canonical M2/8 GB heavy-adapter runs with stable post-exit memory, challenger license/training/digest provenance, and demonstrated untouched-holdout calibration gain over ridge-v1 without any VAD or preset regression. Automatic layers cannot authorize semantic promotion and production copy remains unchanged.",
+      "gate": "V1 remains valid with full SER posteriors, entropy/margin abstention, sequential acoustic/ASR/identity/UTMOS/SER composition, and ridge-v1. The versioned v2 harness adds the source-bound cache, five-region temporal contours, resumable blinded listener packets, preset-local logistic heads, elastic-net/PLS challengers, blocked validation/conformal uncertainty/OOD, and an explanatory serial cascade. LIVE EVIDENCE 2026-08-23 (operator-local and untracked): exact contract-pinned SenseVoiceSmall Q8 and DistilHuBERT assets were acquired under build/cache only. Each passed two cache-cold probes on the attested canonical Mac14,3 / 8 GiB host with zero swap growth, no pressure warning and clean post-exit recovery; observed peak RSS was 275-293 MB for SenseVoice and 677-874 MB for DistilHuBERT. A first balanced 64-row cohort was rejected in full after one fixed-seed take repeatedly produced a real 4.613-second dropout and failed mandatory Fast QC; its initial/retry states remain retained. A fresh predeclared seed block then completed 64/64 instructed rows plus 8/8 shared neutral controls across all eight presets, eight speakers, six scripts/three translation groups and English/Chinese/Japanese, and its bounded acoustic/temporal analysis passed. The v2 session is built with 64 label-blind dimensional trials, 56 non-neutral target-vs-neutral pairs, three multilingual dropout anchors and source-bound resumable responses; the zero-response readiness report correctly remains INCOMPLETE. Full SenseVoice and DistilHuBERT cascades each covered all 64 rows with valid source/report digests and abstained because no calibrated tiny head exists. Both candidates remain unadopted. Closure now requires three independent complete listener sessions with per-language fluency coverage and qualification floors, calibration-only challenger preselection, a separately generated untouched multi-speaker/script/language confirmation cohort, and demonstrated holdout gain over ridge-v1 without any VAD, preset, speaker or script-group regression. Automatic layers cannot authorize semantic promotion and production copy remains unchanged.",
       "sourceOfTruth": [
         "config/delivery-evaluator-v2-contract.json",
+        "config/delivery-evaluator-v2-candidates.json",
         "scripts/delivery_calibration_session.py",
         "scripts/delivery_evaluator.py",
         "scripts/delivery_evaluator_v2.py",
@@ -1024,6 +1025,10 @@
         "scripts/delivery_temporal_features.py",
         "scripts/delivery_resource_supervisor.py",
         "scripts/delivery_compact_model_adapter.py",
+        "scripts/delivery_compact_model_runtime.py",
+        "scripts/prepare_delivery_compact_model_config.py",
+        "scripts/qualify_delivery_compact_models.py",
+        "scripts/prepare_delivery_listener_anchors.py",
         "scripts/run_local_delivery_cascade.py",
         "scripts/emotion_advisory.py",
         "scripts/analyze_prosody.py"
@@ -1037,6 +1042,10 @@
         "file:scripts/tests/test_delivery_temporal_features.py",
         "file:scripts/tests/test_delivery_resource_supervisor.py",
         "file:scripts/tests/test_delivery_compact_model_adapter.py",
+        "file:scripts/tests/test_delivery_compact_model_runtime.py",
+        "file:scripts/tests/test_prepare_delivery_compact_model_config.py",
+        "file:scripts/tests/test_qualify_delivery_compact_models.py",
+        "file:scripts/tests/test_prepare_delivery_listener_anchors.py",
         "file:scripts/tests/test_run_local_delivery_cascade.py",
         "file:scripts/tests/test_emotion_advisory.py",
         "doc:docs/reference/autonomous-validation-audit-2026-08-21.md"

@@ -228,7 +228,7 @@ isolated opt-ins documented in the platform rules.
 | `benchmarks/`, `scripts/benchmark_history.py` | privacy-safe PASS registry and generated history |
 | `scripts/ui_test.sh`, `scripts/macos_test.sh`, `scripts/ios_device.sh` | native test and diagnostic entry points |
 | `docs/reference/model-delivery.md` | download/restoration/retry diagnostics and live-proof rules |
-| `config/delivery-experiment-contract.json`, `config/delivery-evaluator-v2-contract.json`, `config/delivery-evaluation-corpus.json` | pre-registered prompt arms, compact local evaluator, sampling, multilingual scripts, holdouts, and semantic-promotion limits |
+| `config/delivery-experiment-contract.json`, `config/delivery-evaluator-v2-contract.json`, `config/delivery-evaluation-corpus.json`, `config/delivery-evaluator-v2-candidates.json` | pre-registered prompt arms, compact local evaluator, sampling, multilingual scripts, pinned candidate models, holdouts, and semantic-promotion limits |
 | `docs/reference/delivery-harness.md` | delivery/emotion protocol, provenance, layered evaluation, statistics, and results |
 | `website/` | marketing site governed by `website/AGENTS.md` |
 

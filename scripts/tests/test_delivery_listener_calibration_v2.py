@@ -19,6 +19,7 @@ from delivery_listener_calibration_v2 import (  # noqa: E402
     build_v2_session,
     listener_trial_plan,
     merge_v2_responses,
+    run_v2_session,
 )
 
 
@@ -138,6 +139,23 @@ class DeliveryListenerCalibrationV2Tests(unittest.TestCase):
         self.assertNotIn("targetDelivery", dimensional)
         self.assertIn("targetDelivery", self.manifest["pairwiseTrials"][0])
 
+    def test_neutral_self_control_does_not_create_a_meaningless_pairwise_trial(self) -> None:
+        plan = json.loads(self.plan_path.read_text(encoding="utf-8"))
+        plan["rows"][0]["preset"] = "neutral"
+        plan_path = self.root / "neutral-plan.json"
+        plan_path.write_text(json.dumps(plan), encoding="utf-8")
+        session = self.root / "neutral-session"
+        manifest = build_v2_session(
+            plan_path=plan_path, run_dir=self.run, out_dir=session,
+            session_seed=20260824,
+        )
+        private = json.loads((session / "private-key.json").read_text(encoding="utf-8"))
+        neutral_row = next(row for row in private["items"] if row["preset"] == "neutral")
+        self.assertIsNone(neutral_row["targetNeutralTrialID"])
+        self.assertFalse(any(
+            row.get("targetDelivery") == "neutral" for row in manifest["pairwiseTrials"]
+        ))
+
     def test_per_listener_order_and_repeat_fraction_are_deterministic(self) -> None:
         one = hashlib.sha256(b"one").hexdigest()
         two = hashlib.sha256(b"two").hexdigest()
@@ -164,6 +182,17 @@ class DeliveryListenerCalibrationV2Tests(unittest.TestCase):
         self.assertIn("anchors-not-configured", failures)
         self.assertFalse(merged["labelProvenance"]["calibrationQualified"])
 
+    def test_zero_response_readiness_is_incomplete_not_an_exception(self) -> None:
+        merged = merge_v2_responses(session_dir=self.session)
+        self.assertEqual(len(merged["rows"]), 24)
+        self.assertEqual(merged["listenerRows"], [])
+        self.assertFalse(merged["labelProvenance"]["calibrationQualified"])
+        self.assertIn(
+            "fewer-than-three-independent-listeners",
+            merged["labelProvenance"]["qualificationFailures"],
+        )
+        self.assertIsNone(merged["rows"][0]["naturalness"])
+
     def test_order_tampering_fails_closed(self) -> None:
         self._response("one")
         path = next((self.session / "responses-v2").glob("*.json"))
@@ -175,6 +204,34 @@ class DeliveryListenerCalibrationV2Tests(unittest.TestCase):
         path.write_text(json.dumps(response), encoding="utf-8")
         with self.assertRaisesRegex(CalibrationSessionError, "deterministic listener order"):
             merge_v2_responses(session_dir=self.session)
+
+    def test_complete_listener_response_resumes_without_replaying_audio(self) -> None:
+        self._response("one")
+        result = run_v2_session(
+            session_dir=self.session, listener_id="one",
+            fluent_languages=("English",), player="/bin/false",
+        )
+        self.assertEqual(len(result["responses"]), len(listener_trial_plan(
+            self.manifest, hashlib.sha256(b"one").hexdigest()
+        )))
+
+    def test_confirmation_session_is_distinct_and_remains_blinded(self) -> None:
+        confirmation_plan = dict(self.plan)
+        confirmation_plan["designation"] = "confirmation"
+        confirmation_path = self.root / "confirmation-plan.json"
+        confirmation_path.write_text(json.dumps(confirmation_plan), encoding="utf-8")
+        confirmation = build_v2_session(
+            plan_path=confirmation_path,
+            run_dir=self.run,
+            out_dir=self.root / "confirmation-session",
+            session_seed=20260823,
+        )
+        self.assertEqual(confirmation["designation"], "confirmation")
+        self.assertEqual(
+            confirmation["kind"],
+            "blinded-delivery-perceptual-untouched-confirmation-v2",
+        )
+        self.assertNotIn("preset", json.dumps(confirmation["dimensionalTrials"]))
 
 
 if __name__ == "__main__":

@@ -103,6 +103,10 @@ REQUIRED_SURFACES=(
     "scripts/delivery_temporal_features.py"
     "scripts/delivery_listener_calibration_v2.py"
     "scripts/delivery_compact_model_adapter.py"
+    "scripts/delivery_compact_model_runtime.py"
+    "scripts/prepare_delivery_compact_model_config.py"
+    "scripts/qualify_delivery_compact_models.py"
+    "scripts/prepare_delivery_listener_anchors.py"
     "scripts/delivery_resource_supervisor.py"
     "scripts/run_local_delivery_cascade.py"
     "scripts/delivery_promotion_decision.py"
@@ -115,11 +119,16 @@ REQUIRED_SURFACES=(
     "scripts/tests/test_delivery_temporal_features.py"
     "scripts/tests/test_delivery_listener_calibration_v2.py"
     "scripts/tests/test_delivery_compact_model_adapter.py"
+    "scripts/tests/test_delivery_compact_model_runtime.py"
+    "scripts/tests/test_prepare_delivery_compact_model_config.py"
+    "scripts/tests/test_qualify_delivery_compact_models.py"
+    "scripts/tests/test_prepare_delivery_listener_anchors.py"
     "scripts/tests/test_delivery_resource_supervisor.py"
     "scripts/tests/test_run_local_delivery_cascade.py"
     "scripts/tests/test_delivery_promotion_decision.py"
     "config/delivery-experiment-contract.json"
     "config/delivery-evaluator-v2-contract.json"
+    "config/delivery-evaluator-v2-candidates.json"
     "config/delivery-evaluation-corpus.json"
     "docs/reference/qwen3-tts-emotion-tone-research-2026-08-22.md"
     "scripts/check_surface_coverage.py"
@@ -215,6 +224,7 @@ python3 "$SCRIPT_DIR/model_catalog_contract.py" rebuild --check
 python3 "$SCRIPT_DIR/model_catalog_contract.py" validate
 python3 "$SCRIPT_DIR/evidence_impact.py" validate
 python3 "$SCRIPT_DIR/quality_promotion.py" validate-contract
+python3 "$SCRIPT_DIR/prepare_delivery_compact_model_config.py" --validate-only
 
 # iOS device tooling and explicit XCUITest are first-class. `scripts/ios_device.sh` owns
 # physical-device operations; `scripts/ui_test.sh` is the sole app-UI entry point.

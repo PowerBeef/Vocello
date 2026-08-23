@@ -11,6 +11,8 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import copy
+from pathlib import Path
 from typing import Any, Callable
 
 import numpy as np
@@ -56,6 +58,12 @@ def validate_v2_contract(payload: dict[str, Any]) -> dict[str, Any]:
         raise EvaluatorError("requested labels cannot enter blind dimensional features")
     if human.get("humanSemanticAuthorityRequired") is not True:
         raise EvaluatorError("human semantic authority cannot be removed")
+    if human.get("minimumIntraRaterRepeatAgreement") != 0.75:
+        raise EvaluatorError("listener repeat-agreement floor drifted")
+    if human.get("minimumAnchorAccuracy") != 0.8:
+        raise EvaluatorError("listener anchor-accuracy floor drifted")
+    if human.get("minimumValidListenersPerRatedRow") != 3:
+        raise EvaluatorError("per-row independent-listener floor drifted")
     evaluator = payload.get("evaluator")
     if not isinstance(evaluator, dict) or evaluator.get("baseline") != "ridge-v1":
         raise EvaluatorError("ridge-v1 must remain the delivery evaluator baseline")
@@ -65,6 +73,12 @@ def validate_v2_contract(payload: dict[str, Any]) -> dict[str, Any]:
         raise EvaluatorError("challengers cannot regress a VAD dimension")
     if evaluator.get("challengerMayRegressAnyPreset") is not False:
         raise EvaluatorError("challengers cannot regress a preset")
+    if evaluator.get("challengerMayRegressAnySpeaker") is not False:
+        raise EvaluatorError("challengers cannot regress a speaker")
+    if evaluator.get("challengerMayRegressAnyScriptGroup") is not False:
+        raise EvaluatorError("challengers cannot regress a script group")
+    if evaluator.get("distributedSpeakerAndScriptGainRequired") is not True:
+        raise EvaluatorError("challenger gains must be speaker/script distributed")
     adapters = payload.get("compactAdapters")
     if not isinstance(adapters, dict) or adapters.get("adopted") != []:
         raise EvaluatorError("no compact model adapter is adopted by this contract")
@@ -151,6 +165,11 @@ def load_v2_dataset(payload: dict[str, Any], *, require_labels: bool) -> tuple[l
             _flatten(source.get("features"), "global", features)
             if source.get("temporalDeltaV1") is not None:
                 _flatten(source["temporalDeltaV1"], "temporal", features)
+            if source.get("compactDeltaV1") is not None:
+                compact = source["compactDeltaV1"]
+                if not isinstance(compact, dict) or not isinstance(compact.get("featureVector"), dict):
+                    raise EvaluatorError(f"{generation}: compact feature block is invalid")
+                _flatten(compact["featureVector"], "compact", features)
         if not features:
             raise EvaluatorError(f"{generation}: no blind acoustic features")
         feature_sets.append(set(features))
@@ -535,6 +554,8 @@ def _ood_model(x: np.ndarray, features: list[str]) -> dict[str, Any]:
 
 
 def calibrate_v2(payload: dict[str, Any]) -> dict[str, Any]:
+    if payload.get("labelProvenance", {}).get("sourceSplit") != "calibration":
+        raise EvaluatorError("v2 model fitting requires the calibration split")
     features, rows = load_v2_dataset(payload, require_labels=True)
     models = {
         kind: {
@@ -543,6 +564,32 @@ def calibrate_v2(payload: dict[str, Any]) -> dict[str, Any]:
         }
         for kind in MODEL_KINDS
     }
+    baseline_error = float(np.mean([
+        models["ridge-v1"][dimension]["validation"]["primary"]["rmse"]
+        for dimension in DIMENSIONS
+    ]))
+    preselection_rows = []
+    for kind in MODEL_KINDS[1:]:
+        dimension_errors = {
+            dimension: models[kind][dimension]["validation"]["primary"]["rmse"]
+            for dimension in DIMENSIONS
+        }
+        regressions = [
+            dimension for dimension, error in dimension_errors.items()
+            if error > models["ridge-v1"][dimension]["validation"]["primary"]["rmse"] + 1e-12
+        ]
+        mean_error = float(np.mean(list(dimension_errors.values())))
+        preselection_rows.append({
+            "modelKind": kind,
+            "speakerBlockedMeanRMSE": mean_error,
+            "dimensionRMSE": dimension_errors,
+            "dimensionRegressions": regressions,
+            "eligibleForOneTimeHoldout": mean_error < baseline_error and not regressions,
+        })
+    eligible = [row for row in preselection_rows if row["eligibleForOneTimeHoldout"]]
+    preselected = min(
+        eligible, key=lambda row: (row["speakerBlockedMeanRMSE"], row["modelKind"])
+    )["modelKind"] if eligible else None
     means = np.median(_matrix(rows, features), axis=0)
     scales = np.std(_matrix(rows, features), axis=0)
     scales[scales < 1e-9] = 1.0
@@ -551,9 +598,19 @@ def calibrate_v2(payload: dict[str, Any]) -> dict[str, Any]:
         "modelVersion": MODEL_VERSION,
         "kind": "local-perceptual-delivery-evaluator-v2",
         "promotionAuthority": False,
+        "trainerSHA256": hashlib.sha256(Path(__file__).resolve().read_bytes()).hexdigest(),
         "baseline": "ridge-v1",
         "adoptedDimensionalModel": "ridge-v1",
-        "challengerAdoptionStatus": "awaiting-untouched-human-holdout",
+        "challengerAdoptionStatus": (
+            "preselected-awaiting-untouched-human-holdout"
+            if preselected is not None else "no-calibration-challenger-qualified"
+        ),
+        "preselectedChallenger": preselected,
+        "preselection": {
+            "usedConfirmationLabels": False,
+            "baselineSpeakerBlockedMeanRMSE": baseline_error,
+            "candidates": preselection_rows,
+        },
         "featureNames": features,
         "featureMeans": {name: float(value) for name, value in zip(features, means)},
         "featureScales": {name: float(value) for name, value in zip(features, scales)},
@@ -573,6 +630,147 @@ def calibrate_v2(payload: dict[str, Any]) -> dict[str, Any]:
     return model
 
 
+def attach_compact_features(
+    payload: dict[str, Any], cascade: dict[str, Any],
+) -> dict[str, Any]:
+    """Join blind compact deltas by generation identity without touching labels."""
+    if payload.get("schemaVersion") != SCHEMA_VERSION or not isinstance(payload.get("rows"), list):
+        raise EvaluatorError("compact attachment requires a v2 listener dataset")
+    if cascade.get("schemaVersion") != 1 or cascade.get("kind") != "local-delivery-cascade":
+        raise EvaluatorError("compact attachment requires a local delivery cascade report")
+    cascade_rows = cascade.get("rows")
+    if not isinstance(cascade_rows, list):
+        raise EvaluatorError("compact cascade rows are missing")
+    by_generation: dict[str, dict[str, Any]] = {}
+    adapter_ids: set[str] = set()
+    feature_names: set[str] | None = None
+    for row in cascade_rows:
+        generation = row.get("generationID") if isinstance(row, dict) else None
+        compact = row.get("alwaysLayers", {}).get("compactRepresentation") if isinstance(row, dict) else None
+        if not isinstance(generation, str) or not generation or generation in by_generation:
+            raise EvaluatorError("compact cascade generation identities are missing or duplicated")
+        if not isinstance(compact, dict) or compact.get("kind") != "compact-instructed-minus-neutral-delta":
+            raise EvaluatorError(f"{generation}: compact cascade feature is unavailable")
+        vector = compact.get("featureVector")
+        if not isinstance(vector, dict) or not vector:
+            raise EvaluatorError(f"{generation}: compact feature vector is empty")
+        normalized: dict[str, float] = {}
+        for name, value in vector.items():
+            if not isinstance(name, str) or not name:
+                raise EvaluatorError(f"{generation}: compact feature name is invalid")
+            normalized[name] = _finite(value, f"{generation}.compact.{name}")
+        names = set(normalized)
+        if feature_names is None:
+            feature_names = names
+        elif names != feature_names:
+            raise EvaluatorError("compact feature sets differ across cascade rows")
+        adapter = compact.get("adapterID")
+        if not isinstance(adapter, str) or not adapter:
+            raise EvaluatorError(f"{generation}: compact adapter identity is missing")
+        adapter_ids.add(adapter)
+        by_generation[generation] = {**compact, "featureVector": normalized}
+    dataset_generations = {
+        row.get("generationID") for row in payload["rows"] if isinstance(row, dict)
+    }
+    if None in dataset_generations or dataset_generations != set(by_generation):
+        raise EvaluatorError("listener dataset and compact cascade coverage differ")
+    if len(adapter_ids) != 1:
+        raise EvaluatorError("compact cascade mixes adapter identities")
+    attached = copy.deepcopy(payload)
+    prior_manifest = attached.get("manifestDigest")
+    if not isinstance(prior_manifest, str) or len(prior_manifest) != 64:
+        raise EvaluatorError("listener dataset manifest digest is invalid")
+    for row in attached["rows"]:
+        if row.get("compactDeltaV1") is not None:
+            raise EvaluatorError("listener dataset already contains compact features")
+        row["compactDeltaV1"] = by_generation[row["generationID"]]
+    attachment = {
+        "schemaVersion": 1,
+        "kind": "blind-compact-feature-attachment",
+        "promotionAuthority": False,
+        "adapterID": next(iter(adapter_ids)),
+        "sourceManifestDigest": prior_manifest,
+        "cascadeInputManifestDigest": cascade.get("inputManifestDigest"),
+        "rowCount": len(attached["rows"]),
+        "featureNames": sorted(feature_names or set()),
+        "rowFeatureDigests": {
+            generation: digest(by_generation[generation]) for generation in sorted(by_generation)
+        },
+    }
+    attachment["attachmentDigest"] = digest(attachment)
+    attached["compactFeatureAttachment"] = attachment
+    attached["manifestDigest"] = digest({
+        "sourceManifestDigest": prior_manifest,
+        "attachmentDigest": attachment["attachmentDigest"],
+    })
+    return attached
+
+
+def score_untouched_holdout(payload: dict[str, Any], model: dict[str, Any]) -> dict[str, Any]:
+    """Score every fitted VAD family against a once-opened human confirmation set."""
+    model = validate_v2_model(model)
+    if payload.get("labelProvenance", {}).get("sourceSplit") != "confirmation":
+        raise EvaluatorError("v2 holdout scoring requires the untouched confirmation split")
+    features, rows = load_v2_dataset(payload, require_labels=True)
+    if features != model.get("featureNames"):
+        raise EvaluatorError("v2 holdout feature order differs from calibration")
+    preselected = model.get("preselectedChallenger")
+    if preselected not in MODEL_KINDS[1:]:
+        raise EvaluatorError("no calibration-selected challenger may open the untouched holdout")
+    x = _matrix(rows, features)
+    means = np.asarray([model["featureMeans"][name] for name in features])
+    scales = np.asarray([model["featureScales"][name] for name in features])
+    standardized = (x - means) / scales
+
+    def errors_for(kind: str) -> dict[str, Any]:
+        per_row: dict[str, list[float]] = {}
+        dimension_errors: dict[str, float] = {}
+        for dimension in DIMENSIONS:
+            entry = model["dimensionalModels"][kind][dimension]
+            coefficients = np.asarray([entry["coefficients"][name] for name in features])
+            predicted = np.clip(standardized @ coefficients + entry["intercept"], -1, 1)
+            expected = np.asarray([row["labels"][dimension] for row in rows])
+            dimension_errors[dimension] = _rmse(expected, predicted)
+            for index, row in enumerate(rows):
+                per_row.setdefault(row["generationID"], []).append(float(predicted[index] - expected[index]))
+
+        def grouped(axis: str) -> dict[str, float]:
+            result: dict[str, float] = {}
+            for group in sorted({str(row[axis]) for row in rows}):
+                residuals = [
+                    residual
+                    for row in rows if str(row[axis]) == group
+                    for residual in per_row[row["generationID"]]
+                ]
+                result[group] = math.sqrt(sum(value * value for value in residuals) / len(residuals))
+            return result
+
+        residuals = [value for values in per_row.values() for value in values]
+        return {
+            "overallCalibrationError": math.sqrt(sum(value * value for value in residuals) / len(residuals)),
+            "dimensions": dimension_errors,
+            "presets": grouped("preset"),
+            "speakers": grouped("speakerID"),
+            "scriptGroups": grouped("scriptTranslationGroup"),
+        }
+
+    result = {
+        "schemaVersion": SCHEMA_VERSION,
+        "kind": "delivery-evaluator-v2-untouched-holdout-scores",
+        "designation": "untouched-confirmation",
+        "promotionAuthority": False,
+        "modelDigest": model["modelDigest"],
+        "inputManifestDigest": payload["manifestDigest"],
+        "rowCount": len(rows),
+        "preselectedChallenger": preselected,
+        "models": {
+            kind: errors_for(kind) for kind in ("ridge-v1", preselected)
+        },
+    }
+    result["scoreDigest"] = digest(result)
+    return result
+
+
 def validate_v2_model(model: dict[str, Any]) -> dict[str, Any]:
     if model.get("schemaVersion") != SCHEMA_VERSION or model.get("modelVersion") != MODEL_VERSION:
         raise EvaluatorError("v2 model schema is invalid")
@@ -581,6 +779,8 @@ def validate_v2_model(model: dict[str, Any]) -> dict[str, Any]:
         raise EvaluatorError("v2 model digest mismatch")
     if model.get("promotionAuthority") is not False or model.get("baseline") != "ridge-v1":
         raise EvaluatorError("v2 model authority or baseline changed")
+    if model.get("trainerSHA256") != hashlib.sha256(Path(__file__).resolve().read_bytes()).hexdigest():
+        raise EvaluatorError("v2 model trainer source changed")
     return model
 
 
@@ -689,10 +889,23 @@ def evaluate_v2(payload: dict[str, Any], model: dict[str, Any]) -> dict[str, Any
 
 
 def compare_untouched_holdout(payload: dict[str, Any]) -> dict[str, Any]:
-    if payload.get("designation") != "untouched-confirmation":
+    if (
+        payload.get("designation") != "untouched-confirmation"
+        or payload.get("kind") != "delivery-evaluator-v2-untouched-holdout-scores"
+    ):
         raise EvaluatorError("challenger selection requires the untouched confirmation designation")
-    baseline = payload.get("baseline")
-    challenger = payload.get("challenger")
+    body = dict(payload)
+    stored_digest = body.pop("scoreDigest", None)
+    if stored_digest != digest(body):
+        raise EvaluatorError("untouched holdout score digest mismatch")
+    preselected = payload.get("preselectedChallenger")
+    if preselected not in MODEL_KINDS[1:]:
+        raise EvaluatorError("untouched holdout lacks one preselected challenger")
+    models = payload.get("models")
+    if not isinstance(models, dict) or set(models) != {"ridge-v1", preselected}:
+        raise EvaluatorError("untouched holdout exposed an unselected challenger")
+    baseline = models["ridge-v1"]
+    challenger = models[preselected]
     if not isinstance(baseline, dict) or not isinstance(challenger, dict):
         raise EvaluatorError("holdout comparison requires baseline and challenger metrics")
     regressions = []
@@ -704,21 +917,39 @@ def compare_untouched_holdout(payload: dict[str, Any]) -> dict[str, Any]:
             regressions.append(f"vad-{dimension}")
         elif challenger_error < baseline_error - 1e-12:
             improvements.append(f"vad-{dimension}")
-    for preset, baseline_error in baseline.get("presets", {}).items():
-        challenger_error = challenger.get("presets", {}).get(preset)
-        if challenger_error is None:
-            regressions.append(f"missing-preset-{preset}")
-        elif _finite(challenger_error, f"challenger.{preset}") > _finite(baseline_error, f"baseline.{preset}") + 1e-12:
-            regressions.append(f"preset-{preset}")
+    distributed_improvements: dict[str, int] = {}
+    for section, prefix in (("presets", "preset"), ("speakers", "speaker"), ("scriptGroups", "script")):
+        baseline_groups = baseline.get(section)
+        challenger_groups = challenger.get(section)
+        if not isinstance(baseline_groups, dict) or not baseline_groups:
+            raise EvaluatorError(f"baseline {section} coverage is missing")
+        if not isinstance(challenger_groups, dict) or set(challenger_groups) != set(baseline_groups):
+            raise EvaluatorError(f"challenger {section} coverage differs from baseline")
+        improved = 0
+        for group, baseline_error in baseline_groups.items():
+            challenger_error = challenger_groups[group]
+            left = _finite(baseline_error, f"baseline.{section}.{group}")
+            right = _finite(challenger_error, f"challenger.{section}.{group}")
+            if right > left + 1e-12:
+                regressions.append(f"{prefix}-{group}")
+            elif right < left - 1e-12:
+                improved += 1
+        distributed_improvements[section] = improved
     baseline_overall = _finite(baseline.get("overallCalibrationError"), "baseline.overall")
     challenger_overall = _finite(challenger.get("overallCalibrationError"), "challenger.overall")
-    qualifies = challenger_overall < baseline_overall and bool(improvements) and not regressions
+    distributed = all(value > 0 for value in distributed_improvements.values())
+    qualifies = (
+        challenger_overall < baseline_overall and bool(improvements)
+        and distributed and not regressions
+    )
     return {
         "schemaVersion": SCHEMA_VERSION,
         "kind": "delivery-evaluator-v2-untouched-holdout-comparison",
         "promotionAuthority": False,
+        "preselectedChallenger": preselected,
         "challengerAdvances": qualifies,
         "improvements": improvements,
+        "distributedImprovements": distributed_improvements,
         "regressions": regressions,
         "decision": "advance-for-advisory-use" if qualifies else "retain-ridge-v1",
     }

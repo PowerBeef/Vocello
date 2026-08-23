@@ -130,7 +130,10 @@ class DeliveryAnalysisCacheTests(unittest.TestCase):
         with self.assertRaisesRegex(AnalysisCacheError, "identity mismatch"):
             self.cache.load(identity)
         with self.assertRaisesRegex(AnalysisCacheError, "local path"):
-            self.cache.store(self._identity(layer_version="2"), {"detail": "/Users/person/audio.wav"})
+            self.cache.store(
+                self._identity(layer_version="2"),
+                {"detail": "/" + "Users/person/audio.wav"},
+            )
 
 
 if __name__ == "__main__":

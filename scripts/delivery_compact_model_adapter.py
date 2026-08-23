@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+import re
 import tempfile
 from typing import Any, Callable
 import wave
@@ -25,10 +26,17 @@ from delivery_analysis_cache import (
     file_sha256,
 )
 from delivery_resource_supervisor import SupervisedResult, run_supervised
+import delivery_resource_supervisor
 
 
 SCHEMA_VERSION = 1
 PERMITTED_ADAPTERS = ("sensevoice-small-q8", "distilhubert")
+EXECUTION_IDENTITY_VERSION = 2
+SENSEVOICE_OUTPUT = re.compile(
+    r"^<\|(?P<language>[^|]+)\|><\|(?P<emotion>[^|]+)\|>"
+    r"<\|(?P<event>[^|]+)\|><\|(?P<textnorm>[^|]+)\|>(?P<transcript>.*)$",
+    re.DOTALL,
+)
 
 
 class CompactAdapterError(ValueError):
@@ -78,6 +86,44 @@ def validate_adapter_config(config: dict[str, Any]) -> dict[str, Any]:
         raise CompactAdapterError("requested labels may not enter compact feature extraction")
     if adapter_id == "sensevoice-small-q8" and "q8" not in config["modelID"].lower():
         raise CompactAdapterError("SenseVoice first candidate must identify a Q8 artifact")
+    identity_version = config.get("executionIdentityVersion", 1)
+    if identity_version not in (1, EXECUTION_IDENTITY_VERSION):
+        raise CompactAdapterError("compact adapter execution identity version is unsupported")
+    if identity_version == EXECUTION_IDENTITY_VERSION:
+        for field in ("sourceURI", "trainingDataSourceURI"):
+            if not isinstance(config.get(field), str) or not config[field].strip():
+                raise CompactAdapterError(f"v2 compact adapter requires {field}")
+        output_format = config.get("outputFormat")
+        if output_format not in {"json", "sensevoice-tagged-text"}:
+            raise CompactAdapterError("v2 compact adapter output format is unsupported")
+        label_map = config.get("labelMap")
+        if not isinstance(label_map, dict) or digest(label_map) != label_digest:
+            raise CompactAdapterError("compact adapter label map drifted")
+        dependencies = config.get("runtimeDependencies")
+        if not isinstance(dependencies, dict) or digest(dependencies) != _sha(
+            config.get("runtimeDependenciesDigest"), "runtimeDependenciesDigest"
+        ):
+            raise CompactAdapterError("compact adapter runtime dependency identity drifted")
+        source_digest = _sha(config.get("adapterSourceSHA256"), "adapterSourceSHA256")
+        layer_digest = _sha(config.get("adapterLayerSHA256"), "adapterLayerSHA256")
+        supervisor_digest = _sha(
+            config.get("resourceSupervisorSHA256"), "resourceSupervisorSHA256"
+        )
+        if layer_digest != file_sha256(Path(__file__)):
+            raise CompactAdapterError("compact adapter layer source drifted")
+        if supervisor_digest != file_sha256(Path(delivery_resource_supervisor.__file__)):
+            raise CompactAdapterError("compact adapter supervisor source drifted")
+        bound = preprocessing.get("executionIdentity")
+        expected = {
+            "adapterSourceSHA256": source_digest,
+            "adapterLayerSHA256": layer_digest,
+            "resourceSupervisorSHA256": supervisor_digest,
+            "runtimeDependenciesDigest": config["runtimeDependenciesDigest"],
+            "labelMapDigest": label_digest,
+            "outputFormat": output_format,
+        }
+        if bound != expected:
+            raise CompactAdapterError("compact adapter preprocessing does not bind execution identity")
     _ = label_digest
     return config
 
@@ -93,6 +139,30 @@ def _canonical_wav(canonical: CanonicalAudio, destination: Path) -> None:
 
 
 def _parse_output(config: dict[str, Any], output: bytes) -> dict[str, Any]:
+    if config.get("outputFormat") == "sensevoice-tagged-text":
+        try:
+            text = output.decode("utf-8").strip()
+        except UnicodeDecodeError as error:
+            raise CompactAdapterError("SenseVoice output is not UTF-8") from error
+        match = SENSEVOICE_OUTPUT.fullmatch(text)
+        if match is None:
+            raise CompactAdapterError("SenseVoice output lacks the four governed tags")
+        payload = {
+            "transcript": match.group("transcript").strip(),
+            "languageTag": match.group("language"),
+            "emotionTag": match.group("emotion"),
+            "eventTag": match.group("event"),
+            "textNormalizationTag": match.group("textnorm"),
+        }
+        label_map = config.get("labelMap", {})
+        for field, key in (
+            ("languageTag", "languages"), ("emotionTag", "emotions"),
+            ("eventTag", "events"), ("textNormalizationTag", "textNormalization"),
+        ):
+            allowed = label_map.get(key, [])
+            if not isinstance(allowed, list) or payload[field] not in allowed:
+                raise CompactAdapterError(f"SenseVoice emitted undeclared {field}")
+        return payload
     try:
         payload = json.loads(output.decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError) as error:
@@ -115,6 +185,7 @@ def run_compact_adapter(
     lock_root: Path,
     supervisor: Callable[..., SupervisedResult] = run_supervised,
     supervisor_options: dict[str, Any] | None = None,
+    return_unqualified: bool = False,
 ) -> tuple[dict[str, Any], bool]:
     config = validate_adapter_config(config)
     canonical = cache.canonicalize(wav_path)
@@ -122,7 +193,7 @@ def run_compact_adapter(
         original_wav_sha256=canonical.original_wav_sha256,
         canonical_derivative_sha256=canonical.canonical_derivative_sha256,
         layer_id="compact-speech-representation",
-        layer_version="1",
+        layer_version=str(config.get("executionIdentityVersion", 1)),
         binary_sha256=config["binarySHA256"],
         model_id=config["modelID"],
         model_revision=config["sourceRevision"],
@@ -152,7 +223,7 @@ def run_compact_adapter(
         result = supervisor(
             command, lock_root=lock_root, environment=environment, **options
         )
-    if not result.report.get("qualified"):
+    if not result.report.get("qualified") and not return_unqualified:
         raise CompactAdapterError(
             "compact adapter resource envelope is unqualified: "
             + ",".join(result.report.get("qualificationFailures", []))
@@ -172,14 +243,23 @@ def run_compact_adapter(
             "binarySHA256": config["binarySHA256"],
             "license": config["license"],
             "trainingDataDeclaration": config["trainingDataDeclaration"],
+            "sourceURI": config.get("sourceURI"),
+            "trainingDataSourceURI": config.get("trainingDataSourceURI"),
             "labelMapDigest": config["labelMapDigest"],
             "preprocessingConfigDigest": config["preprocessingConfigDigest"],
+            "runtimeDependenciesDigest": config.get("runtimeDependenciesDigest"),
+            "adapterSourceSHA256": config.get("adapterSourceSHA256"),
+            "adapterLayerSHA256": config.get("adapterLayerSHA256"),
+            "resourceSupervisorSHA256": config.get("resourceSupervisorSHA256"),
+            "executionIdentityVersion": config.get("executionIdentityVersion", 1),
+            "outputFormat": config.get("outputFormat", "json"),
             "offlineAfterAcquisition": True,
             "adopted": False,
         },
     }
-    try:
-        cache.store(identity, payload)
-    except AnalysisCacheError as error:
-        raise CompactAdapterError(str(error)) from error
+    if result.report.get("qualified"):
+        try:
+            cache.store(identity, payload)
+        except AnalysisCacheError as error:
+            raise CompactAdapterError(str(error)) from error
     return payload, False

@@ -9,11 +9,18 @@ sourceOfTruth:
   - config/runtime-debug-knobs.json
   - config/delivery-experiment-contract.json
   - config/delivery-evaluator-v2-contract.json
+  - config/delivery-evaluator-v2-candidates.json
   - config/delivery-evaluation-corpus.json
   - scripts/delivery_experiment.py
   - scripts/delivery_experiment_runner.py
   - scripts/delivery_calibration_session.py
   - scripts/delivery_evaluator.py
+  - scripts/delivery_compact_model_adapter.py
+  - scripts/delivery_compact_model_runtime.py
+  - scripts/prepare_delivery_compact_model_config.py
+  - scripts/qualify_delivery_compact_models.py
+  - scripts/prepare_delivery_listener_anchors.py
+  - scripts/delivery_resource_supervisor.py
   - scripts/run_local_delivery_cascade.py
   - scripts/delivery_promotion_decision.py
 ---
@@ -72,6 +79,10 @@ Before changing anything in this layer, read:
   `scripts/delivery_calibration_session.py` builds and merges metadata-blinded independent-listener
   calibration sessions,
   `scripts/delivery_evaluator.py` composes post-generation layers, and
+  `scripts/prepare_delivery_compact_model_config.py` plus
+  `scripts/qualify_delivery_compact_models.py` verify exact local candidate assets and canonical-host
+  resource evidence, while `scripts/prepare_delivery_listener_anchors.py` creates label-blind
+  attention anchors,
   `scripts/run_local_delivery_cascade.py` runs the content-addressed v2 acoustic/adapter cascade
   only after the generator has exited,
   `scripts/delivery_promotion_decision.py` fails closed over automatic and blinded evidence.

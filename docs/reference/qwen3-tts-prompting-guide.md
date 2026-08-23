@@ -746,7 +746,10 @@ conflicting semantics at three lengths; covers the nine speakers natively; and a
 cross-language sentinels. [`delivery_experiment_runner.py`](../../scripts/delivery_experiment_runner.py)
 binds a plan to exact production instructions, binary digest, sampling parameters, seeds, script
 identities, instruction receipts, and output hashes. It is serial, resumable, local-only, and never
-publishes evidence automatically.
+publishes evidence automatically. For evaluator calibration, its balanced rotation can keep one
+seed and one neutral script fixed per speaker across all presets while the cohort collectively
+spans multiple seeds and all three script lengths; this preserves paired neutral reuse and real
+speaker/script/seed blocking without expanding the listener packet into a full factorial.
 
 The current production instructions remain unchanged until an untouched candidate passes the
 automatic integrity/intelligibility/identity/naturalness guardrails and blinded listener rules in

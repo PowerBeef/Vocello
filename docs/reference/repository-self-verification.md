@@ -56,6 +56,7 @@ T1 hook and on every push through CI. None of it needs a model, a device, or XCU
 | `check_surface_coverage.py` | omission | Every enforced gate and contract is named in guidance; the optional-assists section survives |
 | `roadmap.py validate` | evidence | Plans and items; every evidence reference resolved against the repository |
 | `check_delivery_instructions.py` | contradiction | Delivery-copy tier parity, repeated intensifiers, direction conflicts |
+| `prepare_delivery_compact_model_config.py --validate-only` | omission + integrity | Experimental local evaluator candidates, exact source/weight/runtime pins, research-only boundary, and untouched-holdout adoption gates |
 | `model_catalog_contract.py` | integrity | Catalog reproducibility and completeness |
 | `vendor_runtime_contract.py` | contradiction | Owned-runtime inventory and facade API baseline |
 | `runtime_security_contract.py` | omission | Debug knobs and concurrency exceptions are registered |

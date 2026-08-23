@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import copy
+import fcntl
 import json
 from pathlib import Path
 import stat
@@ -13,7 +14,7 @@ import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from delivery_experiment import digest  # noqa: E402
+from delivery_experiment import EXPECTED_PRESETS, digest  # noqa: E402
 from delivery_experiment_runner import (  # noqa: E402
     REPO,
     RunnerError,
@@ -137,6 +138,39 @@ class DeliveryExperimentRunnerTests(unittest.TestCase):
         self.assertEqual({row["preset"] for row in plan["rows"]}, {"happy", "angry"})
         self.assertEqual(validate_execution_plan(plan, self.binary), plan)
 
+    def test_balanced_calibration_rotation_is_compact_and_covers_every_factor(self) -> None:
+        cells = (
+            ("aiden", "English"), ("ryan", "English"),
+            ("vivian", "Chinese"), ("serena", "Chinese"),
+            ("uncle_fu", "Chinese"), ("dylan", "Chinese"),
+            ("eric", "Chinese"), ("ono_anna", "Japanese"),
+        )
+        plan = create_execution_plan(
+            binary=self.binary, data_dir=None, split="calibration", arm="current",
+            instruction_language="english", variant="speed",
+            sampling_combination="official-official",
+            seeds=[31000003, 31000004, 31000005, 31000006],
+            screen_label="compact-listener-calibration", cells=cells,
+            presets=tuple(EXPECTED_PRESETS), lengths=("short", "medium", "long"),
+            conditions=("neutral",), balanced_script_rotation=True,
+        )
+        self.assertEqual(len(plan["rows"]), 64)
+        self.assertEqual(len({row["speakerID"] for row in plan["rows"]}), 8)
+        self.assertEqual({row["preset"] for row in plan["rows"]}, set(EXPECTED_PRESETS))
+        self.assertEqual({row["script"]["length"] for row in plan["rows"]}, {"short", "medium", "long"})
+        self.assertEqual(len({row["seed"] for row in plan["rows"]}), 4)
+        for cell in cells:
+            cell_rows = [
+                row for row in plan["rows"]
+                if (row["speakerID"], row["outputLanguage"]) == cell
+            ]
+            self.assertEqual(len({row["seed"] for row in cell_rows}), 1)
+            self.assertEqual(len({row["script"]["scriptID"] for row in cell_rows}), 1)
+        self.assertEqual(plan["screeningSelection"]["scope"], "screened-calibration")
+        self.assertTrue(plan["screeningSelection"]["balancedScriptRotation"])
+        self.assertTrue(plan["screeningSelection"]["balancedSeedRotation"])
+        self.assertEqual(validate_execution_plan(plan, self.binary), plan)
+
     def test_screen_requires_label_and_cannot_partially_open_confirmation(self) -> None:
         common = dict(
             binary=self.binary, data_dir=None, arm="current",
@@ -170,6 +204,42 @@ class DeliveryExperimentRunnerTests(unittest.TestCase):
         take = next(iter(second["takes"].values()))
         self.assertEqual(take["status"], "complete")
         self.assertFalse(Path(take["audio"]).is_absolute())
+
+    def test_retry_retains_the_failed_attempt(self) -> None:
+        plan = self._single_row_plan()
+        run_dir = self.root / "retry-run"
+        first = run_execution_plan(
+            plan=plan, binary=self.binary, data_dir=None, run_dir=run_dir,
+            lock_root=self.root / "retry-lock",
+        )
+        take_id = next(iter(first["takes"]))
+        first["takes"][take_id] = {
+            "status": "failed", "returnCode": 1,
+            "failureCategory": "audio-quality-rejected",
+        }
+        (run_dir / "execution-state.json").write_text(json.dumps(first), encoding="utf-8")
+        retried = run_execution_plan(
+            plan=plan, binary=self.binary, data_dir=None, run_dir=run_dir,
+            retry_failures=True, lock_root=self.root / "retry-lock",
+        )
+        take = retried["takes"][take_id]
+        self.assertEqual(take["status"], "complete")
+        self.assertEqual(take["attempts"][0]["failureCategory"], "audio-quality-rejected")
+        self.assertEqual(retried["counts"]["retryAttempts"], 1)
+        self.assertEqual(retried["counts"]["historicalFailures"], 1)
+
+    def test_generator_and_heavy_analyzer_share_one_fail_closed_lock(self) -> None:
+        lock_root = self.root / "shared-lock"
+        lock_root.mkdir()
+        lock_path = lock_root / "delivery-analysis-supervisor.lock"
+        with lock_path.open("a+b") as lock:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            with self.assertRaisesRegex(RunnerError, "already active"):
+                run_execution_plan(
+                    plan=self._single_row_plan(), binary=self.binary,
+                    data_dir=None, run_dir=self.root / "blocked-run",
+                    lock_root=lock_root,
+                )
 
     def test_paired_analyzer_emits_evaluator_compatible_rows(self) -> None:
         plan = self._single_row_plan()

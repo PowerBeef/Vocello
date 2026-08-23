@@ -49,21 +49,29 @@ machine-readable status record and wins over any older prose.
 
 ## Resume here (2026-08-23)
 
-**DP-28 compact delivery evaluator v2 foundation landed; live qualification remains open
-(2026-08-23, macOS/CLI research tooling):** the existing source-bound delivery experiment now
-adds a bounded five-region temporal contour block and a content-addressed analysis cache whose
-identity binds original/canonical audio, analyzer binary, model revision/weights, and preprocessing.
-The same calibration entry point has versioned v2 packets with per-listener shuffle, repeats,
-anchors, uncertainty/confidence/replay/latency, two kinds of 2AFC, naturalness and intensity. The
-evaluator preserves ridge-v1 while adding preset-local logistic heads, elastic-net/PLS challengers,
-fold-local speaker/translation/seed/language validation, conformal intervals, OOD and typed
-abstention. A serial resource supervisor and cascade enforce generator exit before heavy analyzers,
-retain privacy-safe resource provenance, and explain reject/abstain/manual-listening routes.
-SenseVoiceSmall Q8 and DistilHuBERT remain unadopted contract candidates; no weights were acquired.
-Closure still requires the full six-speaker/three-script/eight-preset listener cohort, qualified
-human labels, two clean canonical-host adapter runs, and untouched-holdout improvement over
-ridge-v1. This infrastructure changes no product delivery instruction or `EmotionPreset`; automatic
-layers still cannot authorize semantic promotion. See
+**DP-28 live evaluator infrastructure and calibration audio are complete; human evidence is next
+(2026-08-23, macOS/CLI research tooling):** the exact contract-pinned SenseVoiceSmall Q8 and
+DistilHuBERT assets now live only under the operator-local build cache. Both passed two cache-cold
+probes on the attested Mac14,3 / 8 GiB host with zero swap growth, no pressure warning and clean
+post-exit recovery. SenseVoice peaked at 275-293 MB RSS; DistilHuBERT peaked at 677-874 MB. They
+remain unadopted until a qualified untouched human holdout improves over ridge-v1.
+
+The accepted balanced calibration run completed 64/64 instructed rows and eight reusable neutral
+controls across all eight presets, eight speakers, six scripts/three translation groups and
+English, Chinese and Japanese. Its bounded acoustic/temporal analysis and both 64-row compact
+cascades passed with valid source/report digests; every cascade row honestly abstains because no
+human-calibrated tiny head exists. A prior seed block is retained but excluded in full: one take
+repeatedly produced a genuine 4.613-second dropout and failed mandatory Fast QC. No row was silently
+dropped or substituted.
+
+The listener packet is ready with 64 label-blind dimensional trials, 56 meaningful non-neutral
+target-vs-neutral pairs, three multilingual attention anchors, per-listener deterministic order,
+12.5% repeats and per-response atomic resume. Its zero-response readiness report is explicitly
+INCOMPLETE. Remaining DP-28 work is human rather than implementation inference: three independent
+complete sessions with English/Chinese/Japanese fluency coverage and qualification floors, then
+calibration-only challenger preselection, a separately generated untouched confirmation cohort,
+and the ridge-v1 comparison. No production delivery instruction or `EmotionPreset` changed;
+automatic layers still cannot authorize semantic promotion. See
 [`docs/reference/delivery-harness.md`](reference/delivery-harness.md) §2.3.
 
 **DP-27 foundation completed and DP-28/DP-30 screening underway; production copy unchanged

@@ -44,10 +44,13 @@
   "humanCalibration": {
     "schemaVersion": 2,
     "minimumIndependentListeners": 3,
+    "minimumValidListenersPerRatedRow": 3,
     "minimumSpeakers": 6,
     "minimumScripts": 3,
     "minimumPresets": 8,
     "repeatFraction": 0.125,
+    "minimumIntraRaterRepeatAgreement": 0.75,
+    "minimumAnchorAccuracy": 0.8,
     "allowedRepeatFraction": {
       "minimum": 0.1,
       "maximum": 0.15
@@ -82,7 +85,10 @@
     ],
     "challengerMustImproveUntouchedHoldout": true,
     "challengerMayRegressAnyVADDimension": false,
-    "challengerMayRegressAnyPreset": false
+    "challengerMayRegressAnyPreset": false,
+    "challengerMayRegressAnySpeaker": false,
+    "challengerMayRegressAnyScriptGroup": false,
+    "distributedSpeakerAndScriptGainRequired": true
   },
   "compactAdapters": {
     "contractFirst": true,
@@ -97,6 +103,9 @@
       "immutable-revision",
       "binary-sha256",
       "weights-sha256",
+      "adapter-layer-sha256",
+      "resource-supervisor-sha256",
+      "runtime-dependency-digest",
       "preprocessing-config-digest",
       "offline-after-acquisition"
     ],

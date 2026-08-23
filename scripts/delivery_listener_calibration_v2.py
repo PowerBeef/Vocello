@@ -38,6 +38,9 @@ MIN_SPEAKERS = 6
 MIN_SCRIPTS = 3
 MIN_PRESETS = 8
 MIN_PAIRWISE_CCC = 0.60
+MIN_REPEAT_AGREEMENT = 0.75
+MIN_ANCHOR_ACCURACY = 0.80
+MIN_VALID_LISTENERS_PER_ROW = 3
 
 
 def _read(path: Path) -> dict[str, Any]:
@@ -115,8 +118,11 @@ def build_v2_session(
     anchor_manifest_path: Path | None = None,
 ) -> dict[str, Any]:
     plan = _read(plan_path)
-    if plan.get("designation") != "calibration":
-        raise CalibrationSessionError("v2 perceptual labels require the calibration split")
+    designation = plan.get("designation")
+    if designation not in {"calibration", "confirmation"}:
+        raise CalibrationSessionError(
+            "v2 perceptual labels require the calibration or untouched confirmation split"
+        )
     rows, acoustic = _collect_run(plan, run_dir)
     baseline_rows: dict[str, dict[str, Any]] = {}
     if baseline_run_dir is not None:
@@ -149,20 +155,21 @@ def build_v2_session(
             "outputLanguage": row["outputLanguage"],
             "task": "dimensional-naturalness-intensity-free-identification",
         })
-        public_pairs.append({
-            "trialID": pair_id,
-            "task": "target-versus-neutral-2afc",
-            "targetDelivery": row["preset"],
-            "outputLanguage": row["outputLanguage"],
-            "clipIDs": [instructed_clip, neutral_clip],
-        })
+        if row["preset"] != "neutral":
+            public_pairs.append({
+                "trialID": pair_id,
+                "task": "target-versus-neutral-2afc",
+                "targetDelivery": row["preset"],
+                "outputLanguage": row["outputLanguage"],
+                "clipIDs": [instructed_clip, neutral_clip],
+            })
         private = {
             key: value for key, value in row.items()
             if key not in {"instructedPath", "neutralPath"}
         }
         private.update({
             "dimensionalTrialID": dimensional_id,
-            "targetNeutralTrialID": pair_id,
+            "targetNeutralTrialID": pair_id if row["preset"] != "neutral" else None,
             "instructedClipID": instructed_clip,
             "neutralClipID": neutral_clip,
         })
@@ -185,6 +192,7 @@ def build_v2_session(
         private_rows.append(private)
     private_body = {
         "schemaVersion": SCHEMA_VERSION,
+        "designation": designation,
         "executionPlanDigest": plan["executionPlanDigest"],
         "featureNames": acoustic["featureNames"],
         "items": private_rows,
@@ -228,8 +236,14 @@ def build_v2_session(
     private_digest = digest(private_body)
     manifest = {
         "schemaVersion": SCHEMA_VERSION,
-        "kind": "blinded-delivery-perceptual-calibration-v2",
+        "kind": (
+            "blinded-delivery-perceptual-calibration-v2"
+            if designation == "calibration"
+            else "blinded-delivery-perceptual-untouched-confirmation-v2"
+        ),
         "promotionAuthority": False,
+        "designation": designation,
+        "builderSHA256": file_sha256(Path(__file__).resolve()),
         "executionPlanDigest": plan["executionPlanDigest"],
         "privateKeyDigest": private_digest,
         "sessionSeed": session_seed,
@@ -260,6 +274,13 @@ def validate_v2_session(session_dir: Path) -> tuple[dict[str, Any], dict[str, An
     private = _read(session_dir / "private-key.json")
     if manifest.get("schemaVersion") != SCHEMA_VERSION or private.get("schemaVersion") != SCHEMA_VERSION:
         raise CalibrationSessionError("v2 session schema is invalid")
+    if (
+        manifest.get("designation") not in {"calibration", "confirmation"}
+        or private.get("designation") != manifest.get("designation")
+    ):
+        raise CalibrationSessionError("v2 session split designation is invalid")
+    if manifest.get("builderSHA256") != file_sha256(Path(__file__).resolve()):
+        raise CalibrationSessionError("v2 session builder source changed")
     body = dict(manifest)
     stored = body.pop("sessionDigest", None)
     if stored != digest(body) or private.get("sessionDigest") != stored:
@@ -327,6 +348,30 @@ def run_v2_session(
         raise CalibrationSessionError("v2 listener ID and fluent languages are required")
     listener_digest = hashlib.sha256(listener_id.strip().encode()).hexdigest()
     plan = listener_trial_plan(manifest, listener_digest)
+    response_path = session_dir / "responses-v2" / f"{listener_digest[:16]}.json"
+    response_path.parent.mkdir(exist_ok=True)
+    responses: list[dict[str, Any]] = []
+    if response_path.is_file():
+        retained = _read(response_path)
+        retained_body = dict(retained)
+        retained_digest = retained_body.pop("responseDigest", None)
+        if retained_digest != digest(retained_body):
+            raise CalibrationSessionError("retained v2 response digest is invalid")
+        if (
+            retained.get("sessionDigest") != manifest["sessionDigest"]
+            or retained.get("listenerDigest") != listener_digest
+            or retained.get("trialOrderDigest") != digest(plan)
+            or retained.get("fluentLanguages") != sorted(set(fluent_languages))
+        ):
+            raise CalibrationSessionError("retained v2 response identity changed")
+        retained_rows = retained.get("responses")
+        if not isinstance(retained_rows, list) or len(retained_rows) > len(plan):
+            raise CalibrationSessionError("retained v2 response coverage is invalid")
+        for row, trial in zip(retained_rows, plan):
+            if row.get("presentationID") != trial["presentationID"]:
+                raise CalibrationSessionError("retained v2 response order changed")
+            _validate_response_row(row, trial)
+        responses = retained_rows
     clip_by_id = {
         row["clipID"]: row for row in manifest.get("dimensionalTrials", [])
     }
@@ -342,22 +387,24 @@ def run_v2_session(
     for anchor in private.get("anchors", []):
         private_clips[anchor["expectedClipID"]] = anchor["expectedSHA256"]
         private_clips[anchor["comparisonClipID"]] = anchor["comparisonSHA256"]
-    responses = []
-    for index, trial in enumerate(plan, start=1):
+    for index, trial in enumerate(plan[len(responses):], start=len(responses) + 1):
         started = time.monotonic()
         replay_count = 0
         clip_ids = [trial["clipID"]] if "clipID" in trial else trial.get("clipIDs", [])
-        for slot, clip_id in enumerate(clip_ids, start=1):
-            public = clip_by_id.get(clip_id)
-            clip = session_dir / (public["clip"] if public else f"clips/{clip_id}.wav")
-            expected = public["audioSHA256"] if public else private_clips.get(clip_id)
-            if not clip.is_file() or not expected or file_sha256(clip) != expected:
-                raise CalibrationSessionError("v2 playback clip is missing or changed")
-            print(f"\nTrial {index}/{len(plan)} clip {slot}/{len(clip_ids)}")
-            result = subprocess.run([player, str(clip)], check=False)
-            if result.returncode != 0:
-                raise CalibrationSessionError("v2 audio player failed")
-            replay_count += 1
+        while True:
+            for slot, clip_id in enumerate(clip_ids, start=1):
+                public = clip_by_id.get(clip_id)
+                clip = session_dir / (public["clip"] if public else f"clips/{clip_id}.wav")
+                expected = public["audioSHA256"] if public else private_clips.get(clip_id)
+                if not clip.is_file() or not expected or file_sha256(clip) != expected:
+                    raise CalibrationSessionError("v2 playback clip is missing or changed")
+                print(f"\nTrial {index}/{len(plan)} clip {slot}/{len(clip_ids)}")
+                result = subprocess.run([player, str(clip)], check=False)
+                if result.returncode != 0:
+                    raise CalibrationSessionError("v2 audio player failed")
+                replay_count += 1
+            if input("Replay this trial? [y/N]: ").strip().lower() not in {"y", "yes"}:
+                break
         response: dict[str, Any] = {
             "presentationID": trial["presentationID"],
             "trialID": trial["trialID"],
@@ -382,16 +429,20 @@ def run_v2_session(
         response["confidence"] = _bounded_float("Confidence [1..5]: ", 1, 5)
         response["responseLatencyMilliseconds"] = int((time.monotonic() - started) * 1000)
         responses.append(response)
-    body = {
-        "schemaVersion": SCHEMA_VERSION,
-        "sessionDigest": manifest["sessionDigest"],
-        "listenerDigest": listener_digest,
-        "fluentLanguages": sorted(set(fluent_languages)),
-        "trialOrderDigest": digest(plan),
-        "responses": responses,
-    }
-    body["responseDigest"] = digest(body)
-    atomic_json(session_dir / "responses-v2" / f"{listener_digest[:16]}.json", body)
+        body = {
+            "schemaVersion": SCHEMA_VERSION,
+            "sessionDigest": manifest["sessionDigest"],
+            "listenerDigest": listener_digest,
+            "fluentLanguages": sorted(set(fluent_languages)),
+            "trialOrderDigest": digest(plan),
+            "responses": responses,
+            "complete": len(responses) == len(plan),
+        }
+        body["responseDigest"] = digest(body)
+        atomic_json(response_path, body)
+    if not responses:
+        raise CalibrationSessionError("v2 session has no listener trials")
+    body = _read(response_path)
     return body
 
 
@@ -529,8 +580,9 @@ def merge_v2_responses(*, session_dir: Path) -> dict[str, Any]:
         free_identification_agreement = statistics.fmean(agreements) if agreements else None
 
     private_by_dimensional = {row["dimensionalTrialID"]: row for row in private["items"]}
-    private_by_pair = {row["targetNeutralTrialID"]: row for row in private["items"]}
     dataset_rows = []
+    insufficient_dimensional_rows = 0
+    insufficient_pairwise_rows = 0
     for trial_id in dimensional_ids:
         source = private_by_dimensional[trial_id]
         dimension_values = {
@@ -540,15 +592,24 @@ def merge_v2_responses(*, session_dir: Path) -> dict[str, Any]:
             ]
             for dimension in DIMENSIONS
         }
+        if any(
+            sum(isinstance(value, (int, float)) for value in values)
+            < MIN_VALID_LISTENERS_PER_ROW
+            for values in dimension_values.values()
+        ):
+            insufficient_dimensional_rows += 1
         pair_id = source["targetNeutralTrialID"]
-        preferences = []
-        for listener in listener_ids:
-            response = by_listener_trial[listener][pair_id][0]
-            choice = response.get("choice")
-            if choice in {"A", "B"}:
-                presented = presented_by_listener[listener][pair_id]
-                chosen_clip = presented["clipIDs"][0 if choice == "A" else 1]
-                preferences.append(1.0 if chosen_clip == source["instructedClipID"] else 0.0)
+        preferences = [0.5] if pair_id is None else []
+        if pair_id is not None:
+            for listener in listener_ids:
+                response = by_listener_trial[listener][pair_id][0]
+                choice = response.get("choice")
+                if choice in {"A", "B"}:
+                    presented = presented_by_listener[listener][pair_id]
+                    chosen_clip = presented["clipIDs"][0 if choice == "A" else 1]
+                    preferences.append(1.0 if chosen_clip == source["instructedClipID"] else 0.0)
+            if len(preferences) < MIN_VALID_LISTENERS_PER_ROW:
+                insufficient_pairwise_rows += 1
         candidate_preferences = []
         candidate_pair_id = source.get("candidateBaselineTrialID")
         if candidate_pair_id:
@@ -559,6 +620,8 @@ def merge_v2_responses(*, session_dir: Path) -> dict[str, Any]:
                     chosen_clip = presented["clipIDs"][0 if response["choice"] == "A" else 1]
                     candidate_preferences.append(1.0 if chosen_clip == source["instructedClipID"] else 0.0)
         dimensional_responses = [by_listener_trial[listener][trial_id][0] for listener in listener_ids]
+        naturalness_values = [float(row["naturalness"]) for row in dimensional_responses]
+        intensity_values = [float(row["perceivedIntensity"]) for row in dimensional_responses]
         dataset_rows.append({
             "generationID": source["generationID"],
             "speakerID": source["speakerID"],
@@ -576,8 +639,8 @@ def merge_v2_responses(*, session_dir: Path) -> dict[str, Any]:
             },
             "targetPreference": statistics.fmean(preferences) if preferences else None,
             "candidatePreference": statistics.fmean(candidate_preferences) if candidate_preferences else None,
-            "naturalness": statistics.median(float(row["naturalness"]) for row in dimensional_responses),
-            "perceivedIntensity": statistics.median(float(row["perceivedIntensity"]) for row in dimensional_responses),
+            "naturalness": statistics.median(naturalness_values) if naturalness_values else None,
+            "perceivedIntensity": statistics.median(intensity_values) if intensity_values else None,
         })
     failures = []
     if len(listener_ids) < MIN_LISTENERS:
@@ -588,6 +651,10 @@ def merge_v2_responses(*, session_dir: Path) -> dict[str, Any]:
         failures.append("fewer-than-three-scripts")
     if len({row["preset"] for row in dataset_rows}) < MIN_PRESETS:
         failures.append("fewer-than-eight-presets")
+    if insufficient_dimensional_rows:
+        failures.append("insufficient-per-row-dimensional-labels")
+    if insufficient_pairwise_rows:
+        failures.append("insufficient-per-row-pairwise-decisions")
     if not manifest.get("anchors"):
         failures.append("anchors-not-configured")
     if any(count < 1 for count in fluent_coverage.values()):
@@ -605,6 +672,10 @@ def merge_v2_responses(*, session_dir: Path) -> dict[str, Any]:
             chosen = presented["clipIDs"][0 if response["choice"] == "A" else 1]
             anchor_scores.append(chosen == anchor["expectedClipID"])
     anchor_accuracy = statistics.fmean(anchor_scores) if anchor_scores else None
+    if any(value is None or value < MIN_REPEAT_AGREEMENT for value in repeat_scores.values()):
+        failures.append("intra-rater-repeat-agreement-below-floor")
+    if anchor_accuracy is None or anchor_accuracy < MIN_ANCHOR_ACCURACY:
+        failures.append("anchor-accuracy-below-floor")
     report = {
         "schemaVersion": SCHEMA_VERSION,
         "kind": "blinded-delivery-perceptual-labels-v2",
@@ -617,7 +688,7 @@ def merge_v2_responses(*, session_dir: Path) -> dict[str, Any]:
         "listenerRows": [listeners[listener] for listener in listener_ids],
         "labelProvenance": {
             "kind": "blinded-independent-listener-perceptual-v2",
-            "sourceSplit": "calibration",
+            "sourceSplit": private["designation"],
             "targetLabelsVisibleToDimensionalListeners": False,
             "listenerCount": len(listener_ids),
             "responseDigests": sorted(response["responseDigest"] for response in listeners.values()),
@@ -627,6 +698,11 @@ def merge_v2_responses(*, session_dir: Path) -> dict[str, Any]:
             "anchorAccuracy": anchor_accuracy,
             "orderBias": order_bias,
             "uncertainRate": uncertain_rate,
+            "perRowCoverage": {
+                "minimumValidListeners": MIN_VALID_LISTENERS_PER_ROW,
+                "insufficientDimensionalRows": insufficient_dimensional_rows,
+                "insufficientPairwiseRows": insufficient_pairwise_rows,
+            },
             "fluentLanguageCoverage": fluent_coverage,
             "qualificationFailures": failures,
             "calibrationQualified": not failures,

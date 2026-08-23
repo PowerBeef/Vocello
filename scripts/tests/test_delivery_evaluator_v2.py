@@ -13,13 +13,15 @@ import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from delivery_evaluator import EvaluatorError  # noqa: E402
+from delivery_evaluator import EvaluatorError, digest  # noqa: E402
 from delivery_evaluator_v2 import (  # noqa: E402
     BLOCK_AXES,
+    attach_compact_features,
     calibrate_v2,
     compare_untouched_holdout,
     evaluate_v2,
     load_v2_dataset,
+    score_untouched_holdout,
     validate_v2_contract,
 )
 
@@ -156,26 +158,88 @@ class DeliveryEvaluatorV2Tests(unittest.TestCase):
             "overallCalibrationError": 0.4,
             "dimensions": {"valence": 0.4, "arousal": 0.4, "dominance": 0.4},
             "presets": {preset: 0.4 for preset in PRESETS},
+            "speakers": {f"speaker-{index}": 0.4 for index in range(6)},
+            "scriptGroups": {f"translation-{index}": 0.4 for index in range(4)},
         }
         challenger = copy.deepcopy(baseline)
         challenger["overallCalibrationError"] = 0.3
         challenger["dimensions"] = {name: 0.3 for name in ("valence", "arousal", "dominance")}
         challenger["presets"] = {preset: 0.3 for preset in PRESETS}
-        result = compare_untouched_holdout({
+        challenger["speakers"] = {name: 0.3 for name in baseline["speakers"]}
+        challenger["scriptGroups"] = {name: 0.3 for name in baseline["scriptGroups"]}
+        score_report = {
+            "schemaVersion": 2,
+            "kind": "delivery-evaluator-v2-untouched-holdout-scores",
             "designation": "untouched-confirmation",
-            "baseline": baseline, "challenger": challenger,
-        })
+            "promotionAuthority": False,
+            "preselectedChallenger": "elastic-net-v2",
+            "models": {"ridge-v1": baseline, "elastic-net-v2": challenger},
+        }
+        score_report["scoreDigest"] = digest(score_report)
+        result = compare_untouched_holdout(score_report)
         self.assertTrue(result["challengerAdvances"])
         challenger["dimensions"]["valence"] = 0.5
-        result = compare_untouched_holdout({
-            "designation": "untouched-confirmation",
-            "baseline": baseline, "challenger": challenger,
+        score_report["models"]["elastic-net-v2"] = challenger
+        score_report["scoreDigest"] = digest({
+            key: value for key, value in score_report.items() if key != "scoreDigest"
         })
+        result = compare_untouched_holdout(score_report)
         self.assertFalse(result["challengerAdvances"])
         self.assertIn("vad-valence", result["regressions"])
         with self.assertRaisesRegex(EvaluatorError, "untouched"):
             compare_untouched_holdout({
                 "designation": "development", "baseline": baseline, "challenger": challenger,
+            })
+
+    def test_blind_compact_attachment_and_holdout_scoring(self) -> None:
+        cascade = {
+            "schemaVersion": 1,
+            "kind": "local-delivery-cascade",
+            "inputManifestDigest": "a" * 64,
+            "rows": [{
+                "generationID": row["generationID"],
+                "alwaysLayers": {"compactRepresentation": {
+                    "schemaVersion": 1,
+                    "kind": "compact-instructed-minus-neutral-delta",
+                    "adapterID": "distilhubert",
+                    "weightsSHA256": "b" * 64,
+                    "featureVector": {"embedding.000": row["features"]["pitch"]},
+                }},
+            } for row in self.dataset["rows"]],
+        }
+        attached = attach_compact_features(self.dataset, cascade)
+        features, _rows = load_v2_dataset(attached, require_labels=True)
+        self.assertIn("compact.embedding.000", features)
+        self.assertEqual(
+            [row["labels"] for row in attached["rows"]],
+            [row["labels"] for row in self.dataset["rows"]],
+        )
+        model = calibrate_v2(attached)
+        self.assertIsNone(model["preselectedChallenger"])
+        model["preselectedChallenger"] = "elastic-net-v2"
+        model["challengerAdoptionStatus"] = "preselected-awaiting-untouched-human-holdout"
+        model["modelDigest"] = digest({
+            key: value for key, value in model.items() if key != "modelDigest"
+        })
+        holdout = copy.deepcopy(attached)
+        holdout["labelProvenance"]["sourceSplit"] = "confirmation"
+        holdout["manifestDigest"] = hashlib.sha256(b"untouched-holdout").hexdigest()
+        scores = score_untouched_holdout(holdout, model)
+        self.assertEqual(set(scores["models"]), {"ridge-v1", "elastic-net-v2"})
+        self.assertEqual(set(scores["models"]["ridge-v1"]), {
+            "overallCalibrationError", "dimensions", "presets", "speakers", "scriptGroups",
+        })
+
+    def test_holdout_cannot_open_without_calibration_preselection(self) -> None:
+        holdout = copy.deepcopy(self.dataset)
+        holdout["labelProvenance"]["sourceSplit"] = "confirmation"
+        with self.assertRaisesRegex(EvaluatorError, "no calibration-selected challenger"):
+            score_untouched_holdout(holdout, self.model)
+
+    def test_compact_attachment_rejects_cross_run_coverage(self) -> None:
+        with self.assertRaisesRegex(EvaluatorError, "coverage"):
+            attach_compact_features(self.dataset, {
+                "schemaVersion": 1, "kind": "local-delivery-cascade", "rows": [],
             })
 
     def test_contract_preserves_research_and_human_authority_boundaries(self) -> None:

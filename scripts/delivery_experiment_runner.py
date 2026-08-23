@@ -11,6 +11,7 @@ published automatically.
 from __future__ import annotations
 
 import argparse
+import fcntl
 import hashlib
 import json
 import math
@@ -46,6 +47,7 @@ from delivery_experiment import (
 
 
 REPO = Path(__file__).resolve().parents[1]
+DEFAULT_SERIAL_LOCK_ROOT = REPO / "build/cache/delivery-analysis"
 SCHEMA_VERSION = 1
 DEFAULT_TIMEOUT_SECONDS = 3_600
 ACOUSTIC_FEATURES = (
@@ -157,6 +159,7 @@ def create_execution_plan(
     presets: tuple[str, ...] = (),
     lengths: tuple[str, ...] = (),
     conditions: tuple[str, ...] = (),
+    balanced_script_rotation: bool = False,
 ) -> dict[str, Any]:
     if not binary.is_file():
         raise RunnerError(f"CLI binary does not exist: {binary}")
@@ -173,7 +176,7 @@ def create_execution_plan(
         sampling_combination=sampling_combination, seeds=seeds,
         production_instructions=instructions,
     )
-    selection_requested = bool(cells or presets or lengths or conditions)
+    selection_requested = bool(cells or presets or lengths or conditions or balanced_script_rotation)
     if split == "confirmation" and selection_requested:
         raise RunnerError(
             "confirmation plans cannot be screened or partially selected; "
@@ -202,6 +205,28 @@ def create_execution_plan(
         and (not lengths or row["script"]["length"] in lengths)
         and (not conditions or row["script"]["semanticCondition"] in conditions)
     ]
+    if balanced_script_rotation:
+        observed_conditions = sorted({row["script"]["semanticCondition"] for row in rows})
+        observed_lengths = sorted({row["script"]["length"] for row in rows})
+        if len(observed_conditions) != 1:
+            raise RunnerError("balanced script rotation requires exactly one semantic condition")
+        if set(observed_lengths) != {"short", "medium", "long"}:
+            raise RunnerError("balanced script rotation requires short, medium, and long scripts")
+        if split == "calibration" and len(seeds) < 2:
+            raise RunnerError("balanced evaluator calibration requires at least two rotated seeds")
+        cell_order = sorted({(row["speakerID"], row["outputLanguage"]) for row in rows})
+        seed_order = sorted({row["seed"] for row in rows})
+        cell_index = {value: index for index, value in enumerate(cell_order)}
+        length_order = ("short", "medium", "long")
+        rows = [
+            row for row in rows
+            if row["script"]["length"] == length_order[
+                cell_index[(row["speakerID"], row["outputLanguage"])] % len(length_order)
+            ]
+            and row["seed"] == seed_order[
+                cell_index[(row["speakerID"], row["outputLanguage"])] % len(seed_order)
+            ]
+        ]
     if selection_requested and not rows:
         raise RunnerError("screen selection produced no experiment rows")
     if requested_cells:
@@ -214,7 +239,9 @@ def create_execution_plan(
         row["shippedIntensity"] = deliveries[row["preset"]]["intensity"]
     plan["screeningSelection"] = {
         "label": screen_label,
-        "scope": "screened-development" if selection_requested else "complete-split",
+        "scope": (
+            f"screened-{split}" if selection_requested else "complete-split"
+        ),
         "cells": [
             {"speakerID": speaker, "outputLanguage": language}
             for speaker, language in cells
@@ -222,6 +249,8 @@ def create_execution_plan(
         "presets": list(presets),
         "lengths": list(lengths),
         "semanticConditions": list(conditions),
+        "balancedScriptRotation": balanced_script_rotation,
+        "balancedSeedRotation": balanced_script_rotation and len(seeds) > 1,
         "promotionAuthority": False,
     }
     plan_body = dict(plan)
@@ -369,7 +398,39 @@ def _reference_key(row: dict[str, Any]) -> str:
     return digest(identity)[:24]
 
 
+def _retry_attempts(retained: dict[str, Any] | None) -> list[dict[str, Any]]:
+    if not retained or retained.get("status") == "complete":
+        return []
+    attempts = list(retained.get("attempts", []))
+    attempts.append({
+        key: value for key, value in retained.items() if key != "attempts"
+    })
+    return attempts
+
+
 def run_execution_plan(
+    *, plan: dict[str, Any], binary: Path, data_dir: Path | None,
+    run_dir: Path, limit: int | None = None,
+    timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS, retry_failures: bool = False,
+    lock_root: Path = DEFAULT_SERIAL_LOCK_ROOT,
+) -> dict[str, Any]:
+    lock_root.mkdir(parents=True, exist_ok=True)
+    lock_path = lock_root / "delivery-analysis-supervisor.lock"
+    with lock_path.open("a+b") as lock:
+        try:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as error:
+            raise RunnerError(
+                "another generator or heavy delivery analyzer is already active"
+            ) from error
+        return _run_execution_plan_locked(
+            plan=plan, binary=binary, data_dir=data_dir, run_dir=run_dir,
+            limit=limit, timeout_seconds=timeout_seconds,
+            retry_failures=retry_failures,
+        )
+
+
+def _run_execution_plan_locked(
     *, plan: dict[str, Any], binary: Path, data_dir: Path | None,
     run_dir: Path, limit: int | None = None,
     timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS, retry_failures: bool = False,
@@ -409,12 +470,15 @@ def run_execution_plan(
         reference_key = _reference_key(row)
         reference = state["references"].get(reference_key)
         if not reference or (reference.get("status") != "complete" and retry_failures):
+            reference_attempts = _retry_attempts(reference)
             reference_path = audio_dir / f"reference-{reference_key}.wav"
             reference = _invoke_generate(
                 binary=binary, data_dir=data_dir, row=row,
                 instruction=row["neutralReferenceInstruction"],
                 output_path=reference_path, timeout_seconds=timeout_seconds,
             )
+            if reference_attempts:
+                reference["attempts"] = reference_attempts
             state["references"][reference_key] = reference
             atomic_json(state_path, state)
         if reference.get("status") != "complete":
@@ -425,10 +489,13 @@ def run_execution_plan(
             processed += 1
             continue
         instructed_path = audio_dir / f"take-{take_id}.wav"
+        take_attempts = _retry_attempts(retained) if retry_failures else []
         take = _invoke_generate(
             binary=binary, data_dir=data_dir, row=row, instruction=row["instruction"],
             output_path=instructed_path, timeout_seconds=timeout_seconds,
         )
+        if take_attempts:
+            take["attempts"] = take_attempts
         take["referenceKey"] = reference_key
         state["takes"][take_id] = take
         atomic_json(state_path, state)
@@ -437,6 +504,17 @@ def run_execution_plan(
         "planned": len(plan["rows"]),
         "complete": sum(row.get("status") == "complete" for row in state["takes"].values()),
         "failedOrBlocked": sum(row.get("status") != "complete" for row in state["takes"].values()),
+        "retryAttempts": sum(
+            len(row.get("attempts", []))
+            for bucket in (state["references"], state["takes"])
+            for row in bucket.values()
+        ),
+        "historicalFailures": sum(
+            attempt.get("status") != "complete"
+            for bucket in (state["references"], state["takes"])
+            for row in bucket.values()
+            for attempt in row.get("attempts", [])
+        ),
     }
     atomic_json(state_path, state)
     return state
@@ -793,6 +871,10 @@ def main() -> int:
     plan_parser.add_argument(
         "--conditions", help="comma-separated neutral,congruent,conflicting"
     )
+    plan_parser.add_argument(
+        "--balanced-script-rotation", action="store_true",
+        help="select one short/medium/long script per speaker/preset/seed in a deterministic rotation",
+    )
     plan_parser.add_argument("--out", type=Path, required=True)
     run_parser = commands.add_parser("run")
     run_parser.add_argument("--binary", type=Path, default=REPO / "build/vocello")
@@ -827,6 +909,7 @@ def main() -> int:
                 presets=_parse_csv(args.presets),
                 lengths=_parse_csv(args.lengths),
                 conditions=_parse_csv(args.conditions),
+                balanced_script_rotation=args.balanced_script_rotation,
             )
             atomic_json(args.out, result)
         elif args.command in {"run", "analyze"}:

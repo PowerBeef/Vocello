@@ -22,6 +22,9 @@ from delivery_compact_model_adapter import (  # noqa: E402
     validate_adapter_config,
 )
 from delivery_resource_supervisor import HostSnapshot, run_supervised  # noqa: E402
+from delivery_resource_supervisor import SupervisedResult  # noqa: E402
+import delivery_resource_supervisor  # noqa: E402
+import delivery_compact_model_adapter  # noqa: E402
 
 
 class DeliveryCompactModelAdapterTests(unittest.TestCase):
@@ -118,6 +121,77 @@ class DeliveryCompactModelAdapterTests(unittest.TestCase):
             lock_root=self.root / "lock", supervisor=self._supervisor,
         )
         self.assertFalse(hit)
+
+    def test_v2_tagged_output_binds_runtime_and_label_map(self) -> None:
+        config = copy.deepcopy(self.config)
+        labels = {
+            "languages": ["en"], "emotions": ["NEUTRAL"],
+            "events": ["Speech"], "textNormalization": ["withitn"],
+        }
+        dependencies = {"runtime": "fixture-v1"}
+        source_digest = file_sha256(Path(sys.executable))
+        config.update({
+            "executionIdentityVersion": 2,
+            "outputFormat": "sensevoice-tagged-text",
+            "sourceURI": "https://example.invalid/model/revision",
+            "trainingDataSourceURI": "https://example.invalid/training-data",
+            "labelMap": labels,
+            "labelMapDigest": digest(labels),
+            "runtimeDependencies": dependencies,
+            "runtimeDependenciesDigest": digest(dependencies),
+            "adapterSourceSHA256": source_digest,
+            "adapterLayerSHA256": file_sha256(Path(delivery_compact_model_adapter.__file__)),
+            "resourceSupervisorSHA256": file_sha256(Path(delivery_resource_supervisor.__file__)),
+        })
+        config["preprocessingConfig"]["executionIdentity"] = {
+            "adapterSourceSHA256": source_digest,
+            "adapterLayerSHA256": config["adapterLayerSHA256"],
+            "resourceSupervisorSHA256": config["resourceSupervisorSHA256"],
+            "runtimeDependenciesDigest": digest(dependencies),
+            "labelMapDigest": digest(labels),
+            "outputFormat": "sensevoice-tagged-text",
+        }
+        config["preprocessingConfigDigest"] = digest(config["preprocessingConfig"])
+        code = "print('<|en|><|NEUTRAL|><|Speech|><|withitn|>hello')"
+        config["commandTemplate"] = ["{binary}", "-c", code, "{audio}", "{weights}"]
+        payload, hit = run_compact_adapter(
+            wav_path=self.audio, config=config, cache=self.cache,
+            lock_root=self.root / "lock", supervisor=self._supervisor,
+        )
+        self.assertFalse(hit)
+        self.assertEqual(payload["outputs"]["emotionTag"], "NEUTRAL")
+        self.assertEqual(payload["outputs"]["transcript"], "hello")
+        drifted = copy.deepcopy(config)
+        drifted["runtimeDependencies"]["runtime"] = "fixture-v2"
+        with self.assertRaisesRegex(CompactAdapterError, "dependency identity"):
+            validate_adapter_config(drifted)
+
+    def test_unqualified_output_can_be_returned_for_forensics_but_is_not_cached(self) -> None:
+        def unqualified(_command, **_kwargs):
+            return SupervisedResult(
+                report={
+                    "qualified": False,
+                    "qualificationFailures": ["post-exit-memory-recovery-unqualified"],
+                },
+                stdout=json.dumps({
+                    "transcript": "hello", "languageTag": "en",
+                    "emotionTag": "neutral", "eventTag": "speech",
+                }).encode(),
+                stderr=b"",
+            )
+
+        payload, hit = run_compact_adapter(
+            wav_path=self.audio, config=self.config, cache=self.cache,
+            lock_root=self.root / "lock", supervisor=unqualified,
+            return_unqualified=True,
+        )
+        self.assertFalse(hit)
+        self.assertFalse(payload["resourceEnvelope"]["qualified"])
+        _payload, second_hit = run_compact_adapter(
+            wav_path=self.audio, config=self.config, cache=self.cache,
+            lock_root=self.root / "lock", supervisor=self._supervisor,
+        )
+        self.assertFalse(second_hit)
 
 
 if __name__ == "__main__":

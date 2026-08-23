@@ -156,7 +156,9 @@ The SER checkpoint's full posterior, entropy and top-two margin are evidence; it
 semantic truth. Calm-to-neutral is a testable hypothesis and whisper has no categorical class, so
 it uses breathiness, HNR, CPP, voicing, and energy instead. The dimensional layer remains advisory
 until it is fitted to blinded local labels and clears grouped speaker/script validation plus an
-untouched holdout.
+untouched holdout. Evaluator v2 preselects at most one elastic-net/PLS challenger from calibration
+folds before confirmation is opened; holdout scoring exposes only ridge-v1 and that preselected
+challenger, and adoption still requires no VAD, preset, speaker, or script-group regression.
 
 `scripts/delivery_listening_session.py` builds, runs, and scores the blind
 delivery listening session recommended by the 2026-08-04 delivery-control

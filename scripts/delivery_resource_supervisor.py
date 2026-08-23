@@ -27,6 +27,8 @@ PROVISIONAL_MAXIMUM_RSS_BYTES = 5 * 1024**3
 MEANINGFUL_SWAP_GROWTH_BYTES = 64 * 1024**2
 DEFAULT_TIMEOUT_SECONDS = 900.0
 SAMPLE_INTERVAL_SECONDS = 0.05
+DEFAULT_RECOVERY_TIMEOUT_SECONDS = 15.0
+RECOVERY_SAMPLE_INTERVAL_SECONDS = 0.5
 
 
 class ResourceSupervisorError(RuntimeError):
@@ -107,6 +109,7 @@ def run_supervised(
     environment: dict[str, str] | None = None,
     snapshotter: Callable[[], HostSnapshot] = host_snapshot,
     rss_sampler: Callable[[int], int] = _process_rss_bytes,
+    recovery_timeout_seconds: float = DEFAULT_RECOVERY_TIMEOUT_SECONDS,
 ) -> SupervisedResult:
     if not command or any(not isinstance(item, str) or not item for item in command):
         raise ResourceSupervisorError("supervised command must be a non-empty string vector")
@@ -114,6 +117,8 @@ def run_supervised(
         raise ResourceSupervisorError("timeout must be positive and finite")
     if maximum_rss_bytes <= 0:
         raise ResourceSupervisorError("maximum RSS must be positive")
+    if not math.isfinite(recovery_timeout_seconds) or recovery_timeout_seconds < 0:
+        raise ResourceSupervisorError("recovery timeout must be finite and nonnegative")
     lock_root.mkdir(parents=True, exist_ok=True)
     lock_path = lock_root / "delivery-analysis-supervisor.lock"
     with lock_path.open("a+b") as lock:
@@ -158,7 +163,19 @@ def run_supervised(
         wall_seconds = time.monotonic() - started
         # Snapshot only after the child has exited: a next layer may not start
         # while its predecessor still owns resident model pages.
+        recovery_started = time.monotonic()
         after = snapshotter()
+        recovery_snapshot_count = 1
+        while (
+            before.free_percent is not None
+            and after.free_percent is not None
+            and after.free_percent < before.free_percent - 5.0
+            and time.monotonic() - recovery_started < recovery_timeout_seconds
+        ):
+            time.sleep(RECOVERY_SAMPLE_INTERVAL_SECONDS)
+            after = snapshotter()
+            recovery_snapshot_count += 1
+        recovery_wait_seconds = time.monotonic() - recovery_started
         swap_delta = (
             after.swap_used_bytes - before.swap_used_bytes
             if before.swap_used_bytes is not None and after.swap_used_bytes is not None
@@ -201,6 +218,8 @@ def run_supervised(
             "hostAfter": after.report(),
             "swapDeltaBytes": swap_delta,
             "postExitMemoryRecovered": memory_recovered,
+            "recoverySnapshotCount": recovery_snapshot_count,
+            "recoveryWaitSeconds": recovery_wait_seconds,
             "stdoutSHA256": _digest(stdout),
             "stderrSHA256": _digest(stderr),
             "stdoutByteCount": len(stdout),

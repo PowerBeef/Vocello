@@ -98,13 +98,28 @@ REQUIRED_SURFACES=(
     "scripts/delivery_experiment_runner.py"
     "scripts/delivery_calibration_session.py"
     "scripts/delivery_evaluator.py"
+    "scripts/delivery_evaluator_v2.py"
+    "scripts/delivery_analysis_cache.py"
+    "scripts/delivery_temporal_features.py"
+    "scripts/delivery_listener_calibration_v2.py"
+    "scripts/delivery_compact_model_adapter.py"
+    "scripts/delivery_resource_supervisor.py"
+    "scripts/run_local_delivery_cascade.py"
     "scripts/delivery_promotion_decision.py"
     "scripts/tests/test_delivery_experiment.py"
     "scripts/tests/test_delivery_experiment_runner.py"
     "scripts/tests/test_delivery_calibration_session.py"
     "scripts/tests/test_delivery_evaluator.py"
+    "scripts/tests/test_delivery_evaluator_v2.py"
+    "scripts/tests/test_delivery_analysis_cache.py"
+    "scripts/tests/test_delivery_temporal_features.py"
+    "scripts/tests/test_delivery_listener_calibration_v2.py"
+    "scripts/tests/test_delivery_compact_model_adapter.py"
+    "scripts/tests/test_delivery_resource_supervisor.py"
+    "scripts/tests/test_run_local_delivery_cascade.py"
     "scripts/tests/test_delivery_promotion_decision.py"
     "config/delivery-experiment-contract.json"
+    "config/delivery-evaluator-v2-contract.json"
     "config/delivery-evaluation-corpus.json"
     "docs/reference/qwen3-tts-emotion-tone-research-2026-08-22.md"
     "scripts/check_surface_coverage.py"
@@ -413,6 +428,8 @@ python3 "$SCRIPT_DIR/check_convergence_promotion_gate.py"
 # intensifiers, and direction conflicts against config/delivery-instruction-contract.json.
 python3 "$SCRIPT_DIR/check_delivery_instructions.py"
 python3 "$SCRIPT_DIR/delivery_experiment.py" validate
+python3 "$SCRIPT_DIR/delivery_evaluator.py" validate-v2-contract \
+    --contract "$PROJECT_DIR/config/delivery-evaluator-v2-contract.json"
 # Per-file documentation metadata: pinned historical bodies cannot change without
 # an explicit re-pin, active docs are scanned for contradictions with facts derived
 # from code, and source bindings warn on drift. Non-strict during rollout: the

@@ -8,11 +8,13 @@ sourceOfTruth:
   - Sources/Resources/qwenvoice_contract.json
   - config/runtime-debug-knobs.json
   - config/delivery-experiment-contract.json
+  - config/delivery-evaluator-v2-contract.json
   - config/delivery-evaluation-corpus.json
   - scripts/delivery_experiment.py
   - scripts/delivery_experiment_runner.py
   - scripts/delivery_calibration_session.py
   - scripts/delivery_evaluator.py
+  - scripts/run_local_delivery_cascade.py
   - scripts/delivery_promotion_decision.py
 ---
 # Backend / MLX domain rule
@@ -70,6 +72,8 @@ Before changing anything in this layer, read:
   `scripts/delivery_calibration_session.py` builds and merges metadata-blinded independent-listener
   calibration sessions,
   `scripts/delivery_evaluator.py` composes post-generation layers, and
+  `scripts/run_local_delivery_cascade.py` runs the content-addressed v2 acoustic/adapter cascade
+  only after the generator has exited,
   `scripts/delivery_promotion_decision.py` fails closed over automatic and blinded evidence.
 - When callable, use Swift/concurrency/performance skills (for example the Axiom skills) and
   authoritative MLX / Hugging Face documentation for language, isolation, and profiling decisions.

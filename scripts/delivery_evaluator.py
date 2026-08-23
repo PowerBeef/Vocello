@@ -580,6 +580,18 @@ def main() -> int:
     evaluate_command.add_argument("--out", required=True, type=Path)
     validate_command = commands.add_parser("validate-model")
     validate_command.add_argument("--model", required=True, type=Path)
+    calibrate_v2_command = commands.add_parser("calibrate-v2")
+    calibrate_v2_command.add_argument("--input", required=True, type=Path)
+    calibrate_v2_command.add_argument("--out", required=True, type=Path)
+    evaluate_v2_command = commands.add_parser("evaluate-v2")
+    evaluate_v2_command.add_argument("--input", required=True, type=Path)
+    evaluate_v2_command.add_argument("--model", required=True, type=Path)
+    evaluate_v2_command.add_argument("--out", required=True, type=Path)
+    compare_v2_command = commands.add_parser("compare-v2-holdout")
+    compare_v2_command.add_argument("--input", required=True, type=Path)
+    compare_v2_command.add_argument("--out", required=True, type=Path)
+    validate_v2_contract_command = commands.add_parser("validate-v2-contract")
+    validate_v2_contract_command.add_argument("--contract", required=True, type=Path)
     compose = commands.add_parser("compose")
     compose.add_argument("--acoustic", required=True, type=Path)
     compose.add_argument("--asr", type=Path)
@@ -591,7 +603,24 @@ def main() -> int:
     compose.add_argument("--out", required=True, type=Path)
     args = parser.parse_args()
     try:
-        if args.command == "calibrate":
+        if args.command in {
+            "calibrate-v2", "evaluate-v2", "compare-v2-holdout", "validate-v2-contract"
+        }:
+            from delivery_evaluator_v2 import (
+                calibrate_v2, compare_untouched_holdout, evaluate_v2, validate_v2_contract,
+            )
+            if args.command == "calibrate-v2":
+                result = calibrate_v2(_read(args.input))
+            elif args.command == "evaluate-v2":
+                result = evaluate_v2(_read(args.input), _read(args.model))
+            elif args.command == "validate-v2-contract":
+                validate_v2_contract(_read(args.contract))
+                print(json.dumps({"status": "PASS", "contract": str(args.contract)}))
+                return 0
+            else:
+                result = compare_untouched_holdout(_read(args.input))
+            atomic_json(args.out, result)
+        elif args.command == "calibrate":
             result = calibrate(_read(args.input))
             atomic_json(args.out, result)
         elif args.command == "evaluate":

@@ -25,6 +25,7 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from analyze_prosody import analyze
+from delivery_temporal_features import analyze_temporal, paired_temporal_delta
 from delivery_quality_gate import delivery_features, evaluate_delivery
 from prosody_profile import builtin_profile
 from delivery_experiment import (
@@ -231,6 +232,7 @@ def create_execution_plan(
         "binarySHA256": file_sha256(binary),
         "runnerSHA256": file_sha256(Path(__file__)),
         "analyzerSHA256": file_sha256(REPO / "scripts/analyze_prosody.py"),
+        "temporalAnalyzerSHA256": file_sha256(REPO / "scripts/delivery_temporal_features.py"),
         "deliveryGateSHA256": file_sha256(REPO / "scripts/delivery_quality_gate.py"),
         "prosodyProfileSHA256": file_sha256(REPO / "scripts/prosody_profile.py"),
         "serialProcessPolicy": "one-generator-or-analyzer-process-at-a-time",
@@ -253,6 +255,7 @@ def validate_execution_plan(plan: dict[str, Any], binary: Path) -> dict[str, Any
     expected_sources = {
         "runnerSHA256": Path(__file__),
         "analyzerSHA256": REPO / "scripts/analyze_prosody.py",
+        "temporalAnalyzerSHA256": REPO / "scripts/delivery_temporal_features.py",
         "deliveryGateSHA256": REPO / "scripts/delivery_quality_gate.py",
         "prosodyProfileSHA256": REPO / "scripts/prosody_profile.py",
     }
@@ -469,6 +472,13 @@ def analyze_execution(plan: dict[str, Any], run_dir: Path) -> dict[str, Any]:
         reference_analysis = analyze(str(run_dir / reference["audio"]))
         if "error" in instructed_analysis or "error" in reference_analysis:
             raise RunnerError(f"{take_id}: deterministic prosody analysis failed")
+        try:
+            temporal_features = paired_temporal_delta(
+                analyze_temporal(str(run_dir / result["audio"])),
+                analyze_temporal(str(run_dir / reference["audio"])),
+            )
+        except (OSError, ValueError) as error:
+            raise RunnerError(f"{take_id}: deterministic temporal analysis failed") from error
         rows.append({
             "generationID": result["generationID"],
             "takeID": take_id, "speakerID": row["speakerID"],
@@ -480,6 +490,7 @@ def analyze_execution(plan: dict[str, Any], run_dir: Path) -> dict[str, Any]:
             "derivedFeatures": delivery_features(
                 instructed_analysis, reference_analysis, profile
             ),
+            "temporalDeltaV1": temporal_features,
             "deliveryVerdict": evaluate_delivery(
                 instructed_analysis, reference_analysis,
                 f"{row['preset']}.{row['shippedIntensity']}",
@@ -494,7 +505,8 @@ def analyze_execution(plan: dict[str, Any], run_dir: Path) -> dict[str, Any]:
     report = {
         "schemaVersion": SCHEMA_VERSION, "kind": "paired-acoustic-delta",
         "promotionAuthority": False, "manifestDigest": plan["executionPlanDigest"],
-        "featureNames": list(ACOUSTIC_FEATURES), "rows": rows,
+        "featureNames": list(ACOUSTIC_FEATURES),
+        "optionalFeatureBlocks": ["temporalDeltaV1"], "rows": rows,
     }
     atomic_json(run_dir / "acoustic-layer.json", report)
     return report

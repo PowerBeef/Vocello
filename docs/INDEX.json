@@ -16,11 +16,13 @@
         "Sources/Resources/qwenvoice_contract.json",
         "config/runtime-debug-knobs.json",
         "config/delivery-experiment-contract.json",
+        "config/delivery-evaluator-v2-contract.json",
         "config/delivery-evaluation-corpus.json",
         "scripts/delivery_experiment.py",
         "scripts/delivery_experiment_runner.py",
         "scripts/delivery_calibration_session.py",
         "scripts/delivery_evaluator.py",
+        "scripts/run_local_delivery_cascade.py",
         "scripts/delivery_promotion_decision.py"
       ]
     },
@@ -313,11 +315,19 @@
         "scripts/delivery_experiment_runner.py",
         "scripts/delivery_calibration_session.py",
         "scripts/delivery_evaluator.py",
+        "scripts/delivery_evaluator_v2.py",
+        "scripts/delivery_listener_calibration_v2.py",
+        "scripts/delivery_analysis_cache.py",
+        "scripts/delivery_temporal_features.py",
+        "scripts/delivery_compact_model_adapter.py",
+        "scripts/delivery_resource_supervisor.py",
+        "scripts/run_local_delivery_cascade.py",
         "scripts/delivery_promotion_decision.py",
         "scripts/delivery_separability.py",
         "scripts/bench_delivery_prosody.py",
         "scripts/analyze_prosody.py",
         "config/delivery-experiment-contract.json",
+        "config/delivery-evaluator-v2-contract.json",
         "config/delivery-evaluation-corpus.json"
       ]
     },

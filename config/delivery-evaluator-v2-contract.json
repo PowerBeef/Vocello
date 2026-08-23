@@ -1,0 +1,138 @@
+{
+  "schemaVersion": 2,
+  "status": "active-experimental",
+  "boundary": "Operator-local post-release research. This contract cannot alter product delivery instructions, cannot become an ordinary CI or release prerequisite, and cannot authorize semantic promotion without qualified blinded human evidence.",
+  "hostClass": {
+    "canonical": "Mac mini M2 8GB",
+    "executionPolicy": "strictly-sequential-subprocesses",
+    "provisionalMaximumProcessPeakRSSBytes": 5368709120,
+    "ceilingIsProvisional": true,
+    "requireNoMemoryPressureWarning": true,
+    "requireNoMeaningfulSwapOutGrowth": true,
+    "requirePostExitMemoryRecovery": true,
+    "qualificationRuns": 2
+  },
+  "cache": {
+    "root": "build/cache/delivery-analysis",
+    "identityComponents": [
+      "originalWAVSHA256",
+      "canonicalDerivativeSHA256",
+      "layerID",
+      "layerVersion",
+      "binarySHA256",
+      "modelID",
+      "modelRevision",
+      "weightsSHA256",
+      "preprocessingConfigDigest"
+    ],
+    "canonicalAudio": {
+      "sampleRateHz": 16000,
+      "channels": 1,
+      "format": "pcm-s16le",
+      "deterministicResampling": "linear-rational-v1"
+    },
+    "atomicWrites": true,
+    "failClosedOnDigestMismatch": true,
+    "reportsMayContainLocalPaths": false
+  },
+  "temporalFeatures": {
+    "schemaVersion": 1,
+    "voicedContentRegions": 5,
+    "boundedMemory": true,
+    "pairedDeltaBlock": "temporalDeltaV1"
+  },
+  "humanCalibration": {
+    "schemaVersion": 2,
+    "minimumIndependentListeners": 3,
+    "minimumSpeakers": 6,
+    "minimumScripts": 3,
+    "minimumPresets": 8,
+    "repeatFraction": 0.125,
+    "allowedRepeatFraction": {
+      "minimum": 0.1,
+      "maximum": 0.15
+    },
+    "perListenerIndependentOrder": true,
+    "requireAnchors": true,
+    "allowUncertain": true,
+    "retainListenerLevelRows": true,
+    "requestedLabelMayEnterDimensionalBlock": false,
+    "humanSemanticAuthorityRequired": true
+  },
+  "evaluator": {
+    "baseline": "ridge-v1",
+    "pairwise": "per-preset-regularized-logistic-v2",
+    "dimensionalChallengers": [
+      "elastic-net-v2",
+      "partial-least-squares-v2"
+    ],
+    "blockedValidationGroups": [
+      "speakerID",
+      "scriptTranslationGroup",
+      "seed",
+      "outputLanguage"
+    ],
+    "uncertainty": "blocked-split-conformal-v1",
+    "outOfDistribution": [
+      "robustMahalanobis",
+      "nearestNeighborDistance",
+      "perFeatureZ",
+      "speakerNovelty",
+      "languageNovelty"
+    ],
+    "challengerMustImproveUntouchedHoldout": true,
+    "challengerMayRegressAnyVADDimension": false,
+    "challengerMayRegressAnyPreset": false
+  },
+  "compactAdapters": {
+    "contractFirst": true,
+    "candidateOrder": [
+      "sensevoice-small-q8",
+      "distilhubert"
+    ],
+    "adopted": [],
+    "requiredBeforeExecution": [
+      "commercially-compatible-license",
+      "declared-training-data",
+      "immutable-revision",
+      "binary-sha256",
+      "weights-sha256",
+      "preprocessing-config-digest",
+      "offline-after-acquisition"
+    ],
+    "requiredBeforeAdoption": [
+      "two-clean-eight-gigabyte-runs",
+      "clean-post-exit-memory-release",
+      "untouched-human-holdout-improvement"
+    ]
+  },
+  "cascade": {
+    "always": [
+      "audio-qc",
+      "global-acoustics",
+      "temporal-acoustics",
+      "cached-compact-representation",
+      "tiny-local-heads"
+    ],
+    "ambiguousOnly": [
+      "coarse-ser-asr",
+      "extra-identity",
+      "legacy-ser-during-bakeoff"
+    ],
+    "finalistsOnly": [
+      "utmos",
+      "complete-multilingual-asr-cer",
+      "optional-semantic-reviewer",
+      "human-holdout"
+    ]
+  },
+  "promotion": {
+    "automaticLayersMayReject": true,
+    "automaticLayersMayAbstain": true,
+    "automaticLayersMayRouteToManualListening": true,
+    "automaticLayersMayPromoteSemanticDelivery": false,
+    "confirmationSelectorsForbidden": true,
+    "requestedLabelsForbiddenFromBlindFeatureExtraction": true,
+    "productionEmotionPresetChangesInThisWork": false
+  }
+}

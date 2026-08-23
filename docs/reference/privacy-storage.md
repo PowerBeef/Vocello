@@ -151,6 +151,7 @@ block byte-for-byte, so a manifest change cannot silently leave documentation st
 | `build/cache/xcode/ios-device/` | Physical-device iOS build and XCUITest lanes | `cache` | `aggressive` | Persistent incremental physical-device Xcode cache |
 | `build/cache/xcode/source-packages/` | Serialized Xcode SwiftPM resolver | `cache` | `aggressive` | Shared pinned Xcode package checkout and artifact store |
 | `build/cache/swiftpm/mlx-audio-runtime/` | Owned Vocello Qwen3 Core SwiftPM commands | `cache` | `aggressive` | Persistent package-specific SwiftPM scratch cache |
+| `build/cache/delivery-analysis/` | Operator-local delivery evaluator | `cache` | `aggressive` | Content-addressed canonical PCM and source-bound analysis layers; never promotion evidence by itself |
 | `build/scratch/derived-data/foundation/` | Foundation target compile-safety lane | `scratch` | `routine` | Delete after successful invocation and during routine cleanup |
 | `build/scratch/derived-data/package-resolution/` | Serialized Xcode SwiftPM resolver | `scratch` | `routine` | Ephemeral resolver intermediates; the shared checkout lives under build/cache |
 | `build/scratch/transient/` | One-off repository tooling and migration-only diagnostic probes | `scratch` | `routine` | Invocation-local helpers and obsolete untracked probes; routine cleanup removes them |

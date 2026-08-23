@@ -445,9 +445,44 @@ def main() -> int:
     merge = commands.add_parser("merge")
     merge.add_argument("--session", required=True, type=Path)
     merge.add_argument("--out", required=True, type=Path)
+    build_v2 = commands.add_parser("build-v2")
+    build_v2.add_argument("--plan", required=True, type=Path)
+    build_v2.add_argument("--run-dir", required=True, type=Path)
+    build_v2.add_argument("--baseline-run-dir", type=Path)
+    build_v2.add_argument("--anchors", type=Path)
+    build_v2.add_argument("--out", required=True, type=Path)
+    build_v2.add_argument("--session-seed", required=True, type=int)
+    run_v2 = commands.add_parser("run-v2")
+    run_v2.add_argument("--session", required=True, type=Path)
+    run_v2.add_argument("--listener-id", required=True)
+    run_v2.add_argument("--fluent-languages", required=True)
+    run_v2.add_argument("--player", default="/usr/bin/afplay")
+    merge_v2 = commands.add_parser("merge-v2")
+    merge_v2.add_argument("--session", required=True, type=Path)
+    merge_v2.add_argument("--out", required=True, type=Path)
     args = parser.parse_args()
     try:
-        if args.command == "build":
+        if args.command in {"build-v2", "run-v2", "merge-v2"}:
+            from delivery_listener_calibration_v2 import (
+                build_v2_session, merge_v2_responses, run_v2_session,
+            )
+            if args.command == "build-v2":
+                result = build_v2_session(
+                    plan_path=args.plan, run_dir=args.run_dir,
+                    baseline_run_dir=args.baseline_run_dir,
+                    anchor_manifest_path=args.anchors,
+                    out_dir=args.out, session_seed=args.session_seed,
+                )
+            elif args.command == "run-v2":
+                result = run_v2_session(
+                    session_dir=args.session, listener_id=args.listener_id,
+                    fluent_languages=_parse_languages(args.fluent_languages),
+                    player=args.player,
+                )
+            else:
+                result = merge_v2_responses(session_dir=args.session)
+                atomic_json(args.out, result)
+        elif args.command == "build":
             result = build_session(
                 plan_path=args.plan, run_dir=args.run_dir, out_dir=args.out,
                 session_seed=args.session_seed,

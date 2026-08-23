@@ -47,7 +47,24 @@ machine-readable status record and wins over any older prose.
 | 13 — Benchmark/history v3 | Live 2026-07-29: the first schema-v3 records are committed (three clean `phase0-cli-control-*` engine records plus one exploratory run that also exposed and fixed the summarizer's v3 pin). `benchmarks/schema-v3.json` adds the typed quality identity to generation takes (pass/warning only, five fast gates required, machine-code issues); v1/v2 records stay valid immutable history; the publisher stamps v3 only when every take carries the identity. The UI benchmark checkers folded the same identity 2026-08-01: ui-generation records now publish v3 (first: the focused `v3-fold-proof` record `macos-xcui-benchmark-20260801-003208-403989cf`); the canonical iOS matrix published its first v3 record 2026-08-01 (`ios-xcui-benchmark-20260801-132415-abbec96b`). |
 | 14 — Organization and retirement | Closed 2026-07-23 (14a + 14b): compatibility SPI retired, actor-owned loading/metadata/priming/clone artifacts, clone conditioning epoch-bound end to end. |
 
-## Resume here (2026-08-22)
+## Resume here (2026-08-23)
+
+**DP-28 compact delivery evaluator v2 foundation landed; live qualification remains open
+(2026-08-23, macOS/CLI research tooling):** the existing source-bound delivery experiment now
+adds a bounded five-region temporal contour block and a content-addressed analysis cache whose
+identity binds original/canonical audio, analyzer binary, model revision/weights, and preprocessing.
+The same calibration entry point has versioned v2 packets with per-listener shuffle, repeats,
+anchors, uncertainty/confidence/replay/latency, two kinds of 2AFC, naturalness and intensity. The
+evaluator preserves ridge-v1 while adding preset-local logistic heads, elastic-net/PLS challengers,
+fold-local speaker/translation/seed/language validation, conformal intervals, OOD and typed
+abstention. A serial resource supervisor and cascade enforce generator exit before heavy analyzers,
+retain privacy-safe resource provenance, and explain reject/abstain/manual-listening routes.
+SenseVoiceSmall Q8 and DistilHuBERT remain unadopted contract candidates; no weights were acquired.
+Closure still requires the full six-speaker/three-script/eight-preset listener cohort, qualified
+human labels, two clean canonical-host adapter runs, and untouched-holdout improvement over
+ridge-v1. This infrastructure changes no product delivery instruction or `EmotionPreset`; automatic
+layers still cannot authorize semantic promotion. See
+[`docs/reference/delivery-harness.md`](reference/delivery-harness.md) §2.3.
 
 **DP-27 foundation completed and DP-28/DP-30 screening underway; production copy unchanged
 (2026-08-22, macOS/CLI):** the pinned primary-source report confirms that Vocello's

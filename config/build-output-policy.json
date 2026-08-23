@@ -133,6 +133,15 @@
       "env": "QVOICE_SWIFTPM_RUNTIME_CACHE"
     },
     {
+      "id": "delivery-analysis-cache",
+      "path": "build/cache/delivery-analysis",
+      "class": "cache",
+      "owner": "Operator-local delivery evaluator",
+      "cleanup": "aggressive",
+      "retention": "Content-addressed canonical PCM and source-bound analysis layers; never promotion evidence by itself",
+      "env": "QVOICE_DELIVERY_ANALYSIS_CACHE"
+    },
+    {
       "id": "scratch-foundation",
       "path": "build/scratch/derived-data/foundation",
       "class": "scratch",

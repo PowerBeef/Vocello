@@ -1013,20 +1013,35 @@
       "plan": "delivery-prompting-2026-08",
       "title": "Calibrate the layered local delivery evaluator",
       "status": "planned",
-      "gate": "Infrastructure landed with full SER posteriors, entropy/margin abstention, sequential acoustic/ASR/identity/UTMOS/SER composition, and a lightweight dimensional VAD model with nested speaker/script-grouped validation. The blinded calibration workflow now requires exact complete planned-row coverage, verifies every WAV, binds its private key, withholds preset/speaker/script/seed/features from listeners, requires at least three independent complete listeners plus fluent language coverage and per-dimension mean pairwise CCC >= 0.60, and rejects target-derived or otherwise unqualified label provenance at evaluator training. A first untracked 27-clip English packet completed without retained generation failures across Aiden/Ryan/Vivian, three script lengths and Happy/Angry/Sad; it remains deliberately unqualified pending real listener responses. Closure still requires AV-07's frozen blinded-label training manifest, independent untouched multi-speaker/script/language holdout, declared feature normalization and noise floors, calibration and out-of-distribution metrics, immutable coefficients/provenance, challenger license and memory checks, and negative fixtures proving threshold leakage or a missing scorer cannot authorize promotion.",
+      "gate": "V1 remains valid with full SER posteriors, entropy/margin abstention, sequential acoustic/ASR/identity/UTMOS/SER composition, and ridge-v1. The versioned v2 foundation extends the same source-bound harness: an atomic content-addressed cache binds original/canonical audio to analyzer/model/preprocessing provenance; a bounded five-region contour layer emits same-identity instructed-minus-neutral deltas; v2 listener packets add independent order, 12.5% repeats, anchors, uncertainty/confidence/replay/latency, target-neutral and candidate-baseline 2AFC, naturalness/intensity, retained listener rows, pairwise CCC, free-identification agreement, order bias and fluent coverage; v2 evaluation adds preset-local regularized logistic heads, elastic-net/PLS challengers, fold-local speaker/translation/seed/language validation, blocked conformal intervals, robust Mahalanobis/nearest-neighbor OOD and typed contradictions/abstention. A serial supervisor and cascade require generator exit before heavy analyzers and explain rejection, abstention and manual-listening routes. SenseVoiceSmall Q8 and DistilHuBERT are unadopted contract candidates; no weights were acquired. The first untracked 27-clip English v1 packet remains deliberately unqualified. Closure still requires AV-07's frozen six-speaker/three-script/eight-preset blinded labels, anchors and qualified listeners, independent untouched multi-speaker/script/language holdout, two clean canonical M2/8 GB heavy-adapter runs with stable post-exit memory, challenger license/training/digest provenance, and demonstrated untouched-holdout calibration gain over ridge-v1 without any VAD or preset regression. Automatic layers cannot authorize semantic promotion and production copy remains unchanged.",
       "sourceOfTruth": [
+        "config/delivery-evaluator-v2-contract.json",
         "scripts/delivery_calibration_session.py",
         "scripts/delivery_evaluator.py",
+        "scripts/delivery_evaluator_v2.py",
+        "scripts/delivery_listener_calibration_v2.py",
+        "scripts/delivery_analysis_cache.py",
+        "scripts/delivery_temporal_features.py",
+        "scripts/delivery_resource_supervisor.py",
+        "scripts/delivery_compact_model_adapter.py",
+        "scripts/run_local_delivery_cascade.py",
         "scripts/emotion_advisory.py",
         "scripts/analyze_prosody.py"
       ],
       "evidence": [
         "file:scripts/tests/test_delivery_calibration_session.py",
         "file:scripts/tests/test_delivery_evaluator.py",
+        "file:scripts/tests/test_delivery_listener_calibration_v2.py",
+        "file:scripts/tests/test_delivery_evaluator_v2.py",
+        "file:scripts/tests/test_delivery_analysis_cache.py",
+        "file:scripts/tests/test_delivery_temporal_features.py",
+        "file:scripts/tests/test_delivery_resource_supervisor.py",
+        "file:scripts/tests/test_delivery_compact_model_adapter.py",
+        "file:scripts/tests/test_run_local_delivery_cascade.py",
         "file:scripts/tests/test_emotion_advisory.py",
         "doc:docs/reference/autonomous-validation-audit-2026-08-21.md"
       ],
-      "updated": "2026-08-22"
+      "updated": "2026-08-23"
     },
     {
       "id": "DP-29",

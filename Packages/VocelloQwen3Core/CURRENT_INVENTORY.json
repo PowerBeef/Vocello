@@ -153,12 +153,12 @@
     },
     {
       "path": "Sources/VocelloQwen3Core/Engine.swift",
-      "sha256": "a51dcf1801b9c2dc39418b21d7fd050dc7357014c9c70c8600acf77d3d46c7ee",
+      "sha256": "ae72752a05410e7e395a29ee2eebd4498032500b90d768ee9d8ef196a494ebb6",
       "upstreamStatus": "added"
     },
     {
       "path": "Sources/VocelloQwen3Core/GenerationSession.swift",
-      "sha256": "06ad6a00091f50d871e1ca53c614281506cc6d3339f6538d82ba763d449be217",
+      "sha256": "219fbe5ffff3960bed57e3445d2a36ccc56e42b39ed83bffe5c331d318ca9f95",
       "upstreamStatus": "added"
     },
     {

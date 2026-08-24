@@ -8,6 +8,19 @@ import XCTest
 /// preset pick silently emitted the normal-tier copy — reversing DP-8's
 /// ship-strong decision without anyone deciding it (2026-08-04 audit, F4).
 final class EmotionPresetResolutionTests: XCTestCase {
+    func testStrictDeliveryCellRequiresExplicitValidTier() throws {
+        let cell = try DeliveryInstructionCell.resolveStrict("calm.strong")
+        XCTAssertEqual(cell.id, "calm.strong")
+        XCTAssertEqual(cell.preset.id, "calm")
+        XCTAssertEqual(cell.intensity, .strong)
+        XCTAssertEqual(cell.instruction, cell.preset.instruction(for: .strong))
+
+        XCTAssertThrowsError(try DeliveryInstructionCell.resolveStrict("calm"))
+        XCTAssertThrowsError(try DeliveryInstructionCell.resolveStrict("calm.loud"))
+        XCTAssertThrowsError(try DeliveryInstructionCell.resolveStrict("missing.strong"))
+        XCTAssertThrowsError(try DeliveryInstructionCell.resolveStrict("calm.strong.extra"))
+    }
+
     func testIdenticalTierStringsResolveToStrong() {
         let neutral = EmotionPreset.preset(id: "neutral")
         XCTAssertNotNil(neutral)

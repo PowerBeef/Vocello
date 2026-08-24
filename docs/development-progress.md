@@ -49,6 +49,34 @@ machine-readable status record and wins over any older prose.
 
 ## Resume here (2026-08-23)
 
+**iOS Built-in Voice startup evidence localized a false-startup label; exact-script closure remains
+open (2026-08-24):** the governed physical-device runner and visible XCUITest parity lane are now
+live-proven with the 285-character screenshot reconstruction. Vivian / Calm Strong / English UI and
+engine receipts matched. Five fixed-seed cold takes and ten same-process warm takes passed. Across
+seeds `38112001` through `38112008`, six passed and two reached model tokens, decoded audio, and
+published chunks before deterministic dropout QC rejection (`2725 ms` and `14992 ms`). Neither used
+allocation recovery. An immediate production-state retry after the first failing seed stayed alive
+and produced the same represented QC result.
+
+That evidence exposed a source-proven presentation defect: `MLXTTSEngine`'s outer catch relabeled
+downstream mandatory audio-QC failures as “could not start audio generation.” Typed runtime errors
+now preserve their owning stage. A rejected dropout remains `stream_failed` /
+`audio.quality_rejected`, retains only its allowlisted QC flag, tells the user the generated take had
+an unusable silent gap, and is still not saved. Generic startup failures and allocation-retry
+wording remain unchanged. The focused core tests, generic iOS build, and physical failing-seed proof
+pass this contract.
+
+One separate diagnostics-only forced-unload successor exited after an iOS memory warning without a
+terminal take or new retained crash record. The host now checks the exact CoreDevice launch PID,
+stops within one polling interval, and performs final evidence collection rather than waiting the
+one-hour run timeout. That preparation-arm memory behavior remains open and cannot be promoted into
+a product defect without further evidence. ISR-01 through ISR-03 and ISR-05 are implemented; ISR-04
+and ISR-06 remain open because the original script bytes, remaining preparation/predecessor/platform
+arms, and complete closure matrix are still outstanding. No prompt, sampling default, model pin,
+retry count, or audio-QC acceptance rule changed. See
+[`ios-built-in-startup-reliability.md`](reference/ios-built-in-startup-reliability.md) and the
+authoritative roadmap.
+
 **DP-28 live evaluator infrastructure and calibration audio are complete; human evidence is next
 (2026-08-23, macOS/CLI research tooling):** the exact contract-pinned SenseVoiceSmall Q8 and
 DistilHuBERT assets now live only under the operator-local build cache. Both passed two cache-cold

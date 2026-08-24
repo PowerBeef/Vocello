@@ -225,6 +225,19 @@
         "result-retention"
       ]
     },
+    "ui-ios-startup-parity": {
+      "producer": "scripts/ui_test.sh",
+      "requiredSteps": [
+        "source-provenance",
+        "crash-baseline",
+        "xcuitest",
+        "startup-parity-validation",
+        "crash-delta"
+      ],
+      "optionalSteps": [
+        "result-retention"
+      ]
+    },
     "ui-ios-enroll-clone-fixture": {
       "producer": "scripts/ui_test.sh",
       "requiredSteps": [

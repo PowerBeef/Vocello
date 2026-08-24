@@ -76,6 +76,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         NativeLoadCapabilityProfile,
         NativeMemoryPolicy,
         [String: NativeMLXMemorySnapshot],
+        GenerationRequestReceipt,
         AudioMarkingConfiguration?
     ) -> any GenerationOutputAdapting
 
@@ -346,6 +347,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
     private var activeModelOperation: ActiveModelOperation?
     private var modelOperationWaiters: [ModelOperationWaiter] = []
     private var modelOperationQuiescenceWaiters: [CheckedContinuation<Void, Never>] = []
+    private var nextOperationGeneration: UInt64 = 1
 
     private struct ModelOperationWaiter {
         let id: UUID
@@ -488,7 +490,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         pcmScratchBuffer: PCM16ScratchBuffer,
         diagnosticAppSupportBox: DiagnosticAppSupportBox
     ) -> StreamingSessionFactory {
-        { generationID, requestID, request, model, actorRequest, cloneHandle, cancellationIngress, streamSessionsDirectory, warmState, timingOverridesMS, booleanFlags, stringFlags, wasPrimed, telemetryRecorder, telemetrySampler, telemetryTerminalPolicy, loadCapabilityProfile, memoryPolicy, mlxMemorySnapshots, markingConfiguration in
+        { generationID, requestID, request, model, actorRequest, cloneHandle, cancellationIngress, streamSessionsDirectory, warmState, timingOverridesMS, booleanFlags, stringFlags, wasPrimed, telemetryRecorder, telemetrySampler, telemetryTerminalPolicy, loadCapabilityProfile, memoryPolicy, mlxMemorySnapshots, requestReceipt, markingConfiguration in
             GenerationOutputAdapter(
                 generationID: generationID,
                 requestID: requestID,
@@ -509,6 +511,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
                 loadCapabilityProfile: loadCapabilityProfile,
                 memoryPolicy: memoryPolicy,
                 mlxMemorySnapshots: mlxMemorySnapshots,
+                requestReceipt: requestReceipt,
                 pcmScratchBuffer: pcmScratchBuffer,
                 diagnosticAppSupportBox: diagnosticAppSupportBox,
                 markingConfiguration: markingConfiguration
@@ -1105,13 +1108,29 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         }
 
         let deliveryGenerationID = request.generationID ?? UUID()
+        let operationGeneration = nextOperationGeneration
+        nextOperationGeneration &+= 1
+        // One logical request owns one immutable random state, including the
+        // existing allocation-recovery attempt. Resolving again after unload
+        // would silently change an unpinned seed while claiming to retry the
+        // same take.
+        let samplingConfiguration = Qwen3TalkerSamplingOverride.samplingConfiguration(
+            requestedSeed: request.seed,
+            variation: request.variation
+        )
+        let initialWarmState: EngineWarmState = loadState.currentModelID == request.modelID
+            ? .warm
+            : .cold
         eventRouter.beginGeneration(deliveryGenerationID)
 
         do {
             let result = try await runGenerationAttempt(
                 request,
                 telemetryTerminalPolicy: .deferRetryableAllocationFailure,
-                cancellationIngress: cancellationIngress
+                cancellationIngress: cancellationIngress,
+                retryAttempt: 0,
+                operationGeneration: operationGeneration,
+                samplingConfiguration: samplingConfiguration
             )
             loadState = .loaded(modelID: request.modelID)
             visibleErrorMessage = nil
@@ -1158,6 +1177,25 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
                 throw CancellationError()
             }
             if NativeGenerationTerminalClassifier.isRetryableAllocationFailure(error) {
+                // Public engine telemetry deliberately keeps one terminal row per
+                // generation. Preserve the deferred first attempt in the bounded
+                // local journal so diagnostic runs can still prove exact 0 -> 1
+                // allocation-recovery accounting without changing that contract.
+                GenerationFailureDiagnosticLogger.shared.log(
+                    surfacedMessage: "The native runtime is preparing one allocation retry.",
+                    stage: NativeRuntimeStage.streamStartup.description,
+                    underlyingError: error,
+                    request: request,
+                    receipt: Self.failureReceipt(
+                        request: request,
+                        generationID: deliveryGenerationID,
+                        effectiveSeed: samplingConfiguration.effectiveSeed,
+                        warmState: initialWarmState,
+                        retryAttempt: 0,
+                        operationGeneration: operationGeneration
+                    ),
+                    appSupportDirectory: diagnosticAppSupportBox.url
+                )
                 let cleanupStartedAt = ContinuousClock.now
                 try? FileManager.default.removeItem(at: URL(fileURLWithPath: request.outputPath))
                 Memory.clearCache()
@@ -1167,7 +1205,10 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
                     let retryResult = try await runGenerationAttempt(
                         request,
                         telemetryTerminalPolicy: .publish,
-                        cancellationIngress: cancellationIngress
+                        cancellationIngress: cancellationIngress,
+                        retryAttempt: 1,
+                        operationGeneration: operationGeneration,
+                        samplingConfiguration: samplingConfiguration
                     )
                     loadState = .loaded(modelID: request.modelID)
                     visibleErrorMessage = nil
@@ -1206,18 +1247,24 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
                         await recordEventDeliveryLossIfNeeded(delivery, request: request)
                         throw CancellationError()
                     }
-                    let surfacedMessage = "The native runtime could not start audio generation after one allocation retry."
+                    let surfacedError = Self.surfacedGenerationError(
+                        error,
+                        allocationRetryAttempted: true
+                    )
                     GenerationFailureDiagnosticLogger.shared.log(
-                        surfacedMessage: surfacedMessage,
-                        stage: NativeRuntimeStage.streamStartup.description,
+                        surfacedMessage: surfacedError.localizedDescription,
+                        stage: surfacedError.stage.description,
                         underlyingError: error,
                         request: request,
+                        receipt: Self.failureReceipt(
+                            request: request,
+                            generationID: deliveryGenerationID,
+                            effectiveSeed: samplingConfiguration.effectiveSeed,
+                            warmState: .cold,
+                            retryAttempt: 1,
+                            operationGeneration: operationGeneration
+                        ),
                         appSupportDirectory: diagnosticAppSupportBox.url
-                    )
-                    let surfacedError = NativeRuntimeError.wrapping(
-                        error,
-                        stage: .streamStartup,
-                        message: surfacedMessage
                     )
                     handle(surfacedError)
                     let failureEvent = GenerationEvent.failed(surfacedError.localizedDescription)
@@ -1228,18 +1275,24 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
                     throw surfacedError
                 }
             }
-            let surfacedMessage = "The native runtime could not start audio generation."
+            let surfacedError = Self.surfacedGenerationError(
+                error,
+                allocationRetryAttempted: false
+            )
             GenerationFailureDiagnosticLogger.shared.log(
-                surfacedMessage: surfacedMessage,
-                stage: NativeRuntimeStage.streamStartup.description,
+                surfacedMessage: surfacedError.localizedDescription,
+                stage: surfacedError.stage.description,
                 underlyingError: error,
                 request: request,
+                receipt: Self.failureReceipt(
+                    request: request,
+                    generationID: deliveryGenerationID,
+                    effectiveSeed: samplingConfiguration.effectiveSeed,
+                    warmState: initialWarmState,
+                    retryAttempt: 0,
+                    operationGeneration: operationGeneration
+                ),
                 appSupportDirectory: diagnosticAppSupportBox.url
-            )
-            let surfacedError = NativeRuntimeError.wrapping(
-                error,
-                stage: .streamStartup,
-                message: surfacedMessage
             )
             handle(surfacedError)
             let failureEvent = GenerationEvent.failed(surfacedError.localizedDescription)
@@ -1269,7 +1322,10 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
     private func runGenerationAttempt(
         _ request: GenerationRequest,
         telemetryTerminalPolicy: NativeTelemetryTerminalPolicy,
-        cancellationIngress: GenerationCancellationIngress
+        cancellationIngress: GenerationCancellationIngress,
+        retryAttempt: Int,
+        operationGeneration: UInt64,
+        samplingConfiguration: VocelloQwen3SamplingConfiguration
     ) async throws -> GenerationResult {
         // The per-generation stage recorder is created inside `prepareGeneration`
         // (started before model load) and returned in `prepared` so the session's
@@ -1282,7 +1338,10 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
 
         let prepared = try await runtime.prepareGeneration(
             for: request,
-            telemetryTerminalPolicy: telemetryTerminalPolicy
+            telemetryTerminalPolicy: telemetryTerminalPolicy,
+            retryAttempt: retryAttempt,
+            operationGeneration: operationGeneration,
+            fixedSamplingConfiguration: samplingConfiguration
         )
         let session = streamingSessionFactory(
             prepared.generationID,
@@ -1304,6 +1363,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
             prepared.loadCapabilityProfile,
             prepared.memoryPolicy,
             prepared.mlxMemorySnapshots,
+            prepared.requestReceipt,
             markingConfiguration(for: request)
         )
         let deliveryGenerationID = request.generationID ?? prepared.generationID
@@ -1314,6 +1374,44 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
             await self?.yieldEvent(event, generationID: deliveryGenerationID)
             self?.latestEventCoalescer.push(event.withoutPreviewAudioPayload())
         }
+    }
+
+    nonisolated private static func failureReceipt(
+        request: GenerationRequest,
+        generationID: UUID,
+        effectiveSeed: UInt64,
+        warmState: EngineWarmState,
+        retryAttempt: Int,
+        operationGeneration: UInt64
+    ) -> GenerationRequestReceipt {
+        return GenerationRequestReceipt(
+            request: request,
+            generationID: generationID,
+            effectiveSeed: effectiveSeed,
+            warmState: warmState,
+            predecessorIdentityDigest: BenchRunContext.telemetryNotes()[
+                "startupPredecessorIdentityDigest"
+            ],
+            retryAttempt: retryAttempt,
+            operationGeneration: operationGeneration
+        )
+    }
+
+    nonisolated static func surfacedGenerationError(
+        _ error: Error,
+        allocationRetryAttempted: Bool
+    ) -> NativeRuntimeError {
+        if let runtimeError = error as? NativeRuntimeError {
+            return runtimeError
+        }
+        let message = allocationRetryAttempted
+            ? "The native runtime could not start audio generation after one allocation retry."
+            : "The native runtime could not start audio generation."
+        return NativeRuntimeError.wrapping(
+            error,
+            stage: .streamStartup,
+            message: message
+        )
     }
 
     nonisolated private func yieldEvent(

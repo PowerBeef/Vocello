@@ -919,7 +919,7 @@ Records are written by the `GenerationTelemetryJSONLSink` actor as JSONL under
 - `generations-merged.jsonl` (merged by `Sources/Services/GenerationTelemetryMerger.swift`)
 - `*/native-events.jsonl` (chunk gaps, warm-admission, XPC retirement — gated)
 - `<documents>/generation-failures.jsonl` (`GenerationFailureDiagnosticLogger` — gated,
-  privacy-reduced schema v2, capped at 200 entries and 256 KiB)
+  privacy-reduced schema v3 with schema-v2 decoding, capped at 200 entries and 256 KiB)
 
 `GenerationTelemetryRecord` schema v8 remains the shipping and publishable versioned Codable
 record keyed by `generationID`

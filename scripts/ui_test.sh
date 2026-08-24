@@ -41,6 +41,7 @@ Usage:
   scripts/ui_test.sh ios benchmark [--modes custom,design,clone] [--lengths short,medium,long] [--warm 3] [--label RUN_ID]
   scripts/ui_test.sh ios perf [--label RUN_ID]
   scripts/ui_test.sh ios delivery-cohort --text SCRIPT [--takes 20] [--label RUN_ID]
+  scripts/ui_test.sh ios startup-parity --script-file UNTRACKED.txt
   scripts/ui_test.sh ios model-download [--scenario diagnose|queue|acceptance|soak|recover] [--iterations 3] [--engine-profile legacy|chunked|chunked-multisession]
   scripts/ui_test.sh ios enroll-clone-fixture
   scripts/ui_test.sh ios saved-voice-lifecycle
@@ -49,6 +50,8 @@ The iOS destination is the paired physical iPhone only. Simulator destinations a
 `model-download` is an opt-in isolated lifecycle proof and never runs in smoke, benchmark, CI, or release.
 `delivery-cohort` is a diagnostic delivery-consistency lane (N identical Neutral Custom takes through
 the production UI); it never publishes benchmark history and never runs in smoke, benchmark, CI, or release.
+`startup-parity` enters the supplied script through the real composer, visibly selects Vivian / Calm Strong /
+English, then correlates the completed generation UUID with the engine request receipt. It never publishes.
 `enroll-clone-fixture` is an opt-in helper that enrolls the benchmark clone voice through the genuine
 visible Files-import flow; stage the reference WAV and .txt sidecar in the app's Documents first
 (devicectl appDataContainer copy). It never runs in smoke, benchmark, CI, or release. The headless
@@ -67,9 +70,10 @@ platform="$1"
 lane="$2"
 shift 2
 [[ "$platform" == "macos" || "$platform" == "ios" ]] || usage
-[[ "$lane" == "smoke" || "$lane" == "benchmark" || "$lane" == "model-download" || "$lane" == "delivery-cohort" || "$lane" == "perf" || "$lane" == "enroll-clone-fixture" || "$lane" == "saved-voice-lifecycle" ]] || usage
+[[ "$lane" == "smoke" || "$lane" == "benchmark" || "$lane" == "model-download" || "$lane" == "delivery-cohort" || "$lane" == "startup-parity" || "$lane" == "perf" || "$lane" == "enroll-clone-fixture" || "$lane" == "saved-voice-lifecycle" ]] || usage
 [[ "$lane" != "model-download" || "$platform" == "ios" ]] || usage
 [[ "$lane" != "delivery-cohort" || "$platform" == "ios" ]] || usage
+[[ "$lane" != "startup-parity" || "$platform" == "ios" ]] || usage
 [[ "$lane" != "enroll-clone-fixture" || "$platform" == "ios" ]] || usage
 [[ "$lane" != "saved-voice-lifecycle" || "$platform" == "ios" ]] || usage
 
@@ -81,6 +85,8 @@ long_form_segments=""
 perf_run_started_epoch_ms=0
 cohort_takes=20
 cohort_text=""
+startup_parity_script_file=""
+startup_parity_script=""
 engine_profile=""
 model_scenario="acceptance"
 model_iterations=3
@@ -104,6 +110,8 @@ while [[ $# -gt 0 ]]; do
     --takes=*) cohort_takes="${1#*=}"; shift ;;
     --text) cohort_text="${2:?--text requires a value}"; shift 2 ;;
     --text=*) cohort_text="${1#*=}"; shift ;;
+    --script-file) startup_parity_script_file="${2:?--script-file requires a value}"; shift 2 ;;
+    --script-file=*) startup_parity_script_file="${1#*=}"; shift ;;
     --long-form-segments) long_form_segments="${2:?--long-form-segments requires a value}"; shift 2 ;;
     --long-form-segments=*) long_form_segments="${1#*=}"; shift ;;
     -h|--help|help) usage ;;
@@ -120,6 +128,23 @@ if [[ "$lane" != "benchmark" && ( "$modes" != "custom,design,clone" || "$lengths
 fi
 if [[ "$lane" != "delivery-cohort" ]] && [[ "$cohort_takes" != 20 || -n "$cohort_text" ]]; then
   die "--takes and --text are accepted only by the delivery-cohort lane"
+fi
+if [[ "$lane" == "startup-parity" ]]; then
+  [[ -f "$startup_parity_script_file" ]] || die "startup-parity requires a readable --script-file"
+  startup_parity_script="$(<"$startup_parity_script_file")"
+  python3 - "$startup_parity_script_file" <<'PY' || exit $?
+import pathlib, sys
+path = pathlib.Path(sys.argv[1])
+data = path.read_bytes()
+try:
+    text = data.decode("utf-8")
+except UnicodeDecodeError:
+    raise SystemExit("error: --script-file must be UTF-8")
+if not text.strip() or "\x00" in text or not 1 <= len(text) <= 2000:
+    raise SystemExit("error: --script-file must contain 1...2000 non-NUL characters")
+PY
+elif [[ -n "$startup_parity_script_file" ]]; then
+  die "--script-file is accepted only by the startup-parity lane"
 fi
 if [[ -n "$engine_profile" ]]; then
   [[ "$lane" == "model-download" ]] || die "--engine-profile is accepted only by the model-download lane"
@@ -451,8 +476,16 @@ snapshot_ios_crashes() {
   local destination="$1"
   rm -rf "$destination"
   mkdir -p "$destination"
-  if ! "$ROOT_DIR/scripts/ios_device.sh" pull "$destination/pull" \
+  if ! xcrun devicectl device copy from --device "$device" \
+      --domain-type appDataContainer --domain-identifier "$BUNDLE_ID_IOS" \
+      --source "Library/Caches/Vocello/diagnostics/crashes" \
+      --destination "$destination/pull" --timeout 30 --quiet \
       >"$destination/pull.log" 2>&1; then
+    if grep -Fq 'Failed to retrieve the file node for Library/Caches/Vocello/diagnostics/crashes' "$destination/pull.log" \
+      && grep -Fq 'CoreDeviceError error 7000' "$destination/pull.log"; then
+      : >"$destination/hashes.txt"
+      return 0
+    fi
     warn "could not collect the iPhone crash snapshot (see $destination/pull.log)"
     return 1
   fi
@@ -465,6 +498,17 @@ snapshot_ios_crashes() {
   # Crash gating needs the stable hashes, not another copy of the device's complete historical
   # diagnostics tree. Exact payload retrieval remains available through ios_device.sh crashes.
   rm -rf "$destination/pull"
+}
+
+pull_ios_run_diagnostics() {
+  local device_id="$1" target_run_id="$2" destination="$3" log="$4"
+  rm -rf "$destination"
+  mkdir -p "$destination/$target_run_id"
+  xcrun devicectl device copy from --device "$device_id" \
+    --domain-type appDataContainer --domain-identifier "$BUNDLE_ID_IOS" \
+    --source "Library/Caches/Vocello/diagnostics/$target_run_id" \
+    --destination "$destination/$target_run_id" --timeout 60 --quiet \
+    >"$log" 2>&1
 }
 
 pull_ios_model_download_diagnostics() {
@@ -1079,6 +1123,10 @@ else
     export TEST_RUNNER_QVOICE_IOS_COHORT_RUN_ID="$run_id"
     export TEST_RUNNER_QVOICE_IOS_COHORT_TAKES="$cohort_takes"
     export TEST_RUNNER_QVOICE_IOS_COHORT_TEXT="$cohort_text"
+  elif [[ "$lane" == "startup-parity" ]]; then
+    only_test="VocelloiOSUITests/VocelloiOSStartupParityUITests/testVivianCalmStrongEnglishRequestReceiptParity"
+    export TEST_RUNNER_QVOICE_IOS_STARTUP_PARITY_RUN_ID="$run_id"
+    export TEST_RUNNER_QVOICE_IOS_STARTUP_PARITY_SCRIPT="$startup_parity_script"
   elif [[ "$lane" == "perf" ]]; then
     # UI-performance scenarios (frame probe + marked windows) on the paired
     # physical iPhone. The run ID reaches the app per scenario launch as
@@ -1169,12 +1217,30 @@ PY
     fi
   fi
 
+  startup_parity_status=0
+  if [[ "$lane" == "startup-parity" ]]; then
+    if ! pull_ios_run_diagnostics "$device" "$run_id" \
+        "$out/startup-parity-diagnostics" "$out/startup-parity-pull.log"; then
+      startup_parity_status=1
+      warn "could not pull startup-parity telemetry"
+    elif ! required_step_run "$step_ledger" startup-parity-validation \
+        python3 "$ROOT_DIR/scripts/ios_startup_reliability.py" validate-ui-parity \
+        --xcodebuild-log "$out/xcodebuild.log" \
+        --diagnostics "$out/startup-parity-diagnostics" \
+        --run-id "$run_id" \
+        --output "$out/startup-parity-summary.json" \
+        >"$out/startup-parity-validator.log" 2>&1; then
+      startup_parity_status=1
+      warn "visible UI and engine request receipt did not prove parity"
+    fi
+  fi
+
   crash_delta_status=0
   if ! required_step_run "$step_ledger" crash-delta check_ios_crash_delta; then
     crash_delta_status=1
     warn "could not establish a clean post-run iPhone crash delta"
   fi
-  if (( xcuitest_status != 0 || dsym_status != 0 || model_diagnostics_status != 0 || crash_delta_status != 0 )); then
+  if (( xcuitest_status != 0 || dsym_status != 0 || model_diagnostics_status != 0 || startup_parity_status != 0 || crash_delta_status != 0 )); then
     die "physical-iPhone $lane failed; complete available forensics are preserved in $out"
   fi
   [[ "$lane" != "smoke" ]] || required_step_run "$step_ledger" \

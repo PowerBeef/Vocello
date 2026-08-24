@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vocello.local/schemas/ios-startup-reliability-plan-v1.json",
+  "title": "Vocello iOS startup reliability plan v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "scriptSHA256", "scriptCharacters", "takes"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "scriptSHA256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "scriptCharacters": {"type": "integer", "minimum": 1, "maximum": 2000},
+    "takes": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 128,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["takeIndex", "takeID", "speakerID", "deliveryID", "language", "seed", "variation", "streaming", "preparation"],
+        "properties": {
+          "takeIndex": {"type": "integer", "minimum": 1, "maximum": 128},
+          "takeID": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,95}$"},
+          "speakerID": {"enum": ["aiden", "ryan", "vivian", "serena", "uncle_fu", "dylan", "eric", "ono_anna", "sohee"]},
+          "deliveryID": {"type": "string", "pattern": "^(neutral|happy|sad|angry|fearful|surprised|calm|whisper)\\.(normal|strong)$"},
+          "language": {"enum": ["auto", "english", "chinese", "japanese", "korean", "french", "german", "spanish", "portuguese", "russian", "italian"]},
+          "seed": {"type": "integer", "minimum": 0},
+          "variation": {"enum": ["expressive", "balanced", "consistent"]},
+          "streaming": {"type": "boolean"},
+          "predecessorTakeID": {"type": ["string", "null"], "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,95}$"},
+          "preparation": {"enum": ["production", "full_runtime_unload", "prepared_cache_clear", "prewarm_disabled"]}
+        }
+      }
+    }
+  }
+}

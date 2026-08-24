@@ -110,6 +110,7 @@ final class GenerationOutputAdapter: GenerationOutputAdapting, @unchecked Sendab
     private let loadCapabilityProfile: NativeLoadCapabilityProfile
     private let memoryPolicy: NativeMemoryPolicy
     private let initialMLXMemorySnapshots: [String: NativeMLXMemorySnapshot]
+    private let requestReceipt: GenerationRequestReceipt
     private let pcmScratchBuffer: PCM16ScratchBuffer?
     /// Sendable holder for the engine process's app-support directory; read at
     /// telemetry-write time so the rescued `TelemetrySummary` lands under
@@ -137,6 +138,7 @@ final class GenerationOutputAdapter: GenerationOutputAdapting, @unchecked Sendab
         loadCapabilityProfile: NativeLoadCapabilityProfile,
         memoryPolicy: NativeMemoryPolicy,
         mlxMemorySnapshots: [String: NativeMLXMemorySnapshot],
+        requestReceipt: GenerationRequestReceipt,
         pcmScratchBuffer: PCM16ScratchBuffer? = nil,
         diagnosticAppSupportBox: DiagnosticAppSupportBox? = nil,
         markingConfiguration: AudioMarkingConfiguration? = nil
@@ -160,6 +162,7 @@ final class GenerationOutputAdapter: GenerationOutputAdapting, @unchecked Sendab
         self.loadCapabilityProfile = loadCapabilityProfile
         self.memoryPolicy = memoryPolicy
         self.initialMLXMemorySnapshots = mlxMemorySnapshots
+        self.requestReceipt = requestReceipt
         self.pcmScratchBuffer = pcmScratchBuffer
         self.diagnosticAppSupportBox = diagnosticAppSupportBox
         self.markingConfiguration = markingConfiguration
@@ -182,6 +185,9 @@ final class GenerationOutputAdapter: GenerationOutputAdapting, @unchecked Sendab
                     cloneHandle: cloneHandle,
                     audioCapacityFrames: chunkCapacity
                 )
+                await telemetryRecorder?.mark(
+                    stage: GenerationStartupBoundary.generationReserved.telemetryStage
+                )
                 cancellationIngress.install { reason in
                     currentReservation.session.cancellation.request(
                         Self.runtimeCancellationReason(for: reason)
@@ -192,9 +198,15 @@ final class GenerationOutputAdapter: GenerationOutputAdapting, @unchecked Sendab
                 do {
                     try cancellationIngress.checkCancellation()
                     let claimedAudio = try await currentReservation.session.claimAudioConsumer()
+                    await telemetryRecorder?.mark(
+                        stage: GenerationStartupBoundary.audioConsumerClaimed.telemetryStage
+                    )
                     audio = claimedAudio
                     try cancellationIngress.checkCancellation()
                     let sessionDirectory = try makeSessionDirectory()
+                    await telemetryRecorder?.mark(
+                        stage: GenerationStartupBoundary.sessionDirectoryCreated.telemetryStage
+                    )
                     let execution = StreamingExecutionContext(
                         requestID: requestID,
                         generationID: generationID,
@@ -213,6 +225,7 @@ final class GenerationOutputAdapter: GenerationOutputAdapting, @unchecked Sendab
                         loadCapabilityProfile: loadCapabilityProfile,
                         memoryPolicy: memoryPolicy,
                         initialMLXMemorySnapshots: initialMLXMemorySnapshots,
+                        requestReceipt: requestReceipt,
                         pcmScratchBuffer: pcmScratchBuffer,
                         diagnosticAppSupportBox: diagnosticAppSupportBox,
                         markingConfiguration: markingConfiguration
@@ -220,11 +233,16 @@ final class GenerationOutputAdapter: GenerationOutputAdapting, @unchecked Sendab
                     // The reservation stays inert until its mandatory consumer
                     // and every fallible product-side setup step are complete.
                     try cancellationIngress.checkCancellation()
+                    let engineOpenClockMS = telemetryRecorder?.clock.now().0
                     try await model.engine.open(currentReservation.id)
+                    await telemetryRecorder?.mark(
+                        stage: GenerationStartupBoundary.engineOpened.telemetryStage
+                    )
                     opened = true
                     let result = try await execution.run(
                         audio: claimedAudio,
                         session: currentReservation.session,
+                        engineOpenClockMS: engineOpenClockMS,
                         chunkSink: chunkSink
                     )
                     let terminal = await currentReservation.session.waitForModelTermination()
@@ -357,7 +375,8 @@ final class GenerationOutputAdapter: GenerationOutputAdapting, @unchecked Sendab
             summary: summary,
             thermalState: summary.thermalState,
             notes: GenerationTelemetryPrivacy.failureNotes(message: error.localizedDescription)
-                .merging(BenchRunContext.telemetryNotes()) { current, _ in current }
+                .merging(BenchRunContext.telemetryNotes()) { current, _ in current },
+            requestReceipt: requestReceipt
         )
         await GenerationTelemetryJSONLSink.shared.write(
             record: record,
@@ -1104,6 +1123,7 @@ struct StreamingExecutionContext: Sendable {
     let loadCapabilityProfile: NativeLoadCapabilityProfile
     let memoryPolicy: NativeMemoryPolicy
     let initialMLXMemorySnapshots: [String: NativeMLXMemorySnapshot]
+    let requestReceipt: GenerationRequestReceipt
     /// Optional pooled scratch buffer shared with the parent session.
     /// When provided, the execution context calls `reset()` and reuses
     /// it instead of allocating a fresh `PCM16ScratchBuffer`. Saves the
@@ -1148,6 +1168,7 @@ struct StreamingExecutionContext: Sendable {
     func run(
         audio: VocelloQwen3LosslessAudioSequence,
         session: VocelloQwen3ClassifiedGenerationSession,
+        engineOpenClockMS: Int?,
         chunkSink: @escaping @Sendable (GenerationEvent) async -> Void
     ) async throws -> GenerationResult {
         let benchNotes = BenchRunContext.telemetryNotes()
@@ -1281,6 +1302,25 @@ struct StreamingExecutionContext: Sendable {
                     }
 
                     if chunkIndex == 0 {
+                        if let base = engineOpenClockMS,
+                           let observations = chunk.startupObservations {
+                            if let tokenMS = observations.firstModelTokenAndAudioCodeMilliseconds {
+                                await telemetryRecorder?.mark(
+                                    stage: GenerationStartupBoundary.firstModelToken.telemetryStage,
+                                    atMilliseconds: base + tokenMS,
+                                    metadata: ["coObserved": "first_audio_code_group"]
+                                )
+                                await telemetryRecorder?.mark(
+                                    stage: GenerationStartupBoundary.firstAudioCodeGroup.telemetryStage,
+                                    atMilliseconds: base + tokenMS,
+                                    metadata: ["coObserved": "first_model_token"]
+                                )
+                            }
+                            await telemetryRecorder?.mark(
+                                stage: GenerationStartupBoundary.firstDecodedAudioFrame.telemetryStage,
+                                atMilliseconds: base + observations.firstDecodedAudioFrameMilliseconds
+                            )
+                        }
                         NativeStreamingSignposts.signposter.emitEvent(
                             "Native First Audio Chunk",
                             id: generationSignpostID,
@@ -1377,6 +1417,11 @@ struct StreamingExecutionContext: Sendable {
                     let previewDisposition: PreviewPublicationDispositionV9
                     if request.shouldStream {
                         await chunkSink(chunkEvent)
+                        if observationIndex == 0 {
+                            await telemetryRecorder?.mark(
+                                stage: GenerationStartupBoundary.firstPublishedStreamChunk.telemetryStage
+                            )
+                        }
                         if previewAudio == nil {
                             previewDisposition = .notRequested
                         } else {
@@ -1546,10 +1591,7 @@ struct StreamingExecutionContext: Sendable {
                 if TelemetryGate.resolvedEnabled {
                     Self.preserveFailedQCStagedWAV(stagingURL, sessionDirectory: sessionDirectory)
                 }
-                throw MLXTTSEngineError.generationFailed(
-                    "The finalized streaming WAV failed mandatory Fast audio QC "
-                    + "[\(finalAudioQC.flags.joined(separator: ","))]."
-                )
+                throw Self.finalAudioQCRejectionError(flags: finalAudioQC.flags)
             }
             try finalWriter.publish()
             guard Self.isReadableWAV(at: outputURL) else {
@@ -1807,16 +1849,45 @@ struct StreamingExecutionContext: Sendable {
             error: error,
             policy: telemetryTerminalPolicy
         ) else { return }
+        var failureNotes = TelemetryGate.resolvedEnabled
+            ? GenerationTelemetryPrivacy.failureNotes(message: error.localizedDescription)
+            : [:]
+        if let runtimeError = error as? NativeRuntimeError {
+            failureNotes.merge(runtimeError.telemetryNotes) { current, _ in current }
+        }
         await writeEngineTelemetryRecord(
             summary: summary,
             stageMarks: stageMarks,
             usedStreaming: usedStreaming,
             finishReason: reason.rawValue,
             counters: counters,
-            notes: TelemetryGate.resolvedEnabled
-                ? GenerationTelemetryPrivacy.failureNotes(message: error.localizedDescription)
-                : [:],
+            notes: failureNotes,
             rawSamples: NativeTelemetryMode.current().persistsRawSamples ? rawSamples : nil
+        )
+    }
+
+    static func finalAudioQCRejectionError(flags: [String]) -> NativeRuntimeError {
+        let diagnosticDetail = flags.joined(separator: ",")
+        let diagnosticError = MLXTTSEngineError.generationFailed(
+            "The finalized streaming WAV failed mandatory Fast audio QC "
+            + "[\(diagnosticDetail)]."
+        )
+        let message: String
+        if flags.contains(where: { $0.hasPrefix("dropout:") }) {
+            message = "The generated audio contained an unusually long silent gap and was not saved. Retry to generate a new take."
+        } else if flags.contains("near_silent") || flags.contains("silent") || flags.contains("empty") {
+            message = "The generated audio did not contain usable speech and was not saved. Retry to generate a new take."
+        } else if flags.contains("nonfinite") || flags.contains("clipping") || flags.contains("clicks") {
+            message = "The generated audio was unstable or distorted and was not saved. Retry to generate a new take."
+        } else {
+            message = "The generated audio did not pass its mandatory quality check and was not saved. Retry to generate a new take."
+        }
+        return NativeRuntimeError(
+            stage: .streamFailed,
+            message: message,
+            underlying: diagnosticError,
+            failureCode: .audioQualityRejected,
+            diagnosticDetail: diagnosticDetail
         )
     }
 
@@ -2061,7 +2132,8 @@ struct StreamingExecutionContext: Sendable {
                 nativeLoadCapabilityProfile: loadCapabilityProfile.rawValue,
                 fixtureDigest: fixtureDigest
             ),
-            streamingTelemetryV9: nestedStreamingV9
+            streamingTelemetryV9: nestedStreamingV9,
+            requestReceipt: requestReceipt
         )
         await GenerationTelemetryJSONLSink.shared.write(
             record: record,

@@ -260,6 +260,8 @@ public actor VocelloQwen3Engine {
         var nextAudioSequence = 0
         var pendingChunkTimings: VocelloQwen3ChunkTimings?
         var generationInfo: VocelloQwen3GenerationInfo?
+        var firstModelTokenAndAudioCodeMS: Int?
+        var firstDecodedAudioFrameMS: Int?
     }
 
     private struct LastFinalization {
@@ -1329,6 +1331,9 @@ public actor VocelloQwen3Engine {
             try revalidate(pending.lease)
             try pending.session.cancellation.checkCancellation()
         case .token:
+            if pending.firstModelTokenAndAudioCodeMS == nil {
+                pending.firstModelTokenAndAudioCodeMS = startedAt.elapsedMilliseconds
+            }
             pending.generatedTokenCount += 1
             pendingGeneration = pending
         case .info(let info):
@@ -1351,6 +1356,9 @@ public actor VocelloQwen3Engine {
             try revalidate(pending.lease)
             try pending.session.cancellation.checkCancellation()
         case .audio(let samples):
+            if pending.firstDecodedAudioFrameMS == nil {
+                pending.firstDecodedAudioFrameMS = startedAt.elapsedMilliseconds
+            }
             // Quality-first generation materializes the whole waveform at
             // once. Keep product output lossless while respecting the exact
             // frame capacity that governs the classified audio channel.
@@ -1361,6 +1369,13 @@ public actor VocelloQwen3Engine {
             while lowerBound < samples.count {
                 let upperBound = min(samples.count, lowerBound + maximumFrames)
                 let boundedSamples = Array(samples[lowerBound ..< upperBound])
+                let startupObservations: VocelloQwen3StartupObservations? = pending.nextAudioSequence == 0
+                    ? VocelloQwen3StartupObservations(
+                        firstModelTokenAndAudioCodeMilliseconds: pending.firstModelTokenAndAudioCodeMS,
+                        firstDecodedAudioFrameMilliseconds: pending.firstDecodedAudioFrameMS
+                            ?? startedAt.elapsedMilliseconds
+                    )
+                    : nil
                 let chunk = VocelloQwen3AudioChunkEvent(
                     generationID: pending.request.generationID,
                     sequence: pending.nextAudioSequence,
@@ -1368,7 +1383,8 @@ public actor VocelloQwen3Engine {
                     sampleRate: sampleRate,
                     timings: pending.pendingChunkTimings,
                     codecStartFrame: pending.pendingChunkTimings?.codecStartFrame,
-                    codecEndFrameExclusive: pending.pendingChunkTimings?.codecEndFrameExclusive
+                    codecEndFrameExclusive: pending.pendingChunkTimings?.codecEndFrameExclusive,
+                    startupObservations: startupObservations
                 )
                 try await pending.session.publishAudio(chunk)
                 guard var current = pendingGeneration,

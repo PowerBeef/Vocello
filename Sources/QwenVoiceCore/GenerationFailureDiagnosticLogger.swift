@@ -44,14 +44,15 @@ public final class GenerationFailureDiagnosticLogger: @unchecked Sendable {
         stage: String?,
         underlyingError: Error,
         request: GenerationRequest? = nil,
+        receipt: GenerationRequestReceipt? = nil,
         appSupportDirectory: URL? = nil
     ) {
         guard ignoresTelemetryGate || TelemetryGate.resolvedEnabled else { return }
         guard let url = resolvedFileURL(appSupportDirectory: appSupportDirectory) else { return }
 
         let metadata = Self.errorMetadata(for: underlyingError)
-        let entry = FailureEntry(
-            schemaVersion: 2,
+        let entry = GenerationFailureJournalEntry(
+            schemaVersion: 3,
             timestamp: Date(),
             errorCode: metadata.code,
             classification: metadata.classification.rawValue,
@@ -59,7 +60,15 @@ public final class GenerationFailureDiagnosticLogger: @unchecked Sendable {
             requestMode: request.map { $0.mode.rawValue },
             modelID: request.flatMap { Self.allowlistedIdentifier($0.modelID) },
             textLength: request.map { $0.text.count },
-            shouldStream: request?.shouldStream
+            shouldStream: request?.shouldStream,
+            generationID: receipt?.generationID,
+            generationIdentityDigest: receipt?.generationIdentityDigest,
+            requestIdentityDigest: receipt?.requestIdentityDigest,
+            sessionIdentityDigest: receipt?.sessionIdentityDigest,
+            prewarmIdentityDigest: receipt?.prewarmIdentityDigest,
+            retryAttempt: receipt?.retryAttempt,
+            operationGeneration: receipt?.operationGeneration,
+            requestReceipt: receipt
         )
 
         lock.lock()
@@ -97,6 +106,18 @@ public final class GenerationFailureDiagnosticLogger: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         try? FileManager.default.removeItem(at: url)
+    }
+
+    public func read(appSupportDirectory: URL? = nil) -> [GenerationFailureJournalEntry] {
+        guard let url = resolvedFileURL(appSupportDirectory: appSupportDirectory) else { return [] }
+        lock.lock()
+        defer { lock.unlock() }
+        guard let data = try? Data(contentsOf: url) else { return [] }
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return data.split(separator: 0x0A).compactMap {
+            try? decoder.decode(GenerationFailureJournalEntry.self, from: Data($0))
+        }
     }
 
     private func resolvedFileURL(appSupportDirectory: URL?) -> URL? {
@@ -139,7 +160,7 @@ public final class GenerationFailureDiagnosticLogger: @unchecked Sendable {
         }
     }
 
-    private enum Classification: String {
+    public enum Classification: String, Codable, Sendable {
         case cancelled
         case model
         case invalidRequest = "invalid_request"
@@ -152,12 +173,12 @@ public final class GenerationFailureDiagnosticLogger: @unchecked Sendable {
         case unknown
     }
 
-    private struct ErrorMetadata {
-        let code: String
-        let classification: Classification
+    public struct ErrorMetadata: Codable, Sendable {
+        public let code: String
+        public let classification: Classification
     }
 
-    private static func errorMetadata(for error: Error) -> ErrorMetadata {
+    public static func errorMetadata(for error: Error) -> ErrorMetadata {
         if error is CancellationError {
             return ErrorMetadata(code: "generation.cancelled", classification: .cancelled)
         }
@@ -231,8 +252,13 @@ public final class GenerationFailureDiagnosticLogger: @unchecked Sendable {
             return ErrorMetadata(code: "network.request_failed", classification: .network)
         }
 
-        if error is NativeRuntimeError {
-            return ErrorMetadata(code: "runtime.failed", classification: .runtime)
+        if let runtimeError = error as? NativeRuntimeError {
+            switch runtimeError.failureCode {
+            case .audioQualityRejected:
+                return ErrorMetadata(code: runtimeError.failureCode.rawValue, classification: .audio)
+            case .runtimeFailed:
+                return ErrorMetadata(code: runtimeError.failureCode.rawValue, classification: .runtime)
+            }
         }
 
         let cocoaError = error as NSError
@@ -278,15 +304,64 @@ public final class GenerationFailureDiagnosticLogger: @unchecked Sendable {
         return value
     }
 
-    private struct FailureEntry: Codable {
-        let schemaVersion: Int
-        let timestamp: Date
-        let errorCode: String
-        let classification: String
-        let stage: String?
-        let requestMode: String?
-        let modelID: String?
-        let textLength: Int?
-        let shouldStream: Bool?
+}
+
+public struct GenerationFailureJournalEntry: Codable, Sendable {
+    public let schemaVersion: Int
+    public let timestamp: Date
+    public let errorCode: String
+    public let classification: String
+    public let stage: String?
+    public let requestMode: String?
+    public let modelID: String?
+    public let textLength: Int?
+    public let shouldStream: Bool?
+    public let generationID: String?
+    public let generationIdentityDigest: String?
+    public let requestIdentityDigest: String?
+    public let sessionIdentityDigest: String?
+    public let prewarmIdentityDigest: String?
+    public let retryAttempt: Int?
+    public let operationGeneration: UInt64?
+    /// Complete privacy-safe receipt for schema-v3 attempt reconstruction.
+    /// Schema-v2 rows decode this as nil.
+    public let requestReceipt: GenerationRequestReceipt?
+
+    public init(
+        schemaVersion: Int,
+        timestamp: Date,
+        errorCode: String,
+        classification: String,
+        stage: String?,
+        requestMode: String?,
+        modelID: String?,
+        textLength: Int?,
+        shouldStream: Bool?,
+        generationID: String? = nil,
+        generationIdentityDigest: String? = nil,
+        requestIdentityDigest: String? = nil,
+        sessionIdentityDigest: String? = nil,
+        prewarmIdentityDigest: String? = nil,
+        retryAttempt: Int? = nil,
+        operationGeneration: UInt64? = nil,
+        requestReceipt: GenerationRequestReceipt? = nil
+    ) {
+        self.schemaVersion = schemaVersion
+        self.timestamp = timestamp
+        self.errorCode = errorCode
+        self.classification = classification
+        self.stage = stage
+        self.requestMode = requestMode
+        self.modelID = modelID
+        self.textLength = textLength
+        self.shouldStream = shouldStream
+        self.generationID = generationID
+        self.generationIdentityDigest = generationIdentityDigest
+        self.requestIdentityDigest = requestIdentityDigest
+        self.sessionIdentityDigest = sessionIdentityDigest
+        self.prewarmIdentityDigest = prewarmIdentityDigest
+        self.retryAttempt = retryAttempt
+        self.operationGeneration = operationGeneration
+        self.requestReceipt = requestReceipt
     }
 }

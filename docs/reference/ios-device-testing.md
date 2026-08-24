@@ -221,6 +221,28 @@ throwaway reference, resolve a possible soft warning, preview it, hand it to Clo
 exact named deletion, verify the row disappears, and verify the matching Studio draft is cleared.
 It does not run in smoke, benchmark, CI, or release.
 
+Built-in Voice startup reliability is a separate compile-gated diagnostic, not an ordinary
+benchmark or release lane. The headless route consumes a schema-v1 ordered plan plus an exact
+untracked UTF-8 script; retained results contain only its SHA-256 and character count:
+
+```sh
+scripts/ios_device.sh delivery-reliability \
+  --plan <plan.json> \
+  --script-file <untracked-exact-script.txt>
+
+scripts/ui_test.sh ios startup-parity \
+  --script-file <untracked-exact-script.txt>
+```
+
+The app records a privacy-safe request receipt and one-shot startup boundaries, represents every
+planned take, preserves allocation attempts zero/one with the same request and seed, and writes the
+terminal sentinel last. The host also polls the exact PID returned by CoreDevice and immediately
+fails into forensic collection if that process exits before terminal evidence; a process-query
+failure remains unknown rather than being treated as an exit. The XCUITest route selects Vivian,
+Calm Strong, and English through genuine visible controls and correlates the completed generation
+UUID with the engine receipt. Both routes are physical-iPhone-only, publish nothing, and are documented in
+[`ios-built-in-startup-reliability.md`](ios-built-in-startup-reliability.md).
+
 **Bench spec syntax:** the `ios_device.sh bench` positional argument is the full
 `mode:variant:text` spec; a bare argument is treated as *text* (wrapped as
 `custom:speed:<arg>`), so `bench custom` generates the literal word "custom" — a

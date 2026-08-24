@@ -1,11 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Scheme
    LastUpgradeVersion = "2600"
-   version = "1.7">
+   version = "1.3">
    <BuildAction
       parallelizeBuildables = "YES"
-      buildImplicitDependencies = "YES"
-      runPostActionsOnFailure = "NO">
+      buildImplicitDependencies = "YES">
       <BuildActionEntries>
          <BuildActionEntry
             buildForTesting = "YES"
@@ -16,7 +15,7 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "939725D6CC844653EA90F39E"
-               BuildableName = "QwenVoice.app"
+               BuildableName = "Vocello.app"
                BlueprintName = "QwenVoice"
                ReferencedContainer = "container:QwenVoice.xcodeproj">
             </BuildableReference>
@@ -42,21 +41,19 @@
       selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"
       selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
       shouldUseLaunchSchemeArgsEnv = "YES"
-      preferredScreenCaptureFormat = "screenshots"
-      onlyGenerateCoverageForSpecifiedTargets = "NO">
+      preferredScreenCaptureFormat = "screenshots">
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "939725D6CC844653EA90F39E"
-            BuildableName = "QwenVoice.app"
+            BuildableName = "Vocello.app"
             BlueprintName = "QwenVoice"
             ReferencedContainer = "container:QwenVoice.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
       <Testables>
          <TestableReference
-            skipped = "NO"
-            parallelizable = "NO">
+            skipped = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "4342C5A6FEF870F69F428B8A"
@@ -66,8 +63,6 @@
             </BuildableReference>
          </TestableReference>
       </Testables>
-      <CommandLineArguments>
-      </CommandLineArguments>
    </TestAction>
    <LaunchAction
       buildConfiguration = "Release"
@@ -84,13 +79,11 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "939725D6CC844653EA90F39E"
-            BuildableName = "QwenVoice.app"
+            BuildableName = "Vocello.app"
             BlueprintName = "QwenVoice"
             ReferencedContainer = "container:QwenVoice.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
-      <CommandLineArguments>
-      </CommandLineArguments>
    </LaunchAction>
    <ProfileAction
       buildConfiguration = "Release"
@@ -103,13 +96,11 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "939725D6CC844653EA90F39E"
-            BuildableName = "QwenVoice.app"
+            BuildableName = "Vocello.app"
             BlueprintName = "QwenVoice"
             ReferencedContainer = "container:QwenVoice.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
-      <CommandLineArguments>
-      </CommandLineArguments>
    </ProfileAction>
    <AnalyzeAction
       buildConfiguration = "Release">

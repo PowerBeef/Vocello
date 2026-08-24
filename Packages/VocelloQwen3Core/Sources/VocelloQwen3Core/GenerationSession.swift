@@ -37,6 +37,10 @@ public struct VocelloQwen3AudioChunkEvent: Codable, Hashable, Sendable {
     /// present together when the streaming producer observed them.
     public let codecStartFrame: UInt64?
     public let codecEndFrameExclusive: UInt64?
+    /// One-shot startup observations attached only to the first materialized
+    /// audio event. Both token/code timestamps are co-observed because Qwen's
+    /// public producer signal materializes one complete code group per token.
+    public let startupObservations: VocelloQwen3StartupObservations?
 
     public init(
         generationID: UUID,
@@ -46,7 +50,8 @@ public struct VocelloQwen3AudioChunkEvent: Codable, Hashable, Sendable {
         channelCount: Int = 1,
         timings: VocelloQwen3ChunkTimings? = nil,
         codecStartFrame: UInt64? = nil,
-        codecEndFrameExclusive: UInt64? = nil
+        codecEndFrameExclusive: UInt64? = nil,
+        startupObservations: VocelloQwen3StartupObservations? = nil
     ) {
         self.generationID = generationID
         self.sequence = sequence
@@ -56,11 +61,25 @@ public struct VocelloQwen3AudioChunkEvent: Codable, Hashable, Sendable {
         self.timings = timings
         self.codecStartFrame = codecStartFrame ?? timings?.codecStartFrame
         self.codecEndFrameExclusive = codecEndFrameExclusive ?? timings?.codecEndFrameExclusive
+        self.startupObservations = startupObservations
     }
 
     public var frameCount: Int {
         guard channelCount > 0 else { return 0 }
         return samples.count / channelCount
+    }
+}
+
+public struct VocelloQwen3StartupObservations: Codable, Hashable, Sendable {
+    public let firstModelTokenAndAudioCodeMilliseconds: Int?
+    public let firstDecodedAudioFrameMilliseconds: Int
+
+    public init(
+        firstModelTokenAndAudioCodeMilliseconds: Int?,
+        firstDecodedAudioFrameMilliseconds: Int
+    ) {
+        self.firstModelTokenAndAudioCodeMilliseconds = firstModelTokenAndAudioCodeMilliseconds
+        self.firstDecodedAudioFrameMilliseconds = firstDecodedAudioFrameMilliseconds
     }
 }
 

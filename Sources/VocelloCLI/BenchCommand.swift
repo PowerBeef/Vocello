@@ -152,10 +152,7 @@ enum BenchCommand {
     /// A resolved delivery cell: `id` is the stable `<preset>.<intensity>` token
     /// (stamped into the telemetry note + filename), `instruction` the preset's
     /// instruction string sent as `deliveryStyle`.
-    struct DeliveryItem {
-        let id: String
-        let instruction: String
-    }
+    typealias DeliveryItem = DeliveryInstructionCell
 
     /// Parse `--delivery` items (`<preset>[.<intensity>]`, intensity defaults to
     /// normal) against the shared EmotionPreset table. Fails loudly on unknown
@@ -164,30 +161,12 @@ enum BenchCommand {
     static func resolveDeliveryItems(_ spec: String?) throws -> [DeliveryItem] {
         let tokens = parseList(spec) ?? defaultDeliverySet
         return try tokens.map { token in
-            let parts = token.split(separator: ".").map(String.init)
-            guard (1...2).contains(parts.count),
-                  let preset = EmotionPreset.preset(id: parts[0]) else {
-                let known = EmotionPreset.all.map(\.id).joined(separator: ", ")
-                throw CLIError("unknown delivery preset '\(token)' (use <preset>[.<intensity>]; presets: \(known))")
+            let explicit = token.contains(".") ? token : "\(token).strong"
+            do {
+                return try DeliveryInstructionCell.resolveStrict(explicit)
+            } catch {
+                throw CLIError(error.localizedDescription)
             }
-            // Neutral is a real instructed preset (2026-08-01): its cell
-            // measures the steadied delivery against the uninstructed plain
-            // warm take, exactly like every other preset.
-            let intensity: EmotionIntensity
-            if parts.count == 2 {
-                guard let resolved = EmotionIntensity.allCases.first(where: { $0.rpcValue == parts[1] }) else {
-                    throw CLIError("unknown delivery intensity '\(parts[1])' (use normal | strong)")
-                }
-                intensity = resolved
-            } else {
-                // Bare preset names take the tier the product ships (DP-8:
-                // every selection ships the strong copy).
-                intensity = .strong
-            }
-            return DeliveryItem(
-                id: "\(preset.id).\(intensity.rpcValue)",
-                instruction: preset.instruction(for: intensity)
-            )
         }
     }
 
@@ -1585,6 +1564,8 @@ enum BenchCommand {
                          text, 1 take each): comma list of <preset>[.<intensity>]
                          (e.g. happy.strong,calm.normal); bare flag runs the
                          default set (\(defaultDeliverySet.joined(separator: ","))).
+                         Intensity values use normal | strong; a bare preset
+                         defaults to strong.
                          Rows are stamped notes.delivery and summarized in their
                          own block so the headline matrix stays comparable; the
                          plain warm takes double as the neutral reference. Also

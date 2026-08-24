@@ -84,6 +84,7 @@ enum IOSDeviceDiagnosticsRunner {
 
     /// True when the launch environment requested a diagnostic generation.
     static var isRequested: Bool {
+        if IOSStartupReliabilityRunner.isRequested { return true }
         var keys = [
             environmentKey,
             memoryQualificationEnvironmentKey,
@@ -105,6 +106,10 @@ enum IOSDeviceDiagnosticsRunner {
     /// doesn't block app startup.
     static func runIfRequested(engine: TTSEngineStore) {
         guard isRequested else { return }
+        if IOSStartupReliabilityRunner.runIfRequested(engine: engine) {
+            IOSInterruptionRecorder.shared.start()
+            return
+        }
         #if QVOICE_DEVICE_DIAGNOSTICS
         // Crash-capture lane verification: deliberately fault so MetricKit captures the
         // crash and the `scripts/ios_device.sh crashes --test` flow can symbolicate it

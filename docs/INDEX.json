@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "generated": "python3 scripts/doc_metadata.py rebuild-index",
   "note": "Machine-readable documentation map. Query this instead of globbing docs/.",
-  "annotatedDocuments": 92,
+  "annotatedDocuments": 93,
   "unannotatedDocuments": 0,
   "documents": [
     {
@@ -407,6 +407,21 @@
       "sourceOfTruth": [
         "project.yml",
         "docs/reference/eu-ai-act-article50-assessment.md"
+      ]
+    },
+    {
+      "path": "docs/reference/ios-built-in-startup-reliability.md",
+      "status": "active",
+      "owner": "backend-and-platform",
+      "summary": "Governed diagnosis of the reported iOS Built-in Voice startup failure, including conservative historical classification, typed request receipts, startup boundaries, physical-device plans, and closure requirements.",
+      "sourceOfTruth": [
+        "config/roadmap.json",
+        "Sources/QwenVoiceCore/GenerationStartupDiagnostics.swift",
+        "Sources/QwenVoiceCore/GenerationOutputAdapter.swift",
+        "Sources/QwenVoiceCore/MLXTTSEngine.swift",
+        "Sources/iOS/IOSStartupReliabilityRunner.swift",
+        "scripts/ios_device.sh",
+        "scripts/ios_startup_reliability.py"
       ]
     },
     {

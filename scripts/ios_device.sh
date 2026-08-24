@@ -28,6 +28,8 @@
 #                               [--diagnostic-cohort[=PATH]]
 #                                                 # headless language/output matrix; optional
 #                                                 # fixed-seed diagnostic cohort never publishes history
+#   scripts/ios_device.sh delivery-reliability --plan PLAN.json --script-file SCRIPT.txt
+#                                                 # governed Built-in Voice startup characterization
 #   scripts/ios_device.sh speech-assets           # resolve/install DE/ES/JA/ZH DictationTranscriber
 #   scripts/ios_device.sh enroll-clone-fixture --wav W.wav --transcript W.txt  # headless fixture voice enrollment
 #                                                 # assets and recheck Vocello's legacy Speech readiness
@@ -970,6 +972,120 @@ PY
   die "no clone-conditioning-result.json after ${timeout}s for runID=$run_id"
 }
 
+# Poll the terminal record written last by IOSStartupReliabilityRunner. A typed
+# harness-failure marker stops the poll, but never substitutes for a represented
+# per-take result.
+pull_startup_reliability_run() {
+  local run_id="$1" destination="$2"
+  local dev; dev="$(resolve_device)"
+  local run_destination="$destination/$run_id"
+  mkdir -p "$run_destination"
+  xcrun devicectl device copy from --device "$dev" \
+    --domain-type appDataContainer --domain-identifier "$BUNDLE_ID" \
+    --source "Library/Caches/Vocello/diagnostics/$run_id" \
+    --destination "$run_destination" --timeout 60 --quiet
+}
+
+# Query only the exact CoreDevice PID returned by the launch response. An empty
+# successful result means that process has exited; a failed query is unknown and
+# must not be mistaken for process death. The temporary inventory is never retained
+# because it can contain host/device tool metadata unrelated to the governed run.
+startup_reliability_process_is_alive() {
+  local dev="$1" target_pid="$2" inventory
+  [[ "$target_pid" =~ ^[0-9]+$ ]] || return 2
+  inventory="$(mktemp)"
+  if ! xcrun devicectl device info processes --device "$dev" \
+      --filter "processIdentifier == $target_pid" \
+      --json-output "$inventory" --quiet --timeout 15 >/dev/null 2>&1; then
+    rm -f "$inventory"
+    return 2
+  fi
+  local status=0
+  python3 - "$inventory" "$target_pid" <<'PY' || status=$?
+import json
+import sys
+
+try:
+    payload = json.load(open(sys.argv[1], encoding="utf-8"))
+    target = int(sys.argv[2])
+    rows = (payload.get("result") or {}).get("runningProcesses") or []
+except (OSError, TypeError, ValueError, json.JSONDecodeError):
+    raise SystemExit(2)
+raise SystemExit(0 if any(row.get("processIdentifier") == target for row in rows) else 1)
+PY
+  rm -f "$inventory"
+  return "$status"
+}
+
+wait_startup_reliability_result() {
+  local run_id="$1" timeout="$2" dest="$3" dev="$4" target_pid="$5"
+  local waited=0 terminal="" failure=""
+  while (( waited < timeout )); do
+    sleep 10
+    waited=$((waited + 10))
+    pull_startup_reliability_run "$run_id" "$dest" >/dev/null 2>&1 || true
+    terminal="$(find "$dest" -type f -path "*/${run_id}/startup-reliability-result.json" 2>/dev/null | head -1)"
+    if [[ -n "$terminal" && -f "$terminal" ]]; then
+      note "startup-reliability terminal found after ${waited}s (runID=$run_id)"
+      printf '%s\n' "$terminal"
+      return 0
+    fi
+    failure="$(find "$dest" -type f -path "*/${run_id}/startup-reliability-failure.json" 2>/dev/null | head -1)"
+    if [[ -n "$failure" && -f "$failure" ]]; then
+      warn "startup-reliability runner emitted a typed harness failure: $failure"
+      return 22
+    fi
+    local state verdict
+    state="$(probe_device_state 2>/dev/null || true)"
+    verdict="${state%%|*}"
+    [[ "$verdict" != "DEVICE_UNREACHABLE" ]] \
+      || { warn "startup-reliability device became unreachable at ${waited}s"; return 23; }
+    local process_status=0
+    if startup_reliability_process_is_alive "$dev" "$target_pid"; then
+      process_status=0
+    else
+      process_status=$?
+    fi
+    if (( process_status == 1 )); then
+      warn "startup-reliability process exited before terminal evidence at ${waited}s"
+      return 27
+    fi
+    (( process_status == 0 )) \
+      || warn "startup-reliability exact-process liveness was temporarily unavailable at ${waited}s"
+    note "…startup reliability still running (${waited}s / runID=$run_id)"
+  done
+  warn "no startup-reliability-result.json after ${timeout}s for runID=$run_id"
+  return 24
+}
+
+snapshot_startup_reliability_crashes() {
+  local destination="$1"
+  local pulled="$destination/pull"
+  local log="$destination/pull.log"
+  local dev; dev="$(resolve_device)"
+  mkdir -p "$pulled"
+  if ! xcrun devicectl device copy from --device "$dev" \
+    --domain-type appDataContainer --domain-identifier "$BUNDLE_ID" \
+    --source "Library/Caches/Vocello/diagnostics/crashes" \
+    --destination "$pulled" --timeout 30 --quiet >"$log" 2>&1; then
+    if grep -Fq 'Failed to retrieve the file node for Library/Caches/Vocello/diagnostics/crashes' "$log" \
+      && grep -Fq 'CoreDeviceError error 7000' "$log"; then
+      : >"$destination/hashes.txt"
+      rm -rf "$pulled"
+      return 0
+    fi
+    warn "could not collect startup-reliability crash snapshot"
+    return 1
+  fi
+  while IFS= read -r -d '' crash; do
+    local hash
+    hash="$(shasum -a 256 "$crash" | awk '{print $1}')"
+    printf '%s\n' "$hash"
+  done < <(find "$pulled" -type f -path '*/crashes/*' -print0 2>/dev/null) \
+    | LC_ALL=C sort -u >"$destination/hashes.txt"
+  rm -rf "$pulled"
+}
+
 read_devicectl_launch_pid() {
   local launch_json="$1"
   python3 - "$launch_json" <<'PY'
@@ -1869,6 +1985,106 @@ print(json.dumps({"QWENVOICE_DEBUG": "1", **{key: os.environ[key] for key in key
   note "clone-conditioning PASS · local evidence only · $artifacts"
 }
 
+# delivery-reliability --plan PLAN.json --script-file SCRIPT.txt
+# Runs the schema-bound startup matrix in one diagnostics-compiled app process.
+# The exact script is carried only by an ephemeral launch-spec file/environment
+# value. Retained evidence contains its digest and character count.
+cmd_delivery_reliability() {
+  require_team
+  local plan="" script_file="" timeout="${QVOICE_IOS_DELIVERY_RELIABILITY_TIMEOUT:-3600}"
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --plan) plan="${2:-}"; shift 2 ;;
+      --plan=*) plan="${1#*=}"; shift ;;
+      --script-file) script_file="${2:-}"; shift 2 ;;
+      --script-file=*) script_file="${1#*=}"; shift ;;
+      *) die "delivery-reliability accepts only --plan PLAN.json and --script-file SCRIPT.txt" ;;
+    esac
+  done
+  [[ -f "$plan" ]] || die "delivery-reliability requires a readable --plan"
+  [[ -f "$script_file" ]] || die "delivery-reliability requires a readable --script-file"
+  [[ "$timeout" =~ ^[1-9][0-9]*$ ]] \
+    || die "QVOICE_IOS_DELIVERY_RELIABILITY_TIMEOUT must be a positive whole number of seconds"
+
+  local run_id="ios-startup-reliability-$(date -u +%Y%m%d-%H%M%S)-$(benchmark_nonce)"
+  local artifacts="$QVOICE_ARTIFACTS_DIAGNOSTICS/ios/startup-reliability/$run_id"
+  local pulled="$artifacts/device-diagnostics"
+  local launch_spec launch_json dev env_json target_pid="" cleanup_command="" wait_status=0
+  mkdir -p "$artifacts"
+  launch_spec="$(mktemp)"
+  launch_json="$artifacts/launch.json"
+  python3 "$ROOT_DIR/scripts/ios_startup_reliability.py" prepare \
+    --plan "$plan" --script-file "$script_file" --run-id "$run_id" \
+    --sanitized-output "$artifacts/sanitized-plan.json" --launch-output "$launch_spec" \
+    || { rm -f "$launch_spec"; die "startup-reliability plan/script validation failed"; }
+
+  cmd_build --device-diagnostics
+  cmd_install >/dev/null
+  snapshot_startup_reliability_crashes "$artifacts/crashes-before" \
+    || { rm -f "$launch_spec"; die "could not establish the pre-run crash baseline"; }
+  dev="$(resolve_device)"
+  export QVOICE_IOS_DEVICE_DELIVERY_RELIABILITY_SPEC="$(<"$launch_spec")"
+  export QVOICE_IOS_DEVICE_RUN_ID="$run_id"
+  export QVOICE_MAC_BENCH_RUN_ID="$run_id"
+  export QWENVOICE_NATIVE_TELEMETRY_MODE=verbose
+  env_json="$(python3 -c '
+import json, os
+keys = (
+    "QVOICE_IOS_DEVICE_DELIVERY_RELIABILITY_SPEC",
+    "QVOICE_IOS_DEVICE_RUN_ID",
+    "QVOICE_MAC_BENCH_RUN_ID",
+    "QWENVOICE_NATIVE_TELEMETRY_MODE",
+)
+print(json.dumps({"QWENVOICE_DEBUG": "1", **{key: os.environ[key] for key in keys}}, sort_keys=True))
+')"
+  unset QVOICE_IOS_DEVICE_DELIVERY_RELIABILITY_SPEC QVOICE_IOS_DEVICE_RUN_ID \
+    QVOICE_MAC_BENCH_RUN_ID QWENVOICE_NATIVE_TELEMETRY_MODE
+  rm -f "$launch_spec"
+
+  note "startup reliability: schema-bound physical-device matrix (runID=$run_id)"
+  xcrun devicectl device process launch --device "$dev" --terminate-existing \
+    -e "$env_json" --json-output "$launch_json" "$BUNDLE_ID" \
+    >"$artifacts/launch.log" 2>&1 \
+    || die "could not launch startup-reliability diagnostics (see $artifacts/launch.log)"
+  target_pid="$(read_devicectl_launch_pid "$launch_json")" \
+    || die "startup-reliability launch did not return its exact process PID"
+  # The launch response is needed only to bind the exact PID. Discard it before
+  # collection so an OS tooling change cannot retain ephemeral launch input.
+  rm -f "$launch_json"
+  [[ "$target_pid" =~ ^[0-9]+$ ]] || die "startup-reliability returned an invalid process PID"
+  printf -v cleanup_command \
+    'xcrun devicectl device process terminate --device %q --pid %q --quiet >/dev/null 2>&1 || true' \
+    "$dev" "$target_pid"
+  trap "$cleanup_command" EXIT
+
+  set +e
+  wait_startup_reliability_result "$run_id" "$timeout" "$pulled" "$dev" "$target_pid" >/dev/null
+  wait_status=$?
+  set -e
+  # Forensics are mandatory even after a timeout, typed failure, or disconnected
+  # device. Keep each collection best-effort so the first failure is not erased.
+  pull_startup_reliability_run "$run_id" "$pulled" >"$artifacts/final-pull.log" 2>&1 || true
+  if ! snapshot_startup_reliability_crashes "$artifacts/crashes-after"; then
+    warn "could not establish the post-run crash snapshot"
+    wait_status=26
+  fi
+  local crash_delta
+  crash_delta="$(comm -13 "$artifacts/crashes-before/hashes.txt" "$artifacts/crashes-after/hashes.txt" 2>/dev/null || true)"
+  if [[ -n "$crash_delta" ]]; then
+    printf '%s\n' "$crash_delta" >"$artifacts/new-crashes.txt"
+    wait_status=25
+  fi
+  eval "$cleanup_command"
+  trap - EXIT
+
+  (( wait_status == 0 )) \
+    || die "startup-reliability run did not produce acceptable terminal evidence (status=$wait_status; see $artifacts)"
+  python3 "$ROOT_DIR/scripts/ios_startup_reliability.py" validate-result \
+    --plan "$plan" --artifact-dir "$pulled" --run-id "$run_id" \
+    || die "startup-reliability evidence validation failed (see $artifacts)"
+  note "startup reliability evidence → $artifacts"
+}
+
 # memory-field-report [pulled-diagnostics]: summarize privacy-reduced MetricKit memory
 # aggregates already present on disk. MetricKit delivery is delayed and not run-correlated,
 # so absence reports notYetDelivered and remains nonfatal. This command intentionally does
@@ -2065,6 +2281,10 @@ main() {
       require_build_free_space language-benchmark || die "iOS language benchmark storage preflight failed"
       cmd_lang_bench "$@"
       ;;
+    delivery-reliability)
+      require_build_free_space startup-reliability || die "iOS startup-reliability storage preflight failed"
+      cmd_delivery_reliability "$@"
+      ;;
     speech-assets) cmd_speech_assets "$@" ;;
     enroll-clone-fixture) cmd_enroll_clone_fixture "$@" ;;
     crashes) cmd_crashes "$@" ;;
@@ -2087,7 +2307,7 @@ main() {
       ;;
     help|-h|--help)
       sed -n '2,/^$/p' "$0" | sed 's/^# \{0,1\}//' >&2 ;;
-    *) die "unknown subcommand '$sub' (try: doctor|build|install|launch|console|device-state|pull|bench|lang-bench|speech-assets|enroll-clone-fixture|crashes|debug|logs|profile|memory|clone-conditioning|memory-field-report|preflight|gate|help)" ;;
+    *) die "unknown subcommand '$sub' (try: doctor|build|install|launch|console|device-state|pull|bench|lang-bench|delivery-reliability|speech-assets|enroll-clone-fixture|crashes|debug|logs|profile|memory|clone-conditioning|memory-field-report|preflight|gate|help)" ;;
   esac
 }
 

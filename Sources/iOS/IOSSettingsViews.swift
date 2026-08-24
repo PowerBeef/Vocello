@@ -341,7 +341,9 @@ struct IOSSettingsPickerRow: View {
     private var picker: some View {
         Picker("Take variation", selection: $selection) {
             ForEach(Qwen3SamplingVariation.allCases, id: \.self) { variation in
-                Text(variation.displayName).tag(variation.rawValue)
+                Text(variation.displayName)
+                    .accessibilityIdentifier("iosSettings_variationOption_\(variation.rawValue)")
+                    .tag(variation.rawValue)
             }
         }
         .pickerStyle(.menu)

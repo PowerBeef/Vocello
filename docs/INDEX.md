@@ -58,6 +58,7 @@ Review when: target or scheme changes; runtime topology; telemetry schema; test 
 - [`docs/reference/interactive-ui-qa.md`](../docs/reference/interactive-ui-qa.md)
 - [`docs/reference/ios-app-guide.md`](../docs/reference/ios-app-guide.md)
 - [`docs/reference/ios-appstore-submission.md`](../docs/reference/ios-appstore-submission.md)
+- [`docs/reference/ios-built-in-startup-reliability.md`](../docs/reference/ios-built-in-startup-reliability.md)
 - [`docs/reference/ios-device-testing.md`](../docs/reference/ios-device-testing.md)
 - [`docs/reference/ios-engine-optimization.md`](../docs/reference/ios-engine-optimization.md)
 - [`docs/reference/ios-increased-memory-entitlement-request.md`](../docs/reference/ios-increased-memory-entitlement-request.md)

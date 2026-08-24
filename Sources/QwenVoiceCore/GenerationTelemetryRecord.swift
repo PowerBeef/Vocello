@@ -825,6 +825,9 @@ public struct GenerationTelemetryRecord: Hashable, Codable, Sendable {
     /// schema-v8 row. This keeps benchmark-history schema v2 compatible while
     /// making unavailable actor/session observations explicit instead of zero.
     public let streamingTelemetryV9: GenerationStreamingTelemetryTransitionV9?
+    /// Privacy-safe startup/request identity. Optional so every historical
+    /// schema-v1...v8 row remains decodable without migration.
+    public let requestReceipt: GenerationRequestReceipt?
 
     public init(
         generationID: String,
@@ -852,6 +855,7 @@ public struct GenerationTelemetryRecord: Hashable, Codable, Sendable {
         modelRuntimeIdentity: ModelRuntimeIdentity? = nil,
         memoryMetrics: GenerationMemoryMetrics? = nil,
         streamingTelemetryV9: GenerationStreamingTelemetryTransitionV9? = nil,
+        requestReceipt: GenerationRequestReceipt? = nil,
         clockSource: String? = "mach_absolute_time",
         schemaVersion: Int = GenerationTelemetryRecord.currentSchemaVersion,
         processName: String = ProcessInfo.processInfo.processName,
@@ -942,6 +946,7 @@ public struct GenerationTelemetryRecord: Hashable, Codable, Sendable {
                 frontend: self.frontendMetrics,
                 transport: self.transportMetrics
             )
+        self.requestReceipt = requestReceipt
     }
 }
 

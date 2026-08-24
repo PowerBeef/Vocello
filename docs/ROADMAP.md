@@ -12,6 +12,7 @@
 | `autonomous-validation-remediation-2026-08` | active | release-qa | 5/11 (45%) |
 | `delivery-prompting-2026-08` | active | backend-mlx | 25/32 (78%) |
 | `engineering-review-remediation-2026-08` | active | backend-and-platform | 3/14 (21%) |
+| `ios-generation-startup-reliability-2026-08` | active | backend-and-platform | 4/6 (67%) |
 | `model-delivery-2026-08` | active | release-qa | 2/3 (67%) |
 | `compliance-2026-08` | complete | release-qa | 2/2 (100%) |
 | `convergence-metal4-stage4-2026-08` | complete | backend-and-platform | 7/7 (100%) |
@@ -188,6 +189,31 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
 
 - **`F-14`** (planned) — Low — schedule Thread Sanitizer and enforce concurrency-debt quality.
   gate: Add a scheduled TSan lane for the deterministic core/XPC subset, non-blocking only while noise is characterized, then promote stable coverage. Extend the concurrency registry so new unsafe declarations require review date and removal condition in addition to the already-enforced owner, invariant, and direct tests; add an explicit no-unreviewed-growth budget. Current scripts support opt-in TSan and the registry fail-closes on unregistered declarations, but no scheduled lane or review/removal metadata is enforced.
+
+## iOS Built-in Voice startup reliability
+
+`ios-generation-startup-reliability-2026-08` · **active** · backend-and-platform · adopted 2026-08-23
+
+Causally classify and eliminate the reported iOS Built-in Voice startup failure using privacy-safe exact-request receipts, typed startup boundaries, ordered physical-device characterization, and the smallest evidence-supported production fix without changing delivery copy, sampling, model pins, or deterministic audio quality.
+
+Narrative authority: [`docs/reference/ios-built-in-startup-reliability.md`](reference/ios-built-in-startup-reliability.md)
+
+| Item | Status | Title | Evidence |
+| --- | --- | --- | --- |
+| `ISR-01` | done | Mine and conservatively classify retained startup evidence | `file:scripts/tests/test_delivery_failure_topology.py` |
+| `ISR-02` | done | Add exact request receipts and typed startup boundaries | `file:Tests/VocelloCoreTests/GenerationStartupDiagnosticsTests.swift`, `file:Tests/VocelloCoreTests/GenerationFailureDiagnosticLoggerTests.swift` |
+| `ISR-03` | done | Add ordered physical-device runner and visible request parity | `file:scripts/tests/test_ios_startup_reliability.py`, `file:Tests/VocelloCoreTests/IOSStartupReliabilityPlanTests.swift` |
+| `ISR-04` | planned | Complete staged exact-request characterization | — |
+| `ISR-05` | done | Implement only the evidence-supported causal fix | `file:Tests/VocelloCoreTests/GenerationStartupDiagnosticsTests.swift` |
+| `ISR-06` | planned | Complete exact-script and broader closure evidence | — |
+
+### Open items in detail
+
+- **`ISR-04`** (planned) — Complete staged exact-request characterization.
+  gate: With the original exact 285-character UTF-8 script, run five fixed-seed cold launches, ten same-process warm takes, seeds 38112001 through 38112008, focused delivery/speaker/default predecessors, production/full-unload/prepared-cache-clear/prewarm-disabled arms, streaming parity, macOS CLI/headless controls, and iOS headless/visible UI parity. Stop expansion at the first decision-complete divergent boundary; preserve every attempt and crash delta.
+
+- **`ISR-06`** (planned) — Complete exact-script and broader closure evidence.
+  gate: Both the original script and tracked sentinel must pass 10/10 cold, 20/20 warm, all eight seeds, every focused predecessor, streaming/non-streaming, and matching UI/engine receipts; then complete the 9-speaker × 8-delivery grid at one seed plus a second seed for the affected speaker row and delivery column. Closure rejects unknown boundaries, silent seed changes, leaked retries, memory-policy violations, crashes, or unrepresented attempts and requires all deterministic gates green.
 
 ## Model download throughput
 

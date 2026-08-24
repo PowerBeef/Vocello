@@ -35,11 +35,27 @@ enum IOSPullableDiagnosticsMirror {
     static func syncGenerationTelemetryIfEnabled(generationID: UUID) {
         guard TelemetryGate.resolvedEnabled else { return }
         guard let pullableRoot else { return }
+        let generationID = generationID.uuidString
         syncGenerationTelemetry(
-            generationID: generationID.uuidString,
+            generationID: generationID,
             from: appGroupDiagnosticsRoot,
             into: pullableRoot
         )
+
+        // Run-scoped UI diagnostics are pulled independently from the app's
+        // historical telemetry mirror. Export the same generation-filtered
+        // rows into that run directory so request-receipt parity can be proven
+        // without copying unrelated prior runs. Keep the global destination
+        // above for existing benchmark and acceptance consumers.
+        if let runID = safeRunID(
+            from: ProcessInfo.processInfo.environment["QVOICE_IOS_DEVICE_RUN_ID"]
+        ) {
+            syncGenerationTelemetry(
+                generationID: generationID,
+                from: appGroupDiagnosticsRoot,
+                into: pullableRoot.appendingPathComponent(runID, isDirectory: true)
+            )
+        }
     }
 
     static func syncGenerationTelemetry(
@@ -124,5 +140,19 @@ enum IOSPullableDiagnosticsMirror {
                 print("[IOSPullableDiagnosticsMirror] could not mirror \(layer) telemetry: \(error.localizedDescription)")
             }
         }
+    }
+
+    private static func safeRunID(from rawValue: String?) -> String? {
+        guard let value = rawValue?.trimmingCharacters(in: .whitespacesAndNewlines),
+              (1...96).contains(value.count),
+              value.unicodeScalars.allSatisfy({ scalar in
+                  CharacterSet.alphanumerics.contains(scalar)
+                      || scalar == "."
+                      || scalar == "_"
+                      || scalar == "-"
+              }) else {
+            return nil
+        }
+        return value
     }
 }

@@ -42,13 +42,19 @@ public enum BenchRunContext {
     public static func writeCurrentTakeFile(
         takeIndex: Int,
         cell: String,
-        intendedWarmState: String
+        intendedWarmState: String,
+        startupPredecessorIdentityDigest: String? = nil
     ) throws {
-        let payload: [String: String] = [
+        var payload: [String: String] = [
             "benchTakeIndex": String(takeIndex),
             "benchCell": cell,
             "benchWarmState": intendedWarmState,
         ]
+        if let digest = startupPredecessorIdentityDigest?.lowercased(),
+           digest.count == 64,
+           digest.allSatisfy({ $0.isHexDigit }) {
+            payload["startupPredecessorIdentityDigest"] = digest
+        }
         let data = try JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys])
         try data.write(to: currentTakeFileURL, options: .atomic)
         guard currentTakeFileNotes() == payload else {

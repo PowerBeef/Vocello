@@ -48,19 +48,30 @@ enum NativeRuntimeStage: String, Codable, Sendable {
     }
 }
 
+enum NativeRuntimeFailureCode: String, Sendable {
+    case runtimeFailed = "runtime.failed"
+    case audioQualityRejected = "audio.quality_rejected"
+}
+
 struct NativeRuntimeError: LocalizedError, Sendable {
     let stage: NativeRuntimeStage
     let message: String
     let underlyingDescription: String?
+    let failureCode: NativeRuntimeFailureCode
+    let diagnosticDetail: String?
 
     init(
         stage: NativeRuntimeStage,
         message: String,
-        underlying: Error? = nil
+        underlying: Error? = nil,
+        failureCode: NativeRuntimeFailureCode = .runtimeFailed,
+        diagnosticDetail: String? = nil
     ) {
         self.stage = stage
         self.message = message
         self.underlyingDescription = underlying.map { String(reflecting: $0) }
+        self.failureCode = failureCode
+        self.diagnosticDetail = diagnosticDetail
     }
 
     var errorDescription: String? {
@@ -80,6 +91,19 @@ struct NativeRuntimeError: LocalizedError, Sendable {
             message: "\(message) (\(stage.description)). \(error.localizedDescription)",
             underlying: error
         )
+    }
+
+    var telemetryNotes: [String: String] {
+        var notes = ["nativeRuntimeFailureCode": failureCode.rawValue]
+        if failureCode == .audioQualityRejected,
+           let diagnosticDetail,
+           diagnosticDetail.range(
+               of: #"^[a-z0-9_:(),.-]+(?:,[a-z0-9_:(),.-]+)*$"#,
+               options: .regularExpression
+           ) != nil {
+            notes["audioQCFlags"] = diagnosticDetail
+        }
+        return notes
     }
 }
 
@@ -168,6 +192,7 @@ struct NativePreparedGeneration: Sendable {
     /// conditioning, prewarm, synthesis, finalization, and trim on one clock.
     let telemetrySampler: NativeTelemetrySampler?
     let telemetryTerminalPolicy: NativeTelemetryTerminalPolicy
+    let requestReceipt: GenerationRequestReceipt
 }
 
 public struct InteractivePrefetchDiagnostics: Codable, Equatable, Sendable {
@@ -485,7 +510,10 @@ actor NativeEngineRuntime {
 
     func prepareGeneration(
         for request: GenerationRequest,
-        telemetryTerminalPolicy: NativeTelemetryTerminalPolicy = .publish
+        telemetryTerminalPolicy: NativeTelemetryTerminalPolicy = .publish,
+        retryAttempt: Int = 0,
+        operationGeneration: UInt64 = 0,
+        fixedSamplingConfiguration: VocelloQwen3SamplingConfiguration? = nil
     ) async throws -> NativePreparedGeneration {
         try GenerationSemantics.validateQwenPromptContract(for: request)
         let generationID = request.generationID ?? UUID()
@@ -493,10 +521,12 @@ actor NativeEngineRuntime {
         // effective seed is always present and the package owns a fresh MLX
         // random state for the request; no process-global RNG or variation
         // override is mutated here.
-        let samplingConfiguration = Qwen3TalkerSamplingOverride.samplingConfiguration(
-            requestedSeed: request.seed,
-            variation: request.variation
-        )
+        let samplingConfiguration = fixedSamplingConfiguration
+            ?? Qwen3TalkerSamplingOverride.samplingConfiguration(
+                requestedSeed: request.seed,
+                variation: request.variation
+            )
+        let receiptWarmState: EngineWarmState = activeModelID == request.modelID ? .warm : .cold
         // Fresh per-generation stage recorder, started at prepare entry (before model
         // load / prewarm) so the full backend timeline is measured from one origin.
         // Propagate to the load coordinator so its cache/tokenizer/model-load marks
@@ -507,11 +537,13 @@ actor NativeEngineRuntime {
             : nil
         self.telemetryRecorder = telemetryRecorder
         await loadCoordinator.setTelemetryRecorder(telemetryRecorder)
+        await telemetryRecorder?.mark(stage: GenerationStartupBoundary.requestValidated.telemetryStage)
         let memoryPolicy = NativeMemoryPolicyResolver.policy(
             mode: request.mode,
             isBatch: request.batchTotal != nil
         )
         NativeMemoryPolicyResolver.apply(memoryPolicy)
+        await telemetryRecorder?.mark(stage: GenerationStartupBoundary.memoryAdmitted.telemetryStage)
         let requestMemory = NativeMemoryPolicyResolver.memoryConfiguration(for: memoryPolicy)
         NativeMemoryPolicyResolver.resetPeakMemory()
         let telemetrySampler: NativeTelemetrySampler? = {
@@ -560,6 +592,7 @@ actor NativeEngineRuntime {
         )
         let loadStartedAt = ContinuousClock.now
         let loadCapabilityProfile = NativeLoadCapabilityProfile(for: request)
+        await telemetryRecorder?.mark(stage: GenerationStartupBoundary.modelLoadStarted.telemetryStage)
         await telemetrySampler?.captureBoundary("before_model_load")
 
         var mlxMemorySnapshots: [String: NativeMLXMemorySnapshot] = [
@@ -571,6 +604,7 @@ actor NativeEngineRuntime {
             preserveActiveClonePrimeToken: false,
             signpostGenerationID: generationID
         )
+        await telemetryRecorder?.mark(stage: GenerationStartupBoundary.modelLoaded.telemetryStage)
         await telemetrySampler?.captureBoundary("after_model_load")
         mlxMemorySnapshots["after_load"] = NativeMemoryPolicyResolver.snapshot()
         await recordDiagnosticEvent(
@@ -607,6 +641,7 @@ actor NativeEngineRuntime {
 
         let cloneConditioning: ResolvedCloneConditioning?
         let wasPrimed: Bool
+        await telemetryRecorder?.mark(stage: GenerationStartupBoundary.prewarmStarted.telemetryStage)
         await telemetrySampler?.captureBoundary("before_mode_preparation")
         switch request.payload {
         case .clone(let reference):
@@ -740,6 +775,7 @@ actor NativeEngineRuntime {
             mlxMemorySnapshots["after_prewarm"] = NativeMemoryPolicyResolver.snapshot()
         }
         await telemetrySampler?.captureBoundary("after_mode_preparation")
+        await telemetryRecorder?.mark(stage: GenerationStartupBoundary.prewarmCompleted.telemetryStage)
 
         if cloneConditioning?.cloneCacheHit != nil {
             booleanFlags["prepared_clone_cache_hit"] = cloneConditioning?.cloneCacheHit ?? false
@@ -795,6 +831,16 @@ actor NativeEngineRuntime {
             cloneHandle = nil
         }
         await telemetrySampler?.captureBoundary("after_preparation")
+        let predecessorDigest = BenchRunContext.telemetryNotes()["startupPredecessorIdentityDigest"]
+        let requestReceipt = GenerationRequestReceipt(
+            request: request,
+            generationID: generationID,
+            effectiveSeed: samplingConfiguration.effectiveSeed,
+            warmState: loadResult.didLoad ? .cold : .warm,
+            predecessorIdentityDigest: predecessorDigest,
+            retryAttempt: retryAttempt,
+            operationGeneration: operationGeneration
+        )
         return NativePreparedGeneration(
             // Reuse the app-minted ID so app/middle/engine telemetry rows correlate;
             // fall back to a fresh UUID for callers (e.g. internal batch) passing nil.
@@ -815,7 +861,8 @@ actor NativeEngineRuntime {
             mlxMemorySnapshots: mlxMemorySnapshots,
             telemetryRecorder: telemetryRecorder,
             telemetrySampler: telemetrySampler,
-            telemetryTerminalPolicy: telemetryTerminalPolicy
+            telemetryTerminalPolicy: telemetryTerminalPolicy,
+            requestReceipt: requestReceipt
         )
         } catch {
             await telemetrySampler?.captureBoundary("preparation_failed")
@@ -849,7 +896,18 @@ actor NativeEngineRuntime {
                     stageMarks: stageMarks,
                     summary: summary,
                     thermalState: summary.thermalState,
-                    notes: failureNotes
+                    notes: failureNotes,
+                    requestReceipt: GenerationRequestReceipt(
+                        request: request,
+                        generationID: generationID,
+                        effectiveSeed: samplingConfiguration.effectiveSeed,
+                        warmState: receiptWarmState,
+                        predecessorIdentityDigest: BenchRunContext.telemetryNotes()[
+                            "startupPredecessorIdentityDigest"
+                        ],
+                        retryAttempt: retryAttempt,
+                        operationGeneration: operationGeneration
+                    )
                 )
                 await GenerationTelemetryJSONLSink.shared.write(
                     record: record,

@@ -84,6 +84,7 @@ public actor NativeTelemetryRecorder {
     /// would break that join. The clock also supplies high-resolution nanoseconds.
     public nonisolated let clock: NativeTelemetryClock
     private var stageMarks: [NativeTelemetryStageMark] = []
+    private var observedStartupStages: Set<String> = []
     private var nextSequence: Int = 0
 
     public init(clock: NativeTelemetryClock) {
@@ -94,6 +95,7 @@ public actor NativeTelemetryRecorder {
         stage: String,
         metadata: [String: String] = [:]
     ) {
+        guard registerStartupStageIfNeeded(stage) else { return }
         let (ms, ns) = clock.now()
         let sequence = nextSequence
         nextSequence += 1
@@ -108,13 +110,40 @@ public actor NativeTelemetryRecorder {
         )
     }
 
+    /// Append a one-shot boundary observed by the actor-owned producer on its
+    /// existing stream signal. The caller supplies an elapsed offset on this
+    /// recorder's clock; no per-token task or actor hop is introduced.
+    public func mark(
+        stage: String,
+        atMilliseconds tMS: Int,
+        metadata: [String: String] = [:]
+    ) {
+        guard registerStartupStageIfNeeded(stage) else { return }
+        let sequence = nextSequence
+        nextSequence += 1
+        stageMarks.append(
+            NativeTelemetryStageMark(
+                tMS: max(0, tMS),
+                sequence: sequence,
+                stage: stage,
+                metadata: metadata
+            )
+        )
+    }
+
     public func snapshot() -> [NativeTelemetryStageMark] {
         stageMarks.sorted(by: NativeTelemetryStageMark.chronologicallyPrecedes)
     }
 
     public func reset() {
         stageMarks.removeAll(keepingCapacity: false)
+        observedStartupStages.removeAll(keepingCapacity: false)
         nextSequence = 0
+    }
+
+    private func registerStartupStageIfNeeded(_ stage: String) -> Bool {
+        guard stage.hasPrefix("startup.") else { return true }
+        return observedStartupStages.insert(stage).inserted
     }
 }
 

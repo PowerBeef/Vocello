@@ -34,6 +34,57 @@ public enum EmotionIntensity: Int, CaseIterable, Identifiable, Sendable {
     }
 }
 
+public struct DeliveryInstructionCell: Equatable, Sendable {
+    public let id: String
+    public let preset: EmotionPreset
+    public let intensity: EmotionIntensity
+    public let instruction: String
+
+    public init(preset: EmotionPreset, intensity: EmotionIntensity) {
+        self.id = "\(preset.id).\(intensity.rpcValue)"
+        self.preset = preset
+        self.intensity = intensity
+        self.instruction = preset.instruction(for: intensity)
+    }
+
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.id == rhs.id && lhs.instruction == rhs.instruction
+    }
+
+    /// Resolve the canonical diagnostics/receipt spelling. Unlike user-facing
+    /// convenience parsing, this boundary deliberately requires both the
+    /// preset and intensity so retained evidence never has an implicit tier.
+    public static func resolveStrict(_ rawValue: String) throws -> Self {
+        let token = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        let parts = token.split(separator: ".", omittingEmptySubsequences: false).map(String.init)
+        guard parts.count == 2,
+              let preset = EmotionPreset.preset(id: parts[0]) else {
+            throw DeliveryInstructionCellError.invalidCell(token)
+        }
+        guard let intensity = EmotionIntensity.allCases.first(where: {
+            $0.rpcValue == parts[1]
+        }) else {
+            throw DeliveryInstructionCellError.invalidIntensity(parts[1])
+        }
+        return Self(preset: preset, intensity: intensity)
+    }
+}
+
+public enum DeliveryInstructionCellError: LocalizedError, Equatable, Sendable {
+    case invalidCell(String)
+    case invalidIntensity(String)
+
+    public var errorDescription: String? {
+        switch self {
+        case .invalidCell(let value):
+            let known = EmotionPreset.all.map(\.id).joined(separator: ", ")
+            return "Unknown delivery cell '\(value)'. Use <preset>.<intensity>; presets: \(known)."
+        case .invalidIntensity(let value):
+            return "Unknown delivery intensity '\(value)'. Use normal or strong."
+        }
+    }
+}
+
 public struct DeliveryProfile: Equatable, Sendable {
     public static let neutralInstruction = "Neutral"
 

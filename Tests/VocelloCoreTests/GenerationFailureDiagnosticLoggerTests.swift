@@ -44,7 +44,7 @@ final class GenerationFailureDiagnosticLoggerTests: XCTestCase {
         let object = try XCTUnwrap(
             JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any]
         )
-        XCTAssertEqual(object["schemaVersion"] as? Int, 2)
+        XCTAssertEqual(object["schemaVersion"] as? Int, 3)
         XCTAssertEqual(object["errorCode"] as? String, "audio.input_missing")
         XCTAssertEqual(object["classification"] as? String, "audio")
         XCTAssertEqual(object["stage"] as? String, "stream_failed")
@@ -52,6 +52,66 @@ final class GenerationFailureDiagnosticLoggerTests: XCTestCase {
         XCTAssertNil(object["modelID"])
         XCTAssertEqual(object["textLength"] as? Int, secretPrompt.count)
         XCTAssertEqual(object["shouldStream"] as? Bool, true)
+    }
+
+    func testV2RowsDecodeAndV3RowsCarryOnlyReceiptIdentities() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("vocello-failure-v3-\(UUID().uuidString)", isDirectory: true)
+        let fileURL = directory.appendingPathComponent("generation-failures.jsonl")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let v2 = #"{"schemaVersion":2,"timestamp":"2026-08-23T00:00:00Z","errorCode":"generation.failed","classification":"runtime","stage":"stream_startup","requestMode":"custom","modelID":"pro_custom_speed","textLength":285,"shouldStream":true}"#
+        try Data((v2 + "\n").utf8).write(to: fileURL)
+
+        let logger = GenerationFailureDiagnosticLogger(fileURL: fileURL, ignoresTelemetryGate: true)
+        let decodedV2 = try XCTUnwrap(logger.read().first)
+        XCTAssertEqual(decodedV2.schemaVersion, 2)
+        XCTAssertNil(decodedV2.requestIdentityDigest)
+
+        let generationID = UUID()
+        let request = GenerationRequest(
+            mode: .custom,
+            modelID: "pro_custom_speed",
+            text: "Private source text",
+            outputPath: "/tmp/private.wav",
+            shouldStream: true,
+            languageHint: "english",
+            payload: .custom(
+                speakerID: "vivian",
+                deliveryStyle: try DeliveryInstructionCell.resolveStrict("calm.strong").instruction
+            ),
+            generationID: generationID,
+            seed: 38_112_001,
+            variation: .balanced
+        )
+        let receipt = GenerationRequestReceipt(
+            request: request,
+            generationID: generationID,
+            effectiveSeed: 38_112_001,
+            warmState: .cold,
+            predecessorIdentityDigest: String(repeating: "a", count: 64),
+            retryAttempt: 1,
+            operationGeneration: 7
+        )
+        logger.log(
+            surfacedMessage: "private",
+            stage: "generation startup",
+            underlyingError: TTSEngineError.generationFailed("private"),
+            request: request,
+            receipt: receipt
+        )
+        let rows = logger.read()
+        XCTAssertEqual(rows.count, 2)
+        let v3 = try XCTUnwrap(rows.last)
+        XCTAssertEqual(v3.schemaVersion, 3)
+        XCTAssertEqual(v3.generationID, generationID.uuidString)
+        XCTAssertEqual(v3.requestIdentityDigest, receipt.requestIdentityDigest)
+        XCTAssertEqual(v3.retryAttempt, 1)
+        XCTAssertEqual(v3.operationGeneration, 7)
+        XCTAssertEqual(v3.requestReceipt, receipt)
+        let raw = try String(contentsOf: fileURL, encoding: .utf8)
+        XCTAssertFalse(raw.contains("Private source text"))
+        XCTAssertFalse(raw.contains("/tmp/private.wav"))
     }
 
     func testLogRetentionIsEntryAndByteBoundedAndClearable() throws {

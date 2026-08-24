@@ -50,6 +50,7 @@ Before changing iOS UI or behavior, read:
   - `scripts/ios_device.sh profile [--kind cpu|memory] [--keep-trace] [spec]`
   - `scripts/ios_device.sh memory --voice-id ID [--label ID]` (one-process retained-memory sequence)
   - `scripts/ios_device.sh clone-conditioning [--label ID]` (compile-gated, local-only transcript-backed versus x-vector proof; no history publication)
+  - `scripts/ios_device.sh delivery-reliability --plan PLAN.json --script-file SCRIPT.txt` (compile-gated ordered Built-in Voice startup diagnosis; exact script remains untracked)
   - `scripts/ios_device.sh enroll-clone-fixture --wav W.wav --transcript W.txt` (headless benchmark-fixture voice enrollment for wipe recovery; the visible Files-import flow returned 2026-08-15 and has its own opt-in `ui_test.sh ios enroll-clone-fixture` lane)
   - `scripts/ios_device.sh memory-field-report [pulled-diagnostics]` (local-only; never contacts the phone)
   - `scripts/ios_device.sh crashes`
@@ -62,6 +63,11 @@ Before changing iOS UI or behavior, read:
 - Generated output must use `config/build-output-policy.json`. Do not add an iOS DerivedData,
   package, evidence, symbol, or archive root outside the manifest; route policy changes through
   `.agents/rules/release-qa.md`.
+- Built-in Voice startup plans, retained results, and the tracked control sentence are governed by
+  `config/ios-startup-reliability-plan-schema-v1.json`,
+  `config/ios-startup-reliability-result-schema-v1.json`, and
+  `config/ios-startup-reliability-sentinel.json`. Exact reported script bytes remain untracked and
+  may enter the app only through the diagnostic command's ephemeral launch input.
 - Use authoritative Apple documentation (docs MCP when callable) for current framework APIs. Use a
   GitHub integration when callable, otherwise `gh`, for repository context; scripts remain the test
   interface.
@@ -103,6 +109,7 @@ scripts/ui_test.sh ios delivery-cohort   # delivery-consistency cohort (--text/-
 scripts/ui_test.sh ios model-download    # isolated background-delivery lifecycle proof
 scripts/ui_test.sh ios enroll-clone-fixture  # benchmark clone voice through the visible Files-import flow
 scripts/ui_test.sh ios saved-voice-lifecycle # opt-in F-01 import/preview/handoff/delete acceptance
+scripts/ui_test.sh ios startup-parity --script-file SCRIPT.txt # exact visible request-to-engine receipt proof
 scripts/ios_device.sh gate            # deterministic physical-device/runtime proof
 ```
 

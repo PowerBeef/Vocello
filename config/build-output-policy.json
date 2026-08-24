@@ -13,6 +13,7 @@
         "smoke",
         "benchmark",
         "model-download",
+        "startup-parity",
         "perf"
       ],
       "keepPassingPerPlatformLane": 1,
@@ -53,6 +54,10 @@
         "requiredFreeBytes": 16106127360,
         "cleanupHint": "scripts/clean_build_caches.sh --routine"
       },
+      "startup-reliability": {
+        "requiredFreeBytes": 16106127360,
+        "cleanupHint": "scripts/clean_build_caches.sh --prune-ui-results"
+      },
       "telemetry-overhead": {
         "requiredFreeBytes": 12884901888,
         "cleanupHint": "scripts/clean_build_caches.sh --routine"
@@ -70,6 +75,10 @@
         "cleanupHint": "scripts/clean_build_caches.sh --prune-ui-results"
       },
       "ui-delivery-cohort": {
+        "requiredFreeBytes": 12884901888,
+        "cleanupHint": "scripts/clean_build_caches.sh --prune-ui-results"
+      },
+      "ui-startup-parity": {
         "requiredFreeBytes": 12884901888,
         "cleanupHint": "scripts/clean_build_caches.sh --prune-ui-results"
       },

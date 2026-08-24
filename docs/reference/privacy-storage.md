@@ -125,11 +125,12 @@ Recording a reference clip uses the **Microphone** permission; transcript auto-f
 Diagnostics should be user-initiated. The app may write local logs or exportable diagnostic files for model download, generation, playback, XPC, and model-admission failures, but it should not report those details over the network automatically.
 
 When runtime telemetry is explicitly enabled, `generation-failures.jsonl` is a privacy-reduced
-schema-v2 support log capped at 200 entries and 256 KiB. It stores only an allowlisted error code
-and classification, known lifecycle stage and model identifier, generation mode, text length,
-streaming flag, and timestamp. It never stores prompts, transcripts, voice descriptions, paths,
-URLs, reflected/localized errors, stack symbols, credentials, email addresses, or arbitrary
-metadata. The logger exposes a local clear operation; it never uploads the file.
+schema-v3 support log capped at 200 entries and 256 KiB; schema-v2 rows remain decodable. It stores
+only an allowlisted error code and classification, known lifecycle stage and model identifier,
+generation mode, text length, streaming flag, timestamp, and privacy-safe request/attempt receipt
+identities. It never stores prompts, transcripts, delivery copy, voice descriptions, paths, URLs,
+reflected/localized errors, stack symbols, credentials, email addresses, or arbitrary metadata.
+The logger exposes a local clear operation; it never uploads the file.
 
 Repository-local build and QA state lives under the ignored `build/` tree. Its machine-readable
 contract is `config/build-output-policy.json`; `scripts/build_output_policy.py validate` rejects an

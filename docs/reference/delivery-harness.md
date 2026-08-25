@@ -444,8 +444,9 @@ Aiden/English/Speed/current-arm run completed all four generations and analyses 
 identity failure at compliant development seed `32060824`. The literal handout seed `42060824` was
 correctly refused because it is outside the governed development partition. Happy, Angry, Fearful,
 and Surprised each retained one-seed advisory acoustic misses, so the smoke makes no adherence or
-semantic-improvement claim. DP-30 remains open for script/language/power screening, and
-DP-31/DP-32 retain blinded semantic promotion authority.
+semantic-improvement claim. This checkpoint left DP-30 open for script/language/power screening;
+§2.7 records the later decision-complete negative screen. DP-31/DP-32 retain blinded semantic
+promotion authority.
 
 ### 2.6 Autonomous per-preset acoustic screen (pre-registered 2026-08-25)
 
@@ -487,6 +488,37 @@ negative for pitch, variation, arousal, and tension in both variants, so prosody
 uses zero magnitude for those supporting normal-tier axes while retaining direction checks. The
 unmeasured 1.15 strong multiplier is also retired; both tiers use 1.0 because the measured cross-tier
 separation ratio was 0.997. This changes threshold calibration, not tier identity or prompt copy.
+
+### 2.7 Autonomous screen result (2026-08-25)
+
+All six pre-registered Speed candidates completed the first screen. None produced
+`automatic_acoustic_improvement`, so the contract's stopping rule kept the larger script-interaction,
+powered, and untouched variant matrices closed. This is a decision-complete negative screen, not an
+unfinished positive experiment:
+
+| Candidate | Result | Completion | Score delta (95% paired interval) | Adherence delta | Competing-preset distance delta | New hard rows |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| Happy acoustic | `regression` | 100% | +0.085938 (-0.031250…+0.210938) | +0.1875 | -0.1875 vs Surprised | 0 |
+| Happy emotion + acoustic | `abstained_out_of_distribution` | 96.875% | -0.007812 (-0.140625…+0.132812) | 0.0000 | -0.0625 vs Surprised | 1 |
+| Angry emotion + acoustic | `abstained_out_of_distribution` | 96.875% | +0.055556 (-0.055556…+0.180556) | +0.1875 | 0.0000 vs Happy | 1 |
+| Fearful urgent | `abstained_out_of_distribution` | 90.625% | +0.125000 (approximately 0…+0.255682) | +0.0625 | -0.045455 vs Sad | 0 relative to baseline |
+| Fearful structured | `abstained_out_of_distribution` | 81.25% | +0.034091 (-0.085227…+0.153409) | -0.1250 | -0.045455 vs Sad | 2 relative to baseline |
+| Surprised onset | `regression` | 100% | +0.062500 (-0.014423…+0.144231) | -0.0625 | -0.038462 vs Happy | 0 |
+
+The Fearful/Sad pair exposed a separate reliability topology that must not be misreported as four
+Fearful failures. Two independently generated baselines reproduced the same four failed take
+identities: one Fearful Vivian/Mandarin row, two Sad Vivian/Mandarin competitor rows, and one Sad
+Sohee/Korean competitor row. The shipped Fearful prompt also produced reproducible excessive
+durations (up to 112.8 seconds for the medium neutral sentence). The urgent candidate removed the
+target-preset hard failure and shortened the worst valid output, but unchanged Sad competitor rows
+remained incomplete and Fearful/Sad distance regressed. The structured candidate produced six
+failed rows and regressed adherence. Neither can advance.
+
+The tempting positive means for Happy acoustic, Angry, and Fearful urgent do not override intervals
+that touch/cross zero, new/missing hard rows, or reduced competing-preset separation. Production copy
+therefore stays at the maintainer-directed checkpoint in §2.5. The full WAVs, execution state, and
+automatic decisions remain untracked; the roadmap records their compact metrics and decision
+digests. No automatic layer gained semantic, production-copy, or publication authority.
 
 ## 3. Evidence conventions
 

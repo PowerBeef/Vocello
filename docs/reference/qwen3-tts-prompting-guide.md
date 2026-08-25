@@ -739,6 +739,18 @@ a fast settle. Happy and Surprised still suppress the redundant English-diction 
 existing `clear` token, while Angry and Fearful still receive it. This records the applied pattern
 and deterministic wiring only—not a measured acoustic or perceptual improvement.
 
+`MEASURED-HERE`, autonomous acoustic screen on 2026-08-25. Six separately pre-registered shorter
+or more explicit alternatives for Happy, Angry, Fearful, and Surprised all stopped at the first
+speaker-diverse multilingual stage. Some improved a mean acoustic score, but their paired intervals
+touched/crossed zero, a competing-preset distance regressed, or a hard/missing row forced
+abstention. The onset-specific Surprised arm remained generation-clean but reduced both adherence
+and separation from Happy. The conflict-reduced Fearful arm removed one target-preset hard failure
+and shortened the worst target output, but the Fearful/Sad screen remained incomplete and less
+separable. The more descriptive Fearful arm was worse. This is direct evidence against assuming
+that shorter, more explicit, or more acoustically detailed wording is universally better. The
+current checkpoint copy remains in production without a semantic-improvement claim; see
+[`delivery-harness.md`](delivery-harness.md) §2.7 for the bounded results.
+
 ### 8.4 The controlled experiment layer
 
 `MEASURED-HERE`, 2026-08-22. Vocello now compiles experiments through

@@ -3,7 +3,19 @@ import XCTest
 
 @MainActor
 final class AllocationRetryAnnotationTests: XCTestCase {
-    func testRetryAnnotationPreservesResultAndRecordsAttempt() {
+    func testRetryAnnotationPreservesResultAndRecordsAttempt() throws {
+        let audioQC = AudioQCReport(
+            verdict: .warn,
+            flags: ["cadence:excess1(2/1)"],
+            rmsDBFS: -18,
+            peak: 0.4,
+            clippedSamples: 0,
+            hotSamples: 0,
+            nonFiniteSamples: 0,
+            clickEvents: 0,
+            longestSilenceMS: 600,
+            durationSeconds: 4
+        )
         let original = GenerationResult(
             audioPath: "fixture.wav",
             durationSeconds: 1.25,
@@ -11,7 +23,8 @@ final class AllocationRetryAnnotationTests: XCTestCase {
             usedStreaming: true,
             diagnosticTimingsMS: ["existing": 4],
             diagnosticBooleanFlags: ["existing": true],
-            diagnosticStringFlags: ["identity": "fixture"]
+            diagnosticStringFlags: ["identity": "fixture"],
+            audioQC: audioQC
         )
 
         let annotated = MLXTTSEngine.annotatingAllocationRetry(
@@ -30,6 +43,12 @@ final class AllocationRetryAnnotationTests: XCTestCase {
         XCTAssertEqual(annotated.diagnosticBooleanFlags["allocationRetrySucceeded"], true)
         XCTAssertEqual(annotated.diagnosticBooleanFlags["allocationRetryStreamingUsed"], true)
         XCTAssertEqual(annotated.diagnosticStringFlags["identity"], "fixture")
+        XCTAssertEqual(annotated.audioQC, audioQC)
+        let decoded = try JSONDecoder().decode(
+            GenerationResult.self,
+            from: JSONEncoder().encode(annotated)
+        )
+        XCTAssertEqual(decoded.audioQC, audioQC)
     }
 
     func testNoRetryIsExplicitRatherThanSilentlyUnannotated() {

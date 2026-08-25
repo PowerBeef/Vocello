@@ -50,10 +50,17 @@ enum IOSPullableDiagnosticsMirror {
         if let runID = safeRunID(
             from: ProcessInfo.processInfo.environment["QVOICE_IOS_DEVICE_RUN_ID"]
         ) {
+            let runRoot = pullableRoot.appendingPathComponent(runID, isDirectory: true)
             syncGenerationTelemetry(
                 generationID: generationID,
                 from: appGroupDiagnosticsRoot,
-                into: pullableRoot.appendingPathComponent(runID, isDirectory: true)
+                into: runRoot
+            )
+            syncStartupReliabilityEvidence(
+                generationID: generationID,
+                runID: runID,
+                from: appGroupDiagnosticsRoot,
+                into: runRoot
             )
         }
     }
@@ -139,6 +146,33 @@ enum IOSPullableDiagnosticsMirror {
             } catch {
                 print("[IOSPullableDiagnosticsMirror] could not mirror \(layer) telemetry: \(error.localizedDescription)")
             }
+        }
+    }
+
+    private static func syncStartupReliabilityEvidence(
+        generationID: String,
+        runID: String,
+        from sourceRoot: URL,
+        into runRoot: URL
+    ) {
+        let fileManager = FileManager.default
+        let source = sourceRoot
+            .appendingPathComponent("startup-reliability-evidence", isDirectory: true)
+            .appendingPathComponent(runID, isDirectory: true)
+            .appendingPathComponent(generationID, isDirectory: true)
+        guard fileManager.fileExists(atPath: source.path) else { return }
+        let destination = runRoot
+            .appendingPathComponent("evidence", isDirectory: true)
+            .appendingPathComponent(generationID, isDirectory: true)
+        do {
+            try fileManager.createDirectory(
+                at: destination.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            try? fileManager.removeItem(at: destination)
+            try fileManager.copyItem(at: source, to: destination)
+        } catch {
+            print("[IOSPullableDiagnosticsMirror] could not export startup evidence: \(error.localizedDescription)")
         }
     }
 

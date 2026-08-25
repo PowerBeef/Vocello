@@ -122,7 +122,8 @@
     "Sources/VocelloQwen3Core/Contracts.swift::public let memory: VocelloQwen3MemoryConfiguration",
     "Sources/VocelloQwen3Core/Contracts.swift::public let chunking: VocelloQwen3StreamChunkConfiguration",
     "Sources/VocelloQwen3Core/Contracts.swift::public let executionStyle: VocelloQwen3ExecutionStyle",
-    "Sources/VocelloQwen3Core/Contracts.swift::public init( generationID: UUID, text: String, language: String, input: VocelloQwen3SynthesisInput, sampling: VocelloQwen3SamplingConfiguration, memory: VocelloQwen3MemoryConfiguration, chunking: VocelloQwen3StreamChunkConfiguration? = nil, executionStyle: VocelloQwen3ExecutionStyle = .streaming )",
+    "Sources/VocelloQwen3Core/Contracts.swift::public let captureCodecTrace: Bool",
+    "Sources/VocelloQwen3Core/Contracts.swift::public init( generationID: UUID, text: String, language: String, input: VocelloQwen3SynthesisInput, sampling: VocelloQwen3SamplingConfiguration, memory: VocelloQwen3MemoryConfiguration, chunking: VocelloQwen3StreamChunkConfiguration? = nil, executionStyle: VocelloQwen3ExecutionStyle = .streaming, captureCodecTrace: Bool = false )",
     "Sources/VocelloQwen3Core/Contracts.swift::public var mode: VocelloQwen3SynthesisMode",
     "Sources/VocelloQwen3Core/Contracts.swift::public func validated(for capabilities: VocelloQwen3CapabilitySet) throws -> Self",
     "Sources/VocelloQwen3Core/Contracts.swift::public init(from decoder: any Decoder) throws",
@@ -182,6 +183,15 @@
     "Sources/VocelloQwen3Core/Engine.swift::public let audioFrameCount: Int",
     "Sources/VocelloQwen3Core/Engine.swift::public let sampleRate: Int",
     "Sources/VocelloQwen3Core/Engine.swift::public init(audioFrameCount: Int, sampleRate: Int)",
+    "Sources/VocelloQwen3Core/Engine.swift::public struct VocelloQwen3CodecFrameRange: Codable, Hashable, Sendable",
+    "Sources/VocelloQwen3Core/Engine.swift::public let start: Int",
+    "Sources/VocelloQwen3Core/Engine.swift::public let endExclusive: Int",
+    "Sources/VocelloQwen3Core/Engine.swift::public init(start: Int, endExclusive: Int)",
+    "Sources/VocelloQwen3Core/Engine.swift::public struct VocelloQwen3CodecReplayResult: Sendable",
+    "Sources/VocelloQwen3Core/Engine.swift::public let incrementalAudio: [Float]",
+    "Sources/VocelloQwen3Core/Engine.swift::public let fullAudio: [Float]",
+    "Sources/VocelloQwen3Core/Engine.swift::public let sampleRate: Int",
+    "Sources/VocelloQwen3Core/Engine.swift::public init(incrementalAudio: [Float], fullAudio: [Float], sampleRate: Int)",
     "Sources/VocelloQwen3Core/Engine.swift::public enum VocelloQwen3EngineError: Error, Equatable, Sendable",
     "Sources/VocelloQwen3Core/Engine.swift::public enum VocelloQwen3CloneHandleCapability: String, Codable, Hashable, Sendable",
     "Sources/VocelloQwen3Core/Engine.swift::public struct VocelloQwen3CloneHandle: Hashable, Sendable",
@@ -210,6 +220,7 @@
     "Sources/VocelloQwen3Core/Engine.swift::public func adoptCloneArtifact( from directory: URL, expectedMetadata: VocelloQwen3CloneArtifactMetadata, conditioningDigest: String ) throws -> VocelloQwen3CloneHandle",
     "Sources/VocelloQwen3Core/Engine.swift::public func prewarm( request: VocelloQwen3SynthesisRequest, cloneHandle: VocelloQwen3CloneHandle? = nil, customDepth: String? = nil ) async throws",
     "Sources/VocelloQwen3Core/Engine.swift::public func prime( request: VocelloQwen3SynthesisRequest, cloneHandle: VocelloQwen3CloneHandle? = nil ) async throws -> VocelloQwen3PrimeResult",
+    "Sources/VocelloQwen3Core/Engine.swift::public func replayCodecTrace( frames: [[Int32]], incrementalRanges: [VocelloQwen3CodecFrameRange] ) throws -> VocelloQwen3CodecReplayResult",
     "Sources/VocelloQwen3Core/Engine.swift::public func reserveGeneration( request: VocelloQwen3SynthesisRequest, cloneHandle: VocelloQwen3CloneHandle? = nil, audioCapacityFrames: Int, diagnosticCapacity: Int = 128 ) async throws -> VocelloQwen3GenerationReservation",
     "Sources/VocelloQwen3Core/Engine.swift::public func open(_ reservationID: UUID) async throws",
     "Sources/VocelloQwen3Core/Engine.swift::public func abortReservation( _ reservationID: UUID, reason: VocelloQwen3CancellationReason = .shutdown ) async throws",
@@ -242,6 +253,12 @@
     "Sources/VocelloQwen3Core/GenerationSession.swift::public let firstModelTokenAndAudioCodeMilliseconds: Int?",
     "Sources/VocelloQwen3Core/GenerationSession.swift::public let firstDecodedAudioFrameMilliseconds: Int",
     "Sources/VocelloQwen3Core/GenerationSession.swift::public init( firstModelTokenAndAudioCodeMilliseconds: Int?, firstDecodedAudioFrameMilliseconds: Int )",
+    "Sources/VocelloQwen3Core/GenerationSession.swift::public struct VocelloQwen3CodecTrace: Codable, Hashable, Sendable",
+    "Sources/VocelloQwen3Core/GenerationSession.swift::public let schemaVersion: Int",
+    "Sources/VocelloQwen3Core/GenerationSession.swift::public let frames: [[Int32]]",
+    "Sources/VocelloQwen3Core/GenerationSession.swift::public let droppedFrameCount: Int",
+    "Sources/VocelloQwen3Core/GenerationSession.swift::public init(frames: [[Int32]], droppedFrameCount: Int)",
+    "Sources/VocelloQwen3Core/GenerationSession.swift::public var isComplete: Bool",
     "Sources/VocelloQwen3Core/GenerationSession.swift::public struct VocelloQwen3ProgressEvent: Codable, Hashable, Sendable",
     "Sources/VocelloQwen3Core/GenerationSession.swift::public let generationID: UUID",
     "Sources/VocelloQwen3Core/GenerationSession.swift::public let generatedTokenCount: Int",
@@ -256,7 +273,8 @@
     "Sources/VocelloQwen3Core/GenerationSession.swift::public let elapsedMilliseconds: Int",
     "Sources/VocelloQwen3Core/GenerationSession.swift::public let generationInfo: VocelloQwen3GenerationInfo?",
     "Sources/VocelloQwen3Core/GenerationSession.swift::public let diagnostics: VocelloQwen3GenerationDiagnostics?",
-    "Sources/VocelloQwen3Core/GenerationSession.swift::public init( generationID: UUID, outcome: VocelloQwen3TerminalOutcome, generatedTokenCount: Int, emittedAudioFrameCount: Int, elapsedMilliseconds: Int, generationInfo: VocelloQwen3GenerationInfo? = nil, diagnostics: VocelloQwen3GenerationDiagnostics? = nil )",
+    "Sources/VocelloQwen3Core/GenerationSession.swift::public let codecTrace: VocelloQwen3CodecTrace?",
+    "Sources/VocelloQwen3Core/GenerationSession.swift::public init( generationID: UUID, outcome: VocelloQwen3TerminalOutcome, generatedTokenCount: Int, emittedAudioFrameCount: Int, elapsedMilliseconds: Int, generationInfo: VocelloQwen3GenerationInfo? = nil, diagnostics: VocelloQwen3GenerationDiagnostics? = nil, codecTrace: VocelloQwen3CodecTrace? = nil )",
     "Sources/VocelloQwen3Core/LoadedModel.swift::public struct VocelloQwen3LoadBehavior: Codable, Hashable, Sendable",
     "Sources/VocelloQwen3Core/LoadedModel.swift::public let trustPreparedCheckpoint: Bool",
     "Sources/VocelloQwen3Core/LoadedModel.swift::public let preparedDirectoryAlreadyValidated: Bool",
@@ -396,19 +414,19 @@
     },
     {
       "path": "Sources/VocelloQwen3Core/Contracts.swift",
-      "sha256": "2e664f25d7becaedff0d1ba76e81c093211ef5f659f01d35fc7474ec93d248d4"
+      "sha256": "9a5793d194f070aca35731e0b075649603d0a6e5ef719331c8d2130da49ee5f0"
     },
     {
       "path": "Sources/VocelloQwen3Core/Engine.swift",
-      "sha256": "ae72752a05410e7e395a29ee2eebd4498032500b90d768ee9d8ef196a494ebb6"
+      "sha256": "422613df579372f7a69a00722e4f5afba69c7888d50ff285d5dab3d530e62f84"
     },
     {
       "path": "Sources/VocelloQwen3Core/GenerationSession.swift",
-      "sha256": "219fbe5ffff3960bed57e3445d2a36ccc56e42b39ed83bffe5c331d318ca9f95"
+      "sha256": "fe38da130a895c389663c31efa55d3bb2f909460aae3e2ba1ea4546dd02016aa"
     },
     {
       "path": "Sources/VocelloQwen3Core/LoadedModel.swift",
-      "sha256": "20be89b064b173381162394ea2bd2a1d67d6802d6898c01e1e62d45b33cde587"
+      "sha256": "509cf34cced2ee7685691d1888f2e616faa2444eca0124166266e1287ecb427b"
     },
     {
       "path": "Sources/VocelloQwen3Core/ProductOutputAdapter.swift",

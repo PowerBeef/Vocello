@@ -217,6 +217,10 @@ public enum Qwen3MaterializedGenerationEvent: Sendable {
     /// by a host before the model has actually reached the prepared boundary.
     case prepared
     case token(Int)
+    /// One fully materialized codec group for diagnostics-only replay.
+    /// The producer emits this only when the request explicitly enables the
+    /// bounded trace; normal generation performs no additional materialization.
+    case codecFrame([Int32])
     case info(AudioGenerationInfo)
     case audio([Float])
     case chunkTimings(ChunkSubstageTimings)
@@ -225,6 +229,45 @@ public enum Qwen3MaterializedGenerationEvent: Sendable {
 public typealias Qwen3MaterializedGenerationSink = @Sendable (
     Qwen3MaterializedGenerationEvent
 ) async throws -> Void
+
+public typealias Qwen3CodecTraceSink = @Sendable ([Int32]) async throws -> Void
+
+/// One contiguous codec-frame range observed at a production streaming
+/// decoder call. Diagnostics replay the captured codes with these exact
+/// boundaries instead of guessing the chunk schedule.
+public struct Qwen3CodecFrameRange: Codable, Hashable, Sendable {
+    public let start: Int
+    public let endExclusive: Int
+
+    public init(start: Int, endExclusive: Int) {
+        self.start = start
+        self.endExclusive = endExclusive
+    }
+}
+
+/// Materialized PCM from the same captured codec sequence decoded through the
+/// production incremental schedule and the quality-first full-sequence path.
+public struct Qwen3CodecReplayResult: Sendable {
+    public let incrementalAudio: [Float]
+    public let fullAudio: [Float]
+    public let sampleRate: Int
+
+    public init(incrementalAudio: [Float], fullAudio: [Float], sampleRate: Int) {
+        self.incrementalAudio = incrementalAudio
+        self.fullAudio = fullAudio
+        self.sampleRate = sampleRate
+    }
+}
+
+/// Diagnostics-only codec replay surface. Implementations must reset mutable
+/// decoder state before and after each arm and remain inside the loaded-model
+/// isolation domain.
+public protocol Qwen3CodecTraceReplayModel: AnyObject {
+    func replayCodecTrace(
+        frames: [[Int32]],
+        incrementalRanges: [Qwen3CodecFrameRange]
+    ) throws -> Qwen3CodecReplayResult
+}
 
 /// Async, backpressure-capable Qwen3 production surface.
 ///
@@ -247,6 +290,7 @@ public protocol Qwen3SuspendingSpeechGenerationModel: AnyObject {
         generationSpeedProfile: String?,
         memoryClearCadence: Int?,
         enableChunkTimings: Bool,
+        enableCodecTrace: Bool,
         sink: @escaping Qwen3MaterializedGenerationSink,
         isolation: isolated (any Actor)?
     ) async throws -> AudioGenerationFinishReason
@@ -263,6 +307,7 @@ public protocol Qwen3SuspendingSpeechGenerationModel: AnyObject {
         generationSpeedProfile: String?,
         memoryClearCadence: Int?,
         enableChunkTimings: Bool,
+        enableCodecTrace: Bool,
         sink: @escaping Qwen3MaterializedGenerationSink,
         isolation: isolated (any Actor)?
     ) async throws -> AudioGenerationFinishReason
@@ -279,6 +324,7 @@ public protocol Qwen3SuspendingSpeechGenerationModel: AnyObject {
         generationSpeedProfile: String?,
         memoryClearCadence: Int?,
         enableChunkTimings: Bool,
+        enableCodecTrace: Bool,
         sink: @escaping Qwen3MaterializedGenerationSink,
         isolation: isolated (any Actor)?
     ) async throws -> AudioGenerationFinishReason
@@ -407,6 +453,7 @@ public protocol Qwen3PreparedQualityGenerationModel: AnyObject {
         samplingPolicy: Qwen3RequestSamplingPolicy,
         memoryPolicy: Qwen3RequestMemoryPolicy,
         onPrepared: @escaping @Sendable () async throws -> Void,
+        codecTraceSink: Qwen3CodecTraceSink?,
         isolation: isolated (any Actor)?
     ) async throws -> AudioGenerationCompletion
 
@@ -418,6 +465,7 @@ public protocol Qwen3PreparedQualityGenerationModel: AnyObject {
         samplingPolicy: Qwen3RequestSamplingPolicy,
         memoryPolicy: Qwen3RequestMemoryPolicy,
         onPrepared: @escaping @Sendable () async throws -> Void,
+        codecTraceSink: Qwen3CodecTraceSink?,
         isolation: isolated (any Actor)?
     ) async throws -> AudioGenerationCompletion
 
@@ -429,6 +477,7 @@ public protocol Qwen3PreparedQualityGenerationModel: AnyObject {
         samplingPolicy: Qwen3RequestSamplingPolicy,
         memoryPolicy: Qwen3RequestMemoryPolicy,
         onPrepared: @escaping @Sendable () async throws -> Void,
+        codecTraceSink: Qwen3CodecTraceSink?,
         isolation: isolated (any Actor)?
     ) async throws -> AudioGenerationCompletion
 }

@@ -5,6 +5,7 @@ private enum IOSStudioCanvasLayout {
     static let tabDockReservation: CGFloat = 97
     static let compactDockAreaHeight: CGFloat = 64
     static let completeDockAreaHeight: CGFloat = 135
+    static let cadenceNoticeExtraHeight: CGFloat = 58
     /// Extra dock height when the completed card carries the "Save as voice" button (Voice Design),
     /// matching the card's added button row so the dock expands instead of overlapping the chips.
     static let saveAsVoiceExtraHeight: CGFloat = 52
@@ -98,6 +99,7 @@ struct IOSStudioCanvas<SetupChips: View>: View {
     // Honor Reduce Motion for the generating waveform (AGENTS.md animation rule);
     // injected at RootView. When on, the dock waveform renders frozen.
     @Environment(\.iosReduceMotionEnabled) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         // B.3 closed (2026-05-21): composer is now `flex: 1` per the
@@ -156,17 +158,22 @@ struct IOSStudioCanvas<SetupChips: View>: View {
 
     private var dockAreaHeight: CGFloat {
         switch genState {
-        case .complete:
+        case .complete(let item):
             // Grow to fit the "Save as voice" button (Voice Design) so the dock expands + pushes the
             // chips up, instead of the taller card overflowing upward over them.
             return IOSStudioCanvasLayout.completeDockAreaHeight
                 + (onSaveAsVoice != nil ? IOSStudioCanvasLayout.saveAsVoiceExtraHeight : 0)
+                + (item.cadenceNotice != nil ? cadenceNoticeExtraHeight : 0)
         case .live:
             // Base height (no save button while streaming) so the live→complete morph stays smooth.
             return IOSStudioCanvasLayout.completeDockAreaHeight
         default:
             return IOSStudioCanvasLayout.compactDockAreaHeight
         }
+    }
+
+    private var cadenceNoticeExtraHeight: CGFloat {
+        dynamicTypeSize.isAccessibilitySize ? 112 : IOSStudioCanvasLayout.cadenceNoticeExtraHeight
     }
 
     // MARK: - Composer pad
@@ -280,6 +287,7 @@ struct IOSStudioCanvas<SetupChips: View>: View {
                 tint: tint,
                 onDismiss: onPlayerDismiss,
                 onCancel: onCancel,
+                onRetry: onGenerate,
                 onExpand: onPlayerExpand,
                 onSaveAsVoice: onSaveAsVoice
             )
@@ -476,10 +484,35 @@ struct IOSStudioInlinePlayerItem: Equatable {
     let transcript: String
     let waveformSeed: Int
     let autoplay: Bool
+    let cadenceNotice: IOSStudioCadenceNotice?
     /// True when the shared AudioPlayerViewModel already owns this generation's playback
     /// (live preview during generation → seamless hand-off). The inline card then mirrors/
     /// forwards that shared player instead of starting its own AVAudioPlayer (no double audio).
     var ownedBySharedPlayer: Bool = false
+
+    init(
+        generationID: UUID,
+        audioURL: URL,
+        voiceName: String,
+        modeLabel: String,
+        mode: GenerationMode,
+        transcript: String,
+        waveformSeed: Int,
+        autoplay: Bool,
+        cadenceNotice: IOSStudioCadenceNotice? = nil,
+        ownedBySharedPlayer: Bool = false
+    ) {
+        self.generationID = generationID
+        self.audioURL = audioURL
+        self.voiceName = voiceName
+        self.modeLabel = modeLabel
+        self.mode = mode
+        self.transcript = transcript
+        self.waveformSeed = waveformSeed
+        self.autoplay = autoplay
+        self.cadenceNotice = cadenceNotice
+        self.ownedBySharedPlayer = ownedBySharedPlayer
+    }
 
     static func == (lhs: IOSStudioInlinePlayerItem, rhs: IOSStudioInlinePlayerItem) -> Bool {
         lhs.audioURL == rhs.audioURL
@@ -497,5 +530,16 @@ struct IOSStudioInlinePlayerItem: Equatable {
             avatarInitials: voiceName,
             waveformSeed: waveformSeed
         )
+    }
+}
+
+struct IOSStudioCadenceNotice: Equatable {
+    let title: String
+    let message: String
+
+    init?(audioQC: AudioQCReport?) {
+        guard audioQC?.cadence?.classification == .unusual else { return nil }
+        title = "Unusual pacing detected"
+        message = "Review this take or generate it again."
     }
 }

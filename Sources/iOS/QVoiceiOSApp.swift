@@ -120,6 +120,12 @@ struct QVoiceiOSApp: App {
     private func startEngineIfNeeded() {
         guard !didInitializeEngine, let engine = deps.engine else { return }
         didInitializeEngine = true
+        // Evidence cleanup is a host-authorized diagnostics action and does not
+        // require a native runtime. Perform it before engine startup so cleanup
+        // remains reliable after memory-pressure or initialization failures.
+        if IOSStartupReliabilityRunner.runCleanupIfRequested() {
+            return
+        }
         engine.start()
         Task {
             do {

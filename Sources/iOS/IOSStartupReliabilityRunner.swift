@@ -12,14 +12,34 @@ import QwenVoiceCore
 @MainActor
 enum IOSStartupReliabilityRunner {
     static let environmentKey = "QVOICE_IOS_DEVICE_DELIVERY_RELIABILITY_SPEC"
+    static let cleanupEnvironmentKey = "QVOICE_IOS_DEVICE_DELIVERY_RELIABILITY_CLEANUP_RUN_ID"
 
     static var isRequested: Bool {
-        guard let value = ProcessInfo.processInfo.environment[environmentKey]?
-            .trimmingCharacters(in: .whitespacesAndNewlines) else { return false }
-        return !value.isEmpty
+        [environmentKey, cleanupEnvironmentKey].contains { key in
+            guard let value = ProcessInfo.processInfo.environment[key]?
+                .trimmingCharacters(in: .whitespacesAndNewlines) else { return false }
+            return !value.isEmpty
+        }
+    }
+
+    /// Removes already-collected diagnostics without starting the native engine.
+    /// Cleanup is intentionally resolved before engine initialization so a large
+    /// retained runtime or a failed engine bootstrap cannot strand evidence that
+    /// the host has already validated and copied.
+    static func runCleanupIfRequested() -> Bool {
+        guard let cleanupRunID = ProcessInfo.processInfo.environment[cleanupEnvironmentKey]?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+              !cleanupRunID.isEmpty else {
+            return false
+        }
+        Task { @MainActor in
+            await cleanCollectedEvidence(runID: cleanupRunID)
+        }
+        return true
     }
 
     static func runIfRequested(engine: TTSEngineStore) -> Bool {
+        if runCleanupIfRequested() { return true }
         guard let rawSpec = ProcessInfo.processInfo.environment[environmentKey],
               !rawSpec.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             return false
@@ -28,6 +48,38 @@ enum IOSStartupReliabilityRunner {
             await run(rawSpec: rawSpec, engine: engine)
         }
         return true
+    }
+
+    private static func cleanCollectedEvidence(runID: String) async {
+        guard TelemetryGate.resolvedEnabled,
+              NativeTelemetryMode.current() == .verbose,
+              isSafeIdentifier(runID),
+              ProcessInfo.processInfo.environment["QVOICE_IOS_DEVICE_RUN_ID"] == runID,
+              let pullableRoot = IOSPullableDiagnosticsMirror.pullableRoot else {
+            return
+        }
+        try? StartupReliabilityDiagnosticEvidence.removeRun(
+            appSupportDirectory: AppPaths.appSupportDir,
+            runID: runID
+        )
+        try? FileManager.default.removeItem(at: AppPaths.appSupportDir
+            .appendingPathComponent("diagnostics", isDirectory: true)
+            .appendingPathComponent(runID, isDirectory: true))
+        try? FileManager.default.removeItem(at: pullableRoot
+            .appendingPathComponent(runID, isDirectory: true))
+
+        let cleanupDirectory = pullableRoot.appendingPathComponent("cleanup", isDirectory: true)
+        try? FileManager.default.createDirectory(
+            at: cleanupDirectory,
+            withIntermediateDirectories: true
+        )
+        let record = CleanupRecord(runID: runID)
+        if let data = try? JSONEncoder().encode(record) {
+            try? data.write(
+                to: cleanupDirectory.appendingPathComponent("\(runID).json"),
+                options: .atomic
+            )
+        }
     }
 
     private static func run(rawSpec: String, engine: TTSEngineStore) async {
@@ -126,15 +178,51 @@ enum IOSStartupReliabilityRunner {
         let cell = "startup/\(take.takeID)"
         let outputURL = startupOutputURL(runID: runID, take: take)
         var submitted = false
+        let prePreparationStoreWarmState = engine.loadState.currentModelID == model.id ? "warm" : "cold"
+        var preparationEvidence: [PreparationEvidence] = []
+        var preRequestStoreWarmState = prePreparationStoreWarmState
+        var reloadObservation: Task<IOSUnloadQuiescenceSample, Never>?
+        var diagnosticRequest: GenerationRequest?
         defer { try? FileManager.default.removeItem(at: outputURL) }
 
         do {
-            try await prepare(take.preparation, engine: engine)
-            let actualWarmState = engine.loadState.currentModelID == model.id ? "warm" : "cold"
+            let preparation = try await prepare(take.preparation, engine: engine)
+            preparationEvidence = preparation.evidence
+            guard preparation.canStartRequest else {
+                return TakeResult(
+                    takeIndex: take.takeIndex,
+                    takeID: take.takeID,
+                    generationID: generationID.uuidString,
+                    status: "failed",
+                    preparation: take.preparation.rawValue,
+                    prePreparationStoreWarmState: prePreparationStoreWarmState,
+                    preRequestStoreWarmState: engine.loadState.currentModelID == model.id ? "warm" : "cold",
+                    preparationEvidence: preparationEvidence,
+                    requestReceipt: nil,
+                    attempts: [],
+                    startupTimeline: [],
+                    failureCode: "preparation_not_quiescent",
+                    classification: "memory_failure",
+                    output: nil,
+                    audioQC: nil,
+                    diagnosticArtifacts: [],
+                    codecReplay: nil
+                )
+            }
+            let preRequestSample = await engine.startupReliabilityQuiescenceSample(
+                sequence: preparationEvidence.count
+            )
+            preparationEvidence.append(memoryEvidence(
+                stage: "immediately_before_request",
+                sample: preRequestSample,
+                previous: nil,
+                includeStability: false
+            ))
+            preRequestStoreWarmState = engine.loadState.currentModelID == model.id ? "warm" : "cold"
             try BenchRunContext.writeCurrentTakeFile(
                 takeIndex: take.takeIndex,
                 cell: cell,
-                intendedWarmState: actualWarmState,
+                intendedWarmState: preRequestStoreWarmState,
                 startupPredecessorIdentityDigest: predecessorSessionDigest
             )
             let delivery = try take.deliveryCell
@@ -151,12 +239,41 @@ enum IOSStartupReliabilityRunner {
                 payload: .custom(speakerID: take.speakerID, deliveryStyle: delivery.instruction),
                 generationID: generationID,
                 seed: take.seed,
-                variation: variation
+                variation: variation,
+                captureCodecTrace: true
             )
+            diagnosticRequest = request
 
             await AppGenerationTimeline.shared.recordSubmitted(id: generationID, mode: GenerationMode.custom.rawValue)
             submitted = true
+            let reloadObservationSequence = preparationEvidence.count
+            reloadObservation = Task { @MainActor in
+                for _ in 0 ..< 600 {
+                    guard !Task.isCancelled else { break }
+                    if engine.loadState.currentModelID == model.id {
+                        return await engine.startupReliabilityQuiescenceSample(
+                            sequence: reloadObservationSequence
+                        )
+                    }
+                    do {
+                        try await Task.sleep(for: .milliseconds(100))
+                    } catch {
+                        break
+                    }
+                }
+                return await engine.startupReliabilityQuiescenceSample(
+                    sequence: reloadObservationSequence
+                )
+            }
             let generationResult = try await engine.generate(request)
+            let afterReloadSample = await reloadObservation!.value
+            reloadObservation = nil
+            preparationEvidence.append(memoryEvidence(
+                stage: "after_reload_observed",
+                sample: afterReloadSample,
+                previous: nil,
+                includeStability: false
+            ))
             await AppGenerationTimeline.shared.recordCompleted(
                 id: generationID,
                 mode: GenerationMode.custom.rawValue,
@@ -170,12 +287,37 @@ enum IOSStartupReliabilityRunner {
             let records = telemetryRecords(generationID: generationID)
             guard let final = terminalTelemetryRecord(in: records),
                   let receipt = final.requestReceipt else {
-                return missingReceiptResult(take: take, generationID: generationID, preparation: take.preparation)
+                return missingReceiptResult(
+                    take: take,
+                    generationID: generationID,
+                    preparation: take.preparation,
+                    prePreparationStoreWarmState: prePreparationStoreWarmState,
+                    preRequestStoreWarmState: preRequestStoreWarmState,
+                    preparationEvidence: preparationEvidence
+                )
             }
             let evidence = try outputEvidence(at: outputURL)
             let audioQCPassed = final.audioQC.map {
                 $0.verdict != .fail && $0.instabilityVerdict != .fail && $0.writtenOutputVerdict != .fail
             } ?? false
+            let codecReplay: CodecReplayComparison?
+            if Self.requiresCodecReplay(final.audioQC), let diagnosticRequest {
+                codecReplay = await replayCodecTraceIfAvailable(
+                    request: diagnosticRequest,
+                    generationID: generationID,
+                    runID: runID,
+                    script: script,
+                    records: records,
+                    engine: engine
+                )
+            } else {
+                codecReplay = nil
+            }
+            if codecReplay != nil {
+                IOSPullableDiagnosticsMirror.syncGenerationTelemetryIfEnabled(
+                    generationID: generationID
+                )
+            }
             let preparationVerified = take.preparation != .prewarmDisabled
                 || generationResult.diagnosticBooleanFlags["custom_dedicated_prewarm_skipped"] == true
             guard audioQCPassed, preparationVerified else {
@@ -187,7 +329,11 @@ enum IOSStartupReliabilityRunner {
                     records: records,
                     failureCode: audioQCPassed ? "prewarm_disable_unverified" : "audio_qc_failed",
                     classification: "post_generation_qc",
-                    output: evidence
+                    output: evidence,
+                    prePreparationStoreWarmState: prePreparationStoreWarmState,
+                    preRequestStoreWarmState: preRequestStoreWarmState,
+                    preparationEvidence: preparationEvidence,
+                    codecReplay: codecReplay
                 )
             }
             return makeResult(
@@ -198,9 +344,17 @@ enum IOSStartupReliabilityRunner {
                 records: records,
                 failureCode: nil,
                 classification: "success",
-                output: evidence
+                output: evidence,
+                prePreparationStoreWarmState: prePreparationStoreWarmState,
+                preRequestStoreWarmState: preRequestStoreWarmState,
+                preparationEvidence: preparationEvidence,
+                codecReplay: codecReplay
             )
         } catch {
+            reloadObservation?.cancel()
+            if let reloadObservation {
+                _ = await reloadObservation.value
+            }
             if submitted {
                 await AppGenerationTimeline.shared.recordFailed(id: generationID)
             }
@@ -209,15 +363,40 @@ enum IOSStartupReliabilityRunner {
             let receipt = terminalTelemetryRecord(in: records)?.requestReceipt
             let metadata = GenerationFailureDiagnosticLogger.errorMetadata(for: error)
             let output = try? outputEvidence(at: outputURL)
+            let rejectedByAudioQC = terminalTelemetryRecord(in: records)?.audioQC?.verdict == .fail
+            let codecReplay: CodecReplayComparison?
+            if let diagnosticRequest {
+                codecReplay = await replayCodecTraceIfAvailable(
+                    request: diagnosticRequest,
+                    generationID: generationID,
+                    runID: runID,
+                    script: script,
+                    records: records,
+                    engine: engine
+                )
+            } else {
+                codecReplay = nil
+            }
+            if codecReplay != nil {
+                IOSPullableDiagnosticsMirror.syncGenerationTelemetryIfEnabled(
+                    generationID: generationID
+                )
+            }
             return makeResult(
                 take: take,
                 generationID: generationID,
                 status: "failed",
                 receipt: receipt,
                 records: records,
-                failureCode: receipt == nil ? "request_receipt_unavailable" : metadata.code,
+                failureCode: receipt == nil
+                    ? "request_receipt_unavailable"
+                    : (rejectedByAudioQC ? "audio_qc_failed" : metadata.code),
                 classification: classifyFailure(metadata: metadata, records: records, output: output),
-                output: output
+                output: output,
+                prePreparationStoreWarmState: prePreparationStoreWarmState,
+                preRequestStoreWarmState: preRequestStoreWarmState,
+                preparationEvidence: preparationEvidence,
+                codecReplay: codecReplay
             )
         }
     }
@@ -225,16 +404,59 @@ enum IOSStartupReliabilityRunner {
     private static func prepare(
         _ preparation: IOSStartupReliabilityPreparation,
         engine: TTSEngineStore
-    ) async throws {
+    ) async throws -> PreparationResult {
+        var samples: [IOSUnloadQuiescenceSample] = []
+        func capture() async -> IOSUnloadQuiescenceSample {
+            let sample = await engine.startupReliabilityQuiescenceSample(sequence: samples.count)
+            samples.append(sample)
+            return sample
+        }
+        _ = await capture()
         switch preparation {
         case .production, .prewarmDisabled:
-            return
+            return PreparationResult(
+                canStartRequest: true,
+                evidence: [memoryEvidence(stage: "before_preparation", sample: samples[0], previous: nil)]
+            )
         case .fullRuntimeUnload:
             try await engine.unloadModel()
+            let released = await capture()
+            await engine.trimMemory(
+                level: .hardTrim,
+                reason: "startup_reliability_post_unload_cache_clear"
+            )
+            let cleared = await capture()
+            var evidence = [
+                memoryEvidence(stage: "before_unload", sample: samples[0], previous: nil),
+                memoryEvidence(stage: "after_owned_references_released", sample: released, previous: samples[0]),
+                memoryEvidence(stage: "after_mlx_cache_clear", sample: cleared, previous: released),
+            ]
+            for index in 1 ... 30 {
+                try await Task.sleep(for: .seconds(1))
+                let previous = samples.last
+                let sample = await capture()
+                evidence.append(memoryEvidence(
+                    stage: "quiescence_poll_\(index)",
+                    sample: sample,
+                    previous: previous
+                ))
+                if IOSUnloadQuiescenceEvaluator.isQuiescent(samples) {
+                    return PreparationResult(canStartRequest: true, evidence: evidence)
+                }
+            }
+            return PreparationResult(canStartRequest: false, evidence: evidence)
         case .preparedCacheClear:
             await engine.trimMemory(
                 level: .hardTrim,
                 reason: "startup_reliability_prepared_cache_clear"
+            )
+            let cleared = await capture()
+            return PreparationResult(
+                canStartRequest: true,
+                evidence: [
+                    memoryEvidence(stage: "before_preparation", sample: samples[0], previous: nil),
+                    memoryEvidence(stage: "after_mlx_cache_clear", sample: cleared, previous: samples[0]),
+                ]
             )
         }
     }
@@ -247,7 +469,11 @@ enum IOSStartupReliabilityRunner {
         records: [GenerationTelemetryRecord],
         failureCode: String?,
         classification: String,
-        output: OutputDigest?
+        output: OutputDigest?,
+        prePreparationStoreWarmState: String,
+        preRequestStoreWarmState: String,
+        preparationEvidence: [PreparationEvidence],
+        codecReplay: CodecReplayComparison? = nil
     ) -> TakeResult {
         var attemptsByIndex: [Int: AttemptResult] = [:]
         for record in records {
@@ -271,25 +497,37 @@ enum IOSStartupReliabilityRunner {
         }
         let attempts = attemptsByIndex.values.sorted { $0.retryAttempt < $1.retryAttempt }
         let terminalTimeline = attempts.last?.startupTimeline ?? []
+        var artifacts = diagnosticArtifacts(in: records)
+        if let artifact = codecReplay?.incrementalArtifact { artifacts.append(artifact) }
+        if let artifact = codecReplay?.fullArtifact { artifacts.append(artifact) }
         return TakeResult(
             takeIndex: take.takeIndex,
             takeID: take.takeID,
             generationID: generationID.uuidString,
             status: status,
             preparation: take.preparation.rawValue,
+            prePreparationStoreWarmState: prePreparationStoreWarmState,
+            preRequestStoreWarmState: preRequestStoreWarmState,
+            preparationEvidence: preparationEvidence,
             requestReceipt: receipt,
             attempts: attempts,
             startupTimeline: terminalTimeline,
             failureCode: failureCode,
             classification: classification,
-            output: output
+            output: output,
+            audioQC: terminalTelemetryRecord(in: records)?.audioQC,
+            diagnosticArtifacts: artifacts.sorted { $0.kind.rawValue < $1.kind.rawValue },
+            codecReplay: codecReplay
         )
     }
 
     private static func missingReceiptResult(
         take: IOSStartupReliabilityTake,
         generationID: UUID,
-        preparation: IOSStartupReliabilityPreparation
+        preparation: IOSStartupReliabilityPreparation,
+        prePreparationStoreWarmState: String,
+        preRequestStoreWarmState: String,
+        preparationEvidence: [PreparationEvidence]
     ) -> TakeResult {
         TakeResult(
             takeIndex: take.takeIndex,
@@ -297,13 +535,104 @@ enum IOSStartupReliabilityRunner {
             generationID: generationID.uuidString,
             status: "failed",
             preparation: preparation.rawValue,
+            prePreparationStoreWarmState: prePreparationStoreWarmState,
+            preRequestStoreWarmState: preRequestStoreWarmState,
+            preparationEvidence: preparationEvidence,
             requestReceipt: nil,
             attempts: [],
             startupTimeline: [],
             failureCode: "request_receipt_unavailable",
             classification: "unmaterialized_unknown",
-            output: nil
+            output: nil,
+            audioQC: nil,
+            diagnosticArtifacts: [],
+            codecReplay: nil
         )
+    }
+
+    private static func replayCodecTraceIfAvailable(
+        request: GenerationRequest,
+        generationID: UUID,
+        runID: String,
+        script: String,
+        records: [GenerationTelemetryRecord],
+        engine: TTSEngineStore
+    ) async -> CodecReplayComparison? {
+        guard requiresCodecReplay(terminalTelemetryRecord(in: records)?.audioQC),
+              let traceEvidence = diagnosticArtifacts(in: records).first(where: {
+                  $0.kind == .codecTrace
+              }),
+              traceEvidence.complete == true,
+              let ranges = traceEvidence.codecChunkRanges,
+              !ranges.isEmpty else {
+            return nil
+        }
+        do {
+            let trace = try StartupReliabilityDiagnosticEvidence.loadCodecTrace(
+                appSupportDirectory: AppPaths.appSupportDir,
+                runID: runID,
+                generationID: generationID
+            )
+            let replay = try await engine.replayStartupReliabilityCodecTrace(
+                request: request,
+                frames: trace.frames,
+                incrementalRanges: ranges
+            )
+            let expectedPauseCount = PersistedWAVAudioQCAnalyzer.expectedPauseCount(in: script)
+            let incremental = try StartupReliabilityDiagnosticEvidence.persistReplayAudio(
+                samples: replay.incrementalAudio,
+                sampleRate: replay.sampleRate,
+                kind: .incrementalReplayAudio,
+                appSupportDirectory: AppPaths.appSupportDir,
+                runID: runID,
+                generationID: generationID,
+                expectedPauseCount: expectedPauseCount
+            )
+            let full = try StartupReliabilityDiagnosticEvidence.persistReplayAudio(
+                samples: replay.fullAudio,
+                sampleRate: replay.sampleRate,
+                kind: .fullReplayAudio,
+                appSupportDirectory: AppPaths.appSupportDir,
+                runID: runID,
+                generationID: generationID,
+                expectedPauseCount: expectedPauseCount
+            )
+            return CodecReplayComparison(
+                status: "complete",
+                failureCode: nil,
+                traceSHA256: traceEvidence.sha256,
+                ranges: ranges,
+                incrementalArtifact: incremental.0,
+                incrementalAudioQC: incremental.1,
+                fullArtifact: full.0,
+                fullAudioQC: full.1
+            )
+        } catch {
+            return CodecReplayComparison(
+                status: "failed",
+                failureCode: GenerationFailureDiagnosticLogger.errorMetadata(for: error).code,
+                traceSHA256: traceEvidence.sha256,
+                ranges: ranges,
+                incrementalArtifact: nil,
+                incrementalAudioQC: nil,
+                fullArtifact: nil,
+                fullAudioQC: nil
+            )
+        }
+    }
+
+    /// A full-output warning can still contain a failed decoder chunk. Those
+    /// short near-silent partitions are perceptually audible as broken cadence
+    /// even when they do not form one continuous hard-fail dropout, so the
+    /// diagnostics lane must retain/replay them instead of calling them clean.
+    private static func requiresCodecReplay(_ report: AudioQCReport?) -> Bool {
+        guard let report else { return false }
+        if report.verdict != .pass
+            || report.instabilityVerdict != .pass
+            || report.writtenOutputVerdict != .pass {
+            return true
+        }
+        return report.chunkQC?.contains(where: { $0.verdict == .fail }) == true
     }
 
     private static func classifyFailure(
@@ -320,6 +649,87 @@ enum IOSStartupReliabilityRunner {
         }
         if stages.contains(where: { $0.hasPrefix("startup.") }) { return "pre_audio_startup" }
         return "unmaterialized_unknown"
+    }
+
+    private static func memoryEvidence(
+        stage: String,
+        sample: IOSUnloadQuiescenceSample,
+        previous: IOSUnloadQuiescenceSample?,
+        includeStability: Bool = true
+    ) -> PreparationEvidence {
+        var violations = IOSUnloadQuiescenceEvaluator
+            .violations(current: sample, previous: previous)
+        if !includeStability {
+            violations.remove(.mlxActiveUnstable)
+            violations.remove(.metalAllocationUnstable)
+        }
+        return PreparationEvidence(
+            stage: stage,
+            sequence: sample.sequence,
+            capturedAtUptimeSeconds: sample.capturedAtUptimeSeconds,
+            mlxActiveMB: sample.mlx.activeMB,
+            mlxCacheMB: sample.mlx.cacheMB,
+            mlxPeakMB: sample.mlx.peakMB,
+            metalAllocatedMB: sample.process.gpuAllocatedMB,
+            physicalFootprintMB: sample.process.physFootprintMB,
+            availableHeadroomMB: sample.process.availableHeadroomMB,
+            hasActiveGeneration: sample.hasActiveGeneration,
+            memoryActionInFlight: sample.criticalMemoryActionInFlight,
+            modelOperationInFlight: sample.modelOperationInFlight,
+            generationReservationInFlight: sample.generationReservationInFlight,
+            loadedModelID: safeIdentifier(sample.loadedModelID),
+            engineLifecycle: safeIdentifier(sample.engineLifecycle) ?? "unknown",
+            violations: violations.map(\.rawValue).sorted()
+        )
+    }
+
+    private static func diagnosticArtifacts(
+        in records: [GenerationTelemetryRecord]
+    ) -> [StartupReliabilityArtifactEvidence] {
+        guard let notes = terminalTelemetryRecord(in: records)?.notes else { return [] }
+        var result: [StartupReliabilityArtifactEvidence] = []
+        if let sha256 = notes["codecTraceSHA256"],
+           let byteCount = notes["codecTraceByteCount"].flatMap(Int.init),
+           let frameCount = notes["codecTraceFrameCount"].flatMap(Int.init),
+           let minimum = notes["codecTraceCodeGroupsMinimum"].flatMap(Int.init),
+           let maximum = notes["codecTraceCodeGroupsMaximum"].flatMap(Int.init),
+           let complete = notes["codecTraceComplete"].flatMap(Bool.init),
+           let ranges = parseCodecRanges(notes["codecTraceChunkRanges"]) {
+            result.append(StartupReliabilityArtifactEvidence(
+                kind: .codecTrace,
+                sha256: sha256,
+                byteCount: byteCount,
+                codecFrameCount: frameCount,
+                codeGroupRange: .init(minimum: minimum, maximum: maximum),
+                codecChunkRanges: ranges,
+                complete: complete
+            ))
+        }
+        if let sha256 = notes["rejectedAudioSHA256"],
+           let byteCount = notes["rejectedAudioByteCount"].flatMap(Int.init),
+           let duration = notes["rejectedAudioDurationSeconds"].flatMap(Double.init) {
+            result.append(StartupReliabilityArtifactEvidence(
+                kind: .rejectedAudio,
+                sha256: sha256,
+                byteCount: byteCount,
+                durationSeconds: duration
+            ))
+        }
+        return result.sorted { $0.kind.rawValue < $1.kind.rawValue }
+    }
+
+    private static func parseCodecRanges(
+        _ raw: String?
+    ) -> [StartupReliabilityCodecFrameRange]? {
+        guard let raw, !raw.isEmpty else { return nil }
+        let ranges = raw.split(separator: ",").compactMap { component -> StartupReliabilityCodecFrameRange? in
+            let values = component.split(separator: ":", omittingEmptySubsequences: false)
+            guard values.count == 2, let start = Int(values[0]), let end = Int(values[1]) else {
+                return nil
+            }
+            return StartupReliabilityCodecFrameRange(start: start, endExclusive: end)
+        }
+        return ranges.count == raw.split(separator: ",").count ? ranges : nil
     }
 
     private static func telemetryRecords(generationID: UUID) -> [GenerationTelemetryRecord] {
@@ -537,22 +947,63 @@ enum IOSStartupReliabilityRunner {
         let loadedModelID: String?
     }
 
+    private struct PreparationResult {
+        let canStartRequest: Bool
+        let evidence: [PreparationEvidence]
+    }
+
+    private struct PreparationEvidence: Codable {
+        let stage: String
+        let sequence: Int
+        let capturedAtUptimeSeconds: Double
+        let mlxActiveMB: Double?
+        let mlxCacheMB: Double?
+        let mlxPeakMB: Double?
+        let metalAllocatedMB: Double?
+        let physicalFootprintMB: Double?
+        let availableHeadroomMB: Double?
+        let hasActiveGeneration: Bool
+        let memoryActionInFlight: Bool
+        let modelOperationInFlight: Bool
+        let generationReservationInFlight: Bool
+        let loadedModelID: String?
+        let engineLifecycle: String
+        let violations: [String]
+    }
+
     private struct TakeResult: Codable {
         let takeIndex: Int
         let takeID: String
         let generationID: String
         let status: String
         let preparation: String
+        let prePreparationStoreWarmState: String
+        let preRequestStoreWarmState: String
+        let preparationEvidence: [PreparationEvidence]
         let requestReceipt: GenerationRequestReceipt?
         let attempts: [AttemptResult]
         let startupTimeline: [BoundaryResult]
         let failureCode: String?
         let classification: String
         let output: OutputDigest?
+        let audioQC: AudioQCReport?
+        let diagnosticArtifacts: [StartupReliabilityArtifactEvidence]
+        let codecReplay: CodecReplayComparison?
+    }
+
+    private struct CodecReplayComparison: Codable {
+        let status: String
+        let failureCode: String?
+        let traceSHA256: String
+        let ranges: [StartupReliabilityCodecFrameRange]
+        let incrementalArtifact: StartupReliabilityArtifactEvidence?
+        let incrementalAudioQC: AudioQCReport?
+        let fullArtifact: StartupReliabilityArtifactEvidence?
+        let fullAudioQC: AudioQCReport?
     }
 
     private struct ResultRecord: Codable {
-        var schemaVersion = 1
+        var schemaVersion = 2
         let status: String
         let runID: String
         let scriptSHA256: String
@@ -567,10 +1018,16 @@ enum IOSStartupReliabilityRunner {
     }
 
     private struct FailureRecord: Codable {
-        var schemaVersion = 1
+        var schemaVersion = 2
         let runID: String
         let failedAt: String
         let failureCode: String
+    }
+
+    private struct CleanupRecord: Codable {
+        var schemaVersion = 1
+        let status = "collected_evidence_removed"
+        let runID: String
     }
 
     private enum RunnerError: String, LocalizedError {

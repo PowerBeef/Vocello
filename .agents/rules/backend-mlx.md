@@ -11,6 +11,7 @@ sourceOfTruth:
   - config/delivery-evaluator-v2-contract.json
   - config/delivery-evaluator-v2-candidates.json
   - config/delivery-evaluation-corpus.json
+  - config/audio-cadence-qc-contract.json
   - scripts/delivery_experiment.py
   - scripts/delivery_experiment_runner.py
   - scripts/delivery_calibration_session.py
@@ -23,6 +24,7 @@ sourceOfTruth:
   - scripts/delivery_resource_supervisor.py
   - scripts/run_local_delivery_cascade.py
   - scripts/delivery_promotion_decision.py
+  - scripts/audio_cadence_qc.py
 ---
 # Backend / MLX domain rule
 
@@ -85,7 +87,9 @@ Before changing anything in this layer, read:
   attention anchors,
   `scripts/run_local_delivery_cascade.py` runs the content-addressed v2 acoustic/adapter cascade
   only after the generator has exited,
-  `scripts/delivery_promotion_decision.py` fails closed over automatic and blinded evidence.
+  `scripts/delivery_promotion_decision.py` fails closed over automatic and blinded evidence, and
+  `scripts/audio_cadence_qc.py` validates independently labelled cadence evidence before any
+  Fast-QC warning or rejection boundary can be reconsidered.
 - When callable, use Swift/concurrency/performance skills (for example the Axiom skills) and
   authoritative MLX / Hugging Face documentation for language, isolation, and profiling decisions.
   Read each selected skill before use.

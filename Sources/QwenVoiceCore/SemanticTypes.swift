@@ -1152,6 +1152,9 @@ public struct GenerationResult: Hashable, Codable, Sendable {
     /// Optional + `decodeIfPresent` keeps the IPC wire and persisted history readable
     /// across versions; `nil` when telemetry was off for the run.
     public let telemetrySummary: TelemetrySummary?
+    /// Persisted-WAV quality evidence for a normal generation. Optional for
+    /// legacy IPC rows and synthetic/assembled results that predate QC v5.
+    public let audioQC: AudioQCReport?
 
     public init(
         audioPath: String,
@@ -1162,7 +1165,8 @@ public struct GenerationResult: Hashable, Codable, Sendable {
         diagnosticTimingsMS: [String: Int] = [:],
         diagnosticBooleanFlags: [String: Bool] = [:],
         diagnosticStringFlags: [String: String] = [:],
-        telemetrySummary: TelemetrySummary? = nil
+        telemetrySummary: TelemetrySummary? = nil,
+        audioQC: AudioQCReport? = nil
     ) {
         self.audioPath = audioPath
         self.durationSeconds = durationSeconds
@@ -1173,6 +1177,7 @@ public struct GenerationResult: Hashable, Codable, Sendable {
         self.diagnosticBooleanFlags = diagnosticBooleanFlags
         self.diagnosticStringFlags = diagnosticStringFlags
         self.telemetrySummary = telemetrySummary
+        self.audioQC = audioQC
     }
 
     /// The effective sampling seed the engine actually used for this take
@@ -1193,6 +1198,7 @@ public struct GenerationResult: Hashable, Codable, Sendable {
         case diagnosticBooleanFlags
         case diagnosticStringFlags
         case telemetrySummary
+        case audioQC
     }
 
     public init(from decoder: Decoder) throws {
@@ -1206,6 +1212,7 @@ public struct GenerationResult: Hashable, Codable, Sendable {
         diagnosticBooleanFlags = try container.decodeIfPresent([String: Bool].self, forKey: .diagnosticBooleanFlags) ?? [:]
         diagnosticStringFlags = try container.decodeIfPresent([String: String].self, forKey: .diagnosticStringFlags) ?? [:]
         telemetrySummary = try container.decodeIfPresent(TelemetrySummary.self, forKey: .telemetrySummary)
+        audioQC = try container.decodeIfPresent(AudioQCReport.self, forKey: .audioQC)
     }
 
     public var audioURL: URL {
@@ -1436,6 +1443,11 @@ public struct GenerationRequest: Hashable, Codable, Sendable {
     /// suppressing preview-chunk publication. Optional + synthesized `Codable`
     /// keeps the IPC wire back-compatible.
     public let suppressStreamingPreview: Bool?
+    /// Diagnostics-only request for a bounded, privacy-sensitive codec trace.
+    /// Shipping callers leave this false. The physical-device startup runner
+    /// enables it only behind the existing telemetry/debug gate so identical
+    /// sampled code groups can be replayed through both decoder paths.
+    public let captureCodecTrace: Bool?
 
     public init(
         mode: GenerationMode,
@@ -1452,7 +1464,8 @@ public struct GenerationRequest: Hashable, Codable, Sendable {
         generationID: UUID? = nil,
         seed: UInt64? = nil,
         variation: Qwen3SamplingVariation? = nil,
-        suppressStreamingPreview: Bool? = nil
+        suppressStreamingPreview: Bool? = nil,
+        captureCodecTrace: Bool? = nil
     ) {
         self.mode = mode
         self.modelID = modelID
@@ -1469,6 +1482,7 @@ public struct GenerationRequest: Hashable, Codable, Sendable {
         self.seed = seed
         self.variation = variation
         self.suppressStreamingPreview = suppressStreamingPreview
+        self.captureCodecTrace = captureCodecTrace
     }
 
     public init(
@@ -1485,7 +1499,8 @@ public struct GenerationRequest: Hashable, Codable, Sendable {
         generationID: UUID? = nil,
         seed: UInt64? = nil,
         variation: Qwen3SamplingVariation? = nil,
-        suppressStreamingPreview: Bool? = nil
+        suppressStreamingPreview: Bool? = nil,
+        captureCodecTrace: Bool? = nil
     ) {
         let resolvedMode: GenerationMode
         switch payload {
@@ -1512,7 +1527,8 @@ public struct GenerationRequest: Hashable, Codable, Sendable {
             generationID: generationID,
             seed: seed,
             variation: variation,
-            suppressStreamingPreview: suppressStreamingPreview
+            suppressStreamingPreview: suppressStreamingPreview,
+            captureCodecTrace: captureCodecTrace
         )
     }
 
@@ -1539,7 +1555,9 @@ public struct GenerationRequest: Hashable, Codable, Sendable {
             payload: payload,
             generationID: generationID,
             seed: seed,
-            variation: variation
+            variation: variation,
+            suppressStreamingPreview: suppressStreamingPreview,
+            captureCodecTrace: captureCodecTrace
         )
     }
 }

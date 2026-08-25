@@ -1548,7 +1548,8 @@ final class VocelloQwen3FacadeTests: XCTestCase {
                 request: makeRequest(
                     generationID: UUID(),
                     input: input,
-                    executionStyle: .qualityFirst
+                    executionStyle: .qualityFirst,
+                    captureCodecTrace: true
                 ),
                 cloneHandle: cloneHandle,
                 audioCapacityFrames: 24_000
@@ -1570,8 +1571,14 @@ final class VocelloQwen3FacadeTests: XCTestCase {
             let prepared = await reservation.session.prepared.snapshot()
             XCTAssertEqual(qualityChunks.count, 1, "mode=\(input.mode)")
             XCTAssertEqual(qualityPreviews.count, 0, "mode=\(input.mode)")
+            XCTAssertNotNil(
+                qualityChunks.first?.startupObservations?
+                    .firstModelTokenAndAudioCodeMilliseconds,
+                "mode=\(input.mode)"
+            )
             XCTAssertEqual(terminal.modelTerminal.emittedAudioFrameCount, 1)
             XCTAssertEqual(terminal.modelTerminal.generationInfo?.generationTokenCount, 1)
+            XCTAssertEqual(terminal.modelTerminal.codecTrace?.frames, [[1, 2]])
             XCTAssertNotNil(prepared)
             XCTAssertEqual(compatibilityModel.capturedStreamingIntervals, [])
             let snapshot = await engine.snapshot()
@@ -1816,7 +1823,8 @@ final class VocelloQwen3FacadeTests: XCTestCase {
     private func makeRequest(
         generationID: UUID,
         input: VocelloQwen3SynthesisInput,
-        executionStyle: VocelloQwen3ExecutionStyle = .streaming
+        executionStyle: VocelloQwen3ExecutionStyle = .streaming,
+        captureCodecTrace: Bool = false
     ) -> VocelloQwen3SynthesisRequest {
         VocelloQwen3SynthesisRequest(
             generationID: generationID,
@@ -1834,7 +1842,8 @@ final class VocelloQwen3FacadeTests: XCTestCase {
                 clearCacheOnStreamChunk: false,
                 tokenMemoryClearCadence: 16
             ),
-            executionStyle: executionStyle
+            executionStyle: executionStyle,
+            captureCodecTrace: captureCodecTrace
         )
     }
 
@@ -2162,6 +2171,7 @@ private final class FacadeCompatibilityModel: SpeechGenerationModel, Qwen3Optimi
         samplingPolicy: Qwen3RequestSamplingPolicy,
         memoryPolicy: Qwen3RequestMemoryPolicy,
         onPrepared: @escaping @Sendable () async throws -> Void,
+        codecTraceSink: Qwen3CodecTraceSink?,
         isolation: isolated (any Actor)?
     ) async throws -> AudioGenerationCompletion {
         _ = isolation
@@ -2171,6 +2181,7 @@ private final class FacadeCompatibilityModel: SpeechGenerationModel, Qwen3Optimi
             memoryPolicy: memoryPolicy
         )
         try await onPrepared()
+        try await codecTraceSink?([1, 2])
         return fixtureCompletion()
     }
 
@@ -2188,6 +2199,7 @@ private final class FacadeCompatibilityModel: SpeechGenerationModel, Qwen3Optimi
         generationSpeedProfile _: String?,
         memoryClearCadence _: Int?,
         enableChunkTimings _: Bool,
+        enableCodecTrace _: Bool,
         sink: @escaping Qwen3MaterializedGenerationSink,
         isolation: isolated (any Actor)?
     ) async throws -> AudioGenerationFinishReason {
@@ -2268,6 +2280,7 @@ private final class FacadeCompatibilityModel: SpeechGenerationModel, Qwen3Optimi
         samplingPolicy: Qwen3RequestSamplingPolicy,
         memoryPolicy: Qwen3RequestMemoryPolicy,
         onPrepared: @escaping @Sendable () async throws -> Void,
+        codecTraceSink: Qwen3CodecTraceSink?,
         isolation: isolated (any Actor)?
     ) async throws -> AudioGenerationCompletion {
         _ = isolation
@@ -2277,6 +2290,7 @@ private final class FacadeCompatibilityModel: SpeechGenerationModel, Qwen3Optimi
             memoryPolicy: memoryPolicy
         )
         try await onPrepared()
+        try await codecTraceSink?([1, 2])
         return fixtureCompletion()
     }
 
@@ -2292,6 +2306,7 @@ private final class FacadeCompatibilityModel: SpeechGenerationModel, Qwen3Optimi
         generationSpeedProfile _: String?,
         memoryClearCadence _: Int?,
         enableChunkTimings _: Bool,
+        enableCodecTrace _: Bool,
         sink: @escaping Qwen3MaterializedGenerationSink,
         isolation: isolated (any Actor)?
     ) async throws -> AudioGenerationFinishReason {
@@ -2378,6 +2393,7 @@ private final class FacadeCompatibilityModel: SpeechGenerationModel, Qwen3Optimi
         samplingPolicy: Qwen3RequestSamplingPolicy,
         memoryPolicy: Qwen3RequestMemoryPolicy,
         onPrepared: @escaping @Sendable () async throws -> Void,
+        codecTraceSink: Qwen3CodecTraceSink?,
         isolation: isolated (any Actor)?
     ) async throws -> AudioGenerationCompletion {
         _ = isolation
@@ -2387,6 +2403,7 @@ private final class FacadeCompatibilityModel: SpeechGenerationModel, Qwen3Optimi
             memoryPolicy: memoryPolicy
         )
         try await onPrepared()
+        try await codecTraceSink?([1, 2])
         return fixtureCompletion()
     }
 
@@ -2402,6 +2419,7 @@ private final class FacadeCompatibilityModel: SpeechGenerationModel, Qwen3Optimi
         generationSpeedProfile _: String?,
         memoryClearCadence _: Int?,
         enableChunkTimings _: Bool,
+        enableCodecTrace _: Bool,
         sink: @escaping Qwen3MaterializedGenerationSink,
         isolation: isolated (any Actor)?
     ) async throws -> AudioGenerationFinishReason {

@@ -169,6 +169,7 @@ public struct VocelloQwen3ChunkTimings: Codable, Hashable, Sendable {
 enum VocelloQwen3GenerationSignal: Sendable {
     case prepared
     case token(Int)
+    case codecFrame([Int32])
     case info(VocelloQwen3GenerationInfo)
     case audio([Float])
     case chunkTimings(VocelloQwen3ChunkTimings)
@@ -359,6 +360,7 @@ final class VocelloQwen3LoadedModel: @unchecked Sendable {
         let optimized: any Qwen3OptimizedSpeechGenerationModel
         let quality: any Qwen3PreparedQualityGenerationModel
         let suspending: any Qwen3SuspendingSpeechGenerationModel
+        let replay: (any Qwen3CodecTraceReplayModel)?
 
         init(_ base: any SpeechGenerationModel) throws {
             guard let optimized = base as? any Qwen3OptimizedSpeechGenerationModel,
@@ -370,6 +372,7 @@ final class VocelloQwen3LoadedModel: @unchecked Sendable {
             self.optimized = optimized
             self.quality = quality
             self.suspending = suspending
+            replay = base as? any Qwen3CodecTraceReplayModel
         }
     }
 
@@ -417,6 +420,26 @@ final class VocelloQwen3LoadedModel: @unchecked Sendable {
 
     public func resetPreparationDiagnostics() {
         (box.base as? any SpeechGenerationModelDiagnosticsProvider)?.resetPreparationDiagnostics()
+    }
+
+    func replayCodecTrace(
+        frames: [[Int32]],
+        incrementalRanges: [VocelloQwen3CodecFrameRange]
+    ) throws -> VocelloQwen3CodecReplayResult {
+        guard let replay = box.replay else {
+            throw VocelloQwen3ContractError.incompatibleLoadedModel
+        }
+        let result = try replay.replayCodecTrace(
+            frames: frames,
+            incrementalRanges: incrementalRanges.map {
+                Qwen3CodecFrameRange(start: $0.start, endExclusive: $0.endExclusive)
+            }
+        )
+        return VocelloQwen3CodecReplayResult(
+            incrementalAudio: result.incrementalAudio,
+            fullAudio: result.fullAudio,
+            sampleRate: result.sampleRate
+        )
     }
 
     private func parameters(_ policy: VocelloQwen3SamplingConfiguration) throws -> GenerateParameters {
@@ -498,6 +521,8 @@ final class VocelloQwen3LoadedModel: @unchecked Sendable {
                 .prepared
             case .token(let token):
                 .token(token)
+            case .codecFrame(let codes):
+                .codecFrame(codes)
             case .info(let info):
                 .info(VocelloQwen3GenerationInfo(info))
             case .audio(let samples):
@@ -525,6 +550,7 @@ final class VocelloQwen3LoadedModel: @unchecked Sendable {
                 generationSpeedProfile: nil,
                 memoryClearCadence: nil,
                 enableChunkTimings: true,
+                enableCodecTrace: request.captureCodecTrace,
                 sink: eventSink,
                 isolation: isolation
             )
@@ -541,6 +567,7 @@ final class VocelloQwen3LoadedModel: @unchecked Sendable {
                 generationSpeedProfile: nil,
                 memoryClearCadence: nil,
                 enableChunkTimings: true,
+                enableCodecTrace: request.captureCodecTrace,
                 sink: eventSink,
                 isolation: isolation
             )
@@ -560,6 +587,7 @@ final class VocelloQwen3LoadedModel: @unchecked Sendable {
                 generationSpeedProfile: nil,
                 memoryClearCadence: nil,
                 enableChunkTimings: true,
+                enableCodecTrace: request.captureCodecTrace,
                 sink: eventSink,
                 isolation: isolation
             )
@@ -592,6 +620,14 @@ final class VocelloQwen3LoadedModel: @unchecked Sendable {
         let onPrepared: @Sendable () async throws -> Void = {
             try await sink(.prepared)
         }
+        let codecTraceSink: Qwen3CodecTraceSink?
+        if request.captureCodecTrace {
+            codecTraceSink = { @Sendable codes in
+                try await sink(.codecFrame(codes))
+            }
+        } else {
+            codecTraceSink = nil
+        }
         let rawCompletion: AudioGenerationCompletion
         switch request.input {
         case .customVoice(let speakerID, let instruction):
@@ -604,6 +640,7 @@ final class VocelloQwen3LoadedModel: @unchecked Sendable {
                 samplingPolicy: samplingPolicy,
                 memoryPolicy: memoryPolicy,
                 onPrepared: onPrepared,
+                codecTraceSink: codecTraceSink,
                 isolation: isolation
             )
         case .voiceDesign(let description):
@@ -615,6 +652,7 @@ final class VocelloQwen3LoadedModel: @unchecked Sendable {
                 samplingPolicy: samplingPolicy,
                 memoryPolicy: memoryPolicy,
                 onPrepared: onPrepared,
+                codecTraceSink: codecTraceSink,
                 isolation: isolation
             )
         case .voiceClone:
@@ -629,6 +667,7 @@ final class VocelloQwen3LoadedModel: @unchecked Sendable {
                 samplingPolicy: samplingPolicy,
                 memoryPolicy: memoryPolicy,
                 onPrepared: onPrepared,
+                codecTraceSink: codecTraceSink,
                 isolation: isolation
             )
         }

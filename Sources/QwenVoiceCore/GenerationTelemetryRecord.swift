@@ -958,13 +958,84 @@ public struct GenerationTelemetryRecord: Hashable, Codable, Sendable {
 /// promotion combines it with the applicable ASR, prosody, and delivery gates;
 /// optional listening remains annotation only. Thresholds are conservative +
 /// tunable (see the builder in `GenerationOutputAdapter`).
+public struct AudioCadenceQCReport: Hashable, Codable, Sendable {
+    public enum Classification: String, Hashable, Codable, Sendable {
+        /// The bounded amplitude-only gate found no cadence anomaly. This is not
+        /// a semantic naturalness claim; the delivery evaluator owns that decision.
+        case withinFastGate
+        /// The take remains usable, but its pause pattern warrants an explicit
+        /// user notice and downstream inspection.
+        case unusual
+        /// The existing gross-defect policy rejected the take before product
+        /// publication. This classification never creates a new hard threshold.
+        case severe
+    }
+
+    public enum Reason: String, Hashable, Codable, Sendable {
+        case excessCadencePauses = "excess_cadence_pauses"
+        case singleSuspiciousPause = "single_suspicious_pause"
+        case repeatedSuspiciousPauses = "repeated_suspicious_pauses"
+        case egregiousInteriorSilence = "egregious_interior_silence"
+    }
+
+    public let classification: Classification
+    public let reasons: [Reason]
+    public let expectedPauseCount: Int
+    public let cadencePauseThresholdMS: Int
+    public let suspiciousPauseThresholdMS: Int
+    public let observedCadencePauseCount: Int
+    public let excessCadencePauseCount: Int
+    public let suspiciousPauseCount: Int
+    /// Every bounded interior pause retained by the fast analyzer, in close order.
+    /// Values contain no prompt text or audio and remain capped by the limiter.
+    public let recordedInteriorPausesMS: [Int]
+    public let totalInteriorSilenceMS: Int
+    public let totalCadenceSilenceMS: Int
+    public let medianCadencePauseMS: Int?
+    public let p90CadencePauseMS: Int?
+    public let cadenceSilenceRatio: Double
+
+    public init(
+        classification: Classification,
+        reasons: [Reason],
+        expectedPauseCount: Int,
+        cadencePauseThresholdMS: Int,
+        suspiciousPauseThresholdMS: Int,
+        observedCadencePauseCount: Int,
+        excessCadencePauseCount: Int,
+        suspiciousPauseCount: Int,
+        recordedInteriorPausesMS: [Int],
+        totalInteriorSilenceMS: Int,
+        totalCadenceSilenceMS: Int,
+        medianCadencePauseMS: Int?,
+        p90CadencePauseMS: Int?,
+        cadenceSilenceRatio: Double
+    ) {
+        self.classification = classification
+        self.reasons = reasons
+        self.expectedPauseCount = expectedPauseCount
+        self.cadencePauseThresholdMS = cadencePauseThresholdMS
+        self.suspiciousPauseThresholdMS = suspiciousPauseThresholdMS
+        self.observedCadencePauseCount = observedCadencePauseCount
+        self.excessCadencePauseCount = excessCadencePauseCount
+        self.suspiciousPauseCount = suspiciousPauseCount
+        self.recordedInteriorPausesMS = recordedInteriorPausesMS
+        self.totalInteriorSilenceMS = totalInteriorSilenceMS
+        self.totalCadenceSilenceMS = totalCadenceSilenceMS
+        self.medianCadencePauseMS = medianCadencePauseMS
+        self.p90CadencePauseMS = p90CadencePauseMS
+        self.cadenceSilenceRatio = cadenceSilenceRatio
+    }
+}
+
 public struct AudioQCReport: Hashable, Codable, Sendable {
     /// v2 fixed cross-chunk interior-silence localization. v3 derives the
     /// written-output verdict from the atomically published WAV frames rather
     /// than assuming the pre-write limited buffer and persisted file agree. v4
     /// separates ordinary cadence warnings from repeated suspicious-scale or
-    /// context-sensitive egregious dead-air failures.
-    public static let currentAlgorithmVersion = 4
+    /// context-sensitive egregious dead-air failures. v5 retains those exact
+    /// verdict boundaries and adds a structured, bounded cadence report.
+    public static let currentAlgorithmVersion = 5
 
     public enum Verdict: String, Hashable, Codable, Sendable {
         case pass
@@ -1008,6 +1079,8 @@ public struct AudioQCReport: Hashable, Codable, Sendable {
     /// the start of the clip, or nil if none.
     public let longestSilenceStartMS: Int?
     public let durationSeconds: Double
+    /// Schema-versioned cadence evidence. Optional for v1-v4 telemetry.
+    public let cadence: AudioCadenceQCReport?
     /// Optional per-chunk QC snapshots (verbose mode only). nil when not computed.
     public let chunkQC: [AudioQCChunkReport]?
 
@@ -1029,6 +1102,7 @@ public struct AudioQCReport: Hashable, Codable, Sendable {
         firstNonFiniteSample: Int? = nil,
         firstClipSample: Int? = nil,
         longestSilenceStartMS: Int? = nil,
+        cadence: AudioCadenceQCReport? = nil,
         chunkQC: [AudioQCChunkReport]? = nil
     ) {
         self.algorithmVersion = algorithmVersion
@@ -1048,6 +1122,7 @@ public struct AudioQCReport: Hashable, Codable, Sendable {
         self.firstNonFiniteSample = firstNonFiniteSample
         self.firstClipSample = firstClipSample
         self.longestSilenceStartMS = longestSilenceStartMS
+        self.cadence = cadence
         self.chunkQC = chunkQC
     }
 
@@ -1072,6 +1147,7 @@ public struct AudioQCReport: Hashable, Codable, Sendable {
         self.firstNonFiniteSample = try container.decodeIfPresent(Int.self, forKey: .firstNonFiniteSample)
         self.firstClipSample = try container.decodeIfPresent(Int.self, forKey: .firstClipSample)
         self.longestSilenceStartMS = try container.decodeIfPresent(Int.self, forKey: .longestSilenceStartMS)
+        self.cadence = try container.decodeIfPresent(AudioCadenceQCReport.self, forKey: .cadence)
         self.chunkQC = try container.decodeIfPresent([AudioQCChunkReport].self, forKey: .chunkQC)
     }
 }

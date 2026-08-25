@@ -10,7 +10,7 @@
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
 | `autonomous-validation-remediation-2026-08` | active | release-qa | 5/11 (45%) |
-| `delivery-prompting-2026-08` | active | backend-mlx | 25/32 (78%) |
+| `delivery-prompting-2026-08` | active | backend-mlx | 26/33 (79%) |
 | `engineering-review-remediation-2026-08` | active | backend-and-platform | 3/14 (21%) |
 | `ios-generation-startup-reliability-2026-08` | active | backend-and-platform | 4/6 (67%) |
 | `model-delivery-2026-08` | active | release-qa | 2/3 (67%) |
@@ -106,6 +106,7 @@ Narrative authority: [`docs/reference/qwen3-tts-prompting-guide.md`](reference/q
 | `DP-30` | planned | Run prompt, sampling, instruction-language and script-interaction screens | — |
 | `DP-31` | planned | Confirm Speed and Quality candidates with untouched blinded listening | `file:scripts/tests/test_delivery_listening_session.py`, `file:scripts/tests/test_delivery_promotion_decision.py`, `file:scripts/tests/test_delivery_statistics.py` |
 | `DP-32` | planned | Promote only qualifying delivery changes and revalidate all modes | — |
+| `DP-33` | declined | Calibrate abnormal cadence detection without hiding valid expressive pauses | — |
 
 ### Open items in detail
 
@@ -203,14 +204,14 @@ Narrative authority: [`docs/reference/ios-built-in-startup-reliability.md`](refe
 | `ISR-01` | done | Mine and conservatively classify retained startup evidence | `file:scripts/tests/test_delivery_failure_topology.py` |
 | `ISR-02` | done | Add exact request receipts and typed startup boundaries | `file:Tests/VocelloCoreTests/GenerationStartupDiagnosticsTests.swift`, `file:Tests/VocelloCoreTests/GenerationFailureDiagnosticLoggerTests.swift` |
 | `ISR-03` | done | Add ordered physical-device runner and visible request parity | `file:scripts/tests/test_ios_startup_reliability.py`, `file:Tests/VocelloCoreTests/IOSStartupReliabilityPlanTests.swift` |
-| `ISR-04` | planned | Complete staged exact-request characterization | — |
-| `ISR-05` | done | Implement only the evidence-supported causal fix | `file:Tests/VocelloCoreTests/GenerationStartupDiagnosticsTests.swift` |
+| `ISR-04` | planned | Complete staged exact-request characterization | `file:Tests/VocelloCoreTests/StartupReliabilityDiagnosticsV2Tests.swift`, `file:scripts/tests/test_ios_startup_reliability.py` |
+| `ISR-05` | done | Implement only the evidence-supported causal fix | `file:Tests/VocelloCoreTests/GenerationStartupDiagnosticsTests.swift`, `file:Packages/VocelloQwen3Core/Tests/Qwen3RuntimeTests/Qwen3DecoderPartitionTests.swift`, `file:Packages/VocelloQwen3Core/Tests/Qwen3RuntimeTests/VocelloQwen3FacadeTests.swift` |
 | `ISR-06` | planned | Complete exact-script and broader closure evidence | — |
 
 ### Open items in detail
 
 - **`ISR-04`** (planned) — Complete staged exact-request characterization.
-  gate: With the original exact 285-character UTF-8 script, run five fixed-seed cold launches, ten same-process warm takes, seeds 38112001 through 38112008, focused delivery/speaker/default predecessors, production/full-unload/prepared-cache-clear/prewarm-disabled arms, streaming parity, macOS CLI/headless controls, and iOS headless/visible UI parity. Stop expansion at the first decision-complete divergent boundary; preserve every attempt and crash delta.
+  gate: With the original exact 285-character UTF-8 script, run five fixed-seed cold launches, ten same-process warm takes, seeds 38112001 through 38112008, focused delivery/speaker/default predecessors, production/full-unload/prepared-cache-clear/prewarm-disabled arms, streaming parity, macOS CLI/headless controls, and iOS headless/visible UI parity. For seeds 38112004, 38112006, and passing control 38112001, retain complete final/chunk QC plus bounded codec traces and compare exact production-range incremental replay against full decoding across three fresh-process repetitions per output mode. Require the full-unload quiescence barrier, exact-PID process-exit composition, and sanitized CoreDevice system-crash-log delta. Stop expansion at the first decision-complete divergent boundary; preserve every attempt and crash delta.
 
 - **`ISR-06`** (planned) — Complete exact-script and broader closure evidence.
   gate: Both the original script and tracked sentinel must pass 10/10 cold, 20/20 warm, all eight seeds, every focused predecessor, streaming/non-streaming, and matching UI/engine receipts; then complete the 9-speaker × 8-delivery grid at one seed plus a second seed for the affected speaker row and delivery column. Closure rejects unknown boundaries, silent seed changes, leaked retries, memory-policy violations, crashes, or unrepresented attempts and requires all deterministic gates green.

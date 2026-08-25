@@ -223,13 +223,14 @@ isolated opt-ins documented in the platform rules.
 | `Tests/VocelloiOSLogicTests/` | compile-only generic device-SDK policy contracts |
 | `config/runtime-debug-knobs.json`, `config/concurrency-safety.json` | debug and concurrency exception registries |
 | `config/model-management-diagnostics-schema-v1.json`, `scripts/check_ios_model_management.py` | correlated physical-iPhone model-delivery and progress diagnosis contract |
-| `config/ios-startup-reliability-{plan-schema-v1,result-schema-v1,sentinel}.json`, `scripts/ios_startup_reliability.py` | bounded physical-iPhone Built-in Voice startup plans, retained results, and exact request parity |
+| `config/ios-startup-reliability-{plan-schema-v1,result-schema-v1,result-schema-v2,sentinel}.json`, `scripts/ios_startup_reliability.py` | bounded physical-iPhone Built-in Voice startup plans, backward-compatible retained results, codec replay, memory/crash forensics, and exact request parity |
 | `config/runtime-refactor-contract.json`, `config/roadmap.json` | convergence and work-state authorities |
 | `config/language-bench-*.json` | language corpus and matrices |
 | `benchmarks/`, `scripts/benchmark_history.py` | privacy-safe PASS registry and generated history |
 | `scripts/ui_test.sh`, `scripts/macos_test.sh`, `scripts/ios_device.sh` | native test and diagnostic entry points |
 | `docs/reference/model-delivery.md` | download/restoration/retry diagnostics and live-proof rules |
 | `config/delivery-experiment-contract.json`, `config/delivery-evaluator-v2-contract.json`, `config/delivery-evaluation-corpus.json`, `config/delivery-evaluator-v2-candidates.json` | pre-registered prompt arms, compact local evaluator, sampling, multilingual scripts, pinned candidate models, holdouts, and semantic-promotion limits |
+| `config/audio-cadence-qc-contract.json`, `scripts/audio_cadence_qc.py` | Fast-QC cadence classification, privacy-safe calibration coverage, and held-out threshold-review authority |
 | `docs/reference/delivery-harness.md` | delivery/emotion protocol, provenance, layered evaluation, statistics, and results |
 | `website/` | marketing site governed by `website/AGENTS.md` |
 

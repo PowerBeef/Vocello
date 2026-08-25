@@ -41,7 +41,7 @@ public enum TTSEngineError: LocalizedError, Equatable {
 public typealias MLXTTSEngineError = TTSEngineError
 
 @MainActor
-public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReporting, TTSEngineEventStreaming, ActiveGenerationCancellable {
+public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReporting, TTSEngineEventStreaming, ActiveGenerationCancellable, StartupReliabilityCodecReplaying, StartupReliabilityRuntimeOwnershipReporting {
     private static let lightweightWarmupText = "Hi."
     public static var lightweightWarmupTextForUI: String { lightweightWarmupText }
 
@@ -362,12 +362,14 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         case proactiveLoad
         case proactivePrewarm
         case clonePriming
+        case diagnosticCodecReplay
 
         var isGeneration: Bool {
             switch self {
             case .generation, .batchGeneration:
                 return true
-            case .explicitLoad, .explicitUnload, .proactiveLoad, .proactivePrewarm, .clonePriming:
+            case .explicitLoad, .explicitUnload, .proactiveLoad, .proactivePrewarm, .clonePriming,
+                 .diagnosticCodecReplay:
                 return false
             }
         }
@@ -972,6 +974,38 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         }
     }
 
+    public func replayStartupReliabilityCodecTrace(
+        request: GenerationRequest,
+        frames: [[Int32]],
+        incrementalRanges: [StartupReliabilityCodecFrameRange]
+    ) async throws -> StartupReliabilityCodecReplayResult {
+        try ensureInitialized()
+        guard TelemetryGate.resolvedEnabled, request.captureCodecTrace == true else {
+            throw MLXTTSEngineError.unsupportedRequest(
+                "Codec replay is available only to gated startup-reliability diagnostics."
+            )
+        }
+        cancelIdleUnload()
+        let operationID = try await beginUserModelOperation(.diagnosticCodecReplay)
+        defer { finishModelOperation(id: operationID) }
+        let replay = try await runtime.replayStartupReliabilityCodecTrace(
+            request: request,
+            frames: frames,
+            incrementalRanges: incrementalRanges
+        )
+        loadState = .loaded(modelID: request.modelID)
+        scheduleIdleUnloadIfNeeded(modelID: request.modelID, mode: request.mode, isBatch: false)
+        return replay
+    }
+
+    public func startupReliabilityRuntimeOwnershipSnapshot()
+        async -> StartupReliabilityRuntimeOwnershipSnapshot {
+        StartupReliabilityRuntimeOwnershipSnapshot(
+            modelOperationInFlight: activeModelOperation != nil,
+            generationReservationInFlight: await activeGenerationCoordinator.hasActiveGeneration
+        )
+    }
+
     private func performGenerate(
         _ request: GenerationRequest,
         cancellationIngress: GenerationCancellationIngress
@@ -1481,7 +1515,8 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
             diagnosticTimingsMS: result.diagnosticTimingsMS,
             diagnosticBooleanFlags: booleans,
             diagnosticStringFlags: strings,
-            telemetrySummary: result.telemetrySummary
+            telemetrySummary: result.telemetrySummary,
+            audioQC: result.audioQC
         )
     }
 
@@ -1509,7 +1544,8 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
             diagnosticTimingsMS: timings,
             diagnosticBooleanFlags: booleans,
             diagnosticStringFlags: result.diagnosticStringFlags,
-            telemetrySummary: result.telemetrySummary
+            telemetrySummary: result.telemetrySummary,
+            audioQC: result.audioQC
         )
     }
 

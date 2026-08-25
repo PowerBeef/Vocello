@@ -1326,7 +1326,7 @@ struct Qwen3StreamChunkSchedule: Sendable {
 
 // MARK: - Qwen3TTS Model
 
-public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedSpeechGenerationModel, Qwen3PreparedQualityGenerationModel, Qwen3SuspendingSpeechGenerationModel, Qwen3CustomVoicePrewarmDepthControlling, SpeechGenerationModelDiagnosticsProvider, @unchecked Sendable {
+public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedSpeechGenerationModel, Qwen3PreparedQualityGenerationModel, Qwen3SuspendingSpeechGenerationModel, Qwen3CodecTraceReplayModel, Qwen3CustomVoicePrewarmDepthControlling, SpeechGenerationModelDiagnosticsProvider, @unchecked Sendable {
     private static let productionMinimumGeneratedCodeTokensBeforeEOS = 2
     private static let productionFullResultMemoryClearCadence = 0
 
@@ -2385,6 +2385,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
             samplingPolicy: samplingPolicy,
             memoryPolicy: memoryPolicy,
             onPrepared: {},
+            codecTraceSink: nil,
             isolation: #isolation
         )
     }
@@ -2398,6 +2399,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         samplingPolicy: Qwen3RequestSamplingPolicy,
         memoryPolicy: Qwen3RequestMemoryPolicy,
         onPrepared: @escaping @Sendable () async throws -> Void,
+        codecTraceSink: Qwen3CodecTraceSink?,
         isolation: isolated (any Actor)?
     ) async throws -> AudioGenerationCompletion {
         try await withGenerationGate(isolation: isolation) {
@@ -2418,6 +2420,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                 generationSpeedProfile: nil,
                 memoryClearCadence: Self.productionFullResultMemoryClearCadence,
                 onInfo: { info in generationInfo.withLock { $0 = info } },
+                codecTraceSink: codecTraceSink,
                 onPrepared: onPrepared,
                 isolation: isolation
             )
@@ -2446,6 +2449,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
             samplingPolicy: samplingPolicy,
             memoryPolicy: memoryPolicy,
             onPrepared: {},
+            codecTraceSink: nil,
             isolation: #isolation
         )
     }
@@ -2458,6 +2462,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         samplingPolicy: Qwen3RequestSamplingPolicy,
         memoryPolicy: Qwen3RequestMemoryPolicy,
         onPrepared: @escaping @Sendable () async throws -> Void,
+        codecTraceSink: Qwen3CodecTraceSink?,
         isolation: isolated (any Actor)?
     ) async throws -> AudioGenerationCompletion {
         try await withGenerationGate(isolation: isolation) {
@@ -2477,6 +2482,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                 generationSpeedProfile: nil,
                 memoryClearCadence: Self.productionFullResultMemoryClearCadence,
                 onInfo: { info in generationInfo.withLock { $0 = info } },
+                codecTraceSink: codecTraceSink,
                 onPrepared: onPrepared,
                 isolation: isolation
             )
@@ -2505,6 +2511,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
             samplingPolicy: samplingPolicy,
             memoryPolicy: memoryPolicy,
             onPrepared: {},
+            codecTraceSink: nil,
             isolation: #isolation
         )
     }
@@ -2517,6 +2524,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         samplingPolicy: Qwen3RequestSamplingPolicy,
         memoryPolicy: Qwen3RequestMemoryPolicy,
         onPrepared: @escaping @Sendable () async throws -> Void,
+        codecTraceSink: Qwen3CodecTraceSink?,
         isolation: isolated (any Actor)?
     ) async throws -> AudioGenerationCompletion {
         try await withGenerationGate(isolation: isolation) {
@@ -2538,6 +2546,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                 generationSpeedProfile: nil,
                 memoryClearCadence: Self.productionFullResultMemoryClearCadence,
                 onInfo: { info in generationInfo.withLock { $0 = info } },
+                codecTraceSink: codecTraceSink,
                 onPrepared: onPrepared,
                 isolation: isolation
             )
@@ -2775,6 +2784,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         generationSpeedProfile: String?,
         memoryClearCadence: Int?,
         enableChunkTimings: Bool,
+        enableCodecTrace: Bool,
         sink: @escaping Qwen3MaterializedGenerationSink,
         isolation: isolated (any Actor)? = #isolation
     ) async throws -> AudioGenerationFinishReason {
@@ -2797,6 +2807,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                     memoryClearCadence: memoryClearCadence,
                     materializedEventSink: sink,
                     emitMaterializedChunkTimings: enableChunkTimings,
+                    emitMaterializedCodecTrace: enableCodecTrace,
                     isolation: isolation
                 )
                 return latestAudioGenerationFinishReason()
@@ -2818,6 +2829,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         generationSpeedProfile: String?,
         memoryClearCadence: Int?,
         enableChunkTimings: Bool,
+        enableCodecTrace: Bool,
         sink: @escaping Qwen3MaterializedGenerationSink,
         isolation: isolated (any Actor)? = #isolation
     ) async throws -> AudioGenerationFinishReason {
@@ -2838,6 +2850,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                     memoryClearCadence: memoryClearCadence,
                     materializedEventSink: sink,
                     emitMaterializedChunkTimings: enableChunkTimings,
+                    emitMaterializedCodecTrace: enableCodecTrace,
                     isolation: isolation
                 )
                 return latestAudioGenerationFinishReason()
@@ -2859,6 +2872,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         generationSpeedProfile: String?,
         memoryClearCadence: Int?,
         enableChunkTimings: Bool,
+        enableCodecTrace: Bool,
         sink: @escaping Qwen3MaterializedGenerationSink,
         isolation: isolated (any Actor)? = #isolation
     ) async throws -> AudioGenerationFinishReason {
@@ -2881,6 +2895,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                     memoryClearCadence: memoryClearCadence,
                     materializedEventSink: sink,
                     emitMaterializedChunkTimings: enableChunkTimings,
+                    emitMaterializedCodecTrace: enableCodecTrace,
                     isolation: isolation
                 )
                 return latestAudioGenerationFinishReason()
@@ -2897,7 +2912,16 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
     ///   - codes: Codec codes [1, time, numCodeGroups]
     ///   - chunkTokens: Tokens per decode chunk (controls decode granularity)
     /// - Returns: Decoded audio waveform (1D)
-    private func decodeChunk(_ codes: MLXArray, chunkTokens: Int = 300) -> MLXArray {
+    /// Full-text conditioning still decodes through Mimi incrementally. Keep
+    /// the decoder partition small enough for constrained unified-memory
+    /// devices; decoder partition invariance is covered by
+    /// `Qwen3DecoderPartitionTests`.
+    static let qualityFirstDecoderChunkFrames = 25
+
+    private func decodeChunk(
+        _ codes: MLXArray,
+        chunkTokens: Int = Qwen3TTSModel.qualityFirstDecoderChunkFrames
+    ) -> MLXArray {
         guard let speechTokenizer else { return MLXArray.zeros([1]) }
 
         var audioChunks = [MLXArray]()
@@ -2914,6 +2938,61 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
 
         eval(audio)
         return audio
+    }
+
+    public func replayCodecTrace(
+        frames: [[Int32]],
+        incrementalRanges: [Qwen3CodecFrameRange]
+    ) throws -> Qwen3CodecReplayResult {
+        guard let speechTokenizer else {
+            throw AudioGenerationError.modelNotInitialized("Speech tokenizer not loaded")
+        }
+        guard !frames.isEmpty, frames.count <= 8_192,
+              let groupCount = frames.first?.count,
+              groupCount > 0, groupCount <= 64,
+              frames.allSatisfy({ $0.count == groupCount }) else {
+            throw AudioGenerationError.invalidInput("Invalid bounded codec trace")
+        }
+        guard !incrementalRanges.isEmpty,
+              incrementalRanges.first?.start == 0,
+              incrementalRanges.last?.endExclusive == frames.count else {
+            throw AudioGenerationError.invalidInput("Codec replay ranges are incomplete")
+        }
+        var expectedStart = 0
+        for range in incrementalRanges {
+            guard range.start == expectedStart,
+                  range.endExclusive > range.start,
+                  range.endExclusive <= frames.count else {
+                throw AudioGenerationError.invalidInput("Codec replay ranges are not contiguous")
+            }
+            expectedStart = range.endExclusive
+        }
+
+        let flatCodes = frames.flatMap { $0 }
+        let codes = MLXArray(flatCodes).reshaped([1, frames.count, groupCount])
+
+        speechTokenizer.decoder.resetStreamingState()
+        var incrementalChunks: [[Float]] = []
+        incrementalChunks.reserveCapacity(incrementalRanges.count)
+        defer { speechTokenizer.decoder.resetStreamingState() }
+        for range in incrementalRanges {
+            let decoderCodes = codes[0..., range.start ..< range.endExclusive, 0...]
+                .transposed(0, 2, 1)
+            let decoded = speechTokenizer.decoder.streamingStep(decoderCodes)[0, 0]
+            eval(decoded)
+            incrementalChunks.append(decoded.asArray(Float.self))
+        }
+        speechTokenizer.decoder.resetStreamingState()
+        let full = decodeChunk(codes)
+        eval(full)
+        let fullAudio = full.asArray(Float.self)
+        speechTokenizer.decoder.resetStreamingState()
+
+        return Qwen3CodecReplayResult(
+            incrementalAudio: incrementalChunks.flatMap { $0 },
+            fullAudio: fullAudio,
+            sampleRate: sampleRate
+        )
     }
 
     // MARK: - VoiceDesign generation
@@ -2940,6 +3019,8 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         onAudioChunkTimings: ((ChunkSubstageTimings) -> Void)? = nil,
         materializedEventSink: Qwen3MaterializedGenerationSink? = nil,
         emitMaterializedChunkTimings: Bool = false,
+        emitMaterializedCodecTrace: Bool = false,
+        codecTraceSink: Qwen3CodecTraceSink? = nil,
         onPrepared: (@Sendable () async throws -> Void)? = nil,
         isolation: isolated (any Actor)? = #isolation
     ) async throws -> MLXArray {
@@ -3133,9 +3214,13 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
             cache = talker.makeCache()
         }
         let isStreaming = onAudioChunk != nil || materializedEventSink != nil
-        var generatedCodes = [MLXArray]()
+        // Quality-first generation must not retain one lazy MLX graph per
+        // sampled codec frame. On iOS a 280-character request accumulated the
+        // graphs until final decode and crossed the process limit. Store only
+        // materialized codec IDs; full-text conditioning remains unchanged.
+        var generatedCodecFrames = [[Int32]]()
         if !isStreaming {
-            generatedCodes.reserveCapacity(effectiveMaxTokens)
+            generatedCodecFrames.reserveCapacity(effectiveMaxTokens)
         }
         var pendingStreamCodes = [MLXArray]()
         var generatedCodebookTokenIDs = Set<Int>()
@@ -3493,7 +3578,6 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
             codePredictorTotalMS += codePredictorStartedAt.elapsedMilliseconds
 
             let allCodes = concatenated(codeTokens, axis: 1) // [1, num_code_groups]
-
             // Prepare next input
             let textEmbed: MLXArray
             if trailingIdx < trailingTextHidden.dim(1) {
@@ -3574,14 +3658,31 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                 generationEndReason = "eos"
                 break
             }
+            let materializedCodeFrame: [Int32]?
+            if emitMaterializedCodecTrace || codecTraceSink != nil || !isStreaming {
+                materializedCodeFrame = allCodes.asArray(Int32.self)
+            } else {
+                materializedCodeFrame = nil
+            }
+            if emitMaterializedCodecTrace,
+               let materializedEventSink,
+               let materializedCodeFrame {
+                try Task.checkCancellation()
+                try await materializedEventSink(.codecFrame(materializedCodeFrame))
+                try Task.checkCancellation()
+            } else if let codecTraceSink, let materializedCodeFrame {
+                try Task.checkCancellation()
+                try await codecTraceSink(materializedCodeFrame)
+                try Task.checkCancellation()
+            }
             generatedCodebookTokenIDs.insert(tokenId)
             samplerScratch.appendRepetitionTokenID(tokenId)
             generatedCodeCount += 1
             if isStreaming {
                 pendingStreamCodes.append(allCodes)
                 _ = streamChunkSchedule.append()
-            } else {
-                generatedCodes.append(allCodes)
+            } else if let materializedCodeFrame {
+                generatedCodecFrames.append(materializedCodeFrame)
             }
 
             // Streaming: decode and yield audio chunks during generation
@@ -3936,7 +4037,15 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         }
 
         // Non-streaming path: full decode (existing behavior)
-        let codes = stacked(generatedCodes, axis: 1) // [1, seq_len, num_code_groups]
+        guard let codeGroupCount = generatedCodecFrames.first?.count,
+              codeGroupCount > 0,
+              generatedCodecFrames.allSatisfy({ $0.count == codeGroupCount }) else {
+            throw AudioGenerationError.audioDecodingFailed(
+                "Quality-first generation produced invalid codec frames"
+            )
+        }
+        let codes = MLXArray(generatedCodecFrames.flatMap { $0 })
+            .reshaped([1, generatedCodecFrames.count, codeGroupCount])
 
         var decodeCodes = codes
         if let refCodes {

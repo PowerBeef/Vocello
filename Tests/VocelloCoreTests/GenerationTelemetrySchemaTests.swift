@@ -440,6 +440,18 @@ final class GenerationTelemetrySchemaTests: XCTestCase {
         XCTAssertEqual(report.writtenOutputVerdict, .warn)
         XCTAssertTrue(report.flags.contains("cadence:excess2(3/1)"))
         XCTAssertFalse(report.flags.contains(where: { $0.hasPrefix("dropout:excess") }))
+        let cadence = try? XCTUnwrap(report.cadence)
+        XCTAssertEqual(cadence?.classification, .unusual)
+        XCTAssertEqual(cadence?.reasons, [.excessCadencePauses])
+        XCTAssertEqual(cadence?.expectedPauseCount, 1)
+        XCTAssertEqual(cadence?.observedCadencePauseCount, 3)
+        XCTAssertEqual(cadence?.excessCadencePauseCount, 2)
+        XCTAssertEqual(cadence?.recordedInteriorPausesMS, [420, 510, 780])
+        XCTAssertEqual(cadence?.totalInteriorSilenceMS, 1_710)
+        XCTAssertEqual(cadence?.totalCadenceSilenceMS, 1_710)
+        XCTAssertEqual(cadence?.medianCadencePauseMS, 510)
+        XCTAssertEqual(cadence?.p90CadencePauseMS, 780)
+        XCTAssertEqual(cadence?.cadenceSilenceRatio ?? 0, 0.171, accuracy: 0.000_001)
     }
 
     func testRepeatedSuspiciousGapsStillFailFastQC() {
@@ -461,6 +473,11 @@ final class GenerationTelemetrySchemaTests: XCTestCase {
 
         XCTAssertEqual(report.writtenOutputVerdict, .fail)
         XCTAssertTrue(report.flags.contains("dropout:excess2(2/0)"))
+        XCTAssertEqual(report.cadence?.classification, .severe)
+        XCTAssertEqual(
+            report.cadence?.reasons,
+            [.excessCadencePauses, .repeatedSuspiciousPauses]
+        )
     }
 
     func testCrossChunkSilenceAndMergeCompleteness() throws {
@@ -476,7 +493,7 @@ final class GenerationTelemetrySchemaTests: XCTestCase {
             durationSeconds: 0.006,
             expectedPauseCount: 0
         )
-        XCTAssertEqual(report.algorithmVersion, 4)
+        XCTAssertEqual(report.algorithmVersion, 5)
         XCTAssertEqual(report.longestSilenceMS, 4)
         XCTAssertEqual(report.longestSilenceStartMS, 1)
 
@@ -566,6 +583,7 @@ final class GenerationTelemetrySchemaTests: XCTestCase {
         XCTAssertEqual(decoded.algorithmVersion, 1)
         XCTAssertEqual(decoded.instabilityVerdict, .warn)
         XCTAssertEqual(decoded.writtenOutputVerdict, .warn)
+        XCTAssertNil(decoded.cadence)
     }
 
     func testSamplerStopIsIdempotentAcrossTerminalCleanup() async {

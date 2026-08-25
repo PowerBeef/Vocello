@@ -8,6 +8,7 @@ import hashlib
 import json
 import os
 import re
+import struct
 import tempfile
 import uuid
 from datetime import datetime
@@ -16,6 +17,7 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 SCHEMA_VERSION = 1
+RESULT_SCHEMA_VERSIONS = {1, 2}
 SAFE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,95}$")
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
 DELIVERY = re.compile(r"^(neutral|happy|sad|angry|fearful|surprised|calm|whisper)\.(normal|strong)$")
@@ -272,6 +274,246 @@ def validate_output(value: Any, field: str) -> None:
         raise ContractError(f"{field}.durationSeconds is invalid")
 
 
+def validate_preparation_evidence(value: Any, field: str) -> None:
+    required = {
+        "stage", "sequence", "capturedAtUptimeSeconds", "hasActiveGeneration",
+        "memoryActionInFlight", "modelOperationInFlight",
+        "generationReservationInFlight", "engineLifecycle", "violations",
+    }
+    allowed = required | {
+        "mlxActiveMB", "mlxCacheMB", "mlxPeakMB", "metalAllocatedMB",
+        "physicalFootprintMB", "availableHeadroomMB", "loadedModelID",
+    }
+    if not isinstance(value, dict) or not required.issubset(value) or set(value) - allowed:
+        raise ContractError(f"{field} does not match preparation-evidence schema v2")
+    if not isinstance(value["stage"], str) or not SAFE_ID.fullmatch(value["stage"]):
+        raise ContractError(f"{field}.stage is invalid")
+    if not isinstance(value["sequence"], int) or value["sequence"] < 0:
+        raise ContractError(f"{field}.sequence is invalid")
+    if not isinstance(value["capturedAtUptimeSeconds"], (int, float)) or value["capturedAtUptimeSeconds"] < 0:
+        raise ContractError(f"{field}.capturedAtUptimeSeconds is invalid")
+    for key in (
+        "mlxActiveMB", "mlxCacheMB", "mlxPeakMB", "metalAllocatedMB",
+        "physicalFootprintMB", "availableHeadroomMB",
+    ):
+        child = value.get(key)
+        if child is not None and (not isinstance(child, (int, float)) or child < 0):
+            raise ContractError(f"{field}.{key} is invalid")
+    for key in (
+        "hasActiveGeneration", "memoryActionInFlight", "modelOperationInFlight",
+        "generationReservationInFlight",
+    ):
+        if not isinstance(value[key], bool):
+            raise ContractError(f"{field}.{key} must be boolean")
+    for key in ("loadedModelID",):
+        child = value.get(key)
+        if child is not None and (not isinstance(child, str) or not SAFE_ID.fullmatch(child)):
+            raise ContractError(f"{field}.{key} is invalid")
+    if not isinstance(value["engineLifecycle"], str) or not SAFE_ID.fullmatch(value["engineLifecycle"]):
+        raise ContractError(f"{field}.engineLifecycle is invalid")
+    violations = value["violations"]
+    if not isinstance(violations, list) or violations != sorted(set(violations)) or any(
+        not isinstance(item, str) or not SAFE_ID.fullmatch(item) for item in violations
+    ):
+        raise ContractError(f"{field}.violations is not a sorted allowlisted set")
+
+
+def validate_audio_qc(value: Any, field: str) -> None:
+    required = {
+        "algorithmVersion", "instabilityVerdict", "writtenOutputVerdict", "verdict",
+        "flags", "peak", "clippedSamples", "hotSamples", "nonFiniteSamples",
+        "clickEvents", "longestSilenceMS", "durationSeconds",
+    }
+    allowed = required | {
+        "rmsDBFS", "dcOffset", "firstNonFiniteSample", "firstClipSample",
+        "longestSilenceStartMS", "chunkQC",
+    }
+    if not isinstance(value, dict) or not required.issubset(value) or set(value) - allowed:
+        raise ContractError(f"{field} does not match complete AudioQCReport")
+    if value["verdict"] not in {"pass", "warn", "fail"} or value["instabilityVerdict"] not in {"pass", "warn", "fail"} or value["writtenOutputVerdict"] not in {"pass", "warn", "fail"}:
+        raise ContractError(f"{field} has invalid verdict vocabulary")
+    if not isinstance(value["longestSilenceMS"], int) or value["longestSilenceMS"] < 0:
+        raise ContractError(f"{field}.longestSilenceMS is invalid")
+    silence_start = value.get("longestSilenceStartMS")
+    if silence_start is not None and (not isinstance(silence_start, int) or silence_start < 0):
+        raise ContractError(f"{field}.longestSilenceStartMS is invalid")
+    if not isinstance(value["durationSeconds"], (int, float)) or value["durationSeconds"] <= 0:
+        raise ContractError(f"{field}.durationSeconds is invalid")
+    if not isinstance(value["flags"], list) or any(not isinstance(flag, str) for flag in value["flags"]):
+        raise ContractError(f"{field}.flags is invalid")
+    if not isinstance(value["algorithmVersion"], int) or value["algorithmVersion"] < 1:
+        raise ContractError(f"{field}.algorithmVersion is invalid")
+    for key in ("clippedSamples", "hotSamples", "nonFiniteSamples", "clickEvents"):
+        if not isinstance(value[key], int) or value[key] < 0:
+            raise ContractError(f"{field}.{key} is invalid")
+    if not isinstance(value["peak"], (int, float)) or value["peak"] < 0:
+        raise ContractError(f"{field}.peak is invalid")
+    chunk_qc = value.get("chunkQC")
+    if chunk_qc is not None:
+        if not isinstance(chunk_qc, list):
+            raise ContractError(f"{field}.chunkQC is invalid")
+        chunk_required = {
+            "chunkIndex", "frameOffset", "frameCount", "verdict", "flags", "peak",
+            "clippedSamples", "hotSamples", "nonFiniteSamples", "clickEvents",
+            "longestSilenceMS", "durationSeconds",
+        }
+        chunk_allowed = chunk_required | {
+            "rmsDBFS", "firstNonFiniteSample", "firstClipSample", "longestSilenceStartMS",
+        }
+        expected_frame_offset = 0
+        for index, chunk in enumerate(chunk_qc):
+            if not isinstance(chunk, dict) or not chunk_required.issubset(chunk) or set(chunk) - chunk_allowed:
+                raise ContractError(f"{field}.chunkQC[{index}] is incomplete")
+            if chunk["chunkIndex"] != index or chunk["verdict"] not in {"pass", "warn", "fail"}:
+                raise ContractError(f"{field}.chunkQC[{index}] identity is invalid")
+            for key in ("frameOffset", "frameCount", "clippedSamples", "hotSamples", "nonFiniteSamples", "clickEvents", "longestSilenceMS"):
+                if not isinstance(chunk[key], int) or chunk[key] < 0 or (key == "frameCount" and chunk[key] == 0):
+                    raise ContractError(f"{field}.chunkQC[{index}].{key} is invalid")
+            if chunk["frameOffset"] != expected_frame_offset:
+                raise ContractError(f"{field}.chunkQC[{index}] frame coverage is not contiguous")
+            expected_frame_offset += chunk["frameCount"]
+            if not isinstance(chunk["flags"], list) or any(
+                not isinstance(flag, str) for flag in chunk["flags"]
+            ):
+                raise ContractError(f"{field}.chunkQC[{index}].flags is invalid")
+            if not isinstance(chunk["peak"], (int, float)) or chunk["peak"] < 0:
+                raise ContractError(f"{field}.chunkQC[{index}].peak is invalid")
+            if not isinstance(chunk["durationSeconds"], (int, float)) or chunk["durationSeconds"] <= 0:
+                raise ContractError(f"{field}.chunkQC[{index}].durationSeconds is invalid")
+            for key in ("firstNonFiniteSample", "firstClipSample", "longestSilenceStartMS"):
+                optional_index = chunk.get(key)
+                if optional_index is not None and (
+                    not isinstance(optional_index, int) or optional_index < 0
+                ):
+                    raise ContractError(f"{field}.chunkQC[{index}].{key} is invalid")
+
+
+def validate_codec_ranges(value: Any, field: str, frame_count: int | None = None) -> list[dict[str, int]]:
+    if not isinstance(value, list) or not value:
+        raise ContractError(f"{field} is empty")
+    expected = 0
+    for index, row in enumerate(value):
+        if not isinstance(row, dict) or set(row) != {"start", "endExclusive"}:
+            raise ContractError(f"{field}[{index}] does not match the range schema")
+        if row["start"] != expected or not isinstance(row["endExclusive"], int) or row["endExclusive"] <= row["start"]:
+            raise ContractError(f"{field}[{index}] is not contiguous")
+        expected = row["endExclusive"]
+    if frame_count is not None and expected != frame_count:
+        raise ContractError(f"{field} does not cover every codec frame")
+    return value
+
+
+def validate_diagnostic_artifacts(
+    value: Any,
+    field: str,
+    *,
+    artifact_dir: Path,
+    generation_id: str,
+) -> None:
+    if not isinstance(value, list) or len(value) > 4:
+        raise ContractError(f"{field} exceeds the bounded diagnostic artifact set")
+    seen: set[str] = set()
+    for index, row in enumerate(value):
+        required = {"schemaVersion", "kind", "sha256", "byteCount"}
+        allowed = required | {"durationSeconds", "codecFrameCount", "codeGroupRange", "codecChunkRanges", "complete"}
+        if not isinstance(row, dict) or not required.issubset(row) or set(row) - allowed:
+            raise ContractError(f"{field}[{index}] does not match diagnostic-artifact schema")
+        kind = row["kind"]
+        kinds = {"codec_trace", "rejected_audio", "incremental_replay_audio", "full_replay_audio"}
+        if row["schemaVersion"] != 1 or kind not in kinds or kind in seen:
+            raise ContractError(f"{field}[{index}] has invalid identity")
+        seen.add(kind)
+        if not isinstance(row["sha256"], str) or not SHA256.fullmatch(row["sha256"]):
+            raise ContractError(f"{field}[{index}].sha256 is invalid")
+        if not isinstance(row["byteCount"], int) or row["byteCount"] <= 0:
+            raise ContractError(f"{field}[{index}].byteCount is invalid")
+        filenames = {
+            "codec_trace": "codec-trace-v1.bin",
+            "rejected_audio": "rejected.wav",
+            "incremental_replay_audio": "incremental-replay.wav",
+            "full_replay_audio": "full-replay.wav",
+        }
+        filename = filenames[kind]
+        candidates = list(artifact_dir.rglob(f"evidence/{generation_id}/{filename}"))
+        if len(candidates) != 1:
+            raise ContractError(f"{field}[{index}] has no unique correlated binary artifact")
+        data = candidates[0].read_bytes()
+        if len(data) != row["byteCount"] or digest_bytes(data) != row["sha256"]:
+            raise ContractError(f"{field}[{index}] artifact bytes do not match retained identity")
+        if kind == "codec_trace":
+            if not data.startswith(b"VQCT") or len(data) < 16:
+                raise ContractError(f"{field}[{index}] codec trace is corrupt")
+            if not isinstance(row.get("codecFrameCount"), int) or row["codecFrameCount"] < 0:
+                raise ContractError(f"{field}[{index}] codec frame count is invalid")
+            code_range = row.get("codeGroupRange")
+            if not isinstance(code_range, dict) or set(code_range) != {"minimum", "maximum"}:
+                raise ContractError(f"{field}[{index}] code-group range is invalid")
+            if not isinstance(row.get("complete"), bool):
+                raise ContractError(f"{field}[{index}] completeness is invalid")
+            version, frame_count, dropped_count = struct.unpack_from("<III", data, 4)
+            if version != 1 or frame_count != row["codecFrameCount"]:
+                raise ContractError(f"{field}[{index}] codec trace header drifted")
+            offset = 16
+            group_counts: list[int] = []
+            for _ in range(frame_count):
+                if offset + 2 > len(data):
+                    raise ContractError(f"{field}[{index}] codec trace is truncated")
+                group_count = struct.unpack_from("<H", data, offset)[0]
+                offset += 2
+                if not 1 <= group_count <= 64 or offset + group_count * 4 > len(data):
+                    raise ContractError(f"{field}[{index}] codec frame is out of bounds")
+                group_counts.append(group_count)
+                offset += group_count * 4
+            if offset != len(data):
+                raise ContractError(f"{field}[{index}] codec trace has trailing bytes")
+            if not group_counts:
+                raise ContractError(f"{field}[{index}] codec trace is empty")
+            if code_range != {"minimum": min(group_counts), "maximum": max(group_counts)}:
+                raise ContractError(f"{field}[{index}] code-group range drifted")
+            if row["complete"] != (dropped_count == 0):
+                raise ContractError(f"{field}[{index}] completeness drifted")
+            validate_codec_ranges(
+                row.get("codecChunkRanges"),
+                f"{field}[{index}].codecChunkRanges",
+                frame_count=frame_count,
+            )
+        else:
+            if not isinstance(row.get("durationSeconds"), (int, float)) or row["durationSeconds"] <= 0:
+                raise ContractError(f"{field}[{index}] audio duration is invalid")
+
+
+def validate_codec_replay(value: Any, field: str, artifacts: list[dict[str, Any]]) -> None:
+    required = {"status", "traceSHA256", "ranges"}
+    allowed = required | {
+        "failureCode", "incrementalArtifact", "incrementalAudioQC",
+        "fullArtifact", "fullAudioQC",
+    }
+    if not isinstance(value, dict) or not required.issubset(value) or set(value) - allowed:
+        raise ContractError(f"{field} does not match codec-replay schema")
+    if value["status"] not in {"complete", "failed"} or not SHA256.fullmatch(str(value["traceSHA256"])):
+        raise ContractError(f"{field} identity is invalid")
+    ranges = validate_codec_ranges(value["ranges"], f"{field}.ranges")
+    codec = next((item for item in artifacts if item.get("kind") == "codec_trace"), None)
+    if codec is None or codec.get("sha256") != value["traceSHA256"] or codec.get("codecChunkRanges") != ranges:
+        raise ContractError(f"{field} is not bound to the retained codec trace")
+    if value["status"] == "failed":
+        if not isinstance(value.get("failureCode"), str) or not SAFE_ID.fullmatch(value["failureCode"]):
+            raise ContractError(f"{field} lacks a typed failure")
+        if any(value.get(key) is not None for key in ("incrementalArtifact", "incrementalAudioQC", "fullArtifact", "fullAudioQC")):
+            raise ContractError(f"{field} failed replay carries completed evidence")
+        return
+    expected_kinds = {
+        "incrementalArtifact": "incremental_replay_audio",
+        "fullArtifact": "full_replay_audio",
+    }
+    for artifact_key, kind in expected_kinds.items():
+        artifact = value.get(artifact_key)
+        if not isinstance(artifact, dict) or artifact.get("kind") != kind or artifact not in artifacts:
+            raise ContractError(f"{field}.{artifact_key} is missing from the retained set")
+    for key in ("incrementalAudioQC", "fullAudioQC"):
+        validate_audio_qc(value.get(key), f"{field}.{key}")
+
+
 def validate_result(plan_path: Path, artifact_dir: Path, run_id: str) -> dict[str, Any]:
     plan = load_plan(plan_path)
     result_path = next(iter(artifact_dir.rglob("startup-reliability-result.json")), None)
@@ -279,11 +521,12 @@ def validate_result(plan_path: Path, artifact_dir: Path, run_id: str) -> dict[st
         failure = next(iter(artifact_dir.rglob("startup-reliability-failure.json")), None)
         raise ContractError("terminal result is missing" + ("; typed failure marker exists" if failure else ""))
     result = json.loads(result_path.read_text(encoding="utf-8"))
-    if not isinstance(result, dict) or result.get("schemaVersion") != 1 or result.get("runID") != run_id:
+    result_version = result.get("schemaVersion") if isinstance(result, dict) else None
+    if result_version not in RESULT_SCHEMA_VERSIONS or result.get("runID") != run_id:
         raise ContractError("terminal result identity is invalid")
     required_result = {"schemaVersion", "status", "runID", "scriptSHA256", "scriptCharacters", "plannedTakeCount", "representedTakeCount", "startedAt", "finishedAt", "startingDeviceState", "finishingDeviceState", "takes"}
     if set(result) != required_result or result.get("status") not in {"pass", "diagnosed_failure"}:
-        raise ContractError("terminal result does not match result schema v1")
+        raise ContractError(f"terminal result does not match result schema v{result_version}")
     started_at = parse_timestamp(result["startedAt"], "startedAt")
     finished_at = parse_timestamp(result["finishedAt"], "finishedAt")
     if finished_at < started_at:
@@ -302,8 +545,14 @@ def validate_result(plan_path: Path, artifact_dir: Path, run_id: str) -> dict[st
     for planned, observed in zip(plan["takes"], takes):
         required_take = {"takeIndex", "takeID", "generationID", "status", "preparation", "attempts", "startupTimeline", "classification"}
         allowed_take = required_take | {"requestReceipt", "failureCode", "output"}
+        if result_version == 2:
+            required_take |= {
+                "prePreparationStoreWarmState", "preRequestStoreWarmState",
+                "preparationEvidence", "audioQC", "diagnosticArtifacts",
+            }
+            allowed_take |= required_take | {"codecReplay"}
         if not isinstance(observed, dict) or not required_take.issubset(observed) or set(observed) - allowed_take:
-            raise ContractError("take does not match result schema v1")
+            raise ContractError(f"take does not match result schema v{result_version}")
         validate_uuid(observed["generationID"], "take.generationID")
         if observed["status"] not in {"pass", "failed"} or observed["preparation"] not in PREPARATIONS or observed["classification"] not in CLASSIFICATIONS:
             raise ContractError("take has invalid terminal vocabulary")
@@ -311,15 +560,70 @@ def validate_result(plan_path: Path, artifact_dir: Path, run_id: str) -> dict[st
             raise ContractError("take preparation drifted")
         if observed.get("output") is not None:
             validate_output(observed["output"], "take.output")
+        if result_version == 2:
+            for key in ("prePreparationStoreWarmState", "preRequestStoreWarmState"):
+                if observed.get(key) not in {"cold", "warm"}:
+                    raise ContractError(f"take.{key} is invalid")
+            preparation_evidence = observed.get("preparationEvidence")
+            if not isinstance(preparation_evidence, list) or not preparation_evidence:
+                raise ContractError("take lacks preparation evidence")
+            for evidence_index, evidence in enumerate(preparation_evidence):
+                validate_preparation_evidence(
+                    evidence,
+                    f"take.preparationEvidence[{evidence_index}]",
+                )
+            audio_qc = observed.get("audioQC")
+            if audio_qc is not None:
+                validate_audio_qc(audio_qc, "take.audioQC")
+            validate_diagnostic_artifacts(
+                observed.get("diagnosticArtifacts"),
+                "take.diagnosticArtifacts",
+                artifact_dir=artifact_dir,
+                generation_id=observed["generationID"],
+            )
+            artifacts = observed.get("diagnosticArtifacts", [])
+            codec_replay = observed.get("codecReplay")
+            if codec_replay is not None:
+                validate_codec_replay(codec_replay, "take.codecReplay", artifacts)
+            if observed.get("failureCode") == "audio_qc_failed":
+                if not isinstance(audio_qc, dict) or audio_qc.get("verdict") != "fail":
+                    raise ContractError("audio-QC rejection lacks its complete failing report")
+                if not any(
+                    artifact.get("kind") == "rejected_audio"
+                    for artifact in observed.get("diagnosticArtifacts", [])
+                    if isinstance(artifact, dict)
+                ):
+                    raise ContractError("audio-QC rejection lacks generation-scoped rejected audio")
+                if codec_replay is None:
+                    raise ContractError("audio-QC rejection lacks codec replay accounting")
         if observed.get("takeIndex") != planned["takeIndex"] or observed.get("takeID") != planned["takeID"]:
             raise ContractError("take identity/order drifted")
         receipt = observed.get("requestReceipt")
         if not isinstance(receipt, dict):
-            if observed.get("status") == "pass" or observed.get("failureCode") != "request_receipt_unavailable":
+            allowed_receiptless = {"request_receipt_unavailable"}
+            if result_version == 2:
+                allowed_receiptless.add("preparation_not_quiescent")
+            if observed.get("status") == "pass" or observed.get("failureCode") not in allowed_receiptless:
                 raise ContractError("take request receipt is missing without a typed diagnostic failure")
             previous_session = None
             continue
         validate_receipt(receipt, "take.requestReceipt")
+        if result_version == 2:
+            artifacts = observed.get("diagnosticArtifacts", [])
+            has_codec_trace = any(
+                artifact.get("kind") == "codec_trace"
+                for artifact in artifacts
+                if isinstance(artifact, dict)
+            )
+            reached_codec_boundary = any(
+                row.get("boundary") == "first_audio_code_group"
+                for row in observed.get("startupTimeline", [])
+                if isinstance(row, dict)
+            )
+            if reached_codec_boundary and not has_codec_trace:
+                raise ContractError("materialized-code take lacks its codec trace")
+            if observed.get("status") == "pass" and not isinstance(observed.get("audioQC"), dict):
+                raise ContractError("passing take lacks its complete AudioQCReport")
         required_matches = {
             "speakerID": planned["speakerID"], "deliveryID": planned["deliveryID"],
             "language": planned["language"], "seed": planned["seed"],
@@ -406,7 +710,7 @@ def validate_result(plan_path: Path, artifact_dir: Path, run_id: str) -> dict[st
     if other_files and any(path.stat().st_mtime_ns > result_path.stat().st_mtime_ns for path in other_files):
         raise ContractError("terminal sentinel was not written last")
     summary = {
-        "schemaVersion": 1,
+        "schemaVersion": result_version,
         "runID": run_id,
         "result": result.get("status"),
         "plannedTakeCount": len(plan["takes"]),
@@ -492,6 +796,249 @@ def validate_ui_parity(log_path: Path, diagnostics: Path, run_id: str, output: P
     return result
 
 
+def compose_process_exit(
+    plan_path: Path,
+    artifact_dir: Path,
+    run_id: str,
+    output: Path,
+) -> dict[str, Any]:
+    if not SAFE_ID.fullmatch(run_id):
+        raise ContractError("run ID is not allowlisted")
+    plan = load_plan(plan_path)
+    if next(iter(artifact_dir.rglob("startup-reliability-result.json")), None) is not None:
+        raise ContractError("process-exit composition refuses an app-completed terminal result")
+    represented: dict[int, dict[str, Any]] = {}
+    for path in artifact_dir.rglob("startup-reliability-take-*.json"):
+        row = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(row, dict) or not isinstance(row.get("takeIndex"), int):
+            raise ContractError("partial take result is malformed")
+        index = row["takeIndex"]
+        if index in represented:
+            raise ContractError("partial take result identity is duplicated")
+        if row.get("takeID") != plan["takes"][index - 1]["takeID"]:
+            raise ContractError("partial take result drifted from the plan")
+        recursively_reject_private_fields(row)
+        represented[index] = row
+    rows: list[dict[str, Any]] = []
+    first_missing = next(
+        (take["takeIndex"] for take in plan["takes"] if take["takeIndex"] not in represented),
+        None,
+    )
+    if first_missing is None:
+        raise ContractError("all takes are represented but the terminal sentinel is missing")
+    for take in plan["takes"]:
+        index = take["takeIndex"]
+        if index in represented:
+            observed = represented[index]
+            rows.append({
+                "takeIndex": index,
+                "takeID": take["takeID"],
+                "status": "represented",
+                "classification": observed.get("classification", "unmaterialized_unknown"),
+                "generationID": observed.get("generationID"),
+            })
+        elif index == first_missing:
+            rows.append({
+                "takeIndex": index,
+                "takeID": take["takeID"],
+                "status": "process_terminated",
+                "classification": "crash",
+            })
+        else:
+            rows.append({
+                "takeIndex": index,
+                "takeID": take["takeID"],
+                "status": "not_started_after_process_exit",
+                "classification": "unmaterialized_unknown",
+            })
+    result = {
+        "schemaVersion": 1,
+        "status": "process_terminated",
+        "runID": run_id,
+        "scriptSHA256": plan["scriptSHA256"],
+        "plannedTakeCount": len(plan["takes"]),
+        "representedTakeCount": len(represented),
+        "rows": rows,
+    }
+    recursively_reject_private_fields(result)
+    atomic_json(output, result)
+    return result
+
+
+def _load_ips_objects(path: Path) -> list[Any]:
+    text = path.read_text(encoding="utf-8", errors="replace")
+    objects: list[Any] = []
+    try:
+        objects.append(json.loads(text))
+        return objects
+    except json.JSONDecodeError:
+        pass
+    for line in text.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            objects.append(json.loads(line))
+        except json.JSONDecodeError:
+            continue
+    return objects
+
+
+def _walk_scalars(value: Any, *, prefix: str = "") -> list[tuple[str, Any]]:
+    result: list[tuple[str, Any]] = []
+    if isinstance(value, dict):
+        for key, child in value.items():
+            result.extend(_walk_scalars(child, prefix=f"{prefix}.{key}" if prefix else str(key)))
+    elif isinstance(value, list):
+        for child in value[:64]:
+            result.extend(_walk_scalars(child, prefix=prefix))
+    elif isinstance(value, (str, int, float, bool)) or value is None:
+        result.append((prefix.lower(), value))
+    return result
+
+
+def sanitize_system_crashes(
+    input_dir: Path,
+    output: Path,
+    process_allowlist: set[str],
+) -> dict[str, Any]:
+    rows: list[dict[str, Any]] = []
+    for path in sorted(input_dir.rglob("*")):
+        if not path.is_file():
+            continue
+        scalars = [item for obj in _load_ips_objects(path) for item in _walk_scalars(obj)]
+        process_candidates = [
+            str(value) for key, value in scalars
+            if isinstance(value, str) and any(token in key for token in ("procname", "process", "bundleid", "app_name"))
+        ]
+        process = next(
+            (candidate for candidate in process_candidates if candidate in process_allowlist),
+            None,
+        )
+        if process is None:
+            continue
+        combined = " ".join(
+            str(value).lower() for key, value in scalars
+            if isinstance(value, str) and any(token in key for token in ("termination", "reason", "exception", "jetsam"))
+        )
+        if any(token in combined for token in ("jetsam", "per-process-limit", "highwater", "memory-pressure")):
+            classification = "jetsam"
+            reason = "memory_pressure_termination"
+        elif "watchdog" in combined:
+            classification = "watchdog"
+            reason = "watchdog_termination"
+        elif combined:
+            classification = "crash"
+            reason = "process_crash"
+        else:
+            classification = "unknown"
+            reason = "unclassified_termination"
+        timestamp = next(
+            (str(value) for key, value in scalars if isinstance(value, str) and any(token in key for token in ("timestamp", "capturetime"))),
+            None,
+        )
+        footprint_mb = None
+        for key, value in scalars:
+            if isinstance(value, (int, float)) and not isinstance(value, bool) and any(
+                token in key for token in ("phys_footprint", "physfootprint", "footprintbytes")
+            ):
+                footprint_mb = round(float(value) / 1_048_576, 3)
+                break
+        row: dict[str, Any] = {
+            "process": process,
+            "classification": classification,
+            "reason": reason,
+            "reportSHA256": digest_bytes(path.read_bytes()),
+        }
+        if timestamp is not None:
+            row["timestamp"] = timestamp[:64]
+        if footprint_mb is not None:
+            row["footprintMB"] = footprint_mb
+        rows.append(row)
+    result = {"schemaVersion": 1, "reports": rows}
+    atomic_json(output, result)
+    return result
+
+
+def classify_xcui_bootstrap(
+    log_path: Path,
+    summary_path: Path,
+    run_id: str,
+    output: Path,
+) -> dict[str, Any]:
+    if not SAFE_ID.fullmatch(run_id):
+        raise ContractError("run ID is not allowlisted")
+    log = log_path.read_text(encoding="utf-8", errors="replace")
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    if not isinstance(summary, dict):
+        raise ContractError("xcresult summary is not an object")
+    count_values = [summary.get(key) for key in ("totalTestCount", "testsCount", "testCount") if key in summary]
+    if len(count_values) != 1 or not isinstance(count_values[0], int) or isinstance(count_values[0], bool):
+        raise ContractError("XCUITest bootstrap classification requires a proved test count")
+    reported_test_count = count_values[0]
+    failures = summary.get("testFailures", [])
+    if not isinstance(failures, list) or not all(isinstance(row, dict) for row in failures):
+        raise ContractError("xcresult test failures are malformed")
+
+    # `xcresulttool get test-results summary` reports the UI-test runner's own
+    # bootstrap error as one failed test even though no XCTestCase entered its
+    # body. Prove that special shape narrowly instead of treating the aggregate
+    # `totalTestCount` as a launched-test count. A real test failure carries a
+    # `testIdentifierURL` and a class/method identifier; the runner-level error
+    # has neither and names only the generated `*-Runner` process.
+    runner_failures = [
+        row for row in failures
+        if isinstance(row.get("testName"), str)
+        and "-Runner (" in row["testName"]
+        and row["testName"].endswith("encountered an error")
+        and row.get("testIdentifierURL") in (None, "")
+        and isinstance(row.get("failureText"), str)
+        and any(
+            marker in row["failureText"]
+            for marker in (
+                "Timed out while enabling automation mode",
+                "Failed to enable automation mode",
+            )
+        )
+    ]
+    proved_zero_launched = reported_test_count == 0
+    if reported_test_count == 1 and len(failures) == 1 and len(runner_failures) == 1:
+        proved_zero_launched = all(
+            summary.get(key, 0) == expected
+            for key, expected in (("passedTests", 0), ("skippedTests", 0), ("failedTests", 1))
+        )
+    if not proved_zero_launched:
+        raise ContractError("XCUITest bootstrap classification requires a proved zero launched tests")
+    bootstrap_markers = (
+        "Timed out while enabling automation mode",
+        "Failed to enable automation mode",
+    )
+    if not any(marker in log for marker in bootstrap_markers):
+        raise ContractError("failure did not occur in the automation-session bootstrap phase")
+    forbidden_markers = (
+        "Test Case '-[",
+        "VOCELLO-STARTUP-PARITY-UI-MANIFEST",
+        "generation failed",
+        "audio_qc",
+        "Assertion Failure",
+        "crashed",
+    )
+    if any(marker.lower() in log.lower() for marker in forbidden_markers):
+        raise ContractError("launched-test or product evidence forbids bootstrap classification")
+    result = {
+        "schemaVersion": 1,
+        "status": "infrastructure_bootstrap_failure",
+        "runID": run_id,
+        "testCaseCount": 0,
+        "xcresultReportedTestCount": reported_test_count,
+        "runnerFailureCount": len(runner_failures),
+        "xcodebuildLogSHA256": digest_bytes(log_path.read_bytes()),
+        "xcresultSummarySHA256": digest_bytes(summary_path.read_bytes()),
+    }
+    atomic_json(output, result)
+    return result
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
     sub = parser.add_subparsers(dest="command", required=True)
@@ -510,14 +1057,39 @@ def main(argv: list[str] | None = None) -> int:
     ui_parser.add_argument("--diagnostics", required=True, type=Path)
     ui_parser.add_argument("--run-id", required=True)
     ui_parser.add_argument("--output", required=True, type=Path)
+    exit_parser = sub.add_parser("compose-process-exit")
+    exit_parser.add_argument("--plan", required=True, type=Path)
+    exit_parser.add_argument("--artifact-dir", required=True, type=Path)
+    exit_parser.add_argument("--run-id", required=True)
+    exit_parser.add_argument("--output", required=True, type=Path)
+    crash_parser = sub.add_parser("sanitize-system-crashes")
+    crash_parser.add_argument("--input-dir", required=True, type=Path)
+    crash_parser.add_argument("--output", required=True, type=Path)
+    crash_parser.add_argument("--process", action="append", required=True)
+    bootstrap_parser = sub.add_parser("classify-xcui-bootstrap")
+    bootstrap_parser.add_argument("--xcodebuild-log", required=True, type=Path)
+    bootstrap_parser.add_argument("--xcresult-summary", required=True, type=Path)
+    bootstrap_parser.add_argument("--run-id", required=True)
+    bootstrap_parser.add_argument("--output", required=True, type=Path)
     args = parser.parse_args(argv)
     try:
         if args.command == "prepare":
             prepare(args.plan, args.script_file, args.run_id, args.sanitized_output, args.launch_output)
         elif args.command == "validate-result":
             validate_result(args.plan, args.artifact_dir, args.run_id)
-        else:
+        elif args.command == "validate-ui-parity":
             validate_ui_parity(args.xcodebuild_log, args.diagnostics, args.run_id, args.output)
+        elif args.command == "compose-process-exit":
+            compose_process_exit(args.plan, args.artifact_dir, args.run_id, args.output)
+        elif args.command == "sanitize-system-crashes":
+            sanitize_system_crashes(args.input_dir, args.output, set(args.process))
+        else:
+            classify_xcui_bootstrap(
+                args.xcodebuild_log,
+                args.xcresult_summary,
+                args.run_id,
+                args.output,
+            )
     except (ContractError, json.JSONDecodeError, OSError) as error:
         print(f"startup reliability contract failed: {error}", file=os.sys.stderr)
         return 2

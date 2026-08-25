@@ -337,6 +337,8 @@ public struct VocelloQwen3SynthesisRequest: Codable, Hashable, Sendable {
     public let memory: VocelloQwen3MemoryConfiguration
     public let chunking: VocelloQwen3StreamChunkConfiguration
     public let executionStyle: VocelloQwen3ExecutionStyle
+    /// Gated diagnostic capture only; never enabled by normal product requests.
+    public let captureCodecTrace: Bool
 
     public init(
         generationID: UUID,
@@ -346,7 +348,8 @@ public struct VocelloQwen3SynthesisRequest: Codable, Hashable, Sendable {
         sampling: VocelloQwen3SamplingConfiguration,
         memory: VocelloQwen3MemoryConfiguration,
         chunking: VocelloQwen3StreamChunkConfiguration? = nil,
-        executionStyle: VocelloQwen3ExecutionStyle = .streaming
+        executionStyle: VocelloQwen3ExecutionStyle = .streaming,
+        captureCodecTrace: Bool = false
     ) {
         self.generationID = generationID
         self.text = text
@@ -356,6 +359,7 @@ public struct VocelloQwen3SynthesisRequest: Codable, Hashable, Sendable {
         self.memory = memory
         self.chunking = chunking ?? .currentConstrainedDefault(for: input.mode)
         self.executionStyle = executionStyle
+        self.captureCodecTrace = captureCodecTrace
     }
 
     public var mode: VocelloQwen3SynthesisMode { input.mode }
@@ -377,7 +381,8 @@ public struct VocelloQwen3SynthesisRequest: Codable, Hashable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case generationID, text, language, input, sampling, memory, chunking, executionStyle
+        case generationID, text, language, input, sampling, memory, chunking, executionStyle,
+            captureCodecTrace
     }
 
     public init(from decoder: any Decoder) throws {
@@ -403,6 +408,10 @@ public struct VocelloQwen3SynthesisRequest: Codable, Hashable, Sendable {
             VocelloQwen3ExecutionStyle.self,
             forKey: .executionStyle
         ) ?? .streaming
+        self.captureCodecTrace = try container.decodeIfPresent(
+            Bool.self,
+            forKey: .captureCodecTrace
+        ) ?? false
     }
 
     public func encode(to encoder: any Encoder) throws {
@@ -415,6 +424,7 @@ public struct VocelloQwen3SynthesisRequest: Codable, Hashable, Sendable {
         try container.encode(memory, forKey: .memory)
         try container.encode(chunking, forKey: .chunking)
         try container.encode(executionStyle, forKey: .executionStyle)
+        try container.encode(captureCodecTrace, forKey: .captureCodecTrace)
     }
 }
 

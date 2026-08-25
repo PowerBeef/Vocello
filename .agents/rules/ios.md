@@ -65,9 +65,12 @@ Before changing iOS UI or behavior, read:
   `.agents/rules/release-qa.md`.
 - Built-in Voice startup plans, retained results, and the tracked control sentence are governed by
   `config/ios-startup-reliability-plan-schema-v1.json`,
-  `config/ios-startup-reliability-result-schema-v1.json`, and
+  `config/ios-startup-reliability-result-schema-v1.json`,
+  `config/ios-startup-reliability-result-schema-v2.json`, and
   `config/ios-startup-reliability-sentinel.json`. Exact reported script bytes remain untracked and
-  may enter the app only through the diagnostic command's ephemeral launch input.
+  may enter the app only through the diagnostic command's ephemeral launch input. Schema v2 adds
+  gated, generation-scoped rejected audio and codec replay, unload-quiescence samples, and strict
+  process-exit/crash evidence while the host continues to validate schema-v1 results.
 - Use authoritative Apple documentation (docs MCP when callable) for current framework APIs. Use a
   GitHub integration when callable, otherwise `gh`, for repository context; scripts remain the test
   interface.

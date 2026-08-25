@@ -156,6 +156,28 @@ public struct VocelloQwen3PrimeResult: Sendable {
     }
 }
 
+public struct VocelloQwen3CodecFrameRange: Codable, Hashable, Sendable {
+    public let start: Int
+    public let endExclusive: Int
+
+    public init(start: Int, endExclusive: Int) {
+        self.start = start
+        self.endExclusive = endExclusive
+    }
+}
+
+public struct VocelloQwen3CodecReplayResult: Sendable {
+    public let incrementalAudio: [Float]
+    public let fullAudio: [Float]
+    public let sampleRate: Int
+
+    public init(incrementalAudio: [Float], fullAudio: [Float], sampleRate: Int) {
+        self.incrementalAudio = incrementalAudio
+        self.fullAudio = fullAudio
+        self.sampleRate = sampleRate
+    }
+}
+
 public enum VocelloQwen3EngineError: Error, Equatable, Sendable {
     case operationInProgress(VocelloQwen3RuntimeOperationKind)
     case noLoadedModel
@@ -242,6 +264,7 @@ public actor VocelloQwen3Engine {
     }
 
     private struct PendingGeneration {
+        static let maximumCodecTraceFrames = 8_192
         let reservationID: UUID
         let lease: VocelloQwen3RuntimeOperationLease
         let request: VocelloQwen3SynthesisRequest
@@ -262,6 +285,16 @@ public actor VocelloQwen3Engine {
         var generationInfo: VocelloQwen3GenerationInfo?
         var firstModelTokenAndAudioCodeMS: Int?
         var firstDecodedAudioFrameMS: Int?
+        var codecTraceFrames: [[Int32]] = []
+        var droppedCodecTraceFrameCount = 0
+
+        var codecTrace: VocelloQwen3CodecTrace? {
+            guard request.captureCodecTrace else { return nil }
+            return VocelloQwen3CodecTrace(
+                frames: codecTraceFrames,
+                droppedFrameCount: droppedCodecTraceFrameCount
+            )
+        }
     }
 
     private struct LastFinalization {
@@ -697,6 +730,33 @@ public actor VocelloQwen3Engine {
                 audioFrameCount: completion.audio.count,
                 sampleRate: model.sampleRate
             )
+        } catch {
+            failOperationIfCurrent(lease)
+            throw error
+        }
+    }
+
+    /// Replays a bounded diagnostic codec trace while the actor exclusively
+    /// owns the loaded model and mutable Mimi decoder state.
+    public func replayCodecTrace(
+        frames: [[Int32]],
+        incrementalRanges: [VocelloQwen3CodecFrameRange]
+    ) throws -> VocelloQwen3CodecReplayResult {
+        guard let model = loadedModel else {
+            throw VocelloQwen3EngineError.noLoadedModel
+        }
+        let lease = try beginOperation(kind: .prewarm, generationID: nil, phase: .prewarming)
+        do {
+            try Task.checkCancellation()
+            let result = try model.replayCodecTrace(
+                frames: frames,
+                incrementalRanges: incrementalRanges
+            )
+            try revalidate(lease)
+            try Task.checkCancellation()
+            activeOperation = nil
+            phase = .ready
+            return result
         } catch {
             failOperationIfCurrent(lease)
             throw error
@@ -1244,7 +1304,8 @@ public actor VocelloQwen3Engine {
                 emittedAudioFrameCount: completed.emittedAudioFrameCount,
                 elapsedMilliseconds: startedAt.elapsedMilliseconds,
                 generationInfo: completed.generationInfo,
-                diagnostics: model.finalizedGenerationDiagnostics
+                diagnostics: model.finalizedGenerationDiagnostics,
+                codecTrace: completed.codecTrace
             )
             try revalidate(pending.lease)
             phase = .awaitingProductFinalization
@@ -1281,7 +1342,8 @@ public actor VocelloQwen3Engine {
                     emittedAudioFrameCount: frameCount,
                     elapsedMilliseconds: startedAt.elapsedMilliseconds,
                     generationInfo: current?.generationInfo,
-                    diagnostics: model.finalizedGenerationDiagnostics
+                    diagnostics: model.finalizedGenerationDiagnostics,
+                    codecTrace: current?.codecTrace
                 )
                 await pending.session.cancelModelTerminal(terminal, reason: reason)
             } else {
@@ -1292,7 +1354,8 @@ public actor VocelloQwen3Engine {
                     emittedAudioFrameCount: frameCount,
                     elapsedMilliseconds: startedAt.elapsedMilliseconds,
                     generationInfo: current?.generationInfo,
-                    diagnostics: model.finalizedGenerationDiagnostics
+                    diagnostics: model.finalizedGenerationDiagnostics,
+                    codecTrace: current?.codecTrace
                 )
                 await pending.session.failModelTerminal(
                     terminal,
@@ -1335,6 +1398,27 @@ public actor VocelloQwen3Engine {
                 pending.firstModelTokenAndAudioCodeMS = startedAt.elapsedMilliseconds
             }
             pending.generatedTokenCount += 1
+            pendingGeneration = pending
+        case .codecFrame(let codes):
+            guard pending.request.captureCodecTrace else {
+                throw VocelloQwen3EngineRuntimeFailure()
+            }
+            guard !codes.isEmpty, codes.count <= 64 else {
+                throw VocelloQwen3EngineRuntimeFailure()
+            }
+            // Quality-first generation has no separate per-token transport;
+            // its first materialized codec group is the first observable model
+            // token boundary. Record the two startup boundaries together, as
+            // required by the request-receipt contract, instead of leaving a
+            // successful non-streaming take unverifiable.
+            if pending.firstModelTokenAndAudioCodeMS == nil {
+                pending.firstModelTokenAndAudioCodeMS = startedAt.elapsedMilliseconds
+            }
+            if pending.codecTraceFrames.count < PendingGeneration.maximumCodecTraceFrames {
+                pending.codecTraceFrames.append(codes)
+            } else {
+                pending.droppedCodecTraceFrameCount += 1
+            }
             pendingGeneration = pending
         case .info(let info):
             pending.generatedTokenCount = max(

@@ -94,6 +94,8 @@ REQUIRED_SURFACES=(
     "scripts/tests/test_check_release_notes.py"
     "scripts/check_delivery_instructions.py"
     "scripts/tests/test_check_delivery_instructions.py"
+    "scripts/audio_cadence_qc.py"
+    "scripts/tests/test_audio_cadence_qc.py"
     "scripts/delivery_experiment.py"
     "scripts/delivery_experiment_runner.py"
     "scripts/delivery_calibration_session.py"
@@ -153,6 +155,7 @@ REQUIRED_SURFACES=(
     "config/build-output-policy.json"
     "config/benchmark-baseline-migrations.json"
     "config/delivery-instruction-contract.json"
+    "config/audio-cadence-qc-contract.json"
     "config/derived-doc-facts.json"
     "config/roadmap.json"
     "docs/ROADMAP.md"
@@ -437,6 +440,7 @@ python3 "$SCRIPT_DIR/check_convergence_promotion_gate.py"
 # this checks those: append parity across a preset's intensity tiers, repeated
 # intensifiers, and direction conflicts against config/delivery-instruction-contract.json.
 python3 "$SCRIPT_DIR/check_delivery_instructions.py"
+python3 "$SCRIPT_DIR/audio_cadence_qc.py" validate-contract
 python3 "$SCRIPT_DIR/delivery_experiment.py" validate
 python3 "$SCRIPT_DIR/delivery_evaluator.py" validate-v2-contract \
     --contract "$PROJECT_DIR/config/delivery-evaluator-v2-contract.json"

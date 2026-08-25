@@ -62,6 +62,7 @@ struct IOSStudioPlayerCard: View {
     var onSave: (() -> Void)?
     var onDismiss: () -> Void
     var onCancel: () -> Void
+    var onRetry: (() -> Void)?
     var onExpand: (() -> Void)?
     /// When provided (Voice Design), the completed card shows a "Save as voice" button.
     var onSaveAsVoice: (() -> Void)?
@@ -80,15 +81,25 @@ struct IOSStudioPlayerCard: View {
     @State private var showDismissConfirm = false
     @EnvironmentObject private var audioPlayer: AudioPlayerViewModel
     @Environment(\.iosReduceMotionEnabled) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private let referenceHeight: CGFloat = 127
     private let saveAsVoiceRowHeight: CGFloat = 52
+
+    private var cadenceNoticeRowHeight: CGFloat {
+        dynamicTypeSize.isAccessibilitySize ? 112 : 58
+    }
 
     /// Show "Save as voice" only on a COMPLETED card when the host provides the action (Voice
     /// Design). The live preview keeps the base height so the live→complete morph stays smooth.
     private var showsSaveAsVoice: Bool {
         if case .complete = phase, onSaveAsVoice != nil { return true }
         return false
+    }
+
+    private var cadenceNotice: IOSStudioCadenceNotice? {
+        guard case .complete(let item) = phase else { return nil }
+        return item.cadenceNotice
     }
 
     var body: some View {
@@ -105,6 +116,10 @@ struct IOSStudioPlayerCard: View {
             )
             controlsRow
 
+            if let cadenceNotice {
+                cadenceNoticeRow(cadenceNotice)
+            }
+
             if showsSaveAsVoice {
                 saveAsVoiceButton
             }
@@ -113,7 +128,11 @@ struct IOSStudioPlayerCard: View {
         .padding(.top, 14)
         .padding(.bottom, 16)
         .frame(maxWidth: .infinity)
-        .frame(height: referenceHeight + (showsSaveAsVoice ? saveAsVoiceRowHeight : 0))
+        .frame(
+            height: referenceHeight
+                + (cadenceNotice == nil ? 0 : cadenceNoticeRowHeight)
+                + (showsSaveAsVoice ? saveAsVoiceRowHeight : 0)
+        )
         .background {
             RoundedRectangle(cornerRadius: 28, style: .continuous)
                 .fill(Color(red: 13 / 255, green: 14 / 255, blue: 18 / 255).opacity(0.85))
@@ -244,6 +263,62 @@ struct IOSStudioPlayerCard: View {
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("studio_inlinePlayer_saveAsVoice")
+    }
+
+    private func cadenceNoticeRow(_ notice: IOSStudioCadenceNotice) -> some View {
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: 6) {
+                    cadenceNoticeLabel(notice)
+                    cadenceRetryButton
+                }
+            } else {
+                HStack(spacing: 10) {
+                    cadenceNoticeLabel(notice)
+                    Spacer(minLength: 4)
+                    cadenceRetryButton
+                }
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("studio_inlinePlayer_cadenceNotice")
+    }
+
+    private func cadenceNoticeLabel(_ notice: IOSStudioCadenceNotice) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: "exclamationmark.waveform")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Theme.Status.guarded)
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(notice.title)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Theme.Text.primary)
+                Text(notice.message)
+                    .font(.caption2)
+                    .foregroundStyle(Theme.Text.secondary)
+                    .lineLimit(2)
+            }
+        }
+    }
+
+    private var cadenceRetryButton: some View {
+        Button {
+            IOSHaptics.selection()
+            onRetry?()
+        } label: {
+            Text("Generate again")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(Theme.Status.guarded)
+                .frame(minWidth: 44, minHeight: 44)
+                .padding(.horizontal, 8)
+                .background(Theme.Status.guarded.opacity(0.12), in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Generate this take again")
+        .accessibilityHint("Starts a new generation using the visible Studio settings")
+        .accessibilityIdentifier("studio_inlinePlayer_cadenceRetry")
     }
 
     private var playPauseButton: some View {

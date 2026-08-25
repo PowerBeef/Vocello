@@ -538,6 +538,7 @@ struct IOSCustomVoiceView: View {
                             transcript: promptText,
                             waveformSeed: seed,
                             autoplay: false,
+                            cadenceNotice: IOSStudioCadenceNotice(audioQC: result.audioQC),
                             ownedBySharedPlayer: true
                         )
                     )
@@ -1308,6 +1309,7 @@ struct IOSVoiceDesignView: View {
                             transcript: promptText,
                             waveformSeed: seed,
                             autoplay: false,
+                            cadenceNotice: IOSStudioCadenceNotice(audioQC: result.audioQC),
                             ownedBySharedPlayer: true
                         )
                     )
@@ -2098,6 +2100,7 @@ struct IOSVoiceCloningView: View {
                             transcript: promptText,
                             waveformSeed: seed,
                             autoplay: false,
+                            cadenceNotice: IOSStudioCadenceNotice(audioQC: result.audioQC),
                             ownedBySharedPlayer: true
                         )
                     )

@@ -514,6 +514,49 @@ final class TTSEngineStore: ObservableObject, TTSEngine {
         latestMemoryContext
     }
 
+    /// Gated diagnostic snapshot for the startup reliability runner. The
+    /// returned value contains only bounded state and memory scalars.
+    func startupReliabilityQuiescenceSample(
+        sequence: Int
+    ) async -> IOSUnloadQuiescenceSample {
+        let context = await refreshMemoryContext(
+            reason: "startup_reliability_quiescence",
+            source: "diagnostic_runner"
+        )
+        let ownership = await backend.startupReliabilityRuntimeOwnershipSnapshot()
+        return IOSUnloadQuiescenceSample(
+            sequence: sequence,
+            capturedAtUptimeSeconds: ProcessInfo.processInfo.systemUptime,
+            mlx: NativeMemoryPolicyResolver.snapshot(),
+            process: context.appSnapshot,
+            hasActiveGeneration: hasActiveGeneration,
+            criticalMemoryActionInFlight: criticalMemoryActionInFlight,
+            modelOperationInFlight: ownership.modelOperationInFlight,
+            generationReservationInFlight: ownership.generationReservationInFlight,
+            loadedModelID: loadState.currentModelID,
+            engineLifecycle: engineLifecycleState.rawValue
+        )
+    }
+
+    func replayStartupReliabilityCodecTrace(
+        request: GenerationRequest,
+        frames: [[Int32]],
+        incrementalRanges: [StartupReliabilityCodecFrameRange]
+    ) async throws -> StartupReliabilityCodecReplayResult {
+        guard !hasActiveGeneration, !criticalMemoryActionInFlight else {
+            throw MLXTTSEngineError.generationFailed(
+                "The runtime is not idle for startup-reliability codec replay."
+            )
+        }
+        let result = try await backend.replayStartupReliabilityCodecTrace(
+            request: request,
+            frames: frames,
+            incrementalRanges: incrementalRanges
+        )
+        syncFromBackend()
+        return result
+    }
+
     @discardableResult
     func refreshMemoryContext(reason: String, source: String = "store") async -> IOSMemoryContext {
         let previousBand = latestMemoryContext.pressureBand
@@ -1052,6 +1095,13 @@ final class AnyTTSEngineBackend {
     private let cancelClonePreparationIfNeededBlock: () async -> Void
     private let cancelActiveGenerationBlock: (GenerationCancellationReason) async throws -> Void
     private let generateBlock: (GenerationRequest) async throws -> GenerationResult
+    private let replayStartupReliabilityCodecTraceBlock: (
+        GenerationRequest,
+        [[Int32]],
+        [StartupReliabilityCodecFrameRange]
+    ) async throws -> StartupReliabilityCodecReplayResult
+    private let startupReliabilityRuntimeOwnershipSnapshotBlock:
+        () async -> StartupReliabilityRuntimeOwnershipSnapshot
     private let listPreparedVoicesBlock: () async throws -> [PreparedVoice]
     private let preparePreparedVoiceCandidateBlock: (String, String, String?, String?) async throws -> PreparedVoiceCandidate
     private let commitPreparedVoiceCandidateBlock: (UUID) async throws -> PreparedVoice
@@ -1135,6 +1185,33 @@ final class AnyTTSEngineBackend {
             }
         }
         self.generateBlock = { try await engine.generate($0) }
+        if let engine = engine as? any StartupReliabilityCodecReplaying {
+            self.replayStartupReliabilityCodecTraceBlock = { request, frames, ranges in
+                try await engine.replayStartupReliabilityCodecTrace(
+                    request: request,
+                    frames: frames,
+                    incrementalRanges: ranges
+                )
+            }
+        } else {
+            self.replayStartupReliabilityCodecTraceBlock = { _, _, _ in
+                throw TTSEngineError.unsupportedRequest(
+                    "This engine host does not support startup-reliability codec replay."
+                )
+            }
+        }
+        if let engine = engine as? any StartupReliabilityRuntimeOwnershipReporting {
+            self.startupReliabilityRuntimeOwnershipSnapshotBlock = {
+                await engine.startupReliabilityRuntimeOwnershipSnapshot()
+            }
+        } else {
+            self.startupReliabilityRuntimeOwnershipSnapshotBlock = {
+                StartupReliabilityRuntimeOwnershipSnapshot(
+                    modelOperationInFlight: false,
+                    generationReservationInFlight: false
+                )
+            }
+        }
         self.listPreparedVoicesBlock = { try await engine.listPreparedVoices() }
         self.preparePreparedVoiceCandidateBlock = {
             try await engine.preparePreparedVoiceCandidate(
@@ -1222,6 +1299,17 @@ final class AnyTTSEngineBackend {
         eventsBlock(generationID)
     }
     func generate(_ request: GenerationRequest) async throws -> GenerationResult { try await generateBlock(request) }
+    func replayStartupReliabilityCodecTrace(
+        request: GenerationRequest,
+        frames: [[Int32]],
+        incrementalRanges: [StartupReliabilityCodecFrameRange]
+    ) async throws -> StartupReliabilityCodecReplayResult {
+        try await replayStartupReliabilityCodecTraceBlock(request, frames, incrementalRanges)
+    }
+    func startupReliabilityRuntimeOwnershipSnapshot()
+        async -> StartupReliabilityRuntimeOwnershipSnapshot {
+        await startupReliabilityRuntimeOwnershipSnapshotBlock()
+    }
     func listPreparedVoices() async throws -> [PreparedVoice] { try await listPreparedVoicesBlock() }
     func preparePreparedVoiceCandidate(
         name: String,

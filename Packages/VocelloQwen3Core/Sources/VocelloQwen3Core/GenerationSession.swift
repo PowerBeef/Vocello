@@ -83,6 +83,22 @@ public struct VocelloQwen3StartupObservations: Codable, Hashable, Sendable {
     }
 }
 
+/// Bounded diagnostic copy of the sampled codec groups. This value stays
+/// inside the local generation session and is persisted only by a gated host.
+public struct VocelloQwen3CodecTrace: Codable, Hashable, Sendable {
+    public let schemaVersion: Int
+    public let frames: [[Int32]]
+    public let droppedFrameCount: Int
+
+    public init(frames: [[Int32]], droppedFrameCount: Int) {
+        self.schemaVersion = 1
+        self.frames = frames
+        self.droppedFrameCount = max(0, droppedFrameCount)
+    }
+
+    public var isComplete: Bool { droppedFrameCount == 0 }
+}
+
 /// Monotonic progress snapshot. Counts describe work already completed, not a
 /// prediction of the model's final duration.
 public struct VocelloQwen3ProgressEvent: Codable, Hashable, Sendable {
@@ -117,6 +133,7 @@ public struct VocelloQwen3TerminalEvent: Codable, Hashable, Sendable {
     /// Privacy-safe scalar diagnostics copied while the actor still owns the
     /// loaded model. No text, path, tensor, or raw error crosses this boundary.
     public let diagnostics: VocelloQwen3GenerationDiagnostics?
+    public let codecTrace: VocelloQwen3CodecTrace?
 
     public init(
         generationID: UUID,
@@ -125,7 +142,8 @@ public struct VocelloQwen3TerminalEvent: Codable, Hashable, Sendable {
         emittedAudioFrameCount: Int,
         elapsedMilliseconds: Int,
         generationInfo: VocelloQwen3GenerationInfo? = nil,
-        diagnostics: VocelloQwen3GenerationDiagnostics? = nil
+        diagnostics: VocelloQwen3GenerationDiagnostics? = nil,
+        codecTrace: VocelloQwen3CodecTrace? = nil
     ) {
         self.generationID = generationID
         self.outcome = outcome
@@ -134,6 +152,7 @@ public struct VocelloQwen3TerminalEvent: Codable, Hashable, Sendable {
         self.elapsedMilliseconds = elapsedMilliseconds
         self.generationInfo = generationInfo
         self.diagnostics = diagnostics
+        self.codecTrace = codecTrace
     }
 }
 

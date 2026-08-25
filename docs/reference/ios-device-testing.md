@@ -236,12 +236,35 @@ scripts/ui_test.sh ios startup-parity \
 
 The app records a privacy-safe request receipt and one-shot startup boundaries, represents every
 planned take, preserves allocation attempts zero/one with the same request and seed, and writes the
-terminal sentinel last. The host also polls the exact PID returned by CoreDevice and immediately
-fails into forensic collection if that process exits before terminal evidence; a process-query
-failure remains unknown rather than being treated as an exit. The XCUITest route selects Vivian,
-Calm Strong, and English through genuine visible controls and correlates the completed generation
-UUID with the engine receipt. Both routes are physical-iPhone-only, publish nothing, and are documented in
+terminal sentinel last. Result schema v2 retains complete final and chunk QC, and, only for the
+gated diagnostic request, a bounded generation-scoped rejected WAV plus codec trace. The same
+loaded Mimi decoder replays that trace both incrementally at the captured production chunk ranges
+and as one full decode; both replay WAVs receive ordinary persisted-WAV QC. No path, script, codec
+ID, or raw error enters retained JSON.
+
+Full-unload preparation records memory before unload, after owned references release and MLX cache
+clearing, immediately before a request, and after reload. A request starts only after three stable
+one-second samples prove no active generation/operation/reservation/model, a cleared MLX cache, at
+least 768 MiB process headroom, and footprint below the existing 4.5 GiB guard. The host polls the
+exact PID returned by CoreDevice and immediately enters forensic collection if it exits before
+terminal evidence; a process-query failure remains unknown rather than being treated as an exit.
+Partial evidence is composed into explicit `process_terminated` and
+`not_started_after_process_exit` rows, while CoreDevice `systemCrashLogs` are retained untracked and
+reduced to an allowlisted termination summary.
+
+The XCUITest route selects Vivian, Calm Strong, and English through genuine visible controls and
+correlates the completed generation UUID with the engine receipt. An automation-session bootstrap
+timeout is classified as infrastructure only when the `.xcresult` proves zero launched test cases
+and the log contains no app assertion, generation, crash, or QC outcome. It is never retried
+automatically; a manual rerun has a new run ID and separate evidence. Both routes are
+physical-iPhone-only, publish nothing, and are documented in
 [`ios-built-in-startup-reliability.md`](ios-built-in-startup-reliability.md).
+
+Successful startup-reliability evidence is removed through a second narrowly gated launch. That
+cleanup executes before native-engine initialization, writes a pullable acknowledgement only after
+removing the run-scoped app/App-Group evidence, and never converts a generation result. If cleanup
+fails, the already-collected run remains valid but the command fails and retains the artifact for
+forensics; do not automatically rerun the generation.
 
 **Bench spec syntax:** the `ios_device.sh bench` positional argument is the full
 `mode:variant:text` spec; a bare argument is treated as *text* (wrapped as

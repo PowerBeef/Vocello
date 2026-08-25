@@ -39,6 +39,26 @@ final class Qwen3DecoderPartitionTests: XCTestCase {
         }
     }
 
+    func testQualityFirstDecoderUsesBoundedInvariantPartition() throws {
+        XCTAssertEqual(Qwen3TTSModel.qualityFirstDecoderChunkFrames, 25)
+
+        MLXRandom.seed(0xC0DEC0DE)
+        let decoder = Qwen3TTSSpeechTokenizerDecoder(config: try tinyConfig())
+        let codes = fixtureCodes(tokenCount: 300)
+        let baseline = decode(decoder, codes: codes, partitions: [300], timing: false)
+        let bounded = decode(
+            decoder,
+            codes: codes,
+            partitions: repeatedPartitions(
+                total: 300,
+                size: Qwen3TTSModel.qualityFirstDecoderChunkFrames
+            ),
+            timing: false
+        )
+
+        assertWaveform(bounded, matches: baseline, label: "quality-first bounded partition")
+    }
+
     func testResetIsolationRestoresDeterministicWaveform() throws {
         MLXRandom.seed(0xC0DEC0DE)
         let decoder = Qwen3TTSSpeechTokenizerDecoder(config: try tinyConfig())

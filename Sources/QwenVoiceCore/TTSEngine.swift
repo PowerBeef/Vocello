@@ -143,6 +143,58 @@ public protocol TTSEngineEventStreaming: AnyObject {
     func events(for generationID: UUID) -> AsyncStream<GenerationEvent>
 }
 
+public struct StartupReliabilityCodecFrameRange: Codable, Hashable, Sendable {
+    public let start: Int
+    public let endExclusive: Int
+
+    public init(start: Int, endExclusive: Int) {
+        self.start = start
+        self.endExclusive = endExclusive
+    }
+}
+
+public struct StartupReliabilityCodecReplayResult: Sendable {
+    public let incrementalAudio: [Float]
+    public let fullAudio: [Float]
+    public let sampleRate: Int
+
+    public init(incrementalAudio: [Float], fullAudio: [Float], sampleRate: Int) {
+        self.incrementalAudio = incrementalAudio
+        self.fullAudio = fullAudio
+        self.sampleRate = sampleRate
+    }
+}
+
+public struct StartupReliabilityRuntimeOwnershipSnapshot: Hashable, Codable, Sendable {
+    public let modelOperationInFlight: Bool
+    public let generationReservationInFlight: Bool
+
+    public init(modelOperationInFlight: Bool, generationReservationInFlight: Bool) {
+        self.modelOperationInFlight = modelOperationInFlight
+        self.generationReservationInFlight = generationReservationInFlight
+    }
+}
+
+/// Diagnostics-only runtime ownership probe. It exposes only booleans and does
+/// not grant access to the operation, reservation, model, or MLX state.
+@MainActor
+public protocol StartupReliabilityRuntimeOwnershipReporting: AnyObject {
+    func startupReliabilityRuntimeOwnershipSnapshot()
+        async -> StartupReliabilityRuntimeOwnershipSnapshot
+}
+
+/// Diagnostics-only capability implemented by the in-process native engine.
+/// It is intentionally separate from `TTSEngine`: replay is not a product
+/// feature and must never become an ordinary engine requirement.
+@MainActor
+public protocol StartupReliabilityCodecReplaying: AnyObject {
+    func replayStartupReliabilityCodecTrace(
+        request: GenerationRequest,
+        frames: [[Int32]],
+        incrementalRanges: [StartupReliabilityCodecFrameRange]
+    ) async throws -> StartupReliabilityCodecReplayResult
+}
+
 @MainActor
 public protocol TTSEngineRuntimeControlling: TTSEngine {
     func prefetchInteractiveReadinessIfNeeded(

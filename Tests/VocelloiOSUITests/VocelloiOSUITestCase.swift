@@ -522,6 +522,12 @@ class VocelloiOSUITestCase: XCTestCase {
                 completedPlayer.exists || generationError.exists
             }
         )
+        if generationError.exists {
+            // Preserve the genuine visible terminal state before the assertion
+            // unwinds the test session. XCTest's automatic hierarchy snapshots
+            // can otherwise stop at the preceding Generating frame.
+            VocelloUIScreenshot.attach(app, named: "ios-generation-visible-error")
+        }
         XCTAssertFalse(generationError.exists, "Generation must not expose its visible error control")
         XCTAssertTrue(VocelloUIWait.exists(completedPlayer, timeout: 5))
         XCTAssertTrue(

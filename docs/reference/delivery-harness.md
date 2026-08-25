@@ -20,6 +20,7 @@ sourceOfTruth:
   - scripts/delivery_resource_supervisor.py
   - scripts/run_local_delivery_cascade.py
   - scripts/delivery_promotion_decision.py
+  - scripts/audio_cadence_qc.py
   - scripts/delivery_separability.py
   - scripts/bench_delivery_prosody.py
   - scripts/analyze_prosody.py
@@ -27,6 +28,7 @@ sourceOfTruth:
   - config/delivery-evaluator-v2-contract.json
   - config/delivery-evaluator-v2-candidates.json
   - config/delivery-evaluation-corpus.json
+  - config/audio-cadence-qc-contract.json
 ---
 # The audio delivery analysis harness
 
@@ -43,8 +45,9 @@ sourceOfTruth:
 
 ## 1. Tool inventory
 
-Only `check_delivery_instructions.py` runs in the deterministic commit/CI gate; everything
-else is an explicit measurement lane. Test files live under `scripts/tests/` and run in
+Only the text-only `check_delivery_instructions.py` and cadence-contract validation run in the
+deterministic commit/CI gate; audio generation and calibration remain explicit measurement lanes.
+Test files live under `scripts/tests/` and run in
 the script self-test suite via `scripts/check_test_workflows.sh`.
 
 | Tool | Purpose | Tests |
@@ -64,6 +67,7 @@ the script self-test suite via `scripts/check_test_workflows.sh`.
 | `scripts/delivery_resource_supervisor.py` | Single-process lock, peak RSS/pressure/swap/timeout capture, and post-exit memory-recovery qualification for heavy local analyzers | `test_delivery_resource_supervisor.py` |
 | `scripts/run_local_delivery_cascade.py` | Existing-harness post-generation composer for always-on, ambiguous-only, finalist-only, abstention, rejection, and manual-listening routes | `test_run_local_delivery_cascade.py` |
 | `scripts/delivery_promotion_decision.py` | Fail-closed decision over blinded listener evidence, paired statistics, multiplicity correction, acoustic guardrails, and runtime invariants | `test_delivery_promotion_decision.py` |
+| `scripts/audio_cadence_qc.py` | Validates the Fast-QC cadence policy and audits untracked, privacy-safe, independently labelled calibration/development/confirmation cohorts before a threshold review | `test_audio_cadence_qc.py` |
 | `scripts/delivery_separability.py` | Cross-preset separability: ridge-LDA over paired signed features, seed-grouped CV, UAR, computed chance floor, permutation null, Wilson intervals, per-cell BH-FDR, `--presets` subset probes | `test_delivery_separability.py` |
 | `scripts/bench_delivery_prosody.py` | Post-processes the current `vocello bench --delivery` run from its immutable manifest into `bench-prosody.json`; fail-closed instruction-receipt provenance (§4) | via `test_bench_command_contract.py` |
 | `scripts/delivery_listening_session.py` | Build / run / score the blind 2AFC + free-identification listening session from bench archives; sealed keys, pre-registered exact-binomial decision rules | `test_delivery_listening_session.py` |
@@ -346,6 +350,42 @@ across both speaker and script groupings. SenseVoiceSmall Q8 and DistilHuBERT re
 adapter candidates until license/training provenance, immutable digests, two clean serial M2/8 GB
 runs, post-exit memory release, and human-holdout gain all pass. UTMOS remains finalist-only and
 legacy SER remains a bake-off comparator.
+
+### 2.4 Cadence validity is separate from delivery adherence
+
+Fast audio QC algorithm v5 retains the v4 pass/warn/fail boundaries and adds a bounded typed
+`AudioCadenceQCReport`. It records the punctuation-derived expected pause count, observed and
+excess cadence pauses, suspicious-pause count, the bounded pause-duration vector, cumulative
+interior/cadence silence, median and p90 pause duration, and cadence-silence ratio. These fields
+contain no script or audio. A `severe` cadence classification is still only the existing gross
+defect rule: a context-sensitive egregious interior gap or repeated suspicious-scale gaps. An
+ordinary excess remains `unusual`, not a hidden product rejection.
+
+On iOS, an otherwise accepted unusual take remains in the completed player and History. The
+player shows “Unusual pacing detected” with a visible “Generate again” action. The action uses the
+currently visible request; Vocello does not silently retry, alter the seed, or choose among hidden
+takes. A severe take still fails mandatory QC before publication. Cadence validity and semantic
+delivery adherence remain independent decisions: a take can match Calm yet have pathological word
+spacing, or have ordinary pauses while missing the requested emotion.
+
+[`config/audio-cadence-qc-contract.json`](../../config/audio-cadence-qc-contract.json) keeps the
+current boundary authoritative until an independently labelled cohort qualifies. Operator-local
+datasets contain digests and measurements only, require three listeners per row, block compound
+speaker/script/seed/language identities across calibration, development, and untouched
+confirmation, and cover every preset, at least six speakers, English/Chinese/Japanese/Korean,
+three script lengths, six script groups, and eight seeds in each split. Run:
+
+```sh
+python3 scripts/audio_cadence_qc.py validate-contract
+python3 scripts/audio_cadence_qc.py evaluate \
+  --dataset build/artifacts/macos/delivery-cadence/labelled-cohort.json \
+  --output build/artifacts/macos/delivery-cadence/review-readiness.json
+```
+
+The untouched confirmation must have zero severe false rejection among human-acceptable takes,
+at least 90% severe recall, and at most 25% warning notices among acceptable takes. The report can
+authorize an explicit source review only; it cannot edit thresholds or claim semantic delivery
+quality.
 
 Live status on 2026-08-23: both exact candidate configurations passed two cache-cold probes on the
 attested Mac14,3 / 8 GiB host. SenseVoice used 275-293 MB peak RSS and DistilHuBERT used 677-874 MB;

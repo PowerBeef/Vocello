@@ -1213,6 +1213,7 @@ struct StreamingExecutionContext: Sendable {
         var chunkQCReports: [AudioQCChunkReport] = []
         var latestInfo: VocelloQwen3GenerationInfo?
         var finalizedDiagnostics = VocelloQwen3GenerationDiagnostics()
+        var diagnosticEvidenceNotes: [String: String] = [:]
         await telemetrySampler?.captureBoundary("session_start")
         await telemetryRecorder?.mark(stage: .streamStartup)
         do {
@@ -1460,6 +1461,22 @@ struct StreamingExecutionContext: Sendable {
             modelTerminalAtNS = DispatchTime.now().uptimeNanoseconds
             latestInfo = terminal.generationInfo
             finalizedDiagnostics = terminal.diagnostics ?? finalizedDiagnostics
+            if request.captureCodecTrace == true,
+               TelemetryGate.resolvedEnabled,
+               let trace = terminal.codecTrace,
+               let appSupportDirectory = diagnosticAppSupportBox?.url,
+               let evidence = try? StartupReliabilityDiagnosticEvidence.persistCodecTrace(
+                   trace,
+                   codecChunkRanges: Self.codecReplayRanges(
+                       traceFrameCount: trace.frames.count,
+                       chunkObservations: chunkObservations
+                   ),
+                   appSupportDirectory: appSupportDirectory,
+                   runID: benchRunID,
+                   generationID: generationID
+               ) {
+                diagnosticEvidenceNotes.merge(evidence.telemetryNotes) { _, new in new }
+            }
             switch terminal.outcome {
             case .completed(.endOfSequence):
                 modelOutcomeV9 = .eos
@@ -1539,6 +1556,7 @@ struct StreamingExecutionContext: Sendable {
         )
         let finalWAVFinishStartedAt = ContinuousClock.now
         let finalAudioQC: AudioQCReport
+        var rejectedAudioQC: AudioQCReport?
         do {
             // Finalize the hidden staging file first. Fast QC owns the exact
             // persisted bytes and must pass before atomic destination
@@ -1584,12 +1602,17 @@ struct StreamingExecutionContext: Sendable {
             )
             await telemetrySampler?.captureBoundary("after_audio_qc")
             guard finalAudioQC.verdict != .fail else {
-                // Triage evidence for an intermittent failure class: name the
-                // exact failing rule flags (allowlisted labels, privacy-safe)
-                // and, in diagnostics-enabled sessions, retain the rejected
-                // staged WAV (newest only) so the audio itself is inspectable.
-                if TelemetryGate.resolvedEnabled {
-                    Self.preserveFailedQCStagedWAV(stagingURL, sessionDirectory: sessionDirectory)
+                rejectedAudioQC = finalAudioQC
+                if TelemetryGate.resolvedEnabled,
+                   let appSupportDirectory = diagnosticAppSupportBox?.url,
+                   let evidence = try? StartupReliabilityDiagnosticEvidence.persistRejectedAudio(
+                       from: stagingURL,
+                       appSupportDirectory: appSupportDirectory,
+                       runID: benchRunID,
+                       generationID: generationID,
+                       durationSeconds: finalAudioQC.durationSeconds
+                   ) {
+                    diagnosticEvidenceNotes.merge(evidence.telemetryNotes) { _, new in new }
                 }
                 throw Self.finalAudioQCRejectionError(flags: finalAudioQC.flags)
             }
@@ -1605,7 +1628,13 @@ struct StreamingExecutionContext: Sendable {
                 finalWriteSignpost,
                 "runID=\(benchRunID, privacy: .public) generationID=\(generationID.uuidString, privacy: .public) takeIndex=\(benchTakeIndex, privacy: .public) cell=\(benchCell, privacy: .public)"
             )
-            await writeFailureTelemetry(error: error, usedStreaming: request.shouldStream, counters: ["chunkCount": chunkIndex])
+            await writeFailureTelemetry(
+                error: error,
+                usedStreaming: request.shouldStream,
+                counters: ["chunkCount": chunkIndex],
+                audioQC: rejectedAudioQC,
+                additionalNotes: diagnosticEvidenceNotes
+            )
             throw error
         }
         NativeStreamingSignposts.signposter.endInterval(
@@ -1706,6 +1735,7 @@ struct StreamingExecutionContext: Sendable {
         successNotes.merge(GenerationStreamingTelemetryV9Publication.shippingIdentityNotes) {
             current, _ in current
         }
+        successNotes.merge(diagnosticEvidenceNotes) { _, evidence in evidence }
 
         // Phase 12: the typed quality registry runs at fast depth on every
         // shipping finalization; the persisted-WAV Fast QC verdict folds into
@@ -1766,8 +1796,42 @@ struct StreamingExecutionContext: Sendable {
             diagnosticTimingsMS: finalTimingsMS,
             diagnosticBooleanFlags: finalBooleanFlags,
             diagnosticStringFlags: finalStringFlags,
-            telemetrySummary: summary
+            telemetrySummary: summary,
+            audioQC: finalAudioQC
         )
+    }
+
+    private static func codecReplayRanges(
+        traceFrameCount: Int,
+        chunkObservations: [ShippingChunkObservationV9]
+    ) -> [StartupReliabilityCodecFrameRange] {
+        guard traceFrameCount > 0 else { return [] }
+        let observed = chunkObservations.compactMap { observation -> StartupReliabilityCodecFrameRange? in
+            guard let start = observation.codecStartFrame,
+                  let end = observation.codecEndFrameExclusive,
+                  start <= UInt64(Int.max), end <= UInt64(Int.max) else {
+                return nil
+            }
+            return StartupReliabilityCodecFrameRange(
+                start: Int(start),
+                endExclusive: Int(end)
+            )
+        }
+        if observed.first?.start == 0,
+           observed.last?.endExclusive == traceFrameCount,
+           zip(observed, observed.dropFirst()).allSatisfy({ $0.endExclusive == $1.start }) {
+            return observed
+        }
+        // Quality-first generation has no production streaming boundaries.
+        // Replay it with the canonical initial 2 s / 12.5 Hz bucket so the
+        // incremental arm still exercises repeated decoder state transitions.
+        let diagnosticChunkFrames = 25
+        return stride(from: 0, to: traceFrameCount, by: diagnosticChunkFrames).map { start in
+            StartupReliabilityCodecFrameRange(
+                start: start,
+                endExclusive: min(start + diagnosticChunkFrames, traceFrameCount)
+            )
+        }
     }
 
     /// Async streams may finish normally after their producer task is
@@ -1814,24 +1878,12 @@ struct StreamingExecutionContext: Sendable {
     /// empty-output, token-cap, or finalization failures that occur outside the
     /// producer-loop catch. The sampler itself is idempotent, so an outer cleanup
     /// may safely call stop again without changing this evidence.
-    /// Newest-only retention of a QC-rejected staged WAV beside the session
-    /// tree (policy-owned cache; routine cleanup prunes it). Diagnostics-gated
-    /// by the caller.
-    private static func preserveFailedQCStagedWAV(_ stagingURL: URL, sessionDirectory: URL) {
-        let holdingDirectory = sessionDirectory
-            .deletingLastPathComponent()
-            .appendingPathComponent("failed-audio-qc", isDirectory: true)
-        let fileManager = FileManager.default
-        try? fileManager.createDirectory(at: holdingDirectory, withIntermediateDirectories: true)
-        let destination = holdingDirectory.appendingPathComponent("failed-qc-latest.wav", isDirectory: false)
-        try? fileManager.removeItem(at: destination)
-        try? fileManager.copyItem(at: stagingURL, to: destination)
-    }
-
     private func writeFailureTelemetry(
         error: Error,
         usedStreaming: Bool,
-        counters: [String: Int]
+        counters: [String: Int],
+        audioQC: AudioQCReport? = nil,
+        additionalNotes: [String: String] = [:]
     ) async {
         let reason = NativeGenerationTerminalClassifier.reason(for: error)
         await telemetrySampler?.captureBoundary(
@@ -1855,6 +1907,7 @@ struct StreamingExecutionContext: Sendable {
         if let runtimeError = error as? NativeRuntimeError {
             failureNotes.merge(runtimeError.telemetryNotes) { current, _ in current }
         }
+        failureNotes.merge(additionalNotes) { _, diagnostic in diagnostic }
         await writeEngineTelemetryRecord(
             summary: summary,
             stageMarks: stageMarks,
@@ -1862,6 +1915,7 @@ struct StreamingExecutionContext: Sendable {
             finishReason: reason.rawValue,
             counters: counters,
             notes: failureNotes,
+            audioQC: audioQC,
             rawSamples: NativeTelemetryMode.current().persistsRawSamples ? rawSamples : nil
         )
     }
@@ -2318,6 +2372,18 @@ struct StreamingExecutionContext: Sendable {
         let excessCadencePauses = max(0, cadencePauseCount - max(0, expectedPauseCount))
         let suspiciousPauseCount = interiorSilencesMS.filter { $0 >= suspiciousSingleMS }.count
         let excessSuspiciousPauses = max(0, suspiciousPauseCount - max(0, expectedPauseCount))
+        let cadencePausesMS = interiorSilencesMS.filter { $0 >= cadencePauseMS }
+        let sortedCadencePausesMS = cadencePausesMS.sorted()
+        let totalInteriorSilenceMS = interiorSilencesMS.reduce(0, +)
+        let totalCadenceSilenceMS = cadencePausesMS.reduce(0, +)
+        let cadenceSilenceRatio = durationSeconds > 0
+            ? min(1, Double(totalCadenceSilenceMS) / (durationSeconds * 1_000))
+            : 0
+        func percentile(_ sortedValues: [Int], numerator: Int, denominator: Int) -> Int? {
+            guard !sortedValues.isEmpty, denominator > 0 else { return nil }
+            let rank = max(0, (sortedValues.count * numerator + denominator - 1) / denominator - 1)
+            return sortedValues[min(rank, sortedValues.count - 1)]
+        }
 
         var flags: [String] = []
         var instabilityVerdict: AudioQCReport.Verdict = .pass
@@ -2365,6 +2431,42 @@ struct StreamingExecutionContext: Sendable {
             }
         }
         let verdict = worst(instabilityVerdict, writtenOutputVerdict)
+        var cadenceReasons: [AudioCadenceQCReport.Reason] = []
+        if excessCadencePauses > 0 {
+            cadenceReasons.append(.excessCadencePauses)
+        }
+        if longestSilenceMS >= egregiousMS {
+            cadenceReasons.append(.egregiousInteriorSilence)
+        } else if excessSuspiciousPauses >= 2 {
+            cadenceReasons.append(.repeatedSuspiciousPauses)
+        } else if longestSilenceMS >= suspiciousSingleMS {
+            cadenceReasons.append(.singleSuspiciousPause)
+        }
+        let cadenceClassification: AudioCadenceQCReport.Classification
+        if cadenceReasons.contains(.egregiousInteriorSilence)
+            || cadenceReasons.contains(.repeatedSuspiciousPauses) {
+            cadenceClassification = .severe
+        } else if !cadenceReasons.isEmpty {
+            cadenceClassification = .unusual
+        } else {
+            cadenceClassification = .withinFastGate
+        }
+        let cadence = AudioCadenceQCReport(
+            classification: cadenceClassification,
+            reasons: cadenceReasons,
+            expectedPauseCount: max(0, expectedPauseCount),
+            cadencePauseThresholdMS: cadencePauseMS,
+            suspiciousPauseThresholdMS: suspiciousSingleMS,
+            observedCadencePauseCount: cadencePauseCount,
+            excessCadencePauseCount: excessCadencePauses,
+            suspiciousPauseCount: suspiciousPauseCount,
+            recordedInteriorPausesMS: interiorSilencesMS,
+            totalInteriorSilenceMS: totalInteriorSilenceMS,
+            totalCadenceSilenceMS: totalCadenceSilenceMS,
+            medianCadencePauseMS: percentile(sortedCadencePausesMS, numerator: 1, denominator: 2),
+            p90CadencePauseMS: percentile(sortedCadencePausesMS, numerator: 9, denominator: 10),
+            cadenceSilenceRatio: cadenceSilenceRatio
+        )
 
         return AudioQCReport(
             instabilityVerdict: instabilityVerdict,
@@ -2383,6 +2485,7 @@ struct StreamingExecutionContext: Sendable {
             firstNonFiniteSample: metrics.firstNonFiniteSample,
             firstClipSample: metrics.firstClipSample,
             longestSilenceStartMS: longestSilenceStartMS,
+            cadence: cadence,
             chunkQC: chunkQC
         )
     }

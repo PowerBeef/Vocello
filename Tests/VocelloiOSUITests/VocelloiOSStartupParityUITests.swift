@@ -36,6 +36,7 @@ final class VocelloiOSStartupParityUITests: VocelloiOSUITestCase {
         assertChip("studioChip_language", contains: "English")
         replaceScript(with: script)
         let generationID = generateAndWaitForCompletedPlayer(timeout: 360)
+        assertCadenceNoticeConsistency()
         VocelloUIScreenshot.attach(app, named: "ios-startup-parity-vivian-calm-strong-english")
         print(
             "VOCELLO-STARTUP-PARITY-UI-MANIFEST "
@@ -145,5 +146,28 @@ final class VocelloiOSStartupParityUITests: VocelloiOSUITestCase {
                     || accessibilityValue.localizedCaseInsensitiveContains(value)
             }
         )
+    }
+
+    /// Accepted unusual cadence is advisory, not a hidden rejection. Verify
+    /// that the completed player never exposes a warning without its explicit
+    /// user-controlled retry, and never exposes the retry without the warning.
+    private func assertCadenceNoticeConsistency() {
+        let notice = element("studio_inlinePlayer_cadenceNotice")
+        let retry = element("studio_inlinePlayer_cadenceRetry")
+        if notice.exists {
+            XCTAssertTrue(
+                notice.label.localizedCaseInsensitiveContains("Unusual pacing"),
+                "Cadence notice must describe the pacing concern without relying on color"
+            )
+            XCTAssertTrue(VocelloUIWait.exists(retry, timeout: 5))
+            XCTAssertTrue(retry.isHittable, "Generate again must remain an explicit user action")
+            XCTAssertTrue(
+                retry.label.localizedCaseInsensitiveContains("Generate again"),
+                "Cadence retry must expose its action to VoiceOver"
+            )
+            VocelloUIScreenshot.attach(app, named: "ios-startup-parity-cadence-warning")
+        } else {
+            XCTAssertFalse(retry.exists, "Cadence retry must not appear without its review notice")
+        }
     }
 }

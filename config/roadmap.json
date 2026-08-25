@@ -1122,6 +1122,23 @@
       "updated": "2026-08-22"
     },
     {
+      "id": "DP-33",
+      "plan": "delivery-prompting-2026-08",
+      "title": "Calibrate abnormal cadence detection without hiding valid expressive pauses",
+      "status": "declined",
+      "gate": "Fast-QC v5 must retain the existing v4 severe boundary while exposing bounded typed cadence evidence through the generation result. An otherwise accepted unusual take remains playable and saved, carries a visible non-color-only iOS review notice, and offers only an explicit user retry using the currently visible settings; severe gross gaps remain rejected before publication. Before changing any warning or rejection threshold, scripts/audio_cadence_qc.py must qualify an independently labelled, privacy-safe calibration/development/untouched-confirmation cohort spanning all eight presets, at least six Built-in Voice speakers, English/Chinese/Japanese/Korean output, short/medium/long scripts, at least six script groups and eight seeds per split. Untouched confirmation requires zero severe false rejection among acceptable takes, at least 90% severe recall, and no more than 25% review notices among acceptable takes. Cadence validity remains separate from semantic delivery adherence, and no automatic retry, seed mutation, hidden best-of-N, or threshold auto-edit is permitted.",
+      "sourceOfTruth": [
+        "Sources/QwenVoiceCore/GenerationTelemetryRecord.swift",
+        "Sources/QwenVoiceCore/GenerationOutputAdapter.swift",
+        "Sources/iOS/Studio/IOSStudioInlinePlayerCard.swift",
+        "config/audio-cadence-qc-contract.json",
+        "scripts/audio_cadence_qc.py"
+      ],
+      "updated": "2026-08-25",
+      "notes": "Infrastructure landed 2026-08-25: QC v5 adds typed bounded cadence metrics without changing v4 verdict boundaries; GenerationResult preserves the report to iOS; accepted unusual takes show a visible completed-player warning and explicit Generate again control; the contract validator and fixture tests fail closed on privacy leaks, identity leakage, malformed metrics, insufficient coverage, and false severe rejection. Physical-iPhone evidence using the screenshot-derived 285-character request then separated the two paths: seed 38112001 passed mandatory QC but reported unusual cadence (14 observed versus 4 expected pauses), while seed 38112006 and a fresh visible-UI seed remained hard failures with 14.992-second and 13.993-second interior gaps. Full and incremental replay preserved the defects, binding them to sampled codec sequences rather than UI, streaming decode, or WAV persistence. The visible take was correctly rejected before publication, so advisory-warning visual acceptance was not inferred from it. On 2026-08-25 the maintainer accepted the current fail-closed rejection plus explicit-review behavior as sufficient and closed the product issue; the optional labelled multilingual threshold-calibration cohort is therefore declined rather than represented as a passed gate. Existing boundaries remain unchanged. Cross-reference ISR-04 for the replay-proven Vivian/Calm sampled-code spacing and AV-07 for broader analyzer calibration.",
+      "reason": "Maintainer decision 2026-08-25: current severe-gap rejection, bounded cadence evidence, visible review notice, and explicit user-controlled retry are sufficient. The additional multilingual threshold-calibration and advisory-visual-acceptance program is not required for this product issue and was not executed; its gate is preserved as unmet rather than weakened."
+    },
+    {
       "id": "CM-7",
       "plan": "convergence-metal4-stage4-2026-08",
       "title": "Non-streaming CLI generation publishes no WAV while reporting success",
@@ -1576,7 +1593,8 @@
         "scripts/python_test_contract.py"
       ],
       "notes": "Closed 2026-08-21. T1/T2 now run recursive unittest discovery in both Python roots; a structural inventory rejects zero-test modules and free-function tests without an explicit unittest adapter. The former pytest-only baseline module has a load_tests adapter and corrected stale RTF fixtures. Contract fixtures prove that a newly added module is discovered without a curated-list edit.",
-      "updated": "2026-08-21"
+      "updated": "2026-08-25",
+      "notes": "On 2026-08-25 Xcode reported a pre-test automation-session timeout as totalTestCount=1 because xcresult counted the generated UI-test runner error as a failed test. The fail-closed classifier now recognizes only that exact runner-level shape—no test identifier URL, no passed/skipped case, and an allowlisted automation-mode failure—while still rejecting every launched test or product assertion. The failed xcresult remains separate evidence and no automatic retry was added. A distinct operator-started run entered the real test and produced a genuine audio-QC failure, which the classifier correctly refused to downgrade. AV-09 remains open for its broader stateful-lane repeatability gate."
     },
     {
       "id": "AV-02",
@@ -1830,14 +1848,22 @@
       "plan": "ios-generation-startup-reliability-2026-08",
       "title": "Complete staged exact-request characterization",
       "status": "planned",
-      "gate": "With the original exact 285-character UTF-8 script, run five fixed-seed cold launches, ten same-process warm takes, seeds 38112001 through 38112008, focused delivery/speaker/default predecessors, production/full-unload/prepared-cache-clear/prewarm-disabled arms, streaming parity, macOS CLI/headless controls, and iOS headless/visible UI parity. Stop expansion at the first decision-complete divergent boundary; preserve every attempt and crash delta.",
+      "gate": "With the original exact 285-character UTF-8 script, run five fixed-seed cold launches, ten same-process warm takes, seeds 38112001 through 38112008, focused delivery/speaker/default predecessors, production/full-unload/prepared-cache-clear/prewarm-disabled arms, streaming parity, macOS CLI/headless controls, and iOS headless/visible UI parity. For seeds 38112004, 38112006, and passing control 38112001, retain complete final/chunk QC plus bounded codec traces and compare exact production-range incremental replay against full decoding across three fresh-process repetitions per output mode. Require the full-unload quiescence barrier, exact-PID process-exit composition, and sanitized CoreDevice system-crash-log delta. Stop expansion at the first decision-complete divergent boundary; preserve every attempt and crash delta.",
       "sourceOfTruth": [
         "docs/reference/ios-built-in-startup-reliability.md",
         "scripts/ios_device.sh",
-        "scripts/ui_test.sh"
+        "scripts/ui_test.sh",
+        "scripts/ios_startup_reliability.py",
+        "Sources/QwenVoiceCore/StartupReliabilityDiagnosticEvidence.swift",
+        "Sources/QwenVoiceCore/IOSUnloadQuiescence.swift",
+        "config/ios-startup-reliability-result-schema-v2.json"
       ],
-    "updated": "2026-08-24",
-    "notes": "Still blocked on the original script bytes; a screenshot-derived 285-character reconstruction is diagnostic evidence only. On the paired physical iPhone, visible Vivian / Calm Strong / English request parity passed, five fixed-seed cold launches and ten same-process warm takes passed, and seeds 38112001 through 38112008 produced six passes plus two fully materialized post-generation dropout rejections at 38112004 and 38112006. Both rejected takes crossed first model token, decoded audio, and published-stream boundaries with no allocation retry. A production-state retry after the deterministic 38112004 rejection remained represented and failed the same QC normally. The diagnostics-only forced-unload successor instead exited after a memory warning; the host now detects the exact PID loss promptly and preserves partial evidence, but that preparation-arm memory behavior and the remaining predecessor/platform matrix stay open. Production and prewarm-disabled remain expected-equivalent on this checkout. Cross-reference AV-09 for repeatability and the delivery-evaluator plan for post-generation analysis only."
+      "evidence": [
+        "file:Tests/VocelloCoreTests/StartupReliabilityDiagnosticsV2Tests.swift",
+        "file:scripts/tests/test_ios_startup_reliability.py"
+      ],
+    "updated": "2026-08-25",
+      "notes": "Still blocked on the original script bytes; screenshot reconstruction is diagnostic evidence only. Earlier paired-iPhone work passed visible Vivian / Calm Strong / English request parity, five fixed-seed cold launches, ten same-process warm takes, and six of eight fixed seeds; 38112004 and 38112006 instead materialized audio and were rejected for deterministic dropouts. Fresh schema-v2 proof with the tracked 280-character sentinel captured 38112006 in streaming mode: live output, exact-range incremental replay, and full replay all retained the same approximately 980 ms silence and cadence:excess11(17/6) warning. This localizes the unusual word spacing to the sampled codec sequence rather than Mimi incremental state, chunk publication, or WAV persistence; the product keeps explicit user-controlled retry and does not mutate the seed, add hidden retries, or weaken QC. A mixed-mode run then exposed a separate quality-first memory defect: retaining lazy per-frame MLX arrays and decoding a 300-frame graph reached 6292.85 MiB footprint, zero headroom, critical pressure, and process termination without a correlated system-crash report. Materializing compact Int32 codec frames and decoding in bounded 25-frame partitions reduced two fresh cold non-streaming control runs to 2923.55 and 3023.69 MiB peak footprint with over 3.1 GiB minimum headroom, nominal thermal state, no capture failures, complete first-token/audio-code boundaries, byte-identical incremental/full replay, and no crash-log delta. A subsequent 10-take sentinel matrix completed five warm-generation/full-unload/quiescence/cold-reload cycles in one process: 10/10 represented passes, correct warm/cold receipts, every unload clear and immediately-before-request snapshot violation-free, per-take peaks 2778.30-3185.05 MiB, at least 2958.95 MiB headroom, zero capture failures, no system-crash delta, and successful evidence cleanup. The two earlier otherwise-valid commands failed only during evidence cleanup: CoreDevice requires an explicit destination filename for a file pull, while the host supplied a directory. The host now pulls to the exact marker path, and app-side cleanup is dispatched before engine startup; direct and complete-run proofs returned the expected collected_evidence_removed record. The remaining three-repetition affected-seed/output-mode matrix, other preparation/predecessor/platform arms, original-script proof, and closure grid stay open. Cross-reference AV-09 for XCUITest repeatability, F-08 for stale Studio terminal ownership, and the delivery-evaluator plan for semantic delivery analysis."
   },
   {
     "id": "ISR-05",
@@ -1850,13 +1876,17 @@
       "Sources/QwenVoiceCore/GenerationOutputAdapter.swift",
       "Sources/QwenVoiceCore/MLXTTSEngine.swift",
       "Sources/QwenVoiceCore/GenerationFailureDiagnosticLogger.swift",
+      "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
+      "Packages/VocelloQwen3Core/Sources/VocelloQwen3Core/Engine.swift",
       "docs/reference/ios-built-in-startup-reliability.md"
     ],
     "evidence": [
-      "file:Tests/VocelloCoreTests/GenerationStartupDiagnosticsTests.swift"
+      "file:Tests/VocelloCoreTests/GenerationStartupDiagnosticsTests.swift",
+      "file:Packages/VocelloQwen3Core/Tests/Qwen3RuntimeTests/Qwen3DecoderPartitionTests.swift",
+      "file:Packages/VocelloQwen3Core/Tests/Qwen3RuntimeTests/VocelloQwen3FacadeTests.swift"
     ],
-    "updated": "2026-08-24",
-    "notes": "Live fixed-seed evidence localized a source-proven causal defect in failure presentation: the outer engine catch wrapped a downstream mandatory audio-QC rejection as stream startup failure. Existing NativeRuntimeError stages now pass through unchanged; dropout and other QC rejections remain typed audio.quality_rejected at stream_failed with allowlisted QC flags and an honest user message. A physical-device 38112004 proof crossed every startup boundary, retained dropout:2725ms, rejected the output, and surfaced no false startup label. Audio QC, sampling, seed behavior, retry count, prompts, and model pins were not weakened or changed. This closes the evidence-supported false-startup fix only; ISR-04 and ISR-06 remain open."
+    "updated": "2026-08-25",
+    "notes": "Live evidence supports two bounded source fixes. First, the outer engine catch no longer wraps a downstream mandatory audio-QC rejection as startup failure; typed QC errors retain stream_failed/audio.quality_rejected and honest UI copy. Second, quality-first generation no longer retains hundreds of lazy MLXArray frames or builds a 300-frame decoder graph: codec frames materialize as compact Int32 values and Mimi decoding uses invariant-tested 25-frame partitions. The paired-iPhone control fell from a 6292.85 MiB critical-pressure process termination to two healthy 2.92-3.02 GiB runs with complete boundaries and identical replay. Quality-first codec signals now co-observe first model token/audio code as required. Exact replay proved the affected streaming cadence gaps are already encoded by the sampled codec sequence, so no decoder change, hidden retry, seed mutation, prompt/sampling change, or weaker QC was introduced. ISR-04 and ISR-06 remain open for the incomplete characterization and exact-script closure matrices."
   },
     {
       "id": "ISR-06",
@@ -1869,8 +1899,8 @@
         "config/ios-startup-reliability-sentinel.json",
         "scripts/ios_startup_reliability.py"
       ],
-    "updated": "2026-08-24",
-    "notes": "Open. The original script bytes have not been supplied, broader predecessor/platform/grid evidence is incomplete, and the diagnostics-only forced-unload successor exposed an unrepresented process exit after a memory warning. The exact-PID host guard now fails promptly and preserves partial evidence, but closure cannot accept or infer the missing take."
+    "updated": "2026-08-25",
+    "notes": "Open. The original script bytes have not been supplied and the broader predecessor, preparation, platform, repetition, and grid evidence is incomplete. The earlier forced-unload successor remains a represented process termination without a correlated system-crash report; after the bounded quality-first fix, the tracked sentinel completed five full unload/quiescence/reload cycles with 10/10 passes, healthy 2.78-3.19 GiB per-take peaks, no crash delta, and successful cleanup. The same five-cycle proof is still required for the unavailable original script. Exact codec replay classifies the observed 38112006 word spacing as sampled-output cadence, not decoder corruption, and does not waive the existing acceptance gate."
   }
   ]
 }

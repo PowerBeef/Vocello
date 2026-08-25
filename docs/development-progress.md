@@ -77,6 +77,70 @@ retry count, or audio-QC acceptance rule changed. See
 [`ios-built-in-startup-reliability.md`](reference/ios-built-in-startup-reliability.md) and the
 authoritative roadmap.
 
+The result-v2 diagnostic expansion is now exercised on the physical iPhone. For streaming seed
+`38112006`, live output, exact-range incremental replay, and full replay preserve the same roughly
+`980 ms` silence and `cadence:excess11(17/6)` warning. The unusual word spacing is therefore already
+encoded in the sampled codec sequence; it is not introduced by Mimi incremental state, chunk
+publication, or WAV persistence. Vocello preserves the warning and explicit user retry—there is no
+silent seed mutation, hidden regeneration, prompt/sampling change, or relaxed QC.
+
+That first replay used the tracked 280-character sentinel. A later run used the screenshot-derived
+285-character request (digest `f946d050…7204b`) and exposed the request-specific severity that the
+sentinel could not represent. Seed `38112001` passed the mandatory v4 boundary but v5 classified its
+cadence as unusual (14 observed pauses versus 4 punctuation-derived expectations, p90 `1.013 s`).
+Seed `38112006` failed the unchanged hard gate with a `14.992 s` interior dropout, and both full and
+incremental replay preserved the gross gap. The real visible Studio flow then assembled Vivian,
+Calm Strong, English, Balanced, streaming exactly, but its fresh generated seed
+`9407571633493666194` also failed hard QC with a `13.993 s` gap. No cadence warning was expected for
+either severe take because rejected audio never reaches the completed player; physical visual
+acceptance of the advisory state therefore remains open rather than being inferred from a failure.
+
+The visible-UI run also reproduced Xcode's pre-test “Timed out while enabling automation mode”
+condition. `xcresulttool` counts that generated runner error as one failed test even though no test
+case launched. The classifier now proves the runner-only shape from the missing test URL, zero
+passed/skipped tests, and allowlisted bootstrap error; it continues to reject any launched test or
+product assertion and never retries automatically. A separate run ID entered the test and its real
+audio-QC failure remained a failure.
+
+Fast QC v5 now makes that pacing decision inspectable without changing the v4 acceptance boundary.
+Every completed result can carry bounded typed cadence evidence: expected/observed/excess pause
+counts, suspicious-gap count, pause durations, cumulative silence, median/p90, and cadence ratio.
+An accepted unusual take stays playable and saved on iOS, where the completed player presents a
+non-color-only “Unusual pacing detected” notice and an explicit visible-settings “Generate again”
+control; severe gross gaps remain rejected before publication. On 2026-08-25 the maintainer accepted
+that fail-closed product behavior as sufficient and closed the cadence issue. DP-33 therefore records
+the additional independently labelled multilingual threshold-calibration and advisory-visual-
+acceptance program as declined, not as a passed gate; no threshold, retry, seed, prompt, or sampling
+behavior was changed to manufacture closure. Broader evaluator calibration remains separately owned
+by AV-07.
+
+The same run series localized the earlier non-streaming process exit. Quality-first generation had
+retained every lazy codec-frame `MLXArray` and then materialized a 300-frame decode graph, reaching
+`6292.85 MiB`, zero headroom, critical pressure, and process termination. Codec frames now
+materialize as compact `Int32` values and decode through waveform-invariant 25-frame partitions.
+Two fresh cold controls completed at `2923.55` and `3023.69 MiB` peak footprint with over `3.1 GiB`
+headroom, nominal thermals, complete startup boundaries, identical incremental/full replay, and no
+system-crash delta. Diagnostics evidence cleanup also runs before engine initialization so a
+validated run is not stranded by unrelated runtime startup. The affected-seed repetition matrix
+remains open.
+
+The tracked sentinel has since completed five full warm-generation/unload/quiescence/cold-reload
+cycles in one physical-device process. All 10 quality-first takes were represented and passed; warm
+and cold engine receipts matched the requested preparation, every post-clear/pre-request snapshot
+was violation-free, per-take footprint peaks stayed between `2778.30` and `3185.05 MiB`, minimum
+headroom stayed above `2958.95 MiB`, and there were no capture failures or system-crash delta. The
+host also received the terminal evidence-cleanup acknowledgement. Equivalent original-script cycles
+remain blocked on the unavailable bytes.
+
+The phone-independent macOS CLI control now covers the tracked 280-character sentinel with Vivian,
+Calm Strong, English, Expressive sampling, and seeds `38112001`, `38112004`, and `38112006` in both
+streaming and non-streaming execution. All 18 fresh-process takes passed mandatory QC with the exact
+shipped instruction digest; each seed's per-mode duration was stable across its three repetitions.
+Streaming/non-streaming durations nevertheless differed materially for every seed. Fresh on-device
+codec evidence now resolves the decoder side for the sampled sequence above, while output-mode RNG
+identity, full quiescence cycles, and the remaining matrix still require controlled repetitions.
+The original 285-character bytes remain unavailable and exact-script closure is still blocked.
+
 **DP-28 live evaluator infrastructure and calibration audio are complete; human evidence is next
 (2026-08-23, macOS/CLI research tooling):** the exact contract-pinned SenseVoiceSmall Q8 and
 DistilHuBERT assets now live only under the operator-local build cache. Both passed two cache-cold

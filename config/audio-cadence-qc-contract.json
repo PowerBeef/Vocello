@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "status": "calibration-required",
+  "fastQCAlgorithmVersion": 5,
+  "classificationSource": "Sources/QwenVoiceCore/GenerationOutputAdapter.swift",
+  "reportSource": "Sources/QwenVoiceCore/GenerationTelemetryRecord.swift",
+  "policy": {
+    "withinFastGate": "publish",
+    "unusual": "publish-with-visible-review-notice",
+    "severe": "reject-before-publication",
+    "retry": "explicit-user-controlled-visible-settings",
+    "automaticRetry": false,
+    "seedMutation": false,
+    "bestOfN": false,
+    "semanticDeliveryAuthority": false
+  },
+  "labels": [
+    "acceptable",
+    "unusual",
+    "severe"
+  ],
+  "splits": [
+    "calibration",
+    "development",
+    "confirmation"
+  ],
+  "scriptLengths": [
+    "short",
+    "medium",
+    "long"
+  ],
+  "minimumCoverage": {
+    "allPresets": true,
+    "speakerCount": 6,
+    "outputLanguages": [
+      "en",
+      "zh",
+      "ja",
+      "ko"
+    ],
+    "scriptLengths": [
+      "short",
+      "medium",
+      "long"
+    ],
+    "distinctSeeds": 8,
+    "distinctScriptGroups": 6,
+    "listenersPerRow": 3,
+    "minimumLabelAgreement": 0.6666666667
+  },
+  "confirmationGuardrails": {
+    "maximumAcceptableSevereFalseRejectRate": 0.0,
+    "minimumSevereRecall": 0.9,
+    "maximumAcceptableReviewNoticeRate": 0.25
+  },
+  "identity": {
+    "requiredDigests": [
+      "audioDigest",
+      "requestReceiptDigest"
+    ],
+    "blockedSplitKey": [
+      "speakerID",
+      "scriptGroupID",
+      "seed",
+      "outputLanguage"
+    ],
+    "forbiddenFields": [
+      "audioPath",
+      "path",
+      "scriptText",
+      "prompt",
+      "transcript",
+      "rawError"
+    ]
+  },
+  "thresholdChangeAuthority": {
+    "requiresUntouchedConfirmation": true,
+    "requiresIndependentHumanLabels": true,
+    "automaticMetricsMayScreenOnly": true,
+    "sourceChangeRequiresExplicitReview": true,
+    "currentBoundaryRemainsUntilQualified": true
+  }
+}

@@ -1173,6 +1173,25 @@ else
     xcuitest_status=1
     warn "physical-iPhone XCUITest failed; collecting forensics before returning failure"
   fi
+  if [[ "$lane" == "startup-parity" && "$xcuitest_status" -ne 0 ]]; then
+    printf 'scripts/ui_test.sh ios startup-parity --script-file %q\n' \
+      "$startup_parity_script_file" >"$out/exact-manual-rerun-command.txt"
+    if [[ -d "$result" ]] && xcrun xcresulttool get test-results summary \
+        --path "$result" --compact >"$out/xcresult-test-summary.json" 2>"$out/xcresult-summary.log"; then
+      if python3 "$ROOT_DIR/scripts/ios_startup_reliability.py" classify-xcui-bootstrap \
+          --xcodebuild-log "$out/xcodebuild.log" \
+          --xcresult-summary "$out/xcresult-test-summary.json" \
+          --run-id "$run_id" \
+          --output "$out/xcui-bootstrap-classification.json" \
+          >"$out/xcui-bootstrap-classifier.log" 2>&1; then
+        warn "XCUITest failed before any test launched; bootstrap classification retained without retry"
+      else
+        note "startup-parity failure was not eligible for bootstrap classification"
+      fi
+    else
+      note "startup-parity failure has no readable xcresult summary; no bootstrap classification emitted"
+    fi
+  fi
   dsym_status=0
   if ! preserve_ios_ui_dsym; then
     dsym_status=1

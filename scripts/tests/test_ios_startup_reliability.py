@@ -209,6 +209,222 @@ class IOSStartupReliabilityTests(unittest.TestCase):
         with self.assertRaisesRegex(MODULE.ContractError, "forbidden"):
             MODULE.recursively_reject_private_fields({"nested": {"error": "raw"}})
 
+    def test_v2_preparation_evidence_requires_operation_and_reservation_state(self):
+        evidence = {
+            "stage": "after_mlx_cache_clear", "sequence": 2,
+            "capturedAtUptimeSeconds": 42.0, "mlxActiveMB": 100.0,
+            "mlxCacheMB": 0.0, "mlxPeakMB": 500.0, "metalAllocatedMB": 120.0,
+            "physicalFootprintMB": 1_200.0, "availableHeadroomMB": 2_000.0,
+            "hasActiveGeneration": False, "memoryActionInFlight": False,
+            "modelOperationInFlight": False, "generationReservationInFlight": False,
+            "loadedModelID": None, "engineLifecycle": "idle", "violations": [],
+        }
+        MODULE.validate_preparation_evidence(evidence, "take.preparationEvidence[0]")
+        for missing in ("modelOperationInFlight", "generationReservationInFlight"):
+            incomplete = dict(evidence)
+            incomplete.pop(missing)
+            with self.assertRaisesRegex(MODULE.ContractError, "schema v2"):
+                MODULE.validate_preparation_evidence(
+                    incomplete, "take.preparationEvidence[0]"
+                )
+
+    def test_v2_qc_and_generation_scoped_artifacts_fail_closed(self):
+        generation = "00000000-0000-0000-0000-000000000001"
+        evidence = self.root / "artifacts" / "run-1" / "evidence" / generation
+        evidence.mkdir(parents=True)
+        codec = b"VQCT" + (1).to_bytes(4, "little") + (1).to_bytes(4, "little") + (0).to_bytes(4, "little")
+        codec += (2).to_bytes(2, "little") + (4).to_bytes(4, "little", signed=True) + (5).to_bytes(4, "little", signed=True)
+        (evidence / "codec-trace-v1.bin").write_bytes(codec)
+        rejected = b"RIFFfixture"
+        (evidence / "rejected.wav").write_bytes(rejected)
+        artifacts = [
+            {"schemaVersion": 1, "kind": "codec_trace", "sha256": hashlib.sha256(codec).hexdigest(),
+             "byteCount": len(codec), "codecFrameCount": 1,
+             "codeGroupRange": {"minimum": 2, "maximum": 2},
+             "codecChunkRanges": [{"start": 0, "endExclusive": 1}], "complete": True},
+            {"schemaVersion": 1, "kind": "rejected_audio", "sha256": hashlib.sha256(rejected).hexdigest(),
+             "byteCount": len(rejected), "durationSeconds": 3.5},
+        ]
+        MODULE.validate_diagnostic_artifacts(
+            artifacts, "take.diagnosticArtifacts", artifact_dir=self.root / "artifacts",
+            generation_id=generation,
+        )
+        qc = {
+            "algorithmVersion": 4, "instabilityVerdict": "pass",
+            "writtenOutputVerdict": "fail", "verdict": "fail",
+            "flags": ["dropout:2725ms"], "rmsDBFS": -20.0, "dcOffset": 0.0,
+            "peak": 0.8, "clippedSamples": 0, "hotSamples": 0,
+            "nonFiniteSamples": 0, "clickEvents": 0, "longestSilenceMS": 2725,
+            "longestSilenceStartMS": 1400, "durationSeconds": 8.0, "chunkQC": [],
+        }
+        MODULE.validate_audio_qc(qc, "take.audioQC")
+        (evidence / "codec-trace-v1.bin").write_bytes(codec + b"corrupt")
+        with self.assertRaisesRegex(MODULE.ContractError, "do not match"):
+            MODULE.validate_diagnostic_artifacts(
+                artifacts, "take.diagnosticArtifacts", artifact_dir=self.root / "artifacts",
+                generation_id=generation,
+            )
+
+    def test_v2_codec_replay_binds_trace_ranges_audio_and_qc(self):
+        trace_digest = "a" * 64
+        ranges = [{"start": 0, "endExclusive": 2}]
+        codec = {
+            "schemaVersion": 1, "kind": "codec_trace", "sha256": trace_digest,
+            "byteCount": 32, "codecFrameCount": 2,
+            "codeGroupRange": {"minimum": 2, "maximum": 2},
+            "codecChunkRanges": ranges, "complete": True,
+        }
+        incremental = {
+            "schemaVersion": 1, "kind": "incremental_replay_audio",
+            "sha256": "b" * 64, "byteCount": 100, "durationSeconds": 1.0,
+        }
+        full = {
+            "schemaVersion": 1, "kind": "full_replay_audio",
+            "sha256": "c" * 64, "byteCount": 100, "durationSeconds": 1.0,
+        }
+        chunk = {
+            "chunkIndex": 0, "frameOffset": 0, "frameCount": 24_000,
+            "verdict": "pass", "flags": [], "rmsDBFS": -20.0, "peak": 0.7,
+            "clippedSamples": 0, "hotSamples": 0, "nonFiniteSamples": 0,
+            "clickEvents": 0, "longestSilenceMS": 0, "durationSeconds": 1.0,
+        }
+        qc = {
+            "algorithmVersion": 4, "instabilityVerdict": "pass",
+            "writtenOutputVerdict": "pass", "verdict": "pass", "flags": [],
+            "rmsDBFS": -20.0, "dcOffset": 0.0, "peak": 0.7,
+            "clippedSamples": 0, "hotSamples": 0, "nonFiniteSamples": 0,
+            "clickEvents": 0, "longestSilenceMS": 0, "durationSeconds": 1.0,
+            "chunkQC": [chunk],
+        }
+        replay = {
+            "status": "complete", "traceSHA256": trace_digest, "ranges": ranges,
+            "incrementalArtifact": incremental, "incrementalAudioQC": qc,
+            "fullArtifact": full, "fullAudioQC": qc,
+        }
+        MODULE.validate_codec_replay(replay, "take.codecReplay", [codec, incremental, full])
+
+        drifted = json.loads(json.dumps(replay))
+        drifted["ranges"] = [{"start": 0, "endExclusive": 1}]
+        with self.assertRaisesRegex(MODULE.ContractError, "not bound"):
+            MODULE.validate_codec_replay(
+                drifted, "take.codecReplay", [codec, incremental, full]
+            )
+
+        incomplete_chunk = json.loads(json.dumps(qc))
+        incomplete_chunk["chunkQC"][0].pop("peak")
+        replay["incrementalAudioQC"] = incomplete_chunk
+        with self.assertRaisesRegex(MODULE.ContractError, "incomplete"):
+            MODULE.validate_codec_replay(replay, "take.codecReplay", [codec, incremental, full])
+
+    def test_v2_failed_codec_replay_is_typed_and_carries_no_partial_success(self):
+        codec = {
+            "schemaVersion": 1, "kind": "codec_trace", "sha256": "a" * 64,
+            "byteCount": 32, "codecFrameCount": 2,
+            "codeGroupRange": {"minimum": 2, "maximum": 2},
+            "codecChunkRanges": [{"start": 0, "endExclusive": 2}], "complete": True,
+        }
+        failed = {
+            "status": "failed", "traceSHA256": codec["sha256"],
+            "ranges": codec["codecChunkRanges"], "failureCode": "decoder_replay_failed",
+        }
+        MODULE.validate_codec_replay(failed, "take.codecReplay", [codec])
+        failed["fullArtifact"] = {"kind": "full_replay_audio"}
+        with self.assertRaisesRegex(MODULE.ContractError, "completed evidence"):
+            MODULE.validate_codec_replay(failed, "take.codecReplay", [codec])
+
+    def test_process_exit_composition_represents_every_planned_take(self):
+        artifacts = self.root / "exit"; artifacts.mkdir()
+        partial = {
+            "takeIndex": 1, "takeID": "cold-1", "generationID": "00000000-0000-0000-0000-000000000001",
+            "classification": "success",
+        }
+        (artifacts / "startup-reliability-take-001.json").write_text(json.dumps(partial))
+        output = self.root / "forensics.json"
+        result = MODULE.compose_process_exit(self.plan_path, artifacts, "run-1", output)
+        self.assertEqual(result["rows"][0]["status"], "represented")
+        self.assertEqual(result["rows"][1]["status"], "process_terminated")
+        self.assertNotIn("generationID", result["rows"][1])
+
+    def test_system_crash_sanitization_classifies_only_allowlisted_process(self):
+        crashes = self.root / "crashes"; crashes.mkdir()
+        report = {
+            "procName": "Vocello", "timestamp": "2026-08-24T00:00:00Z",
+            "termination": {"reason": "jetsam per-process-limit"},
+            "physFootprint": 5 * 1024 * 1024 * 1024,
+            "path": "/private/forbidden",
+        }
+        (crashes / "one.ips").write_text(json.dumps(report))
+        (crashes / "other.ips").write_text(json.dumps({"procName": "Other", "reason": "jetsam"}))
+        output = self.root / "crash-summary.json"
+        result = MODULE.sanitize_system_crashes(crashes, output, {"Vocello"})
+        self.assertEqual(len(result["reports"]), 1)
+        self.assertEqual(result["reports"][0]["classification"], "jetsam")
+        self.assertNotIn("path", output.read_text())
+
+    def test_xcui_bootstrap_classifier_requires_zero_launched_tests(self):
+        log = self.root / "xcui.log"
+        log.write_text("Timed out while enabling automation mode\n", encoding="utf-8")
+        summary = self.root / "summary.json"
+        summary.write_text(json.dumps({"totalTestCount": 0}), encoding="utf-8")
+        output = self.root / "bootstrap.json"
+        result = MODULE.classify_xcui_bootstrap(log, summary, "run-1", output)
+        self.assertEqual(result["status"], "infrastructure_bootstrap_failure")
+        summary.write_text(json.dumps({"totalTestCount": 1}), encoding="utf-8")
+        with self.assertRaisesRegex(MODULE.ContractError, "zero launched"):
+            MODULE.classify_xcui_bootstrap(log, summary, "run-1", output)
+        summary.write_text(json.dumps({"totalTestCount": 0}), encoding="utf-8")
+        log.write_text("Timed out while enabling automation mode\nTest Case '-[Suite test]' failed\n")
+        with self.assertRaisesRegex(MODULE.ContractError, "forbids"):
+            MODULE.classify_xcui_bootstrap(log, summary, "run-1", output)
+
+    def test_xcui_bootstrap_classifier_accepts_xcresult_runner_failure_count(self):
+        log = self.root / "xcui-runner.log"
+        log.write_text(
+            "Failed to initialize for UI testing: Timed out while enabling automation mode.\n",
+            encoding="utf-8",
+        )
+        summary = self.root / "runner-summary.json"
+        summary.write_text(json.dumps({
+            "result": "Failed",
+            "totalTestCount": 1,
+            "passedTests": 0,
+            "failedTests": 1,
+            "skippedTests": 0,
+            "testFailures": [{
+                "failureText": (
+                    "The test runner failed to initialize for UI testing. "
+                    "(Underlying Error: Timed out while enabling automation mode.)"
+                ),
+                "targetName": "VocelloiOSUITests",
+                "testIdentifier": 1,
+                "testIdentifierString": (
+                    "VocelloiOSUITests-Runner (61727) encountered an error"
+                ),
+                "testName": "VocelloiOSUITests-Runner (61727) encountered an error",
+            }],
+        }), encoding="utf-8")
+        output = self.root / "runner-bootstrap.json"
+        result = MODULE.classify_xcui_bootstrap(log, summary, "run-1", output)
+        self.assertEqual(result["testCaseCount"], 0)
+        self.assertEqual(result["xcresultReportedTestCount"], 1)
+        self.assertEqual(result["runnerFailureCount"], 1)
+
+        actual_test_summary = json.loads(summary.read_text(encoding="utf-8"))
+        actual_test_summary["testFailures"][0].update({
+            "testName": "testVisibleJourney()",
+            "testIdentifierString": "Suite/testVisibleJourney()",
+            "testIdentifierURL": "test://example/Suite/testVisibleJourney",
+        })
+        summary.write_text(json.dumps(actual_test_summary), encoding="utf-8")
+        with self.assertRaisesRegex(MODULE.ContractError, "zero launched"):
+            MODULE.classify_xcui_bootstrap(log, summary, "run-1", output)
+
+        mixed_summary = json.loads(summary.read_text(encoding="utf-8"))
+        mixed_summary.update({"totalTestCount": 2, "passedTests": 1})
+        summary.write_text(json.dumps(mixed_summary), encoding="utf-8")
+        with self.assertRaisesRegex(MODULE.ContractError, "zero launched"):
+            MODULE.classify_xcui_bootstrap(log, summary, "run-1", output)
+
     def test_failed_take_can_preserve_unknown_boundary_without_fabricating_receipt(self):
         artifacts = self.root / "unknown"; artifacts.mkdir()
         observed = []
@@ -266,9 +482,12 @@ class IOSStartupReliabilityTests(unittest.TestCase):
         source = (ROOT / "scripts" / "ios_device.sh").read_text(encoding="utf-8")
         helpers = (
             "pull_startup_reliability_run() {",
+            "cleanup_startup_reliability_device_evidence() {",
             "startup_reliability_process_is_alive() {",
             "wait_startup_reliability_result() {",
             "snapshot_startup_reliability_crashes() {",
+            "snapshot_startup_reliability_system_crashes() {",
+            "collect_startup_reliability_system_crash_delta() {",
         )
         for helper in helpers:
             self.assertEqual(source.count(helper), 1)
@@ -308,6 +527,14 @@ class IOSStartupReliabilityTests(unittest.TestCase):
         self.assertIn("return 27", wait_body)
         self.assertNotIn('cmd_pull "$dest"', wait_body)
 
+        cleanup_body = source[
+            source.index("cleanup_startup_reliability_device_evidence() {"):
+            source.index("wait_startup_reliability_result() {")
+        ]
+        self.assertIn('marker="$cleanup_pull/${run_id}.json"', cleanup_body)
+        self.assertIn('--destination "$marker"', cleanup_body)
+        self.assertNotIn('--destination "$cleanup_pull"', cleanup_body)
+
         liveness_body = source[
             source.index("startup_reliability_process_is_alive() {"):
             source.index("wait_startup_reliability_result() {")
@@ -333,6 +560,8 @@ class IOSStartupReliabilityTests(unittest.TestCase):
         self.assertIn("diagnostics/crashes", crash_body)
         self.assertIn("CoreDeviceError error 7000", crash_body)
         self.assertIn("--timeout 30", crash_body)
+        self.assertIn("systemCrashLogs", crash_body)
+        self.assertIn("compose-process-exit", command_body)
 
         ui_source = (ROOT / "scripts" / "ui_test.sh").read_text(encoding="utf-8")
         ui_crash_body = ui_source[
@@ -369,6 +598,8 @@ class IOSStartupReliabilityTests(unittest.TestCase):
             3,
             "the UI mirror must preserve the global export and add a run-scoped export",
         )
+        self.assertIn("classify-xcui-bootstrap", ui_source)
+        self.assertIn("exact-manual-rerun-command.txt", ui_source)
 
 
 if __name__ == "__main__":

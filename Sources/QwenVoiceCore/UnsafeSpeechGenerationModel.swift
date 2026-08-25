@@ -170,6 +170,23 @@ final class UnsafeSpeechGenerationModel: Sendable {
         await engine.resetPreparationDiagnostics()
     }
 
+    func replayCodecTrace(
+        frames: [[Int32]],
+        incrementalRanges: [StartupReliabilityCodecFrameRange]
+    ) async throws -> StartupReliabilityCodecReplayResult {
+        let replay = try await engine.replayCodecTrace(
+            frames: frames,
+            incrementalRanges: incrementalRanges.map {
+                VocelloQwen3CodecFrameRange(start: $0.start, endExclusive: $0.endExclusive)
+            }
+        )
+        return StartupReliabilityCodecReplayResult(
+            incrementalAudio: replay.incrementalAudio,
+            fullAudio: replay.fullAudio,
+            sampleRate: replay.sampleRate
+        )
+    }
+
     var supportsDedicatedCustomVoice: Bool { facts.capabilities.contains(.customVoice) }
     var supportsOptimizedCustomVoice: Bool { facts.capabilities.contains(.customVoice) }
     var supportsOptimizedVoiceDesign: Bool { facts.capabilities.contains(.voiceDesign) }

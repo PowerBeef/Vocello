@@ -5,6 +5,7 @@ import MLX
 import OSLog
 
 enum NativeRuntimeStage: String, Codable, Sendable {
+    case requestValidation
     case preparedCacheValidation
     case preparedCacheRebuild
     case tokenizerPreparation
@@ -20,6 +21,8 @@ enum NativeRuntimeStage: String, Codable, Sendable {
 
     var description: String {
         switch self {
+        case .requestValidation:
+            return "request validation"
         case .preparedCacheValidation:
             return "prepared cache validation"
         case .preparedCacheRebuild:
@@ -324,6 +327,29 @@ actor NativeEngineRuntime {
         await activeTelemetrySampler?.captureBoundary("memory_unload")
         await telemetryRecorder?.mark(
             metadata: MemoryUnloadMetadata(reason: "runtime_unload", source: .runtime)
+        )
+    }
+
+    func replayStartupReliabilityCodecTrace(
+        request: GenerationRequest,
+        frames: [[Int32]],
+        incrementalRanges: [StartupReliabilityCodecFrameRange]
+    ) async throws -> StartupReliabilityCodecReplayResult {
+        guard TelemetryGate.resolvedEnabled, request.captureCodecTrace == true else {
+            throw NativeRuntimeError(
+                stage: .requestValidation,
+                message: "Codec replay requires the gated startup-reliability trace request."
+            )
+        }
+        let loadResult = try await loadModel(
+            id: request.modelID,
+            capabilityProfile: NativeLoadCapabilityProfile(for: request),
+            preserveActiveClonePrimeToken: false,
+            signpostGenerationID: request.generationID
+        )
+        return try await loadResult.model.replayCodecTrace(
+            frames: frames,
+            incrementalRanges: incrementalRanges
         )
     }
 
@@ -996,7 +1022,8 @@ actor NativeEngineRuntime {
                 pendingFrameLimit: chunkPolicy.pendingFrameLimit,
                 materializationLeadSteps: chunkPolicy.materializationLeadSteps
             ),
-            executionStyle: request.shouldStream ? .streaming : .qualityFirst
+            executionStyle: request.shouldStream ? .streaming : .qualityFirst,
+            captureCodecTrace: request.captureCodecTrace == true
         )
     }
 

@@ -986,6 +986,57 @@ pull_startup_reliability_run() {
     --destination "$run_destination" --timeout 60 --quiet
 }
 
+# After host validation succeeds, relaunch the diagnostics build with a
+# narrowly registered cleanup request. The app removes the collected run and
+# generation-scoped WAV/codec artifacts from both containers, then writes a
+# small privacy-safe acknowledgement outside the removed run directory.
+cleanup_startup_reliability_device_evidence() {
+  local run_id="$1" dev="$2" artifacts="$3"
+  local env_json launch_json="$artifacts/cleanup-launch.json" cleanup_pid=""
+  local cleanup_pull="$artifacts/cleanup-pull"
+  env_json="$(python3 -c '
+import json, sys
+run_id = sys.argv[1]
+print(json.dumps({
+    "QWENVOICE_DEBUG": "1",
+    "QWENVOICE_NATIVE_TELEMETRY_MODE": "verbose",
+    "QVOICE_IOS_DEVICE_RUN_ID": run_id,
+    "QVOICE_IOS_DEVICE_DELIVERY_RELIABILITY_CLEANUP_RUN_ID": run_id,
+}, sort_keys=True))
+' "$run_id")"
+  xcrun devicectl device process launch --device "$dev" --terminate-existing \
+    -e "$env_json" --json-output "$launch_json" "$BUNDLE_ID" \
+    >"$artifacts/cleanup-launch.log" 2>&1 || return 1
+  cleanup_pid="$(read_devicectl_launch_pid "$launch_json")" || return 1
+  rm -f "$launch_json"
+  [[ "$cleanup_pid" =~ ^[0-9]+$ ]] || return 1
+  mkdir -p "$cleanup_pull"
+  local waited=0 marker="$cleanup_pull/${run_id}.json"
+  while (( waited < 30 )); do
+    sleep 1
+    waited=$((waited + 1))
+    xcrun devicectl device copy from --device "$dev" \
+      --domain-type appDataContainer --domain-identifier "$BUNDLE_ID" \
+      --source "Library/Caches/Vocello/diagnostics/cleanup/${run_id}.json" \
+      --destination "$marker" --timeout 15 --quiet >/dev/null 2>&1 || true
+    [[ -f "$marker" ]] || continue
+    python3 - "$marker" "$run_id" <<'PY' || return 1
+import json, sys
+value = json.load(open(sys.argv[1], encoding="utf-8"))
+expected = {"schemaVersion": 1, "status": "collected_evidence_removed", "runID": sys.argv[2]}
+raise SystemExit(0 if value == expected else 1)
+PY
+    cp "$marker" "$artifacts/device-evidence-cleanup.json"
+    xcrun devicectl device process terminate --device "$dev" \
+      --pid "$cleanup_pid" --quiet >/dev/null 2>&1 || true
+    rm -rf "$cleanup_pull"
+    return 0
+  done
+  xcrun devicectl device process terminate --device "$dev" \
+    --pid "$cleanup_pid" --quiet >/dev/null 2>&1 || true
+  return 1
+}
+
 # Query only the exact CoreDevice PID returned by the launch response. An empty
 # successful result means that process has exited; a failed query is unknown and
 # must not be mistaken for process death. The temporary inventory is never retained
@@ -1084,6 +1135,45 @@ snapshot_startup_reliability_crashes() {
   done < <(find "$pulled" -type f -path '*/crashes/*' -print0 2>/dev/null) \
     | LC_ALL=C sort -u >"$destination/hashes.txt"
   rm -rf "$pulled"
+}
+
+# Snapshot CoreDevice's systemCrashLogs domain. Raw reports remain local and
+# untracked; callers compare content hashes and sanitize only the new delta.
+snapshot_startup_reliability_system_crashes() {
+  local destination="$1"
+  local pulled="$destination/pull"
+  local dev; dev="$(resolve_device)"
+  mkdir -p "$pulled"
+  if ! xcrun devicectl device copy from --device "$dev" \
+      --domain-type systemCrashLogs --source . --destination "$pulled" \
+      --timeout 60 --quiet >"$destination/pull.log" 2>&1; then
+    warn "could not collect CoreDevice systemCrashLogs snapshot"
+    return 1
+  fi
+  while IFS= read -r -d '' crash; do
+    local hash
+    hash="$(shasum -a 256 "$crash" | awk '{print $1}')"
+    printf '%s\t%s\n' "$hash" "$crash"
+  done < <(find "$pulled" -type f -print0 2>/dev/null) \
+    | LC_ALL=C sort -u >"$destination/inventory.tsv"
+  cut -f1 "$destination/inventory.tsv" | LC_ALL=C sort -u >"$destination/hashes.txt"
+}
+
+collect_startup_reliability_system_crash_delta() {
+  local before="$1" after="$2" destination="$3"
+  mkdir -p "$destination/raw"
+  comm -13 "$before/hashes.txt" "$after/hashes.txt" >"$destination/new-hashes.txt" || true
+  while IFS= read -r hash; do
+    [[ -n "$hash" ]] || continue
+    local source
+    source="$(awk -F '\t' -v target="$hash" '$1 == target {print $2; exit}' "$after/inventory.tsv")"
+    [[ -n "$source" && -f "$source" ]] || continue
+    cp "$source" "$destination/raw/${hash}.ips"
+  done <"$destination/new-hashes.txt"
+  python3 "$ROOT_DIR/scripts/ios_startup_reliability.py" sanitize-system-crashes \
+    --input-dir "$destination/raw" \
+    --process Vocello --process com.patricedery.vocello \
+    --output "$destination/system-crash-summary.json"
 }
 
 read_devicectl_launch_pid() {
@@ -2022,6 +2112,9 @@ cmd_delivery_reliability() {
   cmd_install >/dev/null
   snapshot_startup_reliability_crashes "$artifacts/crashes-before" \
     || { rm -f "$launch_spec"; die "could not establish the pre-run crash baseline"; }
+  snapshot_startup_reliability_system_crashes "$artifacts/system-crashes-before" \
+    || { rm -f "$launch_spec"; die "could not establish the pre-run systemCrashLogs baseline"; }
+  rm -rf "$artifacts/system-crashes-before/pull"
   dev="$(resolve_device)"
   export QVOICE_IOS_DEVICE_DELIVERY_RELIABILITY_SPEC="$(<"$launch_spec")"
   export QVOICE_IOS_DEVICE_RUN_ID="$run_id"
@@ -2061,6 +2154,8 @@ print(json.dumps({"QWENVOICE_DEBUG": "1", **{key: os.environ[key] for key in key
   wait_startup_reliability_result "$run_id" "$timeout" "$pulled" "$dev" "$target_pid" >/dev/null
   wait_status=$?
   set -e
+  local process_exited=0
+  (( wait_status == 27 )) && process_exited=1
   # Forensics are mandatory even after a timeout, typed failure, or disconnected
   # device. Keep each collection best-effort so the first failure is not erased.
   pull_startup_reliability_run "$run_id" "$pulled" >"$artifacts/final-pull.log" 2>&1 || true
@@ -2068,6 +2163,23 @@ print(json.dumps({"QWENVOICE_DEBUG": "1", **{key: os.environ[key] for key in key
     warn "could not establish the post-run crash snapshot"
     wait_status=26
   fi
+  if ! snapshot_startup_reliability_system_crashes "$artifacts/system-crashes-after"; then
+    warn "could not establish the post-run systemCrashLogs snapshot"
+    wait_status=26
+  elif ! collect_startup_reliability_system_crash_delta \
+      "$artifacts/system-crashes-before" "$artifacts/system-crashes-after" \
+      "$artifacts/system-crash-delta"; then
+    warn "could not sanitize the system crash-log delta"
+    wait_status=26
+  elif python3 - "$artifacts/system-crash-delta/system-crash-summary.json" <<'PY'
+import json, sys
+raise SystemExit(0 if json.load(open(sys.argv[1], encoding="utf-8")).get("reports") else 1)
+PY
+  then
+    warn "startup-reliability produced a correlated system crash-log delta"
+    wait_status=25
+  fi
+  rm -rf "$artifacts/system-crashes-after/pull"
   local crash_delta
   crash_delta="$(comm -13 "$artifacts/crashes-before/hashes.txt" "$artifacts/crashes-after/hashes.txt" 2>/dev/null || true)"
   if [[ -n "$crash_delta" ]]; then
@@ -2077,11 +2189,20 @@ print(json.dumps({"QWENVOICE_DEBUG": "1", **{key: os.environ[key] for key in key
   eval "$cleanup_command"
   trap - EXIT
 
+  if (( process_exited == 1 )); then
+    python3 "$ROOT_DIR/scripts/ios_startup_reliability.py" compose-process-exit \
+      --plan "$plan" --artifact-dir "$pulled" --run-id "$run_id" \
+      --output "$artifacts/startup-reliability-forensics.json" \
+      || warn "could not compose the process-exit forensic summary"
+  fi
+
   (( wait_status == 0 )) \
     || die "startup-reliability run did not produce acceptable terminal evidence (status=$wait_status; see $artifacts)"
   python3 "$ROOT_DIR/scripts/ios_startup_reliability.py" validate-result \
     --plan "$plan" --artifact-dir "$pulled" --run-id "$run_id" \
     || die "startup-reliability evidence validation failed (see $artifacts)"
+  cleanup_startup_reliability_device_evidence "$run_id" "$dev" "$artifacts" \
+    || die "startup-reliability evidence was collected but device cleanup failed (see $artifacts)"
   note "startup reliability evidence → $artifacts"
 }
 

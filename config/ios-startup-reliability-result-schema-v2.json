@@ -1,0 +1,159 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vocello.local/schemas/ios-startup-reliability-result-v2.json",
+  "title": "Vocello iOS startup reliability result v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "status", "runID", "scriptSHA256", "scriptCharacters", "plannedTakeCount", "representedTakeCount", "startedAt", "finishedAt", "startingDeviceState", "finishingDeviceState", "takes"],
+  "properties": {
+    "schemaVersion": {"const": 2},
+    "status": {"enum": ["pass", "diagnosed_failure"]},
+    "runID": {"$ref": "#/$defs/safeID"},
+    "scriptSHA256": {"$ref": "#/$defs/sha256"},
+    "scriptCharacters": {"type": "integer", "minimum": 1, "maximum": 2000},
+    "plannedTakeCount": {"type": "integer", "minimum": 1, "maximum": 128},
+    "representedTakeCount": {"type": "integer", "minimum": 1, "maximum": 128},
+    "startedAt": {"type": "string", "format": "date-time"},
+    "finishedAt": {"type": "string", "format": "date-time"},
+    "startingDeviceState": {"$ref": "#/$defs/deviceState"},
+    "finishingDeviceState": {"$ref": "#/$defs/deviceState"},
+    "takes": {"type": "array", "minItems": 1, "maxItems": 128, "items": {"$ref": "#/$defs/take"}}
+  },
+  "$defs": {
+    "safeID": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,95}$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "nullableSHA256": {"oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
+    "frameRange": {
+      "type": "object", "additionalProperties": false, "required": ["start", "endExclusive"],
+      "properties": {"start": {"type": "integer", "minimum": 0}, "endExclusive": {"type": "integer", "minimum": 1}}
+    },
+    "boundary": {
+      "type": "object", "additionalProperties": false, "required": ["boundary", "tMS"],
+      "properties": {
+        "boundary": {"enum": ["request_validated", "memory_admitted", "model_load_started", "model_loaded", "prewarm_started", "prewarm_completed", "generation_reserved", "audio_consumer_claimed", "session_directory_created", "engine_opened", "first_model_token", "first_audio_code_group", "first_decoded_audio_frame", "first_published_stream_chunk"]},
+        "tMS": {"type": "integer", "minimum": 0}
+      }
+    },
+    "receipt": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schemaVersion", "generationID", "generationIdentityDigest", "requestIdentityDigest", "sessionIdentityDigest", "prewarmIdentityDigest", "modelID", "instructionCharacters", "language", "seed", "seedSource", "variation", "streaming", "warmState", "retryAttempt", "operationGeneration"],
+      "properties": {
+        "schemaVersion": {"const": 1}, "generationID": {"type": "string", "format": "uuid"},
+        "generationIdentityDigest": {"$ref": "#/$defs/sha256"}, "requestIdentityDigest": {"$ref": "#/$defs/sha256"},
+        "sessionIdentityDigest": {"$ref": "#/$defs/sha256"}, "prewarmIdentityDigest": {"$ref": "#/$defs/sha256"},
+        "modelID": {"$ref": "#/$defs/safeID"}, "speakerID": {"type": ["string", "null"]},
+        "deliveryID": {"type": ["string", "null"]}, "instructionDigest": {"$ref": "#/$defs/nullableSHA256"},
+        "instructionCharacters": {"type": "integer", "minimum": 0}, "language": {"$ref": "#/$defs/safeID"},
+        "seed": {"type": "integer", "minimum": 0}, "seedSource": {"enum": ["requested", "generated"]},
+        "variation": {"enum": ["expressive", "balanced", "consistent"]}, "streaming": {"type": "boolean"},
+        "warmState": {"enum": ["cold", "warm"]}, "predecessorIdentityDigest": {"$ref": "#/$defs/nullableSHA256"},
+        "retryAttempt": {"type": "integer", "minimum": 0, "maximum": 1}, "operationGeneration": {"type": "integer", "minimum": 0}
+      }
+    },
+    "attempt": {
+      "type": "object", "additionalProperties": false,
+      "required": ["retryAttempt", "finishReason", "requestReceipt", "startupTimeline"],
+      "properties": {
+        "retryAttempt": {"type": "integer", "minimum": 0, "maximum": 1}, "finishReason": {"$ref": "#/$defs/safeID"},
+        "requestReceipt": {"$ref": "#/$defs/receipt"}, "startupTimeline": {"type": "array", "items": {"$ref": "#/$defs/boundary"}}
+      }
+    },
+    "output": {
+      "type": "object", "additionalProperties": false, "required": ["sha256", "byteCount", "durationSeconds"],
+      "properties": {"sha256": {"$ref": "#/$defs/sha256"}, "byteCount": {"type": "integer", "minimum": 1}, "durationSeconds": {"type": "number", "exclusiveMinimum": 0}}
+    },
+    "artifact": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schemaVersion", "kind", "sha256", "byteCount"],
+      "properties": {
+        "schemaVersion": {"const": 1}, "kind": {"enum": ["codec_trace", "rejected_audio", "incremental_replay_audio", "full_replay_audio"]},
+        "sha256": {"$ref": "#/$defs/sha256"}, "byteCount": {"type": "integer", "minimum": 1},
+        "durationSeconds": {"type": ["number", "null"], "exclusiveMinimum": 0},
+        "codecFrameCount": {"type": ["integer", "null"], "minimum": 0},
+        "codeGroupRange": {"oneOf": [{"type": "null"}, {"type": "object", "additionalProperties": false, "required": ["minimum", "maximum"], "properties": {"minimum": {"type": "integer", "minimum": 1}, "maximum": {"type": "integer", "minimum": 1}}}]},
+        "codecChunkRanges": {"type": ["array", "null"], "maxItems": 8192, "items": {"$ref": "#/$defs/frameRange"}},
+        "complete": {"type": ["boolean", "null"]}
+      }
+    },
+    "audioQCChunk": {
+      "type": "object", "additionalProperties": false,
+      "required": ["chunkIndex", "frameOffset", "frameCount", "verdict", "flags", "peak", "clippedSamples", "hotSamples", "nonFiniteSamples", "clickEvents", "longestSilenceMS", "durationSeconds"],
+      "properties": {
+        "chunkIndex": {"type": "integer", "minimum": 0}, "frameOffset": {"type": "integer", "minimum": 0}, "frameCount": {"type": "integer", "minimum": 1},
+        "verdict": {"enum": ["pass", "warn", "fail"]}, "flags": {"type": "array", "items": {"type": "string"}},
+        "rmsDBFS": {"type": ["number", "null"]}, "peak": {"type": "number", "minimum": 0},
+        "clippedSamples": {"type": "integer", "minimum": 0}, "hotSamples": {"type": "integer", "minimum": 0},
+        "nonFiniteSamples": {"type": "integer", "minimum": 0}, "clickEvents": {"type": "integer", "minimum": 0},
+        "longestSilenceMS": {"type": "integer", "minimum": 0}, "firstNonFiniteSample": {"type": ["integer", "null"], "minimum": 0},
+        "firstClipSample": {"type": ["integer", "null"], "minimum": 0}, "longestSilenceStartMS": {"type": ["integer", "null"], "minimum": 0},
+        "durationSeconds": {"type": "number", "minimum": 0}
+      }
+    },
+    "audioQC": {
+      "type": "object", "additionalProperties": false,
+      "required": ["algorithmVersion", "instabilityVerdict", "writtenOutputVerdict", "verdict", "flags", "peak", "clippedSamples", "hotSamples", "nonFiniteSamples", "clickEvents", "longestSilenceMS", "durationSeconds"],
+      "properties": {
+        "algorithmVersion": {"type": "integer", "minimum": 1}, "instabilityVerdict": {"enum": ["pass", "warn", "fail"]},
+        "writtenOutputVerdict": {"enum": ["pass", "warn", "fail"]}, "verdict": {"enum": ["pass", "warn", "fail"]},
+        "flags": {"type": "array", "items": {"type": "string"}}, "rmsDBFS": {"type": ["number", "null"]},
+        "dcOffset": {"type": ["number", "null"]}, "peak": {"type": "number", "minimum": 0},
+        "clippedSamples": {"type": "integer", "minimum": 0}, "hotSamples": {"type": "integer", "minimum": 0},
+        "nonFiniteSamples": {"type": "integer", "minimum": 0}, "clickEvents": {"type": "integer", "minimum": 0},
+        "longestSilenceMS": {"type": "integer", "minimum": 0}, "firstNonFiniteSample": {"type": ["integer", "null"], "minimum": 0},
+        "firstClipSample": {"type": ["integer", "null"], "minimum": 0}, "longestSilenceStartMS": {"type": ["integer", "null"], "minimum": 0},
+        "durationSeconds": {"type": "number", "minimum": 0},
+        "chunkQC": {"type": ["array", "null"], "items": {"$ref": "#/$defs/audioQCChunk"}}
+      }
+    },
+    "codecReplay": {
+      "type": "object", "additionalProperties": false, "required": ["status", "traceSHA256", "ranges"],
+      "properties": {
+        "status": {"enum": ["complete", "failed"]}, "failureCode": {"type": ["string", "null"]},
+        "traceSHA256": {"$ref": "#/$defs/sha256"}, "ranges": {"type": "array", "minItems": 1, "maxItems": 8192, "items": {"$ref": "#/$defs/frameRange"}},
+        "incrementalArtifact": {"oneOf": [{"$ref": "#/$defs/artifact"}, {"type": "null"}]},
+        "incrementalAudioQC": {"oneOf": [{"$ref": "#/$defs/audioQC"}, {"type": "null"}]},
+        "fullArtifact": {"oneOf": [{"$ref": "#/$defs/artifact"}, {"type": "null"}]},
+        "fullAudioQC": {"oneOf": [{"$ref": "#/$defs/audioQC"}, {"type": "null"}]}
+      }
+    },
+    "preparationEvidence": {
+      "type": "object", "additionalProperties": false,
+      "required": ["stage", "sequence", "capturedAtUptimeSeconds", "hasActiveGeneration", "memoryActionInFlight", "modelOperationInFlight", "generationReservationInFlight", "engineLifecycle", "violations"],
+      "properties": {
+        "stage": {"$ref": "#/$defs/safeID"}, "sequence": {"type": "integer", "minimum": 0},
+        "capturedAtUptimeSeconds": {"type": "number", "minimum": 0},
+        "mlxActiveMB": {"type": ["number", "null"], "minimum": 0}, "mlxCacheMB": {"type": ["number", "null"], "minimum": 0},
+        "mlxPeakMB": {"type": ["number", "null"], "minimum": 0}, "metalAllocatedMB": {"type": ["number", "null"], "minimum": 0},
+        "physicalFootprintMB": {"type": ["number", "null"], "minimum": 0}, "availableHeadroomMB": {"type": ["number", "null"], "minimum": 0},
+        "hasActiveGeneration": {"type": "boolean"}, "memoryActionInFlight": {"type": "boolean"},
+        "modelOperationInFlight": {"type": "boolean"}, "generationReservationInFlight": {"type": "boolean"},
+        "loadedModelID": {"type": ["string", "null"]}, "engineLifecycle": {"$ref": "#/$defs/safeID"},
+        "violations": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/safeID"}}
+      }
+    },
+    "deviceState": {
+      "type": "object", "additionalProperties": false, "required": ["lowPowerModeEnabled", "thermalState", "modelInstalled"],
+      "properties": {"lowPowerModeEnabled": {"type": "boolean"}, "thermalState": {"enum": ["nominal", "fair", "serious", "critical", "unknown"]}, "modelInstalled": {"type": "boolean"}, "loadedModelID": {"type": ["string", "null"]}}
+    },
+    "take": {
+      "type": "object", "additionalProperties": false,
+      "required": ["takeIndex", "takeID", "generationID", "status", "preparation", "prePreparationStoreWarmState", "preRequestStoreWarmState", "preparationEvidence", "attempts", "startupTimeline", "classification", "audioQC", "diagnosticArtifacts"],
+      "properties": {
+        "takeIndex": {"type": "integer", "minimum": 1, "maximum": 128}, "takeID": {"$ref": "#/$defs/safeID"},
+        "generationID": {"type": "string", "format": "uuid"}, "status": {"enum": ["pass", "failed"]},
+        "preparation": {"enum": ["production", "full_runtime_unload", "prepared_cache_clear", "prewarm_disabled"]},
+        "prePreparationStoreWarmState": {"enum": ["cold", "warm"]}, "preRequestStoreWarmState": {"enum": ["cold", "warm"]},
+        "preparationEvidence": {"type": "array", "minItems": 1, "maxItems": 40, "items": {"$ref": "#/$defs/preparationEvidence"}},
+        "requestReceipt": {"oneOf": [{"$ref": "#/$defs/receipt"}, {"type": "null"}]},
+        "attempts": {"type": "array", "maxItems": 2, "items": {"$ref": "#/$defs/attempt"}},
+        "startupTimeline": {"type": "array", "items": {"$ref": "#/$defs/boundary"}},
+        "failureCode": {"type": ["string", "null"]},
+        "classification": {"enum": ["success", "pre_audio_startup", "post_generation_qc", "timeout", "cancelled", "memory_failure", "crash", "unmaterialized_unknown"]},
+        "output": {"oneOf": [{"$ref": "#/$defs/output"}, {"type": "null"}]},
+        "audioQC": {"oneOf": [{"$ref": "#/$defs/audioQC"}, {"type": "null"}]},
+        "diagnosticArtifacts": {"type": "array", "maxItems": 4, "items": {"$ref": "#/$defs/artifact"}},
+        "codecReplay": {"oneOf": [{"$ref": "#/$defs/codecReplay"}, {"type": "null"}]}
+      }
+    }
+  }
+}

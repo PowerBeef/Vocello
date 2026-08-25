@@ -1,0 +1,237 @@
+{
+  "schemaVersion": 1,
+  "status": "active-experimental",
+  "boundary": "Operator-local automatic acoustic screening only. It may reject, rank, or retain a prompt candidate, but it has no semantic promotion authority, cannot claim human-perceived superiority, cannot publish evidence, and cannot alter production copy without the separately governed DP-31/DP-32 authority.",
+  "baselineArm": "current",
+  "resultVocabulary": [
+    "automatic_acoustic_improvement",
+    "no_measured_improvement",
+    "regression",
+    "inconclusive",
+    "abstained_out_of_distribution"
+  ],
+  "candidatePriority": [
+    "happy-acoustic-v2",
+    "happy-emotion-acoustic-v2",
+    "angry-emotion-acoustic-v2",
+    "fearful-urgent-v2",
+    "fearful-structured-v2",
+    "surprised-onset-v2"
+  ],
+  "stableControls": [
+    "neutral",
+    "sad",
+    "calm",
+    "whisper"
+  ],
+  "candidates": [
+    {
+      "id": "happy-acoustic-v2",
+      "targetPreset": "happy",
+      "competingPreset": "surprised",
+      "instruction": "Use a bright slightly higher pitch, lively upward melody, smiling resonance, and buoyant pacing.",
+      "instructionSHA256": "d6c08dba5114369ada02880f21aeba61dee6a24543f14770c399cbd42606a3e6",
+      "expectedGlobal": [
+        {"feature": "pitch_shift_semitones", "direction": 1, "weight": 1.0},
+        {"feature": "arousal_score", "direction": 1, "weight": 1.0},
+        {"feature": "rate_delta_hz", "direction": 1, "weight": 1.0},
+        {"feature": "voice_tension_score", "direction": 1, "weight": 0.5}
+      ],
+      "expectedTemporal": [
+        {"feature": "cadenceAccelerationHz", "direction": 1, "weight": 0.5}
+      ]
+    },
+    {
+      "id": "happy-emotion-acoustic-v2",
+      "targetPreset": "happy",
+      "competingPreset": "surprised",
+      "instruction": "Sound unmistakably happy and delighted. Use a bright slightly higher pitch, lively upward melody, smiling resonance, and buoyant pacing.",
+      "instructionSHA256": "b2923acc5fa78507a26cce134ee81594d3d48e4f7154dea71efcd42ef98c0789",
+      "expectedGlobal": [
+        {"feature": "pitch_shift_semitones", "direction": 1, "weight": 1.0},
+        {"feature": "arousal_score", "direction": 1, "weight": 1.0},
+        {"feature": "rate_delta_hz", "direction": 1, "weight": 1.0},
+        {"feature": "voice_tension_score", "direction": 1, "weight": 0.5}
+      ],
+      "expectedTemporal": [
+        {"feature": "cadenceAccelerationHz", "direction": 1, "weight": 0.5}
+      ]
+    },
+    {
+      "id": "angry-emotion-acoustic-v2",
+      "targetPreset": "angry",
+      "competingPreset": "happy",
+      "instruction": "Sound fiercely angry and frustrated. Use a tense, forceful voice, hard clipped consonants, strong energy, and fast emphatic pacing.",
+      "instructionSHA256": "e029abc96a23c5afe766f0dd1e57335ac1791074bc5882e86754b9d92d7e9fdf",
+      "expectedGlobal": [
+        {"feature": "arousal_score", "direction": 1, "weight": 1.0},
+        {"feature": "voice_tension_score", "direction": 1, "weight": 1.0},
+        {"feature": "rate_delta_hz", "direction": 1, "weight": 1.0},
+        {"feature": "voice_breathiness_score", "direction": -1, "weight": 0.5}
+      ],
+      "expectedTemporal": [
+        {"feature": "tensionPersistence", "direction": 1, "weight": 0.5},
+        {"feature": "contourAbruptnessHz", "direction": 1, "weight": 0.5}
+      ]
+    },
+    {
+      "id": "fearful-structured-v2",
+      "targetPreset": "fearful",
+      "competingPreset": "sad",
+      "instruction": "Sound frightened, anxious, and close to panic. Use a high tight shaky voice, trembling pitch, uneven urgent pacing, and brief hesitant catches.",
+      "instructionSHA256": "11e6f6bd9f94fe54e886b0c58ed9f62eab747fffee9337ac1b9944ccabc93618",
+      "expectedGlobal": [
+        {"feature": "pitch_shift_semitones", "direction": 1, "weight": 1.0},
+        {"feature": "arousal_score", "direction": 1, "weight": 1.0},
+        {"feature": "rate_delta_hz", "direction": 1, "weight": 1.0},
+        {"feature": "pause_ratio_delta", "direction": 1, "weight": 0.5}
+      ],
+      "expectedTemporal": [
+        {"feature": "tremorPersistenceHz", "direction": 1, "weight": 1.0},
+        {"feature": "maximumLocalRiseHz", "direction": 1, "weight": 0.5},
+        {"feature": "contourAbruptnessHz", "direction": 1, "weight": 0.5}
+      ]
+    },
+    {
+      "id": "fearful-urgent-v2",
+      "targetPreset": "fearful",
+      "competingPreset": "sad",
+      "instruction": "Sound panicked and afraid. Use a high, tight, trembling voice, abrupt pitch rises, short urgent phrases, and quick uneven pacing.",
+      "instructionSHA256": "d88e021058171556e4c7cd239c0a9cf9ba23a3ef543020b3d5a6b929c857cc62",
+      "expectedGlobal": [
+        {"feature": "pitch_shift_semitones", "direction": 1, "weight": 1.0},
+        {"feature": "arousal_score", "direction": 1, "weight": 1.0},
+        {"feature": "rate_delta_hz", "direction": 1, "weight": 1.0},
+        {"feature": "pause_ratio_delta", "direction": 1, "weight": 0.5}
+      ],
+      "expectedTemporal": [
+        {"feature": "tremorPersistenceHz", "direction": 1, "weight": 1.0},
+        {"feature": "maximumLocalRiseHz", "direction": 1, "weight": 0.5},
+        {"feature": "contourAbruptnessHz", "direction": 1, "weight": 0.5}
+      ]
+    },
+    {
+      "id": "surprised-onset-v2",
+      "targetPreset": "surprised",
+      "competingPreset": "happy",
+      "instruction": "Sound intensely astonished. Start with a sharp, high pitch leap on the first key word, then settle into clear natural phrasing.",
+      "instructionSHA256": "4eca96428decd1a95f2a758eea032ec00abd70d78b71bd45fe4d64a70408c7e3",
+      "expectedGlobal": [
+        {"feature": "pitch_shift_semitones", "direction": 1, "weight": 0.5}
+      ],
+      "expectedTemporal": [
+        {"feature": "onsetToPeakPitchHz", "direction": 1, "weight": 1.5},
+        {"feature": "maximumLocalRiseHz", "direction": 1, "weight": 1.0},
+        {"feature": "normalizedPeakPosition", "direction": -1, "weight": 1.0},
+        {"feature": "peakToEndPitchHz", "direction": -1, "weight": 1.0},
+        {"feature": "contourAbruptnessHz", "direction": 1, "weight": 1.0},
+        {"feature": "phraseFinalPitchSlopeHz", "direction": -1, "weight": 0.5}
+      ]
+    }
+  ],
+  "stages": {
+    "screen": {
+      "split": "development",
+      "seeds": [32060826, 32060827, 32060828, 32060829],
+      "cells": [
+        {"speakerID": "aiden", "outputLanguage": "English"},
+        {"speakerID": "ryan", "outputLanguage": "English"},
+        {"speakerID": "vivian", "outputLanguage": "Chinese"},
+        {"speakerID": "sohee", "outputLanguage": "Korean"}
+      ],
+      "lengths": ["medium"],
+      "semanticConditions": ["neutral"],
+      "variants": ["speed"],
+      "sampling": "official-official",
+      "minimumCompletionRate": 0.9,
+      "minimumScoreImprovement": 0.05,
+      "minimumAdherenceImprovement": 0.0,
+      "requirePositiveBootstrapLower": false
+    },
+    "script-interaction": {
+      "split": "development",
+      "seeds": [32060830, 32060831, 32060832, 32060833],
+      "cells": [
+        {"speakerID": "aiden", "outputLanguage": "English"},
+        {"speakerID": "ryan", "outputLanguage": "English"},
+        {"speakerID": "vivian", "outputLanguage": "Chinese"},
+        {"speakerID": "sohee", "outputLanguage": "Korean"}
+      ],
+      "lengths": ["short", "medium", "long"],
+      "semanticConditions": ["neutral", "congruent", "conflicting"],
+      "variants": ["speed"],
+      "sampling": "official-official",
+      "minimumCompletionRate": 0.95,
+      "minimumScoreImprovement": 0.1,
+      "minimumAdherenceImprovement": 0.1,
+      "requirePositiveBootstrapLower": false
+    },
+    "powered": {
+      "split": "development",
+      "seeds": [32060840, 32060841, 32060842, 32060843, 32060844, 32060845, 32060846, 32060847],
+      "cells": [
+        {"speakerID": "aiden", "outputLanguage": "English"},
+        {"speakerID": "ryan", "outputLanguage": "English"},
+        {"speakerID": "vivian", "outputLanguage": "Chinese"},
+        {"speakerID": "serena", "outputLanguage": "Chinese"},
+        {"speakerID": "uncle_fu", "outputLanguage": "Chinese"},
+        {"speakerID": "dylan", "outputLanguage": "Chinese"},
+        {"speakerID": "eric", "outputLanguage": "Chinese"},
+        {"speakerID": "ono_anna", "outputLanguage": "Japanese"},
+        {"speakerID": "sohee", "outputLanguage": "Korean"},
+        {"speakerID": "aiden", "outputLanguage": "Chinese"},
+        {"speakerID": "vivian", "outputLanguage": "English"},
+        {"speakerID": "ono_anna", "outputLanguage": "English"},
+        {"speakerID": "sohee", "outputLanguage": "English"}
+      ],
+      "lengths": ["short", "medium", "long"],
+      "semanticConditions": ["neutral", "congruent", "conflicting"],
+      "variants": ["speed"],
+      "sampling": "official-official",
+      "minimumCompletionRate": 1.0,
+      "minimumScoreImprovement": 0.2,
+      "minimumAdherenceImprovement": 0.2,
+      "requirePositiveBootstrapLower": true
+    },
+    "variant-confirmation": {
+      "split": "confirmation",
+      "seeds": [33060826, 33060827, 33060828, 33060829, 33060830, 33060831, 33060832, 33060833],
+      "cells": [
+        {"speakerID": "aiden", "outputLanguage": "English"},
+        {"speakerID": "ryan", "outputLanguage": "English"},
+        {"speakerID": "vivian", "outputLanguage": "Chinese"},
+        {"speakerID": "serena", "outputLanguage": "Chinese"},
+        {"speakerID": "uncle_fu", "outputLanguage": "Chinese"},
+        {"speakerID": "dylan", "outputLanguage": "Chinese"},
+        {"speakerID": "eric", "outputLanguage": "Chinese"},
+        {"speakerID": "ono_anna", "outputLanguage": "Japanese"},
+        {"speakerID": "sohee", "outputLanguage": "Korean"},
+        {"speakerID": "aiden", "outputLanguage": "Chinese"},
+        {"speakerID": "vivian", "outputLanguage": "English"},
+        {"speakerID": "ono_anna", "outputLanguage": "English"},
+        {"speakerID": "sohee", "outputLanguage": "English"}
+      ],
+      "lengths": ["short", "medium", "long"],
+      "semanticConditions": ["neutral", "congruent", "conflicting"],
+      "variants": ["speed", "quality"],
+      "sampling": "official-official",
+      "minimumCompletionRate": 1.0,
+      "minimumScoreImprovement": 0.2,
+      "minimumAdherenceImprovement": 0.2,
+      "requirePositiveBootstrapLower": true
+    }
+  },
+  "acceptance": {
+    "pairedBootstrapConfidence": 0.95,
+    "pairedBootstrapResamples": 10000,
+    "pairedBootstrapSeed": 20260825,
+    "holmAlpha": 0.05,
+    "maximumNewHardAudioQCFailures": 0,
+    "maximumAbsoluteWEROrCERRegression": 0.01,
+    "maximumMedianSpeakerSimilarityRegression": 0.02,
+    "maximumMedianRelativeUTMOSRegression": 0.1,
+    "maximumCompetingPresetDistanceRegression": 0.0,
+    "allowAutomaticSemanticPromotion": false,
+    "allowAutomaticPublication": false
+  }
+}

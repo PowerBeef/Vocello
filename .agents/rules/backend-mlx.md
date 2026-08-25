@@ -8,12 +8,14 @@ sourceOfTruth:
   - Sources/Resources/qwenvoice_contract.json
   - config/runtime-debug-knobs.json
   - config/delivery-experiment-contract.json
+  - config/delivery-prompt-remediation-contract.json
   - config/delivery-evaluator-v2-contract.json
   - config/delivery-evaluator-v2-candidates.json
   - config/delivery-evaluation-corpus.json
   - config/audio-cadence-qc-contract.json
   - scripts/delivery_experiment.py
   - scripts/delivery_experiment_runner.py
+  - scripts/delivery_prompt_remediation.py
   - scripts/delivery_calibration_session.py
   - scripts/delivery_evaluator.py
   - scripts/delivery_compact_model_adapter.py

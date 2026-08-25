@@ -16,7 +16,7 @@ Usage:
 import json
 import os
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 # Built-in defaults mirror the original hard-coded thresholds/weights. They are
 # intentionally conservative: they flag obvious prosody issues, not subtle
@@ -95,15 +95,14 @@ BUILTIN_PROFILE = {
     # preset moved prosody, never that the result is distinguishable from the
     # preset beside it. See Sources/QwenVoiceCore/EmotionPreset.swift.
     "delivery_expectations": {
-        # UNVALIDATED CONSTANT. 1.15 asserts that `strong` should land 15% above
-        # `normal`; nothing measured it. The 19-seed × 20-cell matrix put the
-        # actual mean inter-cell separation ratio at 0.997 (2.435 strong against
-        # 2.442 normal), so the tier moves cells sideways rather than further
-        # apart. Kept because changing it would silently move every strong-tier
-        # threshold, and flagged because tuning instruction copy until this
-        # passes would fit the copy to a target no measurement supports. Resolve
-        # it with evidence (scripts/delivery_matrix_report.py), not by reasoning.
-        "intensity_scale": {"normal": 1.0, "strong": 1.15},
+        # MEASURED 2026-08-25 (DP-25). The old 1.15 strong multiplier was an
+        # unmeasured assumption. DP-22's 17-seed normal-tier bank and the earlier
+        # 19-seed cross-tier matrix both refuted it: the latter measured a 0.997
+        # strong/normal inter-cell separation ratio. Schema v4 therefore uses
+        # one measured magnitude scale for both tiers. Tier identity and prompt
+        # copy remain distinct; only the invented threshold amplification is
+        # retired.
+        "intensity_scale": {"normal": 1.0, "strong": 1.0},
         # CALIBRATED 2026-08-05 from the banked paired seed matrix: 272 unique
         # neutral-vs-instructed rows (8 presets × .strong × speed/quality ×
         # 17-18 seeds, one fixed text, bench-archive sidecars). Rules, fixed
@@ -131,10 +130,14 @@ BUILTIN_PROFILE = {
                 "pitch_variation_delta_hz": {"direction": -1, "min_effect_normal": 5.2, "tier": "supporting"},
             },
             "happy": {
-                "pitch_shift_semitones": {"direction": 1, "min_effect_normal": 0.12, "tier": "supporting"},
-                "arousal_score": {"direction": 1, "min_effect_normal": 1.5, "tier": "supporting"},
-                "voice_tension_score": {"direction": 1, "min_effect_normal": 0.53, "tier": "supporting"},
-                "pitch_variation_delta_hz": {"direction": 1, "min_effect_normal": 5.1, "tier": "supporting"},
+                # DP-22 measured normal-tier signed q10 values were negative in
+                # both variants for all four supporting axes. A positive floor
+                # would therefore reject ordinary measured output. Zero keeps
+                # the directional warning while refusing to invent magnitude.
+                "pitch_shift_semitones": {"direction": 1, "min_effect_normal": 0.0, "tier": "supporting"},
+                "arousal_score": {"direction": 1, "min_effect_normal": 0.0, "tier": "supporting"},
+                "voice_tension_score": {"direction": 1, "min_effect_normal": 0.0, "tier": "supporting"},
+                "pitch_variation_delta_hz": {"direction": 1, "min_effect_normal": 0.0, "tier": "supporting"},
             },
             "surprised": {
                 "pitch_shift_semitones": {"direction": 1, "min_effect_normal": 0.5, "tier": "required"},
@@ -150,10 +153,13 @@ BUILTIN_PROFILE = {
                 "arousal_score": {"direction": -1, "min_effect_normal": 1.4, "tier": "supporting"},
             },
             "angry": {
-                "pitch_shift_semitones": {"direction": 1, "min_effect_normal": 0.39, "tier": "supporting"},
-                "pitch_variation_delta_hz": {"direction": 1, "min_effect_normal": 5.1, "tier": "supporting"},
-                "arousal_score": {"direction": 1, "min_effect_normal": 1.6, "tier": "supporting"},
-                "voice_tension_score": {"direction": 1, "min_effect_normal": 0.33, "tier": "supporting"},
+                # As for Happy, DP-22's measured normal-tier q10 values were
+                # negative in both variants. Preserve direction-only supporting
+                # diagnostics instead of scaling strong-tier floors by 1.15.
+                "pitch_shift_semitones": {"direction": 1, "min_effect_normal": 0.0, "tier": "supporting"},
+                "pitch_variation_delta_hz": {"direction": 1, "min_effect_normal": 0.0, "tier": "supporting"},
+                "arousal_score": {"direction": 1, "min_effect_normal": 0.0, "tier": "supporting"},
+                "voice_tension_score": {"direction": 1, "min_effect_normal": 0.0, "tier": "supporting"},
             },
             "fearful": {
                 "pitch_shift_semitones": {"direction": 1, "min_effect_normal": 1.3, "tier": "supporting"},
@@ -230,7 +236,7 @@ def migrate_profile(profile):
     """
     if not isinstance(profile, dict):
         return profile
-    if profile.get("schema_version") in (1, 2, SCHEMA_VERSION):
+    if profile.get("schema_version") in (1, 2, 3, SCHEMA_VERSION):
         profile = dict(profile)
         profile["schema_version"] = SCHEMA_VERSION
         for key in _ADDON_BLOCKS:

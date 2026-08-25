@@ -727,9 +727,17 @@ fails so the list cannot rot.
 It deliberately does **not** assert that the copy must conform to a delivery expectation. Those
 expectations were seeded before the project had any voice-quality measurement, so a conformance
 gate would fit copy to an unvalidated target — the failure mode this whole document exists to stop.
-It reports that the two disagree and that one of them is wrong, without presuming which. Two
-findings are acknowledged today, both on `angry`: its tiers invert the pitch axis, and its `normal`
-copy contradicts a `required` pitch expectation.
+It reports that the two disagree and that one of them is wrong, without presuming which. The two
+historical `angry` findings were removed with the maintainer-directed 2026-08-24 copy remediation;
+the acknowledged-finding list is now empty and will fail closed if either conflict returns.
+
+`MEASURED-HERE`, source-level application on 2026-08-25. The remediation uses plain-language,
+multidimensional prose rather than tags: Happy separates sustained positive warmth from surprise;
+Angry emphasizes hostile resentment rather than generic high energy; Fearful combines danger,
+slipping control, unstable pitch, and hesitant starts; Surprised asks for one onset/peak followed by
+a fast settle. Happy and Surprised still suppress the redundant English-diction append through the
+existing `clear` token, while Angry and Fearful still receive it. This records the applied pattern
+and deterministic wiring only—not a measured acoustic or perceptual improvement.
 
 ### 8.4 The controlled experiment layer
 
@@ -751,11 +759,13 @@ seed and one neutral script fixed per speaker across all presets while the cohor
 spans multiple seeds and all three script lengths; this preserves paired neutral reuse and real
 speaker/script/seed blocking without expanding the listener packet into a full factorial.
 
-The current production instructions remain unchanged until an untouched candidate passes the
-automatic integrity/intelligibility/identity/naturalness guardrails and blinded listener rules in
-[`delivery-harness.md`](delivery-harness.md). Concise and multidimensional prompts remain separate
-arms because official examples support both and this repository has not shown either to dominate
-across speakers and scripts.
+The experiment compiler and its candidate arms remain unchanged until an untouched candidate passes
+the automatic integrity/intelligibility/identity/naturalness guardrails and blinded listener rules
+in [`delivery-harness.md`](delivery-harness.md). The maintainer-directed 2026-08-24 production-copy
+checkpoint is tracked separately because it was not selected from those arms and makes no measured
+improvement claim. Concise and multidimensional prompts remain separate experiment arms because
+official examples support both and this repository has not shown either to dominate across speakers
+and scripts.
 
 ---
 

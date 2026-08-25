@@ -49,6 +49,21 @@ machine-readable status record and wins over any older prose.
 
 ## Resume here (2026-08-23)
 
+**Happy, Angry, Fearful, and Surprised have a maintainer-directed production-copy checkpoint
+awaiting semantic confirmation (2026-08-25, macOS/CLI):** the 2026-08-24 engineering handout
+supplied replacement normal/strong instructions for those delivery presets. The change targets clearer
+valence, dominance, and temporal contour; it does not claim measured improvement. Stable presets,
+experimental arms, preset IDs/order, shipped tiers, sampling, models, runtime, and QC remain
+unchanged. The text contract now has no acknowledged conflict, focused core tests pin tier
+distinctness and English-diction append parity. The source-bound Aiden/English/Speed smoke then
+completed 4/4 generation rows and 4/4 deterministic analyses with exact current-arm receipts, no
+hard QC failure, and no identity mismatch. Repository split policy rejected the handout's
+out-of-range `42060824` development seed, so the run used compliant fresh seed `32060824` without
+changing the seed contract. All four single-seed comparisons retained advisory acoustic misses;
+that does not block the receipt/QC smoke and is not evidence of semantic improvement. DP-30 remains
+planned; DP-31/DP-32 still require speaker/script-distributed and untouched blinded evidence before
+any semantic promotion claim.
+
 **iOS Built-in Voice startup evidence localized a false-startup label; exact-script closure remains
 open (2026-08-24):** the governed physical-device runner and visible XCUITest parity lane are now
 live-proven with the 285-character screenshot reconstruction. Vivian / Calm Strong / English UI and

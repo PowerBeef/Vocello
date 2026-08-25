@@ -1,20 +1,5 @@
 {
   "schemaVersion": 1,
   "description": "Open findings from scripts/check_delivery_instructions.py that are real but whose resolution is not yet known. An entry here is a known-open issue that passes the gate; any new finding fails it, and an entry that no longer occurs also fails so the list cannot rot. Acknowledging is not approving: each entry names how it gets settled.",
-  "acknowledgedFindings": [
-    {
-      "key": "tier-direction-inversion/angry/pitch",
-      "why": "MEASURED 2026-08-03 (DP-6, 23 seeds): the inversion is textual only. angry.normal asks for 'a lower clipped tone' and the model raises pitch regardless, so there is no acoustic contradiction to fix. angry.strong is also the better copy at adequate power (7 surviving features against 4) and is what ships since the intensity control was retired. Kept acknowledged because the text still contradicts itself and a future reader will notice; correcting the clause is a copy change that would need its own measurement.",
-      "opened": "2026-08-02",
-      "resolveWith": "scripts/delivery_matrix_report.py",
-      "measured": "2026-08-03"
-    },
-    {
-      "key": "expectation-conflict/angry/normal/pitch",
-      "why": "RESOLVED 2026-08-03 (DP-6, 23 seeds): the expectation is correct. pitch_shift_semitones is +5.98 semitones for the shipped angry copy, Cohen's d 1.40, win rate 0.91, so the required +1 direction is confirmed rather than merely assumed. The conflict is with a clause the model does not follow, not with what it produces.",
-      "opened": "2026-08-02",
-      "resolveWith": "scripts/delivery_matrix_report.py",
-      "measured": "2026-08-03"
-    }
-  ]
+  "acknowledgedFindings": []
 }

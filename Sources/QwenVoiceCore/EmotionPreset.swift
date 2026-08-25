@@ -418,9 +418,10 @@ public struct EmotionPreset: Identifiable, Sendable {
     //
     // The tiers that amplify best (calm 1.82x, happy 1.45x) re-state their own
     // normal axes with stronger adjectives, while the ones that saturate
-    // (dramatic 0.18x, excited 0.63x, angry 0.64x) swap in different axes. Two
-    // are outright self-contradictions across tiers: angry asks for "a lower
-    // clipped tone" then "heated raised pitch", fearful for "breathy" then "a
+    // (dramatic 0.18x, excited 0.63x, angry 0.64x) swap in different axes. Before
+    // the maintainer-directed 2026-08-24 remediation, two were outright
+    // self-contradictions across tiers: angry asked for "a lower clipped tone"
+    // then "heated raised pitch", while fearful asked for "breathy" then "a
     // thin tight tone".
     //
     // Rewriting those five so `strong` pushed the same axes harder was tried and
@@ -432,9 +433,11 @@ public struct EmotionPreset: Identifiable, Sendable {
     // *output* more alike, so internal consistency traded away the very
     // differentiation the tier needs. Do not retry that specific fix.
     //
-    // The self-contradictions above are still worth removing on their own terms,
-    // but removing them must be measured, not assumed — and a candidate needs
-    // enough seeds to clear a ~0.35 noise floor, which n=9 does not.
+    // Those self-contradictions were removed on 2026-08-24 as part of a
+    // maintainer-directed valence, dominance, and temporal-contour remediation.
+    // This is an attributed production-copy decision, not a measured improvement
+    // claim; DP-30 through DP-32 retain the source-bound and blinded confirmation.
+    // A candidate still needs enough seeds to clear the measured noise floor.
     // Verify with scripts/delivery_matrix_report.py, never by reading text back.
     //
     // REMOVED 2026-08-03, maintainer decision on DP-10 (18 seeds x 10 shipped
@@ -476,8 +479,8 @@ public struct EmotionPreset: Identifiable, Sendable {
             label: "Happy",
             sfSymbol: "face.smiling",
             instructions: [
-                .normal: "Speak happily and warmly, with a clearly lifted pitch, a light bouncing rhythm, a bright smiling tone, and quick cheerful pacing; no laughing.",
-                .strong: "Speak joyfully and energetically, with a noticeably higher pitch and louder volume, a fast animated pace, a bright ringing tone, and strong rising emphasis on key words; no laughing or shouting.",
+                .normal: "Speak with genuine warm delight and a relaxed smile in the voice. Use bright open resonance, smooth, clear, buoyant phrasing, a moderately lifted pitch, and a naturally lively pace; sustain pleasant warmth rather than sounding startled.",
+                .strong: "Speak with radiant joy and unmistakable positive warmth. Use a broad smiling resonance, smooth, clear, buoyant phrasing, a noticeably higher pitch, and energetic but flowing pacing; sustain delighted warmth rather than sounding startled.",
             ]
         ),
         EmotionPreset(
@@ -494,8 +497,8 @@ public struct EmotionPreset: Identifiable, Sendable {
             label: "Angry",
             sfSymbol: "flame",
             instructions: [
-                .normal: "Speak angrily and firmly, with sharp consonants, tight stress, forceful tension, and a lower clipped tone; never shout or scream.",
-                .strong: "Speak with fierce open anger, hard biting consonants, a fast forceful attack, heated raised pitch, and strong projected volume; no screaming.",
+                .normal: "Speak with controlled resentment and unmistakable irritation. Use a dry tense resonance, clipped consonants, compressed phrasing, and sharp deliberate stress; sound hostile and confrontational rather than energetic or triumphant.",
+                .strong: "Speak with fierce controlled anger and seething resentment. Use a harsher tense resonance, biting consonants, compressed forceful phrasing, and hard deliberate stress; sound openly hostile and confrontational rather than excited or triumphant.",
             ]
         ),
         EmotionPreset(
@@ -503,8 +506,8 @@ public struct EmotionPreset: Identifiable, Sendable {
             label: "Fearful",
             sfSymbol: "exclamationmark.triangle",
             instructions: [
-                .normal: "Speak fearfully and anxiously, with a breathy shaky voice, uncertain pacing, and a smaller urgent tone; stay fully audible.",
-                .strong: "Speak in trembling panic, voice quavering and urgent, with fast uneven pacing and a thin tight tone; stay fully audible.",
+                .normal: "Speak as though danger is close and confidence is slipping. Use a tight unsteady voice, hesitant starts, unstable pitch, and tentative rising endings; sound afraid rather than sorrowful.",
+                .strong: "Speak in vulnerable panic, as though danger is immediate and control is failing. Use a tight trembling voice, hesitant starts, uneven urgent phrasing, unstable pitch, and tentative rising endings; sound frightened rather than mournful.",
             ]
         ),
         EmotionPreset(
@@ -512,8 +515,8 @@ public struct EmotionPreset: Identifiable, Sendable {
             label: "Surprised",
             sfSymbol: "exclamationmark.2",
             instructions: [
-                .normal: "Speak with clear surprise, pitch rising steeply on key words, a quick animated pace with brief catches, and wide swings between low and high; no gasping or extra sounds.",
-                .strong: "Speak in sudden astonishment, the voice darting up and down with sharp pitch leaps at each discovery and quick catching bursts of pace; no gasping or extra sounds.",
+                .normal: "React as though one unexpected fact has just landed. Use a brief startled onset and one sudden pitch jump on the first important word, then settle quickly into clear natural phrasing; sound astonished rather than continuously excited.",
+                .strong: "React with intense astonishment to a completely unexpected revelation. Use a sharp startled onset and one abrupt high pitch leap on the first important word, then settle quickly into clear natural phrasing instead of staying excited throughout.",
             ]
         ),
         EmotionPreset(

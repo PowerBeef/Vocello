@@ -108,6 +108,49 @@ final class EmotionPresetResolutionTests: XCTestCase {
         }
     }
 
+    func testRemediatedPresetTiersRemainDistinct() throws {
+        for id in ["happy", "angry", "fearful", "surprised"] {
+            let preset = try XCTUnwrap(EmotionPreset.preset(id: id))
+            XCTAssertNotEqual(
+                preset.instruction(for: .normal),
+                preset.instruction(for: .strong),
+                "\(id) must preserve two independently addressable experiment cells"
+            )
+        }
+    }
+
+    func testRemediatedPresetDictionAppendDecisionsRemainStableAcrossTiers() throws {
+        for id in ["happy", "surprised"] {
+            let preset = try XCTUnwrap(EmotionPreset.preset(id: id))
+            for intensity in EmotionIntensity.allCases {
+                let instruction = preset.instruction(for: intensity)
+                XCTAssertEqual(
+                    GenerationSemantics.englishDictionReinforcedInstruction(
+                        baseInstruction: instruction,
+                        language: "english"
+                    ),
+                    instruction,
+                    "\(id).\(intensity.rpcValue) must suppress redundant diction reinforcement"
+                )
+            }
+        }
+
+        for id in ["angry", "fearful"] {
+            let preset = try XCTUnwrap(EmotionPreset.preset(id: id))
+            for intensity in EmotionIntensity.allCases {
+                let instruction = preset.instruction(for: intensity)
+                XCTAssertEqual(
+                    GenerationSemantics.englishDictionReinforcedInstruction(
+                        baseInstruction: instruction,
+                        language: "english"
+                    ),
+                    "\(instruction) \(GenerationSemantics.englishDictionReinforcement)",
+                    "\(id).\(intensity.rpcValue) must retain the English diction append"
+                )
+            }
+        }
+    }
+
     func testMeasuredRosterSplitStaysCoherent() {
         // The distinct/hint split is measured (DP-12), not taste: every
         // distinct id must exist in the roster, and the two halves must

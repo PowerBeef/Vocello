@@ -261,6 +261,19 @@ class VoiceQualityFeatureTests(unittest.TestCase):
         self.assertIn("voice_quality", migrated["delivery_weights"])
         validate_profile(migrated)
 
+    def test_schema_v4_uses_measured_tier_scale_and_normal_shipping_floors(self):
+        profile = builtin_profile()
+        expectations = profile["delivery_expectations"]
+        self.assertEqual(expectations["intensity_scale"], {"normal": 1.0, "strong": 1.0})
+        for preset in ("happy", "angry"):
+            features = expectations["presets"][preset]
+            self.assertTrue(features)
+            self.assertTrue(all(
+                specification["tier"] == "supporting"
+                and specification["min_effect_normal"] == 0.0
+                for specification in features.values()
+            ))
+
 
 if __name__ == "__main__":
     unittest.main()

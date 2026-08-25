@@ -55,6 +55,7 @@ the script self-test suite via `scripts/check_test_workflows.sh`.
 | `scripts/custom_delivery_matrix.py` | Resumable, fail-closed 9-speaker × 8-shipped-preset screen with exact instruction receipts, typed failure preservation, rejected-WAV analysis, speaker-balanced reporting, held-speaker separability, and paired same-seed arm comparison | `test_custom_delivery_matrix.py` |
 | `scripts/delivery_experiment.py` | Validates and compiles the six registered prompt arms, multilingual split-safe corpus, factorial sampling profiles, stable digests, and bounded seed-power plan | `test_delivery_experiment.py` |
 | `scripts/delivery_experiment_runner.py` | Source-bound, serial and resumable CLI experiment runner; seals the binary, exact instructions, corpus, sampling, seeds, receipts, audio digests, failures, and analysis layers without publishing | `test_delivery_experiment_runner.py` |
+| `scripts/delivery_prompt_remediation.py` | Pre-registered per-preset automatic acoustic screen: exact candidate digests, shared neutral controls, temporal-first scoring, competing-preset distance, paired bootstrap and typed abstention without semantic or publication authority | `test_delivery_prompt_remediation.py` |
 | `scripts/delivery_calibration_session.py` | Builds and merges v1 calibration packets; its versioned v2 commands add per-listener shuffle, repeats, anchors, uncertainty, confidence, replay/latency, 2AFC, naturalness and intensity without weakening v1 | `test_delivery_calibration_session.py`, `test_delivery_listener_calibration_v2.py` |
 | `scripts/delivery_evaluator.py` | Preserves ridge-v1 and exposes versioned v2 commands for preset-specific pairwise heads, elastic-net/PLS challengers, blocked validation, conformal intervals, OOD and typed abstention | `test_delivery_evaluator.py`, `test_delivery_evaluator_v2.py` |
 | `scripts/delivery_analysis_cache.py` | Content-addressed, atomic analysis cache keyed by original and canonical audio plus exact analyzer/model/preprocessing provenance; cache hits launch no model | `test_delivery_analysis_cache.py` |
@@ -423,9 +424,69 @@ open the confirmation split.
   regressed two (`p=1.0`). No global arm advances. Acoustic-only remains an exploratory Happy-only
   candidate; Surprised retains shipped copy until a different candidate is supported.
 
-Production instructions and the default Expressive sampler remain unchanged. The next automatic
-screen may expand the Happy-only acoustic arm to the pre-registered 8-20 seed range, but semantic
-promotion still requires the blinded calibration and untouched listening gates below.
+Those exploratory screens left production instructions and the default Expressive sampler
+unchanged. The next automatic screen may expand the Happy-only acoustic arm to the pre-registered
+8-20 seed range, but semantic promotion still requires the blinded calibration and untouched
+listening gates below.
+
+### 2.5 Maintainer-directed production-copy checkpoint (2026-08-25)
+
+The maintainer directed a narrow production-copy remediation from the 2026-08-24 engineering
+handout for Happy, Angry, Fearful, and Surprised. Both tiers now distinguish target valence and
+dominance more explicitly, while Fearful uses hesitant/unstable contours and Surprised uses one
+startled onset followed by a rapid settle instead of sustained arousal. No model, sampler, seed,
+runtime, QC, preset identity, tier mapping, or experimental arm changed.
+
+This is a maintainer-authored copy decision, not evidence that delivery improved. The deterministic
+contract proves the eight strings are coherent and preserves their English-diction append behavior;
+the source-bound four-cell smoke proves generation and receipt integrity only. Its
+Aiden/English/Speed/current-arm run completed all four generations and analyses without hard QC or
+identity failure at compliant development seed `32060824`. The literal handout seed `42060824` was
+correctly refused because it is outside the governed development partition. Happy, Angry, Fearful,
+and Surprised each retained one-seed advisory acoustic misses, so the smoke makes no adherence or
+semantic-improvement claim. DP-30 remains open for script/language/power screening, and
+DP-31/DP-32 retain blinded semantic promotion authority.
+
+### 2.6 Autonomous per-preset acoustic screen (pre-registered 2026-08-25)
+
+[`config/delivery-prompt-remediation-contract.json`](../../config/delivery-prompt-remediation-contract.json)
+freezes six exact candidates before new generation: two Happy arms, one Angry arm, two Fearful arms,
+and one Surprised onset/settle arm. It also fixes candidate order, instruction digests, competing
+presets, feature directions and weights, stable controls, disjoint development/confirmation seeds,
+speaker-language cells, scripts, variants, and decision thresholds. The result vocabulary is
+bounded to `automatic_acoustic_improvement`, `no_measured_improvement`, `regression`,
+`inconclusive`, and `abstained_out_of_distribution`.
+
+The composer extends the existing runner rather than launching another harness. It changes only the
+target preset's instruction, keeps the competing preset on current production copy, hard-links a
+digest-verified neutral reference from the baseline run so a cache hit launches no second control,
+and preserves every failed row in the denominator. Requested labels enter only after global and
+temporal feature extraction. Surprised is temporal-first (early onset-to-peak, local rise, early peak,
+abruptness, and settling); Fearful emphasizes tremor, local rises, tension/arousal, urgent cadence,
+and separation from Sad. Missing/non-finite features abstain rather than disappearing.
+
+Run one registered stage serially:
+
+```sh
+python3 scripts/delivery_prompt_remediation.py validate
+python3 scripts/delivery_prompt_remediation.py execute-stage \
+  --binary ./build/vocello --candidate surprised-onset-v2 \
+  --stage screen --variant speed \
+  --root build/artifacts/macos/delivery-prompt-remediation/20260825
+```
+
+An automatic positive result means only that the candidate improved the frozen acoustic/temporal
+objective and its deterministic guardrails. It cannot establish emotion meaning, alter production
+copy, publish evidence, or close DP-31/DP-32. Candidates that fail a stage stop there, which avoids
+opening the much larger script, powered, and untouched matrices after the registered rejection is
+already decision-complete.
+
+DP-25 removed one evaluator bias before this screen. All 17 banked DP-22 normal-tier sidecars were
+replayed (34 Happy/Angry rows per feature across Speed and Quality). The signed noise-decile was
+negative for pitch, variation, arousal, and tension in both variants, so prosody-profile schema v4
+uses zero magnitude for those supporting normal-tier axes while retaining direction checks. The
+unmeasured 1.15 strong multiplier is also retired; both tiers use 1.0 because the measured cross-tier
+separation ratio was 0.997. This changes threshold calibration, not tier identity or prompt copy.
 
 ## 3. Evidence conventions
 

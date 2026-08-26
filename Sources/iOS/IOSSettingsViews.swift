@@ -861,12 +861,10 @@ struct IOSModelRow: View {
                 suffix: "Waiting for connectivity",
                 formatBytes: IOSSettingsFormatters.fileSize
             ))
-        case .retrying(let progress, let downloaded, let total, let retryCount, let reason):
-            modelProgressPresentation(.transfer(
-                durableBytes: downloaded,
-                catalogBytes: total,
-                suffix: "Retry \(retryCount)\(reason.map { ": \($0)" } ?? "") · verified files will be reused",
-                formatBytes: IOSSettingsFormatters.fileSize
+        case .retrying(_, _, _, let retryCount, let reason):
+            modelProgressPresentation(.retrying(
+                retryCount: retryCount,
+                reason: reason
             ))
         case .verifying:
             modelProgressPresentation(.verification)

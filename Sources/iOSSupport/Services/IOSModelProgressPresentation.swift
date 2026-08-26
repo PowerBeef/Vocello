@@ -71,6 +71,15 @@ struct IOSModelProgressPresentation: Equatable, Sendable {
         detail: "Making the model available offline."
     )
 
+    static func retrying(retryCount: Int, reason: String?) -> Self {
+        var detail = "Preparing retry \(max(1, retryCount))"
+        if let reason, !reason.isEmpty {
+            detail += ": \(reason)"
+        }
+        detail += ". Verified files will be reused."
+        return Self(indicator: .indeterminate, detail: detail)
+    }
+
     /// Keeps an incomplete determinate rail visibly incomplete after pixel quantization while
     /// preserving the exact byte fraction in the presentation and accessibility contract.
     /// A segment no thicker than the rail itself is reserved at either end, so the rendered

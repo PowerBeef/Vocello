@@ -204,8 +204,9 @@ cannot count a retried range twice. Reused and restored bytes remain monotonic, 
 transient callbacks do not inflate the fraction. Once transfer reaches the catalog total, the bar
 is replaced by indeterminate `Download complete — finishing setup`, `Checking downloaded files`,
 or `Making the model available offline` activity. Ready is the only terminal success. This
-presentation contract does not weaken or close MD-3: authenticated publication still has to reach
-Ready.
+presentation contract alone did not close MD-3: authenticated publication still had to reach
+Ready. The physical-device closure evidence below proves that boundary; the same rule remains a
+standing regression invariant.
 
 Explicit **Cancel** is a discard operation. The coordinator first persists `cancelRequested`, stops
 new task registration, awaits all resume-data cancellation callbacks and terminal tasks, persists
@@ -234,7 +235,13 @@ Foreground delegate callbacks are serialized, durable staging is sequenced befor
 completion, and high-frequency byte callbacks are reduced to bounded cumulative progress updates
 plus the exact terminal byte count. This prevents a completed transfer from being stranded behind
 its own progress backlog without sacrificing final byte accuracy.
-Diagnostic summaries never contain a raw URL, absolute path, device identity, or user data.
+For catalog-v2 success, the summary separates bytes received on the wire from bytes reused after
+local verification. The validator requires the exact conservation equation
+`wire + reused verified = expected catalog + duplicate`; it also requires shared-component reuse
+for the applicable multi-model acceptance sequence. A stale file-size observation after atomic
+publication cannot authorize this evidence: accounting reads the authoritative installed file
+metadata. Diagnostic summaries never contain a raw URL, absolute path, device identity, or user
+data.
 
 The explicit physical-device diagnostic adds a schema-v1 correlated event journal when the
 registered `QVOICE_IOS_MODEL_MANAGEMENT_RUN_ID` debug knob is active. Events join one run across
@@ -266,8 +273,14 @@ monotonic growth, stable geometry, and writes `model-management-diagnosis.json`,
 `model-management-timeline.md`,
 `model-management-summary.json`, `progress-visual-summary.json`, and a contact sheet beside the
 `.xcresult`. Forensic collection runs even after XCTest fails. Acceptance requires no inconsistent
-layer; `diagnose` may complete as a diagnostic collection while truthfully classifying MD-3. Such a
-run is recorded as `diagnosedFailure`, not as a passing acceptance result.
+layer; `diagnose` may complete as a diagnostic collection while truthfully classifying a failure.
+Such a run is recorded as `diagnosedFailure`, not as a passing acceptance result. MD-3 closed on
+2026-08-26 after two consecutive clean `diagnose` runs and acceptance run
+`ios-xcui-model-download-20260826-144618-6274d157`: all three real artifacts installed and were
+visibly removed, relaunch preserved the isolated terminal state, the canonical surface was
+unchanged, 1,783 correlated events and 21 UI observations had no finding, and every
+wire/reuse/duplicate equation and quantitative bar measurement passed. The complete raw evidence
+remains an untracked build artifact as required by repository policy.
 
 Deterministic tests are model-free and Simulator-free. Live delivery is an explicit diagnostic:
 

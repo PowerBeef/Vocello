@@ -60,6 +60,7 @@ public final class ModelDownloadDiagnosticsStore: @unchecked Sendable {
         let installationSeconds: Double?
         let expectedBytes: Int64?
         let wireBytes: Int64?
+        let reusedBytes: Int64?
         let controlBytes: Int64?
         let duplicateBytes: Int64?
         let protocols: [String]?
@@ -91,6 +92,7 @@ public final class ModelDownloadDiagnosticsStore: @unchecked Sendable {
             installationSeconds: Double? = nil,
             expectedBytes: Int64? = nil,
             wireBytes: Int64? = nil,
+            reusedBytes: Int64? = nil,
             controlBytes: Int64? = nil,
             duplicateBytes: Int64? = nil,
             protocols: [String]? = nil,
@@ -122,6 +124,7 @@ public final class ModelDownloadDiagnosticsStore: @unchecked Sendable {
             self.installationSeconds = installationSeconds
             self.expectedBytes = expectedBytes
             self.wireBytes = wireBytes
+            self.reusedBytes = reusedBytes
             self.controlBytes = controlBytes
             self.duplicateBytes = duplicateBytes
             self.protocols = protocols
@@ -149,6 +152,7 @@ public final class ModelDownloadDiagnosticsStore: @unchecked Sendable {
     private let processInstanceID = UUID().uuidString.lowercased()
     private var traceRunID: String?
     private var traceSequence: UInt64 = 0
+    private var traceBytesWritten: Int64 = 0
 
     public convenience init(
         directory: URL,
@@ -303,7 +307,7 @@ public final class ModelDownloadDiagnosticsStore: @unchecked Sendable {
         ))
     }
 
-    public func recordSuccess(expectedBytes: Int64) {
+    public func recordSuccess(expectedBytes: Int64, reusedBytes: Int64 = 0) {
         let now = Date()
         lock.lock()
         let networkSeconds = verificationStartedAt.flatMap { start in
@@ -314,6 +318,7 @@ public final class ModelDownloadDiagnosticsStore: @unchecked Sendable {
         }
         let installationSeconds = installationStartedAt.map { max(0, now.timeIntervalSince($0)) }
         let wireBytes = accumulatedWireBytes
+        let reusedBytes = max(0, reusedBytes)
         let controlBytes = accumulatedControlBytes
         let retryCount = maximumRetryCount
         let protocols = observedProtocols.sorted()
@@ -329,8 +334,9 @@ public final class ModelDownloadDiagnosticsStore: @unchecked Sendable {
             installationSeconds: installationSeconds,
             expectedBytes: expectedBytes,
             wireBytes: wireBytes,
+            reusedBytes: reusedBytes,
             controlBytes: controlBytes,
-            duplicateBytes: max(0, wireBytes - max(0, expectedBytes)),
+            duplicateBytes: max(0, wireBytes + reusedBytes - max(0, expectedBytes)),
             protocols: protocols,
             thermalState: thermalStateToken(),
             finalIntegrity: true
@@ -350,17 +356,33 @@ public final class ModelDownloadDiagnosticsStore: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         let fileName = "attempt-\(UUID().uuidString).json"
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        guard let data = try? encoder.encode(record) else { return }
         for root in [directory, mirrorDirectory].compactMap({ $0 }) {
             do {
                 try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
-                let encoder = JSONEncoder()
-                encoder.outputFormatting = [.sortedKeys]
-                let data = try encoder.encode(record)
                 try data.write(
                     to: root.appendingPathComponent(fileName),
                     options: [.atomic]
                 )
                 try prune(in: root)
+                if let runID = traceRunID {
+                    let journalRoot = root
+                        .appendingPathComponent("attempts", isDirectory: true)
+                        .appendingPathComponent(runID, isDirectory: true)
+                    try fileManager.createDirectory(
+                        at: journalRoot,
+                        withIntermediateDirectories: true
+                    )
+                    try appendLine(
+                        data,
+                        to: journalRoot.appendingPathComponent(
+                            "records-\(processInstanceID).jsonl",
+                            isDirectory: false
+                        )
+                    )
+                }
             } catch {
                 // Diagnostics must never interfere with model delivery.
             }
@@ -370,45 +392,41 @@ public final class ModelDownloadDiagnosticsStore: @unchecked Sendable {
     private func persistTrace(_ record: DeliveryEvent) {
         lock.lock()
         defer { lock.unlock() }
-        let sequenceToken = String(format: "%020llu", record.sequence)
-        let fileName = "event-\(record.processInstanceID)-\(sequenceToken).json"
+        guard record.sequence <= UInt64(Self.maxRetainedTraceEvents) else { return }
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        guard let data = try? encoder.encode(record) else { return }
+        let lineBytes = Int64(data.count + 1)
+        guard traceBytesWritten + lineBytes <= Self.maxRetainedTraceBytes else { return }
         for root in [directory, mirrorDirectory].compactMap({ $0 }) {
-            let traceRoot = root.appendingPathComponent("trace", isDirectory: true)
+            let traceRoot = root
+                .appendingPathComponent("trace", isDirectory: true)
+                .appendingPathComponent(record.runID, isDirectory: true)
             do {
                 try fileManager.createDirectory(at: traceRoot, withIntermediateDirectories: true)
-                let encoder = JSONEncoder()
-                encoder.outputFormatting = [.sortedKeys]
-                try encoder.encode(record).write(
-                    to: traceRoot.appendingPathComponent(fileName),
-                    options: [.atomic]
+                try appendLine(
+                    data,
+                    to: traceRoot.appendingPathComponent(
+                        "events-\(record.processInstanceID).jsonl",
+                        isDirectory: false
+                    )
                 )
-                try pruneTrace(in: traceRoot)
             } catch {
                 // Diagnostics must never interfere with model delivery.
             }
         }
+        traceBytesWritten += lineBytes
     }
 
-    private func pruneTrace(in directory: URL) throws {
-        let keys: Set<URLResourceKey> = [.contentModificationDateKey, .fileSizeKey]
-        let files = try fileManager.contentsOfDirectory(
-            at: directory,
-            includingPropertiesForKeys: Array(keys),
-            options: [.skipsHiddenFiles]
-        ).filter { $0.pathExtension == "json" }.sorted {
-            let lhs = (try? $0.resourceValues(forKeys: keys).contentModificationDate) ?? .distantPast
-            let rhs = (try? $1.resourceValues(forKeys: keys).contentModificationDate) ?? .distantPast
-            return lhs > rhs
-        }
-        var retainedBytes: Int64 = 0
-        for (index, file) in files.enumerated() {
-            let size = Int64((try? file.resourceValues(forKeys: keys).fileSize) ?? 0)
-            if index >= Self.maxRetainedTraceEvents
-                || retainedBytes + size > Self.maxRetainedTraceBytes {
-                try? fileManager.removeItem(at: file)
-            } else {
-                retainedBytes += size
-            }
+    private func appendLine(_ data: Data, to fileURL: URL) throws {
+        let payload = data + Data([0x0A])
+        if fileManager.fileExists(atPath: fileURL.path) {
+            let handle = try FileHandle(forWritingTo: fileURL)
+            defer { try? handle.close() }
+            try handle.seekToEnd()
+            try handle.write(contentsOf: payload)
+        } else {
+            try payload.write(to: fileURL, options: [.atomic])
         }
     }
 

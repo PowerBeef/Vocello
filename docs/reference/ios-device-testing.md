@@ -112,8 +112,9 @@ The 95% visual checkpoint is an honest late-transfer band: the first exact incom
 90% through under 100% is used because durable catalog-byte progress can jump directly from 94% to
 complete. Crossed milestones share one immutable UI sample and screenshot, preventing Ready or
 finalization from removing controls while the evidence is being serialized. A completed diagnostic
-that isolates a defect is retained and labelled `diagnosedFailure`; only a clean diagnosis is an
-MD-3 closure pass.
+that isolates a defect is retained and labelled `diagnosedFailure`; only a clean diagnosis counted
+toward MD-3 closure. The two-diagnose-plus-acceptance sequence completed on 2026-08-26, and this
+procedure remains the fail-closed regression protocol.
 `scripts/check_ios_model_management.py` identifies the first inconsistent layer and emits a timeline,
 machine-readable diagnosis/summary, visual measurements, and a milestone contact sheet. A failed
 isolated root remains available to the next `diagnose` or `recover` run; ordinary app data and

@@ -49,6 +49,24 @@ machine-readable status record and wins over any older prose.
 
 ## Resume here (2026-08-26)
 
+**MD-3 iOS model-management delivery and progress closed on physical iPhone (2026-08-26):**
+two consecutive `diagnose` runs
+(`ios-xcui-model-download-20260826-141408-dd2a4575` and
+`ios-xcui-model-download-20260826-142022-902b5d25`) passed before the definitive
+`acceptance` run `ios-xcui-model-download-20260826-144618-6274d157`. Acceptance exercised a
+real Custom cancellation, process termination and background-task adoption, authenticated Ready
+for Custom, Design, and Clone, shared-component reuse, visible removal of all three isolated
+models, relaunch persistence, and exact preservation of the canonical model surface. The
+fail-closed host validator correlated 1,783 journal events and 21 immutable UI observations with
+no lifecycle or visual finding. All three artifacts satisfied
+`wire + reused verified = catalog + duplicate` with zero duplicate bytes; reused bytes were at
+least the catalog shared component. Every sampled bar was leading-edge anchored, stable at
+900×18 pixels, above 8.8:1 contrast, and within 0.35 percentage points of its exact catalog-byte
+fraction. This also closes the final harness accounting gap: success records now distinguish
+wire bytes from verified reused bytes, and forensic collection cannot swallow a validator
+failure. Raw `.xcresult`, screenshots, journals, ledgers, and filesystem inventories remain
+untracked under the build-output policy; `config/roadmap.json` records MD-3 as done.
+
 **Angry Normal bilingual routing promoted after a 36/36 hard-safety screen (2026-08-26,
 macOS/CLI):** `angry.normal` alone now uses the maintainer-directed
 `angry-bilingual-v3` English copy. Its Strong tier and all other preset/tier digests are unchanged.

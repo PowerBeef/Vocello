@@ -378,9 +378,15 @@ public enum ModelDownloadTaskReconciler {
 
 public enum ModelDownloadProgressReconciler {
     /// A relaunched or retried task may report fewer bytes than the durable ledger while it is
-    /// being adopted. User-visible progress never moves backward and never exceeds the total.
-    public static func visibleBytes(current: Int64, persisted: Int64, total: Int64?) -> Int64 {
-        let value = max(0, max(current, persisted))
+    /// being adopted. Preserve that ledger floor unless a clean retry explicitly invalidated
+    /// bytes; a retry must expose the downloader's exact durable total rather than false 100%.
+    public static func visibleBytes(
+        current: Int64,
+        persisted: Int64,
+        total: Int64?,
+        persistedBytesAreValid: Bool = true
+    ) -> Int64 {
+        let value = max(0, persistedBytesAreValid ? max(current, persisted) : current)
         guard let total, total > 0 else { return value }
         return min(value, total)
     }

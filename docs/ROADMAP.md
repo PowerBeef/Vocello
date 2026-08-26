@@ -13,7 +13,6 @@
 | `delivery-prompting-2026-08` | active | backend-mlx | 29/34 (85%) |
 | `engineering-review-remediation-2026-08` | active | backend-and-platform | 3/14 (21%) |
 | `ios-generation-startup-reliability-2026-08` | active | backend-and-platform | 4/6 (67%) |
-| `model-delivery-2026-08` | active | release-qa | 2/3 (67%) |
 | `compliance-2026-08` | complete | release-qa | 2/2 (100%) |
 | `convergence-metal4-stage4-2026-08` | complete | backend-and-platform | 7/7 (100%) |
 | `doc-governance-2026-08` | complete | release-qa | 9/9 (100%) |
@@ -21,6 +20,7 @@
 | `ios-settings-2026-08` | complete | ios | 3/3 (100%) |
 | `ios-ui-2026-08` | complete | ios | 6/6 (100%) |
 | `macos-ui-2026-08` | complete | macos | 7/7 (100%) |
+| `model-delivery-2026-08` | complete | release-qa | 3/3 (100%) |
 
 ## Autonomous validation audit remediation
 
@@ -211,25 +211,6 @@ Narrative authority: [`docs/reference/ios-built-in-startup-reliability.md`](refe
 - **`ISR-06`** (planned) — Complete exact-script and broader closure evidence.
   gate: Both the original script and tracked sentinel must pass 10/10 cold, 20/20 warm, all eight seeds, every focused predecessor, streaming/non-streaming, and matching UI/engine receipts; then complete the 9-speaker × 8-delivery grid at one seed plus a second seed for the affected speaker row and delivery column. Closure rejects unknown boundaries, silent seed changes, leaked retries, memory-policy violations, crashes, or unrepresented attempts and requires all deterministic gates green.
 
-## Model download throughput
-
-`model-delivery-2026-08` · **active** · release-qa · adopted 2026-08-08
-
-Fix the maintainer-reported download crawl (Hugging Face's CDN shapes throughput per connection, so single-stream multi-gigabyte files always decay) with chunked parallel byte-range transfers, gated by the model-delivery tuning policy's controlled-comparison requirement; extend to iOS only after the background-session identity work and a device A/B.
-
-Narrative authority: [`docs/reference/model-delivery.md`](reference/model-delivery.md)
-
-| Item | Status | Title | Evidence |
-| --- | --- | --- | --- |
-| `MD-1` | done | macOS/CLI chunked byte-range transfers, default on | `commit:ce687f5`, `commit:5e6a9a0`, `file:Tests/VocelloCoreTests/ModelDownloadChunkSchedulingTests.swift`, `file:docs/reference/model-delivery.md` |
-| `MD-2` | done | iOS chunked delivery (identity schema + reconciler + device A/B) | `file:Sources/QwenVoiceCore/ModelDownloadContracts.swift`, `file:Sources/QwenVoiceCore/HuggingFaceDownloader.swift`, `file:Sources/iOS/IOSModelDownloadCoordinator.swift`, `file:Tests/VocelloCoreTests/ModelDownloadChunkSchedulingTests.swift`, `file:docs/reference/model-delivery.md`, `commit:ce687f5`, `commit:5e6a9a0` |
-| `MD-3` | planned | P1 — fix iOS model-management progress and adopted finalization | `doc:docs/development-progress.md`, `file:Tests/VocelloiOSUITests/VocelloiOSModelDownloadUITests.swift`, `file:scripts/check_ios_model_management.py`, `file:docs/reference/model-delivery.md` |
-
-### Open items in detail
-
-- **`MD-3`** (planned) — P1 — fix iOS model-management progress and adopted finalization.
-  gate: An explicit install after Delete/Cancel must begin a new zero-byte logical request rather than reusing terminal ledger counters. An isolated physical-iPhone Custom transfer that is cancelled, restarted, backgrounded, process-terminated, and adopted after relaunch must transition from Downloading to Ready after authenticated publication rather than remaining indefinitely with logical bytes equal to the catalog total. The deterministic regression must cover terminal-ledger replacement, retryable resume preservation, adopted background-task retry/finalization with every catalog identity and byte complete, prove the large payload is durably published before Ready, and fail on a non-terminal ledger. Determinate UI progress must equal unique durable logical catalog bytes without retry duplication; transfer completion, verification, and installation are indeterminate until Ready. Required closure evidence: two consecutive `scripts/ui_test.sh ios model-download --scenario diagnose` passes followed by one `--scenario acceptance` pass covering Design/Clone shared-component installs, visible removal of all three isolated models, quantitative row/bar checkpoints within five percentage points and 3:1 contrast, exact canonical-state preservation, no leaked tasks or crashes, and no weakening of fail-closed cancellation or integrity policies.
-
 ## EU AI Act Article 50 readiness
 
 `compliance-2026-08` · **complete** · release-qa · adopted 2026-08-06
@@ -342,3 +323,17 @@ Narrative authority: [`docs/reference/macos-ui-refresh-2026-08.md`](reference/ma
 | `UI-5` | done | Refinement wave 1 (warm text ramp, motion family, focus rings, scoped observation, type scaling, stable resize fields, glass helper) | `commit:4e0c7cf`, `commit:bc7c108`, `commit:357d482`, `commit:20e14b2`, `file:docs/reference/macos-ui-refresh-2026-08.md` |
 | `UI-6` | done | Wave 2 re-engineering: store observation migration, History/Voices coordinators, shared generation lifecycle, player split | `file:docs/reference/macos-ui-refresh-2026-08.md`, `file:Sources/QwenVoiceCore/HistoryDeletionEngine.swift`, `file:Sources/ViewModels/GenerationLifecycleExecutor.swift`, `file:Sources/SharedSupport/Services/LiveStreamingPlaybackEngine.swift` |
 | `UI-7` | done | Registry formalization of the perf lane (benchmark-history kind, thresholds from repeated baselines) | `file:config/ui-perf-thresholds.json`, `file:benchmarks/runs/ui-perf/macos-xcui-perf-20260805-092804-98c69168.json`, `file:scripts/tests/test_check_macos_ui_perf.py` |
+
+## Model download throughput
+
+`model-delivery-2026-08` · **complete** · release-qa · adopted 2026-08-08
+
+Fix the maintainer-reported download crawl (Hugging Face's CDN shapes throughput per connection, so single-stream multi-gigabyte files always decay) with chunked parallel byte-range transfers, gated by the model-delivery tuning policy's controlled-comparison requirement; extend to iOS only after the background-session identity work and a device A/B.
+
+Narrative authority: [`docs/reference/model-delivery.md`](reference/model-delivery.md)
+
+| Item | Status | Title | Evidence |
+| --- | --- | --- | --- |
+| `MD-1` | done | macOS/CLI chunked byte-range transfers, default on | `commit:ce687f5`, `commit:5e6a9a0`, `file:Tests/VocelloCoreTests/ModelDownloadChunkSchedulingTests.swift`, `file:docs/reference/model-delivery.md` |
+| `MD-2` | done | iOS chunked delivery (identity schema + reconciler + device A/B) | `file:Sources/QwenVoiceCore/ModelDownloadContracts.swift`, `file:Sources/QwenVoiceCore/HuggingFaceDownloader.swift`, `file:Sources/iOS/IOSModelDownloadCoordinator.swift`, `file:Tests/VocelloCoreTests/ModelDownloadChunkSchedulingTests.swift`, `file:docs/reference/model-delivery.md`, `commit:ce687f5`, `commit:5e6a9a0` |
+| `MD-3` | done | P1 — fix iOS model-management progress and adopted finalization | `doc:docs/development-progress.md`, `file:Tests/VocelloiOSUITests/VocelloiOSModelDownloadUITests.swift`, `file:scripts/check_ios_model_management.py`, `file:docs/reference/model-delivery.md` |

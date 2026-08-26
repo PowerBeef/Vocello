@@ -210,12 +210,14 @@ comes from `qwenvoice_ios_model_catalog.json`.
 Cancel opens a confirmation dialog: `iosModelCancelDownloadConfirmButton` (cancel, deletes staged
 data). There is no paused state or Resume control. Waiting for connectivity comes from URLSession;
 an active task separately reports no progress after 20 seconds. `iosModelProgress_<id>` exposes
-the complete installation journey rather than raw transfer completion: file transfer owns 0–90%,
-verification reports 94%, installation reports 98%, and only the terminal `Ready` state is complete.
-The visible detail reports an unrounded percentage plus bytes, smoothed speed, a remaining-time
-estimate derived from those same visible bytes, retry reason, and verified-file reuse. A logically
-complete transfer awaiting publication says `Finishing` instead of displaying a full bar. This UI
-honesty rule does not substitute for the MD-3 adopted-download finalization gate.
+exact `durable logical catalog bytes / catalog bytes` while transfer is incomplete. The visible
+detail derives its percentage and byte counts from that same presentation value, alongside
+smoothed speed, ETA, retry reason, and verified-file reuse. Transfer completion replaces the
+determinate bar with `Download complete — finishing setup`; verification and installation use
+indeterminate `Checking downloaded files` and `Making the model available offline` activity.
+Only terminal `Ready` is complete. MD-3's physical-device closure proved this UI truth remains
+correlated with authenticated publication across cancellation, adoption, shared-component reuse,
+three-model installation/removal, and relaunch; the lane remains the regression authority.
 
 One bundle-aware background URLSession lives for the app lifetime. On launch, the atomic v2 ledger
 and current catalog adopt exactly matching tasks, cancel stale/unknown/duplicate tasks, and create

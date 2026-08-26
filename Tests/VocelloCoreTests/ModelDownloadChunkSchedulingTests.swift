@@ -314,6 +314,60 @@ final class ModelDownloadChunkSchedulingTests: XCTestCase {
         XCTAssertLessThan(measured, 750, "skipped bytes leaked into the speed sample")
     }
 
+    func testCleanRetryPublishesLowerExactDurableTotal() async throws {
+        let sink = ProgressSink()
+        let registry = HuggingFaceDownloader.DownloadStateRegistry(
+            repositoryProgressHandler: HuggingFaceDownloader.RepositoryProgressHandlerBox {
+                sink.append($0)
+            }
+        )
+        await registry.beginRepositoryDownload(totalBytes: 100, totalFiles: 1)
+        try await Task.sleep(for: .milliseconds(300))
+        await registry.reportPreexistingFileBytes(fileIndex: 0, bytes: 80)
+        XCTAssertEqual(try XCTUnwrap(sink.last).downloadedBytes, 80)
+
+        await registry.resetFileProgress(fileIndex: 0, publishReset: true)
+
+        let reset = try XCTUnwrap(sink.last)
+        let accounting = await registry.repositoryTransferAccounting()
+        XCTAssertEqual(reset.downloadedBytes, 0)
+        XCTAssertNil(reset.bytesPerSecond)
+        XCTAssertEqual(
+            accounting.reusedVerifiedBytes,
+            0,
+            "a clean retry must remove the discarded partial from exact reuse accounting"
+        )
+    }
+
+    func testTransferAccountingIncludesSharedSkippedAndRecoveredBytesExactly() async throws {
+        let registry = HuggingFaceDownloader.DownloadStateRegistry(
+            repositoryProgressHandler: nil
+        )
+        await registry.beginRepositoryDownload(
+            totalBytes: 1_000,
+            totalFiles: 4,
+            preverifiedBytes: 300,
+            preverifiedFiles: 1
+        )
+
+        await registry.reportFileCompleted(
+            fileIndex: 0,
+            expectedSize: 200,
+            wasTransferred: false
+        )
+        await registry.reportPreexistingFileBytes(fileIndex: 1, bytes: 80)
+        await registry.reportPreexistingFileBytes(fileIndex: 1, bytes: 120)
+        await registry.reportFileCompleted(fileIndex: 1, expectedSize: 400)
+        await registry.reportFileCompleted(fileIndex: 2, expectedSize: 100)
+
+        let accounting = await registry.repositoryTransferAccounting()
+        XCTAssertEqual(
+            accounting.reusedVerifiedBytes,
+            620,
+            "shared files, skipped staged files, and only the largest durable recovered range count"
+        )
+    }
+
     // MARK: - Out-of-order chunk assembly
 
     func testChunkAssemblyWritesOutOfOrderChunksIntoOnePartial() async throws {

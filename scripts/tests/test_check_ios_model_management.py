@@ -109,6 +109,62 @@ class ModelManagementDiagnosisTests(unittest.TestCase):
         codes = {finding.code for finding in findings}
         self.assertIn("premature-full-bar", codes)
 
+    def test_accepts_typed_clean_retry_progress_reset(self):
+        findings = MODULE.diagnose(
+            [
+                event(1, event="progress", phase="downloading", durableBytes=100),
+                event(
+                    2,
+                    event="progress",
+                    phase="retrying",
+                    durableBytes=20,
+                    errorClassification="integrity",
+                ),
+                event(3, event="progress", phase="downloading", durableBytes=40),
+            ],
+            [observation()],
+        )
+        self.assertNotIn("progress-regressed", {finding.code for finding in findings})
+
+    def test_classifies_saturated_progress_with_live_task(self):
+        findings = MODULE.diagnose(
+            [
+                event(
+                    1,
+                    event="heartbeat",
+                    capturedAtUTC="2026-08-26T12:00:00Z",
+                    durableBytes=100,
+                    totalBytes=100,
+                    phase="downloading",
+                    taskCount=1,
+                    targetAvailable=False,
+                ),
+                event(
+                    2,
+                    event="heartbeat",
+                    capturedAtUTC="2026-08-26T12:05:01Z",
+                    durableBytes=100,
+                    totalBytes=100,
+                    phase="downloading",
+                    taskCount=1,
+                    targetAvailable=False,
+                ),
+            ],
+            [observation()],
+        )
+        self.assertIn(
+            "saturated-progress-with-live-task",
+            {finding.code for finding in findings},
+        )
+
+    def test_xcodebuild_failure_cannot_produce_pass(self):
+        findings = MODULE.diagnose(
+            [event()],
+            [observation()],
+            test_execution_failed=True,
+        )
+        self.assertIn("xcuitest-failed", {finding.code for finding in findings})
+
     def test_rejects_trace_sequence_gap(self):
         findings = MODULE.diagnose([event(1), event(3)], [observation()])
         self.assertIn("trace-sequence-gap", {finding.code for finding in findings})
@@ -192,6 +248,30 @@ class ModelManagementDiagnosisTests(unittest.TestCase):
         )
         self.assertIn("urlsession-completion-not-staged", {finding.code for finding in findings})
 
+    def test_classifies_staged_file_integrity_rejection_before_xcuitest_failure(self):
+        failure = event(
+            2,
+            event="request-failed",
+            layer="downloader",
+            errorClassification="transfer",
+            errorMessage=(
+                "Downloaded file failed integrity checks for <redacted-path>: "
+                "expected 1333510029 bytes, found 0"
+            ),
+        )
+        findings = MODULE.diagnose(
+            [event(1, event="task-completed", layer="url-session", taskID=8), failure],
+            [observation()],
+            test_execution_failed=True,
+        )
+
+        codes = [finding.code for finding in findings]
+        self.assertIn("downloaded-file-integrity-rejected", codes)
+        self.assertLess(
+            codes.index("downloaded-file-integrity-rejected"),
+            codes.index("xcuitest-failed"),
+        )
+
     def test_classifies_claimed_completion_without_downstream_resume(self):
         findings = MODULE.diagnose(
             [
@@ -209,6 +289,25 @@ class ModelManagementDiagnosisTests(unittest.TestCase):
             (trace / "event-one.json").write_text(json.dumps(event(runID="other")), encoding="utf-8")
             with self.assertRaises(SystemExit):
                 MODULE.read_trace(pathlib.Path(temporary), "run-1")
+
+    def test_trace_reader_accepts_run_scoped_jsonl_and_rejects_corruption(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            trace = root / "trace" / "run-1"
+            trace.mkdir(parents=True)
+            journal = trace / "events-process-1.jsonl"
+            journal.write_text(
+                json.dumps(event(1)) + "\n" + json.dumps(event(2)) + "\n",
+                encoding="utf-8",
+            )
+
+            rows = MODULE.read_trace(root, "run-1")
+            self.assertEqual([row["sequence"] for row in rows], [1, 2])
+            self.assertTrue(rows[0]["_artifact"].endswith("#1"))
+
+            journal.write_text(json.dumps(event(1)) + "\n{broken\n", encoding="utf-8")
+            with self.assertRaises(SystemExit):
+                MODULE.read_trace(root, "run-1")
 
     def test_partitions_retained_prior_run_trace_without_weakening_active_reader(self):
         with tempfile.TemporaryDirectory() as temporary:

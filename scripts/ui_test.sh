@@ -513,20 +513,26 @@ pull_ios_run_diagnostics() {
 
 pull_ios_model_download_diagnostics() {
   local device="$1" destination="$2"
+  local validation_status=0
   rm -rf "$destination"
-  mkdir -p "$destination"
-  xcrun devicectl device copy from --device "$device" \
-    --domain-type appDataContainer --domain-identifier "$BUNDLE_ID_IOS" \
-    --source "Library/Application Support/Q-Voice/model-download-acceptance/diagnostics/model-downloads" \
-    --destination "$destination" >"$out/model-download-diagnostics-pull.log" 2>&1 \
-    || return 1
+  mkdir -p "$destination/trace/$run_id" "$destination/attempts/$run_id"
+  : >"$out/model-download-diagnostics-pull.log"
+  local journal
+  for journal in trace attempts; do
+    xcrun devicectl device copy from --device "$device" \
+      --domain-type appDataContainer --domain-identifier "$BUNDLE_ID_IOS" \
+      --source "Library/Application Support/Q-Voice/model-download-acceptance/diagnostics/model-downloads/$journal/$run_id" \
+      --destination "$destination/$journal/$run_id" --timeout 60 --quiet \
+      >>"$out/model-download-diagnostics-pull.log" 2>&1 \
+      || return 1
+  done
   python3 "$ROOT_DIR/scripts/check_ios_model_management.py" \
     --partition-prior-traces \
     --diagnostics "$destination" \
     --run-id "$run_id" \
     >>"$out/model-download-diagnostics-pull.log" 2>&1 \
     || return 1
-  python3 - "$destination" "$ROOT_DIR/Sources/Resources/qwenvoice_production_model_catalog.json" "$model_scenario" <<'PY'
+  python3 - "$destination" "$ROOT_DIR/Sources/Resources/qwenvoice_production_model_catalog.json" "$model_scenario" <<'PY' || validation_status=$?
 import json, os, pathlib, sys
 
 root = pathlib.Path(sys.argv[1])
@@ -542,12 +548,25 @@ if shared_component_bytes <= 0:
 
 # Upper bound mirrors ModelDownloadDiagnosticsStore.maxRetainedRecords (200), sized
 # for a chunked three-artifact lifecycle's per-range task metrics; the two move together.
-files = sorted(root.glob("*.json"))
-if not files or len(files) > 200:
-    raise SystemExit(f"expected 1-200 compact diagnostic records, found {len(files)}")
-if sum(path.stat().st_size for path in files) > 5 * 1024 * 1024:
+legacy_files = sorted(root.glob("*.json"))
+journals = sorted(root.glob("**/attempts/**/*.jsonl"))
+records = [json.loads(path.read_text(encoding="utf-8")) for path in legacy_files]
+for journal in journals:
+    for line_number, line in enumerate(journal.read_text(encoding="utf-8").splitlines(), start=1):
+        if not line.strip():
+            continue
+        try:
+            records.append(json.loads(line))
+        except json.JSONDecodeError as error:
+            raise SystemExit(
+                f"malformed compact diagnostic journal {journal}:{line_number}: {error}"
+            ) from error
+
+record_count = len(records)
+if record_count < 1 or record_count > 200:
+    raise SystemExit(f"expected 1-200 compact diagnostic records, found {record_count}")
+if sum(path.stat().st_size for path in legacy_files + journals) > 5 * 1024 * 1024:
     raise SystemExit("model-download diagnostics exceed the 5 MiB retention contract")
-records = [json.loads(path.read_text(encoding="utf-8")) for path in files]
 if scenario != "acceptance":
     raise SystemExit(0)
 successes = sorted(
@@ -580,12 +599,11 @@ for success in successes[-3:]:
         record for record in window
         if record.get("kind") == "task-metrics" and record.get("relativePath")
     ]
-    expected = max(
-        (record.get("totalBytes", 0) for record in window if record.get("kind") == "phase"),
-        default=success.get("expectedBytes", 0),
-    )
-    wire = sum(max(0, record.get("transferredBytes", 0)) for record in metrics)
-    protocols = sorted({record.get("protocolName") for record in metrics if record.get("protocolName")})
+    expected = int(success.get("expectedBytes", 0) or 0)
+    wire = int(success.get("wireBytes", 0) or 0)
+    reused = int(success.get("reusedBytes", 0) or 0)
+    duplicate = int(success.get("duplicateBytes", 0) or 0)
+    protocols = sorted(success.get("protocols") or [])
     if expected <= 0 or not protocols:
         raise SystemExit("a selected success is missing complete transfer metrics")
     # Model payload never rides cellular: the download session excludes it, so
@@ -616,43 +634,28 @@ for success in successes[-3:]:
             f"slowest transfer {transfer_rates[0]:.2f} MB/s" if transfer_rates
             else f"payload throughput collapsed: {artifact_mbps:.2f} MB/s (floor {floor_mbps} MB/s)"
         )
-    # The shared-component store omits exactly the verified tokenizer bytes from a
-    # later artifact's plan. A success must therefore account for its full catalog
-    # bytes either entirely on the wire or with exactly the component reused. A
-    # chunk retry legitimately meters a failed range's partial bytes before the
-    # re-fetch, so bounded overage is tolerated ONLY when the success recorded
-    # retries — capped at one full 128 MiB range per retry. Shortfall is missing
-    # payload and always fails closed; retry-free runs must still be byte-exact.
-    if wire == expected:
-        reused, duplicate = 0, 0
-    elif wire == expected - shared_component_bytes:
-        reused, duplicate = shared_component_bytes, 0
-    else:
-        retry_count = int(success.get("retryCount", 0) or 0)
-        max_overage = retry_count * 128 * 1024 * 1024
-        if wire > expected:
-            reused, duplicate = 0, wire - expected
-        elif wire > expected - shared_component_bytes:
-            reused = shared_component_bytes
-            duplicate = wire - (expected - shared_component_bytes)
-        else:
-            raise SystemExit(
-                "wire bytes fall short of every valid accounting (missing payload): "
-                f"wire={wire} expected={expected} sharedComponent={shared_component_bytes}"
-            )
-        if duplicate > max_overage:
-            raise SystemExit(
-                "wire bytes exceed the exact accounting beyond the recorded retry "
-                f"allowance: wire={wire} expected={expected} "
-                f"sharedComponent={shared_component_bytes} duplicate={duplicate} "
-                f"retryCount={retry_count}"
-            )
+    # The downloader reports all durable preexisting bytes explicitly: shared
+    # component files, already-verified staging, and recovered chunk ranges. The
+    # equality is therefore exact even after cancel/relaunch recovery. A retry may
+    # meter duplicate network bytes, but only within one 128 MiB range per retry.
+    retry_count = int(success.get("retryCount", 0) or 0)
+    if wire + reused != expected + duplicate:
+        raise SystemExit(
+            "catalog byte accounting is not exact: "
+            f"wire={wire} reused={reused} expected={expected} duplicate={duplicate}"
+        )
+    max_overage = retry_count * 128 * 1024 * 1024
+    if duplicate > max_overage:
+        raise SystemExit(
+            "duplicate wire bytes exceed the recorded retry allowance: "
+            f"duplicate={duplicate} retryCount={retry_count}"
+        )
     validated.append({
         "capturedAtUTC": success_time,
         "finalIntegrity": True,
         "expectedBytes": expected,
         "wireBytes": wire,
-        "reusedComponentBytes": reused,
+        "reusedVerifiedBytes": reused,
         "duplicateBytes": duplicate,
         "retryCount": success.get("retryCount", 0),
         "protocols": protocols,
@@ -666,7 +669,7 @@ for success in successes[-3:]:
         "throughputFloorMBPerSecond": floor_mbps,
     })
 
-if sum(1 for entry in validated if entry["reusedComponentBytes"] > 0) < 2:
+if sum(1 for entry in validated if entry["reusedVerifiedBytes"] >= shared_component_bytes) < 2:
     raise SystemExit(
         "the three-artifact lifecycle must observe shared-component reuse on at "
         "least two artifacts"
@@ -687,8 +690,9 @@ PY
   xcrun devicectl device copy from --device "$device" \
     --domain-type appDataContainer --domain-identifier "$BUNDLE_ID_IOS" \
     --source "Library/Application Support/Q-Voice/model-download-acceptance/downloads/ios_model_delivery_state.json" \
-    --destination "$destination/forensics" \
+    --destination "$destination/forensics" --timeout 30 --quiet \
     >>"$out/model-download-diagnostics-pull.log" 2>&1 || true
+  return "$validation_status"
 }
 
 # Combine the smoke journey's wall-clock line with the newest long-form v4

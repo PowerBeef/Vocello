@@ -709,7 +709,7 @@ final class ModelManagerViewModel {
         delivery: ProductionModelCatalog.ArtifactDeliveryPlan
     ) async {
         do {
-            try await downloader.downloadFiles(
+            let transferAccounting = try await downloader.downloadFiles(
                 delivery.filesToDownload,
                 repo: artifact.repo,
                 revision: artifact.revision,
@@ -729,7 +729,8 @@ final class ModelManagerViewModel {
             } else {
                 persistInstallMetadata(for: model, snapshot: postDownloadSnapshot)
                 diagnostics.recordSuccess(
-                    expectedBytes: model.estimatedDownloadBytes ?? Int64(postDownloadSnapshot.sizeBytes)
+                    expectedBytes: model.estimatedDownloadBytes ?? Int64(postDownloadSnapshot.sizeBytes),
+                    reusedBytes: transferAccounting.reusedVerifiedBytes
                 )
             }
         } catch is CancellationError {

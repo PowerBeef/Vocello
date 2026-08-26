@@ -579,6 +579,15 @@ final class VocelloiOSLogicTests: XCTestCase {
             IOSModelProgressPresentation.installation.detail,
             "Making the model available offline."
         )
+        let retry = IOSModelProgressPresentation.retrying(
+            retryCount: 1,
+            reason: "Integrity verification"
+        )
+        XCTAssertEqual(retry.indicator, .indeterminate)
+        XCTAssertEqual(
+            retry.detail,
+            "Preparing retry 1: Integrity verification. Verified files will be reused."
+        )
     }
 
     func testModelProgressIncompleteRailRetainsVisibleTrackAtPixelBoundary() {

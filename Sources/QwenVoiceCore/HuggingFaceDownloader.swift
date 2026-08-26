@@ -150,6 +150,18 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         }
     }
 
+    /// Exact durable-byte provenance for one completed repository installation.
+    /// `reusedVerifiedBytes` covers catalog files omitted by shared-component reuse,
+    /// already-verified staged files, and verified partial ranges recovered after a
+    /// cancellation or process relaunch. It never includes transient wire bytes.
+    public struct RepositoryTransferAccounting: Equatable, Sendable {
+        public let reusedVerifiedBytes: Int64
+
+        public init(reusedVerifiedBytes: Int64) {
+            self.reusedVerifiedBytes = max(0, reusedVerifiedBytes)
+        }
+    }
+
     struct DownloadStateManifest: Codable, Equatable {
         let schemaVersion: Int
         let repo: String
@@ -270,6 +282,8 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         private var logicalSlotBytes: [String: Int64] = [:]
         private var logicalSlotFileIndex: [String: Int] = [:]
         private var completedFilesBytes: Int64 = 0
+        private var preverifiedRepositoryBytes: Int64 = 0
+        private var reusedVerifiedBytesByFile: [Int: Int64] = [:]
         private let repositoryProgressHandler: RepositoryProgressHandlerBox?
         private let lifecycleEventHandler: LifecycleEventHandlerBox?
         private var repositoryTotalBytes: Int64 = 0
@@ -335,6 +349,8 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             logicalSlotBytes.removeAll()
             logicalSlotFileIndex.removeAll()
             completedFilesBytes = 0
+            preverifiedRepositoryBytes = 0
+            reusedVerifiedBytesByFile.removeAll()
             repositoryTotalBytes = 0
             repositoryTotalFiles = 0
             repositoryCompletedFiles = 0
@@ -381,6 +397,8 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             repositoryTotalFiles = max(0, totalFiles)
             repositoryCompletedFiles = max(0, min(preverifiedFiles, repositoryTotalFiles))
             completedFilesBytes = max(0, min(preverifiedBytes, repositoryTotalBytes))
+            preverifiedRepositoryBytes = completedFilesBytes
+            reusedVerifiedBytesByFile.removeAll()
             taskFileIndex.removeAll()
             taskBytes.removeAll()
             taskLogicalSlot.removeAll()
@@ -663,7 +681,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         /// Drop any live task state for `fileIndex` (called at the start of each download
         /// attempt). Clears stale bytes from a prior failed attempt so they don't inflate
         /// the counter during a retry; the fresh attempt re-accumulates from zero.
-        func resetFileProgress(fileIndex: Int) {
+        func resetFileProgress(fileIndex: Int, publishReset: Bool = false) {
             let staleTaskIDs = taskFileIndex.keys.filter { taskFileIndex[$0] == fileIndex }
             for taskID in staleTaskIDs {
                 taskBytes.removeValue(forKey: taskID)
@@ -677,6 +695,20 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
                 logicalSlotBytes.removeValue(forKey: slot)
                 logicalSlotFileIndex.removeValue(forKey: slot)
             }
+            if publishReset {
+                // A clean retry discards the durable partial represented by this file.
+                // A normal retry keeps it and re-reports the same maximum after reading
+                // the sidecar, so its reused-byte identity remains stable.
+                reusedVerifiedBytesByFile.removeValue(forKey: fileIndex)
+            }
+            if publishReset, !staleTaskIDs.isEmpty || !staleSlots.isEmpty {
+                // A clean retry invalidated these logical bytes. Publish the lower
+                // durable total before its replacement task begins; otherwise the
+                // UI can falsely remain complete throughout the re-download.
+                lastSpeedSampleBytes = repositoryDownloadedBytes
+                lastMeasuredBytesPerSecond = nil
+                emitRepositoryProgress(isStalled: false, force: true)
+            }
         }
 
         /// Bytes of `fileIndex` already durable on disk from completed chunk ranges of a
@@ -687,6 +719,10 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         /// progress, not fresh network throughput.
         func reportPreexistingFileBytes(fileIndex: Int, bytes: Int64) {
             guard bytes > 0 else { return }
+            reusedVerifiedBytesByFile[fileIndex] = max(
+                reusedVerifiedBytesByFile[fileIndex] ?? 0,
+                bytes
+            )
             let logicalSlot = "recovered-file-\(fileIndex)"
             logicalSlotFileIndex[logicalSlot] = fileIndex
             logicalSlotBytes[logicalSlot] = max(logicalSlotBytes[logicalSlot] ?? 0, bytes)
@@ -719,6 +755,12 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             }
             completedFilesBytes += expectedSize
             repositoryCompletedFiles += 1
+            if !wasTransferred {
+                reusedVerifiedBytesByFile[fileIndex] = max(
+                    reusedVerifiedBytesByFile[fileIndex] ?? 0,
+                    expectedSize
+                )
+            }
             if wasTransferred {
                 let now = ProcessInfo.processInfo.systemUptime
                 applySpeedMeasurement(now: now, totalDownloaded: repositoryDownloadedBytes, advancedDelta: expectedSize - liveForFile)
@@ -751,6 +793,16 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         func finishRepositoryDownload() {
             heartbeatTask?.cancel()
             heartbeatTask = nil
+        }
+
+        func repositoryTransferAccounting() -> RepositoryTransferAccounting {
+            let perFileReuse = reusedVerifiedBytesByFile.values.reduce(Int64(0), +)
+            return RepositoryTransferAccounting(
+                reusedVerifiedBytes: min(
+                    repositoryTotalBytes,
+                    max(0, preverifiedRepositoryBytes + perFileReuse)
+                )
+            )
         }
 
         func stageSuccess(
@@ -1203,8 +1255,13 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         expectedSize: Int64,
         sha256: String?
     ) throws {
-        let values = try url.resourceValues(forKeys: [.fileSizeKey])
-        let actualSize = Int64(values.fileSize ?? 0)
+        // URL resource values may retain stale metadata across an atomic replacement. The
+        // background-session path moves its durable temporary file over an earlier empty
+        // partial immediately before this check; on iOS that has been observed returning a
+        // cached zero even though the file on disk is exactly the catalog size. FileManager's
+        // path attributes are the authoritative post-move stat and prevent a valid multi-GB
+        // payload from being discarded and downloaded again.
+        let actualSize = try authoritativeFileSize(at: url)
         if expectedSize > 0, actualSize != expectedSize {
             throw DownloadError.integrityCheckFailed(
                 path: url.path,
@@ -1322,7 +1379,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         await state.resetForNewRepositoryDownload(preserveUnclaimedCompletions: isBackgroundSession)
         do {
             let files = try await listFiles(repo: repo, revision: revision)
-            try await runDownload(
+            _ = try await runDownload(
                 files: files,
                 repo: repo,
                 revision: revision,
@@ -1340,6 +1397,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
     /// catalog) and a request identity so task metrics remain attributable to payload files on
     /// foreground macOS/CLI runs and adoptable across iOS background-session relaunches.
     /// `repo`/`revision` seed the integrity manifest and fallback resolve URL.
+    @discardableResult
     public func downloadFiles(
         _ files: [RepoFile],
         repo: String,
@@ -1349,9 +1407,9 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         stagingRoot explicitStagingRoot: URL? = nil,
         installedFiles: [RepoFile]? = nil,
         sharedComponentPlan: SharedComponentMigrationPlan? = nil
-    ) async throws {
+    ) async throws -> RepositoryTransferAccounting {
         await state.resetForNewRepositoryDownload(preserveUnclaimedCompletions: isBackgroundSession)
-        try await runDownload(
+        return try await runDownload(
             files: files,
             repo: repo,
             revision: revision,
@@ -1376,7 +1434,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         explicitStagingRoot: URL? = nil,
         installedFiles: [RepoFile]? = nil,
         sharedComponentPlan: SharedComponentMigrationPlan? = nil
-    ) async throws {
+    ) async throws -> RepositoryTransferAccounting {
         let installedFiles = installedFiles ?? files
         let installedPaths = Set(installedFiles.map(\.path))
         let downloadPaths = Set(files.map(\.path))
@@ -1538,12 +1596,14 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             try await throwIfCancellationRequested()
             Self.markExcludedFromBackup(targetDir)
             try? fileManager.removeItem(at: stagingRoot)
+            let transferAccounting = await state.repositoryTransferAccounting()
             await state.finishRepositoryDownload()
             await completeBackgroundEventsAfterPostprocessing()
             if !isBackgroundSession {
                 session.finishTasksAndInvalidate()
                 invalidateChunkSessions(cancelling: false)
             }
+            return transferAccounting
         } catch {
             // A failure (or cancellation) mid-download: tear down any remaining
             // in-flight URLSession tasks so the caller doesn't wait for them.
@@ -1938,6 +1998,10 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
                     try? fileManager.removeItem(at: partialURL)
                     try? fileManager.removeItem(at: Self.chunkSidecarURL(forPartial: partialURL))
                     try? fileManager.removeItem(at: resumeDataURL)
+                    await state.resetFileProgress(
+                        fileIndex: fileIndex,
+                        publishReset: true
+                    )
                     if let dlError = error as? DownloadError,
                        case .integrityCheckFailed = dlError {
                         integrityRetryUsed = true
@@ -2901,8 +2965,18 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
     }
 
     private static func fileSizeIfPresent(at url: URL) -> Int64 {
-        guard let values = try? url.resourceValues(forKeys: [.fileSizeKey]) else { return 0 }
-        return Int64(values.fileSize ?? 0)
+        (try? authoritativeFileSize(at: url)) ?? 0
+    }
+
+    static func authoritativeFileSize(at url: URL) throws -> Int64 {
+        let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+        guard let size = attributes[.size] as? NSNumber else {
+            throw DownloadError.integrityCheckFailed(
+                path: url.path,
+                reason: "file size metadata was unavailable"
+            )
+        }
+        return size.int64Value
     }
 
     // MARK: - URLSessionDownloadDelegate

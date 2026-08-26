@@ -577,6 +577,18 @@ class IOSStartupReliabilityTests(unittest.TestCase):
         ]
         self.assertIn('diagnostics/$target_run_id', ui_run_pull)
         self.assertIn("--timeout 60", ui_run_pull)
+        model_download_pull = ui_source[
+            ui_source.index("pull_ios_model_download_diagnostics() {"):
+            ui_source.index("# Combine the smoke journey")
+        ]
+        self.assertIn('model-downloads/$journal/$run_id', model_download_pull)
+        self.assertIn('for journal in trace attempts', model_download_pull)
+        self.assertIn("--timeout 60", model_download_pull)
+        self.assertIn("--timeout 30", model_download_pull)
+        self.assertIn("local validation_status=0", model_download_pull)
+        self.assertIn("|| validation_status=$?", model_download_pull)
+        self.assertIn('return "$validation_status"', model_download_pull)
+        self.assertIn('success.get("reusedBytes"', model_download_pull)
         startup_collection = ui_source[
             ui_source.index('if [[ "$lane" == "startup-parity" ]]; then', ui_source.index("startup_parity_status=0")):
             ui_source.index("crash_delta_status=0")

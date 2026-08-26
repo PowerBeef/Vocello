@@ -198,7 +198,7 @@ final class ModelDownloadLifecycleTests: XCTestCase {
         XCTAssertEqual(plan.missingReconciliationKeys, ["b.safetensors"])
     }
 
-    func testProgressNeverRegressesAcrossRelaunchOrRetry() {
+    func testProgressPreservesValidRelaunchFloorButDropsInvalidatedRetryBytes() {
         XCTAssertEqual(
             ModelDownloadProgressReconciler.visibleBytes(current: 20, persisted: 40, total: 100),
             40
@@ -210,6 +210,15 @@ final class ModelDownloadLifecycleTests: XCTestCase {
         XCTAssertEqual(
             ModelDownloadProgressReconciler.visibleBytes(current: 120, persisted: 40, total: 100),
             100
+        )
+        XCTAssertEqual(
+            ModelDownloadProgressReconciler.visibleBytes(
+                current: 25,
+                persisted: 100,
+                total: 100,
+                persistedBytesAreValid: false
+            ),
+            25
         )
     }
 
@@ -342,6 +351,40 @@ final class ModelDownloadLifecycleTests: XCTestCase {
         let recordedEvents = await events.snapshot()
         XCTAssertEqual(recordedEvents, ["staged", "completed"])
         XCTAssertEqual(sequencer.pendingStageCount, 0)
+    }
+
+    func testDownloadedFileValidationStatsAtomicReplacementAuthoritatively() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let partial = root.appendingPathComponent("model.safetensors.partial")
+        let durableTemporary = root.appendingPathComponent("background-download.tmp")
+        try Data().write(to: partial)
+        // Prime the URL metadata path with the old zero-byte file before replacing it,
+        // matching the physical-device background download sequence.
+        XCTAssertEqual(try partial.resourceValues(forKeys: [.fileSizeKey]).fileSize, 0)
+
+        let payload = Data(repeating: 0xA5, count: 8_193)
+        try payload.write(to: durableTemporary)
+        try FileManager.default.removeItem(at: partial)
+        try FileManager.default.moveItem(at: durableTemporary, to: partial)
+
+        XCTAssertEqual(
+            try HuggingFaceDownloader.authoritativeFileSize(at: partial),
+            Int64(payload.count)
+        )
+        XCTAssertNoThrow(try HuggingFaceDownloader.validateDownloadedFile(
+            at: partial,
+            expectedSize: Int64(payload.count),
+            sha256: nil
+        ))
+        XCTAssertThrowsError(try HuggingFaceDownloader.validateDownloadedFile(
+            at: partial,
+            expectedSize: Int64(payload.count + 1),
+            sha256: nil
+        ))
     }
 
     func testRetryPolicySeparatesTransientPermanentTLSDiskAndIntegrity() {
@@ -715,23 +758,33 @@ final class ModelDownloadLifecycleTests: XCTestCase {
         )
 
         let traceRoot = root.appendingPathComponent("trace", isDirectory: true)
-        let files = try FileManager.default.contentsOfDirectory(
+            .appendingPathComponent("ios-run-1", isDirectory: true)
+        let journal = try XCTUnwrap(FileManager.default.contentsOfDirectory(
             at: traceRoot,
             includingPropertiesForKeys: nil
-        ).sorted { $0.lastPathComponent < $1.lastPathComponent }
-        XCTAssertEqual(files.count, 2)
-        let rows = try files.map {
-            try JSONDecoder().decode(
+        ).first { $0.pathExtension == "jsonl" })
+        let rows = try String(contentsOf: journal, encoding: .utf8)
+            .split(separator: "\n")
+            .map {
+                try JSONDecoder().decode(
                 ModelDownloadDiagnosticsStore.DeliveryEvent.self,
-                from: Data(contentsOf: $0)
-            )
-        }
+                    from: Data($0.utf8)
+                )
+            }
         XCTAssertEqual(rows.map(\.runID), ["ios-run-1", "ios-run-1"])
         XCTAssertEqual(rows.map(\.sequence), [1, 2])
         XCTAssertEqual(Set(rows.map(\.processInstanceID)).count, 1)
         XCTAssertEqual(rows.last?.ledgerStatus, "verifying")
         XCTAssertFalse(rows.first?.errorMessage?.contains("example.invalid") ?? true)
         XCTAssertFalse(rows.first?.errorMessage?.contains("/private/var") ?? true)
+
+        let attemptRoot = root.appendingPathComponent("attempts", isDirectory: true)
+            .appendingPathComponent("ios-run-1", isDirectory: true)
+        store.recordFailure(classification: "network", message: "bounded")
+        XCTAssertTrue(try FileManager.default.contentsOfDirectory(
+            at: attemptRoot,
+            includingPropertiesForKeys: nil
+        ).contains { $0.pathExtension == "jsonl" })
     }
 
     func testModelManagementTraceRetentionCoversOneWorstCaseTransferAndStaysBounded() {
@@ -794,7 +847,7 @@ final class ModelDownloadLifecycleTests: XCTestCase {
         ))
         store.record(progress: progress(.verifying))
         store.record(progress: progress(.installing))
-        store.recordSuccess(expectedBytes: 100)
+        store.recordSuccess(expectedBytes: 150, reusedBytes: 30)
 
         let files = try FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: nil)
         let objects = try files.compactMap { file -> [String: Any]? in
@@ -804,8 +857,9 @@ final class ModelDownloadLifecycleTests: XCTestCase {
         let success = try XCTUnwrap(objects.first { $0["kind"] as? String == "success" })
         XCTAssertEqual(success["wireBytes"] as? Int, 120)
         XCTAssertEqual(success["controlBytes"] as? Int, 20)
-        XCTAssertEqual(success["expectedBytes"] as? Int, 100)
-        XCTAssertEqual(success["duplicateBytes"] as? Int, 20)
+        XCTAssertEqual(success["expectedBytes"] as? Int, 150)
+        XCTAssertEqual(success["reusedBytes"] as? Int, 30)
+        XCTAssertEqual(success["duplicateBytes"] as? Int, 0)
         XCTAssertEqual(success["retryCount"] as? Int, 1)
         XCTAssertEqual(success["protocols"] as? [String], ["h3"])
         XCTAssertEqual(success["finalIntegrity"] as? Bool, true)

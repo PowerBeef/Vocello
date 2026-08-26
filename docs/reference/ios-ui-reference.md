@@ -127,11 +127,12 @@ Install, Retry, Cancel, or Remove action sits beside the compact model summary; 
 Repair/Remove, and accessibility sizes reflow below it with 44-point targets. Installed and
 update-available models expose `iosModelDelete_<id>` without an overflow-menu discovery step and
 retain the named confirmation. `iosModelStatus_<id>` reads `Ready` when usable. The installation
-bar reserves its final range for authenticated verification and atomic publication (transfer
-0–90%, verification 94%, installation 98%); it never reports 100% before `Ready`, and restored
-byte/speed/ETA presentation is reconciled from one visible byte count. Normal smoke and
-benchmark lanes do not install or delete models; they visibly assert that Custom, Design, and Clone
-Speed are ready before generation.
+bar renders exact durable logical catalog-byte progress while transfer is incomplete, reserving a
+visible trailing rail segment so a 99% rounded capsule cannot look finished. Transfer completion,
+verification, and installation replace the bar with named indeterminate activity; only `Ready` is
+terminal. Restored percentage, bytes, speed, and ETA are reconciled from the same presentation
+value. Normal smoke and benchmark lanes do not install or delete models; they visibly assert that
+Custom, Design, and Clone Speed are ready before generation.
 
 Settings also owns the persistent Clone consent row
 `voiceCloning_consentAcknowledgment` under Settings → Privacy. Smoke and benchmark enable it through that visible row when

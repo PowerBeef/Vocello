@@ -203,7 +203,7 @@ enum ModelsCommand {
         )
 
         do {
-            try await downloader.downloadFiles(
+            let transferAccounting = try await downloader.downloadFiles(
                 delivery.filesToDownload,
                 repo: artifact.repo,
                 revision: artifact.revision,
@@ -217,7 +217,8 @@ enum ModelsCommand {
                 sharedComponentPlan: delivery.sharedComponentPlan
             )
             diagnostics.recordSuccess(
-                expectedBytes: descriptor.estimatedDownloadBytes ?? directorySize(targetDir)
+                expectedBytes: descriptor.estimatedDownloadBytes ?? directorySize(targetDir),
+                reusedBytes: transferAccounting.reusedVerifiedBytes
             )
         } catch {
             diagnostics.recordFailure(classification: "download", message: error.localizedDescription)

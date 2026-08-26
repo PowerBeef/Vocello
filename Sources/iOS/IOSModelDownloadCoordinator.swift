@@ -121,6 +121,10 @@ final class IOSModelDownloadCoordinator {
         [String: (uptime: TimeInterval, phase: IOSModelDeliverySnapshot.Phase, bytes: Int64)] = [:]
     private var lastDiagnosticSnapshotTrace:
         [String: (uptime: TimeInterval, phase: IOSModelDeliverySnapshot.Phase, bytes: Int64)] = [:]
+    /// A clean retry can invalidate bytes that an earlier attempt had durably counted. Once that
+    /// happens, progress for this logical request follows the downloader's exact durable total
+    /// instead of the older ledger high-water mark.
+    private var retryProgressResetModels: Set<String> = []
 
     private lazy var downloader: HuggingFaceDownloader = makeSharedDownloader()
 
@@ -184,6 +188,11 @@ final class IOSModelDownloadCoordinator {
             ledger.requests.append(queuedRequest)
         }
         try ledgerStore.save(ledger)
+        if queuedRequest.retryCount > 0 {
+            retryProgressResetModels.insert(model.id)
+        } else {
+            retryProgressResetModels.remove(model.id)
+        }
         diagnosticsStore.recordEvent(
             layer: "coordinator",
             event: "request-queued",
@@ -327,6 +336,9 @@ final class IOSModelDownloadCoordinator {
                     continue
                 }
                 if request.status != .installed {
+                    if request.retryCount > 0 {
+                        retryProgressResetModels.insert(request.modelID)
+                    }
                     ledger.requests[index].status = .queued
                     restored.append(descriptor)
                 }
@@ -454,7 +466,7 @@ final class IOSModelDownloadCoordinator {
         sharedComponentPlan: SharedComponentMigrationPlan?
     ) async {
         do {
-            try await downloader.downloadFiles(
+            let transferAccounting = try await downloader.downloadFiles(
                 files,
                 repo: request.repo,
                 revision: request.revision,
@@ -479,7 +491,10 @@ final class IOSModelDownloadCoordinator {
                 generation: generation,
                 outcome: "installed"
             )
-            diagnosticsStore.recordSuccess(expectedBytes: totalBytes)
+            diagnosticsStore.recordSuccess(
+                expectedBytes: totalBytes,
+                reusedBytes: transferAccounting.reusedVerifiedBytes
+            )
             publishSnapshot(
                 modelID: model.id,
                 phase: .installed,
@@ -637,6 +652,7 @@ final class IOSModelDownloadCoordinator {
             phase = .downloading; ledgerStatus = .downloading
         case .retrying:
             phase = .retrying; ledgerStatus = .retrying
+            retryProgressResetModels.insert(active.modelID)
         case .verifying:
             phase = .verifying; ledgerStatus = .verifying
         case .installing:
@@ -647,7 +663,8 @@ final class IOSModelDownloadCoordinator {
         let visibleBytes = ModelDownloadProgressReconciler.visibleBytes(
             current: progress.downloadedBytes,
             persisted: ledgerReceivedBytes(modelID: active.modelID),
-            total: active.totalBytes
+            total: active.totalBytes,
+            persistedBytesAreValid: !retryProgressResetModels.contains(active.modelID)
         )
         let visibleTotalBytes = progress.totalBytes > 0 ? progress.totalBytes : active.totalBytes
         let visibleSpeed: Int64? = {
@@ -676,14 +693,18 @@ final class IOSModelDownloadCoordinator {
                 phase: phase.rawValue,
                 durableBytes: visibleBytes,
                 totalBytes: visibleTotalBytes,
-                verifiedFileCount: progress.completedFiles
+                verifiedFileCount: progress.completedFiles,
+                errorClassification: phase == .retrying
+                    ? diagnosticRetryClassification(progress.statusMessage)
+                    : nil
             )
         }
         guard persistProgressIfNeeded(
             modelID: active.modelID,
             status: ledgerStatus,
             bytes: visibleBytes,
-            retryCount: progress.retryCount
+            retryCount: progress.retryCount,
+            allowByteRegression: retryProgressResetModels.contains(active.modelID)
         ) else { return }
         publishSnapshot(
             modelID: active.modelID,
@@ -709,12 +730,23 @@ final class IOSModelDownloadCoordinator {
         let previous = lastDiagnosticProgressTrace[modelID]
         let shouldRecord = previous == nil
             || previous?.phase != phase
-            || bytes >= totalBytes
+            || (bytes >= totalBytes && previous?.bytes != bytes)
             || now - (previous?.uptime ?? 0) >= 5
         if shouldRecord {
             lastDiagnosticProgressTrace[modelID] = (now, phase, bytes)
         }
         return shouldRecord
+    }
+
+    private func diagnosticRetryClassification(_ reason: String?) -> String {
+        switch reason {
+        case "Integrity verification": return "integrity"
+        case "Range response": return "range-response"
+        case "Chunk assembly": return "chunk-assembly"
+        case "Network transfer": return "network-transfer"
+        case let value? where value.hasPrefix("HTTP "): return "http"
+        default: return "unknown"
+        }
     }
 
     private func resolveFiles(entry: IOSModelCatalogEntry) -> [HuggingFaceDownloader.RepoFile] {
@@ -850,7 +882,8 @@ final class IOSModelDownloadCoordinator {
         modelID: String,
         status: IOSModelDownloadLedger.Status,
         bytes: Int64,
-        retryCount: Int
+        retryCount: Int,
+        allowByteRegression: Bool = false
     ) -> Bool {
         guard !cancellationBarriers.contains(modelID) else { return false }
         do {
@@ -868,7 +901,9 @@ final class IOSModelDownloadCoordinator {
             let last = lastLedgerProgressWrite[modelID] ?? 0
             guard now - last >= 0.5 || status != .downloading else { return true }
             ledger.requests[index].status = status
-            ledger.requests[index].receivedBytes = max(ledger.requests[index].receivedBytes, bytes)
+            ledger.requests[index].receivedBytes = allowByteRegression
+                ? min(max(0, bytes), ledger.requests[index].totalBytes)
+                : max(ledger.requests[index].receivedBytes, bytes)
             ledger.requests[index].retryCount = max(ledger.requests[index].retryCount, retryCount)
             try ledgerStore.save(ledger)
             let request = ledger.requests[index]

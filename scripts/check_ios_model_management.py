@@ -53,21 +53,49 @@ def read_observations(log_path: pathlib.Path) -> list[dict[str, Any]]:
     return observations
 
 
+def xcodebuild_failed(log_path: pathlib.Path) -> bool:
+    if not log_path.is_file():
+        return False
+    text = log_path.read_text(encoding="utf-8", errors="replace")
+    return "** TEST FAILED **" in text or bool(
+        re.search(r"Executed\s+\d+\s+tests?,\s+with\s+[1-9]\d*\s+failures?", text)
+    )
+
+
 def read_trace(root: pathlib.Path, run_id: str) -> list[dict[str, Any]]:
     events: list[dict[str, Any]] = []
     for path in sorted(root.glob("**/trace/event-*.json")):
         value = load_json(path)
-        if value.get("schemaVersion") != 1:
-            raise SystemExit(f"unsupported delivery trace schema in {path}")
-        if value.get("runID") != run_id:
-            raise SystemExit(
-                f"cross-run delivery trace contamination: {path.name} belongs to "
-                f"{value.get('runID')!r}, expected {run_id!r}"
-            )
+        validate_trace_event(value, path, run_id)
         value["_artifact"] = str(path.relative_to(root))
         events.append(value)
+    for path in sorted(root.glob("**/trace/**/*.jsonl")):
+        for line_number, line in enumerate(
+            path.read_text(encoding="utf-8").splitlines(), start=1
+        ):
+            if not line.strip():
+                continue
+            try:
+                value = json.loads(line)
+            except json.JSONDecodeError as error:
+                raise SystemExit(
+                    f"malformed delivery trace journal {path}:{line_number}: {error}"
+                ) from error
+            validate_trace_event(value, path, run_id)
+            value["_artifact"] = f"{path.relative_to(root)}#{line_number}"
+            events.append(value)
     events.sort(key=lambda row: (row.get("capturedAtUTC", ""), row.get("processInstanceID", ""), row.get("sequence", 0)))
     return events
+
+
+def validate_trace_event(value: Any, path: pathlib.Path, run_id: str) -> None:
+    if not isinstance(value, dict) or value.get("schemaVersion") != 1:
+        raise SystemExit(f"unsupported delivery trace schema in {path}")
+    if value.get("runID") != run_id:
+        raise SystemExit(
+            f"cross-run delivery trace contamination: {path.name} belongs to "
+            f"{value.get('runID')!r}, expected {run_id!r}"
+        )
 
 
 def partition_prior_trace_events(root: pathlib.Path, run_id: str) -> dict[str, int]:
@@ -94,6 +122,34 @@ def partition_prior_trace_events(root: pathlib.Path, run_id: str) -> dict[str, i
         destination.parent.mkdir(parents=True, exist_ok=True)
         path.replace(destination)
         prior += 1
+    for path in sorted(trace_root.glob("**/*.jsonl")):
+        rows = []
+        for line_number, line in enumerate(
+            path.read_text(encoding="utf-8").splitlines(), start=1
+        ):
+            if not line.strip():
+                continue
+            try:
+                value = json.loads(line)
+            except json.JSONDecodeError as error:
+                raise SystemExit(
+                    f"malformed delivery trace journal {path}:{line_number}: {error}"
+                ) from error
+            if not isinstance(value, dict) or value.get("schemaVersion") != 1:
+                raise SystemExit(f"unsupported delivery trace schema in {path}")
+            rows.append(value)
+        run_ids = {row.get("runID") for row in rows}
+        if run_ids == {run_id}:
+            current += len(rows)
+            continue
+        if len(run_ids) != 1:
+            raise SystemExit(f"mixed-run delivery trace journal: {path}")
+        event_run_id = next(iter(run_ids), None)
+        safe_run_id = re.sub(r"[^A-Za-z0-9._-]+", "-", str(event_run_id or "unknown"))[:96]
+        destination = prior_root / safe_run_id / path.name
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        path.replace(destination)
+        prior += len(rows)
     return {"currentEventCount": current, "priorEventCount": prior}
 
 
@@ -390,7 +446,12 @@ class Finding:
         }
 
 
-def diagnose(events: list[dict[str, Any]], observations: list[dict[str, Any]]) -> list[Finding]:
+def diagnose(
+    events: list[dict[str, Any]],
+    observations: list[dict[str, Any]],
+    *,
+    test_execution_failed: bool = False,
+) -> list[Finding]:
     findings: list[Finding] = []
     if not events:
         return [Finding("missing-trace", "harness", "No correlated delivery trace was collected.")]
@@ -416,9 +477,19 @@ def diagnose(events: list[dict[str, Any]], observations: list[dict[str, Any]]) -
             previous = progress_by_request.get(key)
             if durable > total:
                 findings.append(Finding("bytes-exceed-total", "downloader", f"{model_id} durable bytes exceed catalog bytes.", previous and {"durableBytes": previous[0], "totalBytes": previous[1]}, event))
-            if previous and durable < previous[0]:
+            clean_retry_reset = (
+                previous
+                and durable < previous[0]
+                and event.get("phase") == "retrying"
+                and event.get("errorClassification")
+                in {"integrity", "range-response", "chunk-assembly"}
+            )
+            if previous and durable < previous[0] and not clean_retry_reset:
                 findings.append(Finding("progress-regressed", "downloader", f"{model_id} durable progress regressed.", {"durableBytes": previous[0], "totalBytes": previous[1]}, event))
-            progress_by_request[key] = (max(durable, previous[0] if previous else 0), total)
+            progress_by_request[key] = (
+                durable if clean_retry_reset else max(durable, previous[0] if previous else 0),
+                total,
+            )
 
     task_events: dict[tuple[str, int], list[dict[str, Any]]] = {}
     for event in events:
@@ -436,6 +507,32 @@ def diagnose(events: list[dict[str, Any]], observations: list[dict[str, Any]]) -
                 "A successful URLSession task completed without a staged download callback.",
                 task_history[-2] if len(task_history) > 1 else None,
                 terminal,
+            ))
+
+    for index, failure in enumerate(events):
+        if failure.get("event") != "request-failed":
+            continue
+        message = str(failure.get("errorMessage") or "")
+        model_id = failure.get("modelID", "unknown")
+        prior = next((
+            candidate for candidate in reversed(events[:index])
+            if candidate.get("modelID") == failure.get("modelID")
+        ), None)
+        if "failed integrity checks" in message.lower():
+            findings.append(Finding(
+                "downloaded-file-integrity-rejected",
+                "file-verification",
+                f"{model_id} completed transfer but its staged file was rejected by integrity validation.",
+                prior,
+                failure,
+            ))
+        else:
+            findings.append(Finding(
+                "download-request-failed",
+                "downloader",
+                f"{model_id} ended with a typed downloader failure before installation.",
+                prior,
+                failure,
             ))
 
     for index, queued in enumerate(events):
@@ -461,6 +558,32 @@ def diagnose(events: list[dict[str, Any]], observations: list[dict[str, Any]]) -
     for model_id in {event.get("modelID") for event in events if event.get("modelID")}:
         model_events = [event for event in events if event.get("modelID") == model_id]
         last = model_events[-1]
+        saturated_heartbeats = [
+            event for event in model_events
+            if event.get("event") == "heartbeat"
+            and event.get("phase") in {"downloading", "retrying"}
+            and isinstance(event.get("durableBytes"), int)
+            and isinstance(event.get("totalBytes"), int)
+            and event["totalBytes"] > 0
+            and event["durableBytes"] >= event["totalBytes"]
+            and event.get("targetAvailable") is not True
+            and (event.get("taskCount") or 0) > 0
+        ]
+        if len(saturated_heartbeats) >= 2:
+            first_time = datetime.fromisoformat(
+                saturated_heartbeats[0]["capturedAtUTC"].replace("Z", "+00:00")
+            )
+            last_time = datetime.fromisoformat(
+                saturated_heartbeats[-1]["capturedAtUTC"].replace("Z", "+00:00")
+            )
+            if (last_time - first_time).total_seconds() >= 300:
+                findings.append(Finding(
+                    "saturated-progress-with-live-task",
+                    "progress-accounting",
+                    f"{model_id} remained at the catalog total with a live transfer task for at least 300 seconds.",
+                    saturated_heartbeats[0],
+                    saturated_heartbeats[-1],
+                ))
         if (
             last.get("expectedFileCount")
             and last.get("expectedFileCount") == last.get("verifiedFileCount")
@@ -560,6 +683,12 @@ def diagnose(events: list[dict[str, Any]], observations: list[dict[str, Any]]) -
             "harness",
             "No structured model-row or progress observation was collected.",
         ))
+    if test_execution_failed:
+        findings.append(Finding(
+            "xcuitest-failed",
+            "harness",
+            "The physical-device XCUITest execution failed; its diagnostic output cannot be summarized as PASS.",
+        ))
     return findings
 
 
@@ -606,9 +735,14 @@ def main() -> int:
     artifact_dir = args.artifact_dir
     artifact_dir.mkdir(parents=True, exist_ok=True)
     diagnostics = args.diagnostics or artifact_dir / "model-download-diagnostics"
-    observations = read_observations(args.xcodebuild_log or artifact_dir / "xcodebuild.log")
+    xcodebuild_log = args.xcodebuild_log or artifact_dir / "xcodebuild.log"
+    observations = read_observations(xcodebuild_log)
     events = read_trace(diagnostics, args.run_id)
-    findings = diagnose(events, observations)
+    findings = diagnose(
+        events,
+        observations,
+        test_execution_failed=xcodebuild_failed(xcodebuild_log),
+    )
 
     attachments = attachment_map(args.attachments or artifact_dir / "attachments")
     visual_rows: list[dict[str, Any]] = []

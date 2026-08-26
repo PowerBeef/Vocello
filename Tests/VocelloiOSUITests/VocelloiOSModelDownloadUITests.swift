@@ -429,11 +429,23 @@ final class VocelloiOSModelDownloadUITests: VocelloiOSUITestCase {
         let installed = element("iosModelDelete_\(modelID)")
         var highestProgress = max(initialProgress, progressFraction(progress))
         var lastAdvance = Date()
+        var terminalFailureAction: String?
 
         let reachedInstalledOrStalled = VocelloUIWait.condition(
             "isolated \(modelID) to install or expose a \(Int(stallTimeout))s progress stall",
             timeout: timeout
         ) {
+            if installed.exists { return true }
+            // A transfer can replace its progress element with a terminal recovery action
+            // between the `exists` and `value` snapshots used by `observeProgress`. Detect
+            // those states first so a real downloader failure is reported as such instead
+            // of producing an XCUITest query-race failure with no causal diagnosis.
+            for action in ["Retry", "Repair", "Download"] {
+                if self.element("iosModel\(action)_\(modelID)").exists {
+                    terminalFailureAction = action
+                    return true
+                }
+            }
             let currentProgress = self.observeProgress(modelID: modelID)
             if currentProgress > highestProgress + 0.000_1 {
                 highestProgress = currentProgress
@@ -445,6 +457,11 @@ final class VocelloiOSModelDownloadUITests: VocelloiOSUITestCase {
         }
         guard reachedInstalledOrStalled else {
             return "isolated \(modelID) did not install within \(Int(timeout))s"
+        }
+        if let terminalFailureAction {
+            VocelloUIScreenshot.attach(app, named: "ios-model-download-terminal-\(modelID)")
+            return "isolated \(modelID) exposed terminal \(terminalFailureAction) before Ready "
+                + "(highest progress \(highestProgress))"
         }
         guard installed.exists else {
             VocelloUIScreenshot.attach(app, named: "ios-model-download-stalled-\(modelID)")
@@ -501,14 +518,20 @@ final class VocelloiOSModelDownloadUITests: VocelloiOSUITestCase {
         screenshot suppliedScreenshot: XCUIScreenshot? = nil
     ) {
         let progress = element("iosModelProgress_\(modelID)")
-        let activity = element("iosModelPhaseActivity_\(modelID)")
-        let row = element("iosModelRow_\(modelID)")
         let sampledProgress = suppliedProgressSample ?? progressSample(progress)
         let progressExists = sampledProgress != nil
-        let activityExists = !progressExists && activity.exists
+        // Finalization can replace the activity/detail elements with Ready while this
+        // observation is being assembled. Take one throwable snapshot per element and
+        // consume that immutable value instead of issuing an `exists` query followed by
+        // a second `frame`, `value`, or `label` query against a disappearing SwiftUI node.
+        let activitySnapshot = progressExists
+            ? nil
+            : stableSnapshot(element("iosModelPhaseActivity_\(modelID)"))
+        let rowSnapshot = stableSnapshot(element("iosModelRow_\(modelID)"))
         let measuredFrame = sampledProgress?.frame
-            ?? (activityExists ? activity.frame : .zero)
-        let rowFrame = row.exists ? row.frame : .zero
+            ?? activitySnapshot?.frame
+            ?? .zero
+        let rowFrame = rowSnapshot?.frame ?? .zero
         // A supplied transfer sample is an immutable observation of UI state that may already
         // have advanced to finalization while screenshots are attached. Never re-query mutable
         // progress-detail, status, or action elements for each crossed milestone: a fast transfer
@@ -582,9 +605,9 @@ final class VocelloiOSModelDownloadUITests: VocelloiOSUITestCase {
     }
 
     private func accessibilityText(_ element: XCUIElement) -> String? {
-        guard element.exists else { return nil }
-        if let value = element.value as? String, !value.isEmpty { return value }
-        return element.label.isEmpty ? nil : element.label
+        guard let snapshot = stableSnapshot(element) else { return nil }
+        if let value = snapshot.value, !value.isEmpty { return value }
+        return snapshot.label.isEmpty ? nil : snapshot.label
     }
 
     private func parseByteAccessibilityValue(_ value: String?) -> (raw: Int64?, total: Int64?) {
@@ -595,8 +618,7 @@ final class VocelloiOSModelDownloadUITests: VocelloiOSUITestCase {
     }
 
     private func progressSample(_ element: XCUIElement) -> ProgressSample? {
-        guard element.exists else { return nil }
-        guard let value = element.value as? String else { return nil }
+        guard let snapshot = stableSnapshot(element), let value = snapshot.value else { return nil }
         let byteValues = parseByteAccessibilityValue(value)
         guard let rawBytes = byteValues.raw,
               let totalBytes = byteValues.total,
@@ -607,8 +629,23 @@ final class VocelloiOSModelDownloadUITests: VocelloiOSUITestCase {
             rawBytes: rawBytes,
             totalBytes: totalBytes,
             fraction: progressFraction(value),
-            frame: element.frame,
+            frame: snapshot.frame,
             visibleText: value
+        )
+    }
+
+    private struct StableElementSnapshot {
+        let value: String?
+        let label: String
+        let frame: CGRect
+    }
+
+    private func stableSnapshot(_ element: XCUIElement) -> StableElementSnapshot? {
+        guard let snapshot = try? element.snapshot() else { return nil }
+        return StableElementSnapshot(
+            value: snapshot.value as? String,
+            label: snapshot.label,
+            frame: snapshot.frame
         )
     }
 

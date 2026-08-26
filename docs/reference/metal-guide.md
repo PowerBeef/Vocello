@@ -594,7 +594,8 @@ Approximate peak values for planning. Real sustained throughput is lower due to 
 
 The MLX/Metal diagnostic variables below come from their respective runtimes. Vocello-owned
 production-affecting keys are registered in `config/runtime-debug-knobs.json`, read through
-`RuntimeDebugGate`, and remain inert unless `QWENVOICE_DEBUG=1`.
+`RuntimeDebugGate`, and require both an internal diagnostics build and `QWENVOICE_DEBUG=1`.
+Distributed builds omit the capability.
 
 | Variable | Effect |
 | --- | --- |

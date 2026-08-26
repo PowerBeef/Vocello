@@ -344,7 +344,7 @@ done < <(find "$APP_PATH/Contents/Frameworks" -maxdepth 1 -type d -name '*.frame
 while IFS= read -r -d '' xpc_path; do
     run_codesign "$xpc_path" \
         --options runtime \
-        --entitlements "$PROJECT_DIR/Sources/QwenVoice.entitlements"
+        --entitlements "$PROJECT_DIR/Sources/QwenVoiceEmbeddedRuntime.entitlements"
 done < <(find "$APP_PATH/Contents/XPCServices" -maxdepth 1 -type d -name '*.xpc' -print0 2>/dev/null)
 run_codesign "$APP_PATH" \
     --options runtime \

@@ -150,7 +150,7 @@ Set `QVOICE_REQUIRE_TEST_MODELS=1` is automatic on script paths; bare `xcodebuil
 | Debug data dir | `QWENVOICE_DEBUG=1` → `~/Library/Application Support/QwenVoice-Debug/` |
 | Floor-tier simulation | `QWENVOICE_FORCE_MEMORY_CLASS=floor_8gb_mac` (propagates to engine via handshake) |
 | Suppress proactive warm | `QWENVOICE_SUPPRESS_WARMUP=1` for accurate Custom/Design **cold** rows in UI runs |
-| Disable publication marking | `QWENVOICE_MARKING=off` (registered knob, master-gated) disables both publication marks — the AudioSeal watermark and the WAV provenance chunk — for A/B isolation of the marking pass. Never set for canonical records. |
+| Disable publication marking | `QWENVOICE_MARKING=off` disables both publication marks only in a repository-built internal diagnostics binary with the master gate enabled. It exists for A/B isolation of the marking pass, is unavailable in distributed builds, and must never be set for canonical records. |
 
 **Publication byte-identity discontinuity (CP-2, 2026-08).** Published WAVs carry the
 Article 50 marking pass: an imperceptible AudioSeal watermark embedded in the samples plus a

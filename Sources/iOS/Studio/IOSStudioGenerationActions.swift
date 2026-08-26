@@ -8,13 +8,21 @@ enum IOSStudioGenerationActions {
         ttsEngine: TTSEngineStore,
         audioPlayer: AudioPlayerViewModel
     ) {
-        coordinator.generationTask?.cancel()
+        guard let attempt = coordinator.requestCancellation() else { return }
         // Stop audible preview immediately, but keep the generation coordinator
         // nonterminal until the engine-owned cancellation barrier confirms that
-        // MLX compute has exited. The generation task's defer owns the UI finish.
+        // MLX compute has exited. The matching attempt token prevents an older
+        // barrier from clearing a later generation.
         audioPlayer.abortLivePreviewIfNeeded()
         Task {
-            try? await ttsEngine.cancelActiveGeneration()
+            do {
+                try await ttsEngine.cancelActiveGeneration()
+                coordinator.completeCancellation(attempt: attempt)
+            } catch {
+                if coordinator.failCancellation(error, attempt: attempt) {
+                    IOSHaptics.warning()
+                }
+            }
         }
     }
 }

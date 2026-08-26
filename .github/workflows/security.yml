@@ -1,8 +1,7 @@
 name: Security
 
-# Pull requests receive a dependency-diff review. CodeQL runs after changes land
-# on main and on a weekly schedule so ordinary PR iteration does not acquire a
-# second full Swift build.
+# Pull requests receive dependency review plus path-relevant security analysis.
+# Main pushes, the weekly schedule, and manual dispatch retain the same coverage.
 on:
   pull_request:
   push:
@@ -25,6 +24,56 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
+  changes:
+    name: Security path routing
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      native: ${{ steps.classify.outputs.native }}
+      website: ${{ steps.classify.outputs.website }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Classify security-relevant paths
+        id: classify
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE_SHA: ${{ github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+          native=true
+          website=true
+          changed=""
+          if [[ "$EVENT_NAME" == "pull_request" && -n "$BASE_REF" ]]; then
+            git fetch --quiet origin "$BASE_REF"
+            changed="$(git diff --name-only "origin/$BASE_REF...HEAD")"
+          elif [[ "$EVENT_NAME" == "push" && -n "$BEFORE_SHA" \
+              && "$BEFORE_SHA" != "0000000000000000000000000000000000000000" \
+              && "$(git cat-file -t "$BEFORE_SHA" 2>/dev/null || true)" == "commit" ]]; then
+            changed="$(git diff --name-only "$BEFORE_SHA..$HEAD_SHA")"
+          fi
+          if [[ -n "$changed" ]]; then
+            native=false
+            website=false
+            while IFS= read -r path; do
+              case "$path" in
+                Sources/*|Tests/*|Packages/*|config/*|scripts/*|benchmarks/*|project.yml|QwenVoice.xcodeproj/*|.github/*|Package.resolved)
+                  native=true ;;
+              esac
+              case "$path" in
+                website/*) website=true ;;
+              esac
+            done <<<"$changed"
+          fi
+          echo "native=$native" >>"$GITHUB_OUTPUT"
+          echo "website=$website" >>"$GITHUB_OUTPUT"
+          echo "security routing: native=$native website=$website"
+
   dependency-review:
     name: Dependency review
     if: github.event_name == 'pull_request'
@@ -73,8 +122,9 @@ jobs:
             --input "$RUNNER_TEMP/swift-dependency-snapshot.json"
 
   npm-advisory-audit:
-    name: npm advisory audit (scheduled)
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    name: npm advisory audit
+    needs: changes
+    if: needs.changes.outputs.website == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -97,7 +147,8 @@ jobs:
 
   codeql:
     name: CodeQL (${{ matrix.language }})
-    if: github.event_name != 'pull_request'
+    needs: changes
+    if: needs.changes.outputs.native == 'true' || needs.changes.outputs.website == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -172,3 +223,22 @@ jobs:
 
       - name: Analyze
         uses: github/codeql-action/analyze@f205ea1c3313d32999d8d6a48b4f6530d4437b38 # v4.37.4
+
+  security-required:
+    name: Security required
+    needs: [changes, dependency-review, swift-dependency-submission, npm-advisory-audit, codeql]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Aggregate exact-SHA security results
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          set -euo pipefail
+          echo "$RESULTS"
+          if printf '%s' "$RESULTS" | grep -Eq '"result": *"(failure|cancelled)"'; then
+            echo "::error::a path-relevant security job failed or was cancelled"
+            exit 1
+          fi
+          echo "all path-relevant security jobs succeeded or were skipped"

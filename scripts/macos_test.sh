@@ -8,8 +8,9 @@
 #
 # usage:
 #   scripts/macos_test.sh preflight [--strict-models]  # Xcode + app + dSYMs + XPC + model status
-#   scripts/macos_test.sh core-test                 # VocelloCoreTests (language semantics, no models)
+#   scripts/macos_test.sh core-test                 # VocelloCoreTests (core + host-runnable iOS policy, no models)
 #                                                    # opt-in: QWENVOICE_ENABLE_TSAN=1
+#   scripts/macos_test.sh tsan                      # scheduled core + injectable XPC transport TSan subset
 #   scripts/macos_test.sh lang-bench [--subset quick|full] [--label RUN_ID]
 #                                                 # headless macOS language-hint matrix (vocello CLI)
 #   scripts/macos_test.sh test                      # Core + XPC transport + Qwen3 runtime tests (no UI)
@@ -142,45 +143,111 @@ build_mac_test_bundles() {
   [[ "$tsan" == "0" || "$tsan" == "1" ]] \
     || die "QWENVOICE_ENABLE_TSAN must be 0 or 1"
   local sanitizer_setting="NO"
+  local derived_data="$QVOICE_XCODE_MACOS_DERIVED"
+  local build_command="scripts/macos_test.sh test"
   if [[ "$tsan" == "1" ]]; then
     sanitizer_setting="YES"
+    derived_data="$QVOICE_XCODE_MACOS_TSAN_DERIVED"
+    build_command="scripts/macos_test.sh tsan"
     note "Thread Sanitizer enabled for this deterministic test build"
   fi
   mkdir -p "$(dirname "$log_path")"
+  if [[ "$tsan" == "0" && -d "$derived_data/Build/Products" ]]; then
+    # Xcode does not always remove a sanitizer runtime left by an older shared-
+    # cache build. Delete only that generated toolchain dylib before constructing
+    # a normal product; all source, packages, and other cache products stay intact.
+    find "$derived_data/Build/Products" -type f \
+      -name 'libclang_rt.tsan_osx_dynamic.dylib' -delete
+  fi
   ensure_project_regenerated || return 1
   ensure_spm_resolved "$QVOICE_SCRATCH_PACKAGE_RESOLUTION" "$QVOICE_XCODE_SOURCE_PACKAGES" \
     macos-test QwenVoice Release 'platform=macOS,arch=arm64' || return 1
   local xcode_status=0
   xcb_run build-for-testing -project "$ROOT_DIR/QwenVoice.xcodeproj" -scheme QwenVoice \
     -configuration Release -destination 'platform=macOS,arch=arm64' \
-    -derivedDataPath "$QVOICE_XCODE_MACOS_DERIVED" \
+    -derivedDataPath "$derived_data" \
     -clonedSourcePackagesDirPath "$QVOICE_XCODE_SOURCE_PACKAGES" \
     -disableAutomaticPackageResolution -onlyUsePackageVersionsFromResolvedFile \
     -enableThreadSanitizer "$sanitizer_setting" \
     ARCHS=arm64 ONLY_ACTIVE_ARCH=YES CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="-" \
     CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION=YES \
+    'OTHER_SWIFT_FLAGS=$(inherited) -DVOCELLO_INTERNAL_DIAGNOSTICS' \
     SWIFT_OPTIMIZATION_LEVEL="-Onone" SWIFT_COMPILATION_MODE="incremental" \
     ENABLE_TESTABILITY=YES > "$log_path" 2>&1 || xcode_status=$?
   (( xcode_status == 0 )) || return "$xcode_status"
-  local products="$QVOICE_XCODE_MACOS_DERIVED/Build/Products/Release"
-  assert_macos_bundle_arm64_only "$products/Vocello.app" || return 1
-  preserve_macos_dsyms "$products" "$products/Vocello.app" "$QVOICE_SYMBOLS_MACOS" || return 1
-  write_build_provenance "$QVOICE_XCODE_MACOS_DERIVED/last-build.json" \
-    "scripts/macos_test.sh test" QwenVoice Release \
+  local products="$derived_data/Build/Products/Release"
+  if [[ "$tsan" == "1" ]]; then
+    assert_macos_tsan_bundle_architectures "$products/Vocello.app" || return 1
+  else
+    assert_macos_bundle_arm64_only "$products/Vocello.app" || return 1
+  fi
+  if [[ "$tsan" == "0" ]]; then
+    preserve_macos_dsyms "$products" "$products/Vocello.app" "$QVOICE_SYMBOLS_MACOS" || return 1
+  fi
+  write_build_provenance "$derived_data/last-build.json" \
+    "$build_command" QwenVoice Release \
     "platform=macOS,arch=arm64" arm64 Onone ad-hoc \
-    "$QVOICE_XCODE_MACOS_DERIVED" "$QVOICE_XCODE_SOURCE_PACKAGES" || return 1
-  write_build_provenance "$QVOICE_SYMBOLS_MACOS/last-build.json" \
-    "scripts/macos_test.sh test" QwenVoice Release \
-    "platform=macOS,arch=arm64" arm64 Onone ad-hoc \
-    "$QVOICE_XCODE_MACOS_DERIVED" "$QVOICE_XCODE_SOURCE_PACKAGES" || return 1
+    "$derived_data" "$QVOICE_XCODE_SOURCE_PACKAGES" || return 1
+  if [[ "$tsan" == "0" ]]; then
+    write_build_provenance "$QVOICE_SYMBOLS_MACOS/last-build.json" \
+      "$build_command" QwenVoice Release \
+      "platform=macOS,arch=arm64" arm64 Onone ad-hoc \
+      "$derived_data" "$QVOICE_XCODE_SOURCE_PACKAGES" || return 1
+  fi
 }
 
 run_mac_test_bundle() {
-  local bundle_name="$1" log_path="$2"
-  local products="$QVOICE_XCODE_MACOS_DERIVED/Build/Products/Release"
+  local bundle_name="$1" log_path="$2" tsan="${3:-0}"
+  local derived_data="$QVOICE_XCODE_MACOS_DERIVED"
+  [[ "$tsan" != "1" ]] || derived_data="$QVOICE_XCODE_MACOS_TSAN_DERIVED"
+  local products="$derived_data/Build/Products/Release"
   local bundle="$products/$bundle_name.xctest"
+  local tsan_runtime="$bundle/Contents/Frameworks/libclang_rt.tsan_osx_dynamic.dylib"
+  local xctest_runner=""
   [[ -d "$bundle" ]] || { echo "missing test bundle: $bundle" > "$log_path"; return 1; }
+  [[ "$tsan" == "0" || "$tsan" == "1" ]] \
+    || { echo "invalid TSan test-runner mode: $tsan" > "$log_path"; return 1; }
+  if [[ "$tsan" == "1" ]]; then
+    [[ -f "$tsan_runtime" ]] \
+      || { echo "missing embedded ThreadSanitizer runtime: $tsan_runtime" > "$log_path"; return 1; }
+    xctest_runner="$(xcrun --find xctest 2>/dev/null || true)"
+    [[ -x "$xctest_runner" ]] \
+      || { echo "could not resolve Xcode's xctest runner" > "$log_path"; return 1; }
+    # Launch the resolved runner directly. Starting it through xcrun causes macOS
+    # to strip DYLD_INSERT_LIBRARIES before xctest starts, loading TSan too late.
+    DYLD_INSERT_LIBRARIES="$tsan_runtime" DYLD_FRAMEWORK_PATH="$products" \
+      "$xctest_runner" "$bundle" > "$log_path" 2>&1
+    return
+  fi
   DYLD_FRAMEWORK_PATH="$products" xcrun xctest "$bundle" > "$log_path" 2>&1
+}
+
+# Xcode embeds its universal ThreadSanitizer runtime in instrumented products even
+# when every repository-owned target is built for arm64 only. Keep the product and
+# release validator strict; this test-only validator permits exactly that named
+# toolchain runtime, and only when it still contains an arm64 slice.
+assert_macos_tsan_bundle_architectures() {
+  local app_bundle="$1" candidate architectures=""
+  assert_macho_arm64_only "$app_bundle/Contents/MacOS/Vocello" "Vocello executable" || return 1
+  assert_macho_arm64_only \
+    "$app_bundle/Contents/XPCServices/QwenVoiceEngineService.xpc/Contents/MacOS/QwenVoiceEngineService" \
+    "QwenVoiceEngineService executable" || return 1
+  while IFS= read -r -d '' candidate; do
+    /usr/bin/file -b "$candidate" 2>/dev/null | grep -q 'Mach-O' || continue
+    if [[ "${candidate##*/}" == "libclang_rt.tsan_osx_dynamic.dylib" ]]; then
+      architectures="$(/usr/bin/lipo -archs "$candidate" 2>/dev/null || true)"
+      [[ " $architectures " == *" arm64 "* ]] || {
+        echo "error: embedded ThreadSanitizer runtime lacks arm64 (found: ${architectures:-unknown})" >&2
+        return 1
+      }
+      continue
+    fi
+    assert_macho_arm64_only "$candidate" "embedded Mach-O ${candidate#"$app_bundle"/}" || return 1
+  done < <(find \
+    "$app_bundle/Contents/MacOS" \
+    "$app_bundle/Contents/XPCServices" \
+    "$app_bundle/Contents/Frameworks" \
+    -type f -print0 2>/dev/null)
 }
 
 # crashes [--test]: collect macOS .ips crash reports (app + XPC service) from
@@ -668,9 +735,9 @@ EOF
   esac
 }
 
-# core-test: VocelloCoreTests (language semantics, no models).
+# core-test: VocelloCoreTests (core semantics + host-runnable iOS policy, no models).
 cmd_core_test() {
-  note "core-test: VocelloCoreTests (QwenVoiceCore language semantics, no models)"
+  note "core-test: VocelloCoreTests (QwenVoiceCore + iOS policy semantics, no models)"
   local build_log="$QVOICE_ARTIFACTS_MACOS/tests/core-test-build.log"
   local test_log="$QVOICE_ARTIFACTS_MACOS/tests/core-test.log"
   rm -f "$test_log"
@@ -691,6 +758,41 @@ cmd_core_test() {
     warn "core-test FAIL (see build/artifacts/macos/tests/core-test.log)"
   fi
   return "$st"
+}
+
+# Thread Sanitizer characterization deliberately excludes execution of the
+# MLX/Metal runtime test bundle: the owned deterministic core and injectable XPC
+# transport are the stable CPU subset, while MLX has its own single-owner/runtime
+# tests. Xcode may still compile linked package targets while building the host.
+# The
+# scheduled workflow retains both logs and remains non-blocking only while the
+# policy records characterization status.
+cmd_tsan() {
+  [[ $# -eq 0 ]] || die "tsan accepts no arguments"
+  local run_id="tsan-$(date +%Y%m%d-%H%M%S)"
+  local artifacts="$QVOICE_ARTIFACTS_MACOS/tests/$run_id"
+  local build_st=0 core_st=0 transport_st=0
+  mkdir -p "$artifacts"
+  note "tsan: deterministic core and injectable XPC transport subset"
+  set +e
+  QWENVOICE_ENABLE_TSAN=1 build_mac_test_bundles "$artifacts/build.log" || build_st=$?
+  if (( build_st == 0 )); then
+    run_mac_test_bundle VocelloCoreTests "$artifacts/core.log" 1 || core_st=$?
+    run_mac_test_bundle VocelloEngineIntegrationTests "$artifacts/transport.log" 1 || transport_st=$?
+  else
+    core_st="$build_st"
+    transport_st="$build_st"
+  fi
+  set -e
+  printf 'build=%s\ncore=%s\ntransport=%s\n' \
+    "$build_st" "$core_st" "$transport_st" > "$artifacts/verdict.txt"
+  cat "$artifacts/verdict.txt" >&2
+  if (( build_st == 0 && core_st == 0 && transport_st == 0 )); then
+    note "tsan characterization PASS · artifacts → $artifacts"
+    return 0
+  fi
+  warn "tsan characterization FAIL · artifacts → $artifacts"
+  return 1
 }
 
 cmd_lang_bench() {
@@ -1148,6 +1250,10 @@ main() {
       require_build_free_space runtime-tests || die "macOS test storage preflight failed"
       cmd_core_test "$@"
       ;;
+    tsan)
+      require_build_free_space runtime-tests || die "macOS TSan storage preflight failed"
+      cmd_tsan "$@"
+      ;;
     lang-bench)
       require_build_free_space language-benchmark || die "language benchmark storage preflight failed"
       cmd_lang_bench "$@"
@@ -1172,7 +1278,7 @@ main() {
     help|-h|--help)
       sed -n '2,/^$/p' "$0" | sed 's/^# \{0,1\}//' >&2
       ;;
-    *) die "unknown subcommand '$sub' (try: preflight|core-test|lang-bench|test|telemetry-overhead|crashes|debug|logs|profile|memory|gate|release-readiness|models|help)" ;;
+    *) die "unknown subcommand '$sub' (try: preflight|core-test|tsan|lang-bench|test|telemetry-overhead|crashes|debug|logs|profile|memory|gate|release-readiness|models|help)" ;;
   esac
 }
 

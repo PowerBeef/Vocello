@@ -502,7 +502,7 @@ cmd_build() {
       "${SIGN_ARGS[@]}"
     )
     if (( diagnostics_build )); then
-      command+=('OTHER_SWIFT_FLAGS=$(inherited) -DQVOICE_DEVICE_DIAGNOSTICS')
+      command+=('OTHER_SWIFT_FLAGS=$(inherited) -DQVOICE_DEVICE_DIAGNOSTICS -DVOCELLO_INTERNAL_DIAGNOSTICS')
     fi
     command+=(
       ARCHS=arm64 ONLY_ACTIVE_ARCH=YES

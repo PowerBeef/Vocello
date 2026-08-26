@@ -85,7 +85,9 @@ were indistinguishable, by bytes, from any other 24 kHz mono PCM WAV.
 > reference) and appends a machine-readable `LIST`/`INFO` provenance chunk — the layered
 > approach §4 recommends. Both marks flip together and fail closed; the only off-switch is
 > a registered debug knob under the `QWENVOICE_DEBUG` master gate. Weights ship through the
-> model catalog as a required per-model file. This section's point-in-time findings are
+> model catalog as a required per-model file. Since F-02 closed on 2026-08-26, that off-switch is
+> additionally unavailable in distributed builds: it requires the repository-owned internal
+> diagnostics capability as well as the master gate. This section's point-in-time findings are
 > retained unedited as the motivating record.
 
 ## 3. Does it apply to Vocello? An honest analysis

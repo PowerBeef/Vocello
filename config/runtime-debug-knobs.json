@@ -1,7 +1,21 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "owner": "backend-runtime",
   "masterGate": "QWENVOICE_DEBUG",
+  "internalBuildCapability": {
+    "compileCondition": "VOCELLO_INTERNAL_DIAGNOSTICS",
+    "source": "Sources/QwenVoiceCore/RuntimeDebugGate.swift",
+    "enabledBuildRoutes": [
+      "scripts/build.sh",
+      "scripts/macos_test.sh",
+      "scripts/ui_test.sh",
+      "scripts/ios_device.sh"
+    ],
+    "distributedBuildRoutes": [
+      "scripts/release.sh",
+      ".github/workflows/release.yml"
+    ]
+  },
   "sourceRoots": [
     "Sources",
     "Packages/VocelloQwen3Core/Sources"
@@ -9,8 +23,10 @@
   "groups": [
     {
       "id": "production-affecting-debug",
+      "classification": "behavior-or-policy-mutation",
       "gateRequired": true,
-      "releaseBehavior": "ignored-unless-master-gate-enabled",
+      "compileCondition": "VOCELLO_INTERNAL_DIAGNOSTICS",
+      "releaseBehavior": "unavailable-without-internal-capability",
       "purpose": "Isolated storage, catalog, sampler, streaming, lifecycle, and memory-policy diagnostics.",
       "keys": [
         "QVOICE_APP_SUPPORT_DIR",
@@ -58,6 +74,7 @@
     },
     {
       "id": "bounded-observability",
+      "classification": "observability-only",
       "gateRequired": false,
       "releaseBehavior": "diagnostic-only-no-product-policy-change",
       "purpose": "Bounded telemetry selection and benchmark correlation; never changes model correctness or public storage roots.",
@@ -74,6 +91,7 @@
     },
     {
       "id": "device-diagnostics-harness",
+      "classification": "behavior-or-policy-mutation",
       "gateRequired": false,
       "compileCondition": "QVOICE_DEVICE_DIAGNOSTICS",
       "releaseBehavior": "unavailable-without-diagnostics-compilation-condition",
@@ -101,8 +119,10 @@
     },
     {
       "id": "input-substitution",
+      "classification": "behavior-or-policy-mutation",
       "gateRequired": true,
-      "releaseBehavior": "ignored-unless-master-gate-enabled",
+      "compileCondition": "VOCELLO_INTERNAL_DIAGNOSTICS",
+      "releaseBehavior": "unavailable-without-internal-capability",
       "purpose": "Deterministic reference-clip recording QA on machines without a usable microphone; replays a WAV through the genuine visible recording flow. Reclassified 2026-07-22 from the retired hidden-hook list by explicit maintainer decision.",
       "keys": [
         "QWENVOICE_FAKE_MIC_WAV"
@@ -110,6 +130,7 @@
     },
     {
       "id": "master-gate",
+      "classification": "capability-gate",
       "gateRequired": false,
       "releaseBehavior": "explicit-opt-in",
       "purpose": "Enables runtime diagnostic overrides in a Release-only build topology.",

@@ -18,6 +18,8 @@ initialize on the iOS Simulator.
 > device lanes (`scripts/ios_device.sh`) in [`ios-device-testing.md`](ios-device-testing.md);
 > generation-engine internals in [`../ARCHITECTURE.md`](../ARCHITECTURE.md);
 > tone/delivery prompt-writing in [`../qwen_tone.md`](../qwen_tone.md).
+> String Catalog ownership, typed presentation text, and pseudo-localization acceptance are in
+> [`localization.md`](localization.md).
 > The compact UI state map is [`ios-ui-reference.md`](ios-ui-reference.md). XCUITest is the only
 > autonomous iOS app UI driver.
 
@@ -87,6 +89,20 @@ Clone reads the persistent `voiceCloning_consentAcknowledgment` preference from 
 remains unavailable until the user acknowledges consent there. The optional transcript selects
 transcript-backed conditioning; no transcript selects the separate audio-only x-vector path.
 
+Studio lifecycle state is attempt-scoped. `StudioGenerationCoordinator.start` returns an opaque
+token that every single-take and long-form live or terminal callback must present. Delayed success,
+failure, deferred cleanup, or cancellation callbacks from an older take therefore cannot clear or
+replace a newer take. Cancel keeps the matching attempt nonterminal until the engine-owned
+cancellation barrier returns; a barrier failure is shown to the user, and a repeated Cancel cannot
+start a second barrier for the same attempt.
+
+Short-form Built-in, Design, and Clone takes share one execution boundary in
+`IOSSingleTakeGenerationExecutor`. Views construct the exact mode request and perform any
+mode-specific preparation (including Clone priming), then the executor singularly owns frontend
+timeline submission/terminal recording, engine invocation, materialized-output cancellation
+cleanup, playback handoff, History outbox persistence, and optional Files export. Successful
+inline-card publication remains attempt-scoped in the view after the shared boundary returns.
+
 ### Bottom sheets — `Sources/iOS/Sheets/IOSBottomSheets.swift`
 
 Sheets are separate overlays, so **inside-sheet elements keep their own identifiers**
@@ -152,6 +168,10 @@ Yesterday / Previous 7/30 Days / Earlier.
 
 Database failures are typed and fail closed. The error state does not masquerade as empty History;
 destructive actions remain disabled until `historyRetryButton` completes a successful read.
+Every atomically published take is also written to the local `history-outbox/` before its
+idempotent SQLite commit. Startup and History entry reconcile pending rows. If attention remains,
+`historyRecovery_banner` exposes `historyRecovery_retry` and `historyRecovery_export`; clear-all
+uses a resumable database-first marker so a database failure cannot delete audio behind live rows.
 
 ### Settings tab — `Sources/iOS/Settings/SettingsScreen.swift`
 

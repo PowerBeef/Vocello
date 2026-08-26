@@ -4,12 +4,10 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 MATRIX_PATH="$SCRIPT_DIR/../config/apple-platform-capability-matrix.json"
 EXPECT_SIGNED_RELEASE="${QWENVOICE_EXPECT_SIGNED_RELEASE:-0}"
-# Skip step [3/4] (launch the packaged app and confirm it stays running)
-# when the host OS can't actually run the app — most importantly the
-# GitHub Actions macOS runners, which ship Xcode 26 on a macOS-15 image
-# and therefore can launch nothing built against the macOS 26 SDK. The
-# build, sign, and bundle-content checks still run; only the GUI smoke
-# is suppressed. Set QWENVOICE_SKIP_LAUNCH_SMOKE=1 in the CI environment.
+# A local operator without a GUI session may explicitly skip step [3/4].
+# Candidate CI is never allowed to do so: release.yml runs on macos-26 and
+# must prove that both the staged app and the copy extracted from the DMG
+# survive external startup.
 SKIP_LAUNCH_SMOKE="${QWENVOICE_SKIP_LAUNCH_SMOKE:-0}"
 TEAM_ID_INFO_KEY="QwenVoiceTeamIdentifier"
 
@@ -34,6 +32,10 @@ codesign_team_identifier() {
 
 if [ $# -ne 1 ]; then
     fail "Usage: $0 /path/to/QwenVoice.app|/path/to/Vocello.app"
+fi
+
+if [ "$SKIP_LAUNCH_SMOKE" = "1" ] && [ "${CI:-}" = "true" ]; then
+    fail "Packaged-app launch smoke cannot be skipped in CI"
 fi
 
 APP_PATH="$1"
@@ -118,6 +120,10 @@ if [ "$EXPECT_SIGNED_RELEASE" = "1" ]; then
     codesign_has_runtime_metadata "$APP_PATH" || fail "Signed release is missing hardened runtime metadata"
     codesign --verify --strict "$XPC_SERVICE_PATH" >/dev/null 2>&1 || fail "Bundled XPC service code signature verification failed"
     codesign_has_runtime_metadata "$XPC_SERVICE_PATH" || fail "Bundled XPC service is missing hardened runtime metadata"
+    python3 "$SCRIPT_DIR/entitlement_contract.py" verify-bundle --role macos-app --bundle "$APP_PATH" \
+        || fail "Signed release app entitlement allowlist verification failed"
+    python3 "$SCRIPT_DIR/entitlement_contract.py" verify-bundle --role macos-engine-xpc --bundle "$XPC_SERVICE_PATH" \
+        || fail "Signed release XPC entitlement allowlist verification failed"
     EXPECTED_TEAM_ID="${QWENVOICE_EXPECT_TEAM_ID:-${APPLE_TEAM_ID:-}}"
     [ -n "$APP_TEAM_ID" ] || fail "Signed release app Info.plist is missing $TEAM_ID_INFO_KEY"
     [ -n "$XPC_TEAM_ID" ] || fail "Signed release XPC Info.plist is missing $TEAM_ID_INFO_KEY"
@@ -136,6 +142,8 @@ if [ "$EXPECT_SIGNED_RELEASE" = "1" ]; then
         FRAMEWORK_SIGNATURE_TEAM_ID="$(codesign_team_identifier "$framework_path")"
         [ "$FRAMEWORK_SIGNATURE_TEAM_ID" = "$APP_TEAM_ID" ] \
             || fail "Nested framework $(basename "$framework_path") signature Team ID mismatch: expected $APP_TEAM_ID, got ${FRAMEWORK_SIGNATURE_TEAM_ID:-missing (ad-hoc?)}"
+        python3 "$SCRIPT_DIR/entitlement_contract.py" verify-bundle --role macos-framework --bundle "$framework_path" \
+            || fail "Nested framework $(basename "$framework_path") carries unexpected entitlements"
     done < <(find "$APP_PATH/Contents/Frameworks" -maxdepth 1 -type d -name '*.framework' -print0 2>/dev/null)
     echo "[2/4] Signed release checks OK"
 else

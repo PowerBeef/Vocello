@@ -24,11 +24,14 @@ class VocelloMacUITestCase: XCTestCase {
 
     var additionalLaunchEnvironment: [String: String] { [:] }
 
-    func beginSession() {
+    func beginSession(additionalArguments: [String] = []) {
         continueAfterFailure = false
         session = VocelloUIApplicationSession()
         VocelloUIInterruptionSentinel.install(on: self)
-        launchApp(additionalEnvironment: additionalLaunchEnvironment)
+        launchApp(
+            additionalEnvironment: additionalLaunchEnvironment,
+            additionalArguments: additionalArguments
+        )
     }
 
     func endSession() {
@@ -41,7 +44,10 @@ class VocelloMacUITestCase: XCTestCase {
         restorePendingAutoplayPreference()
     }
 
-    func launchApp(additionalEnvironment: [String: String] = [:]) {
+    func launchApp(
+        additionalEnvironment: [String: String] = [:],
+        additionalArguments: [String] = []
+    ) {
         var environment = [
             "QWENVOICE_DEBUG": "1",
             "QWENVOICE_NATIVE_TELEMETRY_MODE": "verbose",
@@ -50,7 +56,7 @@ class VocelloMacUITestCase: XCTestCase {
             environment[key] = value
         }
 
-        session.launch(environment: environment)
+        session.launch(environment: environment, arguments: additionalArguments)
         XCTAssertTrue(
             VocelloUIWait.exists(app.windows.firstMatch, timeout: 30),
             "Vocello must expose one host-app window after launch"

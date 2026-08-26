@@ -299,8 +299,8 @@ final class IOSLongFormCoordinator {
               let request = lastRequest,
               let priorSegments = outcome?.segments,
               index >= 0, index < priorSegments.count else { return }
+        guard let attempt = studioCoordinator.start(live: nil) else { return }
         isProcessing = true
-        studioCoordinator.start(live: nil)
         let runner = IOSLongFormProjectRunner(
             ttsEngine: ttsEngine,
             audioPlayer: audioPlayer,
@@ -323,7 +323,8 @@ final class IOSLongFormCoordinator {
                 priorReplacements: replacements,
                 onProgress: { [weak self] snapshot in self?.progress = snapshot },
                 onSegmentsUpdated: { [weak self] segments in self?.segments = segments },
-                studioCoordinator: studioCoordinator
+                studioCoordinator: studioCoordinator,
+                studioAttempt: attempt
             )
             self.isProcessing = false
             self.runTask = nil
@@ -334,19 +335,32 @@ final class IOSLongFormCoordinator {
                 outcome: result.outcome,
                 request: request,
                 audioPlayer: audioPlayer,
-                studioCoordinator: studioCoordinator
+                studioCoordinator: studioCoordinator,
+                studioAttempt: attempt
             )
         }
     }
 
-    func cancel(ttsEngine: TTSEngineStore, audioPlayer: AudioPlayerViewModel) {
+    func cancel(
+        ttsEngine: TTSEngineStore,
+        audioPlayer: AudioPlayerViewModel,
+        studioCoordinator: StudioGenerationCoordinator
+    ) {
         guard isProcessing else { return }
+        guard let attempt = studioCoordinator.requestCancellation() else { return }
         let state = cancellationState
         runTask?.cancel()
         audioPlayer.abortLivePreviewIfNeeded()
         Task {
             await state.request()
-            try? await ttsEngine.cancelActiveGeneration()
+            do {
+                try await ttsEngine.cancelActiveGeneration()
+                studioCoordinator.completeCancellation(attempt: attempt)
+            } catch {
+                if studioCoordinator.failCancellation(error, attempt: attempt) {
+                    IOSHaptics.warning()
+                }
+            }
         }
     }
 
@@ -361,11 +375,11 @@ final class IOSLongFormCoordinator {
         if lastRequest?.plan.evidence.planDigest != request.plan.evidence.planDigest {
             replacements = []
         }
+        guard let attempt = studioCoordinator.start(live: nil) else { return }
         lastRequest = request
         lastMode = request.mode
         outcome = nil
         isProcessing = true
-        studioCoordinator.start(live: nil)
         let runner = IOSLongFormProjectRunner(
             ttsEngine: ttsEngine,
             audioPlayer: audioPlayer,
@@ -392,7 +406,8 @@ final class IOSLongFormCoordinator {
                 priorReplacements: replacements,
                 onProgress: { [weak self] snapshot in self?.progress = snapshot },
                 onSegmentsUpdated: { [weak self] segments in self?.segments = segments },
-                studioCoordinator: studioCoordinator
+                studioCoordinator: studioCoordinator,
+                studioAttempt: attempt
             )
             self.isProcessing = false
             self.runTask = nil
@@ -402,7 +417,8 @@ final class IOSLongFormCoordinator {
                 outcome: outcome,
                 request: request,
                 audioPlayer: audioPlayer,
-                studioCoordinator: studioCoordinator
+                studioCoordinator: studioCoordinator,
+                studioAttempt: attempt
             )
         }
     }
@@ -414,7 +430,8 @@ final class IOSLongFormCoordinator {
         outcome: IOSLongFormOutcome,
         request: IOSLongFormProjectRequest,
         audioPlayer: AudioPlayerViewModel,
-        studioCoordinator: StudioGenerationCoordinator
+        studioCoordinator: StudioGenerationCoordinator,
+        studioAttempt: StudioGenerationAttemptToken
     ) {
         switch outcome {
         case .completed(_, let joinedAudioPath, let joinedDurationSeconds):
@@ -430,7 +447,7 @@ final class IOSLongFormCoordinator {
                 shouldAutoPlay: shouldAutoPlay
             )
             let transcript = request.lines.joined(separator: " ")
-            studioCoordinator.complete(
+            let accepted = studioCoordinator.complete(
                 IOSStudioInlinePlayerItem(
                     generationID: UUID(),
                     audioURL: URL(fileURLWithPath: joinedAudioPath),
@@ -441,15 +458,16 @@ final class IOSLongFormCoordinator {
                     waveformSeed: IOSStableVisualHash.int(transcript),
                     autoplay: false,
                     ownedBySharedPlayer: shouldAutoPlay
-                )
+                ),
+                attempt: studioAttempt
             )
-            IOSHaptics.success()
+            if accepted { IOSHaptics.success() }
         case .cancelled:
-            studioCoordinator.finish()
-            studioCoordinator.errorMessage = nil
+            studioCoordinator.finish(attempt: studioAttempt)
         case .failed(_, let message):
-            studioCoordinator.fail(message)
-            IOSHaptics.warning()
+            if studioCoordinator.fail(message, attempt: studioAttempt) {
+                IOSHaptics.warning()
+            }
         }
     }
 }
@@ -494,7 +512,8 @@ final class IOSLongFormProjectRunner {
         priorReplacements: [LongFormSegmentReplacementEvidence],
         onProgress: @escaping @MainActor (IOSLongFormProgressSnapshot) -> Void,
         onSegmentsUpdated: @escaping @MainActor ([IOSLongFormSegmentState]) -> Void,
-        studioCoordinator: StudioGenerationCoordinator
+        studioCoordinator: StudioGenerationCoordinator,
+        studioAttempt: StudioGenerationAttemptToken
     ) async -> IOSLongFormOutcome {
         // Hold the fixed-refresh performance gate across the whole run —
         // segments, QC, History saves, and assembly — instead of flickering
@@ -570,14 +589,14 @@ final class IOSLongFormProjectRunner {
                     title: "Segment \(index + 1) of \(total)",
                     shouldAutoPlay: AudioService.shouldAutoPlay
                 )
-                studioCoordinator.liveItem = IOSStudioLivePreviewItem(
+                studioCoordinator.updateLiveItem(IOSStudioLivePreviewItem(
                     voiceName: "Segment \(index + 1) of \(total)",
                     modeLabel: "Long-form",
                     mode: request.mode,
                     transcript: line,
                     waveformSeed: IOSStableVisualHash.int(line),
                     estimatedAudioDuration: LivePreviewEstimate(text: line)?.estimatedAudioDuration ?? 0
-                )
+                ), attempt: studioAttempt)
                 await AppGenerationTimeline.shared.recordSubmitted(
                     id: generationID,
                     mode: request.mode.rawValue
@@ -683,7 +702,10 @@ final class IOSLongFormProjectRunner {
                 assembly: joined.evidence,
                 outputURL: joined.outputURL
             )
-            let saved = try await DatabaseService.shared.replaceLongFormJoinedGenerationAsync(joinedRecord)
+            let saved = try await GenerationHistoryRecovery.persist(
+                joinedRecord,
+                operation: .replaceLongFormJoined
+            )
             NotificationCenter.default.post(name: .generationSaved, object: nil)
             IOSSavedOutputsDestination.exportIfConfigured(internalAudioPath: joined.outputURL.path)
             publish(active: nil, message: "Done")
@@ -720,7 +742,8 @@ final class IOSLongFormProjectRunner {
         priorReplacements: [LongFormSegmentReplacementEvidence],
         onProgress: @escaping @MainActor (IOSLongFormProgressSnapshot) -> Void,
         onSegmentsUpdated: @escaping @MainActor ([IOSLongFormSegmentState]) -> Void,
-        studioCoordinator: StudioGenerationCoordinator
+        studioCoordinator: StudioGenerationCoordinator,
+        studioAttempt: StudioGenerationAttemptToken
     ) async -> (outcome: IOSLongFormOutcome, replacements: [LongFormSegmentReplacementEvidence]) {
         ttsEngine.beginSustainedPerformanceActivity()
         defer { ttsEngine.endSustainedPerformanceActivity() }
@@ -770,14 +793,14 @@ final class IOSLongFormProjectRunner {
                 title: "Segment \(segmentIndex + 1) of \(total)",
                 shouldAutoPlay: AudioService.shouldAutoPlay
             )
-            studioCoordinator.liveItem = IOSStudioLivePreviewItem(
+            studioCoordinator.updateLiveItem(IOSStudioLivePreviewItem(
                 voiceName: "Segment \(segmentIndex + 1) of \(total)",
                 modeLabel: "Long-form",
                 mode: request.mode,
                 transcript: line,
                 waveformSeed: IOSStableVisualHash.int(line),
                 estimatedAudioDuration: LivePreviewEstimate(text: line)?.estimatedAudioDuration ?? 0
-            )
+            ), attempt: studioAttempt)
             await AppGenerationTimeline.shared.recordSubmitted(
                 id: generationID,
                 mode: request.mode.rawValue
@@ -876,7 +899,10 @@ final class IOSLongFormProjectRunner {
                 assembly: joined.evidence,
                 outputURL: joined.outputURL
             )
-            let saved = try await DatabaseService.shared.replaceLongFormJoinedGenerationAsync(joinedRecord)
+            let saved = try await GenerationHistoryRecovery.persist(
+                joinedRecord,
+                operation: .replaceLongFormJoined
+            )
             NotificationCenter.default.post(name: .generationSaved, object: nil)
             IOSSavedOutputsDestination.exportIfConfigured(internalAudioPath: joined.outputURL.path)
             publish(active: nil, message: "Done")

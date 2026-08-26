@@ -140,28 +140,45 @@
       "id": "F-02",
       "plan": "engineering-review-remediation-2026-08",
       "title": "Medium — make behavior-changing diagnostics an enforceable distribution boundary",
-      "status": "planned",
-      "gate": "Classify registered knobs as observability-only or behavior/policy mutation. Make distributed builds unable to disable publication marking or redirect other policy-sensitive behavior through process environment alone, using an internal-build capability or an explicitly documented product policy. Preserve bounded diagnostics and record provenance whenever an internal diagnostic build mutates output. Current RuntimeDebugGate remains environment-only and QWENVOICE_MARKING=off is still compiled into shipped code.",
+      "status": "done",
+      "gate": "Classify registered knobs as observability-only or behavior/policy mutation. Make distributed builds unable to disable publication marking or redirect other policy-sensitive behavior through process environment alone, using an internal-build capability or an explicitly documented product policy. Preserve bounded diagnostics and record provenance whenever an internal diagnostic build mutates output.",
+      "evidence": [
+        "file:Sources/QwenVoiceCore/RuntimeDebugGate.swift",
+        "file:Tests/VocelloCoreTests/RuntimeDebugGateTests.swift",
+        "file:config/runtime-debug-knobs.json",
+        "file:scripts/runtime_security_contract.py",
+        "doc:docs/decisions/runtime-hardening-and-trust-boundary.md"
+      ],
       "sourceOfTruth": [
         "Sources/QwenVoiceCore/RuntimeDebugGate.swift",
         "Sources/QwenVoiceCore/AudioPublicationMarking.swift",
         "config/runtime-debug-knobs.json"
       ],
-      "updated": "2026-08-19"
+      "updated": "2026-08-26",
+      "notes": "Closed 2026-08-26. The runtime registry is schema v2 and classifies every key as behavior/policy mutation, bounded observability, or the capability gate. Behavior-changing RuntimeDebugGate reads now require both the repository-owned VOCELLO_INTERNAL_DIAGNOSTICS compile capability and QWENVOICE_DEBUG; local build, deterministic-test, UI-test, and device-diagnostics routes opt in explicitly, while macOS and iOS distribution routes are contractually forbidden from carrying the capability. QWENVOICE_MARKING=off therefore cannot disable Article 50 publication marking in a distributed binary even when its process environment is controlled. Bounded observability has a separate reader and remains available without product-policy mutation. Generation telemetry records the active override key names and a digest of their exact values, never the values themselves. Swift regression tests prove the distributed and internal branches, Python fixtures prove route leakage/missing-capability failures, runtime security passes, and the complete macOS deterministic suite passed outside the sandbox."
     },
     {
       "id": "F-03",
       "plan": "engineering-review-remediation-2026-08",
       "title": "Medium — execute deterministic iOS policy assertions in ordinary CI",
-      "status": "planned",
-      "gate": "Extract Foundation-only iOS policies into a host-runnable target and execute their assertions in ordinary macOS CI while retaining the generic physical-device SDK compile and real-device-only lifecycle/UI lanes. Move catalog/URL, ledger, managed-path, memory-band, cancellation-transition, and diagnostic-redaction logic only where it is genuinely platform-neutral. Current VocelloiOSLogicTests is compiled but not executed in ordinary CI.",
+      "status": "done",
+      "gate": "Extract Foundation-only iOS policies into a host-runnable target and execute their assertions in ordinary macOS CI while retaining the generic physical-device SDK compile and real-device-only lifecycle/UI lanes. Move catalog/URL, ledger, managed-path, memory-band, cancellation-transition, and diagnostic-redaction logic only where it is genuinely platform-neutral.",
+      "evidence": [
+        "file:Tests/VocelloiOSLogicTests/VocelloiOSLogicTests.swift",
+        "file:project.yml",
+        "file:scripts/macos_test.sh",
+        "file:scripts/build_foundation_targets.sh",
+        "file:scripts/check_test_workflows.sh",
+        "file:.github/workflows/ci.yml"
+      ],
       "sourceOfTruth": [
         "Tests/VocelloiOSLogicTests/VocelloiOSLogicTests.swift",
         "scripts/build_foundation_targets.sh",
         ".github/workflows/ci.yml",
         "project.yml"
       ],
-      "updated": "2026-08-19"
+      "updated": "2026-08-26",
+      "notes": "Closed 2026-08-26. The existing 19 Foundation-level iOS policy assertions and their four service sources now compile into both VocelloCoreTests and the standalone app-host-free VocelloiOSLogicTests target. Ordinary macOS CI therefore executes the assertions without a phone, while generic/platform=iOS still proves the same source against the physical-device SDK and Xcode 26's unsupported tool-hosted device execution is not misrepresented. The host suite passed all 437 tests including 19/19 VocelloiOSLogicTests, and the iOS app plus standalone policy bundle both compiled successfully outside the managed sandbox. Physical-device runtime and UI acceptance remain unchanged and XCUITest-only."
     },
     {
       "id": "F-04",
@@ -188,81 +205,121 @@
       "plan": "engineering-review-remediation-2026-08",
       "title": "Medium — restore packaged macOS launch verification",
       "status": "planned",
-      "gate": "Run the existing packaged-app launch smoke on the declared macos-26 release runner and remove the obsolete macOS-15 rationale. If hosted GUI launch proves unreliable, replace the unconditional QWENVOICE_SKIP_LAUNCH_SMOKE=1 with a capability-based packaged executable/dyld/XPC startup probe and require equivalent source-bound external startup evidence before public promotion. Current release.yml still skips launch unconditionally.",
+      "gate": "Run the existing packaged-app launch smoke on the declared macos-26 release runner. The release workflow and extracted-DMG verifier must require external startup evidence and reject a QWENVOICE_SKIP_LAUNCH_SMOKE bypass in CI. Close only after the next signed candidate records that hosted macos-26 proof.",
       "sourceOfTruth": [
         ".github/workflows/release.yml",
         "scripts/verify_release_bundle.sh",
         "scripts/verify_packaged_dmg.sh"
       ],
-      "updated": "2026-08-19"
+      "updated": "2026-08-26",
+      "notes": "Source remediation completed 2026-08-26: release.yml no longer bypasses launch smoke, the macos-26 package job verifies both the staged app and extracted DMG app, the verifier rejects the skip in CI, and supply-chain fixtures fail on runner downgrade or weakened startup evidence. A real external launch of build/Vocello.app passed locally. The item remains planned until an explicitly requested signed candidate supplies hosted macos-26 evidence; no release or tag was created to manufacture closure."
     },
     {
       "id": "F-06",
       "plan": "engineering-review-remediation-2026-08",
       "title": "Medium — durably couple audio publication and History persistence",
-      "status": "planned",
+      "status": "done",
       "gate": "Add a durable pending-history outbox/sidecar after atomic WAV publication, clear it only after the database commit, reconcile it at startup and History open, and expose privacy-safe retry/reveal/export state. Make clear-all resumable or database-first so a database failure cannot leave live rows pointing to already-deleted files. Current schedulePersistence uses an unstructured detached task with no retry, and clearAll deletes files before deleting rows.",
       "sourceOfTruth": [
         "Sources/SharedSupport/Services/GenerationPersistence.swift",
+        "Sources/SharedSupport/Database/GenerationHistoryOutbox.swift",
+        "Sources/SharedSupport/Services/GenerationHistoryRecovery.swift",
         "Sources/QwenVoiceCore/HistoryDeletionEngine.swift",
         "Sources/Services/DatabaseService.swift",
-        "Sources/iOSSupport/Services/DatabaseService.swift"
+        "Sources/iOSSupport/Services/DatabaseService.swift",
+        "Tests/VocelloCoreTests/GenerationHistoryOutboxTests.swift"
       ],
-      "updated": "2026-08-19"
+      "evidence": [
+        "file:Tests/VocelloCoreTests/GenerationHistoryOutboxTests.swift",
+        "file:Tests/VocelloCoreTests/HistoryDeletionEngineTests.swift",
+        "file:docs/reference/privacy-storage.md"
+      ],
+      "updated": "2026-08-26",
+      "notes": "Closed 2026-08-26. Every published take is atomically queued in a schema-v1 app-support outbox before its idempotent audioPath-bound SQLite write; startup and History entry reconcile pending work, and visible recovery offers retry plus platform-appropriate reveal/export. Interrupted entry and clear-marker writes recover fail closed. Clear-all now persists a resumable transaction, deletes database rows first, then removes outbox entries and requested audio, so database failure preserves live rows and files. Deterministic tests cover commit/removal ordering, database failure and replay, duplicate identity, corrupt/interrupted records, missing audio, clear resumption, and database-first deletion."
     },
     {
       "id": "F-07",
       "plan": "engineering-review-remediation-2026-08",
       "title": "Medium — close the main-branch administrator and security-timing gap",
-      "status": "planned",
+      "status": "done",
       "gate": "Preserve the maintainer-required main-only workflow while making its residual risk explicit and release-safe: either enforce required checks for administrators through a compatible protected-merge mechanism, or formally accept direct-main admin bypass for ordinary development and make exact-SHA green CI plus path-relevant security verdicts mandatory before release promotion. Add pull-request/path timing for CodeQL and npm advisory checks where compatible, and require signed release tags. Live GitHub state on 2026-08-19 still had enforce_admins=false and required_signatures=false; the direct main push of f6404ce reported a required-check bypass. Force-push and branch deletion are already disabled.",
       "sourceOfTruth": [
         ".github/workflows/ci.yml",
         ".github/workflows/security.yml",
+        ".github/workflows/release.yml",
         ".github/workflows/promote-release.yml",
+        "scripts/release_source_authority.py",
+        "scripts/supply_chain_contract.py",
         "AGENTS.md"
       ],
-      "updated": "2026-08-19"
+      "evidence": [
+        "file:scripts/tests/test_release_source_authority.py",
+        "file:scripts/tests/test_supply_chain_contract.py",
+        "file:docs/reference/macos-release-qa.md"
+      ],
+      "updated": "2026-08-26",
+      "notes": "Closed 2026-08-26 through the gate's compatible acceptance branch. Live read-only GitHub inspection confirmed strict CI required, force-push and deletion disabled, but enforce_admins=false, required_signatures=false, and no ruleset; that direct-main administrator bypass remains an explicit ordinary-development residual because main-only direct development is a maintainer requirement. Release and promotion now fail closed unless the release source is in origin/main, the version tag is annotated and GitHub-verified with reason=valid, and the exact commit's latest CI required and Security required check runs are completed successfully. Path routing brings CodeQL to native/website pull requests and npm advisory audit to website-relevant pushes and pull requests, while a stable Security required aggregate gives the release boundary an exact-SHA verdict. Supply-chain contracts and 41 focused tests cover missing, unsigned, cross-SHA, incomplete, failed, paginated, path-routing, and weakened-workflow cases. No live repository setting was mutated as part of this source change."
     },
     {
       "id": "F-08",
       "plan": "engineering-review-remediation-2026-08",
       "title": "Low — scope iOS Studio terminal state to a generation attempt",
-      "status": "planned",
+      "status": "done",
       "gate": "Have start return an attempt token and require finish, complete, fail, and cancellation completion to match it; ignore stale callbacks and surface cancellation-barrier failures. Add deterministic rapid-cancel/restart and stale-terminal tests before extracting any common generation executor. Current StudioGenerationCoordinator terminal methods have no attempt identity.",
       "sourceOfTruth": [
+        "Sources/iOSSupport/Services/StudioGenerationAttemptAuthority.swift",
         "Sources/iOS/Studio/StudioGenerationCoordinator.swift",
         "Sources/iOS/IOSGenerationModeViews.swift",
-        "Sources/iOS/IOSStudioGenerationActions.swift"
+        "Sources/iOS/Studio/IOSStudioGenerationActions.swift",
+        "Sources/iOS/Studio/IOSLongFormProject.swift"
       ],
-      "updated": "2026-08-19"
+      "evidence": [
+        "file:Tests/VocelloiOSLogicTests/StudioGenerationAttemptAuthorityTests.swift",
+        "file:docs/reference/ios-app-guide.md"
+      ],
+      "updated": "2026-08-26",
+      "notes": "Closed 2026-08-26. Studio start now returns an opaque attempt token; single-take and long-form live, success, failure, defer, and cancellation-barrier callbacks must present the current token. Stale or mismatched callbacks are ignored, overlapping starts and duplicate cancellation requests are rejected, and an engine cancellation-barrier failure remains visible instead of being swallowed. Five deterministic transition tests cover overlap, stale terminal events, cancellation ownership/failure, and rapid cancel/restart; they execute in ordinary macOS CI and compile in the generic iOS device-SDK target. macOS core-test and the full generic iOS app/policy build passed."
     },
     {
       "id": "F-09",
       "plan": "engineering-review-remediation-2026-08",
       "title": "Medium — split oversized authorities incrementally",
-      "status": "planned",
+      "status": "done",
       "gate": "Extract one characterized authority at a time from the current hotspots, preserving public types and contracts. Start with the clearest independently testable seam rather than a big-bang rewrite; candidate seams are downloader request/transfer/install stages, output-adapter publication/finalization/QC, iOS common generation execution, and device-diagnostics command families. Current largest files remain HuggingFaceDownloader.swift (about 132 KB), GenerationOutputAdapter.swift (about 118 KB), IOSDeviceDiagnosticsRunner.swift (about 102 KB), and IOSGenerationModeViews.swift (about 95 KB).",
       "sourceOfTruth": [
-        "Sources/QwenVoiceCore/HuggingFaceDownloader.swift",
-        "Sources/QwenVoiceCore/GenerationOutputAdapter.swift",
-        "Sources/iOS/IOSDeviceDiagnosticsRunner.swift",
+        "Sources/iOSSupport/Services/IOSSingleTakeGenerationExecutor.swift",
+        "Sources/iOS/Studio/IOSSingleTakeGenerationExecutionHooks.swift",
         "Sources/iOS/IOSGenerationModeViews.swift"
       ],
-      "updated": "2026-08-19"
+      "evidence": [
+        "file:Tests/VocelloiOSLogicTests/IOSSingleTakeGenerationExecutorTests.swift",
+        "file:docs/reference/ios-app-guide.md"
+      ],
+      "updated": "2026-08-26",
+      "notes": "Closed 2026-08-26 through the gate's incremental acceptance boundary. The first characterized seam moved the duplicated short-form Built-in, Design, and Clone submit/generate/cancel/telemetry/persistence/export pipeline out of IOSGenerationModeViews into a singular MainActor executor with dependency-injected hooks. Mode-specific request assembly, clone priming, save-sheet state, and attempt-scoped UI completion remain at the view boundary, preserving existing public and product contracts. Five deterministic tests cover required correlation identity, exact plan preservation, success ordering, materialized-result cancellation cleanup ownership, wrapped cancellation normalization, and ordinary failure propagation. IOSGenerationModeViews fell from 97,588 to 85,406 bytes; the macOS-hosted core suite and both generic iOS app/policy builds pass. Further hotspot extraction is ordinary incremental maintenance rather than an open review finding."
     },
     {
       "id": "F-10",
       "plan": "engineering-review-remediation-2026-08",
       "title": "Medium — establish localization architecture before translations",
-      "status": "planned",
+      "status": "done",
       "gate": "Adopt an Xcode String Catalog with translator context, typed localized presentation keys for dynamic errors/status, plural rules, pseudo-localization coverage, and a deterministic guard against new unlocalized user-facing literals. Then add long-string/accessibility XCUITest acceptance on supported physical platforms before accepting broad translations. The repository currently ships no owned .xcstrings/.strings resources and GitHub issue #95 remains open.",
       "sourceOfTruth": [
         "project.yml",
-        "Sources/iOS",
-        "Sources/Views"
+        "Sources/Resources/Localizable.xcstrings",
+        "Sources/SharedSupport/Services/VocelloPresentationText.swift",
+        "scripts/localization_contract.py",
+        "config/localization-unlocalized-baseline.json",
+        "Tests/VocelloMacUITests/VocelloMacSmokeUITests.swift",
+        "Tests/VocelloiOSUITests/VocelloiOSSmokeUITests.swift"
       ],
-      "updated": "2026-08-19"
+      "evidence": [
+        "file:scripts/tests/test_localization_contract.py",
+        "file:Tests/VocelloiOSLogicTests/VocelloPresentationTextTests.swift",
+        "doc:docs/reference/localization.md"
+      ],
+      "updated": "2026-08-26",
+      "notes": "Closed 2026-08-26. Vocello now owns one Xcode String Catalog with English source copy, translator comments, typed dynamic status/error formatting, and plural categories. The incremental localization contract validates target routing and Xcode settings, rejects missing context or plural forms, and blocks growth of direct unlocalized presentation literals against a content-addressed baseline while allowing migrations out of the baseline. Seven Python fixtures and three Swift presentation tests pass. Focused native acceptance passed outside the managed sandbox: macos-xcui-localization-20260826-173053-a9e0d9d6 ran the pseudo-localized macOS readiness journey, and ios-xcui-localization-20260826-173528-7744c05b walked Settings and Voice Models at Default, AX-L, AX-XXXL, and Pseudo-AX-XXXL on the paired physical iPhone. Neither lane generated audio or changed model installation state. Broad translations remain future product work rather than part of this closure."
     },
     {
       "id": "F-11",
@@ -288,44 +345,67 @@
       "id": "F-12",
       "plan": "engineering-review-remediation-2026-08",
       "title": "Low — add a root Xcode Swift dependency update path",
-      "status": "planned",
+      "status": "done",
       "gate": "Keep exact root Xcode dependency pins, but add a scheduled read-only release/advisory checker that proposes coordinated project.yml, Package.resolved, compatibility-matrix, and evidence updates. Do not loosen constraints or infer production compatibility from availability alone. Dependabot currently covers GitHub Actions, website npm, and Packages/VocelloQwen3Core only.",
       "sourceOfTruth": [
-        ".github/dependabot.yml",
+        ".github/workflows/swift-dependency-watch.yml",
+        "config/swift-dependency-update-policy.json",
+        "scripts/swift_dependency_updates.py",
         "project.yml",
         "QwenVoice.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved",
-        "config/toolchain.json"
+        "Packages/VocelloQwen3Core/COMPATIBILITY.json"
       ],
-      "updated": "2026-08-19"
+      "evidence": [
+        "file:scripts/tests/test_swift_dependency_updates.py",
+        "file:scripts/tests/test_supply_chain_contract.py",
+        "doc:docs/reference/mlx-guide.md"
+      ],
+      "updated": "2026-08-26",
+      "notes": "Closed 2026-08-26. A weekly and manually dispatchable read-only workflow now validates five coordinated exact pins, queries stable GitHub releases plus the repository's open Dependabot alerts, and retains privacy-safe JSON/Markdown proposals for 14 days. The policy binds each package to every declaration, root/owned lock, compatibility surface, and required evidence; any pin disagreement, missing feed, malformed advisory, prerelease-only candidate, mutable action, write permission, or incomplete package inventory fails closed. MLX changes are proposed as one lockstep group, availability never implies compatibility, and the workflow cannot edit source, open a PR, or loosen a constraint. Seven focused checker tests plus supply-chain negative fixtures pass."
     },
     {
       "id": "F-13",
       "plan": "engineering-review-remediation-2026-08",
       "title": "Advisory — continuously constrain the macOS entitlement posture",
-      "status": "planned",
+      "status": "done",
       "gate": "Add a per-target entitlement allowlist/diff gate for every deterministic change and release, retain negative loading tests, and re-evaluate allow-unsigned-executable-memory and disable-library-validation on each MLX upgrade. Preserve the documented accepted architecture unless evidence permits removing an entitlement. Current governance documents the posture and checks release signing, but does not yet machine-enforce a complete per-target entitlement diff on every change.",
       "sourceOfTruth": [
         "Sources/QwenVoice.entitlements",
         "Sources/QwenVoiceEmbeddedRuntime.entitlements",
+        "config/macos-entitlement-policy.json",
         "docs/decisions/runtime-hardening-and-trust-boundary.md",
-        "scripts/runtime_security_contract.py"
+        "scripts/entitlement_contract.py",
+        "scripts/verify_release_bundle.sh"
       ],
-      "updated": "2026-08-19"
+      "evidence": [
+        "file:scripts/tests/test_entitlement_contract.py",
+        "file:QwenVoice.xcodeproj/project.pbxproj",
+        "doc:docs/decisions/runtime-hardening-and-trust-boundary.md"
+      ],
+      "updated": "2026-08-26",
+      "notes": "Closed 2026-08-26. The app, engine XPC, and nested frameworks now have exact independent entitlement roles. The XPC project target and release signer use Sources/QwenVoiceEmbeddedRuntime.entitlements (only allow-unsigned-executable-memory and disable-library-validation) instead of inheriting the app's audio-input and user-selected-file capabilities; the app retains its accepted five-key posture and frameworks must carry none. The deterministic contract compares source plists, project routing, release signing, actual signed bundle entitlements, and a forbidden arbitrary-code-loading API inventory. Its MLX exception review is bound to resolved mlx-swift 0.31.6 and mlx-swift-lm 3.31.4, forcing re-review whenever either pin changes. Nine entitlement fixtures cover added keys, routing/signing drift, stale MLX review, loading APIs, comments, and signed-bundle diffs."
     },
     {
       "id": "F-14",
       "plan": "engineering-review-remediation-2026-08",
       "title": "Low — schedule Thread Sanitizer and enforce concurrency-debt quality",
-      "status": "planned",
+      "status": "done",
       "gate": "Add a scheduled TSan lane for the deterministic core/XPC subset, non-blocking only while noise is characterized, then promote stable coverage. Extend the concurrency registry so new unsafe declarations require review date and removal condition in addition to the already-enforced owner, invariant, and direct tests; add an explicit no-unreviewed-growth budget. Current scripts support opt-in TSan and the registry fail-closes on unregistered declarations, but no scheduled lane or review/removal metadata is enforced.",
       "sourceOfTruth": [
         "scripts/macos_test.sh",
         "scripts/check_test_workflows.sh",
         "config/concurrency-safety.json",
+        "config/tsan-policy.json",
         "scripts/runtime_security_contract.py",
-        ".github/workflows/ci.yml"
+        ".github/workflows/tsan.yml"
       ],
-      "updated": "2026-08-19"
+      "evidence": [
+        "file:scripts/tests/test_runtime_security_contract.py",
+        "file:scripts/macos_test.sh",
+        "doc:docs/reference/macos-testing.md"
+      ],
+      "updated": "2026-08-26",
+      "notes": "Closed in source on 2026-08-26. Concurrency governance schema v2 requires a current review date and substantive removal condition for every registered unsafe declaration and rejects growth beyond the measured 40 @unchecked Sendable and 9 nonisolated(unsafe) declarations. The weekly/manual macos-26 TSan workflow runs the 460-test deterministic core and 18-test injectable XPC transport subset, retains evidence for 14 days, never retries automatically, and remains non-blocking only through the bounded 2026-09-30 characterization window. The corrected isolated-cache physical-host characterization (`tsan-20260826-142440`) passed with no TSan warning or race summary. Its governed `build/cache/xcode/macos-tsan` DerivedData prevents sanitizer runtime contamination of ordinary and release products. One of three required consecutive clean runs is recorded; promotion to blocking still requires the remaining clean runs and explicit maintainer review. MLX/Metal runtime execution remains in its owned deterministic suite rather than this CPU-focused sanitizer subset."
     },
     {
       "id": "CM-1",

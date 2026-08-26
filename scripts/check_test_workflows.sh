@@ -19,6 +19,10 @@ rg -q 'sanitizer_setting="YES"' scripts/macos_test.sh \
   || fail "macOS core-test no longer enables Thread Sanitizer for the opt-in value"
 rg -q -- '-enableThreadSanitizer "\$sanitizer_setting"' scripts/macos_test.sh \
   || fail "macOS core-test no longer routes the opt-in switch to xcodebuild"
+rg -q 'cmd_tsan()' scripts/macos_test.sh \
+  || fail "macOS scheduled TSan subset command is missing"
+rg -q 'scripts/macos_test.sh tsan' .github/workflows/tsan.yml \
+  || fail "scheduled TSan workflow no longer invokes the repository subset"
 
 for required_policy_surface in \
   config/build-output-policy.json \
@@ -28,6 +32,7 @@ for required_policy_surface in \
   config/orchestration-contract.json \
   config/project-health-contract.json \
   config/quality-promotion-contract.json \
+  config/tsan-policy.json \
   docs/project-health.md \
   scripts/build_output_policy.py \
   scripts/codex_session_storage.py \
@@ -40,6 +45,8 @@ for required_policy_surface in \
   scripts/vendor_runtime_contract.py \
   scripts/supply_chain_contract.py \
   scripts/swift_dependency_snapshot.py \
+  scripts/swift_dependency_updates.py \
+  scripts/entitlement_contract.py \
   scripts/release_evidence.py \
   scripts/release_sbom.py \
   scripts/required_step_ledger.py \
@@ -66,6 +73,8 @@ for required_policy_surface in \
   scripts/tests/test_vendor_runtime_contract.py \
   scripts/tests/test_supply_chain_contract.py \
   scripts/tests/test_swift_dependency_snapshot.py \
+  scripts/tests/test_swift_dependency_updates.py \
+  scripts/tests/test_entitlement_contract.py \
   scripts/tests/test_release_evidence.py \
   scripts/tests/test_required_step_ledger.py \
   scripts/tests/test_project_health.py \
@@ -431,6 +440,35 @@ if "type: bundle.unit-test" not in logic_body or "platform: iOS" not in logic_bo
     raise SystemExit("VocelloiOSLogicTests must remain a standalone iOS unit-test bundle")
 if "TEST_TARGET_NAME" in logic_body:
     raise SystemExit("VocelloiOSLogicTests must remain app-host-free")
+core_target = re.search(
+    r"^  VocelloCoreTests:\n(?P<body>(?:    .*\n|\n)*)",
+    text,
+    re.MULTILINE,
+)
+core_body = core_target.group("body") if core_target else ""
+required_host_policy_sources = (
+    "Tests/VocelloiOSLogicTests",
+    "Sources/iOSSupport/Services/AppPaths.swift",
+    "Sources/iOSSupport/Services/IOSModelDeliverySupport.swift",
+    "Sources/iOSSupport/Services/IOSModelProgressPresentation.swift",
+    "Sources/iOSSupport/Services/RuntimeReleaseCoordinator.swift",
+)
+missing_logic_policy_sources = [
+    source for source in required_host_policy_sources if source not in logic_body
+]
+if missing_logic_policy_sources:
+    raise SystemExit(
+        "VocelloiOSLogicTests must compile the same platform-neutral policy surface: "
+        + ", ".join(missing_logic_policy_sources)
+    )
+missing_host_policy_sources = [
+    source for source in required_host_policy_sources if source not in core_body
+]
+if missing_host_policy_sources:
+    raise SystemExit(
+        "VocelloCoreTests must execute the platform-neutral iOS policy surface: "
+        + ", ".join(missing_host_policy_sources)
+    )
 logic_template = Path("config/xcode-schemes/VocelloiOSLogic.xcscheme.template").read_text(
     encoding="utf-8"
 )
@@ -464,6 +502,10 @@ PY
 [[ -z "$ci_error" ]] || fail "$ci_error"
 rg -q -- '-scheme VocelloiOSLogic' .github/workflows/ci.yml \
   || fail "ordinary CI must compile the standalone iOS logic-test bundle"
+rg -q -- 'scripts/macos_test.sh test' .github/workflows/ci.yml \
+  || fail "ordinary CI must execute the host-runnable iOS policy assertions"
+rg -q -- 'run_mac_test_bundle VocelloCoreTests' scripts/macos_test.sh \
+  || fail "macOS deterministic tests must execute VocelloCoreTests"
 rg -q 'CODE_SIGNING_ALLOWED=NO' .github/workflows/ci.yml \
   || fail "generic iOS CI compilation must remain signing-independent"
 
@@ -550,7 +592,7 @@ for root in roots:
     )
 allowed = {
     "ios_device.sh": {"doctor", "build", "install", "launch", "console", "pull", "bench", "lang-bench", "delivery-reliability", "clone-conditioning", "speech-assets", "enroll-clone-fixture", "crashes", "debug", "logs", "profile", "memory", "memory-field-report", "preflight", "device-state", "gate", "help"},
-    "macos_test.sh": {"preflight", "core-test", "lang-bench", "test", "telemetry-overhead", "crashes", "debug", "logs", "profile", "memory", "gate", "release-readiness", "models", "help"},
+    "macos_test.sh": {"preflight", "core-test", "tsan", "lang-bench", "test", "telemetry-overhead", "crashes", "debug", "logs", "profile", "memory", "gate", "release-readiness", "models", "help"},
     "ui_test.sh": {"macos", "ios"},
 }
 errors = []

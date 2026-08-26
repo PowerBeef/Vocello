@@ -177,17 +177,21 @@
         ".github/workflows/release.yml",
         ".github/workflows/promote-release.yml",
         ".github/workflows/security.yml",
+        ".github/workflows/swift-dependency-watch.yml",
+        "config/swift-dependency-update-policy.json",
         "config/quality-promotion-contract.json",
         "scripts/quality_promotion.py",
         "scripts/release_evidence.py",
         "scripts/release_sbom.py",
         "scripts/swift_dependency_snapshot.py",
+        "scripts/swift_dependency_updates.py",
         "scripts/supply_chain_contract.py"
       ],
       "testGlobs": [
         "scripts/tests/test_quality_promotion.py",
         "scripts/tests/test_release_evidence.py",
         "scripts/tests/test_swift_dependency_snapshot.py",
+        "scripts/tests/test_swift_dependency_updates.py",
         "scripts/tests/test_supply_chain_contract.py"
       ],
       "hardwareEvidence": []
@@ -211,17 +215,24 @@
       "id": "runtime-hardening",
       "owner": "backend-release-qa",
       "productionGlobs": [
+        ".github/workflows/tsan.yml",
+        "Sources/QwenVoice.entitlements",
+        "Sources/QwenVoiceEmbeddedRuntime.entitlements",
+        "config/macos-entitlement-policy.json",
         "config/runtime-debug-knobs.json",
         "config/concurrency-safety.json",
+        "config/tsan-policy.json",
         "config/release-evidence-contract.json",
         "config/quality-promotion-contract.json",
         "scripts/quality_promotion.py",
         "scripts/runtime_security_contract.py",
+        "scripts/entitlement_contract.py",
         "Sources/QwenVoiceCore/RuntimeDebugGate.swift"
       ],
       "testGlobs": [
         "scripts/tests/test_quality_promotion.py",
         "scripts/tests/test_runtime_security_contract.py",
+        "scripts/tests/test_entitlement_contract.py",
         "Tests/VocelloCoreTests/RuntimeDebugGateTests.swift"
       ],
       "hardwareEvidence": []

@@ -183,7 +183,7 @@ jobs:
             ONLY_ACTIVE_ARCH=YES \
             CODE_SIGNING_ALLOWED=NO | xcbeautify
 
-      - name: Compile iOS logic tests for the device SDK
+      - name: Compile host-executed iOS policy tests for the device SDK
         run: |
           set -euo pipefail
           xcodebuild build \

@@ -151,7 +151,7 @@ struct IOSCustomVoiceView: View {
 
     private var setupMessage: String? {
         if !isModelAvailable, let activeModel {
-            return "Install \(activeModel.name) in Settings."
+            return VocelloPresentationText.installModel(named: activeModel.name)
         }
         return nil
     }
@@ -203,7 +203,11 @@ struct IOSCustomVoiceView: View {
             onGenerate: generate,
             onCancel: {
                 if appModel.longForm.isProcessing {
-                    appModel.longForm.cancel(ttsEngine: ttsEngine, audioPlayer: audioPlayer)
+                    appModel.longForm.cancel(
+                        ttsEngine: ttsEngine,
+                        audioPlayer: audioPlayer,
+                        studioCoordinator: coordinator
+                    )
                 } else {
                     IOSStudioGenerationActions.cancelGeneration(
                         coordinator: coordinator,
@@ -246,7 +250,7 @@ struct IOSCustomVoiceView: View {
         do {
             let plan = try IOSLongFormCoordinator.plan(originalText: promptText)
             guard plan.segments.count <= IOSLongFormCoordinator.maxSegments else {
-                coordinator.fail(
+                coordinator.rejectStart(
                     "This script plans \(plan.segments.count) segments; the maximum is \(IOSLongFormCoordinator.maxSegments). Split the text and try again."
                 )
                 return
@@ -272,7 +276,9 @@ struct IOSCustomVoiceView: View {
                 studioCoordinator: coordinator
             )
         } catch {
-            coordinator.fail("Long-form planning failed: \(error.localizedDescription)")
+            coordinator.rejectStart(VocelloPresentationText.longFormPlanningFailed(
+                details: error.localizedDescription
+            ))
         }
     }
 
@@ -414,12 +420,12 @@ struct IOSCustomVoiceView: View {
     private func generate() {
         guard !scriptLimitState.trimmedIsEmpty, ttsEngine.isReady, !ttsEngine.hasActiveGeneration else { return }
         guard !scriptLimitState.isOverLimit else {
-            coordinator.fail(scriptLimitState.warningMessage)
+            coordinator.rejectStart(scriptLimitState.warningMessage)
             return
         }
         guard let model = activeModel else { return }
         guard isModelAvailable else {
-            coordinator.fail("Install \(model.name) in Settings to generate audio.")
+            coordinator.rejectStart(VocelloPresentationText.installModel(named: model.name))
             return
         }
         if scriptLimitState.routesToLongForm {
@@ -429,36 +435,30 @@ struct IOSCustomVoiceView: View {
 
         // Same seed for the live + final card so the decorative waveform doesn't change shape.
         let seed = IOSStableVisualHash.int(promptText)
-        coordinator.start(live: IOSStudioLivePreviewItem(
+        let generationID = UUID()
+        guard let attempt = coordinator.start(live: IOSStudioLivePreviewItem(
             voiceName: speakerDisplayName,
             modeLabel: "Built-in",
             mode: .custom,
             transcript: promptText,
             waveformSeed: seed,
             estimatedAudioDuration: LivePreviewEstimate(text: promptText)?.estimatedAudioDuration ?? 0
-        ))
-        let generationID = UUID()
+        )) else { return }
 
-        coordinator.generationTask = Task {
+        let hooks = IOSStudioSingleTakeGenerationHooks(
+            engine: ttsEngine,
+            audioPlayer: audioPlayer
+        )
+        let task = Task {
             defer {
                 Task { @MainActor in
-                    if coordinator.isGenerating {
-                        coordinator.finish()
-                    }
+                    coordinator.finish(attempt: attempt)
                 }
             }
             let outputPath = makeOutputPath(subfolder: model.outputSubfolder, text: promptText)
             do {
-                // Live streaming playback: estimate the buffer up front, then let
-                // AudioPlayerViewModel play chunks as they arrive (it already subscribes on
-                // iOS) and seamlessly hand off to the final file at completion.
-                audioPlayer.setLivePreviewEstimate(LivePreviewEstimate(text: promptText))
-                await AppGenerationTimeline.shared.recordSubmitted(
-                    id: generationID,
-                    mode: GenerationMode.custom.rawValue
-                )
-                let result = try await ttsEngine.generate(
-                    GenerationRequest(
+                let plan = try IOSSingleTakeGenerationPlan(
+                    request: GenerationRequest(
                         mode: .custom,
                         modelID: model.id,
                         text: promptText,
@@ -478,108 +478,34 @@ struct IOSCustomVoiceView: View {
                         deliveryInstructionCellID: model.supportsInstructionControl
                             ? draft.resolvedDeliveryProfile.instructionCellID
                             : nil
-                    )
-                )
-                // If the user cancelled while the take was generating, discard it: don't
-                // play it, don't persist it as a clip, and remove the orphaned WAV. The
-                // engine has already completed + cleaned up via its normal path here (this is
-                // iOS-only — it does NOT alter engine lifecycle/loadState), so this just
-                // suppresses surfacing an unwanted result. Keeps cancelled takes out of History.
-                if Task.isCancelled {
-                    await AppGenerationTimeline.shared.recordFailed(
-                        id: generationID,
-                        finishReason: .cancelled
-                    )
-                    IOSPullableDiagnosticsMirror.syncGenerationTelemetryIfEnabled(
-                        generationID: generationID
-                    )
-                    try? FileManager.default.removeItem(atPath: result.audioPath)
-                    audioPlayer.abortLivePreviewIfNeeded()
-                    return
-                }
-                // Finalize or hand off playback while the frontend timeline is
-                // still open. Short clips can reach final-file autoplay before
-                // live playback starts, and that genuine scheduling event must
-                // be recorded before the durable app telemetry row is written.
-                audioPlayer.completeStreamingPreview(
-                    result: result,
-                    title: String(promptText.prefix(40)),
-                    shouldAutoPlay: AudioService.shouldAutoPlay
-                )
-                await AppGenerationTimeline.shared.recordCompleted(
-                    id: generationID,
-                    mode: GenerationMode.custom.rawValue,
-                    usedStreaming: true,
-                    finishReason: result.finishReason?.rawValue,
-                    summary: result.telemetrySummary
-                )
-                IOSPullableDiagnosticsMirror.syncGenerationTelemetryIfEnabled(
-                    generationID: generationID
-                )
-                let generation = Generation(
-                    text: promptText,
-                    mode: model.mode.rawValue,
+                    ),
                     modelTier: model.tier,
-                    voice: draft.selectedSpeaker,
-                    emotion: model.supportsInstructionControl ? draft.resolvedDeliveryInstruction : nil,
-                    speed: nil,
-                    audioPath: result.audioPath,
-                    duration: result.durationSeconds,
-                    createdAt: Date(),
-                    seed: result.observedSamplingSeed.map { Int64(bitPattern: $0) }
+                    historyVoice: draft.selectedSpeaker,
+                    historyEmotion: model.supportsInstructionControl
+                        ? draft.resolvedDeliveryInstruction
+                        : nil,
+                    displayVoiceName: speakerDisplayName,
+                    modeLabel: "Built-in",
+                    waveformSeed: seed,
+                    persistenceCaller: "IOSCustomVoiceView"
                 )
-                GenerationPersistence.persist(
-                    generation,
-                    caller: "IOSCustomVoiceView"
+                let result = try await IOSSingleTakeGenerationExecutor.run(
+                    plan: plan,
+                    hooks: hooks
                 )
-                IOSSavedOutputsDestination.exportIfConfigured(internalAudioPath: result.audioPath)
-                await MainActor.run {
-                    coordinator.complete(
-                        IOSStudioInlinePlayerItem(
-                            generationID: generationID,
-                            audioURL: URL(fileURLWithPath: result.audioPath),
-                            voiceName: speakerDisplayName,
-                            modeLabel: "Built-in",
-                            mode: .custom,
-                            transcript: promptText,
-                            waveformSeed: seed,
-                            autoplay: false,
-                            cadenceNotice: IOSStudioCadenceNotice(audioQC: result.audioQC),
-                            ownedBySharedPlayer: true
-                        )
-                    )
-                }
-                IOSHaptics.success()
+                let accepted = coordinator.complete(
+                    hooks.inlinePlayerItem(for: result, plan: plan),
+                    attempt: attempt
+                )
+                if accepted { IOSHaptics.success() }
             } catch is CancellationError {
-                await AppGenerationTimeline.shared.recordFailed(
-                    id: generationID,
-                    finishReason: .cancelled
-                )
-                IOSPullableDiagnosticsMirror.syncGenerationTelemetryIfEnabled(
-                    generationID: generationID
-                )
-                audioPlayer.abortLivePreviewIfNeeded()
-                await MainActor.run { coordinator.errorMessage = nil }
+                // The shared executor owns cancellation cleanup and telemetry.
             } catch {
-                await AppGenerationTimeline.shared.recordFailed(
-                    id: generationID,
-                    finishReason: Task.isCancelled ? .cancelled : .failed
-                )
-                IOSPullableDiagnosticsMirror.syncGenerationTelemetryIfEnabled(
-                    generationID: generationID
-                )
-                audioPlayer.abortLivePreviewIfNeeded()
-                if Task.isCancelled {
-                    // A user cancel can surface as a wrapped engine error (not a bare
-                    // CancellationError) — treat it as a clean cancel, not a failure banner.
-                    // iOS-only: does not touch engine lifecycle/cleanup.
-                    await MainActor.run { coordinator.errorMessage = nil }
-                } else {
-                    await MainActor.run { coordinator.fail(error.localizedDescription) }
-                    IOSHaptics.warning()
-                }
+                let accepted = coordinator.fail(error.localizedDescription, attempt: attempt)
+                if accepted { IOSHaptics.warning() }
             }
         }
+        coordinator.installGenerationTask(task, for: attempt)
     }
 }
 
@@ -709,7 +635,7 @@ struct IOSVoiceDesignView: View {
 
     private var setupMessage: String? {
         if !isModelAvailable, let activeModel {
-            return "Install \(activeModel.name) in Settings."
+            return VocelloPresentationText.installModel(named: activeModel.name)
         }
         return nil
     }
@@ -1005,7 +931,11 @@ struct IOSVoiceDesignView: View {
             onGenerate: generate,
             onCancel: {
                 if appModel.longForm.isProcessing {
-                    appModel.longForm.cancel(ttsEngine: ttsEngine, audioPlayer: audioPlayer)
+                    appModel.longForm.cancel(
+                        ttsEngine: ttsEngine,
+                        audioPlayer: audioPlayer,
+                        studioCoordinator: coordinator
+                    )
                 } else {
                     IOSStudioGenerationActions.cancelGeneration(
                         coordinator: coordinator,
@@ -1049,7 +979,7 @@ struct IOSVoiceDesignView: View {
         do {
             let plan = try IOSLongFormCoordinator.plan(originalText: promptText)
             guard plan.segments.count <= IOSLongFormCoordinator.maxSegments else {
-                coordinator.fail(
+                coordinator.rejectStart(
                     "This script plans \(plan.segments.count) segments; the maximum is \(IOSLongFormCoordinator.maxSegments). Split the text and try again."
                 )
                 return
@@ -1073,7 +1003,9 @@ struct IOSVoiceDesignView: View {
                 studioCoordinator: coordinator
             )
         } catch {
-            coordinator.fail("Long-form planning failed: \(error.localizedDescription)")
+            coordinator.rejectStart(VocelloPresentationText.longFormPlanningFailed(
+                details: error.localizedDescription
+            ))
         }
     }
 
@@ -1199,9 +1131,9 @@ struct IOSVoiceDesignView: View {
         guard let model = activeModel else { return }
         guard canGenerate else {
             if !isModelAvailable {
-                coordinator.fail("Install \(model.name) in Settings to generate audio.")
+                coordinator.rejectStart(VocelloPresentationText.installModel(named: model.name))
             } else if scriptLimitState.isOverLimit {
-                coordinator.fail(scriptLimitState.warningMessage)
+                coordinator.rejectStart(scriptLimitState.warningMessage)
             }
             return
         }
@@ -1212,33 +1144,30 @@ struct IOSVoiceDesignView: View {
 
         // Same seed for the live + final card so the decorative waveform doesn't change shape.
         let seed = IOSStableVisualHash.int(promptText)
-        coordinator.start(live: IOSStudioLivePreviewItem(
+        let generationID = UUID()
+        guard let attempt = coordinator.start(live: IOSStudioLivePreviewItem(
             voiceName: briefChipLabel,
             modeLabel: "Design",
             mode: .design,
             transcript: promptText,
             waveformSeed: seed,
             estimatedAudioDuration: LivePreviewEstimate(text: promptText)?.estimatedAudioDuration ?? 0
-        ))
-        let generationID = UUID()
+        )) else { return }
 
-        coordinator.generationTask = Task {
+        let hooks = IOSStudioSingleTakeGenerationHooks(
+            engine: ttsEngine,
+            audioPlayer: audioPlayer
+        )
+        let task = Task {
             defer {
                 Task { @MainActor in
-                    if coordinator.isGenerating {
-                        coordinator.finish()
-                    }
+                    coordinator.finish(attempt: attempt)
                 }
             }
             let outputPath = makeOutputPath(subfolder: model.outputSubfolder, text: promptText)
             do {
-                audioPlayer.setLivePreviewEstimate(LivePreviewEstimate(text: promptText))
-                await AppGenerationTimeline.shared.recordSubmitted(
-                    id: generationID,
-                    mode: GenerationMode.design.rawValue
-                )
-                let result = try await ttsEngine.generate(
-                    GenerationRequest(
+                let plan = try IOSSingleTakeGenerationPlan(
+                    request: GenerationRequest(
                         mode: .design,
                         modelID: model.id,
                         text: promptText,
@@ -1253,105 +1182,33 @@ struct IOSVoiceDesignView: View {
                         generationID: generationID,
                         seed: draft.pinnedSeed,
                         variation: IOSGenerationVariationPreference.requestValue()
-                    )
-                )
-                // If the user cancelled while the take was generating, discard it: don't
-                // play it, don't persist it as a clip, and remove the orphaned WAV. The
-                // engine has already completed + cleaned up via its normal path here (this is
-                // iOS-only — it does NOT alter engine lifecycle/loadState), so this just
-                // suppresses surfacing an unwanted result. Keeps cancelled takes out of History.
-                if Task.isCancelled {
-                    await AppGenerationTimeline.shared.recordFailed(
-                        id: generationID,
-                        finishReason: .cancelled
-                    )
-                    IOSPullableDiagnosticsMirror.syncGenerationTelemetryIfEnabled(
-                        generationID: generationID
-                    )
-                    try? FileManager.default.removeItem(atPath: result.audioPath)
-                    audioPlayer.abortLivePreviewIfNeeded()
-                    return
-                }
-                audioPlayer.completeStreamingPreview(
-                    result: result,
-                    title: String(promptText.prefix(40)),
-                    shouldAutoPlay: AudioService.shouldAutoPlay
-                )
-                await AppGenerationTimeline.shared.recordCompleted(
-                    id: generationID,
-                    mode: GenerationMode.design.rawValue,
-                    usedStreaming: true,
-                    finishReason: result.finishReason?.rawValue,
-                    summary: result.telemetrySummary
-                )
-                IOSPullableDiagnosticsMirror.syncGenerationTelemetryIfEnabled(
-                    generationID: generationID
-                )
-                let generation = Generation(
-                    text: promptText,
-                    mode: model.mode.rawValue,
+                    ),
                     modelTier: model.tier,
-                    voice: draft.voiceDescription,
-                    emotion: draft.resolvedDeliveryInstruction,
-                    speed: nil,
-                    audioPath: result.audioPath,
-                    duration: result.durationSeconds,
-                    createdAt: Date(),
-                    seed: result.observedSamplingSeed.map { Int64(bitPattern: $0) }
+                    historyVoice: draft.voiceDescription,
+                    historyEmotion: draft.resolvedDeliveryInstruction,
+                    displayVoiceName: briefChipLabel,
+                    modeLabel: "Design",
+                    waveformSeed: seed,
+                    persistenceCaller: "IOSVoiceDesignView"
                 )
-                GenerationPersistence.persist(
-                    generation,
-                    caller: "IOSVoiceDesignView"
+                let result = try await IOSSingleTakeGenerationExecutor.run(
+                    plan: plan,
+                    hooks: hooks
                 )
-                IOSSavedOutputsDestination.exportIfConfigured(internalAudioPath: result.audioPath)
                 saveSheetAudioPath = result.audioPath
-                await MainActor.run {
-                    coordinator.complete(
-                        IOSStudioInlinePlayerItem(
-                            generationID: generationID,
-                            audioURL: URL(fileURLWithPath: result.audioPath),
-                            voiceName: briefChipLabel,
-                            modeLabel: "Design",
-                            mode: .design,
-                            transcript: promptText,
-                            waveformSeed: seed,
-                            autoplay: false,
-                            cadenceNotice: IOSStudioCadenceNotice(audioQC: result.audioQC),
-                            ownedBySharedPlayer: true
-                        )
-                    )
-                }
-                IOSHaptics.success()
+                let accepted = coordinator.complete(
+                    hooks.inlinePlayerItem(for: result, plan: plan),
+                    attempt: attempt
+                )
+                if accepted { IOSHaptics.success() }
             } catch is CancellationError {
-                await AppGenerationTimeline.shared.recordFailed(
-                    id: generationID,
-                    finishReason: .cancelled
-                )
-                IOSPullableDiagnosticsMirror.syncGenerationTelemetryIfEnabled(
-                    generationID: generationID
-                )
-                audioPlayer.abortLivePreviewIfNeeded()
-                await MainActor.run { coordinator.errorMessage = nil }
+                // The shared executor owns cancellation cleanup and telemetry.
             } catch {
-                await AppGenerationTimeline.shared.recordFailed(
-                    id: generationID,
-                    finishReason: Task.isCancelled ? .cancelled : .failed
-                )
-                IOSPullableDiagnosticsMirror.syncGenerationTelemetryIfEnabled(
-                    generationID: generationID
-                )
-                audioPlayer.abortLivePreviewIfNeeded()
-                if Task.isCancelled {
-                    // A user cancel can surface as a wrapped engine error (not a bare
-                    // CancellationError) — treat it as a clean cancel, not a failure banner.
-                    // iOS-only: does not touch engine lifecycle/cleanup.
-                    await MainActor.run { coordinator.errorMessage = nil }
-                } else {
-                    await MainActor.run { coordinator.fail(error.localizedDescription) }
-                    IOSHaptics.warning()
-                }
+                let accepted = coordinator.fail(error.localizedDescription, attempt: attempt)
+                if accepted { IOSHaptics.warning() }
             }
         }
+        coordinator.installGenerationTask(task, for: attempt)
     }
 }
 
@@ -1545,10 +1402,10 @@ struct IOSVoiceCloningView: View {
 
     private var setupMessage: String? {
         if !cloneConsentAcknowledged {
-            return "Enable voice-cloning consent in Settings → Privacy before generating."
+            return VocelloPresentationText.cloningConsentRequired
         }
         if !isModelAvailable, let cloneModel {
-            return "Install \(cloneModel.name) in Settings."
+            return VocelloPresentationText.installModel(named: cloneModel.name)
         }
         if draft.referenceAudioPath == nil {
             return "Choose a saved voice or record a reference clip on this iPhone."
@@ -1670,7 +1527,11 @@ struct IOSVoiceCloningView: View {
                 onGenerate: generate,
                 onCancel: {
                     if appModel.longForm.isProcessing {
-                        appModel.longForm.cancel(ttsEngine: ttsEngine, audioPlayer: audioPlayer)
+                        appModel.longForm.cancel(
+                            ttsEngine: ttsEngine,
+                            audioPlayer: audioPlayer,
+                            studioCoordinator: coordinator
+                        )
                     } else {
                         IOSStudioGenerationActions.cancelGeneration(
                             coordinator: coordinator,
@@ -1713,7 +1574,7 @@ struct IOSVoiceCloningView: View {
         do {
             let plan = try IOSLongFormCoordinator.plan(originalText: promptText)
             guard plan.segments.count <= IOSLongFormCoordinator.maxSegments else {
-                coordinator.fail(
+                coordinator.rejectStart(
                     "This script plans \(plan.segments.count) segments; the maximum is \(IOSLongFormCoordinator.maxSegments). Split the text and try again."
                 )
                 return
@@ -1737,7 +1598,9 @@ struct IOSVoiceCloningView: View {
                 studioCoordinator: coordinator
             )
         } catch {
-            coordinator.fail("Long-form planning failed: \(error.localizedDescription)")
+            coordinator.rejectStart(VocelloPresentationText.longFormPlanningFailed(
+                details: error.localizedDescription
+            ))
         }
     }
 
@@ -1960,21 +1823,21 @@ struct IOSVoiceCloningView: View {
     private func generate() {
         guard !scriptLimitState.trimmedIsEmpty, ttsEngine.isReady, !ttsEngine.hasActiveGeneration else { return }
         guard cloneConsentAcknowledged else {
-            coordinator.fail("Enable voice-cloning consent in Settings → Privacy before generating.")
+            coordinator.rejectStart(VocelloPresentationText.cloningConsentRequired)
             return
         }
         guard !scriptLimitState.isOverLimit else {
-            coordinator.fail(scriptLimitState.warningMessage)
+            coordinator.rejectStart(scriptLimitState.warningMessage)
             return
         }
         guard let model = cloneModel else { return }
         guard isModelAvailable else {
-            coordinator.fail("Install \(model.name) in Settings to generate audio.")
+            coordinator.rejectStart(VocelloPresentationText.installModel(named: model.name))
             return
         }
         if scriptLimitState.routesToLongForm {
             guard let refPath = draft.referenceAudioPath else {
-                coordinator.fail("Select a reference audio file before generating.")
+                coordinator.rejectStart(VocelloPresentationText.referenceAudioRequired)
                 return
             }
             startLongFormProject(model: model, refPath: refPath)
@@ -1982,22 +1845,24 @@ struct IOSVoiceCloningView: View {
         }
         // Same seed for the live + final card so the decorative waveform doesn't change shape.
         let seed = IOSStableVisualHash.int(promptText)
-        coordinator.start(live: IOSStudioLivePreviewItem(
+        let generationID = UUID()
+        guard let attempt = coordinator.start(live: IOSStudioLivePreviewItem(
             voiceName: referenceChipLabel,
             modeLabel: "Clone",
             mode: .clone,
             transcript: promptText,
             waveformSeed: seed,
             estimatedAudioDuration: LivePreviewEstimate(text: promptText)?.estimatedAudioDuration ?? 0
-        ))
-        let generationID = UUID()
+        )) else { return }
 
-        coordinator.generationTask = Task {
+        let hooks = IOSStudioSingleTakeGenerationHooks(
+            engine: ttsEngine,
+            audioPlayer: audioPlayer
+        )
+        let task = Task {
             defer {
                 Task { @MainActor in
-                    if coordinator.isGenerating {
-                        coordinator.finish()
-                    }
+                    coordinator.finish(attempt: attempt)
                 }
             }
             do {
@@ -2006,7 +1871,7 @@ struct IOSVoiceCloningView: View {
                     throw NSError(
                         domain: "QVoice.AppGeneration",
                         code: 4,
-                        userInfo: [NSLocalizedDescriptionKey: "Select a reference audio file before generating."]
+                        userInfo: [NSLocalizedDescriptionKey: VocelloPresentationText.referenceAudioRequired]
                     )
                 }
                 if ttsEngine.clonePreparationState.phase != .failed || ttsEngine.clonePreparationState.identityKey != clonePrimingRequestKey {
@@ -2021,13 +1886,10 @@ struct IOSVoiceCloningView: View {
                 }
 
                 let outputPath = makeOutputPath(subfolder: model.outputSubfolder, text: promptText)
-                audioPlayer.setLivePreviewEstimate(LivePreviewEstimate(text: promptText))
-                await AppGenerationTimeline.shared.recordSubmitted(
-                    id: generationID,
-                    mode: GenerationMode.clone.rawValue
-                )
-                let result = try await ttsEngine.generate(
-                    GenerationRequest(
+                let voiceName = selectedVoice?.name
+                    ?? URL(fileURLWithPath: refPath).deletingPathExtension().lastPathComponent
+                let plan = try IOSSingleTakeGenerationPlan(
+                    request: GenerationRequest(
                         mode: .clone,
                         modelID: model.id,
                         text: promptText,
@@ -2045,105 +1907,32 @@ struct IOSVoiceCloningView: View {
                         generationID: generationID,
                         seed: draft.pinnedSeed,
                         variation: IOSGenerationVariationPreference.requestValue()
-                    )
-                )
-                // If the user cancelled while the take was generating, discard it: don't
-                // play it, don't persist it as a clip, and remove the orphaned WAV. The
-                // engine has already completed + cleaned up via its normal path here (this is
-                // iOS-only — it does NOT alter engine lifecycle/loadState), so this just
-                // suppresses surfacing an unwanted result. Keeps cancelled takes out of History.
-                if Task.isCancelled {
-                    await AppGenerationTimeline.shared.recordFailed(
-                        id: generationID,
-                        finishReason: .cancelled
-                    )
-                    IOSPullableDiagnosticsMirror.syncGenerationTelemetryIfEnabled(
-                        generationID: generationID
-                    )
-                    try? FileManager.default.removeItem(atPath: result.audioPath)
-                    audioPlayer.abortLivePreviewIfNeeded()
-                    return
-                }
-                audioPlayer.completeStreamingPreview(
-                    result: result,
-                    title: String(promptText.prefix(40)),
-                    shouldAutoPlay: AudioService.shouldAutoPlay
-                )
-                await AppGenerationTimeline.shared.recordCompleted(
-                    id: generationID,
-                    mode: GenerationMode.clone.rawValue,
-                    usedStreaming: true,
-                    finishReason: result.finishReason?.rawValue,
-                    summary: result.telemetrySummary
-                )
-                IOSPullableDiagnosticsMirror.syncGenerationTelemetryIfEnabled(
-                    generationID: generationID
-                )
-                let voiceName = selectedVoice?.name ?? URL(fileURLWithPath: refPath).deletingPathExtension().lastPathComponent
-                let generation = Generation(
-                    text: promptText,
-                    mode: model.mode.rawValue,
+                    ),
                     modelTier: model.tier,
-                    voice: voiceName,
-                    emotion: nil,
-                    speed: nil,
-                    audioPath: result.audioPath,
-                    duration: result.durationSeconds,
-                    createdAt: Date(),
-                    seed: result.observedSamplingSeed.map { Int64(bitPattern: $0) }
+                    historyVoice: voiceName,
+                    historyEmotion: nil,
+                    displayVoiceName: voiceName,
+                    modeLabel: "Clone",
+                    waveformSeed: seed,
+                    persistenceCaller: "IOSVoiceCloningView"
                 )
-                GenerationPersistence.persist(
-                    generation,
-                    caller: "IOSVoiceCloningView"
+                let result = try await IOSSingleTakeGenerationExecutor.run(
+                    plan: plan,
+                    hooks: hooks
                 )
-                IOSSavedOutputsDestination.exportIfConfigured(internalAudioPath: result.audioPath)
-                await MainActor.run {
-                    coordinator.complete(
-                        IOSStudioInlinePlayerItem(
-                            generationID: generationID,
-                            audioURL: URL(fileURLWithPath: result.audioPath),
-                            voiceName: voiceName,
-                            modeLabel: "Clone",
-                            mode: .clone,
-                            transcript: promptText,
-                            waveformSeed: seed,
-                            autoplay: false,
-                            cadenceNotice: IOSStudioCadenceNotice(audioQC: result.audioQC),
-                            ownedBySharedPlayer: true
-                        )
-                    )
-                }
-                IOSHaptics.success()
+                let accepted = coordinator.complete(
+                    hooks.inlinePlayerItem(for: result, plan: plan),
+                    attempt: attempt
+                )
+                if accepted { IOSHaptics.success() }
             } catch is CancellationError {
-                await AppGenerationTimeline.shared.recordFailed(
-                    id: generationID,
-                    finishReason: .cancelled
-                )
-                IOSPullableDiagnosticsMirror.syncGenerationTelemetryIfEnabled(
-                    generationID: generationID
-                )
-                audioPlayer.abortLivePreviewIfNeeded()
-                await MainActor.run { coordinator.errorMessage = nil }
+                // The shared executor owns cancellation cleanup and telemetry.
             } catch {
-                await AppGenerationTimeline.shared.recordFailed(
-                    id: generationID,
-                    finishReason: Task.isCancelled ? .cancelled : .failed
-                )
-                IOSPullableDiagnosticsMirror.syncGenerationTelemetryIfEnabled(
-                    generationID: generationID
-                )
-                audioPlayer.abortLivePreviewIfNeeded()
-                if Task.isCancelled {
-                    // A user cancel can surface as a wrapped engine error (not a bare
-                    // CancellationError) — treat it as a clean cancel, not a failure banner.
-                    // iOS-only: does not touch engine lifecycle/cleanup.
-                    await MainActor.run { coordinator.errorMessage = nil }
-                } else {
-                    await MainActor.run { coordinator.fail(error.localizedDescription) }
-                    IOSHaptics.warning()
-                }
+                let accepted = coordinator.fail(error.localizedDescription, attempt: attempt)
+                if accepted { IOSHaptics.warning() }
             }
         }
+        coordinator.installGenerationTask(task, for: attempt)
     }
 
     private func syncCloneReferencePriming() async {

@@ -347,8 +347,11 @@ class IOSSmokeAcceptanceTests(unittest.TestCase):
         self.assertIn(".fill(Theme.Surface.hairline)", rows)
         self.assertIn(".stroke(Theme.Surface.panelStroke", rows)
         self.assertNotIn("IOSSettingsReferenceSwitch", rows)
+        self.assertIn(
+            "return VocelloPresentationText.status(.ready)",
+            rows,
+        )
         for state in [
-            'return "Ready"',
             'return "Not Installed"',
             'return "Update Available"',
             'return "Repair Needed"',

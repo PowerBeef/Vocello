@@ -363,6 +363,7 @@ public struct RunEnvironmentSnapshot: Hashable, Codable, Sendable {
     public let uptimeSeconds: Double
     public let lowPowerModeEnabled: Bool
     public let thermalState: String
+    public let runtimeDebugProvenance: RuntimeDebugProvenance?
 
     public init(
         loadAverage1Minute: Double? = nil,
@@ -371,7 +372,8 @@ public struct RunEnvironmentSnapshot: Hashable, Codable, Sendable {
         freeStorageBytes: UInt64? = nil,
         uptimeSeconds: Double,
         lowPowerModeEnabled: Bool,
-        thermalState: String
+        thermalState: String,
+        runtimeDebugProvenance: RuntimeDebugProvenance? = nil
     ) {
         self.loadAverage1Minute = loadAverage1Minute
         self.loadAverage5Minutes = loadAverage5Minutes
@@ -380,6 +382,7 @@ public struct RunEnvironmentSnapshot: Hashable, Codable, Sendable {
         self.uptimeSeconds = uptimeSeconds
         self.lowPowerModeEnabled = lowPowerModeEnabled
         self.thermalState = thermalState
+        self.runtimeDebugProvenance = runtimeDebugProvenance
     }
 
     static func capture() -> RunEnvironmentSnapshot {
@@ -402,7 +405,8 @@ public struct RunEnvironmentSnapshot: Hashable, Codable, Sendable {
             freeStorageBytes: freeStorageBytes,
             uptimeSeconds: processInfo.systemUptime,
             lowPowerModeEnabled: processInfo.isLowPowerModeEnabled,
-            thermalState: ThermalStateSnapshot.string(for: processInfo.thermalState)
+            thermalState: ThermalStateSnapshot.string(for: processInfo.thermalState),
+            runtimeDebugProvenance: RuntimeDebugGate.provenance()
         )
     }
 }

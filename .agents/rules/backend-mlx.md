@@ -194,7 +194,8 @@ an ordinary build/release prerequisite.
   acoustic audibility; process memory belongs only to the process that measured it, and a macOS UI
   benchmark is authoritative only when app, XPC service, and engine layers are complete.
 - **Diagnostic overrides are fail closed.** Every production-affecting environment key must be in
-  `config/runtime-debug-knobs.json` and is inert without the `QWENVOICE_DEBUG` master gate. Every
+  `config/runtime-debug-knobs.json` and requires both a repository-owned internal diagnostics build
+  and the `QWENVOICE_DEBUG` master gate. Distributed binaries omit the compile capability. Every
   owned unchecked/unsafe concurrency declaration must remain justified in
   `config/concurrency-safety.json`; validate both with `scripts/runtime_security_contract.py`.
 - **Catalog activation is fail closed.** The generated schema-v2 production catalog is complete for

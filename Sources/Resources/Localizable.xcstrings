@@ -1,0 +1,138 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "vocello.error.cancellation_not_finished" : {
+      "comment" : "Studio error. The substitution explains why the engine cancellation barrier failed.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancellation could not finish safely: %1$@"
+          }
+        }
+      }
+    },
+    "vocello.error.cloning_consent_required" : {
+      "comment" : "Studio error shown when Voice Cloning consent has not been acknowledged.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enable voice-cloning consent in Settings → Privacy before generating."
+          }
+        }
+      }
+    },
+    "vocello.error.install_model" : {
+      "comment" : "Studio error. The substitution is the display name of a missing voice model.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Install “%1$@” in Settings to generate audio."
+          }
+        }
+      }
+    },
+    "vocello.error.long_form_planning_failed" : {
+      "comment" : "Studio error. The substitution is a localized, non-sensitive planning error.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Long-form planning failed: %1$@"
+          }
+        }
+      }
+    },
+    "vocello.error.reference_audio_required" : {
+      "comment" : "Voice Cloning error shown when no reference clip is selected.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Select a reference audio file before generating."
+          }
+        }
+      }
+    },
+    "vocello.models.ready_count" : {
+      "comment" : "Summary count of installed on-device voice models.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld model ready"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld models ready"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "vocello.status.checking_downloaded_files" : {
+      "comment" : "Indeterminate model-install phase after all transfer bytes arrive.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Checking downloaded files"
+          }
+        }
+      }
+    },
+    "vocello.status.generation_failed" : {
+      "comment" : "Title shown when speech generation cannot complete.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Generation failed"
+          }
+        }
+      }
+    },
+    "vocello.status.making_model_available_offline" : {
+      "comment" : "Indeterminate model-install publication phase.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Making the model available offline"
+          }
+        }
+      }
+    },
+    "vocello.status.ready" : {
+      "comment" : "Terminal status for an installed on-device voice model.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ready"
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}

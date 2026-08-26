@@ -23,12 +23,33 @@ These checks are sufficient to commit, push, open a pull request, merge ordinary
 run ordinary CI. They do not require UI execution, installed generation models, or release
 evidence.
 
+## Scheduled ThreadSanitizer characterization
+
+```sh
+scripts/macos_test.sh tsan
+```
+
+This explicit lane instruments the deterministic `VocelloCoreTests` and injectable
+`VocelloEngineIntegrationTests` bundles. It does not execute the MLX/Metal runtime tests, whose
+lazy graph and single-owner behavior remain covered by their owned deterministic suite. Xcode may
+still compile linked MLX targets while building the test host. The driver launches Xcode's resolved
+`xctest` binary directly with each bundle's own embedded TSan runtime preloaded; repository-owned
+Mach-O files remain arm64-only, while only the named Xcode sanitizer dylib may retain its universal
+toolchain slices.
+
+The weekly/manual workflow is non-blocking only during the bounded characterization period in
+`config/tsan-policy.json`. It preserves every failed run, performs no automatic retry, and requires
+three consecutive clean runs plus explicit maintainer review before it may become blocking. The
+first corrected physical-host run on 2026-08-26 passed all 460 core and 18 XPC tests with no TSan
+warning or race summary.
+
 ## Explicit XCUITest lanes
 
 Run only when frontend acceptance is explicitly requested:
 
 ```sh
 scripts/ui_test.sh macos smoke
+scripts/ui_test.sh macos localization
 scripts/ui_test.sh macos benchmark
 # Filtered benchmark example:
 scripts/ui_test.sh macos benchmark --modes custom --lengths short --warm 1 --label "focused"

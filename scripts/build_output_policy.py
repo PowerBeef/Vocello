@@ -85,6 +85,7 @@ HEAVY_LANE_IDS = {
     "telemetry-overhead",
     "memory-qualification",
     "ui-smoke",
+    "ui-localization",
     "ui-benchmark",
     "ui-perf",
     "ui-delivery-cohort",

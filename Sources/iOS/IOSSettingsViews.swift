@@ -764,12 +764,12 @@ struct IOSModelRow: View {
             switch status {
             case .checking: return "Checking…"
             case .notInstalled: return "Not Installed"
-            case .installed: return "Ready"
+            case .installed: return VocelloPresentationText.status(.ready)
             case .updateAvailable: return "Update Available"
             case .incomplete: return "Repair Needed"
             case .error: return "Retry Needed"
             }
-        case .installed: return "Ready"
+        case .installed: return VocelloPresentationText.status(.ready)
         case .available: return "Not Installed"
         case .queued: return "Queued"
         case .waitingForConnectivity: return "Waiting for Network"

@@ -459,7 +459,8 @@ Streaming:
 
 - `appStreamingInterval = 0.32` s (configurable, used to batch decoder output into user-facing chunks).
 - PCM preview data is emitted by default on both platforms. A preview-policy environment override is
-  production-affecting and therefore inert unless the `QWENVOICE_DEBUG` master gate is enabled.
+  production-affecting and therefore requires an internal diagnostics build plus the
+  `QWENVOICE_DEBUG` master gate; distributed builds cannot enable it.
 
 `config/runtime-debug-knobs.json` is the exhaustive authority for these environment surfaces. Never
 add a behavior-changing reader outside `RuntimeDebugGate` or describe a debug-gated override as

@@ -2048,7 +2048,7 @@ struct StreamingExecutionContext: Sendable {
         // the summarizer can segregate instruct-bearing takes from the plain matrix.
         // Read via getenv (not ProcessInfo) because the in-process CLI updates it per
         // take; only the id is recorded, never user text.
-        if let delivery = RuntimeDebugGate.value(for: "QWENVOICE_BENCH_DELIVERY") {
+        if let delivery = RuntimeDebugGate.observabilityValue(for: "QWENVOICE_BENCH_DELIVERY") {
             if !delivery.isEmpty { tierNotes["delivery"] = delivery }
         }
         // MLX/Metal memory policy notes so each row self-identifies the substrate

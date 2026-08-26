@@ -114,8 +114,8 @@ graph.)
 | `QwenVoiceEngineSupport` | framework.static | macOS | `QwenVoiceEngineSupport` | `com.qwenvoice.engine-support` | macOS runtime helpers + the **XPC wire protocol** (`EngineCommand`, envelopes, codec). |
 | `QwenVoiceNative` | framework.static | macOS | `QwenVoiceNative` | `com.qwenvoice.native` | macOS app-facing XPC client/coordinator/store bridging XPC to SwiftUI. |
 | `QwenVoiceEngineService` | xpc-service | macOS | `QwenVoiceEngineService` | `com.qwenvoice.app.engine-service` | Out-of-process engine host for crash isolation + memory containment. |
-| `VocelloCoreTests` | bundle.unit-test | macOS | `VocelloCoreTests` | `com.qwenvoice.core.tests` | Core semantics, typed telemetry compatibility, and atomic/readable output contracts. |
-| `VocelloiOSLogicTests` | bundle.unit-test | iOS | `VocelloiOSLogicTests` | `com.patricedery.vocello.logic-tests` | Standalone, app-host-free platform policy contracts for catalog/ledger, memory, cancellation, storage gating, and privacy-safe diagnostics. Ordinary CI compiles this bundle for the physical-device SDK. Xcode 26 does not support executing a tool-hosted app-free bundle on a physical-device destination, so it is compile-only. |
+| `VocelloCoreTests` | bundle.unit-test | macOS | `VocelloCoreTests` | `com.qwenvoice.core.tests` | Core semantics, typed telemetry compatibility, atomic/readable output contracts, and the 19 host-runnable Foundation-level iOS policy assertions. |
+| `VocelloiOSLogicTests` | bundle.unit-test | iOS | `VocelloiOSLogicTests` | `com.patricedery.vocello.logic-tests` | Duplicate standalone, app-host-free platform policy compile for catalog/ledger, memory, cancellation, storage gating, and privacy-safe diagnostics. Ordinary CI compiles this bundle for the physical-device SDK. Xcode 26 does not support executing a tool-hosted app-free bundle on a physical-device destination, so this target is compile-only; its shared assertions execute in `VocelloCoreTests`. |
 | `VocelloEngineIntegrationTests` | bundle.unit-test | macOS | `VocelloEngineIntegrationTests` | `com.qwenvoice.engine-integration.tests` | Injectable XPC client/transport lifecycle and correlation contracts; never launches frontend UI. |
 | `VocelloMacUITests` | bundle.ui-testing | macOS | `VocelloMacUITests` | `com.qwenvoice.app.uitests` | Explicit native-app smoke and benchmark XCUITest lanes. |
 | `VocelloiOSUITests` | bundle.ui-testing | iOS | `VocelloiOSUITests` | `com.patricedery.vocello.uitests` | Explicit paired-physical-iPhone smoke/benchmark lanes plus the isolated opt-in model-delivery lifecycle proof; never Simulator. |
@@ -124,7 +124,7 @@ graph.)
 
 | Layer | macOS | iOS | Development publishing policy |
 | --- | --- | --- | --- |
-| **Deterministic verification** | Core + XPC integration + `Qwen3RuntimeTests` + app build | Project-input checks + app and standalone logic-test bundle physical-device SDK compile | Required by ordinary CI; sufficient for commit, push, pull request, and merge |
+| **Deterministic verification** | Core + XPC integration + `Qwen3RuntimeTests` + 19 host-runnable iOS policy assertions + app build | Project-input checks + app and standalone logic-test bundle physical-device SDK compile | Required by ordinary CI; sufficient for commit, push, pull request, and merge |
 | **Platform runtime gate** | `macos_test.sh gate` | `ios_device.sh gate` | Deterministic/device diagnostics; independent of XCUITest |
 | **UI regression** | `ui_test.sh macos smoke\|benchmark` XCUITest | `ui_test.sh ios smoke\|benchmark` XCUITest on a paired physical iPhone | Explicit frontend QA only; never required for publishing or packaging |
 | **Model-delivery lifecycle** | Isolated CLI install | `ui_test.sh ios model-download` on a paired physical iPhone | Opt-in diagnostic only; never part of smoke, benchmark, CI, or release |
@@ -138,8 +138,9 @@ platform-specific and is created only when explicitly requested.
 (iOS app), `VocelloMacUI` (explicit macOS XCUITest), and `VocelloiOSUI` (explicit physical-device
 iOS XCUITest), plus the separately rendered `VocelloCLI` and `VocelloiOSLogic` (standalone iOS
 policy XCTest) schemes. XcodeGen cannot directly render those tool and app-host-free test
-schemes (verified unchanged through 2.46.0), so checked-in templates bind to their generated target IDs. The UI schemes are isolated from ordinary test actions; ordinary CI only
-compiles `VocelloiOSLogic` for the generic device SDK and never executes it. A single shippable config,
+schemes (verified unchanged through 2.46.0), so checked-in templates bind to their generated target IDs. The UI schemes are isolated from ordinary test actions; ordinary CI executes the shared
+policy assertions through `VocelloCoreTests`, compiles `VocelloiOSLogic` for the generic device SDK,
+and never executes that standalone bundle. A single shippable config,
 **`Release`**, is the only config — there is no `Debug` config or generic `DEBUG` symbol.
 
 ### Key layering rule
@@ -354,8 +355,9 @@ readable, the fixed-payload AudioSeal watermark is embedded through the `Vocello
 facade and the machine-readable `LIST`/`INFO` provenance chunk is appended, before QC reads the
 file. Both marks flip together — one byte-identity discontinuity for published audio. The pass
 fails closed (a sample-count change aborts publication), resolves its weights from the generating
-model's own directory, and is disabled only by the registered `QWENVOICE_MARKING` debug knob under
-the master gate. Long-form assembly re-marks nothing: segments are marked at segment publication,
+model's own directory, and is disabled only by the registered `QWENVOICE_MARKING` internal knob in
+a capability-bearing diagnostic build under the master gate. Distributed builds cannot disable it.
+Long-form assembly re-marks nothing: segments are marked at segment publication,
 and `LongFormAssembly` appends only the provenance chunk to the stitched product.
 
 The shipping product-generation path is `VocelloQwen3Engine` plus its classified session and
@@ -398,8 +400,8 @@ phase table in [`development-progress.md`](development-progress.md)).
 device into `NativeDeviceMemoryClass` and resolves an `NativeMemoryPolicy` per
 tier + mode + batch. Classification: iPhone → `.iPhonePro`; Mac ≤10 GB →
 `.floor8GBMac`; ≤24 GB → `.mid16GBMac`; else `.highMemoryMac`. Diagnostic override
-`QWENVOICE_FORCE_MEMORY_CLASS` is propagated over the `initialize` handshake only when the
-`QWENVOICE_DEBUG` master gate is enabled.
+`QWENVOICE_FORCE_MEMORY_CLASS` is propagated over the `initialize` handshake only from an internal
+diagnostics build when the `QWENVOICE_DEBUG` master gate is enabled.
 
 | Tier (`NativeDeviceMemoryClass`) | MLX cache | Clone slots | Idle-unload | Token clear cadence | Post-batch trim |
 | --- | --- | --- | --- | --- | --- |
@@ -409,7 +411,7 @@ tier + mode + batch. Classification: iPhone → `.iPhonePro`; Mac ≤10 GB →
 | `.iPhonePro` | 128 MB* | 1 | 30 s | 50 | — |
 
 \* iPhone cache default 128 MB, diagnostically overridable with
-`QVOICE_IOS_MLX_CACHE_LIMIT_MB` only behind `QWENVOICE_DEBUG`.
+`QVOICE_IOS_MLX_CACHE_LIMIT_MB` only behind the internal capability and `QWENVOICE_DEBUG`.
 A hard `Memory.memoryLimit` is **only** set on iPhone **and only** when the debug-gated
 `QVOICE_IOS_MLX_MEMORY_LIMIT_MB` override is present — so **there is no hard memory limit in
 production**, and no Quality→Speed OOM fallback. `apply(_:)` configures only MLX's unavoidable
@@ -440,8 +442,9 @@ classified session into the incremental WAV before corresponding preview publica
 `NativeStreamingPreviewDataPolicy` controls whether the output adapter publishes live preview after
 the corresponding frames have been written. Preview uses the suspending frontend-event router, not
 an `AsyncStream.bufferingNewest` policy. The
-`QWENVOICE_STREAMING_PREVIEW_DATA=off` diagnostic override is inert unless `QWENVOICE_DEBUG`
-enables the master runtime gate. Output is 24 kHz mono Int16 PCM WAV.
+`QWENVOICE_STREAMING_PREVIEW_DATA=off` diagnostic override requires the internal diagnostics
+capability and remains inert unless `QWENVOICE_DEBUG` enables the master runtime gate. Output is
+24 kHz mono Int16 PCM WAV.
 
 ### 4.7 Prewarm
 
@@ -611,15 +614,15 @@ sequenceDiagram
     participant E as MLXTTSEngine<br/>(in-process, QwenVoiceCore)
     participant P as GenerationPersistence
 
-    V->>C: start
+    V->>C: start → attempt token
     C->>S: generate(request)
     S->>E: generate(request) (same process)
     E-->>S: GenerationEvent (96-event suspending router)
     E-->>S: adapter-owned preview after lossless WAV drain
     S-->>V: live preview (in-process, no XPC)
     E-->>S: GenerationResult
-    S-->>C: GenerationResult
-    C->>P: persist + inline player
+    S-->>C: GenerationResult + attempt token
+    C->>P: persist + token-matched inline player
 ```
 
 iOS casts the engine to capability protocols at runtime
@@ -633,6 +636,17 @@ concrete type. Key iOS behaviors:
 - **Typed cancellation barrier**: user and memory-pressure cancellation flow through
   `cancelActiveGeneration(reason:)`; the active task reaches `.cancelled` before ownership release,
   trim, or unload, and no cancelled result is persisted.
+- **Attempt-scoped Studio terminal authority**: `StudioGenerationCoordinator.start` returns a
+  token required by single-take and long-form live, completion, failure, deferred cleanup, and
+  cancellation-barrier callbacks. An older callback cannot clear or replace a newer attempt;
+  overlapping starts and duplicate cancellation requests are rejected, and a barrier error is
+  surfaced rather than discarded.
+- **Singular short-form execution authority**: Built-in, Design, and Clone views assemble their
+  typed request and retain mode-specific preparation/UI state, while
+  `IOSSingleTakeGenerationExecutor` owns their common submit, engine invocation, cancellation
+  cleanup, frontend telemetry terminal, playback handoff, History persistence, and saved-output
+  export sequence. The executor is dependency-injected so success/failure/cancellation ordering is
+  characterized without a model, UI host, network, or Simulator.
 - **Thermal gate** (2026-07-02): `TTSEngineStore.startThermalObservation` records
   thermal transitions and blocks PROACTIVE warm work (prewarm/clone priming) at
   serious/critical; generation is never thermally blocked
@@ -776,12 +790,16 @@ Layout under the root: `models/` (downloaded HF weights, staged in
 `imported_references`, `normalized_clone_refs`, `stream_sessions`). Full detail:
 [`reference/privacy-storage.md`](reference/privacy-storage.md).
 
-History storage fails closed. Database open, migration, read, write, and delete failures are reduced
-to typed privacy-safe classifications; an unavailable store never masquerades as an empty history
-and never turns a destructive operation into a successful no-op. History surfaces enter a degraded
-state and disable deletion until a read succeeds, preserving the existing database and audio. iOS
-exposes a visible Retry action; macOS retries when History reloads or is re-entered and must not be
-described as having a dedicated Retry control until one exists.
+History storage fails closed. After atomic WAV publication, `GenerationPersistence` first writes a
+schema-v1 sidecar under `history-outbox/`, then schedules an idempotent `audioPath`-bound SQLite
+commit; only a successful database transaction removes the sidecar. Startup and every History open
+reconcile retained entries. Database open, migration, read, write, and delete failures are reduced
+to typed privacy-safe classifications; an unavailable store never masquerades as empty History or
+turns a destructive operation into a successful no-op. Both platforms expose a recovery banner:
+macOS offers Retry, Reveal, and Export, while iOS offers Retry and system share/export. Clear-all
+first persists a transaction containing database and pending-outbox paths, deletes SQLite rows,
+then removes outbox entries and requested WAVs; an interrupted cleanup resumes before any pending
+append can replay.
 
 **`UserDefaults` keys**: `QwenVoice.DebugModeEnabled` (debug toggle, mirrored to
 `TelemetryGate`), `vocello.voiceCloningConsent.v1` (visible Settings-owned clone-consent acknowledgment), per-mode variant choices
@@ -905,10 +923,19 @@ propagated to the engine over the `initialize` handshake. All diagnostic writers
 Environment-variable ownership is explicit. `config/runtime-debug-knobs.json` registers every
 supported key and classifies production-affecting overrides, bounded observability, and
 test-target-only device diagnostics. Production-affecting values are read only through
-`RuntimeDebugGate` and remain inert unless `QWENVOICE_DEBUG` is enabled. Likewise,
+`RuntimeDebugGate` and require both the `VOCELLO_INTERNAL_DIAGNOSTICS` compile capability and
+`QWENVOICE_DEBUG`; distribution routes omit the capability. Bounded observability remains
+separately classified, and telemetry records active override key names plus a digest of their
+values without retaining those values. Likewise,
 `config/concurrency-safety.json` is the authoritative inventory and justification for owned
 `@unchecked Sendable` and other unsafe concurrency declarations; unregistered exceptions fail
-`scripts/runtime_security_contract.py`.
+`scripts/runtime_security_contract.py`. Registry schema v2 also requires a current review date and
+substantive removal condition for every exception and caps unreviewed growth at the measured 40
+`@unchecked Sendable` and 9 `nonisolated(unsafe)` declarations. The scheduled CPU-focused
+ThreadSanitizer subset is owned by `config/tsan-policy.json`; it covers the deterministic core and
+injectable XPC transport while MLX/Metal runtime execution stays in its single-owner deterministic
+suite. Characterization remains non-blocking only until the policy deadline and cannot become
+blocking without three consecutive clean runs and explicit maintainer review.
 
 Records are written by the `GenerationTelemetryJSONLSink` actor as JSONL under
 `…/QwenVoice[-Debug]/diagnostics/`:
@@ -999,7 +1026,12 @@ All generation, recording, transcription, and model storage happen locally.
 
 Repository supply-chain and publication controls are also security boundaries. External GitHub
 Actions are pinned by full SHA through `config/toolchain.json`; CI performs dependency review,
-scheduled CodeQL, and deterministic website/native checks. Release candidates produce SPDX and
+path-relevant CodeQL and npm advisory analysis on pull requests/main, plus deterministic
+website/native checks. `Security required` is the stable exact-SHA security aggregate. Direct
+administrator development on `main` remains an explicit workflow residual, so release authority
+begins only when `scripts/release_source_authority.py` proves a GitHub-verified annotated tag,
+containment in `origin/main`, and successful latest `CI required` plus `Security required` runs on
+the tagged commit. Release candidates produce SPDX and
 CycloneDX SBOMs, checksums, provenance/attestation, and a validated
 `config/release-evidence-contract.json` evidence set before a draft Release is created. The emitted
 schema-v2 `release-evidence.json` binds the clean tracked-and-untracked source identity, required
@@ -1067,7 +1099,7 @@ Most-frequent imports across `Sources/**/*.swift`:
 | `NativeMemoryPolicyResolver` | Per-device-tier MLX cache/clone/idle/cadence policy. |
 | `ActiveGenerationCoordinator` | Owns one in-process generation and waits for a typed cancellation terminal barrier before releasing it. |
 | `GenerationEventDeliveryProbe` | Owns the bounded suspending frontend-event router and measures accepted, terminated, or unobserved sends. |
-| `RuntimeDebugGate` | Makes registered production-affecting environment overrides inert unless `QWENVOICE_DEBUG` is enabled. |
+| `RuntimeDebugGate` | Requires a repository-owned internal build capability plus `QWENVOICE_DEBUG` for behavior-changing overrides; records privacy-safe override provenance in generation telemetry. |
 | `EngineServiceHost` | `@MainActor` XPC service host (`QwenVoiceEngineService`) running the engine out-of-process. |
 | `XPCNativeEngineClient` | macOS XPC client conforming to `MacTTSEngine`; `XPCNativeEngineCoordinator` manages the connection. |
 | `EngineCommand` | The XPC command enum carried inside the single `perform(_:withReply:)` envelope. |

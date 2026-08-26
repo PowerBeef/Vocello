@@ -160,7 +160,8 @@ tasks keep transferring across process death, and the OS scheduler owns concurre
 per-host caps are inert there) with 128 MiB ranges; and chunk task descriptions carry
 their identity so post-relaunch transfer metrics still attribute payload bytes to their
 file. The registered `QVOICE_DOWNLOAD_ENGINE_PROFILE` knob keeps `legacy` as the
-regression-comparison arm on iPhone (inert without `QWENVOICE_DEBUG`).
+regression-comparison arm on iPhone (available only in an internal diagnostics build with
+`QWENVOICE_DEBUG`).
 
 The iPhone default flip is an explicit maintainer call (2026-08-11) and a recorded
 deviation from the pre-registered model-download-lane A/B protocol: the mechanism is
@@ -185,7 +186,8 @@ transfer metrics attribute their bytes to their file so `wireBytes` accounting s
 exact, and an optional per-worker-session mode defeats HTTP/2/3 connection coalescing
 (measured equivalent to the shared session on this CDN; kept as a diagnostic lever). The
 CLI A/B knob is `QVOICE_DOWNLOAD_ENGINE_PROFILE` (`legacy` | `chunked` |
-`chunked-multisession`, registered, inert without `QWENVOICE_DEBUG`).
+`chunked-multisession`, registered, and available only in an internal diagnostics build with
+`QWENVOICE_DEBUG`).
 Since 2026-08-11 a chunked partial is crash-resumable: each landed range is recorded in a
 completed-range sidecar beside the partial (written atomically, after the bytes are in the
 partial), so a process death re-fetches only missing ranges; a missing or invalid sidecar

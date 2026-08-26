@@ -20,10 +20,12 @@ and UI automation are unsupported. XCUITest is the sole autonomous iOS app UI dr
 ./scripts/build_foundation_targets.sh ios
 ```
 
-The generic physical-device SDK compile builds both the app and the standalone
-`VocelloiOSLogicTests` policy bundle without executing XCTest. It requires no connected phone and is
-sufficient for routine commits, pushes, pull requests, ordinary merges, and ordinary CI. Missing
-models, a phone, or UI results must not block preserving and sharing development work.
+The ordinary macOS deterministic lane executes the 19 Foundation-level iOS policy assertions in
+`VocelloCoreTests`. The generic physical-device SDK compile then builds both the app and a duplicate,
+standalone `VocelloiOSLogicTests` policy bundle without executing that iOS bundle. Neither route
+requires a connected phone, and together they are sufficient for routine commits, pushes, pull
+requests, ordinary merges, and ordinary CI. Missing models, a phone, or UI results must not block
+preserving and sharing development work.
 
 ### Host toolchain prerequisite
 
@@ -44,8 +46,8 @@ operation, so repository scripts never invoke it automatically. Installing the c
 toolchain repair; it does not authorize Simulator builds, launches, tests, or UI automation. See
 [Apple's additional Xcode components guide](https://developer.apple.com/documentation/xcode/downloading-and-installing-additional-xcode-components).
 
-That app-host-free bundle covers catalog and delivery-ledger validation, memory policy,
-cancellation semantics, app-support path gating, and privacy-safe diagnostics at compile time. Xcode
+Those shared sources and assertions cover catalog and delivery-ledger validation, memory policy,
+cancellation semantics, app-support path gating, and privacy-safe diagnostics. Xcode
 26 reports tool-hosted testing as unavailable for physical-device destinations, so the repository
 does not expose a device execution command for this target. Physical runtime assurance remains in
 the existing headless diagnostics and genuine XCUITest lanes; no Simulator substitute is used.
@@ -70,6 +72,7 @@ diagnostic, which uses an isolated app-support root and is never part of smoke o
 
 ```sh
 scripts/ui_test.sh ios smoke
+scripts/ui_test.sh ios localization
 scripts/ui_test.sh ios benchmark
 # Filtered benchmark example:
 scripts/ui_test.sh ios benchmark --modes custom --lengths short --warm 1 --label "focused"

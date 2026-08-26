@@ -23,6 +23,7 @@ REQUIRED_SURFACES=(
     "scripts/build_output_policy.py"
     "scripts/codex_session_storage.py"
     "scripts/cli_version_contract.py"
+    "scripts/localization_contract.py"
     "scripts/saved_voice_lifecycle_contract.py"
     "scripts/documentation_contract.py"
     "scripts/model_catalog_contract.py"
@@ -32,9 +33,11 @@ REQUIRED_SURFACES=(
     "scripts/project_health.py"
     "scripts/refresh_derived_artifacts.py"
     "scripts/runtime_security_contract.py"
+    "scripts/entitlement_contract.py"
     "scripts/vendor_runtime_contract.py"
     "scripts/supply_chain_contract.py"
     "scripts/swift_dependency_snapshot.py"
+    "scripts/swift_dependency_updates.py"
     "scripts/release_evidence.py"
     "scripts/release_sbom.py"
     "scripts/build_cleanup.py"
@@ -76,12 +79,15 @@ REQUIRED_SURFACES=(
     "scripts/tests/test_project_health.py"
     "scripts/tests/test_refresh_derived_artifacts.py"
     "scripts/tests/test_runtime_security_contract.py"
+    "scripts/tests/test_entitlement_contract.py"
     "scripts/tests/test_vendor_runtime_contract.py"
     "scripts/tests/test_supply_chain_contract.py"
     "scripts/tests/test_swift_dependency_snapshot.py"
+    "scripts/tests/test_swift_dependency_updates.py"
     "scripts/tests/test_release_evidence.py"
     "scripts/tests/test_build_routing_contract.py"
     "scripts/tests/test_cli_version_contract.py"
+    "scripts/tests/test_localization_contract.py"
     "scripts/tests/test_saved_voice_lifecycle_contract.py"
     "scripts/tests/test_generate_cli_scheme.py"
     "scripts/tests/test_generate_ios_logic_scheme.py"
@@ -145,6 +151,8 @@ REQUIRED_SURFACES=(
     "scripts/release.sh"
     "Sources/Resources/qwenvoice_contract.json"
     "Sources/Resources/qwenvoice_production_model_catalog.json"
+    "Sources/Resources/Localizable.xcstrings"
+    "Sources/SharedSupport/Services/VocelloPresentationText.swift"
     "benchmarks/hardware-profiles.json"
     "benchmarks/schema-v1.json"
     "benchmarks/schema-v2.json"
@@ -157,6 +165,7 @@ REQUIRED_SURFACES=(
     "config/build-output-policy.json"
     "config/benchmark-baseline-migrations.json"
     "config/delivery-instruction-contract.json"
+    "config/localization-unlocalized-baseline.json"
     "config/audio-cadence-qc-contract.json"
     "config/derived-doc-facts.json"
     "config/roadmap.json"
@@ -176,9 +185,12 @@ REQUIRED_SURFACES=(
     "config/runtime-debug-knobs.json"
     "config/runtime-refactor-contract.json"
     "config/concurrency-safety.json"
+    "config/tsan-policy.json"
+    "config/macos-entitlement-policy.json"
     "config/release-evidence-contract.json"
     "config/public-product-facts.json"
     "config/toolchain.json"
+    "config/swift-dependency-update-policy.json"
     "config/xcode-schemes/VocelloCLI.xcscheme.template"
     "config/xcode-schemes/VocelloiOSLogic.xcscheme.template"
     "config/apple-platform-capability-matrix.json"
@@ -195,6 +207,8 @@ REQUIRED_SURFACES=(
     "SECURITY.md"
     ".github/CODEOWNERS"
     ".github/workflows/promote-release.yml"
+    ".github/workflows/swift-dependency-watch.yml"
+    ".github/workflows/tsan.yml"
     ".github/dependabot.yml"
     "Tests/UIAutomationSupport"
     "Tests/VocelloMacUITests"
@@ -224,6 +238,7 @@ python3 "$SCRIPT_DIR/codex_session_storage.py" validate
 python3 "$SCRIPT_DIR/generate_cli_scheme.py" --check
 python3 "$SCRIPT_DIR/generate_ios_logic_scheme.py" --check
 python3 "$SCRIPT_DIR/cli_version_contract.py" validate
+python3 "$SCRIPT_DIR/localization_contract.py" validate
 python3 "$SCRIPT_DIR/saved_voice_lifecycle_contract.py" validate
 python3 "$SCRIPT_DIR/model_catalog_contract.py" rebuild --check
 python3 "$SCRIPT_DIR/model_catalog_contract.py" validate
@@ -436,6 +451,7 @@ python3 "$SCRIPT_DIR/required_step_ledger.py" validate-contract
 python3 "$SCRIPT_DIR/project_health.py" validate
 python3 "$SCRIPT_DIR/project_health.py" rebuild-summary --check
 python3 "$SCRIPT_DIR/runtime_security_contract.py"
+python3 "$SCRIPT_DIR/entitlement_contract.py" validate
 python3 "$SCRIPT_DIR/check_convergence_promotion_gate.py"
 # Delivery quality needs audio and models, so it can never gate ordinary CI.
 # The text-level ways the instruction copy can be wrong are deterministic, and

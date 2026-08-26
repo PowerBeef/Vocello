@@ -100,7 +100,7 @@ final class HistoryDeletionEngineTests: XCTestCase {
         XCTAssertEqual(log.snapshot, ["deleteRecord(7)", "removeFile(/a.wav)"])
     }
 
-    func testClearAllSweepsFromDatabaseCountsFailuresAndStillWipesRows() throws {
+    func testClearAllWipesRowsBeforeFileCleanupAndCountsFailures() throws {
         let log = EffectLog()
         let engine = makeEngine(
             log: log,
@@ -112,7 +112,7 @@ final class HistoryDeletionEngineTests: XCTestCase {
         XCTAssertEqual(outcome, HistoryDeletionEngine.ClearAllOutcome(failedFileRemovals: 1))
         XCTAssertEqual(
             log.snapshot,
-            ["fetchPaths", "removeFile(/a.wav)", "removeFile(/b.wav)", "deleteAllRecords"]
+            ["fetchPaths", "deleteAllRecords", "removeFile(/a.wav)", "removeFile(/b.wav)"]
         )
     }
 
@@ -124,12 +124,12 @@ final class HistoryDeletionEngineTests: XCTestCase {
         XCTAssertEqual(log.snapshot, ["deleteAllRecords"])
     }
 
-    func testClearAllDatabaseFailureSurfacesAfterSweep() {
+    func testClearAllDatabaseFailurePreservesEveryAudioFile() {
         let log = EffectLog()
         let engine = makeEngine(log: log, deleteAllFails: true, paths: ["/a.wav"])
         XCTAssertThrowsError(try engine.clearAll(deleteAudio: true)) { error in
             XCTAssertEqual(error as? HistoryDeletionEngine.ClearAllError, .database("db down"))
         }
-        XCTAssertEqual(log.snapshot, ["fetchPaths", "removeFile(/a.wav)", "deleteAllRecords"])
+        XCTAssertEqual(log.snapshot, ["fetchPaths", "deleteAllRecords"])
     }
 }

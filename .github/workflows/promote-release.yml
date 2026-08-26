@@ -25,6 +25,7 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: write
+      checks: read
     steps:
       - name: Checkout exact tag
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -40,6 +41,37 @@ jobs:
           [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?$ ]] \
             || { echo "::error::invalid release tag"; exit 1; }
           commit="$(git rev-parse HEAD)"
+          git fetch --quiet origin main
+          git merge-base --is-ancestor "$commit" origin/main \
+            || { echo "::error::release commit is not contained in origin/main"; exit 1; }
+          gh api -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2026-03-10" \
+            "repos/${GITHUB_REPOSITORY}/git/ref/tags/${RELEASE_TAG}" \
+            > "$RUNNER_TEMP/release-tag-ref.json"
+          tag_object="$(python3 - "$RUNNER_TEMP/release-tag-ref.json" <<'PY'
+          import json, sys
+          value = json.load(open(sys.argv[1], encoding="utf-8"))
+          obj = value.get("object")
+          if not isinstance(obj, dict) or obj.get("type") != "tag" or not isinstance(obj.get("sha"), str):
+              raise SystemExit("error: release tag must be annotated")
+          print(obj["sha"])
+          PY
+          )"
+          gh api -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2026-03-10" \
+            "repos/${GITHUB_REPOSITORY}/git/tags/${tag_object}" \
+            > "$RUNNER_TEMP/release-tag-object.json"
+          gh api --paginate --slurp \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2026-03-10" \
+            "repos/${GITHUB_REPOSITORY}/commits/${commit}/check-runs?filter=latest&per_page=100" \
+            > "$RUNNER_TEMP/release-check-runs.json"
+          python3 scripts/release_source_authority.py \
+            --tag "$RELEASE_TAG" \
+            --commit "$commit" \
+            --tag-ref "$RUNNER_TEMP/release-tag-ref.json" \
+            --tag-object "$RUNNER_TEMP/release-tag-object.json" \
+            --check-runs "$RUNNER_TEMP/release-check-runs.json"
           python3 scripts/release_evidence.py verify-source --tag "$RELEASE_TAG" --commit "$commit"
           gh release view "$RELEASE_TAG" --json isDraft > "$RUNNER_TEMP/release-state.json"
           python3 - "$RUNNER_TEMP/release-state.json" <<'PY'

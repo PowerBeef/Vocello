@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "policy": "Every shipped macOS code target has an exact entitlement allowlist. Any added, removed, or changed entitlement fails deterministic and packaged-release verification until this policy and its security review are updated together.",
+  "targets": [
+    {
+      "id": "macos-app",
+      "projectTarget": "QwenVoice",
+      "source": "Sources/QwenVoice.entitlements",
+      "allowed": {
+        "com.apple.security.app-sandbox": false,
+        "com.apple.security.cs.allow-unsigned-executable-memory": true,
+        "com.apple.security.cs.disable-library-validation": true,
+        "com.apple.security.device.audio-input": true,
+        "com.apple.security.files.user-selected.read-write": true
+      }
+    },
+    {
+      "id": "macos-engine-xpc",
+      "projectTarget": "QwenVoiceEngineService",
+      "source": "Sources/QwenVoiceEmbeddedRuntime.entitlements",
+      "allowed": {
+        "com.apple.security.cs.allow-unsigned-executable-memory": true,
+        "com.apple.security.cs.disable-library-validation": true
+      }
+    },
+    {
+      "id": "macos-framework",
+      "projectTarget": null,
+      "source": null,
+      "allowed": {}
+    }
+  ],
+  "forbiddenDynamicLoadingAPIs": [
+    "dlopen",
+    "NSCreateObjectFileImageFromFile",
+    "CFBundleLoadExecutable",
+    "NSBundle.load"
+  ],
+  "scannedSourceRoots": [
+    "Sources",
+    "Packages/VocelloQwen3Core/Sources"
+  ],
+  "mlxExceptionReview": {
+    "reviewedAt": "2026-08-26",
+    "reviewedPins": {
+      "mlx-swift": "0.31.6",
+      "mlx-swift-lm": "3.31.4"
+    },
+    "exceptionEntitlements": [
+      "com.apple.security.cs.allow-unsigned-executable-memory",
+      "com.apple.security.cs.disable-library-validation"
+    ],
+    "conclusion": "Retain for the current MLX Metal runtime; the app loads no user-selected executable code and the XPC target receives no unrelated app capability.",
+    "removalCondition": "Re-test and remove either exception when an MLX upgrade or Apple runtime change can load and execute the pinned Metal/runtime graph without it."
+  }
+}

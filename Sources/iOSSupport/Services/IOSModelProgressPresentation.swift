@@ -63,12 +63,12 @@ struct IOSModelProgressPresentation: Equatable, Sendable {
 
     static let verification = Self(
         indicator: .indeterminate,
-        detail: "Checking downloaded files."
+        detail: VocelloPresentationText.status(.checkingDownloadedFiles) + "."
     )
 
     static let installation = Self(
         indicator: .indeterminate,
-        detail: "Making the model available offline."
+        detail: VocelloPresentationText.status(.makingModelAvailableOffline) + "."
     )
 
     static func retrying(retryCount: Int, reason: String?) -> Self {

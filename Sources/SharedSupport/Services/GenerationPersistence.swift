@@ -18,11 +18,10 @@ typealias PersistenceGenerationResult = QwenVoiceCore.GenerationResult
 @MainActor
 enum GenerationPersistence {
 
-    /// Hands off playback (synchronously, on `@MainActor`) and schedules
-    /// the SQLite save + library-event broadcast in a detached background
-    /// Task. The caller's `Generation` value is captured by-value into
-    /// the detached Task (no `inout` — the caller never observed
-    /// `generation.id` post-save anyway).
+    /// Hands off playback synchronously, durably queues the finished take,
+    /// then schedules its idempotent SQLite commit off the main actor. The
+    /// outbox intent exists before this method returns, so a process exit or
+    /// database failure cannot silently orphan a published WAV.
     ///
     /// Behavior change from May 2026: persistence errors that occur
     /// AFTER playback handoff are no longer thrown — they're logged via
@@ -130,18 +129,31 @@ enum GenerationPersistence {
         _ generation: Generation,
         caller: String
     ) {
-        // Schedule persistence in a detached Task so it doesn't block the
-        // main run loop. `DatabaseService` is now non-isolated; its
-        // `DatabaseQueue` handles thread-safety internally.
-        Task.detached {
+        let entry: GenerationHistoryOutboxEntry
+        do {
+            entry = try GenerationHistoryRecovery.enqueue(generation)
+        } catch {
+            if TelemetryGate.resolvedEnabled {
+                print("[Performance][\(caller)] history_outbox_enqueue_failed")
+            }
+            announceRecoveryStateChanged()
+            return
+        }
+
+        // The task is deliberately unstructured because persistence must
+        // outlive the initiating view. Unlike the retired Task.detached route,
+        // it preserves task-local provenance while explicitly leaving
+        // MainActor; durability and retry are owned by the outbox.
+        Task { @concurrent in
             let saveStart = DispatchTime.now().uptimeNanoseconds
             let savedGeneration: Generation
             do {
-                savedGeneration = try await DatabaseService.shared.saveGenerationAsync(generation)
+                savedGeneration = try await GenerationHistoryRecovery.coordinator.commit(entry)
             } catch {
                 if TelemetryGate.resolvedEnabled {
-                    print("[Performance][\(caller)] db_save_failed: \(error.localizedDescription)")
+                    print("[Performance][\(caller)] db_save_deferred_to_history_outbox")
                 }
+                await MainActor.run { announceRecoveryStateChanged() }
                 return
             }
             let saveMS = elapsedMs(since: saveStart)
@@ -158,11 +170,20 @@ enum GenerationPersistence {
                 if TelemetryGate.resolvedEnabled {
                     print("[Performance][\(caller)] history_notification_wall_ms=\(elapsedMs(since: notificationStart))")
                 }
+                announceRecoveryStateChanged()
             }
         }
+    }
+
+    private static func announceRecoveryStateChanged() {
+        NotificationCenter.default.post(name: .generationHistoryRecoveryChanged, object: nil)
     }
 
     nonisolated private static func elapsedMs(since start: UInt64) -> Int {
         Int((DispatchTime.now().uptimeNanoseconds - start) / 1_000_000)
     }
+}
+
+extension Notification.Name {
+    static let generationHistoryRecoveryChanged = Notification.Name("generationHistoryRecoveryChanged")
 }

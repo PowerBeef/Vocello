@@ -9,16 +9,35 @@ final class VocelloiOSSmokeUITests: VocelloiOSUITestCase {
         defer {
             if session != nil { endSession() }
         }
-        let categories = [
-            (name: "Default", value: "UICTContentSizeCategoryL"),
-            (name: "AX-L", value: "UICTContentSizeCategoryAccessibilityL"),
-            (name: "AX-XXXL", value: "UICTContentSizeCategoryAccessibilityXXXL"),
+        let categories: [(name: String, arguments: [String])] = [
+            (
+                name: "Default",
+                arguments: ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryL"]
+            ),
+            (
+                name: "AX-L",
+                arguments: [
+                    "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityL",
+                ]
+            ),
+            (
+                name: "AX-XXXL",
+                arguments: [
+                    "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL",
+                ]
+            ),
+            (
+                name: "Pseudo-AX-XXXL",
+                arguments: [
+                    "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL",
+                    "-NSDoubleLocalizedStrings", "YES",
+                    "-NSShowNonLocalizedStrings", "YES",
+                ]
+            ),
         ]
 
         for category in categories {
-            beginSession(additionalArguments: [
-                "-UIPreferredContentSizeCategoryName", category.value,
-            ])
+            beginSession(additionalArguments: category.arguments)
 
             select(tab: .settings)
             let settings = element("screen_settings")

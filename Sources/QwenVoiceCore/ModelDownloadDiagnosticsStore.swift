@@ -163,7 +163,7 @@ public final class ModelDownloadDiagnosticsStore: @unchecked Sendable {
             directory: directory,
             mirrorDirectory: mirrorDirectory,
             fileManager: fileManager,
-            diagnosticTraceRunID: RuntimeDebugGate.value(
+            diagnosticTraceRunID: RuntimeDebugGate.observabilityValue(
                 for: "QVOICE_IOS_MODEL_MANAGEMENT_RUN_ID"
             )
         )

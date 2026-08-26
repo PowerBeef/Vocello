@@ -1,7 +1,12 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "owner": "backend-runtime",
-  "policy": "Every unchecked Sendable declaration in owned production Swift requires a registry entry, an explicit owner, a synchronization invariant, and deterministic evidence.",
+  "policy": "Every unchecked Sendable or nonisolated(unsafe) declaration in owned production Swift requires a registry entry, explicit owner, synchronization invariant, review date, removal condition, deterministic evidence where applicable, and room within the no-unreviewed-growth budget.",
+  "budget": {
+    "maximumUncheckedSendableDeclarations": 40,
+    "maximumNonisolatedUnsafeDeclarations": 9,
+    "reviewCadenceDays": 365
+  },
   "sourceRoots": [
     "Sources",
     "Packages/VocelloQwen3Core/Sources"
@@ -15,7 +20,9 @@
         "transferDelegateQueue"
       ],
       "owner": "downloader initializer and terminal invalidation",
-      "invariant": "The URLSession reference, the retained foreground configuration, and the shared serial delegate queue are assigned once during init and never mutated; sessions (including lazily created per-worker chunk sessions behind a Mutex) are invalidated only after terminal processing."
+      "invariant": "The URLSession reference, the retained foreground configuration, and the shared serial delegate queue are assigned once during init and never mutated; sessions (including lazily created per-worker chunk sessions behind a Mutex) are invalidated only after terminal processing.",
+      "reviewedAt": "2026-08-26",
+      "removalCondition": "Remove these escapes when URLSession ownership can be expressed through immutable initialization without nonisolated storage or when the downloader is isolated behind one actor-compatible delegate boundary."
     },
     {
       "source": "Sources/QwenVoiceCore/TelemetryGate.swift",
@@ -24,7 +31,9 @@
         "handshakeMode"
       ],
       "owner": "TelemetryGate lock",
-      "invariant": "All reads and writes occur while the process-local lock is held."
+      "invariant": "All reads and writes occur while the process-local lock is held.",
+      "reviewedAt": "2026-08-26",
+      "removalCondition": "Remove when the diagnostic handshake can be immutable after process launch or isolated in a concurrency-checked actor without synchronous call-site regressions."
     },
     {
       "source": "Sources/QwenVoiceCore/NativeDeviceClassGate.swift",
@@ -32,7 +41,9 @@
         "handshakeForcedClass"
       ],
       "owner": "NativeDeviceClassGate lock",
-      "invariant": "The handshake override is a lock-protected one-way latch."
+      "invariant": "The handshake override is a lock-protected one-way latch.",
+      "reviewedAt": "2026-08-26",
+      "removalCondition": "Remove when the one-way device-class handshake becomes an immutable launch value or moves behind a concurrency-checked isolation boundary."
     },
     {
       "source": "Sources/QwenVoiceCore/BenchForceColdPolicy.swift",
@@ -40,7 +51,9 @@
         "consumed"
       ],
       "owner": "BenchForceColdPolicy lock",
-      "invariant": "The benchmark-only one-shot flag is read and written only while locked."
+      "invariant": "The benchmark-only one-shot flag is read and written only while locked.",
+      "reviewedAt": "2026-08-26",
+      "removalCondition": "Remove when benchmark cold-start consumption is carried as request-local immutable state instead of a process-wide one-shot latch."
     },
     {
       "source": "Sources/VocelloCLI/Support.swift",
@@ -48,7 +61,9 @@
         "_verbosity"
       ],
       "owner": "CLIOutput lock",
-      "invariant": "Verbosity is read and written only through the lock-protected property."
+      "invariant": "Verbosity is read and written only through the lock-protected property.",
+      "reviewedAt": "2026-08-26",
+      "removalCondition": "Remove when CLI verbosity is injected immutably into every command context and the process-wide compatibility accessor can be retired."
     },
     {
       "source": "Sources/iOS/TTSEngineStore.swift",
@@ -56,7 +71,9 @@
         "thermalObserverToken"
       ],
       "owner": "TTSEngineStore MainActor lifetime",
-      "invariant": "The observer token is assigned once during MainActor initialization and read only during deinitialization."
+      "invariant": "The observer token is assigned once during MainActor initialization and read only during deinitialization.",
+      "reviewedAt": "2026-08-26",
+      "removalCondition": "Remove when observer teardown can remain MainActor-isolated through an explicit lifecycle owner without deinitializer access to nonisolated storage."
     }
   ],
   "entries": [
@@ -68,6 +85,8 @@
       ],
       "owner": "RecoverableStoreCoordinator mutex and GRDB DatabaseQueue",
       "invariant": "Ordinary access fails closed after open or migration failure; only explicit Retry serially replaces the failed state after a complete successful reopen.",
+      "reviewedAt": "2026-08-26",
+      "removalCondition": "Remove unchecked conformance when GRDB storage ownership is fully actor-isolated or the database facade becomes a concurrency-checked immutable Sendable adapter.",
       "tests": [
         "Tests/VocelloCoreTests/HistoryPersistenceErrorTests.swift",
         "Tests/VocelloCoreTests/RecoverableStoreCoordinatorTests.swift"
@@ -81,6 +100,8 @@
       ],
       "owner": "RecoverableStoreCoordinator mutex and GRDB DatabaseQueue",
       "invariant": "Ordinary access fails closed after open or migration failure; only explicit Retry serially replaces the failed state after a complete successful reopen.",
+      "reviewedAt": "2026-08-26",
+      "removalCondition": "Remove unchecked conformance when the iOS GRDB storage owner is fully actor-isolated or the database facade becomes a concurrency-checked immutable Sendable adapter.",
       "tests": [
         "Tests/VocelloCoreTests/HistoryPersistenceErrorTests.swift",
         "Tests/VocelloCoreTests/RecoverableStoreCoordinatorTests.swift"
@@ -103,6 +124,8 @@
       ],
       "owner": "Qwen3 model generation gate and cache locks",
       "invariant": "Mutable MLX values are accessed only by the single generation owner or their documented lock-protected cache.",
+      "reviewedAt": "2026-08-26",
+      "removalCondition": "Remove each unchecked model/cache box when MLX arrays gain checked sendability or the corresponding value no longer crosses the single-owner generation boundary.",
       "tests": [
         "Packages/VocelloQwen3Core/Tests/Qwen3RuntimeTests/Qwen3GenerationGateTests.swift"
       ]
@@ -115,6 +138,8 @@
       ],
       "owner": "AudioConverter callback lifetime",
       "invariant": "The provider is retained for one converter invocation and callback mutation is serialized by AudioToolbox.",
+      "reviewedAt": "2026-08-26",
+      "removalCondition": "Remove when AudioToolbox exposes a Sendable callback context or conversion input can be provided without a mutable cross-callback reference box.",
       "tests": [
         "Tests/VocelloCoreTests/AtomicWAVPublicationTests.swift"
       ]
@@ -130,6 +155,8 @@
       ],
       "owner": "EngineServiceHost actor and lock-protected request registries",
       "invariant": "XPC callback boxes are single-resume and runtime access is serialized by the service actor.",
+      "reviewedAt": "2026-08-26",
+      "removalCondition": "Remove unchecked types as XPC reply ownership and runtime context become expressible with checked Sendable values fully confined to the service actor.",
       "tests": [
         "Tests/VocelloEngineIntegrationTests/EngineServiceTransportAccumulatorTests.swift"
       ]
@@ -142,6 +169,8 @@
       ],
       "owner": "NativePreparedCloneConditioningCache actor",
       "invariant": "MLX arrays remain actor-confined and are never concurrently mutated outside the active generation owner.",
+      "reviewedAt": "2026-08-26",
+      "removalCondition": "Remove when clone conditioning no longer carries MLXArray across the actor boundary or MLX provides checked Sendable immutable tensor handles.",
       "tests": [
         "Tests/VocelloCoreTests/CloneConditioningContractTests.swift"
       ]
@@ -155,6 +184,8 @@
       ],
       "owner": "downloader ordered delegate bridge",
       "invariant": "File operations and cancellation callbacks cross sendable closures through immutable or lock-protected boxes only.",
+      "reviewedAt": "2026-08-26",
+      "removalCondition": "Remove when URLSession delegate callbacks can deliver file and cancellation state through checked Sendable values without mutable bridge boxes.",
       "tests": [
         "Tests/VocelloCoreTests/ModelDownloadLifecycleTests.swift"
       ]
@@ -171,6 +202,8 @@
       ],
       "owner": "VocelloQwen3 loaded-model generation gate",
       "invariant": "Opaque MLX model and clone tensors remain behind the package facade; one generation task owns mutation through the loaded-model generation gate.",
+      "reviewedAt": "2026-08-26",
+      "removalCondition": "Remove each facade escape when the opaque MLX model and clone tensors become checked Sendable or stop crossing package concurrency boundaries.",
       "tests": [
         "Packages/VocelloQwen3Core/Tests/Qwen3RuntimeTests/VocelloQwen3FacadeTests.swift",
         "Packages/VocelloQwen3Core/Tests/Qwen3RuntimeTests/Qwen3StreamingContractTests.swift"
@@ -184,6 +217,8 @@
       ],
       "owner": "OSAllocatedUnfairLock-protected cancellation ingress",
       "invariant": "The lock protects only the immutable first cancellation reason and one task-cancellation closure; it never guards MLX state, performs suspension, or remains held while invoking the closure.",
+      "reviewedAt": "2026-08-26",
+      "removalCondition": "Remove when cancellation ingress can use a checked Sendable standard-library primitive while preserving synchronous first-reason capture and prompt task cancellation.",
       "tests": [
         "Packages/VocelloQwen3Core/Tests/Qwen3RuntimeTests/ClassifiedGenerationSessionTests.swift"
       ]
@@ -210,6 +245,8 @@
       ],
       "owner": "per-type locks or immutable capture boxes",
       "invariant": "Each utility confines mutation to its documented lock, actor, queue, or immutable capture lifetime; the memory-pressure snapshot uses OSAllocatedUnfairLock for cross-domain reads while dispatch-source lifecycle stays queue-confined.",
+      "reviewedAt": "2026-08-26",
+      "removalCondition": "Remove individual utility escapes as their framework callbacks and lock-protected state migrate to checked Sendable primitives without weakening synchronous diagnostics.",
       "tests": [
         "Tests/VocelloCoreTests/GenerationEventDeliveryProbeTests.swift",
         "Tests/VocelloCoreTests/GenerationFailureDiagnosticLoggerTests.swift",
@@ -225,6 +262,8 @@
       ],
       "owner": "single active product output adapter and scratch-buffer lock",
       "invariant": "The adapter drains one classified-session consumer and holds product finalization through atomic output and Fast QC; reusable PCM storage never escapes concurrent mutable access.",
+      "reviewedAt": "2026-08-26",
+      "removalCondition": "Remove when product output and reusable PCM storage are fully confined to one checked isolation domain or use a standard Sendable buffer abstraction.",
       "tests": [
         "Tests/VocelloCoreTests/ActiveGenerationCoordinatorTests.swift"
       ]
@@ -242,6 +281,8 @@
       ],
       "owner": "XPCNativeEngineClient main actor and single-resume pending request boxes",
       "invariant": "Mutable client state stays main-actor isolated; callback bridges are single-resume and lock-protected.",
+      "reviewedAt": "2026-08-26",
+      "removalCondition": "Remove as XPC callback APIs are wrapped by checked Sendable continuations and all client transport state remains expressibly MainActor-isolated.",
       "tests": [
         "Tests/VocelloEngineIntegrationTests/EngineServiceTransportAccumulatorTests.swift"
       ]
@@ -262,6 +303,8 @@
       ],
       "owner": "framework callback lifetime plus lock, actor, or main-queue isolation",
       "invariant": "Framework callbacks mutate only the registered synchronized state and are invalidated before owner teardown.",
+      "reviewedAt": "2026-08-26",
+      "removalCondition": "Remove each callback bridge escape when the corresponding Apple framework offers checked Sendable callbacks or ownership can remain in one actor for its full lifetime.",
       "tests": [
         "Tests/VocelloCoreTests/MainThreadStallWatchdogTests.swift",
         "Tests/VocelloCoreTests/MemoryTelemetryV8Tests.swift"

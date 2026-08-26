@@ -1,0 +1,99 @@
+{
+  "schemaVersion": 1,
+  "policy": "Exact Swift package pins remain authoritative. Release availability and Dependabot alerts may propose a coordinated review, but never prove source or runtime compatibility and never mutate the repository.",
+  "workflow": ".github/workflows/swift-dependency-watch.yml",
+  "governanceSurfaces": [
+    "config/toolchain.json",
+    "config/evidence-impact.json",
+    "config/macos-entitlement-policy.json",
+    "docs/reference/mlx-guide.md"
+  ],
+  "packages": [
+    {
+      "identity": "grdb.swift",
+      "repository": "groue/GRDB.swift",
+      "group": "root-application-dependencies",
+      "declarations": ["project.yml"],
+      "locks": ["QwenVoice.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved"],
+      "compatibility": [],
+      "requiredEvidence": [
+        "QVOICE_GATES=quick ./scripts/check_project_inputs.sh",
+        "scripts/macos_test.sh test",
+        "./scripts/build_foundation_targets.sh ios"
+      ]
+    },
+    {
+      "identity": "mlx-swift",
+      "repository": "ml-explore/mlx-swift",
+      "group": "mlx-runtime-lockstep",
+      "declarations": ["project.yml", "Packages/VocelloQwen3Core/Package.swift"],
+      "locks": [
+        "QwenVoice.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved",
+        "Packages/VocelloQwen3Core/Package.resolved"
+      ],
+      "compatibility": ["Packages/VocelloQwen3Core/COMPATIBILITY.json"],
+      "requiredEvidence": [
+        "./scripts/regenerate_project.sh",
+        "QVOICE_GATES=quick ./scripts/check_project_inputs.sh",
+        "scripts/macos_test.sh test",
+        "./scripts/build_foundation_targets.sh macos",
+        "./scripts/build_foundation_targets.sh ios",
+        "fixed-seed Speed/Quality benchmark and audio-QC comparison"
+      ]
+    },
+    {
+      "identity": "mlx-swift-lm",
+      "repository": "ml-explore/mlx-swift-lm",
+      "group": "mlx-runtime-lockstep",
+      "declarations": ["Packages/VocelloQwen3Core/Package.swift"],
+      "locks": [
+        "QwenVoice.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved",
+        "Packages/VocelloQwen3Core/Package.resolved"
+      ],
+      "compatibility": ["Packages/VocelloQwen3Core/COMPATIBILITY.json"],
+      "requiredEvidence": [
+        "./scripts/regenerate_project.sh",
+        "QVOICE_GATES=quick ./scripts/check_project_inputs.sh",
+        "scripts/macos_test.sh test",
+        "./scripts/build_foundation_targets.sh macos",
+        "./scripts/build_foundation_targets.sh ios",
+        "fixed-seed Speed/Quality benchmark and audio-QC comparison"
+      ]
+    },
+    {
+      "identity": "swift-huggingface",
+      "repository": "huggingface/swift-huggingface",
+      "group": "model-loading-dependencies",
+      "declarations": ["project.yml", "Packages/VocelloQwen3Core/Package.swift"],
+      "locks": [
+        "QwenVoice.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved",
+        "Packages/VocelloQwen3Core/Package.resolved"
+      ],
+      "compatibility": ["Packages/VocelloQwen3Core/COMPATIBILITY.json"],
+      "requiredEvidence": [
+        "./scripts/regenerate_project.sh",
+        "QVOICE_GATES=quick ./scripts/check_project_inputs.sh",
+        "scripts/macos_test.sh test",
+        "./scripts/build_foundation_targets.sh ios",
+        "model catalog and isolated download lifecycle validation"
+      ]
+    },
+    {
+      "identity": "swift-transformers",
+      "repository": "huggingface/swift-transformers",
+      "group": "model-loading-dependencies",
+      "declarations": ["Packages/VocelloQwen3Core/Package.swift"],
+      "locks": [
+        "QwenVoice.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved",
+        "Packages/VocelloQwen3Core/Package.resolved"
+      ],
+      "compatibility": ["Packages/VocelloQwen3Core/COMPATIBILITY.json"],
+      "requiredEvidence": [
+        "QVOICE_GATES=quick ./scripts/check_project_inputs.sh",
+        "scripts/macos_test.sh test",
+        "./scripts/build_foundation_targets.sh ios",
+        "fixed-seed tokenizer byte-identity or justified full benchmark battery"
+      ]
+    }
+  ]
+}

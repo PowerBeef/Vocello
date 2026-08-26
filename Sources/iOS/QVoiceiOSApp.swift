@@ -66,6 +66,7 @@ struct QVoiceiOSApp: App {
                             .environmentObject(installer)
                             .onAppear {
                                 setupAppSupport()
+                                reconcilePendingHistory()
                                 Task {
                                     await engine.refreshMemoryContext(reason: "appear", source: "app")
                                 }
@@ -400,6 +401,17 @@ struct QVoiceiOSApp: App {
         try? IOSModelDeliverySupport.excludeFromBackup(
             AppPaths.appSupportDir.appendingPathComponent("cache", isDirectory: true)
         )
+    }
+
+    private func reconcilePendingHistory() {
+        Task { @concurrent in
+            let result = await GenerationHistoryRecovery.reconcile()
+            guard !result.committed.isEmpty || result.snapshot.needsAttention else { return }
+            await MainActor.run {
+                NotificationCenter.default.post(name: .generationSaved, object: nil)
+                NotificationCenter.default.post(name: .generationHistoryRecoveryChanged, object: nil)
+            }
+        }
     }
 
     private func configureAudioSession() {

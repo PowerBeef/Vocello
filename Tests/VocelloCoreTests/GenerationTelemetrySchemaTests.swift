@@ -799,6 +799,7 @@ final class GenerationTelemetrySchemaTests: XCTestCase {
         XCTAssertGreaterThan(environment.uptimeSeconds, 0)
         XCTAssertGreaterThanOrEqual(environment.loadAverage1Minute ?? 0, 0)
         XCTAssertFalse(environment.thermalState.isEmpty)
+        XCTAssertNotNil(environment.runtimeDebugProvenance)
     }
 
     private func telemetrySample(

@@ -1,0 +1,1703 @@
+{
+  "records": [
+    {
+      "call": "Button",
+      "count": 1,
+      "literalSha256": "11a6767d5674c7e45f7e00dc525762275b3a48491ad6045427d2609cc496c516",
+      "path": "Sources/Views/Components/BatchGenerationSheet.swift"
+    },
+    {
+      "call": "Button",
+      "count": 1,
+      "literalSha256": "1651031bf58d8eeac8dc9c3e3d5eba20380197e7f638115570bc729064544c06",
+      "path": "Sources/Views/Components/BatchGenerationSheet.swift"
+    },
+    {
+      "call": "Button",
+      "count": 1,
+      "literalSha256": "19766ed6ccb2f4a32778eed80d1928d2c87a18d7c275ccb163ec6709d3eb2e27",
+      "path": "Sources/Views/Components/BatchGenerationSheet.swift"
+    },
+    {
+      "call": "Button",
+      "count": 1,
+      "literalSha256": "36e5410cd857ebeb4666bdbe4eabc0682483e95451afca6f0c618ace0f63defe",
+      "path": "Sources/Views/Components/BatchGenerationSheet.swift"
+    },
+    {
+      "call": "Button",
+      "count": 1,
+      "literalSha256": "3bcb2a81cf84cc874a8fc025e534bd383990439281279d5ce8771c3fff376471",
+      "path": "Sources/Views/Components/BatchGenerationSheet.swift"
+    },
+    {
+      "call": "Button",
+      "count": 1,
+      "literalSha256": "a9fc13281689e88990ebd866ed84e1b0c668ad0cfca57f8f5ab2b9900cba7531",
+      "path": "Sources/Views/Components/BatchGenerationSheet.swift"
+    },
+    {
+      "call": "Button",
+      "count": 1,
+      "literalSha256": "f0141c7247e6b8b0f7a9b7b9b54b1317b604cfc62d4020aec7186650c0977c39",
+      "path": "Sources/Views/Components/BatchGenerationSheet.swift"
+    },
+    {
+      "call": "GroupBox",
+      "count": 1,
+      "literalSha256": "0879875b61b66f64c55842e0a72cc6c0ddbfbf885092084e0e13b0acf80f42b8",
+      "path": "Sources/Views/Components/BatchGenerationSheet.swift"
+    },
+    {
+      "call": "Picker",
+      "count": 1,
+      "literalSha256": "35cdf79cc95f488768e17219fef80fa44af50eaa7bfe74dd32c54009fafb3f89",
+      "path": "Sources/Views/Components/BatchGenerationSheet.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "015f03785ade5fbb994436b4ac1cbbfaf9b3e3622bab86868adc9cc3623c24eb",
+      "path": "Sources/Views/Components/BatchGenerationSheet.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "04ad7d122697015a092fdb2a52bd1668827de7d518e64c8fce2063764fc80ccd",
+      "path": "Sources/Views/Components/BatchGenerationSheet.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "2607979373fe86256ced33ca237195d7c6e99d3a1ddb390ede1dd7101b39371f",
+      "path": "Sources/Views/Components/BatchGenerationSheet.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "7176ab0fa015c5cfe868c003adae14f9400e5eccb607ebf34688387766507c6a",
+      "path": "Sources/Views/Components/BatchGenerationSheet.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "9fd2e18e1b534e924baa190dfb525586f62986128b98d6ddfbb8ad8f7b62c0e6",
+      "path": "Sources/Views/Components/BatchGenerationSheet.swift"
+    },
+    {
+      "call": "Picker",
+      "count": 1,
+      "literalSha256": "a6d01dcff3bfd333edf90a50daac2104cefab98b85bdbba67c8209ab75eb6447",
+      "path": "Sources/Views/Components/EmotionPickerView.swift"
+    },
+    {
+      "call": "Section",
+      "count": 1,
+      "literalSha256": "55e393ee85408d2686a24708f2ee2fd33eef1f6230054737fa96412b69b5fb8a",
+      "path": "Sources/Views/Components/EmotionPickerView.swift"
+    },
+    {
+      "call": "Section",
+      "count": 1,
+      "literalSha256": "8c06018059e8dbebe1e1f4cbf2386ce7afd6f30c7feb4028ef97145ee1e3434c",
+      "path": "Sources/Views/Components/EmotionPickerView.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "494ca78f7374e46fb2de9ad9f2dbd4aaae89b50b2ca044177a1566a59e06627e",
+      "path": "Sources/Views/Components/EmotionPickerView.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "668bb300283612b888e30bd3e9587e889a5f125d43feccedb4adb35b9dc56d1f",
+      "path": "Sources/Views/Components/EmotionPickerView.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "a6d01dcff3bfd333edf90a50daac2104cefab98b85bdbba67c8209ab75eb6447",
+      "path": "Sources/Views/Components/EmotionPickerView.swift"
+    },
+    {
+      "call": "Section",
+      "count": 1,
+      "literalSha256": "3665466d25bc2df4788c8ed82ceae150b5a52390de67ac150d23272b705b7bb6",
+      "path": "Sources/Views/Components/GenerationWorkflowView.swift"
+    },
+    {
+      "call": "Section",
+      "count": 1,
+      "literalSha256": "acce3d0e30f951f65b8f58ecc8aff5ca409068626f183de4b7e789117ef591e9",
+      "path": "Sources/Views/Components/GenerationWorkflowView.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "5e2c614c23f02239bc03c6c04fcb681950f9e72bf8fdff6be79c79841cbb10c0",
+      "path": "Sources/Views/Components/GenerationWorkflowView.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "caaba84670559b5bd406e01cb8f8c69eb1306b258197ceed0dd88ba7988dfeb4",
+      "path": "Sources/Views/Components/GenerationWorkflowView.swift"
+    },
+    {
+      "call": "accessibilityLabel",
+      "count": 1,
+      "literalSha256": "12bcf53e8b083881504a8df37364a3a87fed9be3af0c3799b3d5ed03ccadd972",
+      "path": "Sources/Views/Components/GenerationWorkflowView.swift"
+    },
+    {
+      "call": "accessibilityLabel",
+      "count": 1,
+      "literalSha256": "f9c9d9e9c16bdbe53470f0b70fe54d5ba615bb730e86d1746dba092c03da12ca",
+      "path": "Sources/Views/Components/GenerationWorkflowView.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "5ab0afd9960e7d083b572cf75866d37fcb39ed258618a04f63eb857a5037d1a0",
+      "path": "Sources/Views/Components/SidebarPlayerView.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "64aee8c6cbd026d9ea9221661f7632351d9a741198cd01ca017450b56f78a206",
+      "path": "Sources/Views/Components/SidebarPlayerView.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "b64ac05f17e64d037db81a98f51e2688216e292ae9748f979f04dfbac49fd7fc",
+      "path": "Sources/Views/Components/SidebarPlayerView.swift"
+    },
+    {
+      "call": "accessibilityLabel",
+      "count": 1,
+      "literalSha256": "c12ff673ae9836ca0f4624dfc9911fff24dac0a1db10cfd46b137cafedb5c3f7",
+      "path": "Sources/Views/Components/SidebarPlayerView.swift"
+    },
+    {
+      "call": "accessibilityLabel",
+      "count": 1,
+      "literalSha256": "df6a15231bd2855ffe64254b2cf1090549d36e1f64cb5c8ef5011e550741672e",
+      "path": "Sources/Views/Components/SidebarPlayerView.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "54a0e8c17ebb21a11f8a25b8042786ef7efe52441e6cc87e92c67e0c4c0c6e78",
+      "path": "Sources/Views/Components/SidebarStatusView.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "5fa7aac5375c5815787fba3f49559f9b45b14023147ce0652803387974144e5f",
+      "path": "Sources/Views/Components/SidebarStatusView.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "8e75ebbdb21505d2f18439f43fe046abc67fc567515bb1d53b855a020a179092",
+      "path": "Sources/Views/Components/SidebarStatusView.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "a5dfedfc1c5c48fcd45749ccd0aadfce3ef2884495ffae07a3d3661dfa94e967",
+      "path": "Sources/Views/Components/SidebarStatusView.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "c11d46b21d56e3c9f0f24d2b5c1da1377403fc3575126d4171bd2675d261c3d8",
+      "path": "Sources/Views/Components/SidebarStatusView.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "fcd589c1bc20cd2df52fad1f802dd6c09654fd29048b78260567223fa2b8ef69",
+      "path": "Sources/Views/Components/SidebarStatusView.swift"
+    },
+    {
+      "call": "Button",
+      "count": 1,
+      "literalSha256": "320b5d80f8cfd184c57473d7081003135e0001480dac18583a0bdc748b361b88",
+      "path": "Sources/Views/Components/TextInputView.swift"
+    },
+    {
+      "call": "Button",
+      "count": 1,
+      "literalSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "path": "Sources/Views/Components/TextInputView.swift"
+    },
+    {
+      "call": "Label",
+      "count": 1,
+      "literalSha256": "19766ed6ccb2f4a32778eed80d1928d2c87a18d7c275ccb163ec6709d3eb2e27",
+      "path": "Sources/Views/Components/TextInputView.swift"
+    },
+    {
+      "call": "Label",
+      "count": 1,
+      "literalSha256": "49e49bb4401e67bd54ffe1e9ab6c2af87ddad0cdc8ca1c84ba1b4e94234438ba",
+      "path": "Sources/Views/Components/TextInputView.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "0063787271a29dd40c6755f7ff5d975434e8ab6feaad868a54daa38c7df919a4",
+      "path": "Sources/Views/Components/TextInputView.swift"
+    },
+    {
+      "call": "accessibilityLabel",
+      "count": 1,
+      "literalSha256": "e5184612c1c71843b66ddebf901c23213f328a260b6b609666a6979b1cf6ff7a",
+      "path": "Sources/Views/Components/TextInputView.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "70148f9507f9b70bdef9b52bebd2a3b241a9e03d68ca5c80ea18d9708634d807",
+      "path": "Sources/Views/Components/VoiceBriefEditor.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "87dafcd787b075b807d2aa324ce9d8f716094e971dbdf3638ef94ae9d7022215",
+      "path": "Sources/Views/Components/VoiceBriefEditor.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "a0984b2815de28688ba2b255a5892ae5deb34699affbccaebe29a7cf846ac951",
+      "path": "Sources/Views/Components/VoiceBriefEditor.swift"
+    },
+    {
+      "call": "accessibilityLabel",
+      "count": 1,
+      "literalSha256": "c8a98f8cc1de82c6727660e2164783aa5e5fa8f80c32f7ec3a24b0944bc57064",
+      "path": "Sources/Views/Components/VoiceBriefEditor.swift"
+    },
+    {
+      "call": "Picker",
+      "count": 1,
+      "literalSha256": "a9e0c70585121f5f79e52330eaf56937d5088e388f0e8b0e14968d9891044f2c",
+      "path": "Sources/Views/Generate/CustomVoiceView.swift"
+    },
+    {
+      "call": "Section",
+      "count": 1,
+      "literalSha256": "3665466d25bc2df4788c8ed82ceae150b5a52390de67ac150d23272b705b7bb6",
+      "path": "Sources/Views/Generate/CustomVoiceView.swift"
+    },
+    {
+      "call": "Section",
+      "count": 1,
+      "literalSha256": "e9ea8b0c13f4e4b9513478195549a5df12227070447799f5736518ba633b303a",
+      "path": "Sources/Views/Generate/CustomVoiceView.swift"
+    },
+    {
+      "call": "Button",
+      "count": 1,
+      "literalSha256": "83b12c2216efb4fdc924e1deb5182e905e4926ed0c1c324d467107f46d5a26a9",
+      "path": "Sources/Views/Generate/VoiceCloningView.swift"
+    },
+    {
+      "call": "Label",
+      "count": 1,
+      "literalSha256": "79fd6d6019413a48df59a85f2e1909899d9946e547dcd59352fa59ecb1529b14",
+      "path": "Sources/Views/Generate/VoiceCloningView.swift"
+    },
+    {
+      "call": "Label",
+      "count": 1,
+      "literalSha256": "824afd8a49cba4e696ace3e3f8155dcbc28a5b25cde23ddb8684c5ecfb03da24",
+      "path": "Sources/Views/Generate/VoiceCloningView.swift"
+    },
+    {
+      "call": "Label",
+      "count": 1,
+      "literalSha256": "bfdd510698ef3ccbf17f2c67fc47790e1ba72894fb74fe284bbc136b47ef73e6",
+      "path": "Sources/Views/Generate/VoiceCloningView.swift"
+    },
+    {
+      "call": "Picker",
+      "count": 1,
+      "literalSha256": "3e9e7f6ecec0ce0d6fddd7abe4e75653e7cd410406f844475616445275dadec5",
+      "path": "Sources/Views/Generate/VoiceCloningView.swift"
+    },
+    {
+      "call": "Picker",
+      "count": 1,
+      "literalSha256": "52bfe584a5fc450539e2aa651b990fa2415060492a243816ab2994292089c6fd",
+      "path": "Sources/Views/Generate/VoiceCloningView.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "1c6ac69f1e5db9c36e9f549d72ef77d23ceab19c557a7eb3a27c7f06f4484b44",
+      "path": "Sources/Views/Generate/VoiceCloningView.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "52bfe584a5fc450539e2aa651b990fa2415060492a243816ab2994292089c6fd",
+      "path": "Sources/Views/Generate/VoiceCloningView.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "8d9e2bb12d087a532158463488058debb6ac41a488c35ab8a7399cf2e75a91da",
+      "path": "Sources/Views/Generate/VoiceCloningView.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "f3086ea68d8c6779f2cf5712a397d78494993591427e6dbaf39f016f2e9c335c",
+      "path": "Sources/Views/Generate/VoiceCloningView.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "faba489c6bb593251a81518571434c65c3d5c5ae7ed8ec9ab0f994a0474c04ee",
+      "path": "Sources/Views/Generate/VoiceCloningView.swift"
+    },
+    {
+      "call": "accessibilityLabel",
+      "count": 1,
+      "literalSha256": "721164f0dc7096a8c09be2069c5c689a56df933fc5798822e8134bd3e76771eb",
+      "path": "Sources/Views/Generate/VoiceCloningView.swift"
+    },
+    {
+      "call": "Label",
+      "count": 1,
+      "literalSha256": "79028058b7d55e9f074d56742ab70d7542f826f78e9734abb50cd643e8abc5c2",
+      "path": "Sources/Views/Generate/VoiceDesignView.swift"
+    },
+    {
+      "call": "Label",
+      "count": 1,
+      "literalSha256": "93f3b580288a44dc081f6af5cdb0169dc59038143f25a80397fbafa08d6e6c55",
+      "path": "Sources/Views/Generate/VoiceDesignView.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "565339bc4d33d72817b583024112eb7f5cdf3e5eef0252d6ec1b9c9a94e12bb3",
+      "path": "Sources/Views/Generate/VoiceDesignView.swift"
+    },
+    {
+      "call": "Button",
+      "count": 1,
+      "literalSha256": "19766ed6ccb2f4a32778eed80d1928d2c87a18d7c275ccb163ec6709d3eb2e27",
+      "path": "Sources/Views/Library/HistoryView.swift"
+    },
+    {
+      "call": "Button",
+      "count": 1,
+      "literalSha256": "8a7a6d62c763f57834e0c0dc47ca31f19c049c7e89e15e5eb28c9e41994cd682",
+      "path": "Sources/Views/Library/HistoryView.swift"
+    },
+    {
+      "call": "Button",
+      "count": 2,
+      "literalSha256": "942087cc2d41e01304b7195558d093d10c72af8e838c7556d6a02d471ee71852",
+      "path": "Sources/Views/Library/HistoryView.swift"
+    },
+    {
+      "call": "Button",
+      "count": 1,
+      "literalSha256": "ae01c52c92a45f486e8de812d3cff4e1f4a321573e84d92dc1846b0258a613b0",
+      "path": "Sources/Views/Library/HistoryView.swift"
+    },
+    {
+      "call": "Button",
+      "count": 1,
+      "literalSha256": "e2d0a54968ead24efc0dffa6ac78fc606dceec34a0f586177a74a54cc2272cf8",
+      "path": "Sources/Views/Library/HistoryView.swift"
+    },
+    {
+      "call": "Label",
+      "count": 1,
+      "literalSha256": "a840027ebd5200ddd2595f0180be5d05a835662019ea6446797829b484f9d9d3",
+      "path": "Sources/Views/Library/HistoryView.swift"
+    },
+    {
+      "call": "Label",
+      "count": 1,
+      "literalSha256": "cc849385646ba0d67a8687fb561eec23fadf51b144242cf6a41dd5b594bb4180",
+      "path": "Sources/Views/Library/HistoryView.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "565339bc4d33d72817b583024112eb7f5cdf3e5eef0252d6ec1b9c9a94e12bb3",
+      "path": "Sources/Views/Library/HistoryView.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "5f17342f3e52daae934a72626758bda2933ce18d49fd382894c01febbd0dd7e9",
+      "path": "Sources/Views/Library/HistoryView.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "68f9660a1cb201bc93b8be2f22adf659969e63b053cb3ca80179766a7715ea51",
+      "path": "Sources/Views/Library/HistoryView.swift"
+    },
+    {
+      "call": "accessibilityLabel",
+      "count": 1,
+      "literalSha256": "93f3b580288a44dc081f6af5cdb0169dc59038143f25a80397fbafa08d6e6c55",
+      "path": "Sources/Views/Library/HistoryView.swift"
+    },
+    {
+      "call": "alert",
+      "count": 1,
+      "literalSha256": "103597ad1342b850b7f121a3f66e0e63001f87b68e87f608f3b362d2bfcbfd5f",
+      "path": "Sources/Views/Library/HistoryView.swift"
+    },
+    {
+      "call": "Button",
+      "count": 1,
+      "literalSha256": "18196b39b44de54ac56110e77207ad61e1d8bb3198c1649d36c3ae12f8df6768",
+      "path": "Sources/Views/Library/RecordReferenceClipSheet.swift"
+    },
+    {
+      "call": "Button",
+      "count": 2,
+      "literalSha256": "19766ed6ccb2f4a32778eed80d1928d2c87a18d7c275ccb163ec6709d3eb2e27",
+      "path": "Sources/Views/Library/RecordReferenceClipSheet.swift"
+    },
+    {
+      "call": "Button",
+      "count": 1,
+      "literalSha256": "1c62f54c28ffaf9964655f13f25dfb88fd5315497cfbc47b04da13a67a0447d8",
+      "path": "Sources/Views/Library/RecordReferenceClipSheet.swift"
+    },
+    {
+      "call": "Label",
+      "count": 1,
+      "literalSha256": "bfdd510698ef3ccbf17f2c67fc47790e1ba72894fb74fe284bbc136b47ef73e6",
+      "path": "Sources/Views/Library/RecordReferenceClipSheet.swift"
+    },
+    {
+      "call": "Label",
+      "count": 1,
+      "literalSha256": "cae7d57bc067a514b8e34c9589631a95c7dc051638ddd2a190773269279a99df",
+      "path": "Sources/Views/Library/RecordReferenceClipSheet.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "541c635f98dc3ae8ac1a62ccae5c66b9edd763510a5d07c4c0d4393bfefd5f75",
+      "path": "Sources/Views/Library/RecordReferenceClipSheet.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "983e99c6d24802bd0a3f92a7269044f5273d3cd6b35eeb8d3b165dc2bfe9c78b",
+      "path": "Sources/Views/Library/RecordReferenceClipSheet.swift"
+    },
+    {
+      "call": "alert",
+      "count": 1,
+      "literalSha256": "310f3051c6b19d061626c66212a1dc0087e7d5f50a52d2bb1b9eb33599386250",
+      "path": "Sources/Views/Library/RecordReferenceClipSheet.swift"
+    },
+    {
+      "call": "Button",
+      "count": 2,
+      "literalSha256": "19766ed6ccb2f4a32778eed80d1928d2c87a18d7c275ccb163ec6709d3eb2e27",
+      "path": "Sources/Views/Library/SavedVoiceSheet.swift"
+    },
+    {
+      "call": "Button",
+      "count": 1,
+      "literalSha256": "483995603059370445fa6d80c8cb96920b72160616a7ef7eb22c758924340d18",
+      "path": "Sources/Views/Library/SavedVoiceSheet.swift"
+    },
+    {
+      "call": "Button",
+      "count": 1,
+      "literalSha256": "4cf1164264fa04535b5f6190f4bdc38d460ea97e034226ff9c2ddc0cabbc9e8d",
+      "path": "Sources/Views/Library/SavedVoiceSheet.swift"
+    },
+    {
+      "call": "Button",
+      "count": 1,
+      "literalSha256": "c58a6bd402efb06c3e7dfd6d68910412fee2dfc1788ae384dc123089ce912285",
+      "path": "Sources/Views/Library/SavedVoiceSheet.swift"
+    },
+    {
+      "call": "Label",
+      "count": 1,
+      "literalSha256": "1f226c628d67e3cf57985cba5c47bf9152319df7683392ab96936e9e71dbc73f",
+      "path": "Sources/Views/Library/SavedVoiceSheet.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "3ca8ce19da03da9ea42dea845f32984bc075e69be2dd725b8a43328f2522db6b",
+      "path": "Sources/Views/Library/SavedVoiceSheet.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "8e93d6556e5913236249242ff866ea289f477202c66f8d46d1167c59ca2e9d57",
+      "path": "Sources/Views/Library/SavedVoiceSheet.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "b7cbcc7c8eae7699a66fda88fd4f42cae8e46b5bfdc3793046cd9b663d582104",
+      "path": "Sources/Views/Library/SavedVoiceSheet.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "bc1b88907d3b748af99cb9d4ffc07a0118dad5dab21a9dbdcc5a17a09641364a",
+      "path": "Sources/Views/Library/SavedVoiceSheet.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "dcd1d5223f73b3a965c07e3ff5dbee3eedcfedb806686a05b9b3868a2c3d6d50",
+      "path": "Sources/Views/Library/SavedVoiceSheet.swift"
+    },
+    {
+      "call": "Button",
+      "count": 1,
+      "literalSha256": "19766ed6ccb2f4a32778eed80d1928d2c87a18d7c275ccb163ec6709d3eb2e27",
+      "path": "Sources/Views/Library/VoicesView.swift"
+    },
+    {
+      "call": "Button",
+      "count": 1,
+      "literalSha256": "324b134f57c70c729ae3dc4d298bb451656717d70523e942c1ce667b8024ea07",
+      "path": "Sources/Views/Library/VoicesView.swift"
+    },
+    {
+      "call": "Button",
+      "count": 1,
+      "literalSha256": "581d6c565171de2f58a8e40445d89fc7ceff38d7493bc713220c0f962836ce6c",
+      "path": "Sources/Views/Library/VoicesView.swift"
+    },
+    {
+      "call": "Button",
+      "count": 1,
+      "literalSha256": "7d9eb7acb13e24625c404401d8e88b2350e32162455885f18276cf802f7701ed",
+      "path": "Sources/Views/Library/VoicesView.swift"
+    },
+    {
+      "call": "Button",
+      "count": 1,
+      "literalSha256": "c040a9f5f27b4f0d04cb3b5ab3fc19cdf8b895b10e07ff756577ea5c32c20835",
+      "path": "Sources/Views/Library/VoicesView.swift"
+    },
+    {
+      "call": "Button",
+      "count": 1,
+      "literalSha256": "df0fe9e00d354b01c502bf2d9c755a2b0d8a1ec3719a389d086ad2f8667ef8f4",
+      "path": "Sources/Views/Library/VoicesView.swift"
+    },
+    {
+      "call": "Button",
+      "count": 1,
+      "literalSha256": "e2d0a54968ead24efc0dffa6ac78fc606dceec34a0f586177a74a54cc2272cf8",
+      "path": "Sources/Views/Library/VoicesView.swift"
+    },
+    {
+      "call": "Label",
+      "count": 1,
+      "literalSha256": "79fd6d6019413a48df59a85f2e1909899d9946e547dcd59352fa59ecb1529b14",
+      "path": "Sources/Views/Library/VoicesView.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "26f4c5fb4789a27d857a8ec795c8cc0cb6cbedd8eb8a2a09386498b92752a95b",
+      "path": "Sources/Views/Library/VoicesView.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "3b7f36ffe5363b8d73fb998e8baaa87b11919423127ee1aa634dbb6d6a50afb2",
+      "path": "Sources/Views/Library/VoicesView.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "4b4f3e5773dedc9392bea9a24bdf48b9b7706d53e91bafd7ca79c6f3029c1468",
+      "path": "Sources/Views/Library/VoicesView.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "565339bc4d33d72817b583024112eb7f5cdf3e5eef0252d6ec1b9c9a94e12bb3",
+      "path": "Sources/Views/Library/VoicesView.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "c58580f9d1cf67147d5c68472f88de6e2d695e4c6f4eb2ad826c491c8eafd484",
+      "path": "Sources/Views/Library/VoicesView.swift"
+    },
+    {
+      "call": "accessibilityLabel",
+      "count": 1,
+      "literalSha256": "19d963e23c307646ae86c3844a4c081a67dfb9e161a22c7deccd6e942dec8b97",
+      "path": "Sources/Views/Library/VoicesView.swift"
+    },
+    {
+      "call": "alert",
+      "count": 1,
+      "literalSha256": "9a70a5c31c5dfaec49da39a4fc7de81020a53aaacde67b1c7fe38bfb941c4456",
+      "path": "Sources/Views/Library/VoicesView.swift"
+    },
+    {
+      "call": "Button",
+      "count": 2,
+      "literalSha256": "19766ed6ccb2f4a32778eed80d1928d2c87a18d7c275ccb163ec6709d3eb2e27",
+      "path": "Sources/Views/Settings/SettingsView.swift"
+    },
+    {
+      "call": "Button",
+      "count": 1,
+      "literalSha256": "7ca41615c19be38d63b5defd85e2db57712e18014c8d9e985f449245c0fdabc4",
+      "path": "Sources/Views/Settings/SettingsView.swift"
+    },
+    {
+      "call": "Button",
+      "count": 1,
+      "literalSha256": "cc849385646ba0d67a8687fb561eec23fadf51b144242cf6a41dd5b594bb4180",
+      "path": "Sources/Views/Settings/SettingsView.swift"
+    },
+    {
+      "call": "Button",
+      "count": 1,
+      "literalSha256": "daee7606b339f3c339076fe2c9f372a3ff40c8ee896005d829c7481b64ca5303",
+      "path": "Sources/Views/Settings/SettingsView.swift"
+    },
+    {
+      "call": "Button",
+      "count": 1,
+      "literalSha256": "e2d0a54968ead24efc0dffa6ac78fc606dceec34a0f586177a74a54cc2272cf8",
+      "path": "Sources/Views/Settings/SettingsView.swift"
+    },
+    {
+      "call": "Button",
+      "count": 1,
+      "literalSha256": "ea48d2bd27662f4c8152c0b3a133d96db4c87858645ffaf0704bf7197e99e271",
+      "path": "Sources/Views/Settings/SettingsView.swift"
+    },
+    {
+      "call": "Picker",
+      "count": 1,
+      "literalSha256": "8dc605f468e5eca3e2f7ac6ad049c18c2eccd08e22acddfcb86933fa8456276c",
+      "path": "Sources/Views/Settings/SettingsView.swift"
+    },
+    {
+      "call": "Section",
+      "count": 1,
+      "literalSha256": "2db1db07062e4a013e4662a3eab15891bd2dcaffe689d97cf99a605bf6fe5b67",
+      "path": "Sources/Views/Settings/SettingsView.swift"
+    },
+    {
+      "call": "Section",
+      "count": 1,
+      "literalSha256": "4b2406073cc3b22fc8b621c741e34a951d7652bf831bb27532aef35562126024",
+      "path": "Sources/Views/Settings/SettingsView.swift"
+    },
+    {
+      "call": "Section",
+      "count": 1,
+      "literalSha256": "8b3b1eda1ec200a2ba7c5908be67292bff411168e14ba0755cf394c01f01d04b",
+      "path": "Sources/Views/Settings/SettingsView.swift"
+    },
+    {
+      "call": "Section",
+      "count": 1,
+      "literalSha256": "a69c4dece144a46e40d430726395533d8f335a7d601d8ca292220b3a4a7faca4",
+      "path": "Sources/Views/Settings/SettingsView.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "40536dd8a0e2d0c77825529561e1c5091310fe90a8a94524c7bd9b4c8f1fc091",
+      "path": "Sources/Views/Settings/SettingsView.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "442aded87a55aa8c8f7d5ff0c30228150d4b1cb8756e4be138d615ca4708fc26",
+      "path": "Sources/Views/Settings/SettingsView.swift"
+    },
+    {
+      "call": "Text",
+      "count": 2,
+      "literalSha256": "5a23444828db654a0eaef5f81aabe79432871f43f73ea888279b3ee212f98a7b",
+      "path": "Sources/Views/Settings/SettingsView.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "824afd8a49cba4e696ace3e3f8155dcbc28a5b25cde23ddb8684c5ecfb03da24",
+      "path": "Sources/Views/Settings/SettingsView.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "894f28ff6ad105bb6497b24c239c3c1531deec6f1d4b242d5f9af744ccda53f7",
+      "path": "Sources/Views/Settings/SettingsView.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "96fea7c0acb228e9b059fdff274dce78c41dead9ae009e9382c26035a31634d2",
+      "path": "Sources/Views/Settings/SettingsView.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "caaba84670559b5bd406e01cb8f8c69eb1306b258197ceed0dd88ba7988dfeb4",
+      "path": "Sources/Views/Settings/SettingsView.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "d70604e8430461372849bbd123d85771e11423870a507e8fa4650a7e9a5a50ef",
+      "path": "Sources/Views/Settings/SettingsView.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "df631b5a6fab3af26cbb189e07c3c209344b5f05985f2c990ffa2efe82cca0b6",
+      "path": "Sources/Views/Settings/SettingsView.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "df81cb30d1fb3ded137236fd832f22f42065f1d947873f82af1e2291ff5eeaea",
+      "path": "Sources/Views/Settings/SettingsView.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "fa8f5a137a858a349a1d4f5c3572945f1840a07d800081fb29c878b67d27ef1b",
+      "path": "Sources/Views/Settings/SettingsView.swift"
+    },
+    {
+      "call": "Toggle",
+      "count": 1,
+      "literalSha256": "5696da9078f6d29019c3ef1d3051aa18594ba8de82e2bce0480750a36a528b43",
+      "path": "Sources/Views/Settings/SettingsView.swift"
+    },
+    {
+      "call": "accessibilityLabel",
+      "count": 1,
+      "literalSha256": "f9c9d9e9c16bdbe53470f0b70fe54d5ba615bb730e86d1746dba092c03da12ca",
+      "path": "Sources/Views/Settings/SettingsView.swift"
+    },
+    {
+      "call": "alert",
+      "count": 1,
+      "literalSha256": "544752c4d02ab776e6b31df13b13c6d5cb3f504988a5529232725f2d6a5effa4",
+      "path": "Sources/Views/Settings/SettingsView.swift"
+    },
+    {
+      "call": "navigationTitle",
+      "count": 1,
+      "literalSha256": "74a883a037bc227f91891ab654a753d3a99f31ab06ae5b5d2b6e594a692b41f8",
+      "path": "Sources/Views/Settings/SettingsView.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "0950e77af2ab95fddf3077f6c93b66ed6cee3bf001f7387a2024baa689e040ae",
+      "path": "Sources/Views/Sidebar/SidebarView.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "3e6562f22f3dce29ccd3dac9e6811c517e864e872291b93533b8d66e9fedd0cb",
+      "path": "Sources/Views/Sidebar/SidebarView.swift"
+    },
+    {
+      "call": "accessibilityLabel",
+      "count": 1,
+      "literalSha256": "67b07415e481074f600f9a8cfc2bde1c6b65b767af45376bf1b8fd5f7f86a5c7",
+      "path": "Sources/Views/Sidebar/SidebarView.swift"
+    },
+    {
+      "call": "Button",
+      "count": 1,
+      "literalSha256": "87a3f848e997fe63746507a102205aa488043077ff797741494d1fadc77cbe6a",
+      "path": "Sources/Views/StartupDiagnosticsView.swift"
+    },
+    {
+      "call": "Button",
+      "count": 1,
+      "literalSha256": "942087cc2d41e01304b7195558d093d10c72af8e838c7556d6a02d471ee71852",
+      "path": "Sources/Views/StartupDiagnosticsView.swift"
+    },
+    {
+      "call": "Label",
+      "count": 1,
+      "literalSha256": "3e6562f22f3dce29ccd3dac9e6811c517e864e872291b93533b8d66e9fedd0cb",
+      "path": "Sources/Views/StartupDiagnosticsView.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "1aceba257b252a53eb7a0e5549812c0a734ff8296c02630b230d43d575c17550",
+      "path": "Sources/Views/StartupDiagnosticsView.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "ecf11b0fa9e93ff6680fe6a1ffac7b41b483e0bd559685435c7c908bd3023ed5",
+      "path": "Sources/Views/StartupDiagnosticsView.swift"
+    },
+    {
+      "call": "Button",
+      "count": 1,
+      "literalSha256": "565339bc4d33d72817b583024112eb7f5cdf3e5eef0252d6ec1b9c9a94e12bb3",
+      "path": "Sources/iOS/App/RootView.swift"
+    },
+    {
+      "call": "alert",
+      "count": 1,
+      "literalSha256": "bbeca4fe7db0288cc95dcce2b9489666934e907ef3a924a1bb393eb146809250",
+      "path": "Sources/iOS/App/RootView.swift"
+    },
+    {
+      "call": "Button",
+      "count": 1,
+      "literalSha256": "057c55724893d98e5d2e1ecac9fb91196f585f189d2cec61daf507910351f9ae",
+      "path": "Sources/iOS/History/HistoryScreen.swift"
+    },
+    {
+      "call": "Button",
+      "count": 1,
+      "literalSha256": "19766ed6ccb2f4a32778eed80d1928d2c87a18d7c275ccb163ec6709d3eb2e27",
+      "path": "Sources/iOS/History/HistoryScreen.swift"
+    },
+    {
+      "call": "Button",
+      "count": 1,
+      "literalSha256": "1b87244759adfefb7593a1a9db8e4e0edfae5e656d1919692907a0e72b2a3a06",
+      "path": "Sources/iOS/History/HistoryScreen.swift"
+    },
+    {
+      "call": "Button",
+      "count": 2,
+      "literalSha256": "942087cc2d41e01304b7195558d093d10c72af8e838c7556d6a02d471ee71852",
+      "path": "Sources/iOS/History/HistoryScreen.swift"
+    },
+    {
+      "call": "Button",
+      "count": 2,
+      "literalSha256": "e2d0a54968ead24efc0dffa6ac78fc606dceec34a0f586177a74a54cc2272cf8",
+      "path": "Sources/iOS/History/HistoryScreen.swift"
+    },
+    {
+      "call": "Label",
+      "count": 1,
+      "literalSha256": "1beb4382cc9a27ce4f8a3fe47aa57114a847b8573c76b8bbd2ce115da604b102",
+      "path": "Sources/iOS/History/HistoryScreen.swift"
+    },
+    {
+      "call": "Label",
+      "count": 1,
+      "literalSha256": "436e61016e26fcb773b9725745cbbf0afe7f001ea26041a814a7712c2925c442",
+      "path": "Sources/iOS/History/HistoryScreen.swift"
+    },
+    {
+      "call": "Label",
+      "count": 1,
+      "literalSha256": "68f9660a1cb201bc93b8be2f22adf659969e63b053cb3ca80179766a7715ea51",
+      "path": "Sources/iOS/History/HistoryScreen.swift"
+    },
+    {
+      "call": "Label",
+      "count": 1,
+      "literalSha256": "a840027ebd5200ddd2595f0180be5d05a835662019ea6446797829b484f9d9d3",
+      "path": "Sources/iOS/History/HistoryScreen.swift"
+    },
+    {
+      "call": "Label",
+      "count": 1,
+      "literalSha256": "c29c426760ac0192f7779c46c88b232ad341b09bfff29695a16a71a3015ce69d",
+      "path": "Sources/iOS/History/HistoryScreen.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "51e6e88c55f187b520d57f127af840537e4a2c06befe9b8c5ce7b5f27feed1e3",
+      "path": "Sources/iOS/History/HistoryScreen.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "52c3c4282af9c9a947b33a7895e220f33e9c830097f433b656dc272b7acba63e",
+      "path": "Sources/iOS/History/HistoryScreen.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "5e72392838965d7b348ca4f347cfa0b54f97428dbfacfa0dae0f94d8ab69f814",
+      "path": "Sources/iOS/History/HistoryScreen.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "9768be40e9310726579a1227ca7dbf789dcbf3fbd9ca5edccc4446d0282639e8",
+      "path": "Sources/iOS/History/HistoryScreen.swift"
+    },
+    {
+      "call": "Text",
+      "count": 3,
+      "literalSha256": "a137f17a19a09cbe511ba654931ed30fd9c52205140ec096fa6180f1a0577546",
+      "path": "Sources/iOS/History/HistoryScreen.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "bf0d6e2ca40037c52c6aa6c6812c068ced7b8e0d9ac77c3d83cbee589d66795f",
+      "path": "Sources/iOS/History/HistoryScreen.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "bf5303fa798d9d8c520d1a84ed193e15a833d6f6e9ac21db91cf3cca141ffe19",
+      "path": "Sources/iOS/History/HistoryScreen.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "c27d7e714e709447f37d05fea664419c9023575ee1820a8bba6fa377a7c4f6cc",
+      "path": "Sources/iOS/History/HistoryScreen.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "d640513585967b5fcb21290a5b2b0ed2d166389d4d6aa6bd63329feed058cf06",
+      "path": "Sources/iOS/History/HistoryScreen.swift"
+    },
+    {
+      "call": "accessibilityLabel",
+      "count": 1,
+      "literalSha256": "496121494e4a967a7de25c83441a67f66d6a24b08de0730ce6f0cb3db1b42cb8",
+      "path": "Sources/iOS/History/HistoryScreen.swift"
+    },
+    {
+      "call": "accessibilityLabel",
+      "count": 1,
+      "literalSha256": "f8d46c2570e70736d62beb6e2e8df321d7cb4842a2b894f2025c47b31871d9f1",
+      "path": "Sources/iOS/History/HistoryScreen.swift"
+    },
+    {
+      "call": "confirmationDialog",
+      "count": 1,
+      "literalSha256": "3c53bb56624a2f97548921bffa9a59083bfaef04de146b3f36d1e024b2b02965",
+      "path": "Sources/iOS/History/HistoryScreen.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "23a5eff4c3d97180ea54cbd22e3ac032d20e5d6e2b0bb60237567d0b0f1f9405",
+      "path": "Sources/iOS/IOSAppBootstrap.swift"
+    },
+    {
+      "call": "Button",
+      "count": 1,
+      "literalSha256": "058a8b83888cc728638c480be802f9d9e23813584299d83397729933eea3637d",
+      "path": "Sources/iOS/IOSDesignSystemPrimitives.swift"
+    },
+    {
+      "call": "Button",
+      "count": 1,
+      "literalSha256": "1ea9e783449e8543bb50a35eb94c335af9048f6e2ac39865db21a8e444647aa8",
+      "path": "Sources/iOS/IOSDesignSystemPrimitives.swift"
+    },
+    {
+      "call": "accessibilityLabel",
+      "count": 1,
+      "literalSha256": "3b7ea51793e9d906afa06afb86252abb48e1125cc96a7f5efabcfd8597ea183a",
+      "path": "Sources/iOS/IOSDesignSystemPrimitives.swift"
+    },
+    {
+      "call": "accessibilityLabel",
+      "count": 2,
+      "literalSha256": "7d9eb7acb13e24625c404401d8e88b2350e32162455885f18276cf802f7701ed",
+      "path": "Sources/iOS/IOSDesignSystemPrimitives.swift"
+    },
+    {
+      "call": "accessibilityLabel",
+      "count": 1,
+      "literalSha256": "afb6479323ee93f51e367992cc3a2603b6321c76ec23e7127100a20f57061efe",
+      "path": "Sources/iOS/IOSDesignSystemPrimitives.swift"
+    },
+    {
+      "call": "confirmationDialog",
+      "count": 1,
+      "literalSha256": "ec6aeeae3a01d346a1adc4bb11405e2bd549d0f91bcfee7e87d301a8471ef8e3",
+      "path": "Sources/iOS/IOSDesignSystemPrimitives.swift"
+    },
+    {
+      "call": "Button",
+      "count": 1,
+      "literalSha256": "19766ed6ccb2f4a32778eed80d1928d2c87a18d7c275ccb163ec6709d3eb2e27",
+      "path": "Sources/iOS/IOSGenerationModeViews.swift"
+    },
+    {
+      "call": "Button",
+      "count": 1,
+      "literalSha256": "483995603059370445fa6d80c8cb96920b72160616a7ef7eb22c758924340d18",
+      "path": "Sources/iOS/IOSGenerationModeViews.swift"
+    },
+    {
+      "call": "Button",
+      "count": 1,
+      "literalSha256": "4cf1164264fa04535b5f6190f4bdc38d460ea97e034226ff9c2ddc0cabbc9e8d",
+      "path": "Sources/iOS/IOSGenerationModeViews.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "0643c6f40be57ef35b7126908dbb7b954f5398f56a6de76ddabfcc0e1f35a75b",
+      "path": "Sources/iOS/IOSGenerationModeViews.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "cc4ca4384a543a648ec28188fd2a51c5c15a329c25f556867bb60ecd0716a332",
+      "path": "Sources/iOS/IOSGenerationModeViews.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "ed7f929be6f3eb323325415a7da686694a292ca40158b1896af938f356839e81",
+      "path": "Sources/iOS/IOSGenerationModeViews.swift"
+    },
+    {
+      "call": "Button",
+      "count": 1,
+      "literalSha256": "c3812fc4acb861d5182fc2b8155f327f736fbe5e5eb86a7bd7afcb6dc5497282",
+      "path": "Sources/iOS/IOSGenerationSetupCards.swift"
+    },
+    {
+      "call": "Picker",
+      "count": 1,
+      "literalSha256": "a9e0c70585121f5f79e52330eaf56937d5088e388f0e8b0e14968d9891044f2c",
+      "path": "Sources/iOS/IOSGenerationSetupCards.swift"
+    },
+    {
+      "call": "Picker",
+      "count": 1,
+      "literalSha256": "ecd0c486923b3ef6b54eb1a3d1fd7734e816ff7c8735febcd93c29a54c13835e",
+      "path": "Sources/iOS/IOSGenerationSetupCards.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "3275dd011d716a9d5e08f1062929d92a9ba8e1fe6ae7cd6df6435e89b6560244",
+      "path": "Sources/iOS/IOSGenerationSetupCards.swift"
+    },
+    {
+      "call": "accessibilityLabel",
+      "count": 1,
+      "literalSha256": "2158038765ccb30ab46fd7fa92fceb21742e87571fa379c3016139ad06e72a55",
+      "path": "Sources/iOS/IOSGenerationSharedViews.swift"
+    },
+    {
+      "call": "Label",
+      "count": 1,
+      "literalSha256": "3f940108cb1ecd9c0090da0b51b45f9fe673f00b22c7ffe3d013319b97456674",
+      "path": "Sources/iOS/IOSOnboardingCard.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "5263bfd6fb8debe9706eedbd9a0187878d5ad51dacbb91435fae11ca546d5c75",
+      "path": "Sources/iOS/IOSOnboardingCard.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "de5ef72e148a2b093aa3deac753ee358f1356c407440d583902efaa59783344d",
+      "path": "Sources/iOS/IOSOnboardingCard.swift"
+    },
+    {
+      "call": "Picker",
+      "count": 1,
+      "literalSha256": "4eda8de6c29856173466b1e6489339e27bd240ceb38739c001abccd91d35770d",
+      "path": "Sources/iOS/IOSSettingsViews.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "03c276a5b0e18c4f0b23b3623346f02f451b2ec4cdc8a7d37b6b85534061ac1e",
+      "path": "Sources/iOS/IOSSettingsViews.swift"
+    },
+    {
+      "call": "accessibilityHint",
+      "count": 1,
+      "literalSha256": "f0dcd795e75541dd54b8fbe4c9bca28a9ab1313f2e0168b5a2c4ff0478e97abd",
+      "path": "Sources/iOS/IOSSettingsViews.swift"
+    },
+    {
+      "call": "accessibilityLabel",
+      "count": 1,
+      "literalSha256": "29ce1903c2be0d52112478f9bd81f63de8493f42a2ba4886f51a2c704c08083b",
+      "path": "Sources/iOS/IOSSettingsViews.swift"
+    },
+    {
+      "call": "accessibilityLabel",
+      "count": 1,
+      "literalSha256": "4eda8de6c29856173466b1e6489339e27bd240ceb38739c001abccd91d35770d",
+      "path": "Sources/iOS/IOSSettingsViews.swift"
+    },
+    {
+      "call": "accessibilityLabel",
+      "count": 1,
+      "literalSha256": "7b2b1c2b5b05f9bca9099b04920797acc92d92c9ecbef0f5b609575d9aac94ce",
+      "path": "Sources/iOS/IOSSettingsViews.swift"
+    },
+    {
+      "call": "accessibilityLabel",
+      "count": 1,
+      "literalSha256": "927baf0952ca4c722a9001f2fedb2e2a8a9e935a95636b8efba26b0089133ab7",
+      "path": "Sources/iOS/IOSSettingsViews.swift"
+    },
+    {
+      "call": "accessibilityLabel",
+      "count": 1,
+      "literalSha256": "b3970c0c0bda390966f4762a4b5c14ca43cd6146bf407a4737859f439795342e",
+      "path": "Sources/iOS/IOSSettingsViews.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "3607d4f487c6bde66fbc466461b13c0a5f3030dc347c70b974fa7f92a8f57c8a",
+      "path": "Sources/iOS/IOSStudioCanvas.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "78257562583c064d31526ab81c8627337a4e9b61d66b817248fb1826b4df7695",
+      "path": "Sources/iOS/IOSStudioCanvas.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "83b12c2216efb4fdc924e1deb5182e905e4926ed0c1c324d467107f46d5a26a9",
+      "path": "Sources/iOS/IOSStudioCanvas.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "f6f8cc42775ed105a898cbb7a8e436c51c3dac8af3f3435180354b012089a0f1",
+      "path": "Sources/iOS/IOSStudioCanvas.swift"
+    },
+    {
+      "call": "accessibilityLabel",
+      "count": 1,
+      "literalSha256": "0752a039e1b63f2199eeede5793a8d6fe0afb1c1b630c70aad9d09032d462591",
+      "path": "Sources/iOS/IOSStudioCanvas.swift"
+    },
+    {
+      "call": "accessibilityLabel",
+      "count": 1,
+      "literalSha256": "f6a74a2716d96439a3b066b5591c6fe74515bbb68510c743544c3343e38911a9",
+      "path": "Sources/iOS/IOSStudioCanvas.swift"
+    },
+    {
+      "call": "Button",
+      "count": 1,
+      "literalSha256": "19766ed6ccb2f4a32778eed80d1928d2c87a18d7c275ccb163ec6709d3eb2e27",
+      "path": "Sources/iOS/IOSVoicesView.swift"
+    },
+    {
+      "call": "Button",
+      "count": 2,
+      "literalSha256": "565339bc4d33d72817b583024112eb7f5cdf3e5eef0252d6ec1b9c9a94e12bb3",
+      "path": "Sources/iOS/IOSVoicesView.swift"
+    },
+    {
+      "call": "Button",
+      "count": 1,
+      "literalSha256": "e2d0a54968ead24efc0dffa6ac78fc606dceec34a0f586177a74a54cc2272cf8",
+      "path": "Sources/iOS/IOSVoicesView.swift"
+    },
+    {
+      "call": "Label",
+      "count": 1,
+      "literalSha256": "a7b97182c8bc8c4562678e4638d8c7343f0e7cec391938b8091e3d0529438515",
+      "path": "Sources/iOS/IOSVoicesView.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "3d90e14be7a8e85e21e591bdb9a635d1a1bb70a125ef7e9a95a8cd2652cc3b90",
+      "path": "Sources/iOS/IOSVoicesView.swift"
+    },
+    {
+      "call": "accessibilityLabel",
+      "count": 1,
+      "literalSha256": "29189c9f5cc23a013c0ee895715457bbf61c73a33f31ba5b50288386e251b555",
+      "path": "Sources/iOS/IOSVoicesView.swift"
+    },
+    {
+      "call": "accessibilityLabel",
+      "count": 1,
+      "literalSha256": "31b2059e9f107dd4a611c094e4accbace7d12eaf5bf1898ffc3fb358358f1333",
+      "path": "Sources/iOS/IOSVoicesView.swift"
+    },
+    {
+      "call": "alert",
+      "count": 1,
+      "literalSha256": "8727e2ba364c2c46192df0e1d0318d0cc82b0c1e6f7465e012ac59430254e170",
+      "path": "Sources/iOS/IOSVoicesView.swift"
+    },
+    {
+      "call": "alert",
+      "count": 1,
+      "literalSha256": "bbeca4fe7db0288cc95dcce2b9489666934e907ef3a924a1bb393eb146809250",
+      "path": "Sources/iOS/IOSVoicesView.swift"
+    },
+    {
+      "call": "alert",
+      "count": 1,
+      "literalSha256": "c6fef5f60a41a818b863db21f4644dc0a07650c6cda8eb77ce94f83de31972c7",
+      "path": "Sources/iOS/IOSVoicesView.swift"
+    },
+    {
+      "call": "Button",
+      "count": 1,
+      "literalSha256": "28d03596d24eeb4eab2d6fe21ca1cb95be7cb1fa6f92933db05e2cc4f4cdfa06",
+      "path": "Sources/iOS/Overlays/IOSOnboardingFlow.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "06d5aba93fa14fbe932b767673038c82ab889c07c231d0895a74ee7c42ffa14c",
+      "path": "Sources/iOS/Overlays/IOSOnboardingFlow.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "182b9fec0abf23461985bb2cb9c5b45755adb257572a37898be9389f29ca70dc",
+      "path": "Sources/iOS/Overlays/IOSOnboardingFlow.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "3e6562f22f3dce29ccd3dac9e6811c517e864e872291b93533b8d66e9fedd0cb",
+      "path": "Sources/iOS/Overlays/IOSOnboardingFlow.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "4ea7518174d3e81920d1a7134b9df3ee81ad3ee41b60d9f3b7b0759d8361265e",
+      "path": "Sources/iOS/Overlays/IOSOnboardingFlow.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "5b6f972fe06cd67b7a24ec88d8c7a1eb389e944c585a89779b4140bf822c47d3",
+      "path": "Sources/iOS/Overlays/IOSOnboardingFlow.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "fc9fb93890ad97aaaf2de69805c6c69f32910f7b1c5c2afb9d8592d7a1bbbf6c",
+      "path": "Sources/iOS/Overlays/IOSOnboardingFlow.swift"
+    },
+    {
+      "call": "accessibilityLabel",
+      "count": 1,
+      "literalSha256": "3d3d77b2471b05905fff899793c35e316e0151c392f4ec5899b72a784bdc1f12",
+      "path": "Sources/iOS/Overlays/IOSOnboardingFlow.swift"
+    },
+    {
+      "call": "Button",
+      "count": 1,
+      "literalSha256": "19766ed6ccb2f4a32778eed80d1928d2c87a18d7c275ccb163ec6709d3eb2e27",
+      "path": "Sources/iOS/Overlays/IOSRecordingOverlay.swift"
+    },
+    {
+      "call": "Button",
+      "count": 1,
+      "literalSha256": "1c62f54c28ffaf9964655f13f25dfb88fd5315497cfbc47b04da13a67a0447d8",
+      "path": "Sources/iOS/Overlays/IOSRecordingOverlay.swift"
+    },
+    {
+      "call": "Button",
+      "count": 1,
+      "literalSha256": "3f940108cb1ecd9c0090da0b51b45f9fe673f00b22c7ffe3d013319b97456674",
+      "path": "Sources/iOS/Overlays/IOSRecordingOverlay.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "65dac57710d68f7efd6f915dfd290ae088fe379277d91b2e61a887c2415cca65",
+      "path": "Sources/iOS/Overlays/IOSRecordingOverlay.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "7a887ba30e4376fa5cf954786d2222f914a5c313bf0ecd77dbee0a2cde18742b",
+      "path": "Sources/iOS/Overlays/IOSRecordingOverlay.swift"
+    },
+    {
+      "call": "accessibilityLabel",
+      "count": 1,
+      "literalSha256": "7d9eb7acb13e24625c404401d8e88b2350e32162455885f18276cf802f7701ed",
+      "path": "Sources/iOS/Overlays/IOSRecordingOverlay.swift"
+    },
+    {
+      "call": "alert",
+      "count": 1,
+      "literalSha256": "310f3051c6b19d061626c66212a1dc0087e7d5f50a52d2bb1b9eb33599386250",
+      "path": "Sources/iOS/Overlays/IOSRecordingOverlay.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "ab9a331401f670266df6bcf71455a6560604c28ad08aac25c2b12e249ed19004",
+      "path": "Sources/iOS/QVoiceiOSApp.swift"
+    },
+    {
+      "call": "Button",
+      "count": 1,
+      "literalSha256": "6da1ddebc0b9f92bbd52136aaea3264142d0f7fcb4e21e050534f55924d9b650",
+      "path": "Sources/iOS/Settings/SettingsScreen.swift"
+    },
+    {
+      "call": "Button",
+      "count": 1,
+      "literalSha256": "c44e479a42562e7fb0d57ac1fb0566e5dc8cc3e7e1c3ec4f9c9871c3926faa9c",
+      "path": "Sources/iOS/Settings/SettingsScreen.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "894f28ff6ad105bb6497b24c239c3c1531deec6f1d4b242d5f9af744ccda53f7",
+      "path": "Sources/iOS/Settings/SettingsScreen.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "8e542b9d7c8560cc48c9335df3810ba2a60507959c10f2bd127e31a3d6d7eea6",
+      "path": "Sources/iOS/Settings/SettingsScreen.swift"
+    },
+    {
+      "call": "accessibilityHint",
+      "count": 1,
+      "literalSha256": "4ef38591c822b9d9cc006f9a2224d94ca532aaa7d26c3a396d2f1347ab0cc261",
+      "path": "Sources/iOS/Settings/SettingsScreen.swift"
+    },
+    {
+      "call": "accessibilityLabel",
+      "count": 1,
+      "literalSha256": "3222025e434db29620cb08e7b1e74d10fab15c8a2a2e742358822aeb6914675c",
+      "path": "Sources/iOS/Settings/SettingsScreen.swift"
+    },
+    {
+      "call": "accessibilityLabel",
+      "count": 1,
+      "literalSha256": "3307a8e92878bd2533f0b33142deddebcd510ea9ce441d1e2d1443e69047d329",
+      "path": "Sources/iOS/Settings/SettingsScreen.swift"
+    },
+    {
+      "call": "confirmationDialog",
+      "count": 1,
+      "literalSha256": "4f29b610e50290f7d6c8350f77d5e4d33448157a5cc90ce2b3afe37b4e6970fb",
+      "path": "Sources/iOS/Settings/SettingsScreen.swift"
+    },
+    {
+      "call": "Button",
+      "count": 1,
+      "literalSha256": "c0c05b34c0b1ed98474b99e3b68f3e3d9a58be2fe838cf21afc61128f94c4472",
+      "path": "Sources/iOS/Settings/VoiceModelsScreen.swift"
+    },
+    {
+      "call": "Button",
+      "count": 1,
+      "literalSha256": "df83bc043803953c1fe45fbc832898e4f1322f57d73b1bad0847289a475b1029",
+      "path": "Sources/iOS/Settings/VoiceModelsScreen.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "032c92a8bcc74c989ad8d209e46106134da67666de7ca0bef002e45a5b8d7b52",
+      "path": "Sources/iOS/Settings/VoiceModelsScreen.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "3222025e434db29620cb08e7b1e74d10fab15c8a2a2e742358822aeb6914675c",
+      "path": "Sources/iOS/Settings/VoiceModelsScreen.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "5305bfd5436706aca7b82af2f4e72f12f150214e9674454f6305a89c30bfc449",
+      "path": "Sources/iOS/Settings/VoiceModelsScreen.swift"
+    },
+    {
+      "call": "accessibilityHint",
+      "count": 1,
+      "literalSha256": "17888a155967d8d2e1f63919280c35976b81c3a1e1991c78f55ca5b53bc46ec8",
+      "path": "Sources/iOS/Settings/VoiceModelsScreen.swift"
+    },
+    {
+      "call": "accessibilityLabel",
+      "count": 1,
+      "literalSha256": "ea37ec29c3865c359d3efb005bd252c35457976140bb718824f39d157ea32567",
+      "path": "Sources/iOS/Settings/VoiceModelsScreen.swift"
+    },
+    {
+      "call": "confirmationDialog",
+      "count": 1,
+      "literalSha256": "10e661fd85662eb9a838761987f1306bb2c302669533d537fb7443bc04e99d79",
+      "path": "Sources/iOS/Settings/VoiceModelsScreen.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "19766ed6ccb2f4a32778eed80d1928d2c87a18d7c275ccb163ec6709d3eb2e27",
+      "path": "Sources/iOS/Sheets/IOSBottomSheets.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "4f8865abeddbfab37520d0c56eed1bf17f37e3778e1a55e6dc54895d2ae17849",
+      "path": "Sources/iOS/Sheets/IOSBottomSheets.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "728c4ed2241c479fd8890100e06fd056df210f2c07cccd2cb26146e4393f3642",
+      "path": "Sources/iOS/Sheets/IOSBottomSheets.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "8492f2aa1b2c5874e0b9bd488195e62274dc1ab20b0f28238ed4383c2aed95f2",
+      "path": "Sources/iOS/Sheets/IOSBottomSheets.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "86d38e3856b8cfc195def8f8da7a0010c39e8222a4302f0a059dfd288895cc9f",
+      "path": "Sources/iOS/Sheets/IOSBottomSheets.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "9eed5ae774f6911609f9bf4341472226ad08169243239f37c1a0530881460b74",
+      "path": "Sources/iOS/Sheets/IOSBottomSheets.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "b7828ba00ee15c116cbf524cf22fe0bd02190f0a31ce4943c78017b6d0093b74",
+      "path": "Sources/iOS/Sheets/IOSBottomSheets.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "bfb11ab2bb2d66c97cab801868ff4b13e611ab70b34e573803f04049535e5f0e",
+      "path": "Sources/iOS/Sheets/IOSBottomSheets.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "e68ee04dff59551b7d1ae07a2f8a00dc61d841628948da3d2781630706a05e92",
+      "path": "Sources/iOS/Sheets/IOSBottomSheets.swift"
+    },
+    {
+      "call": "Text",
+      "count": 3,
+      "literalSha256": "eebdd24a77d9ad32222660c07777163bf5f6732df2b172351f3f8d5783e4f529",
+      "path": "Sources/iOS/Sheets/IOSBottomSheets.swift"
+    },
+    {
+      "call": "accessibilityLabel",
+      "count": 1,
+      "literalSha256": "31c35e2a7fbf3adc4d3a4135cd16e41af60870ef72375f428c003701a0d235e2",
+      "path": "Sources/iOS/Sheets/IOSBottomSheets.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "4a2f8fe111ee13426e3efd7b165ff3bf65d648fd20a2454e0f4209c6f699dc58",
+      "path": "Sources/iOS/Sheets/IOSPlayerSheet.swift"
+    },
+    {
+      "call": "accessibilityLabel",
+      "count": 1,
+      "literalSha256": "721164f0dc7096a8c09be2069c5c689a56df933fc5798822e8134bd3e76771eb",
+      "path": "Sources/iOS/Sheets/IOSPlayerSheet.swift"
+    },
+    {
+      "call": "accessibilityLabel",
+      "count": 1,
+      "literalSha256": "7d9eb7acb13e24625c404401d8e88b2350e32162455885f18276cf802f7701ed",
+      "path": "Sources/iOS/Sheets/IOSPlayerSheet.swift"
+    },
+    {
+      "call": "accessibilityLabel",
+      "count": 1,
+      "literalSha256": "c12ff673ae9836ca0f4624dfc9911fff24dac0a1db10cfd46b137cafedb5c3f7",
+      "path": "Sources/iOS/Sheets/IOSPlayerSheet.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "297a5f845a0a9d63e5935269715242c04c15b49261304e7fb8b43f1b80770d57",
+      "path": "Sources/iOS/Sheets/IOSVoiceDesignBriefSheet.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "4af2dcb372d0405d2246c2a35f9019060da0b1dcc80615dd26795bde0ed49f6a",
+      "path": "Sources/iOS/Sheets/IOSVoiceDesignBriefSheet.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "c018c0c89380ef3135fca2c49d0929961bd42ac700f94f0d7e3cc3cf063a2f2f",
+      "path": "Sources/iOS/Sheets/IOSVoiceDesignBriefSheet.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "eebdd24a77d9ad32222660c07777163bf5f6732df2b172351f3f8d5783e4f529",
+      "path": "Sources/iOS/Sheets/IOSVoiceDesignBriefSheet.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "f44c3977f17ce16085850831ac16a7daeb7efdc856b0b2501023cbb91459de62",
+      "path": "Sources/iOS/Sheets/IOSVoiceDesignBriefSheet.swift"
+    },
+    {
+      "call": "Button",
+      "count": 1,
+      "literalSha256": "19766ed6ccb2f4a32778eed80d1928d2c87a18d7c275ccb163ec6709d3eb2e27",
+      "path": "Sources/iOS/Studio/IOSLongFormSegmentsPanel.swift"
+    },
+    {
+      "call": "Button",
+      "count": 1,
+      "literalSha256": "ac81e078e19ea95e6e4c6ad91d8bce623962ff2b1757ee5ec92bdf92371b978a",
+      "path": "Sources/iOS/Studio/IOSLongFormSegmentsPanel.swift"
+    },
+    {
+      "call": "confirmationDialog",
+      "count": 1,
+      "literalSha256": "44373fdcd6bc1bb42b672a8c97a4be651b9b93b464de01703ad5d07bd847d0f2",
+      "path": "Sources/iOS/Studio/IOSLongFormSegmentsPanel.swift"
+    },
+    {
+      "call": "Button",
+      "count": 1,
+      "literalSha256": "19766ed6ccb2f4a32778eed80d1928d2c87a18d7c275ccb163ec6709d3eb2e27",
+      "path": "Sources/iOS/Studio/IOSStudioInlinePlayerCard.swift"
+    },
+    {
+      "call": "Button",
+      "count": 1,
+      "literalSha256": "48845bff334a50a59aaecf499f28a7a24c3b4b891b8b18a9f1169ad8e8a6b261",
+      "path": "Sources/iOS/Studio/IOSStudioInlinePlayerCard.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "140d42505fcee49b83c4c25537782247b8183bbd88ee7efc2d58f889fe75bdcd",
+      "path": "Sources/iOS/Studio/IOSStudioInlinePlayerCard.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "450d35ba0fc75bb7febef145faaf225e6a4bd9c5c873091c3b355af2851cf7d0",
+      "path": "Sources/iOS/Studio/IOSStudioInlinePlayerCard.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "88ab51580e0f83c64d30ab2d47d81e1ca11c2dc5a019151f8b1f2b8cc72553b7",
+      "path": "Sources/iOS/Studio/IOSStudioInlinePlayerCard.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "b93b72246a76169a49c4c0e71606a4ff3fd98dc46f989d20a6538826f0c98bf9",
+      "path": "Sources/iOS/Studio/IOSStudioInlinePlayerCard.swift"
+    },
+    {
+      "call": "Text",
+      "count": 1,
+      "literalSha256": "b9c237adde7f0a7c868de2c9141eec3099e61193b90e63a1af70803aba2b1852",
+      "path": "Sources/iOS/Studio/IOSStudioInlinePlayerCard.swift"
+    },
+    {
+      "call": "accessibilityHint",
+      "count": 1,
+      "literalSha256": "c2d009a32e816e5f0d00bbdcdcbeef5329974fe0635a8c89fe44b4900baac88a",
+      "path": "Sources/iOS/Studio/IOSStudioInlinePlayerCard.swift"
+    },
+    {
+      "call": "accessibilityLabel",
+      "count": 1,
+      "literalSha256": "12ad4ee6d948e230233564ea283c58ffd456dfb23114e8ce0493d3c1abca49b8",
+      "path": "Sources/iOS/Studio/IOSStudioInlinePlayerCard.swift"
+    },
+    {
+      "call": "accessibilityLabel",
+      "count": 1,
+      "literalSha256": "39ede499413c77a6e24e029aacd96e80aa8fbc4009fba241a65732c7d9fe548f",
+      "path": "Sources/iOS/Studio/IOSStudioInlinePlayerCard.swift"
+    },
+    {
+      "call": "accessibilityLabel",
+      "count": 1,
+      "literalSha256": "c12ff673ae9836ca0f4624dfc9911fff24dac0a1db10cfd46b137cafedb5c3f7",
+      "path": "Sources/iOS/Studio/IOSStudioInlinePlayerCard.swift"
+    },
+    {
+      "call": "confirmationDialog",
+      "count": 1,
+      "literalSha256": "56b74645f1cb894027563699fd6d241780fc02921f36fc151dfe4a1df14d13e3",
+      "path": "Sources/iOS/Studio/IOSStudioInlinePlayerCard.swift"
+    },
+    {
+      "call": "Button",
+      "count": 1,
+      "literalSha256": "19766ed6ccb2f4a32778eed80d1928d2c87a18d7c275ccb163ec6709d3eb2e27",
+      "path": "Sources/iOS/Voices/IOSRecordVoiceSheet.swift"
+    },
+    {
+      "call": "Button",
+      "count": 1,
+      "literalSha256": "483995603059370445fa6d80c8cb96920b72160616a7ef7eb22c758924340d18",
+      "path": "Sources/iOS/Voices/IOSRecordVoiceSheet.swift"
+    }
+  ],
+  "scanner": "swift-direct-presentation-literals-v1",
+  "schemaVersion": 1,
+  "scope": [
+    "Sources/iOS",
+    "Sources/Views",
+    "Sources/SharedSupport"
+  ]
+}

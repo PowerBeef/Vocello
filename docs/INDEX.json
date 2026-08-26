@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "generated": "python3 scripts/doc_metadata.py rebuild-index",
   "note": "Machine-readable documentation map. Query this instead of globbing docs/.",
-  "annotatedDocuments": 93,
+  "annotatedDocuments": 94,
   "unannotatedDocuments": 0,
   "documents": [
     {
@@ -54,7 +54,9 @@
       "sourceOfTruth": [
         "scripts/ios_device.sh",
         "scripts/ui_test.sh",
-        "scripts/build_foundation_targets.sh"
+        "scripts/build_foundation_targets.sh",
+        "scripts/localization_contract.py",
+        "config/localization-unlocalized-baseline.json"
       ]
     },
     {
@@ -497,6 +499,21 @@
         "scripts/check_language_hints.py",
         "scripts/check_language_output.py",
         "config/language-bench-matrix.json"
+      ]
+    },
+    {
+      "path": "docs/reference/localization.md",
+      "status": "active",
+      "owner": "ios",
+      "summary": "Vocello localization architecture, String Catalog ownership, typed presentation vocabulary, literal-growth guard, and pseudo-localization acceptance.",
+      "sourceOfTruth": [
+        "project.yml",
+        "Sources/Resources/Localizable.xcstrings",
+        "Sources/SharedSupport/Services/VocelloPresentationText.swift",
+        "scripts/localization_contract.py",
+        "config/localization-unlocalized-baseline.json",
+        "Tests/VocelloMacUITests/VocelloMacSmokeUITests.swift",
+        "Tests/VocelloiOSUITests/VocelloiOSSmokeUITests.swift"
       ]
     },
     {

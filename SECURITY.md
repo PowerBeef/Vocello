@@ -21,10 +21,20 @@ and when run manually. These snapshots make the root Xcode workspace and the own
 visible to GitHub's dependency graph and advisory matching without uploading source, credentials,
 absolute paths, or local device data.
 
-Pull requests receive dependency-diff review for newly introduced high-severity findings. A
-separate website lock audit runs only on the weekly security schedule or manual dispatch; it is not
-an ordinary commit, pull-request, or release-packaging gate. Release SBOM generation continues to
-use the committed lock files as its authoritative input.
+Pull requests receive dependency-diff review for newly introduced high-severity findings.
+Path-relevant CodeQL runs for native or website changes, and the website lock receives a
+high-severity npm advisory audit whenever website paths are relevant. The weekly schedule and
+manual dispatch conservatively run both surfaces. `Security required` aggregates those jobs into a
+stable exact-commit verdict; skipped irrelevant jobs do not become false failures. Release SBOM
+generation continues to use the committed lock files as its authoritative input.
+
+The repository intentionally permits its maintainer to develop directly on `main`, so that
+administrator bypass is treated as a residual risk rather than as release authorization. A release
+candidate requires an annotated version tag whose signature GitHub verifies as valid, a tag commit
+contained in `origin/main`, and latest successful `CI required` and `Security required` check runs
+on that exact commit. Candidate creation and later public promotion both re-evaluate this authority
+and fail closed on lightweight or unsigned tags, missing checks, cross-commit evidence, or an
+incomplete check-run response.
 
 ## Report a vulnerability privately
 

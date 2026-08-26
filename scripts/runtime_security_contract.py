@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 import re
 import sys
+from datetime import date
 from pathlib import Path
 
 
@@ -197,19 +198,95 @@ def debug_gate_enforcement_errors(
     ]
 
 
+def internal_diagnostics_capability_errors(
+    contract: dict,
+    *,
+    route_sources: dict[str, str] | None = None,
+) -> list[str]:
+    """Validate the compile-time boundary between internal and distributed builds."""
+    errors: list[str] = []
+    capability = contract.get("internalBuildCapability")
+    if not isinstance(capability, dict):
+        return ["runtime-debug-knobs requires internalBuildCapability"]
+    condition = capability.get("compileCondition")
+    if condition != "VOCELLO_INTERNAL_DIAGNOSTICS":
+        errors.append(
+            "runtime-debug-knobs internal capability must be "
+            "VOCELLO_INTERNAL_DIAGNOSTICS"
+        )
+        return errors
+    source = capability.get("source")
+    if not isinstance(source, str) or not (ROOT / source).is_file():
+        errors.append("runtime-debug-knobs internal capability source is missing")
+    else:
+        source_text = (ROOT / source).read_text(encoding="utf-8")
+        if f"#if {condition}" not in source_text:
+            errors.append(
+                f"runtime debug gate does not compile-check {condition}: {source}"
+            )
+
+    enabled = capability.get("enabledBuildRoutes")
+    distributed = capability.get("distributedBuildRoutes")
+    if not isinstance(enabled, list) or not enabled:
+        errors.append("runtime-debug-knobs enabledBuildRoutes must be non-empty")
+        enabled = []
+    if not isinstance(distributed, list) or not distributed:
+        errors.append("runtime-debug-knobs distributedBuildRoutes must be non-empty")
+        distributed = []
+    if set(enabled) & set(distributed):
+        errors.append("runtime debug enabled and distributed build routes overlap")
+
+    def route_text(relative: object) -> str | None:
+        if not isinstance(relative, str):
+            return None
+        if route_sources is not None and relative in route_sources:
+            return route_sources[relative]
+        path = ROOT / relative
+        if not path.is_file():
+            return None
+        return path.read_text(encoding="utf-8")
+
+    for relative in enabled:
+        source_text = route_text(relative)
+        if source_text is None:
+            errors.append(f"runtime debug enabled build route is missing: {relative}")
+        elif condition not in source_text:
+            errors.append(
+                f"internal diagnostics capability is absent from enabled build route: {relative}"
+            )
+    for relative in distributed:
+        source_text = route_text(relative)
+        if source_text is None:
+            errors.append(f"runtime debug distributed build route is missing: {relative}")
+        elif condition in source_text:
+            errors.append(
+                f"internal diagnostics capability leaked into distributed build route: {relative}"
+            )
+    return errors
+
+
 def validate_debug_contract() -> list[str]:
     errors: list[str] = []
     contract = load_json(ROOT / "config/runtime-debug-knobs.json")
-    if contract.get("schemaVersion") != 1:
-        errors.append("runtime-debug-knobs schemaVersion must be 1")
+    if contract.get("schemaVersion") != 2:
+        errors.append("runtime-debug-knobs schemaVersion must be 2")
     if contract.get("masterGate") != "QWENVOICE_DEBUG":
         errors.append("runtime-debug-knobs masterGate must be QWENVOICE_DEBUG")
+    errors.extend(internal_diagnostics_capability_errors(contract))
+    internal_condition = (
+        (contract.get("internalBuildCapability") or {}).get("compileCondition")
+    )
 
     groups = contract.get("groups")
     if not isinstance(groups, list) or not groups:
         return errors + ["runtime-debug-knobs groups must be a non-empty array"]
     registered: set[str] = set()
     gated: set[str] = set()
+    allowed_classifications = {
+        "behavior-or-policy-mutation",
+        "observability-only",
+        "capability-gate",
+    }
     for index, group in enumerate(groups):
         if not isinstance(group, dict):
             errors.append(f"runtime-debug-knobs groups[{index}] must be an object")
@@ -220,8 +297,30 @@ def validate_debug_contract() -> list[str]:
             continue
         if not isinstance(group.get("purpose"), str) or not group["purpose"].strip():
             errors.append(f"runtime-debug-knobs groups[{index}] requires purpose")
-        if group.get("gateRequired") is True and group.get("releaseBehavior") != "ignored-unless-master-gate-enabled":
-            errors.append(f"runtime-debug-knobs groups[{index}] has invalid gated releaseBehavior")
+        classification = group.get("classification")
+        if classification not in allowed_classifications:
+            errors.append(
+                f"runtime-debug-knobs groups[{index}] has invalid classification"
+            )
+        if classification == "behavior-or-policy-mutation":
+            compile_condition = group.get("compileCondition")
+            if compile_condition not in {internal_condition, "QVOICE_DEVICE_DIAGNOSTICS"}:
+                errors.append(
+                    f"runtime-debug-knobs groups[{index}] behavior mutation lacks a compile capability"
+                )
+            if not str(group.get("releaseBehavior", "")).startswith("unavailable-without-"):
+                errors.append(
+                    f"runtime-debug-knobs groups[{index}] behavior mutation is available in distribution"
+                )
+        elif classification == "observability-only":
+            if group.get("releaseBehavior") != "diagnostic-only-no-product-policy-change":
+                errors.append(
+                    f"runtime-debug-knobs groups[{index}] has invalid observability releaseBehavior"
+                )
+        elif classification == "capability-gate" and group.get("id") != "master-gate":
+            errors.append(
+                f"runtime-debug-knobs groups[{index}] misuses capability-gate classification"
+            )
         for key in keys:
             if not isinstance(key, str) or ENV_KEY_PATTERN.fullmatch(key) is None:
                 errors.append(f"invalid runtime environment key: {key!r}")
@@ -229,7 +328,10 @@ def validate_debug_contract() -> list[str]:
                 errors.append(f"duplicate runtime environment key: {key}")
             else:
                 registered.add(key)
-                if group.get("gateRequired") is True:
+                if (
+                    group.get("gateRequired") is True
+                    and classification == "behavior-or-policy-mutation"
+                ):
                     gated.add(key)
 
     observed: set[str] = set()
@@ -258,11 +360,81 @@ def validate_debug_contract() -> list[str]:
     return errors
 
 
+def concurrency_metadata_errors(
+    contract: dict,
+    *,
+    observed_unchecked_count: int,
+    observed_unsafe_count: int,
+    today: date | None = None,
+) -> list[str]:
+    errors: list[str] = []
+    if contract.get("schemaVersion") != 2:
+        errors.append("concurrency-safety schemaVersion must be 2")
+    budget = contract.get("budget")
+    if not isinstance(budget, dict):
+        errors.append("concurrency-safety requires a no-unreviewed-growth budget")
+        budget = {}
+    expected_budget_keys = {
+        "maximumUncheckedSendableDeclarations",
+        "maximumNonisolatedUnsafeDeclarations",
+        "reviewCadenceDays",
+    }
+    if set(budget) != expected_budget_keys:
+        errors.append("concurrency-safety budget fields are incomplete or unexpected")
+    maximum_unchecked = budget.get("maximumUncheckedSendableDeclarations")
+    maximum_unsafe = budget.get("maximumNonisolatedUnsafeDeclarations")
+    cadence = budget.get("reviewCadenceDays")
+    if not isinstance(maximum_unchecked, int) or maximum_unchecked < 0:
+        errors.append("concurrency-safety unchecked Sendable budget must be non-negative")
+    elif observed_unchecked_count > maximum_unchecked:
+        errors.append(
+            "unchecked Sendable declarations exceed the reviewed growth budget: "
+            f"observed {observed_unchecked_count}, maximum {maximum_unchecked}"
+        )
+    if not isinstance(maximum_unsafe, int) or maximum_unsafe < 0:
+        errors.append("concurrency-safety nonisolated unsafe budget must be non-negative")
+    elif observed_unsafe_count > maximum_unsafe:
+        errors.append(
+            "nonisolated unsafe declarations exceed the reviewed growth budget: "
+            f"observed {observed_unsafe_count}, maximum {maximum_unsafe}"
+        )
+    if not isinstance(cadence, int) or cadence < 30 or cadence > 730:
+        errors.append("concurrency-safety reviewCadenceDays must be between 30 and 730")
+        cadence = 365
+    current = today or date.today()
+    for collection_name in ("unsafeDeclarations", "entries"):
+        rows = contract.get(collection_name)
+        if not isinstance(rows, list):
+            continue
+        for index, entry in enumerate(rows):
+            if not isinstance(entry, dict):
+                continue
+            label = entry.get("id") or f"{collection_name}[{index}]"
+            reviewed_at = entry.get("reviewedAt")
+            if not isinstance(reviewed_at, str):
+                errors.append(f"concurrency-safety {label} requires reviewedAt")
+            else:
+                try:
+                    reviewed = date.fromisoformat(reviewed_at)
+                except ValueError:
+                    errors.append(f"concurrency-safety {label} reviewedAt must be an ISO date")
+                else:
+                    age = (current - reviewed).days
+                    if age < 0:
+                        errors.append(f"concurrency-safety {label} reviewedAt cannot be in the future")
+                    elif age > cadence:
+                        errors.append(
+                            f"concurrency-safety {label} review is stale ({age} days; cadence {cadence})"
+                        )
+            removal = entry.get("removalCondition")
+            if not isinstance(removal, str) or len(removal.strip()) < 24:
+                errors.append(f"concurrency-safety {label} requires a substantive removalCondition")
+    return errors
+
+
 def validate_concurrency_contract() -> list[str]:
     errors: list[str] = []
     contract = load_json(ROOT / "config/concurrency-safety.json")
-    if contract.get("schemaVersion") != 1:
-        errors.append("concurrency-safety schemaVersion must be 1")
     entries = contract.get("entries")
     if not isinstance(entries, list) or not entries:
         return errors + ["concurrency-safety entries must be a non-empty array"]
@@ -276,6 +448,14 @@ def validate_concurrency_contract() -> list[str]:
             observed.add((relative, match.group(1)))
         for match in UNSAFE_DECLARATION_PATTERN.finditer(text):
             observed_unsafe.add((relative, match.group(1)))
+
+    errors.extend(
+        concurrency_metadata_errors(
+            contract,
+            observed_unchecked_count=len(observed),
+            observed_unsafe_count=len(observed_unsafe),
+        )
+    )
 
     registered_unsafe: set[tuple[str, str]] = set()
     unsafe_entries = contract.get("unsafeDeclarations")
@@ -417,6 +597,105 @@ def validate_release_contract() -> list[str]:
     if '"managed-subprocess"' not in evidence_source or "validate_step_ledger" not in evidence_source:
         errors.append("release evidence can self-assert verification without managed step manifests")
     return errors
+
+
+def tsan_contract_errors(
+    policy: dict,
+    *,
+    workflow: str,
+    macos_test: str,
+    today: date | None = None,
+) -> list[str]:
+    errors: list[str] = []
+    if policy.get("schemaVersion") != 1:
+        errors.append("TSan policy schemaVersion must be 1")
+    if policy.get("workflow") != ".github/workflows/tsan.yml":
+        errors.append("TSan policy must own .github/workflows/tsan.yml")
+    if policy.get("command") != "scripts/macos_test.sh tsan":
+        errors.append("TSan policy command must use the repository macOS test driver")
+    if policy.get("derivedDataEntry") != "xcode-macos-tsan-derived-data":
+        errors.append("TSan policy must use the isolated governed macOS TSan DerivedData entry")
+    if policy.get("subset") != ["VocelloCoreTests", "VocelloEngineIntegrationTests"]:
+        errors.append("TSan policy must cover the deterministic core and injectable XPC subset")
+    excluded = policy.get("excluded")
+    if (
+        not isinstance(excluded, dict)
+        or set(excluded) != {"Qwen3RuntimeTests"}
+        or not isinstance(excluded.get("Qwen3RuntimeTests"), str)
+        or len(excluded["Qwen3RuntimeTests"].strip()) < 40
+    ):
+        errors.append("TSan policy must justify the MLX/Metal runtime exclusion")
+
+    characterization = policy.get("characterization")
+    if not isinstance(characterization, dict):
+        errors.append("TSan policy characterization block is missing")
+        characterization = {}
+    try:
+        deadline = date.fromisoformat(characterization.get("deadline", ""))
+    except ValueError:
+        errors.append("TSan characterization deadline must be an ISO date")
+        deadline = date.min
+    required_passes = characterization.get("requiredConsecutivePassesForBlockingReview")
+    recorded_passes = characterization.get("recordedConsecutivePasses")
+    open_races = characterization.get("openConfirmedRaceCount")
+    if not isinstance(required_passes, int) or required_passes < 2:
+        errors.append("TSan blocking review requires at least two consecutive clean runs")
+    if not isinstance(recorded_passes, int) or recorded_passes < 0:
+        errors.append("TSan recordedConsecutivePasses must be non-negative")
+    if not isinstance(open_races, int) or open_races < 0:
+        errors.append("TSan openConfirmedRaceCount must be non-negative")
+    if characterization.get("promotionRequiresMaintainerReview") is not True:
+        errors.append("TSan promotion to blocking must require maintainer review")
+
+    status = policy.get("status")
+    if status not in {"characterizing-non-blocking", "blocking"}:
+        errors.append("TSan policy status must be characterizing-non-blocking or blocking")
+    current = today or date.today()
+    if status == "characterizing-non-blocking":
+        if deadline < current:
+            errors.append("TSan non-blocking characterization deadline has expired")
+        if "continue-on-error: true" not in workflow:
+            errors.append("TSan characterization workflow must preserve failed evidence non-blockingly")
+    elif "continue-on-error: true" in workflow:
+        errors.append("blocking TSan workflow cannot continue on sanitizer failure")
+
+    for token in (
+        "schedule:",
+        "workflow_dispatch:",
+        "permissions:\n  contents: read",
+        "runs-on: macos-26",
+        "scripts/macos_test.sh tsan",
+        "if: always()",
+        "actions/upload-artifact@",
+        "retention-days: 14",
+        "no retry is automatic",
+    ):
+        if token not in workflow:
+            errors.append(f"TSan workflow is missing: {token}")
+    for forbidden in ("pull_request:", "push:", "git commit", "gh pr create"):
+        if forbidden in workflow:
+            errors.append(f"TSan characterization workflow has a forbidden mutation/trigger: {forbidden}")
+    for token in (
+        "cmd_tsan()",
+        "QWENVOICE_ENABLE_TSAN=1 build_mac_test_bundles",
+        'derived_data="$QVOICE_XCODE_MACOS_TSAN_DERIVED"',
+        "assert_macos_tsan_bundle_architectures",
+        'libclang_rt.tsan_osx_dynamic.dylib',
+        'DYLD_INSERT_LIBRARIES="$tsan_runtime"',
+        'xctest_runner="$(xcrun --find xctest',
+        "run_mac_test_bundle VocelloCoreTests",
+        "run_mac_test_bundle VocelloEngineIntegrationTests",
+    ):
+        if token not in macos_test:
+            errors.append(f"macOS TSan driver is missing: {token}")
+    return errors
+
+
+def validate_tsan_contract() -> list[str]:
+    policy = load_json(ROOT / "config/tsan-policy.json")
+    workflow = (ROOT / ".github/workflows/tsan.yml").read_text(encoding="utf-8")
+    macos_test = (ROOT / "scripts/macos_test.sh").read_text(encoding="utf-8")
+    return tsan_contract_errors(policy, workflow=workflow, macos_test=macos_test)
 
 
 def runtime_refactor_contract_errors(
@@ -858,6 +1137,7 @@ def main() -> int:
         errors.extend(validate_concurrency_contract())
         errors.extend(validate_runtime_refactor_contract())
         errors.extend(validate_release_contract())
+        errors.extend(validate_tsan_contract())
         errors.extend(validate_docs())
     except ValueError as exc:
         errors.append(str(exc))

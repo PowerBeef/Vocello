@@ -174,6 +174,8 @@ private struct IOSHistoryLibrarySection: View {
     @State private var reloadTask: Task<Void, Never>?
     @State private var clearConfirmation: IOSHistoryClearConfirmation?
     @State private var databaseUnavailable = false
+    @State private var recoverySnapshot: GenerationHistoryRecoverySnapshot = .empty
+    @State private var recoveryAudioURLs: [URL] = []
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -205,6 +207,12 @@ private struct IOSHistoryLibrarySection: View {
 
             IOSHistoryFilterChips(selection: $modeFilter)
                 .padding(.bottom, 0)
+
+            if recoverySnapshot.needsAttention {
+                historyRecoveryBanner
+                    .padding(.horizontal, 20)
+                    .padding(.top, 12)
+            }
 
             IOSScrollView {
                 LazyVStack(alignment: .leading, spacing: 0) {
@@ -266,6 +274,9 @@ private struct IOSHistoryLibrarySection: View {
         .onReceive(NotificationCenter.default.publisher(for: .generationSaved)) { _ in
             reload()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .generationHistoryRecoveryChanged)) { _ in
+            refreshRecoveryState()
+        }
         .onDisappear {
             reloadTask?.cancel()
             reloadTask = nil
@@ -304,24 +315,53 @@ private struct IOSHistoryLibrarySection: View {
         }
     }
 
-    /// Clears the whole history; with `deleteAudio` false the WAVs stay on
-    /// disk (GitHub #48). The database is the source of truth for the file
-    /// sweep so rows beyond the loaded list are covered too. The fetch +
-    /// file sweep + delete run off the main thread (a large history's worth
-    /// of synchronous removeItem calls would stall the UI — 2026-06-12
-    /// release-QA audit); state updates hop back to the MainActor.
-    private func performClearAll(deleteAudio: Bool) {
-        Task.detached(priority: .userInitiated) {
-            do {
-                if deleteAudio {
-                    let allGenerations = try DatabaseService.shared.fetchAllGenerations()
-                    let fileManager = FileManager.default
-                    for generation in allGenerations where fileManager.fileExists(atPath: generation.audioPath) {
-                        try? fileManager.removeItem(atPath: generation.audioPath)
+    private var historyRecoveryBanner: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label("Finished audio is waiting for History", systemImage: "arrow.clockwise.icloud")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Theme.Text.primary)
+            Text(recoveryMessage)
+                .font(.caption)
+                .foregroundStyle(Theme.Text.secondary)
+            HStack(spacing: 10) {
+                Button("Retry") { reload(reopenFailedStore: true) }
+                    .iosAdaptiveUtilityButtonStyle(tint: Theme.Brand.library)
+                    .accessibilityIdentifier("historyRecovery_retry")
+                if !recoveryAudioURLs.isEmpty {
+                    ShareLink(items: recoveryAudioURLs) {
+                        Label("Export Audio", systemImage: "square.and.arrow.up")
                     }
+                    .iosAdaptiveUtilityButtonStyle(tint: Theme.Brand.library)
+                    .accessibilityIdentifier("historyRecovery_export")
                 }
-                try DatabaseService.shared.deleteAllGenerations()
-                await MainActor.run { reload() }
+            }
+        }
+        .padding(14)
+        .background(Theme.Surface.panel, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("historyRecovery_banner")
+    }
+
+    private var recoveryMessage: String {
+        if recoverySnapshot.issueCount > 0 {
+            return "Vocello preserved the recovery record but could not verify or commit it. Retry before clearing History."
+        }
+        let count = recoverySnapshot.pendingCount
+        return "\(count) take\(count == 1 ? "" : "s") remain safely queued and available to retry or export."
+    }
+
+    /// Clears the whole history; with `deleteAudio` false the WAVs stay on
+    /// disk (GitHub #48). A durable transaction captures database and pending
+    /// outbox paths, deletes rows first, then clears recovery entries and
+    /// files. Work runs off the main thread; state updates hop to MainActor.
+    private func performClearAll(deleteAudio: Bool) {
+        Task { @concurrent in
+            do {
+                _ = try await GenerationHistoryRecovery.clearAll(deleteAudio: deleteAudio)
+                await MainActor.run {
+                    NotificationCenter.default.post(name: .generationHistoryRecoveryChanged, object: nil)
+                    reload()
+                }
             } catch {
                 let message = error.localizedDescription
                 await MainActor.run {
@@ -342,6 +382,7 @@ private struct IOSHistoryLibrarySection: View {
                     if reopenFailedStore {
                         try DatabaseService.shared.reopenIfNeeded()
                     }
+                    _ = await GenerationHistoryRecovery.reconcile()
                     let loaded = try DatabaseService.shared.fetchAllGenerations()
                     // Row menus need audio availability; resolving it here
                     // keeps the per-row stat(2) off the main thread and out of
@@ -359,6 +400,7 @@ private struct IOSHistoryLibrarySection: View {
                 databaseUnavailable = false
                 errorMessage = nil
                 recomputePresentation()
+                refreshRecoveryState()
             } catch {
                 guard !Task.isCancelled else { return }
                 items = []
@@ -379,6 +421,16 @@ private struct IOSHistoryLibrarySection: View {
         )
         groupedItems = grouped
         filteredItemCount = grouped.reduce(0) { $0 + $1.items.count }
+    }
+
+    private func refreshRecoveryState() {
+        Task {
+            let snapshot = await GenerationHistoryRecovery.snapshot()
+            let urls = await GenerationHistoryRecovery.pendingAudioURLs()
+            guard !Task.isCancelled else { return }
+            recoverySnapshot = snapshot
+            recoveryAudioURLs = urls
+        }
     }
 
     private static func makeGroupedItems(

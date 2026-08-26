@@ -302,6 +302,18 @@
         "result-retention"
       ]
     },
+    "ui-ios-localization": {
+      "producer": "scripts/ui_test.sh",
+      "requiredSteps": [
+        "source-provenance",
+        "crash-baseline",
+        "xcuitest",
+        "crash-delta"
+      ],
+      "optionalSteps": [
+        "result-retention"
+      ]
+    },
     "ui-macos-benchmark": {
       "producer": "scripts/ui_test.sh",
       "requiredSteps": [
@@ -318,6 +330,19 @@
       ]
     },
     "ui-macos-smoke": {
+      "producer": "scripts/ui_test.sh",
+      "requiredSteps": [
+        "source-provenance",
+        "xcuitest",
+        "crash-delta"
+      ],
+      "optionalSteps": [
+        "result-retention",
+        "ui-preflight",
+        "ui-build"
+      ]
+    },
+    "ui-macos-localization": {
       "producer": "scripts/ui_test.sh",
       "requiredSteps": [
         "source-provenance",

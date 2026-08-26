@@ -11,6 +11,7 @@
       "pinFilename": "retention-pin.json",
       "lanes": [
         "smoke",
+        "localization",
         "benchmark",
         "model-download",
         "startup-parity",
@@ -70,6 +71,10 @@
         "requiredFreeBytes": 12884901888,
         "cleanupHint": "scripts/clean_build_caches.sh --prune-ui-results"
       },
+      "ui-localization": {
+        "requiredFreeBytes": 12884901888,
+        "cleanupHint": "scripts/clean_build_caches.sh --prune-ui-results"
+      },
       "ui-benchmark": {
         "requiredFreeBytes": 16106127360,
         "cleanupHint": "scripts/clean_build_caches.sh --prune-ui-results"
@@ -113,6 +118,15 @@
       "cleanup": "aggressive",
       "retention": "Persistent incremental macOS Xcode cache",
       "env": "QVOICE_XCODE_MACOS_DERIVED"
+    },
+    {
+      "id": "xcode-macos-tsan-derived-data",
+      "path": "build/cache/xcode/macos-tsan",
+      "class": "cache",
+      "owner": "Scheduled macOS ThreadSanitizer characterization lane",
+      "cleanup": "aggressive",
+      "retention": "Isolated incremental macOS ThreadSanitizer Xcode cache",
+      "env": "QVOICE_XCODE_MACOS_TSAN_DERIVED"
     },
     {
       "id": "xcode-ios-device-derived-data",

@@ -95,10 +95,13 @@ Tests assert these visible production surfaces directly.
 | Pin seed | `history_pinSeedButton` in the row context menu (only for rows with a recorded seed, DP-15): pins the take's seed into its mode's draft and switches to that mode; the composer then shows the pinned-seed chip |
 | Long-form project | joined row plus `history_longFormSegmentsToggle_<digest8>` disclosure over the per-segment map; segments collapse under the project, flatten during search, and orphans stay visible |
 | Degraded database state | `history_errorState`; destructive actions stay disabled until a later reload/read succeeds |
+| Pending-history recovery | `historyRecovery_banner` with `historyRecovery_retry`, `historyRecovery_reveal`, and `historyRecovery_export` |
 
 Database failures are typed and fail closed: an unavailable store is not shown as empty History.
-macOS retries when the surface reloads or is re-entered; it does not currently expose a dedicated
-Retry button.
+Every published WAV is durably queued before its idempotent database write. Startup and History
+entry retry pending writes; if recovery still needs attention, the visible banner can retry,
+reveal the local outputs folder, or export the pending audio. Clear-all records a resumable
+database-first transaction before removing pending entries or files.
 
 ### Saved Voices (`sidebar_voices` → `screen_voices`)
 

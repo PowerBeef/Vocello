@@ -215,10 +215,12 @@ scripts/macos_test.sh test
 ```
 
 The iOS command compiles both the app and its standalone, app-host-free platform-policy XCTest
-bundle for the physical-device SDK. It does not execute tests or require a connected phone. Xcode
-26 does not support executing a tool-hosted, app-host-free XCTest bundle on a physical-device
-destination, so this bundle is compile-only; physical runtime and UI acceptance use the explicit
-device diagnostics and XCUITest lanes. The selected Xcode must still have matching iOS Platform
+bundle for the physical-device SDK. It does not execute tests or require a connected phone. The
+same Foundation-level policy sources and 19 assertions run inside `VocelloCoreTests` during the
+ordinary macOS deterministic lane. Xcode 26 does not support executing the standalone tool-hosted,
+app-host-free bundle on a physical-device destination, so that duplicate target remains
+compile-only; physical runtime and UI acceptance use the explicit device diagnostics and
+XCUITest lanes. The selected Xcode must still have matching iOS Platform
 Support/runtime availability for `generic/platform=iOS`; the repository checks this before package
 resolution and never downloads or runs a Simulator component automatically.
 

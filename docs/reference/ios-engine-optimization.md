@@ -14,9 +14,9 @@ optimization problem from the macOS engine (different process model, a hard per-
 streaming-first), so it gets its own doc.
 
 All Vocello-owned production-affecting environment overrides named below are registered in
-`config/runtime-debug-knobs.json` and are inert unless `QWENVOICE_DEBUG=1`. Bounded observability and
-the separately compiled physical-device diagnostics target are classified independently by that
-registry.
+`config/runtime-debug-knobs.json` and require both `VOCELLO_INTERNAL_DIAGNOSTICS` and
+`QWENVOICE_DEBUG=1`; distributed builds omit the capability. Bounded observability and the
+separately compiled physical-device diagnostics target are classified independently by that registry.
 
 Companion docs: [`../../benchmarks/OPTIMIZATION.md`](../../benchmarks/OPTIMIZATION.md) (backend/MLX
 decode-loop + output-quality work, shared by both platforms — the deep §A–§F findings live there),

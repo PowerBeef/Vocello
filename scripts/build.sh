@@ -3,9 +3,9 @@
 #
 # Single shippable config: there is no separate Debug config. This builds the
 # Release config UNOPTIMIZED (-Onone) for a fast local loop; scripts/release.sh
-# builds the same config OPTIMIZED for the DMG. Debug capabilities are gated at
-# runtime via DebugMode (env QWENVOICE_DEBUG=1 or the hidden version-tap toggle),
-# not by a compile-time symbol.
+# builds the same config OPTIMIZED for the DMG. Repository-owned local builds
+# add the narrow VOCELLO_INTERNAL_DIAGNOSTICS capability; runtime overrides
+# still require QWENVOICE_DEBUG. Distribution builds omit the capability.
 #
 # Skips XcodeGen regen when project.yml hasn't changed and SwiftPM resolve when
 # Package.resolved hasn't changed, so back-to-back builds drop into xcodebuild.
@@ -146,6 +146,7 @@ build_app() {
         CODE_SIGN_IDENTITY="$signing_identity" \
         ENABLE_HARDENED_RUNTIME=NO \
         CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION=YES \
+        'OTHER_SWIFT_FLAGS=$(inherited) -DVOCELLO_INTERNAL_DIAGNOSTICS' \
         SWIFT_OPTIMIZATION_LEVEL="-Onone" \
         SWIFT_COMPILATION_MODE="incremental" \
         GCC_OPTIMIZATION_LEVEL="0" \
@@ -343,6 +344,7 @@ build_cli() {
         CODE_SIGN_STYLE=Manual \
         CODE_SIGN_IDENTITY="-" \
         CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION=YES \
+        'OTHER_SWIFT_FLAGS=$(inherited) -DVOCELLO_INTERNAL_DIAGNOSTICS' \
         SWIFT_OPTIMIZATION_LEVEL="$swift_optimization" \
         SWIFT_COMPILATION_MODE="$compilation_mode" \
         GCC_OPTIMIZATION_LEVEL="$gcc_optimization" \

@@ -119,6 +119,16 @@ Before changing scripts or CI, read:
   platform, support, and canonical-hardware references. Model implementation facts remain backend-owned.
 - **Schema review:** telemetry or benchmark schema-version changes require backend, the affected
   platform owner, and release/QA review before publication contracts change.
+- **Root Swift dependency watch:** `scripts/swift_dependency_updates.py` and
+  `config/swift-dependency-update-policy.json` keep project, owned-runtime, lock, compatibility,
+  and evidence surfaces coordinated. The scheduled workflow is read-only; release availability or
+  an advisory proposes review but never changes exact pins or establishes compatibility.
+- **macOS entitlement diff:** `scripts/entitlement_contract.py` validates exact app/XPC/framework
+  allowlists on every deterministic change. Signed bundle verification must compare the emitted
+  entitlements to the same policy; do not sign the engine XPC with the broader app plist.
+- **TSan characterization:** `config/tsan-policy.json` owns the bounded non-blocking deadline,
+  exact test subset, recorded clean runs, and maintainer-reviewed transition to blocking. Do not
+  weaken ordinary deterministic or MLX runtime coverage to make the sanitizer subset pass.
 
 ## Build / test commands
 
@@ -129,6 +139,9 @@ QVOICE_GATES=quick ./scripts/check_project_inputs.sh   # local fast loop: self-t
 scripts/macos_test.sh test
 ./scripts/build.sh build
 ./scripts/build_foundation_targets.sh ios
+
+# Explicit scheduled-lane characterization; not an ordinary commit/release prerequisite.
+scripts/macos_test.sh tsan
 
 # Deterministic/runtime macOS gate (models are needed only for the optional bounded bench)
 scripts/macos_test.sh models ensure   # explicit repair/bootstrap only; normal readiness is visible in Settings
@@ -164,6 +177,7 @@ scripts/macos_test.sh models check|ensure|install
 # Release packaging
 ./scripts/build.sh release
 python3 scripts/supply_chain_contract.py
+python3 scripts/release_source_authority.py --help
 python3 scripts/release_evidence.py validate --output-dir build/dist/macos
 
 # Benchmark driver (PASS publishes a registry record automatically when run in this checkout)
@@ -236,11 +250,20 @@ scripts/clean_build_caches.sh --compact-profile-failure <run-id> --dry-run
   `CI required` without the contract suite — the T1 commit-gate hook
   (`scripts/hooks/precommit_gate.sh`, owned here) provides the same coverage locally but is
   Codex-session tooling, not a universal git hook. Both heavy macOS jobs cache SwiftPM checkouts.
-- **Ordinary CI is deterministic-only.** GitHub CI compiles the `VocelloiOS` app and standalone
-  `VocelloiOSLogicTests` bundle with `generic/platform=iOS`, runs macOS deterministic verification,
-  and never executes XCUITest. Xcode 26 cannot execute the app-host-free tool-hosted policy bundle
-  on a physical-device destination, so it remains compile-only; device runtime proof uses the
-  existing diagnostics and XCUITest lanes. Missing matching iOS Platform Support/runtime
+- **Security timing is path-relevant and release-bound.** `security.yml` routes native and website
+  changes on pushes and pull requests, runs CodeQL for either relevant surface and npm advisory
+  audit for website changes, and always publishes the stable `Security required` aggregate. The
+  repository deliberately retains direct-to-`main` administrator development, so live
+  `enforce_admins=false` and branch-level `required_signatures=false` are an explicit residual—not
+  release authority. Candidate and promotion workflows compensate by requiring a GitHub-verified
+  annotated tag, containment in `origin/main`, and successful latest `CI required` plus
+  `Security required` runs on the exact tagged commit.
+- **Ordinary CI is deterministic-only.** GitHub CI executes the 19 platform-neutral iOS policy
+  assertions inside macOS `VocelloCoreTests`, compiles the `VocelloiOS` app and duplicate standalone
+  `VocelloiOSLogicTests` bundle with `generic/platform=iOS`, and never executes XCUITest. Xcode 26
+  cannot execute the app-host-free tool-hosted policy bundle on a physical-device destination, so
+  that duplicate target remains compile-only; device runtime proof uses the existing diagnostics
+  and XCUITest lanes. Missing matching iOS Platform Support/runtime
   availability is classified as a host-toolchain readiness failure before package resolution, not
   as a source, phone, model, or UI failure. Repository automation never downloads that component.
 - **Release notes are curated and fail-closed.** The GitHub Release body comes verbatim
@@ -299,8 +322,12 @@ scripts/clean_build_caches.sh --compact-profile-failure <run-id> --dry-run
   clear a machine warning or failure.
 - **Deep checkout on CI.** `fetch-depth: 0` is required so `git rev-parse HEAD` in
   `scripts/release.sh` resolves for `release-metadata.txt`.
-- **Release publication is the final transaction.** A protected `v*` tag or explicit existing tag
-  starts the workflow. Source/tag/version identity, signing, notarization, package verification,
+- **Release publication is the final transaction.** A GitHub-verified annotated `v*` tag or
+  explicit existing tag starts the workflow. Before any platform job, `release_source_authority.py`
+  proves that the tag targets the exact checked-out commit, that the commit belongs to
+  `origin/main`, and that its latest `CI required` and `Security required` check runs completed
+  successfully. Lightweight/unsigned tags, cross-SHA checks, missing rows, and incomplete check-run
+  pagination fail closed. Source/tag/version identity, signing, notarization, package verification,
   SPDX/CycloneDX generation, checksums, and provenance all pass before a draft Release exists.
   Schema-v2 release evidence accepts only a clean full-tree source identity and fresh same-invocation
   required-step manifests produced by the managed release subprocess. Every release step must match

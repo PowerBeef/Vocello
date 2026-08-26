@@ -3,6 +3,7 @@
 import copy
 import importlib.util
 import unittest
+from datetime import date
 from pathlib import Path
 
 
@@ -18,6 +19,157 @@ SPEC.loader.exec_module(MODULE)
 class RuntimeSecurityContractTests(unittest.TestCase):
     def test_runtime_debug_registry_covers_production_sources(self) -> None:
         self.assertEqual(MODULE.validate_debug_contract(), [])
+
+    def test_concurrency_registry_metadata_and_budget_are_current(self) -> None:
+        contract = MODULE.load_json(ROOT / "config/concurrency-safety.json")
+        self.assertEqual(
+            MODULE.concurrency_metadata_errors(
+                contract,
+                observed_unchecked_count=40,
+                observed_unsafe_count=9,
+                today=date(2026, 8, 26),
+            ),
+            [],
+        )
+
+    def test_concurrency_registry_rejects_unreviewed_growth(self) -> None:
+        contract = MODULE.load_json(ROOT / "config/concurrency-safety.json")
+        errors = MODULE.concurrency_metadata_errors(
+            contract,
+            observed_unchecked_count=41,
+            observed_unsafe_count=10,
+            today=date(2026, 8, 26),
+        )
+        self.assertTrue(any("unchecked Sendable declarations exceed" in error for error in errors))
+        self.assertTrue(any("nonisolated unsafe declarations exceed" in error for error in errors))
+
+    def test_concurrency_registry_requires_review_and_removal_condition(self) -> None:
+        contract = MODULE.load_json(ROOT / "config/concurrency-safety.json")
+        del contract["entries"][0]["reviewedAt"]
+        contract["unsafeDeclarations"][0]["removalCondition"] = "later"
+        errors = MODULE.concurrency_metadata_errors(
+            contract,
+            observed_unchecked_count=40,
+            observed_unsafe_count=9,
+            today=date(2026, 8, 26),
+        )
+        self.assertTrue(any("requires reviewedAt" in error for error in errors))
+        self.assertTrue(any("substantive removalCondition" in error for error in errors))
+
+    def test_concurrency_registry_rejects_stale_review(self) -> None:
+        contract = MODULE.load_json(ROOT / "config/concurrency-safety.json")
+        contract["entries"][0]["reviewedAt"] = "2024-01-01"
+        errors = MODULE.concurrency_metadata_errors(
+            contract,
+            observed_unchecked_count=40,
+            observed_unsafe_count=9,
+            today=date(2026, 8, 26),
+        )
+        self.assertTrue(any("review is stale" in error for error in errors))
+
+    def test_tsan_characterization_contract_is_bounded_and_non_blocking(self) -> None:
+        policy = MODULE.load_json(ROOT / "config/tsan-policy.json")
+        workflow = (ROOT / ".github/workflows/tsan.yml").read_text(encoding="utf-8")
+        macos_test = (ROOT / "scripts/macos_test.sh").read_text(encoding="utf-8")
+        self.assertEqual(
+            MODULE.tsan_contract_errors(
+                policy,
+                workflow=workflow,
+                macos_test=macos_test,
+                today=date(2026, 8, 26),
+            ),
+            [],
+        )
+
+    def test_tsan_non_blocking_characterization_cannot_outlive_deadline(self) -> None:
+        policy = MODULE.load_json(ROOT / "config/tsan-policy.json")
+        workflow = (ROOT / ".github/workflows/tsan.yml").read_text(encoding="utf-8")
+        macos_test = (ROOT / "scripts/macos_test.sh").read_text(encoding="utf-8")
+        errors = MODULE.tsan_contract_errors(
+            policy,
+            workflow=workflow,
+            macos_test=macos_test,
+            today=date(2026, 10, 1),
+        )
+        self.assertTrue(any("deadline has expired" in error for error in errors))
+
+    def test_tsan_must_use_isolated_governed_derived_data(self) -> None:
+        policy = MODULE.load_json(ROOT / "config/tsan-policy.json")
+        policy["derivedDataEntry"] = "xcode-macos-derived-data"
+        workflow = (ROOT / ".github/workflows/tsan.yml").read_text(encoding="utf-8")
+        macos_test = (ROOT / "scripts/macos_test.sh").read_text(encoding="utf-8")
+        errors = MODULE.tsan_contract_errors(
+            policy,
+            workflow=workflow,
+            macos_test=macos_test,
+            today=date(2026, 8, 26),
+        )
+        self.assertTrue(any("isolated governed" in error for error in errors))
+
+    def test_tsan_blocking_status_cannot_keep_continue_on_error(self) -> None:
+        policy = MODULE.load_json(ROOT / "config/tsan-policy.json")
+        policy["status"] = "blocking"
+        workflow = (ROOT / ".github/workflows/tsan.yml").read_text(encoding="utf-8")
+        macos_test = (ROOT / "scripts/macos_test.sh").read_text(encoding="utf-8")
+        errors = MODULE.tsan_contract_errors(
+            policy,
+            workflow=workflow,
+            macos_test=macos_test,
+            today=date(2026, 8, 26),
+        )
+        self.assertTrue(any("blocking TSan workflow" in error for error in errors))
+
+    def test_runtime_debug_groups_classify_behavior_and_observability(self) -> None:
+        contract = MODULE.load_json(ROOT / "config/runtime-debug-knobs.json")
+        classifications = {
+            group["id"]: group["classification"] for group in contract["groups"]
+        }
+        self.assertEqual(
+            classifications["production-affecting-debug"],
+            "behavior-or-policy-mutation",
+        )
+        self.assertEqual(
+            classifications["bounded-observability"],
+            "observability-only",
+        )
+        self.assertEqual(classifications["master-gate"], "capability-gate")
+
+    def test_internal_capability_may_not_leak_into_distribution_routes(self) -> None:
+        contract = MODULE.load_json(ROOT / "config/runtime-debug-knobs.json")
+        capability = contract["internalBuildCapability"]
+        route_sources = {
+            relative: (ROOT / relative).read_text(encoding="utf-8")
+            for relative in (
+                capability["enabledBuildRoutes"] + capability["distributedBuildRoutes"]
+            )
+        }
+        release_route = capability["distributedBuildRoutes"][0]
+        route_sources[release_route] += "\nVOCELLO_INTERNAL_DIAGNOSTICS\n"
+        errors = MODULE.internal_diagnostics_capability_errors(
+            contract,
+            route_sources=route_sources,
+        )
+        self.assertTrue(any("leaked into distributed" in error for error in errors))
+
+    def test_every_enabled_route_must_compile_internal_capability(self) -> None:
+        contract = MODULE.load_json(ROOT / "config/runtime-debug-knobs.json")
+        capability = contract["internalBuildCapability"]
+        route_sources = {
+            relative: (ROOT / relative).read_text(encoding="utf-8")
+            for relative in (
+                capability["enabledBuildRoutes"] + capability["distributedBuildRoutes"]
+            )
+        }
+        enabled_route = capability["enabledBuildRoutes"][0]
+        route_sources[enabled_route] = route_sources[enabled_route].replace(
+            "VOCELLO_INTERNAL_DIAGNOSTICS",
+            "REMOVED_INTERNAL_CAPABILITY",
+        )
+        errors = MODULE.internal_diagnostics_capability_errors(
+            contract,
+            route_sources=route_sources,
+        )
+        self.assertTrue(any("absent from enabled" in error for error in errors))
 
     def test_production_affecting_key_must_use_gate_api(self) -> None:
         errors = MODULE.debug_gate_enforcement_errors(

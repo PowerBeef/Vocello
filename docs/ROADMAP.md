@@ -11,7 +11,7 @@
 | --- | --- | --- | --- |
 | `autonomous-validation-remediation-2026-08` | active | release-qa | 5/11 (45%) |
 | `delivery-prompting-2026-08` | active | backend-mlx | 29/34 (85%) |
-| `engineering-review-remediation-2026-08` | active | backend-and-platform | 3/14 (21%) |
+| `engineering-review-remediation-2026-08` | active | backend-and-platform | 13/14 (93%) |
 | `ios-generation-startup-reliability-2026-08` | active | backend-and-platform | 4/6 (67%) |
 | `compliance-2026-08` | complete | release-qa | 2/2 (100%) |
 | `convergence-metal4-stage4-2026-08` | complete | backend-and-platform | 7/7 (100%) |
@@ -137,54 +137,24 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
 | Item | Status | Title | Evidence |
 | --- | --- | --- | --- |
 | `F-01` | done | High — make saved-voice review transactional and add iOS deletion | `file:Sources/QwenVoiceCore/PreparedVoiceRepository.swift`, `file:Tests/VocelloCoreTests/PreparedVoiceRepositoryTests.swift`, `file:Tests/VocelloEngineIntegrationTests/PreparedVoiceWireContractTests.swift`, `file:Tests/VocelloiOSUITests/VocelloiOSSavedVoiceLifecycleUITests.swift`, `file:scripts/saved_voice_lifecycle_contract.py`, `doc:docs/reference/privacy-storage.md`, `doc:docs/reference/ios-app-guide.md` |
-| `F-02` | planned | Medium — make behavior-changing diagnostics an enforceable distribution boundary | — |
-| `F-03` | planned | Medium — execute deterministic iOS policy assertions in ordinary CI | — |
+| `F-02` | done | Medium — make behavior-changing diagnostics an enforceable distribution boundary | `file:Sources/QwenVoiceCore/RuntimeDebugGate.swift`, `file:Tests/VocelloCoreTests/RuntimeDebugGateTests.swift`, `file:config/runtime-debug-knobs.json`, `file:scripts/runtime_security_contract.py`, `doc:docs/decisions/runtime-hardening-and-trust-boundary.md` |
+| `F-03` | done | Medium — execute deterministic iOS policy assertions in ordinary CI | `file:Tests/VocelloiOSLogicTests/VocelloiOSLogicTests.swift`, `file:project.yml`, `file:scripts/macos_test.sh`, `file:scripts/build_foundation_targets.sh`, `file:scripts/check_test_workflows.sh`, `file:.github/workflows/ci.yml` |
 | `F-04` | done | Medium — bind public promotion to exact-source canonical evidence | `commit:f6404ce`, `file:config/quality-promotion-contract.json`, `file:.github/workflows/promote-release.yml`, `doc:docs/reference/quality-promotion.md` |
 | `F-05` | planned | Medium — restore packaged macOS launch verification | — |
-| `F-06` | planned | Medium — durably couple audio publication and History persistence | — |
-| `F-07` | planned | Medium — close the main-branch administrator and security-timing gap | — |
-| `F-08` | planned | Low — scope iOS Studio terminal state to a generation attempt | — |
-| `F-09` | planned | Medium — split oversized authorities incrementally | — |
-| `F-10` | planned | Medium — establish localization architecture before translations | — |
+| `F-06` | done | Medium — durably couple audio publication and History persistence | `file:Tests/VocelloCoreTests/GenerationHistoryOutboxTests.swift`, `file:Tests/VocelloCoreTests/HistoryDeletionEngineTests.swift`, `file:docs/reference/privacy-storage.md` |
+| `F-07` | done | Medium — close the main-branch administrator and security-timing gap | `file:scripts/tests/test_release_source_authority.py`, `file:scripts/tests/test_supply_chain_contract.py`, `file:docs/reference/macos-release-qa.md` |
+| `F-08` | done | Low — scope iOS Studio terminal state to a generation attempt | `file:Tests/VocelloiOSLogicTests/StudioGenerationAttemptAuthorityTests.swift`, `file:docs/reference/ios-app-guide.md` |
+| `F-09` | done | Medium — split oversized authorities incrementally | `file:Tests/VocelloiOSLogicTests/IOSSingleTakeGenerationExecutorTests.swift`, `file:docs/reference/ios-app-guide.md` |
+| `F-10` | done | Medium — establish localization architecture before translations | `file:scripts/tests/test_localization_contract.py`, `file:Tests/VocelloiOSLogicTests/VocelloPresentationTextTests.swift`, `doc:docs/reference/localization.md` |
 | `F-11` | done | Low — single-source CLI version identity | `commit:f6404ce`, `file:scripts/cli_version_contract.py`, `file:scripts/tests/test_cli_version_contract.py`, `doc:docs/reference/cli.md` |
-| `F-12` | planned | Low — add a root Xcode Swift dependency update path | — |
-| `F-13` | planned | Advisory — continuously constrain the macOS entitlement posture | — |
-| `F-14` | planned | Low — schedule Thread Sanitizer and enforce concurrency-debt quality | — |
+| `F-12` | done | Low — add a root Xcode Swift dependency update path | `file:scripts/tests/test_swift_dependency_updates.py`, `file:scripts/tests/test_supply_chain_contract.py`, `doc:docs/reference/mlx-guide.md` |
+| `F-13` | done | Advisory — continuously constrain the macOS entitlement posture | `file:scripts/tests/test_entitlement_contract.py`, `file:QwenVoice.xcodeproj/project.pbxproj`, `doc:docs/decisions/runtime-hardening-and-trust-boundary.md` |
+| `F-14` | done | Low — schedule Thread Sanitizer and enforce concurrency-debt quality | `file:scripts/tests/test_runtime_security_contract.py`, `file:scripts/macos_test.sh`, `doc:docs/reference/macos-testing.md` |
 
 ### Open items in detail
 
-- **`F-02`** (planned) — Medium — make behavior-changing diagnostics an enforceable distribution boundary.
-  gate: Classify registered knobs as observability-only or behavior/policy mutation. Make distributed builds unable to disable publication marking or redirect other policy-sensitive behavior through process environment alone, using an internal-build capability or an explicitly documented product policy. Preserve bounded diagnostics and record provenance whenever an internal diagnostic build mutates output. Current RuntimeDebugGate remains environment-only and QWENVOICE_MARKING=off is still compiled into shipped code.
-
-- **`F-03`** (planned) — Medium — execute deterministic iOS policy assertions in ordinary CI.
-  gate: Extract Foundation-only iOS policies into a host-runnable target and execute their assertions in ordinary macOS CI while retaining the generic physical-device SDK compile and real-device-only lifecycle/UI lanes. Move catalog/URL, ledger, managed-path, memory-band, cancellation-transition, and diagnostic-redaction logic only where it is genuinely platform-neutral. Current VocelloiOSLogicTests is compiled but not executed in ordinary CI.
-
 - **`F-05`** (planned) — Medium — restore packaged macOS launch verification.
-  gate: Run the existing packaged-app launch smoke on the declared macos-26 release runner and remove the obsolete macOS-15 rationale. If hosted GUI launch proves unreliable, replace the unconditional QWENVOICE_SKIP_LAUNCH_SMOKE=1 with a capability-based packaged executable/dyld/XPC startup probe and require equivalent source-bound external startup evidence before public promotion. Current release.yml still skips launch unconditionally.
-
-- **`F-06`** (planned) — Medium — durably couple audio publication and History persistence.
-  gate: Add a durable pending-history outbox/sidecar after atomic WAV publication, clear it only after the database commit, reconcile it at startup and History open, and expose privacy-safe retry/reveal/export state. Make clear-all resumable or database-first so a database failure cannot leave live rows pointing to already-deleted files. Current schedulePersistence uses an unstructured detached task with no retry, and clearAll deletes files before deleting rows.
-
-- **`F-07`** (planned) — Medium — close the main-branch administrator and security-timing gap.
-  gate: Preserve the maintainer-required main-only workflow while making its residual risk explicit and release-safe: either enforce required checks for administrators through a compatible protected-merge mechanism, or formally accept direct-main admin bypass for ordinary development and make exact-SHA green CI plus path-relevant security verdicts mandatory before release promotion. Add pull-request/path timing for CodeQL and npm advisory checks where compatible, and require signed release tags. Live GitHub state on 2026-08-19 still had enforce_admins=false and required_signatures=false; the direct main push of f6404ce reported a required-check bypass. Force-push and branch deletion are already disabled.
-
-- **`F-08`** (planned) — Low — scope iOS Studio terminal state to a generation attempt.
-  gate: Have start return an attempt token and require finish, complete, fail, and cancellation completion to match it; ignore stale callbacks and surface cancellation-barrier failures. Add deterministic rapid-cancel/restart and stale-terminal tests before extracting any common generation executor. Current StudioGenerationCoordinator terminal methods have no attempt identity.
-
-- **`F-09`** (planned) — Medium — split oversized authorities incrementally.
-  gate: Extract one characterized authority at a time from the current hotspots, preserving public types and contracts. Start with the clearest independently testable seam rather than a big-bang rewrite; candidate seams are downloader request/transfer/install stages, output-adapter publication/finalization/QC, iOS common generation execution, and device-diagnostics command families. Current largest files remain HuggingFaceDownloader.swift (about 132 KB), GenerationOutputAdapter.swift (about 118 KB), IOSDeviceDiagnosticsRunner.swift (about 102 KB), and IOSGenerationModeViews.swift (about 95 KB).
-
-- **`F-10`** (planned) — Medium — establish localization architecture before translations.
-  gate: Adopt an Xcode String Catalog with translator context, typed localized presentation keys for dynamic errors/status, plural rules, pseudo-localization coverage, and a deterministic guard against new unlocalized user-facing literals. Then add long-string/accessibility XCUITest acceptance on supported physical platforms before accepting broad translations. The repository currently ships no owned .xcstrings/.strings resources and GitHub issue #95 remains open.
-
-- **`F-12`** (planned) — Low — add a root Xcode Swift dependency update path.
-  gate: Keep exact root Xcode dependency pins, but add a scheduled read-only release/advisory checker that proposes coordinated project.yml, Package.resolved, compatibility-matrix, and evidence updates. Do not loosen constraints or infer production compatibility from availability alone. Dependabot currently covers GitHub Actions, website npm, and Packages/VocelloQwen3Core only.
-
-- **`F-13`** (planned) — Advisory — continuously constrain the macOS entitlement posture.
-  gate: Add a per-target entitlement allowlist/diff gate for every deterministic change and release, retain negative loading tests, and re-evaluate allow-unsigned-executable-memory and disable-library-validation on each MLX upgrade. Preserve the documented accepted architecture unless evidence permits removing an entitlement. Current governance documents the posture and checks release signing, but does not yet machine-enforce a complete per-target entitlement diff on every change.
-
-- **`F-14`** (planned) — Low — schedule Thread Sanitizer and enforce concurrency-debt quality.
-  gate: Add a scheduled TSan lane for the deterministic core/XPC subset, non-blocking only while noise is characterized, then promote stable coverage. Extend the concurrency registry so new unsafe declarations require review date and removal condition in addition to the already-enforced owner, invariant, and direct tests; add an explicit no-unreviewed-growth budget. Current scripts support opt-in TSan and the registry fail-closes on unregistered declarations, but no scheduled lane or review/removal metadata is enforced.
+  gate: Run the existing packaged-app launch smoke on the declared macos-26 release runner. The release workflow and extracted-DMG verifier must require external startup evidence and reject a QWENVOICE_SKIP_LAUNCH_SMOKE bypass in CI. Close only after the next signed candidate records that hosted macos-26 proof.
 
 ## iOS Built-in Voice startup reliability
 

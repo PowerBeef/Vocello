@@ -96,6 +96,41 @@ def validate(root: Path, installed: str | None = None) -> list[str]:
         errors.append("release workflow does not preserve verify -> draft -> upload -> remote verify ordering")
     if "Publish verified GitHub Release" in release or re.search(r"--draft=false", release):
         errors.append("release candidate workflow must stop at a verified draft")
+    package_job = _workflow_job(release, "package")
+    if not package_job:
+        errors.append("release workflow is missing the macOS package job")
+    else:
+        if "runs-on: macos-26" not in package_job:
+            errors.append("macOS release packaging must run on macos-26")
+        if "QWENVOICE_SKIP_LAUNCH_SMOKE" in package_job:
+            errors.append("macOS release packaging must not bypass packaged-app launch smoke")
+        if "./scripts/verify_packaged_dmg.sh" not in package_job:
+            errors.append("macOS release packaging must verify the packaged DMG")
+        if "needs: source-authority" not in package_job:
+            errors.append("macOS release packaging must depend on signed exact-SHA source authority")
+    source_authority = _workflow_job(release, "source-authority")
+    if not source_authority:
+        errors.append("release workflow is missing signed exact-SHA source authority")
+    else:
+        if _job_permissions(source_authority) != ["contents: read", "checks: read"]:
+            errors.append("release source authority must have only contents:read and checks:read")
+        for required_source_control in (
+            'git merge-base --is-ancestor "$commit" origin/main',
+            "git/ref/tags/${RELEASE_TAG}",
+            "git/tags/${tag_object}",
+            "commits/${commit}/check-runs?filter=latest&per_page=100",
+            "gh api --paginate --slurp",
+            "python3 scripts/release_source_authority.py",
+            "python3 scripts/release_evidence.py verify-source",
+        ):
+            if required_source_control not in source_authority:
+                errors.append(
+                    f"release source authority is missing exact-source control: {required_source_control}"
+                )
+    for dependent_job_name in ("compile-ios", "archive-ios"):
+        dependent_job = _workflow_job(release, dependent_job_name)
+        if not dependent_job or "needs: source-authority" not in dependent_job:
+            errors.append(f"release job {dependent_job_name} must depend on source authority")
     for required in (
         "gh release delete-asset",
         'gh release view "$RELEASE_TAG" --json assets',
@@ -103,6 +138,34 @@ def validate(root: Path, installed: str | None = None) -> list[str]:
     ):
         if required not in release:
             errors.append(f"release workflow does not enforce an exact draft asset set: {required}")
+
+    bundle_verifier_path = root / "scripts/verify_release_bundle.sh"
+    bundle_verifier = (
+        bundle_verifier_path.read_text(encoding="utf-8")
+        if bundle_verifier_path.is_file()
+        else ""
+    )
+    for required, message in (
+        ('SKIP_LAUNCH_SMOKE="${QWENVOICE_SKIP_LAUNCH_SMOKE:-0}"',
+         "packaged-app launch skip must remain opt-in"),
+        ('[ "${CI:-}" = "true" ]',
+         "packaged-app launch smoke must reject CI bypass"),
+        ('/usr/bin/open -n "$APP_PATH"',
+         "packaged-app verifier must launch the external app bundle"),
+        ('did not remain running long enough to pass startup smoke',
+         "packaged-app verifier must prove startup survival"),
+    ):
+        if required not in bundle_verifier:
+            errors.append(message)
+
+    dmg_verifier_path = root / "scripts/verify_packaged_dmg.sh"
+    dmg_verifier = (
+        dmg_verifier_path.read_text(encoding="utf-8")
+        if dmg_verifier_path.is_file()
+        else ""
+    )
+    if '"$SCRIPT_DIR/verify_release_bundle.sh" "$COPIED_APP"' not in dmg_verifier:
+        errors.append("packaged DMG verification must launch-check the extracted app")
 
     promotion_path = root / ".github/workflows/promote-release.yml"
     promotion = promotion_path.read_text(encoding="utf-8") if promotion_path.is_file() else ""
@@ -122,6 +185,17 @@ def validate(root: Path, installed: str | None = None) -> list[str]:
     for required in ("quality-promotion.json", "--platform macos", "--draft=false"):
         if required not in promotion:
             errors.append(f"promotion workflow is missing source-bound publication control: {required}")
+    for required in (
+        "checks: read",
+        'git merge-base --is-ancestor "$commit" origin/main',
+        "git/ref/tags/${RELEASE_TAG}",
+        "git/tags/${tag_object}",
+        "commits/${commit}/check-runs?filter=latest&per_page=100",
+        "gh api --paginate --slurp",
+        "python3 scripts/release_source_authority.py",
+    ):
+        if required not in promotion:
+            errors.append(f"promotion workflow is missing signed exact-SHA control: {required}")
 
     ios_release_order = re.compile(
         r"Run process-bound iOS release readiness.*Archive VocelloiOS.*"
@@ -153,8 +227,13 @@ def validate(root: Path, installed: str | None = None) -> list[str]:
         ".github/workflows/security.yml", ".github/ISSUE_TEMPLATE/config.yml",
         ".github/ISSUE_TEMPLATE/bug_report.yml", ".github/ISSUE_TEMPLATE/feature_request.yml",
         "scripts/release_evidence.py", "scripts/release_sbom.py",
+        "scripts/release_source_authority.py",
         "scripts/swift_dependency_snapshot.py",
+        "scripts/swift_dependency_updates.py",
+        "config/swift-dependency-update-policy.json",
+        ".github/workflows/swift-dependency-watch.yml",
         "scripts/verify_ios_release_artifacts.py",
+        "scripts/verify_release_bundle.sh", "scripts/verify_packaged_dmg.sh",
     ]
     for relative in required:
         if not (root / relative).is_file():
@@ -165,10 +244,77 @@ def validate(root: Path, installed: str | None = None) -> list[str]:
         if f'package-ecosystem: "{ecosystem}"' not in dependabot:
             errors.append(f"Dependabot does not cover {ecosystem}")
 
+    dependency_watch_path = root / ".github/workflows/swift-dependency-watch.yml"
+    dependency_watch = (
+        dependency_watch_path.read_text(encoding="utf-8") if dependency_watch_path.is_file() else ""
+    )
+    if not dependency_watch:
+        errors.append("root Swift dependency watch workflow is missing")
+    else:
+        for required_token in (
+            "schedule:",
+            "workflow_dispatch:",
+            "contents: read",
+            "security-events: read",
+            "python3 scripts/swift_dependency_updates.py validate",
+            "python3 scripts/swift_dependency_updates.py report",
+            '--repository "$GITHUB_REPOSITORY"',
+            "swift-dependency-watch.json",
+            "swift-dependency-watch.md",
+            "actions/upload-artifact@",
+            "retention-days: 14",
+        ):
+            if required_token not in dependency_watch:
+                errors.append(f"root Swift dependency watch is missing: {required_token}")
+        for forbidden_token in (
+            "pull_request:",
+            "push:",
+            "contents: write",
+            "issues: write",
+            "pull-requests: write",
+            "git commit",
+            "gh pr create",
+        ):
+            if forbidden_token in dependency_watch:
+                errors.append(f"root Swift dependency watch must remain read-only: {forbidden_token}")
+
+    dependency_policy_path = root / "config/swift-dependency-update-policy.json"
+    if dependency_policy_path.is_file():
+        try:
+            dependency_policy = json.loads(dependency_policy_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as error:
+            errors.append(f"Swift dependency update policy is invalid JSON: {error}")
+        else:
+            identities = {
+                row.get("identity")
+                for row in dependency_policy.get("packages", [])
+                if isinstance(row, dict)
+            }
+            expected_identities = {
+                "grdb.swift", "mlx-swift", "mlx-swift-lm", "swift-huggingface", "swift-transformers"
+            }
+            if dependency_policy.get("schemaVersion") != 1:
+                errors.append("Swift dependency update policy has an unsupported schema")
+            if identities != expected_identities:
+                errors.append("Swift dependency update policy does not cover every coordinated exact pin")
+
     security_path = root / ".github/workflows/security.yml"
     security = security_path.read_text(encoding="utf-8") if security_path.is_file() else ""
     if not re.search(r"(?m)^  push:\s*$\n^    branches:\s*\[main\]\s*$", security):
         errors.append("security workflow push trigger must remain limited to main")
+    changes = _workflow_job(security, "changes")
+    if not changes:
+        errors.append("security workflow is missing path routing")
+    else:
+        for token in (
+            "Security path routing",
+            "native: ${{ steps.classify.outputs.native }}",
+            "website: ${{ steps.classify.outputs.website }}",
+            'git diff --name-only "origin/$BASE_REF...HEAD"',
+            'git diff --name-only "$BEFORE_SHA..$HEAD_SHA"',
+        ):
+            if token not in changes:
+                errors.append(f"security path routing is missing: {token}")
     submission = _workflow_job(security, "swift-dependency-submission")
     expected_submission_condition = (
         "if: github.event_name == 'push' || github.event_name == 'schedule' || "
@@ -190,12 +336,14 @@ def validate(root: Path, installed: str | None = None) -> list[str]:
                 errors.append(f"Swift dependency submission is missing: {required_command}")
 
     npm_audit = _workflow_job(security, "npm-advisory-audit")
-    expected_audit_condition = "if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'"
+    expected_audit_condition = "if: needs.changes.outputs.website == 'true'"
     if not npm_audit:
-        errors.append("security workflow is missing the scheduled npm advisory audit")
+        errors.append("security workflow is missing the path-relevant npm advisory audit")
     else:
+        if "needs: changes" not in npm_audit:
+            errors.append("npm advisory audit must depend on security path routing")
         if expected_audit_condition not in npm_audit:
-            errors.append("npm advisory audit must run only on schedule or manual dispatch")
+            errors.append("npm advisory audit must run for website-relevant push, PR, or scheduled work")
         if "npm --prefix website audit --package-lock-only --audit-level=high" not in npm_audit:
             errors.append("npm advisory audit must inspect the committed website lock at high severity")
 
@@ -203,6 +351,10 @@ def validate(root: Path, installed: str | None = None) -> list[str]:
     if not codeql:
         errors.append("security workflow is missing CodeQL")
     else:
+        if "needs: changes" not in codeql:
+            errors.append("CodeQL must depend on security path routing")
+        if "if: needs.changes.outputs.native == 'true' || needs.changes.outputs.website == 'true'" not in codeql:
+            errors.append("CodeQL must run for path-relevant push and pull-request work")
         if "runner: macos-26" not in codeql:
             errors.append("Swift CodeQL must retain the macos-26 ARM runner")
         # 2026-08-06: the drifting tools moved off Homebrew entirely —
@@ -248,6 +400,33 @@ def validate(root: Path, installed: str | None = None) -> list[str]:
             errors.append(
                 "Swift CodeQL must preserve toolchain -> prepare -> initialize -> traced build -> analyze ordering"
             )
+
+    security_required = _workflow_job(security, "security-required")
+    if not security_required:
+        errors.append("security workflow is missing the exact-SHA Security required aggregate")
+    else:
+        for token in (
+            "name: Security required",
+            "needs: [changes, dependency-review, swift-dependency-submission, npm-advisory-audit, codeql]",
+            "if: always()",
+            '"result": *"(failure|cancelled)"',
+        ):
+            if token not in security_required:
+                errors.append(f"Security required aggregate is missing: {token}")
+
+    authority_path = root / "scripts/release_source_authority.py"
+    authority = authority_path.read_text(encoding="utf-8") if authority_path.is_file() else ""
+    for token in (
+        'DEFAULT_REQUIRED_CHECKS = ("CI required", "Security required")',
+        'reference_object.get("type") != "tag"',
+        'verification.get("verified") is not True',
+        'verification.get("reason") != "valid"',
+        'row.get("head_sha") == commit',
+        'latest.get("status") != "completed"',
+        'latest.get("conclusion") != "success"',
+    ):
+        if token not in authority:
+            errors.append(f"release source authority is missing fail-closed control: {token}")
 
     build_path = root / "scripts/build.sh"
     build_source = build_path.read_text(encoding="utf-8") if build_path.is_file() else ""

@@ -65,6 +65,7 @@ Review when: target or scheme changes; runtime topology; telemetry schema; test 
 - [`docs/reference/ios-ui-reference.md`](../docs/reference/ios-ui-reference.md)
 - [`docs/reference/ios-ui-refresh-2026-08.md`](../docs/reference/ios-ui-refresh-2026-08.md)
 - [`docs/reference/language-bench.md`](../docs/reference/language-bench.md)
+- [`docs/reference/localization.md`](../docs/reference/localization.md)
 - [`docs/reference/long-form-generation.md`](../docs/reference/long-form-generation.md)
 - [`docs/reference/macos-app-guide.md`](../docs/reference/macos-app-guide.md)
 - [`docs/reference/macos-permissions.md`](../docs/reference/macos-permissions.md)

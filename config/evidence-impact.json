@@ -418,11 +418,18 @@
       "include": [
         ".github/**",
         "SECURITY.md",
+        "Sources/QwenVoice.entitlements",
+        "Sources/QwenVoiceEmbeddedRuntime.entitlements",
+        "config/macos-entitlement-policy.json",
+        "config/tsan-policy.json",
+        "config/swift-dependency-update-policy.json",
         "config/toolchain.json",
         "scripts/release.sh",
         "scripts/release_evidence.py",
         "scripts/release_sbom.py",
+        "scripts/entitlement_contract.py",
         "scripts/swift_dependency_snapshot.py",
+        "scripts/swift_dependency_updates.py",
         "scripts/supply_chain_contract.py"
       ],
       "mergeRequiredEvidence": [

@@ -49,6 +49,104 @@ machine-readable status record and wins over any older prose.
 
 ## Resume here (2026-08-26)
 
+**F-03 deterministic iOS policy assertions now execute in ordinary CI, F-06 History durability
+is closed, F-07 release-source authority is fail-closed, and F-08 Studio terminal ownership is
+attempt-scoped (2026-08-26):** the 24 app-host-free
+catalog, URL, ledger, managed-path,
+memory-band, cancellation, redaction, and Studio-attempt assertions compile into both the generic iOS policy
+target and `VocelloCoreTests`. Ordinary macOS CI now executes them without claiming that Xcode's
+tool-hosted generic-device bundle can run, while the generic physical-device SDK compile remains
+the platform proof and physical-device lifecycle/UI acceptance remains unchanged.
+
+Every atomically published macOS or iOS take is now queued in a schema-v1 local History outbox
+before its idempotent `audioPath`-bound SQLite write. Startup and History entry reconcile pending
+work, and visible recovery offers Retry plus platform-appropriate Reveal or Export. Clear-all
+persists a resumable transaction and deletes database rows before pending entries or requested
+audio, so a database failure cannot leave live rows pointing to files already removed. The
+deterministic suite covers commit/removal ordering, failed-database replay, duplicate identity,
+missing audio, corrupt and interrupted records, and interrupted clear recovery. F-03 and F-06 are
+`done` in `config/roadmap.json`.
+
+The repository keeps its maintainer-required direct-to-`main` development workflow, so the live
+administrator bypass is recorded rather than misrepresented as closed by branch settings. Release
+source authority now compensates at the publication boundary: candidates and promotion require an
+annotated GitHub-verified version tag contained in `origin/main` plus successful latest
+`CI required` and `Security required` check runs on the exact commit. Path-relevant CodeQL and npm
+advisory checks run for pull requests as well as main pushes, and the stable security aggregate is
+the exact-SHA release verdict. F-07 is `done`; no live GitHub setting was changed by this source
+work.
+
+Every iOS Studio start now owns an opaque attempt token. Single-take and long-form live updates,
+success, failure, deferred cleanup, and cancellation-barrier completion mutate visible terminal
+state only when that token remains current. Overlapping starts and duplicate cancellation requests
+are rejected, stale callbacks cannot clear a newer take, and cancellation-barrier errors are
+surfaced instead of swallowed. Five pure transition tests cover the rapid cancel/restart boundary;
+the macOS core-test lane and generic iOS app/policy build pass. F-08 is `done`.
+
+F-09's first characterized extraction now gives all three short-form Studio modes one typed
+submit/generate/cancel/telemetry/persistence/export authority. The view retains mode-specific
+request construction, Clone priming, Design save-sheet state, and attempt-scoped UI completion;
+the shared executor owns materialized-output cancellation cleanup and normalizes wrapped engine
+cancellation without parsing error text. Five deterministic ordering/failure tests execute in the
+hosted core suite and compile with the generic iOS policy target. `IOSGenerationModeViews.swift`
+fell from 97,588 to 85,406 bytes, and the full generic iOS app build passes. F-09 is `done`; F-10's
+localization architecture is now also `done`.
+
+F-10 established the pre-translation boundary without claiming broad language support: one owned
+String Catalog, translator context, typed dynamic presentation keys, plural rules, and a
+content-addressed incremental guard against new direct unlocalized presentation literals. Seven
+Python contract fixtures and three Swift presentation tests pass. Focused native acceptance also
+passed outside the managed sandbox: `macos-xcui-localization-20260826-173053-a9e0d9d6` exercised
+the pseudo-localized readiness path, while
+`ios-xcui-localization-20260826-173528-7744c05b` walked Settings and Voice Models at Default,
+AX-L, AX-XXXL, and Pseudo-AX-XXXL on the paired physical iPhone. The focused lanes generated no
+audio and did not change installed-model state.
+
+F-12 now closes the root Xcode Swift dependency blind spot without floating any package. A weekly
+and manual read-only workflow validates five exact direct/runtime pins, compares stable GitHub
+releases and open Dependabot alerts, and retains a coordinated 14-day proposal covering
+`project.yml`, both applicable locks, the owned-runtime compatibility matrix, governance, and the
+required evidence battery. Pin drift, incomplete feeds, write-capable workflow permissions, and
+partial MLX proposals fail closed; availability explicitly does not establish compatibility.
+
+F-13 now constrains the accepted unsandboxed macOS architecture per code role. The app retains its
+documented five capabilities, the engine XPC now signs with the pre-existing two-key embedded-runtime
+plist instead of inheriting audio-input and user-file access, and frameworks must carry no
+entitlements. A deterministic source/project/release contract plus signed-bundle verification rejects
+any added, missing, or changed key and scans owned Swift for arbitrary executable-code loading APIs.
+The two MLX hardened-runtime exceptions are bound to the exact reviewed MLX pins, so the next MLX
+upgrade cannot pass without a new need/removal review.
+
+F-14 closes the concurrency-debt governance gap without pretending one sanitizer run is permanent
+proof. Registry schema v2 requires every owned `@unchecked Sendable` and `nonisolated(unsafe)`
+exception to carry a current review date and substantive removal condition, and rejects unreviewed
+growth beyond the measured 40/9 declaration budgets. The new weekly/manual `macos-26` lane runs the
+460-test deterministic core plus 18 injectable XPC transport tests under ThreadSanitizer, retains
+failed evidence without retry, and is time-bounded as non-blocking through 2026-09-30. Its first
+corrected isolated-cache physical-host run (`tsan-20260826-142440`) passed with no sanitizer warning or race
+summary. This records one of three consecutive clean runs; making the lane blocking still requires
+the remaining runs and explicit maintainer review.
+
+**F-05 packaged-startup source remediation is complete but awaits external candidate evidence
+(2026-08-26):** the release workflow now runs on `macos-26`, verifies both the staged app and the
+app extracted from the DMG, and cannot use `QWENVOICE_SKIP_LAUNCH_SMOKE` in CI. Supply-chain
+fixtures reject a runner downgrade or weakened launch proof, and a local external launch of the
+built app passed. F-05 deliberately remains `planned` until the next explicitly requested signed
+candidate records the hosted `macos-26` proof; no tag or release was created merely to close the
+roadmap row.
+
+**F-02 distribution boundary closed (2026-08-26):** behavior-changing runtime overrides now
+require two independent conditions: a repository-owned `VOCELLO_INTERNAL_DIAGNOSTICS` build and
+the explicit `QWENVOICE_DEBUG` process gate. Local build/test/UI/device-diagnostics routes opt in;
+macOS and iOS distribution routes are machine-checked to omit the capability. Consequently,
+process environment alone can no longer disable Article 50 publication marking, redirect storage
+or catalogs, or alter sampling, lifecycle, memory, or delivery policy in a distributed binary.
+`config/runtime-debug-knobs.json` schema v2 classifies behavior mutation separately from bounded
+observability, and generation telemetry records active override key names plus a digest of the
+values without retaining raw launch input. Swift branch/provenance tests, route-leakage fixtures,
+the runtime security contract, and the complete macOS deterministic suite pass. F-02 is done in
+`config/roadmap.json`.
+
 **MD-3 iOS model-management delivery and progress closed on physical iPhone (2026-08-26):**
 two consecutive `diagnose` runs
 (`ios-xcui-model-download-20260826-141408-dd2a4575` and
@@ -854,8 +952,9 @@ every published WAV now carries both marks — the AudioSeal watermark (fixed pa
 `0x56C0`, owned MLX port) embeds and the `LIST`/`INFO` provenance chunk appends at the
 `GenerationOutputAdapter` publication seam, after staging finalization and before Fast QC,
 flipping together as one byte-identity discontinuity. The registered `QWENVOICE_MARKING`
-knob is the sole off-switch, and marking telemetry boundaries exist only when the pass
-executes. The zero-peak promise is enforced by a **within-take** fail-closed gate in the
+knob is the sole internal-diagnostics off-switch and is unavailable in distributed builds;
+marking telemetry boundaries exist only when the pass executes. The zero-peak promise is enforced
+by a **within-take** fail-closed gate in the
 memory-qualification lane (`config/marking-peak-equality.json`); its originally designed
 cross-run form was refuted by its own knob-off control — host-pressure drift of hundreds of
 MB across back-to-back runs on the 8 GB canonical Mac — while the marking pass itself
@@ -1544,14 +1643,21 @@ Status report: [`docs/reference/runtime-refactor-status-report.md`](reference/ru
 
 ## Current implementation
 
+- Engineering-review item F-03 closed on 2026-08-26. The 19 deterministic, Foundation-level iOS
+  policy assertions now execute in ordinary macOS `VocelloCoreTests` while the exact same test and
+  service sources remain compiled in the standalone app-host-free `VocelloiOSLogicTests` target for
+  `generic/platform=iOS`. The host suite passed 437 tests including all 19 shared assertions, and
+  the generic iOS app plus policy-bundle compile passed outside the managed sandbox. Physical
+  runtime and UI acceptance remain exclusively in the headless device and XCUITest lanes.
 - Native app UI acceptance uses one shared XCUITest stack: `macos smoke|benchmark` on the native
   Mac host and `ios smoke|benchmark` on a paired physical iPhone.
 - UI execution is explicit frontend QA. It is not required to commit, push, open or merge a pull
   request, run ordinary CI, package a release, or create an iOS archive.
-- The ordinary iOS compile lane typechecks both the app and a standalone app-host-free policy
-  XCTest bundle for the generic physical-device SDK. It covers catalog/ledger, memory policy,
-  cancellation, storage-path gating, and diagnostic redaction without a phone. Xcode 26 rejects
-  tool-hosted app-free XCTest execution on physical-device destinations, so this target remains
+- The ordinary macOS lane executes 19 shared iOS policy assertions covering catalog/ledger, memory
+  policy, cancellation, storage-path gating, diagnostic redaction, and exact download-progress
+  presentation. The ordinary iOS compile lane also typechecks those exact sources in a standalone
+  app-host-free XCTest bundle for the generic physical-device SDK. Xcode 26 rejects tool-hosted
+  app-free XCTest execution on physical-device destinations, so the duplicate iOS target remains
   compile-only and device runtime proof stays in the headless diagnostics and XCUITest lanes.
 - The physical-iPhone smoke contract covers two distinct cancellation paths (visible Cancel, then
   the registered one-shot critical-memory diagnostic requiring typed `memory_pressure`
@@ -1626,7 +1732,8 @@ Status report: [`docs/reference/runtime-refactor-status-report.md`](reference/ru
 - The Qwen3/Mimi implementation is the owned monorepo package `Packages/VocelloQwen3Core` behind
   the typed `VocelloQwen3Core` facade; immutable lineage/compatibility/ownership/capability
   contracts replace patch-stack governance. Runtime trust boundaries are machine-readable
-  (`config/runtime-debug-knobs.json` master-gated overrides; `config/concurrency-safety.json`
+  (`config/runtime-debug-knobs.json` compile-capability-plus-master-gated overrides;
+  `config/concurrency-safety.json`
   concurrency exceptions), and release-candidate evidence is schema-v2 fail-closed
   (process- and command-bound; iOS adds the non-device archive/IPA verifier).
 - The physical-iPhone language lane predeclares a one-based fixed-seed run plan, requires

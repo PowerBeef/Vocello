@@ -8,8 +8,10 @@ options:
   generateEmptyDirectories: true
 
 # Single shippable config. There is no separate Debug config / DEBUG symbol —
-# debug capabilities are gated at runtime via the explicit QWENVOICE_DEBUG
-# process environment gate. scripts/build.sh builds this config -Onone for
+# behavior-changing diagnostics require both the repository-owned
+# VOCELLO_INTERNAL_DIAGNOSTICS build capability and the explicit
+# QWENVOICE_DEBUG process gate. Local scripts add the capability;
+# distribution builds omit it. scripts/build.sh builds this config -Onone for
 # a fast local loop; scripts/release.sh builds it optimized for the DMG.
 configs:
   Release: release
@@ -22,6 +24,9 @@ settings:
   base:
     MARKETING_VERSION: "2.4.0"
     CURRENT_PROJECT_VERSION: "23"
+    LOCALIZATION_PREFERS_STRING_CATALOGS: YES
+    STRING_CATALOG_GENERATE_SYMBOLS: YES
+    SWIFT_EMIT_LOC_STRINGS: YES
 
 packages:
   GRDB:
@@ -343,7 +348,7 @@ targets:
         MACOSX_DEPLOYMENT_TARGET: "26.0"
         INFOPLIST_FILE: Sources/QwenVoiceEngineService/Info.plist
         INFOPLIST_KEY_QwenVoiceTeamIdentifier: $(QWENVOICE_DEVELOPMENT_TEAM)
-        CODE_SIGN_ENTITLEMENTS: Sources/QwenVoice.entitlements
+        CODE_SIGN_ENTITLEMENTS: Sources/QwenVoiceEmbeddedRuntime.entitlements
         GENERATE_INFOPLIST_FILE: NO
     dependencies:
       - target: QwenVoiceCore
@@ -373,6 +378,8 @@ targets:
       - path: Sources/Resources/qwenvoice_ios_model_catalog.json
         buildPhase: resources
       - path: Sources/Resources/qwenvoice_production_model_catalog.json
+        buildPhase: resources
+      - path: Sources/Resources/Localizable.xcstrings
         buildPhase: resources
       - path: Sources/Resources/voice-previews
         buildPhase: resources
@@ -426,21 +433,33 @@ targets:
       - package: SwiftHuggingFace
         product: HuggingFace
 
-  # Pure logic unit tests for QwenVoiceCore language and model-delivery lifecycle semantics
-  # (no models, no network, no Simulator, no XPC).
+  # Pure logic unit tests for QwenVoiceCore language/model-delivery semantics and
+  # platform-neutral iOS policies (no models, no network, no Simulator, no XPC).
+  # The iOS policy sources/tests are also compiled in the standalone device-SDK
+  # target below; hosting them here makes their assertions execute in ordinary
+  # macOS deterministic CI.
   # Run: scripts/macos_test.sh core-test
   VocelloCoreTests:
     type: bundle.unit-test
     platform: macOS
     sources:
       - path: Tests/VocelloCoreTests
+      - path: Tests/VocelloiOSLogicTests
       - path: Sources/SharedSupport/Services/LanguageSelectionPresentation.swift
       - path: Sources/SharedSupport/Services/GenerationOutputVerifier.swift
       - path: Sources/SharedSupport/Services/VoiceClipTranscriber.swift
       - path: Sources/SharedSupport/Telemetry/MainThreadStallWatchdog.swift
       - path: Sources/SharedSupport/Database/HistoryPersistenceError.swift
       - path: Sources/SharedSupport/Database/GenerationMigrations.swift
+      - path: Sources/SharedSupport/Database/GenerationHistoryOutbox.swift
+      - path: Sources/SharedSupport/Services/VocelloPresentationText.swift
       - path: Sources/Models/Generation.swift
+      - path: Sources/iOSSupport/Services/AppPaths.swift
+      - path: Sources/iOSSupport/Services/IOSModelDeliverySupport.swift
+      - path: Sources/iOSSupport/Services/IOSModelProgressPresentation.swift
+      - path: Sources/iOSSupport/Services/RuntimeReleaseCoordinator.swift
+      - path: Sources/iOSSupport/Services/StudioGenerationAttemptAuthority.swift
+      - path: Sources/iOSSupport/Services/IOSSingleTakeGenerationExecutor.swift
     dependencies:
       - target: QwenVoiceCore
       - package: GRDB
@@ -454,8 +473,10 @@ targets:
         CODE_SIGN_IDENTITY: "-"
         GENERATE_INFOPLIST_FILE: YES
 
-  # Deterministic iOS-only unit logic. This deliberately has no application
-  # host and no hidden app behavior. CI compiles it for generic/platform=iOS.
+  # Deterministic iOS policy compilation. This deliberately has no application
+  # host and no hidden app behavior. CI compiles it for generic/platform=iOS;
+  # the same Foundation-level sources and assertions execute in VocelloCoreTests
+  # on the macOS host.
   # Xcode 26 cannot execute a tool-hosted, app-host-free XCTest bundle on a
   # physical-device destination, so this target is intentionally compile-only.
   VocelloiOSLogicTests:
@@ -467,6 +488,9 @@ targets:
       - path: Sources/iOSSupport/Services/IOSModelDeliverySupport.swift
       - path: Sources/iOSSupport/Services/IOSModelProgressPresentation.swift
       - path: Sources/iOSSupport/Services/RuntimeReleaseCoordinator.swift
+      - path: Sources/iOSSupport/Services/StudioGenerationAttemptAuthority.swift
+      - path: Sources/iOSSupport/Services/IOSSingleTakeGenerationExecutor.swift
+      - path: Sources/SharedSupport/Services/VocelloPresentationText.swift
     dependencies:
       - target: QwenVoiceCore
     settings:

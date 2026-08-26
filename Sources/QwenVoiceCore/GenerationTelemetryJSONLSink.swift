@@ -27,7 +27,7 @@ public actor GenerationTelemetryJSONLSink {
     /// - Verbose sidecars (`samples-<id>.jsonl`): newest `maxSidecarFiles` kept, total
     ///   capped at `maxSidecarTotalBytes`.
     public static let maxLogBytes: Int = {
-        let mb = RuntimeDebugGate.value(for: "QWENVOICE_DIAGNOSTICS_MAX_MB")
+        let mb = RuntimeDebugGate.observabilityValue(for: "QWENVOICE_DIAGNOSTICS_MAX_MB")
             .flatMap { Int($0.trimmingCharacters(in: .whitespacesAndNewlines)) }
             .map { max(1, $0) } ?? 8
         return mb * 1_024 * 1_024

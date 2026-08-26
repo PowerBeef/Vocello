@@ -34,9 +34,11 @@ validate_benchmark_label() {
 usage() {
   cat >&2 <<'EOF'
 Usage:
+  scripts/ui_test.sh macos localization
   scripts/ui_test.sh macos smoke [--long-form-segments N]
   scripts/ui_test.sh macos benchmark [--modes custom,design,clone] [--lengths short,medium,long] [--warm 3] [--label RUN_ID]
   scripts/ui_test.sh macos perf
+  scripts/ui_test.sh ios localization
   scripts/ui_test.sh ios smoke
   scripts/ui_test.sh ios benchmark [--modes custom,design,clone] [--lengths short,medium,long] [--warm 3] [--label RUN_ID]
   scripts/ui_test.sh ios perf [--label RUN_ID]
@@ -47,6 +49,8 @@ Usage:
   scripts/ui_test.sh ios saved-voice-lifecycle
 
 The iOS destination is the paired physical iPhone only. Simulator destinations are unsupported.
+`localization` runs the focused pseudo-localization, long-string, and accessibility-size layout walk
+without generating audio or changing installed model state.
 `model-download` is an opt-in isolated lifecycle proof and never runs in smoke, benchmark, CI, or release.
 `delivery-cohort` is a diagnostic delivery-consistency lane (N identical Neutral Custom takes through
 the production UI); it never publishes benchmark history and never runs in smoke, benchmark, CI, or release.
@@ -70,7 +74,7 @@ platform="$1"
 lane="$2"
 shift 2
 [[ "$platform" == "macos" || "$platform" == "ios" ]] || usage
-[[ "$lane" == "smoke" || "$lane" == "benchmark" || "$lane" == "model-download" || "$lane" == "delivery-cohort" || "$lane" == "startup-parity" || "$lane" == "perf" || "$lane" == "enroll-clone-fixture" || "$lane" == "saved-voice-lifecycle" ]] || usage
+[[ "$lane" == "localization" || "$lane" == "smoke" || "$lane" == "benchmark" || "$lane" == "model-download" || "$lane" == "delivery-cohort" || "$lane" == "startup-parity" || "$lane" == "perf" || "$lane" == "enroll-clone-fixture" || "$lane" == "saved-voice-lifecycle" ]] || usage
 [[ "$lane" != "model-download" || "$platform" == "ios" ]] || usage
 [[ "$lane" != "delivery-cohort" || "$platform" == "ios" ]] || usage
 [[ "$lane" != "startup-parity" || "$platform" == "ios" ]] || usage
@@ -979,7 +983,9 @@ preserve_ios_ui_dsym() {
 
 if [[ "$platform" == "macos" ]]; then
   terminate_macos_app
-  if [[ "$lane" == "smoke" ]]; then
+  if [[ "$lane" == "localization" ]]; then
+    only_test="VocelloMacUITests/VocelloMacSmokeUITests/test01_NavigationAndReadiness"
+  elif [[ "$lane" == "smoke" ]]; then
     # The smoke class runs its seven ordered journeys (navigation/readiness,
     # completed generation + History, mid-generation cancellation, virtual-mic
     # recording, library surfaces, long-form project, line batch) in
@@ -1065,6 +1071,7 @@ WAV
       -disableAutomaticPackageResolution \
       -onlyUsePackageVersionsFromResolvedFile \
       CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="-" ONLY_ACTIVE_ARCH=YES ARCHS=arm64 \
+      'OTHER_SWIFT_FLAGS=$(inherited) -DVOCELLO_INTERNAL_DIAGNOSTICS' \
       SWIFT_OPTIMIZATION_LEVEL=-O \
       || die "macOS UI build-for-testing failed (see $out/xcodebuild.log)"
     printf '%s\n' "$mac_fingerprint" >"$mac_build_marker"
@@ -1112,7 +1119,9 @@ else
     snapshot_ios_crashes "$out/crashes-before" \
     || die "could not establish the pre-run iPhone crash snapshot"
 
-  if [[ "$lane" == "smoke" ]]; then
+  if [[ "$lane" == "localization" ]]; then
+    only_test="VocelloiOSUITests/VocelloiOSSmokeUITests/testSettingsAccessibilityLayoutWalk"
+  elif [[ "$lane" == "smoke" ]]; then
     only_test="VocelloiOSUITests/VocelloiOSSmokeUITests"
     export TEST_RUNNER_QVOICE_IOS_SMOKE_RUN_ID="$run_id"
   elif [[ "$lane" == "benchmark" ]]; then
@@ -1173,6 +1182,7 @@ else
       -only-testing:"$only_test" \
       -allowProvisioningUpdates DEVELOPMENT_TEAM="$team" CODE_SIGN_STYLE=Automatic \
       ARCHS=arm64 ONLY_ACTIVE_ARCH=YES \
+      'OTHER_SWIFT_FLAGS=$(inherited) -DVOCELLO_INTERNAL_DIAGNOSTICS' \
       SWIFT_OPTIMIZATION_LEVEL=-O; then
     xcuitest_status=1
     warn "physical-iPhone XCUITest failed; collecting forensics before returning failure"

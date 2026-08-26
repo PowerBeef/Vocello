@@ -1,0 +1,64 @@
+name: Thread Sanitizer characterization
+
+on:
+  schedule:
+    - cron: '17 13 * * 3'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vocello-tsan-characterization
+  cancel-in-progress: false
+
+jobs:
+  deterministic-subset:
+    name: Core and XPC TSan subset
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Select and validate native toolchain
+        run: |
+          set -euo pipefail
+          sudo xcode-select -s /Applications/Xcode_26.6.app
+          ./scripts/install_pinned_tools.sh
+          export PATH="$HOME/.qwenvoice-pinned-tools/bin:$PATH"
+          if ! xcrun metal --version >/dev/null 2>&1; then
+            xcodebuild -downloadComponent metalToolchain
+          fi
+          python3 scripts/supply_chain_contract.py --installed native
+          python3 scripts/runtime_security_contract.py
+
+      - name: Run scheduled Thread Sanitizer characterization
+        id: tsan
+        continue-on-error: true
+        run: scripts/macos_test.sh tsan
+
+      - name: Record characterization verdict
+        if: always()
+        env:
+          TSAN_OUTCOME: ${{ steps.tsan.outcome }}
+        run: |
+          set -euo pipefail
+          {
+            echo "# Thread Sanitizer characterization"
+            echo
+            echo "Outcome: ${TSAN_OUTCOME}"
+            echo
+            echo "The lane is non-blocking only while config/tsan-policy.json remains in its bounded characterization phase. Failed evidence is retained; no retry is automatic."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Retain sanitizer evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: tsan-${{ github.run_id }}-${{ github.run_attempt }}
+          path: build/artifacts/macos/tests/tsan-*/
+          if-no-files-found: warn
+          retention-days: 14

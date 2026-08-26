@@ -25,8 +25,9 @@ If anything here disagrees with the code, the code wins — fix this file.
 > (bounded by the `benchmarks/` cap). Raw telemetry, audio, screenshots, traces, and result
 > bundles remain untracked. XCUITest is the sole autonomous app UI driver; deterministic
 > history/WAV/XPC/backend probes validate its smoke and benchmark results. iOS UI tests
-> and real-engine generation remain **on-device only** on a paired physical iPhone. GitHub CI is
-> compile-only for iOS.
+> and real-engine generation remain **on-device only** on a paired physical iPhone. GitHub CI
+> executes Foundation-level iOS policy assertions on the macOS host and remains compile-only for
+> iOS binaries.
 > See [`testing-runbook.md`](testing-runbook.md) and [`ios-device-testing.md`](ios-device-testing.md).
 
 ---
@@ -108,8 +109,10 @@ QWENVOICE_DEBUG=1 QWENVOICE_NATIVE_TELEMETRY_MODE=verbose ./scripts/build.sh run
 ### Related benchmark knobs (also propagated over the handshake)
 
 `config/runtime-debug-knobs.json` owns this inventory. Production-affecting knobs are read through
-`RuntimeDebugGate` and remain inert unless `QWENVOICE_DEBUG=1`; bounded observability and
-test-target-only keys are separately classified. Never add an undocumented environment reader.
+`RuntimeDebugGate` and require both `VOCELLO_INTERNAL_DIAGNOSTICS` and `QWENVOICE_DEBUG=1`;
+distributed builds omit the capability. Bounded observability and test-target-only keys are
+separately classified. Generation telemetry binds active override key names and a digest of their
+values without retaining raw launch input. Never add an undocumented environment reader.
 
 | Env | Effect |
 |---|---|

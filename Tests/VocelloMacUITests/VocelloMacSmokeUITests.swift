@@ -91,7 +91,13 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
     }
 
     func test01_NavigationAndReadiness() {
-        beginSession()
+        // Long-string acceptance uses Foundation's standard pseudo-localization
+        // launch arguments. Stable identifiers keep the journey independent of
+        // translated labels; no product-only test route is involved.
+        beginSession(additionalArguments: [
+            "-NSDoubleLocalizedStrings", "YES",
+            "-NSShowNonLocalizedStrings", "YES",
+        ])
         defer { endSession() }
 
         for screen in VocelloMacScreen.allCases {

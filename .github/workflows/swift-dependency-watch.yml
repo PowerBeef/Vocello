@@ -1,0 +1,53 @@
+name: Swift dependency watch
+
+# Dependabot cannot inspect the root XcodeGen manifest. This scheduled lane is
+# deliberately read-only: it compares exact checked-in pins with stable GitHub
+# releases and open repository Dependabot alerts, then uploads a coordinated
+# review proposal. It never opens a PR, edits a pin, or claims compatibility.
+on:
+  schedule:
+    - cron: '41 14 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: read
+
+concurrency:
+  group: swift-dependency-watch
+  cancel-in-progress: false
+
+jobs:
+  inspect:
+    name: Inspect exact Swift pins
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Validate coordinated update policy
+        run: python3 scripts/swift_dependency_updates.py validate
+
+      - name: Build read-only release and advisory proposal
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          generated_at="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          python3 scripts/swift_dependency_updates.py report \
+            --repository "$GITHUB_REPOSITORY" \
+            --generated-at "$generated_at" \
+            --json-out "$RUNNER_TEMP/swift-dependency-watch.json" \
+            --markdown-out "$RUNNER_TEMP/swift-dependency-watch.md"
+          cat "$RUNNER_TEMP/swift-dependency-watch.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Retain proposal
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: swift-dependency-watch-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/swift-dependency-watch.json
+            ${{ runner.temp }}/swift-dependency-watch.md
+          if-no-files-found: error
+          retention-days: 14

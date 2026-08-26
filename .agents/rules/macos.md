@@ -140,6 +140,10 @@ scripts/macos_test.sh gate            # deterministic macOS platform gate
   semantics it protects (user cancel is `.cancelled`, never an error, never persisted).
 - **App sandbox disabled.** `Sources/QwenVoice.entitlements` keeps sandbox off for MLX; do not
   re-enable it.
+- **Entitlements are role-scoped and exact.** The app uses `QwenVoice.entitlements`; the engine XPC
+  uses the narrower `QwenVoiceEmbeddedRuntime.entitlements`; frameworks carry none. Update
+  `config/macos-entitlement-policy.json` only with a security review, and re-evaluate its MLX
+  exceptions whenever the reviewed MLX pins move.
 - **Do not sum unrelated memory peaks.** New memory-qualified macOS benchmark evidence pairs app
   and engine samples by absolute uptime within one 500 ms cadence. Independent per-process maxima
   are useful layer diagnostics but are not a valid total system peak.

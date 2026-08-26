@@ -46,11 +46,11 @@ public struct AudioMarkingConfiguration: Sendable {
     }
 }
 
-/// Registered debug override (`config/runtime-debug-knobs.json`): marking is
-/// default-on for every published WAV; `QWENVOICE_MARKING=off` under the
-/// `QWENVOICE_DEBUG` master gate disables both marks for evidence work that
-/// must compare against pre-marking baselines. There is no production path to
-/// an unmarked file.
+/// Registered internal override (`config/runtime-debug-knobs.json`): marking
+/// is default-on for every published WAV. `QWENVOICE_MARKING=off` disables
+/// both marks only when the binary carries `VOCELLO_INTERNAL_DIAGNOSTICS` and
+/// `QWENVOICE_DEBUG` enables overrides for that process. Distributed binaries
+/// omit that capability, so there is no production path to an unmarked file.
 public enum AudioMarkingPolicy {
     public static func resolvedEnabled(
         environment: [String: String] = ProcessInfo.processInfo.environment

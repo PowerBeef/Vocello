@@ -899,8 +899,9 @@ experiment below is a matrix run plus a paired comparison, pre-registered per
    57 surviving features against 33 over 12 paired seeds.** The benchmark's prediction held and the
    official-examples reading was wrong; see §9.1. Reproduce with
    `QWENVOICE_DEBUG=1 QWENVOICE_DELIVERY_INSTRUCTION_SET=short`, registered in
-   [`runtime-debug-knobs.json`](../../config/runtime-debug-knobs.json) and inert without the master
-   gate. **Do not retry this as a way to fix delivery**: the same run showed `happy`, `excited`,
+   [`runtime-debug-knobs.json`](../../config/runtime-debug-knobs.json) and available only in an
+   internal diagnostics build with the master gate. **Do not retry this as a way to fix delivery**:
+   the same run showed `happy`, `excited`,
    `neutral`, `dramatic.normal` and `surprised.normal` moved nothing under *either* form
    (`excited` and `dramatic` have since been retired, 2026-08-03), so the register is not the
    lever for the presets that failed.

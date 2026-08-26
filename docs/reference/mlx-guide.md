@@ -459,7 +459,26 @@ Only upgrade when:
 6. Keep the bump only if RTF, memory, and audioQC are unchanged or improved.
 7. If anything regresses, document the blocker and revert.
 
-### 9.4 Known 0.31.x gotchas
+### 9.4 Scheduled release and advisory watch
+
+The root XcodeGen manifest cannot be covered by Dependabot's Swift ecosystem directory model.
+`.github/workflows/swift-dependency-watch.yml` therefore performs a weekly, read-only comparison
+of all five coordinated exact pins against stable GitHub releases and the repository's open
+Dependabot alerts. It uploads a 14-day JSON/Markdown proposal and never edits a pin, creates a pull
+request, or treats availability as compatibility.
+
+`config/swift-dependency-update-policy.json` binds each package to its declaration, both applicable
+`Package.resolved` files, `COMPATIBILITY.json`, governance surfaces, and required evidence. Validate
+that binding locally with:
+
+```sh
+python3 scripts/swift_dependency_updates.py validate
+```
+
+Any proposal is only a maintainer review input. The authorization and full upgrade procedure above
+still apply, including MLX lockstep and measured audio/performance evidence.
+
+### 9.5 Known 0.31.x gotchas
 
 - `Quantizable.toQuantized` gains `mode: QuantizationMode`.
 - `quantize(model:groupSize:bits:)` becomes a top-level function with `mode:`.
@@ -510,8 +529,10 @@ Do not regress these without a maintainer decision:
 ### Environment variables
 
 `config/runtime-debug-knobs.json` is authoritative. Every production-affecting override below is
-read through `RuntimeDebugGate` and is inert unless `QWENVOICE_DEBUG=1`; bounded observability keys
-such as telemetry selection are classified separately and do not change synthesis policy.
+read through `RuntimeDebugGate` and requires both a repository-owned internal diagnostics build and
+`QWENVOICE_DEBUG=1`; distributed builds omit that compile capability. Bounded observability keys
+such as telemetry selection are classified separately and do not change synthesis policy. Internal
+generation telemetry retains override key names and a digest, never raw values.
 
 | Variable | Effect |
 |---|---|

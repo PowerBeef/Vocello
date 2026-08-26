@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "status": "characterizing-non-blocking",
+  "workflow": ".github/workflows/tsan.yml",
+  "command": "scripts/macos_test.sh tsan",
+  "derivedDataEntry": "xcode-macos-tsan-derived-data",
+  "subset": [
+    "VocelloCoreTests",
+    "VocelloEngineIntegrationTests"
+  ],
+  "excluded": {
+    "Qwen3RuntimeTests": "MLX and Metal stay under their single-owner deterministic suite; the scheduled TSan lane targets the stable CPU core and injectable XPC transport subset."
+  },
+  "characterization": {
+    "deadline": "2026-09-30",
+    "requiredConsecutivePassesForBlockingReview": 3,
+    "recordedConsecutivePasses": 1,
+    "openConfirmedRaceCount": 0,
+    "promotionRequiresMaintainerReview": true
+  }
+}

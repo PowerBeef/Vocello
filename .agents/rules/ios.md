@@ -6,6 +6,8 @@ sourceOfTruth:
   - scripts/ios_device.sh
   - scripts/ui_test.sh
   - scripts/build_foundation_targets.sh
+  - scripts/localization_contract.py
+  - config/localization-unlocalized-baseline.json
 ---
 # iOS domain rule
 
@@ -123,13 +125,22 @@ scripts/ios_device.sh gate            # deterministic physical-device/runtime pr
   physical-device SDK compile (app plus standalone policy-test bundle) is the sole no-phone iOS
   development lane. It still requires the selected Xcode's matching iOS Platform Support/runtime
   component; `scripts/lib/ios_platform_preflight.py check` verifies that external toolchain state
-  without running a Simulator. Xcode 26 cannot execute its app-host-free, tool-hosted XCTest bundle on a
-  physical-device destination, so the policy target is compile-only; runtime proof uses the
-  existing headless diagnostics and XCUITest lanes.
+  without running a Simulator. The same Foundation-level policy sources and 24 assertions execute
+  in ordinary macOS `VocelloCoreTests`; Xcode 26 cannot execute the duplicate app-host-free,
+  tool-hosted XCTest bundle on a physical-device destination, so that iOS target is compile-only.
+  Runtime proof still uses the existing headless diagnostics and XCUITest lanes.
 - **Typed cancellation barrier.** The in-process `MLXTTSEngine` conforms to
   `ActiveGenerationCancellable`. iOS forwards user and memory-pressure reasons, awaits the active
   task's terminal barrier before trim/unload or ownership release, and treats `.cancelled` as a
   distinct terminal event. A cancelled take must never land in History.
+- **Attempt-scoped Studio terminal state.** Every Studio start returns one attempt token. Live,
+  success, failure, deferred cleanup, and cancellation-barrier callbacks must match the current
+  token; stale callbacks, overlapping starts, and duplicate cancellation requests are rejected.
+  Never restore unscoped terminal setters or swallow a cancellation-barrier failure.
+- **One short-form generation executor.** Built-in, Design, and Clone views retain typed request
+  assembly and mode-specific preparation, but common timeline, engine, cancellation cleanup,
+  playback, persistence, and export sequencing belongs to `IOSSingleTakeGenerationExecutor`.
+  Do not fork that lifecycle back into individual mode views.
 - **Use `IOSScrollView`.** iOS vertical scroll surfaces use `IOSScrollView`, not raw `ScrollView`.
 - **Mode color pairs with icon/label/position.** No color-only signal.
 - **Honor Reduce Motion / Reduce Transparency.** Animations route through `appAnimation` /
@@ -152,6 +163,13 @@ scripts/ios_device.sh gate            # deterministic physical-device/runtime pr
   (`.withoutCloneEncoders`) depending on the entitled memory limit.
 - **`accessibilityIdentifier`s are stable.** Values like `voicesRow_*`, `textInput_*`,
   `studioChip_*` must survive refactors.
+- **Localization grows through typed catalog entries.** Dynamic errors/status belong in
+  `VocelloPresentationText` and `Sources/Resources/Localizable.xcstrings`, with complete format
+  strings, translator context, and plural rules. `scripts/localization_contract.py` rejects new
+  direct presentation literals against `config/localization-unlocalized-baseline.json`; do not
+  refresh that baseline without reviewing the new copy. Before broad translations, run the macOS
+  pseudo-localization smoke and the physical-iPhone `Pseudo-AX-XXXL` Settings walk documented in
+  [`docs/reference/localization.md`](../../docs/reference/localization.md).
 - **No hidden test UI.** XCUITest observes genuine visible controls. Put test-only code in the UI
   test target; do not add preview routes, invisible state markers, onboarding bypasses, seeded UI
   text, or generic `#if DEBUG` app behavior.

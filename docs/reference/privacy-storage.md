@@ -23,8 +23,8 @@ Debug builds use a separate persistent development root so models, saved voices,
 ~/Library/Application Support/QwenVoice-Debug/
 ```
 
-With the `QWENVOICE_DEBUG` master gate enabled, the macOS app also honors this hermetic diagnostic
-override; shipped production behavior ignores it:
+Repository-built internal diagnostics binaries honor this hermetic macOS override only with the
+`QWENVOICE_DEBUG` master gate enabled; distributed builds cannot enable it:
 
 ```sh
 QWENVOICE_APP_SUPPORT_DIR=/path/to/custom/app-support
@@ -45,8 +45,13 @@ Maintained macOS subtrees and preferences:
 - Reference-clip **recording** (macOS, 2026-06) uses two short-lived directories under the system temporary directory: `voice-clone-references/` holds the in-progress capture and `voice-enroll/` holds a stable copy while the private candidate is prepared. Both are deleted as part of enrollment/cancel; only an explicitly committed candidate moves into `voices/`.
 - `history.sqlite` stores local generation history. Database initialization, migration, read,
   write, or delete failures are typed and fail closed: the UI shows a degraded state and disables
-  destructive history actions instead of presenting an unavailable database as empty. macOS retries
-  on reload or re-entry; it does not currently expose a dedicated Retry button.
+  destructive history actions instead of presenting an unavailable database as empty.
+- `history-outbox/` durably couples each atomically published WAV to its pending History write.
+  The local schema-v1 JSON entry contains the generation record and is removed only after an
+  idempotent SQLite commit. Startup and History entry reconcile it; the macOS recovery banner
+  exposes Retry, Reveal Audio, and Export Audio without putting script or path data in telemetry.
+  A separate atomic clear transaction deletes database rows before pending entries or WAVs, so a
+  database failure cannot leave live History rows pointing to files clear-all already removed.
 - Active macOS model-quality choices are stored in app preferences, keyed per generation mode. `DebugMode` isolates preferences to `com.qwenvoice.app.debug`; Release builds use `UserDefaults.standard`.
 
 Delete local macOS app data by quitting the app and removing the app support root or the specific
@@ -67,8 +72,8 @@ Its shared container is rooted under the app-owned `Vocello` subtree and is mana
 
 The May 2026 iOS identity rename moved pre-release storage from the old QVoice App Group to this Vocello App Group without migration, so device builds after the rename start with fresh iPhone data.
 
-With the `QWENVOICE_DEBUG` master gate enabled, the iPhone app also honors this hermetic diagnostic
-override; shipped production behavior ignores it:
+Repository-built internal diagnostics binaries honor this hermetic iPhone override only with the
+`QWENVOICE_DEBUG` master gate enabled; distributed builds cannot enable it:
 
 ```sh
 QVOICE_APP_SUPPORT_DIR=/path/to/custom/app-support
@@ -100,6 +105,10 @@ Maintained iPhone subtrees:
   write, or delete failures are typed and fail closed: the UI shows a degraded state with a visible
   Retry action and disables destructive history actions instead of presenting an unavailable database
   as empty.
+- `history-outbox/` uses the same schema-v1 atomic publication/commit/reconciliation protocol as
+  macOS. The iPhone recovery banner exposes Retry and an explicit system share/export action for
+  available pending audio. Clear-all is resumable and database-first; its local marker remains until
+  every requested pending-entry and audio cleanup has completed.
 
 The iPhone app intentionally keeps shared state constrained to the App Group app-support subtree. It does not use a parallel shared-user-defaults channel for model or voice state.
 
@@ -149,6 +158,7 @@ block byte-for-byte, so a manifest change cannot silently leave documentation st
 | Path | Owner | Class | Cleanup | Retention |
 | --- | --- | --- | --- | --- |
 | `build/cache/xcode/macos/` | macOS build and XCUITest lanes | `cache` | `aggressive` | Persistent incremental macOS Xcode cache |
+| `build/cache/xcode/macos-tsan/` | Scheduled macOS ThreadSanitizer characterization lane | `cache` | `aggressive` | Isolated incremental macOS ThreadSanitizer Xcode cache |
 | `build/cache/xcode/ios-device/` | Physical-device iOS build and XCUITest lanes | `cache` | `aggressive` | Persistent incremental physical-device Xcode cache |
 | `build/cache/xcode/source-packages/` | Serialized Xcode SwiftPM resolver | `cache` | `aggressive` | Shared pinned Xcode package checkout and artifact store |
 | `build/cache/swiftpm/mlx-audio-runtime/` | Owned Vocello Qwen3 Core SwiftPM commands | `cache` | `aggressive` | Persistent package-specific SwiftPM scratch cache |

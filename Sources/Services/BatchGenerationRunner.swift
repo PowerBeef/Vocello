@@ -122,11 +122,11 @@ protocol GenerationPersisting {
 
 extension DatabaseService: GenerationPersisting {
     func saveGeneration(_ generation: Generation) async throws -> Generation {
-        try await saveGenerationAsync(generation)
+        try await GenerationHistoryRecovery.persist(generation)
     }
 
     func replaceLongFormJoinedGeneration(_ generation: Generation) async throws -> Generation {
-        try await replaceLongFormJoinedGenerationAsync(generation)
+        try await GenerationHistoryRecovery.persist(generation, operation: .replaceLongFormJoined)
     }
 }
 

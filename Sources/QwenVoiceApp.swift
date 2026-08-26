@@ -134,6 +134,7 @@ struct QwenVoiceApp: App {
         }
         .onAppear {
             appStartupCoordinator.setupAppSupport()
+            reconcilePendingHistory()
             startSelectedTTSEngineIfNeeded()
             appStartupCoordinator.refreshLaunchDiagnostics()
             AppLaunchConfiguration.openSettingsWindowIfNeeded()
@@ -148,6 +149,19 @@ struct QwenVoiceApp: App {
 
     static var modelsDir: URL { AppPaths.modelsDir }
     static var outputsDir: URL { AppPaths.outputsDir }
+
+    private func reconcilePendingHistory() {
+        Task { @concurrent in
+            let result = await GenerationHistoryRecovery.reconcile()
+            guard !result.committed.isEmpty || result.snapshot.needsAttention else { return }
+            await MainActor.run {
+                for generation in result.committed {
+                    GenerationLibraryEvents.shared.announceGenerationAppended(generation)
+                }
+                NotificationCenter.default.post(name: .generationHistoryRecoveryChanged, object: nil)
+            }
+        }
+    }
 
     private func startSelectedTTSEngineIfNeeded() {
         guard appEngineSelection.requiresManualInitialization() else { return }

@@ -50,10 +50,11 @@ the product's single version authority. `scripts/cli_version_contract.py` valida
 settings and the built executable; an unsupported bare `swiftc` build without embedded metadata
 reports `unknown` rather than a stale numeric version.
 
-By default the CLI uses the app's runtime data directory
-(`~/Library/Application Support/QwenVoice`, or `QwenVoice-Debug` when `QWENVOICE_DEBUG` is truthy);
-`--data-dir <path>` overrides it. `bench` defaults to the debug-isolated folder (which holds the full
-model set) and forces telemetry on.
+By default the CLI uses the app's runtime data directory (`~/Library/Application Support/QwenVoice`).
+A repository-built internal CLI uses `QwenVoice-Debug` when `QWENVOICE_DEBUG` is truthy;
+distributed builds cannot activate that environment override. `--data-dir <path>` remains the
+explicit CLI interface. `bench` defaults to the debug-isolated folder (which holds the full model
+set) and forces telemetry on.
 
 ## Conventions
 

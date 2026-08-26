@@ -51,6 +51,7 @@ T1 hook and on every push through CI. None of it needs a model, a device, or XCU
 | Check | Class | Guards |
 | --- | --- | --- |
 | `build_output_policy.py validate` | omission + integrity | Every directory under `build/` is governed at any depth; heavy-lane free-space floors |
+| `localization_contract.py validate` | omission + contradiction | String Catalog settings/context/plurals, typed dynamic presentation use, pseudo-localization coverage, and content-addressed rejection of new direct UI literals |
 | `documentation_contract.py` | contradiction | Doc lifecycle groups, link and anchor resolution, public-fact consistency |
 | `doc_metadata.py validate` | contradiction + drift + integrity | Per-file status, pinned bodies, derived-fact contradictions in docs, `AGENTS.md`, and `README.md` |
 | `check_surface_coverage.py` | omission | Every enforced gate and contract is named in guidance; the optional-assists section survives |
@@ -138,6 +139,11 @@ confidence becomes misplaced.
    clean checkout — that exact split broke `main` on 2026-08-02.
 5. **Name it in `AGENTS.md` or a domain rule**, or `check_surface_coverage.py` will fail —
    deliberately, since a gate no guidance mentions is invisible to anyone reading the docs.
+
+The root Swift dependency watch follows this pattern: `swift_dependency_updates.py` validates exact
+pin agreement without network access in the deterministic gate, while its scheduled workflow uses
+release/advisory data only to produce a read-only coordinated review proposal. Availability never
+authorizes a pin change.
 
 ## Related
 

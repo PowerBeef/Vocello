@@ -1,9 +1,9 @@
 import Foundation
 import QwenVoiceCore
 
-/// App-target view of the one explicit process-local runtime debug gate.
-/// Release builds retain diagnostic code, but production-affecting overrides are
-/// inert unless the launching process explicitly sets `QWENVOICE_DEBUG`.
+/// App-target view of the process-local runtime debug gate. Behavior-changing
+/// overrides require an internal diagnostics build plus an explicit
+/// `QWENVOICE_DEBUG` launch opt-in; distributed builds have no such capability.
 enum DebugMode {
     static let isEnabled = RuntimeDebugGate.isEnabled()
 }

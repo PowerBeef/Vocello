@@ -12,9 +12,10 @@ import Foundation
 ///   aborts with nothing else touched. A subsequent audio-file removal
 ///   failure is a warning outcome, never a rollback — the row is gone and
 ///   the audio stays on disk.
-/// - Clear-all sweeps audio files from a fresh database fetch (not the
-///   loaded list) so rows written by other sessions are covered; per-file
-///   failures are counted, never abort; the row wipe runs after the sweep.
+/// - Clear-all captures audio paths from a fresh database fetch (not the
+///   loaded list), wipes the rows, and only then removes files. A database
+///   failure therefore cannot leave live rows pointing at deleted audio;
+///   later per-file failures are counted and reported as cleanup warnings.
 public struct HistoryDeletionEngine: Sendable {
     public enum SingleOutcome: Equatable, Sendable {
         case deleted
@@ -79,16 +80,15 @@ public struct HistoryDeletionEngine: Sendable {
     public func clearAll(deleteAudio: Bool) throws -> ClearAllOutcome {
         var failures = 0
         do {
-            if deleteAudio {
-                for path in try audioPathsForAllRecords() where fileExists(path) {
-                    do {
-                        try removeFile(path)
-                    } catch {
-                        failures += 1
-                    }
+            let paths = deleteAudio ? try audioPathsForAllRecords() : []
+            try deleteAllRecords()
+            for path in paths where fileExists(path) {
+                do {
+                    try removeFile(path)
+                } catch {
+                    failures += 1
                 }
             }
-            try deleteAllRecords()
         } catch {
             throw ClearAllError.database(error.localizedDescription)
         }

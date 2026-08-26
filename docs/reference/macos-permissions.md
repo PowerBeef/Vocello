@@ -136,7 +136,8 @@ application's microphone and speech permissions above.
 ## Virtual microphone (registered debug knob)
 
 `QWENVOICE_FAKE_MIC_WAV` is a registered input-substitution knob
-(`config/runtime-debug-knobs.json`, master-gated behind `QWENVOICE_DEBUG`). When both are set and
+(`config/runtime-debug-knobs.json`) available only in an internal diagnostics build with
+`QWENVOICE_DEBUG`. When both are set and
 the path points at a readable audio file, `ReferenceClipRecorder` simulates capture: elapsed time
 and level-meter values come from the clip's real amplitude envelope, auto-stop fires at clip end or
 the 20 s cap, and stop-and-save delivers a copy of the clip — so the record→review→enroll flow runs
@@ -144,7 +145,7 @@ end to end with no input hardware and no mic TCC prompt. The recording XCUITest 
 knob with a synthesized speech-like clip; the flow it drives is the genuine visible recording sheet,
 and it deliberately cancels at the review stage — accepting a clip starts transcript auto-fill,
 whose speech-recognition TCC dialog only a human may answer (see "Manual testing / TCC caveat").
-Inert in production: the knob is ignored without the master gate, which Finder launches never set.
+Unavailable in distributed builds: process environment cannot grant the compile capability.
 
 ## Manual testing / TCC caveat
 

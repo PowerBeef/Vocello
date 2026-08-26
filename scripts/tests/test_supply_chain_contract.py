@@ -27,17 +27,74 @@ class SupplyChainContractTests(unittest.TestCase):
         (self.root / "config/toolchain.json").write_text(json.dumps({
             "schemaVersion": 1,
             "native": {}, "release": {}, "website": {},
-            "actions": {"actions/checkout": {"version": "v4", "sha": self.sha}},
+            "actions": {
+                "actions/checkout": {"version": "v4", "sha": self.sha},
+                "actions/upload-artifact": {"version": "v4", "sha": self.sha},
+            },
         }), encoding="utf-8")
-        workflow = """on:\n  push:\n    tags: ['v*']\nsteps:\n  - name: Verify release tag and source identity\n    uses: actions/checkout@%s # v4\n  - name: Generate and validate release evidence\n  - name: Attest verified DMG provenance\n  - name: Create or reuse draft GitHub Release\n  - name: Reset draft Release assets\n    run: gh release view \"$RELEASE_TAG\" --json assets && gh release delete-asset \"$RELEASE_TAG\" stale --yes\n  - name: Upload verified assets to draft Release\n  - name: Verify downloaded Release assets\n    run: echo \"unexpected or missing draft Release assets\"\n  - name: Run process-bound iOS release readiness\n    run: python3 scripts/required_step_ledger.py run --step platform-readiness -- bash -euo pipefail -c 'scripts/macos_test.sh gate && ./scripts/build_foundation_targets.sh ios'\n  - name: Archive VocelloiOS\n  - name: Export App Store IPA\n  - name: Verify exported IPA identity and signing contract\n    run: python3 scripts/required_step_ledger.py run --step ipa-verification -- python3 scripts/verify_ios_release_artifacts.py --output ios-release-artifact-verification.json\n  - name: Generate and validate iOS release evidence\n""" % self.sha
+        workflow = """on:
+  push:
+    tags: ['v*']
+jobs:
+  source-authority:
+    permissions:
+      contents: read
+      checks: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@%s # v4
+      - run: |
+          git merge-base --is-ancestor "$commit" origin/main
+          gh api repos/${GITHUB_REPOSITORY}/git/ref/tags/${RELEASE_TAG}
+          gh api repos/${GITHUB_REPOSITORY}/git/tags/${tag_object}
+          gh api --paginate --slurp "repos/${GITHUB_REPOSITORY}/commits/${commit}/check-runs?filter=latest&per_page=100"
+          python3 scripts/release_source_authority.py
+          python3 scripts/release_evidence.py verify-source
+  package:
+    needs: source-authority
+    runs-on: macos-26
+    steps:
+      - name: Verify release tag and source identity
+      - name: Generate and validate release evidence
+      - name: Attest verified DMG provenance
+      - name: Create or reuse draft GitHub Release
+      - name: Reset draft Release assets
+        run: gh release view "$RELEASE_TAG" --json assets && gh release delete-asset "$RELEASE_TAG" stale --yes
+      - name: Upload verified assets to draft Release
+      - name: Verify downloaded Release assets
+        run: echo "unexpected or missing draft Release assets"
+      - name: Verify packaged DMG
+        run: ./scripts/verify_packaged_dmg.sh artifact.dmg metadata.txt
+      - name: Run process-bound iOS release readiness
+        run: python3 scripts/required_step_ledger.py run --step platform-readiness -- bash -euo pipefail -c 'scripts/macos_test.sh gate && ./scripts/build_foundation_targets.sh ios'
+      - name: Archive VocelloiOS
+      - name: Export App Store IPA
+      - name: Verify exported IPA identity and signing contract
+        run: python3 scripts/required_step_ledger.py run --step ipa-verification -- python3 scripts/verify_ios_release_artifacts.py --output ios-release-artifact-verification.json
+      - name: Generate and validate iOS release evidence
+  compile-ios:
+    needs: source-authority
+  archive-ios:
+    needs: source-authority
+""" % self.sha
         (self.root / ".github/workflows/release.yml").write_text(workflow, encoding="utf-8")
         promotion = """on:
   workflow_dispatch:
     inputs:
       tag:
+permissions:
+  contents: write
+  checks: read
 steps:
-  - name: Verify tag and draft state
+  - name: Checkout
     uses: actions/checkout@%s # v4
+  - name: Verify tag and draft state
+    run: |
+      git merge-base --is-ancestor "$commit" origin/main
+      gh api repos/${GITHUB_REPOSITORY}/git/ref/tags/${RELEASE_TAG}
+      gh api repos/${GITHUB_REPOSITORY}/git/tags/${tag_object}
+      gh api --paginate --slurp "repos/${GITHUB_REPOSITORY}/commits/${commit}/check-runs?filter=latest&per_page=100"
+      python3 scripts/release_source_authority.py
   - name: Download and validate candidate plus promotion evidence
     run: |
       test -f quality-promotion.json
@@ -56,21 +113,39 @@ on:
     - cron: '23 8 * * 2'
   workflow_dispatch:
 jobs:
+  changes:
+    name: Security path routing
+    outputs:
+      native: ${{ steps.classify.outputs.native }}
+      website: ${{ steps.classify.outputs.website }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@%s
+      - id: classify
+        run: |
+          git diff --name-only "origin/$BASE_REF...HEAD"
+          git diff --name-only "$BEFORE_SHA..$HEAD_SHA"
+  dependency-review:
+    steps: []
   swift-dependency-submission:
     if: github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@%s
+      - name: Checkout
+        uses: actions/checkout@%s
       - run: python3 scripts/swift_dependency_snapshot.py > "$RUNNER_TEMP/swift-dependency-snapshot.json"
       - run: gh api repos/example/project/dependency-graph/snapshots --input "$RUNNER_TEMP/swift-dependency-snapshot.json"
   npm-advisory-audit:
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    needs: changes
+    if: needs.changes.outputs.website == 'true'
     permissions:
       contents: read
     steps:
       - run: npm --prefix website audit --package-lock-only --audit-level=high
   codeql:
+    needs: changes
+    if: needs.changes.outputs.native == 'true' || needs.changes.outputs.website == 'true'
     runner: macos-26
     steps:
       - name: Select and validate native toolchain
@@ -90,8 +165,51 @@ jobs:
         if: matrix.language == 'swift'
         run: ./scripts/build.sh codeql
       - name: Analyze
-""" % self.sha
+  security-required:
+    name: Security required
+    needs: [changes, dependency-review, swift-dependency-submission, npm-advisory-audit, codeql]
+    if: always()
+    steps:
+      - run: grep -Eq '"result": *"(failure|cancelled)"'
+""" % (self.sha, self.sha)
         (self.root / ".github/workflows/security.yml").write_text(security, encoding="utf-8")
+        dependency_watch = """name: Swift dependency watch
+on:
+  schedule:
+    - cron: '41 14 * * 1'
+  workflow_dispatch:
+permissions:
+  contents: read
+  security-events: read
+jobs:
+  inspect:
+    steps:
+      - name: Checkout
+        uses: actions/checkout@%s
+      - run: python3 scripts/swift_dependency_updates.py validate
+      - run: |
+          python3 scripts/swift_dependency_updates.py report --repository "$GITHUB_REPOSITORY" --generated-at 2026-08-26T00:00:00Z --json-out "$RUNNER_TEMP/swift-dependency-watch.json" --markdown-out "$RUNNER_TEMP/swift-dependency-watch.md"
+      - name: Retain proposal
+        uses: actions/upload-artifact@%s
+        with:
+          path: |
+            ${{ runner.temp }}/swift-dependency-watch.json
+            ${{ runner.temp }}/swift-dependency-watch.md
+          retention-days: 14
+""" % (self.sha, self.sha)
+        (self.root / ".github/workflows/swift-dependency-watch.yml").write_text(
+            dependency_watch, encoding="utf-8"
+        )
+        (self.root / "config/swift-dependency-update-policy.json").write_text(json.dumps({
+            "schemaVersion": 1,
+            "packages": [
+                {"identity": identity}
+                for identity in (
+                    "grdb.swift", "mlx-swift", "mlx-swift-lm",
+                    "swift-huggingface", "swift-transformers",
+                )
+            ],
+        }), encoding="utf-8")
         (self.root / "scripts/build.sh").write_text(
             '\n'.join((
                 '#!/usr/bin/env bash',
@@ -165,6 +283,19 @@ jobs:
             )),
             encoding="utf-8",
         )
+        (self.root / "scripts/verify_release_bundle.sh").write_text(
+            '\n'.join((
+                'SKIP_LAUNCH_SMOKE="${QWENVOICE_SKIP_LAUNCH_SMOKE:-0}"',
+                'if [ "$SKIP_LAUNCH_SMOKE" = "1" ] && [ "${CI:-}" = "true" ]; then exit 1; fi',
+                '/usr/bin/open -n "$APP_PATH"',
+                'echo "did not remain running long enough to pass startup smoke"',
+            )),
+            encoding="utf-8",
+        )
+        (self.root / "scripts/verify_packaged_dmg.sh").write_text(
+            '"$SCRIPT_DIR/verify_release_bundle.sh" "$COPIED_APP"\n',
+            encoding="utf-8",
+        )
         (self.root / ".github/dependabot.yml").write_text(
             '\n'.join(f'package-ecosystem: "{value}"' for value in ("github-actions", "npm", "swift")),
             encoding="utf-8",
@@ -176,7 +307,9 @@ jobs:
             "SECURITY.md", ".github/CODEOWNERS", ".github/ISSUE_TEMPLATE/bug_report.yml",
             ".github/ISSUE_TEMPLATE/feature_request.yml", ".github/ISSUE_TEMPLATE/config.yml",
             "scripts/release_evidence.py", "scripts/release_sbom.py",
+            "scripts/release_source_authority.py",
             "scripts/swift_dependency_snapshot.py",
+            "scripts/swift_dependency_updates.py",
             "scripts/verify_ios_release_artifacts.py",
         ):
             contents = "fixture\n"
@@ -184,6 +317,16 @@ jobs:
                 contents = "\n".join((
                     "QwenVoice.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved",
                     "Packages/VocelloQwen3Core/Package.resolved",
+                ))
+            elif relative == "scripts/release_source_authority.py":
+                contents = "\n".join((
+                    'DEFAULT_REQUIRED_CHECKS = ("CI required", "Security required")',
+                    'reference_object.get("type") != "tag"',
+                    'verification.get("verified") is not True',
+                    'verification.get("reason") != "valid"',
+                    'row.get("head_sha") == commit',
+                    'latest.get("status") != "completed"',
+                    'latest.get("conclusion") != "success"',
                 ))
             (self.root / relative).write_text(contents, encoding="utf-8")
 
@@ -230,6 +373,38 @@ jobs:
         text = path.read_text(encoding="utf-8")
         path.write_text(text.replace("gh release delete-asset", "echo skip-delete"), encoding="utf-8")
         self.assertTrue(any("exact draft asset set" in value for value in module.validate(self.root)))
+
+    def test_macos_release_must_run_packaged_launch_smoke_on_macos_26(self) -> None:
+        path = self.root / ".github/workflows/release.yml"
+        text = path.read_text(encoding="utf-8")
+        path.write_text(text.replace("runs-on: macos-26", "runs-on: macos-15", 1), encoding="utf-8")
+        self.assertTrue(any("packaging must run on macos-26" in value for value in module.validate(self.root)))
+
+        path.write_text(
+            text.replace(
+                "    runs-on: macos-26\n",
+                "    runs-on: macos-26\n    env:\n      QWENVOICE_SKIP_LAUNCH_SMOKE: \"1\"\n",
+                1,
+            ),
+            encoding="utf-8",
+        )
+        self.assertTrue(any("must not bypass" in value for value in module.validate(self.root)))
+
+        path.write_text(text.replace("./scripts/verify_packaged_dmg.sh", "./scripts/skip_dmg_verification.sh"), encoding="utf-8")
+        self.assertTrue(any("must verify the packaged DMG" in value for value in module.validate(self.root)))
+
+    def test_packaged_launch_contract_cannot_be_weakened(self) -> None:
+        bundle = self.root / "scripts/verify_release_bundle.sh"
+        text = bundle.read_text(encoding="utf-8")
+        bundle.write_text(text.replace('[ "${CI:-}" = "true" ]', '[ "${CI:-}" = "false" ]'), encoding="utf-8")
+        self.assertTrue(any("reject CI bypass" in value for value in module.validate(self.root)))
+
+        bundle.write_text(text.replace('/usr/bin/open -n "$APP_PATH"', 'echo skip-launch'), encoding="utf-8")
+        self.assertTrue(any("launch the external app bundle" in value for value in module.validate(self.root)))
+
+        dmg = self.root / "scripts/verify_packaged_dmg.sh"
+        dmg.write_text("echo skip-bundle-verification\n", encoding="utf-8")
+        self.assertTrue(any("launch-check the extracted app" in value for value in module.validate(self.root)))
 
     def test_ios_export_must_be_verified_before_evidence(self) -> None:
         path = self.root / ".github/workflows/release.yml"
@@ -294,18 +469,61 @@ jobs:
         path.write_text(text.replace("      contents: write", "      contents: write\n      actions: write", 1), encoding="utf-8")
         self.assertTrue(any("only contents:write" in value for value in module.validate(self.root)))
 
-    def test_npm_advisory_audit_cannot_run_on_ordinary_push(self) -> None:
+    def test_root_swift_dependency_watch_cannot_write_repository_state(self) -> None:
+        path = self.root / ".github/workflows/swift-dependency-watch.yml"
+        text = path.read_text(encoding="utf-8")
+        path.write_text(text.replace("contents: read", "contents: write", 1), encoding="utf-8")
+        self.assertTrue(any("must remain read-only" in value for value in module.validate(self.root)))
+
+    def test_root_swift_dependency_watch_must_retain_the_coordinated_report(self) -> None:
+        path = self.root / ".github/workflows/swift-dependency-watch.yml"
+        text = path.read_text(encoding="utf-8")
+        path.write_text(text.replace("retention-days: 14", "retention-days: 1", 1), encoding="utf-8")
+        self.assertTrue(any("retention-days: 14" in value for value in module.validate(self.root)))
+
+    def test_root_swift_dependency_policy_must_cover_every_exact_pin(self) -> None:
+        path = self.root / "config/swift-dependency-update-policy.json"
+        value = json.loads(path.read_text(encoding="utf-8"))
+        value["packages"] = value["packages"][:-1]
+        path.write_text(json.dumps(value), encoding="utf-8")
+        self.assertTrue(any("every coordinated exact pin" in value for value in module.validate(self.root)))
+
+    def test_npm_advisory_audit_must_follow_website_path_routing(self) -> None:
         path = self.root / ".github/workflows/security.yml"
         text = path.read_text(encoding="utf-8")
         path.write_text(
             text.replace(
-                "if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'",
-                "if: github.event_name != 'pull_request'",
+                "if: needs.changes.outputs.website == 'true'",
+                "if: github.event_name == 'schedule'",
                 1,
             ),
             encoding="utf-8",
         )
-        self.assertTrue(any("audit must run only" in value for value in module.validate(self.root)))
+        self.assertTrue(any("website-relevant" in value for value in module.validate(self.root)))
+
+    def test_security_required_aggregate_is_mandatory(self) -> None:
+        path = self.root / ".github/workflows/security.yml"
+        text = path.read_text(encoding="utf-8")
+        path.write_text(text.replace("    name: Security required", "    name: Security advisory"), encoding="utf-8")
+        self.assertTrue(any("Security required aggregate" in value for value in module.validate(self.root)))
+
+    def test_release_source_authority_is_mandatory(self) -> None:
+        path = self.root / ".github/workflows/release.yml"
+        text = path.read_text(encoding="utf-8")
+        path.write_text(
+            text.replace("          python3 scripts/release_source_authority.py", "          echo skip-authority"),
+            encoding="utf-8",
+        )
+        self.assertTrue(any("exact-source control" in value for value in module.validate(self.root)))
+
+    def test_promotion_rechecks_signed_exact_sha_authority(self) -> None:
+        path = self.root / ".github/workflows/promote-release.yml"
+        text = path.read_text(encoding="utf-8")
+        path.write_text(
+            text.replace("      python3 scripts/release_source_authority.py", "      echo skip-authority"),
+            encoding="utf-8",
+        )
+        self.assertTrue(any("signed exact-SHA control" in value for value in module.validate(self.root)))
 
     def test_swift_codeql_tooling_must_stay_pinned_and_brew_free(self) -> None:
         path = self.root / ".github/workflows/security.yml"

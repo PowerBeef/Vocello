@@ -78,9 +78,18 @@ final class DatabaseService: @unchecked Sendable {
     /// auto-assigned `id` without an `inout` parameter (unsendable in
     /// async contexts).
     func saveGenerationAsync(_ generation: Generation) async throws -> Generation {
+        try await saveGenerationIfMissingAsync(generation)
+    }
+
+    func saveGenerationIfMissingAsync(_ generation: Generation) async throws -> Generation {
         let dbQueue = try requireQueue(for: .write)
         do {
             return try await dbQueue.write { db in
+                if let existing = try Generation
+                    .filter(Generation.Columns.audioPath == generation.audioPath)
+                    .fetchOne(db) {
+                    return existing
+                }
                 var copy = generation
                 try copy.save(db)
                 return copy
@@ -93,9 +102,18 @@ final class DatabaseService: @unchecked Sendable {
     /// Deletes any existing joined-output row for the generation's long-form
     /// project, then saves the new one — one joined record per project.
     func replaceLongFormJoinedGenerationAsync(_ generation: Generation) async throws -> Generation {
+        try await replaceLongFormJoinedGenerationIfMissingAsync(generation)
+    }
+
+    func replaceLongFormJoinedGenerationIfMissingAsync(_ generation: Generation) async throws -> Generation {
         let dbQueue = try requireQueue(for: .write)
         do {
             return try await dbQueue.write { db in
+                if let existing = try Generation
+                    .filter(Generation.Columns.audioPath == generation.audioPath)
+                    .fetchOne(db) {
+                    return existing
+                }
                 if let projectID = generation.longFormProjectID {
                     try db.execute(
                         sql: "DELETE FROM generations WHERE longFormProjectID = ? AND longFormRole = 'joined'",

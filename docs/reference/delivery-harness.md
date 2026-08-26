@@ -55,7 +55,7 @@ the script self-test suite via `scripts/check_test_workflows.sh`.
 | `scripts/custom_delivery_matrix.py` | Resumable, fail-closed 9-speaker × 8-shipped-preset screen with exact instruction receipts, typed failure preservation, rejected-WAV analysis, speaker-balanced reporting, held-speaker separability, and paired same-seed arm comparison | `test_custom_delivery_matrix.py` |
 | `scripts/delivery_experiment.py` | Validates and compiles the six registered prompt arms, multilingual split-safe corpus, factorial sampling profiles, stable digests, and bounded seed-power plan | `test_delivery_experiment.py` |
 | `scripts/delivery_experiment_runner.py` | Source-bound, serial and resumable CLI experiment runner; seals the binary, exact instructions, corpus, sampling, seeds, receipts, audio digests, failures, and analysis layers without publishing | `test_delivery_experiment_runner.py` |
-| `scripts/delivery_prompt_remediation.py` | Pre-registered per-preset automatic acoustic screen: exact candidate digests, shared neutral controls, temporal-first scoring, competing-preset distance, paired bootstrap and typed abstention without semantic or publication authority | `test_delivery_prompt_remediation.py` |
+| `scripts/delivery_prompt_remediation.py` | Pre-registered per-preset automatic acoustic screen: exact candidate digests, shared neutral controls, independently calibrated bounded-magnitude scoring, signed target-over-competitor margins, paired bootstrap, explicit legacy recomposition, and typed abstention without semantic or publication authority | `test_delivery_prompt_remediation.py` |
 | `scripts/delivery_calibration_session.py` | Builds and merges v1 calibration packets; its versioned v2 commands add per-listener shuffle, repeats, anchors, uncertainty, confidence, replay/latency, 2AFC, naturalness and intensity without weakening v1 | `test_delivery_calibration_session.py`, `test_delivery_listener_calibration_v2.py` |
 | `scripts/delivery_evaluator.py` | Preserves ridge-v1 and exposes versioned v2 commands for preset-specific pairwise heads, elastic-net/PLS challengers, blocked validation, conformal intervals, OOD and typed abstention | `test_delivery_evaluator.py`, `test_delivery_evaluator_v2.py` |
 | `scripts/delivery_analysis_cache.py` | Content-addressed, atomic analysis cache keyed by original and canonical audio plus exact analyzer/model/preprocessing provenance; cache hits launch no model | `test_delivery_analysis_cache.py` |
@@ -466,10 +466,31 @@ temporal feature extraction. Surprised is temporal-first (early onset-to-peak, l
 abruptness, and settling); Fearful emphasizes tremor, local rises, tension/arousal, urgent cadence,
 and separation from Sad. Missing/non-finite features abstain rather than disappearing.
 
+Scoring schema v2 corrects two weaknesses found in the first decision composer. A feature no longer
+receives full credit merely because it moved by any positive amount in the expected direction.
+Each feature instead uses an acoustic magnitude band reproduced from the independent 64-row
+pre-candidate cohort (`a111cbaf...dff2`): credit starts at the absolute q25 noise floor (with a
+0.1×-median positive floor), reaches full credit at the absolute median, stays bounded through twice
+the largest observed movement, and then loses credit as an overdrive penalty. These bands calibrate
+measurement scale only; they are not emotion labels and have no perceptual authority.
+
+The competing-preset guard now reports the signed `target score - competitor score` margin. It
+requires the target median to rank strictly above the competitor, forbids a median-margin regression,
+and forbids an increased wrong-order rate. The v1 absolute distance discarded ordering and could
+mistake a higher-scoring competitor for successful separation. Decision schema v2 replaces that
+field with `competingPresetSeparation` and retains per-feature credit/classification rows so tiny,
+wrong-direction, full-credit, and overdriven movements remain auditable. A failed planned take stays
+as zero in the registered denominator and is governed by the completion/hard-failure rules; a
+completed take with no analysis remains a fail-closed out-of-distribution error.
+Every stage, including the initial screen, now requires positive lower confidence bounds for both
+the bounded feature score and deterministic adherence delta before a candidate can advance.
+
 Run one registered stage serially:
 
 ```sh
 python3 scripts/delivery_prompt_remediation.py validate
+python3 scripts/delivery_prompt_remediation.py verify-calibration \
+  --acoustic-layer build/artifacts/macos/delivery-evaluator-v2/<run>/acoustic-layer.json
 python3 scripts/delivery_prompt_remediation.py execute-stage \
   --binary ./build/vocello --candidate surprised-onset-v2 \
   --stage screen --variant speed \
@@ -482,6 +503,11 @@ copy, publish evidence, or close DP-31/DP-32. Candidates that fail a stage stop 
 opening the much larger script, powered, and untouched matrices after the registered rejection is
 already decision-complete.
 
+Old schema-v1 evidence may only be re-evaluated through the explicit `recompose-legacy` command.
+The contract pins the old composer and contract digests; ordinary `decide` rejects those plans.
+Recomposition never overwrites `automatic-decision.json` and writes the versioned
+`automatic-decision-v2-recomposed.json` instead.
+
 DP-25 removed one evaluator bias before this screen. All 17 banked DP-22 normal-tier sidecars were
 replayed (34 Happy/Angry rows per feature across Speed and Quality). The signed noise-decile was
 negative for pitch, variation, arousal, and tension in both variants, so prosody-profile schema v4
@@ -489,36 +515,42 @@ uses zero magnitude for those supporting normal-tier axes while retaining direct
 unmeasured 1.15 strong multiplier is also retired; both tiers use 1.0 because the measured cross-tier
 separation ratio was 0.997. This changes threshold calibration, not tier identity or prompt copy.
 
-### 2.7 Autonomous screen result (2026-08-25)
+### 2.7 Autonomous screen result, corrected v2 composition (2026-08-26)
 
-All six pre-registered Speed candidates completed the first screen. None produced
-`automatic_acoustic_improvement`, so the contract's stopping rule kept the larger script-interaction,
-powered, and untouched variant matrices closed. This is a decision-complete negative screen, not an
-unfinished positive experiment:
+All six pre-registered Speed candidates completed the first screen on 2026-08-25. The same source-
+bound plans, WAVs, acoustic layers, and failure rows were recomposed on 2026-08-26 after the scoring
+audit found that v1 gave full feature credit to arbitrarily small signed movements and took the
+absolute target/competitor gap. The v1 decision JSON remains immutable historical evidence, but its
+scores and distance-based interpretations are superseded by schema v2. No audio was regenerated and
+no row was selected after seeing the correction.
 
-| Candidate | Result | Completion | Score delta (95% paired interval) | Adherence delta | Competing-preset distance delta | New hard rows |
-| --- | --- | ---: | ---: | ---: | ---: | ---: |
-| Happy acoustic | `regression` | 100% | +0.085938 (-0.031250…+0.210938) | +0.1875 | -0.1875 vs Surprised | 0 |
-| Happy emotion + acoustic | `abstained_out_of_distribution` | 96.875% | -0.007812 (-0.140625…+0.132812) | 0.0000 | -0.0625 vs Surprised | 1 |
-| Angry emotion + acoustic | `abstained_out_of_distribution` | 96.875% | +0.055556 (-0.055556…+0.180556) | +0.1875 | 0.0000 vs Happy | 1 |
-| Fearful urgent | `abstained_out_of_distribution` | 90.625% | +0.125000 (approximately 0…+0.255682) | +0.0625 | -0.045455 vs Sad | 0 relative to baseline |
-| Fearful structured | `abstained_out_of_distribution` | 81.25% | +0.034091 (-0.085227…+0.153409) | -0.1250 | -0.045455 vs Sad | 2 relative to baseline |
-| Surprised onset | `regression` | 100% | +0.062500 (-0.014423…+0.144231) | -0.0625 | -0.038462 vs Happy | 0 |
+No v2 result is `automatic_acoustic_improvement`, so the registered stopping rule still keeps the
+larger script-interaction, powered, and untouched variant matrices closed:
 
-The Fearful/Sad pair exposed a separate reliability topology that must not be misreported as four
-Fearful failures. Two independently generated baselines reproduced the same four failed take
-identities: one Fearful Vivian/Mandarin row, two Sad Vivian/Mandarin competitor rows, and one Sad
-Sohee/Korean competitor row. The shipped Fearful prompt also produced reproducible excessive
-durations (up to 112.8 seconds for the medium neutral sentence). The urgent candidate removed the
-target-preset hard failure and shortened the worst valid output, but unchanged Sad competitor rows
-remained incomplete and Fearful/Sad distance regressed. The structured candidate produced six
-failed rows and regressed adherence. Neither can advance.
+| Candidate | V2 result | Completion | Bounded score delta (95% paired interval) | Adherence delta | Baseline → candidate signed margin | Wrong-order count | New hard rows |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Happy acoustic | `regression` | 100% | +0.019584 (-0.118876…+0.176553) | +0.1875 | -0.1250 → -0.0625 vs Surprised | 10 → 8 | 0 |
+| Happy emotion + acoustic | `regression` | 96.875% | +0.012549 (-0.098127…+0.121692) | 0.0000 | -0.1250 → 0.0000 vs Surprised | 9 → 7 | 1 |
+| Angry emotion + acoustic | `regression` | 96.875% | +0.178349 (+0.056659…+0.308483) | +0.1875 | -0.083276 → +0.082532 vs Happy | 8 → 6 | 1 |
+| Fearful urgent | `inconclusive` | 90.625% | +0.003339 (-0.089921…+0.098956) | +0.0625 | +0.050592 → +0.088952 vs Sad | 4 → 3 | 0 relative to baseline |
+| Fearful structured | `abstained_out_of_distribution` | 81.25% | -0.070266 (-0.159664…+0.009530) | -0.1250 | +0.066904 → +0.038233 vs Sad | 3 → 5 | 2 relative to baseline |
+| Surprised onset | `no_measured_improvement` | 100% | +0.006804 (-0.089654…+0.104678) | -0.0625 | +0.007539 → +0.041420 vs Happy | 8 → 7 | 0 |
 
-The tempting positive means for Happy acoustic, Angry, and Fearful urgent do not override intervals
-that touch/cross zero, new/missing hard rows, or reduced competing-preset separation. Production copy
-therefore stays at the maintainer-directed checkpoint in §2.5. The full WAVs, execution state, and
-automatic decisions remain untracked; the roadmap records their compact metrics and decision
-digests. No automatic layer gained semantic, production-copy, or publication authority.
+The corrected ordering changes the explanation, not the stopping outcome. Happy acoustic reduced its
+wrong-order count, but Happy still ranked below Surprised at the median and its bounded improvement
+was below the screen floor. Angry crossed to a correctly ordered positive median and cleared the
+bounded-score interval, but its new hard row makes it a regression under the frozen zero-new-failure
+rule. Fearful urgent preserved positive separation and reduced wrong orders, but its score gain was
+effectively zero. Surprised also improved signed separation, but not the bounded feature score, and
+its adherence rate fell.
+
+The Fearful/Sad reliability topology remains separately valid: two generated baselines reproduced
+one Fearful Vivian/Mandarin failure, two Sad Vivian/Mandarin competitor failures, one Sad
+Sohee/Korean competitor failure, and Fearful durations up to 112.8 seconds. V2 correctly leaves
+failed planned rows in the denominator while distinguishing them from missing features on a
+completed analysis. The full WAVs, execution state, original decisions, and recomposed decisions
+remain untracked. No automatic layer gained semantic, production-copy, or publication authority;
+DP-28/DP-31 still own calibrated human evidence.
 
 ## 3. Evidence conventions
 

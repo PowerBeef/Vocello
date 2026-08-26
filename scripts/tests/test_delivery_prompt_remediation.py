@@ -20,6 +20,8 @@ from delivery_prompt_remediation import (  # noqa: E402
     DEFAULT_CONTRACT,
     RESULT_VOCABULARY,
     RemediationError,
+    _bounded_magnitude_credit,
+    _derive_band,
     _reseal_plan,
     candidate_by_id,
     create_candidate_plan,
@@ -27,6 +29,7 @@ from delivery_prompt_remediation import (  # noqa: E402
     seed_reference_controls,
     validate_candidate_plan,
     validate_contract,
+    validate_legacy_candidate_plan,
 )
 
 
@@ -141,6 +144,7 @@ class DeliveryPromptRemediationTests(unittest.TestCase):
         validated = validate_contract(self.contract)
         self.assertEqual(tuple(validated["resultVocabulary"]), RESULT_VOCABULARY)
         self.assertFalse(validated["acceptance"]["allowAutomaticSemanticPromotion"])
+        self.assertTrue(all(stage["requirePositiveBootstrapLower"] for stage in validated["stages"].values()))
         self.assertEqual(len(validated["candidates"]), 6)
         changed = copy.deepcopy(self.contract)
         changed["candidates"][0]["instruction"] += " changed"
@@ -150,6 +154,21 @@ class DeliveryPromptRemediationTests(unittest.TestCase):
         changed["acceptance"]["allowAutomaticSemanticPromotion"] = True
         with self.assertRaisesRegex(RemediationError, "must remain disabled"):
             validate_contract(changed)
+
+    def test_bounded_magnitude_scoring_rejects_tiny_and_penalizes_overdrive(self) -> None:
+        band = {"minimum": 1.0, "fullCredit": 2.0, "overdrive": 4.0}
+        self.assertEqual(_bounded_magnitude_credit(-1.0, band), (0.0, "wrong-direction-or-zero"))
+        self.assertEqual(_bounded_magnitude_credit(0.99, band), (0.0, "below-calibrated-minimum"))
+        self.assertEqual(_bounded_magnitude_credit(1.5, band), (0.5, "partial-credit"))
+        self.assertEqual(_bounded_magnitude_credit(2.0, band), (1.0, "full-credit"))
+        self.assertEqual(_bounded_magnitude_credit(4.0, band), (1.0, "full-credit"))
+        self.assertEqual(_bounded_magnitude_credit(6.0, band), (0.5, "overdrive-penalty"))
+        self.assertEqual(_bounded_magnitude_credit(8.0, band), (0.0, "overdrive-penalty"))
+        calibration = self.contract["scoring"]["calibration"]
+        self.assertEqual(
+            _derive_band([0.0, 0.0, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0], calibration),
+            {"minimum": 0.375, "fullCredit": 1.5, "overdrive": 10.0},
+        )
 
     def test_candidate_plan_changes_only_target_instruction_and_is_source_bound(self) -> None:
         plan = create_candidate_plan(
@@ -169,6 +188,28 @@ class DeliveryPromptRemediationTests(unittest.TestCase):
         self.assertEqual({row["instruction"]["arm"] for row in control}, {"current"})
         self.assertEqual(plan["screeningSelection"]["scope"], "contract-screen")
         self.assertFalse(plan["remediation"]["semanticAuthority"])
+
+    def test_legacy_plan_recomposition_is_explicit_and_source_bound(self) -> None:
+        plan = create_candidate_plan(
+            binary=self.binary, contract=self.contract,
+            candidate_id="happy-acoustic-v2", stage_name="screen",
+            variant="speed", baseline=False,
+        )
+        legacy = self.contract["scoring"]["legacyRecomposition"]
+        plan["remediation"]["schemaVersion"] = legacy["schemaVersion"]
+        plan["remediation"]["contractDigest"] = legacy["contractDigest"]
+        plan["executionIdentity"]["remediationComposerSHA256"] = legacy["composerSHA256"]
+        plan["executionIdentity"]["remediationContractDigest"] = legacy["contractDigest"]
+        plan = _reseal_plan(plan)
+        validate_legacy_candidate_plan(
+            plan, self.binary, self.contract, candidate_id="happy-acoustic-v2",
+            stage_name="screen", variant="speed", role="candidate",
+        )
+        with self.assertRaisesRegex(RemediationError, "identity drifted"):
+            validate_candidate_plan(
+                plan, self.binary, self.contract, candidate_id="happy-acoustic-v2",
+                stage_name="screen", variant="speed", role="candidate",
+            )
 
     def test_confirmation_plan_is_contract_selected_and_covers_both_variants(self) -> None:
         for variant in ("speed", "quality"):
@@ -195,22 +236,27 @@ class DeliveryPromptRemediationTests(unittest.TestCase):
         self.assertEqual(source.stat().st_ino, reused.stat().st_ino)
 
     def test_preset_specific_temporal_improvement_can_advance_without_semantic_authority(self) -> None:
+        # A one-pair unit fixture cannot form a bootstrap interval. Disable only
+        # that stage gate here; the contract test above pins it on in production.
+        self.contract["stages"]["screen"]["requirePositiveBootstrapLower"] = False
         baseline_dir, candidate_dir, _baseline, _candidate = self._run_pair()
+        baseline_payload = json.loads((baseline_dir / "acoustic-layer.json").read_text())
+        for row in baseline_payload["rows"]:
+            if row["preset"] == "surprised":
+                row["deliveryVerdict"]["passed"] = False
+        (baseline_dir / "acoustic-layer.json").write_text(json.dumps(baseline_payload), encoding="utf-8")
         payload = json.loads((candidate_dir / "acoustic-layer.json").read_text())
+        candidate = candidate_by_id(self.contract, "surprised-onset-v2")
+        bands = self.contract["scoring"]["calibration"]["bands"]["surprised"]
         for row in payload["rows"]:
-            if row["preset"] != "surprised":
-                continue
-            row["derivedFeatures"]["pitch_shift_semitones"] = 2.0
-            contours = row["temporalDeltaV1"]["derivedContours"]
-            contours.update({
-                "onsetToPeakPitchHz": 30.0,
-                "maximumLocalRiseHz": 24.0,
-                "normalizedPeakPosition": -0.5,
-                "peakToEndPitchHz": -20.0,
-                "contourAbruptnessHz": 25.0,
-                "phraseFinalPitchSlopeHz": -10.0,
-            })
-            row["deliveryVerdict"]["passed"] = True
+            is_target = row["preset"] == "surprised"
+            for layer, key in (("global", "expectedGlobal"), ("temporal", "expectedTemporal")):
+                source = row["derivedFeatures"] if layer == "global" else row["temporalDeltaV1"]["derivedContours"]
+                for expectation in candidate[key]:
+                    magnitude = bands[layer][expectation["feature"]]["fullCredit"]
+                    source[expectation["feature"]] = expectation["direction"] * magnitude * (1 if is_target else -1)
+            if is_target:
+                row["deliveryVerdict"]["passed"] = True
         (candidate_dir / "acoustic-layer.json").write_text(json.dumps(payload), encoding="utf-8")
         report = decide(
             baseline_run=baseline_dir, candidate_run=candidate_dir,
@@ -220,8 +266,32 @@ class DeliveryPromptRemediationTests(unittest.TestCase):
         self.assertEqual(report["result"], "automatic_acoustic_improvement")
         self.assertTrue(report["eligibleForNextStage"])
         self.assertFalse(report["semanticAuthority"])
+        self.assertEqual(report["perceptualCalibrationStatus"], "not-evaluated-no-qualified-human-labels")
         self.assertFalse(report["productionCopyAuthority"])
-        self.assertGreater(report["competingPresetDistance"]["medianDelta"], 0)
+        self.assertGreater(report["competingPresetSeparation"]["candidateMedianSignedMargin"], 0)
+
+    def test_signed_separation_rejects_a_competitor_that_scores_higher(self) -> None:
+        baseline_dir, candidate_dir, _baseline, _candidate = self._run_pair()
+        payload = json.loads((candidate_dir / "acoustic-layer.json").read_text())
+        candidate = candidate_by_id(self.contract, "surprised-onset-v2")
+        bands = self.contract["scoring"]["calibration"]["bands"]["surprised"]
+        for row in payload["rows"]:
+            is_competitor = row["preset"] == "happy"
+            for layer, key in (("global", "expectedGlobal"), ("temporal", "expectedTemporal")):
+                source = row["derivedFeatures"] if layer == "global" else row["temporalDeltaV1"]["derivedContours"]
+                for expectation in candidate[key]:
+                    magnitude = bands[layer][expectation["feature"]]["fullCredit"]
+                    source[expectation["feature"]] = expectation["direction"] * magnitude * (1 if is_competitor else -1)
+        (candidate_dir / "acoustic-layer.json").write_text(json.dumps(payload), encoding="utf-8")
+        report = decide(
+            baseline_run=baseline_dir, candidate_run=candidate_dir,
+            binary=self.binary, contract=self.contract,
+            candidate_id="surprised-onset-v2", stage_name="screen", variant="speed",
+        )
+        self.assertEqual(report["result"], "regression")
+        self.assertIn("target-preset-does-not-rank-above-competitor", report["failures"])
+        self.assertLess(report["competingPresetSeparation"]["candidateMedianSignedMargin"], 0)
+        self.assertEqual(report["competingPresetSeparation"]["candidateWrongOrderCount"], 1)
 
     def test_missing_temporal_feature_abstains_instead_of_leaving_the_denominator(self) -> None:
         baseline_dir, candidate_dir, _baseline, _candidate = self._run_pair()
@@ -237,6 +307,27 @@ class DeliveryPromptRemediationTests(unittest.TestCase):
         self.assertEqual(report["result"], "abstained_out_of_distribution")
         self.assertIn("temporal:onsetToPeakPitchHz", report["missingFeatures"])
         self.assertEqual(report["plannedPairCount"], 1)
+
+    def test_failed_planned_take_stays_zero_without_becoming_feature_ood(self) -> None:
+        self.contract["stages"]["screen"]["minimumCompletionRate"] = 0.5
+        self.contract["stages"]["screen"]["requirePositiveBootstrapLower"] = False
+        baseline_dir, candidate_dir, _baseline, candidate_plan = self._run_pair()
+        target_row = next(row for row in candidate_plan["rows"] if row["preset"] == "surprised")
+        payload = json.loads((candidate_dir / "acoustic-layer.json").read_text())
+        payload["rows"] = [row for row in payload["rows"] if row["takeID"] != target_row["takeID"]]
+        (candidate_dir / "acoustic-layer.json").write_text(json.dumps(payload), encoding="utf-8")
+        state = json.loads((candidate_dir / "execution-state.json").read_text())
+        state["takes"][target_row["takeID"]]["status"] = "failed"
+        (candidate_dir / "execution-state.json").write_text(json.dumps(state), encoding="utf-8")
+        report = decide(
+            baseline_run=baseline_dir, candidate_run=candidate_dir,
+            binary=self.binary, contract=self.contract,
+            candidate_id="surprised-onset-v2", stage_name="screen", variant="speed",
+        )
+        self.assertEqual(report["missingAnalysisPairCount"], 1)
+        self.assertEqual(report["missingFeatures"], [])
+        self.assertEqual(report["result"], "regression")
+        self.assertIn("new-hard-audio-qc-or-generation-failure", report["failures"])
 
 
 if __name__ == "__main__":

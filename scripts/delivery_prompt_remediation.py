@@ -37,7 +37,8 @@ from delivery_statistics import paired_bootstrap_delta  # noqa: E402
 
 
 DEFAULT_CONTRACT = REPO / "config/delivery-prompt-remediation-contract.json"
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
+LEGACY_SCHEMA_VERSION = 1
 RESULT_VOCABULARY = (
     "automatic_acoustic_improvement",
     "no_measured_improvement",
@@ -100,6 +101,99 @@ def _validate_expectations(rows: Any, label: str, layer: str) -> None:
             raise RemediationError(f"{label}.{feature} weight must be positive")
 
 
+def _finite_number(value: Any, label: str, *, minimum: float | None = None) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(float(value)):
+        raise RemediationError(f"{label} must be a finite number")
+    normalized = float(value)
+    if minimum is not None and normalized < minimum:
+        raise RemediationError(f"{label} must be at least {minimum}")
+    return normalized
+
+
+def _validate_scoring(contract: dict[str, Any], candidates: list[dict[str, Any]]) -> None:
+    scoring = contract.get("scoring")
+    if not isinstance(scoring, dict) or set(scoring) != {"algorithm", "calibration", "separation", "legacyRecomposition"}:
+        raise RemediationError("scoring block has an invalid shape")
+    if scoring.get("algorithm") != "bounded-magnitude-v2":
+        raise RemediationError("scoring algorithm must remain bounded-magnitude-v2")
+    calibration = scoring.get("calibration")
+    required_calibration = {
+        "kind", "manifestDigest", "rowCount", "rowsPerPreset", "quantileMethod",
+        "minimumAbsoluteQuantile", "fullCreditAbsoluteQuantile",
+        "minimumFloorFractionOfFullCredit", "overdriveMultiplierFromObservedMaximum",
+        "humanPerceptualAuthority", "bands",
+    }
+    if not isinstance(calibration, dict) or set(calibration) != required_calibration:
+        raise RemediationError("scoring calibration has an invalid shape")
+    if calibration.get("kind") != "independent-pre-candidate-acoustic-cohort":
+        raise RemediationError("scoring calibration must remain independent of candidate output")
+    if not isinstance(calibration.get("manifestDigest"), str) or len(calibration["manifestDigest"]) != 64:
+        raise RemediationError("scoring calibration manifest digest is invalid")
+    if calibration.get("rowCount") != 64 or calibration.get("rowsPerPreset") != 8:
+        raise RemediationError("scoring calibration cohort cardinality drifted")
+    if calibration.get("quantileMethod") != "linear-r7":
+        raise RemediationError("scoring calibration quantile method drifted")
+    if calibration.get("minimumAbsoluteQuantile") != 0.25 or calibration.get("fullCreditAbsoluteQuantile") != 0.5:
+        raise RemediationError("scoring calibration quantiles drifted")
+    if calibration.get("minimumFloorFractionOfFullCredit") != 0.1:
+        raise RemediationError("scoring calibration minimum floor drifted")
+    if calibration.get("overdriveMultiplierFromObservedMaximum") != 2.0:
+        raise RemediationError("scoring calibration overdrive multiplier drifted")
+    if calibration.get("humanPerceptualAuthority") is not False:
+        raise RemediationError("acoustic magnitude calibration cannot gain perceptual authority")
+    bands = calibration.get("bands")
+    if not isinstance(bands, dict):
+        raise RemediationError("scoring calibration bands are missing")
+    expected_by_preset: dict[str, dict[str, set[str]]] = {}
+    for candidate in candidates:
+        target = candidate["targetPreset"]
+        target_layers = expected_by_preset.setdefault(target, {"global": set(), "temporal": set()})
+        target_layers["global"].update(row["feature"] for row in candidate["expectedGlobal"])
+        target_layers["temporal"].update(row["feature"] for row in candidate["expectedTemporal"])
+    if set(bands) != set(expected_by_preset):
+        raise RemediationError("scoring calibration presets do not match candidate targets")
+    for preset, layers in expected_by_preset.items():
+        preset_bands = bands.get(preset)
+        if not isinstance(preset_bands, dict) or set(preset_bands) != {"global", "temporal"}:
+            raise RemediationError(f"{preset}: scoring calibration layers are invalid")
+        for layer, expected_features in layers.items():
+            feature_bands = preset_bands[layer]
+            if not isinstance(feature_bands, dict) or set(feature_bands) != expected_features:
+                raise RemediationError(f"{preset}.{layer}: scoring calibration features drifted")
+            for feature, band in feature_bands.items():
+                if not isinstance(band, dict) or set(band) != {"minimum", "fullCredit", "overdrive"}:
+                    raise RemediationError(f"{preset}.{layer}.{feature}: magnitude band shape is invalid")
+                minimum = _finite_number(band["minimum"], f"{preset}.{layer}.{feature}.minimum", minimum=0.0)
+                full_credit = _finite_number(band["fullCredit"], f"{preset}.{layer}.{feature}.fullCredit", minimum=0.0)
+                overdrive = _finite_number(band["overdrive"], f"{preset}.{layer}.{feature}.overdrive", minimum=0.0)
+                if not 0 < minimum < full_credit < overdrive:
+                    raise RemediationError(f"{preset}.{layer}.{feature}: require 0 < minimum < fullCredit < overdrive")
+    separation = scoring.get("separation")
+    if not isinstance(separation, dict) or set(separation) != {
+        "algorithm", "requireStrictPositiveCandidateMedianMargin", "maximumMedianMarginRegression",
+        "maximumWrongOrderRateRegression",
+    }:
+        raise RemediationError("signed preset-separation policy has an invalid shape")
+    if separation.get("algorithm") != "signed-target-minus-competitor-v2":
+        raise RemediationError("preset separation must preserve target-versus-competitor ordering")
+    if separation.get("requireStrictPositiveCandidateMedianMargin") is not True:
+        raise RemediationError("preset separation must require a strictly positive target margin")
+    _finite_number(separation.get("maximumMedianMarginRegression"), "maximumMedianMarginRegression", minimum=0.0)
+    _finite_number(separation.get("maximumWrongOrderRateRegression"), "maximumWrongOrderRateRegression", minimum=0.0)
+    legacy = scoring.get("legacyRecomposition")
+    if not isinstance(legacy, dict) or set(legacy) != {
+        "schemaVersion", "contractDigest", "composerSHA256", "decisionFilename",
+    }:
+        raise RemediationError("legacy recomposition identity has an invalid shape")
+    if legacy.get("schemaVersion") != LEGACY_SCHEMA_VERSION:
+        raise RemediationError("legacy recomposition schema version drifted")
+    for field in ("contractDigest", "composerSHA256"):
+        if not isinstance(legacy.get(field), str) or len(legacy[field]) != 64:
+            raise RemediationError(f"legacy recomposition {field} is invalid")
+    if legacy.get("decisionFilename") != "automatic-decision-v2-recomposed.json":
+        raise RemediationError("legacy recomposition output filename drifted")
+
+
 def validate_contract(contract: dict[str, Any]) -> dict[str, Any]:
     if contract.get("schemaVersion") != SCHEMA_VERSION:
         raise RemediationError(f"contract schemaVersion must be {SCHEMA_VERSION}")
@@ -138,6 +232,7 @@ def validate_contract(contract: dict[str, Any]) -> dict[str, Any]:
     priority = contract.get("candidatePriority")
     if not isinstance(priority, list) or len(priority) != len(set(priority)) or set(priority) != set(ids):
         raise RemediationError("candidate priority must cover every candidate exactly once")
+    _validate_scoring(contract, candidates)
 
     stages = contract.get("stages")
     if not isinstance(stages, dict) or tuple(stages) != STAGE_ORDER:
@@ -201,6 +296,78 @@ def candidate_by_id(contract: dict[str, Any], candidate_id: str) -> dict[str, An
         if row["id"] == candidate_id:
             return row
     raise RemediationError(f"unknown candidate {candidate_id!r}")
+
+
+def _quantile_r7(values: list[float], probability: float) -> float:
+    if not values:
+        raise RemediationError("cannot calculate a quantile from an empty sample")
+    ordered = sorted(values)
+    position = (len(ordered) - 1) * probability
+    lower = math.floor(position)
+    upper = math.ceil(position)
+    if lower == upper:
+        return ordered[lower]
+    return ordered[lower] + (position - lower) * (ordered[upper] - ordered[lower])
+
+
+def _derive_band(values: list[float], calibration: dict[str, Any]) -> dict[str, float]:
+    absolute = [abs(value) for value in values]
+    full_credit = _quantile_r7(absolute, calibration["fullCreditAbsoluteQuantile"])
+    minimum = max(
+        _quantile_r7(absolute, calibration["minimumAbsoluteQuantile"]),
+        full_credit * calibration["minimumFloorFractionOfFullCredit"],
+    )
+    overdrive = max(absolute) * calibration["overdriveMultiplierFromObservedMaximum"]
+    if not 0 < minimum < full_credit < overdrive:
+        raise RemediationError("calibration sample cannot produce an ordered positive magnitude band")
+    return {
+        "minimum": round(minimum, 6),
+        "fullCredit": round(full_credit, 6),
+        "overdrive": round(overdrive, 6),
+    }
+
+
+def verify_calibration_bands(acoustic: dict[str, Any], contract: dict[str, Any]) -> dict[str, Any]:
+    contract = validate_contract(contract)
+    calibration = contract["scoring"]["calibration"]
+    if acoustic.get("manifestDigest") != calibration["manifestDigest"]:
+        raise RemediationError("calibration acoustic manifest digest drifted")
+    rows = acoustic.get("rows")
+    if not isinstance(rows, list) or len(rows) != calibration["rowCount"]:
+        raise RemediationError("calibration acoustic row count drifted")
+    expected_by_preset: dict[str, dict[str, set[str]]] = {}
+    for candidate in contract["candidates"]:
+        layers = expected_by_preset.setdefault(candidate["targetPreset"], {"global": set(), "temporal": set()})
+        layers["global"].update(row["feature"] for row in candidate["expectedGlobal"])
+        layers["temporal"].update(row["feature"] for row in candidate["expectedTemporal"])
+    derived: dict[str, Any] = {}
+    for preset, layers in expected_by_preset.items():
+        preset_rows = [row for row in rows if row.get("preset") == preset]
+        if len(preset_rows) != calibration["rowsPerPreset"]:
+            raise RemediationError(f"{preset}: calibration row count drifted")
+        derived[preset] = {"global": {}, "temporal": {}}
+        for layer, features in layers.items():
+            for feature in sorted(features):
+                values: list[float] = []
+                for row in preset_rows:
+                    source = (
+                        row.get("derivedFeatures", {}) if layer == "global"
+                        else row.get("temporalDeltaV1", {}).get("derivedContours", {})
+                    )
+                    value = source.get(feature)
+                    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(float(value)):
+                        raise RemediationError(f"{preset}.{layer}.{feature}: calibration feature is missing or nonfinite")
+                    values.append(float(value))
+                derived[preset][layer][feature] = _derive_band(values, calibration)
+    if derived != calibration["bands"]:
+        raise RemediationError("pinned magnitude bands differ from the source-bound calibration cohort")
+    return {
+        "status": "PASS",
+        "manifestDigest": acoustic["manifestDigest"],
+        "rowCount": len(rows),
+        "bandsDigest": digest(derived),
+        "humanPerceptualAuthority": False,
+    }
 
 
 def _row_identity(row: dict[str, Any]) -> dict[str, Any]:
@@ -401,12 +568,32 @@ def _analysis_index(run_dir: Path, plan: dict[str, Any]) -> tuple[dict[str, dict
     return indexed, state
 
 
-def _feature_score(analysis: dict[str, Any], candidate: dict[str, Any]) -> tuple[float, list[str]]:
+def _bounded_magnitude_credit(signed_movement: float, band: dict[str, Any]) -> tuple[float, str]:
+    minimum = float(band["minimum"])
+    full_credit = float(band["fullCredit"])
+    overdrive = float(band["overdrive"])
+    if signed_movement <= 0:
+        return 0.0, "wrong-direction-or-zero"
+    if signed_movement < minimum:
+        return 0.0, "below-calibrated-minimum"
+    if signed_movement < full_credit:
+        return (signed_movement - minimum) / (full_credit - minimum), "partial-credit"
+    if signed_movement <= overdrive:
+        return 1.0, "full-credit"
+    credit = max(0.0, 1.0 - ((signed_movement - overdrive) / overdrive))
+    return credit, "overdrive-penalty"
+
+
+def _feature_score(
+    analysis: dict[str, Any], candidate: dict[str, Any], scoring: dict[str, Any],
+) -> tuple[float, list[str], list[dict[str, Any]]]:
     total = 0.0
     earned = 0.0
     missing: list[str] = []
+    feature_rows: list[dict[str, Any]] = []
     global_features = analysis.get("derivedFeatures", {})
     temporal_features = analysis.get("temporalDeltaV1", {}).get("derivedContours", {})
+    preset_bands = scoring["calibration"]["bands"][candidate["targetPreset"]]
     for layer, source, expectations in (
         ("global", global_features, candidate["expectedGlobal"]),
         ("temporal", temporal_features, candidate["expectedTemporal"]),
@@ -418,28 +605,78 @@ def _feature_score(analysis: dict[str, Any], candidate: dict[str, Any]) -> tuple
             value = source.get(feature)
             if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(float(value)):
                 missing.append(f"{layer}:{feature}")
+                feature_rows.append({
+                    "layer": layer, "feature": feature, "weight": weight,
+                    "available": False, "credit": 0.0, "classification": "missing-or-nonfinite",
+                })
                 continue
-            if expectation["direction"] * float(value) > 0:
-                earned += weight
-    return earned / total if total else 0.0, missing
+            signed_movement = expectation["direction"] * float(value)
+            band = preset_bands[layer][feature]
+            credit, classification = _bounded_magnitude_credit(signed_movement, band)
+            earned += weight * credit
+            feature_rows.append({
+                "layer": layer, "feature": feature, "weight": weight,
+                "available": True, "rawValue": float(value),
+                "signedMovement": signed_movement, "magnitudeBand": band,
+                "credit": credit, "classification": classification,
+            })
+    return earned / total if total else 0.0, missing, feature_rows
 
 
 def _median(values: list[float]) -> float | None:
     return statistics.median(values) if values else None
 
 
+def validate_legacy_candidate_plan(
+    plan: dict[str, Any], binary: Path, contract: dict[str, Any], *,
+    candidate_id: str, stage_name: str, variant: str, role: str,
+) -> dict[str, Any]:
+    validate_execution_plan(plan, binary)
+    contract = validate_contract(contract)
+    candidate = candidate_by_id(contract, candidate_id)
+    legacy = contract["scoring"]["legacyRecomposition"]
+    expected = {
+        "schemaVersion": legacy["schemaVersion"],
+        "candidateID": candidate_id,
+        "stage": stage_name,
+        "variant": variant,
+        "role": role,
+        "targetPreset": candidate["targetPreset"],
+        "competingPreset": candidate["competingPreset"],
+        "contractDigest": legacy["contractDigest"],
+        "semanticAuthority": False,
+        "publicationAuthority": False,
+    }
+    if plan.get("remediation") != expected:
+        raise RemediationError("legacy candidate plan remediation identity drifted")
+    identity = plan.get("executionIdentity", {})
+    if identity.get("remediationComposerSHA256") != legacy["composerSHA256"]:
+        raise RemediationError("legacy candidate plan composer identity drifted")
+    if identity.get("remediationContractDigest") != legacy["contractDigest"]:
+        raise RemediationError("legacy candidate plan contract identity drifted")
+    for row in plan["rows"]:
+        if row["preset"] == candidate["targetPreset"] and role == "candidate":
+            if row["instruction"].get("sha256") != candidate["instructionSHA256"]:
+                raise RemediationError("legacy candidate instruction digest drifted")
+        elif row["instruction"].get("arm") != "current":
+            raise RemediationError("legacy baseline or competing-preset instruction is not current")
+    return plan
+
+
 def decide(
     *, baseline_run: Path, candidate_run: Path, binary: Path,
     contract: dict[str, Any], candidate_id: str, stage_name: str, variant: str,
+    legacy_recomposition: bool = False,
 ) -> dict[str, Any]:
     contract = validate_contract(contract)
     candidate = candidate_by_id(contract, candidate_id)
     stage = contract["stages"][stage_name]
-    baseline_plan = validate_candidate_plan(
+    plan_validator = validate_legacy_candidate_plan if legacy_recomposition else validate_candidate_plan
+    baseline_plan = plan_validator(
         _load(baseline_run / "execution-plan.json"), binary, contract,
         candidate_id=candidate_id, stage_name=stage_name, variant=variant, role="baseline",
     )
-    candidate_plan = validate_candidate_plan(
+    candidate_plan = plan_validator(
         _load(candidate_run / "execution-plan.json"), binary, contract,
         candidate_id=candidate_id, stage_name=stage_name, variant=variant, role="candidate",
     )
@@ -453,23 +690,38 @@ def decide(
         _comparison_key(row) for row in baseline_plan["rows"]
         if row["preset"] == candidate["targetPreset"]
     )
+    baseline_row_by_key = {_comparison_key(row): row for row in baseline_plan["rows"]}
+    candidate_row_by_key = {_comparison_key(row): row for row in candidate_plan["rows"]}
     baseline_scores: list[float] = []
     candidate_scores: list[float] = []
     baseline_adherence: list[float] = []
     candidate_adherence: list[float] = []
     missing_features: set[str] = set()
+    missing_analysis_pairs = 0
     pair_rows: list[dict[str, Any]] = []
     for key in target_keys:
         baseline_entry = baseline_index.get(key)
         candidate_entry = candidate_index.get(key)
-        baseline_score, baseline_missing = (
-            _feature_score(baseline_entry["analysis"], candidate)
-            if baseline_entry else (0.0, ["missing-analysis"])
-        )
-        candidate_score, candidate_missing = (
-            _feature_score(candidate_entry["analysis"], candidate)
-            if candidate_entry else (0.0, ["missing-analysis"])
-        )
+        if baseline_entry:
+            baseline_score, baseline_missing, baseline_feature_rows = _feature_score(
+                baseline_entry["analysis"], candidate, contract["scoring"]
+            )
+        else:
+            baseline_score, baseline_missing, baseline_feature_rows = 0.0, [], []
+        if candidate_entry:
+            candidate_score, candidate_missing, candidate_feature_rows = _feature_score(
+                candidate_entry["analysis"], candidate, contract["scoring"]
+            )
+        else:
+            candidate_score, candidate_missing, candidate_feature_rows = 0.0, [], []
+        if baseline_entry is None or candidate_entry is None:
+            missing_analysis_pairs += 1
+        baseline_take = baseline_state.get("takes", {}).get(baseline_row_by_key[key]["takeID"], {})
+        candidate_take = candidate_state.get("takes", {}).get(candidate_row_by_key[key]["takeID"], {})
+        if baseline_entry is None and baseline_take.get("status") == "complete":
+            missing_features.add("baseline:missing-analysis-for-complete-take")
+        if candidate_entry is None and candidate_take.get("status") == "complete":
+            missing_features.add("candidate:missing-analysis-for-complete-take")
         missing_features.update(baseline_missing)
         missing_features.update(candidate_missing)
         baseline_pass = bool(
@@ -493,6 +745,10 @@ def decide(
             "candidateScore": candidate_score,
             "baselineAdherence": baseline_pass,
             "candidateAdherence": candidate_pass,
+            "baselineAnalysisAvailable": baseline_entry is not None,
+            "candidateAnalysisAvailable": candidate_entry is not None,
+            "baselineFeatureRows": baseline_feature_rows,
+            "candidateFeatureRows": candidate_feature_rows,
         })
     bootstrap = paired_bootstrap_delta(
         candidate_scores, baseline_scores,
@@ -528,18 +784,18 @@ def decide(
                 if delta < 0:
                     subgroup_regressions.append({"field": field, "value": value, "meanScoreDelta": delta})
 
-    competing_distances: list[float] = []
-    baseline_competing_distances: list[float] = []
-    # Competing-preset rows are scored against the target expectations. The
-    # absolute target-vs-competitor score gap is a scale-free separability guard.
-    def distances(index: dict[str, dict[str, Any]], plan: dict[str, Any]) -> list[float]:
+    # Competing-preset rows are scored against the target expectations. Keep
+    # the sign: a positive margin means the target ranks above the competitor.
+    def margins(index: dict[str, dict[str, Any]], plan: dict[str, Any]) -> dict[str, float]:
         grouped: dict[str, dict[str, float]] = {}
         for row in plan["rows"]:
             key = _comparison_key(row)
             entry = index.get(key)
             if entry is None:
                 continue
-            score, missing = _feature_score(entry["analysis"], candidate)
+            score, missing, _feature_rows = _feature_score(
+                entry["analysis"], candidate, contract["scoring"]
+            )
             missing_features.update(missing)
             group = digest({
                 "speakerID": row["speakerID"], "outputLanguage": row["outputLanguage"],
@@ -547,17 +803,47 @@ def decide(
                 "variant": row["variant"],
             })
             grouped.setdefault(group, {})[row["preset"]] = score
-        return [
-            abs(values[candidate["targetPreset"]] - values[candidate["competingPreset"]])
-            for values in grouped.values()
+        return {
+            group: values[candidate["targetPreset"]] - values[candidate["competingPreset"]]
+            for group, values in grouped.items()
             if candidate["targetPreset"] in values and candidate["competingPreset"] in values
-        ]
+        }
 
-    baseline_competing_distances = distances(baseline_index, baseline_plan)
-    competing_distances = distances(candidate_index, candidate_plan)
-    distance_delta = (
-        (_median(competing_distances) or 0.0) - (_median(baseline_competing_distances) or 0.0)
-        if competing_distances and baseline_competing_distances else None
+    baseline_margin_map = margins(baseline_index, baseline_plan)
+    candidate_margin_map = margins(candidate_index, candidate_plan)
+    common_margin_keys = sorted(set(baseline_margin_map) & set(candidate_margin_map))
+    baseline_margins = [baseline_margin_map[key] for key in common_margin_keys]
+    candidate_margins = [candidate_margin_map[key] for key in common_margin_keys]
+    baseline_margin_median = _median(baseline_margins)
+    candidate_margin_median = _median(candidate_margins)
+    margin_delta = (
+        candidate_margin_median - baseline_margin_median
+        if candidate_margin_median is not None and baseline_margin_median is not None else None
+    )
+    baseline_wrong_order_count = sum(value < 0 for value in baseline_margins)
+    candidate_wrong_order_count = sum(value < 0 for value in candidate_margins)
+    baseline_wrong_order_rate = (
+        baseline_wrong_order_count / len(baseline_margins) if baseline_margins else None
+    )
+    candidate_wrong_order_rate = (
+        candidate_wrong_order_count / len(candidate_margins) if candidate_margins else None
+    )
+    wrong_order_rate_delta = (
+        candidate_wrong_order_rate - baseline_wrong_order_rate
+        if candidate_wrong_order_rate is not None and baseline_wrong_order_rate is not None else None
+    )
+    separation_policy = contract["scoring"]["separation"]
+    margin_regression = (
+        margin_delta is not None
+        and margin_delta < -float(separation_policy["maximumMedianMarginRegression"])
+    )
+    wrong_order_regression = (
+        wrong_order_rate_delta is not None
+        and wrong_order_rate_delta > float(separation_policy["maximumWrongOrderRateRegression"])
+    )
+    target_order_failure = (
+        candidate_margin_median is not None
+        and candidate_margin_median <= 0
     )
 
     failures: list[str] = []
@@ -578,14 +864,18 @@ def decide(
             failures.append("paired-adherence-bootstrap-lower-not-positive")
     if subgroup_regressions:
         failures.append("speaker-language-or-script-subgroup-regression")
-    if distance_delta is None:
-        failures.append("competing-preset-distance-unavailable")
-    elif distance_delta < -contract["acceptance"]["maximumCompetingPresetDistanceRegression"]:
-        failures.append("competing-preset-distance-regression")
+    if margin_delta is None:
+        failures.append("competing-preset-separation-unavailable")
+    if target_order_failure:
+        failures.append("target-preset-does-not-rank-above-competitor")
+    if margin_regression:
+        failures.append("competing-preset-signed-margin-regression")
+    if wrong_order_regression:
+        failures.append("competing-preset-wrong-order-rate-regression")
 
     if missing_features or completion_rate < stage["minimumCompletionRate"]:
         result = "abstained_out_of_distribution"
-    elif new_hard_failures or subgroup_regressions or (distance_delta is not None and distance_delta < 0):
+    elif new_hard_failures or subgroup_regressions or target_order_failure or margin_regression or wrong_order_regression:
         result = "regression"
     elif not failures:
         result = "automatic_acoustic_improvement"
@@ -604,14 +894,19 @@ def decide(
         "result": result,
         "eligibleForNextStage": result == "automatic_acoustic_improvement",
         "semanticAuthority": False,
+        "perceptualCalibrationStatus": "not-evaluated-no-qualified-human-labels",
         "productionCopyAuthority": False,
         "publicationAuthority": False,
         "failures": failures,
         "missingFeatures": sorted(missing_features),
+        "missingAnalysisPairCount": missing_analysis_pairs,
         "plannedPairCount": len(target_keys),
         "completionRate": completion_rate,
         "newHardFailureCount": new_hard_failures,
         "score": {
+            "algorithm": contract["scoring"]["algorithm"],
+            "calibrationManifestDigest": contract["scoring"]["calibration"]["manifestDigest"],
+            "magnitudeBandsDigest": digest(contract["scoring"]["calibration"]["bands"]),
             "baselineMean": statistics.mean(baseline_scores),
             "candidateMean": statistics.mean(candidate_scores),
             "meanImprovement": score_delta,
@@ -623,10 +918,21 @@ def decide(
             "absoluteImprovement": adherence_delta,
             "pairedBootstrap": adherence_bootstrap,
         },
-        "competingPresetDistance": {
-            "baselineMedian": _median(baseline_competing_distances),
-            "candidateMedian": _median(competing_distances),
-            "medianDelta": distance_delta,
+        "competingPresetSeparation": {
+            "algorithm": separation_policy["algorithm"],
+            "pairedComparisonCount": len(common_margin_keys),
+            "baselineMedianSignedMargin": baseline_margin_median,
+            "candidateMedianSignedMargin": candidate_margin_median,
+            "medianSignedMarginDelta": margin_delta,
+            "baselineWrongOrderCount": baseline_wrong_order_count,
+            "candidateWrongOrderCount": candidate_wrong_order_count,
+            "baselineWrongOrderRate": baseline_wrong_order_rate,
+            "candidateWrongOrderRate": candidate_wrong_order_rate,
+            "wrongOrderRateDelta": wrong_order_rate_delta,
+            "baselineTieCount": sum(value == 0 for value in baseline_margins),
+            "candidateTieCount": sum(value == 0 for value in candidate_margins),
+            "missingBaselineComparisonCount": len(target_keys) - len(baseline_margin_map),
+            "missingCandidateComparisonCount": len(target_keys) - len(candidate_margin_map),
         },
         "subgroupRegressions": subgroup_regressions,
         "pairRows": pair_rows,
@@ -634,6 +940,11 @@ def decide(
         "baselinePlanDigest": baseline_plan["executionPlanDigest"],
         "candidatePlanDigest": candidate_plan["executionPlanDigest"],
         "decisionSourceSHA256": file_sha256(Path(__file__)),
+        "recomposition": {
+            "legacyInput": legacy_recomposition,
+            "inputSchemaVersion": LEGACY_SCHEMA_VERSION if legacy_recomposition else SCHEMA_VERSION,
+            "scoringSchemaVersion": SCHEMA_VERSION,
+        },
     }
 
 
@@ -678,6 +989,8 @@ def main() -> int:
     parser.add_argument("--contract", type=Path, default=DEFAULT_CONTRACT)
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("validate")
+    calibration = commands.add_parser("verify-calibration")
+    calibration.add_argument("--acoustic-layer", type=Path, required=True)
     plan = commands.add_parser("plan")
     plan.add_argument("--binary", type=Path, default=REPO / "build/vocello")
     plan.add_argument("--data-dir", type=Path)
@@ -701,6 +1014,14 @@ def main() -> int:
     decision.add_argument("--baseline-run", type=Path, required=True)
     decision.add_argument("--candidate-run", type=Path, required=True)
     decision.add_argument("--out", type=Path, required=True)
+    recompose = commands.add_parser("recompose-legacy")
+    recompose.add_argument("--binary", type=Path, default=REPO / "build/vocello")
+    recompose.add_argument("--candidate", required=True)
+    recompose.add_argument("--stage", choices=STAGE_ORDER, required=True)
+    recompose.add_argument("--variant", choices=("speed", "quality"), required=True)
+    recompose.add_argument("--baseline-run", type=Path, required=True)
+    recompose.add_argument("--candidate-run", type=Path, required=True)
+    recompose.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
     try:
         contract = validate_contract(_load(args.contract))
@@ -710,6 +1031,8 @@ def main() -> int:
                 "candidateCount": len(contract["candidates"]),
                 "stages": list(contract["stages"]),
             }
+        elif args.command == "verify-calibration":
+            result = verify_calibration_bands(_load(args.acoustic_layer), contract)
         elif args.command == "plan":
             result = create_candidate_plan(
                 binary=args.binary.resolve(), data_dir=args.data_dir,
@@ -723,14 +1046,16 @@ def main() -> int:
                 contract=contract, candidate_id=args.candidate,
                 stage_name=args.stage, variant=args.variant,
             )
-        else:
+        elif args.command in {"decide", "recompose-legacy"}:
             result = decide(
                 baseline_run=args.baseline_run, candidate_run=args.candidate_run,
                 binary=args.binary.resolve(), contract=contract,
                 candidate_id=args.candidate, stage_name=args.stage,
-                variant=args.variant,
+                variant=args.variant, legacy_recomposition=args.command == "recompose-legacy",
             )
             atomic_json(args.out, result)
+        else:
+            raise RemediationError(f"unhandled command {args.command!r}")
         print(json.dumps(result, indent=2, sort_keys=True, ensure_ascii=False))
         return 0
     except (OSError, json.JSONDecodeError, RunnerError, RemediationError) as error:

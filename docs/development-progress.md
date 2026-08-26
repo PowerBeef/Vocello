@@ -47,28 +47,29 @@ machine-readable status record and wins over any older prose.
 | 13 — Benchmark/history v3 | Live 2026-07-29: the first schema-v3 records are committed (three clean `phase0-cli-control-*` engine records plus one exploratory run that also exposed and fixed the summarizer's v3 pin). `benchmarks/schema-v3.json` adds the typed quality identity to generation takes (pass/warning only, five fast gates required, machine-code issues); v1/v2 records stay valid immutable history; the publisher stamps v3 only when every take carries the identity. The UI benchmark checkers folded the same identity 2026-08-01: ui-generation records now publish v3 (first: the focused `v3-fold-proof` record `macos-xcui-benchmark-20260801-003208-403989cf`); the canonical iOS matrix published its first v3 record 2026-08-01 (`ios-xcui-benchmark-20260801-132415-abbec96b`). |
 | 14 — Organization and retirement | Closed 2026-07-23 (14a + 14b): compatibility SPI retired, actor-owned loading/metadata/priming/clone artifacts, clone conditioning epoch-bound end to end. |
 
-## Resume here (2026-08-25)
+## Resume here (2026-08-26)
 
-**DP-30 autonomous per-preset screen completed; no candidate advances and production copy is
-preserved (2026-08-25, macOS/CLI):** commit `1a0d263d` pre-registered six exact prompt candidates,
-four fixed development seeds, Aiden/Ryan English plus Vivian Chinese and Sohee Korean, shared
-same-speaker neutral controls, competing-preset guards, global/temporal feature weights, paired
-bootstrap rules, and a bounded automatic result vocabulary before fresh generation. All six Speed
-screens then ran serially with one generator or analyzer process at a time. No candidate emitted
-`automatic_acoustic_improvement`, so the contract correctly kept script-interaction, powered, and
-untouched variant stages closed.
+**DP-30 automatic evaluation corrected and all six retained screens recomposed; no candidate
+advances (2026-08-26, macOS/CLI):** the scoring audit found two material v1 weaknesses: any positive
+signed feature movement received full credit, and absolute target/competitor distance discarded
+which preset actually ranked higher. Schema v2 now uses bounded magnitude bands reproduced from an
+independent 64-row pre-candidate acoustic cohort and reports signed target-minus-competitor margin,
+wrong-order rate, tiny-movement rejection, and overdrive penalties. Completed rows missing analysis
+still fail closed; genuinely failed planned rows remain zero in the denominator under the existing
+completion and hard-failure rules. Explicit source-bound legacy recomposition preserves the v1
+files and cannot be invoked through ordinary `decide`.
 
-Happy acoustic and Surprised onset were clean-generation regressions because they reduced separation
-from Surprised/Happy; the explicit-emotion Happy and Angry arms abstained after new hard rows and
-intervals that crossed zero. Fearful urgent improved mean score (+0.125) and removed the target's
-hard failure, but the screen was incomplete and Fearful/Sad separation regressed. Fearful structured
-was worse, with six failed rows and lower adherence. Two independent Fearful/Sad baselines
-reproduced four exact failed identities—one Fearful Vivian/Mandarin, two Sad Vivian/Mandarin, and one
-Sad Sohee/Korean—and Fearful outputs as long as 112.8 seconds. That topology is not four Fearful
-failures and is not evidence for weakening QC. Current production instructions remain unchanged;
-automatic evidence made no semantic or publication claim. DP-30 is done for this candidate family,
-while DP-28/DP-29 and the DP-31/DP-32 human semantic boundary remain open. See
-[`delivery-harness.md`](reference/delivery-harness.md) §2.7 and the authoritative roadmap.
+The same retained plans/WAVs/acoustic layers were recomposed without new generation. Happy acoustic
+is regression because its +0.019584 bounded gain misses the floor and Happy still ranks below
+Surprised at the median; Happy emotion+acoustic and Angry are regressions because each has one new
+hard row, even though Angry now has a positive signed margin and a positive score interval. Fearful
+urgent is inconclusive with +0.003339 score gain; Fearful structured remains out-of-distribution and
+regresses; Surprised onset has no measured improvement and lower adherence. No result is
+`automatic_acoustic_improvement`, so the contract still keeps script-interaction, powered, and
+untouched variant stages closed. Production instructions remain unchanged. These automatic metrics
+calibrate acoustics only: DP-28 and DP-31 remain open because human-labelled, speaker/script/language-
+distributed evidence is still required for semantic tone-delivery authority. See
+[`delivery-harness.md`](reference/delivery-harness.md) §2.6–§2.7 and the authoritative roadmap.
 
 **Happy, Angry, Fearful, and Surprised have a maintainer-directed production-copy checkpoint
 awaiting semantic confirmation (2026-08-25, macOS/CLI):** the 2026-08-24 engineering handout

@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "status": "active-experimental",
   "boundary": "Operator-local automatic acoustic screening only. It may reject, rank, or retain a prompt candidate, but it has no semantic promotion authority, cannot claim human-perceived superiority, cannot publish evidence, and cannot alter production copy without the separately governed DP-31/DP-32 authority.",
   "baselineArm": "current",
@@ -24,6 +24,84 @@
     "calm",
     "whisper"
   ],
+  "scoring": {
+    "algorithm": "bounded-magnitude-v2",
+    "calibration": {
+      "kind": "independent-pre-candidate-acoustic-cohort",
+      "manifestDigest": "a111cbafdc0642f648f0c40bf8bb067591c65458d99c0f313e7296bf2274dff2",
+      "rowCount": 64,
+      "rowsPerPreset": 8,
+      "quantileMethod": "linear-r7",
+      "minimumAbsoluteQuantile": 0.25,
+      "fullCreditAbsoluteQuantile": 0.5,
+      "minimumFloorFractionOfFullCredit": 0.1,
+      "overdriveMultiplierFromObservedMaximum": 2.0,
+      "humanPerceptualAuthority": false,
+      "bands": {
+        "happy": {
+          "global": {
+            "pitch_shift_semitones": {"minimum": 1.988757, "fullCredit": 2.487573, "overdrive": 10.809884},
+            "arousal_score": {"minimum": 1.84125, "fullCredit": 2.4775, "overdrive": 31.62},
+            "rate_delta_hz": {"minimum": 0.34, "fullCredit": 0.565, "overdrive": 3.16},
+            "voice_tension_score": {"minimum": 0.8525, "fullCredit": 1.861667, "overdrive": 8.743333}
+          },
+          "temporal": {
+            "cadenceAccelerationHz": {"minimum": 0.971151, "fullCredit": 1.974456, "overdrive": 13.595133}
+          }
+        },
+        "angry": {
+          "global": {
+            "arousal_score": {"minimum": 1.57625, "fullCredit": 4.2275, "overdrive": 40.02},
+            "voice_tension_score": {"minimum": 2.44, "fullCredit": 4.2375, "overdrive": 22.416667},
+            "rate_delta_hz": {"minimum": 0.3325, "fullCredit": 0.505, "overdrive": 2.64},
+            "voice_breathiness_score": {"minimum": 0.39625, "fullCredit": 0.575, "overdrive": 2.08}
+          },
+          "temporal": {
+            "tensionPersistence": {"minimum": 0.2, "fullCredit": 0.3, "overdrive": 0.8},
+            "contourAbruptnessHz": {"minimum": 17.8125, "fullCredit": 21.5625, "overdrive": 184.75}
+          }
+        },
+        "fearful": {
+          "global": {
+            "pitch_shift_semitones": {"minimum": 5.049965, "fullCredit": 5.383491, "overdrive": 17.262205},
+            "arousal_score": {"minimum": 4.375, "fullCredit": 7.3175, "overdrive": 45.09},
+            "rate_delta_hz": {"minimum": 0.5725, "fullCredit": 0.77, "overdrive": 3.22},
+            "pause_ratio_delta": {"minimum": 0.02125, "fullCredit": 0.0535, "overdrive": 0.394}
+          },
+          "temporal": {
+            "tremorPersistenceHz": {"minimum": 2.831307, "fullCredit": 5.235087, "overdrive": 44.303895},
+            "maximumLocalRiseHz": {"minimum": 11.34375, "fullCredit": 25.0, "overdrive": 158.0},
+            "contourAbruptnessHz": {"minimum": 14.59375, "fullCredit": 31.4375, "overdrive": 223.0}
+          }
+        },
+        "surprised": {
+          "global": {
+            "pitch_shift_semitones": {"minimum": 1.352417, "fullCredit": 5.93748, "overdrive": 19.789705}
+          },
+          "temporal": {
+            "onsetToPeakPitchHz": {"minimum": 7.125, "fullCredit": 19.375, "overdrive": 178.5},
+            "maximumLocalRiseHz": {"minimum": 19.5625, "fullCredit": 31.1875, "overdrive": 165.5},
+            "normalizedPeakPosition": {"minimum": 0.0375, "fullCredit": 0.375, "overdrive": 2.0},
+            "peakToEndPitchHz": {"minimum": 6.40625, "fullCredit": 13.25, "overdrive": 165.0},
+            "contourAbruptnessHz": {"minimum": 10.65625, "fullCredit": 27.0625, "overdrive": 194.5},
+            "phraseFinalPitchSlopeHz": {"minimum": 11.21875, "fullCredit": 44.125, "overdrive": 272.75}
+          }
+        }
+      }
+    },
+    "separation": {
+      "algorithm": "signed-target-minus-competitor-v2",
+      "requireStrictPositiveCandidateMedianMargin": true,
+      "maximumMedianMarginRegression": 0.0,
+      "maximumWrongOrderRateRegression": 0.0
+    },
+    "legacyRecomposition": {
+      "schemaVersion": 1,
+      "contractDigest": "0d4267ac7b0a9f814db267dc33a13a10d78fb9d305339dc2efca29aa4399d936",
+      "composerSHA256": "b16fc519aa292d74033fa86dc7f95ef6ccc670b8f268ac2ff41214ad4bc443a2",
+      "decisionFilename": "automatic-decision-v2-recomposed.json"
+    }
+  },
   "candidates": [
     {
       "id": "happy-acoustic-v2",
@@ -146,7 +224,7 @@
       "minimumCompletionRate": 0.9,
       "minimumScoreImprovement": 0.05,
       "minimumAdherenceImprovement": 0.0,
-      "requirePositiveBootstrapLower": false
+      "requirePositiveBootstrapLower": true
     },
     "script-interaction": {
       "split": "development",
@@ -164,7 +242,7 @@
       "minimumCompletionRate": 0.95,
       "minimumScoreImprovement": 0.1,
       "minimumAdherenceImprovement": 0.1,
-      "requirePositiveBootstrapLower": false
+      "requirePositiveBootstrapLower": true
     },
     "powered": {
       "split": "development",
@@ -230,7 +308,6 @@
     "maximumAbsoluteWEROrCERRegression": 0.01,
     "maximumMedianSpeakerSimilarityRegression": 0.02,
     "maximumMedianRelativeUTMOSRegression": 0.1,
-    "maximumCompetingPresetDistanceRegression": 0.0,
     "allowAutomaticSemanticPromotion": false,
     "allowAutomaticPublication": false
   }

@@ -287,7 +287,9 @@ ten-preset roster: for five presets the nearest cell in the whole space was its 
 seven of nine non-neutral presets moved *less* at strong than at normal, and the since-retired
 `dramatic` reversed outright (the roster was cut to 8 on 2026-08-03 — see
 [`delivery-control-audit-2026-08.md`](delivery-control-audit-2026-08.md)). Every
-preset therefore ships its strong copy. Since 2026-08-04 the eight presets also carry the
+preset therefore initially shipped its strong copy. The later measured shipped-tier policy keeps
+`happy` and `angry` at Normal while every other preset retains Strong; legacy drafts continue to
+use the exact raw instruction they stored. Since 2026-08-04 the eight presets also carry the
 measured recognizability split (`EmotionPreset.distinctDeliveryIDs`): Neutral, Calm,
 Whisper, and Sad present as distinct deliveries, while Happy, Angry, Fearful, and
 Surprised present as directional hints with advisory copy — the measurement program and
@@ -302,7 +304,7 @@ stored. The table below is that internal pair; the second column is what ships.
 | `neutral` | Neutral (steady, slightly monotone) | same |
 | `happy` | Happy and upbeat, smiling | High pitch, loud, fast, bright, without laughing |
 | `sad` | Heavy, restrained, lowered pitch | Fragile, tearful, slow, clear words |
-| `angry` | Firm, sharp consonants | Forceful tension, not screaming |
+| `angry` | Fiercely angry/frustrated, tense force, clipped consonants, fast emphasis | Forceful tension, hostile resentment |
 | `fearful` | Anxious, breath caught | Trembling panic, still audible |
 | `surprised` | Pitch jumps, quick, astonished | High rising pitch, amazed, no gasping |
 | `whisper` | Hushed, breathy, confidential | Urgent, barely voiced, secretive |
@@ -337,6 +339,16 @@ carries the full adjudication with references. Summary:
 - **Custom Voice**: detect from the target text; fall back to `english`.
 - **Voice Design**: detect from the target text; fall back to `auto`.
 - **Voice Clone**: detect from the resolved transcript if available, otherwise from the target text; fall back to `auto`.
+
+### 7.3 Delivery-instruction language routing
+
+Canonical delivery instructions remain English by default. The sole versioned localized cell is
+`angry.normal`: CustomVoice uses its Mandarin instruction only when the selected speaker's
+`nativeLanguage` comes from `qwenvoice_contract.json` as Chinese and the resolved output language
+is also Chinese. Either predicate missing falls back to canonical English. Custom instructions and
+legacy History strings carry no delivery-cell identity, remain verbatim, and are never relocalized.
+The engine receipt records the actual instruction language and final digest; the English diction
+clause is retained for English output and is never appended to Mandarin.
 
 Detection order:
 

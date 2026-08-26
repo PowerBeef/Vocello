@@ -34,6 +34,31 @@ public enum EmotionIntensity: Int, CaseIterable, Identifiable, Sendable {
     }
 }
 
+/// Language carried by a versioned, repository-owned delivery instruction.
+/// `.verbatim` describes caller-authored or legacy text whose language the
+/// engine deliberately does not infer or rewrite.
+public enum DeliveryInstructionLanguage: String, Codable, Hashable, Sendable {
+    case english
+    case mandarin
+    case verbatim
+}
+
+public struct DeliveryInstructionVariant: Equatable, Sendable {
+    public let version: String
+    public let language: DeliveryInstructionLanguage
+    public let instruction: String
+
+    public init(
+        version: String,
+        language: DeliveryInstructionLanguage,
+        instruction: String
+    ) {
+        self.version = version
+        self.language = language
+        self.instruction = instruction
+    }
+}
+
 public struct DeliveryInstructionCell: Equatable, Sendable {
     public let id: String
     public let preset: EmotionPreset
@@ -138,6 +163,16 @@ public struct DeliveryProfile: Equatable, Sendable {
         !isNeutral
     }
 
+    /// Stable context for repository-owned preset selections. Custom and
+    /// legacy raw instructions intentionally return nil so they remain
+    /// verbatim even when their text happens to equal current preset copy.
+    public var instructionCellID: String? {
+        guard customText == nil,
+              let presetID,
+              let intensity else { return nil }
+        return "\(presetID).\(intensity.rpcValue)"
+    }
+
     public static func preset(_ preset: EmotionPreset, intensity: EmotionIntensity) -> DeliveryProfile {
         DeliveryProfile(
             presetID: preset.id,
@@ -182,6 +217,29 @@ public struct EmotionPreset: Identifiable, Sendable {
         return instructions[intensity] ?? instructions[.normal] ?? DeliveryProfile.neutralInstruction
     }
 
+    public func instructionVariant(
+        for intensity: EmotionIntensity,
+        language: DeliveryInstructionLanguage
+    ) -> DeliveryInstructionVariant? {
+        guard id == "angry", intensity == .normal else { return nil }
+        switch language {
+        case .english:
+            return DeliveryInstructionVariant(
+                version: EmotionPreset.angryBilingualV3Version,
+                language: .english,
+                instruction: EmotionPreset.angryBilingualV3English
+            )
+        case .mandarin:
+            return DeliveryInstructionVariant(
+                version: EmotionPreset.angryBilingualV3Version,
+                language: .mandarin,
+                instruction: EmotionPreset.angryBilingualV3Mandarin
+            )
+        case .verbatim:
+            return nil
+        }
+    }
+
     /// DP-3 experiment arm. Returns nil in production.
     ///
     /// `QWENVOICE_DELIVERY_INSTRUCTION_SET=short` swaps every preset for an
@@ -205,6 +263,9 @@ public struct EmotionPreset: Identifiable, Sendable {
             return shortInstructions[id]?[intensity]
         case "candidate-v2":
             return candidateV2Instructions[id]?[intensity]
+        case angryBilingualV3Version:
+            guard id == "angry", intensity == .normal else { return nil }
+            return angryBilingualV3English
         default:
             return nil
         }
@@ -215,6 +276,12 @@ public struct EmotionPreset: Identifiable, Sendable {
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()
     }()
+
+    public static let angryBilingualV3Version = "angry-bilingual-v3"
+    public static let angryBilingualV3English =
+        "Sound fiercely angry and frustrated. Use a tense, forceful voice, hard clipped consonants, strong energy, and fast emphatic pacing."
+    public static let angryBilingualV3Mandarin =
+        "语气要强烈愤怒、充满挫败感。使用紧张有力的声音、硬朗辅音、短促重音、强能量和快速强调的节奏。"
 
     /// Modelled directly on the documented upstream examples: a bare adjective
     /// phrase, or `Say it in a … tone`, with the strong tier adding the single
@@ -497,7 +564,7 @@ public struct EmotionPreset: Identifiable, Sendable {
             label: "Angry",
             sfSymbol: "flame",
             instructions: [
-                .normal: "Speak with controlled resentment and unmistakable irritation. Use a dry tense resonance, clipped consonants, compressed phrasing, and sharp deliberate stress; sound hostile and confrontational rather than energetic or triumphant.",
+                .normal: EmotionPreset.angryBilingualV3English,
                 .strong: "Speak with fierce controlled anger and seething resentment. Use a harsher tense resonance, biting consonants, compressed forceful phrasing, and hard deliberate stress; sound openly hostile and confrontational rather than excited or triumphant.",
             ]
         ),

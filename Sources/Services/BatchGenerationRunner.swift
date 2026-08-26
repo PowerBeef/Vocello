@@ -137,6 +137,7 @@ struct BatchGenerationRequest {
     let segmentationMode: BatchSegmentationMode
     let voice: String?
     let emotion: String?
+    let deliveryInstructionCellID: String?
     let languageHint: String?
     let voiceDescription: String?
     let refAudio: String?
@@ -161,6 +162,7 @@ struct BatchGenerationRequest {
         segmentationMode: BatchSegmentationMode = .lineSeparated,
         voice: String?,
         emotion: String?,
+        deliveryInstructionCellID: String? = nil,
         languageHint: String? = nil,
         voiceDescription: String?,
         refAudio: String?,
@@ -173,6 +175,7 @@ struct BatchGenerationRequest {
         self.segmentationMode = segmentationMode
         self.voice = voice
         self.emotion = emotion
+        self.deliveryInstructionCellID = deliveryInstructionCellID
         self.languageHint = languageHint
         self.voiceDescription = voiceDescription
         self.refAudio = refAudio
@@ -308,7 +311,8 @@ struct BatchGenerationRequest {
                         : nil
                 ),
                 seed: segmentSeed(batchIndex: rawBatchIndex, seedOverride: seedOverride),
-                variation: GenerationVariationPreference.requestValue()
+                variation: GenerationVariationPreference.requestValue(),
+                deliveryInstructionCellID: deliveryInstructionCellID
             )
         case .design:
             return QwenVoiceNative.GenerationRequest(

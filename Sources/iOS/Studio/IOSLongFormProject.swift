@@ -88,6 +88,7 @@ struct IOSLongFormProjectRequest {
     let plan: LongFormPlan
     let voice: String?
     let emotion: String?
+    let deliveryInstructionCellID: String?
     let languageHint: String?
     let voiceDescription: String?
     let refAudio: String?
@@ -149,7 +150,8 @@ struct IOSLongFormProjectRequest {
             payload: payload,
             generationID: generationID,
             seed: seed,
-            variation: IOSGenerationVariationPreference.requestValue()
+            variation: IOSGenerationVariationPreference.requestValue(),
+            deliveryInstructionCellID: mode == .custom ? deliveryInstructionCellID : nil
         )
     }
 

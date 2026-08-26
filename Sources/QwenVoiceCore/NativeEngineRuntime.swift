@@ -244,6 +244,7 @@ actor NativeEngineRuntime {
     /// same-clock memory boundary sample while a generation is active.
     private var activeTelemetrySampler: NativeTelemetrySampler?
     private let customPrewarmPolicy: NativeCustomPrewarmPolicy
+    private let speakerNativeLanguages: [String: String]
     private let diagnosticEventSink: (@Sendable (String, [String: String]) async -> Void)?
     private let diagnosticAppSupportBox: DiagnosticAppSupportBox?
 
@@ -287,6 +288,7 @@ actor NativeEngineRuntime {
         lightweightWarmupText: String,
         telemetryRecorder: NativeTelemetryRecorder? = nil,
         customPrewarmPolicy: NativeCustomPrewarmPolicy = .eager,
+        speakerNativeLanguages: [String: String] = [:],
         diagnosticAppSupportBox: DiagnosticAppSupportBox? = nil,
         diagnosticEventSink: (@Sendable (String, [String: String]) async -> Void)? = nil
     ) {
@@ -296,6 +298,7 @@ actor NativeEngineRuntime {
         self.lightweightWarmupText = lightweightWarmupText
         self.telemetryRecorder = telemetryRecorder
         self.customPrewarmPolicy = customPrewarmPolicy
+        self.speakerNativeLanguages = speakerNativeLanguages
         self.diagnosticAppSupportBox = diagnosticAppSupportBox
         self.diagnosticEventSink = diagnosticEventSink
     }
@@ -445,6 +448,7 @@ actor NativeEngineRuntime {
         for request: GenerationRequest,
         customPrewarmDepth: String? = nil
     ) async throws -> InteractivePrefetchDiagnostics {
+        try GenerationSemantics.validateDeliveryInstructionIdentity(for: request)
         try GenerationSemantics.validateQwenPromptContract(for: request)
         let descriptorCapabilities = try await loadCoordinator.qwen3Capabilities(for: request.modelID)
         try Self.validateCloneConditioningCapability(
@@ -587,6 +591,7 @@ actor NativeEngineRuntime {
         activeTelemetrySampler = telemetrySampler
         await telemetrySampler?.start()
         await telemetrySampler?.captureBoundary("before_preparation")
+        var receiptCapabilities: Qwen3TTSModelCapabilities?
         do {
         let benchNotes = BenchRunContext.telemetryNotes()
         let benchRunID = benchNotes["benchRunID"] ?? "not-bench"
@@ -607,6 +612,7 @@ actor NativeEngineRuntime {
             )
         }
         let descriptorCapabilities = try await loadCoordinator.qwen3Capabilities(for: request.modelID)
+        receiptCapabilities = descriptorCapabilities
         try Self.validateCloneConditioningCapability(
             for: request,
             capabilities: descriptorCapabilities
@@ -832,6 +838,7 @@ actor NativeEngineRuntime {
             memoryPolicy: memoryPolicy,
             samplingConfiguration: samplingConfiguration,
             cloneConditioning: cloneConditioning,
+            speakerNativeLanguage: speakerNativeLanguage(for: request),
             booleanFlags: &booleanFlags,
             stringFlags: &stringFlags
         )
@@ -842,7 +849,8 @@ actor NativeEngineRuntime {
             memoryPolicy: memoryPolicy,
             samplingConfiguration: samplingConfiguration,
             requestMemory: requestMemory,
-            cloneConditioning: cloneConditioning
+            cloneConditioning: cloneConditioning,
+            speakerNativeLanguage: speakerNativeLanguage(for: request)
         )
         let cloneHandle: VocelloQwen3CloneHandle?
         if case .voiceClone = actorRequest.input {
@@ -860,6 +868,11 @@ actor NativeEngineRuntime {
         let predecessorDigest = BenchRunContext.telemetryNotes()["startupPredecessorIdentityDigest"]
         let requestReceipt = GenerationRequestReceipt(
             request: request,
+            resolvedInstruction: resolvedInstruction(from: actorRequest),
+            instructionLanguage: resolvedInstructionLanguage(
+                for: request,
+                capabilities: loadResult.qwen3Capabilities
+            ),
             generationID: generationID,
             effectiveSeed: samplingConfiguration.effectiveSeed,
             warmState: loadResult.didLoad ? .cold : .warm,
@@ -867,6 +880,15 @@ actor NativeEngineRuntime {
             retryAttempt: retryAttempt,
             operationGeneration: operationGeneration
         )
+        if let language = requestReceipt.instructionLanguage {
+            stringFlags["delivery_instruction_language"] = language
+        }
+        if let digest = requestReceipt.instructionDigest {
+            stringFlags["delivery_instruction_digest"] = digest
+        }
+        if let deliveryID = requestReceipt.deliveryID {
+            stringFlags["delivery_instruction_cell_id"] = deliveryID
+        }
         return NativePreparedGeneration(
             // Reuse the app-minted ID so app/middle/engine telemetry rows correlate;
             // fall back to a fresh UUID for callers (e.g. internal batch) passing nil.
@@ -925,6 +947,12 @@ actor NativeEngineRuntime {
                     notes: failureNotes,
                     requestReceipt: GenerationRequestReceipt(
                         request: request,
+                        resolvedInstruction: receiptCapabilities.flatMap {
+                            resolvedInstruction(for: request, capabilities: $0)
+                        },
+                        instructionLanguage: receiptCapabilities.flatMap {
+                            resolvedInstructionLanguage(for: request, capabilities: $0)
+                        },
                         generationID: generationID,
                         effectiveSeed: samplingConfiguration.effectiveSeed,
                         warmState: receiptWarmState,
@@ -962,7 +990,8 @@ actor NativeEngineRuntime {
         memoryPolicy: NativeMemoryPolicy,
         samplingConfiguration: VocelloQwen3SamplingConfiguration,
         requestMemory: VocelloQwen3MemoryConfiguration,
-        cloneConditioning: ResolvedCloneConditioning?
+        cloneConditioning: ResolvedCloneConditioning?,
+        speakerNativeLanguage: String?
     ) throws -> VocelloQwen3SynthesisRequest {
         let effectiveInterval = NativeMemoryPolicyResolver.effectiveStreamingInterval(
             requested: request.streamingInterval,
@@ -990,7 +1019,8 @@ actor NativeEngineRuntime {
             for: request,
             capabilities: capabilities,
             resolvedCloneTranscript: cloneConditioning?.resolvedTranscript,
-            spokenText: spokenText
+            spokenText: spokenText,
+            speakerNativeLanguage: speakerNativeLanguage
         )
         let input: VocelloQwen3SynthesisInput
         switch request.payload {
@@ -1376,7 +1406,8 @@ actor NativeEngineRuntime {
                 let capabilities = try await loadCoordinator.qwen3Capabilities(for: request.modelID)
                 let prompt = GenerationSemantics.qwen3PromptAssembly(
                     for: request,
-                    capabilities: capabilities
+                    capabilities: capabilities,
+                    speakerNativeLanguage: speakerNativeLanguage(for: request)
                 )
                 try await model.prewarmCustomVoice(
                     text: lightweightWarmupText,
@@ -1622,7 +1653,8 @@ actor NativeEngineRuntime {
         ]
         let prompt = GenerationSemantics.qwen3PromptAssembly(
             for: request,
-            capabilities: capabilities
+            capabilities: capabilities,
+            speakerNativeLanguage: speakerNativeLanguage(for: request)
         )
         details["qwen3_prompt_mode"] = prompt.mode.rawValue
         details["qwen3_prompt_language"] = prompt.language
@@ -1762,7 +1794,8 @@ actor NativeEngineRuntime {
         let capabilities = try await loadCoordinator.qwen3Capabilities(for: request.modelID)
         let prompt = GenerationSemantics.qwen3PromptAssembly(
             for: request,
-            capabilities: capabilities
+            capabilities: capabilities,
+            speakerNativeLanguage: speakerNativeLanguage(for: request)
         )
         let language = prompt.language
         guard let conditioningWarmIdentity = GenerationSemantics.designConditioningIdentity(for: request) else {
@@ -1889,9 +1922,17 @@ actor NativeEngineRuntime {
     ) -> GenerationSemantics.PrewarmIdentity? {
         switch request.payload {
         case .custom:
+            let delivery = GenerationSemantics.resolvedDeliveryInstruction(
+                for: request,
+                speakerNativeLanguage: speakerNativeLanguage(for: request)
+            )
+            let finalInstruction = GenerationSemantics.englishDictionReinforcedInstruction(
+                baseInstruction: delivery.instruction,
+                language: GenerationSemantics.qwenLanguageHint(for: request)
+            )
             return GenerationSemantics.prewarmIdentity(
-                modelID: request.modelID,
-                mode: request.mode
+                for: request,
+                resolvedCustomInstruction: finalInstruction
             )
         case .design:
             return GenerationSemantics.prewarmIdentity(
@@ -1901,6 +1942,42 @@ actor NativeEngineRuntime {
         case .clone:
             return nil
         }
+    }
+
+    private func speakerNativeLanguage(for request: GenerationRequest) -> String? {
+        guard case .custom(let speakerID, _) = request.payload else { return nil }
+        return speakerNativeLanguages[
+            speakerID.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        ]
+    }
+
+    private func resolvedInstruction(
+        for request: GenerationRequest,
+        capabilities: Qwen3TTSModelCapabilities
+    ) -> String? {
+        GenerationSemantics.qwen3PromptAssembly(
+            for: request,
+            capabilities: capabilities,
+            speakerNativeLanguage: speakerNativeLanguage(for: request)
+        ).instruct
+    }
+
+    private func resolvedInstructionLanguage(
+        for request: GenerationRequest,
+        capabilities: Qwen3TTSModelCapabilities
+    ) -> DeliveryInstructionLanguage? {
+        GenerationSemantics.qwen3PromptAssembly(
+            for: request,
+            capabilities: capabilities,
+            speakerNativeLanguage: speakerNativeLanguage(for: request)
+        ).instructionLanguage
+    }
+
+    private func resolvedInstruction(
+        from actorRequest: VocelloQwen3SynthesisRequest
+    ) -> String? {
+        guard case .customVoice(_, let instruction) = actorRequest.input else { return nil }
+        return instruction
     }
 
     private func clearCloneState(
@@ -1958,6 +2035,7 @@ actor NativeEngineRuntime {
         memoryPolicy: NativeMemoryPolicy,
         samplingConfiguration: VocelloQwen3SamplingConfiguration,
         cloneConditioning: ResolvedCloneConditioning?,
+        speakerNativeLanguage: String?,
         booleanFlags: inout [String: Bool],
         stringFlags: inout [String: String]
     ) {
@@ -2031,7 +2109,8 @@ actor NativeEngineRuntime {
             let shippingPrompt = GenerationSemantics.qwen3PromptAssembly(
                 for: request,
                 capabilities: qwen3Capabilities,
-                resolvedCloneTranscript: cloneConditioning?.resolvedTranscript
+                resolvedCloneTranscript: cloneConditioning?.resolvedTranscript,
+                speakerNativeLanguage: speakerNativeLanguage
             )
             let shippingConditioning: CoreConditioningPlan
             switch request.payload {
@@ -2075,7 +2154,8 @@ actor NativeEngineRuntime {
                     outputPolicy: outputPolicy,
                     qualityPolicy: qualityPolicy,
                     cloneConditioningDigest: cloneConditioning?.internalIdentity.digest,
-                    resolvedCloneTranscript: cloneConditioning?.resolvedTranscript
+                    resolvedCloneTranscript: cloneConditioning?.resolvedTranscript,
+                    speakerNativeLanguage: speakerNativeLanguage
                 ),
                 shipping: GenerationShippingResolutionSnapshot(
                     originalText: request.text,

@@ -21,6 +21,7 @@ public struct GenerationPlanShadowInputs: Sendable {
     public let qualityPolicy: ProductQualityPolicy
     public let cloneConditioningDigest: String?
     public let resolvedCloneTranscript: String?
+    public let speakerNativeLanguage: String?
 
     public init(
         request: GenerationRequest,
@@ -35,7 +36,8 @@ public struct GenerationPlanShadowInputs: Sendable {
         outputPolicy: ProductOutputPlan,
         qualityPolicy: ProductQualityPolicy,
         cloneConditioningDigest: String? = nil,
-        resolvedCloneTranscript: String? = nil
+        resolvedCloneTranscript: String? = nil,
+        speakerNativeLanguage: String? = nil
     ) {
         self.request = request
         self.resolvedGenerationID = resolvedGenerationID
@@ -50,6 +52,7 @@ public struct GenerationPlanShadowInputs: Sendable {
         self.qualityPolicy = qualityPolicy
         self.cloneConditioningDigest = cloneConditioningDigest
         self.resolvedCloneTranscript = resolvedCloneTranscript
+        self.speakerNativeLanguage = speakerNativeLanguage
     }
 }
 
@@ -206,7 +209,8 @@ public enum GenerationPlanShadowMapper {
         let prompt = GenerationSemantics.qwen3PromptAssembly(
             for: inputs.request,
             capabilities: inputs.modelCapabilities,
-            resolvedCloneTranscript: inputs.resolvedCloneTranscript
+            resolvedCloneTranscript: inputs.resolvedCloneTranscript,
+            speakerNativeLanguage: inputs.speakerNativeLanguage
         )
 
         let conditioning: CoreConditioningPlan

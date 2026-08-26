@@ -437,6 +437,7 @@ struct BatchGenerationSheet: View {
                     segmentationMode: segmentationMode,
                     voice: voice,
                     emotion: emotion,
+                    deliveryInstructionCellID: deliveryProfile?.instructionCellID,
                     languageHint: languageHint,
                     voiceDescription: voiceDescription,
                     refAudio: refAudio,

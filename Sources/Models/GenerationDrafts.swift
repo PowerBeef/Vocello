@@ -14,6 +14,7 @@ struct CustomVoiceDraft: Equatable {
     // old .english default's behavior is preserved for English scripts.
     var selectedLanguage = Qwen3SupportedLanguage.auto
     var emotion = EmotionPreset.neutralPresetInstruction
+    var deliveryProfile: DeliveryProfile? = .neutral
     var text = ""
 
     var hasText: Bool {
@@ -30,6 +31,7 @@ struct CustomVoiceDraft: Equatable {
             selectedSpeaker,
             selectedLanguage.rawValue,
             emotion,
+            deliveryProfile?.instructionCellID ?? "verbatim",
             text,
         ].joined(separator: "|")
     }

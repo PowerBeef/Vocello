@@ -10,7 +10,7 @@
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
 | `autonomous-validation-remediation-2026-08` | active | release-qa | 5/11 (45%) |
-| `delivery-prompting-2026-08` | active | backend-mlx | 28/33 (85%) |
+| `delivery-prompting-2026-08` | active | backend-mlx | 29/34 (85%) |
 | `engineering-review-remediation-2026-08` | active | backend-and-platform | 3/14 (21%) |
 | `ios-generation-startup-reliability-2026-08` | active | backend-and-platform | 4/6 (67%) |
 | `model-delivery-2026-08` | active | release-qa | 2/3 (67%) |
@@ -107,6 +107,7 @@ Narrative authority: [`docs/reference/qwen3-tts-prompting-guide.md`](reference/q
 | `DP-31` | planned | Confirm Speed and Quality candidates with untouched blinded listening | `file:scripts/tests/test_delivery_listening_session.py`, `file:scripts/tests/test_delivery_promotion_decision.py`, `file:scripts/tests/test_delivery_statistics.py` |
 | `DP-32` | planned | Promote only qualifying delivery changes and revalidate all modes | — |
 | `DP-33` | declined | Calibrate abnormal cadence detection without hiding valid expressive pauses | — |
+| `DP-34` | done | Promote the maintainer-directed Angry normal bilingual routing checkpoint | `file:Tests/VocelloCoreTests/EmotionPresetResolutionTests.swift`, `file:Tests/VocelloCoreTests/GenerationSemanticsLanguageTests.swift`, `file:Tests/VocelloCoreTests/GenerationStartupDiagnosticsTests.swift`, `file:scripts/tests/test_angry_bilingual_safety_matrix.py`, `doc:docs/reference/delivery-harness.md` |
 
 ### Open items in detail
 

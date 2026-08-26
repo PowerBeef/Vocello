@@ -377,6 +377,17 @@ asymmetry is real and it favours Chinese.
 `UNVERIFIED`. Whether a Chinese instruction paired with English output text transfers cleanly is
 undocumented and I found no experiment either way. Worth an A/B (§10.5); do not ship it on faith.
 
+`MEASURED-HERE`, **maintainer-directed routing checkpoint, 2026-08-26.** Vocello now uses the
+versioned Mandarin instruction only for canonical `angry.normal` when CustomVoice has both a
+speaker whose native language is `Chinese` in `qwenvoice_contract.json` and resolved Chinese
+output. A Chinese-native speaker producing English and a non-Chinese-native speaker producing
+Chinese both retain canonical English. Custom instructions and legacy raw strings are never
+localized. Before the copy became the default, a debug-only arm completed 36/36 serial Speed
+takes across four fixed seeds, five Chinese-native speakers, two English controls, and both
+fallback directions with exact instruction-language/digest receipts and no hard generation or
+audio-QC failure. That screen establishes routing and generation safety only; it is not evidence
+that listeners perceive better anger, and DP-31/DP-32 remain open.
+
 ### 4.5 What does not work
 
 `COMMUNITY`, well-evidenced. Upstream issue #248 systematically tested twelve instructions with
@@ -635,7 +646,7 @@ settled one.
 | `think`/`nothink` branch | implemented; Design and Clone fall back to `nothink` |
 | Design merge template | `Voice character: … Delivery: …`, a repo invention |
 | English diction sentence | appended conditionally — see below |
-| Instruction receipt (2026-08-04) | every instructed take's telemetry row stamps `instructChars`/`instructDigest` from the request payload; the delivery harness verifies it fail-closed against the bench manifest echo ([`delivery-harness.md`](delivery-harness.md) §4) |
+| Instruction receipt (updated 2026-08-26) | every instructed take records the final model-facing instruction digest, instruction language, and optional canonical delivery-cell identity; the delivery harness verifies them fail closed ([`delivery-harness.md`](delivery-harness.md) §4) |
 
 Three of the four hazards that the research pass flagged as likely causes of "delivery sounds off"
 in MLX ports do not apply to this checkout. That is worth stating plainly, because it narrows the
@@ -731,13 +742,16 @@ It reports that the two disagree and that one of them is wrong, without presumin
 historical `angry` findings were removed with the maintainer-directed 2026-08-24 copy remediation;
 the acknowledged-finding list is now empty and will fail closed if either conflict returns.
 
-`MEASURED-HERE`, source-level application on 2026-08-25. The remediation uses plain-language,
+`MEASURED-HERE`, source-level application on 2026-08-25, with one maintainer-directed checkpoint
+on 2026-08-26. The remediation uses plain-language,
 multidimensional prose rather than tags: Happy separates sustained positive warmth from surprise;
 Angry emphasizes hostile resentment rather than generic high energy; Fearful combines danger,
 slipping control, unstable pitch, and hesitant starts; Surprised asks for one onset/peak followed by
 a fast settle. Happy and Surprised still suppress the redundant English-diction append through the
-existing `clear` token, while Angry and Fearful still receive it. This records the applied pattern
-and deterministic wiring only—not a measured acoustic or perceptual improvement.
+existing `clear` token, while Angry and Fearful still receive it. `angry.normal` now uses the exact
+`angry-bilingual-v3` English copy and the dual-match Mandarin routing described in §4.4; its Strong
+tier and every other preset remain unchanged. This records the applied pattern, a 36/36 hard-safety
+screen, and deterministic wiring only—not a measured acoustic or perceptual improvement.
 
 `MEASURED-HERE`, autonomous acoustic screen on 2026-08-25. Six separately pre-registered shorter
 or more explicit alternatives for Happy, Angry, Fearful, and Surprised all stopped at the first

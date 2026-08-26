@@ -708,14 +708,11 @@ actor XPCNativeEngineCoordinator {
         case .ensureModelLoadedIfNeeded(let id):
             .ensureModelLoaded(modelID: id)
         case .prewarmModelIfNeeded(let request):
-            // Use the runtime-aligned key. The runtime intentionally treats
-            // `.custom` prewarm as model-level (see
-            // GenerationSemantics.swift `prewarmIdentityKey(modelID:mode:...)`
-            // — keeps the hot model state stable across UI draft churn). The
-            // request-form `prewarmIdentityKey(for:)` would dedupe at
-            // speaker+instruction level, leaking one XPC round-trip per
-            // draft edit that the runtime will just no-op on.
-            .runtimePrewarm(Self.runtimeAlignedPrewarmIdentity(for: request))
+            // Best-effort client deduplication remains request-scoped. The
+            // service owns the authoritative identity because only it has the
+            // contract-backed native-language metadata needed to resolve a
+            // localized model-facing instruction.
+            .runtimePrewarm(GenerationSemantics.prewarmIdentity(for: request))
         case .prefetchInteractiveReadinessIfNeeded(let request, let customPrewarmDepth):
             .interactivePrefetch(
                 identity: GenerationSemantics.prewarmIdentity(for: request),
@@ -726,35 +723,6 @@ actor XPCNativeEngineCoordinator {
         }
     }
 
-    /// Mirrors `NativeEngineRuntime.prewarmIdentityKey(for:)` so the client
-    /// dedupes prewarm commands using the same key the runtime uses to
-    /// decide whether to do the work. Without this alignment the client
-    /// would dispatch one prewarm XPC call per speaker/instruction change
-    /// for `.custom` requests; the runtime would treat the model as
-    /// already-prewarmed and no-op on each one.
-    private static func runtimeAlignedPrewarmIdentity(
-        for request: GenerationRequest
-    ) -> GenerationSemantics.PrewarmIdentity {
-        switch request.payload {
-        case .custom:
-            return GenerationSemantics.prewarmIdentity(
-                modelID: request.modelID,
-                mode: request.mode
-            )
-        case .design:
-            return GenerationSemantics.prewarmIdentity(
-                modelID: request.modelID,
-                mode: request.mode
-            )
-        case .clone(let reference):
-            return GenerationSemantics.prewarmIdentity(
-                modelID: request.modelID,
-                mode: request.mode,
-                refAudio: reference.audioPath,
-                refText: reference.transcript
-            )
-        }
-    }
 }
 
 public final class XPCNativeEngineClient: MacTTSEngine, @unchecked Sendable {

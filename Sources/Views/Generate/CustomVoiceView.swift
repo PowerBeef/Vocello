@@ -251,6 +251,7 @@ struct CustomVoiceView: View {
                     voice: configuration.voice,
                     emotion: configuration.emotion,
                     languageHint: draft.selectedLanguage.rawValue,
+                    deliveryProfile: configuration.deliveryProfile,
                     voiceDescription: configuration.voiceDescription,
                     refAudio: configuration.refAudio,
                     refText: configuration.refText,
@@ -380,6 +381,7 @@ private extension CustomVoiceView {
         ) {
             DeliveryControlsView(
                 emotion: $draft.emotion,
+                deliveryProfile: $draft.deliveryProfile,
                 accentColor: AppTheme.customVoice,
                 isCompact: true,
                 showsLabel: false,

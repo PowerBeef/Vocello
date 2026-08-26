@@ -94,6 +94,8 @@ REQUIRED_SURFACES=(
     "scripts/tests/test_check_release_notes.py"
     "scripts/check_delivery_instructions.py"
     "scripts/tests/test_check_delivery_instructions.py"
+    "scripts/angry_bilingual_safety_matrix.py"
+    "scripts/tests/test_angry_bilingual_safety_matrix.py"
     "scripts/audio_cadence_qc.py"
     "scripts/tests/test_audio_cadence_qc.py"
     "scripts/delivery_experiment.py"

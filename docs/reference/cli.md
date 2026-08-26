@@ -153,11 +153,18 @@ vocello deliveries [--json]
 ```
 
 Lists every built-in delivery preset as a preset id and the natural-language instruction
-the model receives (the source of truth is `EmotionPreset`). Static and instant. These ids are the
+the model receives in its canonical English form (the source of truth is `EmotionPreset`). Static
+and instant. These ids are the
 `bench --delivery <id>` cells, and `--json` is the DRY feed for `scripts/delivery_adherence.py` — the
 objective, reference-free delivery-adherence measurement (F0 / speaking-rate / duration deltas vs a
 same-seed neutral take). See `scripts/analyze_delivery.py` + the §I.3 writeup in
 [`../../benchmarks/OPTIMIZATION.md`](../../benchmarks/OPTIMIZATION.md).
+
+`generate` and `batch` accept `--delivery-cell <preset>.<intensity>` for repository-owned
+CustomVoice selections. That identity fails closed if its accompanying copy drifts. It also enables
+the dual-match Mandarin route for `angry.normal` when both the contract-backed speaker language and
+resolved output language are Chinese. Free-form `--delivery` stays verbatim. `generate --json`
+reports the actual model-facing instruction language, digest, and cell identity.
 
 ### `models` — inventory and install
 

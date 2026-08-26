@@ -548,6 +548,13 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
             lightweightWarmupText: Self.lightweightWarmupText,
             telemetryRecorder: telemetryRecorder,
             customPrewarmPolicy: customPrewarmPolicy,
+            speakerNativeLanguages: Dictionary(
+                modelRegistry.allSpeakers.compactMap { speaker in
+                    guard let language = speaker.nativeLanguage else { return nil }
+                    return (speaker.id.lowercased(), language)
+                },
+                uniquingKeysWith: { first, _ in first }
+            ),
             diagnosticAppSupportBox: diagnosticAppSupportBox,
             diagnosticEventSink: { action, details in
                 await Self.recordDiagnosticEvent(
@@ -1082,8 +1089,8 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         let operationID = try await beginUserModelOperation(.batchGeneration)
         defer { finishModelOperation(id: operationID) }
         cancelIdleUnload()
-        let firstKey = Self.generationSessionKey(for: requests[0])
-        guard requests.allSatisfy({ Self.generationSessionKey(for: $0) == firstKey }) else {
+        let firstKey = generationSessionKey(for: requests[0])
+        guard requests.allSatisfy({ generationSessionKey(for: $0) == firstKey }) else {
             throw MLXTTSEngineError.unsupportedRequest(
                 "Batch generation requires one model, mode, language, speaker/design, and clone reference session."
             )
@@ -1130,6 +1137,11 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         cancellationIngress: GenerationCancellationIngress
     ) async throws -> GenerationResult {
         try ensureInitialized()
+        do {
+            try GenerationSemantics.validateDeliveryInstructionIdentity(for: request)
+        } catch {
+            throw MLXTTSEngineError.unsupportedRequest(error.localizedDescription)
+        }
         cancelIdleUnload()
         if !allowsBatchRequest {
             let supportDecision = supportDecision(for: request)
@@ -1549,8 +1561,31 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         )
     }
 
-    private static func generationSessionKey(for request: GenerationRequest) -> GenerationSessionKey {
-        GenerationSemantics.generationSessionIdentity(for: request).sessionKey
+    private func generationSessionKey(for request: GenerationRequest) -> GenerationSessionKey {
+        let nativeLanguage: String? = {
+            guard case .custom(let speakerID, _) = request.payload else { return nil }
+            return modelRegistry.allSpeakers.first {
+                $0.id.caseInsensitiveCompare(speakerID) == .orderedSame
+            }?.nativeLanguage
+        }()
+        let resolved = GenerationSemantics.resolvedDeliveryInstruction(
+            for: request,
+            speakerNativeLanguage: nativeLanguage
+        )
+        let finalInstruction: String?
+        if let capabilities = modelRegistry.model(id: request.modelID)?.qwen3Capabilities {
+            finalInstruction = GenerationSemantics.qwen3PromptAssembly(
+                for: request,
+                capabilities: capabilities,
+                speakerNativeLanguage: nativeLanguage
+            ).instruct
+        } else {
+            finalInstruction = resolved.instruction
+        }
+        return GenerationSemantics.generationSessionIdentity(
+            for: request,
+            resolvedCustomInstruction: finalInstruction
+        ).sessionKey
     }
 
     public func listPreparedVoices() async throws -> [PreparedVoice] {

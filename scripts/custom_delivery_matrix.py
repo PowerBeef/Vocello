@@ -1369,7 +1369,7 @@ def main() -> None:
     run_parser.add_argument("--seeds", default=",".join(map(str, DEFAULT_SEEDS)))
     run_parser.add_argument(
         "--instruction-set",
-        choices=("shipped", "short", "candidate-v2"),
+        choices=("shipped", "short", "candidate-v2", "angry-bilingual-v3"),
         default="shipped",
         help="explicit production or registered debug instruction arm",
     )

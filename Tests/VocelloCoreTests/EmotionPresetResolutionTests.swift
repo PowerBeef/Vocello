@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 @testable import QwenVoiceCore
 import XCTest
@@ -8,6 +9,34 @@ import XCTest
 /// preset pick silently emitted the normal-tier copy — reversing DP-8's
 /// ship-strong decision without anyone deciding it (2026-08-04 audit, F4).
 final class EmotionPresetResolutionTests: XCTestCase {
+    func testAngryBilingualV3CopyAndCanonicalDigestsAreExact() throws {
+        let angry = try XCTUnwrap(EmotionPreset.preset(id: "angry"))
+        XCTAssertEqual(
+            angry.instruction(for: .normal),
+            "Sound fiercely angry and frustrated. Use a tense, forceful voice, hard clipped consonants, strong energy, and fast emphatic pacing."
+        )
+        XCTAssertEqual(
+            angry.instruction(for: .strong),
+            "Speak with fierce controlled anger and seething resentment. Use a harsher tense resonance, biting consonants, compressed forceful phrasing, and hard deliberate stress; sound openly hostile and confrontational rather than excited or triumphant."
+        )
+        let english = try XCTUnwrap(
+            angry.instructionVariant(for: .normal, language: .english)
+        )
+        let mandarin = try XCTUnwrap(
+            angry.instructionVariant(for: .normal, language: .mandarin)
+        )
+        XCTAssertEqual(english.version, "angry-bilingual-v3")
+        XCTAssertEqual(english.instruction, angry.instruction(for: .normal))
+        XCTAssertEqual(mandarin.version, "angry-bilingual-v3")
+        XCTAssertEqual(
+            mandarin.instruction,
+            "语气要强烈愤怒、充满挫败感。使用紧张有力的声音、硬朗辅音、短促重音、强能量和快速强调的节奏。"
+        )
+        XCTAssertEqual(Self.sha256(english.instruction), "e029abc96a23c5afe766f0dd1e57335ac1791074bc5882e86754b9d92d7e9fdf")
+        XCTAssertEqual(Self.sha256(mandarin.instruction), "5d08a1b31bfa30c53741656f259ab0184c36f192b35b647afa78349735e9606d")
+        XCTAssertNil(angry.instructionVariant(for: .strong, language: .mandarin))
+    }
+
     func testStrictDeliveryCellRequiresExplicitValidTier() throws {
         let cell = try DeliveryInstructionCell.resolveStrict("calm.strong")
         XCTAssertEqual(cell.id, "calm.strong")
@@ -162,5 +191,11 @@ final class EmotionPresetResolutionTests: XCTestCase {
         XCTAssertEqual(hints.union(EmotionPreset.distinctDeliveryIDs), rosterIDs)
         XCTAssertTrue(hints.isDisjoint(with: EmotionPreset.distinctDeliveryIDs))
         XCTAssertFalse(EmotionPreset.directionalHintAdvisory.isEmpty)
+    }
+
+    private static func sha256(_ value: String) -> String {
+        SHA256.hash(data: Data(value.utf8))
+            .map { String(format: "%02x", $0) }
+            .joined()
     }
 }

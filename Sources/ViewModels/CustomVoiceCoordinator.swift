@@ -122,7 +122,8 @@ final class CustomVoiceCoordinator {
             ),
             generationID: UUID(),
             seed: draft.pinnedSeed,
-            variation: GenerationVariationPreference.requestValue()
+            variation: GenerationVariationPreference.requestValue(),
+            deliveryInstructionCellID: draft.deliveryProfile?.instructionCellID
         )
     }
 

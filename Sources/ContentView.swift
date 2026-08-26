@@ -490,6 +490,9 @@ struct ContentView: View {
             identity = .custom(
                 speakerID: customVoiceDraft.selectedSpeaker,
                 deliveryStyle: model.supportsInstructionControl ? customVoiceDraft.emotion : nil,
+                deliveryInstructionCellID: model.supportsInstructionControl
+                    ? customVoiceDraft.deliveryProfile?.instructionCellID
+                    : nil,
                 languageHint: customVoiceDraft.selectedLanguage.rawValue
             )
             reference = nil

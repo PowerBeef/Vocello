@@ -34,6 +34,7 @@ public struct GenerationRequestReceipt: Hashable, Codable, Sendable {
     public let deliveryID: String?
     public let instructionDigest: String?
     public let instructionCharacters: Int
+    public let instructionLanguage: String?
     public let language: String
     public let seed: UInt64
     public let seedSource: String
@@ -46,6 +47,8 @@ public struct GenerationRequestReceipt: Hashable, Codable, Sendable {
 
     public init(
         request: GenerationRequest,
+        resolvedInstruction: String? = nil,
+        instructionLanguage: DeliveryInstructionLanguage? = nil,
         generationID: UUID,
         effectiveSeed: UInt64,
         warmState: EngineWarmState,
@@ -53,7 +56,7 @@ public struct GenerationRequestReceipt: Hashable, Codable, Sendable {
         retryAttempt: Int,
         operationGeneration: UInt64
     ) {
-        let instruction = request.payload.deliveryInstructionText?
+        let instruction = (resolvedInstruction ?? request.payload.deliveryInstructionText)?
             .trimmingCharacters(in: .whitespacesAndNewlines)
         let speakerID: String? = {
             guard case .custom(let speaker, _) = request.payload else { return nil }
@@ -62,13 +65,19 @@ public struct GenerationRequestReceipt: Hashable, Codable, Sendable {
         let instructionDigest = instruction.flatMap { value in
             value.isEmpty ? nil : Self.sha256(value)
         }
-        let deliveryID = instruction.flatMap { value -> String? in
-            guard let match = EmotionPreset.matchInstruction(value) else { return nil }
-            return "\(match.preset.id).\(match.intensity.rpcValue)"
-        }
+        // A raw string that happens to equal current preset copy is still raw.
+        // Only the explicit wire-compatible context can grant canonical cell
+        // identity or authorize localization.
+        let deliveryID = request.deliveryInstructionCellID
         let language = GenerationSemantics.qwenLanguageHint(for: request)
-        let sessionIdentityDigest = GenerationSemantics.generationSessionIdentity(for: request).digest
-        let prewarmIdentityDigest = GenerationSemantics.prewarmIdentity(for: request).digest
+        let sessionIdentityDigest = GenerationSemantics.generationSessionIdentity(
+            for: request,
+            resolvedCustomInstruction: instruction
+        ).digest
+        let prewarmIdentityDigest = GenerationSemantics.prewarmIdentity(
+            for: request,
+            resolvedCustomInstruction: instruction
+        ).digest
         let promptDigest = Self.sha256(request.text)
         let variation = (request.variation ?? .expressive).rawValue
         let requestSerialization = Self.lengthFramed([
@@ -79,6 +88,7 @@ public struct GenerationRequestReceipt: Hashable, Codable, Sendable {
             speakerID ?? "",
             deliveryID ?? "",
             instructionDigest ?? "",
+            instructionLanguage?.rawValue ?? "",
             language,
             String(effectiveSeed),
             variation,
@@ -96,6 +106,7 @@ public struct GenerationRequestReceipt: Hashable, Codable, Sendable {
         self.deliveryID = deliveryID
         self.instructionDigest = instructionDigest
         self.instructionCharacters = instruction?.count ?? 0
+        self.instructionLanguage = instructionLanguage?.rawValue
         self.language = language
         self.seed = effectiveSeed
         self.seedSource = request.seed == nil ? "generated" : "requested"

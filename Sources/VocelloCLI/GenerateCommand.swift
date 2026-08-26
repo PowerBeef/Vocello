@@ -17,6 +17,8 @@ enum GenerateCommand {
         let modelID: String
         let deliveryInstructionChars: Int?
         let deliveryInstructionDigest: String?
+        let deliveryInstructionLanguage: String?
+        let deliveryInstructionCellID: String?
         let firstChunkMS: Double?
         let chunks: Int?
     }
@@ -103,6 +105,7 @@ enum GenerateCommand {
         let runtime = try await CLIRuntime.bootstrap(dataDirectory: dataDir, manifestOverride: manifestOverride)
         let modelID = try runtime.modelID(mode: mode, quality: quality)
         let payload = try await buildPayload(args, mode: mode, runtime: runtime)
+        let deliveryInstructionCellID = try resolveDeliveryInstructionCellID(args, mode: mode)
 
         let outputPath = resolveOutputPath(args, dataDir: dataDir, mode: mode)
         ensureParentDirectory(of: outputPath)
@@ -120,7 +123,8 @@ enum GenerateCommand {
             languageHint: args.string("language"),
             payload: payload, generationID: generationID,
             seed: try parseSeed(args),
-            variation: try parseVariation(args))
+            variation: try parseVariation(args),
+            deliveryInstructionCellID: deliveryInstructionCellID)
 
         note("generating (\(text.count) chars)\(streaming ? ", streaming" : "")…")
         let t0 = Date()
@@ -141,9 +145,12 @@ enum GenerateCommand {
             let deliveryInstruction = payload.deliveryInstructionText?
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             let deliveryInstructionChars = deliveryInstruction.flatMap { $0.isEmpty ? nil : $0.count }
-            let deliveryInstructionDigest = deliveryInstruction.flatMap { instruction in
+            let fallbackDigest = deliveryInstruction.flatMap { instruction in
                 instruction.isEmpty ? nil : Self.sha256(Data(instruction.utf8))
             }
+            let deliveryInstructionDigest = result.diagnosticStringFlags[
+                "delivery_instruction_digest"
+            ] ?? fallbackDigest
             emitJSON(GenerateJSON(
                 generationID: generationID.uuidString.lowercased(),
                 audioPath: result.audioPath, durationSeconds: result.durationSeconds,
@@ -153,6 +160,12 @@ enum GenerateCommand {
                 modelID: modelID,
                 deliveryInstructionChars: deliveryInstructionChars,
                 deliveryInstructionDigest: deliveryInstructionDigest,
+                deliveryInstructionLanguage: result.diagnosticStringFlags[
+                    "delivery_instruction_language"
+                ],
+                deliveryInstructionCellID: result.diagnosticStringFlags[
+                    "delivery_instruction_cell_id"
+                ],
                 firstChunkMS: firstChunkMS, chunks: chunkCount))
         } else {
             // stdout = machine-readable (the path). stderr = human notes.
@@ -252,14 +265,34 @@ enum GenerateCommand {
     static func buildPayload(_ args: Args, mode: GenerationMode, runtime: CLIRuntime) async throws -> GenerationRequest.Payload {
         switch mode {
         case .custom:
+            let delivery: String?
+            if let cellID = args.string("delivery-cell") {
+                guard args.string("delivery") == nil else {
+                    throw CLIError("use either --delivery-cell or --delivery, not both")
+                }
+                delivery = try DeliveryInstructionCell.resolveStrict(cellID).instruction
+            } else {
+                delivery = args.string("delivery")
+            }
             return .custom(speakerID: args.string("speaker") ?? runtime.defaultSpeakerID,
-                           deliveryStyle: args.string("delivery"))
+                           deliveryStyle: delivery)
         case .design:
             return .design(voiceDescription: try args.require("voice-brief", "a voice description for Voice Design"),
                            deliveryStyle: args.string("delivery"))
         case .clone:
             return .clone(reference: try await resolveCloneReference(args, runtime: runtime))
         }
+    }
+
+    static func resolveDeliveryInstructionCellID(
+        _ args: Args,
+        mode: GenerationMode
+    ) throws -> String? {
+        guard let raw = args.string("delivery-cell") else { return nil }
+        guard mode == .custom else {
+            throw CLIError("--delivery-cell is available only in custom mode")
+        }
+        return try DeliveryInstructionCell.resolveStrict(raw).id
     }
 
     /// Build the clone reference from either a saved voice (--voice <name|id>)
@@ -338,6 +371,7 @@ enum GenerateCommand {
           --reference    (clone) path to a reference .wav (alternative to --voice)
           --transcript   (clone) transcript of the --reference clip
           --delivery     optional delivery style
+          --delivery-cell  canonical preset cell (<preset>.<intensity>); custom mode only
           --language     Qwen3 language hint (english, french, auto, …); omitted = Auto
           --seed         deterministic sampling seed — same request + seed
                          reproduces the same take

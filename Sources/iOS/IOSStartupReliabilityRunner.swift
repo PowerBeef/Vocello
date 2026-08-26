@@ -240,7 +240,8 @@ enum IOSStartupReliabilityRunner {
                 generationID: generationID,
                 seed: take.seed,
                 variation: variation,
-                captureCodecTrace: true
+                captureCodecTrace: true,
+                deliveryInstructionCellID: delivery.id
             )
             diagnosticRequest = request
 

@@ -552,6 +552,29 @@ completed analysis. The full WAVs, execution state, original decisions, and reco
 remain untracked. No automatic layer gained semantic, production-copy, or publication authority;
 DP-28/DP-31 still own calibrated human evidence.
 
+### 2.8 Angry bilingual hard-safety checkpoint (2026-08-26)
+
+`scripts/angry_bilingual_safety_matrix.py` is the narrow fail-closed lane for the versioned
+`angry-bilingual-v3` arm. It derives native-language ownership from
+`qwenvoice_contract.json`, takes medium Angry scripts from the governed delivery corpus, and runs
+four fixed development seeds (`32060826` through `32060829`) across five Chinese-native speakers,
+Aiden and Ryan in English, Aiden speaking Chinese, and Vivian speaking English. The last two rows
+prove each half of the localization predicate independently. Its retained plan contains script
+digests and lengths, never text or local paths.
+
+The pre-promotion run completed 36/36 serial Speed takes with the expected canonical cell,
+instruction language, and final model-facing instruction digest. It reproduced no hard generation
+or mandatory audio-QC failure; Vivian/Chinese seed `32060828`, which had failed in the earlier
+English candidate screen, passed. Generated WAVs and row observations remain untracked under
+`build/artifacts/macos/delivery/`. This authorized the maintainer-directed copy checkpoint only.
+The lane does not compare delivery quality, cannot claim listener-perceived improvement, and does not close
+DP-31 or DP-32.
+
+```sh
+python3 scripts/angry_bilingual_safety_matrix.py validate-plan
+python3 scripts/angry_bilingual_safety_matrix.py run
+```
+
 ## 3. Evidence conventions
 
 - **`~/Library/Application Support/QwenVoice-Debug/outputs/bench-archive/<runID>/` is the

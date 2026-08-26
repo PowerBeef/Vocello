@@ -31,7 +31,12 @@ final class MacGenerationWarmupCoordinator: ObservableObject {
 
     enum WarmupIdentity: Equatable, Sendable {
         case modelOnly
-        case custom(speakerID: String, deliveryStyle: String?, languageHint: String?)
+        case custom(
+            speakerID: String,
+            deliveryStyle: String?,
+            deliveryInstructionCellID: String?,
+            languageHint: String?
+        )
         case design(
             brief: String,
             deliveryStyle: String?,
@@ -148,6 +153,7 @@ final class MacGenerationWarmupCoordinator: ObservableObject {
             identity = .custom(
                 speakerID: GenerationSemantics.canonicalCustomWarmSpeaker,
                 deliveryStyle: GenerationSemantics.canonicalCustomWarmInstruction(),
+                deliveryInstructionCellID: nil,
                 languageHint: Qwen3SupportedLanguage.english.rawValue
             )
         case .design, .clone:
@@ -454,7 +460,12 @@ final class MacGenerationWarmupCoordinator: ObservableObject {
     private func interactivePrewarmRequest(for context: WarmupContext) -> GenerationRequest? {
         let shouldStream = context.purpose == .livePreviewReadiness
         switch context.identity {
-        case .custom(let speakerID, let deliveryStyle, let languageHint):
+        case .custom(
+            let speakerID,
+            let deliveryStyle,
+            let deliveryInstructionCellID,
+            let languageHint
+        ):
             let speaker = speakerID.trimmingCharacters(in: .whitespacesAndNewlines)
             return GenerationRequest(
                 modelID: context.modelID,
@@ -466,7 +477,8 @@ final class MacGenerationWarmupCoordinator: ObservableObject {
                 payload: .custom(
                     speakerID: speaker.isEmpty ? GenerationSemantics.canonicalCustomWarmSpeaker : speaker,
                     deliveryStyle: deliveryStyle
-                )
+                ),
+                deliveryInstructionCellID: deliveryInstructionCellID
             )
         case .design(let brief, let deliveryStyle, let bucket, let languageHint):
             let trimmedBrief = brief.trimmingCharacters(in: .whitespacesAndNewlines)

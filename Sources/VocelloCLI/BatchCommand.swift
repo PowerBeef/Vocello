@@ -45,6 +45,10 @@ enum BatchCommand {
         // One shared payload → all requests carry the same session key, satisfying
         // generateBatch's single-session requirement.
         let payload = try await GenerateCommand.buildPayload(args, mode: mode, runtime: runtime)
+        let deliveryInstructionCellID = try GenerateCommand.resolveDeliveryInstructionCellID(
+            args,
+            mode: mode
+        )
 
         let outDir = resolveOutDir(args, dataDir: dataDir)
         try FileManager.default.createDirectory(at: outDir, withIntermediateDirectories: true)
@@ -67,7 +71,8 @@ enum BatchCommand {
             requests.append(GenerationRequest(
                 mode: mode, modelID: modelID, text: line, outputPath: out,
                 shouldStream: false, payload: payload, generationID: UUID(),
-                seed: seed, variation: variation))
+                seed: seed, variation: variation,
+                deliveryInstructionCellID: deliveryInstructionCellID))
         }
 
         note("loading \(modelID)…")

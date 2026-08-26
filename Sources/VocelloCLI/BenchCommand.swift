@@ -695,7 +695,8 @@ enum BenchCommand {
         let generationID = UUID()
         let request = GenerationRequest(
             mode: mode, modelID: modelID, text: text, outputPath: out,
-            shouldStream: shouldStream, payload: payload, generationID: generationID, seed: seed)
+            shouldStream: shouldStream, payload: payload, generationID: generationID, seed: seed,
+            deliveryInstructionCellID: mode == .custom ? delivery : nil)
         if let delivery { setenv("QWENVOICE_BENCH_DELIVERY", delivery, 1) }
         defer { if delivery != nil { unsetenv("QWENVOICE_BENCH_DELIVERY") } }
         let environment = captureEnvironment()

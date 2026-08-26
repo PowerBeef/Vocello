@@ -3,6 +3,82 @@ import Foundation
 import XCTest
 
 final class GenerationStartupDiagnosticsTests: XCTestCase {
+    func testRawPresetTextDoesNotGainCanonicalCellIdentity() {
+        let generationID = UUID()
+        let request = GenerationRequest(
+            mode: .custom,
+            modelID: "pro_custom_speed",
+            text: "Raw legacy request.",
+            outputPath: "/tmp/raw.wav",
+            shouldStream: false,
+            languageHint: "english",
+            payload: .custom(
+                speakerID: "aiden",
+                deliveryStyle: EmotionPreset.angryBilingualV3English
+            ),
+            generationID: generationID,
+            seed: 1
+        )
+        let receipt = GenerationRequestReceipt(
+            request: request,
+            generationID: generationID,
+            effectiveSeed: 1,
+            warmState: .cold,
+            predecessorIdentityDigest: nil,
+            retryAttempt: 0,
+            operationGeneration: 1
+        )
+        XCTAssertNil(receipt.deliveryID)
+    }
+
+    func testReceiptAndWarmIdentitiesUseTheResolvedMandarinInstruction() throws {
+        let cell = try DeliveryInstructionCell.resolveStrict("angry.normal")
+        let generationID = UUID(uuidString: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")!
+        let request = GenerationRequest(
+            mode: .custom,
+            modelID: "pro_custom_speed",
+            text: "这个错误无法接受。",
+            outputPath: "/private/angry.wav",
+            shouldStream: true,
+            languageHint: "chinese",
+            payload: .custom(speakerID: "vivian", deliveryStyle: cell.instruction),
+            generationID: generationID,
+            seed: 32_060_828,
+            variation: .expressive,
+            deliveryInstructionCellID: cell.id
+        )
+        let receipt = GenerationRequestReceipt(
+            request: request,
+            resolvedInstruction: EmotionPreset.angryBilingualV3Mandarin,
+            instructionLanguage: .mandarin,
+            generationID: generationID,
+            effectiveSeed: 32_060_828,
+            warmState: .cold,
+            predecessorIdentityDigest: nil,
+            retryAttempt: 0,
+            operationGeneration: 1
+        )
+        let englishReceipt = GenerationRequestReceipt(
+            request: request,
+            resolvedInstruction: EmotionPreset.angryBilingualV3English,
+            instructionLanguage: .english,
+            generationID: generationID,
+            effectiveSeed: 32_060_828,
+            warmState: .cold,
+            predecessorIdentityDigest: nil,
+            retryAttempt: 0,
+            operationGeneration: 1
+        )
+
+        XCTAssertEqual(receipt.deliveryID, "angry.normal")
+        XCTAssertEqual(receipt.instructionLanguage, "mandarin")
+        XCTAssertEqual(receipt.instructionCharacters, 46)
+        XCTAssertEqual(receipt.instructionDigest, "5d08a1b31bfa30c53741656f259ab0184c36f192b35b647afa78349735e9606d")
+        XCTAssertNotEqual(receipt.requestIdentityDigest, englishReceipt.requestIdentityDigest)
+        XCTAssertNotEqual(receipt.sessionIdentityDigest, englishReceipt.sessionIdentityDigest)
+        XCTAssertNotEqual(receipt.prewarmIdentityDigest, englishReceipt.prewarmIdentityDigest)
+    }
+
     func testReceiptBindsExactRequestWithoutRetainingScript() throws {
         let cell = try DeliveryInstructionCell.resolveStrict("calm.strong")
         let generationID = UUID(uuidString: "11111111-2222-3333-4444-555555555555")!
@@ -16,7 +92,8 @@ final class GenerationStartupDiagnosticsTests: XCTestCase {
             payload: .custom(speakerID: "vivian", deliveryStyle: cell.instruction),
             generationID: generationID,
             seed: 38_112_001,
-            variation: .balanced
+            variation: .balanced,
+            deliveryInstructionCellID: cell.id
         )
         let receipt = GenerationRequestReceipt(
             request: request,
@@ -55,7 +132,8 @@ final class GenerationStartupDiagnosticsTests: XCTestCase {
             payload: .custom(speakerID: "vivian", deliveryStyle: cell.instruction),
             generationID: generationID,
             seed: 38_112_001,
-            variation: .consistent
+            variation: .consistent,
+            deliveryInstructionCellID: cell.id
         )
         let first = GenerationRequestReceipt(
             request: request,

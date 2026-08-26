@@ -202,7 +202,8 @@ def validate_receipt(value: Any, field: str) -> None:
         "retryAttempt", "operationGeneration",
     }
     allowed = required | {
-        "speakerID", "deliveryID", "instructionDigest", "predecessorIdentityDigest",
+        "speakerID", "deliveryID", "instructionDigest", "instructionLanguage",
+        "predecessorIdentityDigest",
     }
     if not isinstance(value, dict) or not required.issubset(value) or set(value) - allowed:
         raise ContractError(f"{field} does not match request-receipt schema v1")
@@ -226,6 +227,8 @@ def validate_receipt(value: Any, field: str) -> None:
         raise ContractError(f"{field}.deliveryID is invalid")
     if value["language"] not in LANGUAGES or value["variation"] not in VARIATIONS:
         raise ContractError(f"{field} has invalid language or variation")
+    if value.get("instructionLanguage") not in {None, "english", "mandarin", "verbatim"}:
+        raise ContractError(f"{field}.instructionLanguage is invalid")
     if value["seedSource"] not in {"requested", "generated"} or value["warmState"] not in {"cold", "warm"}:
         raise ContractError(f"{field} has invalid seed or warm-state vocabulary")
     if not isinstance(value["streaming"], bool):

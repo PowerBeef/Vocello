@@ -1,4 +1,5 @@
 import Foundation
+import QwenVoiceCore
 import QwenVoiceNative
 
 struct BatchGenerationSheetConfiguration: Identifiable, Equatable {
@@ -6,6 +7,7 @@ struct BatchGenerationSheetConfiguration: Identifiable, Equatable {
     let mode: GenerationMode
     let voice: String?
     let emotion: String?
+    let deliveryProfile: DeliveryProfile?
     let voiceDescription: String?
     let refAudio: String?
     let refText: String?
@@ -21,6 +23,7 @@ struct BatchGenerationSheetConfiguration: Identifiable, Equatable {
             mode: .custom,
             voice: draft.selectedSpeaker,
             emotion: draft.emotion,
+            deliveryProfile: draft.deliveryProfile,
             voiceDescription: nil,
             refAudio: nil,
             refText: nil,
@@ -38,6 +41,7 @@ struct BatchGenerationSheetConfiguration: Identifiable, Equatable {
             mode: .design,
             voice: nil,
             emotion: draft.emotion,
+            deliveryProfile: nil,
             voiceDescription: draft.voiceDescription,
             refAudio: nil,
             refText: nil,
@@ -55,6 +59,7 @@ struct BatchGenerationSheetConfiguration: Identifiable, Equatable {
             mode: .clone,
             voice: nil,
             emotion: nil,
+            deliveryProfile: nil,
             voiceDescription: nil,
             refAudio: draft.referenceAudioPath,
             refText: draft.referenceTranscript.isEmpty ? nil : draft.referenceTranscript,

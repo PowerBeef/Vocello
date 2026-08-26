@@ -49,6 +49,26 @@ machine-readable status record and wins over any older prose.
 
 ## Resume here (2026-08-26)
 
+**Angry Normal bilingual routing promoted after a 36/36 hard-safety screen (2026-08-26,
+macOS/CLI):** `angry.normal` alone now uses the maintainer-directed
+`angry-bilingual-v3` English copy. Its Strong tier and all other preset/tier digests are unchanged.
+Canonical preset selections now carry an optional wire-compatible delivery-cell identity through
+macOS, iOS, CLI, batch, long-form, benchmark, warmup, and startup diagnostics. The engine resolves
+Mandarin only for CustomVoice `angry.normal` when `qwenvoice_contract.json` marks the speaker as
+Chinese-native and the resolved output is Chinese; every fallback uses English, while custom and
+legacy raw strings remain verbatim. Mismatched cell/copy identity is rejected before prewarm or
+generation, and session/prewarm identities bind the final model-facing instruction.
+
+The candidate first ran as a debug-only arm across four fixed seeds, all five contract-derived
+Chinese-native speakers, Aiden/Ryan English, Aiden/Chinese fallback, and Vivian/English fallback.
+The final source-bound rerun completed after that prewarm-identity alignment. All 36 serial Speed
+rows produced audio with exact cell/language/final-instruction receipts and no hard generation or
+mandatory audio-QC failure; Vivian/Chinese seed `32060828` passed. This is a
+maintainer-directed copy checkpoint and routing-safety result, not evidence of listener-perceived
+improvement. DP-31 and DP-32 remain open. The requested roadmap identifier DP-33 was already owned
+by the preserved cadence-calibration decision, so this work is recorded as DP-34 rather than
+overwriting history.
+
 **DP-30 automatic evaluation corrected and all six retained screens recomposed; no candidate
 advances (2026-08-26, macOS/CLI):** the scoring audit found two material v1 weaknesses: any positive
 signed feature movement received full credit, and absolute target/competitor distance discarded

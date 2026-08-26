@@ -1149,6 +1149,28 @@
       "reason": "Maintainer decision 2026-08-25: current severe-gap rejection, bounded cadence evidence, visible review notice, and explicit user-controlled retry are sufficient. The additional multilingual threshold-calibration and advisory-visual-acceptance program is not required for this product issue and was not executed; its gate is preserved as unmet rather than weakened."
     },
     {
+      "id": "DP-34",
+      "plan": "delivery-prompting-2026-08",
+      "title": "Promote the maintainer-directed Angry normal bilingual routing checkpoint",
+      "status": "done",
+      "gate": "Completed 2026-08-26 as a maintainer-directed, evidence-informed copy checkpoint, not a perceptual-improvement claim. angry.normal alone now uses the exact angry-bilingual-v3 English instruction; angry.strong and every other preset/tier retain their prior digests. A canonical optional delivery-cell identity is threaded through macOS, iOS, CLI, batch, long-form, benchmark and startup diagnostics. Only CustomVoice angry.normal with both a contract-registered Chinese-native speaker and resolved Chinese output receives the exact Mandarin variant; every fallback receives canonical English, while custom and legacy raw strings stay verbatim. Engine validation rejects a cell/copy mismatch. The debug-only arm first passed a source-bound 36/36 serial Speed safety matrix using fixed seeds 32060826-32060829 across five contract-derived Chinese-native speakers, Aiden/Ryan English, Aiden/Chinese fallback and Vivian/English fallback, including Vivian/Chinese seed 32060828. Every row carried the expected cell/language/final-instruction digest and produced audio with zero hard generation or mandatory audio-QC failures. The matrix has hard-failure/routing authority only; DP-31 and DP-32 remain open and no listener-proven semantic improvement is claimed. The requested DP-33 identifier was already occupied by the preserved cadence-calibration decision, so this checkpoint uses the next available identifier rather than overwriting history.",
+      "sourceOfTruth": [
+        "Sources/QwenVoiceCore/EmotionPreset.swift",
+        "Sources/QwenVoiceCore/GenerationSemantics.swift",
+        "config/delivery-instruction-contract.json",
+        "scripts/angry_bilingual_safety_matrix.py"
+      ],
+      "evidence": [
+        "file:Tests/VocelloCoreTests/EmotionPresetResolutionTests.swift",
+        "file:Tests/VocelloCoreTests/GenerationSemanticsLanguageTests.swift",
+        "file:Tests/VocelloCoreTests/GenerationStartupDiagnosticsTests.swift",
+        "file:scripts/tests/test_angry_bilingual_safety_matrix.py",
+        "doc:docs/reference/delivery-harness.md"
+      ],
+      "updated": "2026-08-26",
+      "notes": "Untracked final run summary: angry-bilingual-v3, 36 planned/36 passed/0 hard failures, completed 2026-08-26T07:56:57Z after the resolved-instruction prewarm identity was aligned; candidate binary digest 42be4306...22b12, candidate-source digest f3a9b1ca...a284641 and routing-source digest d5f24d7b...ffa08. Generated WAVs and row-level artifacts remain local under build/ and are not roadmap authority."
+    },
+    {
       "id": "CM-7",
       "plan": "convergence-metal4-stage4-2026-08",
       "title": "Non-streaming CLI generation publishes no WAV while reporting success",

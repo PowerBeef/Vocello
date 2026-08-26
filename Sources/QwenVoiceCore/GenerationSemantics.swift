@@ -22,6 +22,41 @@ public enum GenerationSemantics {
         public let speakerID: String?
         public let usesInstructionControl: Bool
         public let cloneUsesTranscript: Bool
+        public let instructionLanguage: DeliveryInstructionLanguage?
+    }
+
+    public struct ResolvedDeliveryInstruction: Hashable, Sendable {
+        public let instruction: String?
+        public let language: DeliveryInstructionLanguage?
+    }
+
+    public enum DeliveryInstructionIdentityError: LocalizedError, Equatable, Sendable {
+        case nonCustomMode(String)
+        case canonicalInstructionMismatch(String)
+
+        public var errorDescription: String? {
+            switch self {
+            case .nonCustomMode(let cellID):
+                return "Delivery cell '\(cellID)' is valid only for CustomVoice requests."
+            case .canonicalInstructionMismatch(let cellID):
+                return "Delivery cell '\(cellID)' does not match its canonical instruction."
+            }
+        }
+    }
+
+    public static func validateDeliveryInstructionIdentity(
+        for request: GenerationRequest
+    ) throws {
+        guard let cellID = request.deliveryInstructionCellID else { return }
+        guard case .custom(_, let suppliedInstruction) = request.payload else {
+            throw DeliveryInstructionIdentityError.nonCustomMode(cellID)
+        }
+        let cell = try DeliveryInstructionCell.resolveStrict(cellID)
+        let supplied = suppliedInstruction?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard supplied == cell.instruction else {
+            throw DeliveryInstructionIdentityError.canonicalInstructionMismatch(cellID)
+        }
     }
 
     /// Collision-safe value identity for a resolved Voice Design warm state.
@@ -416,7 +451,8 @@ public enum GenerationSemantics {
     }
 
     public static func generationSessionIdentity(
-        for request: GenerationRequest
+        for request: GenerationRequest,
+        resolvedCustomInstruction: String? = nil
     ) -> GenerationSessionIdentity {
         let language = qwenLanguageHint(for: request)
         switch request.payload {
@@ -425,7 +461,7 @@ public enum GenerationSemantics {
                 modelID: request.modelID,
                 language: language,
                 speakerID: speakerID,
-                deliveryStyle: deliveryStyle
+                deliveryStyle: resolvedCustomInstruction ?? deliveryStyle
             )
         case .design(let voiceDescription, let deliveryStyle):
             return .design(
@@ -564,7 +600,8 @@ public enum GenerationSemantics {
         for request: GenerationRequest,
         capabilities: Qwen3TTSModelCapabilities,
         resolvedCloneTranscript: String? = nil,
-        spokenText: String? = nil
+        spokenText: String? = nil,
+        speakerNativeLanguage: String? = nil
     ) -> Qwen3PromptAssembly {
         // Phase 10: when the engine speaks a normalized script, the prompt and
         // the language detection must see the same spoken text, never a mix.
@@ -577,12 +614,16 @@ public enum GenerationSemantics {
         switch request.payload {
         case .custom(let speakerID, let deliveryStyle):
             let canUseInstruction = capabilities.supportsInstructionControl
-            let baseInstruction = canUseInstruction
-                ? customInstruction(deliveryStyle: deliveryStyle)
-                : nil
+            let resolvedDelivery = canUseInstruction
+                ? resolvedDeliveryInstruction(
+                    for: request,
+                    speakerNativeLanguage: speakerNativeLanguage,
+                    outputLanguage: language
+                )
+                : ResolvedDeliveryInstruction(instruction: nil, language: nil)
             let instruction = canUseInstruction
                 ? englishDictionReinforcedInstruction(
-                    baseInstruction: baseInstruction,
+                    baseInstruction: resolvedDelivery.instruction,
                     language: language
                 )
                 : nil
@@ -594,7 +635,8 @@ public enum GenerationSemantics {
                 refText: nil,
                 speakerID: speakerID.trimmingCharacters(in: .whitespacesAndNewlines),
                 usesInstructionControl: instruction != nil,
-                cloneUsesTranscript: false
+                cloneUsesTranscript: false,
+                instructionLanguage: resolvedDelivery.language
             )
         case .design(let voiceDescription, let deliveryStyle):
             let baseInstruction = capabilities.supportsInstructionControl
@@ -615,7 +657,8 @@ public enum GenerationSemantics {
                 refText: nil,
                 speakerID: nil,
                 usesInstructionControl: instruction != nil,
-                cloneUsesTranscript: false
+                cloneUsesTranscript: false,
+                instructionLanguage: instruction == nil ? nil : .verbatim
             )
         case .clone(let reference):
             let rawRefText = (resolvedCloneTranscript ?? reference.transcript)?
@@ -629,9 +672,51 @@ public enum GenerationSemantics {
                 refText: trimmedRefText,
                 speakerID: nil,
                 usesInstructionControl: false,
-                cloneUsesTranscript: trimmedRefText != nil
+                cloneUsesTranscript: trimmedRefText != nil,
+                instructionLanguage: nil
             )
         }
+    }
+
+    public static func resolvedDeliveryInstruction(
+        for request: GenerationRequest,
+        speakerNativeLanguage: String?,
+        outputLanguage: String? = nil
+    ) -> ResolvedDeliveryInstruction {
+        guard case .custom(_, let deliveryStyle) = request.payload else {
+            return ResolvedDeliveryInstruction(instruction: nil, language: nil)
+        }
+        let verbatim = customInstruction(deliveryStyle: deliveryStyle)
+        guard let cellID = request.deliveryInstructionCellID,
+              let cell = try? DeliveryInstructionCell.resolveStrict(cellID),
+              verbatim == cell.instruction else {
+            return ResolvedDeliveryInstruction(
+                instruction: verbatim,
+                language: verbatim == nil ? nil : .verbatim
+            )
+        }
+
+        let resolvedOutputLanguage = outputLanguage ?? qwenLanguageHint(for: request)
+        let outputIsChinese = Qwen3SupportedLanguage.normalized(resolvedOutputLanguage) == .chinese
+        let speakerIsChinese = Qwen3SupportedLanguage.nativeLanguage(speakerNativeLanguage) == .chinese
+        let candidateEnglish = cell.preset.instructionVariant(
+            for: cell.intensity,
+            language: .english
+        )
+        if cell.id == "angry.normal",
+           cell.instruction == candidateEnglish?.instruction,
+           outputIsChinese,
+           speakerIsChinese,
+           let variant = cell.preset.instructionVariant(
+               for: cell.intensity,
+               language: .mandarin
+           ) {
+            return ResolvedDeliveryInstruction(
+                instruction: variant.instruction,
+                language: .mandarin
+            )
+        }
+        return ResolvedDeliveryInstruction(instruction: verbatim, language: .english)
     }
 
     /// Dev A/B gate: `QWENVOICE_ENGLISH_DICTION_REINFORCEMENT=off` skips the
@@ -968,11 +1053,15 @@ public enum GenerationSemantics {
         prewarmIdentity(for: request).legacyKey
     }
 
-    public static func prewarmIdentity(for request: GenerationRequest) -> PrewarmIdentity {
+    public static func prewarmIdentity(
+        for request: GenerationRequest,
+        resolvedCustomInstruction: String? = nil
+    ) -> PrewarmIdentity {
         switch request.payload {
         case .custom(let speakerID, let deliveryStyle):
-            let normalizedInstruction = hasMeaningfulDeliveryInstruction(deliveryStyle ?? "")
-                ? deliveryStyle?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            let effectiveInstruction = resolvedCustomInstruction ?? deliveryStyle
+            let normalizedInstruction = hasMeaningfulDeliveryInstruction(effectiveInstruction ?? "")
+                ? effectiveInstruction?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
                 : ""
             return .customRequest(
                 modelID: request.modelID,

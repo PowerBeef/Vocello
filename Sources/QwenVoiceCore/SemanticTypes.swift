@@ -1448,6 +1448,10 @@ public struct GenerationRequest: Hashable, Codable, Sendable {
     /// enables it only behind the existing telemetry/debug gate so identical
     /// sampled code groups can be replayed through both decoder paths.
     public let captureCodecTrace: Bool?
+    /// Optional context proving that `payload.deliveryStyle` came from a
+    /// repository-owned preset cell. Missing means custom or legacy verbatim
+    /// text. Optional synthesized Codable preserves older IPC payloads.
+    public let deliveryInstructionCellID: String?
 
     public init(
         mode: GenerationMode,
@@ -1465,7 +1469,8 @@ public struct GenerationRequest: Hashable, Codable, Sendable {
         seed: UInt64? = nil,
         variation: Qwen3SamplingVariation? = nil,
         suppressStreamingPreview: Bool? = nil,
-        captureCodecTrace: Bool? = nil
+        captureCodecTrace: Bool? = nil,
+        deliveryInstructionCellID: String? = nil
     ) {
         self.mode = mode
         self.modelID = modelID
@@ -1483,6 +1488,7 @@ public struct GenerationRequest: Hashable, Codable, Sendable {
         self.variation = variation
         self.suppressStreamingPreview = suppressStreamingPreview
         self.captureCodecTrace = captureCodecTrace
+        self.deliveryInstructionCellID = deliveryInstructionCellID
     }
 
     public init(
@@ -1500,7 +1506,8 @@ public struct GenerationRequest: Hashable, Codable, Sendable {
         seed: UInt64? = nil,
         variation: Qwen3SamplingVariation? = nil,
         suppressStreamingPreview: Bool? = nil,
-        captureCodecTrace: Bool? = nil
+        captureCodecTrace: Bool? = nil,
+        deliveryInstructionCellID: String? = nil
     ) {
         let resolvedMode: GenerationMode
         switch payload {
@@ -1528,7 +1535,8 @@ public struct GenerationRequest: Hashable, Codable, Sendable {
             seed: seed,
             variation: variation,
             suppressStreamingPreview: suppressStreamingPreview,
-            captureCodecTrace: captureCodecTrace
+            captureCodecTrace: captureCodecTrace,
+            deliveryInstructionCellID: deliveryInstructionCellID
         )
     }
 
@@ -1557,7 +1565,8 @@ public struct GenerationRequest: Hashable, Codable, Sendable {
             seed: seed,
             variation: variation,
             suppressStreamingPreview: suppressStreamingPreview,
-            captureCodecTrace: captureCodecTrace
+            captureCodecTrace: captureCodecTrace,
+            deliveryInstructionCellID: deliveryInstructionCellID
         )
     }
 }

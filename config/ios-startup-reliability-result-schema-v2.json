@@ -43,7 +43,7 @@
         "sessionIdentityDigest": {"$ref": "#/$defs/sha256"}, "prewarmIdentityDigest": {"$ref": "#/$defs/sha256"},
         "modelID": {"$ref": "#/$defs/safeID"}, "speakerID": {"type": ["string", "null"]},
         "deliveryID": {"type": ["string", "null"]}, "instructionDigest": {"$ref": "#/$defs/nullableSHA256"},
-        "instructionCharacters": {"type": "integer", "minimum": 0}, "language": {"$ref": "#/$defs/safeID"},
+        "instructionCharacters": {"type": "integer", "minimum": 0}, "instructionLanguage": {"enum": ["english", "mandarin", "verbatim", null]}, "language": {"$ref": "#/$defs/safeID"},
         "seed": {"type": "integer", "minimum": 0}, "seedSource": {"enum": ["requested", "generated"]},
         "variation": {"enum": ["expressive", "balanced", "consistent"]}, "streaming": {"type": "boolean"},
         "warmState": {"enum": ["cold", "warm"]}, "predecessorIdentityDigest": {"$ref": "#/$defs/nullableSHA256"},

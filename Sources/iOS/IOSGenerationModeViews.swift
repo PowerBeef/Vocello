@@ -258,6 +258,9 @@ struct IOSCustomVoiceView: View {
                     plan: plan,
                     voice: draft.selectedSpeaker,
                     emotion: model.supportsInstructionControl ? draft.resolvedDeliveryInstruction : nil,
+                    deliveryInstructionCellID: model.supportsInstructionControl
+                        ? draft.resolvedDeliveryProfile.instructionCellID
+                        : nil,
                     languageHint: draft.selectedLanguage.rawValue,
                     voiceDescription: nil,
                     refAudio: nil,
@@ -471,7 +474,10 @@ struct IOSCustomVoiceView: View {
                         ),
                         generationID: generationID,
                         seed: draft.pinnedSeed,
-                        variation: IOSGenerationVariationPreference.requestValue()
+                        variation: IOSGenerationVariationPreference.requestValue(),
+                        deliveryInstructionCellID: model.supportsInstructionControl
+                            ? draft.resolvedDeliveryProfile.instructionCellID
+                            : nil
                     )
                 )
                 // If the user cancelled while the take was generating, discard it: don't
@@ -1055,6 +1061,7 @@ struct IOSVoiceDesignView: View {
                     plan: plan,
                     voice: nil,
                     emotion: draft.resolvedDeliveryInstruction,
+                    deliveryInstructionCellID: nil,
                     languageHint: draft.selectedLanguage.rawValue,
                     voiceDescription: draft.voiceDescription,
                     refAudio: nil,
@@ -1718,6 +1725,7 @@ struct IOSVoiceCloningView: View {
                     plan: plan,
                     voice: referenceChipLabel,
                     emotion: nil,
+                    deliveryInstructionCellID: nil,
                     languageHint: draft.selectedLanguage.rawValue,
                     voiceDescription: nil,
                     refAudio: refPath,

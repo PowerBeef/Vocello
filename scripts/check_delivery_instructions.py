@@ -11,7 +11,11 @@ by unrelated text as well as by emotional wording, confounding every
 normal-versus-strong comparison run over them. Every deterministic gate passed
 throughout.
 
-Four checks, in two severities.
+The gate also pins every canonical cell digest and validates each versioned localized variant,
+its source constant, supported language pair, speaker-metadata authority, dual-match routing,
+verbatim custom-text fallback, and hard-safety matrix identity.
+
+Four semantic-text checks follow, in two severities.
 
 Hard failures -- indefensible whatever the right delivery copy turns out to be:
 
@@ -48,6 +52,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import pathlib
 import re
@@ -58,6 +63,8 @@ REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 PRESET_SOURCE = "Sources/QwenVoiceCore/EmotionPreset.swift"
 SEMANTICS_SOURCE = "Sources/QwenVoiceCore/GenerationSemantics.swift"
 CONTRACT_PATH = "config/delivery-instruction-contract.json"
+SPEAKER_CONTRACT_PATH = "Sources/Resources/qwenvoice_contract.json"
+SUPPORTED_INSTRUCTION_LANGUAGES = {"english", "mandarin"}
 
 # Multi-word phrases only, so incidental words ("wide swings between low and
 # high") cannot register a direction. A tier that states no direction on an axis
@@ -318,6 +325,8 @@ def load_contract(root: pathlib.Path) -> dict:
         contract = json.load(handle)
     if not isinstance(contract, dict):
         raise ContractError(f"{CONTRACT_PATH} must be a JSON object")
+    if contract.get("schemaVersion") != 2:
+        raise ContractError(f"{CONTRACT_PATH}.schemaVersion must be 2")
     acknowledged = contract.get("acknowledgedFindings")
     if not isinstance(acknowledged, list):
         raise ContractError(f"{CONTRACT_PATH}.acknowledgedFindings must be a list")
@@ -330,6 +339,133 @@ def load_contract(root: pathlib.Path) -> dict:
     return contract
 
 
+def _sha256(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def validate_versioned_instructions(
+    root: pathlib.Path,
+    contract: dict,
+    presets: dict[str, dict[str, str]],
+) -> dict:
+    """Validate exact cell digests and every registered localized variant."""
+    expected_cells = {
+        f"{preset_id}.{tier}": instruction
+        for preset_id, tiers in presets.items()
+        for tier, instruction in tiers.items()
+    }
+    digests = contract.get("canonicalInstructionDigests")
+    if not isinstance(digests, dict) or set(digests) != set(expected_cells):
+        raise ContractError(
+            f"{CONTRACT_PATH}.canonicalInstructionDigests must exactly cover all delivery cells"
+        )
+    for cell_id, instruction in expected_cells.items():
+        expected_digest = _sha256(instruction)
+        if digests.get(cell_id) != expected_digest:
+            raise ContractError(
+                f"{CONTRACT_PATH} digest drift for {cell_id}: expected {expected_digest}"
+            )
+
+    source_path = root / PRESET_SOURCE
+    source_constants = _swift_string_constants(source_path.read_text(encoding="utf-8"))
+    variants = contract.get("localizedInstructionVariants")
+    if not isinstance(variants, list) or not variants:
+        raise ContractError(f"{CONTRACT_PATH}.localizedInstructionVariants must be non-empty")
+    identities: set[tuple[str, str]] = set()
+    for variant in variants:
+        if not isinstance(variant, dict):
+            raise ContractError("localized instruction variant must be an object")
+        version = variant.get("version")
+        cell_id = variant.get("cellID")
+        if not isinstance(version, str) or not version or cell_id not in expected_cells:
+            raise ContractError("localized instruction variant has invalid version or cellID")
+        identity = (version, cell_id)
+        if identity in identities:
+            raise ContractError(f"duplicate localized instruction variant {version}/{cell_id}")
+        identities.add(identity)
+
+        languages = variant.get("languages")
+        if not isinstance(languages, list):
+            raise ContractError(f"{version}/{cell_id} languages must be a list")
+        language_ids = [entry.get("id") for entry in languages if isinstance(entry, dict)]
+        if len(language_ids) != len(languages) or len(language_ids) != len(set(language_ids)):
+            raise ContractError(f"{version}/{cell_id} has duplicate or malformed languages")
+        unsupported = set(language_ids) - SUPPORTED_INSTRUCTION_LANGUAGES
+        if unsupported:
+            raise ContractError(
+                f"{version}/{cell_id} has unsupported instruction language(s): {sorted(unsupported)}"
+            )
+        missing = SUPPORTED_INSTRUCTION_LANGUAGES - set(language_ids)
+        if missing:
+            raise ContractError(
+                f"{version}/{cell_id} is missing translation(s): {sorted(missing)}"
+            )
+        resolved: dict[str, str] = {}
+        for entry in languages:
+            constant = entry.get("sourceConstant")
+            if not isinstance(constant, str) or constant not in source_constants:
+                raise ContractError(
+                    f"{version}/{cell_id}/{entry.get('id')} references unknown source constant"
+                )
+            instruction = source_constants[constant]
+            if entry.get("digest") != _sha256(instruction):
+                raise ContractError(
+                    f"{version}/{cell_id}/{entry.get('id')} digest does not match source"
+                )
+            resolved[entry["id"]] = instruction
+        if resolved["english"] != expected_cells[cell_id]:
+            raise ContractError(
+                f"{version}/{cell_id} English variant must equal the canonical shipped cell"
+            )
+
+        routing = variant.get("routing")
+        exact_routing = {
+            "mode": "custom",
+            "requiresNativeLanguage": "Chinese",
+            "requiresOutputLanguage": "chinese",
+            "speakerMetadataSource": SPEAKER_CONTRACT_PATH,
+            "fallbackLanguage": "english",
+            "customTextBehavior": "verbatim",
+        }
+        if routing != exact_routing:
+            raise ContractError(f"{version}/{cell_id} dual-match routing contract drifted")
+
+    speaker_contract = root / SPEAKER_CONTRACT_PATH
+    try:
+        speaker_payload = json.loads(speaker_contract.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise ContractError(f"could not load {SPEAKER_CONTRACT_PATH}: {error}") from error
+    groups = speaker_payload.get("speakers")
+    metadata = speaker_payload.get("speakerMetadata")
+    if not isinstance(groups, dict) or not isinstance(metadata, dict):
+        raise ContractError(f"{SPEAKER_CONTRACT_PATH} is missing speaker metadata")
+    roster = [speaker for members in groups.values() for speaker in members]
+    if len(roster) != len(set(roster)) or set(roster) != set(metadata):
+        raise ContractError("speaker-language routing requires unique metadata for every speaker")
+    if not any(
+        str(row.get("nativeLanguage", "")).lower() == "chinese"
+        for row in metadata.values()
+    ):
+        raise ContractError("speaker contract has no registered Chinese-native speaker")
+
+    safety = contract.get("safetyMatrix")
+    if not isinstance(safety, dict):
+        raise ContractError(f"{CONTRACT_PATH}.safetyMatrix must be an object")
+    required_safety = {
+        "runner": "scripts/angry_bilingual_safety_matrix.py",
+        "tests": "scripts/tests/test_angry_bilingual_safety_matrix.py",
+        "fixedSeeds": [32060826, 32060827, 32060828, 32060829],
+        "requiredTakeCount": 36,
+        "authority": "hard-failure-and-routing-safety-only",
+    }
+    if safety != required_safety:
+        raise ContractError(f"{CONTRACT_PATH}.safetyMatrix drifted")
+    for path_key in ("runner", "tests"):
+        if not (root / safety[path_key]).is_file():
+            raise ContractError(f"missing safety-matrix surface: {safety[path_key]}")
+    return {"canonicalCells": len(expected_cells), "localizedVariants": len(variants)}
+
+
 def evaluate(root: pathlib.Path) -> dict:
     sys.path.insert(0, str(root / "scripts"))
     import prosody_profile
@@ -340,6 +476,7 @@ def evaluate(root: pathlib.Path) -> dict:
     findings = find_findings(presets, diction_tokens, expectations, preset_wide)
 
     contract = load_contract(root)
+    versioned = validate_versioned_instructions(root, contract, presets)
     acknowledged = {entry["key"]: entry for entry in contract["acknowledgedFindings"]}
     current = {finding_key(f): f for f in findings}
 
@@ -357,6 +494,7 @@ def evaluate(root: pathlib.Path) -> dict:
         "unacknowledged": unacknowledged,
         "staleAcknowledgements": stale,
         "acknowledged": [f for f in findings if finding_key(f) in acknowledged],
+        "versionedInstructions": versioned,
         "ok": not errors and not unacknowledged and not stale,
     }
 
@@ -401,7 +539,11 @@ def main(argv=None) -> int:
 
     known = len(report["acknowledged"])
     suffix = f", {known} acknowledged open finding(s)" if known else ""
-    print(f"Delivery instruction contract: PASS ({report['presets']} presets{suffix})")
+    variants = report["versionedInstructions"]["localizedVariants"]
+    print(
+        f"Delivery instruction contract: PASS ({report['presets']} presets, "
+        f"{variants} localized variant(s){suffix})"
+    )
     return 0
 
 

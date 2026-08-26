@@ -5,6 +5,8 @@ The behavioural checks run on synthetic presets so they keep testing the rule
 rather than today's shipped copy; one integration test asserts the real
 repository passes its own gate.
 """
+import hashlib
+import json
 import os
 import pathlib
 import sys
@@ -22,6 +24,7 @@ from check_delivery_instructions import (  # noqa: E402
     load_presets,
     main,
     repeated_intensifier,
+    validate_versioned_instructions,
 )
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent.parent
@@ -209,6 +212,119 @@ class KeyTests(unittest.TestCase):
             finding_key({"check": "diction-append-parity", "preset": "happy"}),
             "diction-append-parity/happy",
         )
+
+
+class LocalizedInstructionContractTests(unittest.TestCase):
+    ENGLISH = "Sound fiercely angry and frustrated."
+    MANDARIN = "语气要强烈愤怒。"
+
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory()
+        self.root = pathlib.Path(self.temporary.name)
+        source = self.root / "Sources/QwenVoiceCore/EmotionPreset.swift"
+        source.parent.mkdir(parents=True)
+        source.write_text(
+            f'''public static let angryBilingualV3English = "{self.ENGLISH}"
+public static let angryBilingualV3Mandarin = "{self.MANDARIN}"
+''',
+            encoding="utf-8",
+        )
+        resources = self.root / "Sources/Resources"
+        resources.mkdir(parents=True)
+        (resources / "qwenvoice_contract.json").write_text(json.dumps({
+            "speakers": {"Built-in": ["aiden", "vivian"]},
+            "speakerMetadata": {
+                "aiden": {"nativeLanguage": "English"},
+                "vivian": {"nativeLanguage": "Chinese"},
+            },
+        }), encoding="utf-8")
+        scripts = self.root / "scripts/tests"
+        scripts.mkdir(parents=True)
+        (self.root / "scripts/angry_bilingual_safety_matrix.py").touch()
+        (scripts / "test_angry_bilingual_safety_matrix.py").touch()
+        self.presets = {"angry": {"normal": self.ENGLISH, "strong": "Strong angry."}}
+        self.contract = {
+            "canonicalInstructionDigests": {
+                "angry.normal": self.digest(self.ENGLISH),
+                "angry.strong": self.digest("Strong angry."),
+            },
+            "localizedInstructionVariants": [{
+                "version": "angry-bilingual-v3",
+                "cellID": "angry.normal",
+                "languages": [
+                    {"id": "english", "sourceConstant": "angryBilingualV3English",
+                     "digest": self.digest(self.ENGLISH)},
+                    {"id": "mandarin", "sourceConstant": "angryBilingualV3Mandarin",
+                     "digest": self.digest(self.MANDARIN)},
+                ],
+                "routing": {
+                    "mode": "custom",
+                    "requiresNativeLanguage": "Chinese",
+                    "requiresOutputLanguage": "chinese",
+                    "speakerMetadataSource": "Sources/Resources/qwenvoice_contract.json",
+                    "fallbackLanguage": "english",
+                    "customTextBehavior": "verbatim",
+                },
+            }],
+            "safetyMatrix": {
+                "runner": "scripts/angry_bilingual_safety_matrix.py",
+                "tests": "scripts/tests/test_angry_bilingual_safety_matrix.py",
+                "fixedSeeds": [32060826, 32060827, 32060828, 32060829],
+                "requiredTakeCount": 36,
+                "authority": "hard-failure-and-routing-safety-only",
+            },
+        }
+
+    def tearDown(self):
+        self.temporary.cleanup()
+
+    @staticmethod
+    def digest(value):
+        return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+    def validate(self, contract=None):
+        return validate_versioned_instructions(
+            self.root, contract or self.contract, self.presets
+        )
+
+    def test_valid_exact_variant_and_dual_match_contract_pass(self):
+        self.assertEqual(self.validate(), {"canonicalCells": 2, "localizedVariants": 1})
+
+    def test_missing_translation_fails(self):
+        contract = json.loads(json.dumps(self.contract))
+        contract["localizedInstructionVariants"][0]["languages"].pop()
+        with self.assertRaisesRegex(ContractError, "missing translation"):
+            self.validate(contract)
+
+    def test_unsupported_or_duplicate_language_fails(self):
+        contract = json.loads(json.dumps(self.contract))
+        contract["localizedInstructionVariants"][0]["languages"][1]["id"] = "cantonese"
+        with self.assertRaisesRegex(ContractError, "unsupported instruction language"):
+            self.validate(contract)
+        contract = json.loads(json.dumps(self.contract))
+        contract["localizedInstructionVariants"][0]["languages"][1]["id"] = "english"
+        with self.assertRaisesRegex(ContractError, "duplicate or malformed"):
+            self.validate(contract)
+
+    def test_duplicate_variant_and_digest_drift_fail(self):
+        contract = json.loads(json.dumps(self.contract))
+        contract["localizedInstructionVariants"].append(
+            contract["localizedInstructionVariants"][0]
+        )
+        with self.assertRaisesRegex(ContractError, "duplicate localized"):
+            self.validate(contract)
+        contract = json.loads(json.dumps(self.contract))
+        contract["canonicalInstructionDigests"]["angry.strong"] = "0" * 64
+        with self.assertRaisesRegex(ContractError, "digest drift"):
+            self.validate(contract)
+
+    def test_unregistered_speaker_metadata_fails(self):
+        speaker_path = self.root / "Sources/Resources/qwenvoice_contract.json"
+        payload = json.loads(speaker_path.read_text(encoding="utf-8"))
+        payload["speakerMetadata"].pop("vivian")
+        speaker_path.write_text(json.dumps(payload), encoding="utf-8")
+        with self.assertRaisesRegex(ContractError, "unique metadata"):
+            self.validate()
 
 
 class RepositoryTests(unittest.TestCase):

@@ -1,5 +1,56 @@
 {
-  "schemaVersion": 1,
-  "description": "Open findings from scripts/check_delivery_instructions.py that are real but whose resolution is not yet known. An entry here is a known-open issue that passes the gate; any new finding fails it, and an entry that no longer occurs also fails so the list cannot rot. Acknowledging is not approving: each entry names how it gets settled.",
+  "schemaVersion": 2,
+  "description": "Exact shipped delivery identities, versioned localized variants, and open findings validated by scripts/check_delivery_instructions.py. Acknowledging a finding is not approving it; localized variants apply only under their dual-match routing contract.",
+  "canonicalInstructionDigests": {
+    "angry.normal": "e029abc96a23c5afe766f0dd1e57335ac1791074bc5882e86754b9d92d7e9fdf",
+    "angry.strong": "36963ac234747e5ac4738c5b1643da8d025e8f9d81665272372fe638ecb3d486",
+    "calm.normal": "e44a3336538913a4df1b6e38d6bfdaa655b8f9873ced5a26fb0b59ab3490bab7",
+    "calm.strong": "5e0b8f214f3f9aaf06104a9ed3b58249beb26b2663244411336cb62816805662",
+    "fearful.normal": "27909ea062bb5a56c9db3262ba15597ec3d30c4a73f7fea6b9ffc5a7fd6de184",
+    "fearful.strong": "993644be9eaff050fd4bebfd738b9f1fb0f2ff0afb3175639c8f40e6da7f5c32",
+    "happy.normal": "56c7bed329d08ebb7f24a9719bdc624a2535f869ae660c8f044edb0a722cbf57",
+    "happy.strong": "bcba70259f95d221f1da348062fd171f2127ffa9971e2010e9c9d9eb387207d9",
+    "neutral.normal": "8a164237402295dadea6dbdf0cb4e036e53607817f3fceab57e239eb92047a94",
+    "neutral.strong": "8a164237402295dadea6dbdf0cb4e036e53607817f3fceab57e239eb92047a94",
+    "sad.normal": "b5e115bb7c92a948b3a284c0bd14c51f9888ab4dacb17e27e5a79e1016b5f432",
+    "sad.strong": "dd689d58f27818f8a79e2cddb65fa525dfa72eb5d1fa5f86154e086127ca9955",
+    "surprised.normal": "d0fa9428cb4726df19286324f0ab1705f52e4ef2ccc13aae5c3627303abd4e37",
+    "surprised.strong": "14550a014d01778f480c4af442be559055aabdb8129eabf5f75fa434facd93ed",
+    "whisper.normal": "a949db327d98b6b36e2ab742b777aeab4b1587c926c1a10739f047d6e8369364",
+    "whisper.strong": "f4a215f164fd4511f2911305bfd115f0b900e718b0dc4f0b12327a12e7c46b08"
+  },
+  "localizedInstructionVariants": [
+    {
+      "version": "angry-bilingual-v3",
+      "cellID": "angry.normal",
+      "languages": [
+        {
+          "id": "english",
+          "sourceConstant": "angryBilingualV3English",
+          "digest": "e029abc96a23c5afe766f0dd1e57335ac1791074bc5882e86754b9d92d7e9fdf"
+        },
+        {
+          "id": "mandarin",
+          "sourceConstant": "angryBilingualV3Mandarin",
+          "digest": "5d08a1b31bfa30c53741656f259ab0184c36f192b35b647afa78349735e9606d"
+        }
+      ],
+      "routing": {
+        "mode": "custom",
+        "requiresNativeLanguage": "Chinese",
+        "requiresOutputLanguage": "chinese",
+        "speakerMetadataSource": "Sources/Resources/qwenvoice_contract.json",
+        "fallbackLanguage": "english",
+        "customTextBehavior": "verbatim"
+      }
+    }
+  ],
+  "safetyMatrix": {
+    "runner": "scripts/angry_bilingual_safety_matrix.py",
+    "tests": "scripts/tests/test_angry_bilingual_safety_matrix.py",
+    "fixedSeeds": [32060826, 32060827, 32060828, 32060829],
+    "requiredTakeCount": 36,
+    "authority": "hard-failure-and-routing-safety-only"
+  },
   "acknowledgedFindings": []
 }

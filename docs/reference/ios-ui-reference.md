@@ -114,9 +114,13 @@ mode colors. The Audio group owns a semantic `Toggle` with custom compact switch
 variation menu picker. Models & Files summarizes model
 readiness as `N of 3 ready` through `iosSettings_voiceModelsRow` and keeps the Saved outputs value
 multi-line. Accessibility owns the app-level Reduce Motion and Reduce Transparency switches.
-Privacy owns clone consent, disclosure guidance, the Privacy Policy, and Permissions (explicitly
-labeled as opening iOS Settings). About contains Open Source & Licenses and the compact version/build
-row; there is no oversized logo footer.
+Privacy owns clone consent, disclosure guidance, the Privacy Policy, Permissions (explicitly
+labeled as opening iOS Settings), and `iosSettings_supportRow`, which opens the contract-owned
+unauthenticated support page. About contains `iosSettings_openSourceRow`, Source Code, and the compact
+version/build row; there is no oversized logo footer. Open Source & Licenses pushes
+`screen_openSourceLicenses`, with stable component/model rows and a 44-point
+`iosSettings_openSourceBackButton`; attribution details expose their complete bundled license text
+and governed source link without requiring network access.
 
 `iosSettings_voiceModelsRow` pushes `screen_voiceModels`, whose compact
 `iosSettings_voiceModelsBackButton` is the only Settings-specific contextual header. iOS has one

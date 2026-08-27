@@ -8,6 +8,10 @@ sourceOfTruth:
 ---
 # iPhone 6 GB hardware-floor feasibility — staged evidence plan
 
+> **Currency review (2026-08-27):** later diagnostic knobs do not change the production hardware
+> floor or this staged-evidence decision. App Store installation eligibility is now separately owned
+> by ASR-01; no 6 GB support claim has been made.
+
 - **Status:** pre-registered 2026-08-01 (maintainer-directed). The floor does **not**
   move on simulation evidence alone; this document stages the question so each step
   can kill it cheaply.

@@ -7,6 +7,10 @@ sourceOfTruth:
 ---
 # Product identity compatibility
 
+> **Currency review (2026-08-27):** the new support, attribution, and Settings surfaces use Vocello
+> publicly while retaining the existing module, bundle, storage, and evidence compatibility IDs.
+> No identity migration was introduced.
+
 **Status:** Accepted
 **Owners:** Release/QA with affected platform owners
 **Review trigger:** Branding, bundle/module identity, storage root, App Group, environment key, or schema changes

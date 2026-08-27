@@ -13,6 +13,11 @@ This reference describes the shipping long-form v4 path — macOS since 2026-07-
 iOS since 2026-07-24 — and what remains open. Source and `config/runtime-refactor-contract.json`
 (`longForm`, `longFormV4`) remain higher authority.
 
+Currency review (2026-08-27): iOS long-form start, regeneration, cancellation, progress, and terminal
+callbacks now carry the same attempt token as single-take Studio generation. Stale callbacks cannot
+clear or overwrite a newer take, and cancellation errors are surfaced. Planning, manifests, segment
+identity, resume, and joined-audio semantics are unchanged.
+
 ## Shipping path (macOS)
 
 `LongTextGenerationRouter` routes scripts above 900 trimmed characters (the retired character

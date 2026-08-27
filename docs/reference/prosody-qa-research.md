@@ -8,6 +8,11 @@ sourceOfTruth:
 ---
 # Prosody QA Research Notes
 
+> **Currency review (2026-08-27):** the live roster remains eight presets. `angry.normal` has a
+> governed Mandarin routing variant, and the newer layered delivery evaluator/temporal features
+> supersede any implication that one categorical SER verdict proves semantic emotion. This document
+> remains analyzer research; the delivery experiment contracts own promotion decisions.
+
 > Research for improving Vocello's automated tone/tempo/cadence quality gate.
 > Date: 2026-06-15
 

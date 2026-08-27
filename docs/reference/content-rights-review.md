@@ -78,6 +78,11 @@ A qualified decision is complete only when it records:
 ASR-04 may move to `done` only after all rows have an affirmative qualified decision or the affected
 asset/surface has been removed and the removal is verified in source and the release artifact.
 
+Currency review (2026-08-27): the roadmap still correctly keeps ASR-04 planned. The authenticated
+App Store Connect readback proves only the third-party-content declaration; it does not replace the
+qualified model-redistribution, voice/publicity, cloned-reference consent, marketing-audio, or artwork
+decisions above. ASR-11 separately owns the remaining live account and regional-compliance inventory.
+
 ## Fail-closed release choices
 
 If qualified review cannot be obtained before submission:

@@ -7,6 +7,10 @@ sourceOfTruth:
 ---
 # Exploratory UI QA and failure diagnosis (computer use, assistive)
 
+> **Currency review (2026-08-27):** localization, startup-parity, saved-voice, model-management, and
+> performance lanes have expanded, but the boundary is unchanged: checked-in XCUITest is the only
+> autonomous app UI driver and computer use supplies no acceptance evidence.
+
 An assistive companion to the autonomous XCUITest lanes — never a replacement for them. An AI
 agent may use computer use (screenshots, vision, and clicks on genuine visible controls) to
 *explore* the app and to *diagnose* UI-lane failures: watching a lane run, checking the desktop

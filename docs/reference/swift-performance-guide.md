@@ -9,7 +9,9 @@ sourceOfTruth:
 
 > **Living document.** A project-specific reference for Swift 6 language and runtime performance decisions that affect Vocello's macOS app, iOS app, and `vocello` CLI. It is meant to complement the backend-focused [`mlx-guide.md`](mlx-guide.md) and the model-focused [`qwen3-tts-guide.md`](qwen3-tts-guide.md). When this doc disagrees with the code, the code wins — fix this file.
 >
-> Last reviewed: 2026-06-15. Swift version: **6.0** (`SWIFT_VERSION: "6"` in `project.yml`).
+> Last reviewed: 2026-08-27. Swift version: **6.0** (`SWIFT_VERSION: "6"` in `project.yml`).
+> The latest manifest change only registers iOS support/attribution UI and resources; build
+> configuration, optimization posture, concurrency mode, and runtime performance guidance are unchanged.
 
 ---
 

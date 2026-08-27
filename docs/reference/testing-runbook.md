@@ -20,8 +20,8 @@ driver and is reserved for explicit frontend acceptance.
 
 | Platform | Required for development/CI/release packaging | Explicit UI lanes |
 | --- | --- | --- |
-| macOS | `scripts/macos_test.sh test` + `./scripts/build.sh build` | `scripts/ui_test.sh macos smoke|benchmark` |
-| iOS | `./scripts/check_project_inputs.sh` + `./scripts/build_foundation_targets.sh ios` | `scripts/ui_test.sh ios smoke|benchmark` on a paired physical iPhone |
+| macOS | `scripts/macos_test.sh test` + `./scripts/build.sh build` | `scripts/ui_test.sh macos localization|smoke|benchmark|perf` |
+| iOS | `./scripts/check_project_inputs.sh` + `./scripts/build_foundation_targets.sh ios` | `scripts/ui_test.sh ios localization|smoke|benchmark|perf` on a paired physical iPhone |
 
 No UI lane, model download, paired phone, or UI result is mandatory for ordinary development
 publishing.
@@ -58,6 +58,8 @@ scripts/macos_test.sh gate
 # Explicit frontend acceptance only
 scripts/ui_test.sh macos smoke
 scripts/ui_test.sh macos benchmark
+scripts/ui_test.sh macos localization
+scripts/ui_test.sh macos perf
 # Filtered benchmark example
 scripts/ui_test.sh macos benchmark --modes custom --lengths short --warm 1 --label "focused"
 ```
@@ -75,23 +77,32 @@ scripts/ios_device.sh gate
 # Explicit frontend acceptance only; never Simulator
 scripts/ui_test.sh ios smoke
 scripts/ui_test.sh ios benchmark
+scripts/ui_test.sh ios localization
+scripts/ui_test.sh ios perf
 # Filtered benchmark example
 scripts/ui_test.sh ios benchmark --modes custom --lengths short --warm 1 --label "focused"
 
 # Opt-in three-artifact background-session restoration proof (~1.7 GB Custom full-wire,
 # then Design and Clone with shared-component reuse); isolated data, genuine Settings controls
 scripts/ui_test.sh ios model-download
+
+# Opt-in lifecycle and startup acceptance
+scripts/ui_test.sh ios saved-voice-lifecycle
+scripts/ui_test.sh ios startup-parity --script-file <untracked-script>
+
+# Headless startup characterization, not UI acceptance
+scripts/ios_device.sh delivery-reliability --plan <plan.json> --script-file <untracked-script>
 ```
 
 Both benchmark commands accept `--modes`, `--lengths`, `--warm`, and `--label`. Without filters,
 each runs the canonical 29-take matrix. Filtered runs are targeted diagnostics, not substitutes for
 the full matrix when full frontend benchmark acceptance is explicitly requested.
 
-`ios model-download` is not a third routine UI lane. It selects one isolated physical-device test
-directly, backgrounds and relaunches the app during transfer, checks adopted progress, installs
-Custom full-wire and then Design and Clone with mandatory shared-component reuse, validates
-per-artifact wire-byte accounting and the throughput floor, and deletes all three isolated models
-through Settings. It never runs in ordinary CI or release.
+`ios model-download` is not a routine UI lane. Its `diagnose`, `queue`, `acceptance`, `soak`, and
+`recover` scenarios use one isolated physical-device root, correlate event/ledger/UI observations,
+quantitatively verify exact catalog-byte progress, and preserve complete failure forensics. Full
+acceptance installs and removes Custom, Design, and Clone while proving shared-component reuse and
+canonical-state preservation. It never runs in ordinary CI or release.
 See [`model-delivery.md`](model-delivery.md).
 
 ## Model readiness

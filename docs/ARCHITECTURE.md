@@ -14,7 +14,9 @@ sourceOfTruth:
 > lifecycle, persistence, model management, and telemetry. When this doc disagrees
 > with the code, **the code wins** — fix this doc.
 >
-> Last reviewed: 2026-08-06.
+> Last reviewed: 2026-08-27. The latest `project.yml` change registers the iOS offline-license
+> screen/resource only; target boundaries, engine hosting, model delivery, and runtime topology are
+> unchanged.
 
 ## TL;DR
 

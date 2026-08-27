@@ -13,6 +13,11 @@ sourceOfTruth:
 ---
 # Localization architecture
 
+> **Currency review (2026-08-27):** the catalog now includes the Help & Support and offline-license
+> browser copy with translator context. The direct-literal baseline remains contract-owned and the
+> app still ships English UI only. The bilingual Angry engine instruction is governed delivery data,
+> not a claim that Mandarin UI localization ships.
+
 Vocello currently ships English source copy. The repository has localization architecture before
 translations: one Xcode String Catalog, typed keys for dynamic presentation text, translator
 context, plural rules, a deterministic direct-literal growth guard, and long-string acceptance on

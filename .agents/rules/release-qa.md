@@ -8,6 +8,8 @@ sourceOfTruth:
   - .github/workflows/release.yml
   - .github/workflows/promote-release.yml
   - config/build-output-policy.json
+  - config/support-contact.json
+  - config/third-party-attribution-policy.json
 ---
 # Release / QA domain rule
 
@@ -28,6 +30,9 @@ sourceOfTruth:
   `config/project-health-contract.json`, `config/release-evidence-contract.json`,
   `config/quality-promotion-contract.json`,
   `config/benchmark-baseline-migrations.json`, and `config/marking-peak-equality.json`
+- App Store support and attribution governance:
+  `config/support-contact.json`, `config/third-party-attribution-policy.json`,
+  `scripts/support_contact_contract.py`, and `scripts/attribution_manifest.py`
 - `benchmarks/` schema-v1 compatibility, schema-v2 memory-qualified, and schema-v3
   quality-identity records, generated history, and preserved reference baselines
 - `docs/releases/`
@@ -67,6 +72,11 @@ Before changing scripts or CI, read:
 - **Shell scripts are the source of truth**; run them directly and preserve their artifacts.
 - Use a GitHub integration when it is currently callable for PR, release, and Actions context;
   otherwise use `gh`. User-scoped installation state is not a repository prerequisite.
+- For App Store Connect, use the guarded user-scoped `app-store-connect-cli` skill when available:
+  discover current syntax, request JSON, paginate fully, resolve exact IDs, and default to read-only.
+  Uploads, edits, TestFlight changes, submission, and cancellation each require explicit user
+  authorization immediately before mutation. Raw account JSON stays temporary and untracked;
+  repository archive and release scripts remain authoritative.
 - Optional skills may assist with test triage, performance, signing, packaging, or
   telemetry after their instructions are read. Start from script output and generated artifacts.
   Triage failing UI lanes with `axiom-testing` and focused repository commands, and symbolicate

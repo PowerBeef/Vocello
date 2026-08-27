@@ -177,7 +177,7 @@ Narrative authority: [`docs/reference/ios-app-store-readiness-audit-2026-08-26.m
 | `ASR-08` | planned | Prevent App Store build-number collisions | `doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md` |
 | `ASR-09` | planned | Prove reviewer access to immutable model hosting | `doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md` |
 | `ASR-10` | planned | Produce and verify the signed archive and exported IPA | `doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md` |
-| `ASR-11` | planned | Audit live App Store Connect and regional compliance read-only | `doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md` |
+| `ASR-11` | planned | Audit live App Store Connect and regional compliance read-only | `doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md`, `doc:docs/reference/ios-appstore-submission.md`, `doc:docs/reference/content-rights-review.md` |
 | `ASR-12` | planned | Complete current signed-candidate physical-device acceptance | `doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md` |
 
 ### Open items in detail

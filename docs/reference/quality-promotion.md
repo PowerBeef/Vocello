@@ -19,6 +19,11 @@ The same boundary applies to iOS: archive/export and internal TestFlight upload 
 candidate-validation steps; external TestFlight distribution, App Review submission, and public
 App Store release require a validated iOS promotion manifest.
 
+Before either platform can promote, release-source authority also requires the exact candidate
+commit to be contained in `origin/main`, an annotated GitHub-verified tag, and successful latest
+`CI required` plus `Security required` check runs on that exact SHA. Quality evidence cannot repair
+an untrusted or unverified release source.
+
 ## What the manifest binds
 
 `scripts/quality_promotion.py` binds one privacy-safe artifact to:

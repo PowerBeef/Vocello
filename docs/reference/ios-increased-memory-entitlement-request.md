@@ -8,6 +8,10 @@ sourceOfTruth:
 ---
 # iOS Increased-Memory Entitlement — Enablement & Readiness Guide
 
+> **Currency review (2026-08-27):** the latest project manifest adds the iOS license screen/resource
+> and does not change entitlement selection. A fresh Distribution profile and signed archive still
+> must prove the increased-memory and App Group entitlements under ASR-10.
+
 This is the source of truth for enabling Apple's increased-memory entitlement on the iOS app, verifying it,
 and the (kept-for-fallback) justification text. The engine runs **in-process** in the app (`MLXTTSEngine`),
 so the **app** process is the one that needs the raised limit — there is no separate engine-extension App ID.

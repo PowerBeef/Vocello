@@ -11,6 +11,10 @@ sourceOfTruth:
 ---
 # iOS UI review & refresh — 2026-08
 
+> **Currency review (2026-08-27):** later Settings support/license rows and their stable XCUITest
+> identifiers preserve the completed layout/performance arc. They introduce no new acceptance lane;
+> current Settings coverage remains part of smoke/localization and explicit accessibility review.
+
 > The durable record of the iOS UI stability/reactiveness arc: the frame-health
 > instrument, the measured baseline, the four-lens audit merged into one ranked
 > findings list (performance and design together — design items are a maintainer

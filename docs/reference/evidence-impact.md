@@ -8,6 +8,12 @@ sourceOfTruth:
 ---
 # Evidence impact contract
 
+> **Currency review (2026-08-27):** support/attribution contracts classify as repository validation,
+> the offline license screen as product/UI source, the support page as website, and the rights packet
+> as documentation/governance. The combined change selects project inputs, macOS deterministic tests,
+> generic iOS device-SDK compilation, website build, and documentation contracts without making
+> optional UI/model evidence an ordinary publication prerequisite.
+
 `config/evidence-impact.json` maps changed repository paths to proportionate deterministic merge
 and release evidence. `scripts/evidence_impact.py` validates the map, computes its stable digest,
 and classifies a path set:

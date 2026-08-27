@@ -57,12 +57,19 @@ download it automatically.
       provisioning profile or the multi-gigabyte model load is Jetsam-killed on a signed build.
 - [ ] **App Store provisioning profile** for `com.patricedery.vocello` (Distribution → App Store), regenerated
       after enabling the capabilities so it carries `increased-memory-limit` + the App Group.
-- [ ] App record created in App Store Connect (bundle id `com.patricedery.vocello`, primary language, category).
+- [x] App record exists in App Store Connect for `com.patricedery.vocello`; exact CLI resolution on
+      2026-08-27 found iOS version 1.0 in Prepare for Submission with one `en-US` localization.
+      Category and the rest of the live account remain part of ASR-11.
 - [ ] App Store installation eligibility matches the app's runtime hardware floor. The current source
       requires iPhone 15 Pro or newer but the Info.plist declares only `arm64`; close ASR-01 before the
       first public version, when eligibility can still be set safely.
 
 ## 1. Privacy + compliance (App Store Connect)
+
+Current account checkpoint (2026-08-27): the exact `en-US` Support URL and
+`USES_THIRD_PARTY_CONTENT` declaration were read back after explicit maintainer-authorized changes.
+No other metadata, build, TestFlight, or submission state was changed. ASR-11 still requires the
+complete read-only account and regional-compliance inventory.
 
 - [ ] **Privacy Policy URL** = `https://vocello.vercel.app/privacy` (hosted by this repo's website; the in-app
       Settings → About → Privacy Policy row links to the same URL).

@@ -23,6 +23,11 @@ were the same class of failure, and no check in the repository could see that cl
 Architecture and gate tiers live in [`../ARCHITECTURE.md`](../ARCHITECTURE.md) and the root
 [`AGENTS.md`](../../AGENTS.md). This file is about the verification system itself.
 
+Currency review (2026-08-27): the project-input gate now also executes localization, entitlement,
+support-contact, and deterministic attribution-manifest contracts. Python inventory is
+discovery-complete (107 modules / 1,281 declared tests at this checkpoint), rejects zero-test
+modules, and keeps required surfaces synchronized with the curated runner.
+
 ## The five classes
 
 Every check answers a different question. Placing a new check in the wrong class is the usual way

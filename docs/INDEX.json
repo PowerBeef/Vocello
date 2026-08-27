@@ -80,7 +80,9 @@
         ".github/workflows/ci.yml",
         ".github/workflows/release.yml",
         ".github/workflows/promote-release.yml",
-        "config/build-output-policy.json"
+        "config/build-output-policy.json",
+        "config/support-contact.json",
+        "config/third-party-attribution-policy.json"
       ]
     },
     {

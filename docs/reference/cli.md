@@ -10,6 +10,10 @@ sourceOfTruth:
 ---
 # The `vocello` CLI
 
+> **Currency review (2026-08-27):** the latest project-manifest edits add iOS support/attribution
+> sources only. CLI target membership and its single-source `2.4.0` bundle identity remain unchanged;
+> `scripts/cli_version_contract.py` still passes.
+
 `vocello` is a headless macOS command-line surface over the same in-process MLX engine the app uses.
 It serves two roles:
 

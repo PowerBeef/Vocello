@@ -7,7 +7,12 @@ sourceOfTruth:
 ---
 # Tone and Emotion in Vocello
 
-_Last reviewed: 2026-06-11. Provenance pass 2026-08-02._
+_Last reviewed: 2026-08-27. Provenance pass 2026-08-02._
+
+`angry.normal` now has one governed bilingual variant: English remains canonical, while Mandarin is
+selected only for CustomVoice when both the catalog speaker is Chinese-native and output language
+resolves to Chinese. Custom instructions and legacy raw strings remain verbatim; every other preset
+is unchanged. The delivery instruction contract owns the exact text and digests.
 
 > **Where the sourced version lives.** [`reference/qwen3-tts-prompting-guide.md`](reference/qwen3-tts-prompting-guide.md)
 > is the primary-source reference: it labels every claim `OFFICIAL` / `RESEARCH` / `MEASURED-HERE` /

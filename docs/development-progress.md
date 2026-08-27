@@ -69,6 +69,20 @@ the voice-clone marketing source, other marketing audio/scripts, and artwork pro
 decision-ready evidence and fail-closed alternatives are in
 [`content-rights-review.md`](reference/content-rights-review.md).
 
+The guarded user-scoped App Store Connect CLI profile is authenticated. Only the explicitly
+authorized Support URL and third-party-content declaration were mutated; both were resolved through
+the exact app/version/localization identity and read back successfully. ASR-11 remains planned
+because categories, availability, screenshots, reviewer metadata, privacy/export/age/DSA/regional
+answers, agreements, financial readiness, and all build states have not yet received the required
+complete read-only audit. No raw account response or credential entered the repository.
+
+**Repository guidance and roadmap currency pass complete (2026-08-27):** all 52 completed roadmap
+items flagged by newer source-authority revisions were re-reviewed against their closure gates; none
+required reopening. The 20 active documents carrying freshness signals were reconciled with current
+source, contracts, testing lanes, support/attribution governance, and App Store state. Root guidance
+now routes guarded App Store Connect work through the optional user-scoped CLI skill while preserving
+repository scripts as authority, and the root-plus-website instruction chain remains below 30 KiB.
+
 **The iOS App Store readiness audit is pinned and the submission verdict is not ready
 (2026-08-26):** the generic arm64/iOS 26 Release build and Xcode analysis pass, downloaded models are
 digest-pinned data rather than executable code, required-reason privacy declarations exist, and the
@@ -83,7 +97,8 @@ logging/API hygiene, build-number collision prevention, and model-host reviewer 
 closure. A fresh signed archive/exported IPA, read-only App Store Connect audit, qualified legal/privacy
 decisions, and exact-candidate physical-device/accessibility acceptance remain explicitly pending. See
 [`ios-app-store-readiness-audit-2026-08-26.md`](reference/ios-app-store-readiness-audit-2026-08-26.md);
-no upload, metadata mutation, submission, or release was performed.
+no build upload, TestFlight change, submission, or release was performed. The two controlled
+metadata mutations are recorded above and in the authoritative roadmap.
 
 **F-03 deterministic iOS policy assertions now execute in ordinary CI, F-06 History durability
 is closed, F-07 release-source authority is fail-closed, and F-08 Studio terminal ownership is

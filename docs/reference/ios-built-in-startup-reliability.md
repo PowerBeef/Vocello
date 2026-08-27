@@ -16,6 +16,11 @@ sourceOfTruth:
 ---
 # iOS Built-in Voice startup reliability
 
+> **Currency review (2026-08-27):** request receipts now include resolved instruction language and
+> the latest diagnostics include codec replay, complete QC evidence, crash-log classification, and
+> unload-quiescence proof. ISR-05's false-startup-message fix remains closed; staged characterization
+> and the exact-script closure gate (ISR-04/ISR-06) remain open.
+
 This investigation covers the reported `vivian × calm.strong × english` Built-in Voice startup
 failure with a 285-character script. The external *Vocello Built-in Voice Startup Reliability —
 Codex Handout Revision 2.0* was reviewed as descriptive input. It correctly separates a pre-audio

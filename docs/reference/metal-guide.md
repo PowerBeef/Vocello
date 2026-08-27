@@ -9,7 +9,9 @@ sourceOfTruth:
 
 > **Living document.** A project-specific reference for Apple's Metal API and Metal performance optimization as it applies to Vocello's Qwen3-TTS engine on Apple Silicon macOS and iOS. Most GPU work today is abstracted by MLX; this doc explains how MLX uses Metal, what that means for memory and latency, and the direct-Metal patterns that would matter if future work adds custom kernels or DSP. When this doc disagrees with the code, the code wins — fix this file.
 >
-> Last reviewed: 2026-08-01. MLX pin: `mlx-swift` **0.31.6**. Toolchain: Swift 6, Xcode 26, macOS 26+/iOS 26+.
+> Last reviewed: 2026-08-27. MLX pin: `mlx-swift` **0.31.6**. Toolchain: Swift 6, Xcode 26, macOS 26+/iOS 26+.
+> The latest project-manifest change adds iOS support/attribution UI only and does not alter MLX,
+> Metal dispatch, pins, metallibs, or memory policy.
 
 ---
 

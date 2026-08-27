@@ -19,9 +19,9 @@ repository ships a macOS app with an XPC engine, an iOS app with an in-process e
 are macOS and iOS 26+. No model weights are bundled and no cloud inference is used; approved
 artifacts download from Hugging Face through the complete production model catalog.
 
-Current public facts are derived from `project.yml`, `config/public-product-facts.json`, and the
-benchmark catalog. Do not hand-copy a release, build, hardware, preset, or speaker count without
-checking those sources. Releases happen only on an explicit maintainer request.
+Derive public facts from `project.yml`, `config/public-product-facts.json`, and the benchmark
+catalog. Check them before quoting version, hardware, preset, or speaker counts. Release only on
+an explicit maintainer request.
 
 Source-of-truth order:
 
@@ -43,8 +43,7 @@ machine-readable contract invalidates documentation, update the documentation in
 2. Read `docs/development-progress.md` and confirm its checkpoint against the current checkout.
 3. Read the applicable file under `.agents/rules/` and the authoritative subsystem reference.
 4. Inspect the exact code, tests, and contracts before deciding on an implementation.
-5. Select only skills and MCP tools relevant to the task. Read every selected `SKILL.md` completely
-   before acting. Verify optional tools are currently callable.
+5. Read every selected skill completely and verify optional tools are callable.
 6. Make the smallest coherent change. Preserve module boundaries and stable accessibility IDs.
 7. Land source, tests, evidence, contracts, and narrative updates together. After a dense workstream,
    perform a documentation currency pass before starting another arc.
@@ -143,6 +142,7 @@ scripts and domain rules remain authoritative.
 | GitHub context, CI, reviews, publication | `github:github`, `github:gh-fix-ci`, `github:gh-address-comments`, `github:yeet`; use `gh` when the connector is unavailable |
 | Model repository/source research | Hugging Face connector and `hugging-face:hf-cli`; never infer production artifact identity from a live listing |
 | Website inspection | `browser:control-in-app-browser`; Chrome only for explicitly needed signed-in state; computer-use never drives Vocello UI |
+| App Store Connect | `app-store-connect-cli`; exact IDs, paginated JSON, read-only default, explicit mutation authorization |
 | Codex instructions, hooks, skills, or settings | `openai-docs` and current official OpenAI documentation |
 | Current third-party library APIs | Context7, then primary vendor documentation |
 
@@ -220,6 +220,7 @@ isolated opt-ins documented in the platform rules.
 | `Tests/UIAutomationSupport/`, `Tests/VocelloMacUITests/`, `Tests/VocelloiOSUITests/` | checked-in XCUITest stack |
 | `Tests/VocelloiOSLogicTests/` | Host-executed platform-neutral policy assertions, also compiled in a standalone generic device-SDK bundle |
 | `config/runtime-debug-knobs.json`, `config/concurrency-safety.json` | debug and concurrency exception registries |
+| `config/support-contact.json`, `config/third-party-attribution-policy.json`, `docs/reference/content-rights-review.md` | support, offline attribution, and qualified-rights gates |
 | `config/model-management-diagnostics-schema-v1.json`, `scripts/check_ios_model_management.py` | correlated physical-iPhone model-delivery and progress diagnosis contract |
 | `config/ios-startup-reliability-{plan-schema-v1,result-schema-v1,result-schema-v2,sentinel}.json`, `scripts/ios_startup_reliability.py` | bounded physical-iPhone Built-in Voice startup plans, backward-compatible retained results, codec replay, memory/crash forensics, and exact request parity |
 | `config/runtime-refactor-contract.json`, `config/roadmap.json` | convergence and work-state authorities |

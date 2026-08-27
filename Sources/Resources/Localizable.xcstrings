@@ -1,6 +1,136 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "vocello.licenses.back" : {
+      "comment" : "VoiceOver label for returning from one attribution detail.",
+      "extractionState" : "manual",
+      "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Back to licenses" } } }
+    },
+    "vocello.licenses.back_to_settings" : {
+      "comment" : "VoiceOver label for returning from the attribution browser to Settings.",
+      "extractionState" : "manual",
+      "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Back to Settings" } } }
+    },
+    "vocello.licenses.copyright" : {
+      "comment" : "Heading for a component copyright notice.",
+      "extractionState" : "manual",
+      "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Copyright" } } }
+    },
+    "vocello.licenses.detail_hint" : {
+      "comment" : "VoiceOver hint for an attribution list row.",
+      "extractionState" : "manual",
+      "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Shows license and attribution details" } } }
+    },
+    "vocello.licenses.introduction" : {
+      "comment" : "Introduction on the offline attribution browser.",
+      "extractionState" : "manual",
+      "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Vocello includes open-source software and uses separately downloaded model artifacts. These notices are stored in the app and remain available offline." } } }
+    },
+    "vocello.licenses.license" : {
+      "comment" : "Suffix in a license-section heading after the SPDX identifier.",
+      "extractionState" : "manual",
+      "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "License" } } }
+    },
+    "vocello.licenses.models" : {
+      "comment" : "Heading for downloadable model attribution records.",
+      "extractionState" : "manual",
+      "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Downloadable Models" } } }
+    },
+    "vocello.licenses.notices" : {
+      "comment" : "Heading for third-party NOTICE text.",
+      "extractionState" : "manual",
+      "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Notices" } } }
+    },
+    "vocello.licenses.origins" : {
+      "comment" : "Heading for owned-runtime source-origin details.",
+      "extractionState" : "manual",
+      "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Source Origins" } } }
+    },
+    "vocello.licenses.software" : {
+      "comment" : "Heading for software component attributions.",
+      "extractionState" : "manual",
+      "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Software" } } }
+    },
+    "vocello.licenses.unavailable" : {
+      "comment" : "Fail-closed message when the bundled attribution manifest cannot be decoded.",
+      "extractionState" : "manual",
+      "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "License information is unavailable in this build." } } }
+    },
+    "vocello.licenses.view_source" : {
+      "comment" : "Link label opening the upstream source for a component.",
+      "extractionState" : "manual",
+      "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "View Source" } } }
+    },
+    "vocello.settings.github" : {
+      "comment" : "Value shown for the source-code destination.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "GitHub" } }
+      }
+    },
+    "vocello.settings.help_support" : {
+      "comment" : "Settings row opening the public Vocello support page.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Help & Support" } }
+      }
+    },
+    "vocello.settings.help_support.hint" : {
+      "comment" : "VoiceOver hint for the support-page link.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Opens the Vocello support page" } }
+      }
+    },
+    "vocello.settings.help_support.subtitle" : {
+      "comment" : "Settings support-row description.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Troubleshooting and contact." } }
+      }
+    },
+    "vocello.settings.on_device" : {
+      "comment" : "Value indicating that license details are available inside the app.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "On Device" } }
+      }
+    },
+    "vocello.settings.open_source_licenses" : {
+      "comment" : "Settings row opening bundled open-source license details.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Open Source & Licenses" } }
+      }
+    },
+    "vocello.settings.open_source_licenses.hint" : {
+      "comment" : "VoiceOver hint for the bundled license browser.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Shows software and model license details stored in Vocello" } }
+      }
+    },
+    "vocello.settings.source_code" : {
+      "comment" : "Settings row opening the public source repository.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Source Code" } }
+      }
+    },
+    "vocello.settings.source_code.hint" : {
+      "comment" : "VoiceOver hint for the source-repository link.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Opens the Vocello source repository on GitHub" } }
+      }
+    },
+    "vocello.settings.website" : {
+      "comment" : "Value shown for a website destination.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Website" } }
+      }
+    },
     "vocello.error.cancellation_not_finished" : {
       "comment" : "Studio error. The substitution explains why the engine cancellation barrier failed.",
       "extractionState" : "manual",

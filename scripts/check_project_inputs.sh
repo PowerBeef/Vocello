@@ -24,6 +24,8 @@ REQUIRED_SURFACES=(
     "scripts/codex_session_storage.py"
     "scripts/cli_version_contract.py"
     "scripts/localization_contract.py"
+    "scripts/support_contact_contract.py"
+    "scripts/attribution_manifest.py"
     "scripts/saved_voice_lifecycle_contract.py"
     "scripts/documentation_contract.py"
     "scripts/model_catalog_contract.py"
@@ -88,6 +90,16 @@ REQUIRED_SURFACES=(
     "scripts/tests/test_build_routing_contract.py"
     "scripts/tests/test_cli_version_contract.py"
     "scripts/tests/test_localization_contract.py"
+    "scripts/tests/test_support_contact_contract.py"
+    "scripts/tests/test_attribution_manifest.py"
+    "config/support-contact.json"
+    "config/third-party-attribution-policy.json"
+    "config/licenses/Apache-2.0.txt"
+    "config/licenses/MIT-terms.txt"
+    "config/notices/swift-asn1.txt"
+    "config/notices/swift-crypto.txt"
+    "config/notices/swift-nio.txt"
+    "Sources/Resources/third_party_attributions.json"
     "scripts/tests/test_saved_voice_lifecycle_contract.py"
     "scripts/tests/test_generate_cli_scheme.py"
     "scripts/tests/test_generate_ios_logic_scheme.py"
@@ -452,6 +464,9 @@ python3 "$SCRIPT_DIR/project_health.py" validate
 python3 "$SCRIPT_DIR/project_health.py" rebuild-summary --check
 python3 "$SCRIPT_DIR/runtime_security_contract.py"
 python3 "$SCRIPT_DIR/entitlement_contract.py" validate
+python3 "$SCRIPT_DIR/support_contact_contract.py" validate
+python3 "$SCRIPT_DIR/attribution_manifest.py" rebuild --check
+python3 "$SCRIPT_DIR/attribution_manifest.py" validate
 python3 "$SCRIPT_DIR/check_convergence_promotion_gate.py"
 # Delivery quality needs audio and models, so it can never gate ordinary CI.
 # The text-level ways the instruction copy can be wrong are deterministic, and

@@ -198,12 +198,40 @@ struct SettingsScreen: View {
     private var aboutSection: some View {
         IOSSettingsSection(title: "About") {
             IOSSettingsValueRow(
+                symbol: "questionmark.circle.fill",
+                title: String(localized: "vocello.settings.help_support"),
+                subtitle: String(localized: "vocello.settings.help_support.subtitle"),
+                accessibilityIdentifier: "iosSettings_supportRow",
+                value: String(localized: "vocello.settings.website"),
+                accessibilityHint: String(localized: "vocello.settings.help_support.hint"),
+                action: { open("https://vocello.vercel.app/support/") }
+            )
+
+            IOSSettingsDivider()
+            NavigationLink {
+                OpenSourceLicensesScreen()
+            } label: {
+                IOSSettingsNavigationRow(
+                    symbol: "chevron.left.forwardslash.chevron.right",
+                    title: String(localized: "vocello.settings.open_source_licenses"),
+                    subtitle: nil,
+                    value: String(localized: "vocello.settings.on_device")
+                )
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("iosSettings_openSourceRow")
+            .accessibilityLabel(String(localized: "vocello.settings.open_source_licenses"))
+            .accessibilityValue(String(localized: "vocello.settings.on_device"))
+            .accessibilityHint(String(localized: "vocello.settings.open_source_licenses.hint"))
+
+            IOSSettingsDivider()
+            IOSSettingsValueRow(
                 symbol: "chevron.left.forwardslash.chevron.right",
-                title: "Open Source & Licenses",
+                title: String(localized: "vocello.settings.source_code"),
                 subtitle: nil,
-                accessibilityIdentifier: "iosSettings_openSourceRow",
-                value: "GitHub",
-                accessibilityHint: "Opens the Vocello source repository",
+                accessibilityIdentifier: "iosSettings_sourceCodeRow",
+                value: String(localized: "vocello.settings.github"),
+                accessibilityHint: String(localized: "vocello.settings.source_code.hint"),
                 action: { open("https://github.com/PowerBeef/Vocello") }
             )
 

@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "description": "Source policy for the generated offline attribution manifest. Resolved package and production model identities must match exactly.",
+  "licenses": {
+    "Apache-2.0": "config/licenses/Apache-2.0.txt",
+    "MIT": "config/licenses/MIT-terms.txt"
+  },
+  "packages": [
+    {"identity":"eventsource","displayName":"EventSource","sourceURL":"https://github.com/mattt/EventSource","licenseID":"MIT","upstreamLicenseSHA256":"2f9b695627d569a3ce452b2c03fdd34310df78c8ea94edfafd9ce38381e5b502","copyrightNotice":"Copyright 2025 Mattt (https://mat.tt)"},
+    {"identity":"grdb.swift","displayName":"GRDB.swift","sourceURL":"https://github.com/groue/GRDB.swift","licenseID":"MIT","upstreamLicenseSHA256":"9853f9dce81365fcc1d9b46004633354450164b8d17904e92e80c444545f7e87","copyrightNotice":"Copyright (C) 2015-2025 Gwendal Roué"},
+    {"identity":"mlx-swift","displayName":"MLX Swift","sourceURL":"https://github.com/ml-explore/mlx-swift","licenseID":"MIT","upstreamLicenseSHA256":"44326a4ea062241ae6fc26ee2ec90bdc81af7eb7b9d3966181b733fa69d42057","copyrightNotice":"Copyright (c) 2023 ml-explore"},
+    {"identity":"mlx-swift-lm","displayName":"MLX Swift LM","sourceURL":"https://github.com/ml-explore/mlx-swift-lm","licenseID":"MIT","upstreamLicenseSHA256":"7b1d86acac816ce8192209d7e01141c129b4d48d474c15cc5fb4af62f497c323","copyrightNotice":"Copyright (c) 2024 ml-explore"},
+    {"identity":"swift-argument-parser","displayName":"Swift Argument Parser","sourceURL":"https://github.com/apple/swift-argument-parser","licenseID":"Apache-2.0","upstreamLicenseSHA256":"770af8291f708538d8ff885a0bbc4e045cd700531741c4f99528d435c14d7f55"},
+    {"identity":"swift-asn1","displayName":"SwiftASN1","sourceURL":"https://github.com/apple/swift-asn1","licenseID":"Apache-2.0","upstreamLicenseSHA256":"8c6db340475136df3c1201d458fa5755698eace76e510471ecc9d857d6083dac","noticePath":"config/notices/swift-asn1.txt","upstreamNoticeSHA256":"11dd3b3b783e6ec26098dd38ebc962986ea109b85447e28e62867b83bd0f8c5b"},
+    {"identity":"swift-atomics","displayName":"Swift Atomics","sourceURL":"https://github.com/apple/swift-atomics","licenseID":"Apache-2.0","upstreamLicenseSHA256":"770af8291f708538d8ff885a0bbc4e045cd700531741c4f99528d435c14d7f55"},
+    {"identity":"swift-collections","displayName":"Swift Collections","sourceURL":"https://github.com/apple/swift-collections","licenseID":"Apache-2.0","upstreamLicenseSHA256":"770af8291f708538d8ff885a0bbc4e045cd700531741c4f99528d435c14d7f55"},
+    {"identity":"swift-crypto","displayName":"Swift Crypto","sourceURL":"https://github.com/apple/swift-crypto","licenseID":"Apache-2.0","upstreamLicenseSHA256":"cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30","noticePath":"config/notices/swift-crypto.txt","upstreamNoticeSHA256":"b3ddc2ae068e76b3beb71be03c0400f90090f9469aa491bf7b1ac42320af37b8"},
+    {"identity":"swift-huggingface","displayName":"Swift Hugging Face","sourceURL":"https://github.com/huggingface/swift-huggingface","licenseID":"Apache-2.0","upstreamLicenseSHA256":"4d6ad72952a8329063a71de28329b493de96cf57459e2ac217110d1a6a5f84ae"},
+    {"identity":"swift-jinja","displayName":"Swift Jinja","sourceURL":"https://github.com/huggingface/swift-jinja","licenseID":"Apache-2.0","upstreamLicenseSHA256":"648b81e6c6f9975c3b6cf6d630229b6c8d6f1ddaef55f5770f576adda19f3495"},
+    {"identity":"swift-nio","displayName":"SwiftNIO","sourceURL":"https://github.com/apple/swift-nio","licenseID":"Apache-2.0","upstreamLicenseSHA256":"cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30","noticePath":"config/notices/swift-nio.txt","upstreamNoticeSHA256":"d25ed2452b3476c342082d11e4e8bf5459174d2836124f842b499850bcebc50e"},
+    {"identity":"swift-numerics","displayName":"Swift Numerics","sourceURL":"https://github.com/apple/swift-numerics","licenseID":"Apache-2.0","upstreamLicenseSHA256":"770af8291f708538d8ff885a0bbc4e045cd700531741c4f99528d435c14d7f55"},
+    {"identity":"swift-syntax","displayName":"SwiftSyntax","sourceURL":"https://github.com/swiftlang/swift-syntax","licenseID":"Apache-2.0","upstreamLicenseSHA256":"770af8291f708538d8ff885a0bbc4e045cd700531741c4f99528d435c14d7f55"},
+    {"identity":"swift-system","displayName":"Swift System","sourceURL":"https://github.com/apple/swift-system","licenseID":"Apache-2.0","upstreamLicenseSHA256":"2245a990b635558be210fb3eb4f8a6f7a49aebc0fefbf5859146a65ddc7ddcf3"},
+    {"identity":"swift-transformers","displayName":"Swift Transformers","sourceURL":"https://github.com/huggingface/swift-transformers","licenseID":"Apache-2.0","upstreamLicenseSHA256":"648b81e6c6f9975c3b6cf6d630229b6c8d6f1ddaef55f5770f576adda19f3495"},
+    {"identity":"yyjson","displayName":"yyjson","sourceURL":"https://github.com/ibireme/yyjson","licenseID":"MIT","upstreamLicenseSHA256":"45e384d3d52c73cba3a64d6e6c25d47cd738cd8a55c30629e3201046eda62947","copyrightNotice":"Copyright (c) 2020 YaoYuan <ibireme@gmail.com>"}
+  ],
+  "ownedComponents": [
+    {"identity":"vocello","displayName":"Vocello","version":"2.4.0","sourceURL":"https://github.com/PowerBeef/Vocello","licenseID":"MIT","licensePath":"LICENSE","copyrightNotice":"Copyright (c) 2026 PowerBeef"},
+    {"identity":"vocello-qwen3-core","displayName":"Vocello Qwen3 Core","version":"owned runtime","sourceURL":"https://github.com/PowerBeef/Vocello/tree/main/Packages/VocelloQwen3Core","licenseID":"MIT","licensePath":"Packages/VocelloQwen3Core/LICENSE","noticePath":"Packages/VocelloQwen3Core/NOTICES.md","originsPath":"Packages/VocelloQwen3Core/ORIGINS.md"}
+  ],
+  "modelCards": [
+    {"repo":"PowerBeef02/Qwen3-TTS-12Hz-1.7B-Base-8bit","licenseID":"Apache-2.0","baseRepo":"mlx-community/Qwen3-TTS-12Hz-1.7B-Base-8bit","baseRevision":"e7dd0585652209fa0d7783659aad4e8a324de11c","redistributionDecision":"pending-qualified-review"},
+    {"repo":"PowerBeef02/Qwen3-TTS-12Hz-1.7B-Base-4bit","licenseID":"Apache-2.0","baseRepo":"mlx-community/Qwen3-TTS-12Hz-1.7B-Base-4bit","baseRevision":"37e955a1deb861c088ae5f3a67043185f3d1a60c","redistributionDecision":"pending-qualified-review"},
+    {"repo":"PowerBeef02/Qwen3-TTS-12Hz-1.7B-CustomVoice-8bit","licenseID":"Apache-2.0","baseRepo":"mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-8bit","baseRevision":"41d3337e8b7f2843a75841595fc14e4b9a7a4b96","redistributionDecision":"pending-qualified-review"},
+    {"repo":"PowerBeef02/Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit","licenseID":"Apache-2.0","baseRepo":"mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit","baseRevision":"f35faf19b0cc2160865af64ecf0f22f83d335135","redistributionDecision":"pending-qualified-review"},
+    {"repo":"PowerBeef02/Qwen3-TTS-12Hz-1.7B-VoiceDesign-8bit","licenseID":"Apache-2.0","baseRepo":"mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-8bit","baseRevision":"f90d617701d9f7f4ca499291e0b57f2b3c2fd2ee","redistributionDecision":"pending-qualified-review"},
+    {"repo":"PowerBeef02/Qwen3-TTS-12Hz-1.7B-VoiceDesign-4bit","licenseID":"Apache-2.0","baseRepo":"mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-4bit","baseRevision":"5c390979e4b93af5f2932f90742ca99c7dd04687","redistributionDecision":"pending-qualified-review"}
+  ],
+  "contentRights": [
+    {"id":"voice-previews","description":"Bundled built-in speaker preview audio","status":"pending-qualified-review"},
+    {"id":"marketing-audio","description":"Generated audio used in marketing materials","status":"pending-qualified-review"},
+    {"id":"app-artwork","description":"App icons and original product artwork","status":"pending-qualified-review"},
+    {"id":"system-fonts-symbols","description":"Apple system fonts and SF Symbols are referenced through platform APIs and are not redistributed as standalone assets","status":"source-proven-not-redistributed"},
+    {"id":"app-store-content-rights","description":"App Store Connect declares that the app uses third-party content; qualified rights review remains pending","status":"pending-qualified-review-account-declaration-verified"}
+  ]
+}

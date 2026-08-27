@@ -36,6 +36,7 @@ class ExpectedIOSIdentity:
     application_groups: tuple[str, ...]
     increased_memory_limit: bool
     privacy_manifest_sha256: str
+    attribution_manifest_sha256: str
 
 
 @dataclass(frozen=True)
@@ -62,6 +63,8 @@ class BundleSnapshot:
     get_task_allow: bool
     privacy_manifest_sha256: str
     privacy_manifest_verified: bool
+    attribution_manifest_sha256: str
+    attribution_manifest_verified: bool
 
     def public_dict(self) -> dict[str, Any]:
         return {
@@ -87,6 +90,8 @@ class BundleSnapshot:
             "getTaskAllow": self.get_task_allow,
             "privacyManifestSHA256": self.privacy_manifest_sha256,
             "privacyManifestVerified": self.privacy_manifest_verified,
+            "attributionManifestSHA256": self.attribution_manifest_sha256,
+            "attributionManifestVerified": self.attribution_manifest_verified,
         }
 
 
@@ -176,6 +181,37 @@ def _root_privacy_manifest_digest(app: Path, label: str) -> str:
     return _validate_privacy_manifest(_read_plist(candidates[0]), label)
 
 
+def _root_attribution_manifest_digest(app: Path, label: str) -> str:
+    try:
+        candidates = [
+            candidate
+            for candidate in app.iterdir()
+            if candidate.is_file()
+            and not candidate.is_symlink()
+            and candidate.name.casefold() == "third_party_attributions.json"
+        ]
+    except OSError as error:
+        raise VerificationError(f"cannot inspect {label} attribution resources") from error
+    if len(candidates) != 1 or candidates[0].name != "third_party_attributions.json":
+        raise VerificationError(f"{label} must contain exactly one root third_party_attributions.json")
+    try:
+        payload = json.loads(candidates[0].read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise VerificationError(f"{label} attribution manifest is invalid") from error
+    if (
+        not isinstance(payload, dict)
+        or payload.get("schemaVersion") != 1
+        or not isinstance(payload.get("components"), list)
+        or not payload["components"]
+        or not isinstance(payload.get("modelArtifacts"), list)
+        or not payload["modelArtifacts"]
+        or not isinstance(payload.get("licenses"), list)
+        or not payload["licenses"]
+    ):
+        raise VerificationError(f"{label} attribution manifest is incomplete")
+    return _sha256(candidates[0])
+
+
 def _target_block(project_text: str, target: str) -> str:
     targets = re.search(r"(?ms)^targets:\n(?P<body>.*?)(?=^[A-Za-z0-9_-]+:\n|\Z)", project_text)
     if not targets:
@@ -224,6 +260,7 @@ def load_expected_identity(root: Path = ROOT) -> ExpectedIOSIdentity:
         raise VerificationError("project and capability-matrix iOS bundle identifiers differ")
     groups = tuple(sorted(str(value) for value in app["applicationGroups"]))
     privacy_manifest = _read_plist(root / "Sources/PrivacyInfo.xcprivacy")
+    attribution_manifest = root / "Sources/Resources/third_party_attributions.json"
     return ExpectedIOSIdentity(
         bundle_identifier=project_bundle,
         marketing_version=_inherited_setting(target, project_settings, "MARKETING_VERSION"),
@@ -233,6 +270,7 @@ def load_expected_identity(root: Path = ROOT) -> ExpectedIOSIdentity:
             app["booleanEntitlements"]["com.apple.developer.kernel.increased-memory-limit"]
         ),
         privacy_manifest_sha256=_validate_privacy_manifest(privacy_manifest, "source"),
+        attribution_manifest_sha256=_sha256(attribution_manifest),
     )
 
 
@@ -346,6 +384,7 @@ def validate_bundle_contract(
     signature_normalized_executable_sha256: str,
     bundle_sha256: str,
     privacy_manifest_sha256: str,
+    attribution_manifest_sha256: str,
 ) -> BundleSnapshot:
     identity = (
         str(info.get("CFBundleIdentifier", "")),
@@ -371,11 +410,14 @@ def validate_bundle_contract(
         ("signature-normalized executable", signature_normalized_executable_sha256),
         ("bundle", bundle_sha256),
         ("privacy manifest", privacy_manifest_sha256),
+        ("attribution manifest", attribution_manifest_sha256),
     ):
         if DIGEST_PATTERN.fullmatch(value) is None:
             raise VerificationError(f"{label} {name} digest is malformed")
     if privacy_manifest_sha256 != expected.privacy_manifest_sha256:
         raise VerificationError(f"{label} privacy manifest differs from the source contract")
+    if attribution_manifest_sha256 != expected.attribution_manifest_sha256:
+        raise VerificationError(f"{label} attribution manifest differs from the source contract")
     if signing_certificate_trust_verified is not True:
         raise VerificationError(f"{label} signing certificate did not pass Apple code-signing trust evaluation")
 
@@ -475,6 +517,8 @@ def validate_bundle_contract(
         get_task_allow=get_task_allow,
         privacy_manifest_sha256=privacy_manifest_sha256,
         privacy_manifest_verified=True,
+        attribution_manifest_sha256=attribution_manifest_sha256,
+        attribution_manifest_verified=True,
     )
 
 
@@ -512,6 +556,7 @@ def _snapshot(
         signature_normalized_executable_sha256=_signature_normalized_executable_digest(executable),
         bundle_sha256=_bundle_digest(app),
         privacy_manifest_sha256=_root_privacy_manifest_digest(app, label),
+        attribution_manifest_sha256=_root_attribution_manifest_digest(app, label),
     )
 
 
@@ -532,6 +577,7 @@ def compare_archive_and_export(archive: BundleSnapshot, exported: BundleSnapshot
         archive.application_groups,
         archive.increased_memory_limit,
         archive.privacy_manifest_sha256,
+        archive.attribution_manifest_sha256,
     )
     export_identity = (
         exported.bundle_identifier,
@@ -543,6 +589,7 @@ def compare_archive_and_export(archive: BundleSnapshot, exported: BundleSnapshot
         exported.application_groups,
         exported.increased_memory_limit,
         exported.privacy_manifest_sha256,
+        exported.attribution_manifest_sha256,
     )
     if archive_identity != export_identity:
         raise VerificationError("archive and exported IPA identities differ")
@@ -588,6 +635,7 @@ def verify(archive: Path, export_dir: Path, expected_team_id: str, output: Path,
             "applicationGroups": list(expected.application_groups),
             "increasedMemoryLimit": expected.increased_memory_limit,
             "privacyManifestSHA256": expected.privacy_manifest_sha256,
+            "attributionManifestSHA256": expected.attribution_manifest_sha256,
         },
         "archive": archived.public_dict(),
         "export": exported.public_dict(),

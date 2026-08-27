@@ -381,6 +381,8 @@ targets:
         buildPhase: resources
       - path: Sources/Resources/Localizable.xcstrings
         buildPhase: resources
+      - path: Sources/Resources/third_party_attributions.json
+        buildPhase: resources
       - path: Sources/Resources/voice-previews
         buildPhase: resources
         # Per-voice preview WAVs (24 kHz mono Int16). Each file

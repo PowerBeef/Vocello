@@ -111,6 +111,8 @@ Details for runtime, lifecycle, and event-channel invariants live in `docs/ARCHI
 | `check_delivery_instructions.py` | delivery-copy parity and conflicts |
 | `model_catalog_contract.py`, `vendor_runtime_contract.py` | production artifacts, owned-runtime inventory, and facade baseline |
 | `runtime_security_contract.py`, `validate_backend_risk_spine.py` | debug/concurrency registries and backend risks |
+| `scripts/support_contact_contract.py`, `config/support-contact.json` | public support identity |
+| `scripts/attribution_manifest.py`, `config/third-party-attribution-policy.json` | bundled license/NOTICE coverage |
 | `check_convergence_promotion_gate.py` | convergence promotion preconditions |
 | `check_qwen3_backend_only.sh`, `check_backend_resource_contract.sh` | MLX-only and native resource wiring |
 | `check_test_workflows.sh` | one UI stack, retired-harness exclusion, and script self-tests |
@@ -144,21 +146,16 @@ scripts and domain rules remain authoritative.
 | Codex instructions, hooks, skills, or settings | `openai-docs` and current official OpenAI documentation |
 | Current third-party library APIs | Context7, then primary vendor documentation |
 
-Do not install an external plugin merely because it appears in a recommendation list. Install or
-connect one only when the user requests it or an in-scope task genuinely requires unavailable
-external data.
+Install or connect external plugins only when the user requests one or in-scope work genuinely
+requires unavailable external data.
 
 <!-- END OPTIONAL ASSISTS -->
 
 ## Codex and Xcode workflow
 
-Repository hooks live in `.codex/hooks.json`. Project-local hooks are skipped until the exact
-definition is reviewed and trusted with `/hooks`. The `PreToolUse` Bash hook calls
-`scripts/hooks/precommit_gate.sh` and inspects `tool_input.command`. Before `git commit`, it rejects
-any worktree whose symbolic branch is not exactly `main`, then runs
-`QVOICE_GATES=quick ./scripts/check_project_inputs.sh`. Exit code 2 blocks either violation.
-`QVOICE_SKIP_COMMIT_GATE=1` is an emergency one-shot validation bypass; it never bypasses the
-`main`-branch requirement, and full CI still runs.
+Review and trust `.codex/hooks.json` with `/hooks`. Its Bash hook runs
+`scripts/hooks/precommit_gate.sh`; commits require `main` and the quick gate. Exit 2 blocks.
+`QVOICE_SKIP_COMMIT_GATE=1` bypasses validation once, never the `main` requirement or full CI.
 
 When XcodeBuildMCP is available:
 

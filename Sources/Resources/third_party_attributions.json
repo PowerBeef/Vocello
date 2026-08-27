@@ -1,0 +1,373 @@
+{
+  "components": [
+    {
+      "copyrightNotice": "Copyright 2025 Mattt (https://mat.tt)",
+      "displayName": "EventSource",
+      "id": "eventsource",
+      "licenseID": "MIT",
+      "notice": null,
+      "revision": "a3a85a85214caf642abaa96ae664e4c772a59f6e",
+      "scope": "application-and-owned-runtime",
+      "sourceURL": "https://github.com/mattt/EventSource",
+      "upstreamLicenseSHA256": "2f9b695627d569a3ce452b2c03fdd34310df78c8ea94edfafd9ce38381e5b502",
+      "version": "1.4.1"
+    },
+    {
+      "copyrightNotice": "Copyright (C) 2015-2025 Gwendal Roué",
+      "displayName": "GRDB.swift",
+      "id": "grdb.swift",
+      "licenseID": "MIT",
+      "notice": null,
+      "revision": "36e30a6f1ef10e4194f6af0cff90888526f0c115",
+      "scope": "application",
+      "sourceURL": "https://github.com/groue/GRDB.swift",
+      "upstreamLicenseSHA256": "9853f9dce81365fcc1d9b46004633354450164b8d17904e92e80c444545f7e87",
+      "version": "7.10.0"
+    },
+    {
+      "copyrightNotice": "Copyright (c) 2023 ml-explore",
+      "displayName": "MLX Swift",
+      "id": "mlx-swift",
+      "licenseID": "MIT",
+      "notice": null,
+      "revision": "0bb916c67f4b9e5c682cbe02a42c701c93ab5021",
+      "scope": "application-and-owned-runtime",
+      "sourceURL": "https://github.com/ml-explore/mlx-swift",
+      "upstreamLicenseSHA256": "44326a4ea062241ae6fc26ee2ec90bdc81af7eb7b9d3966181b733fa69d42057",
+      "version": "0.31.6"
+    },
+    {
+      "copyrightNotice": "Copyright (c) 2024 ml-explore",
+      "displayName": "MLX Swift LM",
+      "id": "mlx-swift-lm",
+      "licenseID": "MIT",
+      "notice": null,
+      "revision": "bd4b7434e6bdb588c7ef55706ff8904cb7fd4c57",
+      "scope": "application-and-owned-runtime",
+      "sourceURL": "https://github.com/ml-explore/mlx-swift-lm",
+      "upstreamLicenseSHA256": "7b1d86acac816ce8192209d7e01141c129b4d48d474c15cc5fb4af62f497c323",
+      "version": "3.31.4"
+    },
+    {
+      "copyrightNotice": null,
+      "displayName": "Swift Argument Parser",
+      "id": "swift-argument-parser",
+      "licenseID": "Apache-2.0",
+      "notice": null,
+      "revision": "6a52f3251125d74daf04fcbd5e6f08a75d074382",
+      "scope": "application-and-owned-runtime",
+      "sourceURL": "https://github.com/apple/swift-argument-parser",
+      "upstreamLicenseSHA256": "770af8291f708538d8ff885a0bbc4e045cd700531741c4f99528d435c14d7f55",
+      "version": "1.8.2"
+    },
+    {
+      "copyrightNotice": null,
+      "displayName": "Swift Atomics",
+      "id": "swift-atomics",
+      "licenseID": "Apache-2.0",
+      "notice": null,
+      "revision": "b601256eab081c0f92f059e12818ac1d4f178ff7",
+      "scope": "application-and-owned-runtime",
+      "sourceURL": "https://github.com/apple/swift-atomics",
+      "upstreamLicenseSHA256": "770af8291f708538d8ff885a0bbc4e045cd700531741c4f99528d435c14d7f55",
+      "version": "1.3.0"
+    },
+    {
+      "copyrightNotice": null,
+      "displayName": "Swift Collections",
+      "id": "swift-collections",
+      "licenseID": "Apache-2.0",
+      "notice": null,
+      "revision": "6675bc0ff86e61436e615df6fc5174e043e57924",
+      "scope": "application-and-owned-runtime",
+      "sourceURL": "https://github.com/apple/swift-collections",
+      "upstreamLicenseSHA256": "770af8291f708538d8ff885a0bbc4e045cd700531741c4f99528d435c14d7f55",
+      "version": "1.4.1"
+    },
+    {
+      "copyrightNotice": null,
+      "displayName": "Swift Crypto",
+      "id": "swift-crypto",
+      "licenseID": "Apache-2.0",
+      "notice": "                            The SwiftCrypto Project\n                            =======================\n\nPlease visit the SwiftCrypto web site for more information:\n\n  * https://github.com/apple/swift-crypto\n\nCopyright 2019 The SwiftCrypto Project\n\nThe SwiftCrypto Project licenses this file to you under the Apache License,\nversion 2.0 (the \"License\"); you may not use this file except in compliance\nwith the License. You may obtain a copy of the License at:\n\n  https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS, WITHOUT\nWARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the\nLicense for the specific language governing permissions and limitations\nunder the License.\n\nAlso, please refer to each LICENSE.<component>.txt file, which is located in\nthe 'license' directory of the distribution file, for the license terms of the\ncomponents that this product depends on.\n\n-------------------------------------------------------------------------------\n\nThis product contains test vectors from Google's wycheproof project.\n\n  * LICENSE (Apache License 2.0):\n    * https://github.com/C2SP/wycheproof/blob/31387e2cd596587c859c611027b6a44d2e2b65ff/LICENSE\n  * HOMEPAGE:\n    * https://github.com/google/wycheproof\n\n---\n\nThis product contains a derivation of various files from SwiftNIO.\n\n  * LICENSE (Apache License 2.0):\n    * https://www.apache.org/licenses/LICENSE-2.0\n  * HOMEPAGE:\n    * https://github.com/apple/swift-nio\n",
+      "revision": "476538ccb827f2dd18efc5de754cc87d77127a47",
+      "scope": "application-and-owned-runtime",
+      "sourceURL": "https://github.com/apple/swift-crypto",
+      "upstreamLicenseSHA256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "version": "4.4.0"
+    },
+    {
+      "copyrightNotice": null,
+      "displayName": "Swift Hugging Face",
+      "id": "swift-huggingface",
+      "licenseID": "Apache-2.0",
+      "notice": null,
+      "revision": "b721959445b617d0bf03910b2b4aced345fd93bf",
+      "scope": "application-and-owned-runtime",
+      "sourceURL": "https://github.com/huggingface/swift-huggingface",
+      "upstreamLicenseSHA256": "4d6ad72952a8329063a71de28329b493de96cf57459e2ac217110d1a6a5f84ae",
+      "version": "0.9.0"
+    },
+    {
+      "copyrightNotice": null,
+      "displayName": "Swift Jinja",
+      "id": "swift-jinja",
+      "licenseID": "Apache-2.0",
+      "notice": null,
+      "revision": "7d0b8880ef8e567dd4e0089f8b99fb354129017c",
+      "scope": "application-and-owned-runtime",
+      "sourceURL": "https://github.com/huggingface/swift-jinja",
+      "upstreamLicenseSHA256": "648b81e6c6f9975c3b6cf6d630229b6c8d6f1ddaef55f5770f576adda19f3495",
+      "version": "2.4.2"
+    },
+    {
+      "copyrightNotice": null,
+      "displayName": "Swift Numerics",
+      "id": "swift-numerics",
+      "licenseID": "Apache-2.0",
+      "notice": null,
+      "revision": "0c0290ff6b24942dadb83a929ffaaa1481df04a2",
+      "scope": "application-and-owned-runtime",
+      "sourceURL": "https://github.com/apple/swift-numerics",
+      "upstreamLicenseSHA256": "770af8291f708538d8ff885a0bbc4e045cd700531741c4f99528d435c14d7f55",
+      "version": "1.1.1"
+    },
+    {
+      "copyrightNotice": null,
+      "displayName": "Swift System",
+      "id": "swift-system",
+      "licenseID": "Apache-2.0",
+      "notice": null,
+      "revision": "7c6ad0fc39d0763e0b699210e4124afd5041c5df",
+      "scope": "application-and-owned-runtime",
+      "sourceURL": "https://github.com/apple/swift-system",
+      "upstreamLicenseSHA256": "2245a990b635558be210fb3eb4f8a6f7a49aebc0fefbf5859146a65ddc7ddcf3",
+      "version": "1.6.4"
+    },
+    {
+      "copyrightNotice": null,
+      "displayName": "Swift Transformers",
+      "id": "swift-transformers",
+      "licenseID": "Apache-2.0",
+      "notice": null,
+      "revision": "2fa33e1f5e7131a7fc64c28e6d161dcec0d24820",
+      "scope": "application-and-owned-runtime",
+      "sourceURL": "https://github.com/huggingface/swift-transformers",
+      "upstreamLicenseSHA256": "648b81e6c6f9975c3b6cf6d630229b6c8d6f1ddaef55f5770f576adda19f3495",
+      "version": "1.3.3"
+    },
+    {
+      "copyrightNotice": null,
+      "displayName": "SwiftASN1",
+      "id": "swift-asn1",
+      "licenseID": "Apache-2.0",
+      "notice": "\n                            The SwiftASN1 Project\n                            =====================\n\nPlease visit the SwiftASN1 web site for more information:\n\n  * https://github.com/apple/swift-asn1\n\nCopyright 2022 The SwiftASN1 Project\n\nThe SwiftASN1 Project licenses this file to you under the Apache License,\nversion 2.0 (the \"License\"); you may not use this file except in compliance\nwith the License. You may obtain a copy of the License at:\n\n  https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS, WITHOUT\nWARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the\nLicense for the specific language governing permissions and limitations\nunder the License.\n\nAlso, please refer to each LICENSE.txt file, which is located in\nthe 'license' directory of the distribution file, for the license terms of the\ncomponents that this product depends on.\n\n---\n\nThis product contains derivations of various scripts from SwiftNIO.\n\n  * LICENSE (Apache License 2.0):\n    * https://www.apache.org/licenses/LICENSE-2.0\n  * HOMEPAGE:\n    * https://github.com/apple/swift-nio\n    \n---\n\nThis product contains derivations of various scripts from Swift OpenAPI Generator.\n\n  * LICENSE (Apache License 2.0):\n    * https://www.apache.org/licenses/LICENSE-2.0\n  * HOMEPAGE:\n    * https://github.com/apple/swift-openapi-generator\n",
+      "revision": "eb50cbd14606a9161cbc5d452f18797c90ef0bab",
+      "scope": "application-and-owned-runtime",
+      "sourceURL": "https://github.com/apple/swift-asn1",
+      "upstreamLicenseSHA256": "8c6db340475136df3c1201d458fa5755698eace76e510471ecc9d857d6083dac",
+      "version": "1.7.0"
+    },
+    {
+      "copyrightNotice": null,
+      "displayName": "SwiftNIO",
+      "id": "swift-nio",
+      "licenseID": "Apache-2.0",
+      "notice": "\n                            The SwiftNIO Project\n                            ====================\n\nPlease visit the SwiftNIO web site for more information:\n\n  * https://github.com/apple/swift-nio\n\nCopyright 2017, 2018 The SwiftNIO Project\n\nThe SwiftNIO Project licenses this file to you under the Apache License,\nversion 2.0 (the \"License\"); you may not use this file except in compliance\nwith the License. You may obtain a copy of the License at:\n\n  https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS, WITHOUT\nWARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the\nLicense for the specific language governing permissions and limitations\nunder the License.\n\nAlso, please refer to each LICENSE.<component>.txt file, which is located in\nthe 'license' directory of the distribution file, for the license terms of the\ncomponents that this product depends on.\n\n-------------------------------------------------------------------------------\n\nThis product is heavily influenced by Netty.\n\n  * LICENSE (Apache License 2.0):\n    * https://github.com/netty/netty/blob/4.1/LICENSE.txt\n  * HOMEPAGE:\n    * https://netty.io\n\n---\n\nThis product contains NodeJS's llhttp.\n\n  * LICENSE (MIT):\n    * https://github.com/nodejs/llhttp/blob/1e1c5b43326494e97cf8244ff57475eb72a1b62c/LICENSE-MIT\n  * HOMEPAGE:\n    * https://github.com/nodejs/llhttp\n\n---\n\nThis product contains \"cpp_magic.h\" from Thomas Nixon & Jonathan Heathcote's uSHET\n\n  * LICENSE (MIT):\n    * https://github.com/18sg/uSHET/blob/c09e0acafd86720efe42dc15c63e0cc228244c32/lib/cpp_magic.h\n  * HOMEPAGE:\n    * https://github.com/18sg/uSHET\n\n---\n\nThis product contains \"sha1.c\" and \"sha1.h\" from FreeBSD (Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project)\n\n  * LICENSE (BSD-3):\n    * https://opensource.org/licenses/BSD-3-Clause\n  * HOMEPAGE:\n    * https://github.com/freebsd/freebsd-src\n\n---\n\nThis product contains a derivation of Fabian Fett's 'Base64.swift'.\n\n  * LICENSE (Apache License 2.0):\n    * https://github.com/swift-extras/swift-extras-base64/blob/b8af49699d59ad065b801715a5009619100245ca/LICENSE\n  * HOMEPAGE:\n    * https://github.com/fabianfett/swift-base64-kit\n\n---\n\nThis product contains a derivation of \"XCTest+AsyncAwait.swift\" & \"StructuredConcurrencyHelpers\" from AsyncHTTPClient.\n\n  * LICENSE (Apache License 2.0):\n    * https://www.apache.org/licenses/LICENSE-2.0\n  * HOMEPAGE:\n    * https://github.com/swift-server/async-http-client\n\n---\n\nThis product contains a derivation of \"_TinyArray.swift\" from SwiftCertificates.\n\n  * LICENSE (Apache License 2.0):\n    * https://www.apache.org/licenses/LICENSE-2.0\n  * HOMEPAGE:\n    * https://github.com/apple/swift-certificates\n\n---\n\nThis product contains a derivation of the mocking infrastructure from Swift System.\n\n  * LICENSE (Apache License 2.0):\n    * https://www.apache.org/licenses/LICENSE-2.0\n  * HOMEPAGE:\n    * https://github.com/apple/swift-system\n\n---\n\nThis product contains a derivation of \"TokenBucket.swift\" from Swift Package Manager.\n\n  * LICENSE (Apache License 2.0):\n    * https://www.apache.org/licenses/LICENSE-2.0\n  * HOMEPAGE:\n    * https://github.com/swiftlang/swift-package-manager\n",
+      "revision": "57c0a08a331aaea9f5d7a932ad94ef43be942a95",
+      "scope": "application-and-owned-runtime",
+      "sourceURL": "https://github.com/apple/swift-nio",
+      "upstreamLicenseSHA256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "version": "2.100.0"
+    },
+    {
+      "copyrightNotice": null,
+      "displayName": "SwiftSyntax",
+      "id": "swift-syntax",
+      "licenseID": "Apache-2.0",
+      "notice": null,
+      "revision": "79e4b74a295b6eb74a8b585e3a39d29e70c1dbd1",
+      "scope": "application-and-owned-runtime",
+      "sourceURL": "https://github.com/swiftlang/swift-syntax",
+      "upstreamLicenseSHA256": "770af8291f708538d8ff885a0bbc4e045cd700531741c4f99528d435c14d7f55",
+      "version": "603.0.2"
+    },
+    {
+      "copyrightNotice": "Copyright (c) 2026 PowerBeef",
+      "displayName": "Vocello",
+      "id": "vocello",
+      "licenseID": "MIT",
+      "licenseTextOverride": "MIT License\n\nCopyright (c) 2026 PowerBeef\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n",
+      "notice": null,
+      "origins": null,
+      "revision": null,
+      "scope": "owned",
+      "sourceURL": "https://github.com/PowerBeef/Vocello",
+      "upstreamLicenseSHA256": "91332fae4ac60b9ace81f08ab678e0286317f335e99f7020df9f0152e766d2c8",
+      "version": "2.4.0"
+    },
+    {
+      "copyrightNotice": null,
+      "displayName": "Vocello Qwen3 Core",
+      "id": "vocello-qwen3-core",
+      "licenseID": "MIT",
+      "licenseTextOverride": "MIT License\n\nCopyright (c) 2025 Prince Canuma\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n",
+      "notice": "# Third-party notices\n\n## mlx-audio-swift\n\nVocello Qwen3 Core contains source derived from `mlx-audio-swift` by Prince Canuma and contributors.\nThat source is licensed under the MIT License. The complete license text is preserved in\n[`LICENSE`](LICENSE), including its copyright notice and warranty disclaimer.\n\n## Package dependencies\n\nThis source package references MLX Swift, MLX Swift LM, and Swift Hugging Face as external SwiftPM\ndependencies. Their source is not copied into this directory. Their licenses and notices are\nprovided by their respective upstream distributions and resolved package checkouts.\n\n## Models\n\nQwen3-TTS model weights are downloaded separately and are not distributed in this source tree.\nModel repository identity, immutable revisions, and required artifacts are governed by the root\n[`qwenvoice_contract.json`](../../Sources/Resources/qwenvoice_contract.json).\n",
+      "origins": "# Origins and lineage\n\nVocello Qwen3 Core is repository-owned product source derived from\n[`Blaizzy/mlx-audio-swift`](https://github.com/Blaizzy/mlx-audio-swift) release `v0.1.2`, commit\n`fcbd04daa1bfebe881932f630af2ba6ce9af3274`. The immutable machine-readable import identity is in\n[`LINEAGE.json`](LINEAGE.json). [`UPSTREAM_BASELINE.json`](UPSTREAM_BASELINE.json) contains only\nnon-null hashes from that immutable import. [`CURRENT_INVENTORY.json`](CURRENT_INVENTORY.json) is\nthe separately derived inventory of today's retained files and classifies each one as identical,\nmodified, or added relative to the import.\n\nThe source was specialized for Vocello's Qwen3-TTS product runtime. It retains the Qwen3 TTS\nimplementation and required Mimi codec primitives, while upstream model families and tools outside\nthat product boundary were removed. Subsequent repository work added owned loading, streaming,\nmemory, telemetry, cancellation, codec, and clone-artifact behavior.\n\nReviewing or selectively adopting a newer upstream commit does not change the historical import\nidentity. Upstream reviews are recorded separately in `LINEAGE.json`; owned capabilities are\nrecorded in [`RUNTIME_CAPABILITIES.json`](RUNTIME_CAPABILITIES.json). The active semantic delta\nledger in [`PATCHES.json`](PATCHES.json) owns every changed or added implementation file and names\nits tests, documentation, evidence status, upstream disposition, and removal criteria.\n\nThe relocation from `third_party_patches/mlx-audio-swift` combined a path move with pre-existing\nsemantic deltas plus owned facade and governance additions; it was not pure byte parity. Against\nrepository commit `2f1391d846b2ed259db6959ca47f6129cddb58d2`, the migration retained 65\nbyte-identical files, modified 11, added 12, and removed none. The immutable classification and\ndestination-digest snapshot is [`RELOCATION_INVENTORY.json`](RELOCATION_INVENTORY.json). These\nhistorical relocation facts are distinct from the live upstream-delta counts.\n\nQwen3-TTS model and research attribution belongs to the Qwen team. Model weights are not included\nin this repository and retain their own upstream terms.\n",
+      "revision": null,
+      "scope": "owned",
+      "sourceURL": "https://github.com/PowerBeef/Vocello/tree/main/Packages/VocelloQwen3Core",
+      "upstreamLicenseSHA256": "fd330bb5d9adf9e65bfe4d8f6f90c808a4196ef5c98aad018a3344256fcb2374",
+      "version": "owned runtime"
+    },
+    {
+      "copyrightNotice": "Copyright (c) 2020 YaoYuan <ibireme@gmail.com>",
+      "displayName": "yyjson",
+      "id": "yyjson",
+      "licenseID": "MIT",
+      "notice": null,
+      "revision": "8b4a38dc994a110abaec8a400615567bd996105f",
+      "scope": "application-and-owned-runtime",
+      "sourceURL": "https://github.com/ibireme/yyjson",
+      "upstreamLicenseSHA256": "45e384d3d52c73cba3a64d6e6c25d47cd738cd8a55c30629e3201046eda62947",
+      "version": "0.12.0"
+    }
+  ],
+  "contentRights": [
+    {
+      "description": "Bundled built-in speaker preview audio",
+      "id": "voice-previews",
+      "status": "pending-qualified-review"
+    },
+    {
+      "description": "Generated audio used in marketing materials",
+      "id": "marketing-audio",
+      "status": "pending-qualified-review"
+    },
+    {
+      "description": "App icons and original product artwork",
+      "id": "app-artwork",
+      "status": "pending-qualified-review"
+    },
+    {
+      "description": "Apple system fonts and SF Symbols are referenced through platform APIs and are not redistributed as standalone assets",
+      "id": "system-fonts-symbols",
+      "status": "source-proven-not-redistributed"
+    },
+    {
+      "description": "App Store Connect declares that the app uses third-party content; qualified rights review remains pending",
+      "id": "app-store-content-rights",
+      "status": "pending-qualified-review-account-declaration-verified"
+    }
+  ],
+  "generatedFrom": {
+    "applicationPackageResolutionSHA256": "a3bde2fe2753992858a7b91bfc17ab24c534ff442bacde92937fb3149fd4dd0c",
+    "ownedRuntimePackageResolutionSHA256": "295e8a6d2f512181f28cd8827657a00326daaa7a14a1856768da3ea82c78421f",
+    "policySHA256": "ba2703f7133f6c67fee9af683e098ec1504e3c526e1c35b135bcfa07135d434b",
+    "productionModelCatalogSHA256": "0fffb9bafb2eac071e82fdba2b9ee4810f5a95d9b10d8af4244009743f3f989c"
+  },
+  "licenses": [
+    {
+      "id": "Apache-2.0",
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "text": "\n                                 Apache License\n                           Version 2.0, January 2004\n                        http://www.apache.org/licenses/\n\n   TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION\n\n   1. Definitions.\n\n      \"License\" shall mean the terms and conditions for use, reproduction,\n      and distribution as defined by Sections 1 through 9 of this document.\n\n      \"Licensor\" shall mean the copyright owner or entity authorized by\n      the copyright owner that is granting the License.\n\n      \"Legal Entity\" shall mean the union of the acting entity and all\n      other entities that control, are controlled by, or are under common\n      control with that entity. For the purposes of this definition,\n      \"control\" means (i) the power, direct or indirect, to cause the\n      direction or management of such entity, whether by contract or\n      otherwise, or (ii) ownership of fifty percent (50%) or more of the\n      outstanding shares, or (iii) beneficial ownership of such entity.\n\n      \"You\" (or \"Your\") shall mean an individual or Legal Entity\n      exercising permissions granted by this License.\n\n      \"Source\" form shall mean the preferred form for making modifications,\n      including but not limited to software source code, documentation\n      source, and configuration files.\n\n      \"Object\" form shall mean any form resulting from mechanical\n      transformation or translation of a Source form, including but\n      not limited to compiled object code, generated documentation,\n      and conversions to other media types.\n\n      \"Work\" shall mean the work of authorship, whether in Source or\n      Object form, made available under the License, as indicated by a\n      copyright notice that is included in or attached to the work\n      (an example is provided in the Appendix below).\n\n      \"Derivative Works\" shall mean any work, whether in Source or Object\n      form, that is based on (or derived from) the Work and for which the\n      editorial revisions, annotations, elaborations, or other modifications\n      represent, as a whole, an original work of authorship. For the purposes\n      of this License, Derivative Works shall not include works that remain\n      separable from, or merely link (or bind by name) to the interfaces of,\n      the Work and Derivative Works thereof.\n\n      \"Contribution\" shall mean any work of authorship, including\n      the original version of the Work and any modifications or additions\n      to that Work or Derivative Works thereof, that is intentionally\n      submitted to Licensor for inclusion in the Work by the copyright owner\n      or by an individual or Legal Entity authorized to submit on behalf of\n      the copyright owner. For the purposes of this definition, \"submitted\"\n      means any form of electronic, verbal, or written communication sent\n      to the Licensor or its representatives, including but not limited to\n      communication on electronic mailing lists, source code control systems,\n      and issue tracking systems that are managed by, or on behalf of, the\n      Licensor for the purpose of discussing and improving the Work, but\n      excluding communication that is conspicuously marked or otherwise\n      designated in writing by the copyright owner as \"Not a Contribution.\"\n\n      \"Contributor\" shall mean Licensor and any individual or Legal Entity\n      on behalf of whom a Contribution has been received by Licensor and\n      subsequently incorporated within the Work.\n\n   2. Grant of Copyright License. Subject to the terms and conditions of\n      this License, each Contributor hereby grants to You a perpetual,\n      worldwide, non-exclusive, no-charge, royalty-free, irrevocable\n      copyright license to reproduce, prepare Derivative Works of,\n      publicly display, publicly perform, sublicense, and distribute the\n      Work and such Derivative Works in Source or Object form.\n\n   3. Grant of Patent License. Subject to the terms and conditions of\n      this License, each Contributor hereby grants to You a perpetual,\n      worldwide, non-exclusive, no-charge, royalty-free, irrevocable\n      (except as stated in this section) patent license to make, have made,\n      use, offer to sell, sell, import, and otherwise transfer the Work,\n      where such license applies only to those patent claims licensable\n      by such Contributor that are necessarily infringed by their\n      Contribution(s) alone or by combination of their Contribution(s)\n      with the Work to which such Contribution(s) was submitted. If You\n      institute patent litigation against any entity (including a\n      cross-claim or counterclaim in a lawsuit) alleging that the Work\n      or a Contribution incorporated within the Work constitutes direct\n      or contributory patent infringement, then any patent licenses\n      granted to You under this License for that Work shall terminate\n      as of the date such litigation is filed.\n\n   4. Redistribution. You may reproduce and distribute copies of the\n      Work or Derivative Works thereof in any medium, with or without\n      modifications, and in Source or Object form, provided that You\n      meet the following conditions:\n\n      (a) You must give any other recipients of the Work or\n          Derivative Works a copy of this License; and\n\n      (b) You must cause any modified files to carry prominent notices\n          stating that You changed the files; and\n\n      (c) You must retain, in the Source form of any Derivative Works\n          that You distribute, all copyright, patent, trademark, and\n          attribution notices from the Source form of the Work,\n          excluding those notices that do not pertain to any part of\n          the Derivative Works; and\n\n      (d) If the Work includes a \"NOTICE\" text file as part of its\n          distribution, then any Derivative Works that You distribute must\n          include a readable copy of the attribution notices contained\n          within such NOTICE file, excluding those notices that do not\n          pertain to any part of the Derivative Works, in at least one\n          of the following places: within a NOTICE text file distributed\n          as part of the Derivative Works; within the Source form or\n          documentation, if provided along with the Derivative Works; or,\n          within a display generated by the Derivative Works, if and\n          wherever such third-party notices normally appear. The contents\n          of the NOTICE file are for informational purposes only and\n          do not modify the License. You may add Your own attribution\n          notices within Derivative Works that You distribute, alongside\n          or as an addendum to the NOTICE text from the Work, provided\n          that such additional attribution notices cannot be construed\n          as modifying the License.\n\n      You may add Your own copyright statement to Your modifications and\n      may provide additional or different license terms and conditions\n      for use, reproduction, or distribution of Your modifications, or\n      for any such Derivative Works as a whole, provided Your use,\n      reproduction, and distribution of the Work otherwise complies with\n      the conditions stated in this License.\n\n   5. Submission of Contributions. Unless You explicitly state otherwise,\n      any Contribution intentionally submitted for inclusion in the Work\n      by You to the Licensor shall be under the terms and conditions of\n      this License, without any additional terms or conditions.\n      Notwithstanding the above, nothing herein shall supersede or modify\n      the terms of any separate license agreement you may have executed\n      with Licensor regarding such Contributions.\n\n   6. Trademarks. This License does not grant permission to use the trade\n      names, trademarks, service marks, or product names of the Licensor,\n      except as required for reasonable and customary use in describing the\n      origin of the Work and reproducing the content of the NOTICE file.\n\n   7. Disclaimer of Warranty. Unless required by applicable law or\n      agreed to in writing, Licensor provides the Work (and each\n      Contributor provides its Contributions) on an \"AS IS\" BASIS,\n      WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or\n      implied, including, without limitation, any warranties or conditions\n      of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A\n      PARTICULAR PURPOSE. You are solely responsible for determining the\n      appropriateness of using or redistributing the Work and assume any\n      risks associated with Your exercise of permissions under this License.\n\n   8. Limitation of Liability. In no event and under no legal theory,\n      whether in tort (including negligence), contract, or otherwise,\n      unless required by applicable law (such as deliberate and grossly\n      negligent acts) or agreed to in writing, shall any Contributor be\n      liable to You for damages, including any direct, indirect, special,\n      incidental, or consequential damages of any character arising as a\n      result of this License or out of the use or inability to use the\n      Work (including but not limited to damages for loss of goodwill,\n      work stoppage, computer failure or malfunction, or any and all\n      other commercial damages or losses), even if such Contributor\n      has been advised of the possibility of such damages.\n\n   9. Accepting Warranty or Additional Liability. While redistributing\n      the Work or Derivative Works thereof, You may choose to offer,\n      and charge a fee for, acceptance of support, warranty, indemnity,\n      or other liability obligations and/or rights consistent with this\n      License. However, in accepting such obligations, You may act only\n      on Your own behalf and on Your sole responsibility, not on behalf\n      of any other Contributor, and only if You agree to indemnify,\n      defend, and hold each Contributor harmless for any liability\n      incurred by, or claims asserted against, such Contributor by reason\n      of your accepting any such warranty or additional liability.\n\n   END OF TERMS AND CONDITIONS\n\n   APPENDIX: How to apply the Apache License to your work.\n\n      To apply the Apache License to your work, attach the following\n      boilerplate notice, with the fields enclosed by brackets \"[]\"\n      replaced with your own identifying information. (Don't include\n      the brackets!)  The text should be enclosed in the appropriate\n      comment syntax for the file format. We also recommend that a\n      file or class name and description of purpose be included on the\n      same \"printed page\" as the copyright notice for easier\n      identification within third-party archives.\n\n   Copyright [yyyy] [name of copyright owner]\n\n   Licensed under the Apache License, Version 2.0 (the \"License\");\n   you may not use this file except in compliance with the License.\n   You may obtain a copy of the License at\n\n       http://www.apache.org/licenses/LICENSE-2.0\n\n   Unless required by applicable law or agreed to in writing, software\n   distributed under the License is distributed on an \"AS IS\" BASIS,\n   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\n   See the License for the specific language governing permissions and\n   limitations under the License.\n"
+    },
+    {
+      "id": "MIT",
+      "sha256": "5afc22050b6dfd55677fab336d50f1ac0b9173a53a4cb6bb99b9ef2525b3306c",
+      "text": "MIT License\n\nPermission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the \"Software\"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.\n"
+    }
+  ],
+  "modelArtifacts": [
+    {
+      "baseRepo": "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-8bit",
+      "baseRevision": "e7dd0585652209fa0d7783659aad4e8a324de11c",
+      "displayName": "Qwen3-TTS-12Hz-1.7B-Base-8bit",
+      "id": "pro_clone-quality",
+      "licenseID": "Apache-2.0",
+      "modelCardSHA256": "6ea1eb3f0e547c0bce96cda87a453f7615866f964c3d8d97eab4ea6097d9a903",
+      "modelID": "pro_clone",
+      "redistributionDecision": "pending-qualified-review",
+      "repo": "PowerBeef02/Qwen3-TTS-12Hz-1.7B-Base-8bit",
+      "revision": "0b99ded5c0e6c75c2e00aa8282ed58db02ca55d3",
+      "sourceURL": "https://huggingface.co/PowerBeef02/Qwen3-TTS-12Hz-1.7B-Base-8bit/tree/0b99ded5c0e6c75c2e00aa8282ed58db02ca55d3",
+      "variantID": "quality"
+    },
+    {
+      "baseRepo": "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-4bit",
+      "baseRevision": "37e955a1deb861c088ae5f3a67043185f3d1a60c",
+      "displayName": "Qwen3-TTS-12Hz-1.7B-Base-4bit",
+      "id": "pro_clone-speed",
+      "licenseID": "Apache-2.0",
+      "modelCardSHA256": "26e86b0119ef69cce3f7ca8ff2456151cdc26155f231f00bd37357d27eb4542b",
+      "modelID": "pro_clone",
+      "redistributionDecision": "pending-qualified-review",
+      "repo": "PowerBeef02/Qwen3-TTS-12Hz-1.7B-Base-4bit",
+      "revision": "fdad8c2d93c555ddc02e8ce475aeb72645268ae3",
+      "sourceURL": "https://huggingface.co/PowerBeef02/Qwen3-TTS-12Hz-1.7B-Base-4bit/tree/fdad8c2d93c555ddc02e8ce475aeb72645268ae3",
+      "variantID": "speed"
+    },
+    {
+      "baseRepo": "mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-8bit",
+      "baseRevision": "41d3337e8b7f2843a75841595fc14e4b9a7a4b96",
+      "displayName": "Qwen3-TTS-12Hz-1.7B-CustomVoice-8bit",
+      "id": "pro_custom-quality",
+      "licenseID": "Apache-2.0",
+      "modelCardSHA256": "14cdb04c8d51d31146c416f9ab42ec75def21b242aac39c3f998945d11743e81",
+      "modelID": "pro_custom",
+      "redistributionDecision": "pending-qualified-review",
+      "repo": "PowerBeef02/Qwen3-TTS-12Hz-1.7B-CustomVoice-8bit",
+      "revision": "b90d6592da67881ab6c36e6ca5fda60fdb63b429",
+      "sourceURL": "https://huggingface.co/PowerBeef02/Qwen3-TTS-12Hz-1.7B-CustomVoice-8bit/tree/b90d6592da67881ab6c36e6ca5fda60fdb63b429",
+      "variantID": "quality"
+    },
+    {
+      "baseRepo": "mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit",
+      "baseRevision": "f35faf19b0cc2160865af64ecf0f22f83d335135",
+      "displayName": "Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit",
+      "id": "pro_custom-speed",
+      "licenseID": "Apache-2.0",
+      "modelCardSHA256": "ba7d73683fe44b5e8d3040ec8b1474f594f525924d5cdf67970bd0f1ffd30401",
+      "modelID": "pro_custom",
+      "redistributionDecision": "pending-qualified-review",
+      "repo": "PowerBeef02/Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit",
+      "revision": "f84295ee776abf19745312ae197f1e044a0ce53b",
+      "sourceURL": "https://huggingface.co/PowerBeef02/Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit/tree/f84295ee776abf19745312ae197f1e044a0ce53b",
+      "variantID": "speed"
+    },
+    {
+      "baseRepo": "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-8bit",
+      "baseRevision": "f90d617701d9f7f4ca499291e0b57f2b3c2fd2ee",
+      "displayName": "Qwen3-TTS-12Hz-1.7B-VoiceDesign-8bit",
+      "id": "pro_design-quality",
+      "licenseID": "Apache-2.0",
+      "modelCardSHA256": "39fd8023cf06da4c64c7c14bbf8da5110f96849f5f464088d7ba72b7feca4cff",
+      "modelID": "pro_design",
+      "redistributionDecision": "pending-qualified-review",
+      "repo": "PowerBeef02/Qwen3-TTS-12Hz-1.7B-VoiceDesign-8bit",
+      "revision": "c34146124fd9603add238507c80982160567771e",
+      "sourceURL": "https://huggingface.co/PowerBeef02/Qwen3-TTS-12Hz-1.7B-VoiceDesign-8bit/tree/c34146124fd9603add238507c80982160567771e",
+      "variantID": "quality"
+    },
+    {
+      "baseRepo": "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-4bit",
+      "baseRevision": "5c390979e4b93af5f2932f90742ca99c7dd04687",
+      "displayName": "Qwen3-TTS-12Hz-1.7B-VoiceDesign-4bit",
+      "id": "pro_design-speed",
+      "licenseID": "Apache-2.0",
+      "modelCardSHA256": "2e39ffaa0853bdcd55e18c9cd3de49ebaf4b685d3c409914742927441e17790d",
+      "modelID": "pro_design",
+      "redistributionDecision": "pending-qualified-review",
+      "repo": "PowerBeef02/Qwen3-TTS-12Hz-1.7B-VoiceDesign-4bit",
+      "revision": "ff503f17dd41f8cd589638ec2cade5c0d1c59ecd",
+      "sourceURL": "https://huggingface.co/PowerBeef02/Qwen3-TTS-12Hz-1.7B-VoiceDesign-4bit/tree/ff503f17dd41f8cd589638ec2cade5c0d1c59ecd",
+      "variantID": "speed"
+    }
+  ],
+  "schemaVersion": 1,
+  "summary": {
+    "componentCount": 19,
+    "modelArtifactCount": 6,
+    "pendingContentRightsCount": 4
+  }
+}

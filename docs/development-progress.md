@@ -47,7 +47,43 @@ machine-readable status record and wins over any older prose.
 | 13 — Benchmark/history v3 | Live 2026-07-29: the first schema-v3 records are committed (three clean `phase0-cli-control-*` engine records plus one exploratory run that also exposed and fixed the summarizer's v3 pin). `benchmarks/schema-v3.json` adds the typed quality identity to generation takes (pass/warning only, five fast gates required, machine-code issues); v1/v2 records stay valid immutable history; the publisher stamps v3 only when every take carries the identity. The UI benchmark checkers folded the same identity 2026-08-01: ui-generation records now publish v3 (first: the focused `v3-fold-proof` record `macos-xcui-benchmark-20260801-003208-403989cf`); the canonical iOS matrix published its first v3 record 2026-08-01 (`ios-xcui-benchmark-20260801-132415-abbec96b`). |
 | 14 — Organization and retirement | Closed 2026-07-23 (14a + 14b): compatibility SPI retired, actor-owned loading/metadata/priming/clone artifacts, clone conditioning epoch-bound end to end. |
 
-## Resume here (2026-08-26)
+## Resume here (2026-08-27)
+
+**ASR-03 is closed; ASR-04 has an exact qualified-review boundary (2026-08-27):**
+`config/support-contact.json` owns Vocello's public support URL, monitored address, and response
+owner. The unauthenticated support page, privacy contact, website footer, and iOS Settings
+destination are checked together by `scripts/support_contact_contract.py`, including negative
+fixtures for placeholders, URL drift, absent ownership, and false response-time promises. The
+production HTTPS route returned 200 with the expected contact/owner/privacy surfaces, and the sole
+iOS 1.0 App Store Connect localization (`en-US`) read back the exact governed Support URL. Raw
+deployment and account responses remain untracked.
+
+The exact 17-package application resolution, owned Qwen3 runtime license/NOTICE/origin records, and
+six catalog-pinned downloadable model identities now generate
+`Sources/Resources/third_party_attributions.json`. Settings pushes an accessible offline software/model
+license browser; release artifact verification requires the archive and IPA to contain the exact source
+manifest. App Store Connect now declares `USES_THIRD_PARTY_CONTENT`, with exact post-mutation readback.
+That truthful account declaration is not a rights grant: ASR-04 remains open for qualified review of
+model license delivery/NOTICE/trademark obligations, Qwen output and built-in-speaker presentation,
+the voice-clone marketing source, other marketing audio/scripts, and artwork provenance. The
+decision-ready evidence and fail-closed alternatives are in
+[`content-rights-review.md`](reference/content-rights-review.md).
+
+**The iOS App Store readiness audit is pinned and the submission verdict is not ready
+(2026-08-26):** the generic arm64/iOS 26 Release build and Xcode analysis pass, downloaded models are
+digest-pinned data rather than executable code, required-reason privacy declarations exist, and the
+release workflow has strong source/signature/profile/entitlement/UUID/SBOM verification. Those passes
+do not substitute for the twelve `ASR-*` closure gates now owned by `config/roadmap.json`.
+
+The remaining source-proven P1 gaps are installation eligibility that advertises `arm64` while the app
+rejects pre-iPhone 15 Pro devices; the unsupported “Data Not Collected” instruction while Hugging Face
+receives model-download request metadata; and qualified content-rights/redistribution decisions beyond
+the now-complete support and bundled-attribution source work. Reviewer notes/screenshots, sensitive-file protection, release
+logging/API hygiene, build-number collision prevention, and model-host reviewer availability also need
+closure. A fresh signed archive/exported IPA, read-only App Store Connect audit, qualified legal/privacy
+decisions, and exact-candidate physical-device/accessibility acceptance remain explicitly pending. See
+[`ios-app-store-readiness-audit-2026-08-26.md`](reference/ios-app-store-readiness-audit-2026-08-26.md);
+no upload, metadata mutation, submission, or release was performed.
 
 **F-03 deterministic iOS policy assertions now execute in ordinary CI, F-06 History durability
 is closed, F-07 release-source authority is fail-closed, and F-08 Studio terminal ownership is

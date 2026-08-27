@@ -4,11 +4,16 @@ owner: release-qa
 summary: Operator checklist for shipping Vocello for iPhone to TestFlight / the App Store — account prerequisites, App Store Connect privacy and compliance rows, App Review notes, and the credential-bound archive/upload steps.
 sourceOfTruth:
   - project.yml
+  - config/roadmap.json
   - docs/reference/eu-ai-act-article50-assessment.md
 ---
 # iOS App Store submission runbook
 
-The end-to-end steps to ship **Vocello for iPhone** (`com.patricedery.vocello`) to TestFlight / the App Store. The app code, assets, privacy manifest, entitlements, the in-app privacy link, and a signed-archive CI lane are all in place (see the iOS readiness work). What remains is **credential-bound**: it needs the maintainer's Apple Developer account. This doc is the checklist for those steps.
+The end-to-end steps to ship **Vocello for iPhone** (`com.patricedery.vocello`) to TestFlight / the App Store. The generic Release target, assets, privacy manifest, entitlement sources, in-app privacy link, and signed-archive CI lane are in place. That is not yet submission readiness: the pinned
+[`2026-08-26 readiness audit`](ios-app-store-readiness-audit-2026-08-26.md) records source,
+privacy/legal, support, licensing, metadata, signing/account, hosting, and physical-device gaps.
+`config/roadmap.json` owns their live `ASR-*` status. This document is the operator checklist after
+those gates are closed.
 
 Source-of-truth rule: if this disagrees with the code, the code wins.
 
@@ -53,18 +58,24 @@ download it automatically.
 - [ ] **App Store provisioning profile** for `com.patricedery.vocello` (Distribution → App Store), regenerated
       after enabling the capabilities so it carries `increased-memory-limit` + the App Group.
 - [ ] App record created in App Store Connect (bundle id `com.patricedery.vocello`, primary language, category).
+- [ ] App Store installation eligibility matches the app's runtime hardware floor. The current source
+      requires iPhone 15 Pro or newer but the Info.plist declares only `arm64`; close ASR-01 before the
+      first public version, when eligibility can still be set safely.
 
 ## 1. Privacy + compliance (App Store Connect)
 
 - [ ] **Privacy Policy URL** = `https://vocello.vercel.app/privacy` (hosted by this repo's website; the in-app
       Settings → About → Privacy Policy row links to the same URL).
-- [ ] **App Privacy "nutrition label"**: declare **Data Not Collected**. Vocello collects/transmits nothing;
-      mic audio + transcripts + generated audio stay on device; the only network egress is Hugging Face model
-      downloads. This matches `Sources/PrivacyInfo.xcprivacy` (no tracking, no collected data types).
+- [ ] **App Privacy "nutrition label"**: do not select **Data Not Collected** until ASR-02 closes.
+      Mic audio, transcripts, prompts, and generated audio remain local, but Hugging Face receives
+      network request metadata during model downloads. Record the vendor retention and qualified
+      privacy/legal determination, then make the App Store answers, `PrivacyInfo.xcprivacy`, policy,
+      and review notes agree. Apple requires third-party partner processing in the answers.
 - [ ] **Encryption**: `ITSAppUsesNonExemptEncryption=false` is already in `Sources/iOS/Info.plist` → answer
       "No" to non-exempt encryption (only HTTPS + CryptoKit SHA-256 for download integrity).
-- [ ] **Age rating** questionnaire (updated 2026 tiers): no UGC, no web access, no ads, no violence/mature
-      themes, no data collection → expected **4+**. Answer honestly; the app is a local TTS tool.
+- [ ] **Age rating**: complete the current App Store Connect questionnaire from actual product and
+      content-rights behavior. Do not predeclare a rating from this runbook; preserve the account result
+      as read-only evidence under ASR-11.
 - [ ] **Account deletion / Sign in with Apple**: N/A — there is no account and no third-party login.
 - [ ] EU DSA trader status: complete if distributing in the EU.
 - [ ] **EU AI Act Article 50**: published audio must ship with the built-in AI marking enabled
@@ -77,7 +88,7 @@ download it automatically.
 > Vocello generates speech entirely on-device. It ships with **no bundled model weights** to keep the app
 > small; on first launch you install a voice model from Settings → Voice models (tap **Install** on
 > "Built-in Voice"; it downloads a ~1.7 GB 4-bit Speed model from Hugging Face over Wi-Fi). After the model
-> shows **Active**, open Studio, type a short line, pick a built-in speaker, and tap Generate to hear on-device
+> shows **Ready**, open Studio, type a short line, pick a built-in speaker, and tap Generate to hear on-device
 > synthesis. Voice Design and Voice Cloning each install their own model the same way. No account or login is
 > required. Voice Cloning records its reference with the in-app microphone or imports an audio file
 > the user already has rights to (Files picker on the Voices tab, or opening an audio file from the
@@ -86,14 +97,35 @@ download it automatically.
 No demo account is needed (no login). Note the model download requirement so the app is not judged
 non-functional under Guideline 2.1.
 
+Before using these notes, close ASR-09 with anonymous availability evidence for the exact catalog URLs
+and add truthful expected download time, available-space needs, retry behavior, and offline behavior.
+
 ## 3. Screenshots + metadata
 
-- [ ] iPhone screenshots (6.9" and 6.5" required). Capture from the **device** for all
-      surfaces (generation, model install, sheets). Studio (with a script + voice), Voice Design, Voice
-      Cloning, the Voices library, History, and model-install Settings. Export named screenshots from a current
-      `scripts/ui_test.sh ios smoke` result bundle.
-- [ ] App name, subtitle (≤30 chars each), description, keywords (≤100), support URL (the GitHub repo or the
-      website), marketing URL (`https://vocello.vercel.app`), copyright.
+- [ ] iPhone screenshots: Apple currently requires one highest-resolution iPhone set. Prefer an accepted
+      6.9-inch portrait size (1260×2736, 1290×2796, or 1320×2868); an accepted 6.5-inch set
+      (1284×2778 or 1242×2688) is the fallback when 6.9-inch screenshots are absent. Capture from the
+      exact signed candidate on the supported **physical device** for Studio, model installation,
+      Voice Design, Voice Cloning, Voices, History, and Settings. Reject clipping, stale UI, diagnostic
+      state, personal data, and misleading claims. Do not submit the tracked 780×1696 historical image
+      or the 1440×1224 Mac images as iPhone screenshots.
+- [ ] App name, subtitle (≤30 chars each), description, keywords (≤100), marketing URL
+      (`https://vocello.vercel.app`), and copyright.
+- [x] Source support identity is single-sourced in `config/support-contact.json`: the unauthenticated
+      support page exposes the monitored address and response owner, the website privacy/footer surfaces
+      link it, and Settings opens the exact route. `scripts/support_contact_contract.py` rejects drift,
+      placeholders, insecure URLs, and ungoverned response-time promises.
+- [x] The production support route returned HTTPS 200 with the expected monitored contact, response owner,
+      and privacy link. The sole iOS 1.0 localization (`en-US`) read back the exact governed Support URL in
+      App Store Connect on 2026-08-27. Add and verify the same URL when another localization is introduced.
+- [x] The accessible in-app Open Source & Licenses browser reads the deterministic offline manifest generated
+      from the exact SwiftPM graph, owned-runtime NOTICE/origins, and all six catalog-pinned model cards.
+      Archive/IPA verification rejects a missing, malformed, duplicated, or byte-different manifest.
+- [x] App Store Connect declares `USES_THIRD_PARTY_CONTENT` and read it back on 2026-08-27.
+- [ ] Complete the remaining qualified ASR-04 rights decisions for model-license delivery/NOTICE/trademark
+      obligations, Qwen outputs and built-in speaker presentation, the voice-clone marketing source,
+      other marketing audio/scripts, and artwork. Use
+      [`content-rights-review.md`](content-rights-review.md); the App Store checkbox is not legal clearance.
 
 ## 4. Build the signed IPA
 

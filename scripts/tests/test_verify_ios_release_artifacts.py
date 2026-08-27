@@ -28,6 +28,7 @@ class IOSReleaseArtifactVerificationTests(unittest.TestCase):
     GROUP = "group.com.patricedery.vocello.shared"
     LEAF_CERTIFICATE = b"fixture-signing-leaf"
     PRIVACY_DIGEST = "1" * 64
+    ATTRIBUTION_DIGEST = "2" * 64
 
     def setUp(self) -> None:
         self.expected = module.ExpectedIOSIdentity(
@@ -37,6 +38,7 @@ class IOSReleaseArtifactVerificationTests(unittest.TestCase):
             application_groups=(self.GROUP,),
             increased_memory_limit=True,
             privacy_manifest_sha256=self.PRIVACY_DIGEST,
+            attribution_manifest_sha256=self.ATTRIBUTION_DIGEST,
         )
         self.info = {
             "CFBundleIdentifier": self.BUNDLE,
@@ -81,6 +83,7 @@ class IOSReleaseArtifactVerificationTests(unittest.TestCase):
             "signature_normalized_executable_sha256": "c" * 64,
             "bundle_sha256": "b" * 64,
             "privacy_manifest_sha256": self.PRIVACY_DIGEST,
+            "attribution_manifest_sha256": self.ATTRIBUTION_DIGEST,
         }
         arguments.update(overrides)
         return module.validate_bundle_contract(**arguments)
@@ -217,6 +220,10 @@ class IOSReleaseArtifactVerificationTests(unittest.TestCase):
         with self.assertRaisesRegex(module.VerificationError, "privacy manifest differs"):
             self.snapshot(privacy_manifest_sha256="f" * 64)
 
+    def test_attribution_manifest_must_match_source_contract(self) -> None:
+        with self.assertRaisesRegex(module.VerificationError, "attribution manifest differs"):
+            self.snapshot(attribution_manifest_sha256="f" * 64)
+
     def test_root_privacy_manifest_is_required_and_semantically_hashed(self) -> None:
         payload = {
             "NSPrivacyTracking": False,
@@ -240,6 +247,25 @@ class IOSReleaseArtifactVerificationTests(unittest.TestCase):
             (app / "PrivacyInfo.xcprivacy").write_bytes(module.plistlib.dumps({"NSPrivacyTracking": True}))
             with self.assertRaisesRegex(module.VerificationError, "disable tracking"):
                 module._root_privacy_manifest_digest(app, "archive")
+
+    def test_root_attribution_manifest_is_required_and_complete(self) -> None:
+        payload = {
+            "schemaVersion": 1,
+            "components": [{"id": "fixture"}],
+            "modelArtifacts": [{"id": "model"}],
+            "licenses": [{"id": "MIT"}],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            app = Path(directory) / "Fixture.app"
+            app.mkdir()
+            with self.assertRaisesRegex(module.VerificationError, "exactly one root"):
+                module._root_attribution_manifest_digest(app, "archive")
+            manifest = app / "third_party_attributions.json"
+            manifest.write_text(module.json.dumps(payload), encoding="utf-8")
+            self.assertEqual(module._root_attribution_manifest_digest(app, "archive"), module._sha256(manifest))
+            manifest.write_text(module.json.dumps({"schemaVersion": 1}), encoding="utf-8")
+            with self.assertRaisesRegex(module.VerificationError, "incomplete"):
+                module._root_attribution_manifest_digest(app, "archive")
 
     def test_signature_normalized_digest_removes_signature_from_a_copy(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

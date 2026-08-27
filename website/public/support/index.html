@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="robots" content="index,follow" />
+    <title>Vocello Help and Support</title>
+    <meta name="description" content="Contact Vocello support and find privacy-safe troubleshooting guidance for the Mac and iPhone apps." />
+    <link rel="canonical" href="https://vocello.vercel.app/support/" />
+    <link rel="icon" href="/assets/app-icon-1024.png" />
+    <style>
+      :root {
+        --bg: #0e0f14;
+        --surface: #1b1d25;
+        --ink: #f4f5f7;
+        --muted: #c5c2bb;
+        --faint: #9598a4;
+        --accent: #e5c47f;
+        --rule: rgba(255, 255, 255, 0.1);
+      }
+      * { box-sizing: border-box; }
+      html { -webkit-text-size-adjust: 100%; }
+      body {
+        margin: 0;
+        background:
+          radial-gradient(ellipse 80% 50% at 50% -8%, rgba(229, 196, 127, 0.10), transparent 60%),
+          linear-gradient(180deg, #0e0f14 0%, #131520 45%, #16181e 100%);
+        background-attachment: fixed;
+        color: var(--ink);
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", system-ui, sans-serif;
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
+      }
+      .wrap { max-width: 720px; margin: 0 auto; padding: 64px 24px 96px; }
+      a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+      a:hover { text-decoration-thickness: 2px; }
+      a:focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; border-radius: 4px; }
+      .back { font-size: 14px; color: var(--faint); display: inline-block; margin-bottom: 28px; }
+      h1 { font-size: clamp(30px, 6vw, 42px); line-height: 1.1; letter-spacing: -0.01em; margin: 0 0 6px; }
+      .updated { color: var(--faint); font-size: 14px; margin: 0 0 8px; }
+      .lede { color: var(--muted); font-size: 18px; margin: 18px 0 8px; text-wrap: pretty; }
+      h2 { font-size: 20px; margin: 40px 0 10px; letter-spacing: -0.01em; }
+      p, li { color: var(--muted); font-size: 16px; }
+      strong { color: var(--ink); font-weight: 600; }
+      ul, ol { padding-left: 22px; }
+      li { margin: 7px 0; }
+      code { color: var(--ink); overflow-wrap: anywhere; }
+      hr { border: none; border-top: 1px solid var(--rule); margin: 40px 0; }
+      .contact {
+        background: var(--surface);
+        border: 1px solid var(--rule);
+        border-radius: 16px;
+        padding: 20px;
+        margin: 24px 0 8px;
+      }
+      .contact p { margin: 0 0 8px; }
+      .contact p:last-child { margin-bottom: 0; }
+      footer { color: var(--faint); font-size: 13px; margin-top: 56px; }
+    </style>
+  </head>
+  <body>
+    <main class="wrap">
+      <a class="back" href="/">&larr; Vocello</a>
+      <h1>Help and Support</h1>
+      <p class="updated">Last updated: August 27, 2026</p>
+      <p class="lede">
+        Get help with Vocello for Mac or iPhone. Support is handled directly by the
+        Vocello maintainer, and response time varies with the issue.
+      </p>
+
+      <div class="contact" data-support-owner="Vocello maintainer">
+        <p><strong>Email support</strong></p>
+        <p><a href="mailto:patricedery02@gmail.com">patricedery02@gmail.com</a></p>
+        <p>
+          For public setup questions and reproducible product issues, you can also use
+          <a href="https://github.com/PowerBeef/Vocello/discussions">Vocello Discussions</a>.
+        </p>
+      </div>
+
+      <h2>Before contacting support</h2>
+      <ol>
+        <li>Confirm that the required voice model shows Ready in Settings, Voice Models.</li>
+        <li>Confirm that the device has enough free storage for the selected model and generated audio.</li>
+        <li>For microphone or transcription problems, review Vocello permissions in Apple Settings.</li>
+        <li>For an interrupted model download, keep Vocello installed and use the visible Retry or Remove action.</li>
+      </ol>
+
+      <h2>What to include</h2>
+      <ul>
+        <li>Vocello version and build number from Settings.</li>
+        <li>macOS or iOS version.</li>
+        <li>The Studio mode and model status involved.</li>
+        <li>The visible error title or sanitized error code.</li>
+        <li>The steps immediately before the issue occurred.</li>
+      </ul>
+
+      <h2>Protect your privacy</h2>
+      <p>
+        Do not send scripts, generated clips, reference recordings, cloned voices, transcripts,
+        device serial numbers, account secrets, or absolute file paths. Support should be able to
+        begin diagnosis from product version, operating-system version, model state, and a
+        sanitized error code.
+      </p>
+
+      <h2>Security reports</h2>
+      <p>
+        Do not disclose a vulnerability in a public discussion. Use the repository's
+        <a href="https://github.com/PowerBeef/Vocello/security/advisories/new">private security advisory form</a>.
+      </p>
+
+      <h2>Privacy</h2>
+      <p>
+        The <a href="https://vocello.vercel.app/privacy/">Vocello Privacy Policy</a> explains local storage, model downloads,
+        permissions, and website analytics.
+      </p>
+
+      <hr />
+      <footer>Vocello support for the macOS and iOS apps.</footer>
+    </main>
+  </body>
+</html>

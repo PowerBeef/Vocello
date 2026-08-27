@@ -12,6 +12,7 @@
 | `autonomous-validation-remediation-2026-08` | active | release-qa | 5/11 (45%) |
 | `delivery-prompting-2026-08` | active | backend-mlx | 29/34 (85%) |
 | `engineering-review-remediation-2026-08` | active | backend-and-platform | 13/14 (93%) |
+| `ios-app-store-readiness-2026-08` | active | release-qa | 1/12 (8%) |
 | `ios-generation-startup-reliability-2026-08` | active | backend-and-platform | 4/6 (67%) |
 | `compliance-2026-08` | complete | release-qa | 2/2 (100%) |
 | `convergence-metal4-stage4-2026-08` | complete | backend-and-platform | 7/7 (100%) |
@@ -155,6 +156,64 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
 
 - **`F-05`** (planned) — Medium — restore packaged macOS launch verification.
   gate: Run the existing packaged-app launch smoke on the declared macos-26 release runner. The release workflow and extracted-DMG verifier must require external startup evidence and reject a QWENVOICE_SKIP_LAUNCH_SMOKE bypass in CI. Close only after the next signed candidate records that hosted macos-26 proof.
+
+## iOS App Store readiness
+
+`ios-app-store-readiness-2026-08` · **active** · release-qa · adopted 2026-08-26
+
+Close the code-, policy-, signing-, account-, legal-, hosting-, accessibility-, and physical-device gaps identified by the pinned 2026-08-26 audit before any truthful App Review submission-readiness claim. No item authorizes upload, metadata mutation, review submission, tagging, or publication.
+
+Narrative authority: [`docs/reference/ios-app-store-readiness-audit-2026-08-26.md`](reference/ios-app-store-readiness-audit-2026-08-26.md)
+
+| Item | Status | Title | Evidence |
+| --- | --- | --- | --- |
+| `ASR-01` | planned | Align App Store installation eligibility with the runtime hardware floor | `doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md` |
+| `ASR-02` | planned | Resolve Hugging Face processing and App Privacy disclosure | `doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md` |
+| `ASR-03` | done | Provide an accurate monitored support contact | `doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md`, `doc:docs/reference/ios-appstore-submission.md` |
+| `ASR-04` | planned | Bundle complete attributions and record content rights | `doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md`, `doc:docs/reference/content-rights-review.md` |
+| `ASR-05` | planned | Refresh reviewer notes, metadata guidance, and App Store screenshots | `doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md` |
+| `ASR-06` | planned | Define and verify sensitive-file protection and backup policy | `doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md` |
+| `ASR-07` | planned | Complete final release logging, API, symbol, and analyzer hygiene | `doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md` |
+| `ASR-08` | planned | Prevent App Store build-number collisions | `doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md` |
+| `ASR-09` | planned | Prove reviewer access to immutable model hosting | `doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md` |
+| `ASR-10` | planned | Produce and verify the signed archive and exported IPA | `doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md` |
+| `ASR-11` | planned | Audit live App Store Connect and regional compliance read-only | `doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md` |
+| `ASR-12` | planned | Complete current signed-candidate physical-device acceptance | `doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md` |
+
+### Open items in detail
+
+- **`ASR-01`** (planned) — Align App Store installation eligibility with the runtime hardware floor.
+  gate: Before the first public version, the archived Info.plist and App Store eligibility must exclude every device rejected by IOSDeviceSupport, preferably through Apple's documented iphone-performance-gaming-tier capability for the current iPhone 15 Pro-or-newer floor, or the runtime floor must be removed only after measured support evidence. Deterministic plist/source fixtures must reject any future disagreement.
+
+- **`ASR-02`** (planned) — Resolve Hugging Face processing and App Privacy disclosure.
+  gate: Obtain a documented vendor-retention and qualified privacy/legal determination for every request field Hugging Face receives during model downloads; then make PrivacyInfo.xcprivacy, the website/in-app policy, App Store privacy answers, and reviewer notes mutually consistent. The current Data Not Collected assertion must not survive without evidence satisfying Apple's third-party-partner and retention definitions.
+
+- **`ASR-04`** (planned) — Bundle complete attributions and record content rights.
+  gate: Generate a deterministic offline attribution/NOTICE manifest from the exact SwiftPM graph and owned runtime, bundle it, expose it through an accessible in-app screen, and bind every downloadable model revision to its license, model-card terms, NOTICE, and redistribution decision. Qualified records must also cover built-in speaker names/previews, generated marketing audio, icons/fonts, and the App Store content-rights declaration.
+
+- **`ASR-05`** (planned) — Refresh reviewer notes, metadata guidance, and App Store screenshots.
+  gate: Reviewer notes must use current Ready terminology and exact catalog-derived download/storage expectations; metadata instructions must match Apple's current one-set iPhone screenshot rule; and a current signed candidate must provide privacy-safe physical-device screenshots at an accepted 6.9-inch size, or an accepted 6.5-inch fallback, with no clipping, stale UI, diagnostics, personal data, or misleading claims.
+
+- **`ASR-06`** (planned) — Define and verify sensitive-file protection and backup policy.
+  gate: A machine-readable path contract must classify models, downloads, caches, imported/recorded references, prepared clone data, saved voices, generated audio, History, and diagnostics by backup and data-protection policy. Source must apply the intended protection without breaking background delivery, and signed-device evidence must verify file attributes, backup exclusion, deletion, and relaunch behavior.
+
+- **`ASR-07`** (planned) — Complete final release logging, API, symbol, and analyzer hygiene.
+  gate: Remove or privacy-gate product-reachable raw prints that can expose absolute cache paths or model locations, resolve or register every iOS Release analyzer warning, and make the exported IPA scan fail closed on private/dynamic-loading APIs, enabled diagnostics, test or debug dylibs, forbidden environment behavior, sensitive strings, unexpected executables, missing dependency privacy manifests, and symbol/dSYM drift.
+
+- **`ASR-08`** (planned) — Prevent App Store build-number collisions.
+  gate: Before archive/upload, a least-privilege read-only App Store Connect preflight must reject an already-used bundle/version/build identity. A documented maintainer-owned operation must update CURRENT_PROJECT_VERSION through project.yml and regenerate the project; the release workflow must never silently invent or mutate a build number.
+
+- **`ASR-09`** (planned) — Prove reviewer access to immutable model hosting.
+  gate: The exact anonymous catalog URLs must be probed from representative distribution regions for ownership, availability, range/download behavior, rate limits, and digest identity; a monitored outage response and digest-preserving fallback decision must be documented; and reviewer notes must state exact size, time, network/disk requirements, recovery, and offline behavior after installation.
+
+- **`ASR-10`** (planned) — Produce and verify the signed archive and exported IPA.
+  gate: Against a clean exact-tag source, produce a fresh Distribution-signed archive and App Store-exported IPA using a current profile carrying the App Group and increased-memory entitlements; require the existing release verifier, signature trust, profile/team/App ID consistency, privacy manifests, architecture, executable/code continuity, UUID/dSYM, SBOM, checksums, attestation, release evidence, and absence of get-task-allow all to pass. Do not upload as part of this gate.
+
+- **`ASR-11`** (planned) — Audit live App Store Connect and regional compliance read-only.
+  gate: With an untracked least-privilege read-only API key, redact and validate the live app identity, platforms, categories, availability/pricing, metadata/localizations/URLs, screenshots, review contact/notes, privacy answers, content-rights and export declarations, current age rating, DSA trader and regional fields, agreements/tax/banking readiness, and all existing build states. Qualified legal/privacy decisions must be recorded; no metadata or build mutation is authorized.
+
+- **`ASR-12`** (planned) — Complete current signed-candidate physical-device acceptance.
+  gate: Install the exact signed candidate on a supported physical iPhone and pass repository XCUITest smoke, all three model installs/modes, model cancellation/retry/restoration/update/delete/reinstall, saved voices, startup parity, consent and permission denial/recovery, import/record/export/history, offline/interrupted/background/low-storage/memory recovery, VoiceOver, AX-L/AX-XXXL, Reduce Motion/Transparency, contrast/focus/progress/error review, and accepted-size screenshot capture with no Simulator, alternate UI driver, hidden state, automatic retry, or historical-result substitution.
 
 ## iOS Built-in Voice startup reliability
 

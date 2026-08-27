@@ -184,8 +184,18 @@ their mode colors. `iosSettings_autoPlayToggle` is a semantic SwiftUI `Toggle` w
 chrome; `iosSettings_variationRow` is a menu picker (Expressive/Balanced/Consistent). The landing
 page also owns `iosSettings_savedOutputsRow`, `iosSettings_reduceMotionToggle`,
 `iosSettings_reduceTransparencyToggle`, `voiceCloning_consentAcknowledgment`,
-`iosSettings_privacyPolicyRow`, `iosSettings_openIOSSettingsRow`, `iosSettings_openSourceRow`, and
-the compact read-only `iosSettings_versionLabel`.
+`iosSettings_privacyPolicyRow`, `iosSettings_openIOSSettingsRow`, `iosSettings_supportRow`,
+`iosSettings_openSourceRow`, `iosSettings_sourceCodeRow`, and the compact read-only
+`iosSettings_versionLabel`. Support opens the contract-owned unauthenticated support page; Source Code
+remains a separate GitHub destination.
+
+`iosSettings_openSourceRow` pushes `screen_openSourceLicenses`. The offline browser is generated from
+the exact application SwiftPM resolution, owned-runtime license/NOTICE/origin records, and the six
+production model revisions. Rows expose `iosAttributionRow_<componentID>` and
+`iosModelAttributionRow_<modelID>-<variantID>`; the 44-point
+`iosSettings_openSourceBackButton` returns to Settings. Each detail exposes complete license text,
+applicable NOTICE/origin text, pinned identity, and the upstream source without requiring network access.
+The resource is fail-closed in deterministic and archive/IPA verification.
 
 `iosSettings_voiceModelsRow` pushes the dedicated `screen_voiceModels` destination. That screen
 keeps the system navigation bar hidden and provides the compact 44-point

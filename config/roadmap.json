@@ -109,6 +109,15 @@
       "adopted": "2026-08-23",
       "goal": "Causally classify and eliminate the reported iOS Built-in Voice startup failure using privacy-safe exact-request receipts, typed startup boundaries, ordered physical-device characterization, and the smallest evidence-supported production fix without changing delivery copy, sampling, model pins, or deterministic audio quality.",
       "authority": "docs/reference/ios-built-in-startup-reliability.md"
+    },
+    {
+      "id": "ios-app-store-readiness-2026-08",
+      "title": "iOS App Store readiness",
+      "status": "active",
+      "owner": "release-qa",
+      "adopted": "2026-08-26",
+      "goal": "Close the code-, policy-, signing-, account-, legal-, hosting-, accessibility-, and physical-device gaps identified by the pinned 2026-08-26 audit before any truthful App Review submission-readiness claim. No item authorizes upload, metadata mutation, review submission, tagging, or publication.",
+      "authority": "docs/reference/ios-app-store-readiness-audit-2026-08-26.md"
     }
   ],
   "items": [
@@ -2012,7 +2021,228 @@
         "scripts/ios_startup_reliability.py"
       ],
     "updated": "2026-08-25",
-    "notes": "Open. The original script bytes have not been supplied and the broader predecessor, preparation, platform, repetition, and grid evidence is incomplete. The earlier forced-unload successor remains a represented process termination without a correlated system-crash report; after the bounded quality-first fix, the tracked sentinel completed five full unload/quiescence/reload cycles with 10/10 passes, healthy 2.78-3.19 GiB per-take peaks, no crash delta, and successful cleanup. The same five-cycle proof is still required for the unavailable original script. Exact codec replay classifies the observed 38112006 word spacing as sampled-output cadence, not decoder corruption, and does not waive the existing acceptance gate."
-  }
+      "notes": "Open. The original script bytes have not been supplied and the broader predecessor, preparation, platform, repetition, and grid evidence is incomplete. The earlier forced-unload successor remains a represented process termination without a correlated system-crash report; after the bounded quality-first fix, the tracked sentinel completed five full unload/quiescence/reload cycles with 10/10 passes, healthy 2.78-3.19 GiB per-take peaks, no crash delta, and successful cleanup. The same five-cycle proof is still required for the unavailable original script. Exact codec replay classifies the observed 38112006 word spacing as sampled-output cadence, not decoder corruption, and does not waive the existing acceptance gate."
+    },
+    {
+      "id": "ASR-01",
+      "plan": "ios-app-store-readiness-2026-08",
+      "title": "Align App Store installation eligibility with the runtime hardware floor",
+      "status": "planned",
+      "gate": "Before the first public version, the archived Info.plist and App Store eligibility must exclude every device rejected by IOSDeviceSupport, preferably through Apple's documented iphone-performance-gaming-tier capability for the current iPhone 15 Pro-or-newer floor, or the runtime floor must be removed only after measured support evidence. Deterministic plist/source fixtures must reject any future disagreement.",
+      "sourceOfTruth": [
+        "Sources/iOS/Info.plist",
+        "Sources/iOS/IOSAppBootstrap.swift",
+        "project.yml"
+      ],
+      "evidence": [
+        "doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md"
+      ],
+      "updated": "2026-08-26",
+      "notes": "P1/source-proven. UIRequiredDeviceCapabilities currently declares only arm64 while the app rejects pre-iPhone 15 Pro hardware at runtime. Capability tightening after distribution is unsafe, so this is a pre-first-release decision."
+    },
+    {
+      "id": "ASR-02",
+      "plan": "ios-app-store-readiness-2026-08",
+      "title": "Resolve Hugging Face processing and App Privacy disclosure",
+      "status": "planned",
+      "gate": "Obtain a documented vendor-retention and qualified privacy/legal determination for every request field Hugging Face receives during model downloads; then make PrivacyInfo.xcprivacy, the website/in-app policy, App Store privacy answers, and reviewer notes mutually consistent. The current Data Not Collected assertion must not survive without evidence satisfying Apple's third-party-partner and retention definitions.",
+      "sourceOfTruth": [
+        "Sources/PrivacyInfo.xcprivacy",
+        "Sources/QwenVoiceCore/HuggingFaceDownloader.swift",
+        "website/public/privacy/index.html",
+        "docs/reference/ios-appstore-submission.md"
+      ],
+      "evidence": [
+        "doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md"
+      ],
+      "updated": "2026-08-26",
+      "notes": "P1/source-proven plus legal-review-required. Apple requires third-party partner processing in privacy answers; Hugging Face publicly describes automatic request/session metadata collection, but the repository cannot decide the applicable purpose and retention categories."
+    },
+    {
+      "id": "ASR-03",
+      "plan": "ios-app-store-readiness-2026-08",
+      "title": "Provide an accurate monitored support contact",
+      "status": "done",
+      "gate": "A stable unauthenticated support page must expose accurate monitored contact information and response ownership, be linked from the in-app Settings surface, and be entered and verified as the App Store Connect Support URL in every shipped localization and region.",
+      "sourceOfTruth": [
+        "Sources/iOS/Settings/SettingsScreen.swift",
+        "config/support-contact.json",
+        "scripts/support_contact_contract.py",
+        "website/public/support/index.html",
+        "website/public/privacy/index.html",
+        "docs/reference/ios-appstore-submission.md"
+      ],
+      "evidence": [
+        "doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md",
+        "doc:docs/reference/ios-appstore-submission.md"
+      ],
+      "updated": "2026-08-27",
+      "notes": "Closed 2026-08-27. config/support-contact.json owns the monitored address and response owner; the source surfaces and negative fixtures pass. The production HTTPS support route returned 200 and exposed the expected contact, owner, and privacy link. The sole iOS 1.0 App Store Connect localization (en-US) read back the exact governed Support URL after mutation. Raw deployment and account responses remained untracked."
+    },
+    {
+      "id": "ASR-04",
+      "plan": "ios-app-store-readiness-2026-08",
+      "title": "Bundle complete attributions and record content rights",
+      "status": "planned",
+      "gate": "Generate a deterministic offline attribution/NOTICE manifest from the exact SwiftPM graph and owned runtime, bundle it, expose it through an accessible in-app screen, and bind every downloadable model revision to its license, model-card terms, NOTICE, and redistribution decision. Qualified records must also cover built-in speaker names/previews, generated marketing audio, icons/fonts, and the App Store content-rights declaration.",
+      "sourceOfTruth": [
+        "QwenVoice.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved",
+        "Packages/VocelloQwen3Core/NOTICES.md",
+        "config/third-party-attribution-policy.json",
+        "scripts/attribution_manifest.py",
+        "Sources/Resources/qwenvoice_production_model_catalog.json",
+        "Sources/Resources/third_party_attributions.json",
+        "Sources/Resources/voice-previews/README.md",
+        "Sources/iOS/Settings/SettingsScreen.swift",
+        "Sources/iOS/Settings/OpenSourceLicensesScreen.swift",
+        "docs/reference/content-rights-review.md"
+      ],
+      "evidence": [
+        "doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md",
+        "doc:docs/reference/content-rights-review.md"
+      ],
+      "updated": "2026-08-27",
+      "notes": "P1/source-proven plus legal-review-required. Source remediation is complete for software and models: the exact 17-package resolution, owned-runtime license/NOTICE/origins, and six model-card identities generate one deterministic offline manifest; iOS bundles and displays it accessibly, and archive verification requires byte identity. On 2026-08-27 App Store Connect was set to and read back USES_THIRD_PARTY_CONTENT. Exact fork/base revisions, Apache-2.0 declarations, lineage, and modification notices are verified, but qualified review must still confirm license-delivery/NOTICE/trademark obligations and output/personality rights. Owner/counsel evidence remains required for built-in previews/speaker presentation, the voice-clone marketing source, other marketing audio/scripts, and original or licensed artwork."
+    },
+    {
+      "id": "ASR-05",
+      "plan": "ios-app-store-readiness-2026-08",
+      "title": "Refresh reviewer notes, metadata guidance, and App Store screenshots",
+      "status": "planned",
+      "gate": "Reviewer notes must use current Ready terminology and exact catalog-derived download/storage expectations; metadata instructions must match Apple's current one-set iPhone screenshot rule; and a current signed candidate must provide privacy-safe physical-device screenshots at an accepted 6.9-inch size, or an accepted 6.5-inch fallback, with no clipping, stale UI, diagnostics, personal data, or misleading claims.",
+      "sourceOfTruth": [
+        "docs/reference/ios-appstore-submission.md",
+        "Sources/iOS/IOSSettingsViews.swift",
+        "docs/screenshots"
+      ],
+      "evidence": [
+        "doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md"
+      ],
+      "updated": "2026-08-26",
+      "notes": "P2/source-proven. The runbook says Active and incorrectly requires both 6.9- and 6.5-inch sets. The tracked 780x1696 iPhone image and 1440x1224 Mac images are not a current App Store set."
+    },
+    {
+      "id": "ASR-06",
+      "plan": "ios-app-store-readiness-2026-08",
+      "title": "Define and verify sensitive-file protection and backup policy",
+      "status": "planned",
+      "gate": "A machine-readable path contract must classify models, downloads, caches, imported/recorded references, prepared clone data, saved voices, generated audio, History, and diagnostics by backup and data-protection policy. Source must apply the intended protection without breaking background delivery, and signed-device evidence must verify file attributes, backup exclusion, deletion, and relaunch behavior.",
+      "sourceOfTruth": [
+        "Sources/iOS/QVoiceiOSApp.swift",
+        "Sources/iOSSupport/Services/IOSModelDeliverySupport.swift",
+        "Sources/QwenVoiceCore/GenerationFailureDiagnosticLogger.swift",
+        "docs/reference/privacy-storage.md"
+      ],
+      "evidence": [
+        "doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md"
+      ],
+      "updated": "2026-08-26",
+      "notes": "P2. Backup exclusions are explicit for models and regenerable caches, while user outputs/voices/History are intentionally backed up. No explicit sensitive-file protection-class contract or signed-device proof exists."
+    },
+    {
+      "id": "ASR-07",
+      "plan": "ios-app-store-readiness-2026-08",
+      "title": "Complete final release logging, API, symbol, and analyzer hygiene",
+      "status": "planned",
+      "gate": "Remove or privacy-gate product-reachable raw prints that can expose absolute cache paths or model locations, resolve or register every iOS Release analyzer warning, and make the exported IPA scan fail closed on private/dynamic-loading APIs, enabled diagnostics, test or debug dylibs, forbidden environment behavior, sensitive strings, unexpected executables, missing dependency privacy manifests, and symbol/dSYM drift.",
+      "sourceOfTruth": [
+        "Packages/VocelloQwen3Core/Sources/MLXAudioCore/ModelUtils.swift",
+        "Sources/QwenVoiceCore/RuntimeDebugGate.swift",
+        "config/runtime-debug-knobs.json",
+        "scripts/verify_ios_release_artifacts.py"
+      ],
+      "evidence": [
+        "doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md"
+      ],
+      "updated": "2026-08-26",
+      "notes": "P2/source-proven and build-reproduced. Xcode Analyze succeeds and no owned private API use was found, but the owned runtime has raw path-bearing print calls and the generic binary retains deliberate diagnostic vocabulary. Archive behavior must be proven rather than inferred from the debug gate."
+    },
+    {
+      "id": "ASR-08",
+      "plan": "ios-app-store-readiness-2026-08",
+      "title": "Prevent App Store build-number collisions",
+      "status": "planned",
+      "gate": "Before archive/upload, a least-privilege read-only App Store Connect preflight must reject an already-used bundle/version/build identity. A documented maintainer-owned operation must update CURRENT_PROJECT_VERSION through project.yml and regenerate the project; the release workflow must never silently invent or mutate a build number.",
+      "sourceOfTruth": [
+        "project.yml",
+        "config/ExportOptions-appstore.plist",
+        ".github/workflows/release.yml"
+      ],
+      "evidence": [
+        "doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md"
+      ],
+      "updated": "2026-08-26",
+      "notes": "P2/source-proven and account-pending. Version 2.4.0 build 23 is fixed and automatic management is disabled; the current workflow has no duplicate-build query."
+    },
+    {
+      "id": "ASR-09",
+      "plan": "ios-app-store-readiness-2026-08",
+      "title": "Prove reviewer access to immutable model hosting",
+      "status": "planned",
+      "gate": "The exact anonymous catalog URLs must be probed from representative distribution regions for ownership, availability, range/download behavior, rate limits, and digest identity; a monitored outage response and digest-preserving fallback decision must be documented; and reviewer notes must state exact size, time, network/disk requirements, recovery, and offline behavior after installation.",
+      "sourceOfTruth": [
+        "Sources/Resources/qwenvoice_ios_model_catalog.json",
+        "Sources/Resources/qwenvoice_production_model_catalog.json",
+        "docs/reference/model-delivery.md",
+        "docs/reference/ios-appstore-submission.md"
+      ],
+      "evidence": [
+        "doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md"
+      ],
+      "updated": "2026-08-26",
+      "notes": "P1/account- and hosting-dependent. The app correctly prompts for and manages each approximately 1.7 GB download, but a reviewer can still be blocked by Hugging Face geography, rate limiting, ownership, or outage."
+    },
+    {
+      "id": "ASR-10",
+      "plan": "ios-app-store-readiness-2026-08",
+      "title": "Produce and verify the signed archive and exported IPA",
+      "status": "planned",
+      "gate": "Against a clean exact-tag source, produce a fresh Distribution-signed archive and App Store-exported IPA using a current profile carrying the App Group and increased-memory entitlements; require the existing release verifier, signature trust, profile/team/App ID consistency, privacy manifests, architecture, executable/code continuity, UUID/dSYM, SBOM, checksums, attestation, release evidence, and absence of get-task-allow all to pass. Do not upload as part of this gate.",
+      "sourceOfTruth": [
+        ".github/workflows/release.yml",
+        "scripts/verify_ios_release_artifacts.py",
+        "Sources/iOS/VocelloiOSRelease.entitlements",
+        "config/release-evidence-contract.json"
+      ],
+      "evidence": [
+        "doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md"
+      ],
+      "updated": "2026-08-26",
+      "notes": "P0/archive-pending. No usable Distribution identity/profile, archive, IPA, or release-verification record was present. Cross-reference F-05 and F-07; the unsigned generic Release build is not substitute evidence."
+    },
+    {
+      "id": "ASR-11",
+      "plan": "ios-app-store-readiness-2026-08",
+      "title": "Audit live App Store Connect and regional compliance read-only",
+      "status": "planned",
+      "gate": "With an untracked least-privilege read-only API key, redact and validate the live app identity, platforms, categories, availability/pricing, metadata/localizations/URLs, screenshots, review contact/notes, privacy answers, content-rights and export declarations, current age rating, DSA trader and regional fields, agreements/tax/banking readiness, and all existing build states. Qualified legal/privacy decisions must be recorded; no metadata or build mutation is authorized.",
+      "sourceOfTruth": [
+        "docs/reference/ios-appstore-submission.md",
+        "docs/reference/ios-app-store-readiness-audit-2026-08-26.md"
+      ],
+      "evidence": [
+        "doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md"
+      ],
+      "updated": "2026-08-26",
+      "notes": "P0/account-verified and legal-review-required. No App Store Connect credential or raw account response was available; all live fields remain pending."
+    },
+    {
+      "id": "ASR-12",
+      "plan": "ios-app-store-readiness-2026-08",
+      "title": "Complete current signed-candidate physical-device acceptance",
+      "status": "planned",
+      "gate": "Install the exact signed candidate on a supported physical iPhone and pass repository XCUITest smoke, all three model installs/modes, model cancellation/retry/restoration/update/delete/reinstall, saved voices, startup parity, consent and permission denial/recovery, import/record/export/history, offline/interrupted/background/low-storage/memory recovery, VoiceOver, AX-L/AX-XXXL, Reduce Motion/Transparency, contrast/focus/progress/error review, and accepted-size screenshot capture with no Simulator, alternate UI driver, hidden state, automatic retry, or historical-result substitution.",
+      "sourceOfTruth": [
+        "scripts/ui_test.sh",
+        "scripts/ios_device.sh",
+        "Tests/VocelloiOSUITests",
+        "docs/reference/ios-device-testing.md"
+      ],
+      "evidence": [
+        "doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md"
+      ],
+      "updated": "2026-08-26",
+      "notes": "P1/device-deferred. Historical MD-3, saved-voice, startup, localization, and accessibility evidence remains valuable but cannot authorize the exact signed candidate. Cross-reference MD-3, AV-09, F-08, ISR-04, and ISR-06."
+    }
   ]
 }

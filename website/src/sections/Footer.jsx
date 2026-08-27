@@ -26,7 +26,8 @@ export const Footer = () => (
               <li><a href="#iphone">iPhone</a></li>
               <li><a href="#engineering">Engineering</a></li>
               <li><a href="#download">Download</a></li>
-              <li><a href="privacy/">Privacy</a></li>
+              <li><a href="/support/">Support</a></li>
+              <li><a href="/privacy/">Privacy</a></li>
             </ul>
           </div>
           <div className="footer-col">

@@ -4,11 +4,11 @@
 > execute models, devices, UI tests, signing, or network checks.
 
 - Current source identity and dirty state: local JSON report only (kept out of the tracked snapshot to avoid self-referential drift)
-- Swift tests: 601 cases in 81 files
-- Python tests: 1240 cases in 101 files
+- Swift tests: 624 cases in 85 files
+- Python tests: 1281 cases in 107 files
 - Required-step assurance: 88 steps across 20 workflows, all covered by forced-failure fixtures
 - Unsafe-concurrency annotations: 49 (49 registered with owner and invariant; contract complete)
-- Evidence routing: 814/814 critical paths explicit; 0 use repository-other fallback
+- Evidence routing: 853/853 critical paths explicit; 0 use repository-other fallback
 
 ## Hardware evidence by domain selector
 
@@ -28,15 +28,15 @@
 | generation-terminal | backend | 4 | 2 / 16 | macos-ui-generation: stale, ios-ui-generation: stale |
 | clone-conditioning | backend | 33 | 2 / 32 | macos-ui-generation: stale, ios-ui-generation: stale |
 | event-delivery | backend | 3 | 2 / 10 | macos-ui-generation: stale, ios-ui-generation: stale |
-| memory-policy | backend-platform | 6 | 2 / 29 | macos-memory-qualification: stale, ios-memory-qualification: stale |
-| model-delivery | backend-platform | 17 | 3 / 47 | external promotion: macos-model-download-lifecycle, ios-model-download-lifecycle |
-| ui-performance | platform | 77 | 17 / 57 | macos-ui-performance: stale, ios-ui-performance: stale |
+| memory-policy | backend-platform | 6 | 5 / 42 | macos-memory-qualification: stale, ios-memory-qualification: stale |
+| model-delivery | backend-platform | 17 | 6 / 60 | external promotion: macos-model-download-lifecycle, ios-model-download-lifecycle |
+| ui-performance | platform | 79 | 17 / 57 | macos-ui-performance: stale, ios-ui-performance: stale |
 | xpc-transport | macos | 3 | 4 / 18 | macos-ui-generation: stale |
 | benchmark-validation | release-qa | 6 | 4 / 121 | macos-ui-generation: stale, ios-ui-generation: stale |
 | orchestration-assurance | release-qa | 3 | 1 / 12 | not hardware-gated |
-| release-supply-chain | release-qa | 9 | 4 / 75 | not hardware-gated |
+| release-supply-chain | release-qa | 12 | 5 / 82 | not hardware-gated |
 | persistence-privacy | platform-release-qa | 4 | 2 / 8 | not hardware-gated |
-| runtime-hardening | backend-release-qa | 9 | 3 / 47 | not hardware-gated |
+| runtime-hardening | backend-release-qa | 13 | 4 / 56 | not hardware-gated |
 
 ## Interpretation
 

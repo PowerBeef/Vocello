@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "generated": "python3 scripts/doc_metadata.py rebuild-index",
   "note": "Machine-readable documentation map. Query this instead of globbing docs/.",
-  "annotatedDocuments": 94,
+  "annotatedDocuments": 96,
   "unannotatedDocuments": 0,
   "documents": [
     {
@@ -304,6 +304,19 @@
       "contentDigest": "sha256:db39324f249bac4cf275e0a25be2421692dd6522b65c92420b56b18ee42c35d9"
     },
     {
+      "path": "docs/reference/content-rights-review.md",
+      "status": "active",
+      "owner": "release-qa",
+      "summary": "Decision-ready evidence and qualified-review gates for downloadable Qwen model artifacts, built-in voice previews, marketing audio, product artwork, and the App Store Connect third-party-content declaration.",
+      "sourceOfTruth": [
+        "config/third-party-attribution-policy.json",
+        "Sources/Resources/qwenvoice_production_model_catalog.json",
+        "Sources/Resources/voice-previews/README.md",
+        "website/src/data/samples.js",
+        "config/roadmap.json"
+      ]
+    },
+    {
       "path": "docs/reference/delivery-control-audit-2026-08.md",
       "status": "historical",
       "owner": "backend-mlx",
@@ -408,12 +421,27 @@
       ]
     },
     {
+      "path": "docs/reference/ios-app-store-readiness-audit-2026-08-26.md",
+      "status": "historical",
+      "owner": "release-qa",
+      "summary": "Point-in-time, code-grounded iOS App Store readiness audit covering Apple review policy, the built app, privacy, signing, licensing, reviewer access, accessibility, metadata, and the evidence still required before submission.",
+      "sourceOfTruth": [
+        "config/roadmap.json",
+        "project.yml",
+        "Sources/iOS/Info.plist",
+        "Sources/PrivacyInfo.xcprivacy",
+        ".github/workflows/release.yml"
+      ],
+      "contentDigest": "sha256:65db244ff419d7fc1c7932ab4ac047f3a93c1fa2b44a4b540cfef9f037da9c0e"
+    },
+    {
       "path": "docs/reference/ios-appstore-submission.md",
       "status": "active",
       "owner": "release-qa",
       "summary": "Operator checklist for shipping Vocello for iPhone to TestFlight / the App Store \u2014 account prerequisites, App Store Connect privacy and compliance rows, App Review notes, and the credential-bound archive/upload steps.",
       "sourceOfTruth": [
         "project.yml",
+        "config/roadmap.json",
         "docs/reference/eu-ai-act-article50-assessment.md"
       ]
     },

@@ -167,12 +167,23 @@ class VocelloiOSUITestCase: XCTestCase {
         for identifier in [
             "iosSettings_privacyPolicyRow",
             "iosSettings_openIOSSettingsRow",
+            "iosSettings_supportRow",
             "iosSettings_openSourceRow",
+            "iosSettings_sourceCodeRow",
             "iosSettings_versionLabel",
         ] {
             XCTAssertTrue(VocelloUIWait.exists(element(identifier), timeout: 20))
         }
         VocelloUIScreenshot.attach(app, named: "ios-settings-landing-privacy-about")
+
+        let attributions = element("iosSettings_openSourceRow")
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: attributions, timeout: 20))
+        XCTAssertTrue(VocelloUIWait.exists(element("screen_openSourceLicenses"), timeout: 20))
+        XCTAssertFalse(element("iosAttributionLoadError").exists)
+        XCTAssertTrue(VocelloUIWait.exists(element("iosAttributionRow_vocello"), timeout: 20))
+        VocelloUIScreenshot.attach(app, named: "ios-settings-open-source-licenses")
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: element("iosSettings_openSourceBackButton"), timeout: 20))
+        XCTAssertTrue(VocelloUIWait.exists(element("screen_settings"), timeout: 20))
 
         XCTAssertTrue(revealSettingsElement(element("iosSettings_autoPlayToggle"), swipingUp: false))
     }

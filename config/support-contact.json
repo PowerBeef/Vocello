@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "product": "Vocello",
+  "supportURL": "https://vocello.vercel.app/support/",
+  "supportEmail": "patricedery02@gmail.com",
+  "responseOwner": "Vocello maintainer",
+  "privacyURL": "https://vocello.vercel.app/privacy/",
+  "publicDiscussionURL": "https://github.com/PowerBeef/Vocello/discussions",
+  "securityReportURL": "https://github.com/PowerBeef/Vocello/security/advisories/new"
+}

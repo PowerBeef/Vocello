@@ -5,6 +5,7 @@ summary: Domain rule for the VocelloiOS target — boundaries, physical-device-o
 sourceOfTruth:
   - scripts/ios_device.sh
   - scripts/ui_test.sh
+  - scripts/ios_control_audit.py
   - scripts/build_foundation_targets.sh
   - scripts/localization_contract.py
   - config/localization-unlocalized-baseline.json
@@ -115,6 +116,7 @@ scripts/ui_test.sh ios model-download    # isolated background-delivery lifecycl
 scripts/ui_test.sh ios enroll-clone-fixture  # benchmark clone voice through the visible Files-import flow
 scripts/ui_test.sh ios saved-voice-lifecycle # opt-in F-01 import/preview/handoff/delete acceptance
 scripts/ui_test.sh ios startup-parity --script-file SCRIPT.txt # exact visible request-to-engine receipt proof
+scripts/ui_test.sh ios control-audit --scenario inventory|stateful|external|accessibility|generation|all
 scripts/ios_device.sh gate            # deterministic physical-device/runtime proof
 ```
 
@@ -162,7 +164,11 @@ scripts/ios_device.sh gate            # deterministic physical-device/runtime pr
 - **Clone load profile.** Respect `.fullCapabilities` vs `.iOSProductionDefault`
   (`.withoutCloneEncoders`) depending on the entitled memory limit.
 - **`accessibilityIdentifier`s are stable.** Values like `voicesRow_*`, `textInput_*`,
-  `studioChip_*` must survive refactors.
+  `studioChip_*` must survive refactors. Interactive iOS source files and dynamic control families
+  are also governed by `config/ios-control-audit.json`, its strict
+  `config/ios-control-audit-schema-v1.json`, and the language-matched
+  `config/ios-control-audit-corpus.json`; update source coverage, corpus identity, and the
+  XCUITest owner in the same change instead of exempting a new control silently.
 - **Localization grows through typed catalog entries.** Dynamic errors/status belong in
   `VocelloPresentationText` and `Sources/Resources/Localizable.xcstrings`, with complete format
   strings, translator context, and plural rules. `scripts/localization_contract.py` rejects new

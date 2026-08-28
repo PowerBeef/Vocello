@@ -62,10 +62,17 @@ install state instead of Generate.
 
 ### Voice Cloning
 
-Clone requires a reference clip from a saved voice, the physical-device recording flow, or an
-imported WAV, MP3, AIFF, or M4A file. Automated smoke and benchmark tests use a prepared non-PII
-saved reference. Recording, Files-picker import, and permission enrollment are separate explicit
-product-acceptance scenarios. The genuine visible
+Clone requires a reference clip from a saved voice, the physical-device recording flow
+(`referenceClip_recordNewClip`), or direct Files import (`referenceClip_importAudioFile`) of WAV,
+MP3, AIFF, or M4A. Direct import always enters the permanent Saved Voice enrollment pipeline; it
+does not create a session-only reference. A neighboring `.txt` sidecar wins, otherwise the existing
+on-device transcriber runs automatically and reports through `saveVoice_transcriptionStatus`.
+Save stays disabled until editable text exists or the user explicitly selects
+`saveVoice_useAudioOnlyButton`; a delayed recognizer result cannot overwrite a manual edit.
+Successful enrollment selects the exact new voice in `studioChip_reference` and begins ordinary
+Clone priming. Automated smoke and benchmark tests use a prepared non-PII saved reference.
+Recording, Files-picker import, and permission enrollment are separate explicit product-acceptance
+scenarios. The genuine visible
 `voiceCloning_consentAcknowledgment` control lives in Settings; Clone reads that persistent choice
 and keeps Generate disabled until it is enabled. A transcript is optional: supplied text selects
 transcript-backed conditioning, while an empty transcript selects the distinct audio-only x-vector
@@ -89,8 +96,8 @@ separate row and preview actions, search, filters, and one visible Save a New Vo
 reference with the microphone, or imports one from Files ("Import audio file",
 `voices_importAudioFile`, restored 2026-08-15 — WAV/MP3/AIFF/M4A; audio files opened from the
 Files app route through the same flow via `RootView.onOpenURL`).
-`saveVoice_nameField`, `saveVoice_transcriptEditor`, and `saveVoice_saveButton` complete
-enrollment. A saved voice hands off to Studio Clone; a built-in speaker hands off to Studio
+`saveVoice_nameField`, `saveVoice_transcriptEditor`, `saveVoice_transcriptionStatus`, the conditional
+`saveVoice_useAudioOnlyButton`, and `saveVoice_saveButton` complete enrollment. A saved voice hands off to Studio Clone; a built-in speaker hands off to Studio
 Custom. Benchmark-fixture enrollment is script-owned via
 `scripts/ios_device.sh enroll-clone-fixture`.
 

@@ -4,6 +4,7 @@ owner: ios
 summary: Consolidated iPhone app map — every screen, element, and option from the user view, and how XCUITest drives each via stable identifiers on the paired physical device.
 sourceOfTruth:
   - Sources/iOS
+  - Sources/iOSSupport/Services/IOSReferenceTranscriptionReviewState.swift
   - Tests/VocelloiOSUITests/VocelloiOSUITestCase.swift
 ---
 # Vocello for iPhone — app guide + test-driving reference
@@ -40,7 +41,8 @@ Three generation modes (Studio segmented control `generateSection_*`):
 
 - **Built-in Voice** (`generateSection_custom`) — pick a built-in speaker + optional delivery.
 - **Voice Design** (`generateSection_design`) — describe a voice in natural language.
-- **Voice Cloning** (`generateSection_clone`) — use a reference clip (record on-device or a saved voice).
+- **Voice Cloning** (`generateSection_clone`) — use a saved voice, record a new reference, or
+  import audio from Files and enroll it permanently.
 
 The UI is what this guide drives. Headless, non-UI device diagnostics are documented in
 [`ios-device-testing.md`](ios-device-testing.md); that path is separate from XCUITest.
@@ -79,7 +81,7 @@ mode segments, composer, and primary action; there is no hidden screen-presence 
 |---|---|
 | Custom | `studioChip_voice` → voice picker · `studioChip_delivery` · `studioChip_language` · `studioChip_seedPin` (only while a seed is pinned) |
 | Design | `studioChip_voiceBrief` → brief editor · `studioChip_delivery` · `studioChip_language` · `studioChip_seedPin` (conditional) |
-| Clone | `studioChip_reference` → record or saved voice · `studioChip_bankDelivery` (only while a bank member is selected) · `studioChip_language` · `studioChip_seedPin` (conditional) |
+| Clone | `studioChip_reference` → saved voice, `referenceClip_recordNewClip`, or `referenceClip_importAudioFile` · `studioChip_bankDelivery` (only while a bank member is selected) · `studioChip_language` · `studioChip_seedPin` (conditional) |
 
 `studioChip_seedPin` (DP-15) shows the pinned sampling seed; tapping offers the unpin
 confirmation, returning to a fresh seed per take. `studioChip_bankDelivery` (DP-16) shows the
@@ -140,9 +142,15 @@ The Save a New Voice card has one visible action: `voices_saveNewVoice` starts t
 (iPhone also imports reference files — the "Import audio file" row, `voices_importAudioFile`,
 presents a native `fileImporter` for WAV/MP3/AIFF/M4A and continues through the same
 name → review sheet, restored 2026-08-15; a saved Voice Design voice can also serve as the
-clone reference through the Studio handoff). The enrollment sheet exposes `saveVoice_nameField`,
-`saveVoice_transcriptEditor`, and `saveVoice_saveButton`; Save prepares an opaque candidate that
-does not enter the catalog until any quality warning is explicitly kept. Cancel, Discard, and
+clone reference through the Studio handoff). Studio Clone exposes the same permanent-enrollment
+pipeline directly through `referenceClip_importAudioFile`; it dismisses the custom reference panel
+before presenting Files and never creates a session-only reference. The enrollment sheet exposes
+`saveVoice_nameField`, `saveVoice_transcriptEditor`, `saveVoice_transcriptionStatus`,
+`saveVoice_useAudioOnlyButton`, and `saveVoice_saveButton`. A matching `.txt` sidecar is preferred;
+otherwise `VoiceClipTranscriber` starts automatically on device, keeps Save disabled until the
+result is reviewable, and cannot replace a manual edit with a delayed result. If recognition cannot
+produce text, the user must enter text or explicitly choose Use audio only. Save prepares an opaque
+candidate that does not enter the catalog until any quality warning is explicitly kept. Cancel, Discard, and
 outside dismissal discard the candidate. A successful commit creates `voicesRow_saved_<id>` and
 hands the reference to Studio Clone. Each saved row exposes `voicesRowMenu_<id>` with
 `voicesDelete_<id>`; confirmation `voicesDeleteConfirm_<id>` names the exact voice and explains
@@ -150,10 +158,11 @@ that deleting one voice-bank member leaves the others. Delete stops a matching p
 the engine assets and prepared prompt caches, and clears a matching Studio draft/handoff; failures
 remain visible and retryable. Search is `voicesSearchField`.
 
-Explicit F-01 device acceptance is `scripts/ui_test.sh ios saved-voice-lifecycle`. It requires a
-throwaway `F01 Saved Voice Lifecycle.wav` (optional matching `.txt`) staged in the app Documents
-directory and drives the genuine import, preview, Clone handoff, confirmation, deletion, and draft
-cleanup surfaces. It never runs in ordinary CI or release work.
+Explicit F-01/ICI-4 device acceptance is `scripts/ui_test.sh ios saved-voice-lifecycle`. It requires
+`ICI Direct Clone Import.wav` without a matching `.txt` staged in the app Documents directory and
+drives the genuine direct Clone import, automatic transcription, permanent enrollment, Clone
+generation, preview, confirmation, deletion, and draft-cleanup surfaces. It never runs in ordinary
+CI or release work.
 
 ### History tab — `Sources/iOS/History/HistoryScreen.swift`
 
@@ -304,10 +313,13 @@ Generate rather than Install. Destructive install/cancel/delete actions are outs
 - **Voice Design** — describe a voice in plain language (character, age, accent, gender,
   pitch); the model invents a new voice from that brief each call. Name gender + concrete
   pitch register to avoid underspecified results. The result can be saved and reused in Clone.
-- **Voice Cloning** — supply a reference clip by recording in-app on this iPhone or importing a
-  WAV, MP3, AIFF, or M4A file. A neighboring `.txt` file can prefill an imported clip's transcript;
-  recordings can use on-device speech recognition. Enrollment saves an app-owned reference and
-  hands it directly to Clone. The transcript is optional: its presence selects transcript-backed
+- **Voice Cloning** — supply a reference clip by recording in-app on this iPhone, selecting a
+  saved voice, or importing a WAV, MP3, AIFF, or M4A file directly from the Clone reference panel.
+  A neighboring `.txt` file prefills an imported clip's transcript; otherwise the same on-device
+  recognizer used for recorded enrollment runs automatically. The editable review must resolve to
+  text or an explicit Use audio only choice before Save becomes available. Enrollment permanently
+  saves the app-owned reference and hands it directly to Clone. The transcript is optional after
+  that explicit review: its presence selects transcript-backed
   conditioning, while an empty transcript uses the genuine audio-only x-vector path. The visible
   Settings control `voiceCloning_consentAcknowledgment` must be enabled before Generate. Saved
   voices from the Voices tab are reusable references. Clone

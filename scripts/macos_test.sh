@@ -171,7 +171,7 @@ build_mac_test_bundles() {
     -enableThreadSanitizer "$sanitizer_setting" \
     ARCHS=arm64 ONLY_ACTIVE_ARCH=YES CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="-" \
     CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION=YES \
-    'OTHER_SWIFT_FLAGS=$(inherited) -DVOCELLO_INTERNAL_DIAGNOSTICS' \
+    QVOICE_INTERNAL_DIAGNOSTICS_SWIFT_FLAG=-DVOCELLO_INTERNAL_DIAGNOSTICS \
     SWIFT_OPTIMIZATION_LEVEL="-Onone" SWIFT_COMPILATION_MODE="incremental" \
     ENABLE_TESTABILITY=YES > "$log_path" 2>&1 || xcode_status=$?
   (( xcode_status == 0 )) || return "$xcode_status"
@@ -197,7 +197,7 @@ build_mac_test_bundles() {
 }
 
 run_mac_test_bundle() {
-  local bundle_name="$1" log_path="$2" tsan="${3:-0}"
+  local bundle_name="$1" log_path="$2" tsan="${3:-0}" test_filter="${4:-}"
   local derived_data="$QVOICE_XCODE_MACOS_DERIVED"
   [[ "$tsan" != "1" ]] || derived_data="$QVOICE_XCODE_MACOS_TSAN_DERIVED"
   local products="$derived_data/Build/Products/Release"
@@ -215,11 +215,20 @@ run_mac_test_bundle() {
       || { echo "could not resolve Xcode's xctest runner" > "$log_path"; return 1; }
     # Launch the resolved runner directly. Starting it through xcrun causes macOS
     # to strip DYLD_INSERT_LIBRARIES before xctest starts, loading TSan too late.
-    DYLD_INSERT_LIBRARIES="$tsan_runtime" DYLD_FRAMEWORK_PATH="$products" \
-      "$xctest_runner" "$bundle" > "$log_path" 2>&1
+    if [[ -n "$test_filter" ]]; then
+      DYLD_INSERT_LIBRARIES="$tsan_runtime" DYLD_FRAMEWORK_PATH="$products" \
+        "$xctest_runner" -XCTest "$test_filter" "$bundle" > "$log_path" 2>&1
+    else
+      DYLD_INSERT_LIBRARIES="$tsan_runtime" DYLD_FRAMEWORK_PATH="$products" \
+        "$xctest_runner" "$bundle" > "$log_path" 2>&1
+    fi
     return
   fi
-  DYLD_FRAMEWORK_PATH="$products" xcrun xctest "$bundle" > "$log_path" 2>&1
+  if [[ -n "$test_filter" ]]; then
+    DYLD_FRAMEWORK_PATH="$products" xcrun xctest -XCTest "$test_filter" "$bundle" > "$log_path" 2>&1
+  else
+    DYLD_FRAMEWORK_PATH="$products" xcrun xctest "$bundle" > "$log_path" 2>&1
+  fi
 }
 
 # Xcode embeds its universal ThreadSanitizer runtime in instrumented products even
@@ -737,7 +746,21 @@ EOF
 
 # core-test: VocelloCoreTests (core semantics + host-runnable iOS policy, no models).
 cmd_core_test() {
-  note "core-test: VocelloCoreTests (QwenVoiceCore + iOS policy semantics, no models)"
+  local test_filter=""
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --only) test_filter="${2:-}"; shift 2 ;;
+      --only=*) test_filter="${1#*=}"; shift ;;
+      *) die "unknown core-test argument '$1' (try --only TestClass[/testMethod])" ;;
+    esac
+  done
+  [[ -z "$test_filter" || "$test_filter" =~ ^[A-Za-z_][A-Za-z0-9_.]*(/[A-Za-z_][A-Za-z0-9_]*)?(,[A-Za-z_][A-Za-z0-9_.]*(/[A-Za-z_][A-Za-z0-9_]*)?)*$ ]] \
+    || die "core-test --only must contain comma-separated TestClass or TestClass/testMethod identifiers"
+  if [[ -n "$test_filter" ]]; then
+    note "core-test: focused VocelloCoreTests selection $test_filter (no models)"
+  else
+    note "core-test: VocelloCoreTests (QwenVoiceCore + iOS policy semantics, no models)"
+  fi
   local build_log="$QVOICE_ARTIFACTS_MACOS/tests/core-test-build.log"
   local test_log="$QVOICE_ARTIFACTS_MACOS/tests/core-test.log"
   rm -f "$test_log"
@@ -745,7 +768,7 @@ cmd_core_test() {
   local build_st=0 st=0
   build_mac_test_bundles "$build_log" || build_st=$?
   if (( build_st == 0 )); then
-    run_mac_test_bundle VocelloCoreTests "$test_log" || st=$?
+    run_mac_test_bundle VocelloCoreTests "$test_log" 0 "$test_filter" || st=$?
   else
     st="$build_st"
   fi

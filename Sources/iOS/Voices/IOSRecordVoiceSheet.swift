@@ -1,7 +1,8 @@
 import QwenVoiceCore
 import SwiftUI
 
-/// Record or import → name → enroll a **permanent, reusable** saved voice from the Voices tab.
+/// Record or import → name → enroll a **permanent, reusable** saved voice from Voices or
+/// Studio Clone.
 /// Recordings are auto-transcribed; imported clips preserve a neighboring `.txt` sidecar when
 /// `LocalDocumentIO` materializes one, and are auto-transcribed when no sidecar arrived
 /// (macOS `SavedVoiceSheet` parity — the transcriber decodes any AVFoundation-readable format).
@@ -30,6 +31,8 @@ struct IOSRecordVoiceSheet: View {
     @State private var enrollError: String?
     @State private var pendingVoiceForReview: PreparedVoiceCandidate?
     @State private var isReviewDecisionInFlight = false
+    @State private var transcriptionReview: IOSReferenceTranscriptionReviewState
+    @State private var transcriptionTask: Task<Void, Never>?
 
     private enum Phase { case recording, naming }
 
@@ -55,6 +58,12 @@ struct IOSRecordVoiceSheet: View {
         _isNamingPresented = State(initialValue: importedReference != nil)
         _enrollError = State(initialValue: nil)
         _pendingVoiceForReview = State(initialValue: nil)
+        _transcriptionReview = State(
+            initialValue: IOSReferenceTranscriptionReviewState(
+                sidecarTranscript: importedTranscript
+            )
+        )
+        _transcriptionTask = State(initialValue: nil)
     }
 
     var body: some View {
@@ -70,10 +79,13 @@ struct IOSRecordVoiceSheet: View {
                         capturedURL = stable
                         suggestedName = ""
                         transcript = ""
+                        transcriptionReview = IOSReferenceTranscriptionReviewState(
+                            sidecarTranscript: ""
+                        )
                         enrollError = nil
                         phase = .naming
                         isNamingPresented = true
-                        Task { await autoTranscribe(stable) }
+                        startAutomaticTranscription(stable)
                     },
                     onCancel: { onDismiss() }
                 )
@@ -87,12 +99,12 @@ struct IOSRecordVoiceSheet: View {
             }
         }
         // Imported clips with no `.txt` sidecar still get the recorder's best-effort
-        // on-device transcription (transcript stays optional either way — an empty
-        // field enrolls in the audio-only x-vector conditioning mode).
+        // on-device transcription. If recognition cannot provide text, the user must
+        // explicitly confirm audio-only enrollment before Save becomes available.
         .task {
             if let materializedURL = importedReference?.materializedURL,
                transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                await autoTranscribe(materializedURL)
+                startAutomaticTranscription(materializedURL)
             }
         }
         .sheet(isPresented: $isNamingPresented) {
@@ -100,9 +112,13 @@ struct IOSRecordVoiceSheet: View {
                 title: importedReference == nil ? "Save this voice" : "Import voice",
                 suggestedName: $suggestedName,
                 transcript: $transcript,
+                transcriptionReview: transcriptionReview,
                 errorMessage: enrollError,
                 clipAudioURL: capturedURL,
+                onTranscriptEdited: handleTranscriptEdit,
+                onUseAudioOnly: confirmAudioOnly,
                 onCancel: {
+                    cancelTranscription()
                     isNamingPresented = false
                     cleanupCapturedFile()
                     onDismiss()
@@ -141,28 +157,83 @@ struct IOSRecordVoiceSheet: View {
         } message: { candidate in
             Text(reviewAlertMessage(for: candidate))
         }
+        .onDisappear {
+            cancelTranscription()
+        }
     }
 
     // MARK: - Actions
 
-    /// On-device best-effort transcription + language detection across all Qwen languages; only
-    /// fills the field/language if the user hasn't already provided one.
-    private func autoTranscribe(_ url: URL) async {
-        guard let result = await VoiceClipTranscriber.transcribe(url: url) else { return }
-        await MainActor.run {
-            if transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                transcript = result.text
+    /// Starts the one existing on-device transcriber and binds its result to an operation
+    /// generation. Cancellation is cooperative, so the generation check is the final authority.
+    private func startAutomaticTranscription(_ url: URL) {
+        transcriptionTask?.cancel()
+        let generation = transcriptionReview.beginAutomaticTranscription()
+        transcriptionTask = Task { @MainActor in
+            let result = await VoiceClipTranscriber.transcribe(url: url)
+            guard !Task.isCancelled else { return }
+
+            if let result {
+                let applied = transcriptionReview.acceptAutomaticTranscript(
+                    result.text,
+                    generation: generation,
+                    currentTranscript: transcript
+                )
+                if applied {
+                    transcript = result.text
+                    if detectedLanguage == .auto {
+                        detectedLanguage = result.language
+                    }
+                }
+            } else {
+                transcriptionReview.finishWithoutTranscript(
+                    reason: transcriptionUnavailableReason,
+                    generation: generation,
+                    currentTranscript: transcript
+                )
             }
-            if detectedLanguage == .auto {
-                detectedLanguage = result.language
+
+            if transcriptionReview.isCurrent(generation: generation) {
+                transcriptionTask = nil
             }
         }
+    }
+
+    private var transcriptionUnavailableReason: IOSReferenceTranscriptionReviewState.UnavailableReason {
+        switch VoiceClipTranscriber.availability() {
+        case .denied, .notDetermined:
+            return .permissionDenied
+        case .siriDisabled:
+            return .siriDisabled
+        case .available:
+            return .recognitionUnavailableOrEmpty
+        }
+    }
+
+    private func handleTranscriptEdit(_ newValue: String) {
+        transcriptionTask?.cancel()
+        transcriptionTask = nil
+        transcriptionReview.userEditedTranscript(newValue)
+    }
+
+    private func confirmAudioOnly() {
+        transcriptionTask?.cancel()
+        transcriptionTask = nil
+        transcript = ""
+        transcriptionReview.confirmAudioOnly()
+    }
+
+    private func cancelTranscription() {
+        transcriptionTask?.cancel()
+        transcriptionTask = nil
+        transcriptionReview.invalidate()
     }
 
     private func performEnroll() async {
         guard let url = capturedURL else { return }
         let name = suggestedName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else { return }
+        guard transcriptionReview.allowsSave(transcript: transcript) else { return }
         enrollError = nil
         // Friendly duplicate pre-check (macOS SavedVoiceSheet parity): filename-stem
         // defaults make collisions likely for imports. The engine's normalized-name

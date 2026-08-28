@@ -47,7 +47,57 @@ machine-readable status record and wins over any older prose.
 | 13 — Benchmark/history v3 | Live 2026-07-29: the first schema-v3 records are committed (three clean `phase0-cli-control-*` engine records plus one exploratory run that also exposed and fixed the summarizer's v3 pin). `benchmarks/schema-v3.json` adds the typed quality identity to generation takes (pass/warning only, five fast gates required, machine-code issues); v1/v2 records stay valid immutable history; the publisher stamps v3 only when every take carries the identity. The UI benchmark checkers folded the same identity 2026-08-01: ui-generation records now publish v3 (first: the focused `v3-fold-proof` record `macos-xcui-benchmark-20260801-003208-403989cf`); the canonical iOS matrix published its first v3 record 2026-08-01 (`ios-xcui-benchmark-20260801-132415-abbec96b`). |
 | 14 — Organization and retirement | Closed 2026-07-23 (14a + 14b): compatibility SPI retired, actor-owned loading/metadata/priming/clone artifacts, clone conditioning epoch-bound end to end. |
 
-## Resume here (2026-08-27)
+## Resume here (2026-08-28)
+
+**The exhaustive physical-iPhone control audit is implemented in source; live execution remains
+device-deferred (2026-08-28):** `config/ios-control-audit.json` now binds every interactive iOS
+source file to a governed control family, source token, accessibility contract, mutation class,
+and XCUITest scenario. `scripts/ios_control_audit.py` validates that surface, expands the checked-in
+speaker/delivery/language/variation/model catalogs, and emits a deterministic 201-take all-pairs
+plan: 91 Built-in, 80 Design, and 30 Clone rows with language-matched short/long scripts. The
+harness injects no seed or hidden state: the first successful take in each mode obtains an engine
+seed normally, pins it through the visible run-owned History row, and binds the remaining mode rows
+to that observed seed. The new `control-audit` lane supports inventory, stateful, external, accessibility,
+generation, all, and exact-source resume; observations use fail-closed terminal classifications
+and never turn a missing, destructive-policy-blocked, harness, or infrastructure result into PASS.
+Ordinary Base-model Clone references correctly omit a fabricated delivery-preset dimension because
+they have no instruction channel. The existing Settings smoke journey now reveals the Open Source row above the dock before tapping,
+closing a source-proven harness reachability defect. ICA-01 through ICA-03 are complete; ICA-04 and
+ICA-05 remain planned until the paired phone campaign and evidence-linked re-pin complete. See
+[`ios-on-device-control-audit-2026-08-28.md`](reference/ios-on-device-control-audit-2026-08-28.md).
+
+**The development loop is now path-aware and cache-preserving (2026-08-27):**
+`scripts/dev.sh plan|focused|checkpoint` separates repeated edit feedback from one coherent-tree
+checkpoint while keeping `scripts/evidence_impact.py`, the full project gate, native deterministic
+tests, and CI authoritative. Fast project regeneration measured 0.29 seconds; the focused 12-test
+transcription/import state suite measured 7.3 seconds warm; and the generic iOS app plus logic
+compile measured 12.5 seconds warm after one clean 239-second dependency-cache transition. Target-
+scoped diagnostic flags no longer invalidate every Swift package, full Xcode logs remain governed
+artifacts instead of flooding the task, and the commit cache binds exact final content while
+allowing staging of identical bytes. See
+[`development-workflow.md`](reference/development-workflow.md); DWF-05 awaits the final checkpoint
+and current explicit device acceptance.
+
+**ICI-3 is implemented; direct Clone-import device acceptance is ICI-4 (2026-08-27):** Studio
+Clone's reference panel now offers `referenceClip_importAudioFile` beside Record new clip. The
+custom panel dismisses before the native Files picker, and WAV/MP3/AIFF/M4A selection preserves the
+original security-scoped URL into the same `importReferenceAudio` materializer used by Voices and
+Open in Vocello. Every direct import enters the existing permanent enrollment transaction: a
+neighboring `.txt` sidecar wins; otherwise `VoiceClipTranscriber` runs on device, exposes
+`saveVoice_transcriptionStatus`, keeps Save disabled while unresolved, and requires manual text or
+the explicit `saveVoice_useAudioOnlyButton` when recognition is unavailable. A generation-bound
+review state prevents cancelled or delayed recognition from overwriting a newer file or manual
+edit. Confirmed Save publishes one Saved Voice and hands its exact voice ID, WAV, reviewed
+transcript, and detected language back to Clone; cancellation/failure/discard leaves the catalog
+and existing draft unchanged. The obsolete unused session-only Add Audio card is removed.
+
+Twelve focused state/policy tests pass in the hosted core suite, and both the full generic iPhoneOS
+app and platform-neutral iOS logic bundle compile successfully. The revised
+`saved-voice-lifecycle` XCUITest now starts in Studio Clone, selects a staged no-sidecar
+`ICI Direct Clone Import.wav`, requires an editable automatic transcript, saves it, completes one
+Clone take, previews and deletes the exact throwaway voice, and proves the matching draft clears.
+ICI-4 remains planned until that explicit physical-device lane and iOS smoke pass once without
+automatic retry; deterministic publication does not depend on the phone window.
 
 **ASR-03 is closed; ASR-04 has an exact qualified-review boundary (2026-08-27):**
 `config/support-contact.json` owns Vocello's public support URL, monitored address, and response

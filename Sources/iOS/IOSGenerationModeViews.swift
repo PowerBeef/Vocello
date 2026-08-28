@@ -1677,6 +1677,9 @@ struct IOSVoiceCloningView: View {
                     onRequestRecord: {
                         appModel.requestCloneReferenceRecording(afterDismiss: dismiss)
                     },
+                    onRequestImport: {
+                        appModel.requestCloneReferenceImport(afterDismiss: dismiss)
+                    },
                     onDismiss: dismiss,
                     presentation: .edgeToEdge(
                         bottomSafeAreaInset: bottomSafeAreaInset,

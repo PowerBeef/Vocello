@@ -14,6 +14,18 @@ enum VocelloPresentationText {
         case makingModelAvailableOffline
     }
 
+    enum EnrollmentTranscriptionStatus: Sendable {
+        case sidecarReady
+        case transcribing
+        case automaticReady
+        case manualReady
+        case permissionDenied
+        case unavailable
+        case empty
+        case cancelled
+        case audioOnlyConfirmed
+    }
+
     static func status(_ status: Status) -> String {
         switch status {
         case .ready:
@@ -41,6 +53,99 @@ enum VocelloPresentationText {
                 comment: "Indeterminate model-install publication phase."
             )
         }
+    }
+
+    static func enrollmentTranscriptionStatus(
+        _ status: EnrollmentTranscriptionStatus
+    ) -> String {
+        switch status {
+        case .sidecarReady:
+            return String(
+                localized: "vocello.enrollment.transcription.sidecar_ready",
+                defaultValue: "Transcript loaded from the matching text file.",
+                comment: "Enrollment status when an imported audio file had a neighboring transcript sidecar."
+            )
+        case .transcribing:
+            return String(
+                localized: "vocello.enrollment.transcription.in_progress",
+                defaultValue: "Transcribing on this iPhone…",
+                comment: "Enrollment status while on-device speech recognition processes the reference clip."
+            )
+        case .automaticReady:
+            return String(
+                localized: "vocello.enrollment.transcription.automatic_ready",
+                defaultValue: "Automatic transcript ready. Review it before saving.",
+                comment: "Enrollment status after on-device speech recognition supplied editable text."
+            )
+        case .manualReady:
+            return String(
+                localized: "vocello.enrollment.transcription.manual_ready",
+                defaultValue: "Your transcript is ready.",
+                comment: "Enrollment status after the user edits or enters the transcript."
+            )
+        case .permissionDenied:
+            return String(
+                localized: "vocello.enrollment.transcription.permission_denied",
+                defaultValue: "Speech recognition is unavailable. Enter a transcript or use audio only.",
+                comment: "Enrollment recovery when speech-recognition authorization is unavailable."
+            )
+        case .unavailable:
+            return String(
+                localized: "vocello.enrollment.transcription.unavailable",
+                defaultValue: "On-device transcription is unavailable. Enter a transcript or use audio only.",
+                comment: "Enrollment recovery when on-device speech recognition cannot run."
+            )
+        case .empty:
+            return String(
+                localized: "vocello.enrollment.transcription.empty",
+                defaultValue: "No automatic transcript was found. Enter one or use audio only.",
+                comment: "Enrollment recovery when recognition completes without usable text."
+            )
+        case .cancelled:
+            return String(
+                localized: "vocello.enrollment.transcription.cancelled",
+                defaultValue: "Transcription stopped. Enter a transcript or use audio only.",
+                comment: "Enrollment recovery after automatic transcription is cancelled."
+            )
+        case .audioOnlyConfirmed:
+            return String(
+                localized: "vocello.enrollment.transcription.audio_only_confirmed",
+                defaultValue: "Audio-only enrollment selected. The transcript will remain empty.",
+                comment: "Enrollment status after explicit confirmation to save without a transcript."
+            )
+        }
+    }
+
+    static var importReferenceAudioTitle: String {
+        String(
+            localized: "vocello.enrollment.import_audio",
+            defaultValue: "Import audio file",
+            comment: "Action that opens Files to choose a voice-cloning reference clip."
+        )
+    }
+
+    static var importReferenceAudioDetail: String {
+        String(
+            localized: "vocello.enrollment.import_audio.detail",
+            defaultValue: "Choose a WAV, MP3, AIFF, or M4A file from Files.",
+            comment: "Supported-format description below the reference-audio import action."
+        )
+    }
+
+    static var useAudioOnly: String {
+        String(
+            localized: "vocello.enrollment.use_audio_only",
+            defaultValue: "Use audio only",
+            comment: "Explicit enrollment action used when no transcript is available."
+        )
+    }
+
+    static var useAudioOnlyHint: String {
+        String(
+            localized: "vocello.enrollment.use_audio_only.hint",
+            defaultValue: "Save this reference without transcript-backed delivery.",
+            comment: "VoiceOver hint for the explicit audio-only enrollment action."
+        )
     }
 
     static func installModel(named modelName: String) -> String {

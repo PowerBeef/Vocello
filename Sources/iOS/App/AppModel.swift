@@ -112,7 +112,12 @@ final class AppModel {
     /// Presents `IOSRecordVoiceSheet` (same enroll flow as the Voices tab).
     var isCloneReferenceRecorderPresented = false
 
+    /// Studio Clone → Files. Root ownership prevents the system document picker from racing the
+    /// custom reference panel and routes the selected file into permanent voice enrollment.
+    var isCloneReferenceImporterPresented = false
+
     private var cloneReferenceRecordingPresentationTask: Task<Void, Never>?
+    private var cloneReferenceImportPresentationTask: Task<Void, Never>?
 
     // MARK: - Modal backdrop
 
@@ -189,6 +194,22 @@ final class AppModel {
     func cancelCloneReferenceRecording() {
         cloneReferenceRecordingPresentationTask?.cancel()
         isCloneReferenceRecorderPresented = false
+    }
+
+    /// Dismiss the reference picker, then present Files after the bottom-panel overlay tears down.
+    func requestCloneReferenceImport(afterDismiss dismiss: @escaping @MainActor () -> Void) {
+        cloneReferenceImportPresentationTask?.cancel()
+        dismiss()
+        cloneReferenceImportPresentationTask = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(150))
+            guard !Task.isCancelled else { return }
+            isCloneReferenceImporterPresented = true
+        }
+    }
+
+    func cancelCloneReferenceImport() {
+        cloneReferenceImportPresentationTask?.cancel()
+        isCloneReferenceImporterPresented = false
     }
 
     // MARK: - Init

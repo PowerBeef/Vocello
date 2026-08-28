@@ -1,14 +1,15 @@
 import Foundation
 @preconcurrency import XCTest
 
-/// Explicit physical-device acceptance for F-01. This test imports a
-/// deliberately throwaway reference through the visible Files picker, proves
-/// the committed row can preview and hand off to Clone, then removes exactly
-/// that row through the production confirmation flow. It is selected only by
-/// `scripts/ui_test.sh ios saved-voice-lifecycle`.
+/// Explicit physical-device acceptance for F-01 and ICI-4. This test begins in
+/// Studio Clone, imports a deliberately throwaway reference through the visible
+/// Files picker, waits for automatic on-device transcription, commits it as a
+/// permanent saved voice, completes one Clone take, previews the saved row, and
+/// removes exactly that row through the production confirmation flow. It is
+/// selected only by `scripts/ui_test.sh ios saved-voice-lifecycle`.
 @MainActor
 final class VocelloiOSSavedVoiceLifecycleUITests: VocelloiOSUITestCase {
-    private let voiceName = "F01 Saved Voice Lifecycle"
+    private let voiceName = "ICI Direct Clone Import"
 
     func testImportPreviewHandoffAndDeleteSavedVoice() {
         beginSession()
@@ -17,7 +18,13 @@ final class VocelloiOSSavedVoiceLifecycleUITests: VocelloiOSUITestCase {
         select(tab: .voices)
         deleteThrowawayVoiceIfPresent()
 
-        let importButton = element("voices_importAudioFile")
+        ensureCloneConsentEnabled()
+        select(mode: .clone)
+        let referenceChip = element("studioChip_reference")
+        XCTAssertTrue(VocelloUIWait.exists(referenceChip, timeout: 20))
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: referenceChip, timeout: 20))
+
+        let importButton = element("referenceClip_importAudioFile")
         XCTAssertTrue(VocelloUIWait.exists(importButton, timeout: 20))
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: importButton, timeout: 20))
 
@@ -26,20 +33,51 @@ final class VocelloiOSSavedVoiceLifecycleUITests: VocelloiOSUITestCase {
         ).firstMatch
         XCTAssertTrue(
             VocelloUIWait.exists(pickerItem, timeout: 30),
-            "Stage \(voiceName).wav and its optional .txt sidecar in the app Documents directory first"
+            "Stage \(voiceName).wav without a matching .txt sidecar in the app Documents directory first"
         )
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: pickerItem, timeout: 20))
 
         let nameField = element("saveVoice_nameField")
         XCTAssertTrue(VocelloUIWait.exists(nameField, timeout: 30))
         XCTAssertEqual(nameField.value as? String, voiceName)
-        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: element("saveVoice_saveButton"), timeout: 20))
+
+        let transcriptionStatus = element("saveVoice_transcriptionStatus")
+        let transcriptEditor = element("saveVoice_transcriptEditor")
+        let saveButton = element("saveVoice_saveButton")
+        XCTAssertTrue(VocelloUIWait.exists(transcriptionStatus, timeout: 30))
+        XCTAssertTrue(VocelloUIWait.exists(transcriptEditor, timeout: 20))
+        XCTAssertTrue(
+            VocelloUIWait.condition("automatic transcript to become editable and nonempty", timeout: 180) {
+                guard let value = transcriptEditor.value as? String else { return false }
+                return !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    && saveButton.exists
+                    && saveButton.isEnabled
+            }
+        )
+        XCTAssertTrue(
+            VocelloUIWait.label(transcriptionStatus, contains: "Automatic transcript ready", timeout: 20),
+            "A no-sidecar import must finish through the existing automatic on-device transcriber"
+        )
+        VocelloUIScreenshot.attach(app, named: "ios-clone-import-transcript-ready")
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: saveButton, timeout: 20))
 
         // A soft QC warning is a review decision, never a pre-committed voice.
         let keepDespiteWarning = element("recordVoice_keepDespiteWarning")
         if keepDespiteWarning.waitForExistence(timeout: 5) {
             XCTAssertTrue(VocelloUIPrimaryAction.perform(on: keepDespiteWarning, timeout: 20))
         }
+
+        XCTAssertTrue(
+            VocelloUIWait.condition("saved import to return to Studio Clone", timeout: 60) {
+                let clone = self.element("generateSection_clone")
+                return clone.exists && clone.isSelected
+            }
+        )
+        XCTAssertTrue(VocelloUIWait.label(referenceChip, contains: voiceName, timeout: 30))
+
+        replaceScript(with: "This imported reference now powers a private voice clone on this iPhone.")
+        _ = generateAndWaitForCompletedPlayer(timeout: 300)
+        VocelloUIScreenshot.attach(app, named: "ios-clone-import-generated")
 
         select(tab: .voices)
         let savedRow = element("voicesRow_saved_\(voiceName)")
@@ -53,7 +91,7 @@ final class VocelloiOSSavedVoiceLifecycleUITests: VocelloiOSUITestCase {
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: closePlayer, timeout: 20))
         XCTAssertTrue(VocelloUIWait.disappears(closePlayer, timeout: 20))
 
-        // The ordinary row handoff must select this exact committed reference.
+        // The ordinary row handoff must still select this exact committed reference.
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: savedRow, timeout: 20))
         XCTAssertTrue(
             VocelloUIWait.condition("throwaway voice to hand off to Studio Clone", timeout: 30) {
@@ -61,7 +99,7 @@ final class VocelloiOSSavedVoiceLifecycleUITests: VocelloiOSUITestCase {
                 return clone.exists && clone.isSelected
             }
         )
-        XCTAssertTrue(VocelloUIWait.label(element("studioChip_reference"), contains: voiceName, timeout: 20))
+        XCTAssertTrue(VocelloUIWait.label(referenceChip, contains: voiceName, timeout: 20))
 
         select(tab: .voices)
         deleteThrowawayVoiceIfPresent()
@@ -70,7 +108,7 @@ final class VocelloiOSSavedVoiceLifecycleUITests: VocelloiOSUITestCase {
         select(tab: .studio)
         select(mode: .clone)
         XCTAssertFalse(
-            element("studioChip_reference").label.localizedCaseInsensitiveContains(voiceName),
+            referenceChip.label.localizedCaseInsensitiveContains(voiceName),
             "Deleting the selected voice must clear the matching Studio handoff and draft"
         )
         VocelloUIScreenshot.attach(app, named: "ios-saved-voice-lifecycle-complete")

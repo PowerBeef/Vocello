@@ -5,6 +5,8 @@ summary: iOS physical-device testing — deterministic compile lanes, explicit o
 sourceOfTruth:
   - scripts/ios_device.sh
   - scripts/ui_test.sh
+  - scripts/ios_control_audit.py
+  - config/ios-control-audit.json
   - scripts/check_ios_ui_perf.py
   - scripts/check_ios_model_management.py
 ---
@@ -77,6 +79,15 @@ scripts/ui_test.sh ios benchmark
 # Filtered benchmark example:
 scripts/ui_test.sh ios benchmark --modes custom --lengths short --warm 1 --label "focused"
 
+# Source-bound exhaustive control and pairwise-generation audit:
+scripts/ui_test.sh ios control-audit --scenario inventory
+scripts/ui_test.sh ios control-audit --scenario stateful
+scripts/ui_test.sh ios control-audit --scenario external
+scripts/ui_test.sh ios control-audit --scenario accessibility
+scripts/ui_test.sh ios control-audit --scenario generation
+scripts/ui_test.sh ios control-audit --scenario all
+scripts/ui_test.sh ios control-audit --scenario all --resume RUN_ID
+
 # UI-performance frame-health lane (ios-ui-2026-08):
 scripts/ui_test.sh ios perf [--label RUN_ID]
 
@@ -97,6 +108,7 @@ the extended >220-character long corpus; the iPhone lane never bypasses the user
 | --- | --- |
 | Smoke | Two journeys. Standard: exact app launch, Studio mode and tab navigation, visible model and clone-reference readiness, one visible user cancellation, one run-scoped critical-memory cancellation with cancel-before-unload diagnostics, post-pressure engine reuse, no cancelled History rows, and one real completed Custom History row. Long-form: a >2,000-character script routes to a project, streams every segment with live narration, surfaces the joined output in the inline player, and History shows search-flattened rows plus the grouped project with its expandable per-segment map |
 | Benchmark | Ordered, configurable Studio matrix with pulled telemetry, readable audio, audio QC, thermal and timing evidence; the default is exactly 29 takes |
+| Control audit | Source-bound inventory plus stateful, external-system, accessibility, and deterministic all-pairs generation scenarios. The checked-in contract expands dynamic speakers, deliveries, languages, variations, and models; its current generation plan contains 201 rows. The first successful take in each mode obtains an engine seed normally, pins it through the visible History action, and binds all remaining mode rows to that observed seed without injection or substitution. Clone omits a fabricated delivery dimension because ordinary Base-model references expose no instruction channel. Resume rejects a changed source tree, app build, device, or plan. Missing, blocked, infrastructure, harness, and product results remain distinct and can never be converted to PASS. Global destructive controls are opened and cancelled; run-owned rows may be created and deleted. |
 | Model delivery | Fixed test-owned root normalized through visible state-appropriate controls. `diagnose` covers Custom cancel/restart/process adoption/Ready/remove; `queue` proves independent active/queued cancellation; `acceptance` adds Design/Clone shared-component reuse and all-model removal; `soak` repeats the lifecycle; `recover` inspects and visibly clears retained failure state without starting a transfer. Every transfer records exact logical bytes, milestone row/bar screenshots, phase activity, action exclusivity, five-minute advancement bounds, correlated delivery events, and exact canonical-state preservation |
 | Perf | Nine frame-health scenarios (`Tests/VocelloiOSUITests/VocelloiOSPerfUITests.swift`), each a fresh app launch with the in-app `CADisplayLink` probe pinned to the app's 60 Hz cap and one marked wall-clock window; `scripts/check_ios_ui_perf.py` joins windows to the pulled 500 ms probe rows |
 
@@ -106,6 +118,26 @@ OCR taps, alternate UI drivers, and fixed sleeps are not supported — the perf 
 one recorded exemption (`scripts/check_test_workflows.sh`): its paced sleeps ARE the measured
 workload, and its sweep gestures anchor on the application root so deep per-event accessibility
 re-queries stay out of the measured windows.
+
+The control-audit plan is generated before Xcode contacts the phone:
+
+```sh
+python3 scripts/ios_control_audit.py validate
+python3 scripts/ios_control_audit.py inventory --output /tmp/vocello-ios-controls.json
+python3 scripts/ios_control_audit.py generate-plan \
+  --run-id local-review \
+  --source-identity SOURCE_ID \
+  --output /tmp/vocello-ios-control-plan.json
+```
+
+The raw plan, JSONL observations, `.xcresult`, screenshots, logs, device state, crash delta, and
+cleanup proof stay untracked below the run artifact directory. The composer validates run and
+source identity and assigns only the terminal vocabulary in
+`config/ios-control-audit.json`. A required row without an observation becomes
+`SKIPPED_AFTER_FAILURE`; permission or destructive work that cannot be restored becomes
+`BLOCKED_PRESERVATION_POLICY`. Neither is a passing result. The complete multi-lane campaign and
+current device-deferred checkpoint are recorded in
+[`ios-on-device-control-audit-2026-08-28.md`](ios-on-device-control-audit-2026-08-28.md).
 
 The model-delivery runner always exports the `.xcresult`, attachments, diagnostics journal,
 delivery summaries, ledger copy, sanitized storage inventories, crash delta, and host diagnosis even
@@ -213,17 +245,21 @@ launches with `QVOICE_IOS_DEVICE_ENROLL_VOICE_NAME`, and validates the enrollmen
 (staged digests, voice ID, quality warnings). The runner deletes the staged inputs after a clean
 enrollment. The command is opt-in and never runs in smoke, benchmark, CI, or release.
 
-F-01 saved-voice lifecycle acceptance is separately opt-in:
+F-01/ICI-4 saved-voice and direct Clone-import acceptance is separately opt-in:
 
 ```sh
 scripts/ui_test.sh ios saved-voice-lifecycle
 ```
 
-Before running it, stage `F01 Saved Voice Lifecycle.wav` and an optional matching `.txt` sidecar
-in the app's Documents directory. The XCUITest uses only visible production controls to import the
-throwaway reference, resolve a possible soft warning, preview it, hand it to Clone, confirm the
-exact named deletion, verify the row disappears, and verify the matching Studio draft is cleared.
-It does not run in smoke, benchmark, CI, or release.
+Before running it, stage `ICI Direct Clone Import.wav` **without** a matching `.txt` sidecar in the
+app's Documents directory. The XCUITest uses only visible production controls: Studio Clone opens
+`referenceClip_importAudioFile`, Files selects the staged WAV, the enrollment sheet exposes
+`saveVoice_transcriptionStatus`, on-device recognition supplies a nonempty editable transcript,
+and Save resolves any genuine soft warning. The test then proves the exact voice is selected in
+`studioChip_reference`, completes one Clone take, previews the durable Saved Voice, confirms the
+exact named deletion, verifies the row disappears, and verifies the matching Studio draft is
+cleared. The separate `enroll-clone-fixture` lane retains sidecar-prefilled coverage. Neither lane
+runs in smoke, benchmark, CI, or release.
 
 Built-in Voice startup reliability is a separate compile-gated diagnostic, not an ordinary
 benchmark or release lane. The headless route consumes a schema-v1 ordered plan plus an exact

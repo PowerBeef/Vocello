@@ -1,0 +1,120 @@
+{
+  "$schema": "./ios-control-audit-schema-v1.json",
+  "schemaVersion": 1,
+  "terminalClassifications": [
+    "PASS",
+    "PRODUCT_FAIL",
+    "HARNESS_FAIL",
+    "INFRASTRUCTURE_FAIL",
+    "BLOCKED_PREREQUISITE",
+    "BLOCKED_PRESERVATION_POLICY",
+    "NOT_APPLICABLE",
+    "SKIPPED_AFTER_FAILURE"
+  ],
+  "catalogs": {
+    "speakers": {
+      "source": "Sources/Resources/qwenvoice_contract.json",
+      "selector": "speakers.Built-in[]"
+    },
+    "deliveries": {
+      "source": "Sources/QwenVoiceCore/EmotionPreset.swift",
+      "selector": "EmotionPreset.all[].id"
+    },
+    "languages": {
+      "source": "Sources/QwenVoiceCore/SemanticTypes.swift",
+      "selector": "Qwen3SupportedLanguage.selectableCases[].rawValue"
+    },
+    "variations": {
+      "source": "Sources/QwenVoiceCore/SemanticTypes.swift",
+      "selector": "Qwen3SamplingVariation.allCases[].rawValue"
+    },
+    "models": {
+      "source": "Sources/Resources/qwenvoice_production_model_catalog.json",
+      "selector": "artifacts[platforms contains iOS].modelID"
+    }
+  },
+  "sourceCoverage": [
+    { "path": "Sources/iOS/App/RootView.swift", "screen": "App root and system alerts", "scenario": "stateful", "reason": "Root-owned alerts and permission recovery are observed through their visible labels.", "interactiveOccurrenceCount": 5 },
+    { "path": "Sources/iOS/App/TabDock.swift", "screen": "Tab dock", "scenario": "inventory", "reason": "All four tab controls use the rootTab dynamic identifier family.", "interactiveOccurrenceCount": 1 },
+    { "path": "Sources/iOS/History/HistoryScreen.swift", "screen": "History", "scenario": "stateful", "reason": "History search, filters, rows, menus, recovery, and confirm-only clear actions are source-bound here.", "interactiveOccurrenceCount": 10 },
+    { "path": "Sources/iOS/IOSDesignSystemPrimitives.swift", "screen": "Shared sheets and controls", "scenario": "inventory", "reason": "Shared bottom-sheet dismissal and selection primitives are exercised by each owning screen.", "interactiveOccurrenceCount": 6 },
+    { "path": "Sources/iOS/IOSEngineLifecycleToast.swift", "screen": "Engine lifecycle toast", "scenario": "generation", "reason": "Conditional lifecycle recovery actions are observed during generation and model transitions.", "interactiveOccurrenceCount": 1 },
+    { "path": "Sources/iOS/IOSGenerationInputControls.swift", "screen": "Voice enrollment", "scenario": "stateful", "reason": "Name, transcript review, audio-only fallback, and Save Voice controls are test-owned.", "interactiveOccurrenceCount": 1 },
+    { "path": "Sources/iOS/IOSGenerationModeViews.swift", "screen": "Studio generation modes", "scenario": "stateful", "reason": "Mode-specific warnings, Voice Design, and Clone handoffs are governed by visible controls.", "interactiveOccurrenceCount": 4 },
+    { "path": "Sources/iOS/IOSGenerationSetupCards.swift", "screen": "Voice Design setup", "scenario": "inventory", "reason": "Voice Design brief editing is exercised through its stable text-field identifier.", "interactiveOccurrenceCount": 3 },
+    { "path": "Sources/iOS/IOSGenerationSharedViews.swift", "screen": "Shared generation player", "scenario": "stateful", "reason": "Shared mini-player playback and seek controls are exercised on run-owned audio.", "interactiveOccurrenceCount": 1 },
+    { "path": "Sources/iOS/IOSSettingsViews.swift", "screen": "Settings and model rows", "scenario": "stateful", "reason": "Variation, model lifecycle, progress, version, and dynamic model actions are identified.", "interactiveOccurrenceCount": 4 },
+    { "path": "Sources/iOS/IOSVoicesView.swift", "screen": "Voices", "scenario": "stateful", "reason": "Search, filters, speaker rows, previews, saved voice menus, and deletion are identified.", "interactiveOccurrenceCount": 11 },
+    { "path": "Sources/iOS/Overlays/IOSOnboardingFlow.swift", "screen": "Onboarding", "scenario": "inventory", "reason": "Skip and Continue actions are visible production onboarding controls.", "interactiveOccurrenceCount": 1 },
+    { "path": "Sources/iOS/Overlays/IOSRecordingOverlay.swift", "screen": "Reference recording", "scenario": "external", "reason": "Record, stop, retake, use, and close actions are permission-dependent visible controls.", "interactiveOccurrenceCount": 4 },
+    { "path": "Sources/iOS/Settings/OpenSourceLicensesScreen.swift", "screen": "Open Source and licenses", "scenario": "external", "reason": "Attribution rows, source links, and back navigation are identified and externally verified.", "interactiveOccurrenceCount": 1 },
+    { "path": "Sources/iOS/Settings/SettingsScreen.swift", "screen": "Settings", "scenario": "stateful", "reason": "Preferences, privacy, support, source, licenses, permissions, and model navigation are identified.", "interactiveOccurrenceCount": 4 },
+    { "path": "Sources/iOS/Settings/VoiceModelsScreen.swift", "screen": "Voice Models", "scenario": "stateful", "reason": "Back navigation and cancel confirmation layer over isolated model lifecycle controls.", "interactiveOccurrenceCount": 3 },
+    { "path": "Sources/iOS/Sheets/IOSBottomSheets.swift", "screen": "Studio selector sheets", "scenario": "inventory", "reason": "All speaker, delivery, language, reference, and model selector options use stable families.", "interactiveOccurrenceCount": 2 },
+    { "path": "Sources/iOS/Sheets/IOSPlayerSheet.swift", "screen": "Full player", "scenario": "stateful", "reason": "Player, scrubber, save, download, transcript, and close actions use stable identifiers.", "interactiveOccurrenceCount": 1 },
+    { "path": "Sources/iOS/Studio/IOSLongFormSegmentsPanel.swift", "screen": "Long-form segments", "scenario": "generation", "reason": "Dynamic segment disclosure and regeneration are tested on run-owned projects.", "interactiveOccurrenceCount": 3 },
+    { "path": "Sources/iOS/Studio/IOSStudioInlinePlayerCard.swift", "screen": "Studio inline player", "scenario": "generation", "reason": "Live cancel, playback, scrub, retry, dismissal, and save-as-voice actions are identified.", "interactiveOccurrenceCount": 6 },
+    { "path": "Sources/iOS/Voices/IOSRecordVoiceSheet.swift", "screen": "Saved voice review", "scenario": "stateful", "reason": "Quality-warning decisions are exercised only on test-owned candidates.", "interactiveOccurrenceCount": 4 }
+  ],
+  "controlFamilies": [
+    { "id": "root-tabs", "identifierPattern": "rootTab_{value}", "sourceToken": "rootTab_", "screen": "Tab dock", "prerequisite": "Main app surface", "role": "tab", "action": "Select each tab", "expectedResult": "Selected tab becomes visible and selected", "expectedSemantics": "Localized tab label, selected value, button role", "minimumTargetPoints": 44, "mutationClass": "reversible", "scenario": "inventory", "availability": "required" },
+    { "id": "studio-modes", "identifierPattern": "generateSection_{value}", "sourceToken": "generateSection_", "screen": "Studio", "prerequisite": "Studio tab", "role": "segmented button", "action": "Select Built-in, Design, and Clone", "expectedResult": "Matching setup control is visible", "expectedSemantics": "Mode label and selected state", "minimumTargetPoints": 44, "mutationClass": "reversible", "scenario": "inventory", "availability": "required" },
+    { "id": "composer", "identifierPattern": "textInput_(textEditor|clearButton|lengthCount|generateButton|cancelButton|generationError|installModelButton)", "sourceToken": "textInput_", "screen": "Studio", "prerequisite": "Any generation mode", "role": "editor and buttons", "action": "Edit, clear, generate, cancel, retry, or install", "expectedResult": "Composer and generation state transition visibly", "expectedSemantics": "Name, value, limit, enabled state, and error recovery", "minimumTargetPoints": 44, "mutationClass": "reversible", "scenario": "generation", "availability": "required" },
+    { "id": "speaker-options", "identifierPattern": "voicePickerRow_{value}", "sourceToken": "voicePickerRow_", "expandFrom": "speakers", "screen": "Built-in Voice picker", "prerequisite": "Built-in Voice selected", "role": "radio option", "action": "Select every speaker", "expectedResult": "Visible speaker chip matches selection", "expectedSemantics": "Speaker name, native language, selected state", "minimumTargetPoints": 44, "mutationClass": "reversible", "scenario": "inventory", "availability": "required" },
+    { "id": "speaker-previews", "identifierPattern": "voicePickerPreview_{value}", "sourceToken": "voicePickerPreview_", "expandFrom": "speakers", "screen": "Built-in Voice picker", "prerequisite": "Speaker preview exists", "role": "button", "action": "Play and stop preview", "expectedResult": "Only selected preview plays", "expectedSemantics": "Play or stop plus speaker name", "minimumTargetPoints": 44, "mutationClass": "reversible", "scenario": "inventory", "availability": "conditional" },
+    { "id": "delivery-options", "identifierPattern": "deliveryPickerPreset_{value}", "sourceToken": "deliveryPickerPreset_", "expandFrom": "deliveries", "screen": "Delivery picker", "prerequisite": "Delivery chip opened", "role": "radio option", "action": "Select every preset", "expectedResult": "Visible delivery chip matches selection", "expectedSemantics": "Preset label and selected state", "minimumTargetPoints": 44, "mutationClass": "reversible", "scenario": "inventory", "availability": "required" },
+    { "id": "delivery-editor", "identifierPattern": "deliveryPickerSheet_(customTone|customTone_back|customTone_examples|customTone_charCount|hintAdvisory|customTone_durationAdvisory)", "sourceToken": "deliveryPickerSheet_", "screen": "Custom delivery editor", "prerequisite": "Delivery picker opened", "role": "editor and buttons", "action": "Open, edit, review examples, and return", "expectedResult": "Custom instruction remains explicit and editable", "expectedSemantics": "Editor value, advisory text, count, and navigation", "minimumTargetPoints": 44, "mutationClass": "reversible", "scenario": "inventory", "availability": "required" },
+    { "id": "language-options", "identifierPattern": "languagePicker_{value}", "sourceToken": "languagePicker_", "expandFrom": "languages", "screen": "Language picker", "prerequisite": "Language chip opened", "role": "radio option", "action": "Select every language", "expectedResult": "Visible language chip matches selection", "expectedSemantics": "Language label and selected state", "minimumTargetPoints": 44, "mutationClass": "reversible", "scenario": "inventory", "availability": "required" },
+    { "id": "variation-options", "identifierPattern": "iosSettings_variationOption_{value}", "sourceToken": "iosSettings_variationOption_", "expandFrom": "variations", "screen": "Settings Audio", "prerequisite": "Settings tab", "role": "picker option", "action": "Select every variation", "expectedResult": "Picker value updates and can be restored", "expectedSemantics": "Variation label and selected value", "minimumTargetPoints": 44, "mutationClass": "reversible", "scenario": "stateful", "availability": "required" },
+    { "id": "studio-chips", "identifierPattern": "studioChip_(voice|voiceBrief|reference|delivery|language)", "sourceToken": "studioChip_", "screen": "Studio", "prerequisite": "Matching mode selected", "role": "button", "action": "Open each selector", "expectedResult": "Matching bottom sheet is visible", "expectedSemantics": "Control name and current value", "minimumTargetPoints": 44, "mutationClass": "reversible", "scenario": "inventory", "availability": "required" },
+    { "id": "reference-actions", "identifierPattern": "referenceClip_(importAudioFile|recordNewClip)", "sourceToken": "referenceClip_", "screen": "Clone reference picker", "prerequisite": "Clone selected", "role": "button", "action": "Open Files or recording enrollment", "expectedResult": "Enrollment flow opens without mutating draft on cancel", "expectedSemantics": "Action label and explanatory hint", "minimumTargetPoints": 44, "mutationClass": "external-system", "scenario": "external", "availability": "required" },
+    { "id": "voice-enrollment", "identifierPattern": "saveVoice_(nameField|saveButton|transcriptionStatus|useAudioOnlyButton)", "sourceToken": "saveVoice_", "screen": "Saved voice review", "prerequisite": "Test-owned recording or import", "role": "editor, status, and buttons", "action": "Review transcript and save or cancel", "expectedResult": "Only confirmed test-owned candidate enters Saved Voices", "expectedSemantics": "Progress, transcript state, name, enabled state", "minimumTargetPoints": 44, "mutationClass": "test-owned-destructive", "scenario": "stateful", "availability": "required" },
+    { "id": "voices-surface", "identifierPattern": "(screen_voices|voicesSearchField|voicesFilterButton|voicesImportAudioFile|voicesSaveNewVoice)", "sourceToken": "voicesSearchField", "screen": "Voices", "prerequisite": "Voices tab", "role": "screen, search, and buttons", "action": "Search, filter, enroll, and import", "expectedResult": "Visible voice collection updates without user-data mutation", "expectedSemantics": "Search value, filter state, and action hints", "minimumTargetPoints": 44, "mutationClass": "reversible", "scenario": "stateful", "availability": "required" },
+    { "id": "saved-voice-rows", "identifierPattern": "voices(Row_saved|Preview_saved|RowMenu|Delete|DeleteConfirm)_{dynamic}", "sourceToken": "voicesRow_saved_", "screen": "Voices", "prerequisite": "Run-owned saved voice exists", "role": "row and buttons", "action": "Preview, hand off, open menu, and delete", "expectedResult": "Only the run-owned voice is removed", "expectedSemantics": "Voice name, playback state, destructive semantics", "minimumTargetPoints": 44, "mutationClass": "test-owned-destructive", "scenario": "stateful", "availability": "conditional" },
+    { "id": "history-surface", "identifierPattern": "history(SearchField|ModeFilter|ClearMenu|ClearKeepFiles|ClearDeleteFiles|RetryButton|Recovery_retry|Recovery_export)", "sourceToken": "historySearchField", "screen": "History", "prerequisite": "History tab", "role": "search, menu, and buttons", "action": "Search, filter, recover, and cancel global clear", "expectedResult": "Global destructive confirmation is cancelled without mutation", "expectedSemantics": "Labels, values, errors, and destructive confirmation", "minimumTargetPoints": 44, "mutationClass": "confirm-only", "scenario": "stateful", "availability": "required" },
+    { "id": "history-rows", "identifierPattern": "history(Row|RowTap|RowPinSeed|RowMenu|RowDeleteConfirm|longFormSegmentsToggle)_{dynamic}", "sourceToken": "historyRow_", "screen": "History", "prerequisite": "Run-owned History row exists", "role": "row, menu, and buttons", "action": "Open, play, pin, share, and delete run-owned result", "expectedResult": "Only run-owned History is mutated", "expectedSemantics": "Summary, seed state, menu, destructive semantics", "minimumTargetPoints": 44, "mutationClass": "test-owned-destructive", "scenario": "generation", "availability": "conditional" },
+    { "id": "settings-preferences", "identifierPattern": "iosSettings_(autoPlayToggle|variationRow|savedOutputsRow|reduceMotionToggle|reduceTransparencyToggle|voiceModelsRow)", "sourceToken": "iosSettings_autoPlayToggle", "screen": "Settings", "prerequisite": "Settings tab", "role": "toggle, picker, and navigation", "action": "Mutate and restore every preference", "expectedResult": "Value changes once and original value is restored", "expectedSemantics": "Setting label, value, hint, and enabled state", "minimumTargetPoints": 44, "mutationClass": "reversible", "scenario": "stateful", "availability": "required" },
+    { "id": "settings-links", "identifierPattern": "iosSettings_(privacyPolicyRow|openIOSSettingsRow|supportRow|openSourceRow|sourceCodeRow)", "sourceToken": "iosSettings_openSourceRow", "screen": "Settings", "prerequisite": "Privacy or About section revealed", "role": "link or navigation button", "action": "Open destination and return", "expectedResult": "Expected destination opens and draft remains unchanged", "expectedSemantics": "Destination label and external-navigation hint", "minimumTargetPoints": 44, "mutationClass": "external-system", "scenario": "external", "availability": "required" },
+    { "id": "model-rows", "identifierPattern": "iosModel(Row|Status|Menu|Download|Delete|Cancel|Retry|Repair|Update|Progress|PhaseActivity|ProgressDetail)_{value}", "sourceToken": "iosModelRow_", "expandFrom": "models", "screen": "Voice Models", "prerequisite": "Isolated model root", "role": "row, status, progress, menu, and buttons", "action": "Install, observe, cancel, retry, and remove", "expectedResult": "Model state, durable bytes, action set, and relaunch state agree", "expectedSemantics": "Non-color status, exact progress, phase, and destructive action", "minimumTargetPoints": 44, "mutationClass": "isolated-model", "scenario": "stateful", "availability": "conditional" },
+    { "id": "player-controls", "identifierPattern": "(iosPlayer|studio_inlinePlayer|studio_livePreview|generate_miniPlayer)_(close|transcript|save|playPause|download|scrubber|seekRail|dismiss|dismissConfirm|saveAsVoice|cadenceNotice|cadenceRetry|cancel)", "sourceToken": "iosPlayer_playPause", "screen": "Players", "prerequisite": "Run-owned generated or preview audio", "role": "buttons and adjustable control", "action": "Play, pause, scrub, save, share, retry, and dismiss", "expectedResult": "Playback and output state remain coherent", "expectedSemantics": "Playback state, elapsed value, action labels, and warnings", "minimumTargetPoints": 44, "mutationClass": "test-owned-destructive", "scenario": "generation", "availability": "conditional" },
+    { "id": "recording-controls", "identifierPattern": "iosRecord_(close|start|stop|retake|use)", "sourceToken": "iosRecord_", "screen": "Reference recording", "prerequisite": "Microphone permission restorable", "role": "buttons", "action": "Record, stop, retake, use, and close", "expectedResult": "Only test-owned candidate is retained", "expectedSemantics": "Action label, recording state, and elapsed status", "minimumTargetPoints": 44, "mutationClass": "external-system", "scenario": "external", "availability": "conditional" },
+    { "id": "attribution-controls", "identifierPattern": "ios(Attribution|ModelAttribution)(Row|SourceLink|DetailBackButton|LoadError)_{dynamic}", "sourceToken": "iosAttributionRow_", "screen": "Open Source and licenses", "prerequisite": "About section revealed", "role": "row, link, and navigation", "action": "Open attribution, source, and return", "expectedResult": "Bundled license and source destination are available", "expectedSemantics": "Component, license, source, and navigation labels", "minimumTargetPoints": 44, "mutationClass": "external-system", "scenario": "external", "availability": "required" },
+    { "id": "onboarding-controls", "identifierPattern": "onboarding_(skip|cta)", "sourceToken": "onboarding_", "screen": "Onboarding", "prerequisite": "First-run onboarding visible", "role": "buttons", "action": "Advance pages or skip", "expectedResult": "Main tab dock becomes visible", "expectedSemantics": "Action label and page context", "minimumTargetPoints": 44, "mutationClass": "reversible", "scenario": "inventory", "availability": "conditional" },
+    { "id": "sheet-navigation", "identifierPattern": "(bottomSheet_close|deliveryPicker_confirm|languagePicker_confirm|voicePicker_confirm|iosSettings_voiceModelsBackButton|iosSettings_openSourceBackButton)", "sourceToken": "bottomSheet_close", "screen": "Sheets and destinations", "prerequisite": "Owning surface visible", "role": "button", "action": "Confirm, close, cancel, or go back", "expectedResult": "Owner returns without stale modal state", "expectedSemantics": "Action label and navigation hint", "minimumTargetPoints": 44, "mutationClass": "reversible", "scenario": "inventory", "availability": "required" }
+  ],
+  "generationMatrix": {
+    "searchTokenBase": 28400001,
+    "maxRows": 384,
+    "modes": {
+      "custom": {
+        "dimensions": {
+          "speaker": ["@speakers"],
+          "delivery": ["@deliveries"],
+          "language": ["@languages"],
+          "variation": ["@variations"],
+          "length": ["short", "long"]
+        },
+        "coldSentinel": { "speaker": "aiden", "delivery": "neutral", "language": "english", "variation": "balanced", "length": "short" }
+      },
+      "design": {
+        "dimensions": {
+          "brief": ["starter", "custom"],
+          "delivery": ["neutral", "happy", "sad", "angry", "fearful", "surprised", "calm", "whisper"],
+          "language": ["english", "chinese", "japanese", "korean", "german", "french", "russian", "portuguese", "spanish", "italian"],
+          "variation": ["expressive", "balanced", "consistent"],
+          "length": ["short", "long"]
+        },
+        "coldSentinel": { "brief": "starter", "delivery": "neutral", "language": "english", "variation": "balanced", "length": "short" }
+      },
+      "clone": {
+        "dimensions": {
+          "reference": ["transcript-backed", "direct-import"],
+          "language": ["english", "chinese", "japanese", "korean", "german", "french", "russian", "portuguese", "spanish", "italian"],
+          "variation": ["expressive", "balanced", "consistent"],
+          "length": ["short", "long"]
+        },
+        "coldSentinel": { "reference": "transcript-backed", "language": "english", "variation": "balanced", "length": "short" }
+      }
+    }
+  }
+}

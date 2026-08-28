@@ -143,6 +143,11 @@ Before changing scripts or CI, read:
 ## Build / test commands
 
 ```sh
+# Preferred local loop: narrow repeatable checks, then one complete checkpoint.
+scripts/dev.sh plan
+scripts/dev.sh focused
+scripts/dev.sh checkpoint
+
 # Ordinary development / CI (no model, device, or UI prerequisite)
 ./scripts/check_project_inputs.sh
 QVOICE_GATES=quick ./scripts/check_project_inputs.sh   # local fast loop: self-tests skipped only while scripts/ + config/ are untouched
@@ -231,6 +236,12 @@ scripts/clean_build_caches.sh --prune-ui-results --dry-run
 scripts/clean_build_caches.sh --cache macos --dry-run
 scripts/clean_build_caches.sh --compact-profile-failure <run-id> --dry-run
 ```
+
+The router optimizes `scripts/evidence_impact.py`; it is not another evidence authority. Focused
+work may use fast regeneration, selected XCTest classes, and the governed incremental iOS cache.
+Checkpoint and CI retain full deterministic coverage. See
+[`development-workflow.md`](../../docs/reference/development-workflow.md). Never add inferred
+UI/model, benchmark, signing, or release work.
 
 ## Invariants (do not regress)
 

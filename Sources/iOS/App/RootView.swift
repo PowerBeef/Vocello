@@ -30,7 +30,7 @@ struct RootView: View {
     @AppStorage(IOSAppDefaults.reduceMotionEnabledKey) private var appReduceMotion = false
     @AppStorage(IOSAppDefaults.reduceTransparencyEnabledKey) private var appReduceTransparency = false
     @State private var importedVoicePresentation: ImportedVoicePresentation?
-    @State private var externalImportErrorMessage: String?
+    @State private var importErrorMessage: String?
 
     init(ttsEngine: TTSEngineStore) {
         self.ttsEngine = ttsEngine
@@ -150,6 +150,16 @@ struct RootView: View {
                 }
             )
         }
+        .fileImporter(
+            isPresented: $appModel.isCloneReferenceImporterPresented,
+            allowedContentTypes: IOSReferenceAudioImportPolicy.allowedContentTypes,
+            allowsMultipleSelection: false
+        ) { result in
+            handleCloneReferenceImport(result)
+        }
+        .fileDialogDefaultDirectory(
+            FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
+        )
         .sheet(item: $appModel.playerSheetItem) { item in
             IOSPlayerSheet(
                 item: item,
@@ -164,13 +174,13 @@ struct RootView: View {
         .alert(
             "Couldn't import audio",
             isPresented: Binding(
-                get: { externalImportErrorMessage != nil },
-                set: { if !$0 { externalImportErrorMessage = nil } }
+                get: { importErrorMessage != nil },
+                set: { if !$0 { importErrorMessage = nil } }
             )
         ) {
-            Button("OK", role: .cancel) { externalImportErrorMessage = nil }
+            Button("OK", role: .cancel) { importErrorMessage = nil }
         } message: {
-            Text(externalImportErrorMessage ?? "Choose another audio file and try again.")
+            Text(importErrorMessage ?? "Choose another audio file and try again.")
         }
         // Outermost on purpose (IUI-5 X3): environment set here reaches the
         // tab screens AND every presentation attached above — sheets, covers,
@@ -306,25 +316,37 @@ struct RootView: View {
     }
 
     private func openExternalAudio(_ sourceURL: URL) {
-        let supportedExtensions: Set<String> = ["wav", "mp3", "aiff", "m4a"]
-        guard supportedExtensions.contains(sourceURL.pathExtension.lowercased()) else {
-            externalImportErrorMessage = "Vocello can import WAV, MP3, AIFF, and M4A reference audio."
-            return
-        }
-
         do {
             // Keep the URL supplied by the system intact so LocalDocumentIO can consume the
             // security-scoped grant before copying audio and any adjacent transcript sidecar.
-            let imported = try ttsEngine.importReferenceAudio(from: sourceURL)
-            externalImportErrorMessage = nil
+            let validatedURL = try IOSReferenceAudioImportPolicy.validatedSourceURL(sourceURL)
+            let imported = try ttsEngine.importReferenceAudio(from: validatedURL)
+            importErrorMessage = nil
             appModel.playerSheetItem = nil
             appModel.cancelCloneReferenceRecording()
+            appModel.cancelCloneReferenceImport()
             appModel.dismissBottomPanel()
             appModel.dismissDeleteModelSheet()
             appModel.tab = .voices
             importedVoicePresentation = ImportedVoicePresentation(reference: imported)
         } catch {
-            externalImportErrorMessage = error.localizedDescription
+            importErrorMessage = error.localizedDescription
+        }
+    }
+
+    private func handleCloneReferenceImport(_ result: Result<[URL], Error>) {
+        appModel.cancelCloneReferenceImport()
+        do {
+            // Preserve the picker URL exactly so the document layer can consume its
+            // security-scoped grant before materializing the audio and optional sidecar.
+            guard let sourceURL = try IOSReferenceAudioImportPolicy.selectedSourceURL(from: result) else {
+                return
+            }
+            let imported = try ttsEngine.importReferenceAudio(from: sourceURL)
+            importErrorMessage = nil
+            importedVoicePresentation = ImportedVoicePresentation(reference: imported)
+        } catch {
+            importErrorMessage = error.localizedDescription
         }
     }
 

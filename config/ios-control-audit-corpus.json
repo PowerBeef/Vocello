@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "description": "Privacy-safe, language-matched control-audit scripts. These sentences contain no personal or account data and are used only by the explicit physical-iPhone audit lane.",
+  "scripts": {
+    "english": {
+      "short": "The morning train left the quiet station at dawn.",
+      "long": "The morning train left the quiet station at dawn while pale sunlight crossed the hills. Travelers watched the river, listened to the steady wheels, and settled into their seats as the city slowly disappeared behind them."
+    },
+    "chinese": {
+      "short": "清晨的火车准时离开了安静的车站。",
+      "long": "清晨的火车准时离开了安静的车站，淡淡的阳光越过远处的山丘。旅客们望着河流，听着车轮平稳的声音，在城市慢慢消失于身后时安静地坐好。"
+    },
+    "japanese": {
+      "short": "朝の列車は静かな駅を時間どおりに出発しました。",
+      "long": "朝の列車は静かな駅を時間どおりに出発し、淡い日差しが遠くの丘を照らしました。乗客たちは川を眺め、車輪の穏やかな音を聞きながら、町がゆっくり後ろへ消えていくのを見守りました。"
+    },
+    "korean": {
+      "short": "아침 열차는 조용한 역을 제시간에 떠났습니다.",
+      "long": "아침 열차는 조용한 역을 제시간에 떠났고 옅은 햇빛이 멀리 있는 언덕을 비추었습니다. 승객들은 강을 바라보고 일정한 바퀴 소리를 들으며 도시가 천천히 뒤로 사라지는 모습을 지켜보았습니다."
+    },
+    "german": {
+      "short": "Der Morgenzug verließ den ruhigen Bahnhof pünktlich.",
+      "long": "Der Morgenzug verließ den ruhigen Bahnhof pünktlich, während blasses Sonnenlicht über die Hügel fiel. Die Reisenden blickten auf den Fluss, hörten das gleichmäßige Geräusch der Räder und sahen zu, wie die Stadt langsam hinter ihnen verschwand."
+    },
+    "french": {
+      "short": "Le train du matin a quitté la gare tranquille à l'heure.",
+      "long": "Le train du matin a quitté la gare tranquille à l'heure tandis qu'une lumière pâle traversait les collines. Les voyageurs regardaient la rivière, écoutaient le rythme régulier des roues et voyaient la ville disparaître lentement derrière eux."
+    },
+    "russian": {
+      "short": "Утренний поезд вовремя покинул тихую станцию.",
+      "long": "Утренний поезд вовремя покинул тихую станцию, пока бледный солнечный свет ложился на холмы. Пассажиры смотрели на реку, слушали ровный стук колёс и наблюдали, как город медленно исчезает позади."
+    },
+    "portuguese": {
+      "short": "O trem da manhã deixou a estação tranquila no horário.",
+      "long": "O trem da manhã deixou a estação tranquila no horário enquanto a luz pálida do sol cruzava as colinas. Os viajantes observavam o rio, ouviam o ritmo constante das rodas e viam a cidade desaparecer lentamente atrás deles."
+    },
+    "spanish": {
+      "short": "El tren de la mañana salió puntualmente de la estación tranquila.",
+      "long": "El tren de la mañana salió puntualmente de la estación tranquila mientras la luz pálida del sol cruzaba las colinas. Los viajeros miraban el río, escuchaban el ritmo constante de las ruedas y veían cómo la ciudad desaparecía lentamente detrás de ellos."
+    },
+    "italian": {
+      "short": "Il treno del mattino lasciò in orario la stazione tranquilla.",
+      "long": "Il treno del mattino lasciò in orario la stazione tranquilla mentre la luce pallida del sole attraversava le colline. I viaggiatori guardavano il fiume, ascoltavano il ritmo regolare delle ruote e vedevano la città scomparire lentamente alle loro spalle."
+    }
+  }
+}

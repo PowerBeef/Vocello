@@ -704,6 +704,7 @@ struct IOSQwenLanguagePickerSheet: View {
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("languagePicker_\(language.rawValue)")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     private func autoRowTitle(_ language: Qwen3SupportedLanguage) -> String {
@@ -1138,6 +1139,7 @@ struct IOSReferenceClipSheet: View {
     let savedVoices: [IOSVoicePickerOption]
     @Binding var selectedSavedVoiceID: String?
     var onRequestRecord: () -> Void
+    var onRequestImport: () -> Void
     var onDismiss: (() -> Void)?
     var presentation: IOSBottomSheetPresentationStyle = .system
 
@@ -1175,18 +1177,29 @@ struct IOSReferenceClipSheet: View {
     }
 
     private var sourcePicker: some View {
-        sourceRow(
-            symbol: "mic.fill",
-            title: "Record new clip",
-            detail: "Capture a 10-20 second sample on this iPhone.",
-            action: onRequestRecord
-        )
+        VStack(spacing: 8) {
+            sourceRow(
+                symbol: "mic.fill",
+                title: "Record new clip",
+                detail: "Capture a 10-20 second sample on this iPhone.",
+                accessibilityIdentifier: "referenceClip_recordNewClip",
+                action: onRequestRecord
+            )
+            sourceRow(
+                symbol: "folder.fill",
+                title: VocelloPresentationText.importReferenceAudioTitle,
+                detail: VocelloPresentationText.importReferenceAudioDetail,
+                accessibilityIdentifier: "referenceClip_importAudioFile",
+                action: onRequestImport
+            )
+        }
     }
 
     private func sourceRow(
         symbol: String,
         title: String,
         detail: String,
+        accessibilityIdentifier: String,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
@@ -1228,6 +1241,7 @@ struct IOSReferenceClipSheet: View {
             }
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier(accessibilityIdentifier)
     }
 
     private func savedVoicesHeader(_ title: String) -> some View {
@@ -1280,6 +1294,7 @@ struct IOSReferenceClipSheet: View {
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("referenceClipRow_\(option.id)")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
 

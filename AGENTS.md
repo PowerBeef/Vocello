@@ -167,19 +167,14 @@ When XcodeBuildMCP is available:
 
 ## Verification tiers
 
-```sh
-./scripts/regenerate_project.sh                         # only after project.yml changes
-python3 scripts/refresh_derived_artifacts.py refresh   # registered generated inputs changed
-QVOICE_GATES=quick ./scripts/check_project_inputs.sh   # edit/checkpoint loop
-scripts/macos_test.sh test                             # macOS core, XPC, owned runtime
-./scripts/build.sh build                               # macOS compile
-./scripts/build_foundation_targets.sh ios              # generic physical-device SDK compile
-npm --prefix website run check                         # website changes
-```
+Use `scripts/dev.sh plan`, repeat `scripts/dev.sh focused` while editing, then run one
+`scripts/dev.sh checkpoint` for the coherent tree. This path-aware router preserves governed caches
+and never schedules UI/model/release work; see
+[`docs/reference/development-workflow.md`](docs/reference/development-workflow.md).
 
-- **T0:** targeted typecheck and focused tests while editing.
-- **T1:** the hook-enforced quick gate at every commit. Quick mode skips the longer Python
-  self-test suite only when neither `scripts/` nor `config/` has pending changes.
+- **T0:** fast generation, adjacent Python tests, and changed XCTest classes.
+- **T1:** derived refresh, the full project-input gate, and path-required native evidence. The
+  commit hook reuses an exact-content PASS but invalidates it after any edit.
 - **T2:** full deterministic GitHub CI for every push/PR; path-aware jobs may skip while the
   aggregate required context remains authoritative.
 - **T3:** explicit release evidence, signing, notarization, archive, and artifact verification.
@@ -201,6 +196,7 @@ scripts/macos_test.sh gate
 scripts/ios_device.sh preflight
 scripts/ui_test.sh ios smoke|benchmark|perf
 scripts/ui_test.sh ios saved-voice-lifecycle
+scripts/ui_test.sh ios control-audit --scenario inventory|stateful|external|accessibility|generation|all
 scripts/ios_device.sh gate
 ```
 

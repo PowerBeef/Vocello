@@ -35,6 +35,9 @@ for required_policy_surface in \
   config/tsan-policy.json \
   docs/project-health.md \
   scripts/build_output_policy.py \
+  scripts/dev.sh \
+  scripts/development_workflow.py \
+  scripts/tree_fingerprint.py \
   scripts/codex_session_storage.py \
   scripts/cli_version_contract.py \
   scripts/saved_voice_lifecycle_contract.py \
@@ -80,6 +83,8 @@ for required_policy_surface in \
   scripts/tests/test_project_health.py \
   scripts/tests/test_refresh_derived_artifacts.py \
   scripts/tests/test_build_routing_contract.py \
+  scripts/tests/test_development_workflow.py \
+  scripts/tests/test_tree_fingerprint.py \
   scripts/tests/test_clean_build_caches.py \
   scripts/tests/test_profile_trace_retention.py \
   scripts/tests/test_storage_preflight.py \

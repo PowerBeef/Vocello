@@ -336,9 +336,12 @@ struct IOSSaveVoiceSheet: View {
     let title: String
     @Binding var suggestedName: String
     @Binding var transcript: String
+    var transcriptionReview: IOSReferenceTranscriptionReviewState? = nil
     let errorMessage: String?
     /// When present, show the clip-review card (review the recording before saving).
     var clipAudioURL: URL? = nil
+    var onTranscriptEdited: ((String) -> Void)? = nil
+    var onUseAudioOnly: (() -> Void)? = nil
     let onCancel: () -> Void
     let onSave: () -> Void
 
@@ -353,6 +356,22 @@ struct IOSSaveVoiceSheet: View {
 
     private var trimmedName: String {
         suggestedName.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var isSaveEnabled: Bool {
+        guard !trimmedName.isEmpty else { return false }
+        guard let transcriptionReview else { return true }
+        return transcriptionReview.allowsSave(transcript: transcript)
+    }
+
+    private var transcriptBinding: Binding<String> {
+        Binding(
+            get: { transcript },
+            set: { newValue in
+                transcript = newValue
+                onTranscriptEdited?(newValue)
+            }
+        )
     }
 
     var body: some View {
@@ -387,13 +406,17 @@ struct IOSSaveVoiceSheet: View {
                         caption: "Auto-transcribed. With it, clones carry this clip's pacing and emotion; without it, identity only."
                     ) {
                         IOSMultilineTextView(
-                            text: $transcript,
+                            text: transcriptBinding,
                             placeholder: "What you said in the recording",
                             tint: tint,
                             isFocused: $isTranscriptFocused,
                             accessibilityIdentifier: "saveVoice_transcriptEditor"
                         )
                         .frame(height: transcriptHeight)
+                    }
+
+                    if let transcriptionReview {
+                        transcriptionStatus(transcriptionReview)
                     }
 
                     if let errorMessage {
@@ -407,7 +430,7 @@ struct IOSSaveVoiceSheet: View {
                         title: "Save voice",
                         symbol: "checkmark",
                         tint: tint,
-                        isEnabled: !trimmedName.isEmpty,
+                        isEnabled: isSaveEnabled,
                         action: {
                             dismissKeyboard()
                             onSave()
@@ -430,6 +453,58 @@ struct IOSSaveVoiceSheet: View {
     }
 
     // MARK: - Sections
+
+    @ViewBuilder
+    private func transcriptionStatus(
+        _ review: IOSReferenceTranscriptionReviewState
+    ) -> some View {
+        let status = review.status
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                if status.showsProgress {
+                    ProgressView()
+                        .controlSize(.small)
+                        .tint(tint)
+                        .accessibilityHidden(true)
+                } else {
+                    Image(systemName: status.symbolName)
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(tint)
+                        .accessibilityHidden(true)
+                }
+
+                Text(status.message)
+                    .font(.caption)
+                    .foregroundStyle(Theme.Text.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(status.message)
+            .accessibilityIdentifier("saveVoice_transcriptionStatus")
+
+            if review.offersAudioOnlyConfirmation, let onUseAudioOnly {
+                Button {
+                    dismissKeyboard()
+                    onUseAudioOnly()
+                } label: {
+                    Label(VocelloPresentationText.useAudioOnly, systemImage: "waveform")
+                        .font(.footnote.weight(.semibold))
+                        .frame(minHeight: 44)
+                        .padding(.horizontal, 14)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(tint)
+                .background {
+                    Capsule().fill(tint.opacity(0.12))
+                }
+                .overlay {
+                    Capsule().stroke(tint.opacity(0.35), lineWidth: 1)
+                }
+                .accessibilityHint(VocelloPresentationText.useAudioOnlyHint)
+                .accessibilityIdentifier("saveVoice_useAudioOnlyButton")
+            }
+        }
+    }
 
     private func fieldSection<Content: View>(
         label: String,

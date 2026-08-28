@@ -120,7 +120,8 @@ catches. So precision decides severity, not importance:
 Stating the boundary honestly matters more than the coverage table, because the gaps are where
 confidence becomes misplaced.
 
-- **Behavioral claims.** "The T1 gate takes ~0–45 s" was measured by hand. Nothing re-measures it.
+- **Behavioral claims.** Timings in [`development-workflow.md`](development-workflow.md) were
+  measured on one host. Gates protect behavior and cache routing, not a permanent wall-clock SLA.
 - **Delivery and audio quality.** These need models, seeds, and audio. The text-level contract
   checks what is deterministic about the instruction copy and says nothing about how a take sounds.
 - **User-scoped tooling.** Skills and MCP servers live outside the repository, so the optional-assists
@@ -144,6 +145,11 @@ confidence becomes misplaced.
    clean checkout — that exact split broke `main` on 2026-08-02.
 5. **Name it in `AGENTS.md` or a domain rule**, or `check_surface_coverage.py` will fail —
    deliberately, since a gate no guidance mentions is invisible to anyone reading the docs.
+
+The local checkpoint cache follows the same rule. `tree_fingerprint.py` binds HEAD, final tracked
+content, and every non-ignored untracked path/byte. Staging identical bytes is not a new tree;
+editing them is. A completed `scripts/dev.sh checkpoint` can therefore satisfy the commit hook
+without recreating the old stale-PASS hole.
 
 The root Swift dependency watch follows this pattern: `swift_dependency_updates.py` validates exact
 pin agreement without network access in the deterministic gate, while its scheduled workflow uses

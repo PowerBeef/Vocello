@@ -305,6 +305,10 @@ targets:
         IPHONEOS_DEPLOYMENT_TARGET: "26.0"
         GENERATE_INFOPLIST_FILE: YES
         SWIFT_OBJC_BRIDGING_HEADER: Sources/QwenVoiceCore/QwenVoiceCore-Bridging-Header.h
+        # Local scripts set only this user-defined value. Keeping the compile
+        # condition on the one owned target that reads it avoids rebuilding
+        # every Swift package dependency when diagnostics are enabled.
+        OTHER_SWIFT_FLAGS: "$(inherited) $(QVOICE_INTERNAL_DIAGNOSTICS_SWIFT_FLAG)"
     dependencies:
       - target: QwenVoiceBackendCore
       - package: MLXAudio
@@ -425,6 +429,10 @@ targets:
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         SUPPORTS_MACCATALYST: NO
         TARGETED_DEVICE_FAMILY: "1"
+        # Device diagnostics live in the app target. Do not pass their compile
+        # condition through global OTHER_SWIFT_FLAGS; that invalidates the
+        # complete package graph before every focused device run.
+        OTHER_SWIFT_FLAGS: "$(inherited) $(QVOICE_DEVICE_DIAGNOSTICS_SWIFT_FLAG)"
     dependencies:
       - package: GRDB
       - target: QwenVoiceCore
@@ -456,9 +464,12 @@ targets:
       - path: Sources/SharedSupport/Database/GenerationHistoryOutbox.swift
       - path: Sources/SharedSupport/Services/VocelloPresentationText.swift
       - path: Sources/Models/Generation.swift
+      - path: Sources/iOSSupport/Models/PendingVoiceCloningHandoff.swift
       - path: Sources/iOSSupport/Services/AppPaths.swift
       - path: Sources/iOSSupport/Services/IOSModelDeliverySupport.swift
       - path: Sources/iOSSupport/Services/IOSModelProgressPresentation.swift
+      - path: Sources/iOSSupport/Services/IOSReferenceAudioImportPolicy.swift
+      - path: Sources/iOSSupport/Services/IOSReferenceTranscriptionReviewState.swift
       - path: Sources/iOSSupport/Services/RuntimeReleaseCoordinator.swift
       - path: Sources/iOSSupport/Services/StudioGenerationAttemptAuthority.swift
       - path: Sources/iOSSupport/Services/IOSSingleTakeGenerationExecutor.swift
@@ -486,9 +497,12 @@ targets:
     platform: iOS
     sources:
       - path: Tests/VocelloiOSLogicTests
+      - path: Sources/iOSSupport/Models/PendingVoiceCloningHandoff.swift
       - path: Sources/iOSSupport/Services/AppPaths.swift
       - path: Sources/iOSSupport/Services/IOSModelDeliverySupport.swift
       - path: Sources/iOSSupport/Services/IOSModelProgressPresentation.swift
+      - path: Sources/iOSSupport/Services/IOSReferenceAudioImportPolicy.swift
+      - path: Sources/iOSSupport/Services/IOSReferenceTranscriptionReviewState.swift
       - path: Sources/iOSSupport/Services/RuntimeReleaseCoordinator.swift
       - path: Sources/iOSSupport/Services/StudioGenerationAttemptAuthority.swift
       - path: Sources/iOSSupport/Services/IOSSingleTakeGenerationExecutor.swift

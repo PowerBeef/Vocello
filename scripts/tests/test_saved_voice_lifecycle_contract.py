@@ -27,7 +27,11 @@ class SavedVoiceLifecycleContractTests(unittest.TestCase):
             "Sources/QwenVoiceCore/MLXTTSEngine.swift",
             "Sources/QwenVoiceEngineSupport/EngineServiceIPC.swift",
             "Sources/iOS/Voices/IOSRecordVoiceSheet.swift",
+            "Sources/iOS/IOSGenerationInputControls.swift",
             "Sources/iOS/IOSGenerationModeViews.swift",
+            "Sources/iOS/App/RootView.swift",
+            "Sources/iOS/Sheets/IOSBottomSheets.swift",
+            "Sources/iOSSupport/Services/IOSReferenceTranscriptionReviewState.swift",
             "Sources/Views/Library/SavedVoiceSheet.swift",
             "Sources/iOS/IOSVoicesView.swift",
             "Tests/VocelloiOSUITests/VocelloiOSSavedVoiceLifecycleUITests.swift",
@@ -88,6 +92,26 @@ class SavedVoiceLifecycleContractTests(unittest.TestCase):
         )
         path.write_text(text, encoding="utf-8")
         with self.assertRaisesRegex(saved_voice_lifecycle_contract.ContractError, "XCUITest lane"):
+            saved_voice_lifecycle_contract.validate(self.root)
+
+    def test_missing_direct_clone_import_surface_fails(self) -> None:
+        path = self.root / "Sources/iOS/Sheets/IOSBottomSheets.swift"
+        text = path.read_text(encoding="utf-8").replace(
+            '"referenceClip_importAudioFile"',
+            '"referenceClip_importWasRemoved"',
+        )
+        path.write_text(text, encoding="utf-8")
+        with self.assertRaisesRegex(saved_voice_lifecycle_contract.ContractError, "direct Clone import"):
+            saved_voice_lifecycle_contract.validate(self.root)
+
+    def test_missing_transcription_save_gate_fails(self) -> None:
+        path = self.root / "Sources/iOS/Voices/IOSRecordVoiceSheet.swift"
+        text = path.read_text(encoding="utf-8").replace(
+            "transcriptionReview.allowsSave(transcript: transcript)",
+            "transcriptionReview.allowsUnsafeSave(transcript: transcript)",
+        )
+        path.write_text(text, encoding="utf-8")
+        with self.assertRaisesRegex(saved_voice_lifecycle_contract.ContractError, "transcription review enrollment"):
             saved_voice_lifecycle_contract.validate(self.root)
 
 

@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "generated": "python3 scripts/doc_metadata.py rebuild-index",
   "note": "Machine-readable documentation map. Query this instead of globbing docs/.",
-  "annotatedDocuments": 96,
+  "annotatedDocuments": 98,
   "unannotatedDocuments": 0,
   "documents": [
     {
@@ -54,6 +54,7 @@
       "sourceOfTruth": [
         "scripts/ios_device.sh",
         "scripts/ui_test.sh",
+        "scripts/ios_control_audit.py",
         "scripts/build_foundation_targets.sh",
         "scripts/localization_contract.py",
         "config/localization-unlocalized-baseline.json"
@@ -375,6 +376,21 @@
       "contentDigest": "sha256:b3b253977a1f67c5a530fe6ce3d04a6215e2f852d66627dc97186351963bbd27"
     },
     {
+      "path": "docs/reference/development-workflow.md",
+      "status": "active",
+      "owner": "release-qa",
+      "summary": "Fast local development workflow \u2014 path-aware focused checks, content-complete checkpoints, governed cache reuse, measured latency, and the unchanged explicit acceptance boundary.",
+      "sourceOfTruth": [
+        "scripts/dev.sh",
+        "scripts/development_workflow.py",
+        "scripts/tree_fingerprint.py",
+        "scripts/hooks/precommit_gate.sh",
+        "scripts/build_foundation_targets.sh",
+        "scripts/regenerate_project.sh",
+        "scripts/evidence_impact.py"
+      ]
+    },
+    {
       "path": "docs/reference/emotion-reference-banks.md",
       "status": "active",
       "owner": "backend-mlx",
@@ -419,6 +435,7 @@
       "summary": "Consolidated iPhone app map \u2014 every screen, element, and option from the user view, and how XCUITest drives each via stable identifiers on the paired physical device.",
       "sourceOfTruth": [
         "Sources/iOS",
+        "Sources/iOSSupport/Services/IOSReferenceTranscriptionReviewState.swift",
         "Tests/VocelloiOSUITests/VocelloiOSUITestCase.swift"
       ]
     },
@@ -473,6 +490,8 @@
       "sourceOfTruth": [
         "scripts/ios_device.sh",
         "scripts/ui_test.sh",
+        "scripts/ios_control_audit.py",
+        "config/ios-control-audit.json",
         "scripts/check_ios_ui_perf.py",
         "scripts/check_ios_model_management.py"
       ]
@@ -496,6 +515,20 @@
         "Sources/iOS/VocelloiOS.entitlements",
         "project.yml"
       ]
+    },
+    {
+      "path": "docs/reference/ios-on-device-control-audit-2026-08-28.md",
+      "status": "historical",
+      "owner": "ios",
+      "summary": "Point-in-time implementation and execution checkpoint for the source-bound exhaustive physical-iPhone control, accessibility, model-lifecycle, and pairwise generation audit.",
+      "sourceOfTruth": [
+        "config/ios-control-audit.json",
+        "scripts/ios_control_audit.py",
+        "scripts/ui_test.sh",
+        "Tests/VocelloiOSUITests/VocelloiOSControlAuditUITests.swift",
+        "config/roadmap.json"
+      ],
+      "contentDigest": "sha256:9c2359202b8e343cf406e05196cb7fd41af49f4d91e3f462f645a08ae46040fa"
     },
     {
       "path": "docs/reference/ios-ui-reference.md",

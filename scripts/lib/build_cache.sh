@@ -84,8 +84,9 @@ sha256_of() {
 }
 
 # Skip the XcodeGen regeneration step when project.yml hasn't changed
-# since the project was last generated. On cache miss, run
-# regenerate_project.sh (which also runs check_project_inputs.sh).
+# since the project was last generated. On cache miss, regenerate only the
+# project graph. Repository-wide validation belongs to the explicit checkpoint
+# and pre-commit lanes, not every build invocation.
 ensure_project_regenerated() {
     mkdir -p "$BUILD_CACHE_DIR"
     local cache_file="$BUILD_CACHE_DIR/project.yml.sha256"
@@ -105,12 +106,18 @@ ensure_project_regenerated() {
         echo "==> project.yml unchanged; skipping XcodeGen"
         python3 "$ROOT_DIR/scripts/generate_cli_scheme.py" --check >/dev/null \
             || python3 "$ROOT_DIR/scripts/generate_cli_scheme.py"
+        python3 "$ROOT_DIR/scripts/generate_ios_logic_scheme.py" --check >/dev/null \
+            || python3 "$ROOT_DIR/scripts/generate_ios_logic_scheme.py"
         return 0
     fi
 
     echo "==> Regenerating Xcode project (project.yml changed or project missing)..."
-    bash "$ROOT_DIR/scripts/regenerate_project.sh"
-    printf '%s\n' "$current" > "$cache_file"
+    bash "$ROOT_DIR/scripts/regenerate_project.sh" --fast
+    cached="$(cat "$cache_file" 2>/dev/null || true)"
+    if [[ "$cached" != "$current" ]]; then
+        echo "error: project regeneration did not publish the expected project.yml digest" >&2
+        return 1
+    fi
 }
 
 # Skip `xcodebuild -resolvePackageDependencies` only when the shared checkout,

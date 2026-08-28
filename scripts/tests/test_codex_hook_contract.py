@@ -16,6 +16,7 @@ import unittest
 REPO_ROOT = Path(__file__).resolve().parents[2]
 HOOK_CONFIG = REPO_ROOT / ".codex" / "hooks.json"
 HOOK_SCRIPT = REPO_ROOT / "scripts" / "hooks" / "precommit_gate.sh"
+TREE_FINGERPRINT = REPO_ROOT / "scripts" / "tree_fingerprint.py"
 
 
 def make_executable(path: Path) -> None:
@@ -62,6 +63,10 @@ class CodexHookContractTests(unittest.TestCase):
             hook = hook_dir / "precommit_gate.sh"
             shutil.copy2(HOOK_SCRIPT, hook)
             make_executable(hook)
+
+            fingerprint = root / "scripts" / "tree_fingerprint.py"
+            shutil.copy2(TREE_FINGERPRINT, fingerprint)
+            make_executable(fingerprint)
 
             gate = root / "scripts" / "check_project_inputs.sh"
             gate.write_text("#!/usr/bin/env bash\nexit 1\n", encoding="utf-8")

@@ -45,6 +45,7 @@ Usage:
   scripts/ui_test.sh ios delivery-cohort --text SCRIPT [--takes 20] [--label RUN_ID]
   scripts/ui_test.sh ios startup-parity --script-file UNTRACKED.txt
   scripts/ui_test.sh ios model-download [--scenario diagnose|queue|acceptance|soak|recover] [--iterations 3] [--engine-profile legacy|chunked|chunked-multisession]
+  scripts/ui_test.sh ios control-audit [--scenario inventory|stateful|external|accessibility|generation|all] [--resume RUN_ID]
   scripts/ui_test.sh ios enroll-clone-fixture
   scripts/ui_test.sh ios saved-voice-lifecycle
 
@@ -52,6 +53,8 @@ The iOS destination is the paired physical iPhone only. Simulator destinations a
 `localization` runs the focused pseudo-localization, long-string, and accessibility-size layout walk
 without generating audio or changing installed model state.
 `model-download` is an opt-in isolated lifecycle proof and never runs in smoke, benchmark, CI, or release.
+`control-audit` is a source-bound, physical-iPhone-only campaign. Its untracked plan, observations,
+screenshots, xcresult, diagnostics, and restoration proof are retained under the run artifact.
 `delivery-cohort` is a diagnostic delivery-consistency lane (N identical Neutral Custom takes through
 the production UI); it never publishes benchmark history and never runs in smoke, benchmark, CI, or release.
 `startup-parity` enters the supplied script through the real composer, visibly selects Vivian / Calm Strong /
@@ -60,9 +63,10 @@ English, then correlates the completed generation UUID with the engine request r
 visible Files-import flow; stage the reference WAV and .txt sidecar in the app's Documents first
 (devicectl appDataContainer copy). It never runs in smoke, benchmark, CI, or release. The headless
 `scripts/ios_device.sh enroll-clone-fixture` remains the wipe-recovery route (no UI, hash-pinned).
-`saved-voice-lifecycle` is an opt-in F-01 acceptance lane. Stage
-`F01 Saved Voice Lifecycle.wav` (and optionally its `.txt` sidecar) in the app Documents directory;
-the lane imports, previews, hands off, and deletes that throwaway voice through visible production UI.
+`saved-voice-lifecycle` is an opt-in F-01/ICI-4 acceptance lane. Stage
+`ICI Direct Clone Import.wav` without a matching `.txt` sidecar in the app Documents directory;
+the lane begins in Studio Clone, imports, auto-transcribes, saves, generates, previews, and deletes
+that throwaway voice through visible production UI.
 No lane retries automatically. A failed run keeps its log, xcresult, screenshots, and diagnostics.
 RUN_ID is an opaque 1-96 character identifier using letters, digits, dot, underscore, or hyphen.
 EOF
@@ -74,8 +78,9 @@ platform="$1"
 lane="$2"
 shift 2
 [[ "$platform" == "macos" || "$platform" == "ios" ]] || usage
-[[ "$lane" == "localization" || "$lane" == "smoke" || "$lane" == "benchmark" || "$lane" == "model-download" || "$lane" == "delivery-cohort" || "$lane" == "startup-parity" || "$lane" == "perf" || "$lane" == "enroll-clone-fixture" || "$lane" == "saved-voice-lifecycle" ]] || usage
+[[ "$lane" == "localization" || "$lane" == "smoke" || "$lane" == "benchmark" || "$lane" == "model-download" || "$lane" == "control-audit" || "$lane" == "delivery-cohort" || "$lane" == "startup-parity" || "$lane" == "perf" || "$lane" == "enroll-clone-fixture" || "$lane" == "saved-voice-lifecycle" ]] || usage
 [[ "$lane" != "model-download" || "$platform" == "ios" ]] || usage
+[[ "$lane" != "control-audit" || "$platform" == "ios" ]] || usage
 [[ "$lane" != "delivery-cohort" || "$platform" == "ios" ]] || usage
 [[ "$lane" != "startup-parity" || "$platform" == "ios" ]] || usage
 [[ "$lane" != "enroll-clone-fixture" || "$platform" == "ios" ]] || usage
@@ -94,10 +99,17 @@ startup_parity_script=""
 engine_profile=""
 model_scenario="acceptance"
 model_iterations=3
+scenario_argument=""
+control_scenario="all"
+control_resume=""
+control_resume_run_ids=""
+control_resume_take_start=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --scenario) model_scenario="${2:?--scenario requires a value}"; shift 2 ;;
-    --scenario=*) model_scenario="${1#*=}"; shift ;;
+    --scenario) scenario_argument="${2:?--scenario requires a value}"; shift 2 ;;
+    --scenario=*) scenario_argument="${1#*=}"; shift ;;
+    --resume) control_resume="${2:?--resume requires a value}"; shift 2 ;;
+    --resume=*) control_resume="${1#*=}"; shift ;;
     --iterations) model_iterations="${2:?--iterations requires a value}"; shift 2 ;;
     --iterations=*) model_iterations="${1#*=}"; shift ;;
     --engine-profile) engine_profile="${2:?--engine-profile requires a value}"; shift 2 ;;
@@ -123,6 +135,18 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 validate_benchmark_label "$label"
+validate_benchmark_label "$control_resume"
+
+if [[ "$lane" == "model-download" ]]; then
+  model_scenario="${scenario_argument:-acceptance}"
+elif [[ "$lane" == "control-audit" ]]; then
+  control_scenario="${scenario_argument:-all}"
+elif [[ -n "$scenario_argument" ]]; then
+  die "--scenario is accepted only by model-download and control-audit"
+fi
+if [[ -n "$control_resume" && "$lane" != "control-audit" ]]; then
+  die "--resume is accepted only by control-audit"
+fi
 
 if [[ "$lane" != "benchmark" && "$lane" != "delivery-cohort" && "$lane" != "perf" ]] && [[ -n "$label" ]]; then
   die "--label is accepted only by the benchmark, delivery-cohort, and perf lanes"
@@ -155,8 +179,8 @@ if [[ -n "$engine_profile" ]]; then
   [[ "$engine_profile" == "legacy" || "$engine_profile" == "chunked" || "$engine_profile" == "chunked-multisession" ]] \
     || die "--engine-profile must be legacy, chunked, or chunked-multisession"
 fi
-if [[ "$model_scenario" != "acceptance" || "$model_iterations" != 3 ]]; then
-  [[ "$lane" == "model-download" ]] || die "--scenario and --iterations are accepted only by the model-download lane"
+if [[ "$model_iterations" != 3 ]]; then
+  [[ "$lane" == "model-download" ]] || die "--iterations is accepted only by the model-download lane"
 fi
 if [[ "$lane" == "model-download" ]]; then
   [[ "$model_scenario" == "diagnose" || "$model_scenario" == "queue" || "$model_scenario" == "acceptance" || "$model_scenario" == "soak" || "$model_scenario" == "recover" ]] \
@@ -165,6 +189,15 @@ if [[ "$lane" == "model-download" ]]; then
     || die "--iterations must be an integer between 1 and 20"
   [[ "$model_scenario" == "soak" || "$model_iterations" == 3 ]] \
     || die "--iterations applies only to the soak scenario"
+fi
+if [[ "$lane" == "control-audit" ]]; then
+  [[ "$control_scenario" == "inventory" || "$control_scenario" == "stateful" \
+      || "$control_scenario" == "external" || "$control_scenario" == "accessibility" \
+      || "$control_scenario" == "generation" || "$control_scenario" == "all" ]] \
+    || die "control-audit --scenario must be inventory, stateful, external, accessibility, generation, or all"
+  if [[ -n "$control_resume" && "$control_scenario" != "generation" && "$control_scenario" != "all" ]]; then
+    die "control-audit --resume is supported only for generation or all"
+  fi
 fi
 if [[ "$lane" == "delivery-cohort" ]]; then
   [[ "$cohort_takes" =~ ^[0-9]+$ ]] && (( cohort_takes >= 1 && cohort_takes <= 60 )) \
@@ -228,6 +261,12 @@ fi
 timestamp="$(date -u +%Y%m%d-%H%M%S)"
 nonce="$(uuidgen | tr '[:upper:]' '[:lower:]' | cut -c1-8)"
 run_id="${platform}-xcui-${lane}-${timestamp}-${nonce}"
+audit_source_id=""
+if [[ "$lane" == "control-audit" ]]; then
+  audit_source_id="$(python3 "$ROOT_DIR/scripts/tree_fingerprint.py" --root "$ROOT_DIR")" \
+    || die "could not fingerprint the complete control-audit source tree"
+  [[ "$audit_source_id" =~ ^[0-9a-f]{64}$ ]] || die "control-audit source fingerprint is invalid"
+fi
 out="$QVOICE_ARTIFACTS_UI_TESTS/$platform/$run_id"
 result="$out/result.xcresult"
 mkdir -p "$out"
@@ -240,7 +279,8 @@ printf '%s\n' "${label:-$run_id}" >"$out/label.txt"
 write_run_metadata() {
   local status="$1" finished_at="${2:-}" exit_code="${3:-}"
   python3 - "$out/run.json" "$platform" "$lane" "$run_id" "$modes" "$lengths" \
-    "$warm" "${label:-$run_id}" "$started_at" "$finished_at" "$status" "$exit_code" <<'PY'
+    "$warm" "${label:-$run_id}" "$started_at" "$finished_at" "$status" "$exit_code" \
+    "$audit_source_id" "$control_scenario" "$control_resume" "$control_resume_run_ids" <<'PY'
 import json, os, pathlib, sys, tempfile
 
 path = pathlib.Path(sys.argv[1])
@@ -252,6 +292,13 @@ payload = {
     "exitCode": int(sys.argv[12]) if sys.argv[12] else None,
     "schemaVersion": 2,
 }
+if sys.argv[13]:
+    payload["treeFingerprint"] = sys.argv[13]
+    payload["controlAuditScenario"] = sys.argv[14]
+if sys.argv[15]:
+    payload["resumedFrom"] = sys.argv[15]
+if sys.argv[16]:
+    payload["resumeRunIDs"] = sys.argv[16].split(",")
 path.parent.mkdir(parents=True, exist_ok=True)
 descriptor, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
 try:
@@ -284,6 +331,114 @@ required_step_run "$step_ledger" source-provenance \
   python3 "$ROOT_DIR/scripts/publish_benchmark_history.py" snapshot \
   --output "$out/benchmark-source.json" --crash-scope none >/dev/null \
   || die "could not capture pre-run source provenance"
+
+if [[ "$lane" == "control-audit" ]]; then
+  required_step_run "$step_ledger" control-inventory \
+    python3 "$ROOT_DIR/scripts/ios_control_audit.py" validate \
+      --output "$out/control-inventory-validation.json" \
+    >"$out/control-inventory-validator.log" 2>&1 \
+    || die "iOS control inventory is not source/test complete"
+  required_step_run "$step_ledger" control-plan \
+    python3 "$ROOT_DIR/scripts/ios_control_audit.py" generate-plan \
+      --source-identity "$audit_source_id" \
+      --output "$out/control-audit-plan.json" \
+    >"$out/control-plan-generator.log" 2>&1 \
+    || die "could not generate the source-bound iOS control audit plan"
+  if [[ -n "$control_resume" ]]; then
+    control_resume_root="$QVOICE_ARTIFACTS_UI_TESTS/ios/$control_resume"
+    python3 - "$control_resume_root/run.json" "$control_resume_root/control-audit-plan.json" \
+      "$audit_source_id" "$out/control-audit-plan.json" "$control_scenario" \
+      "$control_resume_root/control-observations.jsonl" \
+      "$control_resume_root/control-audit-generation-correlation.json" \
+      "$out/control-resume-state.json" "$out/control-observations-prior.jsonl" \
+      >"$out/control-resume-validation.log" <<'PY' \
+      || die "--resume rejected: prior run identity does not match this source and plan"
+import json, pathlib, sys
+run_path = pathlib.Path(sys.argv[1])
+prior_plan_path = pathlib.Path(sys.argv[2])
+source_identity = sys.argv[3]
+current_plan_path = pathlib.Path(sys.argv[4])
+scenario = sys.argv[5]
+observations_path = pathlib.Path(sys.argv[6])
+correlation_path = pathlib.Path(sys.argv[7])
+state_path = pathlib.Path(sys.argv[8])
+prior_output_path = pathlib.Path(sys.argv[9])
+if not run_path.is_file() or not prior_plan_path.is_file():
+    raise SystemExit("prior run is missing run.json or control-audit-plan.json")
+if not observations_path.is_file():
+    raise SystemExit("prior run is missing composed control observations")
+run = json.loads(run_path.read_text(encoding="utf-8"))
+prior = json.loads(prior_plan_path.read_text(encoding="utf-8"))
+current = json.loads(current_plan_path.read_text(encoding="utf-8"))
+if run.get("runID") != run_path.parent.name:
+    raise SystemExit("prior run directory and runID disagree")
+if run.get("treeFingerprint") != source_identity:
+    raise SystemExit("prior run source fingerprint differs")
+if prior.get("sourceIdentity") != source_identity:
+    raise SystemExit("prior plan source fingerprint differs")
+if prior.get("planDigest") != current.get("planDigest"):
+    raise SystemExit("prior and current immutable plans differ")
+if run.get("controlAuditScenario") != scenario:
+    raise SystemExit("prior and current control-audit scenarios differ")
+
+rows = [json.loads(line) for line in observations_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+generation_ids = [f"generation:{take['takeID']}" for take in current["takes"]]
+represented = {row.get("controlID") for row in rows}
+contiguous = 0
+while contiguous < len(generation_ids) and generation_ids[contiguous] in represented:
+    contiguous += 1
+if any(control_id in represented for control_id in generation_ids[contiguous + 1:]):
+    raise SystemExit("prior generation observations contain a non-contiguous gap")
+
+successful_generation = [
+    row for row in rows
+    if row.get("controlID", "").startswith("generation:")
+    and row.get("classification") == "PASS"
+]
+if successful_generation:
+    if not correlation_path.is_file():
+        raise SystemExit("prior successful generation rows have no device-correlation report")
+    correlation = json.loads(correlation_path.read_text(encoding="utf-8"))
+    if correlation.get("result") != "passed":
+        raise SystemExit("prior successful generation evidence did not pass correlation")
+
+# A failed prior run has no trustworthy terminal observation for the first
+# missing take. Never rerun it automatically: leave it absent so composition
+# reports SKIPPED_AFTER_FAILURE, and continue at the following take.
+skipped = None
+start = contiguous
+if run.get("status") not in {"passed", "diagnosedFailure"} and start < len(generation_ids):
+    skipped = generation_ids[start]
+    start += 1
+if start >= len(generation_ids):
+    raise SystemExit("prior run leaves no generation take to resume")
+
+chain = list(run.get("resumeRunIDs", []))
+chain.append(run["runID"])
+if len(chain) != len(set(chain)):
+    raise SystemExit("resume chain contains a duplicate run ID")
+prior_output_path.write_text(observations_path.read_text(encoding="utf-8"), encoding="utf-8")
+state = {
+    "schemaVersion": 1,
+    "resumeRunIDs": chain,
+    "takeStart": start,
+    "representedTakeCount": contiguous,
+    "skippedAfterFailure": skipped,
+}
+state_path.write_text(json.dumps(state, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+print(f"resume identity accepted from {run['runID']}; starting take index {start}")
+PY
+    control_resume_take_start="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["takeStart"])' "$out/control-resume-state.json")"
+    control_resume_run_ids="$(python3 -c 'import json,sys; print(",".join(json.load(open(sys.argv[1]))["resumeRunIDs"]))' "$out/control-resume-state.json")"
+    write_run_metadata running
+  fi
+  required_step_run "$step_ledger" control-plan-encoding \
+    python3 "$ROOT_DIR/scripts/ios_control_audit.py" encode-plan \
+      --plan "$out/control-audit-plan.json" \
+      --output "$out/control-audit-plan.zlib.b64" \
+    >"$out/control-plan-encoder.log" 2>&1 \
+    || die "could not encode the immutable control-audit plan"
+fi
 
 export_attachments() {
   [[ -d "$result" ]] || return 0
@@ -831,9 +986,11 @@ PY
 
 run_xcodebuild() {
   local -a command=("$@")
+  local log_path="$out/xcodebuild.log"
+  : >"$log_path"
   set +e
   "${command[@]}" 2>&1 | while IFS= read -r line || [[ -n "$line" ]]; do
-    printf '%s\n' "$line"
+    printf '%s\n' "$line" >>"$log_path"
     if [[ "$line" == *"VOCELLO_BENCH_TAKE_MANIFEST="* ]]; then
       local encoded="${line##*VOCELLO_BENCH_TAKE_MANIFEST=}"
       if [[ "$encoded" =~ ^[A-Za-z0-9+/=]+$ ]]; then
@@ -842,10 +999,24 @@ run_xcodebuild() {
         fi
       fi
     fi
-  done | tee "$out/xcodebuild.log"
+    # Keep the interactive surface useful. The complete raw build log remains
+    # in the run artifact; echo only test progress and actionable diagnostics
+    # instead of megabytes of compiler command lines.
+    case "$line" in
+      "Test Suite "*|"Test Case "*|"Testing started"*|"Testing failed"*|\*\*\ TEST\ *|\*\*\ BUILD\ *|*"Failed to initialize for UI testing"*|*"encountered an error"*|*" error: "*)
+        printf '%s\n' "$line"
+        ;;
+    esac
+  done
   local -a pipeline_status=("${PIPESTATUS[@]}")
   local status=${pipeline_status[0]}
   set -e
+  if (( status != 0 )); then
+    warn "xcodebuild exited $status; final diagnostics follow (complete log: $log_path)"
+    tail -n 80 "$log_path" >&2 || true
+  else
+    note "xcodebuild completed; complete log retained at $log_path"
+  fi
   export_attachments
   return "$status"
 }
@@ -1042,19 +1213,10 @@ WAV
   # followed by test-without-building against the already-built products.
   # Ordinary CI never invokes this script; the workflow-YML guard on
   # test-without-building is unaffected.
-  # HEAD + dirty paths + dirty CONTENT: `status --porcelain` alone lists
-  # paths, so editing an already-modified file left the fingerprint
-  # unchanged and repeat lanes reused stale test products (found live
-  # 2026-08-04 when a freshly added test class ran as zero tests).
-  # `diff HEAD` covers tracked edits only; untracked files must hash their
-  # content too (found live 2026-08-04 again: edits to a not-yet-committed
-  # test file reran the stale binary).
-  mac_fingerprint="$( { git -C "$ROOT_DIR" rev-parse HEAD 2>/dev/null; \
-    git -C "$ROOT_DIR" status --porcelain 2>/dev/null; \
-    git -C "$ROOT_DIR" diff HEAD 2>/dev/null; \
-    git -C "$ROOT_DIR" ls-files --others --exclude-standard -z 2>/dev/null \
-      | (cd "$ROOT_DIR" && xargs -0 shasum -a 256 2>/dev/null); } \
-    | shasum -a 256 | cut -d' ' -f1)"
+  # The shared helper binds HEAD, staged/unstaged bytes, and untracked content.
+  # One implementation prevents UI-build and commit-gate cache semantics from
+  # drifting apart.
+  mac_fingerprint="$(python3 "$ROOT_DIR/scripts/tree_fingerprint.py" --root "$ROOT_DIR")"
   mac_build_marker="$MAC_DERIVED/.vocello-ui-build-fingerprint"
   mac_products_ready="$(find "$MAC_DERIVED/Build/Products" -maxdepth 1 \
     -name 'VocelloMacUI_*.xctestrun' -print -quit 2>/dev/null || true)"
@@ -1071,7 +1233,7 @@ WAV
       -disableAutomaticPackageResolution \
       -onlyUsePackageVersionsFromResolvedFile \
       CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="-" ONLY_ACTIVE_ARCH=YES ARCHS=arm64 \
-      'OTHER_SWIFT_FLAGS=$(inherited) -DVOCELLO_INTERNAL_DIAGNOSTICS' \
+      QVOICE_INTERNAL_DIAGNOSTICS_SWIFT_FLAG=-DVOCELLO_INTERNAL_DIAGNOSTICS \
       SWIFT_OPTIMIZATION_LEVEL=-O \
       || die "macOS UI build-for-testing failed (see $out/xcodebuild.log)"
     printf '%s\n' "$mac_fingerprint" >"$mac_build_marker"
@@ -1156,6 +1318,13 @@ else
     only_test="VocelloiOSUITests/VocelloiOSFixtureEnrollmentUITests/testEnrollBenchmarkCloneFixtureFromDocuments"
   elif [[ "$lane" == "saved-voice-lifecycle" ]]; then
     only_test="VocelloiOSUITests/VocelloiOSSavedVoiceLifecycleUITests/testImportPreviewHandoffAndDeleteSavedVoice"
+  elif [[ "$lane" == "control-audit" ]]; then
+    only_test="VocelloiOSUITests/VocelloiOSControlAuditUITests/testConfiguredControlAuditScenario"
+    export TEST_RUNNER_QVOICE_IOS_CONTROL_AUDIT_RUN_ID="$run_id"
+    export TEST_RUNNER_QVOICE_IOS_CONTROL_AUDIT_SOURCE_ID="$audit_source_id"
+    export TEST_RUNNER_QVOICE_IOS_CONTROL_AUDIT_SCENARIO="$control_scenario"
+    export TEST_RUNNER_QVOICE_IOS_CONTROL_AUDIT_PLAN_B64="$(<"$out/control-audit-plan.zlib.b64")"
+    export TEST_RUNNER_QVOICE_IOS_CONTROL_AUDIT_TAKE_START="$control_resume_take_start"
   else
     only_test="VocelloiOSUITests/VocelloiOSModelDownloadUITests/testConfiguredModelManagementScenario"
     export TEST_RUNNER_QVOICE_IOS_MODEL_MANAGEMENT_RUN_ID="$run_id"
@@ -1182,7 +1351,7 @@ else
       -only-testing:"$only_test" \
       -allowProvisioningUpdates DEVELOPMENT_TEAM="$team" CODE_SIGN_STYLE=Automatic \
       ARCHS=arm64 ONLY_ACTIVE_ARCH=YES \
-      'OTHER_SWIFT_FLAGS=$(inherited) -DVOCELLO_INTERNAL_DIAGNOSTICS' \
+      QVOICE_INTERNAL_DIAGNOSTICS_SWIFT_FLAG=-DVOCELLO_INTERNAL_DIAGNOSTICS \
       SWIFT_OPTIMIZATION_LEVEL=-O; then
     xcuitest_status=1
     warn "physical-iPhone XCUITest failed; collecting forensics before returning failure"
@@ -1268,12 +1437,76 @@ PY
     fi
   fi
 
+  control_audit_status=0
+  if [[ "$lane" == "control-audit" ]]; then
+    if ! python3 - "$out/attachments/manifest.json" "$out/attachments" \
+        "$out/control-observations-current.jsonl" >"$out/control-observation-collector.log" <<'PY'
+import json, pathlib, sys
+manifest_path, attachment_root, output_path = map(pathlib.Path, sys.argv[1:])
+rows = []
+if manifest_path.is_file():
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    for test in manifest:
+        for attachment in test.get("attachments", []):
+            if attachment.get("suggestedHumanReadableName") == "control-observations.jsonl":
+                source = attachment_root / attachment["exportedFileName"]
+                if source.is_file():
+                    rows.extend(line for line in source.read_text(encoding="utf-8").splitlines() if line.strip())
+output_path.write_text("\n".join(rows) + ("\n" if rows else ""), encoding="utf-8")
+print(f"collected {len(rows)} control observations")
+PY
+    then
+      control_audit_status=1
+      warn "could not collect control-audit observation attachments"
+    fi
+    if ! python3 - "$out/control-observations-prior.jsonl" \
+        "$out/control-observations-current.jsonl" "$out/control-observations.jsonl" <<'PY'
+import pathlib, sys
+prior, current, output = map(pathlib.Path, sys.argv[1:])
+lines = []
+for source in (prior, current):
+    if source.is_file():
+        lines.extend(line for line in source.read_text(encoding="utf-8").splitlines() if line.strip())
+output.write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
+PY
+    then
+      control_audit_status=1
+      warn "could not compose current and source-bound resume observations"
+    fi
+    if [[ "$control_scenario" == "generation" || "$control_scenario" == "all" ]]; then
+      if ! pull_ios_run_diagnostics "$device" "$run_id" \
+          "$out/control-audit-diagnostics" "$out/control-audit-diagnostics-pull.log"; then
+        control_audit_status=1
+        warn "could not pull run-scoped control-audit generation telemetry"
+      elif ! required_step_run "$step_ledger" control-audit-device-correlation \
+          python3 "$ROOT_DIR/scripts/ios_control_audit.py" validate-device \
+            --plan "$out/control-audit-plan.json" \
+            --observations "$out/control-observations-current.jsonl" \
+            --diagnostics "$out/control-audit-diagnostics" \
+            --output "$out/control-audit-generation-correlation.json" \
+          >"$out/control-audit-generation-validator.log" 2>&1; then
+        control_audit_status=1
+        warn "control-audit visible requests, engine receipts, or QC evidence diverged"
+      fi
+    fi
+    if ! required_step_run "$step_ledger" control-audit-composition \
+        python3 "$ROOT_DIR/scripts/ios_control_audit.py" compose \
+          --run-metadata "$out/run.json" \
+          --plan "$out/control-audit-plan.json" \
+          --observations "$out/control-observations.jsonl" \
+          --output "$out/control-audit-summary.json" \
+        >"$out/control-audit-composer.log" 2>&1; then
+      control_audit_status=1
+      warn "control-audit composition found a required failure or unexplained omission"
+    fi
+  fi
+
   crash_delta_status=0
   if ! required_step_run "$step_ledger" crash-delta check_ios_crash_delta; then
     crash_delta_status=1
     warn "could not establish a clean post-run iPhone crash delta"
   fi
-  if (( xcuitest_status != 0 || dsym_status != 0 || model_diagnostics_status != 0 || startup_parity_status != 0 || crash_delta_status != 0 )); then
+  if (( xcuitest_status != 0 || dsym_status != 0 || model_diagnostics_status != 0 || startup_parity_status != 0 || control_audit_status != 0 || crash_delta_status != 0 )); then
     die "physical-iPhone $lane failed; complete available forensics are preserved in $out"
   fi
   [[ "$lane" != "smoke" ]] || required_step_run "$step_ledger" \

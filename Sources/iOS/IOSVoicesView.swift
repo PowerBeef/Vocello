@@ -149,7 +149,7 @@ struct IOSVoicesView: View {
         .accessibilityIdentifier("screen_voices")
         .fileImporter(
             isPresented: $isAudioImporterPresented,
-            allowedContentTypes: [.wav, .mp3, .aiff, .mpeg4Audio],
+            allowedContentTypes: IOSReferenceAudioImportPolicy.allowedContentTypes,
             allowsMultipleSelection: false
         ) { result in
             handleAudioImport(result)
@@ -204,7 +204,8 @@ struct IOSVoicesView: View {
             do {
                 // Keep the picker-provided URL intact so LocalDocumentIO can consume its
                 // security-scoped grant before materializing both audio and any .txt sidecar.
-                let imported = try ttsEngine.importReferenceAudio(from: sourceURL)
+                let validatedURL = try IOSReferenceAudioImportPolicy.validatedSourceURL(sourceURL)
+                let imported = try ttsEngine.importReferenceAudio(from: validatedURL)
                 importErrorMessage = nil
                 onImportNewVoice(imported)
             } catch {
@@ -253,8 +254,8 @@ struct IOSVoicesView: View {
                 .padding(.leading, 66)
 
             newVoiceActionRow(
-                title: "Import audio file",
-                detail: "Choose a WAV, MP3, AIFF, or M4A file from Files.",
+                title: VocelloPresentationText.importReferenceAudioTitle,
+                detail: VocelloPresentationText.importReferenceAudioDetail,
                 symbol: "folder.fill",
                 accessibilityIdentifier: "voices_importAudioFile"
             ) {

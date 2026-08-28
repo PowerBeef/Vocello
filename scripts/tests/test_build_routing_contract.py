@@ -41,6 +41,53 @@ class BuildRoutingContractTests(unittest.TestCase):
                 self.assert_tokens(relative, *common)
                 self.assert_tokens(relative, "configuration", "ARCHS=arm64")
 
+    def test_local_diagnostics_flags_are_target_scoped(self) -> None:
+        project = self.text("project.yml")
+        self.assertIn("$(QVOICE_INTERNAL_DIAGNOSTICS_SWIFT_FLAG)", project)
+        self.assertIn("$(QVOICE_DEVICE_DIAGNOSTICS_SWIFT_FLAG)", project)
+        self.assertNotIn(
+            'OTHER_SWIFT_FLAGS: "$(inherited) -DVOCELLO_INTERNAL_DIAGNOSTICS"',
+            project,
+        )
+        for relative in ("scripts/build.sh", "scripts/macos_test.sh", "scripts/ui_test.sh"):
+            with self.subTest(relative=relative):
+                self.assertIn(
+                    "QVOICE_INTERNAL_DIAGNOSTICS_SWIFT_FLAG=-DVOCELLO_INTERNAL_DIAGNOSTICS",
+                    self.text(relative),
+                )
+        self.assertIn(
+            "QVOICE_DEVICE_DIAGNOSTICS_SWIFT_FLAG=-DQVOICE_DEVICE_DIAGNOSTICS",
+            self.text("scripts/ios_device.sh"),
+        )
+
+    def test_fast_regeneration_owns_the_project_stamp_and_defers_the_gate(self) -> None:
+        regeneration = self.text("scripts/regenerate_project.sh")
+        for token in (
+            "--fast",
+            "QVOICE_XCODE_SOURCE_PACKAGES",
+            'GENERATION_STAMP="$GENERATION_CACHE_DIR/project.yml.sha256"',
+            'mv -f "$generation_stamp_next" "$GENERATION_STAMP"',
+            'if [[ "$MODE" == "checkpoint" ]]',
+            'bash "$SCRIPT_DIR/check_project_inputs.sh"',
+        ):
+            self.assertIn(token, regeneration)
+        cache = self.text("scripts/lib/build_cache.sh")
+        self.assertIn('"$ROOT_DIR/scripts/regenerate_project.sh" --fast', cache)
+        self.assertNotIn('echo "$current_hash" > "$stamp_path"', cache)
+
+    def test_incremental_ios_foundation_checkpoint_reuses_the_device_cache(self) -> None:
+        foundation = self.text("scripts/build_foundation_targets.sh")
+        for token in (
+            "[--incremental]",
+            'derived_data_path="$QVOICE_XCODE_IOS_DERIVED"',
+            'swift_settings=(SWIFT_OPTIMIZATION_LEVEL=-O)',
+            '[[ "$MODE" != "ios" ]]',
+            'if (( INCREMENTAL == 0 ))',
+            "run_foundation_build",
+            "full log:",
+        ):
+            self.assertIn(token, foundation)
+
     def test_cli_uses_generated_scheme_and_canonical_derived_data(self) -> None:
         build = self.text("scripts/build.sh")
         start = build.index("build_cli() {")

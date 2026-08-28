@@ -131,6 +131,71 @@
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Website" } }
       }
     },
+    "vocello.enrollment.import_audio" : {
+      "comment" : "Action that opens Files to choose a voice-cloning reference clip.",
+      "extractionState" : "manual",
+      "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Import audio file" } } }
+    },
+    "vocello.enrollment.import_audio.detail" : {
+      "comment" : "Supported-format description below the reference-audio import action.",
+      "extractionState" : "manual",
+      "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Choose a WAV, MP3, AIFF, or M4A file from Files." } } }
+    },
+    "vocello.enrollment.transcription.audio_only_confirmed" : {
+      "comment" : "Enrollment status after explicit confirmation to save without a transcript.",
+      "extractionState" : "manual",
+      "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Audio-only enrollment selected. The transcript will remain empty." } } }
+    },
+    "vocello.enrollment.transcription.automatic_ready" : {
+      "comment" : "Enrollment status after on-device speech recognition supplied editable text.",
+      "extractionState" : "manual",
+      "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Automatic transcript ready. Review it before saving." } } }
+    },
+    "vocello.enrollment.transcription.cancelled" : {
+      "comment" : "Enrollment recovery after automatic transcription is cancelled.",
+      "extractionState" : "manual",
+      "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Transcription stopped. Enter a transcript or use audio only." } } }
+    },
+    "vocello.enrollment.transcription.empty" : {
+      "comment" : "Enrollment recovery when recognition completes without usable text.",
+      "extractionState" : "manual",
+      "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "No automatic transcript was found. Enter one or use audio only." } } }
+    },
+    "vocello.enrollment.transcription.in_progress" : {
+      "comment" : "Enrollment status while on-device speech recognition processes the reference clip.",
+      "extractionState" : "manual",
+      "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Transcribing on this iPhone…" } } }
+    },
+    "vocello.enrollment.transcription.manual_ready" : {
+      "comment" : "Enrollment status after the user edits or enters the transcript.",
+      "extractionState" : "manual",
+      "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Your transcript is ready." } } }
+    },
+    "vocello.enrollment.transcription.permission_denied" : {
+      "comment" : "Enrollment recovery when speech-recognition authorization is unavailable.",
+      "extractionState" : "manual",
+      "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Speech recognition is unavailable. Enter a transcript or use audio only." } } }
+    },
+    "vocello.enrollment.transcription.sidecar_ready" : {
+      "comment" : "Enrollment status when an imported audio file had a neighboring transcript sidecar.",
+      "extractionState" : "manual",
+      "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Transcript loaded from the matching text file." } } }
+    },
+    "vocello.enrollment.transcription.unavailable" : {
+      "comment" : "Enrollment recovery when on-device speech recognition cannot run.",
+      "extractionState" : "manual",
+      "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "On-device transcription is unavailable. Enter a transcript or use audio only." } } }
+    },
+    "vocello.enrollment.use_audio_only" : {
+      "comment" : "Explicit enrollment action used when no transcript is available.",
+      "extractionState" : "manual",
+      "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Use audio only" } } }
+    },
+    "vocello.enrollment.use_audio_only.hint" : {
+      "comment" : "VoiceOver hint for the explicit audio-only enrollment action.",
+      "extractionState" : "manual",
+      "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Save this reference without transcript-backed delivery." } } }
+    },
     "vocello.error.cancellation_not_finished" : {
       "comment" : "Studio error. The substitution explains why the engine cancellation barrier failed.",
       "extractionState" : "manual",

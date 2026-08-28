@@ -177,6 +177,7 @@ class VocelloiOSUITestCase: XCTestCase {
         VocelloUIScreenshot.attach(app, named: "ios-settings-landing-privacy-about")
 
         let attributions = element("iosSettings_openSourceRow")
+        XCTAssertTrue(revealSettingsElement(attributions, swipingUp: true))
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: attributions, timeout: 20))
         XCTAssertTrue(VocelloUIWait.exists(element("screen_openSourceLicenses"), timeout: 20))
         XCTAssertFalse(element("iosAttributionLoadError").exists)

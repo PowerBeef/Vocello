@@ -1,0 +1,160 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vocello.local/schemas/ios-control-audit-v1.json",
+  "title": "Vocello iOS control audit contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "terminalClassifications",
+    "catalogs",
+    "sourceCoverage",
+    "controlFamilies",
+    "generationMatrix"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "terminalClassifications": {
+      "type": "array",
+      "minItems": 8,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "PASS",
+          "PRODUCT_FAIL",
+          "HARNESS_FAIL",
+          "INFRASTRUCTURE_FAIL",
+          "BLOCKED_PREREQUISITE",
+          "BLOCKED_PRESERVATION_POLICY",
+          "NOT_APPLICABLE",
+          "SKIPPED_AFTER_FAILURE"
+        ]
+      }
+    },
+    "catalogs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["speakers", "deliveries", "languages", "variations", "models"],
+      "properties": {
+        "speakers": { "$ref": "#/$defs/catalog" },
+        "deliveries": { "$ref": "#/$defs/catalog" },
+        "languages": { "$ref": "#/$defs/catalog" },
+        "variations": { "$ref": "#/$defs/catalog" },
+        "models": { "$ref": "#/$defs/catalog" }
+      }
+    },
+    "sourceCoverage": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "screen", "scenario", "reason", "interactiveOccurrenceCount"],
+        "properties": {
+          "path": { "type": "string", "pattern": "^Sources/iOS/.+\\.swift$" },
+          "screen": { "type": "string", "minLength": 1 },
+          "scenario": { "enum": ["inventory", "stateful", "external", "accessibility", "generation"] },
+          "reason": { "type": "string", "minLength": 12 },
+          "interactiveOccurrenceCount": { "type": "integer", "minimum": 1 }
+        }
+      }
+    },
+    "controlFamilies": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/controlFamily" }
+    },
+    "generationMatrix": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["searchTokenBase", "maxRows", "modes"],
+      "properties": {
+        "searchTokenBase": { "type": "integer", "minimum": 1 },
+        "maxRows": { "type": "integer", "minimum": 1, "maximum": 512 },
+        "modes": {
+          "type": "object",
+          "required": ["custom", "design", "clone"],
+          "additionalProperties": false,
+          "properties": {
+            "custom": { "$ref": "#/$defs/matrixMode" },
+            "design": { "$ref": "#/$defs/matrixMode" },
+            "clone": { "$ref": "#/$defs/matrixMode" }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "catalog": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "selector"],
+      "properties": {
+        "source": { "type": "string", "minLength": 1 },
+        "selector": { "type": "string", "minLength": 1 }
+      }
+    },
+    "controlFamily": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "identifierPattern",
+        "sourceToken",
+        "screen",
+        "prerequisite",
+        "role",
+        "action",
+        "expectedResult",
+        "expectedSemantics",
+        "minimumTargetPoints",
+        "mutationClass",
+        "scenario",
+        "availability"
+      ],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]+$" },
+        "identifierPattern": { "type": "string", "minLength": 1 },
+        "sourceToken": { "type": "string", "minLength": 1 },
+        "expandFrom": { "enum": ["speakers", "deliveries", "languages", "variations", "models"] },
+        "screen": { "type": "string", "minLength": 1 },
+        "prerequisite": { "type": "string", "minLength": 1 },
+        "role": { "type": "string", "minLength": 1 },
+        "action": { "type": "string", "minLength": 1 },
+        "expectedResult": { "type": "string", "minLength": 1 },
+        "expectedSemantics": { "type": "string", "minLength": 1 },
+        "minimumTargetPoints": { "type": "number", "minimum": 0 },
+        "mutationClass": {
+          "enum": [
+            "read-only",
+            "reversible",
+            "test-owned-destructive",
+            "confirm-only",
+            "isolated-model",
+            "external-system"
+          ]
+        },
+        "scenario": { "enum": ["inventory", "stateful", "external", "accessibility", "generation"] },
+        "availability": { "enum": ["required", "conditional", "unavailable", "not-applicable"] }
+      }
+    },
+    "matrixMode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dimensions", "coldSentinel"],
+      "properties": {
+        "dimensions": {
+          "type": "object",
+          "minProperties": 2,
+          "additionalProperties": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": { "type": "string", "minLength": 1 }
+          }
+        },
+        "coldSentinel": { "type": "object" }
+      }
+    }
+  }
+}

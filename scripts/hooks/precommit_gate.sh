@@ -49,13 +49,10 @@ marker_dir="build/scratch/gate-fingerprint"
 marker="$marker_dir/last-pass"
 log="$marker_dir/last-run.log"
 
-# Conservative tree fingerprint: any commit, edit, or staging change since the
-# last passing gate re-runs it. Repeat attempts on an identical tree are free.
-fingerprint="$({
-  git rev-parse HEAD 2>/dev/null
-  git status --porcelain 2>/dev/null
-  git diff --cached 2>/dev/null | shasum -a 256
-} | shasum -a 256 | cut -d' ' -f1)"
+# Content-complete tree fingerprint: final tracked worktree bytes and every
+# non-ignored untracked path/byte are bound. Re-editing an already-dirty file
+# cannot reuse a stale PASS marker, while staging the exact same bytes can.
+fingerprint="$(python3 scripts/tree_fingerprint.py --root "$ROOT_DIR")"
 
 if [[ -f "$marker" && "$(cat "$marker" 2>/dev/null)" == "$fingerprint" ]]; then
   exit 0

@@ -98,8 +98,12 @@ Maintained iPhone subtrees:
 - `voices/` stores committed saved-voice reference assets. Each row can delete only its own audio, transcript, and prepared prompt artifacts after an explicit confirmation; other voice-bank members remain intact.
 - `voice-candidates/` privately stages review candidates for at most 24 hours. They are invisible to the saved-voice catalog until Keep/Save commits them; Cancel, Discard, and outside dismissal remove them. `voice-transactions/` is the bounded recovery journal for commit/replacement/delete operations.
 - `cache/imported_references/` stores app-owned materializations of WAV, MP3, AIFF, or M4A files
-  selected or opened through Files, plus an adjacent `.txt` sidecar when supplied. Enrollment stages
-  the selected reference as a private candidate and copies it into `voices/` only on commit.
+  selected directly from Studio Clone, selected from Voices, or opened through Files, plus an
+  adjacent `.txt` sidecar when supplied. A sidecar is preferred; otherwise on-device recognition
+  produces an editable review without uploading audio. Enrollment stages the selected reference as
+  a private candidate and copies it into `voices/` only after the user confirms Save. Picker
+  cancellation, import failure, enrollment cancellation, and candidate discard do not publish a
+  Saved Voice or replace the current Clone draft.
 - Other `cache/` subtrees store required runtime cache data.
 - `history.sqlite` stores local generation history. Database initialization, migration, read,
   write, or delete failures are typed and fail closed: the UI shows a degraded state with a visible
@@ -127,7 +131,16 @@ audio-only x-vector path. Those modes have separate cache/artifact identities.
 
 ## Microphone And On-Device Transcription
 
-Recording a reference clip uses the **Microphone** permission; transcript auto-fill uses **Speech Recognition**. Both are requested on first use, and recognition always runs with `requiresOnDeviceRecognition` — the audio is never sent to Apple or any server, on macOS or iPhone. Transcripts are stored only as the local `.txt` sidecar next to the voice's WAV. On macOS, transcription additionally requires Siri to be enabled (an OS gate — the system silently refuses speech-recognition authorization otherwise); the app detects this and links the relevant System Settings panes. Full permission model: [`macos-permissions.md`](macos-permissions.md).
+Recording a reference clip uses the **Microphone** permission; transcript auto-fill for both recorded
+and no-sidecar imported clips uses **Speech Recognition**. Both are requested on first use, and
+recognition always runs with `requiresOnDeviceRecognition` — the audio is never sent to Apple or any
+server, on macOS or iPhone. The review stays editable, Save is blocked while recognition is
+unresolved, and unavailable recognition requires manual text or an explicit Use audio only choice.
+Operation generations and cancellation prevent a stale recognizer result from replacing a newer
+file or a user's edit. Transcripts are stored only as the local `.txt` sidecar next to the voice's
+WAV. On macOS, transcription additionally requires Siri to be enabled (an OS gate — the system
+silently refuses speech-recognition authorization otherwise); the app detects this and links the
+relevant System Settings panes. Full permission model: [`macos-permissions.md`](macos-permissions.md).
 
 ## Diagnostics
 

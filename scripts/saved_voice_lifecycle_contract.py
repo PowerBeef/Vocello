@@ -34,6 +34,9 @@ def validate(root: Path) -> None:
     semantic_types = _read(root, "Sources/QwenVoiceCore/SemanticTypes.swift")
     repository = _read(root, "Sources/QwenVoiceCore/PreparedVoiceRepository.swift")
     ios_voices = _read(root, "Sources/iOS/IOSVoicesView.swift")
+    ios_root = _read(root, "Sources/iOS/App/RootView.swift")
+    ios_reference_sheet = _read(root, "Sources/iOS/Sheets/IOSBottomSheets.swift")
+    ios_transcription = _read(root, "Sources/iOSSupport/Services/IOSReferenceTranscriptionReviewState.swift")
     engine = _read(root, "Sources/QwenVoiceCore/MLXTTSEngine.swift")
     wire = _read(root, "Sources/QwenVoiceEngineSupport/EngineServiceIPC.swift")
     ios_ui_test = _read(root, "Tests/VocelloiOSUITests/VocelloiOSSavedVoiceLifecycleUITests.swift")
@@ -112,14 +115,66 @@ def validate(root: Path) -> None:
             raise ContractError(f"iOS saved-voice deletion is missing {token!r}")
 
     for token in (
+        '"referenceClip_importAudioFile"',
+        '"referenceClip_recordNewClip"',
+        "onRequestImport",
+    ):
+        if token not in ios_reference_sheet:
+            raise ContractError(f"direct Clone import sheet is missing {token!r}")
+
+    for token in (
+        "IOSReferenceAudioImportPolicy.selectedSourceURL(from: result)",
+        "ttsEngine.importReferenceAudio(from: sourceURL)",
+        "importedVoicePresentation = ImportedVoicePresentation(reference: imported)",
+        "PendingVoiceCloningHandoff(",
+    ):
+        if token not in ios_root:
+            raise ContractError(f"direct Clone import route is missing {token!r}")
+
+    for token in (
+        "case transcribing",
+        "case audioOnlyConfirmed",
+        "operationGeneration",
+        "acceptAutomaticTranscript(",
+        "allowsSave(transcript:",
+        "offersAudioOnlyConfirmation",
+    ):
+        if token not in ios_transcription:
+            raise ContractError(f"transcription review policy is missing {token!r}")
+
+    ios_record_sheet = _read(root, "Sources/iOS/Voices/IOSRecordVoiceSheet.swift")
+    for token in (
+        "VoiceClipTranscriber.transcribe(url: url)",
+        "transcriptionReview.allowsSave(transcript: transcript)",
+    ):
+        if token not in ios_record_sheet:
+            raise ContractError(f"transcription review enrollment is missing {token!r}")
+
+    ios_save_sheet = _read(root, "Sources/iOS/IOSGenerationInputControls.swift")
+    for token in (
+        '"saveVoice_transcriptionStatus"',
+        '"saveVoice_useAudioOnlyButton"',
+    ):
+        if token not in ios_save_sheet:
+            raise ContractError(f"transcription review UI is missing {token!r}")
+
+    for token in (
         "testImportPreviewHandoffAndDeleteSavedVoice",
         'element("voicesPreview_saved_\\(voiceName)")',
         'element("voicesDeleteConfirm_\\(voiceName)")',
         "studioChip_reference",
+        'element("referenceClip_importAudioFile")',
+        'element("saveVoice_transcriptionStatus")',
+        'element("saveVoice_transcriptEditor")',
+        "generateAndWaitForCompletedPlayer",
     ):
         if token not in ios_ui_test:
             raise ContractError(f"iOS saved-voice lifecycle XCUITest is missing {token!r}")
-    if '"saved-voice-lifecycle"' not in ui_runner or "VocelloiOSSavedVoiceLifecycleUITests" not in ui_runner:
+    if (
+        '"saved-voice-lifecycle"' not in ui_runner
+        or "VocelloiOSSavedVoiceLifecycleUITests" not in ui_runner
+        or "ICI Direct Clone Import.wav" not in ui_runner
+    ):
         raise ContractError("iOS saved-voice lifecycle XCUITest lane is missing")
 
 

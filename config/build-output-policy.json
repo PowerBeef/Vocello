@@ -13,6 +13,7 @@
         "smoke",
         "localization",
         "benchmark",
+        "control-audit",
         "model-download",
         "startup-parity",
         "perf"
@@ -89,6 +90,10 @@
       },
       "ui-model-download": {
         "requiredFreeBytes": 19327352832,
+        "cleanupHint": "scripts/clean_build_caches.sh --prune-ui-results"
+      },
+      "ui-control-audit": {
+        "requiredFreeBytes": 25769803776,
         "cleanupHint": "scripts/clean_build_caches.sh --prune-ui-results"
       },
       "ui-enroll-clone-fixture": {

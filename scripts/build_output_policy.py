@@ -91,6 +91,7 @@ HEAVY_LANE_IDS = {
     "ui-delivery-cohort",
     "ui-startup-parity",
     "ui-model-download",
+    "ui-control-audit",
     "ui-enroll-clone-fixture",
     "ui-saved-voice-lifecycle",
     "release",

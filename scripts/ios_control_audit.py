@@ -388,7 +388,12 @@ def validate_plan(contract: dict[str, Any], plan: dict[str, Any]) -> None:
 
 def encode_plan(contract: dict[str, Any], plan: dict[str, Any]) -> str:
     validate_plan(contract, plan)
-    compressed = zlib.compress(canonical_bytes(plan), level=9)
+    # Foundation's NSData.CompressionAlgorithm.zlib decoder consumes a raw
+    # DEFLATE stream rather than the RFC 1950 wrapper emitted by
+    # zlib.compress(). Keep the transport explicit so the host-produced plan
+    # decodes identically in the physical-device XCTest runner.
+    compressor = zlib.compressobj(level=9, method=zlib.DEFLATED, wbits=-zlib.MAX_WBITS)
+    compressed = compressor.compress(canonical_bytes(plan)) + compressor.flush()
     return base64.b64encode(compressed).decode("ascii")
 
 
@@ -406,6 +411,62 @@ def _read_jsonl(path: pathlib.Path) -> list[dict[str, Any]]:
         if not isinstance(row, dict):
             raise AuditError(f"observation line {line_number} is not an object")
         rows.append(row)
+    return rows
+
+
+def collect_observations(
+    manifest_path: pathlib.Path,
+    attachment_root: pathlib.Path,
+    output_path: pathlib.Path,
+) -> list[dict[str, Any]]:
+    """Collect XCTest's versioned attachment names into validated JSONL.
+
+    `xcresulttool export attachments` may preserve the requested attachment
+    name or append an occurrence index and UUID. Match that documented export
+    shape rather than requiring one literal filename, while rejecting path
+    traversal, missing bytes, malformed JSONL, and a silent zero-row result.
+    """
+
+    manifest = load_json(manifest_path)
+    if not isinstance(manifest, list):
+        raise AuditError("xcresult attachment manifest must be an array")
+    attachment_name = re.compile(
+        r"^control-observations(?:_[0-9]+_[0-9A-Fa-f-]+)?\.jsonl$"
+    )
+    rows: list[dict[str, Any]] = []
+    matches = 0
+    for test in manifest:
+        if not isinstance(test, dict):
+            raise AuditError("xcresult attachment manifest contains a non-object test")
+        attachments = test.get("attachments", [])
+        if not isinstance(attachments, list):
+            raise AuditError("xcresult attachment list is not an array")
+        for attachment in attachments:
+            if not isinstance(attachment, dict):
+                raise AuditError("xcresult attachment entry is not an object")
+            suggested = attachment.get("suggestedHumanReadableName")
+            if not isinstance(suggested, str) or not attachment_name.fullmatch(suggested):
+                continue
+            exported = attachment.get("exportedFileName")
+            if not isinstance(exported, str) or pathlib.Path(exported).name != exported:
+                raise AuditError("control observation attachment has an unsafe exported filename")
+            source = attachment_root / exported
+            if not source.is_file():
+                raise AuditError(f"control observation attachment is missing: {exported}")
+            matches += 1
+            rows.extend(_read_jsonl(source))
+    if matches == 0:
+        raise AuditError("xcresult contains no control-observations attachment")
+    if not rows:
+        raise AuditError("control-observations attachment contains no rows")
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(
+        "".join(
+            json.dumps(row, sort_keys=True, separators=(",", ":"), ensure_ascii=False) + "\n"
+            for row in rows
+        ),
+        encoding="utf-8",
+    )
     return rows
 
 
@@ -676,6 +737,11 @@ def main() -> int:
     encode_parser.add_argument("--plan", type=pathlib.Path, required=True)
     encode_parser.add_argument("--output", type=pathlib.Path, required=True)
 
+    collect_parser = subparsers.add_parser("collect-observations")
+    collect_parser.add_argument("--manifest", type=pathlib.Path, required=True)
+    collect_parser.add_argument("--attachments", type=pathlib.Path, required=True)
+    collect_parser.add_argument("--output", type=pathlib.Path, required=True)
+
     compose_parser = subparsers.add_parser("compose")
     compose_parser.add_argument("--run-metadata", type=pathlib.Path, required=True)
     compose_parser.add_argument("--plan", type=pathlib.Path, required=True)
@@ -707,6 +773,14 @@ def main() -> int:
             arguments.output.parent.mkdir(parents=True, exist_ok=True)
             arguments.output.write_text(encoded + "\n", encoding="ascii")
             print(arguments.output)
+            return 0
+        if arguments.command == "collect-observations":
+            rows = collect_observations(
+                arguments.manifest,
+                arguments.attachments,
+                arguments.output,
+            )
+            print(f"collected {len(rows)} control observations")
             return 0
         if arguments.command == "compose":
             summary = compose(

@@ -2,7 +2,7 @@
 status: historical
 owner: ios
 summary: Point-in-time implementation and execution checkpoint for the source-bound exhaustive physical-iPhone control, accessibility, model-lifecycle, and pairwise generation audit.
-contentDigest: sha256:9c2359202b8e343cf406e05196cb7fd41af49f4d91e3f462f645a08ae46040fa
+contentDigest: sha256:bdd889c6475858ef51e66ebb5af6206c860777c257469fd7ebc6d31a95ff039e
 sourceOfTruth:
   - config/ios-control-audit.json
   - scripts/ios_control_audit.py
@@ -12,29 +12,35 @@ sourceOfTruth:
 ---
 # iOS on-device control audit — 2026-08-28
 
-> **Pinned historical implementation checkpoint.** This report describes the harness and the
-> evidence available on 2026-08-28. It is not a clean device verdict, App Store authorization, or
-> product-fix authority. Source, machine-readable contracts, repository scripts, and
+> **Pinned historical pause checkpoint.** This report describes the harness and the retained
+> evidence available when device work paused after the ninth performance scenario on 2026-08-28.
+> It is not a clean device verdict, App Store authorization, or product-fix authority. Source,
+> machine-readable contracts, repository scripts, and
 > [`config/roadmap.json`](../../config/roadmap.json) remain authoritative. The report must be
 > deliberately re-pinned after the physical campaign adds device findings.
 
 ## Executive assessment
 
-The phone-independent implementation is complete. Vocello now has one source-bound
-`control-audit` lane layered over the existing physical-device XCUITest runner. It inventories the
-production control surface, freezes the complete source-tree identity, generates a deterministic
-all-pairs generation campaign, records terminal outcomes without automatic retries, and composes
-untracked observations without converting missing or blocked rows into passes.
+The implementation and a substantial first physical-device campaign are complete. Inventory,
+stateful controls, external handoffs, direct Clone import, isolated model queue/acceptance, smoke,
+and all nine performance scenarios have authoritative retained outcomes. The performance XCTest
+suite passed 9/9 and its host gate passed with explicit warnings; its compact record is
+`ios-xcui-perf-20260828-172155-32e5b71e` in the PASS-only benchmark registry.
 
-The physical-device audit is **not complete**. No product defect, accessibility pass, generation
-pass, model-lifecycle pass, or clean restoration conclusion is claimed by this checkpoint. The
-paired iPhone campaign remains ICA-04, and the evidence-linked device report remains ICA-05.
+The physical-device audit is **not complete** and no clean verdict is claimed. Accessibility found
+a 33.68-point Voices tab target, the model diagnostic reproduced a stale/inaccurate progress bar,
+and the pairwise generation campaign stopped without retry on its second take when Qwen3-TTS
+reached `maxNewTokens` before EOS. Every unexecuted generation row remains
+`SKIPPED_AFTER_FAILURE`; permission mutation that could not be restored remains
+`BLOCKED_PRESERVATION_POLICY`. ICA-04 and ICA-05 are therefore in flight rather than complete.
 
 One confirmed harness defect was corrected during implementation: the existing smoke journey
 located `iosSettings_openSourceRow` after scrolling to Privacy but attempted to tap the row while it
 was still below the floating dock. The shared journey now explicitly reveals the row before tapping.
-This remains a harness reachability correction unless the corrected physical journey reproduces a
-product failure.
+The corrected physical journey passed. Additional harness defects found while running the campaign
+were fixed without converting earlier failed evidence into passes: scenario ownership drift,
+History-menu dismissal, failure-observation capture, bounded warning syntax, and offline recovery
+of iOS version/build from the retained `.xcresult` for benchmark publication.
 
 ## Machine-readable inventory
 
@@ -161,6 +167,71 @@ emits `SKIPPED_AFTER_FAILURE` for an expected row with no observation. A complet
 explicit preservation limitations, but it cannot be described as clean when a required row fails,
 is skipped, or remains unexplained.
 
+## Retained physical-device checkpoint
+
+Device work stopped immediately after the ninth performance scenario, as requested. No later
+phone command belongs to this checkpoint.
+
+| Phase | Authoritative run | Outcome | Evidence summary |
+| --- | --- | --- | --- |
+| Inventory | `ios-xcui-control-audit-20260828-163446-1dca3c73` | `PASS` | Tabs, three modes, nine speakers and previews, eight deliveries, ten languages, and custom-tone navigation. |
+| Stateful | `ios-xcui-control-audit-20260828-163043-fc88fb36` | `PASS` | Reversible preferences restored, all variations exercised, model rows observed, and global History deletion opened then cancelled. |
+| External | `ios-xcui-control-audit-20260828-164234-6509e3fa` | `PASS` with one policy block | Privacy, support, source, attribution, iOS Settings, and Files-cancel handoffs passed. Recording-permission mutation is `BLOCKED_PRESERVATION_POLICY`. |
+| Accessibility | `ios-xcui-control-audit-20260828-143417-45184a63` | `PRODUCT_FAIL` | `rootTab_voices` measured 33.6767 points wide at Default size, below the 44-point contract. Later size/surface coverage stopped at that failure. |
+| Direct Clone import | `ios-xcui-saved-voice-lifecycle-20260828-143515-86a2b339` | `PASS` | Files import without sidecar, automatic editable transcription, Save Voice, Clone selection/generation, preview/delete, and draft cleanup passed. |
+| Model diagnose | `ios-xcui-model-download-20260828-143816-b6a21224` | `PRODUCT_FAIL` | Durable bytes advanced while UI/accessibility progress remained stale; fill mismatch exceeded five points and contrast fell below 3:1. Install still reached Ready and removal completed. |
+| Model queue | `ios-xcui-model-download-20260828-144508-d60b4368` | `PASS` | Active/queued requests and independent cancellation converged without cross-model contamination. |
+| Model acceptance | `ios-xcui-model-download-20260828-144815-3ba68250` | `PASS` | Governed acceptance path passed; it does not waive the separate diagnose failure. |
+| Generation | `ios-xcui-control-audit-20260828-160326-950de77a` | `PRODUCT_FAIL` | `custom-001` passed; `custom-002` reached decoded/published audio then failed at token cap without EOS. No retry or seed substitution occurred. |
+| Initial smoke | `ios-xcui-smoke-20260828-164500-f4b01e19` | `BLOCKED_PREREQUISITE` | Canonical clone fixture was absent; Settings accessibility and long-form subtests passed. |
+| Fixture restoration | `ios-enroll-voice-20260828-165800-bbb83fe1` | `PASS` | Governed benchmark clone fixture restored; staged inputs removed. |
+| Smoke | `ios-xcui-smoke-20260828-165939-d9d57039` | `PASS` | Primary journey, Settings accessibility, long-form, pressure event order, post-pressure generation, crash delta, and retention passed. |
+| Performance | `ios-xcui-perf-20260828-172155-32e5b71e` | `PASS` with warnings | Nine of nine XCUITests and the frame gate passed; history publication is now source-bound to retained result identity and does not require the phone. |
+
+Earlier harness-failed attempts remain represented under their original run IDs. They are not
+product findings and were not overwritten or merged with the authoritative runs above. Routine
+latest-pass cleanup did prune the top-level raw bundles for the inventory, stateful, and model
+queue PASS runs before this pause was requested. Their run IDs, verdicts, and bounded device
+diagnostic remnants remain, but their `.xcresult` and complete host bundle do not. They must be
+recaptured with `--retain-result` before final ICA-04 closure. Every surviving authoritative run
+listed above now has an untracked `retention-pin.json`; a cleanup dry-run reports all nine as
+`explicitly-pinned`, so routine cleanup cannot prune them. The runner writes that pin before Xcode
+starts, and explicit pins take precedence even when older run metadata is malformed or legacy-shaped.
+
+The host-only pause checkpoint passed the complete project-input gate after documentation refresh:
+1,223 Python tests, derived artifacts, documentation, roadmap, surface coverage, and the 271-record
+benchmark registry were all green. This validates the recorded checkpoint machinery; it does not
+convert any device failure, blocked row, or pruned raw bundle into passing evidence.
+
+The generation failure is request-specific and source-bound. Its second row used Built-in/Aiden,
+canonical `angry.normal`, Chinese output, Consistent variation, and long Chinese corpus token
+`28400002`; generation ID `79DCD038-6FCD-4647-8F4D-AA02ACE8B3EA`, seed
+`1051465817978323110`, streaming enabled, retry attempt zero, and operation generation two. The
+engine published 293 chunks over about 96.8 seconds with nominal thermal state, about 2.51 GiB peak
+footprint, no underruns, and then reported exactly: `Qwen3-TTS reached maxNewTokens before EOS. The
+output was discarded.` The visible UI incorrectly described this post-stream failure as inability
+to start native generation. The receipt was also cold although the plan expected warm. These are
+ICA-06 evidence, not permission to change prompt, seed, sampling, token limit, or retry policy.
+
+The performance run produced these bounded measurements:
+
+| Scenario | Cadence | Hitch time | Max gap | Classification |
+| --- | ---: | ---: | ---: | --- |
+| Idle baseline | 60 Hz | 0.021 ms/s | 16.75 ms | confirmatory pass |
+| Tab navigation | 57.15 Hz | 82.147 ms/s | 103.58 ms | confirmatory pass |
+| History scroll | 60 Hz | 76.231 ms/s | 83.35 ms | confirmatory pass |
+| Voices scroll | 59.94 Hz | 57.173 ms/s | 62.29 ms | confirmatory pass |
+| Settings scroll | 60 Hz | 41.476 ms/s | 50.01 ms | confirmatory pass |
+| Composer typing | 60 Hz | 23.947 ms/s | 66.71 ms | confirmatory pass |
+| Sheet present/dismiss | 48 Hz | 208.640 ms/s | 160.89 ms | confirmatory, cadence/hitch warnings |
+| Player scrub | 34.4 Hz | 386.149 ms/s | 211.53 ms | exploratory cadence warning |
+| Generation active | 60 Hz | 78.714 ms/s | 518.34 ms | exploratory pass |
+
+XCTest also reported a user-interactive thread waiting on Default QoS at
+`LiveStreamingPlaybackEngine.swift:147`. ICA-08 owns investigation. The warning-range grammar and
+offline result-owned OS identity defects were harness defects and are fixed in the current working
+tree; the retained run now validates in the 271-record history.
+
 ## Accessibility scope
 
 The XCUITest scenario launches Default, AX-L, AX-XXXL, and the existing pseudo-AX-XXXL
@@ -176,34 +247,58 @@ manual/device gaps, not represented as automated passes.
 
 | ID | Severity | Kind | Confidence | Finding | Closure |
 | --- | --- | --- | --- | --- | --- |
-| ICA-H01 | P2 | Harness | source-proven | Settings smoke attempted to tap the Open Source row before scrolling it above the floating dock. | Corrected journey must pass once on the paired physical iPhone. |
-| ICA-PENDING | — | Prerequisite | device-deferred | No live control, accessibility, generation, isolated-model, stress, or restoration campaign has run against this implementation. | Complete ICA-04 and re-pin this report from retained run evidence. |
+| ICA-P01 / ICA-06 | P1 | Product | device-reproduced | The second pairwise row published 293 chunks then reached max tokens without EOS; UI misclassified it as startup failure, and its observed receipt was cold instead of planned warm. | Localize first divergence, preserve exact request/seed/prompt/sampling/QC, correct terminal mapping, add deterministic coverage, and pass the affected row once without retry before restarting the matrix. |
+| ICA-P02 / MD-3 | P1 | Product | device-reproduced | Durable model bytes advanced while the visible/accessibility fraction froze; rendered width diverged by more than five points and contrast fell below 3:1. | Causal fix plus two consecutive diagnose passes and one acceptance pass under the unchanged MD-3 gate. |
+| ICA-P03 / ICA-07 | P2 | Product | device-reproduced | `rootTab_voices` exposed a 33.6767-point width at Default instead of a 44-point activation target. | Geometry regression coverage and one clean four-size physical-device accessibility run. |
+| ICA-P04 / ICA-08 | P2 | Product/performance | device-reproduced | Sheet presentation crossed warn-only cadence/hitch ceilings; player scrub recorded an exploratory cadence warning; XCTest reported playback priority inversion. | Explain ownership, fix causal source where applicable, then repeat the nine-scenario lane without weakening thresholds or classification. |
+| ICA-H01 | P2 | Harness | source- and fixture-proven | Settings reachability, scenario ownership, History dismissal, product-failure capture, warning-range parsing, and delayed iOS history publication each had a harness defect. | Current targeted tests and corrected live journeys pass; full deterministic checkpoint remains required before commit. |
+| ICA-B01 | P2 | Preservation | device-reproduced | Microphone/speech permission mutation could not be proven autonomously restorable. | Keep `BLOCKED_PRESERVATION_POLICY` until a reliable app-specific restore route exists; manual acceptance remains separate. |
+| ICA-R01 | P2 | Prerequisite | device-reproduced | Initial smoke lacked the canonical clone fixture. | Governed restoration succeeded and a separate smoke run passed; retain the first run as blocked evidence. |
+| ICA-PENDING | — | Coverage | device-deferred | The generation rows after `custom-002`, full four-size accessibility walk, actual VoiceOver speech/rotor behavior, conditional Update/Repair states, permission denial/recovery, three-repeat stress/restoration, and exact signed-candidate acceptance remain incomplete. | Resume only after the corresponding causal fixes and prerequisites; do not merge evidence across a changed source identity. |
 
-There are no confirmed product findings in this checkpoint. That absence means “not executed,” not
-“no defects found.” Product remediation is outside this audit and requires a separate maintainer
-request after a source- or device-reproduced root cause exists.
+Product remediation remains outside this audit and requires a separate maintainer request. A clean
+conclusion is prohibited while the required rows above fail, are skipped, or remain blocked.
 
-## Physical execution order
+## Safe resume checkpoint
 
-When the paired iPhone is unlocked, charging, on stable Wi-Fi, and has adequate free space:
+Do not repeat preserved successful phases merely to obtain a green aggregate. Inventory, stateful,
+and model queue require one evidence-recapture pass because their raw bundles were pruned; this is
+an evidence-retention requirement, not a change to their recorded functional result. The next
+device window begins only after the relevant source remediation and deterministic checks:
+
+1. ICA-06: localize and fix the exact non-EOS terminal path and false UI classification; then run
+   the affected generation row as a focused physical-device proof. Because a source fix changes
+   the frozen identity, generate a new campaign rather than using the old resume token.
+2. ICA-07: fix the root-tab activation geometry and repeat the accessibility scenario across
+   Default, AX-L, AX-XXXL, and pseudo-AX-XXXL.
+3. MD-3: fix the progress presentation divergence and complete two fresh diagnose passes followed
+   by one acceptance pass. Queue need not repeat unless the causal change touches queue semantics.
+4. Recapture inventory, stateful, and model queue with `--retain-result` so final closure has their
+   complete `.xcresult`, observations, and host artifacts.
+5. Continue the remaining Built-in, Voice Design, and Clone generation matrix under one new frozen
+   source identity. Do not retry or replace a failing row.
+6. Complete actual VoiceOver/rotor review, any authorized permission denial/recovery, conditional
+   Update/Repair states if they arise naturally, three-repeat stress, and final restoration proof.
+7. Repeat the nine-scenario performance lane only if ICA-08 changes performance-sensitive source;
+   otherwise the retained 9/9 record remains the checkpoint evidence.
+8. ASR-12 still requires the exact signed candidate and cannot be closed by these development
+   builds.
+
+Canonical entry points remain:
 
 ```sh
 scripts/ios_device.sh preflight
-scripts/ui_test.sh ios control-audit --scenario inventory
-scripts/ui_test.sh ios control-audit --scenario stateful
-scripts/ui_test.sh ios control-audit --scenario external
-scripts/ui_test.sh ios control-audit --scenario accessibility
-scripts/ui_test.sh ios saved-voice-lifecycle
-scripts/ui_test.sh ios model-download --scenario diagnose
-scripts/ui_test.sh ios model-download --scenario queue
-scripts/ui_test.sh ios model-download --scenario acceptance
-scripts/ui_test.sh ios control-audit --scenario generation
-scripts/ui_test.sh ios smoke
-scripts/ui_test.sh ios perf
+scripts/ui_test.sh ios control-audit --scenario inventory --retain-result
+scripts/ui_test.sh ios control-audit --scenario stateful --retain-result
+scripts/ui_test.sh ios control-audit --scenario accessibility --retain-result
+scripts/ui_test.sh ios model-download --scenario diagnose --retain-result
+scripts/ui_test.sh ios model-download --scenario queue --retain-result
+scripts/ui_test.sh ios model-download --scenario acceptance --retain-result
+scripts/ui_test.sh ios control-audit --scenario generation --retain-result
 ```
 
-The campaign is expected to require multiple phone windows. Resume is permitted only across an
-identical source and plan; it is not permission to merge a prior failure into a later pass.
+Use `--resume` only when source, app build, device, plan, and retained run identities are unchanged.
+It never merges a prior failure into a later pass and is invalid after any product fix.
 
 ## Roadmap authority
 
@@ -212,9 +307,13 @@ The authoritative plan is `ios-control-audit-2026-08`:
 - ICA-01: source inventory — done.
 - ICA-02: resumable physical-device harness — done in source.
 - ICA-03: pairwise generation plan — done.
-- ICA-04: live physical-device campaign — planned.
-- ICA-05: evidence-linked device findings checkpoint — planned.
+- ICA-04: live physical-device campaign — in flight at the post-performance pause.
+- ICA-05: evidence-linked findings checkpoint — in flight; this report is the safe-resume re-pin.
+- ICA-06: long-Chinese non-EOS generation and terminal classification — planned.
+- ICA-07: Voices root-tab 44-point target — planned.
+- ICA-08: cadence warnings and playback priority inversion — planned.
 
 Related work remains with its existing authority: AV-09 owns XCUITest bootstrap reliability,
-ASR-12 owns exact signed-candidate acceptance, ICI-4 owns direct Clone import acceptance, MD-3 owns
-isolated model-management closure, and ISR-04/ISR-06 own startup reliability.
+ASR-12 owns exact signed-candidate acceptance, ICI-4 is closed by the retained direct-import and
+smoke runs, MD-3 is reopened for the fresh model-progress regression, and ISR-04/ISR-06 own startup
+reliability.

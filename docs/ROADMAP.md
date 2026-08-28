@@ -14,16 +14,16 @@
 | `development-workflow-performance-2026-08` | active | release-qa | 4/5 (80%) |
 | `engineering-review-remediation-2026-08` | active | backend-and-platform | 13/14 (93%) |
 | `ios-app-store-readiness-2026-08` | active | release-qa | 1/12 (8%) |
-| `ios-clone-import-2026-08` | active | ios | 3/4 (75%) |
-| `ios-control-audit-2026-08` | active | ios | 3/5 (60%) |
+| `ios-control-audit-2026-08` | active | ios | 3/8 (38%) |
 | `ios-generation-startup-reliability-2026-08` | active | backend-and-platform | 4/6 (67%) |
+| `model-delivery-2026-08` | active | release-qa | 2/3 (67%) |
 | `compliance-2026-08` | complete | release-qa | 2/2 (100%) |
 | `convergence-metal4-stage4-2026-08` | complete | backend-and-platform | 7/7 (100%) |
 | `doc-governance-2026-08` | complete | release-qa | 9/9 (100%) |
+| `ios-clone-import-2026-08` | complete | ios | 4/4 (100%) |
 | `ios-settings-2026-08` | complete | ios | 3/3 (100%) |
 | `ios-ui-2026-08` | complete | ios | 6/6 (100%) |
 | `macos-ui-2026-08` | complete | macos | 7/7 (100%) |
-| `model-delivery-2026-08` | complete | release-qa | 3/3 (100%) |
 
 ## Autonomous validation audit remediation
 
@@ -238,26 +238,6 @@ Narrative authority: [`docs/reference/ios-app-store-readiness-audit-2026-08-26.m
 - **`ASR-12`** (planned) — Complete current signed-candidate physical-device acceptance.
   gate: Install the exact signed candidate on a supported physical iPhone and pass repository XCUITest smoke, all three model installs/modes, model cancellation/retry/restoration/update/delete/reinstall, saved voices, startup parity, consent and permission denial/recovery, import/record/export/history, offline/interrupted/background/low-storage/memory recovery, VoiceOver, AX-L/AX-XXXL, Reduce Motion/Transparency, contrast/focus/progress/error review, and accepted-size screenshot capture with no Simulator, alternate UI driver, hidden state, automatic retry, or historical-result substitution.
 
-## iOS clone-reference file import and permanent enrollment
-
-`ios-clone-import-2026-08` · **active** · ios · adopted 2026-08-15
-
-Restore and complete the iPhone file-import clone-reference route removed 2026-08-01 for App Store review-posture caution (no rejection ever occurred; build 23 carried the feature and passed beta review): keep the Voices-tab and open-from-Files routes, add direct Studio Clone import, and route every import through permanent enrollment, on-device transcript review, saved-voice lifecycle, and exact Clone handoff rather than reviving a session-only reference path.
-
-Narrative authority: [`docs/reference/ios-app-guide.md`](reference/ios-app-guide.md)
-
-| Item | Status | Title | Evidence |
-| --- | --- | --- | --- |
-| `ICI-1` | done | Full restore of the Files-import clone-reference route | `doc:docs/reference/ios-app-guide.md`, `file:Tests/VocelloiOSUITests/VocelloiOSFixtureEnrollmentUITests.swift` |
-| `ICI-2` | done | Device acceptance of the restored import route | `doc:docs/development-progress.md` |
-| `ICI-3` | done | Direct Clone import with permanent enrollment and transcript review | `file:Sources/iOSSupport/Services/IOSReferenceAudioImportPolicy.swift`, `file:Sources/iOSSupport/Services/IOSReferenceTranscriptionReviewState.swift`, `file:Sources/iOS/Voices/IOSRecordVoiceSheet.swift`, `file:Sources/iOS/App/RootView.swift`, `file:Tests/VocelloiOSLogicTests/IOSReferenceTranscriptionReviewStateTests.swift`, `doc:docs/reference/ios-app-guide.md` |
-| `ICI-4` | planned | Physical-device direct-import, transcription, Clone-generation, and cleanup acceptance | `file:Tests/VocelloiOSUITests/VocelloiOSSavedVoiceLifecycleUITests.swift`, `file:scripts/ui_test.sh`, `doc:docs/reference/ios-device-testing.md` |
-
-### Open items in detail
-
-- **`ICI-4`** (planned) — Physical-device direct-import, transcription, Clone-generation, and cleanup acceptance.
-  gate: On the paired physical iPhone, stage ICI Direct Clone Import.wav without a neighboring .txt sidecar and run scripts/ui_test.sh ios saved-voice-lifecycle. XCUITest must begin in Studio Clone, select referenceClip_importAudioFile, observe saveVoice_transcriptionStatus, receive a nonempty editable automatic transcript, save through any genuine warning review, prove the exact saved voice is selected in studioChip_reference, complete one Clone take, preview the saved row, delete the throwaway voice through its named confirmation, and prove the matching Clone draft clears. Then run scripts/ui_test.sh ios smoke. Both lanes must pass once without automatic retry; screenshots and xcresult remain untracked.
-
 ## Exhaustive physical-iPhone control and generation audit
 
 `ios-control-audit-2026-08` · **active** · ios · adopted 2026-08-28
@@ -271,16 +251,28 @@ Narrative authority: [`docs/reference/ios-on-device-control-audit-2026-08-28.md`
 | `ICA-01` | done | Bind the complete production control inventory | `file:scripts/tests/test_ios_control_audit.py`, `doc:docs/reference/ios-on-device-control-audit-2026-08-28.md` |
 | `ICA-02` | done | Implement the resumable physical-device control harness | `file:scripts/tests/test_ios_control_audit.py`, `doc:docs/reference/ios-on-device-control-audit-2026-08-28.md` |
 | `ICA-03` | done | Freeze the pairwise generation and cleanup plan | `file:scripts/tests/test_ios_control_audit.py`, `doc:docs/reference/ios-on-device-control-audit-2026-08-28.md` |
-| `ICA-04` | planned | Execute the complete physical-device campaign | — |
-| `ICA-05` | planned | Publish the evidence-linked device findings checkpoint | — |
+| `ICA-04` | in-flight | Execute the complete physical-device campaign | — |
+| `ICA-05` | in-flight | Publish the evidence-linked device findings checkpoint | — |
+| `ICA-06` | planned | P1 — localize the long-Chinese non-EOS generation failure and terminal message | `doc:docs/reference/ios-on-device-control-audit-2026-08-28.md` |
+| `ICA-07` | planned | P2 — restore the Voices root-tab 44-point target | `doc:docs/reference/ios-on-device-control-audit-2026-08-28.md` |
+| `ICA-08` | planned | P2 — investigate UI cadence warnings and playback priority inversion | `benchmark:ios-xcui-perf-20260828-172155-32e5b71e`, `doc:docs/reference/ios-on-device-control-audit-2026-08-28.md` |
 
 ### Open items in detail
 
-- **`ICA-04`** (planned) — Execute the complete physical-device campaign.
+- **`ICA-04`** (in-flight) — Execute the complete physical-device campaign.
   gate: On the paired unlocked, charged, thermally nominal iPhone, complete inventory, stateful, external, accessibility, saved-voice, isolated model diagnose/queue/acceptance, generation, smoke, and perf phases against one frozen source identity. Every row must receive a terminal classification, every generated take must correlate visible request, receipt, QC, History and playback, and no failed row may be automatically retried or replaced.
 
-- **`ICA-05`** (planned) — Publish the evidence-linked device findings checkpoint.
+- **`ICA-05`** (in-flight) — Publish the evidence-linked device findings checkpoint.
   gate: After ICA-04, re-pin the historical audit report with every control and generation row represented, P0-P3 findings separated into product, harness, infrastructure, prerequisite, preservation-policy, not-applicable and post-failure categories, exact untracked artifact references, restoration proof, and objective remediation gates. No product fix may be folded into the audit without a separate request.
+
+- **`ICA-06`** (planned) — P1 — localize the long-Chinese non-EOS generation failure and terminal message.
+  gate: Using the exact custom-002 request identity retained by ios-xcui-control-audit-20260828-160326-950de77a, identify why Aiden with angry.normal, Chinese output, Consistent variation, and the long corpus script reaches maxNewTokens without EOS after publishing audio. The fix must preserve the request, seed, sampling defaults, prompts, QC, and one-take policy; correct the visible terminal classification so a post-stream non-EOS failure is never described as startup failure; explain the unexpected cold receipt for a planned warm row; and pass deterministic regression coverage plus the affected physical-device row without automatic retry or seed substitution before restarting the broader matrix.
+
+- **`ICA-07`** (planned) — P2 — restore the Voices root-tab 44-point target.
+  gate: The selected and unselected Voices root-tab control must expose an effective accessibility activation frame at least 44 by 44 points at Default, AX-L, AX-XXXL, and pseudo-AX-XXXL without changing the shared dock's visual alignment or obstructing adjacent tabs. Deterministic geometry tests and the physical-device accessibility scenario must pass once without retry.
+
+- **`ICA-08`** (planned) — P2 — investigate UI cadence warnings and playback priority inversion.
+  gate: Explain and, where source-owned, remove the user-interactive-to-default QoS wait reported at LiveStreamingPlaybackEngine.swift:147. Re-run the nine-scenario physical-device perf lane after any causal change: confirmatory scenarios must meet their warn-only cadence and hitch thresholds, exploratory scrub and generation measurements must remain honestly classified, benchmark publication must succeed offline from retained xcresult identity, and no warning may be hidden or reclassified without contract-backed calibration.
 
 ## iOS Built-in Voice startup reliability
 
@@ -306,6 +298,25 @@ Narrative authority: [`docs/reference/ios-built-in-startup-reliability.md`](refe
 
 - **`ISR-06`** (planned) — Complete exact-script and broader closure evidence.
   gate: Both the original script and tracked sentinel must pass 10/10 cold, 20/20 warm, all eight seeds, every focused predecessor, streaming/non-streaming, and matching UI/engine receipts; then complete the 9-speaker × 8-delivery grid at one seed plus a second seed for the affected speaker row and delivery column. Closure rejects unknown boundaries, silent seed changes, leaked retries, memory-policy violations, crashes, or unrepresented attempts and requires all deterministic gates green.
+
+## Model download throughput
+
+`model-delivery-2026-08` · **active** · release-qa · adopted 2026-08-08
+
+Fix the maintainer-reported download crawl (Hugging Face's CDN shapes throughput per connection, so single-stream multi-gigabyte files always decay) with chunked parallel byte-range transfers, gated by the model-delivery tuning policy's controlled-comparison requirement; extend to iOS only after the background-session identity work and a device A/B.
+
+Narrative authority: [`docs/reference/model-delivery.md`](reference/model-delivery.md)
+
+| Item | Status | Title | Evidence |
+| --- | --- | --- | --- |
+| `MD-1` | done | macOS/CLI chunked byte-range transfers, default on | `commit:ce687f5`, `commit:5e6a9a0`, `file:Tests/VocelloCoreTests/ModelDownloadChunkSchedulingTests.swift`, `file:docs/reference/model-delivery.md` |
+| `MD-2` | done | iOS chunked delivery (identity schema + reconciler + device A/B) | `file:Sources/QwenVoiceCore/ModelDownloadContracts.swift`, `file:Sources/QwenVoiceCore/HuggingFaceDownloader.swift`, `file:Sources/iOS/IOSModelDownloadCoordinator.swift`, `file:Tests/VocelloCoreTests/ModelDownloadChunkSchedulingTests.swift`, `file:docs/reference/model-delivery.md`, `commit:ce687f5`, `commit:5e6a9a0` |
+| `MD-3` | in-flight | P1 — fix iOS model-management progress and adopted finalization | `doc:docs/development-progress.md`, `file:Tests/VocelloiOSUITests/VocelloiOSModelDownloadUITests.swift`, `file:scripts/check_ios_model_management.py`, `file:docs/reference/model-delivery.md` |
+
+### Open items in detail
+
+- **`MD-3`** (in-flight) — P1 — fix iOS model-management progress and adopted finalization.
+  gate: An explicit install after Delete/Cancel must begin a new zero-byte logical request rather than reusing terminal ledger counters. An isolated physical-iPhone Custom transfer that is cancelled, restarted, backgrounded, process-terminated, and adopted after relaunch must transition from Downloading to Ready after authenticated publication rather than remaining indefinitely with logical bytes equal to the catalog total. The deterministic regression must cover terminal-ledger replacement, retryable resume preservation, adopted background-task retry/finalization with every catalog identity and byte complete, prove the large payload is durably published before Ready, and fail on a non-terminal ledger. Determinate UI progress must equal unique durable logical catalog bytes without retry duplication; transfer completion, verification, and installation are indeterminate until Ready. Required closure evidence: two consecutive `scripts/ui_test.sh ios model-download --scenario diagnose` passes followed by one `--scenario acceptance` pass covering Design/Clone shared-component installs, visible removal of all three isolated models, quantitative row/bar checkpoints within five percentage points and 3:1 contrast, exact canonical-state preservation, no leaked tasks or crashes, and no weakening of fail-closed cancellation or integrity policies.
 
 ## EU AI Act Article 50 readiness
 
@@ -358,6 +369,21 @@ Narrative authority: [`docs/reference/repository-self-verification.md`](referenc
 | `DG-8` | done | Deep build-output ownership and storage remediation | `commit:e83ebef`, `file:scripts/build_output_policy.py` |
 | `DG-9` | done | Document the self-verification system and its failure classes | `doc:docs/reference/repository-self-verification.md` |
 
+## iOS clone-reference file import and permanent enrollment
+
+`ios-clone-import-2026-08` · **complete** · ios · adopted 2026-08-15
+
+Restore and complete the iPhone file-import clone-reference route removed 2026-08-01 for App Store review-posture caution (no rejection ever occurred; build 23 carried the feature and passed beta review): keep the Voices-tab and open-from-Files routes, add direct Studio Clone import, and route every import through permanent enrollment, on-device transcript review, saved-voice lifecycle, and exact Clone handoff rather than reviving a session-only reference path.
+
+Narrative authority: [`docs/reference/ios-app-guide.md`](reference/ios-app-guide.md)
+
+| Item | Status | Title | Evidence |
+| --- | --- | --- | --- |
+| `ICI-1` | done | Full restore of the Files-import clone-reference route | `doc:docs/reference/ios-app-guide.md`, `file:Tests/VocelloiOSUITests/VocelloiOSFixtureEnrollmentUITests.swift` |
+| `ICI-2` | done | Device acceptance of the restored import route | `doc:docs/development-progress.md` |
+| `ICI-3` | done | Direct Clone import with permanent enrollment and transcript review | `file:Sources/iOSSupport/Services/IOSReferenceAudioImportPolicy.swift`, `file:Sources/iOSSupport/Services/IOSReferenceTranscriptionReviewState.swift`, `file:Sources/iOS/Voices/IOSRecordVoiceSheet.swift`, `file:Sources/iOS/App/RootView.swift`, `file:Tests/VocelloiOSLogicTests/IOSReferenceTranscriptionReviewStateTests.swift`, `doc:docs/reference/ios-app-guide.md` |
+| `ICI-4` | done | Physical-device direct-import, transcription, Clone-generation, and cleanup acceptance | `file:Tests/VocelloiOSUITests/VocelloiOSSavedVoiceLifecycleUITests.swift`, `file:scripts/ui_test.sh`, `doc:docs/reference/ios-device-testing.md` |
+
 ## iOS Settings information architecture and visual alignment
 
 `ios-settings-2026-08` · **complete** · ios · adopted 2026-08-20
@@ -406,17 +432,3 @@ Narrative authority: [`docs/reference/macos-ui-refresh-2026-08.md`](reference/ma
 | `UI-5` | done | Refinement wave 1 (warm text ramp, motion family, focus rings, scoped observation, type scaling, stable resize fields, glass helper) | `commit:4e0c7cf`, `commit:bc7c108`, `commit:357d482`, `commit:20e14b2`, `file:docs/reference/macos-ui-refresh-2026-08.md` |
 | `UI-6` | done | Wave 2 re-engineering: store observation migration, History/Voices coordinators, shared generation lifecycle, player split | `file:docs/reference/macos-ui-refresh-2026-08.md`, `file:Sources/QwenVoiceCore/HistoryDeletionEngine.swift`, `file:Sources/ViewModels/GenerationLifecycleExecutor.swift`, `file:Sources/SharedSupport/Services/LiveStreamingPlaybackEngine.swift` |
 | `UI-7` | done | Registry formalization of the perf lane (benchmark-history kind, thresholds from repeated baselines) | `file:config/ui-perf-thresholds.json`, `file:benchmarks/runs/ui-perf/macos-xcui-perf-20260805-092804-98c69168.json`, `file:scripts/tests/test_check_macos_ui_perf.py` |
-
-## Model download throughput
-
-`model-delivery-2026-08` · **complete** · release-qa · adopted 2026-08-08
-
-Fix the maintainer-reported download crawl (Hugging Face's CDN shapes throughput per connection, so single-stream multi-gigabyte files always decay) with chunked parallel byte-range transfers, gated by the model-delivery tuning policy's controlled-comparison requirement; extend to iOS only after the background-session identity work and a device A/B.
-
-Narrative authority: [`docs/reference/model-delivery.md`](reference/model-delivery.md)
-
-| Item | Status | Title | Evidence |
-| --- | --- | --- | --- |
-| `MD-1` | done | macOS/CLI chunked byte-range transfers, default on | `commit:ce687f5`, `commit:5e6a9a0`, `file:Tests/VocelloCoreTests/ModelDownloadChunkSchedulingTests.swift`, `file:docs/reference/model-delivery.md` |
-| `MD-2` | done | iOS chunked delivery (identity schema + reconciler + device A/B) | `file:Sources/QwenVoiceCore/ModelDownloadContracts.swift`, `file:Sources/QwenVoiceCore/HuggingFaceDownloader.swift`, `file:Sources/iOS/IOSModelDownloadCoordinator.swift`, `file:Tests/VocelloCoreTests/ModelDownloadChunkSchedulingTests.swift`, `file:docs/reference/model-delivery.md`, `commit:ce687f5`, `commit:5e6a9a0` |
-| `MD-3` | done | P1 — fix iOS model-management progress and adopted finalization | `doc:docs/development-progress.md`, `file:Tests/VocelloiOSUITests/VocelloiOSModelDownloadUITests.swift`, `file:scripts/check_ios_model_management.py`, `file:docs/reference/model-delivery.md` |

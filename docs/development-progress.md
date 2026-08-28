@@ -49,22 +49,41 @@ machine-readable status record and wins over any older prose.
 
 ## Resume here (2026-08-28)
 
-**The exhaustive physical-iPhone control audit is implemented in source; live execution remains
-device-deferred (2026-08-28):** `config/ios-control-audit.json` now binds every interactive iOS
-source file to a governed control family, source token, accessibility contract, mutation class,
-and XCUITest scenario. `scripts/ios_control_audit.py` validates that surface, expands the checked-in
-speaker/delivery/language/variation/model catalogs, and emits a deterministic 201-take all-pairs
-plan: 91 Built-in, 80 Design, and 30 Clone rows with language-matched short/long scripts. The
-harness injects no seed or hidden state: the first successful take in each mode obtains an engine
-seed normally, pins it through the visible run-owned History row, and binds the remaining mode rows
-to that observed seed. The new `control-audit` lane supports inventory, stateful, external, accessibility,
-generation, all, and exact-source resume; observations use fail-closed terminal classifications
-and never turn a missing, destructive-policy-blocked, harness, or infrastructure result into PASS.
-Ordinary Base-model Clone references correctly omit a fabricated delivery-preset dimension because
-they have no instruction channel. The existing Settings smoke journey now reveals the Open Source row above the dock before tapping,
-closing a source-proven harness reachability defect. ICA-01 through ICA-03 are complete; ICA-04 and
-ICA-05 remain planned until the paired phone campaign and evidence-linked re-pin complete. See
+**The exhaustive physical-iPhone control audit is paused after the complete nine-scenario
+performance lane (2026-08-28):** no further device work belongs to this checkpoint. Inventory,
+stateful controls, external handoffs, direct Clone import/transcription/generation/cleanup, model
+queue and acceptance, smoke, and all nine performance scenarios have authoritative retained runs.
+The performance suite passed 9/9 and its gate passed with explicit sheet-presentation and
+player-scrub warnings; compact history record
+`ios-xcui-perf-20260828-172155-32e5b71e` is published. ICI-4 is closed by
+`ios-xcui-saved-voice-lifecycle-20260828-143515-86a2b339` and distinct passing smoke run
+`ios-xcui-smoke-20260828-165939-d9d57039`.
+
+The campaign is not clean or complete. Accessibility run
+`ios-xcui-control-audit-20260828-143417-45184a63` measured `rootTab_voices` at 33.6767 points
+wide. Model diagnose run `ios-xcui-model-download-20260828-143816-b6a21224` reproduced stale UI
+progress, rendered-fraction disagreement, and sub-3:1 contrast, so MD-3 is reopened despite later
+queue and acceptance passes. Generation run `ios-xcui-control-audit-20260828-160326-950de77a`
+passed `custom-001` then stopped without retry at `custom-002`: Aiden, `angry.normal`, Chinese,
+Consistent, long script reached `maxNewTokens` without EOS after 293 published chunks. The UI
+misclassified that post-stream terminal as startup failure, and the observed receipt was cold for a
+planned warm row. All later generation rows are `SKIPPED_AFTER_FAILURE`; recording-permission
+mutation remains `BLOCKED_PRESERVATION_POLICY`.
+
+Resume from ICA-04/ICA-05 only after ICA-06, ICA-07, and the reopened MD-3 have causal fixes and
+deterministic coverage. A source change invalidates the old generation resume identity, so start a
+new frozen campaign rather than merging old failure evidence. Repeat performance only if ICA-08
+changes performance-sensitive source. Actual VoiceOver/rotor behavior, conditional Update/Repair,
+authorized permission denial/recovery, remaining generation rows, three-repeat stress, restoration,
+and exact signed-candidate ASR-12 acceptance remain. See the exact run table and safe commands in
 [`ios-on-device-control-audit-2026-08-28.md`](reference/ios-on-device-control-audit-2026-08-28.md).
+Routine latest-pass cleanup pruned the complete inventory, stateful, and model-queue bundles before
+the pause request; their recorded outcomes and bounded device diagnostics remain, but final ICA-04
+closure needs one recapture pass using the new `--retain-result` option. Every other surviving
+authoritative run is explicitly retention-pinned; a cleanup dry-run reports all nine surviving key
+bundles as `explicitly-pinned`. The pause-checkpoint implementation passed the complete project
+input gate on 2026-08-28, including 1,223 Python tests, derived-document validation, roadmap and
+surface coverage, and the 271-record benchmark registry.
 
 **The development loop is now path-aware and cache-preserving (2026-08-27):**
 `scripts/dev.sh plan|focused|checkpoint` separates repeated edit feedback from one coherent-tree
@@ -92,12 +111,12 @@ transcript, and detected language back to Clone; cancellation/failure/discard le
 and existing draft unchanged. The obsolete unused session-only Add Audio card is removed.
 
 Twelve focused state/policy tests pass in the hosted core suite, and both the full generic iPhoneOS
-app and platform-neutral iOS logic bundle compile successfully. The revised
-`saved-voice-lifecycle` XCUITest now starts in Studio Clone, selects a staged no-sidecar
-`ICI Direct Clone Import.wav`, requires an editable automatic transcript, saves it, completes one
-Clone take, previews and deletes the exact throwaway voice, and proves the matching draft clears.
-ICI-4 remains planned until that explicit physical-device lane and iOS smoke pass once without
-automatic retry; deterministic publication does not depend on the phone window.
+app and platform-neutral iOS logic bundle compile successfully. ICI-4 closed on 2026-08-28:
+`ios-xcui-saved-voice-lifecycle-20260828-143515-86a2b339` started in Studio Clone, selected the
+staged no-sidecar `ICI Direct Clone Import.wav`, received and edited automatic transcription,
+saved it, completed one Clone take, previewed and deleted the exact throwaway voice, and proved the
+matching draft cleared. After governed restoration of the canonical clone fixture, distinct run
+`ios-xcui-smoke-20260828-165939-d9d57039` passed all three smoke tests without automatic retry.
 
 **ASR-03 is closed; ASR-04 has an exact qualified-review boundary (2026-08-27):**
 `config/support-contact.json` owns Vocello's public support URL, monitored address, and response

@@ -32,6 +32,145 @@ class IOSControlAuditContractTests(unittest.TestCase):
         self.assertGreaterEqual(report["interactiveOccurrenceCount"], 70)
         self.assertGreaterEqual(report["expandedControlCount"], 50)
 
+    def test_inventory_returns_to_studio_before_mode_controls(self) -> None:
+        source = (
+            ROOT
+            / "Tests"
+            / "VocelloiOSUITests"
+            / "VocelloiOSControlAuditUITests.swift"
+        ).read_text(encoding="utf-8")
+        inventory = source.split("private func runInventoryAudit()", 1)[1].split(
+            "private func runStatefulAudit()", 1
+        )[0]
+        tab_loop = inventory.index("for tab in VocelloiOSTab.allCases")
+        studio_return = inventory.index("select(tab: .studio)", tab_loop)
+        mode_loop = inventory.index("for mode in VocelloUIBenchMatrix.Mode.allCases", tab_loop)
+        self.assertLess(studio_return, mode_loop)
+
+    def test_speaker_preview_journey_uses_the_voice_sheet_confirmation(self) -> None:
+        source = (
+            ROOT
+            / "Tests"
+            / "VocelloiOSUITests"
+            / "VocelloiOSControlAuditUITests.swift"
+        ).read_text(encoding="utf-8")
+        journey = source.split("private func auditSpeakerOptions()", 1)[1].split(
+            "private func auditDeliveryOptions()", 1
+        )[0]
+        self.assertIn('element("voicePicker_confirm")', journey)
+        self.assertNotIn('element("bottomSheet_close")', journey)
+
+    def test_custom_delivery_journey_uses_the_delivery_sheet_confirmation(self) -> None:
+        source = (
+            ROOT
+            / "Tests"
+            / "VocelloiOSUITests"
+            / "VocelloiOSControlAuditUITests.swift"
+        ).read_text(encoding="utf-8")
+        journey = source.split("private func auditCustomDeliveryEditor()", 1)[1].split(
+            "private func selectSpeaker", 1
+        )[0]
+        self.assertIn('element("deliveryPicker_confirm")', journey)
+        self.assertNotIn('element("bottomSheet_close")', journey)
+
+    def test_snapshot_helpers_use_sheet_owned_confirmation_controls(self) -> None:
+        source = (
+            ROOT
+            / "Tests"
+            / "VocelloiOSUITests"
+            / "VocelloiOSControlAuditUITests.swift"
+        ).read_text(encoding="utf-8")
+        selector_helpers = source.split("private func captureSelectedID", 1)[1].split(
+            "private func captureDesignBrief", 1
+        )[0]
+        self.assertIn('confirmationID: "voicePicker_confirm"', source)
+        self.assertIn('confirmationID: "languagePicker_confirm"', source)
+        self.assertIn('element("deliveryPicker_confirm")', selector_helpers)
+        self.assertNotIn('element("bottomSheet_close")', selector_helpers)
+        self.assertIn("dismissVoiceBriefSheet()", source)
+        self.assertIn('["auto"] + languageIDs', source)
+        brief_dismissal = source.split("private func dismissVoiceBriefSheet", 1)[1].split(
+            "private func captureCloneReferenceSelection", 1
+        )[0]
+        self.assertIn("confirm.swipeDown()", brief_dismissal)
+        self.assertNotIn('element("bottomSheet_close")', brief_dismissal)
+        self.assertNotIn("app.swipeDown()", brief_dismissal)
+
+    def test_settings_reveal_requires_complete_dock_clearance(self) -> None:
+        source = (
+            ROOT
+            / "Tests"
+            / "VocelloiOSUITests"
+            / "VocelloiOSUITestCase.swift"
+        ).read_text(encoding="utf-8")
+        helper = source.split("func revealSettingsElement", 1)[1].split(
+            "func assertRequiredCloneVoice", 1
+        )[0]
+        self.assertIn("settingsElementIsClearOfDock", helper)
+        self.assertIn('element("rootTab_settings")', helper)
+        self.assertIn("target.frame.maxY <= dockAnchor.frame.minY", helper)
+
+    def test_direct_import_dismisses_keyboard_and_reveals_save(self) -> None:
+        source = (
+            ROOT
+            / "Tests"
+            / "VocelloiOSUITests"
+            / "VocelloiOSControlAuditUITests.swift"
+        ).read_text(encoding="utf-8")
+        journey = source.split("private func ensureDirectImportVoice", 1)[1].split(
+            "private func deleteAuditVoiceIfPresent", 1
+        )[0]
+        self.assertIn('nameField.typeText("\\n")', journey)
+        self.assertIn('reveal("saveVoice_saveButton")', journey)
+
+    def test_inline_scrubber_uses_element_gesture_not_slider_api(self) -> None:
+        source = (
+            ROOT
+            / "Tests"
+            / "VocelloiOSUITests"
+            / "VocelloiOSControlAuditUITests.swift"
+        ).read_text(encoding="utf-8")
+        player = source.split("private func exerciseCompletedPlayer", 1)[1].split(
+            "private func deleteRunOwnedHistoryRow", 1
+        )[0]
+        self.assertIn("scrubber.swipeRight()", player)
+        self.assertNotIn("adjust(toNormalizedSliderPosition", player)
+        self.assertNotIn("coordinate(withNormalizedOffset", player)
+        generation = source.split("let generationID = generateAndWaitForCompletedPlayer", 1)[1].split(
+            "if frozenSeed == nil", 1
+        )[0]
+        self.assertLess(
+            generation.index("exerciseCompletedPlayer()"),
+            generation.index("dismissCompletedPlayerAndAssertGenerateReady()"),
+        )
+
+    def test_generation_normalizes_only_exact_reserved_history_rows(self) -> None:
+        source = (
+            ROOT
+            / "Tests"
+            / "VocelloiOSUITests"
+            / "VocelloiOSControlAuditUITests.swift"
+        ).read_text(encoding="utf-8")
+        self.assertIn("deleteStaleAuditHistoryRows(", source)
+        cleanup = source.split("private func deleteStaleAuditHistoryRows", 1)[1].split(
+            "private func visiblePinnedSeed", 1
+        )[0]
+        self.assertIn('NSPredicate(format: "label == %@", expectedScript)', cleanup)
+        self.assertIn("historyRowDeleteConfirm_", cleanup)
+        self.assertIn("dismissHistorySearchKeyboardIfNeeded()", cleanup)
+        keyboard_helper = source.split("private func dismissHistorySearchKeyboardIfNeeded", 1)[1].split(
+            "private func visiblePinnedSeed", 1
+        )[0]
+        self.assertIn('searchField.typeText("\\n")', keyboard_helper)
+        delete_current = source.split("private func deleteRunOwnedHistoryRow", 1)[1].split(
+            "private func deleteStaleAuditHistoryRows", 1
+        )[0]
+        self.assertIn("dismissHistorySearchKeyboardIfNeeded()", delete_current)
+        pin_seed = source.split("private func pinSeedFromRunOwnedHistoryRow", 1)[1].split(
+            "private func unpinAuditSeed", 1
+        )[0]
+        self.assertIn("dismissHistorySearchKeyboardIfNeeded()", pin_seed)
+
     def test_new_interactive_source_fails_closed(self) -> None:
         hits = audit.interactive_sources()
         hits["Sources/iOS/NewUnownedControl.swift"] = [12]
@@ -91,9 +230,13 @@ class IOSControlAuditContractTests(unittest.TestCase):
     def test_compressed_transport_round_trips_the_exact_plan(self) -> None:
         plan = audit.generate_plan(self.contract, self.source_identity)
         encoded = audit.encode_plan(self.contract, plan)
-        decoded = json.loads(zlib.decompress(base64.b64decode(encoded)))
+        compressed = base64.b64decode(encoded)
+        decoded = json.loads(zlib.decompress(compressed, wbits=-zlib.MAX_WBITS))
         self.assertEqual(decoded, plan)
         self.assertLess(len(encoded), 64_000)
+
+        with self.assertRaises(zlib.error):
+            zlib.decompress(compressed)
 
     def test_plan_tamper_and_row_substitution_fail_closed(self) -> None:
         plan = audit.generate_plan(self.contract, self.source_identity)
@@ -215,6 +358,62 @@ class IOSControlAuditCompositionTests(unittest.TestCase):
                 self.plan,
                 [self.observation("not-a-production-control")],
             )
+
+    def test_xcresult_suffixed_observation_attachment_is_collected(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            attachment = root / "exported.txt"
+            observation = self.observation("root-tabs")
+            attachment.write_text(json.dumps(observation) + "\n", encoding="utf-8")
+            manifest = root / "manifest.json"
+            manifest.write_text(
+                json.dumps(
+                    [
+                        {
+                            "attachments": [
+                                {
+                                    "suggestedHumanReadableName": (
+                                        "control-observations_0_"
+                                        "CCE3DAAA-8AA7-47CF-86DC-2C474357FE4D.jsonl"
+                                    ),
+                                    "exportedFileName": attachment.name,
+                                }
+                            ]
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            output = root / "observations.jsonl"
+            rows = audit.collect_observations(manifest, root, output)
+            self.assertEqual(rows, [observation])
+            self.assertEqual(audit._read_jsonl(output), [observation])
+
+    def test_observation_collection_rejects_missing_or_unsafe_attachments(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            manifest = root / "manifest.json"
+            manifest.write_text(json.dumps([{"attachments": []}]), encoding="utf-8")
+            with self.assertRaises(audit.AuditError):
+                audit.collect_observations(manifest, root, root / "output.jsonl")
+
+            manifest.write_text(
+                json.dumps(
+                    [
+                        {
+                            "attachments": [
+                                {
+                                    "suggestedHumanReadableName": "control-observations.jsonl",
+                                    "exportedFileName": "../escape.txt",
+                                }
+                            ]
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            with self.assertRaises(audit.AuditError):
+                audit.collect_observations(manifest, root, root / "output.jsonl")
 
     def test_device_correlation_rejects_receipt_drift(self) -> None:
         take = self.plan["takes"][0]

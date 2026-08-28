@@ -528,7 +528,7 @@
         "Tests/VocelloiOSUITests/VocelloiOSControlAuditUITests.swift",
         "config/roadmap.json"
       ],
-      "contentDigest": "sha256:9c2359202b8e343cf406e05196cb7fd41af49f4d91e3f462f645a08ae46040fa"
+      "contentDigest": "sha256:bdd889c6475858ef51e66ebb5af6206c860777c257469fd7ebc6d31a95ff039e"
     },
     {
       "path": "docs/reference/ios-ui-reference.md",

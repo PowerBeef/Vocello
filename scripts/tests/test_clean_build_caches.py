@@ -302,6 +302,34 @@ raise SystemExit(0 if payload.get("_fixtureValid") is True else 1)
         result = self.run_clean("--prune-ui-results", "--routine", expected=2)
         self.assertIn("mutually exclusive", result.stderr)
 
+    def test_explicit_ui_pin_precedes_legacy_metadata_classification(self) -> None:
+        run = (
+            self.root
+            / "build"
+            / "artifacts"
+            / "ui-tests"
+            / "ios"
+            / "ios-xcui-control-audit-20260713-000001-a"
+        )
+        self.write(run / "run.json", "{malformed")
+        self.write(run / "result.xcresult" / "payload", b"result")
+        self.write(
+            run / "retention-pin.json",
+            json.dumps(
+                {
+                    "schemaVersion": 1,
+                    "pinned": True,
+                    "reason": "campaign-checkpoint",
+                }
+            ),
+        )
+
+        result = self.run_clean("--prune-ui-results", "--dry-run")
+
+        self.assertTrue(run.exists())
+        self.assertIn(run.name, result.stdout)
+        self.assertIn("reason=explicitly-pinned", result.stdout)
+
     def test_prune_preserves_benchmark_publication_repair_evidence(self) -> None:
         repair = self.ui_run("macos", "benchmark", "20260713-000001-a", "passed")
         newest = self.ui_run("macos", "benchmark", "20260713-000002-b", "passed")

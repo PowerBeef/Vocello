@@ -288,7 +288,9 @@ def schema_property_keys(version: int) -> dict[str, set[str]]:
     return properties
 
 SAFE_LABEL_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,95}$")
-SAFE_WARNING_RE = re.compile(r"^[a-z0-9][a-z0-9_.:-]{0,79}(?:\([0-9]+/[0-9]+\))?$")
+SAFE_WARNING_RE = re.compile(
+    r"^[a-z0-9][a-z0-9_.:-]{0,79}(?:\([0-9]+/[0-9]+(?:-[0-9]+)?\))?$"
+)
 SAFE_CELL_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/#:-]{0,159}$")
 SAFE_GENERATION_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{2,159}$")
 SAFE_SCREENSHOT_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
@@ -975,6 +977,37 @@ def ios_runtime_hardware(profile: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
+def xcresult_runtime_hardware(artifact_dir: Path, platform: str) -> dict[str, Any]:
+    """Read immutable OS identity from a retained XCTest result summary.
+
+    Device discovery is useful during a live run, but delayed benchmark
+    publication must not depend on the phone still being connected.  The UI
+    runner stores the compact xcresult summary beside the run artifacts; only
+    its non-identifying OS fields enter tracked history.
+    """
+    summary_path = artifact_dir / "xcresult-test-summary.json"
+    if not summary_path.is_file():
+        return {}
+    summary = load_json(summary_path)
+    devices = summary.get("devicesAndConfigurations")
+    if not isinstance(devices, list):
+        return {}
+    expected_platform = "iOS" if platform == "ios" else "macOS"
+    identities: set[tuple[str, str]] = set()
+    for row in devices:
+        device = row.get("device") if isinstance(row, dict) else None
+        if not isinstance(device, dict) or device.get("platform") != expected_platform:
+            continue
+        version = device.get("osVersion")
+        build = device.get("osBuildNumber")
+        if isinstance(version, str) and version and isinstance(build, str) and build:
+            identities.add((version, build))
+    if len(identities) != 1:
+        return {}
+    version, build = identities.pop()
+    return {"osName": expected_platform, "osVersion": version, "osBuild": build}
+
+
 def default_runtime_hardware(platform: str, profile: dict[str, Any]) -> dict[str, Any]:
     return mac_runtime_hardware() if platform == "macos" else ios_runtime_hardware(profile)
 
@@ -1520,6 +1553,7 @@ def build_record(manifest_path: Path) -> dict[str, Any]:
     merge_missing(record["hardware"], hardware_defaults)
     if isinstance(outer.get("hardware"), dict):
         merge_missing(record["hardware"], outer["hardware"])
+    merge_missing(record["hardware"], xcresult_runtime_hardware(artifact_dir, run["platform"]))
     merge_missing(record["hardware"], default_runtime_hardware(run["platform"], profile))
 
     record.setdefault("toolchain", {})

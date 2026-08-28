@@ -302,14 +302,24 @@ class VocelloiOSUITestCase: XCTestCase {
         // ordinary layout. Keep the bound finite while allowing the complete
         // AX-XXXL surface to move above the floating tab dock.
         for _ in 0..<20 {
-            if target.exists && target.isHittable { return true }
+            if settingsElementIsClearOfDock(target) { return true }
             if swipingUp {
                 app.swipeUp()
             } else {
                 app.swipeDown()
             }
         }
-        return target.exists && target.isHittable
+        return settingsElementIsClearOfDock(target)
+    }
+
+    private func settingsElementIsClearOfDock(_ target: XCUIElement) -> Bool {
+        guard target.exists, target.isHittable else { return false }
+        let dockAnchor = element("rootTab_settings")
+        guard dockAnchor.exists else { return true }
+        // XCTest can report a partially obscured row as hittable even when
+        // its synthesized center tap lands inside the floating dock. Require
+        // the complete target to clear the dock before acting on it.
+        return target.frame.maxY <= dockAnchor.frame.minY - 4
     }
 
     @discardableResult
@@ -506,7 +516,10 @@ class VocelloiOSUITestCase: XCTestCase {
 
     /// Uses only visible production state: enabled Generate before the action,
     /// the completed inline player after it, and no visible generation error.
-    func generateAndWaitForCompletedPlayer(timeout: TimeInterval) -> String {
+    func generateAndWaitForCompletedPlayer(
+        timeout: TimeInterval,
+        onVisibleError: ((String) -> Void)? = nil
+    ) -> String {
         let generate = element("textInput_generateButton")
         let cancel = element("textInput_cancelButton")
         let livePlayer = element("studio_livePreview_playPause")
@@ -539,8 +552,17 @@ class VocelloiOSUITestCase: XCTestCase {
             // unwinds the test session. XCTest's automatic hierarchy snapshots
             // can otherwise stop at the preceding Generating frame.
             VocelloUIScreenshot.attach(app, named: "ios-generation-visible-error")
+            let visibleError = [
+                generationError.label,
+                generationError.value as? String,
+            ]
+            .compactMap { $0 }
+            .filter { !$0.isEmpty }
+            .joined(separator: " | ")
+            onVisibleError?(visibleError.isEmpty ? "Visible generation error" : visibleError)
+            XCTFail("Generation exposed its visible error control: \(visibleError)")
+            return ""
         }
-        XCTAssertFalse(generationError.exists, "Generation must not expose its visible error control")
         XCTAssertTrue(VocelloUIWait.exists(completedPlayer, timeout: 5))
         XCTAssertTrue(
             VocelloUIWait.condition("completed player to replace live generation UI", timeout: 20) {

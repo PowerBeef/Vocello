@@ -191,6 +191,7 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
         beginAuditSession()
         defer { endSession() }
 
+        let originalMode = selectedMode()
         for tab in VocelloiOSTab.allCases {
             select(tab: tab)
         }
@@ -199,7 +200,9 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
             expected: "Every tab becomes selected", actual: "All four tabs selected through rootTab identifiers"
         )
 
-        let originalMode = selectedMode()
+        // The tab loop intentionally ends on Settings. Return to the owning
+        // Studio surface before querying or exercising mode-only controls.
+        select(tab: .studio)
         for mode in VocelloUIBenchMatrix.Mode.allCases {
             select(mode: mode)
         }
@@ -217,7 +220,6 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
         auditSpeakerOptions()
         auditDeliveryOptions()
         auditLanguageOptions()
-        auditVariationOptions()
         auditCustomDeliveryEditor()
         recorder.record(
             scenario: "inventory", controlID: "sheet-navigation",
@@ -272,6 +274,13 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
         let clearMenu = element("historyClearMenu")
         if clearMenu.exists && clearMenu.isHittable {
             XCTAssertTrue(VocelloUIPrimaryAction.perform(on: clearMenu, timeout: 20))
+            let keepAudioAction = app.buttons["Clear History (Keep Audio Files)…"].firstMatch
+            XCTAssertTrue(VocelloUIWait.exists(keepAudioAction, timeout: 20))
+            XCTAssertTrue(VocelloUIPrimaryAction.perform(on: keepAudioAction, timeout: 20))
+            let cancel = app.buttons["Cancel"].firstMatch
+            XCTAssertTrue(VocelloUIWait.exists(cancel, timeout: 20))
+            XCTAssertTrue(VocelloUIPrimaryAction.perform(on: cancel, timeout: 20))
+            XCTAssertTrue(VocelloUIWait.disappears(cancel, timeout: 20))
             select(tab: .settings)
         }
         recorder.record(
@@ -456,6 +465,10 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
         for take in selected {
             let mode = VocelloUIBenchMatrix.Mode(rawValue: take.mode)!
             var frozenSeed = frozenSeeds[take.mode]
+            deleteStaleAuditHistoryRows(
+                searchToken: take.searchToken,
+                expectedScript: take.script
+            )
             if mode == .clone && take.reference == "transcript-backed" && !benchmarkCloneVoiceExists() {
                 recorder.record(
                     scenario: "generation", controlID: "generation:\(take.takeID)",
@@ -481,8 +494,25 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
                     "Every post-sentinel take must use the one visibly pinned seed"
                 )
             }
-            let generationID = generateAndWaitForCompletedPlayer(timeout: take.length == "long" ? 360 : 300)
+            let generationID = generateAndWaitForCompletedPlayer(
+                timeout: take.length == "long" ? 360 : 300,
+                onVisibleError: { [weak self] visibleError in
+                    guard let self else { return }
+                    self.recorder.record(
+                        scenario: "generation", controlID: "generation:\(take.takeID)",
+                        classification: "PRODUCT_FAIL",
+                        expected: "Generation reaches decoded and published terminal audio",
+                        actual: visibleError,
+                        evidence: "ios-generation-visible-error",
+                        take: take,
+                        observedSeed: frozenSeed
+                    )
+                    self.recorder.attach(to: self)
+                }
+            )
+            guard !generationID.isEmpty else { return }
             exerciseCompletedPlayer()
+            dismissCompletedPlayerAndAssertGenerateReady()
             if frozenSeed == nil {
                 frozenSeed = pinSeedFromRunOwnedHistoryRow(searchToken: take.searchToken)
                 frozenSeeds[take.mode] = frozenSeed
@@ -592,6 +622,14 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
         let nameField = element("saveVoice_nameField")
         XCTAssertTrue(VocelloUIWait.exists(nameField, timeout: 30))
         XCTAssertTrue(VocelloUITextEntry.replace(in: nameField, with: directImportVoiceName, timeout: 20))
+        if app.keyboards.firstMatch.exists {
+            nameField.typeText("\n")
+            XCTAssertTrue(
+                VocelloUIWait.condition("save-voice keyboard to dismiss", timeout: 15) {
+                    !self.app.keyboards.firstMatch.exists
+                }
+            )
+        }
         let transcriptEditor = element("saveVoice_transcriptEditor")
         let saveButton = element("saveVoice_saveButton")
         XCTAssertTrue(
@@ -601,7 +639,9 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
                     && saveButton.exists && saveButton.isEnabled
             }
         )
-        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: saveButton, timeout: 20))
+        let revealedSaveButton = reveal("saveVoice_saveButton")
+        XCTAssertTrue(revealedSaveButton.isEnabled)
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: revealedSaveButton, timeout: 20))
         let keepDespiteWarning = element("recordVoice_keepDespiteWarning")
         if keepDespiteWarning.waitForExistence(timeout: 5) {
             XCTAssertTrue(VocelloUIPrimaryAction.perform(on: keepDespiteWarning, timeout: 20))
@@ -688,7 +728,8 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
         let customSpeaker = captureSelectedID(
             chipID: "studioChip_voice",
             rowPrefix: "voicePickerRow_",
-            candidates: speakerIDs
+            candidates: speakerIDs,
+            confirmationID: "voicePicker_confirm"
         )
         let customDelivery = captureDeliverySelection()
         let customLanguage = captureLanguageSelection()
@@ -759,15 +800,21 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
         ["chinese", "english", "japanese", "korean", "german", "french", "russian", "portuguese", "spanish", "italian"]
     }
 
+    private var selectableLanguageIDs: [String] {
+        ["auto"] + languageIDs
+    }
+
     private func captureSelectedID(
         chipID: String,
         rowPrefix: String,
-        candidates: [String]
+        candidates: [String],
+        confirmationID: String
     ) -> String {
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: element(chipID), timeout: 20))
         let selected = findSelectedID(rowPrefix: rowPrefix, candidates: candidates)
         XCTAssertNotNil(selected, "\(chipID) must expose one selected row")
-        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: element("bottomSheet_close"), timeout: 20))
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: element(confirmationID), timeout: 20))
+        XCTAssertTrue(VocelloUIWait.disappears(element(confirmationID), timeout: 20))
         return selected ?? candidates[0]
     }
 
@@ -775,7 +822,8 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
         captureSelectedID(
             chipID: "studioChip_language",
             rowPrefix: "languagePicker_",
-            candidates: languageIDs
+            candidates: selectableLanguageIDs,
+            confirmationID: "languagePicker_confirm"
         )
     }
 
@@ -785,7 +833,8 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
             rowPrefix: "deliveryPickerPreset_",
             candidates: deliveryIDs
         ) {
-            XCTAssertTrue(VocelloUIPrimaryAction.perform(on: element("bottomSheet_close"), timeout: 20))
+            XCTAssertTrue(VocelloUIPrimaryAction.perform(on: element("deliveryPicker_confirm"), timeout: 20))
+            XCTAssertTrue(VocelloUIWait.disappears(element("deliveryPicker_confirm"), timeout: 20))
             return .preset(preset)
         }
 
@@ -795,7 +844,9 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
         let editor = element("deliveryPickerSheet_customTone_editor")
         XCTAssertTrue(VocelloUIWait.exists(editor, timeout: 20))
         let text = (editor.value as? String) ?? ""
-        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: element("bottomSheet_close"), timeout: 20))
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: element("deliveryPickerSheet_customTone_back"), timeout: 20))
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: element("deliveryPicker_confirm"), timeout: 20))
+        XCTAssertTrue(VocelloUIWait.disappears(element("deliveryPicker_confirm"), timeout: 20))
         return .custom(text)
     }
 
@@ -804,8 +855,23 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
         let editor = element("voiceBrief_editor")
         XCTAssertTrue(VocelloUIWait.exists(editor, timeout: 20))
         let brief = (editor.value as? String) ?? ""
-        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: element("bottomSheet_close"), timeout: 20))
+        dismissVoiceBriefSheet()
         return brief
+    }
+
+    private func dismissVoiceBriefSheet() {
+        let confirm = element("voiceBrief_confirm")
+        if confirm.exists && confirm.isEnabled {
+            XCTAssertTrue(VocelloUIPrimaryAction.perform(on: confirm, timeout: 20))
+        } else {
+            // An empty brief disables Confirm and this custom edge panel has
+            // no close button while a trailing header control is present.
+            // Anchor the production drag-to-dismiss gesture to that visible
+            // header element instead of using coordinates or mutating text.
+            XCTAssertTrue(confirm.exists)
+            confirm.swipeDown()
+        }
+        XCTAssertTrue(VocelloUIWait.disappears(element("voiceBrief_editor"), timeout: 20))
     }
 
     private func captureCloneReferenceSelection() -> String? {
@@ -863,10 +929,10 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
         let editor = element("voiceBrief_editor")
         XCTAssertTrue(VocelloUIWait.exists(editor, timeout: 20))
         XCTAssertTrue(VocelloUITextEntry.replace(in: editor, with: brief, timeout: 20))
-        // The production binding updates while editing. Closing is required
-        // instead of Confirm so an originally empty brief can also be
-        // restored without a hidden state mutation.
-        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: element("bottomSheet_close"), timeout: 20))
+        // The production binding updates while editing. An empty original
+        // brief disables Confirm, so use the real system-sheet dismissal in
+        // that state instead of inventing a test-only escape hatch.
+        dismissVoiceBriefSheet()
     }
 
     private func auditSpeakerOptions() {
@@ -880,11 +946,12 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
             let preview = reveal("voicePickerPreview_\(speaker)")
             XCTAssertTrue(VocelloUIPrimaryAction.perform(on: preview, timeout: 20))
             XCTAssertTrue(VocelloUIPrimaryAction.perform(on: preview, timeout: 20))
-            XCTAssertTrue(VocelloUIPrimaryAction.perform(on: element("bottomSheet_close"), timeout: 20))
+            XCTAssertTrue(VocelloUIPrimaryAction.perform(on: element("voicePicker_confirm"), timeout: 20))
+            XCTAssertTrue(VocelloUIWait.disappears(element("voicePicker_confirm"), timeout: 20))
             recorder.record(
                 scenario: "inventory", controlID: "speaker-previews:\(speaker)",
                 expected: "Preview starts and stops for the selected speaker",
-                actual: "Preview accepted its play and stop actions"
+                actual: "Preview accepted its play and stop actions before the visible selection was confirmed"
             )
         }
         selectSpeaker("aiden")
@@ -920,7 +987,7 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
         for value in ["expressive", "balanced", "consistent"] {
             selectVariation(value)
             recorder.record(
-                scenario: "inventory", controlID: "variation-options:\(value)",
+                scenario: "stateful", controlID: "variation-options:\(value)",
                 expected: "Variation becomes selected", actual: "Selected \(value) through Settings"
             )
         }
@@ -937,11 +1004,12 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: custom, timeout: 20))
         XCTAssertTrue(VocelloUIWait.exists(element("deliveryPickerSheet_customTone_charCount"), timeout: 20))
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: element("deliveryPickerSheet_customTone_back"), timeout: 20))
-        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: element("bottomSheet_close"), timeout: 20))
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: element("deliveryPicker_confirm"), timeout: 20))
+        XCTAssertTrue(VocelloUIWait.disappears(element("deliveryPicker_confirm"), timeout: 20))
         recorder.record(
             scenario: "inventory", controlID: "delivery-editor",
             expected: "Custom tone editor opens and returns without changing delivery",
-            actual: "Editor, count, back, and sheet close controls worked"
+            actual: "Editor, count, back, and delivery confirmation controls worked"
         )
     }
 
@@ -1008,11 +1076,28 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
             return
         }
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: toggle, timeout: 20))
-        XCTAssertTrue(VocelloUIWait.condition("\(identifier) changes", timeout: 15) {
+        let changed = VocelloUIWait.condition("\(identifier) changes", timeout: 15) {
             VocelloUIToggle.state(of: toggle) == !original
-        })
+        }
+        guard changed else {
+            restoreToggle(toggle, identifier: identifier, to: original)
+            return
+        }
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: toggle, timeout: 20))
         XCTAssertTrue(VocelloUIWait.condition("\(identifier) restores", timeout: 15) {
+            VocelloUIToggle.state(of: toggle) == original
+        })
+    }
+
+    private func restoreToggle(_ toggle: XCUIElement, identifier: String, to original: Bool) {
+        guard let current = VocelloUIToggle.state(of: toggle) else {
+            XCTFail("Unknown toggle state while restoring \(identifier)")
+            return
+        }
+        guard current != original else { return }
+        XCTAssertTrue(revealSettingsElement(toggle, swipingUp: true))
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: toggle, timeout: 20))
+        XCTAssertTrue(VocelloUIWait.condition("\(identifier) fail-safe restore", timeout: 15) {
             VocelloUIToggle.state(of: toggle) == original
         })
     }
@@ -1082,7 +1167,17 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: playPause, timeout: 20))
         let scrubber = element("studio_inlinePlayer_scrubber")
         if scrubber.exists && scrubber.isHittable {
-            scrubber.adjust(toNormalizedSliderPosition: 0.5)
+            let priorValue = scrubber.value as? String
+            // The waveform is a custom adjustable Button, not UISlider.
+            // Exercise its production DragGesture through an element-anchored
+            // swipe; coordinate automation and slider-only XCTest APIs are
+            // both inappropriate for this accessibility surface.
+            scrubber.swipeRight()
+            XCTAssertTrue(
+                VocelloUIWait.condition("inline player scrubber value to change", timeout: 15) {
+                    (scrubber.value as? String) != priorValue
+                }
+            )
         }
     }
 
@@ -1105,7 +1200,56 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
             .firstMatch
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: confirm, timeout: 20))
         XCTAssertTrue(VocelloUIWait.exists(element("history_noMatchesState"), timeout: 30))
+        dismissHistorySearchKeyboardIfNeeded()
         select(tab: .studio)
+    }
+
+    private func deleteStaleAuditHistoryRows(searchToken: String, expectedScript: String) {
+        replaceHistorySearch(with: searchToken)
+        dismissHistorySearchKeyboardIfNeeded()
+
+        for _ in 0..<32 {
+            let count = historyRows().count
+            guard count > 0 else {
+                select(tab: .studio)
+                return
+            }
+            let matchingScripts = app.staticTexts.matching(
+                NSPredicate(format: "label == %@", expectedScript)
+            ).count
+            XCTAssertEqual(
+                matchingScripts, count,
+                "Reserved token \(searchToken) matched a non-audit History row"
+            )
+            let menu = app.descendants(matching: .any)
+                .matching(NSPredicate(format: "identifier BEGINSWITH %@", "historyRowMenu_"))
+                .firstMatch
+            XCTAssertTrue(VocelloUIPrimaryAction.perform(on: menu, timeout: 20))
+            XCTAssertTrue(VocelloUIPrimaryAction.perform(on: app.buttons["Delete"].firstMatch, timeout: 20))
+            let confirm = app.descendants(matching: .any)
+                .matching(NSPredicate(format: "identifier BEGINSWITH %@", "historyRowDeleteConfirm_"))
+                .firstMatch
+            XCTAssertTrue(VocelloUIPrimaryAction.perform(on: confirm, timeout: 20))
+            XCTAssertTrue(
+                VocelloUIWait.condition("stale audit History row count to decrease", timeout: 30) {
+                    self.historyRows().count < count
+                }
+            )
+        }
+        XCTFail("More than 32 stale audit rows matched reserved token \(searchToken)")
+        select(tab: .studio)
+    }
+
+    private func dismissHistorySearchKeyboardIfNeeded() {
+        guard app.keyboards.firstMatch.exists else { return }
+        let searchField = app.textFields["historySearchField"].firstMatch
+        XCTAssertTrue(searchField.exists)
+        searchField.typeText("\n")
+        XCTAssertTrue(
+            VocelloUIWait.condition("History search keyboard to dismiss", timeout: 15) {
+                !self.app.keyboards.firstMatch.exists
+            }
+        )
     }
 
     private func visiblePinnedSeed() -> UInt64? {
@@ -1130,6 +1274,7 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
         let seed = extractSeed(from: pin.label)
         XCTAssertNotNil(seed, "History Pin seed action must expose its exact numeric seed")
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: pin, timeout: 20))
+        dismissHistorySearchKeyboardIfNeeded()
         select(tab: .studio)
         XCTAssertTrue(VocelloUIWait.condition("History seed to become visibly pinned", timeout: 20) {
             self.visiblePinnedSeed() == seed

@@ -18,6 +18,7 @@ ROOT = Path(__file__).resolve().parents[2]
 TOOL = ROOT / "scripts" / "required_step_ledger.py"
 CONTRACT = ROOT / "config" / "orchestration-contract.json"
 LIBRARY = ROOT / "scripts" / "lib" / "required_steps.sh"
+UI_RUNNER = ROOT / "scripts" / "ui_test.sh"
 SPEC = importlib.util.spec_from_file_location("required_step_ledger", TOOL)
 assert SPEC and SPEC.loader
 ledger_module = importlib.util.module_from_spec(SPEC)
@@ -88,6 +89,40 @@ class RequiredStepLedgerTests(unittest.TestCase):
     def test_contract_is_valid(self) -> None:
         completed = self.run_tool("validate-contract", check=True)
         self.assertIn("Orchestration contract: PASS", completed.stdout)
+
+    def test_ios_control_audit_workflow_is_complete(self) -> None:
+        workflow = json.loads(CONTRACT.read_text(encoding="utf-8"))["workflows"][
+            "ui-ios-control-audit"
+        ]
+        self.assertEqual(workflow["producer"], "scripts/ui_test.sh")
+        self.assertEqual(
+            workflow["requiredSteps"],
+            [
+                "source-provenance",
+                "control-inventory",
+                "control-plan",
+                "control-plan-encoding",
+                "crash-baseline",
+                "xcuitest",
+                "control-audit-composition",
+                "crash-delta",
+            ],
+        )
+        self.assertEqual(
+            workflow["optionalSteps"],
+            ["control-audit-device-correlation", "result-retention"],
+        )
+
+    def test_ui_runner_explicit_retention_pin_precedes_execution(self) -> None:
+        text = UI_RUNNER.read_text(encoding="utf-8")
+        parse = text.index("--retain-result) retain_result=1")
+        pin = text.index('>"$out/retention-pin.json"')
+        xcode = text.index('required_step_run "$step_ledger" xcuitest')
+        prune = text.index('--prune-ui-results --ui-keep 1')
+        self.assertLess(parse, pin)
+        self.assertLess(pin, xcode)
+        self.assertLess(xcode, prune)
+        self.assertIn('"pinned":true', text)
 
     def test_producers_bind_every_declared_step_and_finalize_before_pass(self) -> None:
         workflows = json.loads(CONTRACT.read_text(encoding="utf-8"))["workflows"]

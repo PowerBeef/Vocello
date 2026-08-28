@@ -202,7 +202,9 @@ scripts/ios_device.sh gate
 
 iOS uses the paired physical iPhone only. The platform `gate` commands are device diagnostics and
 do not consume XCUITest results. Model download and clone-enrollment UI lanes remain explicit,
-isolated opt-ins documented in the platform rules.
+isolated opt-ins documented in the platform rules. For multi-run audits use `--retain-result`;
+before releasing the phone, record the exact roadmap/progress resume boundary and keep the pins
+until closure.
 
 ## Key paths
 

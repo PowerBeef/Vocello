@@ -209,6 +209,17 @@ def analyze_ui_artifacts(
                 )
                 continue
             metadata = load_json_object(run_dir / "run.json")
+            if _pinned(run_dir):
+                decisions.append(
+                    _decision(
+                        run_dir=run_dir,
+                        repo_root=repo_root,
+                        metadata=metadata,
+                        action="retain",
+                        reason="explicitly-pinned",
+                    )
+                )
+                continue
             if not metadata:
                 decisions.append(
                     _decision(
@@ -263,8 +274,6 @@ def analyze_ui_artifacts(
                     action, reason = "compact", "unrepairable-unpublished-benchmark"
             else:
                 action, reason = "remove", "superseded-passing-result"
-            if _pinned(run_dir):
-                action, reason = "retain", "explicitly-pinned"
             decisions.append(
                 _decision(
                     run_dir=run_dir,

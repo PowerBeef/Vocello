@@ -116,9 +116,14 @@ scripts/ui_test.sh ios model-download    # isolated background-delivery lifecycl
 scripts/ui_test.sh ios enroll-clone-fixture  # benchmark clone voice through the visible Files-import flow
 scripts/ui_test.sh ios saved-voice-lifecycle # opt-in F-01 import/preview/handoff/delete acceptance
 scripts/ui_test.sh ios startup-parity --script-file SCRIPT.txt # exact visible request-to-engine receipt proof
-scripts/ui_test.sh ios control-audit --scenario inventory|stateful|external|accessibility|generation|all
+scripts/ui_test.sh ios control-audit --scenario inventory|stateful|external|accessibility|generation|all --retain-result
 scripts/ios_device.sh gate            # deterministic physical-device/runtime proof
 ```
+
+For a multi-run campaign, pass `--retain-result` before each member starts. Before the device
+leaves, stop after a completed scenario, record exact run IDs, findings, blocked/skipped rows, and
+the next valid command in `config/roadmap.json` plus `docs/development-progress.md`, then verify the
+untracked pins with a cleanup dry-run. Remove pins only after the evidence set is explicitly closed.
 
 ## Invariants (do not regress)
 
@@ -179,6 +184,9 @@ scripts/ios_device.sh gate            # deterministic physical-device/runtime pr
 - **No hidden test UI.** XCUITest observes genuine visible controls. Put test-only code in the UI
   test target; do not add preview routes, invisible state markers, onboarding bypasses, seeded UI
   text, or generic `#if DEBUG` app behavior.
+- **Device-campaign checkpoints are source-bound.** Pause only between completed scenarios. Never
+  merge a prior failure with a later pass, resume after a source/build/device/plan identity change,
+  or represent pruned raw evidence as retained. Record missing evidence as a recapture requirement.
 
 ## Common mistakes
 

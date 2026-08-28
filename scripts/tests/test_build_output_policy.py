@@ -114,6 +114,14 @@ class BuildOutputPolicyTests(unittest.TestCase):
         self.assertIn("build/cache/xcode/ios-device", paths)
         self.assertIn("build/scratch/derived-data/release-ios", paths)
         self.assertIn("build/dist/macos", paths)
+        self.assertIn(
+            "ui-control-audit",
+            self.document["heavyLanePreflight"]["lanes"],
+        )
+        self.assertIn(
+            "control-audit",
+            self.document["childRetention"]["uiResults"]["lanes"],
+        )
 
     def test_manifest_rejects_absolute_escaping_and_overlapping_roots(self) -> None:
         cases = []

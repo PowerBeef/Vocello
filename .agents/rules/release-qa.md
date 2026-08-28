@@ -117,7 +117,10 @@ Before changing scripts or CI, read:
 - **Evidence artifacts:** `build/artifacts/ui-tests/` owns `.xcresult` bundles and exported
   screenshots; `build/artifacts/diagnostics/` owns pulled/headless generation telemetry and crashes;
   platform gate/profile outputs remain below `build/artifacts/{macos,ios}/`; current dSYMs live
-  under `build/artifacts/symbols/{macos,ios}/`.
+  under `build/artifacts/symbols/{macos,ios}/`. Multi-run UI campaigns use `--retain-result` before
+  execution; its untracked pin outranks ordinary latest-pass pruning, including for legacy-shaped
+  metadata. Verify pins with `clean_build_caches.sh --prune-ui-results --dry-run` and retire them
+  only after the complete evidence set is closed.
 - **Benchmark registry:** successful memory-qualified benchmark lanes publish a compact record under
   `benchmarks/runs/<kind>/` and regenerate `benchmarks/HISTORY.md`. The telemetry-overhead
   observer-effect diagnostic stays local because instrumenting its `off` lane would invalidate the

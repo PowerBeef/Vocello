@@ -1337,6 +1337,12 @@ cross-project comparisons.
 |---|---|---|---|---|---|---:|---|---|---|---|
 | 2026-07-23 | [`macos-xcui-benchmark-20260723-074746-40ab73d6`](runs/ui-generation/macos-xcui-benchmark-20260723-074746-40ab73d6.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 4 | `495a77e6c4ad` dirty | `excluded` | baseline | macos-xcui-benchmark-20260723-074746-40ab73d6 |
 
+## ui-perf / ios / iphone-17-pro / config `48910e79e69e`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---|---|---|---|
+| 2026-08-28 | [`ios-xcui-perf-20260828-172155-32e5b71e`](runs/ui-perf/ios-xcui-perf-20260828-172155-32e5b71e.json) | canonical | exploratory | passedWithWarnings | not-applicable | 9 | `4c1e83720ee0` dirty | `excluded` | baseline | control-audit-20260828 |
+
 ## ui-perf / ios / iphone-17-pro / config `9a7f6e403e06`
 
 | completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |

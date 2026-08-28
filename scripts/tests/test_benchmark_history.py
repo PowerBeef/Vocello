@@ -725,6 +725,31 @@ class BenchmarkHistoryTests(unittest.TestCase):
             "name": "settings-ready.png", "digest": history.file_digest(screenshot),
         }])
 
+    def test_recorder_uses_retained_xcresult_os_identity_without_live_device(self) -> None:
+        record = record_fixture(platform="ios", profile="iphone-17-pro")
+        record["hardware"] = {"profileID": "iphone-17-pro"}
+        directory = self.write_manifest({"historyRecord": record})
+        (directory / "xcresult-test-summary.json").write_text(json.dumps({
+            "devicesAndConfigurations": [{
+                "device": {
+                    "platform": "iOS",
+                    "osVersion": "26.6.1",
+                    "osBuildNumber": "23G83",
+                }
+            }]
+        }), encoding="utf-8")
+        runtime = {
+            "osName": "iOS", "thermalState": "unknown", "lowPowerMode": None,
+            "transport": "physical-device",
+            "loadAverage1M": 1.0, "freeStorageBytes": 1_000_000,
+            "uptimeSeconds": 100.0,
+        }
+        with mock.patch.object(history, "default_runtime_hardware", return_value=runtime):
+            path = history.record_manifest(directory)
+        published = json.loads(path.read_text())
+        self.assertEqual(published["hardware"]["osVersion"], "26.6.1")
+        self.assertEqual(published["hardware"]["osBuild"], "23G83")
+
     def test_explicit_cli_identity_does_not_inherit_an_unrelated_app_bundle(self) -> None:
         repo = self.root / "repo"
         cli = repo / "build" / "vocello"
@@ -1095,6 +1120,15 @@ class BenchmarkHistoryTests(unittest.TestCase):
             mutate(record)
             with self.assertRaises(history.HistoryError):
                 self.publish(record, f"privacy-machine-{index}")
+
+    def test_machine_warning_accepts_a_bounded_numeric_threshold(self) -> None:
+        record = record_fixture(run_id="bounded-warning")
+        record["run"]["warnings"] = ["uiperf.cadence:ios-player-scrub(34/55-65)"]
+        path = self.publish(record, "bounded-warning")
+        self.assertEqual(
+            json.loads(path.read_text())["run"]["warnings"],
+            ["uiperf.cadence:ios-player-scrub(34/55-65)"],
+        )
 
     def test_out_of_order_publish_reconciles_nearest_earlier_baseline(self) -> None:
         later = record_fixture(run_id="compatible-later")

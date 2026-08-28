@@ -80,13 +80,13 @@ scripts/ui_test.sh ios benchmark
 scripts/ui_test.sh ios benchmark --modes custom --lengths short --warm 1 --label "focused"
 
 # Source-bound exhaustive control and pairwise-generation audit:
-scripts/ui_test.sh ios control-audit --scenario inventory
-scripts/ui_test.sh ios control-audit --scenario stateful
-scripts/ui_test.sh ios control-audit --scenario external
-scripts/ui_test.sh ios control-audit --scenario accessibility
-scripts/ui_test.sh ios control-audit --scenario generation
-scripts/ui_test.sh ios control-audit --scenario all
-scripts/ui_test.sh ios control-audit --scenario all --resume RUN_ID
+scripts/ui_test.sh ios control-audit --scenario inventory --retain-result
+scripts/ui_test.sh ios control-audit --scenario stateful --retain-result
+scripts/ui_test.sh ios control-audit --scenario external --retain-result
+scripts/ui_test.sh ios control-audit --scenario accessibility --retain-result
+scripts/ui_test.sh ios control-audit --scenario generation --retain-result
+scripts/ui_test.sh ios control-audit --scenario all --retain-result
+scripts/ui_test.sh ios control-audit --scenario all --resume RUN_ID --retain-result
 
 # UI-performance frame-health lane (ios-ui-2026-08):
 scripts/ui_test.sh ios perf [--label RUN_ID]
@@ -135,9 +135,17 @@ cleanup proof stay untracked below the run artifact directory. The composer vali
 source identity and assigns only the terminal vocabulary in
 `config/ios-control-audit.json`. A required row without an observation becomes
 `SKIPPED_AFTER_FAILURE`; permission or destructive work that cannot be restored becomes
-`BLOCKED_PRESERVATION_POLICY`. Neither is a passing result. The complete multi-lane campaign and
-current device-deferred checkpoint are recorded in
-[`ios-on-device-control-audit-2026-08-28.md`](ios-on-device-control-audit-2026-08-28.md).
+`BLOCKED_PRESERVATION_POLICY`. Neither is a passing result. The complete multi-lane campaign
+contract and current post-performance pause checkpoint are recorded in
+[`ios-on-device-control-audit-2026-08-28.md`](ios-on-device-control-audit-2026-08-28.md). That
+report lists the authoritative passing runs, source/device findings, blocked coverage, and exact
+safe-resume boundary. Do not repeat completed phases merely to obtain a green aggregate, and do not
+use an old resume token after a source fix changes the frozen identity. `--retain-result` writes an
+untracked pin before Xcode starts, so every required multi-run member survives normal latest-pass
+pruning even if its metadata is legacy-shaped. Before releasing the phone, record exact run IDs,
+terminal outcomes, remaining rows, and the next valid command in the roadmap and development
+checkpoint; then confirm each pin reports `explicitly-pinned` in a cleanup dry-run. Remove pins only
+when the evidence set is explicitly retired.
 
 The model-delivery runner always exports the `.xcresult`, attachments, diagnostics journal,
 delivery summaries, ledger copy, sanitized storage inventories, crash delta, and host diagnosis even
@@ -180,11 +188,10 @@ block cadence there conflates system re-pacing with the main-thread stalls the l
 measure (the macOS history-scroll baseline of 456 ms/s hitch — ~33 Hz effective — is the
 canonical example). Artifacts: `ui-perf-report.json` and `ui-perf-gate.txt` under the run
 directory, probe JSONL under `diagnostics/ui-perf/`. **Copy
-`ui-perf-report.json` out of the run directory after every counted baseline
-run** — result retention keeps only the latest passing result per lane, so a
-multi-run session otherwise loses its earlier reports (they remain
-deterministically regenerable from the device's probe files and the captured
-lane log, but copying is the protocol). Warn-only ceilings live in
+`ui-perf-report.json` out of the run directory after any counted baseline that did not use
+`--retain-result`. For a multi-run campaign, prefer `--retain-result`: it preserves the complete
+run bundle until the evidence set closes, while compact PASS history remains the durable tracked
+record. Warn-only ceilings live in
 `config/ui-perf-thresholds-ios.json` (IUI-6, derived from the three counted
 sessions; a breach marks the scenario and run `passedWithWarnings`, never
 failed), and on the canonical iPhone profile a PASS emits registry evidence

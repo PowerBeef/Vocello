@@ -68,6 +68,8 @@ visible Files-import flow; stage the reference WAV and .txt sidecar in the app's
 the lane begins in Studio Clone, imports, auto-transcribes, saves, generates, previews, and deletes
 that throwaway voice through visible production UI.
 No lane retries automatically. A failed run keeps its log, xcresult, screenshots, and diagnostics.
+Append `--retain-result` to explicitly pin a campaign member against routine UI-result pruning;
+remove its untracked `retention-pin.json` only after the evidence set is retired.
 RUN_ID is an opaque 1-96 character identifier using letters, digits, dot, underscore, or hyphen.
 EOF
   exit 2
@@ -104,6 +106,7 @@ control_scenario="all"
 control_resume=""
 control_resume_run_ids=""
 control_resume_take_start=0
+retain_result=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --scenario) scenario_argument="${2:?--scenario requires a value}"; shift 2 ;;
@@ -130,6 +133,7 @@ while [[ $# -gt 0 ]]; do
     --script-file=*) startup_parity_script_file="${1#*=}"; shift ;;
     --long-form-segments) long_form_segments="${2:?--long-form-segments requires a value}"; shift 2 ;;
     --long-form-segments=*) long_form_segments="${1#*=}"; shift ;;
+    --retain-result) retain_result=1; shift ;;
     -h|--help|help) usage ;;
     *) die "unknown flag: $1" ;;
   esac
@@ -318,6 +322,10 @@ PY
 
 run_finalized=0
 write_run_metadata running
+if (( retain_result == 1 )); then
+  printf '{"schemaVersion":1,"pinned":true,"reason":"explicit-ui-campaign-retention"}\n' \
+    >"$out/retention-pin.json"
+fi
 record_early_failure() {
   local status=$?
   trap - EXIT
@@ -1356,11 +1364,18 @@ else
     xcuitest_status=1
     warn "physical-iPhone XCUITest failed; collecting forensics before returning failure"
   fi
+  # Preserve the result-owned OS/build identity for delayed, offline evidence
+  # publication. Publishing must not require the phone to remain connected
+  # after the test has completed.
+  if [[ -d "$result" ]]; then
+    xcrun xcresulttool get test-results summary \
+      --path "$result" --compact >"$out/xcresult-test-summary.json" \
+      2>"$out/xcresult-summary.log" || true
+  fi
   if [[ "$lane" == "startup-parity" && "$xcuitest_status" -ne 0 ]]; then
     printf 'scripts/ui_test.sh ios startup-parity --script-file %q\n' \
       "$startup_parity_script_file" >"$out/exact-manual-rerun-command.txt"
-    if [[ -d "$result" ]] && xcrun xcresulttool get test-results summary \
-        --path "$result" --compact >"$out/xcresult-test-summary.json" 2>"$out/xcresult-summary.log"; then
+    if [[ -s "$out/xcresult-test-summary.json" ]]; then
       if python3 "$ROOT_DIR/scripts/ios_startup_reliability.py" classify-xcui-bootstrap \
           --xcodebuild-log "$out/xcodebuild.log" \
           --xcresult-summary "$out/xcresult-test-summary.json" \
@@ -1439,22 +1454,11 @@ PY
 
   control_audit_status=0
   if [[ "$lane" == "control-audit" ]]; then
-    if ! python3 - "$out/attachments/manifest.json" "$out/attachments" \
-        "$out/control-observations-current.jsonl" >"$out/control-observation-collector.log" <<'PY'
-import json, pathlib, sys
-manifest_path, attachment_root, output_path = map(pathlib.Path, sys.argv[1:])
-rows = []
-if manifest_path.is_file():
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    for test in manifest:
-        for attachment in test.get("attachments", []):
-            if attachment.get("suggestedHumanReadableName") == "control-observations.jsonl":
-                source = attachment_root / attachment["exportedFileName"]
-                if source.is_file():
-                    rows.extend(line for line in source.read_text(encoding="utf-8").splitlines() if line.strip())
-output_path.write_text("\n".join(rows) + ("\n" if rows else ""), encoding="utf-8")
-print(f"collected {len(rows)} control observations")
-PY
+    if ! python3 "$ROOT_DIR/scripts/ios_control_audit.py" collect-observations \
+        --manifest "$out/attachments/manifest.json" \
+        --attachments "$out/attachments" \
+        --output "$out/control-observations-current.jsonl" \
+        >"$out/control-observation-collector.log" 2>&1
     then
       control_audit_status=1
       warn "could not collect control-audit observation attachments"

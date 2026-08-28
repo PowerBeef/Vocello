@@ -262,6 +262,23 @@
         "result-retention"
       ]
     },
+    "ui-ios-control-audit": {
+      "producer": "scripts/ui_test.sh",
+      "requiredSteps": [
+        "source-provenance",
+        "control-inventory",
+        "control-plan",
+        "control-plan-encoding",
+        "crash-baseline",
+        "xcuitest",
+        "control-audit-composition",
+        "crash-delta"
+      ],
+      "optionalSteps": [
+        "control-audit-device-correlation",
+        "result-retention"
+      ]
+    },
     "ui-ios-model-download": {
       "producer": "scripts/ui_test.sh",
       "requiredSteps": [

@@ -654,12 +654,14 @@ def diagnose(
             ))
 
     previous_fraction: dict[str, float] = {}
+    previous_expected: dict[str, float] = {}
     previous_raw: dict[str, int] = {}
     for observation in observations:
         model_id = observation.get("modelID", "unknown")
         expected = observation.get("expectedFraction")
         accessible = observation.get("accessibilityFraction")
         prior_fraction = previous_fraction.get(model_id)
+        prior_expected = previous_expected.get(model_id)
         prior_raw = previous_raw.get(model_id)
         if isinstance(expected, (int, float)) and isinstance(accessible, (int, float)):
             if abs(expected - accessible) > 0.01:
@@ -669,12 +671,31 @@ def diagnose(
         raw, total = observation.get("rawBytes"), observation.get("totalBytes")
         if isinstance(raw, int) and isinstance(accessible, (int, float)):
             if prior_raw is not None and prior_fraction is not None:
-                if raw > prior_raw and accessible <= prior_fraction + 1e-6:
+                # Accessibility deliberately presents an integer percentage while retaining exact
+                # bytes in the value. A few callback bytes can therefore advance without changing
+                # the visible percentage. Call that frozen only after the exact byte fraction has
+                # crossed at least one complete presentation quantum.
+                exact_advance = (
+                    float(expected) - prior_expected
+                    if isinstance(expected, (int, float))
+                    and isinstance(prior_expected, (int, float))
+                    else 0.0
+                )
+                if (
+                    raw > prior_raw
+                    and accessible <= prior_fraction + 1e-6
+                    and exact_advance >= 0.01 - 1e-6
+                ):
                     findings.append(Finding("ui-frozen-while-bytes-advance", "progress-presentation", f"{model_id} bytes advanced while the visible fraction stayed fixed.", None, observation))
                 if raw == prior_raw and accessible > prior_fraction + 1e-6:
                     findings.append(Finding("ui-moved-without-bytes", "progress-presentation", f"{model_id} visible progress advanced without durable byte movement.", None, observation))
             previous_raw[model_id] = max(raw, prior_raw if prior_raw is not None else raw)
             previous_fraction[model_id] = max(accessible, prior_fraction if prior_fraction is not None else accessible)
+            if isinstance(expected, (int, float)):
+                previous_expected[model_id] = max(
+                    float(expected),
+                    prior_expected if prior_expected is not None else float(expected),
+                )
         if isinstance(accessible, (int, float)) and accessible >= 0.999 and isinstance(raw, int) and isinstance(total, int) and raw < total:
             findings.append(Finding("premature-full-bar", "progress-presentation", f"{model_id} showed a full bar before transfer completion.", None, observation))
     if missing_observations:

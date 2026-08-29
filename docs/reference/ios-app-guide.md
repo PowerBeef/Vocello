@@ -1,6 +1,7 @@
 ---
 status: active
 owner: ios
+reviewed: 2026-08-29
 summary: Consolidated iPhone app map — every screen, element, and option from the user view, and how XCUITest drives each via stable identifiers on the paired physical device.
 sourceOfTruth:
   - Sources/iOS

@@ -200,11 +200,11 @@ scripts/ui_test.sh ios control-audit --scenario inventory|stateful|external|acce
 scripts/ios_device.sh gate
 ```
 
-iOS uses the paired physical iPhone only. The platform `gate` commands are device diagnostics and
-do not consume XCUITest results. Model download and clone-enrollment UI lanes remain explicit,
-isolated opt-ins documented in the platform rules. For multi-run audits use `--retain-result`;
-before releasing the phone, record the exact roadmap/progress resume boundary and keep the pins
-until closure.
+iOS uses the paired physical iPhone only; platform `gate` commands are diagnostics independent of
+XCUITest. Model and clone lanes are explicit isolated opt-ins. Pin multi-run audits, record their
+resume boundary before releasing the phone, and keep pins until closure. Classified bootstrap or
+notification interruptions remain failed with skipped rows; a manual rerun gets a new run ID. See
+`docs/reference/ios-device-testing.md`.
 
 ## Key paths
 

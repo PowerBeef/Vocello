@@ -1,6 +1,7 @@
 ---
 status: active
 owner: release-qa
+reviewed: 2026-08-29
 summary: The cross-platform testing runbook — deterministic lanes as the routine contract, explicit XCUITest acceptance, model readiness, and the authority order for test guidance.
 sourceOfTruth:
   - scripts/check_project_inputs.sh
@@ -89,6 +90,7 @@ scripts/ui_test.sh ios model-download
 # Opt-in lifecycle and startup acceptance
 scripts/ui_test.sh ios saved-voice-lifecycle
 scripts/ui_test.sh ios startup-parity --script-file <untracked-script>
+scripts/ui_test.sh ios control-audit --scenario inventory|stateful|external|accessibility|generation|all
 
 # Headless startup characterization, not UI acceptance
 scripts/ios_device.sh delivery-reliability --plan <plan.json> --script-file <untracked-script>
@@ -104,6 +106,13 @@ quantitatively verify exact catalog-byte progress, and preserve complete failure
 acceptance installs and removes Custom, Design, and Clone while proving shared-component reuse and
 canonical-state preservation. It never runs in ordinary CI or release.
 See [`model-delivery.md`](model-delivery.md).
+
+Control-audit failures retain their first result without an automatic retry. A zero-test automation
+bootstrap timeout is `INFRASTRUCTURE_FAIL` only with `.xcresult`/log proof that no test or product
+terminal ran. A launched test blocked by a SpringBoard notification may use the separate external-
+interruption classification only with an identified wait timeout, banner evidence, and no product,
+crash, generation, QC, or harness failure. Unexecuted rows remain `SKIPPED_AFTER_FAILURE`; any
+manual rerun receives a new run ID and never overwrites the failed bundle.
 
 ## Model readiness
 

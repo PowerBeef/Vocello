@@ -1,6 +1,7 @@
 ---
 status: active
 owner: backend-mlx
+reviewed: 2026-08-29
 summary: Domain rule for the engine core, owned Qwen3 runtime package, model catalog, telemetry semantics, and backend invariants (prewarm, cancellation, sampling, memory policy, MLX-only).
 sourceOfTruth:
   - scripts/build_foundation_targets.sh

@@ -136,7 +136,12 @@ struct IOSStudioCanvas<SetupChips: View>: View {
         // the canvas cleanly. The React reference reserves 97 pt for
         // the tab dock; Studio's CTA / inline player then bottom-align
         // immediately above that reservation.
-        .padding(.bottom, IOSStudioCanvasLayout.tabDockReservation)
+        .padding(
+            .bottom,
+            dynamicTypeSize.isAccessibilitySize
+                ? 132
+                : IOSStudioCanvasLayout.tabDockReservation
+        )
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         // Keep the composer layout fixed: the keyboard OVERLAYS the bottom
         // (chips + Generate + tab dock stay put, covered) instead of reflowing
@@ -198,7 +203,7 @@ struct IOSStudioCanvas<SetupChips: View>: View {
             ZStack(alignment: .topLeading) {
                 if script.isEmpty {
                     Text(placeholder)
-                        .font(.system(size: 22, weight: .medium))
+                        .font(.title2.weight(.medium))
                         .tracking(-0.22)            // letter-spacing -0.01em ≈ -0.22pt at 22pt
                         .foregroundStyle(Theme.Text.tertiary)
                         .padding(.top, 8)
@@ -206,7 +211,9 @@ struct IOSStudioCanvas<SetupChips: View>: View {
                 }
                 IOSFlexibleTextEditor(
                     text: $script,
-                    font: UIFont.systemFont(ofSize: 22, weight: .medium),
+                    font: UIFontMetrics(forTextStyle: .title2).scaledFont(
+                        for: UIFont.systemFont(ofSize: 22, weight: .medium)
+                    ),
                     textColor: Theme.Text.primaryUIColor,
                     tintColor: UIColor(tint),
                     isFocused: Binding(
@@ -225,31 +232,24 @@ struct IOSStudioCanvas<SetupChips: View>: View {
                 }
             }
 
-            HStack {
-                Text(modeMetaLabel)
-                    .iosScaledFont(size: 12, weight: .medium, relativeTo: .caption)
-                    .tracking(0.24)               // letter-spacing 0.02em ≈ 0.24pt at 12pt
-                    .foregroundStyle(Theme.Text.secondary)
-                    .accessibilityIdentifier("textInput_modeMetaLabel")
-                Spacer()
-                if !script.isEmpty {
-                    Button {
-                        script = ""
-                        isScriptFocused = false
-                    } label: {
-                        Text("Clear")
-                            .iosScaledFont(size: 12, weight: .semibold, relativeTo: .caption)
-                            .frame(minWidth: 44, minHeight: 44)
+            Group {
+                if dynamicTypeSize.isAccessibilitySize {
+                    VStack(alignment: .leading, spacing: 4) {
+                        modeMetaText
+                        HStack {
+                            clearScriptButton
+                            Spacer()
+                            lengthCountText
+                        }
                     }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(Theme.Text.secondary)
-                    .accessibilityLabel("Clear script")
-                    .accessibilityIdentifier(IOSAccessibilityIdentifier.TextInput.clearButton)
+                } else {
+                    HStack {
+                        modeMetaText
+                        Spacer()
+                        clearScriptButton
+                        lengthCountText
+                    }
                 }
-                Text("\(script.count) / \(charLimit)")
-                    .iosScaledFont(size: 12, weight: .medium, monospacedDigit: true, relativeTo: .caption)
-                    .foregroundStyle(script.count > charLimit ? Color.orange : Theme.Text.secondary)
-                    .accessibilityIdentifier("textInput_lengthCount")
             }
             .padding(.top, 4)
             .padding(.bottom, 10)
@@ -257,6 +257,40 @@ struct IOSStudioCanvas<SetupChips: View>: View {
         .padding(.horizontal, 20)
         .padding(.top, 4)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var modeMetaText: some View {
+        Text(modeMetaLabel)
+            .font(.caption.weight(.medium))
+            .tracking(0.24)
+            .foregroundStyle(Theme.Text.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityIdentifier("textInput_modeMetaLabel")
+    }
+
+    @ViewBuilder
+    private var clearScriptButton: some View {
+        if !script.isEmpty {
+            Button {
+                script = ""
+                isScriptFocused = false
+            } label: {
+                Text("Clear")
+                    .font(.caption.weight(.semibold))
+                    .frame(minWidth: 44, minHeight: 44)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(Theme.Text.secondary)
+            .accessibilityLabel("Clear script")
+            .accessibilityIdentifier(IOSAccessibilityIdentifier.TextInput.clearButton)
+        }
+    }
+
+    private var lengthCountText: some View {
+        Text("\(script.count) / \(charLimit)")
+            .font(.caption.weight(.medium).monospacedDigit())
+            .foregroundStyle(script.count > charLimit ? Color.orange : Theme.Text.secondary)
+            .accessibilityIdentifier("textInput_lengthCount")
     }
 
     // MARK: - Setup row
@@ -333,10 +367,10 @@ struct IOSStudioCanvas<SetupChips: View>: View {
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Generation failed")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.footnote.weight(.semibold))
                         .foregroundStyle(Theme.Text.primary)
                     Text(errorMessage ?? "Try again.")
-                        .font(.system(size: 11))
+                        .font(.caption2)
                         .foregroundStyle(Theme.Text.secondary)
                         .lineLimit(1)
                 }
@@ -391,10 +425,10 @@ struct IOSStudioCanvas<SetupChips: View>: View {
 
             VStack(alignment: .trailing, spacing: 2) {
                 Text("Generating")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.footnote.weight(.semibold))
                     .foregroundStyle(Theme.Text.primary)
                 Text(generatingSubline)
-                    .font(.system(size: 11))
+                    .font(.caption2)
                     .foregroundStyle(Theme.Text.secondary)
             }
 

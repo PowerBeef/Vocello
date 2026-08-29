@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "generated": "python3 scripts/doc_metadata.py rebuild-index",
   "note": "Machine-readable documentation map. Query this instead of globbing docs/.",
-  "annotatedDocuments": 98,
+  "annotatedDocuments": 99,
   "unannotatedDocuments": 0,
   "documents": [
     {
@@ -480,6 +480,22 @@
         "config/ios-startup-reliability-result-schema-v2.json",
         "scripts/ios_device.sh",
         "scripts/ios_startup_reliability.py"
+      ]
+    },
+    {
+      "path": "docs/reference/ios-control-audit-remediation-2026-08-29.md",
+      "status": "active",
+      "owner": "ios",
+      "summary": "Evidence-driven remediation plan for the generation, model-progress, accessibility, playback-performance, and XCUITest bootstrap findings from the August 2026 physical-iPhone control audit.",
+      "sourceOfTruth": [
+        "config/roadmap.json",
+        "Sources/QwenVoiceCore/GenerationOutputAdapter.swift",
+        "Sources/iOS/IOSSettingsViews.swift",
+        "Sources/iOS/App/TabDock.swift",
+        "Sources/SharedSupport/Services/LiveStreamingPlaybackEngine.swift",
+        "scripts/ios_control_audit.py",
+        "scripts/check_ios_model_management.py",
+        "scripts/ui_test.sh"
       ]
     },
     {

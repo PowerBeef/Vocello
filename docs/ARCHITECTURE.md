@@ -1,6 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
+reviewed: 2026-08-29
 summary: System architecture — engine core, macOS XPC request lifecycle, iOS in-process lifecycle, model management, telemetry layers, and the engine invariants each surface must preserve.
 sourceOfTruth:
   - project.yml
@@ -14,7 +15,7 @@ sourceOfTruth:
 > lifecycle, persistence, model management, and telemetry. When this doc disagrees
 > with the code, **the code wins** — fix this doc.
 >
-> Last reviewed: 2026-08-27. The latest `project.yml` change registers the iOS offline-license
+> Last reviewed: 2026-08-29. The latest `project.yml` change registers the iOS offline-license
 > screen/resource only; target boundaries, engine hosting, model delivery, and runtime topology are
 > unchanged.
 

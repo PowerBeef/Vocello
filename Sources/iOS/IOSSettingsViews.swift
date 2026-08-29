@@ -476,6 +476,13 @@ private struct IOSModelTransferProgressBar: View {
             }
         }
         .frame(height: 6)
+        // Model delivery is evidence-bearing state, not decorative motion. A parent transition
+        // can otherwise animate the fill from its minimum capsule while accessibility already
+        // exposes the new exact-byte fraction, producing a visibly false progress sample.
+        .transaction { transaction in
+            transaction.animation = nil
+            transaction.disablesAnimations = true
+        }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityLabel)
         .accessibilityValue(accessibilityValue)

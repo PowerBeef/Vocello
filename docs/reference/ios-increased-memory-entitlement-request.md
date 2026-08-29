@@ -1,6 +1,7 @@
 ---
 status: active
 owner: ios
+reviewed: 2026-08-29
 summary: Enablement and readiness guide for the increased-memory entitlement on the in-process iOS app, with verification steps and the kept-for-fallback justification text.
 sourceOfTruth:
   - Sources/iOS/VocelloiOS.entitlements

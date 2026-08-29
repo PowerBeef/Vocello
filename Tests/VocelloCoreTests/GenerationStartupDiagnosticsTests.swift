@@ -228,4 +228,22 @@ final class GenerationStartupDiagnosticsTests: XCTestCase {
         XCTAssertEqual(surfaced.failureCode, .runtimeFailed)
         XCTAssertTrue(surfaced.localizedDescription.contains("after one allocation retry"))
     }
+
+    func testMaximumTokenLimitRemainsPostGenerationWhenSurfacedByEngine() {
+        let surfaced = MLXTTSEngine.surfacedGenerationError(
+            NativeRuntimeError.maximumTokenLimit(),
+            allocationRetryAttempted: true
+        )
+
+        XCTAssertEqual(surfaced.stage, .streamGenerationEnded)
+        XCTAssertEqual(surfaced.failureCode, .generationIncomplete)
+        XCTAssertEqual(surfaced.diagnosticDetail, "maximum_tokens_before_eos")
+        XCTAssertTrue(surfaced.localizedDescription.contains("generation limit"))
+        XCTAssertTrue(surfaced.localizedDescription.contains("incomplete audio was not saved"))
+        XCTAssertFalse(surfaced.localizedDescription.contains("could not start"))
+
+        let metadata = GenerationFailureDiagnosticLogger.errorMetadata(for: surfaced)
+        XCTAssertEqual(metadata.code, "generation.incomplete")
+        XCTAssertEqual(metadata.classification, .model)
+    }
 }

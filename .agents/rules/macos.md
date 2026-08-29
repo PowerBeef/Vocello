@@ -1,6 +1,7 @@
 ---
 status: active
 owner: macos
+reviewed: 2026-08-29
 summary: Domain rule for the macOS app and XPC stack — boundaries, XPC lifecycle invariants, gated Liquid Glass, accessibility rules, and the macOS test lanes.
 sourceOfTruth:
   - scripts/macos_test.sh

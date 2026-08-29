@@ -1,6 +1,19 @@
 import AVFoundation
 import Foundation
 
+/// Terminal ownership transfer for an AVAudioEngine graph. The main actor first stops the player
+/// node and severs every app reference; this box then owns the graph exclusively until the
+/// utility-priority teardown finishes. AVFAudio does not declare its graph objects Sendable, so the
+/// unchecked conformance is limited to this one-way, never-read-again retirement boundary.
+private struct RetiredLivePlaybackGraph: @unchecked Sendable {
+    let engine: AVAudioEngine
+
+    func stopAndReleaseResources() {
+        engine.stop()
+        engine.reset()
+    }
+}
+
 /// The live-preview audio graph (W2-D, 2026-08 UI review): AVAudioEngine +
 /// player-node lifecycle and the FIFO scheduled-buffer bookkeeping,
 /// extracted from the ~1,700-line `AudioPlayerViewModel`. The engine owns
@@ -68,6 +81,10 @@ final class LiveStreamingPlaybackEngine {
             if existingEngine.attachedNodes.contains(existingNode) {
                 return
             }
+        }
+
+        if engine != nil || playerNode != nil {
+            discardGraph()
         }
 
         let engine = AVAudioEngine()
@@ -140,11 +157,11 @@ final class LiveStreamingPlaybackEngine {
         playerNode?.pause()
     }
 
-    /// Stops node + engine and resets the engine's processing graph
-    /// (mechanics of the view model's `stopLivePlayback`).
+    /// Silences the player immediately and resets node state. The engine remains owned by this
+    /// object until `discardGraph`, which performs the potentially blocking hardware stop away
+    /// from the user-interactive main actor.
     func stopAndReset() {
         playerNode?.stop()
-        engine?.stop()
         engine?.reset()
     }
 
@@ -175,7 +192,13 @@ final class LiveStreamingPlaybackEngine {
     /// of the attached nodes, avoiding stale-graph assertions on the next
     /// attach.
     func discardGraph() {
+        playerNode?.stop()
+        let retiredGraph = engine.map(RetiredLivePlaybackGraph.init)
         playerNode = nil
         engine = nil
+        guard let retiredGraph else { return }
+        Task.detached(priority: .utility) {
+            retiredGraph.stopAndReleaseResources()
+        }
     }
 }

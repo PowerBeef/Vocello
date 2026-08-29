@@ -14,9 +14,8 @@
 | `development-workflow-performance-2026-08` | active | release-qa | 4/5 (80%) |
 | `engineering-review-remediation-2026-08` | active | backend-and-platform | 13/14 (93%) |
 | `ios-app-store-readiness-2026-08` | active | release-qa | 1/12 (8%) |
-| `ios-control-audit-2026-08` | active | ios | 3/8 (38%) |
+| `ios-control-audit-2026-08` | active | ios | 8/12 (67%) |
 | `ios-generation-startup-reliability-2026-08` | active | backend-and-platform | 4/6 (67%) |
-| `model-delivery-2026-08` | active | release-qa | 2/3 (67%) |
 | `compliance-2026-08` | complete | release-qa | 2/2 (100%) |
 | `convergence-metal4-stage4-2026-08` | complete | backend-and-platform | 7/7 (100%) |
 | `doc-governance-2026-08` | complete | release-qa | 9/9 (100%) |
@@ -24,6 +23,7 @@
 | `ios-settings-2026-08` | complete | ios | 3/3 (100%) |
 | `ios-ui-2026-08` | complete | ios | 6/6 (100%) |
 | `macos-ui-2026-08` | complete | macos | 7/7 (100%) |
+| `model-delivery-2026-08` | complete | release-qa | 3/3 (100%) |
 
 ## Autonomous validation audit remediation
 
@@ -253,9 +253,13 @@ Narrative authority: [`docs/reference/ios-on-device-control-audit-2026-08-28.md`
 | `ICA-03` | done | Freeze the pairwise generation and cleanup plan | `file:scripts/tests/test_ios_control_audit.py`, `doc:docs/reference/ios-on-device-control-audit-2026-08-28.md` |
 | `ICA-04` | in-flight | Execute the complete physical-device campaign | — |
 | `ICA-05` | in-flight | Publish the evidence-linked device findings checkpoint | — |
-| `ICA-06` | planned | P1 — localize the long-Chinese non-EOS generation failure and terminal message | `doc:docs/reference/ios-on-device-control-audit-2026-08-28.md` |
-| `ICA-07` | planned | P2 — restore the Voices root-tab 44-point target | `doc:docs/reference/ios-on-device-control-audit-2026-08-28.md` |
-| `ICA-08` | planned | P2 — investigate UI cadence warnings and playback priority inversion | `benchmark:ios-xcui-perf-20260828-172155-32e5b71e`, `doc:docs/reference/ios-on-device-control-audit-2026-08-28.md` |
+| `ICA-06` | in-flight | P1 — localize the long-Chinese non-EOS generation failure and terminal message | `doc:docs/reference/ios-on-device-control-audit-2026-08-28.md` |
+| `ICA-07` | done | P2 — restore the Voices root-tab 44-point target | `doc:docs/reference/ios-on-device-control-audit-2026-08-28.md` |
+| `ICA-08` | done | P2 — investigate UI cadence warnings and playback priority inversion | `benchmark:ios-xcui-perf-20260829-180027-45adde8a`, `doc:docs/reference/ios-on-device-control-audit-2026-08-28.md` |
+| `ICA-09` | in-flight | P2 — classify pre-test XCUITest bootstrap failures without false product rows | `doc:docs/reference/ios-on-device-control-audit-2026-08-28.md` |
+| `ICA-10` | done | P2 — restore Studio mode-selector 44-point targets | `doc:docs/reference/ios-control-audit-remediation-2026-08-29.md` |
+| `ICA-11` | done | P2 — separate forced-size walks from XCTest Dynamic Type audit | `doc:docs/reference/ios-control-audit-remediation-2026-08-29.md` |
+| `ICA-12` | done | P2 — make the stable Studio surface respond to Dynamic Type | `doc:docs/reference/ios-control-audit-remediation-2026-08-29.md` |
 
 ### Open items in detail
 
@@ -265,14 +269,11 @@ Narrative authority: [`docs/reference/ios-on-device-control-audit-2026-08-28.md`
 - **`ICA-05`** (in-flight) — Publish the evidence-linked device findings checkpoint.
   gate: After ICA-04, re-pin the historical audit report with every control and generation row represented, P0-P3 findings separated into product, harness, infrastructure, prerequisite, preservation-policy, not-applicable and post-failure categories, exact untracked artifact references, restoration proof, and objective remediation gates. No product fix may be folded into the audit without a separate request.
 
-- **`ICA-06`** (planned) — P1 — localize the long-Chinese non-EOS generation failure and terminal message.
-  gate: Using the exact custom-002 request identity retained by ios-xcui-control-audit-20260828-160326-950de77a, identify why Aiden with angry.normal, Chinese output, Consistent variation, and the long corpus script reaches maxNewTokens without EOS after publishing audio. The fix must preserve the request, seed, sampling defaults, prompts, QC, and one-take policy; correct the visible terminal classification so a post-stream non-EOS failure is never described as startup failure; explain the unexpected cold receipt for a planned warm row; and pass deterministic regression coverage plus the affected physical-device row without automatic retry or seed substitution before restarting the broader matrix.
+- **`ICA-06`** (in-flight) — P1 — localize the long-Chinese non-EOS generation failure and terminal message.
+  gate: Using the exact custom-002 request identity retained by ios-xcui-control-audit-20260828-160326-950de77a, prove the first divergent boundary when Aiden with angry.normal, Chinese output, Consistent variation, and the long corpus script reaches maxNewTokens without EOS after publishing audio. Preserve the request, seed, maximum-token policy, sampling defaults, prompts, QC, and one-take policy. A deterministic sampled-output non-EOS result may remain rejected, but it must surface as typed post-generation incomplete audio, never startup failure; no incomplete output may enter History. The receipt remains authoritative for actual warm/cold state, and the plan must require genuine observed warm coverage instead of inferring it from sequence. Closure requires deterministic regression coverage and one no-retry physical reproduction proving the correct visible terminal, exact request receipt, safety discard, and no seed substitution before restarting the broader matrix.
 
-- **`ICA-07`** (planned) — P2 — restore the Voices root-tab 44-point target.
-  gate: The selected and unselected Voices root-tab control must expose an effective accessibility activation frame at least 44 by 44 points at Default, AX-L, AX-XXXL, and pseudo-AX-XXXL without changing the shared dock's visual alignment or obstructing adjacent tabs. Deterministic geometry tests and the physical-device accessibility scenario must pass once without retry.
-
-- **`ICA-08`** (planned) — P2 — investigate UI cadence warnings and playback priority inversion.
-  gate: Explain and, where source-owned, remove the user-interactive-to-default QoS wait reported at LiveStreamingPlaybackEngine.swift:147. Re-run the nine-scenario physical-device perf lane after any causal change: confirmatory scenarios must meet their warn-only cadence and hitch thresholds, exploratory scrub and generation measurements must remain honestly classified, benchmark publication must succeed offline from retained xcresult identity, and no warning may be hidden or reclassified without contract-backed calibration.
+- **`ICA-09`** (in-flight) — P2 — classify pre-test XCUITest bootstrap failures without false product rows.
+  gate: When Xcode times out enabling automation before the first test case launches, the retained xcresult and log must prove zero launched tests and no app assertion, generation request, crash, or QC result. The composed control-audit summary must expose one run-level INFRASTRUCTURE_FAIL while every unexecuted control remains SKIPPED_AFTER_FAILURE; it must preserve the failed result and exact manual rerun command, reject mismatched run identity or any coexistence with observations, and never retry or convert the first run to PASS.
 
 ## iOS Built-in Voice startup reliability
 
@@ -298,25 +299,6 @@ Narrative authority: [`docs/reference/ios-built-in-startup-reliability.md`](refe
 
 - **`ISR-06`** (planned) — Complete exact-script and broader closure evidence.
   gate: Both the original script and tracked sentinel must pass 10/10 cold, 20/20 warm, all eight seeds, every focused predecessor, streaming/non-streaming, and matching UI/engine receipts; then complete the 9-speaker × 8-delivery grid at one seed plus a second seed for the affected speaker row and delivery column. Closure rejects unknown boundaries, silent seed changes, leaked retries, memory-policy violations, crashes, or unrepresented attempts and requires all deterministic gates green.
-
-## Model download throughput
-
-`model-delivery-2026-08` · **active** · release-qa · adopted 2026-08-08
-
-Fix the maintainer-reported download crawl (Hugging Face's CDN shapes throughput per connection, so single-stream multi-gigabyte files always decay) with chunked parallel byte-range transfers, gated by the model-delivery tuning policy's controlled-comparison requirement; extend to iOS only after the background-session identity work and a device A/B.
-
-Narrative authority: [`docs/reference/model-delivery.md`](reference/model-delivery.md)
-
-| Item | Status | Title | Evidence |
-| --- | --- | --- | --- |
-| `MD-1` | done | macOS/CLI chunked byte-range transfers, default on | `commit:ce687f5`, `commit:5e6a9a0`, `file:Tests/VocelloCoreTests/ModelDownloadChunkSchedulingTests.swift`, `file:docs/reference/model-delivery.md` |
-| `MD-2` | done | iOS chunked delivery (identity schema + reconciler + device A/B) | `file:Sources/QwenVoiceCore/ModelDownloadContracts.swift`, `file:Sources/QwenVoiceCore/HuggingFaceDownloader.swift`, `file:Sources/iOS/IOSModelDownloadCoordinator.swift`, `file:Tests/VocelloCoreTests/ModelDownloadChunkSchedulingTests.swift`, `file:docs/reference/model-delivery.md`, `commit:ce687f5`, `commit:5e6a9a0` |
-| `MD-3` | in-flight | P1 — fix iOS model-management progress and adopted finalization | `doc:docs/development-progress.md`, `file:Tests/VocelloiOSUITests/VocelloiOSModelDownloadUITests.swift`, `file:scripts/check_ios_model_management.py`, `file:docs/reference/model-delivery.md` |
-
-### Open items in detail
-
-- **`MD-3`** (in-flight) — P1 — fix iOS model-management progress and adopted finalization.
-  gate: An explicit install after Delete/Cancel must begin a new zero-byte logical request rather than reusing terminal ledger counters. An isolated physical-iPhone Custom transfer that is cancelled, restarted, backgrounded, process-terminated, and adopted after relaunch must transition from Downloading to Ready after authenticated publication rather than remaining indefinitely with logical bytes equal to the catalog total. The deterministic regression must cover terminal-ledger replacement, retryable resume preservation, adopted background-task retry/finalization with every catalog identity and byte complete, prove the large payload is durably published before Ready, and fail on a non-terminal ledger. Determinate UI progress must equal unique durable logical catalog bytes without retry duplication; transfer completion, verification, and installation are indeterminate until Ready. Required closure evidence: two consecutive `scripts/ui_test.sh ios model-download --scenario diagnose` passes followed by one `--scenario acceptance` pass covering Design/Clone shared-component installs, visible removal of all three isolated models, quantitative row/bar checkpoints within five percentage points and 3:1 contrast, exact canonical-state preservation, no leaked tasks or crashes, and no weakening of fail-closed cancellation or integrity policies.
 
 ## EU AI Act Article 50 readiness
 
@@ -432,3 +414,17 @@ Narrative authority: [`docs/reference/macos-ui-refresh-2026-08.md`](reference/ma
 | `UI-5` | done | Refinement wave 1 (warm text ramp, motion family, focus rings, scoped observation, type scaling, stable resize fields, glass helper) | `commit:4e0c7cf`, `commit:bc7c108`, `commit:357d482`, `commit:20e14b2`, `file:docs/reference/macos-ui-refresh-2026-08.md` |
 | `UI-6` | done | Wave 2 re-engineering: store observation migration, History/Voices coordinators, shared generation lifecycle, player split | `file:docs/reference/macos-ui-refresh-2026-08.md`, `file:Sources/QwenVoiceCore/HistoryDeletionEngine.swift`, `file:Sources/ViewModels/GenerationLifecycleExecutor.swift`, `file:Sources/SharedSupport/Services/LiveStreamingPlaybackEngine.swift` |
 | `UI-7` | done | Registry formalization of the perf lane (benchmark-history kind, thresholds from repeated baselines) | `file:config/ui-perf-thresholds.json`, `file:benchmarks/runs/ui-perf/macos-xcui-perf-20260805-092804-98c69168.json`, `file:scripts/tests/test_check_macos_ui_perf.py` |
+
+## Model download throughput
+
+`model-delivery-2026-08` · **complete** · release-qa · adopted 2026-08-08
+
+Fix the maintainer-reported download crawl (Hugging Face's CDN shapes throughput per connection, so single-stream multi-gigabyte files always decay) with chunked parallel byte-range transfers, gated by the model-delivery tuning policy's controlled-comparison requirement; extend to iOS only after the background-session identity work and a device A/B.
+
+Narrative authority: [`docs/reference/model-delivery.md`](reference/model-delivery.md)
+
+| Item | Status | Title | Evidence |
+| --- | --- | --- | --- |
+| `MD-1` | done | macOS/CLI chunked byte-range transfers, default on | `commit:ce687f5`, `commit:5e6a9a0`, `file:Tests/VocelloCoreTests/ModelDownloadChunkSchedulingTests.swift`, `file:docs/reference/model-delivery.md` |
+| `MD-2` | done | iOS chunked delivery (identity schema + reconciler + device A/B) | `file:Sources/QwenVoiceCore/ModelDownloadContracts.swift`, `file:Sources/QwenVoiceCore/HuggingFaceDownloader.swift`, `file:Sources/iOS/IOSModelDownloadCoordinator.swift`, `file:Tests/VocelloCoreTests/ModelDownloadChunkSchedulingTests.swift`, `file:docs/reference/model-delivery.md`, `commit:ce687f5`, `commit:5e6a9a0` |
+| `MD-3` | done | P1 — fix iOS model-management progress and adopted finalization | `doc:docs/development-progress.md`, `file:Tests/VocelloiOSUITests/VocelloiOSModelDownloadUITests.swift`, `file:scripts/check_ios_model_management.py`, `file:docs/reference/model-delivery.md` |

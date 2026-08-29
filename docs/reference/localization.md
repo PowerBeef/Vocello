@@ -1,6 +1,7 @@
 ---
 status: active
 owner: ios
+reviewed: 2026-08-29
 summary: Vocello localization architecture, String Catalog ownership, typed presentation vocabulary, literal-growth guard, and pseudo-localization acceptance.
 sourceOfTruth:
   - project.yml

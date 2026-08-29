@@ -393,15 +393,20 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
                 assertAccessibleTarget(element(identifier), category: name)
             }
             VocelloUIScreenshot.attach(app, named: "ios-control-audit-accessibility-\(name)")
-            if name == "Default" {
-                try app.performAccessibilityAudit()
-            }
             endSession()
         }
+
+        // A forced UIPreferredContentSizeCategoryName intentionally pins the app to one layout
+        // category, so XCTest's own Dynamic Type audit cannot vary it and reports every Text as
+        // unsupported. Run the unfiltered system audit in a distinct launch without that override;
+        // the four deterministic launches above remain the geometry/reflow authority.
+        beginAuditSession()
+        try app.performAccessibilityAudit()
+        endSession()
         recorder.record(
             scenario: "accessibility", controlID: "root-tabs",
             expected: "Named 44-point controls at four layout configurations",
-            actual: "Targets, labels, and stable major-surface audit passed"
+            actual: "Targets, labels, and an unforced stable major-surface audit passed"
         )
         recorder.record(
             scenario: "accessibility", controlID: "settings-preferences",

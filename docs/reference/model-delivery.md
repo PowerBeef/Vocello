@@ -276,13 +276,22 @@ monotonic growth, stable geometry, and writes `model-management-diagnosis.json`,
 `model-management-summary.json`, `progress-visual-summary.json`, and a contact sheet beside the
 `.xcresult`. Forensic collection runs even after XCTest fails. Acceptance requires no inconsistent
 layer; `diagnose` may complete as a diagnostic collection while truthfully classifying a failure.
-Such a run is recorded as `diagnosedFailure`, not as a passing acceptance result. MD-3 closed on
-2026-08-26 after two consecutive clean `diagnose` runs and acceptance run
-`ios-xcui-model-download-20260826-144618-6274d157`: all three real artifacts installed and were
-visibly removed, relaunch preserved the isolated terminal state, the canonical surface was
-unchanged, 1,783 correlated events and 21 UI observations had no finding, and every
-wire/reuse/duplicate equation and quantitative bar measurement passed. The complete raw evidence
-remains an untracked build artifact as required by repository policy.
+The rendered rail explicitly disables inherited SwiftUI animation so screenshots and the
+accessibility fraction represent one presentation state. The host declares a rounded-value freeze
+only when exact catalog-byte progress advances by at least one percentage point while the rounded
+accessibility value remains fixed; byte-level movement below display resolution is not a UI stall.
+The existing five-point rendering tolerance and 3:1 contrast requirement are unchanged.
+Such a run is recorded as `diagnosedFailure`, not as a passing acceptance result. MD-3 first closed
+on 2026-08-26, then reopened when the control audit caught inherited SwiftUI animation in a captured
+progress frame. The rail now disables inherited animation, and the exact-byte validator no longer
+mistakes sub-display-resolution movement for a rounded percentage freeze. Corrected-source
+diagnoses `ios-xcui-model-download-20260829-181500-8b1428c9` and
+`ios-xcui-model-download-20260829-182031-207e8a83` passed consecutively. Acceptance
+`ios-xcui-model-download-20260829-182534-91d70526` then installed, relaunched/adopted, reused shared
+components, and visibly removed all three real models with 1,288 correlated events, 21 UI
+observations, 15 visual samples, no finding, maximum fill error of 1.06 percentage points, minimum
+contrast of 8.80:1, and unchanged canonical state. The complete raw evidence remains an untracked
+build artifact as required by repository policy.
 
 Deterministic tests are model-free and Simulator-free. Live delivery is an explicit diagnostic:
 

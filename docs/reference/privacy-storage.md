@@ -1,6 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
+reviewed: 2026-08-29
 summary: Local-first privacy and on-disk storage layout on both platforms — what lives where, what never leaves the device, and deletion semantics.
 sourceOfTruth:
   - Sources/SharedSupport

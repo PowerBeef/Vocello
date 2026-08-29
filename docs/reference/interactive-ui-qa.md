@@ -1,6 +1,7 @@
 ---
 status: active
 owner: release-qa
+reviewed: 2026-08-29
 summary: Assistive computer-use policy for exploratory UI QA and lane-failure diagnosis — never a driver, gate, or replacement for the XCUITest lanes.
 sourceOfTruth:
   - scripts/ui_test.sh
@@ -32,6 +33,9 @@ classes (app-data and speech-recognition) that no log surfaced. XCUITest
 - Observe and operate only genuine visible controls; no coordinate tables, hidden markers, or
   seeded state. The identifier maps in [`ios-ui-reference.md`](ios-ui-reference.md) name controls.
 - System permission (TCC) dialogs are answered by the human operator, never by the agent.
+- A notification banner that obstructs XCUITest is preserved as infrastructure evidence under its
+  original run ID. Dismiss it only for a separately identified manual rerun; never relabel the
+  first run as product failure or PASS.
 - Keep device sessions burn-in-safe: a handful of generations, via the real UI.
 - Screenshots worth keeping go under `build/artifacts/diagnostics/interactive-qa/<run-id>/`
   (untracked), with a short written note of what was observed.

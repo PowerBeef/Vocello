@@ -1,6 +1,7 @@
 ---
 status: active
 owner: release-qa
+reviewed: 2026-08-29
 summary: Decision-ready evidence and qualified-review gates for downloadable Qwen model artifacts, built-in voice previews, marketing audio, product artwork, and the App Store Connect third-party-content declaration.
 sourceOfTruth:
   - config/third-party-attribution-policy.json

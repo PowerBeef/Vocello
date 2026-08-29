@@ -1078,17 +1078,20 @@ struct IOSSetupChipPill: View {
             Image(systemName: symbol)
                 .font(.system(size: 18, weight: .semibold))
                 .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(tint)
+                .foregroundStyle(Theme.Text.primary)
             if isPlaceholder {
                 // Unset slot: a "+" add affordance instead of a value abbreviation.
                 Image(systemName: "plus")
                     .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(tint)
+                    .foregroundStyle(Theme.Text.primary)
             } else {
                 Text(abbreviation)
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.subheadline.weight(.semibold))
                     .tracking(0.5)
-                    .foregroundStyle(tint)
+                    // Tint remains in the capsule fill, stroke, and glow. Repeating the
+                    // same hue as foreground can fall below 3:1 on the brightest part of
+                    // the translucent gradient (for example the Built-in "AI" chip).
+                    .foregroundStyle(Theme.Text.primary)
                     .lineLimit(1)
             }
             // Trailing chevron — signals every pill is a tappable selector (opens a picker),
@@ -1286,13 +1289,15 @@ struct IOSPrimaryCTAButton: View {
     // app text-primary). Under Reduce Transparency the fill is a deep opaque
     // tint, so the same off-white stays legible.
     private var foregroundInk: Color {
-        Theme.Text.primary
+        isEnabled ? Theme.Text.primary : Theme.Text.secondary
     }
 
     private var backgroundFill: AnyShapeStyle {
         if reduceTransparency {
             // Opaque deep-tint fill so the off-white label keeps contrast.
-            return AnyShapeStyle(tint.mix(with: .black, by: 0.42, in: .perceptual))
+            return AnyShapeStyle(
+                tint.mix(with: .black, by: isEnabled ? 0.42 : 0.70, in: .perceptual)
+            )
         }
 
         // Same recipe as the selector pills (tint gradient over the dark
@@ -1300,7 +1305,9 @@ struct IOSPrimaryCTAButton: View {
         // the standout tinted surface while staying the same translucent glass.
         return AnyShapeStyle(
             LinearGradient(
-                colors: [tint.opacity(0.46), tint.opacity(0.24)],
+                colors: isEnabled
+                    ? [tint.opacity(0.46), tint.opacity(0.24)]
+                    : [tint.opacity(0.14), tint.opacity(0.08)],
                 startPoint: .top,
                 endPoint: .bottom
             )
@@ -1334,7 +1341,7 @@ struct IOSPrimaryCTAButton: View {
                         .foregroundStyle(foregroundInk)
                 }
                 Text(title)
-                    .font(.system(size: 17, weight: .semibold))
+                    .font(.headline)
                     .tracking(-0.17)
                     .foregroundStyle(foregroundInk)
             }
@@ -1371,7 +1378,10 @@ struct IOSPrimaryCTAButton: View {
             .shadow(color: .black.opacity(0.22), radius: 10, x: 0, y: 6)
         }
         .buttonStyle(.plain)
-        .opacity(isEnabled ? 1.0 : 0.42)
+        // Keep disabled copy readable and expose the state semantically. Dimming the
+        // complete control made the label fail contrast while still presenting an
+        // apparently enabled Button to assistive technologies.
+        .disabled(!isEnabled)
         .iosAppAnimation(Theme.Motion.stateChange, value: isEnabled)
     }
 }

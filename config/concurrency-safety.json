@@ -3,7 +3,7 @@
   "owner": "backend-runtime",
   "policy": "Every unchecked Sendable or nonisolated(unsafe) declaration in owned production Swift requires a registry entry, explicit owner, synchronization invariant, review date, removal condition, deterministic evidence where applicable, and room within the no-unreviewed-growth budget.",
   "budget": {
-    "maximumUncheckedSendableDeclarations": 40,
+    "maximumUncheckedSendableDeclarations": 41,
     "maximumNonisolatedUnsafeDeclarations": 9,
     "reviewCadenceDays": 365
   },
@@ -308,6 +308,20 @@
       "tests": [
         "Tests/VocelloCoreTests/MainThreadStallWatchdogTests.swift",
         "Tests/VocelloCoreTests/MemoryTelemetryV8Tests.swift"
+      ]
+    },
+    {
+      "id": "live-playback-graph-retirement",
+      "source": "Sources/SharedSupport/Services/LiveStreamingPlaybackEngine.swift",
+      "types": [
+        "RetiredLivePlaybackGraph"
+      ],
+      "owner": "one-way live playback graph retirement task",
+      "invariant": "The MainActor owner stops the player node, removes every app reference to the AVAudioEngine graph, and transfers the graph exactly once into an immutable box. A utility-priority detached task performs only terminal stop/reset and never publishes, reuses, or concurrently reads the graph.",
+      "reviewedAt": "2026-08-29",
+      "removalCondition": "Remove when AVFAudio graph types gain checked Sendable terminal ownership or an asynchronous engine-stop API makes the one-way transfer unnecessary.",
+      "tests": [
+        "Tests/VocelloiOSUITests/VocelloiOSPerfUITests.swift"
       ]
     }
   ]

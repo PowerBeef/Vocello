@@ -59,7 +59,7 @@
     {
       "id": "model-delivery-2026-08",
       "title": "Model download throughput",
-      "status": "active",
+      "status": "complete",
       "owner": "release-qa",
       "adopted": "2026-08-08",
       "goal": "Fix the maintainer-reported download crawl (Hugging Face's CDN shapes throughput per connection, so single-stream multi-gigabyte files always decay) with chunked parallel byte-range transfers, gated by the model-delivery tuning policy's controlled-comparison requirement; extend to iOS only after the background-session identity work and a device A/B.",
@@ -160,7 +160,7 @@
         "Sources/Views/Library/SavedVoiceSheet.swift",
         "Sources/iOS/IOSVoicesView.swift"
       ],
-      "updated": "2026-08-27",
+      "updated": "2026-08-29",
       "notes": "Closed in source and deterministic verification on 2026-08-20. The product lifecycle no longer commits before review, and iOS deletion no longer requires a one-off build. Physical-device acceptance then passed on the paired iPhone in ios-xcui-saved-voice-lifecycle-20260820-061924-73065027: the genuine picker flow imported the staged reference, previewed the committed voice, handed it to Clone, deleted the exact named row, and proved the matching Studio state was cleared. The single XCUITest passed in 82.362 seconds with source-provenance, crash-baseline, xcuitest, crash-delta, and result-retention steps all passing."
     },
     {
@@ -204,7 +204,7 @@
         ".github/workflows/ci.yml",
         "project.yml"
       ],
-      "updated": "2026-08-27",
+      "updated": "2026-08-29",
       "notes": "Closed 2026-08-26. The existing 19 Foundation-level iOS policy assertions and their four service sources now compile into both VocelloCoreTests and the standalone app-host-free VocelloiOSLogicTests target. Ordinary macOS CI therefore executes the assertions without a phone, while generic/platform=iOS still proves the same source against the physical-device SDK and Xcode 26's unsupported tool-hosted device execution is not misrepresented. The host suite passed all 437 tests including 19/19 VocelloiOSLogicTests, and the iOS app plus standalone policy bundle both compiled successfully outside the managed sandbox. Physical-device runtime and UI acceptance remain unchanged and XCUITest-only."
     },
     {
@@ -284,7 +284,7 @@
         "file:scripts/tests/test_supply_chain_contract.py",
         "file:docs/reference/macos-release-qa.md"
       ],
-      "updated": "2026-08-27",
+      "updated": "2026-08-29",
       "notes": "Closed 2026-08-26 through the gate's compatible acceptance branch. Live read-only GitHub inspection confirmed strict CI required, force-push and deletion disabled, but enforce_admins=false, required_signatures=false, and no ruleset; that direct-main administrator bypass remains an explicit ordinary-development residual because main-only direct development is a maintainer requirement. Release and promotion now fail closed unless the release source is in origin/main, the version tag is annotated and GitHub-verified with reason=valid, and the exact commit's latest CI required and Security required check runs are completed successfully. Path routing brings CodeQL to native/website pull requests and npm advisory audit to website-relevant pushes and pull requests, while a stable Security required aggregate gives the release boundary an exact-SHA verdict. Supply-chain contracts and 41 focused tests cover missing, unsigned, cross-SHA, incomplete, failed, paginated, path-routing, and weakened-workflow cases. No live repository setting was mutated as part of this source change."
     },
     {
@@ -304,7 +304,7 @@
         "file:Tests/VocelloiOSLogicTests/StudioGenerationAttemptAuthorityTests.swift",
         "file:docs/reference/ios-app-guide.md"
       ],
-      "updated": "2026-08-26",
+      "updated": "2026-08-29",
       "notes": "Closed 2026-08-26. Studio start now returns an opaque attempt token; single-take and long-form live, success, failure, defer, and cancellation-barrier callbacks must present the current token. Stale or mismatched callbacks are ignored, overlapping starts and duplicate cancellation requests are rejected, and an engine cancellation-barrier failure remains visible instead of being swallowed. Five deterministic transition tests cover overlap, stale terminal events, cancellation ownership/failure, and rapid cancel/restart; they execute in ordinary macOS CI and compile in the generic iOS device-SDK target. macOS core-test and the full generic iOS app/policy build passed."
     },
     {
@@ -322,7 +322,7 @@
         "file:Tests/VocelloiOSLogicTests/IOSSingleTakeGenerationExecutorTests.swift",
         "file:docs/reference/ios-app-guide.md"
       ],
-      "updated": "2026-08-26",
+      "updated": "2026-08-29",
       "notes": "Closed 2026-08-26 through the gate's incremental acceptance boundary. The first characterized seam moved the duplicated short-form Built-in, Design, and Clone submit/generate/cancel/telemetry/persistence/export pipeline out of IOSGenerationModeViews into a singular MainActor executor with dependency-injected hooks. Mode-specific request assembly, clone priming, save-sheet state, and attempt-scoped UI completion remain at the view boundary, preserving existing public and product contracts. Five deterministic tests cover required correlation identity, exact plan preservation, success ordering, materialized-result cancellation cleanup ownership, wrapped cancellation normalization, and ordinary failure propagation. IOSGenerationModeViews fell from 97,588 to 85,406 bytes; the macOS-hosted core suite and both generic iOS app/policy builds pass. Further hotspot extraction is ordinary incremental maintenance rather than an open review finding."
     },
     {
@@ -345,7 +345,7 @@
         "file:Tests/VocelloiOSLogicTests/VocelloPresentationTextTests.swift",
         "doc:docs/reference/localization.md"
       ],
-      "updated": "2026-08-27",
+      "updated": "2026-08-29",
       "notes": "Closed 2026-08-26. Vocello now owns one Xcode String Catalog with English source copy, translator comments, typed dynamic status/error formatting, and plural categories. The incremental localization contract validates target routing and Xcode settings, rejects missing context or plural forms, and blocks growth of direct unlocalized presentation literals against a content-addressed baseline while allowing migrations out of the baseline. Seven Python fixtures and three Swift presentation tests pass. Focused native acceptance passed outside the managed sandbox: macos-xcui-localization-20260826-173053-a9e0d9d6 ran the pseudo-localized macOS readiness journey, and ios-xcui-localization-20260826-173528-7744c05b walked Settings and Voice Models at Default, AX-L, AX-XXXL, and Pseudo-AX-XXXL on the paired physical iPhone. Neither lane generated audio or changed model installation state. Broad translations remain future product work rather than part of this closure."
     },
     {
@@ -365,7 +365,7 @@
         "Sources/VocelloCLI/Support.swift",
         "scripts/cli_version_contract.py"
       ],
-      "updated": "2026-08-27",
+      "updated": "2026-08-29",
       "notes": "Closed in source and CI on 2026-08-19. GitHub issue #86 remains maintainer-owned and open by explicit instruction."
     },
     {
@@ -387,7 +387,7 @@
         "file:scripts/tests/test_supply_chain_contract.py",
         "doc:docs/reference/mlx-guide.md"
       ],
-      "updated": "2026-08-27",
+      "updated": "2026-08-29",
       "notes": "Closed 2026-08-26. A weekly and manually dispatchable read-only workflow now validates five coordinated exact pins, queries stable GitHub releases plus the repository's open Dependabot alerts, and retains privacy-safe JSON/Markdown proposals for 14 days. The policy binds each package to every declaration, root/owned lock, compatibility surface, and required evidence; any pin disagreement, missing feed, malformed advisory, prerelease-only candidate, mutable action, write permission, or incomplete package inventory fails closed. MLX changes are proposed as one lockstep group, availability never implies compatibility, and the workflow cannot edit source, open a PR, or loosen a constraint. Seven focused checker tests plus supply-chain negative fixtures pass."
     },
     {
@@ -431,7 +431,7 @@
         "file:scripts/macos_test.sh",
         "doc:docs/reference/macos-testing.md"
       ],
-      "updated": "2026-08-26",
+      "updated": "2026-08-29",
       "notes": "Closed in source on 2026-08-26. Concurrency governance schema v2 requires a current review date and substantive removal condition for every registered unsafe declaration and rejects growth beyond the measured 40 @unchecked Sendable and 9 nonisolated(unsafe) declarations. The weekly/manual macos-26 TSan workflow runs the 460-test deterministic core and 18-test injectable XPC transport subset, retains evidence for 14 days, never retries automatically, and remains non-blocking only through the bounded 2026-09-30 characterization window. The corrected isolated-cache physical-host characterization (`tsan-20260826-142440`) passed with no TSan warning or race summary. Its governed `build/cache/xcode/macos-tsan` DerivedData prevents sanitizer runtime contamination of ordinary and release products. One of three required consecutive clean runs is recorded; promotion to blocking still requires the remaining clean runs and explicit maintainer review. MLX/Metal runtime execution remains in its owned deterministic suite rather than this CPU-focused sanitizer subset."
     },
     {
@@ -753,7 +753,7 @@
       "sourceOfTruth": [
         "config/build-output-policy.json"
       ],
-      "updated": "2026-08-27"
+      "updated": "2026-08-29"
     },
     {
       "id": "DG-9",
@@ -767,7 +767,7 @@
       "sourceOfTruth": [
         "scripts/check_project_inputs.sh"
       ],
-      "updated": "2026-08-27"
+      "updated": "2026-08-29"
     },
     {
       "id": "DP-7",
@@ -782,7 +782,7 @@
       "sourceOfTruth": [
         "Tests/VocelloiOSUITests/VocelloiOSUITestCase.swift"
       ],
-      "updated": "2026-08-27"
+      "updated": "2026-08-29"
     },
     {
       "id": "DP-8",
@@ -1063,7 +1063,7 @@
         "Sources/iOS/Sheets/IOSBottomSheets.swift",
         "Sources/iOSSupport/Models/GenerationDrafts.swift"
       ],
-      "updated": "2026-08-27",
+      "updated": "2026-08-29",
       "notes": "Landed 2026-08-15. Evidence basis per preset: happy.normal is the only FDR-clear happy cell in any arm (happy.strong fails FDR everywhere and was heard as Surprised in DP-12); angry ships normal because the confirmed angry/happy separation exists only with both at normal (DP-22 4-bit UAR 0.765 p=0.007 + DP-12 perceptual 0.75) and instruct angry.strong was never identified in listening (0/11) - DP-6's angry.strong feature-power edge measures copy adherence, not valence separation. The distinct set and fearful/surprised keep the strong anchor (DP-18 FDR-clear both arms at strong; DP-12 2AFC controls MORE discriminable at strong). DP-23's listening check on happy.normal-vs-Surprised confusion was superseded by the direct maintainer call; it remains a recommended informal check before the next release (releases are separately maintainer-called). The 4-bit-specificity caveat stands: the 8-bit/quality arm is null at both tiers, so the Quality variant expects no audible happy/angry gain from this change.",
       "evidence": [
         "doc:docs/reference/delivery-harness.md",
@@ -1106,7 +1106,7 @@
         "file:scripts/tests/test_custom_delivery_matrix.py",
         "doc:docs/reference/delivery-harness.md"
       ],
-      "updated": "2026-08-27"
+      "updated": "2026-08-29"
     },
     {
       "id": "DP-27",
@@ -1283,7 +1283,7 @@
       "title": "Non-streaming CLI generation publishes no WAV while reporting success",
       "status": "done",
       "gate": "Found 2026-08-04 while generating calibration clips: `vocello generate --no-stream` prints the output path and a success line (finish=eos, plausible RTF) but no file exists at the path for any destination tried (scratch, app-support outputs, repo build/). The streaming path publishes correctly, so the defect sits in the non-streaming product-finalization/publication path of the owned runtime. Blast radius: every `--no-stream` CLI generate, and the clone-fixture bootstrap in scripts/lib/test_models.sh (`models ensure` regeneration would silently enroll nothing). Fix must include a regression guard that fails the CLI when the reported audioPath does not exist, so success can never again be claimed without a published file. FIXED 2026-08-04: root cause was the generation exit path's cleanup defer coupling the final WAV's fate to streaming-session retention — every completed non-streaming take wrote its file, then deleted it, then returned the path. The exit path now decides per artifact via the pure GenerationOutputAdapter.terminalCleanup table (completed keeps the WAV always; session directory retained only for streaming; unfinished removes both), pinned by GenerationTerminalCleanupTests. The CLI additionally fails closed at the product boundary: generate and batch refuse to claim success when no file exists at the reported audioPath. Live proof: --no-stream published a valid 24 kHz WAV whose duration matches the reported 3.68 s; the streaming control still publishes.",
-      "updated": "2026-08-27",
+      "updated": "2026-08-29",
       "evidence": [
         "file:Sources/QwenVoiceCore/GenerationOutputAdapter.swift",
         "file:Tests/VocelloCoreTests/GenerationTerminalCleanupTests.swift",
@@ -1394,7 +1394,7 @@
         "Sources/QwenVoiceCore/WAVProvenanceChunk.swift",
         "docs/reference/ios-appstore-submission.md"
       ],
-      "updated": "2026-08-27",
+      "updated": "2026-08-29",
       "evidence": [
         "file:Sources/QwenVoiceCore/WAVProvenanceChunk.swift",
         "file:Tests/VocelloCoreTests/WAVProvenanceChunkTests.swift",
@@ -1416,7 +1416,7 @@
         "benchmarks/runs/engine-generation/macos-engine-20260807-023057-5275b724.json",
         "benchmarks/runs/engine-generation/macos-engine-20260807-023242-fce41fcb.json"
       ],
-      "updated": "2026-08-27",
+      "updated": "2026-08-29",
       "evidence": [
         "file:docs/reference/model-delivery.md",
         "file:docs/reference/eu-ai-act-article50-assessment.md",
@@ -1435,7 +1435,7 @@
         "Sources/QwenVoiceCore/HuggingFaceDownloader.swift",
         "docs/reference/model-delivery.md"
       ],
-      "updated": "2026-08-27",
+      "updated": "2026-08-29",
       "evidence": [
         "commit:ce687f5",
         "commit:5e6a9a0",
@@ -1456,7 +1456,7 @@
         "Sources/iOS/IOSModelDownloadCoordinator.swift",
         "docs/reference/model-delivery.md"
       ],
-      "updated": "2026-08-27",
+      "updated": "2026-08-29",
       "evidence": [
         "file:Sources/QwenVoiceCore/ModelDownloadContracts.swift",
         "file:Sources/QwenVoiceCore/HuggingFaceDownloader.swift",
@@ -1471,7 +1471,7 @@
       "id": "MD-3",
       "plan": "model-delivery-2026-08",
       "title": "P1 — fix iOS model-management progress and adopted finalization",
-      "status": "in-flight",
+      "status": "done",
       "gate": "An explicit install after Delete/Cancel must begin a new zero-byte logical request rather than reusing terminal ledger counters. An isolated physical-iPhone Custom transfer that is cancelled, restarted, backgrounded, process-terminated, and adopted after relaunch must transition from Downloading to Ready after authenticated publication rather than remaining indefinitely with logical bytes equal to the catalog total. The deterministic regression must cover terminal-ledger replacement, retryable resume preservation, adopted background-task retry/finalization with every catalog identity and byte complete, prove the large payload is durably published before Ready, and fail on a non-terminal ledger. Determinate UI progress must equal unique durable logical catalog bytes without retry duplication; transfer completion, verification, and installation are indeterminate until Ready. Required closure evidence: two consecutive `scripts/ui_test.sh ios model-download --scenario diagnose` passes followed by one `--scenario acceptance` pass covering Design/Clone shared-component installs, visible removal of all three isolated models, quantitative row/bar checkpoints within five percentage points and 3:1 contrast, exact canonical-state preservation, no leaked tasks or crashes, and no weakening of fail-closed cancellation or integrity policies.",
       "sourceOfTruth": [
         "Sources/QwenVoiceCore/HuggingFaceDownloader.swift",
@@ -1486,9 +1486,9 @@
         "config/model-management-diagnostics-schema-v1.json",
         "docs/reference/model-delivery.md"
       ],
-      "updated": "2026-08-28",
-      "checkpoint": "Reopened on 2026-08-28 because fresh diagnose run ios-xcui-model-download-20260828-143816-b6a21224 reproduced a presentation regression: durable bytes advanced while the accessibility/UI fraction remained stale, rendered fill diverged by more than five percentage points, and measured progress contrast fell below 3:1. The transfer still reached authenticated Ready and removal; queue run ios-xcui-model-download-20260828-144508-d60b4368 and acceptance run ios-xcui-model-download-20260828-144815-3ba68250 passed. Closure again requires the unchanged two-diagnose-plus-acceptance gate after a causal fix.",
-      "notes": "Opened from live physical-device runs ios-xcui-model-download-20260821-154031-2a32aa4c and ios-xcui-model-download-20260821-161217-41fab182. Both reached adopted Custom logical completion without Ready; read-only container evidence from the first run showed a downloading ledger with retryCount 1, receivedBytes equal to the 1,708,583,689-byte total, all 14 identities verified, and the 1.33 GB payload absent from staging. The second run proved the five-minute watchdog, visible isolated cleanup, and exact canonical Ready-state preservation before failing. On 2026-08-21 a correlated diagnostic harness was implemented: stable logical-slot byte accounting, exact determinate transfer plus indeterminate finalization UI, schema-v1 cross-process event journal, five scenarios, milestone screenshots, quantitative visual analysis, unconditional failure forensics, and first-divergence host reports. Its first physical-device diagnose run (ios-xcui-model-download-20260821-184903-1b372030) captured 786 events and isolated an earlier coordinator defect: a fresh request recorded zero bytes but its queued snapshot reused a deleted terminal ledger's full 1,708,583,689 bytes. Transfer, verification, publication, installed ledger, and installed snapshots later completed; the old test emitted no UI observation before timing out. Terminal explicit installs now replace the request while interrupted/failed retries preserve resume evidence; failure paths capture state and use the 300-second policy bound. Host replay correctly reports queued-ledger-progress-mismatch plus the evidence gap. On 2026-08-22 live runs proved clean cancel/adopt/install/remove convergence and exact visual agreement, exposed a six-point capsule appearing full at 99.95%, and showed durable progress can jump from 94.06% directly to complete. The presentation now reserves a visible trailing segment before completion; the late checkpoint accepts only an exact 90%-under-100% sample. A later run exposed and locally fixed repeated XCUITest queries racing Ready when one sample crossed multiple milestones. Closure completed on 2026-08-26 with two consecutive clean diagnose runs (ios-xcui-model-download-20260826-141408-dd2a4575 and ios-xcui-model-download-20260826-142022-902b5d25) followed by acceptance run ios-xcui-model-download-20260826-144618-6274d157. Acceptance passed cancellation, relaunch adoption, authenticated Ready for Custom/Design/Clone, shared-component reuse, visible removal of all three isolated models, relaunch persistence, canonical-state preservation, and crash/task leak checks. Its host validator correlated 1,783 events and 21 UI observations with no diagnosis or visual findings; every rendered bar was leading-edge anchored, stable at 900 by 18 pixels, above 8.8:1 contrast, and within 0.35 percentage points of exact catalog-byte progress. Artifact accounting was exact: wire plus reused verified bytes equaled catalog bytes with zero duplication for all three models, and all three installs reused at least the catalog shared component. Raw device evidence remains untracked under the governed build artifact policy.",
+      "updated": "2026-08-29",
+      "checkpoint": "Reopened on 2026-08-28 because diagnose run ios-xcui-model-download-20260828-143816-b6a21224 exposed an inherited SwiftUI width animation and a rounded-percentage validator false positive. Both causes were corrected without changing byte accounting or lifecycle policy. Closure was re-established on the corrected source on 2026-08-29: consecutive diagnose runs ios-xcui-model-download-20260829-181500-8b1428c9 and ios-xcui-model-download-20260829-182031-207e8a83 passed, followed by acceptance run ios-xcui-model-download-20260829-182534-91d70526. The three runs reported no inconsistent layer or visual finding; acceptance covered all three models, 1,288 correlated events, 21 observations, 15 visual samples, at most 1.06 percentage points of rendered-versus-byte error, at least 8.80:1 contrast, clean removal, no leaked tasks or crashes, and exact canonical-state preservation.",
+      "notes": "Opened from live physical-device runs ios-xcui-model-download-20260821-154031-2a32aa4c and ios-xcui-model-download-20260821-161217-41fab182. Both reached adopted Custom logical completion without Ready; read-only container evidence from the first run showed a downloading ledger with retryCount 1, receivedBytes equal to the 1,708,583,689-byte total, all 14 identities verified, and the 1.33 GB payload absent from staging. The second run proved the five-minute watchdog, visible isolated cleanup, and exact canonical Ready-state preservation before failing. On 2026-08-21 a correlated diagnostic harness was implemented: stable logical-slot byte accounting, exact determinate transfer plus indeterminate finalization UI, schema-v1 cross-process event journal, five scenarios, milestone screenshots, quantitative visual analysis, unconditional failure forensics, and first-divergence host reports. Its first physical-device diagnose run (ios-xcui-model-download-20260821-184903-1b372030) captured 786 events and isolated an earlier coordinator defect: a fresh request recorded zero bytes but its queued snapshot reused a deleted terminal ledger's full 1,708,583,689 bytes. Transfer, verification, publication, installed ledger, and installed snapshots later completed; the old test emitted no UI observation before timing out. Terminal explicit installs now replace the request while interrupted/failed retries preserve resume evidence; failure paths capture state and use the 300-second policy bound. Host replay correctly reports queued-ledger-progress-mismatch plus the evidence gap. On 2026-08-22 live runs proved clean cancel/adopt/install/remove convergence and exact visual agreement, exposed a six-point capsule appearing full at 99.95%, and showed durable progress can jump from 94.06% directly to complete. The presentation now reserves a visible trailing segment before completion; the late checkpoint accepts only an exact 90%-under-100% sample. A later run exposed and locally fixed repeated XCUITest queries racing Ready when one sample crossed multiple milestones. Closure first completed on 2026-08-26 with two consecutive clean diagnose runs and a three-model acceptance run. The 2026-08-28 control audit then legitimately reopened the presentation portion after capturing inherited animation and a false rounded-value freeze. Animation-free rendering and exact-fraction freeze detection landed without changing delivery behavior. Fresh corrected-source proof on 2026-08-29 consists of diagnose runs ios-xcui-model-download-20260829-181500-8b1428c9 (666 events, 8 observations, max visual delta 0.41 points, 12.02:1 minimum contrast) and ios-xcui-model-download-20260829-182031-207e8a83 (596 events, 8 observations, max delta 0.65 points, 12.02:1 contrast), followed by acceptance ios-xcui-model-download-20260829-182534-91d70526 (1,288 events, 21 observations, all three models, 15 measurements, max delta 1.06 points, minimum contrast 8.80:1). Every run had zero findings and no inconsistent layer; acceptance passed cancellation, relaunch adoption, authenticated Ready, shared-component reuse, visible removal, relaunch persistence, canonical preservation, and crash/task-leak checks. Raw device evidence remains untracked under the governed build artifact policy.",
       "evidence": [
         "doc:docs/development-progress.md",
         "file:Tests/VocelloiOSUITests/VocelloiOSModelDownloadUITests.swift",
@@ -1508,7 +1508,7 @@
         "Tests/VocelloiOSUITests/VocelloiOSUITestCase.swift",
         "scripts/benchmark_history.py"
       ],
-      "updated": "2026-08-27",
+      "updated": "2026-08-29",
       "notes": "Gate satisfied 2026-08-12 on the canonical iPhone: run ios-xcui-perf-20260812-145449-41b82c87 passed 9/9 scenarios with the checker gate green (idle sentinel 60.0 Hz, 0.006 ms/s hitch), and the three scripted fail-closed refusals (missing marker; coverage 0%<90%; idle cadence 30 Hz) were demonstrated against doctored copies of that run's real pulled evidence. First device attempt failed on the UI Automation toggle (device-side), second on the seeded-history sentinel typing race fixed in c0dba9c. A 3-lens adversarial review (2026-08-12) confirmed and fixed the cadence-band conflation pre-landing: the fail-closed band is idle-anchored, warn-only elsewhere.",
       "evidence": [
         "commit:73dc9f8",
@@ -1532,7 +1532,7 @@
         "Tests/VocelloiOSUITests/VocelloiOSUITestCase.swift",
         "scripts/benchmark_history.py"
       ],
-      "updated": "2026-08-27",
+      "updated": "2026-08-29",
       "notes": "Closed 2026-08-12, same sitting as the IUI-1 acceptance (which served as the discarded warm-up). Five counted runs, all 9/9 PASS, all thermals nominal, zero warnings: ios-xcui-perf-20260812-{150617-6f2622f1, 151529-762c86ba, 152444-f555f9ec, 153408-8e55fe32, 154331-9cb3d9f7}. Medians+IQR table is in the authority doc. Provenance: result retention pruned runs 1-4's host dirs; their reports were deterministically regenerated from the device's retained probe JSONL + captured lane logs (recipe in the authority doc), and the copy-report-out protocol step is now recorded in ios-device-testing.md.",
       "evidence": [
         "doc:docs/reference/ios-ui-refresh-2026-08.md",
@@ -1551,7 +1551,7 @@
         "Tests/VocelloiOSUITests/VocelloiOSUITestCase.swift",
         "scripts/benchmark_history.py"
       ],
-      "updated": "2026-08-27",
+      "updated": "2026-08-29",
       "notes": "Closed 2026-08-12: four-lens audit (8 agents, per-lens adversarial accuracy checks) merged with the IUI-2 baseline into a 30-item ranked list — 11 measured perf findings (P1-P11), 8 input/a11y defects (X1-X8), 10 design pick-list items (D1-D10), 1 annotation (the 60 Hz tier stays frozen/unmeasurable). Headlines: the 178 ms sheet stall is synchronous AVAudioSession activation + decode inside the presentation transition (P1); the unported macOS root-shell observation finding is confirmed at 11 subscription sites (P2); tab switches structurally remount screens and lose user state (P4). Wave scoping proposal published in the authority doc; the maintainer gate now holds until the pick-list and wave scope get an explicit go.",
       "evidence": [
         "doc:docs/reference/ios-ui-refresh-2026-08.md"
@@ -1569,7 +1569,7 @@
         "Tests/VocelloiOSUITests/VocelloiOSUITestCase.swift",
         "scripts/benchmark_history.py"
       ],
-      "updated": "2026-08-27",
+      "updated": "2026-08-29",
       "notes": "Maintainer go 2026-08-12, scope as proposed: P1 (sheet-present stall - move AVAudioSession activation/decode off the presentation transaction, with an activation-epoch session guard from the adversarial diff review), P5 (lazy History row menus + cached file-exists), P8/P9/P10 (dead-wiring removals), and the input/VoiceOver one-liners X1, X2, X5, X7, X8; all landed 2026-08-12 (commit 2f76b8a). Closed 2026-08-13 after the device window: smoke PASS (ios-xcui-smoke-20260813-170127-e0f9c5be) plus five counted nominal ios perf runs ios-xcui-perf-20260813-{171216-3dba81a4, 172154-a4c6966e, 173129-9dc183af, 174111-90338546, 175056-d09be357} with every report copied out between runs. Before/after vs the IUI-2 baseline (table in the authority doc): sheet-present worst gap -11% (P1's target), composer typing -11% and settings scroll -9% hitch, tab-navigation worst gap -12%; history scroll flat within IQR (honest null - the remaining row cost is wave-2 P2 scope); exploratory scenarios within their designated variance. No confirmatory regression outside IQR noise.",
       "evidence": [
         "doc:docs/reference/ios-ui-refresh-2026-08.md",
@@ -1588,7 +1588,7 @@
         "Tests/VocelloiOSUITests/VocelloiOSUITestCase.swift",
         "scripts/benchmark_history.py"
       ],
-      "updated": "2026-08-27",
+      "updated": "2026-08-29",
       "notes": "Maintainer go 2026-08-12 covers the full pick-list: core re-engineering P2/P3/P4, refinements P6/P7/P11, a11y X3/X6, and ALL four approved design groups (D1-D5 copy/glyph, D6-D8 interaction polish, X4+D9 Dynamic Type program, D10 theme unification). Sub-wave A landed 2026-08-13: P2 (flip-scoped IOSGenerationPerformanceGateModel; RootView fully non-observing), P4 (stable-identity tab container with the iosTabIsActive environment replacing remount-teardown semantics), P3 (player controller per-tick publication split into playback clock + boundary-rate karaoke clock), and design pick D6. Two-lens adversarial review confirmed P2/P3 clean and caught the P4 keep-alive inline-player major (invisible audio + display-link leak) plus mount-once refresh regressions pre-device; all fixed. Device evidence: smoke PASS pre-fix (ios-xcui-smoke-20260813-182434-cb1e0832) and on the fixed build (ios-xcui-smoke-20260813-183632-cbbd2bb7). Sub-wave B landed 2026-08-13 (desk-only): P6 catalog memo + per-body hoist, P7 scroll-indicator task-churn fix, X3 root environment moved outermost (toast/dock/panels/sheets/covers now honor reduce-motion, reduce-transparency, and the generation glass gate), X6 VoiceOver-adjustable inline scrub; P11 deferred with recorded reason (downgraded finding, upstream 4 Hz throttle, unmeasured). Two-lens review: two confirmed minors fixed in-change (VoiceOver backward-step during morph hold; memo key-order thrash), mechanisms otherwise verified. Sub-wave C landed 2026-08-13 (desk-only): all seven small design picks D1-D5/D7/D8 (player Save/Share truthful actions, honest onboarding close, existing-destination toast copy plus a repo-wide stale 'Model Downloads' sweep, History retry copy, matching Settings glyphs, primary-ink benefit titles, grabber drag-dismiss with delete-sheet-maps-to-cancel verified); single-verifier adversarial review found five findings incl. a height-greedy layout placeholder, all fixed in-change. Sub-wave D landed 2026-08-13 (desk-only): D10a glass-gate unification (shared IOSGatedGlassModifier, the macOS GatedGlass twin, is the sole glassEffect site; dead ThemeGlassSurfaceModifier twin deleted; ios.md invariant updated; adversarial parity lens verified all four gate states at every migrated site) and the X4+D9 Dynamic Type program (ten-agent fan-out: 50 of 132 fixed-size sites adopted via iosScaledFont with a new monospacedDigit flag, ~80 kept fixed with per-site recorded reasons, karaoke scales base+run from one ScaledMetric, recording-timer shrink guard from the safety lens). Sub-wave E landed 2026-08-14 (desk-only): D10b token-namespace unification - all five legacy namespaces (IOSBrandTheme, IOSAppTheme, IOSCornerRadius, IOSDesignMotion, IOSSelectionMotion) absorbed into canonical Theme, now the sole iOS token namespace; ~440 call sites across 23 files rewritten by a deterministic longest-first token map (net -152 lines, alias layer and dead Color(dark:) wrapper deleted). Value-identical by construction: every live legacy token maps 8-bit-identically (accent->gold converges on the canonical tokens.css hex), all absorbed animations byte-identical, and the drift flagged at the D10 split lived only in zero-call-site aspirational tokens (Surface.field #2A2C36, Surface.dock #171A1F) now re-pointed to shipped truth with recorded tokens.css deltas. Two-lens adversarial review (value-parity + completeness) mechanically reproduced all 401 diff hunks under the map with zero rendered-value deltas; sole finding was the doc-sync reminder closed in-change. iOS foundation compile green. Wave-close part 1, 2026-08-14 phone window: the counted five-run measurement caught a wholesale regression (tab-navigation +56% on the scenario P4 targeted, voices-scroll +161%, generation-active roughly doubled); a same-day on-device bisect attributed all of it to P4's keep-alive ZStack container (pre-wave control reproduced baseline; sub-wave A reproduced the full regression; container-only revert restored control everywhere; B-E exonerated; the wrapper taxed even single-mounted-tab scenarios). P4 reverted (a7f22ad) per the wave's measured-delta discipline; iosTabIsActive key + screen activation wiring kept (default-true degenerates to remount semantics); state preservation re-scoped as model-hoisted state (backlog). Two fixed-build counted runs confirm baseline recovery before the window closed. Also recorded from the first smoke run: pre-existing long-form silent-project-reset on mid-segment memory-pressure cancellation (backlog; environmental memory warning, rerun passed). Remaining: restart the counted chain clean (one warm-up + five counted, one sitting) plus wave-level smoke and the large-type / scrollsToTop / D10b-confirmation spot-checks at the next phone window; UIKit text-editor UIFontMetrics scaling stays recorded deferred scope. Wave-2 close part 2 (2026-08-15, phone window): counted chain restarted clean on the committed fix per the recorded resume protocol - warm-up discarded, five counted runs in one sitting (ios-xcui-perf-20260815-150607-5bcff66e through -154816-52e87368; zero threshold warnings, thermals nominal; one excluded pre-run-1 transient on-device generation failure, engine-side, healthy memory). All confirmatory scenarios hold the IUI-2 baseline (settings-scroll -16%); generation-active exploratory deltas match the same-day pre-wave control from the part-1 bisect (cross-sitting drift, not wave effect). Wave-level smoke PASS first try (ios-xcui-smoke-20260815-155935-0de9a61f). Checklist closed: X4 large-type spot-check passed at AX-L and AX-XXXL via a one-off XCUITest walk (clean at AX-L; four cosmetic extreme-size findings to backlog, headlined by the Generate capsule slipping behind the grown dock at AX-XXXL); the scrollsToTop question dissolved with the P4 revert; the D10b shipped-truth glance confirmed no visible delta. After-table and reading in the authority doc. IUI-5 closed.",
       "evidence": [
         "doc:docs/reference/ios-ui-refresh-2026-08.md",
@@ -1607,7 +1607,7 @@
         "Tests/VocelloiOSUITests/VocelloiOSUITestCase.swift",
         "scripts/benchmark_history.py"
       ],
-      "updated": "2026-08-27",
+      "updated": "2026-08-29",
       "notes": "Landed 2026-08-15 across two phone windows the same day as the IUI-5 close. One platform-aware ui-perf kind: per-platform scenario tables + relaxed validate_ui_perf_semantics in benchmark_history.py (268 pre-existing records unaffected). iOS warn-only ceilings in config/ui-perf-thresholds-ios.json, derived from the three counted sessions and tightened so the P4 keep-alive regression must breach; exploratory scenarios carry none. check_ios_ui_perf.py binds the contract by default and --emit-evidence publishes through the lane's existing publication block on a canonical-iPhone PASS. IOSUIPerfFrameProbe gained a one-per-launch privacy-safe device-environment snapshot row (registry hardware needs device-truth load/storage/uptime) with a fail-closed stale-app guard, found live when the first publication attempt (ios-xcui-perf-20260815-170208-89766d44) failed on exactly those schema fields. Warn path proven live (that run reported passedWithWarnings on a real sheet-present ceiling breach) and offline (checker self-tests drive a breach through the evidence manifest). First mint (ios-xcui-perf-20260815-171707-8af6ffde) was honestly flagged dirty-source/exploratory (publication code necessarily uncommitted); the clean-source follow-up on the committed arc is the canonical record: benchmarks/runs/ui-perf/ios-xcui-perf-20260815-173719-6e425c28.json; validate --all passes at 270 records; harness-hash list pins the iOS probe/seeder/checker/perf-test/contract files. Warn-only promotes to hard ceilings only after repeated stable sessions (macOS UI-7 precedent). Details: docs/reference/ios-ui-refresh-2026-08.md 'IUI-6 - registry formalization'.",
       "evidence": [
         "doc:docs/reference/ios-ui-refresh-2026-08.md",
@@ -1634,7 +1634,7 @@
         "Sources/iOS/IOSSettingsViews.swift",
         "Tests/VocelloiOSUITests/VocelloiOSUITestCase.swift"
       ],
-      "updated": "2026-08-27",
+      "updated": "2026-08-29",
       "notes": "Closed 2026-08-20 and refined 2026-08-21. The landing page keeps the shared title-free tab convention and presents the five task-oriented groups; Voice Models is a pushed destination with a compact custom Back header, readiness-plus-storage overview, truthful status badges, and visible state-dependent lifecycle actions. Project regeneration, generic iPhoneOS app/logic compilation, the 16-test Settings contract, derived-artifact validation, and the 906-test quick gate passed for the original close; the follow-up evidence is recorded by ISU-3."
     },
     {
@@ -1654,7 +1654,7 @@
         "Sources/iOS/Settings/SettingsScreen.swift",
         "Tests/VocelloiOSUITests/VocelloiOSSmokeUITests.swift"
       ],
-      "updated": "2026-08-27",
+      "updated": "2026-08-29",
       "notes": "Closed 2026-08-20 after screenshot-driven refinement. Settings now uses tracked 11-point section eyebrows, 36-point tinted utility tiles, subheadline labels, caption details and values, 52-point minimum rows, quiet panels, and branded 44-by-26 switch chrome around semantic Toggles. Physical run ios-xcui-smoke-20260820-175509-27fb5f81 passed the focused Settings walk at Default, AX-L, and AX-XXXL and passed the long-form journey. The broad smoke method traversed Settings successfully, then failed only because the phone lacked its pre-existing A_warm_elderly_woman saved-clone fixture; that unrelated fixture keeps the aggregate lane red and is not relabeled as a Settings failure."
     },
     {
@@ -1676,7 +1676,7 @@
         "Sources/iOS/Settings/VoiceModelsScreen.swift",
         "Tests/VocelloiOSUITests/VocelloiOSModelDownloadUITests.swift"
       ],
-      "updated": "2026-08-27",
+      "updated": "2026-08-29",
       "notes": "Closed 2026-08-21. Voice Models now summarizes N of 3 ready beside managed bytes, renders compact non-color-dependent state badges, and places valid Install, Update, Repair, Retry, Cancel download, and Remove actions directly beneath each model. Direct Remove retains the existing named confirmation and legacy container identifier while eliminating the ellipsis discovery step. Deterministic verification results are recorded in the development checkpoint."
     },
     {
@@ -1691,7 +1691,7 @@
         "Sources/iOS/App/RootView.swift",
         "scripts/ui_test.sh"
       ],
-      "updated": "2026-08-27",
+      "updated": "2026-08-29",
       "notes": "Landed 2026-08-15. Backend seam was intact throughout (TTSEngineStore/LocalDocumentIO importReferenceAudio, AppPaths.importedReferenceAudioDir). Device acceptance recorded as the remaining explicit QA for the next phone window: the restored enroll-clone-fixture UI lane end to end plus an ios smoke pass; the open-from-Files route is a manual maintainer spot-check (XCUITest cannot drive the Files app). Missing device evidence never blocks commit/push per the publishing-is-deterministic rule.",
       "evidence": [
         "doc:docs/reference/ios-app-guide.md",
@@ -1708,7 +1708,7 @@
         "scripts/ui_test.sh",
         "Tests/VocelloiOSUITests/VocelloiOSFixtureEnrollmentUITests.swift"
       ],
-      "updated": "2026-08-27",
+      "updated": "2026-08-29",
       "notes": "Closed 2026-08-15 (evening phone window). Full picker-driven proof: because the benchmark voice already existed and iOS shipped no saved-voice deletion UI at that checkpoint (gap recorded to backlog), a one-off uncommitted test variant drove the restored flow end to end with a distinctly named staged copy (Import_acceptance_test): voices_importAudioFile -> system picker -> Import voice sheet with name and sidecar transcript prefilled ('Good length' review card) -> save -> voicesRow_saved_ row; PASS in 47s with screenshots (local-only). Shipped lane PASS via its idempotent exit on the real fixture (ios-xcui-enroll-clone-fixture-20260816-000822-4871903c), proving dispatch, ledger, and wiring. Smoke PASS first try (ios-xcui-smoke-20260816-001059-4be45687, both journeys, memory-pressure sentinel clean) on the build carrying the import restore and the Built-in Voice rename. One automation-session transient ('Timed out while enabling automation mode') was retried per the recorded triage pattern. The open-from-Files route stays a manual maintainer spot-check (XCUITest cannot drive the Files app). Later closure: F-01 shipped individual iOS saved-voice deletion on 2026-08-20.",
       "evidence": [
         "doc:docs/development-progress.md"
@@ -1734,7 +1734,7 @@
         "Sources/iOS/Voices/IOSRecordVoiceSheet.swift",
         "Sources/iOSSupport/Services/IOSReferenceTranscriptionReviewState.swift"
       ],
-      "updated": "2026-08-27",
+      "updated": "2026-08-29",
       "notes": "Implemented on main. The direct Clone action uses the same WAV/MP3/AIFF/M4A policy and secure materializer as Voices and Open in Vocello. The operation-generation state prevents a late recognition result from replacing manual text, and the old unused session-only Add Audio helper was removed. Core tests and the generic physical-device SDK app/logic builds pass; physical-device closure remains ICI-4."
     },
     {
@@ -1752,7 +1752,7 @@
         "Tests/VocelloiOSUITests/VocelloiOSSavedVoiceLifecycleUITests.swift",
         "scripts/ui_test.sh"
       ],
-      "updated": "2026-08-28",
+      "updated": "2026-08-29",
       "notes": "Closed on the paired physical iPhone. ios-xcui-saved-voice-lifecycle-20260828-143515-86a2b339 began in Studio Clone, imported the no-sidecar WAV through Files, completed automatic transcription and editable review, saved and selected the exact voice, generated a Clone take, previewed and deleted the throwaway row, and cleared its Clone draft. After the governed canonical benchmark voice prerequisite was restored, a distinct smoke run ios-xcui-smoke-20260828-165939-d9d57039 passed all three smoke tests without an automatic retry. The initial smoke run remains retained as BLOCKED_PREREQUISITE rather than being overwritten."
     },
     {
@@ -1763,7 +1763,7 @@
       "gate": "Record source-proven causes and measured cold/warm timings for project regeneration, focused tests, generic iOS compilation, XCUITest output, package-cache invalidation, and the pre-commit fingerprint without treating one machine's timing as a permanent contract.",
       "evidence": ["doc:docs/reference/development-workflow.md"],
       "sourceOfTruth": ["scripts/regenerate_project.sh", "scripts/build_foundation_targets.sh", "scripts/ui_test.sh", "scripts/hooks/precommit_gate.sh"],
-      "updated": "2026-08-27",
+      "updated": "2026-08-29",
       "notes": "The audit reproduced redundant full-gate regeneration, disposable generic-iOS DerivedData, package-wide diagnostics flag invalidation, unfocused core tests, multi-megabyte console streams, and an index-sensitive commit marker."
     },
     {
@@ -1774,7 +1774,7 @@
       "gate": "A path-aware repository command must infer adjacent Python tests and changed XCTest classes, offer a sub-second project-only regeneration path, run focused checks without device/model prerequisites, and retain the existing full project gate as the checkpoint and CI authority.",
       "evidence": ["file:scripts/dev.sh", "file:scripts/development_workflow.py", "file:scripts/tests/test_development_workflow.py"],
       "sourceOfTruth": ["scripts/dev.sh", "scripts/development_workflow.py", "scripts/regenerate_project.sh"],
-      "updated": "2026-08-27",
+      "updated": "2026-08-29",
       "notes": "scripts/dev.sh plan|focused|checkpoint owns local routing. Explicit XCUITest, model, benchmark, signing, and release lanes are never inferred."
     },
     {
@@ -1785,7 +1785,7 @@
       "gate": "Local checkpoints must reuse governed DerivedData, diagnostic defines must be target-scoped rather than package-global, project-generation stamps must update atomically after successful generation, and heavy Xcode output must be retained in governed logs while the console stays concise.",
       "evidence": ["file:scripts/build_foundation_targets.sh", "file:scripts/lib/build_cache.sh", "file:project.yml", "file:scripts/tests/test_build_routing_contract.py"],
       "sourceOfTruth": ["config/build-output-policy.json", "project.yml", "scripts/build_foundation_targets.sh", "scripts/lib/build_cache.sh"],
-      "updated": "2026-08-27",
+      "updated": "2026-08-29",
       "notes": "The first clean-cache iOS app+logic compile took 239 seconds; the immediate governed warm checkpoint took 12.5 seconds. These observations characterize one host and are not hard thresholds."
     },
     {
@@ -1796,7 +1796,7 @@
       "gate": "The commit PASS cache must bind HEAD, final tracked content, and every non-ignored untracked path and byte; re-editing invalidates it, staging identical bytes does not, checkpoint completion records the exact-tree marker, and synthetic tests cover hit, content, path, staging, and ignored-file behavior.",
       "evidence": ["file:scripts/tree_fingerprint.py", "file:scripts/tests/test_tree_fingerprint.py", "file:scripts/hooks/precommit_gate.sh"],
       "sourceOfTruth": ["scripts/tree_fingerprint.py", "scripts/hooks/precommit_gate.sh"],
-      "updated": "2026-08-27",
+      "updated": "2026-08-29",
       "notes": "The prior key could reuse a stale PASS after re-editing an already-dirty file. The final-content identity closes that false-green while avoiding a second gate after staging."
     },
     {
@@ -1829,7 +1829,7 @@
         "scripts/python_test_contract.py"
       ],
       "notes": "On 2026-08-25 Xcode reported a pre-test automation-session timeout as totalTestCount=1 because xcresult counted the generated UI-test runner error as a failed test. The fail-closed classifier now recognizes only that exact runner-level shape—no test identifier URL, no passed/skipped case, and an allowlisted automation-mode failure—while still rejecting every launched test or product assertion. The failed xcresult remains separate evidence and no automatic retry was added. A distinct operator-started run entered the real test and produced a genuine audio-QC failure, which the classifier correctly refused to downgrade. AV-09 remains open for its broader stateful-lane repeatability gate.",
-      "updated": "2026-08-27"
+      "updated": "2026-08-29"
     },
     {
       "id": "AV-02",
@@ -1890,7 +1890,7 @@
         "config/benchmark-baseline-migrations.json"
       ],
       "notes": "Closed 2026-08-21. Added/removed cells, one-sided required metrics, QC worsening, and true RTF regressions now fail as coverage/regression results. Intentional cell renames require a versioned one-to-one migration with a non-empty review reason; baseline CLI tests execute through unittest discovery.",
-      "updated": "2026-08-27"
+      "updated": "2026-08-29"
     },
     {
       "id": "AV-05",
@@ -2032,7 +2032,7 @@
       "evidence": [
         "file:scripts/tests/test_delivery_failure_topology.py"
       ],
-      "updated": "2026-08-27",
+      "updated": "2026-08-29",
       "notes": "Implemented without model execution. The known completed-audio rejection class cannot be mislabeled as startup, anonymous historical rows remain independently represented, and paths/raw errors are rejected from output. Existing retained evidence does not yet prove the reported 285-character failure boundary. Cross-reference AV-09 for repeatable stateful device-lane policy."
     },
     {
@@ -2052,7 +2052,7 @@
         "file:Tests/VocelloCoreTests/GenerationStartupDiagnosticsTests.swift",
         "file:Tests/VocelloCoreTests/GenerationFailureDiagnosticLoggerTests.swift"
       ],
-      "updated": "2026-08-27",
+      "updated": "2026-08-29",
       "notes": "Strict delivery cells are centralized in QwenVoiceCore and reused by the CLI and diagnostic plan. Receipt fields omit script, instruction, path, URL, and arbitrary error text. First token and first audio-code may be co-observed from the same materialized signal. Cross-reference F-08: this diagnostic operation generation does not replace the still-planned Studio coordinator attempt-token remediation."
     },
     {
@@ -2075,7 +2075,7 @@
         "file:scripts/tests/test_ios_startup_reliability.py",
         "file:Tests/VocelloCoreTests/IOSStartupReliabilityPlanTests.swift"
       ],
-      "updated": "2026-08-27",
+      "updated": "2026-08-29",
       "notes": "Implementation and deterministic fixtures are complete. Live phone execution belongs to ISR-04/ISR-06; no device result is implied here. The existing diagnostics runner remains the only headless iOS engine owner and XCUITest remains the sole UI driver."
     },
     {
@@ -2120,7 +2120,7 @@
         "file:Packages/VocelloQwen3Core/Tests/Qwen3RuntimeTests/Qwen3DecoderPartitionTests.swift",
         "file:Packages/VocelloQwen3Core/Tests/Qwen3RuntimeTests/VocelloQwen3FacadeTests.swift"
       ],
-      "updated": "2026-08-27",
+      "updated": "2026-08-29",
       "notes": "Live evidence supports two bounded source fixes. First, the outer engine catch no longer wraps a downstream mandatory audio-QC rejection as startup failure; typed QC errors retain stream_failed/audio.quality_rejected and honest UI copy. Second, quality-first generation no longer retains hundreds of lazy MLXArray frames or builds a 300-frame decoder graph: codec frames materialize as compact Int32 values and Mimi decoding uses invariant-tested 25-frame partitions. The paired-iPhone control fell from a 6292.85 MiB critical-pressure process termination to two healthy 2.92-3.02 GiB runs with complete boundaries and identical replay. Quality-first codec signals now co-observe first model token/audio code as required. Exact replay proved the affected streaming cadence gaps are already encoded by the sampled codec sequence, so no decoder change, hidden retry, seed mutation, prompt/sampling change, or weaker QC was introduced. ISR-04 and ISR-06 remain open for the incomplete characterization and exact-script closure matrices."
     },
     {
@@ -2190,7 +2190,7 @@
         "doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md",
         "doc:docs/reference/ios-appstore-submission.md"
       ],
-      "updated": "2026-08-27",
+      "updated": "2026-08-29",
       "notes": "Closed 2026-08-27. config/support-contact.json owns the monitored address and response owner; the source surfaces and negative fixtures pass. The production HTTPS support route returned 200 and exposed the expected contact, owner, and privacy link. The sole iOS 1.0 App Store Connect localization (en-US) read back the exact governed Support URL after mutation. Raw deployment and account responses remained untracked."
     },
     {
@@ -2377,7 +2377,7 @@
         "file:scripts/tests/test_ios_control_audit.py",
         "doc:docs/reference/ios-on-device-control-audit-2026-08-28.md"
       ],
-      "updated": "2026-08-28",
+      "updated": "2026-08-29",
       "notes": "The validator currently accounts for 21 production Swift files, 76 interactive source occurrences, 24 control families, and 60 catalog-expanded inventory rows. Adding an unowned interactive source, unresolved source token, or unowned required family fails closed. Dynamic catalogs are read from the product speaker, delivery, language, variation, and iOS model authorities rather than copied into the validator."
     },
     {
@@ -2396,7 +2396,7 @@
         "file:scripts/tests/test_ios_control_audit.py",
         "doc:docs/reference/ios-on-device-control-audit-2026-08-28.md"
       ],
-      "updated": "2026-08-28",
+      "updated": "2026-08-29",
       "notes": "The runner freezes the complete dirty-tree identity, creates an immutable untracked plan, validates resume against source and plan digests, forwards only test-runner configuration, retains raw artifacts untracked, and composes blocked or missing rows without false-green conversion. The prior iosSettings_openSourceRow smoke defect now reveals the row before tapping it. No product remediation is included."
     },
     {
@@ -2404,7 +2404,7 @@
       "plan": "ios-control-audit-2026-08",
       "title": "Freeze the pairwise generation and cleanup plan",
       "status": "done",
-      "gate": "A deterministic plan must cover every pair of applicable Built-in, Voice Design, and Clone dimensions, include an expected cold sentinel plus warm rows per mode, use language-matched privacy-safe scripts, obtain one seed per mode through the ordinary engine and visible History pin action, bind every later row to that observed seed, represent every row exactly once, and identify each History result for test-owned cleanup without seed injection, substitution, or retry.",
+      "gate": "A deterministic plan must cover every pair of applicable Built-in, Voice Design, and Clone dimensions, include one enforced cold sentinel plus enough ordinary rows to observe at least one genuine warm receipt per mode, use language-matched privacy-safe scripts, obtain one seed per mode through the ordinary engine and visible History pin action, bind every later row to that observed seed, represent every row exactly once, and identify each History result for test-owned cleanup without seed injection, substitution, or retry. Warm state is engine-observed evidence and may never be inferred from row order.",
       "sourceOfTruth": [
         "config/ios-control-audit.json",
         "config/ios-control-audit-corpus.json",
@@ -2414,8 +2414,8 @@
         "file:scripts/tests/test_ios_control_audit.py",
         "doc:docs/reference/ios-on-device-control-audit-2026-08-28.md"
       ],
-      "updated": "2026-08-28",
-      "notes": "The deterministic greedy set-cover plan contains 201 rows: 91 Built-in, 80 Voice Design, and 30 Clone. Tests prove every applicable dimension value and pair, deterministic digests, one expected cold sentinel per mode, language-corpus completeness, and search-token isolation for individual History deletion. XCUITest observes the first successful engine seed per mode, pins it visibly from the run-owned History row, requires exact receipt parity thereafter, and removes only audit-created pins after success. Ordinary Base-model Clone references omit a fabricated delivery dimension because they expose no instruction channel; voice-bank delivery remains conditional."
+      "updated": "2026-08-29",
+      "notes": "The deterministic greedy set-cover plan contains 201 rows: 91 Built-in, 80 Voice Design, and 30 Clone. Tests prove every applicable dimension value and pair, deterministic digests, one enforced cold sentinel per mode, language-corpus completeness, and search-token isolation for individual History deletion. Ordinary rows now declare warm state as observed instead of assuming sequence implies residency; composition requires at least one receipt-authoritative warm row per mode. XCUITest observes the first successful engine seed per mode, pins it visibly from the run-owned History row, requires exact receipt parity thereafter, and removes only audit-created pins after success. Ordinary Base-model Clone references omit a fabricated delivery dimension because they expose no instruction channel; voice-bank delivery remains conditional."
     },
     {
       "id": "ICA-04",
@@ -2429,9 +2429,9 @@
         "Tests/VocelloiOSUITests/VocelloiOSControlAuditUITests.swift",
         "config/ios-control-audit.json"
       ],
-      "updated": "2026-08-28",
+      "updated": "2026-08-29",
       "retentionCheckpoint": "Routine latest-pass cleanup pruned the complete inventory, stateful, and model-queue top-level bundles before the pause request. Their recorded outcomes and bounded device diagnostics remain, but final ICA-04 closure requires one recapture pass with --retain-result. All nine surviving authoritative pause-checkpoint bundles carry untracked pins and a cleanup dry-run classifies each as explicitly-pinned.",
-      "notes": "Paused by maintainer request after all nine performance scenarios completed on 2026-08-28. PASS runs: inventory ios-xcui-control-audit-20260828-163446-1dca3c73; stateful ios-xcui-control-audit-20260828-163043-fc88fb36; external ios-xcui-control-audit-20260828-164234-6509e3fa; saved voice ios-xcui-saved-voice-lifecycle-20260828-143515-86a2b339; model queue ios-xcui-model-download-20260828-144508-d60b4368; model acceptance ios-xcui-model-download-20260828-144815-3ba68250; smoke ios-xcui-smoke-20260828-165939-d9d57039; and perf ios-xcui-perf-20260828-172155-32e5b71e (9/9 XCTest PASS, gate passedWithWarnings, history record published). Accessibility run ios-xcui-control-audit-20260828-143417-45184a63 found rootTab_voices at 33.68 points wide. Diagnose run ios-xcui-model-download-20260828-143816-b6a21224 reproduced the MD-3 progress regression. Generation run ios-xcui-control-audit-20260828-160326-950de77a passed custom-001 then stopped without retry on custom-002 when Qwen3-TTS reached maxNewTokens before EOS; remaining matrix rows are SKIPPED_AFTER_FAILURE. Recording permission mutation remains BLOCKED_PRESERVATION_POLICY. No further device commands ran after perf. The final host checkpoint passed 1,223 Python tests plus derived, documentation, roadmap, surface, and 271-record benchmark validation. Resume only from the pinned report; product fixes change source identity and require new affected scenarios rather than cross-source resume."
+      "notes": "The 2026-08-28 campaign completed inventory, stateful, external, saved-voice, queue, acceptance, smoke, and all nine performance scenarios before pausing. It found the ICA-06 generation terminal, ICA-07/10/11/12 accessibility family, ICA-08 priority inversion, and reopened MD-3. Corrected-source work on 2026-08-29 closed accessibility with no-retry run ios-xcui-control-audit-20260829-174031-cae15a02, closed performance with 9/9 PASS run ios-xcui-perf-20260829-180027-45adde8a, and re-closed MD-3 with diagnose runs ios-xcui-model-download-20260829-181500-8b1428c9 and ios-xcui-model-download-20260829-182031-207e8a83 plus acceptance ios-xcui-model-download-20260829-182534-91d70526. Generation run ios-xcui-control-audit-20260829-174356-664034d5 was interrupted by a log-proven SpringBoard banner, identified by the maintainer as Facebook Messenger, and remains a separate INFRASTRUCTURE_FAIL. Manual run ios-xcui-control-audit-20260829-174603-80b1fa0a passed custom-001 and safely rejected custom-002 for a 12.407-second interior gap at a different frozen seed; it did not reproduce the original no-EOS seed 1051465817978323110. ICA-06 exact-seed physical confirmation and the remaining generation matrix still block ICA-04. Recording permission mutation remains BLOCKED_PRESERVATION_POLICY. Never merge results across the changed source identities."
     },
     {
       "id": "ICA-05",
@@ -2444,15 +2444,15 @@
         "config/roadmap.json",
         "scripts/ios_control_audit.py"
       ],
-      "updated": "2026-08-28",
-      "notes": "The pinned report now contains the 2026-08-28 pause checkpoint, exact run IDs, findings, performance measurements, blocked coverage, and resume boundary. It cannot close until ICA-04 completes, every required matrix row has a terminal observation, restoration is proven, and the report is re-pinned from the final evidence set."
+      "updated": "2026-08-29",
+      "notes": "The pinned historical report contains the 2026-08-28 pause checkpoint, exact run IDs, findings, performance measurements, blocked coverage, and resume boundary. The active 2026-08-29 remediation report records corrected-source accessibility, performance, model-management, generation, and Messenger-interruption evidence without rewriting the historical body. ICA-05 cannot close until ICA-04 completes, every required matrix row has a terminal observation, restoration is proven, and the final evidence set is pinned under the documentation contract."
     },
     {
       "id": "ICA-06",
       "plan": "ios-control-audit-2026-08",
       "title": "P1 — localize the long-Chinese non-EOS generation failure and terminal message",
-      "status": "planned",
-      "gate": "Using the exact custom-002 request identity retained by ios-xcui-control-audit-20260828-160326-950de77a, identify why Aiden with angry.normal, Chinese output, Consistent variation, and the long corpus script reaches maxNewTokens without EOS after publishing audio. The fix must preserve the request, seed, sampling defaults, prompts, QC, and one-take policy; correct the visible terminal classification so a post-stream non-EOS failure is never described as startup failure; explain the unexpected cold receipt for a planned warm row; and pass deterministic regression coverage plus the affected physical-device row without automatic retry or seed substitution before restarting the broader matrix.",
+      "status": "in-flight",
+      "gate": "Using the exact custom-002 request identity retained by ios-xcui-control-audit-20260828-160326-950de77a, prove the first divergent boundary when Aiden with angry.normal, Chinese output, Consistent variation, and the long corpus script reaches maxNewTokens without EOS after publishing audio. Preserve the request, seed, maximum-token policy, sampling defaults, prompts, QC, and one-take policy. A deterministic sampled-output non-EOS result may remain rejected, but it must surface as typed post-generation incomplete audio, never startup failure; no incomplete output may enter History. The receipt remains authoritative for actual warm/cold state, and the plan must require genuine observed warm coverage instead of inferring it from sequence. Closure requires deterministic regression coverage and one no-retry physical reproduction proving the correct visible terminal, exact request receipt, safety discard, and no seed substitution before restarting the broader matrix.",
       "sourceOfTruth": [
         "Tests/VocelloiOSUITests/VocelloiOSControlAuditUITests.swift",
         "Sources/QwenVoiceCore",
@@ -2462,14 +2462,14 @@
       "evidence": [
         "doc:docs/reference/ios-on-device-control-audit-2026-08-28.md"
       ],
-      "updated": "2026-08-28",
-      "notes": "Device-reproduced product failure. The stream published 293 chunks over about 96.8 seconds with nominal thermal and memory state before the exact terminal error. Later matrix rows remain explicitly skipped."
+      "updated": "2026-08-29",
+      "notes": "The retained run proves a post-startup model terminal, not a startup defect: 293 chunks were decoded and published over about 96.8 seconds with nominal thermal and memory state before Qwen3-TTS exhausted its 2,048-token generation budget without EOS. Upstream Qwen3-TTS uses the same 2,048 default/evaluation ceiling and has a reported rare non-EOS-at-limit failure mode. Vocello must keep discarding this incomplete take. The adapter now emits generation.incomplete at streamGenerationEnded with an explicit retry message instead of wrapping it as streamStartup. Ordinary matrix rows no longer claim warm from order; at least one receipt-authoritative warm row per mode is required. The exact original seed 1051465817978323110 and request identity were recovered from retained telemetry, but the production UI has no arbitrary-seed entry and the rejected take created no pinnable History row. A later genuine visible run used a different product-selected seed and correctly rejected a 12.407-second interior silence; it is not substitute evidence. Deterministic coverage passes, while physical no-retry exact-seed confirmation remains pending rather than adding hidden seeded state."
     },
     {
       "id": "ICA-07",
       "plan": "ios-control-audit-2026-08",
       "title": "P2 — restore the Voices root-tab 44-point target",
-      "status": "planned",
+      "status": "done",
       "gate": "The selected and unselected Voices root-tab control must expose an effective accessibility activation frame at least 44 by 44 points at Default, AX-L, AX-XXXL, and pseudo-AX-XXXL without changing the shared dock's visual alignment or obstructing adjacent tabs. Deterministic geometry tests and the physical-device accessibility scenario must pass once without retry.",
       "sourceOfTruth": [
         "Sources/iOS",
@@ -2478,27 +2478,96 @@
       "evidence": [
         "doc:docs/reference/ios-on-device-control-audit-2026-08-28.md"
       ],
-      "updated": "2026-08-28",
-      "notes": "Physical-device run ios-xcui-control-audit-20260828-143417-45184a63 measured rootTab_voices at 33.6767 points wide at Default size."
+      "updated": "2026-08-29",
+      "notes": "Physical-device run ios-xcui-control-audit-20260828-143417-45184a63 measured rootTab_voices at 33.6767 points wide at Default size. The root-tab Button now owns a minimum 44-point height, full flexible width, and rectangular content shape after its style modifier so the semantic control—not only its label—defines the activation geometry. Corrected-source run ios-xcui-control-audit-20260829-174031-cae15a02 passed Default, AX-L, AX-XXXL, pseudo-AX-XXXL, and the separate unforced XCTest accessibility audit without retry."
     },
     {
       "id": "ICA-08",
       "plan": "ios-control-audit-2026-08",
       "title": "P2 — investigate UI cadence warnings and playback priority inversion",
-      "status": "planned",
+      "status": "done",
       "gate": "Explain and, where source-owned, remove the user-interactive-to-default QoS wait reported at LiveStreamingPlaybackEngine.swift:147. Re-run the nine-scenario physical-device perf lane after any causal change: confirmatory scenarios must meet their warn-only cadence and hitch thresholds, exploratory scrub and generation measurements must remain honestly classified, benchmark publication must succeed offline from retained xcresult identity, and no warning may be hidden or reclassified without contract-backed calibration.",
       "sourceOfTruth": [
-        "Sources/SharedSupport/Playback/LiveStreamingPlaybackEngine.swift",
+        "Sources/SharedSupport/Services/LiveStreamingPlaybackEngine.swift",
         "Tests/VocelloiOSUITests/VocelloiOSPerfUITests.swift",
         "scripts/check_ios_ui_perf.py",
         "scripts/benchmark_history.py"
       ],
       "evidence": [
-        "benchmark:ios-xcui-perf-20260828-172155-32e5b71e",
+        "benchmark:ios-xcui-perf-20260829-180027-45adde8a",
         "doc:docs/reference/ios-on-device-control-audit-2026-08-28.md"
       ],
-      "updated": "2026-08-28",
-      "notes": "The 9/9 run passed its frame gate with warnings: sheet present/dismiss measured 48 Hz and 208.64 ms/s hitch time; player scrub measured 34.4 Hz and 386.149 ms/s as an exploratory scenario. A local harness fix now accepts bounded warning ranges and derives iOS version/build from the retained xcresult so delayed history publication does not need the phone."
+      "updated": "2026-08-29",
+      "notes": "The earlier 9/9 run passed its frame gate with warnings and reported a user-interactive-to-default wait while MainActor synchronously called AVAudioEngine.stop/reset during graph discard. Playback now silences the player immediately, transfers exclusive ownership of the retired immutable graph to a registered utility-priority task, and releases AVAudioEngine resources off the MainActor; replacement configuration also retires the prior graph before publishing a new one. Corrected-source run ios-xcui-perf-20260829-180027-45adde8a passed all nine scenarios, the governed performance gate, crash-delta validation, and offline benchmark publication. Its current run logs contain no priority-inversion, Thread Performance Checker, engine.stop/reset, QoS-wait, or semaphore-wait signature. Existing confirmatory/exploratory designations and thresholds were not weakened."
+    },
+    {
+      "id": "ICA-09",
+      "plan": "ios-control-audit-2026-08",
+      "title": "P2 — classify pre-test XCUITest bootstrap failures without false product rows",
+      "status": "in-flight",
+      "gate": "When Xcode times out enabling automation before the first test case launches, the retained xcresult and log must prove zero launched tests and no app assertion, generation request, crash, or QC result. The composed control-audit summary must expose one run-level INFRASTRUCTURE_FAIL while every unexecuted control remains SKIPPED_AFTER_FAILURE; it must preserve the failed result and exact manual rerun command, reject mismatched run identity or any coexistence with observations, and never retry or convert the first run to PASS.",
+      "sourceOfTruth": [
+        "scripts/ui_test.sh",
+        "scripts/ios_startup_reliability.py",
+        "scripts/ios_control_audit.py",
+        "scripts/tests/test_ios_control_audit.py"
+      ],
+      "evidence": [
+        "doc:docs/reference/ios-on-device-control-audit-2026-08-28.md"
+      ],
+      "updated": "2026-08-29",
+      "notes": "The existing narrow startup-reliability bootstrap classifier is now reused by failed control-audit runs. Composition validates the same run ID, zero launched tests, and absence of observations before emitting a run-level infrastructure classification; individual rows are not falsely described as product failures or executed controls. A separate narrow launched-test classifier now recognizes only a log-proven SpringBoard BannerNotification interruption and rejects any coexisting product, crash, or harness failure evidence. Run ios-xcui-control-audit-20260829-174356-664034d5 was re-composed as INFRASTRUCTURE_FAIL after its log proved NotificationShortLookView/BannerNotification blocked the Studio-mode tap; the maintainer identified Facebook Messenger as the source. Its later manual run retained a distinct run ID and did not overwrite it. Deterministic positive and negative fixtures pass. Replay against the retained pre-test automation-mode timeout and one fresh physical-device bootstrap observation remain before closure."
+    },
+    {
+      "id": "ICA-10",
+      "plan": "ios-control-audit-2026-08",
+      "title": "P2 — restore Studio mode-selector 44-point targets",
+      "status": "done",
+      "gate": "Built-in, Design, and Clone mode-selector Buttons must each expose an effective accessibility activation frame at least 44 by 44 points at Default, AX-L, AX-XXXL, and pseudo-AX-XXXL while preserving the compact 36-point visual pill, 44-point selector rail, selected-state semantics, and adjacent segment separation. The physical-device accessibility scenario must pass once without retry.",
+      "sourceOfTruth": [
+        "Sources/iOS/IOSGenerateFlowViews.swift",
+        "Tests/VocelloiOSUITests/VocelloiOSControlAuditUITests.swift"
+      ],
+      "evidence": [
+        "doc:docs/reference/ios-control-audit-remediation-2026-08-29.md"
+      ],
+      "updated": "2026-08-29",
+      "notes": "Fresh physical-device run ios-xcui-control-audit-20260829-161701-e80c9f32 passed bootstrap and root-tab geometry, then measured generateSection_custom at 36.51 points high at Default size. The visual pill intentionally remains 36 points; the outer vertical rail padding is now replaced by a 44-point semantic Button frame and rectangular content shape. Corrected-source run ios-xcui-control-audit-20260829-174031-cae15a02 passed all four explicit layout sizes and the separate unforced XCTest accessibility audit without retry."
+    },
+    {
+      "id": "ICA-11",
+      "plan": "ios-control-audit-2026-08",
+      "title": "P2 — separate forced-size walks from XCTest Dynamic Type audit",
+      "status": "done",
+      "gate": "Default, AX-L, AX-XXXL, and pseudo-AX-XXXL geometry/reflow walks must retain their explicit content-size launch categories, while the full unfiltered system XCTest accessibility audit runs in a separate launch with no UIPreferredContentSizeCategoryName override. No audit category may be excluded, and custom ScaledMetric-backed labels must remain visually compact while scaling in the explicit category walks. The physical-device accessibility scenario must pass once without false Dynamic Type failures.",
+      "sourceOfTruth": [
+        "Tests/VocelloiOSUITests/VocelloiOSControlAuditUITests.swift"
+      ],
+      "evidence": [
+        "doc:docs/reference/ios-control-audit-remediation-2026-08-29.md"
+      ],
+      "updated": "2026-08-29",
+      "notes": "Run ios-xcui-control-audit-20260829-162251-f05fc799 attached History, run ios-xcui-control-audit-20260829-162902-b5d8e9a4 attached MODELS & FILES, and run ios-xcui-control-audit-20260829-163420-2e047405 attached Studio. The moving failure proved a harness-level conflict: the test forced UICTContentSizeCategoryL while asking XCTest's Dynamic Type audit to change that same category. The unnecessary product font experiments were reverted. Run ios-xcui-control-audit-20260829-174031-cae15a02 then passed the four explicit size walks plus a separate unforced, unfiltered XCTest accessibility audit, proving the harness split without exclusions or retries."
+    },
+    {
+      "id": "ICA-12",
+      "plan": "ios-control-audit-2026-08",
+      "title": "P2 — make the stable Studio surface respond to Dynamic Type",
+      "status": "done",
+      "gate": "The root-dock labels, Built-in/Design/Clone mode titles, composer placeholder and metadata, UIKit script editor, and setup-chip values must use semantic Dynamic Type styles at their intended compact base hierarchy. The full unfiltered XCTest accessibility audit and all four explicit-size geometry/reflow walks must pass on the physical iPhone without truncation, overlap, or retrying the same source.",
+      "sourceOfTruth": [
+        "Sources/iOS/App/TabDock.swift",
+        "Sources/iOS/IOSGenerateFlowViews.swift",
+        "Sources/iOS/IOSStudioCanvas.swift",
+        "Sources/iOS/Studio/IOSFlexibleTextEditor.swift",
+        "Sources/iOS/IOSDesignSystemPrimitives.swift",
+        "Tests/VocelloiOSUITests/VocelloiOSControlAuditUITests.swift"
+      ],
+      "evidence": [
+        "doc:docs/reference/ios-control-audit-remediation-2026-08-29.md"
+      ],
+      "updated": "2026-08-29",
+      "notes": "After the forced-size/XCTest conflict was removed, successive source-bound runs independently exposed fixed mode text, an AX-L intrinsic-width overflow, partially adjustable dock labels, a fixed Generate title, clipped composer metadata, a fixed UIKit editor description, low-contrast setup-chip abbreviations, and disabled-CTA contrast/semantics. Native semantic styles, an accessibility-only 2-by-2 dock, a two-line metadata row, accessibility-labelled UIFontMetrics editor, primary setup-chip text, and a semantically disabled CTA resolved each first divergence while preserving ordinary layout. Accessibility sizes reflow Built-in, Design, and Clone into three full-width 44-point rows within a 136-point rail, and Studio reserves the taller dock's clearance. Corrected-source run ios-xcui-control-audit-20260829-174031-cae15a02 passed Default, AX-L, AX-XXXL, pseudo-AX-XXXL, and the separate unforced unfiltered XCTest audit without retry."
     }
   ]
 }

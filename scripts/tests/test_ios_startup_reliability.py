@@ -419,6 +419,35 @@ class IOSStartupReliabilityTests(unittest.TestCase):
         with self.assertRaisesRegex(MODULE.ContractError, "zero launched"):
             MODULE.classify_xcui_bootstrap(log, summary, "run-1", output)
 
+    def test_xcui_external_notification_classifier_is_narrow_and_source_bound(self):
+        log = self.root / "xcui-notification.log"
+        log.write_text(
+            "Find: identifier == NotificationShortLookView\n"
+            "Failed to construct element query matching interruption. "
+            "Interrupting element BannerNotification, foreground application "
+            "Application 'com.apple.springboard'\n",
+            encoding="utf-8",
+        )
+        summary = self.root / "notification-summary.json"
+        summary.write_text(json.dumps({
+            "totalTestCount": 1,
+            "testFailures": [{
+                "failureText": "failed - Timed out after 15.0s waiting for Studio mode",
+                "testIdentifierURL": "test://example/Suite/testJourney",
+            }],
+        }), encoding="utf-8")
+        output = self.root / "notification-classification.json"
+        result = MODULE.classify_xcui_external_interruption(
+            log, summary, "run-1", output
+        )
+        self.assertEqual(result["status"], "infrastructure_external_interruption")
+        self.assertEqual(result["testCaseCount"], 1)
+        self.assertEqual(result["notificationKind"], "springboard_banner")
+
+        log.write_text(log.read_text() + "generation failed\n", encoding="utf-8")
+        with self.assertRaisesRegex(MODULE.ContractError, "product or crash"):
+            MODULE.classify_xcui_external_interruption(log, summary, "run-1", output)
+
         mixed_summary = json.loads(summary.read_text(encoding="utf-8"))
         mixed_summary.update({"totalTestCount": 2, "passedTests": 1})
         summary.write_text(json.dumps(mixed_summary), encoding="utf-8")

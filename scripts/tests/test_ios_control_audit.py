@@ -219,7 +219,7 @@ class IOSControlAuditContractTests(unittest.TestCase):
             for name, values in dimensions.items():
                 self.assertEqual({row[name] for row in by_mode[mode]}, set(values))
             self.assertEqual(by_mode[mode][0]["warmState"], "cold")
-            self.assertTrue(all(row["warmState"] == "warm" for row in by_mode[mode][1:]))
+            self.assertTrue(all(row["warmState"] == "observed" for row in by_mode[mode][1:]))
 
     def test_corpus_matches_every_selectable_language(self) -> None:
         plan = audit.generate_plan(self.contract, self.source_identity)
@@ -274,6 +274,100 @@ class IOSControlAuditCompositionTests(unittest.TestCase):
         self.assertEqual(summary["result"], "failed")
         self.assertEqual(summary["counts"]["PASS"], 1)
         self.assertGreater(summary["counts"]["SKIPPED_AFTER_FAILURE"], 0)
+
+    def test_accessibility_scenario_requires_both_aggregate_observations(self) -> None:
+        metadata = dict(self.metadata, controlAuditScenario="accessibility")
+        root_tabs = self.observation("root-tabs")
+        root_tabs["scenario"] = "accessibility"
+        partial = audit.compose(self.contract, metadata, self.plan, [root_tabs])
+        self.assertEqual(partial["result"], "failed")
+        self.assertEqual(partial["counts"]["PASS"], 1)
+        self.assertEqual(partial["counts"]["SKIPPED_AFTER_FAILURE"], 1)
+
+        settings = self.observation("settings-preferences")
+        settings["scenario"] = "accessibility"
+        complete = audit.compose(
+            self.contract, metadata, self.plan, [root_tabs, settings]
+        )
+        self.assertEqual(complete["result"], "passed")
+        self.assertEqual(complete["counts"]["PASS"], 2)
+        self.assertEqual(
+            {row["scenario"] for row in complete["rows"]}, {"accessibility"}
+        )
+
+    def test_bootstrap_failure_is_run_level_infrastructure_evidence(self) -> None:
+        bootstrap = {
+            "status": "infrastructure_bootstrap_failure",
+            "runID": self.metadata["runID"],
+            "testCaseCount": 0,
+            "xcodebuildLogSHA256": "1" * 64,
+            "xcresultSummarySHA256": "2" * 64,
+        }
+        summary = audit.compose(
+            self.contract, self.metadata, self.plan, [], bootstrap
+        )
+        self.assertEqual(summary["runClassification"], "INFRASTRUCTURE_FAIL")
+        self.assertEqual(
+            summary["infrastructureFailure"]["status"],
+            "infrastructure_bootstrap_failure",
+        )
+        self.assertGreater(summary["counts"]["SKIPPED_AFTER_FAILURE"], 0)
+
+    def test_bootstrap_failure_rejects_wrong_run_or_launched_observations(self) -> None:
+        bootstrap = {
+            "status": "infrastructure_bootstrap_failure",
+            "runID": "different-run",
+            "testCaseCount": 0,
+        }
+        with self.assertRaises(audit.AuditError):
+            audit.compose(self.contract, self.metadata, self.plan, [], bootstrap)
+        bootstrap["runID"] = self.metadata["runID"]
+        with self.assertRaises(audit.AuditError):
+            audit.compose(
+                self.contract,
+                self.metadata,
+                self.plan,
+                [self.observation("root-tabs")],
+                bootstrap,
+            )
+
+    def test_external_notification_is_run_level_infrastructure_evidence(self) -> None:
+        interruption = {
+            "status": "infrastructure_external_interruption",
+            "runID": self.metadata["runID"],
+            "testCaseCount": 1,
+            "notificationKind": "springboard_banner",
+            "xcodebuildLogSHA256": "3" * 64,
+            "xcresultSummarySHA256": "4" * 64,
+        }
+        summary = audit.compose(
+            self.contract,
+            self.metadata,
+            self.plan,
+            [],
+            None,
+            interruption,
+        )
+        self.assertEqual(summary["runClassification"], "INFRASTRUCTURE_FAIL")
+        self.assertEqual(
+            summary["infrastructureFailure"]["status"],
+            "infrastructure_external_interruption",
+        )
+        self.assertEqual(
+            summary["infrastructureFailure"]["notificationKind"],
+            "springboard_banner",
+        )
+
+        failed = self.observation("root-tabs", "PRODUCT_FAIL")
+        with self.assertRaisesRegex(audit.AuditError, "product or harness"):
+            audit.compose(
+                self.contract,
+                self.metadata,
+                self.plan,
+                [failed],
+                None,
+                interruption,
+            )
 
     def test_blocked_preservation_policy_is_retained(self) -> None:
         summary = audit.compose(
@@ -437,7 +531,7 @@ class IOSControlAuditCompositionTests(unittest.TestCase):
                 "retryAttempt": 0,
                 "modelID": "pro_custom",
                 "speakerID": take["speaker"],
-                "deliveryID": f"{take['delivery']}.normal",
+                "deliveryID": None,
                 "language": take["language"],
                 "variation": take["variation"],
                 "seed": 28400100,
@@ -463,6 +557,88 @@ class IOSControlAuditCompositionTests(unittest.TestCase):
             )
         self.assertEqual(report["result"], "failed")
         self.assertIn("receipt_seed_mismatch", report["rows"][0]["issues"])
+        self.assertNotIn("receipt_delivery_mismatch", report["rows"][0]["issues"])
+
+    def test_observed_rows_allow_real_cold_receipt_but_require_warm_coverage(self) -> None:
+        takes = self.plan["takes"][1:3]
+        self.assertTrue(all(take["mode"] == "custom" for take in takes))
+        self.assertTrue(all(take["warmState"] == "observed" for take in takes))
+        observations = []
+        engine_rows = []
+        for index, (take, warm_state) in enumerate(zip(takes, ("cold", "warm"))):
+            generation_id = f"00000000-0000-4000-8000-{index + 10:012d}"
+            observation = self.observation(f"generation:{take['takeID']}")
+            observation.update(
+                {
+                    "scenario": "generation",
+                    "takeID": take["takeID"],
+                    "generationID": generation_id,
+                    "seed": 28_400_099,
+                    "mode": take["mode"],
+                }
+            )
+            observations.append(observation)
+            engine_rows.append(
+                {
+                    "schemaVersion": 9,
+                    "layer": "engine",
+                    "generationID": generation_id,
+                    "mode": take["mode"],
+                    "finishReason": "eos",
+                    "requestReceipt": {
+                        "retryAttempt": 0,
+                        "modelID": "pro_custom",
+                        "speakerID": take["speaker"],
+                        "deliveryID": f"{take['delivery']}.normal",
+                        "language": take["language"],
+                        "variation": take["variation"],
+                        "seed": 28_400_099,
+                        "warmState": warm_state,
+                        "streaming": True,
+                    },
+                    "stageMarks": [
+                        {"stage": "startup.first_decoded_audio_frame"},
+                        {"stage": "startup.first_published_stream_chunk"},
+                    ],
+                    "notes": {
+                        "promptDigest": take["scriptDigest"],
+                        "quality_registry_outcome": "pass",
+                    },
+                    "audioQC": {"verdict": "pass"},
+                }
+            )
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            (root / "engine").mkdir()
+            telemetry = root / "engine/generations.jsonl"
+            telemetry.write_text(
+                "\n".join(json.dumps(row) for row in engine_rows) + "\n",
+                encoding="utf-8",
+            )
+            report = audit.validate_device_evidence(
+                self.contract, self.plan, observations, root
+            )
+            self.assertEqual(report["result"], "passed")
+            self.assertEqual(
+                [row["observedWarmState"] for row in report["rows"]],
+                ["cold", "warm"],
+            )
+
+            engine_rows[1]["requestReceipt"]["warmState"] = "cold"
+            telemetry.write_text(
+                "\n".join(json.dumps(row) for row in engine_rows) + "\n",
+                encoding="utf-8",
+            )
+            report = audit.validate_device_evidence(
+                self.contract, self.plan, observations, root
+            )
+        self.assertEqual(report["result"], "failed")
+        self.assertTrue(
+            all(
+                "missing_observed_warm_coverage" in row["issues"]
+                for row in report["rows"]
+            )
+        )
 
 
 if __name__ == "__main__":

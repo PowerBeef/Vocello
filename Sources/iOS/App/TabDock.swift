@@ -11,6 +11,7 @@ import QwenVoiceCore
 /// dock accents from `design_references/Vocello iOS/chrome.jsx`.
 struct TabDock: View {
     @Environment(AppModel.self) private var appModel
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private var dockTint: Color {
         appModel.tab.dockAccent(studioMode: appModel.studioMode.mode)
@@ -23,14 +24,18 @@ struct TabDock: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 2) {
-                ForEach(IOSAppTab.allCases) { tab in
-                    TabDockButton(
-                        tab: tab,
-                        isSelected: appModel.tab == tab,
-                        isDisabled: false,
-                        action: { select(tab) }
-                    )
+            Group {
+                if dynamicTypeSize.isAccessibilitySize {
+                    LazyVGrid(
+                        columns: [GridItem(.flexible()), GridItem(.flexible())],
+                        spacing: 2
+                    ) {
+                        tabButtons(horizontalLayout: true)
+                    }
+                } else {
+                    HStack(spacing: 2) {
+                        tabButtons(horizontalLayout: false)
+                    }
                 }
             }
             .padding(6)
@@ -55,6 +60,19 @@ struct TabDock: View {
         )
     }
 
+    @ViewBuilder
+    private func tabButtons(horizontalLayout: Bool) -> some View {
+        ForEach(IOSAppTab.allCases) { tab in
+            TabDockButton(
+                tab: tab,
+                isSelected: appModel.tab == tab,
+                isDisabled: false,
+                horizontalLayout: horizontalLayout,
+                action: { select(tab) }
+            )
+        }
+    }
+
     private func select(_ tab: IOSAppTab) {
         guard appModel.tab != tab else { return }
         IOSAccessibleAnimation.perform(Theme.Motion.stateChange) {
@@ -69,6 +87,7 @@ private struct TabDockButton: View {
     let tab: IOSAppTab
     let isSelected: Bool
     let isDisabled: Bool
+    let horizontalLayout: Bool
     let action: () -> Void
 
     @Environment(AppModel.self) private var appModel
@@ -79,13 +98,18 @@ private struct TabDockButton: View {
 
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 4) {
-                Image(systemName: tab.systemImage)
-                    .font(.system(size: 22, weight: .semibold))
-                Text(tab.title)
-                    .iosScaledFont(size: 10, weight: .semibold, relativeTo: .caption2)
-                    .tracking(0.05)
-                    .lineLimit(1)
+            Group {
+                if horizontalLayout {
+                    HStack(spacing: 8) {
+                        tabIcon
+                        tabTitle
+                    }
+                } else {
+                    VStack(spacing: 4) {
+                        tabIcon
+                        tabTitle
+                    }
+                }
             }
             .foregroundStyle(isSelected ? accentTint : Color.white.opacity(0.46))
             .frame(maxWidth: .infinity)
@@ -99,10 +123,27 @@ private struct TabDockButton: View {
             }
         }
         .buttonStyle(.plain)
+        // Apply the expansion to the control itself, not only its label. Otherwise SwiftUI can
+        // expose the intrinsic text width as the accessibility frame even though the HStack's
+        // visual selection background spans a much larger area.
+        .frame(maxWidth: .infinity, minHeight: 44)
+        .contentShape(Rectangle())
         .disabled(isDisabled)
         .opacity(isDisabled ? 0.42 : 1)
         .accessibilityIdentifier("rootTab_\(tab.rawValue)")
         .accessibilityAddTraits(isSelected ? [.isSelected, .isButton] : [.isButton])
+    }
+
+    private var tabIcon: some View {
+        Image(systemName: tab.systemImage)
+            .font(.system(size: 22, weight: .semibold))
+    }
+
+    private var tabTitle: some View {
+        Text(tab.title)
+            .font(.caption2.weight(.semibold))
+            .tracking(0.05)
+            .lineLimit(1)
     }
 }
 

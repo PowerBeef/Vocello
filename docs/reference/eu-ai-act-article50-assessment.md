@@ -1,6 +1,7 @@
 ---
 status: active
 owner: release-qa
+reviewed: 2026-08-29
 summary: Point-in-time research assessment (2026-08-06) of the EU AI Act's Article 50 synthetic-content marking obligations — what the law requires, whether and how it applies to Vocello, the gap at assessment time (since closed by the CP-2 marking seam; see the status updates), and maintainer decision points. Not legal advice.
 sourceOfTruth:
   - Sources/QwenVoiceCore/GenerationOutputAdapter.swift

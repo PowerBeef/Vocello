@@ -231,7 +231,7 @@ class ModelManagementDiagnosisTests(unittest.TestCase):
             [event()],
             [
                 observation(rawBytes=20, expectedFraction=0.2, accessibilityFraction=0.2),
-                observation(rawBytes=40, expectedFraction=0.2, accessibilityFraction=0.2),
+                observation(rawBytes=40, expectedFraction=0.4, accessibilityFraction=0.2),
                 observation(rawBytes=40, expectedFraction=0.3, accessibilityFraction=0.3),
                 observation(rawBytes=30, expectedFraction=0.15, accessibilityFraction=0.15),
             ],
@@ -240,6 +240,19 @@ class ModelManagementDiagnosisTests(unittest.TestCase):
         self.assertIn("ui-frozen-while-bytes-advance", codes)
         self.assertIn("ui-moved-without-bytes", codes)
         self.assertIn("ui-progress-regressed", codes)
+
+    def test_does_not_call_subpercent_byte_motion_a_frozen_ui(self):
+        findings = MODULE.diagnose(
+            [event()],
+            [
+                observation(rawBytes=345_713_491, expectedFraction=0.2023392200, accessibilityFraction=0.20),
+                observation(rawBytes=345_713_618, expectedFraction=0.2023392943, accessibilityFraction=0.20),
+            ],
+        )
+        self.assertNotIn(
+            "ui-frozen-while-bytes-advance",
+            {finding.code for finding in findings},
+        )
 
     def test_classifies_successful_urlsession_completion_without_staging(self):
         findings = MODULE.diagnose(

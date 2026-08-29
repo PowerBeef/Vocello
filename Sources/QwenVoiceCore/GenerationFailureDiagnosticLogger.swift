@@ -256,6 +256,8 @@ public final class GenerationFailureDiagnosticLogger: @unchecked Sendable {
             switch runtimeError.failureCode {
             case .audioQualityRejected:
                 return ErrorMetadata(code: runtimeError.failureCode.rawValue, classification: .audio)
+            case .generationIncomplete:
+                return ErrorMetadata(code: runtimeError.failureCode.rawValue, classification: .model)
             case .runtimeFailed:
                 return ErrorMetadata(code: runtimeError.failureCode.rawValue, classification: .runtime)
             }

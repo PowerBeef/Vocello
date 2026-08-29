@@ -29,9 +29,12 @@ struct IOSFlexibleTextEditor: UIViewRepresentable {
     func makeUIView(context: Context) -> NoIntrinsicHeightTextView {
         let view = NoIntrinsicHeightTextView()
         view.accessibilityIdentifier = "textInput_textEditor"
+        view.accessibilityLabel = "Script"
+        view.accessibilityHint = "Enter or paste the text to generate."
         view.delegate = context.coordinator
         view.backgroundColor = .clear
         view.font = font
+        view.adjustsFontForContentSizeCategory = true
         view.textColor = textColor
         view.tintColor = tintColor
         // Match SwiftUI TextEditor's default content insets so the
@@ -62,6 +65,12 @@ struct IOSFlexibleTextEditor: UIViewRepresentable {
     func updateUIView(_ view: NoIntrinsicHeightTextView, context: Context) {
         if view.accessibilityIdentifier != "textInput_textEditor" {
             view.accessibilityIdentifier = "textInput_textEditor"
+        }
+        if view.accessibilityLabel != "Script" {
+            view.accessibilityLabel = "Script"
+        }
+        if view.accessibilityHint != "Enter or paste the text to generate." {
+            view.accessibilityHint = "Enter or paste the text to generate."
         }
         if view.text != text {
             view.text = text

@@ -330,9 +330,7 @@ final class GenerationOutputAdapter: GenerationOutputAdapting, @unchecked Sendab
         case .cancelled:
             return CancellationError()
         case .completed(.maximumTokens):
-            return MLXTTSEngineError.generationFailed(
-                "Qwen3-TTS reached maxNewTokens before EOS. The output was discarded."
-            )
+            return NativeRuntimeError.maximumTokenLimit()
         case .failed, .completed:
             return MLXTTSEngineError.generationFailed(
                 "Qwen3-TTS failed before product finalization."
@@ -1482,9 +1480,7 @@ struct StreamingExecutionContext: Sendable {
                 modelOutcomeV9 = .eos
             case .completed(.maximumTokens):
                 modelOutcomeV9 = .tokenLimit
-                throw MLXTTSEngineError.generationFailed(
-                    "Qwen3-TTS reached maxNewTokens before EOS. The output was discarded."
-                )
+                throw NativeRuntimeError.maximumTokenLimit()
             case .cancelled:
                 modelOutcomeV9 = .cancelled
                 throw CancellationError()

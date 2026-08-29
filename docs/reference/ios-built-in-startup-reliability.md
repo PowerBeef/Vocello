@@ -1,6 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
+reviewed: 2026-08-29
 summary: Governed diagnosis of the reported iOS Built-in Voice startup failure, including conservative historical classification, typed request receipts, startup boundaries, physical-device plans, and closure requirements.
 sourceOfTruth:
   - config/roadmap.json
@@ -171,6 +172,12 @@ It qualifies only when the `.xcresult` reports zero launched tests and the log p
 app assertion, generation request, crash, or QC outcome. The failed bundle and exact manual rerun
 command remain local. The lane never retries automatically or converts the original failure into a
 pass; this repeatability work remains cross-referenced to AV-09.
+
+A launched control-audit test interrupted by a SpringBoard notification is a different boundary.
+It may be classified as external infrastructure only when the retained log proves the banner and
+`NotificationShortLookView`, the `.xcresult` contains exactly one identified launched-test wait
+timeout, and no product, crash, generation, QC, or harness failure coexists. It remains a failed run,
+never authorizes an automatic retry, and cannot substitute for the zero-test bootstrap classifier.
 
 ## Characterization and causal-fix boundary
 

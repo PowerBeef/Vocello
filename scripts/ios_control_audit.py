@@ -44,6 +44,13 @@ TERMINAL = {
     "SKIPPED_AFTER_FAILURE",
 }
 
+# The accessibility XCUITest emits two aggregate observations after exercising
+# the four explicit content-size walks and the separate unfiltered XCTest audit.
+# Keep those rows explicit so a partial attachment cannot turn an unobserved
+# production inventory into PASS, while a focused accessibility run is not
+# incorrectly required to repeat the inventory/stateful/external journeys.
+ACCESSIBILITY_AGGREGATE_CONTROLS = {"root-tabs", "settings-preferences"}
+
 
 class AuditError(RuntimeError):
     pass
@@ -351,7 +358,10 @@ def generate_plan(contract: dict[str, Any], source_identity: str | None = None) 
             row = {
                 "takeID": f"{mode}-{index + 1:03d}",
                 "mode": mode,
-                "warmState": "cold" if index == 0 else "warm",
+                # Only the first row is an enforced cold sentinel. Ordinary UI work between
+                # subsequent rows can legitimately cross iOS's 30-second idle-unload boundary,
+                # so their request receipts are observed rather than inferred from matrix order.
+                "warmState": "cold" if index == 0 else "observed",
                 **values,
                 "script": rendered_script,
                 "scriptDigest": hashlib.sha256(rendered_script.encode("utf-8")).hexdigest(),
@@ -475,6 +485,8 @@ def compose(
     run_metadata: dict[str, Any],
     plan: dict[str, Any],
     observations: list[dict[str, Any]],
+    bootstrap_classification: dict[str, Any] | None = None,
+    external_interruption_classification: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     validate_plan(contract, plan)
     run_id = run_metadata.get("runID")
@@ -483,6 +495,30 @@ def compose(
         raise AuditError("run metadata must contain runID and treeFingerprint/sourceIdentity")
     if plan.get("sourceIdentity") != source_identity:
         raise AuditError("generation plan source identity does not match the device run")
+    if bootstrap_classification is not None and external_interruption_classification is not None:
+        raise AuditError("XCUITest run cannot have two infrastructure classifications")
+    if bootstrap_classification is not None:
+        if bootstrap_classification.get("status") != "infrastructure_bootstrap_failure":
+            raise AuditError("unsupported XCUITest bootstrap classification")
+        if bootstrap_classification.get("runID") != run_id:
+            raise AuditError("cross-run XCUITest bootstrap classification rejected")
+        if bootstrap_classification.get("testCaseCount") != 0:
+            raise AuditError("bootstrap classification must prove zero launched tests")
+        if observations:
+            raise AuditError("bootstrap classification cannot coexist with control observations")
+    if external_interruption_classification is not None:
+        if external_interruption_classification.get("status") != "infrastructure_external_interruption":
+            raise AuditError("unsupported XCUITest external interruption classification")
+        if external_interruption_classification.get("runID") != run_id:
+            raise AuditError("cross-run XCUITest external interruption classification rejected")
+        test_count = external_interruption_classification.get("testCaseCount")
+        if not isinstance(test_count, int) or isinstance(test_count, bool) or test_count < 1:
+            raise AuditError("external interruption classification must prove a launched test")
+        if any(
+            row.get("classification") in {"PRODUCT_FAIL", "HARNESS_FAIL", "INFRASTRUCTURE_FAIL"}
+            for row in observations
+        ):
+            raise AuditError("product or harness evidence forbids external interruption classification")
 
     inventory = expand_inventory(contract, catalogs())
     scenario = run_metadata.get("controlAuditScenario", "all")
@@ -497,9 +533,13 @@ def compose(
         )
     if scenario != "all":
         if scenario == "accessibility":
-            # Accessibility is a cross-cutting proof and therefore retains the
-            # whole control inventory, but not generation rows.
-            inventory = [row for row in inventory if not row["controlID"].startswith("generation:")]
+            inventory = [
+                {**row, "scenario": "accessibility"}
+                for row in inventory
+                if row["controlID"] in ACCESSIBILITY_AGGREGATE_CONTROLS
+            ]
+            if {row["controlID"] for row in inventory} != ACCESSIBILITY_AGGREGATE_CONTROLS:
+                raise AuditError("accessibility aggregate controls drifted from the inventory")
         else:
             inventory = [row for row in inventory if row["scenario"] == scenario]
     expected_control_ids = {row["controlID"] for row in inventory}
@@ -577,10 +617,30 @@ def compose(
         "sourceIdentity": source_identity,
         "planDigest": plan.get("planDigest"),
         "scenario": scenario,
+        "runClassification": (
+            "INFRASTRUCTURE_FAIL"
+            if bootstrap_classification is not None or external_interruption_classification is not None
+            else None
+        ),
         "result": result,
         "counts": counts,
         "rows": composed_rows,
     }
+    if bootstrap_classification is not None:
+        summary["infrastructureFailure"] = {
+            "status": bootstrap_classification["status"],
+            "testCaseCount": 0,
+            "xcodebuildLogSHA256": bootstrap_classification.get("xcodebuildLogSHA256"),
+            "xcresultSummarySHA256": bootstrap_classification.get("xcresultSummarySHA256"),
+        }
+    if external_interruption_classification is not None:
+        summary["infrastructureFailure"] = {
+            "status": external_interruption_classification["status"],
+            "testCaseCount": external_interruption_classification["testCaseCount"],
+            "notificationKind": external_interruption_classification.get("notificationKind"),
+            "xcodebuildLogSHA256": external_interruption_classification.get("xcodebuildLogSHA256"),
+            "xcresultSummarySHA256": external_interruption_classification.get("xcresultSummarySHA256"),
+        }
     summary["summaryDigest"] = digest(summary)
     return summary
 
@@ -648,9 +708,10 @@ def validate_device_evidence(
                 "modelID": model_by_mode[take["mode"]],
                 "language": take["language"],
                 "variation": take["variation"],
-                "warmState": take["warmState"],
                 "streaming": True,
             }
+            if take["warmState"] == "cold":
+                expected_receipt["warmState"] = "cold"
             if take.get("speaker"):
                 expected_receipt["speakerID"] = take["speaker"]
             observed_seed = observation.get("seed")
@@ -661,7 +722,10 @@ def validate_device_evidence(
             for key, expected in expected_receipt.items():
                 if receipt.get(key) != expected:
                     issues.append(f"receipt_{key}_mismatch")
-            if take.get("delivery"):
+            if take.get("delivery") == "neutral":
+                if receipt.get("deliveryID") not in {None, ""}:
+                    issues.append("receipt_delivery_mismatch")
+            elif take.get("delivery"):
                 delivery_id = receipt.get("deliveryID")
                 if not isinstance(delivery_id, str) or delivery_id.split(".", 1)[0] != take["delivery"]:
                     issues.append("receipt_delivery_mismatch")
@@ -687,6 +751,7 @@ def validate_device_evidence(
             {
                 "takeID": take_id,
                 "generationID": observation["generationID"].lower(),
+                "observedWarmState": receipt.get("warmState") if receipt else None,
                 "status": "PASS" if not issues else "PRODUCT_FAIL",
                 "issues": issues,
             }
@@ -705,6 +770,18 @@ def validate_device_evidence(
                     row["status"] = "PRODUCT_FAIL"
                     if "mode_seed_not_frozen" not in row["issues"]:
                         row["issues"].append("mode_seed_not_frozen")
+
+    for mode in sorted({planned[take_id]["mode"] for take_id in generation_observations}):
+        ordinary_rows = [
+            row for row in results
+            if planned[row["takeID"]]["mode"] == mode
+            and planned[row["takeID"]]["warmState"] == "observed"
+        ]
+        if ordinary_rows and not any(row["observedWarmState"] == "warm" for row in ordinary_rows):
+            for row in ordinary_rows:
+                row["status"] = "PRODUCT_FAIL"
+                if "missing_observed_warm_coverage" not in row["issues"]:
+                    row["issues"].append("missing_observed_warm_coverage")
 
     return {
         "schemaVersion": 1,
@@ -746,6 +823,8 @@ def main() -> int:
     compose_parser.add_argument("--run-metadata", type=pathlib.Path, required=True)
     compose_parser.add_argument("--plan", type=pathlib.Path, required=True)
     compose_parser.add_argument("--observations", type=pathlib.Path, required=True)
+    compose_parser.add_argument("--bootstrap-classification", type=pathlib.Path)
+    compose_parser.add_argument("--external-interruption-classification", type=pathlib.Path)
     compose_parser.add_argument("--output", type=pathlib.Path, required=True)
 
     device_parser = subparsers.add_parser("validate-device")
@@ -788,6 +867,16 @@ def main() -> int:
                 load_json(arguments.run_metadata),
                 load_json(arguments.plan),
                 _read_jsonl(arguments.observations),
+                (
+                    load_json(arguments.bootstrap_classification)
+                    if arguments.bootstrap_classification
+                    else None
+                ),
+                (
+                    load_json(arguments.external_interruption_classification)
+                    if arguments.external_interruption_classification
+                    else None
+                ),
             )
             atomic_write_json(arguments.output, summary)
             print(arguments.output)

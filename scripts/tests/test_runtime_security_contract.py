@@ -25,9 +25,9 @@ class RuntimeSecurityContractTests(unittest.TestCase):
         self.assertEqual(
             MODULE.concurrency_metadata_errors(
                 contract,
-                observed_unchecked_count=40,
+                observed_unchecked_count=41,
                 observed_unsafe_count=9,
-                today=date(2026, 8, 26),
+                today=date(2026, 8, 29),
             ),
             [],
         )
@@ -36,9 +36,9 @@ class RuntimeSecurityContractTests(unittest.TestCase):
         contract = MODULE.load_json(ROOT / "config/concurrency-safety.json")
         errors = MODULE.concurrency_metadata_errors(
             contract,
-            observed_unchecked_count=41,
+            observed_unchecked_count=42,
             observed_unsafe_count=10,
-            today=date(2026, 8, 26),
+            today=date(2026, 8, 29),
         )
         self.assertTrue(any("unchecked Sendable declarations exceed" in error for error in errors))
         self.assertTrue(any("nonisolated unsafe declarations exceed" in error for error in errors))
@@ -49,9 +49,9 @@ class RuntimeSecurityContractTests(unittest.TestCase):
         contract["unsafeDeclarations"][0]["removalCondition"] = "later"
         errors = MODULE.concurrency_metadata_errors(
             contract,
-            observed_unchecked_count=40,
+            observed_unchecked_count=41,
             observed_unsafe_count=9,
-            today=date(2026, 8, 26),
+            today=date(2026, 8, 29),
         )
         self.assertTrue(any("requires reviewedAt" in error for error in errors))
         self.assertTrue(any("substantive removalCondition" in error for error in errors))
@@ -61,9 +61,9 @@ class RuntimeSecurityContractTests(unittest.TestCase):
         contract["entries"][0]["reviewedAt"] = "2024-01-01"
         errors = MODULE.concurrency_metadata_errors(
             contract,
-            observed_unchecked_count=40,
+            observed_unchecked_count=41,
             observed_unsafe_count=9,
-            today=date(2026, 8, 26),
+            today=date(2026, 8, 29),
         )
         self.assertTrue(any("review is stale" in error for error in errors))
 

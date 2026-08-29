@@ -3,10 +3,13 @@ import QwenVoiceCore
 
 struct IOSGenerateContainerView: View {
     @Environment(AppModel.self) private var appModel
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @EnvironmentObject private var audioPlayer: AudioPlayerViewModel
     @EnvironmentObject private var ttsEngine: TTSEngineStore
     @EnvironmentObject private var modelManager: ModelManagerViewModel
-    private let selectorRailHeight: CGFloat = 44
+    private var selectorRailHeight: CGFloat {
+        dynamicTypeSize.isAccessibilitySize ? 136 : 44
+    }
 
     @Binding var selectedTab: IOSAppTab
     @Environment(\.iosTabIsActive) private var isTabActive
@@ -115,6 +118,7 @@ struct IOSGenerationModeSelector: View {
 ///   pill:  active tint @ 22 % fill + active tint @ 36 % stroke,
 ///          white inset top highlight, and 1pt black drop shadow.
 struct IOSCapsuleSelector<Item: Identifiable & Hashable>: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let items: [Item]
     @Binding var selection: Item
     let title: KeyPath<Item, String>
@@ -125,7 +129,11 @@ struct IOSCapsuleSelector<Item: Identifiable & Hashable>: View {
     @Namespace private var selectionPillNamespace
 
     var body: some View {
-        HStack(spacing: 4) {
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(spacing: 2))
+            : AnyLayout(HStackLayout(spacing: 4))
+
+        layout {
             ForEach(items) { item in
                 Button {
                     guard !isSelectionDisabled else { return }
@@ -133,7 +141,7 @@ struct IOSCapsuleSelector<Item: Identifiable & Hashable>: View {
                     selection = item
                 } label: {
                     Text(item[keyPath: title])
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.subheadline.weight(.semibold))
                         .lineLimit(1)
                         .minimumScaleFactor(0.85)
                         .foregroundStyle(
@@ -142,7 +150,7 @@ struct IOSCapsuleSelector<Item: Identifiable & Hashable>: View {
                                 : Theme.Text.secondary
                         )
                         .frame(minHeight: 36)
-                        .padding(.horizontal, 20)
+                        .padding(.horizontal, dynamicTypeSize.isAccessibilitySize ? 6 : 20)
                         .background {
                             if item == selection {
                                 IOSCapsuleSelectorPill(tint: selectedTint(item))
@@ -151,6 +159,10 @@ struct IOSCapsuleSelector<Item: Identifiable & Hashable>: View {
                         }
                 }
                 .buttonStyle(.plain)
+                // Keep the 36-point visual pill inside the compact 44-point rail while making
+                // the semantic segment itself own the full HIG activation height.
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .contentShape(Rectangle())
                 .disabled(isSelectionDisabled && item != selection)
                 .opacity(isSelectionDisabled && item != selection ? 0.42 : 1)
                 .iosAppAnimation(Theme.Motion.selectorLabel, value: selection)
@@ -159,7 +171,8 @@ struct IOSCapsuleSelector<Item: Identifiable & Hashable>: View {
             }
         }
         .iosAppAnimation(Theme.Motion.modePillSlide, value: selection)
-        .padding(4)
+        .padding(.horizontal, 4)
+        .frame(maxWidth: .infinity)
         .background {
             Capsule(style: .continuous)
                 .fill(Color.white.opacity(0.04))
@@ -168,9 +181,7 @@ struct IOSCapsuleSelector<Item: Identifiable & Hashable>: View {
             Capsule(style: .continuous)
                 .stroke(Color.white.opacity(0.08), lineWidth: 0.5)
         }
-        .frame(height: 44)
-        .fixedSize(horizontal: true, vertical: false)
-        .frame(maxWidth: .infinity, alignment: .center)
+        .frame(height: dynamicTypeSize.isAccessibilitySize ? 136 : 44)
         .sensoryFeedback(.selection, trigger: selection)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(controlAccessibilityIdentifier)

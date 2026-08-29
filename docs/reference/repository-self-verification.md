@@ -1,6 +1,7 @@
 ---
 status: active
 owner: release-qa
+reviewed: 2026-08-29
 summary: How the repository checks itself — the five classes of failure the gates detect, which class each check belongs to, what none of them can see, and how to add a new one.
 sourceOfTruth:
   - scripts/check_project_inputs.sh

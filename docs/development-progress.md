@@ -47,43 +47,58 @@ machine-readable status record and wins over any older prose.
 | 13 — Benchmark/history v3 | Live 2026-07-29: the first schema-v3 records are committed (three clean `phase0-cli-control-*` engine records plus one exploratory run that also exposed and fixed the summarizer's v3 pin). `benchmarks/schema-v3.json` adds the typed quality identity to generation takes (pass/warning only, five fast gates required, machine-code issues); v1/v2 records stay valid immutable history; the publisher stamps v3 only when every take carries the identity. The UI benchmark checkers folded the same identity 2026-08-01: ui-generation records now publish v3 (first: the focused `v3-fold-proof` record `macos-xcui-benchmark-20260801-003208-403989cf`); the canonical iOS matrix published its first v3 record 2026-08-01 (`ios-xcui-benchmark-20260801-132415-abbec96b`). |
 | 14 — Organization and retirement | Closed 2026-07-23 (14a + 14b): compatibility SPI retired, actor-owned loading/metadata/priming/clone artifacts, clone conditioning epoch-bound end to end. |
 
-## Resume here (2026-08-28)
+## Resume here (2026-08-29)
 
-**The exhaustive physical-iPhone control audit is paused after the complete nine-scenario
-performance lane (2026-08-28):** no further device work belongs to this checkpoint. Inventory,
-stateful controls, external handoffs, direct Clone import/transcription/generation/cleanup, model
-queue and acceptance, smoke, and all nine performance scenarios have authoritative retained runs.
-The performance suite passed 9/9 and its gate passed with explicit sheet-presentation and
-player-scrub warnings; compact history record
-`ios-xcui-perf-20260828-172155-32e5b71e` is published. ICI-4 is closed by
-`ios-xcui-saved-voice-lifecycle-20260828-143515-86a2b339` and distinct passing smoke run
-`ios-xcui-smoke-20260828-165939-d9d57039`.
+**The causal control-audit remediations now have corrected-source device evidence.** Accessibility
+run `ios-xcui-control-audit-20260829-174031-cae15a02` passed Default, AX-L, AX-XXXL,
+pseudo-AX-XXXL, and a separate unforced XCTest accessibility audit, closing ICA-07 and ICA-10
+through ICA-12. Performance run `ios-xcui-perf-20260829-180027-45adde8a` passed all nine governed
+scenarios with no priority-inversion, Thread Performance Checker, engine-stop/reset, QoS-wait, or
+semaphore-wait signature, closing ICA-08. Its compact PASS record is in benchmark history.
 
-The campaign is not clean or complete. Accessibility run
-`ios-xcui-control-audit-20260828-143417-45184a63` measured `rootTab_voices` at 33.6767 points
-wide. Model diagnose run `ios-xcui-model-download-20260828-143816-b6a21224` reproduced stale UI
-progress, rendered-fraction disagreement, and sub-3:1 contrast, so MD-3 is reopened despite later
-queue and acceptance passes. Generation run `ios-xcui-control-audit-20260828-160326-950de77a`
-passed `custom-001` then stopped without retry at `custom-002`: Aiden, `angry.normal`, Chinese,
-Consistent, long script reached `maxNewTokens` without EOS after 293 published chunks. The UI
-misclassified that post-stream terminal as startup failure, and the observed receipt was cold for a
-planned warm row. All later generation rows are `SKIPPED_AFTER_FAILURE`; recording-permission
-mutation remains `BLOCKED_PRESERVATION_POLICY`.
+MD-3 re-closed after the progress-presentation correction. Consecutive diagnoses
+`ios-xcui-model-download-20260829-181500-8b1428c9` and
+`ios-xcui-model-download-20260829-182031-207e8a83`, followed by acceptance
+`ios-xcui-model-download-20260829-182534-91d70526`, passed exact-byte progress, installation,
+relaunch adoption, shared-component reuse, removal of all three models, task/crash cleanup, and
+canonical-state preservation. Across the acceptance run's 15 visual samples, maximum fill error
+was 1.06 percentage points and minimum contrast was 8.80:1.
 
-Resume from ICA-04/ICA-05 only after ICA-06, ICA-07, and the reopened MD-3 have causal fixes and
-deterministic coverage. A source change invalidates the old generation resume identity, so start a
-new frozen campaign rather than merging old failure evidence. Repeat performance only if ICA-08
-changes performance-sensitive source. Actual VoiceOver/rotor behavior, conditional Update/Repair,
-authorized permission denial/recovery, remaining generation rows, three-repeat stress, restoration,
-and exact signed-candidate ASR-12 acceptance remain. See the exact run table and safe commands in
-[`ios-on-device-control-audit-2026-08-28.md`](reference/ios-on-device-control-audit-2026-08-28.md).
-Routine latest-pass cleanup pruned the complete inventory, stateful, and model-queue bundles before
-the pause request; their recorded outcomes and bounded device diagnostics remain, but final ICA-04
-closure needs one recapture pass using the new `--retain-result` option. Every other surviving
-authoritative run is explicitly retention-pinned; a cleanup dry-run reports all nine surviving key
-bundles as `explicitly-pinned`. The pause-checkpoint implementation passed the complete project
-input gate on 2026-08-28, including 1,223 Python tests, derived-document validation, roadmap and
-surface coverage, and the 271-record benchmark registry.
+The `custom-002` long-Chinese result is a valid safety rejection after 293 published chunks, not an
+engine-start failure: Qwen exhausted its unchanged 2,048-token ceiling without EOS. Vocello now
+emits typed `generation.incomplete` at `streamGenerationEnded`, states that incomplete audio was
+not saved, and preserves explicit user-controlled retry. The request, seed, sampling, prompt, token
+limit, QC, and one-take policy remain unchanged. Matrix rows no longer infer warm state from order;
+the engine receipt is authoritative and each mode must prove at least one genuinely warm row.
+
+The Voices tab Button now owns 44-point minimum geometry and full-width content shape. Playback
+graph disposal no longer synchronously calls `AVAudioEngine.stop()` on the MainActor: exclusive
+retired graph ownership moves to a registered utility task. A pre-test XCUITest timeout can produce
+one run-level `INFRASTRUCTURE_FAIL` only with zero-test proof. A separate narrow classifier covers a
+launched test interrupted by a proven SpringBoard notification banner. Run
+`ios-xcui-control-audit-20260829-174356-664034d5` is retained under that classification: its log
+identified `NotificationShortLookView`, and the maintainer confirmed Facebook Messenger was the
+source. It is not product evidence, every unexecuted row stays skipped, and a later manual run has a
+distinct identity rather than overwriting it. The decision record and closure evidence are in
+[`ios-control-audit-remediation-2026-08-29.md`](reference/ios-control-audit-remediation-2026-08-29.md).
+
+Generation run `ios-xcui-control-audit-20260829-174603-80b1fa0a` used a new source identity and a
+different product-selected seed. Its first row passed; its long Chinese row safely rejected a
+12.407-second interior silence with the correct QC message and no saved take. That is valid audio-QC
+behavior, not a reproduction of the earlier no-EOS terminal. The original seed
+`1051465817978323110` has been recovered from retained telemetry, but the production UI has no
+arbitrary-seed entry and the failed take created no pinnable History row. ICA-06 therefore remains
+in flight rather than adding hidden seeded state or substituting another seed. ICA-04/ICA-05 still
+require the remaining source-frozen generation rows, restoration proof, and a re-pinned final report.
+Actual VoiceOver/rotor behavior, conditional Update/Repair, authorized permission denial/recovery,
+three-repeat stress, and exact signed-candidate ASR-12 acceptance remain separate gaps.
+
+The authoritative earlier runs remain recorded in
+[`ios-on-device-control-audit-2026-08-28.md`](reference/ios-on-device-control-audit-2026-08-28.md):
+performance `ios-xcui-perf-20260828-172155-32e5b71e` passed 9/9 with explicit warnings; direct
+Clone lifecycle `ios-xcui-saved-voice-lifecycle-20260828-143515-86a2b339` and smoke
+`ios-xcui-smoke-20260828-165939-d9d57039` passed. The new-source device runs must be retained with
+`--retain-result` where supported.
 
 **The development loop is now path-aware and cache-preserving (2026-08-27):**
 `scripts/dev.sh plan|focused|checkpoint` separates repeated edit feedback from one coherent-tree

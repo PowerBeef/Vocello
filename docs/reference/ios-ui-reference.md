@@ -1,6 +1,7 @@
 ---
 status: active
 owner: ios
+reviewed: 2026-08-29
 summary: Compact iOS screen and accessibility-identifier map for physical-device XCUITest — states, stable identifiers, and expectations per screen.
 sourceOfTruth:
   - Sources/iOS

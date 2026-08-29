@@ -54,6 +54,7 @@ enum NativeRuntimeStage: String, Codable, Sendable {
 enum NativeRuntimeFailureCode: String, Sendable {
     case runtimeFailed = "runtime.failed"
     case audioQualityRejected = "audio.quality_rejected"
+    case generationIncomplete = "generation.incomplete"
 }
 
 struct NativeRuntimeError: LocalizedError, Sendable {
@@ -107,6 +108,15 @@ struct NativeRuntimeError: LocalizedError, Sendable {
             notes["audioQCFlags"] = diagnosticDetail
         }
         return notes
+    }
+
+    static func maximumTokenLimit() -> NativeRuntimeError {
+        NativeRuntimeError(
+            stage: .streamGenerationEnded,
+            message: "This take reached its generation limit before it finished, so the incomplete audio was not saved. Retry to generate a new take.",
+            failureCode: .generationIncomplete,
+            diagnosticDetail: "maximum_tokens_before_eos"
+        )
     }
 }
 

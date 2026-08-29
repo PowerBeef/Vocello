@@ -147,16 +147,46 @@ terminal outcomes, remaining rows, and the next valid command in the roadmap and
 checkpoint; then confirm each pin reports `explicitly-pinned` in a cleanup dry-run. Remove pins only
 when the evidence set is explicitly retired.
 
+Warm/cold lifecycle state is always taken from the engine request receipt. The first row per mode
+is an enforced cold sentinel; ordinary rows declare their state as observed, and composition
+requires at least one genuinely warm receipt per mode. Row order is not residency evidence because
+visible UI setup can outlast the iPhone idle-unload policy. A fixed-seed request that publishes
+audio but reaches the model token ceiling before EOS is a post-generation incomplete take: it must
+be discarded, absent from History, and surfaced as `generation.incomplete`, never described as a
+startup failure or silently retried.
+
+An automation-session bootstrap timeout becomes a run-level `INFRASTRUCTURE_FAIL` only when the
+retained `.xcresult` and log prove zero launched test cases and there are no app observations,
+assertions, generation requests, crashes, or QC results. Every unexecuted control remains
+`SKIPPED_AFTER_FAILURE`; a manual rerun receives a new run ID and cannot overwrite the first run.
+After a test has launched, a separate classifier may report `infrastructure_external_interruption`
+only when the retained log proves a SpringBoard notification banner and
+`NotificationShortLookView`, the `.xcresult` proves exactly one identified wait timeout, and no
+product, harness, crash, generation, or QC failure coexists. It never turns the run into PASS and
+never authorizes an automatic retry. The 2026-08-29 Messenger-interrupted run is the retained proof
+for this boundary.
+See [`ios-control-audit-remediation-2026-08-29.md`](ios-control-audit-remediation-2026-08-29.md).
+
 The model-delivery runner always exports the `.xcresult`, attachments, diagnostics journal,
 delivery summaries, ledger copy, sanitized storage inventories, crash delta, and host diagnosis even
 when XCTest fails. Determinate bar observations include raw and total bytes, expected and
 accessibility fractions, visible copy, status, phase, action set, frames, and screenshot names.
+The SwiftUI progress rail disables inherited animation so a captured frame represents the same
+exact durable-byte fraction exposed through accessibility. An unchanged integer accessibility
+percentage is not a freeze unless exact progress advances by at least one percentage point; tiny
+byte changes below the rounded display resolution remain valid. Rendered-width error, monotonicity,
+leading-edge anchoring, geometry, and 3:1 contrast checks remain fail-closed.
 The 95% visual checkpoint is an honest late-transfer band: the first exact incomplete sample from
 90% through under 100% is used because durable catalog-byte progress can jump directly from 94% to
 complete. Crossed milestones share one immutable UI sample and screenshot, preventing Ready or
 finalization from removing controls while the evidence is being serialized. A completed diagnostic
-that isolates a defect is retained and labelled `diagnosedFailure`; only a clean diagnosis counted
-toward MD-3 closure. The two-diagnose-plus-acceptance sequence completed on 2026-08-26, and this
+that isolates a defect is retained and labelled `diagnosedFailure`; only a clean diagnosis counts
+toward MD-3 closure. After the August 29 animation correction, consecutive diagnoses
+`ios-xcui-model-download-20260829-181500-8b1428c9` and
+`ios-xcui-model-download-20260829-182031-207e8a83` plus acceptance
+`ios-xcui-model-download-20260829-182534-91d70526` re-closed the gate. The acceptance run installed,
+adopted after relaunch, reused shared components, and visibly removed all three models with no
+finding; its 15 visual samples stayed within 1.06 percentage points and above 8.80:1 contrast. This
 procedure remains the fail-closed regression protocol.
 `scripts/check_ios_model_management.py` identifies the first inconsistent layer and emits a timeline,
 machine-readable diagnosis/summary, visual measurements, and a milestone contact sheet. A failed

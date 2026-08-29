@@ -1,6 +1,7 @@
 ---
 status: active
 owner: release-qa
+reviewed: 2026-08-29
 summary: The single telemetry and benchmarking reference — per-generation typed telemetry across frontend/transport/backend, schema versions, knobs, artifacts, and how evidence stays cheap.
 sourceOfTruth:
   - Sources/QwenVoiceCore/NativeTelemetrySampler.swift

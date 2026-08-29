@@ -1,6 +1,7 @@
 ---
 status: active
 owner: release-qa
+reviewed: 2026-08-29
 summary: Operator runbook for performance and quality benchmarks — when to bench, the macOS CLI/app-XPC and iOS device paths, expected artifacts, and how to read results.
 sourceOfTruth:
   - scripts/macos_test.sh

@@ -1042,6 +1042,69 @@ def classify_xcui_bootstrap(
     return result
 
 
+def classify_xcui_external_interruption(
+    log_path: Path,
+    summary_path: Path,
+    run_id: str,
+    output: Path,
+) -> dict[str, Any]:
+    """Classify a launched UI test blocked by a proved SpringBoard notification.
+
+    This is deliberately separate from bootstrap classification: the XCTestCase
+    did launch, and its failed result remains failed. The classification only
+    records that the first divergent layer was an external system banner rather
+    than a Vocello product terminal.
+    """
+    if not SAFE_ID.fullmatch(run_id):
+        raise ContractError("run ID is not allowlisted")
+    log = log_path.read_text(encoding="utf-8", errors="replace")
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    if not isinstance(summary, dict):
+        raise ContractError("xcresult summary is not an object")
+    count = summary.get("totalTestCount")
+    if not isinstance(count, int) or isinstance(count, bool) or count < 1:
+        raise ContractError("external interruption requires a launched test")
+    failures = summary.get("testFailures", [])
+    if len(failures) != 1 or not isinstance(failures[0], dict):
+        raise ContractError("external interruption requires exactly one test failure")
+    failure = failures[0]
+    if not isinstance(failure.get("testIdentifierURL"), str) or not failure["testIdentifierURL"]:
+        raise ContractError("external interruption requires an identified launched test")
+    failure_text = failure.get("failureText")
+    if not isinstance(failure_text, str) or not all(
+        marker in failure_text for marker in ("Timed out after", "waiting for")
+    ):
+        raise ContractError("test failure is not a post-interruption wait timeout")
+
+    interruption_markers = (
+        "Failed to construct element query matching interruption.",
+        "Interrupting element BannerNotification",
+        "NotificationShortLookView",
+        "foreground application Application 'com.apple.springboard'",
+    )
+    if not all(marker in log for marker in interruption_markers):
+        raise ContractError("log does not prove an external SpringBoard notification interruption")
+    forbidden_markers = (
+        "generation failed",
+        "audio_qc",
+        "fatal error",
+        "application crashed",
+    )
+    if any(marker in log.lower() for marker in forbidden_markers):
+        raise ContractError("product or crash evidence forbids external interruption classification")
+    result = {
+        "schemaVersion": 1,
+        "status": "infrastructure_external_interruption",
+        "runID": run_id,
+        "testCaseCount": count,
+        "notificationKind": "springboard_banner",
+        "xcodebuildLogSHA256": digest_bytes(log_path.read_bytes()),
+        "xcresultSummarySHA256": digest_bytes(summary_path.read_bytes()),
+    }
+    atomic_json(output, result)
+    return result
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
     sub = parser.add_subparsers(dest="command", required=True)
@@ -1074,6 +1137,11 @@ def main(argv: list[str] | None = None) -> int:
     bootstrap_parser.add_argument("--xcresult-summary", required=True, type=Path)
     bootstrap_parser.add_argument("--run-id", required=True)
     bootstrap_parser.add_argument("--output", required=True, type=Path)
+    interruption_parser = sub.add_parser("classify-xcui-external-interruption")
+    interruption_parser.add_argument("--xcodebuild-log", required=True, type=Path)
+    interruption_parser.add_argument("--xcresult-summary", required=True, type=Path)
+    interruption_parser.add_argument("--run-id", required=True)
+    interruption_parser.add_argument("--output", required=True, type=Path)
     args = parser.parse_args(argv)
     try:
         if args.command == "prepare":
@@ -1086,8 +1154,15 @@ def main(argv: list[str] | None = None) -> int:
             compose_process_exit(args.plan, args.artifact_dir, args.run_id, args.output)
         elif args.command == "sanitize-system-crashes":
             sanitize_system_crashes(args.input_dir, args.output, set(args.process))
-        else:
+        elif args.command == "classify-xcui-bootstrap":
             classify_xcui_bootstrap(
+                args.xcodebuild_log,
+                args.xcresult_summary,
+                args.run_id,
+                args.output,
+            )
+        else:
+            classify_xcui_external_interruption(
                 args.xcodebuild_log,
                 args.xcresult_summary,
                 args.run_id,

@@ -7,11 +7,23 @@ final class PreparedVoiceWireContractTests: XCTestCase {
     func testCandidateCommandsRoundTripAtSchemaVersionTwo() throws {
         XCTAssertEqual(QwenVoiceWireSchema.currentVersion, 2)
         let id = UUID()
+        let metadata = PreparedVoiceEnrollmentMetadata(
+            referenceLanguage: .french,
+            transcriptSource: .manual,
+            transcriptionEvidenceDigest: String(repeating: "a", count: 64)
+        )
         let commands: [EngineCommand] = [
             .preparePreparedVoiceCandidate(
                 name: "Review Voice",
                 audioPath: "/private/tmp/reference.wav",
                 transcript: "Hello",
+                replacingVoiceID: "Old Voice"
+            ),
+            .preparePreparedVoiceCandidateV2(
+                name: "Review Voice",
+                audioPath: "/private/tmp/reference.wav",
+                transcript: "Bonjour",
+                enrollmentMetadata: metadata,
                 replacingVoiceID: "Old Voice"
             ),
             .commitPreparedVoiceCandidate(id: id),
@@ -25,6 +37,21 @@ final class PreparedVoiceWireContractTests: XCTestCase {
             XCTAssertEqual(decoded.schemaVersion, 2)
             XCTAssertEqual(decoded.command, command)
         }
+    }
+
+    func testLegacyCandidateCommandStillDecodesAfterEnrollmentMetadataExtension() throws {
+        let command = EngineCommand.preparePreparedVoiceCandidate(
+            name: "Legacy Voice",
+            audioPath: "/private/tmp/legacy.wav",
+            transcript: nil,
+            replacingVoiceID: nil
+        )
+        let data = try EngineServiceCodec.encode(
+            EngineRequestEnvelope(id: UUID(), command: command)
+        )
+
+        let decoded = try EngineServiceCodec.decode(EngineRequestEnvelope.self, from: data)
+        XCTAssertEqual(decoded.command, command)
     }
 
     func testCandidateReplyRoundTripsWithoutExposingStagedPath() throws {

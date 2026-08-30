@@ -141,6 +141,26 @@
       "extractionState" : "manual",
       "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Choose a WAV, MP3, AIFF, or M4A file from Files." } } }
     },
+    "vocello.enrollment.reference_language" : {
+      "comment" : "Enrollment field describing the language spoken in the saved reference clip.",
+      "extractionState" : "manual",
+      "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Reference language" } } }
+    },
+    "vocello.enrollment.reference_language.confirmation" : {
+      "comment" : "Enrollment guidance when automatic reference-language detection is inconclusive.",
+      "extractionState" : "manual",
+      "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Confirm the language spoken in this reference." } } }
+    },
+    "vocello.enrollment.reference_language.detail" : {
+      "comment" : "Enrollment guidance clarifying that reference language does not select future output language.",
+      "extractionState" : "manual",
+      "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Used only to describe this saved reference." } } }
+    },
+    "vocello.enrollment.reference_language.placeholder" : {
+      "comment" : "Placeholder option for an unconfirmed reference-clip language.",
+      "extractionState" : "manual",
+      "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Choose a language" } } }
+    },
     "vocello.enrollment.transcription.audio_only_confirmed" : {
       "comment" : "Enrollment status after explicit confirmation to save without a transcript.",
       "extractionState" : "manual",

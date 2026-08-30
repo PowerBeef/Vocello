@@ -144,8 +144,10 @@ def validate(root: Path) -> None:
 
     ios_record_sheet = _read(root, "Sources/iOS/Voices/IOSRecordVoiceSheet.swift")
     for token in (
-        "VoiceClipTranscriber.transcribe(url: url)",
+        "VoiceClipTranscriber.enrollmentResult(url: url)",
         "transcriptionReview.allowsSave(transcript: transcript)",
+        "PreparedVoiceEnrollmentMetadata(",
+        "referenceLanguage: $detectedLanguage",
     ):
         if token not in ios_record_sheet:
             raise ContractError(f"transcription review enrollment is missing {token!r}")
@@ -153,6 +155,7 @@ def validate(root: Path) -> None:
     ios_save_sheet = _read(root, "Sources/iOS/IOSGenerationInputControls.swift")
     for token in (
         '"saveVoice_transcriptionStatus"',
+        '"saveVoice_referenceLanguagePicker"',
         '"saveVoice_useAudioOnlyButton"',
     ):
         if token not in ios_save_sheet:

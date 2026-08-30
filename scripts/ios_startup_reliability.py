@@ -203,17 +203,38 @@ def validate_receipt(value: Any, field: str) -> None:
     }
     allowed = required | {
         "speakerID", "deliveryID", "instructionDigest", "instructionLanguage",
+        "modelFacingInstructionLanguage",
         "predecessorIdentityDigest",
+        "storedLanguageSelection", "detectedTargetLanguage", "referenceTranscriptLanguage",
+        "finalModelLanguage", "languageTokenMode", "conditioningMode",
+        "normalizedTargetTextDigest", "normalizedTargetTextCharacters",
+        "referenceTranscriptDigest", "referenceTranscriptCharacters",
+        "referenceAudioDigest", "modelArtifactVersion",
+        "modelIntegrityManifestDigest", "speechTokenizerDigest",
     }
     if not isinstance(value, dict) or not required.issubset(value) or set(value) - allowed:
         raise ContractError(f"{field} does not match request-receipt schema v1")
-    if value["schemaVersion"] != 1:
+    if value["schemaVersion"] not in {1, 2}:
         raise ContractError(f"{field} uses an unsupported schema")
+    if value["schemaVersion"] == 2:
+        v2_required = {
+            "storedLanguageSelection", "finalModelLanguage", "languageTokenMode", "conditioningMode",
+            "normalizedTargetTextDigest", "normalizedTargetTextCharacters",
+            "referenceTranscriptCharacters",
+        }
+        if not v2_required.issubset(value):
+            raise ContractError(f"{field} omits request-receipt schema v2 fields")
+        if value.get("instructionDigest") is not None and "modelFacingInstructionLanguage" not in value:
+            raise ContractError(f"{field} omits model-facing instruction language")
     validate_uuid(value["generationID"], f"{field}.generationID")
     for key in ("generationIdentityDigest", "requestIdentityDigest", "sessionIdentityDigest", "prewarmIdentityDigest"):
         if not isinstance(value[key], str) or not SHA256.fullmatch(value[key]):
             raise ContractError(f"{field}.{key} is not SHA-256")
-    for key in ("instructionDigest", "predecessorIdentityDigest"):
+    for key in (
+        "instructionDigest", "predecessorIdentityDigest", "normalizedTargetTextDigest",
+        "referenceTranscriptDigest", "referenceAudioDigest", "modelIntegrityManifestDigest",
+        "speechTokenizerDigest",
+    ):
         child = value.get(key)
         if child is not None and (not isinstance(child, str) or not SHA256.fullmatch(child)):
             raise ContractError(f"{field}.{key} is not nullable SHA-256")
@@ -227,8 +248,22 @@ def validate_receipt(value: Any, field: str) -> None:
         raise ContractError(f"{field}.deliveryID is invalid")
     if value["language"] not in LANGUAGES or value["variation"] not in VARIATIONS:
         raise ContractError(f"{field} has invalid language or variation")
+    for key in ("storedLanguageSelection", "detectedTargetLanguage", "referenceTranscriptLanguage", "finalModelLanguage"):
+        child = value.get(key)
+        if child is not None and child not in LANGUAGES:
+            raise ContractError(f"{field}.{key} is invalid")
+    if value.get("finalModelLanguage") not in {None, value["language"]}:
+        raise ContractError(f"{field}.finalModelLanguage disagrees with language")
+    if value.get("languageTokenMode") not in {None, "think", "nothink"}:
+        raise ContractError(f"{field}.languageTokenMode is invalid")
+    if value.get("conditioningMode") not in {
+        None, "custom_voice", "voice_design", "clone_transcript_backed", "clone_audio_only",
+    }:
+        raise ContractError(f"{field}.conditioningMode is invalid")
     if value.get("instructionLanguage") not in {None, "english", "mandarin", "verbatim"}:
         raise ContractError(f"{field}.instructionLanguage is invalid")
+    if value.get("modelFacingInstructionLanguage") not in LANGUAGES | {None}:
+        raise ContractError(f"{field}.modelFacingInstructionLanguage is invalid")
     if value["seedSource"] not in {"requested", "generated"} or value["warmState"] not in {"cold", "warm"}:
         raise ContractError(f"{field} has invalid seed or warm-state vocabulary")
     if not isinstance(value["streaming"], bool):
@@ -236,6 +271,10 @@ def validate_receipt(value: Any, field: str) -> None:
     for key, maximum in (("instructionCharacters", 10000), ("seed", 2**64 - 1), ("retryAttempt", 1), ("operationGeneration", 2**64 - 1)):
         child = value[key]
         if not isinstance(child, int) or isinstance(child, bool) or not 0 <= child <= maximum:
+            raise ContractError(f"{field}.{key} is out of bounds")
+    for key in ("normalizedTargetTextCharacters", "referenceTranscriptCharacters"):
+        child = value.get(key)
+        if child is not None and (not isinstance(child, int) or isinstance(child, bool) or not 0 <= child <= 100000):
             raise ContractError(f"{field}.{key} is out of bounds")
 
 

@@ -1,6 +1,7 @@
 @_exported import QwenVoiceEngineSupport
 import Combine
 import Foundation
+import QwenVoiceCore
 
 public protocol MacTTSEngine: AnyObject, Sendable {
     var snapshot: TTSEngineSnapshot { get }
@@ -24,6 +25,13 @@ public protocol MacTTSEngine: AnyObject, Sendable {
         transcript: String?,
         replacingVoiceID: String?
     ) async throws -> PreparedVoiceCandidate
+    func preparePreparedVoiceCandidate(
+        name: String,
+        audioPath: String,
+        transcript: String?,
+        replacingVoiceID: String?,
+        enrollmentMetadata: PreparedVoiceEnrollmentMetadata?
+    ) async throws -> PreparedVoiceCandidate
     func commitPreparedVoiceCandidate(id: UUID) async throws -> PreparedVoice
     func discardPreparedVoiceCandidate(id: UUID) async throws
     func enrollPreparedVoice(name: String, audioPath: String, transcript: String?) async throws -> PreparedVoice
@@ -40,4 +48,19 @@ public protocol MacTTSEngine: AnyObject, Sendable {
 
 public extension MacTTSEngine {
     func retireServiceIfIdle() async -> Bool { false }
+
+    func preparePreparedVoiceCandidate(
+        name: String,
+        audioPath: String,
+        transcript: String?,
+        replacingVoiceID: String?,
+        enrollmentMetadata: PreparedVoiceEnrollmentMetadata?
+    ) async throws -> PreparedVoiceCandidate {
+        try await preparePreparedVoiceCandidate(
+            name: name,
+            audioPath: audioPath,
+            transcript: transcript,
+            replacingVoiceID: replacingVoiceID
+        )
+    }
 }

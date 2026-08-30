@@ -709,6 +709,38 @@ public struct CloneReference: Hashable, Codable, Sendable {
     }
 }
 
+public enum PreparedVoiceTranscriptSource: String, Codable, Hashable, Sendable {
+    case sidecar
+    case automatic
+    case manual
+    case audioOnly = "audio_only"
+    case unknown
+}
+
+public struct PreparedVoiceEnrollmentMetadata: Hashable, Codable, Sendable {
+    public static let currentSchemaVersion = 1
+
+    public let schemaVersion: Int
+    public let referenceLanguage: Qwen3SupportedLanguage?
+    public let transcriptSource: PreparedVoiceTranscriptSource
+    public let automaticTranscriptionOutcome: String?
+    public let transcriptionEvidenceDigest: String?
+
+    public init(
+        referenceLanguage: Qwen3SupportedLanguage?,
+        transcriptSource: PreparedVoiceTranscriptSource,
+        automaticTranscriptionOutcome: String? = nil,
+        transcriptionEvidenceDigest: String? = nil,
+        schemaVersion: Int = Self.currentSchemaVersion
+    ) {
+        self.schemaVersion = schemaVersion
+        self.referenceLanguage = referenceLanguage == .auto ? nil : referenceLanguage
+        self.transcriptSource = transcriptSource
+        self.automaticTranscriptionOutcome = automaticTranscriptionOutcome
+        self.transcriptionEvidenceDigest = transcriptionEvidenceDigest
+    }
+}
+
 public struct PreparedVoice: Identifiable, Hashable, Codable, Sendable {
     public let id: String
     public let name: String
@@ -723,19 +755,22 @@ public struct PreparedVoice: Identifiable, Hashable, Codable, Sendable {
     /// UI surfaces these as soft warnings during enrollment + as inline
     /// badges in the saved-voices list.
     public let qualityWarnings: [String]
+    public let enrollmentMetadata: PreparedVoiceEnrollmentMetadata?
 
     public init(
         id: String,
         name: String,
         audioPath: String,
         hasTranscript: Bool,
-        qualityWarnings: [String] = []
+        qualityWarnings: [String] = [],
+        enrollmentMetadata: PreparedVoiceEnrollmentMetadata? = nil
     ) {
         self.id = id
         self.name = name
         self.audioPath = audioPath
         self.hasTranscript = hasTranscript
         self.qualityWarnings = qualityWarnings
+        self.enrollmentMetadata = enrollmentMetadata
     }
 
     public init(from decoder: Decoder) throws {
@@ -748,6 +783,10 @@ public struct PreparedVoice: Identifiable, Hashable, Codable, Sendable {
         // `qualityWarnings`; missing key decodes as empty.
         self.qualityWarnings = try container
             .decodeIfPresent([String].self, forKey: .qualityWarnings) ?? []
+        self.enrollmentMetadata = try container.decodeIfPresent(
+            PreparedVoiceEnrollmentMetadata.self,
+            forKey: .enrollmentMetadata
+        )
     }
 
     public var audioURL: URL {
@@ -774,17 +813,20 @@ public struct PreparedVoiceCandidate: Identifiable, Hashable, Codable, Sendable 
     public let name: String
     public let hasTranscript: Bool
     public let qualityWarnings: [String]
+    public let enrollmentMetadata: PreparedVoiceEnrollmentMetadata?
 
     public init(
         id: UUID,
         name: String,
         hasTranscript: Bool,
-        qualityWarnings: [String]
+        qualityWarnings: [String],
+        enrollmentMetadata: PreparedVoiceEnrollmentMetadata? = nil
     ) {
         self.id = id
         self.name = name
         self.hasTranscript = hasTranscript
         self.qualityWarnings = qualityWarnings
+        self.enrollmentMetadata = enrollmentMetadata
     }
 }
 

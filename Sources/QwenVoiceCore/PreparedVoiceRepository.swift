@@ -34,6 +34,7 @@ struct PreparedVoiceStorageRecord: Sendable, Equatable {
     let name: String
     let audioURL: URL
     let hasTranscript: Bool
+    let enrollmentMetadata: PreparedVoiceEnrollmentMetadata?
 }
 
 /// Serializes every mutation of the saved-voice store.
@@ -43,7 +44,8 @@ struct PreparedVoiceStorageRecord: Sendable, Equatable {
 /// `commit`. Audio is moved last, because its presence is the visibility
 /// boundary used by `list`.
 actor PreparedVoiceRepository {
-    static let candidateSchemaVersion = 1
+    static let candidateSchemaVersion = 2
+    static let supportedCandidateSchemaVersions: Set<Int> = [1, 2]
     static let candidateLifetime: TimeInterval = 24 * 60 * 60
     private static let transactionSchemaVersion = 1
     private static let transactionManifestFileName = "transaction.json"
@@ -55,6 +57,7 @@ actor PreparedVoiceRepository {
         let audioFileName: String
         let transcriptFileName: String?
         let qualityWarnings: [String]
+        let enrollmentMetadata: PreparedVoiceEnrollmentMetadata?
         let replacingVoiceID: String?
         let createdAt: Date
     }
@@ -65,6 +68,7 @@ actor PreparedVoiceRepository {
         let newVoiceName: String
         let newAudioFileName: String
         let newTranscriptFileName: String?
+        let newMetadataFileName: String?
     }
 
     private struct DeleteTransactionManifest: Codable, Sendable {
@@ -136,7 +140,8 @@ actor PreparedVoiceRepository {
                     audioURL: audioURL,
                     hasTranscript: fileManager.fileExists(
                         atPath: voicesDirectory.appendingPathComponent("\(id).txt").path
-                    )
+                    ),
+                    enrollmentMetadata: loadEnrollmentMetadata(for: id)
                 )
             }
             .sorted {
@@ -149,6 +154,7 @@ actor PreparedVoiceRepository {
         audioURL sourceURL: URL,
         transcript: String?,
         qualityWarnings: [String],
+        enrollmentMetadata: PreparedVoiceEnrollmentMetadata? = nil,
         replacingVoiceID: String?
     ) throws -> PreparedVoiceCandidate {
         try createRoots()
@@ -195,6 +201,7 @@ actor PreparedVoiceRepository {
                 audioFileName: audioFileName,
                 transcriptFileName: transcriptFileName,
                 qualityWarnings: qualityWarnings,
+                enrollmentMetadata: enrollmentMetadata,
                 replacingVoiceID: replacingVoiceID,
                 createdAt: now()
             )
@@ -216,7 +223,8 @@ actor PreparedVoiceRepository {
             id: candidateID,
             name: name,
             hasTranscript: normalizedTranscript != nil,
-            qualityWarnings: qualityWarnings
+            qualityWarnings: qualityWarnings,
+            enrollmentMetadata: enrollmentMetadata
         )
     }
 
@@ -246,6 +254,7 @@ actor PreparedVoiceRepository {
             "\(manifest.name).\(stagedAudioURL.pathExtension.lowercased())"
         )
         let destinationTranscriptURL = voicesDirectory.appendingPathComponent("\(manifest.name).txt")
+        let destinationMetadataURL = voicesDirectory.appendingPathComponent("\(manifest.name).voice.json")
         let transactionDirectory = transactionsDirectory.appendingPathComponent(
             "commit-\(UUID().uuidString.lowercased())",
             isDirectory: true
@@ -260,7 +269,10 @@ actor PreparedVoiceRepository {
                     newAudioFileName: destinationAudioURL.lastPathComponent,
                     newTranscriptFileName: manifest.transcriptFileName == nil
                         ? nil
-                        : destinationTranscriptURL.lastPathComponent
+                        : destinationTranscriptURL.lastPathComponent,
+                    newMetadataFileName: manifest.enrollmentMetadata == nil
+                        ? nil
+                        : destinationMetadataURL.lastPathComponent
                 ),
                 to: transactionDirectory
             )
@@ -272,6 +284,7 @@ actor PreparedVoiceRepository {
         }
 
         var publishedTranscript = false
+        var publishedMetadata = false
         var publishedAudio = false
         do {
             if let replacingVoiceID = manifest.replacingVoiceID {
@@ -288,6 +301,14 @@ actor PreparedVoiceRepository {
                 }
                 try fileManager.moveItem(at: stagedTranscriptURL, to: destinationTranscriptURL)
                 publishedTranscript = true
+            }
+
+            if let enrollmentMetadata = manifest.enrollmentMetadata {
+                try JSONEncoder().encode(enrollmentMetadata).write(
+                    to: destinationMetadataURL,
+                    options: [.atomic]
+                )
+                publishedMetadata = true
             }
 
             // Publication boundary: listing discovers the voice only after
@@ -307,6 +328,9 @@ actor PreparedVoiceRepository {
                     to: candidateDirectory.appendingPathComponent(transcriptFileName)
                 )
             }
+            if publishedMetadata, fileManager.fileExists(atPath: destinationMetadataURL.path) {
+                try? fileManager.removeItem(at: destinationMetadataURL)
+            }
             try? restoreVoiceAssets(from: transactionDirectory)
             if fileManager.fileExists(atPath: transactionDirectory.path) {
                 try? fileManager.removeItem(at: transactionDirectory)
@@ -318,7 +342,8 @@ actor PreparedVoiceRepository {
             id: manifest.name,
             name: manifest.name,
             audioURL: destinationAudioURL,
-            hasTranscript: manifest.transcriptFileName != nil
+            hasTranscript: manifest.transcriptFileName != nil,
+            enrollmentMetadata: manifest.enrollmentMetadata
         )
     }
 
@@ -378,6 +403,7 @@ actor PreparedVoiceRepository {
         let committedConflict = supportedAudioExtensions.contains { ext in
             fileManager.fileExists(atPath: voicesDirectory.appendingPathComponent("\(name).\(ext)").path)
         } || fileManager.fileExists(atPath: voicesDirectory.appendingPathComponent("\(name).txt").path)
+            || fileManager.fileExists(atPath: voicesDirectory.appendingPathComponent("\(name).voice.json").path)
         if committedConflict && replacingVoiceID != name {
             throw PreparedVoiceRepositoryError.duplicateName(name)
         }
@@ -397,6 +423,7 @@ actor PreparedVoiceRepository {
         let urls = supportedAudioExtensions.map { voicesDirectory.appendingPathComponent("\(id).\($0)") }
             + [
                 voicesDirectory.appendingPathComponent("\(id).txt"),
+                voicesDirectory.appendingPathComponent("\(id).voice.json"),
                 voicesDirectory.appendingPathComponent("\(id).clone_prompt", isDirectory: true),
             ]
         for sourceURL in urls where fileManager.fileExists(atPath: sourceURL.path) {
@@ -441,6 +468,9 @@ actor PreparedVoiceRepository {
               URL(fileURLWithPath: manifest.newAudioFileName).lastPathComponent == manifest.newAudioFileName,
               manifest.newTranscriptFileName.map({
                   URL(fileURLWithPath: $0).lastPathComponent == $0
+              }) ?? true,
+              manifest.newMetadataFileName.map({
+                  URL(fileURLWithPath: $0).lastPathComponent == $0
               }) ?? true else {
             throw PreparedVoiceRepositoryError.malformedCandidate
         }
@@ -477,6 +507,12 @@ actor PreparedVoiceRepository {
                 }
             }
         }
+        if let newMetadataFileName = manifest.newMetadataFileName {
+            let publishedMetadataURL = voicesDirectory.appendingPathComponent(newMetadataFileName)
+            if fileManager.fileExists(atPath: publishedMetadataURL.path) {
+                try fileManager.removeItem(at: publishedMetadataURL)
+            }
+        }
 
         // No published audio means the commit never crossed its visibility
         // boundary. Restore any replaced voice and leave the candidate ready
@@ -509,7 +545,7 @@ actor PreparedVoiceRepository {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         let manifest = try decoder.decode(CandidateManifest.self, from: data)
-        guard manifest.schemaVersion == Self.candidateSchemaVersion,
+        guard Self.supportedCandidateSchemaVersions.contains(manifest.schemaVersion),
               directory.lastPathComponent == manifest.id.uuidString.lowercased(),
               NativeSavedVoiceNaming.normalizedName(manifest.name) == manifest.name,
               !manifest.name.isEmpty,
@@ -518,6 +554,19 @@ actor PreparedVoiceRepository {
             throw PreparedVoiceRepositoryError.malformedCandidate
         }
         return manifest
+    }
+
+    private func loadEnrollmentMetadata(for id: String) -> PreparedVoiceEnrollmentMetadata? {
+        let url = voicesDirectory.appendingPathComponent("\(id).voice.json")
+        guard let data = try? Data(contentsOf: url),
+              let metadata = try? JSONDecoder().decode(
+                  PreparedVoiceEnrollmentMetadata.self,
+                  from: data
+              ),
+              metadata.schemaVersion == PreparedVoiceEnrollmentMetadata.currentSchemaVersion else {
+            return nil
+        }
+        return metadata
     }
 
     private func validateIdentifier(_ id: String) throws {

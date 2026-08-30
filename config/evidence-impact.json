@@ -251,6 +251,7 @@
         "scripts/check_marking_peak_equality.py",
         "config/language-bench-*.json",
         "config/delivery-*.json",
+        "config/voice-identity-language-reliability.json",
         "config/*prosody*.json",
         "config/marking-peak-equality.json"
       ],

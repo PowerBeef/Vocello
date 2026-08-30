@@ -123,6 +123,13 @@ public protocol TTSEngine: ObservableObject {
         transcript: String?,
         replacingVoiceID: String?
     ) async throws -> PreparedVoiceCandidate
+    func preparePreparedVoiceCandidate(
+        name: String,
+        audioPath: String,
+        transcript: String?,
+        replacingVoiceID: String?,
+        enrollmentMetadata: PreparedVoiceEnrollmentMetadata?
+    ) async throws -> PreparedVoiceCandidate
     func commitPreparedVoiceCandidate(id: UUID) async throws -> PreparedVoice
     func discardPreparedVoiceCandidate(id: UUID) async throws
     func enrollPreparedVoice(name: String, audioPath: String, transcript: String?) async throws -> PreparedVoice
@@ -141,6 +148,23 @@ public protocol TTSEngine: ObservableObject {
 /// `.completed`, `.cancelled`, or `.failed` event, including preflight/admission failures.
 public protocol TTSEngineEventStreaming: AnyObject {
     func events(for generationID: UUID) -> AsyncStream<GenerationEvent>
+}
+
+public extension TTSEngine {
+    func preparePreparedVoiceCandidate(
+        name: String,
+        audioPath: String,
+        transcript: String?,
+        replacingVoiceID: String?,
+        enrollmentMetadata: PreparedVoiceEnrollmentMetadata?
+    ) async throws -> PreparedVoiceCandidate {
+        try await preparePreparedVoiceCandidate(
+            name: name,
+            audioPath: audioPath,
+            transcript: transcript,
+            replacingVoiceID: replacingVoiceID
+        )
+    }
 }
 
 public struct StartupReliabilityCodecFrameRange: Codable, Hashable, Sendable {

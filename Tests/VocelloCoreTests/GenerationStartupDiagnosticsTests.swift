@@ -72,6 +72,8 @@ final class GenerationStartupDiagnosticsTests: XCTestCase {
 
         XCTAssertEqual(receipt.deliveryID, "angry.normal")
         XCTAssertEqual(receipt.instructionLanguage, "mandarin")
+        XCTAssertEqual(receipt.modelFacingInstructionLanguage, "chinese")
+        XCTAssertEqual(englishReceipt.modelFacingInstructionLanguage, "english")
         XCTAssertEqual(receipt.instructionCharacters, 46)
         XCTAssertEqual(receipt.instructionDigest, "5d08a1b31bfa30c53741656f259ab0184c36f192b35b647afa78349735e9606d")
         XCTAssertNotEqual(receipt.requestIdentityDigest, englishReceipt.requestIdentityDigest)
@@ -108,6 +110,13 @@ final class GenerationStartupDiagnosticsTests: XCTestCase {
         XCTAssertEqual(receipt.deliveryID, "calm.strong")
         XCTAssertEqual(receipt.speakerID, "vivian")
         XCTAssertEqual(receipt.language, "english")
+        XCTAssertEqual(receipt.schemaVersion, 2)
+        XCTAssertEqual(receipt.storedLanguageSelection, "english")
+        XCTAssertEqual(receipt.detectedTargetLanguage, "english")
+        XCTAssertEqual(receipt.finalModelLanguage, "english")
+        XCTAssertEqual(receipt.languageTokenMode, "think")
+        XCTAssertEqual(receipt.conditioningMode, "custom_voice")
+        XCTAssertEqual(receipt.normalizedTargetTextCharacters, request.text.count)
         XCTAssertEqual(receipt.seed, 38_112_001)
         XCTAssertEqual(receipt.seedSource, "requested")
         XCTAssertEqual(receipt.retryAttempt, 0)
@@ -117,6 +126,133 @@ final class GenerationStartupDiagnosticsTests: XCTestCase {
         XCTAssertFalse(encoded.contains(request.text))
         XCTAssertFalse(encoded.contains(request.outputPath))
         XCTAssertFalse(encoded.contains(cell.instruction))
+    }
+
+    func testReceiptSeparatesCloneTargetAndReferenceLanguages() {
+        let generationID = UUID()
+        let request = GenerationRequest(
+            mode: .clone,
+            modelID: "pro_clone_speed",
+            text: "This output must stay in English.",
+            outputPath: "/tmp/clone.wav",
+            shouldStream: true,
+            languageHint: "auto",
+            payload: .clone(reference: CloneReference(
+                audioPath: "/tmp/reference.wav",
+                conditioningMode: .transcriptBacked("Bonjour, ceci est la référence.")
+            )),
+            generationID: generationID,
+            seed: 8,
+            variation: .consistent
+        )
+        let receipt = GenerationRequestReceipt(
+            request: request,
+            modelFacingText: request.text,
+            modelFacingLanguage: "english",
+            conditioningMode: "clone_transcript_backed",
+            referenceTranscript: "Bonjour, ceci est la référence.",
+            referenceAudioDigest: String(repeating: "a", count: 64),
+            generationID: generationID,
+            effectiveSeed: 8,
+            warmState: .warm,
+            predecessorIdentityDigest: nil,
+            retryAttempt: 0,
+            operationGeneration: 3
+        )
+
+        XCTAssertEqual(receipt.storedLanguageSelection, "auto")
+        XCTAssertEqual(receipt.detectedTargetLanguage, "english")
+        XCTAssertEqual(receipt.referenceTranscriptLanguage, "french")
+        XCTAssertEqual(receipt.finalModelLanguage, "english")
+        XCTAssertEqual(receipt.conditioningMode, "clone_transcript_backed")
+        XCTAssertNotNil(receipt.referenceTranscriptDigest)
+        XCTAssertEqual(receipt.referenceAudioDigest, String(repeating: "a", count: 64))
+    }
+
+    func testReceiptV1StillDecodesWithoutV2Fields() throws {
+        let generationID = UUID()
+        let request = GenerationRequest(
+            mode: .custom,
+            modelID: "pro_custom_speed",
+            text: "Compatibility.",
+            outputPath: "/tmp/compat.wav",
+            shouldStream: false,
+            languageHint: "english",
+            payload: .custom(speakerID: "aiden", deliveryStyle: nil),
+            generationID: generationID,
+            seed: 4
+        )
+        let current = GenerationRequestReceipt(
+            request: request,
+            generationID: generationID,
+            effectiveSeed: 4,
+            warmState: .cold,
+            predecessorIdentityDigest: nil,
+            retryAttempt: 0,
+            operationGeneration: 1
+        )
+        var object = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: JSONEncoder().encode(current)) as? [String: Any]
+        )
+        object["schemaVersion"] = 1
+        for key in [
+            "storedLanguageSelection", "detectedTargetLanguage", "referenceTranscriptLanguage",
+            "finalModelLanguage", "languageTokenMode", "conditioningMode",
+            "normalizedTargetTextDigest", "normalizedTargetTextCharacters",
+            "referenceTranscriptDigest", "referenceTranscriptCharacters", "referenceAudioDigest",
+            "modelArtifactVersion", "modelIntegrityManifestDigest", "speechTokenizerDigest",
+            "modelFacingInstructionLanguage",
+        ] {
+            object.removeValue(forKey: key)
+        }
+        let decoded = try JSONDecoder().decode(
+            GenerationRequestReceipt.self,
+            from: JSONSerialization.data(withJSONObject: object)
+        )
+        XCTAssertEqual(decoded.schemaVersion, 1)
+        XCTAssertNil(decoded.finalModelLanguage)
+        XCTAssertEqual(decoded.language, "english")
+    }
+
+    func testReceiptSeparatesVerbatimRoutingFromActualDesignInstructionLanguage() {
+        let generationID = UUID()
+        let request = GenerationRequest(
+            mode: .design,
+            modelID: "pro_design_speed",
+            text: "Bonjour, cette sortie doit rester en français.",
+            outputPath: "/tmp/design.wav",
+            shouldStream: false,
+            languageHint: "auto",
+            payload: .design(
+                voiceDescription: "A warm, clear narrator.",
+                deliveryStyle: "Speak calmly with measured pacing."
+            ),
+            generationID: generationID,
+            seed: 9,
+            variation: .consistent
+        )
+        let instruction = GenerationSemantics.designInstruction(
+            voiceDescription: "A warm, clear narrator.",
+            emotion: "Speak calmly with measured pacing."
+        )
+        let receipt = GenerationRequestReceipt(
+            request: request,
+            resolvedInstruction: instruction,
+            instructionLanguage: .verbatim,
+            modelFacingText: request.text,
+            modelFacingLanguage: "french",
+            conditioningMode: "voice_design",
+            generationID: generationID,
+            effectiveSeed: 9,
+            warmState: .cold,
+            predecessorIdentityDigest: nil,
+            retryAttempt: 0,
+            operationGeneration: 1
+        )
+
+        XCTAssertEqual(receipt.instructionLanguage, "verbatim")
+        XCTAssertEqual(receipt.modelFacingInstructionLanguage, "english")
+        XCTAssertEqual(receipt.finalModelLanguage, "french")
     }
 
     func testReceiptIdentityIsStableAcrossAllocationRetry() throws {

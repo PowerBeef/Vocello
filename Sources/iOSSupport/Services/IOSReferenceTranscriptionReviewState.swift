@@ -12,7 +12,12 @@ struct IOSReferenceTranscriptionReviewState: Equatable, Sendable {
     enum UnavailableReason: Equatable, Sendable {
         case permissionDenied
         case siriDisabled
-        case recognitionUnavailableOrEmpty
+        case recognizerUnavailable
+        case onDeviceRecognitionUnsupported
+        case recognitionTimedOut
+        case recognitionFailed
+        case emptyResult
+        case lowConfidence
         case cancelled
     }
 
@@ -57,7 +62,7 @@ struct IOSReferenceTranscriptionReviewState: Equatable, Sendable {
             return false
         }
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            phase = .unavailable(.recognitionUnavailableOrEmpty)
+            phase = .unavailable(.emptyResult)
             return false
         }
         phase = .ready(.automatic)
@@ -80,7 +85,7 @@ struct IOSReferenceTranscriptionReviewState: Equatable, Sendable {
     mutating func userEditedTranscript(_ text: String) {
         operationGeneration &+= 1
         phase = text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            ? .unavailable(.recognitionUnavailableOrEmpty)
+            ? .unavailable(.emptyResult)
             : .ready(.manual)
     }
 
@@ -155,7 +160,12 @@ struct IOSReferenceTranscriptionReviewState: Equatable, Sendable {
                 symbolName: "exclamationmark.triangle.fill",
                 showsProgress: false
             )
-        case .unavailable(.recognitionUnavailableOrEmpty):
+        case .unavailable(.recognizerUnavailable),
+             .unavailable(.onDeviceRecognitionUnsupported),
+             .unavailable(.recognitionTimedOut),
+             .unavailable(.recognitionFailed),
+             .unavailable(.emptyResult),
+             .unavailable(.lowConfidence):
             return Status(
                 message: VocelloPresentationText.enrollmentTranscriptionStatus(.empty),
                 symbolName: "exclamationmark.triangle.fill",

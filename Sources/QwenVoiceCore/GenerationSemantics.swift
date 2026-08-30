@@ -825,10 +825,11 @@ public enum GenerationSemantics {
         case .design:
             return detectedQwenLanguage(in: effectiveText)?.rawValue ?? Qwen3SupportedLanguage.auto.rawValue
         case .clone:
-            if let transcript = resolvedCloneTranscript,
-               let detectedLanguage = detectedQwenLanguage(in: transcript) {
-                return detectedLanguage.rawValue
-            }
+            // Qwen's `language` field describes the text being synthesized,
+            // not the language of the reference transcript. The latter is
+            // conditioning metadata and must never redirect an Auto request
+            // away from its target text (for example, a French reference
+            // cloning an English script).
             return detectedQwenLanguage(in: effectiveText)?.rawValue ?? Qwen3SupportedLanguage.auto.rawValue
         }
     }

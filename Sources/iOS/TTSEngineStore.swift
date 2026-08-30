@@ -439,6 +439,24 @@ final class TTSEngineStore: ObservableObject, TTSEngine {
         return candidate
     }
 
+    func preparePreparedVoiceCandidate(
+        name: String,
+        audioPath: String,
+        transcript: String?,
+        replacingVoiceID: String?,
+        enrollmentMetadata: PreparedVoiceEnrollmentMetadata?
+    ) async throws -> PreparedVoiceCandidate {
+        let candidate = try await backend.preparePreparedVoiceCandidate(
+            name: name,
+            audioPath: audioPath,
+            transcript: transcript,
+            replacingVoiceID: replacingVoiceID,
+            enrollmentMetadata: enrollmentMetadata
+        )
+        syncFromBackend()
+        return candidate
+    }
+
     func commitPreparedVoiceCandidate(id: UUID) async throws -> PreparedVoice {
         let voice = try await backend.commitPreparedVoiceCandidate(id: id)
         syncFromBackend()
@@ -1103,7 +1121,13 @@ final class AnyTTSEngineBackend {
     private let startupReliabilityRuntimeOwnershipSnapshotBlock:
         () async -> StartupReliabilityRuntimeOwnershipSnapshot
     private let listPreparedVoicesBlock: () async throws -> [PreparedVoice]
-    private let preparePreparedVoiceCandidateBlock: (String, String, String?, String?) async throws -> PreparedVoiceCandidate
+    private let preparePreparedVoiceCandidateBlock: (
+        String,
+        String,
+        String?,
+        String?,
+        PreparedVoiceEnrollmentMetadata?
+    ) async throws -> PreparedVoiceCandidate
     private let commitPreparedVoiceCandidateBlock: (UUID) async throws -> PreparedVoice
     private let discardPreparedVoiceCandidateBlock: (UUID) async throws -> Void
     private let enrollPreparedVoiceBlock: (String, String, String?) async throws -> PreparedVoice
@@ -1218,7 +1242,8 @@ final class AnyTTSEngineBackend {
                 name: $0,
                 audioPath: $1,
                 transcript: $2,
-                replacingVoiceID: $3
+                replacingVoiceID: $3,
+                enrollmentMetadata: $4
             )
         }
         self.commitPreparedVoiceCandidateBlock = { try await engine.commitPreparedVoiceCandidate(id: $0) }
@@ -1317,7 +1342,22 @@ final class AnyTTSEngineBackend {
         transcript: String?,
         replacingVoiceID: String?
     ) async throws -> PreparedVoiceCandidate {
-        try await preparePreparedVoiceCandidateBlock(name, audioPath, transcript, replacingVoiceID)
+        try await preparePreparedVoiceCandidateBlock(name, audioPath, transcript, replacingVoiceID, nil)
+    }
+    func preparePreparedVoiceCandidate(
+        name: String,
+        audioPath: String,
+        transcript: String?,
+        replacingVoiceID: String?,
+        enrollmentMetadata: PreparedVoiceEnrollmentMetadata?
+    ) async throws -> PreparedVoiceCandidate {
+        try await preparePreparedVoiceCandidateBlock(
+            name,
+            audioPath,
+            transcript,
+            replacingVoiceID,
+            enrollmentMetadata
+        )
     }
     func commitPreparedVoiceCandidate(id: UUID) async throws -> PreparedVoice {
         try await commitPreparedVoiceCandidateBlock(id)

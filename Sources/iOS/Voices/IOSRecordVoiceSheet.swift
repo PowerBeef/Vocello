@@ -1,3 +1,4 @@
+import CryptoKit
 import QwenVoiceCore
 import SwiftUI
 
@@ -14,8 +15,9 @@ import SwiftUI
 struct IOSRecordVoiceSheet: View {
     /// A Files import already materialized inside the app sandbox. Nil starts the recorder.
     let importedReference: ImportedReferenceAudio?
-    /// Called once the voice is enrolled with the confirmed (possibly empty) `transcript` and the
-    /// detected reference `language` (`.auto` if undetected) to pre-set the Clone language.
+    /// Called once the voice is enrolled with the confirmed (possibly empty) transcript and its
+    /// separately reviewed reference language. The latter is conditioning metadata; it never
+    /// selects the language of a future Clone output.
     var onEnrolled: (Voice, String, Qwen3SupportedLanguage) -> Void
     var onDismiss: () -> Void
 
@@ -32,6 +34,7 @@ struct IOSRecordVoiceSheet: View {
     @State private var pendingVoiceForReview: PreparedVoiceCandidate?
     @State private var isReviewDecisionInFlight = false
     @State private var transcriptionReview: IOSReferenceTranscriptionReviewState
+    @State private var transcriptionEvidence: VoiceClipTranscriber.EnrollmentEvidence?
     @State private var transcriptionTask: Task<Void, Never>?
 
     private enum Phase { case recording, naming }
@@ -64,6 +67,7 @@ struct IOSRecordVoiceSheet: View {
             )
         )
         _transcriptionTask = State(initialValue: nil)
+        _transcriptionEvidence = State(initialValue: nil)
     }
 
     var body: some View {
@@ -113,6 +117,8 @@ struct IOSRecordVoiceSheet: View {
                 suggestedName: $suggestedName,
                 transcript: $transcript,
                 transcriptionReview: transcriptionReview,
+                referenceLanguage: $detectedLanguage,
+                requiresReferenceLanguageConfirmation: requiresReferenceLanguageConfirmation,
                 errorMessage: enrollError,
                 clipAudioURL: capturedURL,
                 onTranscriptEdited: handleTranscriptEdit,
@@ -170,24 +176,25 @@ struct IOSRecordVoiceSheet: View {
         transcriptionTask?.cancel()
         let generation = transcriptionReview.beginAutomaticTranscription()
         transcriptionTask = Task { @MainActor in
-            let result = await VoiceClipTranscriber.transcribe(url: url)
+            let result = await VoiceClipTranscriber.enrollmentResult(url: url)
             guard !Task.isCancelled else { return }
+            transcriptionEvidence = result.evidence
 
-            if let result {
+            if let recognizedText = result.text {
                 let applied = transcriptionReview.acceptAutomaticTranscript(
-                    result.text,
+                    recognizedText,
                     generation: generation,
                     currentTranscript: transcript
                 )
                 if applied {
-                    transcript = result.text
+                    transcript = recognizedText
                     if detectedLanguage == .auto {
                         detectedLanguage = result.language
                     }
                 }
             } else {
                 transcriptionReview.finishWithoutTranscript(
-                    reason: transcriptionUnavailableReason,
+                    reason: unavailableReason(for: result.evidence),
                     generation: generation,
                     currentTranscript: transcript
                 )
@@ -199,14 +206,29 @@ struct IOSRecordVoiceSheet: View {
         }
     }
 
-    private var transcriptionUnavailableReason: IOSReferenceTranscriptionReviewState.UnavailableReason {
-        switch VoiceClipTranscriber.availability() {
-        case .denied, .notDetermined:
-            return .permissionDenied
-        case .siriDisabled:
+    private func unavailableReason(
+        for evidence: VoiceClipTranscriber.EnrollmentEvidence
+    ) -> IOSReferenceTranscriptionReviewState.UnavailableReason {
+        if evidence.authorizationStatus == .siriDisabled {
             return .siriDisabled
-        case .available:
-            return .recognitionUnavailableOrEmpty
+        }
+        switch evidence.outcome {
+        case .permissionDenied, .authorizationTimedOut:
+            return .permissionDenied
+        case .noCandidateLocales, .recognizerUnavailable:
+            return .recognizerUnavailable
+        case .onDeviceRecognitionUnsupported:
+            return .onDeviceRecognitionUnsupported
+        case .recognitionTimedOut:
+            return .recognitionTimedOut
+        case .recognitionFailed:
+            return .recognitionFailed
+        case .emptyResult:
+            return .emptyResult
+        case .lowConfidence:
+            return .lowConfidence
+        case .success:
+            return .emptyResult
         }
     }
 
@@ -214,6 +236,9 @@ struct IOSRecordVoiceSheet: View {
         transcriptionTask?.cancel()
         transcriptionTask = nil
         transcriptionReview.userEditedTranscript(newValue)
+        if detectedLanguage == .auto {
+            detectedLanguage = PromptLanguageDetector.detect(newValue)
+        }
     }
 
     private func confirmAudioOnly() {
@@ -227,6 +252,11 @@ struct IOSRecordVoiceSheet: View {
         transcriptionTask?.cancel()
         transcriptionTask = nil
         transcriptionReview.invalidate()
+    }
+
+    private var requiresReferenceLanguageConfirmation: Bool {
+        !transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && detectedLanguage == .auto
     }
 
     private func performEnroll() async {
@@ -250,7 +280,8 @@ struct IOSRecordVoiceSheet: View {
                 name: name,
                 audioPath: url.path,
                 transcript: trimmedTranscript.isEmpty ? nil : trimmedTranscript,
-                replacingVoiceID: nil
+                replacingVoiceID: nil,
+                enrollmentMetadata: enrollmentMetadata
             )
             if candidate.qualityWarnings.isEmpty {
                 do {
@@ -321,6 +352,31 @@ struct IOSRecordVoiceSheet: View {
             await savedVoicesViewModel.refresh(using: ttsEngine)
             onEnrolled(voice, confirmed, language)
         }
+    }
+
+    private var enrollmentMetadata: PreparedVoiceEnrollmentMetadata {
+        PreparedVoiceEnrollmentMetadata(
+            referenceLanguage: detectedLanguage,
+            transcriptSource: transcriptSource,
+            automaticTranscriptionOutcome: transcriptionEvidence?.outcome.rawValue,
+            transcriptionEvidenceDigest: transcriptionEvidenceDigest
+        )
+    }
+
+    private var transcriptSource: PreparedVoiceTranscriptSource {
+        switch transcriptionReview.phase {
+        case .ready(.sidecar): return .sidecar
+        case .ready(.automatic): return .automatic
+        case .ready(.manual): return .manual
+        case .audioOnlyConfirmed: return .audioOnly
+        case .transcribing, .unavailable: return .unknown
+        }
+    }
+
+    private var transcriptionEvidenceDigest: String? {
+        guard let transcriptionEvidence,
+              let data = try? JSONEncoder().encode(transcriptionEvidence) else { return nil }
+        return SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
     }
 
     private var reviewAlertTitle: String {

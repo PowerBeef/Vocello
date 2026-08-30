@@ -16,6 +16,7 @@
 | `ios-app-store-readiness-2026-08` | active | release-qa | 1/12 (8%) |
 | `ios-control-audit-2026-08` | active | ios | 8/12 (67%) |
 | `ios-generation-startup-reliability-2026-08` | active | backend-and-platform | 4/6 (67%) |
+| `voice-identity-language-reliability-2026-08` | active | backend-and-platform | 2/7 (29%) |
 | `compliance-2026-08` | complete | release-qa | 2/2 (100%) |
 | `convergence-metal4-stage4-2026-08` | complete | backend-and-platform | 7/7 (100%) |
 | `doc-governance-2026-08` | complete | release-qa | 9/9 (100%) |
@@ -299,6 +300,41 @@ Narrative authority: [`docs/reference/ios-built-in-startup-reliability.md`](refe
 
 - **`ISR-06`** (planned) — Complete exact-script and broader closure evidence.
   gate: Both the original script and tracked sentinel must pass 10/10 cold, 20/20 warm, all eight seeds, every focused predecessor, streaming/non-streaming, and matching UI/engine receipts; then complete the 9-speaker × 8-delivery grid at one seed plus a second seed for the affected speaker row and delivery column. Closure rejects unknown boundaries, silent seed changes, leaked retries, memory-policy violations, crashes, or unrepresented attempts and requires all deterministic gates green.
+
+## Clone identity, enrollment transcription, and French Voice Design reliability
+
+`voice-identity-language-reliability-2026-08` · **active** · backend-and-platform · adopted 2026-08-30
+
+Causally localize the reported saved-reference pitch/fidelity variance, typed enrollment-transcription failure, and French Voice Design regression with source-bound private diagnostics; separate target language from reference metadata; and apply only tokenizer, reference-quality, or prompt remediation proven by fixed-seed evidence without weakening QC or exposing personal audio and transcript data.
+
+Narrative authority: [`docs/reference/delivery-harness.md`](reference/delivery-harness.md)
+
+| Item | Status | Title | Evidence |
+| --- | --- | --- | --- |
+| `VLR-01` | planned | Preserve and characterize private references and clean controls | — |
+| `VLR-02` | done | Record truthful model input and typed enrollment-transcription evidence | `file:Sources/QwenVoiceCore/GenerationStartupDiagnostics.swift`, `file:Sources/SharedSupport/Services/VoiceClipTranscriber.swift`, `file:Tests/VocelloCoreTests/GenerationStartupDiagnosticsTests.swift`, `file:Tests/VocelloCoreTests/VoiceClipEnrollmentEvidenceTests.swift` |
+| `VLR-03` | in-flight | Complete Clone, tokenizer, transcription, and French Voice Design matrices | `file:scripts/tests/test_voice_identity_language_reliability.py` |
+| `VLR-04` | done | Correct Clone target/reference language ownership | `file:Sources/QwenVoiceCore/GenerationSemantics.swift`, `file:Tests/VocelloCoreTests/GenerationSemanticsLanguageTests.swift`, `file:Sources/iOS/Voices/IOSRecordVoiceSheet.swift` |
+| `VLR-05` | planned | Apply only the proven tokenizer or reference-quality remediation | — |
+| `VLR-06` | planned | Apply only the proven French Voice Design remediation | — |
+| `VLR-07` | planned | Complete physical-device closure and publish the privacy-safe report | — |
+
+### Open items in detail
+
+- **`VLR-01`** (planned) — Preserve and characterize private references and clean controls.
+  gate: Create one untracked content-addressed bundle containing read-only copies of the two maintainer references, the already reviewed manual transcript for the second reference, any reviewed transcript for the first, saved reference-language metadata, immutable runtime identities, and clean French/English transcript-backed controls. Characterize PCM integrity, silence, clipping, noise, pitch register/range, cadence, voicing, roughness, transcript/audio alignment, and warnings using stable aliases only; no name, text, path, or audio may enter tracked evidence.
+
+- **`VLR-03`** (in-flight) — Complete Clone, tokenizer, transcription, and French Voice Design matrices.
+  gate: Run the source-bound serial matrix with eight frozen seeds per core cell across both private references and clean controls, reviewed/corrected/audio-only transcript arms, Auto/explicit and French/English scripts, current fp16 and archived fp32 tokenizer identities when available, Consistent plus Expressive sentinels, and cold/warm sentinels. Run French Design short/medium/long across Auto/explicit, Neutral/no-delivery/non-neutral, tokenizer, seed, and variation arms. Retain every failed row without retry or replacement and require exact schema-2 receipts.
+
+- **`VLR-05`** (planned) — Apply only the proven tokenizer or reference-quality remediation.
+  gate: If fixed-seed evidence localizes the divergence to reference/transcript quality, add actionable enrollment warnings with explicit review and no silent rewrite or identity-normalizing regeneration. If it localizes to fp16 tokenizer precision, isolate encoder/decoder sensitivity where practical and ship only the smallest qualifying immutable artifact with receipt, memory, catalog, and promotion evidence; otherwise retain current artifacts and classify the result as inconclusive.
+
+- **`VLR-06`** (planned) — Apply only the proven French Voice Design remediation.
+  gate: Use target-language, prompt-arm, tokenizer, seed, and variation evidence to localize French Design. A pure Auto-language ownership defect may be corrected directly; any Neutral omission/replacement or localized non-neutral prompt remains experimental under DP-31/DP-32 until blinded semantic promotion authority passes. Preserve production copy when no reproducible first divergence exists.
+
+- **`VLR-07`** (planned) — Complete physical-device closure and publish the privacy-safe report.
+  gate: After Mac/CLI localization, complete two consecutive no-retry focused physical-iPhone passes using the private alias map and exact current source. Require typed transcription classification, correct short/medium/long French output, exact receipt parity, zero new hard QC failures, WER/CER delta <= 0.01, speaker-similarity delta >= -0.02, governed Clone prosody fidelity or explicit reference rejection, and green Built-in/English Design/enrollment/Clone controls. Publish only a digest-pinned privacy-safe historical report; keep audio, text, names, paths, raw diagnostics, and device evidence untracked.
 
 ## EU AI Act Article 50 readiness
 

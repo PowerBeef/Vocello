@@ -1,4 +1,5 @@
 import AVFoundation
+import CryptoKit
 import Foundation
 import NaturalLanguage
 import QwenVoiceCore
@@ -6,8 +7,8 @@ import Speech
 import Synchronization
 
 /// Best-effort **on-device** transcription + language detection of a finished reference WAV, used
-/// to pre-fill the (editable, optional) transcript and to auto-set the Clone language when enrolling
-/// a recorded voice.
+/// to pre-fill the editable transcript and propose separate reference-language metadata when
+/// enrolling a recorded voice. It never selects the language of a future Clone output.
 ///
 /// Enrollment remains intentionally best-effort and single-pass. Benchmark output verification uses
 /// `verificationEvidence` instead: it pins one locale and requires three independent recognition
@@ -67,6 +68,55 @@ enum VoiceClipTranscriber {
         var minimumConfidence: Double?
         var errorDomain: String?
         var errorCode: Int?
+    }
+
+    enum EnrollmentOutcome: String, Codable, Sendable, Equatable {
+        case success
+        case permissionDenied
+        case authorizationTimedOut
+        case noCandidateLocales
+        case recognizerUnavailable
+        case onDeviceRecognitionUnsupported
+        case recognitionTimedOut
+        case recognitionFailed
+        case emptyResult
+        case lowConfidence
+    }
+
+    /// Privacy-safe enrollment evidence. It deliberately retains no
+    /// transcript text, local path, or raw framework error. The accompanying
+    /// in-memory `EnrollmentResult` carries text only to the review UI.
+    struct EnrollmentLocaleAttempt: Codable, Sendable, Equatable {
+        var order: Int
+        var localeIdentifier: String
+        var language: String
+        var recognizerAvailable: Bool
+        var supportsOnDeviceRecognition: Bool
+        var status: RecognitionFinalStatus
+        var transcriptDigest: String?
+        var transcriptCharacters: Int
+        var languageScore: Double?
+        var averageConfidence: Double?
+    }
+
+    struct EnrollmentEvidence: Codable, Sendable, Equatable {
+        static let currentSchemaVersion = 1
+        static let currentAlgorithmVersion = "apple-speech-enrollment-v1"
+
+        var schemaVersion: Int
+        var algorithmVersion: String
+        var authorizationStatus: AuthorizationState
+        var outcome: EnrollmentOutcome
+        var attempts: [EnrollmentLocaleAttempt]
+        var bestLanguage: String?
+        var bestLanguageScore: Double?
+        var bestTranscriptConfidence: Double?
+    }
+
+    struct EnrollmentResult: Sendable, Equatable {
+        var text: String?
+        var language: Qwen3SupportedLanguage
+        var evidence: EnrollmentEvidence
     }
 
     struct VerificationEvidence: Codable, Sendable, Equatable {
@@ -165,32 +215,129 @@ enum VoiceClipTranscriber {
     private static let authorizationTimeout: Duration = .seconds(30)
     private static let recognitionPassTimeout: Duration = .seconds(45)
 
+    private static func sha256(_ value: String) -> String {
+        SHA256.hash(data: Data(value.utf8))
+            .map { String(format: "%02x", $0) }
+            .joined()
+    }
+
     static func transcribe(url: URL) async -> (text: String, language: Qwen3SupportedLanguage)? {
-        guard await requestAuthorizationState() == .authorized else { return nil }
+        let result = await enrollmentResult(url: url)
+        guard let text = result.text else { return nil }
+        return (text, result.language)
+    }
 
-        var best: (text: String, language: Qwen3SupportedLanguage, score: Double, confidence: Float)?
-
-        for candidate in candidateLocales() {
-            guard let pass = await recognizeForEnrollment(url: url, candidate: candidate) else {
-                continue
-            }
-            let score = languageMatchScore(text: pass.text, expected: candidate.language)
-
-            let isBetter: Bool
-            if let best {
-                isBetter = score != best.score ? score > best.score : pass.confidence > best.confidence
-            } else {
-                isBetter = true
-            }
-            if isBetter {
-                best = (pass.text, candidate.language, score, pass.confidence)
-            }
-            if score >= earlyExitScore { break }
+    static func enrollmentResult(url: URL) async -> EnrollmentResult {
+        let authorization = await requestAuthorizationState()
+        guard authorization == .authorized else {
+            return EnrollmentResult(
+                text: nil,
+                language: .auto,
+                evidence: EnrollmentEvidence(
+                    schemaVersion: EnrollmentEvidence.currentSchemaVersion,
+                    algorithmVersion: EnrollmentEvidence.currentAlgorithmVersion,
+                    authorizationStatus: authorization,
+                    outcome: authorization == .timedOut ? .authorizationTimedOut : .permissionDenied,
+                    attempts: [],
+                    bestLanguage: nil,
+                    bestLanguageScore: nil,
+                    bestTranscriptConfidence: nil
+                )
+            )
         }
 
-        guard let best, best.score >= minimumUsableScore else { return nil }
-        let language = best.score >= confidentLanguageScore ? best.language : .auto
-        return (best.text, language)
+        let candidates = candidateLocales()
+        guard !candidates.isEmpty else {
+            return EnrollmentResult(
+                text: nil,
+                language: .auto,
+                evidence: EnrollmentEvidence(
+                    schemaVersion: EnrollmentEvidence.currentSchemaVersion,
+                    algorithmVersion: EnrollmentEvidence.currentAlgorithmVersion,
+                    authorizationStatus: authorization,
+                    outcome: .noCandidateLocales,
+                    attempts: [],
+                    bestLanguage: nil,
+                    bestLanguageScore: nil,
+                    bestTranscriptConfidence: nil
+                )
+            )
+        }
+
+        var attempts: [EnrollmentLocaleAttempt] = []
+        var best: (text: String, language: Qwen3SupportedLanguage, score: Double, confidence: Double)?
+        for (offset, candidate) in candidates.enumerated() {
+            let pass = await recognizeDetailed(
+                url: url,
+                candidate: candidate,
+                authorizationStatus: authorization,
+                passIndex: offset + 1
+            )
+            let trimmed = pass.transcript?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let text = trimmed?.isEmpty == false ? trimmed : nil
+            let score = text.map { languageMatchScore(text: $0, expected: candidate.language) }
+            attempts.append(EnrollmentLocaleAttempt(
+                order: offset + 1,
+                localeIdentifier: candidate.locale.identifier,
+                language: candidate.language.rawValue,
+                recognizerAvailable: pass.recognizerAvailable,
+                supportsOnDeviceRecognition: pass.supportsOnDeviceRecognition,
+                status: pass.finalResultStatus,
+                transcriptDigest: text.map(Self.sha256),
+                transcriptCharacters: text?.count ?? 0,
+                languageScore: score,
+                averageConfidence: pass.averageConfidence
+            ))
+            if pass.finalResultStatus == .finalResult, let text, let score {
+                let confidence = pass.averageConfidence ?? 0
+                if best == nil
+                    || score > best!.score
+                    || (score == best!.score && confidence > best!.confidence) {
+                    best = (text, candidate.language, score, confidence)
+                }
+                if score >= earlyExitScore { break }
+            }
+        }
+
+        let outcome: EnrollmentOutcome
+        if let best, best.score < minimumUsableScore {
+            outcome = .lowConfidence
+        } else if best != nil {
+            outcome = .success
+        } else {
+            outcome = enrollmentFailureOutcome(attempts)
+        }
+        let accepted = outcome == .success ? best : nil
+        let language = accepted.map {
+            $0.score >= confidentLanguageScore ? $0.language : .auto
+        } ?? .auto
+        return EnrollmentResult(
+            text: accepted?.text,
+            language: language,
+            evidence: EnrollmentEvidence(
+                schemaVersion: EnrollmentEvidence.currentSchemaVersion,
+                algorithmVersion: EnrollmentEvidence.currentAlgorithmVersion,
+                authorizationStatus: authorization,
+                outcome: outcome,
+                attempts: attempts,
+                bestLanguage: best?.language.rawValue,
+                bestLanguageScore: best?.score,
+                bestTranscriptConfidence: best?.confidence
+            )
+        )
+    }
+
+    static func enrollmentFailureOutcome(
+        _ attempts: [EnrollmentLocaleAttempt]
+    ) -> EnrollmentOutcome {
+        let statuses = Set(attempts.map(\.status))
+        if statuses.contains(.timedOut) { return .recognitionTimedOut }
+        if statuses.contains(.recognitionError) { return .recognitionFailed }
+        if statuses.contains(.emptyTranscript) { return .emptyResult }
+        if statuses.contains(.onDeviceRecognitionUnsupported) {
+            return .onDeviceRecognitionUnsupported
+        }
+        return .recognizerUnavailable
     }
 
     /// Compatibility surface for callers that need only a transcript. Unlike enrollment, output

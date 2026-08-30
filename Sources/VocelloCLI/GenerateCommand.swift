@@ -18,7 +18,24 @@ enum GenerateCommand {
         let deliveryInstructionChars: Int?
         let deliveryInstructionDigest: String?
         let deliveryInstructionLanguage: String?
+        let modelFacingInstructionLanguage: String?
         let deliveryInstructionCellID: String?
+        let requestReceiptSchemaVersion: Int?
+        let storedLanguageSelection: String?
+        let detectedTargetLanguage: String?
+        let referenceTranscriptLanguage: String?
+        let finalModelLanguage: String?
+        let languageTokenMode: String?
+        let conditioningMode: String?
+        let targetTextDigest: String?
+        let targetTextCharacters: Int?
+        let referenceTranscriptDigest: String?
+        let referenceTranscriptCharacters: Int?
+        let referenceAudioDigest: String?
+        let modelArtifactVersion: String?
+        let modelIntegrityManifestDigest: String?
+        let speechTokenizerDigest: String?
+        let audioQC: AudioQCReport?
         let firstChunkMS: Double?
         let chunks: Int?
     }
@@ -163,9 +180,58 @@ enum GenerateCommand {
                 deliveryInstructionLanguage: result.diagnosticStringFlags[
                     "delivery_instruction_language"
                 ],
+                modelFacingInstructionLanguage: result.diagnosticStringFlags[
+                    "request_receipt_model_facing_instruction_language"
+                ],
                 deliveryInstructionCellID: result.diagnosticStringFlags[
                     "delivery_instruction_cell_id"
                 ],
+                requestReceiptSchemaVersion: result.diagnosticStringFlags[
+                    "request_receipt_schema_version"
+                ].flatMap(Int.init),
+                storedLanguageSelection: result.diagnosticStringFlags[
+                    "request_receipt_stored_language_selection"
+                ],
+                detectedTargetLanguage: result.diagnosticStringFlags[
+                    "request_receipt_detected_target_language"
+                ],
+                referenceTranscriptLanguage: result.diagnosticStringFlags[
+                    "request_receipt_reference_transcript_language"
+                ],
+                finalModelLanguage: result.diagnosticStringFlags[
+                    "request_receipt_final_model_language"
+                ],
+                languageTokenMode: result.diagnosticStringFlags[
+                    "request_receipt_language_token_mode"
+                ],
+                conditioningMode: result.diagnosticStringFlags[
+                    "request_receipt_conditioning_mode"
+                ],
+                targetTextDigest: result.diagnosticStringFlags[
+                    "request_receipt_target_text_digest"
+                ],
+                targetTextCharacters: result.diagnosticStringFlags[
+                    "request_receipt_target_text_characters"
+                ].flatMap(Int.init),
+                referenceTranscriptDigest: result.diagnosticStringFlags[
+                    "request_receipt_reference_transcript_digest"
+                ],
+                referenceTranscriptCharacters: result.diagnosticStringFlags[
+                    "request_receipt_reference_transcript_characters"
+                ].flatMap(Int.init),
+                referenceAudioDigest: result.diagnosticStringFlags[
+                    "request_receipt_reference_audio_digest"
+                ],
+                modelArtifactVersion: result.diagnosticStringFlags[
+                    "request_receipt_model_artifact_version"
+                ],
+                modelIntegrityManifestDigest: result.diagnosticStringFlags[
+                    "request_receipt_model_integrity_manifest_digest"
+                ],
+                speechTokenizerDigest: result.diagnosticStringFlags[
+                    "request_receipt_speech_tokenizer_digest"
+                ],
+                audioQC: result.audioQC,
                 firstChunkMS: firstChunkMS, chunks: chunkCount))
         } else {
             // stdout = machine-readable (the path). stderr = human notes.

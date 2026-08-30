@@ -1640,6 +1640,22 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         transcript: String?,
         replacingVoiceID: String?
     ) async throws -> PreparedVoiceCandidate {
+        try await preparePreparedVoiceCandidate(
+            name: name,
+            audioPath: audioPath,
+            transcript: transcript,
+            replacingVoiceID: replacingVoiceID,
+            enrollmentMetadata: nil
+        )
+    }
+
+    public func preparePreparedVoiceCandidate(
+        name: String,
+        audioPath: String,
+        transcript: String?,
+        replacingVoiceID: String?,
+        enrollmentMetadata: PreparedVoiceEnrollmentMetadata?
+    ) async throws -> PreparedVoiceCandidate {
         try ensureInitialized()
         let sourceURL = URL(fileURLWithPath: audioPath)
         let repository = try requirePreparedVoiceRepository()
@@ -1650,6 +1666,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
                 audioURL: sourceURL,
                 transcript: transcript,
                 qualityWarnings: warnings,
+                enrollmentMetadata: enrollmentMetadata,
                 replacingVoiceID: replacingVoiceID
             )
         } catch {
@@ -1723,7 +1740,8 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
             name: record.name,
             audioPath: record.audioURL.path,
             hasTranscript: record.hasTranscript,
-            qualityWarnings: savedReferenceQualityWarnings(forAudioAt: record.audioURL.path)
+            qualityWarnings: savedReferenceQualityWarnings(forAudioAt: record.audioURL.path),
+            enrollmentMetadata: record.enrollmentMetadata
         )
     }
 

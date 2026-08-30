@@ -337,6 +337,8 @@ struct IOSSaveVoiceSheet: View {
     @Binding var suggestedName: String
     @Binding var transcript: String
     var transcriptionReview: IOSReferenceTranscriptionReviewState? = nil
+    var referenceLanguage: Binding<Qwen3SupportedLanguage>? = nil
+    var requiresReferenceLanguageConfirmation = false
     let errorMessage: String?
     /// When present, show the clip-review card (review the recording before saving).
     var clipAudioURL: URL? = nil
@@ -361,7 +363,12 @@ struct IOSSaveVoiceSheet: View {
     private var isSaveEnabled: Bool {
         guard !trimmedName.isEmpty else { return false }
         guard let transcriptionReview else { return true }
-        return transcriptionReview.allowsSave(transcript: transcript)
+        guard transcriptionReview.allowsSave(transcript: transcript) else { return false }
+        if requiresReferenceLanguageConfirmation,
+           referenceLanguage?.wrappedValue == .auto {
+            return false
+        }
+        return true
     }
 
     private var transcriptBinding: Binding<String> {
@@ -417,6 +424,29 @@ struct IOSSaveVoiceSheet: View {
 
                     if let transcriptionReview {
                         transcriptionStatus(transcriptionReview)
+                    }
+
+                    if let referenceLanguage {
+                        fieldSection(
+                            label: VocelloPresentationText.referenceLanguageTitle,
+                            caption: requiresReferenceLanguageConfirmation
+                                ? VocelloPresentationText.referenceLanguageConfirmation
+                                : VocelloPresentationText.referenceLanguageDetail
+                        ) {
+                            Picker(
+                                VocelloPresentationText.referenceLanguageTitle,
+                                selection: referenceLanguage
+                            ) {
+                                Text(VocelloPresentationText.referenceLanguagePlaceholder)
+                                    .tag(Qwen3SupportedLanguage.auto)
+                                ForEach(Qwen3SupportedLanguage.selectableCases, id: \.self) { language in
+                                    Text(language.displayName).tag(language)
+                                }
+                            }
+                            .pickerStyle(.menu)
+                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                            .accessibilityIdentifier("saveVoice_referenceLanguagePicker")
+                        }
                     }
 
                     if let errorMessage {

@@ -1,0 +1,104 @@
+{
+  "schemaVersion": 1,
+  "status": "operator-local-diagnostic",
+  "authority": "diagnosis-only-no-production-promotion",
+  "description": "Source-bound Clone identity, enrollment-transcription, tokenizer, and French Voice Design characterization. Personal reference audio and transcripts are supplied only through an untracked bundle.",
+  "requiredReferenceAliases": {
+    "user-reference-a": "user",
+    "user-reference-b": "user",
+    "control-french": "control",
+    "control-english": "control"
+  },
+  "fixedSeeds": [
+    32060821,
+    32060822,
+    32060823,
+    32060824,
+    32060825,
+    32060826,
+    32060827,
+    32060828
+  ],
+  "tokenizerArms": {
+    "current-fp16": {
+      "required": true,
+      "sha256": "88f0a51a62f89d9d970bc01b52f811ee429be29bc0ae387c7d2f0311560b088e",
+      "sizeBytes": 341179884,
+      "artifactVersion": "2026.08.06.1"
+    },
+    "archived-fp32": {
+      "required": false,
+      "sha256": "836b7b357f5ea43e889936a3709af68dfe3751881acefe4ecf0dbd30ba571258",
+      "sizeBytes": 682293092,
+      "artifactVersion": "2026.07.26.1",
+      "sourceCommit": "6de7283a"
+    }
+  },
+  "scripts": {
+    "english-short": {
+      "source": "config/ios-control-audit-corpus.json",
+      "language": "english",
+      "length": "short"
+    },
+    "english-medium": {
+      "source": "config/language-bench-corpus.json",
+      "language": "english",
+      "length": "medium"
+    },
+    "french-short": {
+      "source": "config/ios-control-audit-corpus.json",
+      "language": "french",
+      "length": "short"
+    },
+    "french-medium": {
+      "source": "config/language-bench-corpus.json",
+      "language": "french",
+      "length": "medium"
+    },
+    "french-long": {
+      "source": "config/ios-control-audit-corpus.json",
+      "language": "french",
+      "length": "long"
+    }
+  },
+  "clone": {
+    "coreReferenceAliases": ["user-reference-a", "user-reference-b"],
+    "controlReferenceAliases": ["control-french", "control-english"],
+    "transcriptArms": ["reviewed", "corrected", "audio-only"],
+    "scriptIDs": ["english-medium", "french-medium"],
+    "languageSelections": ["auto", "explicit"],
+    "primaryVariation": "consistent",
+    "sentinelVariation": "expressive"
+  },
+  "voiceDesign": {
+    "voiceBrief": "A warm, friendly narrator with a clear, natural voice and measured pacing.",
+    "scriptIDs": ["french-short", "french-medium", "french-long"],
+    "languageSelections": ["auto", "explicit"],
+    "deliveryArms": ["current-neutral", "diagnostic-no-delivery", "calm-strong-control"],
+    "deliveryCells": {
+      "current-neutral": "neutral.strong",
+      "diagnostic-no-delivery": null,
+      "calm-strong-control": "calm.strong"
+    },
+    "primaryVariation": "consistent",
+    "sentinelVariation": "expressive"
+  },
+  "privacy": {
+    "trackedReportsMayContain": [
+      "stable aliases",
+      "digests",
+      "counts",
+      "durations",
+      "language IDs",
+      "model and tokenizer identities",
+      "aggregated metrics and typed outcomes"
+    ],
+    "trackedReportsMustNotContain": [
+      "personal voice names",
+      "transcript text",
+      "audio bytes",
+      "absolute paths",
+      "raw framework errors"
+    ]
+  }
+}

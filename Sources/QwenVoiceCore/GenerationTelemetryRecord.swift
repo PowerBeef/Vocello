@@ -401,6 +401,7 @@ public struct ModelRuntimeIdentity: Hashable, Codable, Sendable {
     public let artifactVersion: String?
     public let quantization: String?
     public let integrityManifestDigest: String?
+    public let speechTokenizerDigest: String?
     public let runtimeProfileSignature: String?
     public let nativeLoadCapabilityProfile: String?
     public let fixtureDigest: String?
@@ -413,6 +414,7 @@ public struct ModelRuntimeIdentity: Hashable, Codable, Sendable {
         artifactVersion: String? = nil,
         quantization: String? = nil,
         integrityManifestDigest: String? = nil,
+        speechTokenizerDigest: String? = nil,
         runtimeProfileSignature: String? = nil,
         nativeLoadCapabilityProfile: String? = nil,
         fixtureDigest: String? = nil
@@ -424,6 +426,7 @@ public struct ModelRuntimeIdentity: Hashable, Codable, Sendable {
         self.artifactVersion = artifactVersion
         self.quantization = quantization
         self.integrityManifestDigest = integrityManifestDigest
+        self.speechTokenizerDigest = speechTokenizerDigest
         self.runtimeProfileSignature = runtimeProfileSignature
         self.nativeLoadCapabilityProfile = nativeLoadCapabilityProfile
         self.fixtureDigest = fixtureDigest
@@ -917,6 +920,7 @@ public struct GenerationTelemetryRecord: Hashable, Codable, Sendable {
                     artifactVersion: notes["modelArtifactVersion"],
                     quantization: notes["modelQuantization"],
                     integrityManifestDigest: notes["modelIntegrityManifestDigest"],
+                    speechTokenizerDigest: notes["speechTokenizerDigest"],
                     runtimeProfileSignature: notes["qwen3RuntimeProfileSignature"],
                     nativeLoadCapabilityProfile: notes["nativeLoadCapabilityProfile"],
                     fixtureDigest: notes["fixtureDigest"]

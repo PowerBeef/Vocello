@@ -883,6 +883,15 @@ actor NativeEngineRuntime {
                 for: request,
                 capabilities: loadResult.qwen3Capabilities
             ),
+            modelFacingText: actorRequest.text,
+            modelFacingLanguage: actorRequest.language,
+            conditioningMode: receiptConditioningMode(
+                actorRequest: actorRequest,
+                cloneConditioning: cloneConditioning
+            ),
+            referenceTranscript: cloneConditioning?.resolvedTranscript,
+            referenceAudioDigest: cloneConditioning?.normalizedReference.fingerprint,
+            modelRuntimeIdentity: loadResult.modelRuntimeIdentity,
             generationID: generationID,
             effectiveSeed: samplingConfiguration.effectiveSeed,
             warmState: loadResult.didLoad ? .cold : .warm,
@@ -893,11 +902,59 @@ actor NativeEngineRuntime {
         if let language = requestReceipt.instructionLanguage {
             stringFlags["delivery_instruction_language"] = language
         }
+        if let language = requestReceipt.modelFacingInstructionLanguage {
+            stringFlags["request_receipt_model_facing_instruction_language"] = language
+        }
         if let digest = requestReceipt.instructionDigest {
             stringFlags["delivery_instruction_digest"] = digest
         }
         if let deliveryID = requestReceipt.deliveryID {
             stringFlags["delivery_instruction_cell_id"] = deliveryID
+        }
+        stringFlags["request_receipt_schema_version"] = String(requestReceipt.schemaVersion)
+        if let value = requestReceipt.storedLanguageSelection {
+            stringFlags["request_receipt_stored_language_selection"] = value
+        }
+        if let value = requestReceipt.detectedTargetLanguage {
+            stringFlags["request_receipt_detected_target_language"] = value
+        }
+        if let value = requestReceipt.finalModelLanguage {
+            stringFlags["request_receipt_final_model_language"] = value
+        }
+        if let value = requestReceipt.languageTokenMode {
+            stringFlags["request_receipt_language_token_mode"] = value
+        }
+        if let value = requestReceipt.conditioningMode {
+            stringFlags["request_receipt_conditioning_mode"] = value
+        }
+        if let value = requestReceipt.normalizedTargetTextDigest {
+            stringFlags["request_receipt_target_text_digest"] = value
+        }
+        if let value = requestReceipt.normalizedTargetTextCharacters {
+            stringFlags["request_receipt_target_text_characters"] = String(value)
+        }
+        if let value = requestReceipt.modelArtifactVersion {
+            stringFlags["request_receipt_model_artifact_version"] = value
+        }
+        if let value = requestReceipt.modelIntegrityManifestDigest {
+            stringFlags["request_receipt_model_integrity_manifest_digest"] = value
+        }
+        if let value = requestReceipt.speechTokenizerDigest {
+            stringFlags["request_receipt_speech_tokenizer_digest"] = value
+        }
+        if let referenceTranscriptLanguage = requestReceipt.referenceTranscriptLanguage {
+            stringFlags["request_receipt_reference_transcript_language"] = referenceTranscriptLanguage
+        }
+        if let referenceTranscriptDigest = requestReceipt.referenceTranscriptDigest {
+            stringFlags["request_receipt_reference_transcript_digest"] = referenceTranscriptDigest
+        }
+        if let referenceTranscriptCharacters = requestReceipt.referenceTranscriptCharacters {
+            stringFlags["request_receipt_reference_transcript_characters"] = String(
+                referenceTranscriptCharacters
+            )
+        }
+        if let referenceAudioDigest = requestReceipt.referenceAudioDigest {
+            stringFlags["request_receipt_reference_audio_digest"] = referenceAudioDigest
         }
         return NativePreparedGeneration(
             // Reuse the app-minted ID so app/middle/engine telemetry rows correlate;
@@ -1986,8 +2043,30 @@ actor NativeEngineRuntime {
     private func resolvedInstruction(
         from actorRequest: VocelloQwen3SynthesisRequest
     ) -> String? {
-        guard case .customVoice(_, let instruction) = actorRequest.input else { return nil }
-        return instruction
+        switch actorRequest.input {
+        case .customVoice(_, let instruction):
+            return instruction
+        case .voiceDesign(let description):
+            return description
+        case .voiceClone:
+            return nil
+        }
+    }
+
+    private func receiptConditioningMode(
+        actorRequest: VocelloQwen3SynthesisRequest,
+        cloneConditioning: ResolvedCloneConditioning?
+    ) -> String {
+        switch actorRequest.input {
+        case .customVoice:
+            return "custom_voice"
+        case .voiceDesign:
+            return "voice_design"
+        case .voiceClone:
+            return cloneConditioning?.resolvedTranscript == nil
+                ? "clone_audio_only"
+                : "clone_transcript_backed"
+        }
     }
 
     private func clearCloneState(

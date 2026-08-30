@@ -2178,6 +2178,7 @@ struct StreamingExecutionContext: Sendable {
                 artifactVersion: stringFlags["model_identity_artifact_version"],
                 quantization: stringFlags["model_identity_quantization"],
                 integrityManifestDigest: stringFlags["model_identity_integrity_manifest_digest"],
+                speechTokenizerDigest: stringFlags["model_identity_speech_tokenizer_digest"],
                 runtimeProfileSignature: stringFlags["qwen3_runtime_profile_signature"],
                 nativeLoadCapabilityProfile: loadCapabilityProfile.rawValue,
                 fixtureDigest: fixtureDigest

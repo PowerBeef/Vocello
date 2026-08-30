@@ -134,6 +134,22 @@ public final class TTSEngineStore {
         )
     }
 
+    public func preparePreparedVoiceCandidate(
+        name: String,
+        audioPath: String,
+        transcript: String?,
+        replacingVoiceID: String?,
+        enrollmentMetadata: PreparedVoiceEnrollmentMetadata?
+    ) async throws -> PreparedVoiceCandidate {
+        try await engine.preparePreparedVoiceCandidate(
+            name: name,
+            audioPath: audioPath,
+            transcript: transcript,
+            replacingVoiceID: replacingVoiceID,
+            enrollmentMetadata: enrollmentMetadata
+        )
+    }
+
     public func commitPreparedVoiceCandidate(id: UUID) async throws -> PreparedVoice {
         try await engine.commitPreparedVoiceCandidate(id: id)
     }

@@ -373,6 +373,7 @@ actor MLXModelLoadCoordinator: MLXModelCoordinating {
                 for: preparedCacheResult.metadata.qwenRuntimeProfile.quantizationTier
             ),
             integrityManifestDigest: modelRuntimeIdentity.integrityManifestDigest,
+            speechTokenizerDigest: modelRuntimeIdentity.speechTokenizerDigest,
             runtimeProfileSignature: preparedCacheResult.metadata.qwenRuntimeProfile.validationSignature,
             nativeLoadCapabilityProfile: capabilityProfile.rawValue
         )
@@ -516,6 +517,12 @@ actor MLXModelLoadCoordinator: MLXModelCoordinating {
         let integrityManifestDigest = SHA256.hash(data: data)
             .map { String(format: "%02x", $0) }
             .joined()
+        let speechTokenizerDigest = (try? JSONDecoder().decode(
+            ModelAssetIntegrityManifest.self,
+            from: data
+        ))?.files.first(where: {
+            $0.path == "speech_tokenizer/model.safetensors"
+        })?.sha256
         return ModelRuntimeIdentity(
             resolvedModelID: descriptor.id,
             modelVariant: variant?.id,
@@ -526,6 +533,7 @@ actor MLXModelLoadCoordinator: MLXModelCoordinating {
                 for: runtimeProfile?.quantizationTier ?? .unknown
             ),
             integrityManifestDigest: integrityManifestDigest,
+            speechTokenizerDigest: speechTokenizerDigest,
             runtimeProfileSignature: runtimeProfile?.validationSignature,
             nativeLoadCapabilityProfile: capabilityProfile.rawValue
         )
@@ -552,6 +560,9 @@ actor MLXModelLoadCoordinator: MLXModelCoordinating {
         }
         if let digest = identity.integrityManifestDigest {
             flags["model_identity_integrity_manifest_digest"] = digest
+        }
+        if let digest = identity.speechTokenizerDigest {
+            flags["model_identity_speech_tokenizer_digest"] = digest
         }
         return flags
     }

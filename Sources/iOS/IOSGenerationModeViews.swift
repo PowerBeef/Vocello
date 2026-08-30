@@ -859,7 +859,7 @@ struct IOSVoiceDesignView: View {
             wavPath: result.voice.wavPath,
             transcript: result.transcript,
             transcriptLoadError: nil,
-            language: PromptLanguageDetector.detect(result.transcript)
+            referenceLanguage: PromptLanguageDetector.detect(result.transcript)
         )
         appModel.studioMode = .clone
         appModel.tab = .studio
@@ -1755,10 +1755,20 @@ struct IOSVoiceCloningView: View {
     /// so the reference picker can recommend voices matching the typed prompt. Cheap (a handful of
     /// short text-only NL passes); recomputed only when the saved-voice list changes.
     private func refreshSavedVoiceLanguages() async {
-        let entries = savedVoices.map { (id: $0.id, wavPath: $0.wavPath) }
+        let entries = savedVoices.map {
+            (
+                id: $0.id,
+                wavPath: $0.wavPath,
+                referenceLanguage: $0.enrollmentMetadata?.referenceLanguage
+            )
+        }
         let map = await Task.detached(priority: .utility) { () -> [String: Qwen3SupportedLanguage] in
             var result: [String: Qwen3SupportedLanguage] = [:]
             for entry in entries {
+                if let referenceLanguage = entry.referenceLanguage {
+                    result[entry.id] = referenceLanguage
+                    continue
+                }
                 let txtURL = URL(fileURLWithPath: entry.wavPath)
                     .deletingPathExtension()
                     .appendingPathExtension("txt")
@@ -1793,9 +1803,6 @@ struct IOSVoiceCloningView: View {
             hydratedSavedVoiceID = pendingSavedVoiceHandoff.savedVoiceID
         }
 
-        if pendingSavedVoiceHandoff.language != .auto {
-            draft.selectedLanguage = pendingSavedVoiceHandoff.language
-        }
         transcriptLoadError = pendingSavedVoiceHandoff.transcriptLoadError
         autoTranscribeReferenceIfNeeded()
         // Covers the fallback branch above that bypasses applySavedVoice.
@@ -1816,9 +1823,6 @@ struct IOSVoiceCloningView: View {
             guard draft.referenceAudioPath == path else { return }
             if draft.referenceTranscript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 draft.referenceTranscript = result.text
-            }
-            if draft.selectedLanguage == .auto, result.language != .auto {
-                draft.selectedLanguage = result.language
             }
         }
     }

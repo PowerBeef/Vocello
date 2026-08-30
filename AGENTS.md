@@ -1,8 +1,7 @@
 # AGENTS.md — Vocello (QwenVoice)
 
-> Durable repository guidance for Codex and other coding agents. Code and machine-readable
-> contracts win over prose. Repository scripts are the gates; optional skills, plugins, MCP
-> servers, devices, and models never are.
+> Durable repository guidance. Code and machine-readable contracts win; repository scripts are
+> the gates; optional assists, devices, and models never are.
 >
 > **Plans:** [`docs/ROADMAP.md`](docs/ROADMAP.md) · **Current narrative:**
 > [`docs/development-progress.md`](docs/development-progress.md) · **Architecture:**
@@ -14,10 +13,9 @@
 
 **Vocello** is a local-first text-to-speech application for Apple Silicon using Qwen3-TTS and
 MLX with Swift 6. The checkout and Xcode project retain the historical `QwenVoice` name. The
-repository ships a macOS app with an XPC engine, an iOS app with an in-process engine, the
-`vocello` CLI, deterministic automation, benchmarks, and a React/Vite website. Supported targets
-are macOS and iOS 26+. No model weights are bundled and no cloud inference is used; approved
-artifacts download from Hugging Face through the complete production model catalog.
+repository ships macOS/XPC and iOS/in-process apps, the `vocello` CLI, automation, benchmarks, and
+a React/Vite website for macOS and iOS 26+. No weights are bundled or cloud inference used;
+approved artifacts download from Hugging Face through the production model catalog.
 
 Derive public facts from `project.yml`, `config/public-product-facts.json`, and the benchmark
 catalog. Check them before quoting version, hardware, preset, or speaker counts. Release only on
@@ -40,7 +38,7 @@ machine-readable contract invalidates documentation, update the documentation in
    `python3 scripts/roadmap.py status`. If `main` cannot be checked out without risking existing
    work, stop and ask; do not continue implementation on another branch. Do not overwrite unrelated
    user changes.
-2. Read `docs/development-progress.md` and confirm its checkpoint against the current checkout.
+2. Read `docs/development-progress.md` and verify its checkpoint.
 3. Read the applicable file under `.agents/rules/` and the authoritative subsystem reference.
 4. Inspect the exact code, tests, and contracts before deciding on an implementation.
 5. Read every selected skill completely and verify optional tools are callable.
@@ -125,10 +123,8 @@ Exemptions require a reason in `config/surface-coverage-exemptions.json`. Read
 
 ## Optional assists (user-scoped; verify before relying)
 
-User-scoped capabilities are outside the repository, so **no gate can validate this table**.
-Confirm that a capability is callable and read its skill before use. Every entry is optional;
-nothing here is a prerequisite for a commit, push, release, or acceptance result. Repository
-scripts and domain rules remain authoritative.
+No gate can validate this table; no entry is a prerequisite. Confirm each assist and read its skill.
+Repository scripts and domain rules remain authoritative.
 
 | Task | Optional capability |
 | --- | --- |
@@ -198,13 +194,15 @@ scripts/ui_test.sh ios smoke|benchmark|perf
 scripts/ui_test.sh ios saved-voice-lifecycle
 scripts/ui_test.sh ios control-audit --scenario inventory|stateful|external|accessibility|generation|all
 scripts/ios_device.sh gate
+# Private Clone/French diagnosis; never CI/release:
+scripts/ios_device.sh voice-reliability --plan <untracked-plan.json> --private-map <untracked-map.json>
 ```
 
-iOS uses the paired physical iPhone only; platform `gate` commands are diagnostics independent of
-XCUITest. Model and clone lanes are explicit isolated opt-ins. Pin multi-run audits, record their
-resume boundary before releasing the phone, and keep pins until closure. Classified bootstrap or
-notification interruptions remain failed with skipped rows; a manual rerun gets a new run ID. See
-`docs/reference/ios-device-testing.md`.
+iOS uses a paired physical iPhone; platform gates are non-XCUITest diagnostics. `preflight`
+requires an Apple Development identity/private key; team, expired, and distribution-only states
+fail. Model/clone lanes are opt-in. Pin multi-run audits until closure and record their resume
+boundary before releasing the phone. Bootstrap/notification interruptions stay failed with skipped
+rows; reruns get new IDs. See `docs/reference/ios-device-testing.md`.
 
 ## Key paths
 
@@ -228,6 +226,7 @@ notification interruptions remain failed with skipped rows; a manual rerun gets 
 | `docs/reference/model-delivery.md` | download/restoration/retry diagnostics and live-proof rules |
 | `config/delivery-experiment-contract.json`, `config/delivery-evaluator-v2-contract.json`, `config/delivery-evaluation-corpus.json`, `config/delivery-evaluator-v2-candidates.json` | pre-registered prompt arms, compact local evaluator, sampling, multilingual scripts, pinned candidate models, holdouts, and semantic-promotion limits |
 | `config/audio-cadence-qc-contract.json`, `scripts/audio_cadence_qc.py` | Fast-QC cadence classification, privacy-safe calibration coverage, and held-out threshold-review authority |
+| `config/voice-identity-language-reliability.json`, `scripts/voice_identity_language_reliability.py` | Private, source-bound Clone/French matrices; reports contain aliases/digests only |
 | `docs/reference/delivery-harness.md` | delivery/emotion protocol, provenance, layered evaluation, statistics, and results |
 | `website/` | marketing site governed by `website/AGENTS.md` |
 

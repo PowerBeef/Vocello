@@ -177,7 +177,7 @@ final class GenerationSemanticsLanguageTests: XCTestCase {
         )
     }
 
-    func testCloneUsesResolvedTranscriptBeforeTargetText() {
+    func testCloneAutoUsesTargetTextInsteadOfReferenceTranscript() {
         let request = LanguageTestSupport.makeRequest(
             mode: .clone,
             text: LanguageFixtures.english,
@@ -188,7 +188,22 @@ final class GenerationSemanticsLanguageTests: XCTestCase {
                 for: request,
                 resolvedCloneTranscript: LanguageFixtures.french
             ),
-            Qwen3SupportedLanguage.french.rawValue
+            Qwen3SupportedLanguage.english.rawValue
+        )
+    }
+
+    func testCloneExplicitOutputLanguageWinsOverReferenceAndTargetLanguages() {
+        let request = LanguageTestSupport.makeRequest(
+            mode: .clone,
+            text: LanguageFixtures.english,
+            languageHint: Qwen3SupportedLanguage.japanese.rawValue
+        )
+        XCTAssertEqual(
+            GenerationSemantics.qwenLanguageHint(
+                for: request,
+                resolvedCloneTranscript: LanguageFixtures.french
+            ),
+            Qwen3SupportedLanguage.japanese.rawValue
         )
     }
 

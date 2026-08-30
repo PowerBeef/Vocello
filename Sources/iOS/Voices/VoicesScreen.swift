@@ -37,7 +37,8 @@ struct VoicesScreen: View {
                     savedVoiceID: voice.id,
                     wavPath: voice.wavPath,
                     transcript: (try? voice.loadTranscript()) ?? "",
-                    transcriptLoadError: nil
+                    transcriptLoadError: nil,
+                    referenceLanguage: voice.enrollmentMetadata?.referenceLanguage ?? .auto
                 )
                 appModel.studioMode = .clone
                 appModel.tab = .studio
@@ -48,16 +49,16 @@ struct VoicesScreen: View {
         .fullScreenCover(item: $newVoiceFlow) { flow in
             IOSRecordVoiceSheet(
                 importedReference: flow.importedReference,
-                onEnrolled: { voice, transcript, language in
+                onEnrolled: { voice, transcript, referenceLanguage in
                     newVoiceFlow = nil
                     // Same staging as tapping a saved voice → Clone mode, pre-loaded; carry the
-                    // detected reference language so the Clone Language picker is pre-set.
+                    // reference language as conditioning metadata without changing Clone output.
                     appModel.pendingVoiceCloningHandoff = PendingVoiceCloningHandoff(
                         savedVoiceID: voice.id,
                         wavPath: voice.wavPath,
                         transcript: transcript,
                         transcriptLoadError: nil,
-                        language: language
+                        referenceLanguage: referenceLanguage
                     )
                     appModel.studioMode = .clone
                     appModel.tab = .studio

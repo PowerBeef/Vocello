@@ -357,6 +357,7 @@
         "scripts/run_local_delivery_cascade.py",
         "scripts/delivery_promotion_decision.py",
         "scripts/audio_cadence_qc.py",
+        "scripts/voice_identity_language_reliability.py",
         "scripts/delivery_separability.py",
         "scripts/bench_delivery_prosody.py",
         "scripts/analyze_prosody.py",
@@ -364,7 +365,8 @@
         "config/delivery-evaluator-v2-contract.json",
         "config/delivery-evaluator-v2-candidates.json",
         "config/delivery-evaluation-corpus.json",
-        "config/audio-cadence-qc-contract.json"
+        "config/audio-cadence-qc-contract.json",
+        "config/voice-identity-language-reliability.json"
       ]
     },
     {
@@ -436,6 +438,8 @@
       "sourceOfTruth": [
         "Sources/iOS",
         "Sources/iOSSupport/Services/IOSReferenceTranscriptionReviewState.swift",
+        "Sources/SharedSupport/Services/VoiceClipTranscriber.swift",
+        "Sources/QwenVoiceCore/GenerationSemantics.swift",
         "Tests/VocelloiOSUITests/VocelloiOSUITestCase.swift"
       ]
     },
@@ -509,7 +513,9 @@
         "scripts/ios_control_audit.py",
         "config/ios-control-audit.json",
         "scripts/check_ios_ui_perf.py",
-        "scripts/check_ios_model_management.py"
+        "scripts/check_ios_model_management.py",
+        "scripts/voice_identity_language_reliability.py",
+        "config/voice-identity-language-reliability.json"
       ]
     },
     {

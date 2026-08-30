@@ -399,6 +399,22 @@ final class EngineServiceHost: NSObject, NSXPCListenerDelegate, QwenVoiceEngineS
                     replacingVoiceID: replacingVoiceID
                 )
             )
+        case .preparePreparedVoiceCandidateV2(
+            let name,
+            let audioPath,
+            let transcript,
+            let enrollmentMetadata,
+            let replacingVoiceID
+        ):
+            return .preparedVoiceCandidate(
+                try await requireRuntimeContext().engine.preparePreparedVoiceCandidate(
+                    name: name,
+                    audioPath: audioPath,
+                    transcript: transcript,
+                    replacingVoiceID: replacingVoiceID,
+                    enrollmentMetadata: enrollmentMetadata
+                )
+            )
         case .commitPreparedVoiceCandidate(let id):
             return .preparedVoice(
                 try await requireRuntimeContext().engine.commitPreparedVoiceCandidate(id: id)

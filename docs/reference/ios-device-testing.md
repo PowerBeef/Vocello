@@ -9,6 +9,8 @@ sourceOfTruth:
   - config/ios-control-audit.json
   - scripts/check_ios_ui_perf.py
   - scripts/check_ios_model_management.py
+  - scripts/voice_identity_language_reliability.py
+  - config/voice-identity-language-reliability.json
 ---
 # iOS physical-device testing
 
@@ -63,7 +65,13 @@ scripts/ios_device.sh device-state
 
 `preflight` and `device-state` verify the paired CoreDevice identity and reachability; preflight
 also checks the selected Xcode's iOS Platform Support, signing, and the existing app-build and dSYM
-readiness. `device-state` treats
+readiness. Signing readiness means a currently valid **Apple Development certificate and its
+private key** for the selected team—not merely a team environment value, an expired certificate,
+or an Apple Distribution identity. The privacy-safe
+`scripts/lib/ios_signing_identity.py` helper distinguishes expiration, a missing private key,
+team mismatch, and a missing certificate before package resolution or compilation. Repair an
+expired/missing identity in Xcode → Settings → Accounts → Manage Certificates; do not revoke or
+regenerate unrelated distribution identities. `device-state` treats
 reachability as its only blocker. The XCUITest runner independently rejects a phone that
 CoreDevice reports as locked before invoking `xcodebuild`. Install or repair iOS models through the
 visible Settings → Voice models section; neither device scripts nor normal UI tests install them.
@@ -281,6 +289,39 @@ fixture store `~/Library/Application Support/QwenVoice-Debug/voices/`) into the 
 launches with `QVOICE_IOS_DEVICE_ENROLL_VOICE_NAME`, and validates the enrollment sentinel
 (staged digests, voice ID, quality warnings). The runner deletes the staged inputs after a clean
 enrollment. The command is opt-in and never runs in smoke, benchmark, CI, or release.
+
+Clone identity, enrollment-transcription, and French Voice Design reliability use a separate
+source-bound diagnostic that extends the same headless runner. It is read-only with respect to the
+saved-voice catalog: the untracked private map resolves the two stable aliases to exact existing
+saved-voice IDs, while the tracked plan and retained reports contain aliases only.
+
+```sh
+python3 scripts/voice_identity_language_reliability.py device-plan \
+  --run-id <new-run-id> \
+  --output /private/tmp/vlr-device-plan.json
+python3 scripts/voice_identity_language_reliability.py validate-device-plan \
+  --plan /private/tmp/vlr-device-plan.json \
+  --private-map /private/tmp/vlr-private-map.json
+scripts/ios_device.sh voice-reliability \
+  --plan /private/tmp/vlr-device-plan.json \
+  --private-map /private/tmp/vlr-private-map.json
+```
+
+The private map is schema 1, binds the plan digest, and contains exactly
+`user-reference-a` and `user-reference-b` mapped to their existing saved IDs. Never place voice
+names, IDs, transcripts, or paths in a tracked file or task log. The command first runs the genuine
+on-device enrollment transcriber against each stored reference without writing its result back; it
+retains only typed authorization, locale-attempt, availability, on-device-support, confidence, and
+digest evidence. It then executes exactly 26 no-retry current-fp16 rows: eight Clone target-language
+ownership cells and eighteen French Design Auto/explicit × short/medium/long × Neutral/no-delivery/
+Calm controls. Every terminal sentinel must expose a schema-2 actor-owned receipt, exact tokenizer,
+target-text and instruction identities, mandatory QC, and locale-locked output verification.
+
+This focused device plan is not the 734-row Mac/CLI tokenizer/reference matrix and cannot prove an
+fp16/fp32 cause. Run it only after Mac/CLI localization, twice with distinct run IDs for VLR-07.
+It installs no models, edits no transcript or reference metadata, creates no History row, and never
+retries or substitutes a failed seed. Missing Speech assets, missing model readiness, absent private
+references, source drift, or an unverifiable output are explicit failures rather than skipped proof.
 
 F-01/ICI-4 saved-voice and direct Clone-import acceptance is separately opt-in:
 

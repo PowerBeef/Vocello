@@ -47,6 +47,42 @@ final class PreparedVoiceRepositoryTests: XCTestCase {
         XCTAssertEqual(committedIDs, ["Review Voice"])
     }
 
+    func testReviewedReferenceMetadataPublishesTransactionallyAndSurvivesRelaunch() async throws {
+        let repository = makeRepository()
+        try await repository.reconcile()
+        let source = try writeSource(named: "metadata-source.wav")
+        let metadata = PreparedVoiceEnrollmentMetadata(
+            referenceLanguage: .french,
+            transcriptSource: .manual,
+            automaticTranscriptionOutcome: "lowConfidence",
+            transcriptionEvidenceDigest: String(repeating: "a", count: 64)
+        )
+        let candidate = try await repository.prepare(
+            name: "Reviewed French",
+            audioURL: source,
+            transcript: "Texte corrigé manuellement.",
+            qualityWarnings: [],
+            enrollmentMetadata: metadata,
+            replacingVoiceID: nil
+        )
+
+        XCTAssertEqual(candidate.enrollmentMetadata, metadata)
+        XCTAssertFalse(FileManager.default.fileExists(
+            atPath: root.appendingPathComponent("voices/Reviewed French.voice.json").path
+        ))
+        _ = try await repository.commit(id: candidate.id)
+
+        let relaunched = makeRepository()
+        try await relaunched.reconcile()
+        let listed = try await relaunched.list()
+        let voice = try XCTUnwrap(listed.first)
+        XCTAssertEqual(voice.enrollmentMetadata, metadata)
+        try await relaunched.delete(id: voice.id)
+        XCTAssertFalse(FileManager.default.fileExists(
+            atPath: root.appendingPathComponent("voices/Reviewed French.voice.json").path
+        ))
+    }
+
     func testDiscardIsIdempotentAndAllowsSameNameRetry() async throws {
         let repository = makeRepository()
         try await repository.reconcile()

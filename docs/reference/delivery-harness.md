@@ -21,6 +21,7 @@ sourceOfTruth:
   - scripts/run_local_delivery_cascade.py
   - scripts/delivery_promotion_decision.py
   - scripts/audio_cadence_qc.py
+  - scripts/voice_identity_language_reliability.py
   - scripts/delivery_separability.py
   - scripts/bench_delivery_prosody.py
   - scripts/analyze_prosody.py
@@ -29,6 +30,7 @@ sourceOfTruth:
   - config/delivery-evaluator-v2-candidates.json
   - config/delivery-evaluation-corpus.json
   - config/audio-cadence-qc-contract.json
+  - config/voice-identity-language-reliability.json
 ---
 # The audio delivery analysis harness
 
@@ -69,6 +71,7 @@ the script self-test suite via `scripts/check_test_workflows.sh`.
 | `scripts/run_local_delivery_cascade.py` | Existing-harness post-generation composer for always-on, ambiguous-only, finalist-only, abstention, rejection, and manual-listening routes | `test_run_local_delivery_cascade.py` |
 | `scripts/delivery_promotion_decision.py` | Fail-closed decision over blinded listener evidence, paired statistics, multiplicity correction, acoustic guardrails, and runtime invariants | `test_delivery_promotion_decision.py` |
 | `scripts/audio_cadence_qc.py` | Validates the Fast-QC cadence policy and audits untracked, privacy-safe, independently labelled calibration/development/confirmation cohorts before a threshold review | `test_audio_cadence_qc.py` |
+| `scripts/voice_identity_language_reliability.py` | Source-bound, serial Clone fidelity/enrollment-transcription/tokenizer and French Voice Design diagnosis; personal references stay in a private content-addressed bundle, rows never retry, and sanitized analysis has no semantic-promotion authority | `test_voice_identity_language_reliability.py` |
 | `scripts/delivery_separability.py` | Cross-preset separability: ridge-LDA over paired signed features, seed-grouped CV, UAR, computed chance floor, permutation null, Wilson intervals, per-cell BH-FDR, `--presets` subset probes | `test_delivery_separability.py` |
 | `scripts/bench_delivery_prosody.py` | Post-processes the current `vocello bench --delivery` run from its immutable manifest into `bench-prosody.json`; fail-closed instruction-receipt provenance (§4) | via `test_bench_command_contract.py` |
 | `scripts/delivery_listening_session.py` | Build / run / score the blind 2AFC + free-identification listening session from bench archives; sealed keys, pre-registered exact-binomial decision rules | `test_delivery_listening_session.py` |
@@ -86,6 +89,53 @@ the script self-test suite via `scripts/check_test_workflows.sh`.
 | `scripts/prosody_profile.py` | Versioned prosody profile: thresholds, delivery weights, per-preset expectations | via gate/separability tests |
 | `scripts/prosody_quality_gate.py` | Reference-free per-take prosody gate (monotone / rushed / flat / pause issues) | `test_prosody_quality_gate.py` |
 | `scripts/check_delivery_instructions.py` | Deterministic text-level contract gate on shipped delivery copy (T1/CI) → [`config/delivery-instruction-contract.json`](../../config/delivery-instruction-contract.json) | `test_check_delivery_instructions.py` |
+
+### Clone identity, enrollment transcription, and French Design reliability
+
+The VLR lane is a diagnosis surface, not another delivery-promotion authority. Its tracked contract
+freezes eight seeds, current/archived tokenizer identities, language-matched scripts, transcript
+arms, variation sentinels, and Design delivery-isolation arms. The operator supplies the two real
+references and clean French/English controls only through an untracked input specification. The
+bundle builder copies audio and transcript bytes below `private/`, exposes aliases/digests/counts
+only in the public manifest, and rejects a reused output directory:
+
+```sh
+python3 scripts/voice_identity_language_reliability.py prepare-bundle \
+  --input-spec /private/tmp/vlr-input.json \
+  --output build/artifacts/diagnostics/vlr/<run-id>
+python3 scripts/voice_identity_language_reliability.py plan \
+  --bundle-root build/artifacts/diagnostics/vlr/<run-id> \
+  --output build/artifacts/diagnostics/vlr/<run-id>/plan.json
+python3 scripts/voice_identity_language_reliability.py execute \
+  --bundle-root build/artifacts/diagnostics/vlr/<run-id> \
+  --plan build/artifacts/diagnostics/vlr/<run-id>/plan.json \
+  --run-dir build/artifacts/diagnostics/vlr/<run-id>/takes
+python3 scripts/voice_identity_language_reliability.py analyze \
+  --bundle-root build/artifacts/diagnostics/vlr/<run-id> \
+  --plan build/artifacts/diagnostics/vlr/<run-id>/plan.json \
+  --run-dir build/artifacts/diagnostics/vlr/<run-id>/takes \
+  --output build/artifacts/diagnostics/vlr/<run-id>/analysis.json
+```
+
+The Mac/CLI plan contains 734 immutable rows when both tokenizer arms are available. It refuses an
+unavailable archived fp32 runtime rather than pretending that the current runtime represents it.
+The analyzer records mandatory audio QC, bounded reference/output prosody fidelity, distributions,
+and optional separately launched ECAPA similarity. It does not call reference audio a neutral
+delivery control and it cannot establish semantic emotion or French correctness by acoustics alone.
+French correctness remains conditional on locale-locked ASR; speaker identity and prosody metrics
+are advisory until AV-07/AV-08 calibration closes.
+
+The schema-2 generation receipt is assembled from the exact native actor request. It distinguishes
+stored UI language, target-text detection, reference-transcript language, final model-facing
+language, think/no-think token mode, transcript-backed versus audio-only conditioning, target and
+reference digests, full instruction identity, tokenizer/model identity, seed, variation, retry,
+and warm state. Clone Auto resolves output language from target text; reference language is saved
+conditioning metadata only. The second private reference's operator-entered transcript is treated
+as reviewed transcript-backed conditioning and is never replaced by delayed recognition.
+
+No prompt, tokenizer, model pin, sampling default, or QC threshold changes from this lane alone.
+Tokenizer/reference remediation belongs to VLR-05; any Design delivery-copy candidate remains under
+DP-31/DP-32 blinded-listening authority.
 
 ## 2. Measurement protocol — `vocello bench --delivery`
 

@@ -65,6 +65,15 @@ public enum EngineCommand: Codable, Equatable, Sendable {
         transcript: String?,
         replacingVoiceID: String?
     )
+    /// Versioned extension of candidate preparation. The original command remains
+    /// decodable so an interrupted upgrade cannot strand a pending review flow.
+    case preparePreparedVoiceCandidateV2(
+        name: String,
+        audioPath: String,
+        transcript: String?,
+        enrollmentMetadata: PreparedVoiceEnrollmentMetadata?,
+        replacingVoiceID: String?
+    )
     case commitPreparedVoiceCandidate(id: UUID)
     case discardPreparedVoiceCandidate(id: UUID)
     case enrollPreparedVoice(name: String, audioPath: String, transcript: String?)

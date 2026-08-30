@@ -436,9 +436,9 @@ final class VoiceCloningCoordinator {
     /// Best-effort on-device transcription of a freshly imported/recorded
     /// reference clip (saved-voice selection already hydrates the sidecar
     /// transcript, so this only runs on the fresh-file path). Fills the
-    /// transcript only if it's still empty when the pass finishes, and
-    /// auto-sets the language only from `.auto` — never overwriting user
-    /// input. Mirrors the iOS record→enroll contract (`onEnrolled`).
+    /// transcript only if it's still empty when the pass finishes. Reference
+    /// language is conditioning metadata; it must not select the language of
+    /// the target text being generated.
     private func autoTranscribeReference(
         path: String,
         draft: Binding<VoiceCloningDraft>
@@ -470,9 +470,6 @@ final class VoiceCloningCoordinator {
             if draft.wrappedValue.referenceTranscript
                 .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 draft.wrappedValue.referenceTranscript = result.text
-            }
-            if draft.wrappedValue.selectedLanguage == .auto, result.language != .auto {
-                draft.wrappedValue.selectedLanguage = result.language
             }
         }
     }

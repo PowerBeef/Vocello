@@ -21,7 +21,7 @@ public enum GenerationStartupBoundary: String, CaseIterable, Codable, Hashable, 
 }
 
 public struct GenerationRequestReceipt: Hashable, Codable, Sendable {
-    public static let currentSchemaVersion = 1
+    public static let currentSchemaVersion = 2
 
     public let schemaVersion: Int
     public let generationID: String
@@ -34,8 +34,30 @@ public struct GenerationRequestReceipt: Hashable, Codable, Sendable {
     public let deliveryID: String?
     public let instructionDigest: String?
     public let instructionCharacters: Int
+    /// Routing/provenance vocabulary retained for compatibility
+    /// (`english`, `mandarin`, or caller-supplied `verbatim`).
     public let instructionLanguage: String?
+    /// Natural language detected from the exact fully assembled instruction.
+    public let modelFacingInstructionLanguage: String?
+    /// The language value retained by the UI/request before target-text
+    /// resolution. `auto` remains distinct from the model-facing language.
+    public let storedLanguageSelection: String?
+    public let detectedTargetLanguage: String?
+    public let referenceTranscriptLanguage: String?
+    /// Compatibility field retained for v1 consumers. It is the exact
+    /// model-facing output language, never the reference language.
     public let language: String
+    public let finalModelLanguage: String?
+    public let languageTokenMode: String?
+    public let conditioningMode: String?
+    public let normalizedTargetTextDigest: String?
+    public let normalizedTargetTextCharacters: Int?
+    public let referenceTranscriptDigest: String?
+    public let referenceTranscriptCharacters: Int?
+    public let referenceAudioDigest: String?
+    public let modelArtifactVersion: String?
+    public let modelIntegrityManifestDigest: String?
+    public let speechTokenizerDigest: String?
     public let seed: UInt64
     public let seedSource: String
     public let variation: String
@@ -49,6 +71,12 @@ public struct GenerationRequestReceipt: Hashable, Codable, Sendable {
         request: GenerationRequest,
         resolvedInstruction: String? = nil,
         instructionLanguage: DeliveryInstructionLanguage? = nil,
+        modelFacingText: String? = nil,
+        modelFacingLanguage: String? = nil,
+        conditioningMode: String? = nil,
+        referenceTranscript: String? = nil,
+        referenceAudioDigest: String? = nil,
+        modelRuntimeIdentity: ModelRuntimeIdentity? = nil,
         generationID: UUID,
         effectiveSeed: UInt64,
         warmState: EngineWarmState,
@@ -69,7 +97,28 @@ public struct GenerationRequestReceipt: Hashable, Codable, Sendable {
         // Only the explicit wire-compatible context can grant canonical cell
         // identity or authorize localization.
         let deliveryID = request.deliveryInstructionCellID
-        let language = GenerationSemantics.qwenLanguageHint(for: request)
+        let normalizedTargetText = (modelFacingText ?? request.text)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let language = (modelFacingLanguage ?? GenerationSemantics.qwenLanguageHint(for: request))
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        let storedLanguageSelection = Qwen3SupportedLanguage
+            .normalized(request.languageHint ?? Qwen3SupportedLanguage.auto.rawValue)
+            .rawValue
+        let detectedTarget = PromptLanguageDetector.detect(normalizedTargetText)
+        let normalizedReferenceTranscript: String? = {
+            guard let referenceTranscript else { return nil }
+            let trimmed = referenceTranscript.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty ? nil : trimmed
+        }()
+        let detectedReference = normalizedReferenceTranscript.map(PromptLanguageDetector.detect)
+        let detectedInstruction: Qwen3SupportedLanguage? = instruction.map(
+            PromptLanguageDetector.detect
+        )
+        let resolvedConditioningMode = conditioningMode ?? Self.conditioningMode(
+            for: request,
+            referenceTranscript: normalizedReferenceTranscript
+        )
         let sessionIdentityDigest = GenerationSemantics.generationSessionIdentity(
             for: request,
             resolvedCustomInstruction: instruction
@@ -78,18 +127,22 @@ public struct GenerationRequestReceipt: Hashable, Codable, Sendable {
             for: request,
             resolvedCustomInstruction: instruction
         ).digest
-        let promptDigest = Self.sha256(request.text)
+        let promptDigest = Self.sha256(normalizedTargetText)
         let variation = (request.variation ?? .expressive).rawValue
         let requestSerialization = Self.lengthFramed([
             request.modelID,
             request.mode.rawValue,
             promptDigest,
-            String(request.text.count),
+            String(normalizedTargetText.count),
             speakerID ?? "",
             deliveryID ?? "",
             instructionDigest ?? "",
             instructionLanguage?.rawValue ?? "",
             language,
+            resolvedConditioningMode,
+            normalizedReferenceTranscript.map(Self.sha256) ?? "",
+            referenceAudioDigest ?? "",
+            modelRuntimeIdentity?.speechTokenizerDigest ?? "",
             String(effectiveSeed),
             variation,
             request.shouldStream ? "streaming" : "quality-first",
@@ -107,7 +160,32 @@ public struct GenerationRequestReceipt: Hashable, Codable, Sendable {
         self.instructionDigest = instructionDigest
         self.instructionCharacters = instruction?.count ?? 0
         self.instructionLanguage = instructionLanguage?.rawValue
+        self.modelFacingInstructionLanguage = detectedInstruction == .auto
+            ? nil
+            : detectedInstruction?.rawValue
+        self.storedLanguageSelection = storedLanguageSelection
+        self.detectedTargetLanguage = detectedTarget == .auto ? nil : detectedTarget.rawValue
+        self.referenceTranscriptLanguage = detectedReference == .auto
+            ? nil
+            : detectedReference?.rawValue
         self.language = language
+        self.finalModelLanguage = language
+        self.languageTokenMode = language == Qwen3SupportedLanguage.auto.rawValue
+            ? "nothink"
+            : "think"
+        self.conditioningMode = resolvedConditioningMode
+        self.normalizedTargetTextDigest = promptDigest
+        self.normalizedTargetTextCharacters = normalizedTargetText.count
+        self.referenceTranscriptDigest = normalizedReferenceTranscript.map(Self.sha256)
+        self.referenceTranscriptCharacters = normalizedReferenceTranscript?.count ?? 0
+        self.referenceAudioDigest = Self.validatedDigest(referenceAudioDigest)
+        self.modelArtifactVersion = modelRuntimeIdentity?.artifactVersion
+        self.modelIntegrityManifestDigest = Self.validatedDigest(
+            modelRuntimeIdentity?.integrityManifestDigest
+        )
+        self.speechTokenizerDigest = Self.validatedDigest(
+            modelRuntimeIdentity?.speechTokenizerDigest
+        )
         self.seed = effectiveSeed
         self.seedSource = request.seed == nil ? "generated" : "requested"
         self.variation = variation
@@ -116,6 +194,20 @@ public struct GenerationRequestReceipt: Hashable, Codable, Sendable {
         self.predecessorIdentityDigest = Self.validatedDigest(predecessorIdentityDigest)
         self.retryAttempt = max(0, retryAttempt)
         self.operationGeneration = operationGeneration
+    }
+
+    private static func conditioningMode(
+        for request: GenerationRequest,
+        referenceTranscript: String?
+    ) -> String {
+        switch request.payload {
+        case .custom:
+            return "custom_voice"
+        case .design:
+            return "voice_design"
+        case .clone:
+            return referenceTranscript == nil ? "clone_audio_only" : "clone_transcript_backed"
+        }
     }
 
     private static func validatedDigest(_ value: String?) -> String? {

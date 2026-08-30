@@ -50,6 +50,8 @@ enum IOSDeviceDiagnosticsRunner {
         "QVOICE_IOS_DEVICE_MEMORY_QUALIFICATION_SPEC"
     private static let cloneConditioningAcceptanceEnvironmentKey =
         "QVOICE_IOS_DEVICE_CLONE_CONDITIONING_ACCEPTANCE"
+    private static let voiceReliabilityTranscriptionEnvironmentKey =
+        "QVOICE_IOS_DEVICE_VOICE_RELIABILITY_TRANSCRIPTION_SPEC"
     private static let expectedCloneAudioSHA256EnvironmentKey =
         "QVOICE_IOS_DEVICE_DIAGNOSTICS_EXPECTED_CLONE_AUDIO_SHA256"
     private static let expectedCloneTranscriptSHA256EnvironmentKey =
@@ -66,6 +68,8 @@ enum IOSDeviceDiagnosticsRunner {
     private static let variationEnvKey = "QVOICE_IOS_DEVICE_DIAGNOSTICS_VARIATION"
     private static let customSpeakerEnvKey = "QVOICE_IOS_DEVICE_DIAGNOSTICS_CUSTOM_SPEAKER"
     private static let designInstructionEnvKey = "QVOICE_IOS_DEVICE_DIAGNOSTICS_DESIGN_INSTRUCTION"
+    private static let designDeliveryEnvKey =
+        "QVOICE_IOS_DEVICE_DIAGNOSTICS_DESIGN_DELIVERY"
 
     /// Default benchmark sentence — long enough to exercise streaming chunking,
     /// free of any personal/sensitive content.
@@ -93,6 +97,7 @@ enum IOSDeviceDiagnosticsRunner {
         ]
         #if QVOICE_DEVICE_DIAGNOSTICS
         keys.append(cloneConditioningAcceptanceEnvironmentKey)
+        keys.append(voiceReliabilityTranscriptionEnvironmentKey)
         #endif
         return keys.contains { key in
             guard let raw = ProcessInfo.processInfo.environment[key]?
@@ -122,6 +127,12 @@ enum IOSDeviceDiagnosticsRunner {
             IOSInterruptionRecorder.shared.start()
             Task { @MainActor in
                 await runCloneConditioningAcceptance(engine: engine)
+            }
+            return
+        }
+        if let rawSpec = trimmedEnvironmentValue(voiceReliabilityTranscriptionEnvironmentKey) {
+            Task { @MainActor in
+                await runVoiceReliabilityTranscription(rawSpec: rawSpec, engine: engine)
             }
             return
         }
@@ -665,6 +676,9 @@ enum IOSDeviceDiagnosticsRunner {
             record.wallSeconds = wall
             record.realtimeFactor = rtf
             record.finishReason = result.finishReason?.rawValue
+            record.requestReceipt = RequestReceiptObservation(
+                stringFlags: result.diagnosticStringFlags
+            )
             print(String(
                 format: "[device-diagnostics] ✓ %.2fs audio · rtf=%.2f · finish=%@",
                 result.durationSeconds, rtf, result.finishReason?.rawValue ?? "?"
@@ -1290,9 +1304,13 @@ enum IOSDeviceDiagnosticsRunner {
             guard instruction.count <= 240 else {
                 throw DiagnosticsError("\(designInstructionEnvKey) exceeds 240 characters")
             }
+            let delivery = trimmedEnvironmentValue(designDeliveryEnvKey)
+            guard delivery == nil || delivery!.count <= 320 else {
+                throw DiagnosticsError("\(designDeliveryEnvKey) exceeds 320 characters")
+            }
             return .design(
                 voiceDescription: instruction,
-                deliveryStyle: nil
+                deliveryStyle: delivery
             )
         case .clone:
             guard let requestedVoiceID = trimmedEnvironmentValue(cloneVoiceIDEnvKey) else {
@@ -1880,6 +1898,158 @@ enum IOSDeviceDiagnosticsRunner {
         writeData(data, to: pullableURL, label: "speech assets (pullable)")
     }
 
+    #if QVOICE_DEVICE_DIAGNOSTICS
+    private struct VoiceReliabilityTranscriptionSpec: Decodable {
+        struct Reference: Decodable {
+            let alias: String
+            let voiceID: String
+        }
+
+        let schemaVersion: Int
+        let references: [Reference]
+    }
+
+    private struct VoiceReliabilityTranscriptionReference: Encodable {
+        let alias: String
+        var found: Bool
+        var referenceAudioDigest: String?
+        var hasStoredTranscript: Bool?
+        var storedTranscriptDigest: String?
+        var storedReferenceLanguage: String?
+        var storedTranscriptSource: String?
+        var storedAutomaticTranscriptionOutcome: String?
+        var qualityWarnings: [String]?
+        var automaticTranscription: VoiceClipTranscriber.EnrollmentEvidence?
+        var failureCode: String?
+    }
+
+    private struct VoiceReliabilityTranscriptionResult: Encodable {
+        let schemaVersion: Int
+        let runID: String
+        let startedAt: String
+        var finishedAt: String?
+        var status: String
+        var references: [VoiceReliabilityTranscriptionReference]
+        var failureCode: String?
+    }
+
+    private static func runVoiceReliabilityTranscription(
+        rawSpec: String,
+        engine: TTSEngineStore
+    ) async {
+        let runID = safeRunID(from: trimmedEnvironmentValue(runIDKey))
+            ?? "ios-voice-reliability-transcription"
+        var result = VoiceReliabilityTranscriptionResult(
+            schemaVersion: 1,
+            runID: runID,
+            startedAt: ISO8601DateFormatter().string(from: Date()),
+            status: "failed",
+            references: []
+        )
+        defer {
+            result.finishedAt = ISO8601DateFormatter().string(from: Date())
+            writeVoiceReliabilityTranscriptionSentinel(result, runID: runID)
+        }
+
+        guard let data = rawSpec.data(using: .utf8),
+              let spec = try? JSONDecoder().decode(
+                  VoiceReliabilityTranscriptionSpec.self,
+                  from: data
+              ),
+              spec.schemaVersion == 1,
+              (1 ... 4).contains(spec.references.count),
+              Set(spec.references.map(\.alias)).count == spec.references.count,
+              spec.references.allSatisfy({ reference in
+                  safeRunID(from: reference.alias) == reference.alias
+                      && !reference.voiceID.trimmingCharacters(
+                          in: .whitespacesAndNewlines
+                      ).isEmpty
+              }) else {
+            result.failureCode = "invalid-spec"
+            return
+        }
+
+        do {
+            let voices = try await engine.listPreparedVoices()
+            let voicesByID = Dictionary(uniqueKeysWithValues: voices.map { ($0.id, $0) })
+            for reference in spec.references {
+                guard let voice = voicesByID[reference.voiceID] else {
+                    result.references.append(VoiceReliabilityTranscriptionReference(
+                        alias: reference.alias,
+                        found: false,
+                        failureCode: "saved-voice-not-found"
+                    ))
+                    continue
+                }
+                let storedTranscript = try? voice.loadTranscript()
+                let automatic = await VoiceClipTranscriber.enrollmentResult(url: voice.audioURL)
+                result.references.append(VoiceReliabilityTranscriptionReference(
+                    alias: reference.alias,
+                    found: true,
+                    referenceAudioDigest: try sha256File(at: voice.audioURL),
+                    hasStoredTranscript: voice.hasTranscript,
+                    storedTranscriptDigest: storedTranscript.map { sha256Text($0) },
+                    storedReferenceLanguage: voice.enrollmentMetadata?.referenceLanguage?.rawValue,
+                    storedTranscriptSource: voice.enrollmentMetadata?.transcriptSource.rawValue,
+                    storedAutomaticTranscriptionOutcome: voice.enrollmentMetadata?
+                        .automaticTranscriptionOutcome,
+                    qualityWarnings: voice.qualityWarnings,
+                    automaticTranscription: automatic.evidence,
+                    failureCode: nil
+                ))
+            }
+            result.status = result.references.allSatisfy(\.found) ? "pass" : "partial"
+        } catch {
+            result.failureCode = "prepared-voice-enumeration-failed"
+        }
+    }
+
+    private static func sha256File(at url: URL) throws -> String {
+        guard let stream = InputStream(url: url) else {
+            throw DiagnosticsError("reference file is unreadable")
+        }
+        stream.open()
+        defer { stream.close() }
+        var hasher = SHA256()
+        var buffer = [UInt8](repeating: 0, count: 64 * 1024)
+        while stream.hasBytesAvailable {
+            let count = stream.read(&buffer, maxLength: buffer.count)
+            if count < 0 {
+                throw stream.streamError ?? DiagnosticsError("reference file read failed")
+            }
+            if count == 0 { break }
+            hasher.update(data: Data(buffer[..<count]))
+        }
+        return hasher.finalize().map { String(format: "%02x", $0) }.joined()
+    }
+
+    private static func sha256Text(_ value: String) -> String {
+        SHA256.hash(data: Data(value.utf8))
+            .map { String(format: "%02x", $0) }
+            .joined()
+    }
+
+    private static func writeVoiceReliabilityTranscriptionSentinel(
+        _ record: VoiceReliabilityTranscriptionResult,
+        runID: String
+    ) {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        guard let data = try? encoder.encode(record) else { return }
+        let fileName = "voice-reliability-transcription-done.json"
+        let appGroupURL = AppPaths.appSupportDir
+            .appendingPathComponent("diagnostics", isDirectory: true)
+            .appendingPathComponent(runID, isDirectory: true)
+            .appendingPathComponent(fileName, isDirectory: false)
+        writeData(data, to: appGroupURL, label: "voice reliability transcription (app-group)")
+        guard let pullableRoot = IOSPullableDiagnosticsMirror.pullableRoot else { return }
+        let pullableURL = pullableRoot
+            .appendingPathComponent(runID, isDirectory: true)
+            .appendingPathComponent(fileName, isDirectory: false)
+        writeData(data, to: pullableURL, label: "voice reliability transcription (pullable)")
+    }
+    #endif
+
     private static func writeSentinel(_ record: SentinelRecord, runID: String) {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
@@ -2173,6 +2343,7 @@ enum IOSDeviceDiagnosticsRunner {
         var wallSeconds: Double?
         var realtimeFactor: Double?
         var finishReason: String?
+        var requestReceipt: RequestReceiptObservation?
         var error: String?
         var outputVerification: GenerationOutputVerifier.Result?
         /// Typed `languageASR` quality-registry gate derived from
@@ -2187,6 +2358,63 @@ enum IOSDeviceDiagnosticsRunner {
         let systemVersion: String
         let bundleVersion: String?
         let buildVersion: String?
+    }
+
+    /// Privacy-safe mirror of the fully assembled engine receipt. It carries
+    /// only model-facing identities, digests, counts, and language decisions;
+    /// reference paths, prompts, and transcript text never enter the sentinel.
+    private struct RequestReceiptObservation: Codable {
+        let schemaVersion: Int?
+        let storedLanguageSelection: String?
+        let detectedTargetLanguage: String?
+        let referenceTranscriptLanguage: String?
+        let instructionDigest: String?
+        let instructionLanguage: String?
+        let modelFacingInstructionLanguage: String?
+        let finalModelLanguage: String?
+        let languageTokenMode: String?
+        let conditioningMode: String?
+        let targetTextDigest: String?
+        let targetTextCharacters: Int?
+        let referenceTranscriptDigest: String?
+        let referenceTranscriptCharacters: Int?
+        let referenceAudioDigest: String?
+        let modelArtifactVersion: String?
+        let modelIntegrityManifestDigest: String?
+        let speechTokenizerDigest: String?
+
+        init(stringFlags: [String: String]) {
+            schemaVersion = stringFlags["request_receipt_schema_version"].flatMap(Int.init)
+            storedLanguageSelection = stringFlags["request_receipt_stored_language_selection"]
+            detectedTargetLanguage = stringFlags["request_receipt_detected_target_language"]
+            referenceTranscriptLanguage = stringFlags[
+                "request_receipt_reference_transcript_language"
+            ]
+            instructionDigest = stringFlags["delivery_instruction_digest"]
+            instructionLanguage = stringFlags["delivery_instruction_language"]
+            modelFacingInstructionLanguage = stringFlags[
+                "request_receipt_model_facing_instruction_language"
+            ]
+            finalModelLanguage = stringFlags["request_receipt_final_model_language"]
+            languageTokenMode = stringFlags["request_receipt_language_token_mode"]
+            conditioningMode = stringFlags["request_receipt_conditioning_mode"]
+            targetTextDigest = stringFlags["request_receipt_target_text_digest"]
+            targetTextCharacters = stringFlags[
+                "request_receipt_target_text_characters"
+            ].flatMap(Int.init)
+            referenceTranscriptDigest = stringFlags[
+                "request_receipt_reference_transcript_digest"
+            ]
+            referenceTranscriptCharacters = stringFlags[
+                "request_receipt_reference_transcript_characters"
+            ].flatMap(Int.init)
+            referenceAudioDigest = stringFlags["request_receipt_reference_audio_digest"]
+            modelArtifactVersion = stringFlags["request_receipt_model_artifact_version"]
+            modelIntegrityManifestDigest = stringFlags[
+                "request_receipt_model_integrity_manifest_digest"
+            ]
+            speechTokenizerDigest = stringFlags["request_receipt_speech_tokenizer_digest"]
+        }
     }
 
     private struct OutputEvidence: Codable {

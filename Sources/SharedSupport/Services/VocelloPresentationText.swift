@@ -132,6 +132,38 @@ enum VocelloPresentationText {
         )
     }
 
+    static var referenceLanguageTitle: String {
+        String(
+            localized: "vocello.enrollment.reference_language",
+            defaultValue: "Reference language",
+            comment: "Enrollment field describing the language spoken in the saved reference clip."
+        )
+    }
+
+    static var referenceLanguageConfirmation: String {
+        String(
+            localized: "vocello.enrollment.reference_language.confirmation",
+            defaultValue: "Confirm the language spoken in this reference.",
+            comment: "Enrollment guidance when automatic reference-language detection is inconclusive."
+        )
+    }
+
+    static var referenceLanguageDetail: String {
+        String(
+            localized: "vocello.enrollment.reference_language.detail",
+            defaultValue: "Used only to describe this saved reference.",
+            comment: "Enrollment guidance clarifying that reference language does not select future output language."
+        )
+    }
+
+    static var referenceLanguagePlaceholder: String {
+        String(
+            localized: "vocello.enrollment.reference_language.placeholder",
+            defaultValue: "Choose a language",
+            comment: "Placeholder option for an unconfirmed reference-clip language."
+        )
+    }
+
     static var useAudioOnly: String {
         String(
             localized: "vocello.enrollment.use_audio_only",

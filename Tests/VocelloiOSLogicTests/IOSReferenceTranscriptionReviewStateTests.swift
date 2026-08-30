@@ -119,7 +119,7 @@ final class IOSReferenceTranscriptionReviewStateTests: XCTestCase {
         var state = IOSReferenceTranscriptionReviewState(sidecarTranscript: "")
         let generation = state.beginAutomaticTranscription()
         state.finishWithoutTranscript(
-            reason: .recognitionUnavailableOrEmpty,
+            reason: .emptyResult,
             generation: generation,
             currentTranscript: ""
         )
@@ -135,13 +135,13 @@ final class IOSReferenceTranscriptionReviewStateTests: XCTestCase {
             wavPath: "/private/app-group/voices/voice-ici-3.wav",
             transcript: "Reviewed transcript",
             transcriptLoadError: nil,
-            language: .english
+            referenceLanguage: .english
         )
 
         XCTAssertEqual(handoff.savedVoiceID, "voice-ici-3")
         XCTAssertEqual(handoff.wavPath, "/private/app-group/voices/voice-ici-3.wav")
         XCTAssertEqual(handoff.transcript, "Reviewed transcript")
         XCTAssertNil(handoff.transcriptLoadError)
-        XCTAssertEqual(handoff.language, .english)
+        XCTAssertEqual(handoff.referenceLanguage, .english)
     }
 }

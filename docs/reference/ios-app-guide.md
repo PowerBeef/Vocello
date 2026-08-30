@@ -1,11 +1,13 @@
 ---
 status: active
 owner: ios
-reviewed: 2026-08-29
+reviewed: 2026-08-30
 summary: Consolidated iPhone app map — every screen, element, and option from the user view, and how XCUITest drives each via stable identifiers on the paired physical device.
 sourceOfTruth:
   - Sources/iOS
   - Sources/iOSSupport/Services/IOSReferenceTranscriptionReviewState.swift
+  - Sources/SharedSupport/Services/VoiceClipTranscriber.swift
+  - Sources/QwenVoiceCore/GenerationSemantics.swift
   - Tests/VocelloiOSUITests/VocelloiOSUITestCase.swift
 ---
 # Vocello for iPhone — app guide + test-driving reference
@@ -90,7 +92,9 @@ selected emotion-bank persona's current delivery and opens the bank member sheet
 
 Clone reads the persistent `voiceCloning_consentAcknowledgment` preference from Settings. Generate
 remains unavailable until the user acknowledges consent there. The optional transcript selects
-transcript-backed conditioning; no transcript selects the separate audio-only x-vector path.
+transcript-backed conditioning; no transcript selects the separate audio-only x-vector path. The
+reference transcript's language describes the conditioning clip only. Auto output language always
+resolves from the script being synthesized; an explicit Studio language always wins.
 
 Studio lifecycle state is attempt-scoped. `StudioGenerationCoordinator.start` returns an opaque
 token that every single-take and long-form live or terminal callback must present. Delayed success,
@@ -147,10 +151,17 @@ clone reference through the Studio handoff). Studio Clone exposes the same perma
 pipeline directly through `referenceClip_importAudioFile`; it dismisses the custom reference panel
 before presenting Files and never creates a session-only reference. The enrollment sheet exposes
 `saveVoice_nameField`, `saveVoice_transcriptEditor`, `saveVoice_transcriptionStatus`,
-`saveVoice_useAudioOnlyButton`, and `saveVoice_saveButton`. A matching `.txt` sidecar is preferred;
+`saveVoice_referenceLanguagePicker`, `saveVoice_useAudioOnlyButton`, and `saveVoice_saveButton`. A
+matching `.txt` sidecar is preferred;
 otherwise `VoiceClipTranscriber` starts automatically on device, keeps Save disabled until the
 result is reviewable, and cannot replace a manual edit with a delayed result. If recognition cannot
-produce text, the user must enter text or explicitly choose Use audio only. Save prepares an opaque
+produce text, the user must enter text or explicitly choose Use audio only. A transcript whose
+language remains inconclusive also requires an explicit Reference language selection. The app
+persists typed, privacy-safe enrollment evidence (source, outcome, attempted locale order,
+availability/on-device support, scores, confidence, and an evidence digest) beside the saved voice;
+it stores no diagnostic transcript copy or raw Speech error. The reviewed transcript and reference
+language survive relaunch, while delayed recognition can never overwrite a sidecar or manual edit.
+Save prepares an opaque
 candidate that does not enter the catalog until any quality warning is explicitly kept. Cancel, Discard, and
 outside dismissal discard the candidate. A successful commit creates `voicesRow_saved_<id>` and
 hands the reference to Studio Clone. Each saved row exposes `voicesRowMenu_<id>` with
@@ -359,7 +370,10 @@ English or Chinese regardless of output language; describe the sound, not a pers
 
 **Auto** (detected from the script's Unicode ranges / `NLLanguageRecognizer`) or pinned to
 one of 10: English, Chinese, Japanese, Korean, German, French, Russian, Portuguese, Spanish,
-Italian. The instruction/brief language is independent of the spoken-text language.
+Italian. The instruction/brief language and saved-reference language are independent of the
+spoken-text language. Clone Auto uses target text, not the language of its reference transcript.
+Schema-2 generation receipts retain stored selection, detected target, reference transcript,
+final model language, think/no-think token mode, and conditioning mode separately.
 
 ### Cross-cutting
 

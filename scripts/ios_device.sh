@@ -30,6 +30,8 @@
 #                                                 # fixed-seed diagnostic cohort never publishes history
 #   scripts/ios_device.sh delivery-reliability --plan PLAN.json --script-file SCRIPT.txt
 #                                                 # governed Built-in Voice startup characterization
+#   scripts/ios_device.sh voice-reliability --plan PLAN.json --private-map MAP.json
+#                                                 # read-only Clone/transcription/French Design diagnosis
 #   scripts/ios_device.sh speech-assets           # resolve/install DE/ES/JA/ZH DictationTranscriber
 #   scripts/ios_device.sh enroll-clone-fixture --wav W.wav --transcript W.txt  # headless fixture voice enrollment
 #                                                 # assets and recheck Vocello's legacy Speech readiness
@@ -274,6 +276,18 @@ require_team() {
     || die "no signing team — set QWENVOICE_DEVELOPMENT_TEAM=<apple-team-id>, or install an 'Apple Development' certificate (Xcode → Settings → Accounts) so it can be auto-derived from the keychain"
 }
 
+development_identity_status() {
+  local team="$1"
+  python3 "$ROOT_DIR/scripts/lib/ios_signing_identity.py" check --team "$team"
+}
+
+require_development_identity() {
+  local team="$1" detail
+  if ! detail="$(development_identity_status "$team" 2>/dev/null)"; then
+    die "device signing unavailable — ${detail:-the Apple Development identity could not be inspected}"
+  fi
+}
+
 # Echo the NAME of the installed *development* provisioning profile (get-task-allow=true)
 # whose application-identifier == <team>.<BUNDLE_ID>. Empty if none. Lets manual signing
 # reuse an already-present profile with zero Apple-account round-trip.
@@ -431,6 +445,7 @@ PY
 }
 
 cmd_doctor() {
+  local rc=0
   note "Vocello iOS device doctor"
   command -v xcrun >/dev/null || die "xcrun not found (install Xcode)"
   printf '  xcode: %s\n' "$(xcodebuild -version 2>/dev/null | head -1)" >&2
@@ -439,8 +454,16 @@ cmd_doctor() {
   if team_d="$(derive_team 2>/dev/null)" && [[ -n "$team_d" ]]; then
     local src="keychain"; [[ -n "${QWENVOICE_DEVELOPMENT_TEAM:-}" ]] && src="env"
     printf '  team:  %s (%s)\n' "$team_d" "$src" >&2
+    local signing_detail
+    if signing_detail="$(development_identity_status "$team_d" 2>/dev/null)"; then
+      printf '  signing: OK (%s)\n' "$signing_detail" >&2
+    else
+      warn "signing: ✗ ${signing_detail:-Apple Development identity unavailable}"
+      rc=1
+    fi
   else
     warn "no signing team — set QWENVOICE_DEVELOPMENT_TEAM, or add an Apple Development cert (Xcode → Settings → Accounts)"
+    rc=1
   fi
   local dev; dev="$(resolve_device)"
   printf '  device: %s\n' "$dev" >&2
@@ -460,7 +483,7 @@ cmd_doctor() {
   else
     printf '  app:   not built yet (run: %s build)\n' "$0" >&2
   fi
-  note "doctor OK"
+  (( rc == 0 )) && note "doctor OK" || die "doctor found blocking prerequisites (see above)"
 }
 
 cmd_build() {
@@ -475,11 +498,12 @@ cmd_build() {
   esac
   [[ $# -eq 0 ]] || die "unknown build argument: $1"
   require_team
+  local team; team="$(derive_team)"
+  require_development_identity "$team"
   ensure_project_regenerated
   ensure_spm_resolved "$QVOICE_SCRATCH_PACKAGE_RESOLUTION" \
     "$QVOICE_XCODE_SOURCE_PACKAGES" ios-device VocelloiOS Release \
     'generic/platform=iOS'
-  local team; team="$(derive_team)"
   local dev; dev="$(resolve_device)"
   local producer="scripts/ios_device.sh build"
   (( diagnostics_build == 0 )) || producer+=" --device-diagnostics"
@@ -1426,6 +1450,186 @@ PY
   note "lang-bench PASS · $artifacts"
 }
 
+# voice-reliability --plan PLAN.json --private-map MAP.json
+# Runs the bounded 26-take VLR physical-device matrix plus a read-only automatic-
+# transcription reproduction against exact saved voices. The private map is never copied
+# into the run artifact; public evidence contains aliases and content digests only.
+cmd_voice_reliability() {
+  require_team
+  local plan="" private_map="" timeout="${QVOICE_IOS_VOICE_RELIABILITY_CELL_TIMEOUT:-420}"
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --plan) plan="${2:-}"; shift 2 ;;
+      --plan=*) plan="${1#*=}"; shift ;;
+      --private-map) private_map="${2:-}"; shift 2 ;;
+      --private-map=*) private_map="${1#*=}"; shift ;;
+      *) die "voice-reliability accepts only --plan PLAN.json and --private-map MAP.json" ;;
+    esac
+  done
+  [[ -f "$plan" ]] || die "voice-reliability requires a readable --plan"
+  [[ -f "$private_map" ]] || die "voice-reliability requires a readable --private-map"
+  [[ "$timeout" =~ ^[1-9][0-9]*$ ]] \
+    || die "QVOICE_IOS_VOICE_RELIABILITY_CELL_TIMEOUT must be a positive whole number"
+
+  python3 "$ROOT_DIR/scripts/voice_identity_language_reliability.py" \
+    validate-device-plan --plan "$plan" --private-map "$private_map" >/dev/null \
+    || die "voice-reliability plan or private alias map is invalid"
+
+  local run_id plan_digest take_count
+  run_id="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["runID"])' "$plan")"
+  plan_digest="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["planDigest"])' "$plan")"
+  take_count="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["takeCount"])' "$plan")"
+  local artifacts="$QVOICE_ARTIFACTS_IOS/voice-reliability/$run_id"
+  local dest="$artifacts/device-diagnostics"
+  local public_plan="$artifacts/device-plan.json"
+  mkdir -p "$artifacts"
+  [[ "$(cd "$(dirname "$plan")" && pwd)/$(basename "$plan")" == "$public_plan" ]] \
+    || cp "$plan" "$public_plan"
+
+  cmd_build --device-diagnostics
+  cmd_install >/dev/null
+  capture_benchmark_source "$artifacts"
+  rm -rf "$dest"
+
+  local transcription_run_id="${run_id}-transcription"
+  local transcription_spec dev env_json transcription_sentinel
+  transcription_spec="$(python3 - "$private_map" "$plan_digest" <<'PY'
+import json, sys
+value = json.load(open(sys.argv[1]))
+if value.get("planDigest") != sys.argv[2]:
+    raise SystemExit("private device map belongs to another plan")
+print(json.dumps({
+    "schemaVersion": 1,
+    "references": [
+        {"alias": row["alias"], "voiceID": row["voiceID"]}
+        for row in value["references"]
+    ],
+}, separators=(",", ":")))
+PY
+)" || die "could not assemble the private transcription diagnostic spec"
+  dev="$(resolve_device)"
+  export QVOICE_IOS_DEVICE_VOICE_RELIABILITY_TRANSCRIPTION_SPEC="$transcription_spec"
+  export QVOICE_IOS_DEVICE_RUN_ID="$transcription_run_id"
+  env_json="$(python3 -c '
+import json, os
+keys=("QVOICE_IOS_DEVICE_VOICE_RELIABILITY_TRANSCRIPTION_SPEC","QVOICE_IOS_DEVICE_RUN_ID")
+print(json.dumps({"QWENVOICE_DEBUG":"1", **{key:os.environ[key] for key in keys}}, separators=(",",":")))')"
+  xcrun devicectl device process launch --device "$dev" --terminate-existing \
+    -e "$env_json" "$BUNDLE_ID" >/dev/null \
+    || die "could not launch the typed transcription diagnostic"
+  unset QVOICE_IOS_DEVICE_VOICE_RELIABILITY_TRANSCRIPTION_SPEC QVOICE_IOS_DEVICE_RUN_ID
+
+  local waited=0
+  transcription_sentinel=""
+  while (( waited < timeout )); do
+    sleep 10
+    waited=$((waited + 10))
+    cmd_pull "$dest" >/dev/null 2>&1 || true
+    transcription_sentinel="$(find "$dest" -type f \
+      -path "*/${transcription_run_id}/voice-reliability-transcription-done.json" \
+      2>/dev/null | head -1)"
+    [[ -z "$transcription_sentinel" ]] || break
+  done
+  [[ -n "$transcription_sentinel" && -f "$transcription_sentinel" ]] \
+    || die "typed transcription diagnostic did not finish; evidence retained at $artifacts"
+
+  export QVOICE_IOS_DEVICE_DIAGNOSTICS_VERIFY_OUTPUT=1
+  local row_json row_count=0 row_fail=0
+  while IFS= read -r row_json; do
+    [[ -n "$row_json" ]] || continue
+    row_count=$((row_count + 1))
+    local take_id child_run_id mode text target_language language_selection seed variation
+    local reference_alias voice_id delivery brief spec sentinel wait_st
+    take_id="$(ROW="$row_json" python3 -c 'import json,os; print(json.loads(os.environ["ROW"])["takeID"])')"
+    child_run_id="$(ROW="$row_json" python3 -c 'import json,os; print(json.loads(os.environ["ROW"])["childRunID"])')"
+    mode="$(ROW="$row_json" python3 -c 'import json,os; print(json.loads(os.environ["ROW"])["mode"])')"
+    text="$(ROW="$row_json" python3 -c 'import json,os; print(json.loads(os.environ["ROW"])["script"], end="")')"
+    target_language="$(ROW="$row_json" python3 -c 'import json,os; print(json.loads(os.environ["ROW"])["targetLanguage"])')"
+    language_selection="$(ROW="$row_json" python3 -c 'import json,os; print(json.loads(os.environ["ROW"])["languageSelection"])')"
+    seed="$(ROW="$row_json" python3 -c 'import json,os; print(json.loads(os.environ["ROW"])["seed"])')"
+    variation="$(ROW="$row_json" python3 -c 'import json,os; print(json.loads(os.environ["ROW"])["variation"])')"
+    reference_alias="$(ROW="$row_json" python3 -c 'import json,os; print(json.loads(os.environ["ROW"]).get("referenceAlias") or "", end="")')"
+    delivery="$(ROW="$row_json" python3 -c 'import json,os; print(json.loads(os.environ["ROW"]).get("deliveryInstruction") or "", end="")')"
+    brief="$(python3 -c 'import json; print(json.load(open("config/voice-identity-language-reliability.json"))["voiceDesign"]["voiceBrief"], end="")')"
+
+    export QVOICE_LAUNCH_RUN_ID="$child_run_id"
+    export QVOICE_MAC_BENCH_CELL="$take_id"
+    export QVOICE_IOS_DEVICE_DIAGNOSTICS_SEED="$seed"
+    export QVOICE_IOS_DEVICE_DIAGNOSTICS_VARIATION="$variation"
+    if [[ "$language_selection" == "auto" ]]; then
+      unset QVOICE_IOS_DEVICE_DIAGNOSTICS_LANGUAGE
+    else
+      export QVOICE_IOS_DEVICE_DIAGNOSTICS_LANGUAGE="$target_language"
+    fi
+    if [[ "$mode" == "clone" ]]; then
+      voice_id="$(python3 - "$private_map" "$reference_alias" <<'PY'
+import json, sys
+for row in json.load(open(sys.argv[1]))["references"]:
+    if row["alias"] == sys.argv[2]:
+        print(row["voiceID"], end="")
+        break
+else:
+    raise SystemExit(1)
+PY
+)" || die "private device map does not contain $reference_alias"
+      export QVOICE_IOS_DEVICE_DIAGNOSTICS_CLONE_VOICE_ID="$voice_id"
+      unset QVOICE_IOS_DEVICE_DIAGNOSTICS_DESIGN_INSTRUCTION \
+        QVOICE_IOS_DEVICE_DIAGNOSTICS_DESIGN_DELIVERY
+    else
+      unset QVOICE_IOS_DEVICE_DIAGNOSTICS_CLONE_VOICE_ID
+      export QVOICE_IOS_DEVICE_DIAGNOSTICS_DESIGN_INSTRUCTION="$brief"
+      if [[ -n "$delivery" ]]; then
+        export QVOICE_IOS_DEVICE_DIAGNOSTICS_DESIGN_DELIVERY="$delivery"
+      else
+        unset QVOICE_IOS_DEVICE_DIAGNOSTICS_DESIGN_DELIVERY
+      fi
+    fi
+    spec="${mode}:speed:${text}"
+    note "voice-reliability take $row_count/$take_count: $take_id"
+    QWENVOICE_NATIVE_TELEMETRY_MODE=verbose cmd_launch "$spec" >/dev/null
+    set +e
+    sentinel="$({ wait_device_diagnostics_sentinel "$child_run_id" "$timeout" "$dest"; })"
+    wait_st=$?
+    set -e
+    if (( wait_st != 0 )) || [[ -z "$sentinel" || ! -f "$sentinel" ]]; then
+      row_fail=$((row_fail + 1))
+      warn "voice-reliability take failed before a terminal sentinel: $take_id"
+    fi
+  done < <(python3 - "$plan" <<'PY'
+import importlib.util, json, pathlib, sys
+repo = pathlib.Path.cwd()
+module_path = repo / "scripts/voice_identity_language_reliability.py"
+spec = importlib.util.spec_from_file_location("vlr", module_path)
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+contract = module.load_json(repo / "config/voice-identity-language-reliability.json")
+scripts = module.resolve_scripts(contract)
+for row in json.load(open(sys.argv[1]))["takes"]:
+    value = dict(row)
+    value["script"] = scripts[row["scriptID"]]["text"]
+    print(json.dumps(value, ensure_ascii=False))
+PY
+)
+  unset QVOICE_IOS_DEVICE_DIAGNOSTICS_VERIFY_OUTPUT QVOICE_LAUNCH_RUN_ID \
+    QVOICE_MAC_BENCH_CELL QVOICE_IOS_DEVICE_DIAGNOSTICS_SEED \
+    QVOICE_IOS_DEVICE_DIAGNOSTICS_VARIATION QVOICE_IOS_DEVICE_DIAGNOSTICS_LANGUAGE \
+    QVOICE_IOS_DEVICE_DIAGNOSTICS_CLONE_VOICE_ID \
+    QVOICE_IOS_DEVICE_DIAGNOSTICS_DESIGN_INSTRUCTION \
+    QVOICE_IOS_DEVICE_DIAGNOSTICS_DESIGN_DELIVERY
+
+  cmd_pull "$dest" >/dev/null 2>&1 || true
+  python3 "$ROOT_DIR/scripts/voice_identity_language_reliability.py" compose-device \
+    --plan "$public_plan" --diagnostics "$dest" \
+    --transcription "$transcription_sentinel" \
+    --output "$artifacts/voice-reliability-summary.json" \
+    | tee "$artifacts/composition.txt"
+  local compose_st="${PIPESTATUS[0]}"
+  if (( row_fail > 0 || compose_st != 0 )); then
+    die "voice-reliability FAIL · $artifacts"
+  fi
+  note "voice-reliability PASS · $artifacts"
+}
+
 cmd_bench() {
   require_team
   note "bench requires Built-in Voice (Speed) on device — confirm it in Settings → Model Downloads before generation"
@@ -2254,7 +2458,12 @@ PY
 
   local team; team="$(derive_team 2>/dev/null)"
   if [[ -n "$team" ]]; then
-    printf '  signing: OK team %s\n' "$team" >&2
+    local signing_detail
+    if signing_detail="$(development_identity_status "$team" 2>/dev/null)"; then
+      printf '  signing: OK team %s (%s)\n' "$team" "$signing_detail" >&2
+    else
+      warn "  signing: ✗ ${signing_detail:-Apple Development identity unavailable}"; rc=1
+    fi
   else
     warn "  signing: ✗ no team (set QWENVOICE_DEVELOPMENT_TEAM or add an Apple Development cert)"; rc=1
   fi
@@ -2409,6 +2618,10 @@ main() {
       require_build_free_space startup-reliability || die "iOS startup-reliability storage preflight failed"
       cmd_delivery_reliability "$@"
       ;;
+    voice-reliability)
+      require_build_free_space language-benchmark || die "iOS voice-reliability storage preflight failed"
+      cmd_voice_reliability "$@"
+      ;;
     speech-assets) cmd_speech_assets "$@" ;;
     enroll-clone-fixture) cmd_enroll_clone_fixture "$@" ;;
     crashes) cmd_crashes "$@" ;;
@@ -2431,7 +2644,7 @@ main() {
       ;;
     help|-h|--help)
       sed -n '2,/^$/p' "$0" | sed 's/^# \{0,1\}//' >&2 ;;
-    *) die "unknown subcommand '$sub' (try: doctor|build|install|launch|console|device-state|pull|bench|lang-bench|delivery-reliability|speech-assets|enroll-clone-fixture|crashes|debug|logs|profile|memory|clone-conditioning|memory-field-report|preflight|gate|help)" ;;
+    *) die "unknown subcommand '$sub' (try: doctor|build|install|launch|console|device-state|pull|bench|lang-bench|delivery-reliability|voice-reliability|speech-assets|enroll-clone-fixture|crashes|debug|logs|profile|memory|clone-conditioning|memory-field-report|preflight|gate|help)" ;;
   esac
 }
 

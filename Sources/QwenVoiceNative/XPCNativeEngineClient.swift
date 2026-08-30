@@ -901,6 +901,28 @@ public final class XPCNativeEngineClient: MacTTSEngine, @unchecked Sendable {
         return candidate
     }
 
+    public func preparePreparedVoiceCandidate(
+        name: String,
+        audioPath: String,
+        transcript: String?,
+        replacingVoiceID: String?,
+        enrollmentMetadata: PreparedVoiceEnrollmentMetadata?
+    ) async throws -> PreparedVoiceCandidate {
+        let reply = try await coordinator.send(
+            .preparePreparedVoiceCandidateV2(
+                name: name,
+                audioPath: audioPath,
+                transcript: transcript,
+                enrollmentMetadata: enrollmentMetadata,
+                replacingVoiceID: replacingVoiceID
+            )
+        )
+        guard case .preparedVoiceCandidate(let candidate) = reply else {
+            throw EngineTransportError.invalidReply
+        }
+        return candidate
+    }
+
     public func commitPreparedVoiceCandidate(id: UUID) async throws -> PreparedVoice {
         let reply = try await coordinator.send(.commitPreparedVoiceCandidate(id: id))
         guard case .preparedVoice(let voice) = reply else {
@@ -991,6 +1013,8 @@ private extension EngineCommand {
             "listPreparedVoices"
         case .preparePreparedVoiceCandidate:
             "preparePreparedVoiceCandidate"
+        case .preparePreparedVoiceCandidateV2:
+            "preparePreparedVoiceCandidateV2"
         case .commitPreparedVoiceCandidate:
             "commitPreparedVoiceCandidate"
         case .discardPreparedVoiceCandidate:
@@ -1017,6 +1041,7 @@ private extension EngineCommand {
             .seconds(180)
         case .ping, .cancelClonePreparationIfNeeded, .cancelActiveGeneration,
              .listPreparedVoices, .preparePreparedVoiceCandidate,
+             .preparePreparedVoiceCandidateV2,
              .commitPreparedVoiceCandidate, .discardPreparedVoiceCandidate,
              .enrollPreparedVoice, .deletePreparedVoice,
              .clearGenerationActivity, .clearVisibleError, .shutdownWhenIdle:

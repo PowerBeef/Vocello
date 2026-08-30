@@ -6,6 +6,7 @@ struct PendingVoiceCloningHandoff: Equatable {
     let wavPath: String
     let transcript: String
     let transcriptLoadError: String?
-    /// Detected reference language (record→enroll flow); `.auto` for an existing saved voice.
-    var language: Qwen3SupportedLanguage = .auto
+    /// Language spoken by the saved reference. This is conditioning metadata
+    /// and is deliberately independent from the Clone draft's output language.
+    var referenceLanguage: Qwen3SupportedLanguage = .auto
 }

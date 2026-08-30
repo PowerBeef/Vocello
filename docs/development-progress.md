@@ -47,7 +47,47 @@ machine-readable status record and wins over any older prose.
 | 13 — Benchmark/history v3 | Live 2026-07-29: the first schema-v3 records are committed (three clean `phase0-cli-control-*` engine records plus one exploratory run that also exposed and fixed the summarizer's v3 pin). `benchmarks/schema-v3.json` adds the typed quality identity to generation takes (pass/warning only, five fast gates required, machine-code issues); v1/v2 records stay valid immutable history; the publisher stamps v3 only when every take carries the identity. The UI benchmark checkers folded the same identity 2026-08-01: ui-generation records now publish v3 (first: the focused `v3-fold-proof` record `macos-xcui-benchmark-20260801-003208-403989cf`); the canonical iOS matrix published its first v3 record 2026-08-01 (`ios-xcui-benchmark-20260801-132415-abbec96b`). |
 | 14 — Organization and retirement | Closed 2026-07-23 (14a + 14b): compatibility SPI retired, actor-owned loading/metadata/priming/clone artifacts, clone conditioning epoch-bound end to end. |
 
-## Resume here (2026-08-29)
+## Resume here (2026-08-30)
+
+**Voice identity/language reliability is instrumented; private live characterization remains the
+next evidence boundary.** VLR-02 and VLR-04 are implemented. Clone Auto previously allowed the
+reference transcript to determine the generated-output language; shared `GenerationSemantics` now
+resolves Auto from normalized target text, while an explicit Studio/CLI language always wins.
+Reference language is persisted only as saved-conditioning metadata. Both iOS and macOS/XPC preserve
+legacy saved voices and commands, and the enrollment sheet now requires separate reference-language
+confirmation when transcript detection is inconclusive.
+
+Generation request receipt schema 2 is assembled from the exact native actor request rather than
+reconstructed from UI input. It retains stored/detected/reference/final languages, think/no-think,
+conditioning mode, normalized target/reference/audio identities, full Design/delivery instruction,
+model/tokenizer, seed/variation, retry, and warm/cold identity. `VoiceClipTranscriber` now emits a
+typed privacy-safe enrollment outcome with authorization, ordered locale attempts, availability,
+on-device support, timeout/error/empty/low-confidence distinctions, scores, confidence, and final
+source. Sidecar/manual text remains authoritative; in particular, the manually reviewed transcript
+already entered for the second private reference is treated as transcript-backed and cannot be
+overwritten by delayed recognition.
+
+The operator-local VLR harness freezes a 734-row serial Mac/CLI matrix across private aliases,
+clean French/English controls, transcript arms, Auto/explicit languages, fixed seeds, variation,
+current fp16, and optional exact archived fp32. It refuses missing artifacts and retains failures
+without retries. A separate 26-row physical-iPhone diagnostic reads the two existing saved voices,
+runs the real transcriber without persisting its output, and checks Clone language ownership plus
+French Design Neutral/no-delivery/Calm arms with schema-2 receipt and locale-locked ASR parity. The
+generic iPhoneOS app/logic build, focused Swift suites, shell syntax, runtime-security contract, and
+seven host fixtures pass. VLR-01/VLR-03/VLR-07 still require the untracked private bundle, Mac/CLI
+model execution, and two consecutive no-retry phone passes. First-reference pitch/fidelity, the
+second reference's original Speech failure, tokenizer causality, and French Design prompt causality
+therefore remain unlocalized. No tokenizer, model pin, prompt, sampling default, QC threshold, saved voice,
+transcript, model installation, or History entry has been changed on their behalf.
+
+The first source-bound physical-device attempt on 2026-08-30 stopped before installation or data
+access: the login Keychain's Apple Development certificate expired that day and no valid
+development identity remained, although Developer ID and Apple Distribution identities were still
+valid. This is a host signing prerequisite, not product evidence. Device preflight now validates
+the development certificate/private-key identity and reports expiration, missing key, team
+mismatch, or absence before package resolution. The untracked 26-row plan remains unexecuted and
+must be regenerated against the eventual exact source identity after the signing prerequisite is
+repaired; no private reference, transcript, model, draft, or History state was read or changed.
 
 **The causal control-audit remediations now have corrected-source device evidence.** Accessibility
 run `ios-xcui-control-audit-20260829-174031-cae15a02` passed Default, AX-L, AX-XXXL,

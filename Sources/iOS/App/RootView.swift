@@ -114,14 +114,14 @@ struct RootView: View {
         }
         .fullScreenCover(isPresented: $appModel.isCloneReferenceRecorderPresented) {
             IOSRecordVoiceSheet(
-                onEnrolled: { voice, transcript, language in
+                onEnrolled: { voice, transcript, referenceLanguage in
                     appModel.isCloneReferenceRecorderPresented = false
                     appModel.pendingVoiceCloningHandoff = PendingVoiceCloningHandoff(
                         savedVoiceID: voice.id,
                         wavPath: voice.wavPath,
                         transcript: transcript,
                         transcriptLoadError: nil,
-                        language: language
+                        referenceLanguage: referenceLanguage
                     )
                     appModel.studioMode = .clone
                 },
@@ -133,14 +133,14 @@ struct RootView: View {
         .fullScreenCover(item: $importedVoicePresentation) { presentation in
             IOSRecordVoiceSheet(
                 importedReference: presentation.reference,
-                onEnrolled: { voice, transcript, language in
+                onEnrolled: { voice, transcript, referenceLanguage in
                     importedVoicePresentation = nil
                     appModel.pendingVoiceCloningHandoff = PendingVoiceCloningHandoff(
                         savedVoiceID: voice.id,
                         wavPath: voice.wavPath,
                         transcript: transcript,
                         transcriptLoadError: nil,
-                        language: language
+                        referenceLanguage: referenceLanguage
                     )
                     appModel.studioMode = .clone
                     appModel.tab = .studio

@@ -114,6 +114,16 @@ class SavedVoiceLifecycleContractTests(unittest.TestCase):
         with self.assertRaisesRegex(saved_voice_lifecycle_contract.ContractError, "transcription review enrollment"):
             saved_voice_lifecycle_contract.validate(self.root)
 
+    def test_missing_typed_transcription_evidence_fails(self) -> None:
+        path = self.root / "Sources/iOS/Voices/IOSRecordVoiceSheet.swift"
+        text = path.read_text(encoding="utf-8").replace(
+            "VoiceClipTranscriber.enrollmentResult(url: url)",
+            "VoiceClipTranscriber.transcribe(url: url)",
+        )
+        path.write_text(text, encoding="utf-8")
+        with self.assertRaisesRegex(saved_voice_lifecycle_contract.ContractError, "transcription review enrollment"):
+            saved_voice_lifecycle_contract.validate(self.root)
+
 
 if __name__ == "__main__":
     unittest.main()

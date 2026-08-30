@@ -136,6 +136,15 @@
       "adopted": "2026-08-28",
       "goal": "Source-bind every production iOS interactive control to explicit physical-device XCUITest ownership, exercise every safe option and state, cover all generation dimensions with an immutable all-pairs matrix, distinguish product/harness/infrastructure/preservation outcomes, and restore user and canonical model state without Simulator, hidden UI, coordinate automation, retries, or unrelated-data mutation.",
       "authority": "docs/reference/ios-on-device-control-audit-2026-08-28.md"
+    },
+    {
+      "id": "voice-identity-language-reliability-2026-08",
+      "title": "Clone identity, enrollment transcription, and French Voice Design reliability",
+      "status": "active",
+      "owner": "backend-and-platform",
+      "adopted": "2026-08-30",
+      "goal": "Causally localize the reported saved-reference pitch/fidelity variance, typed enrollment-transcription failure, and French Voice Design regression with source-bound private diagnostics; separate target language from reference metadata; and apply only tokenizer, reference-quality, or prompt remediation proven by fixed-seed evidence without weakening QC or exposing personal audio and transcript data.",
+      "authority": "docs/reference/delivery-harness.md"
     }
   ],
   "items": [
@@ -2568,6 +2577,116 @@
       ],
       "updated": "2026-08-29",
       "notes": "After the forced-size/XCTest conflict was removed, successive source-bound runs independently exposed fixed mode text, an AX-L intrinsic-width overflow, partially adjustable dock labels, a fixed Generate title, clipped composer metadata, a fixed UIKit editor description, low-contrast setup-chip abbreviations, and disabled-CTA contrast/semantics. Native semantic styles, an accessibility-only 2-by-2 dock, a two-line metadata row, accessibility-labelled UIFontMetrics editor, primary setup-chip text, and a semantically disabled CTA resolved each first divergence while preserving ordinary layout. Accessibility sizes reflow Built-in, Design, and Clone into three full-width 44-point rows within a 136-point rail, and Studio reserves the taller dock's clearance. Corrected-source run ios-xcui-control-audit-20260829-174031-cae15a02 passed Default, AX-L, AX-XXXL, pseudo-AX-XXXL, and the separate unforced unfiltered XCTest audit without retry."
+    },
+    {
+      "id": "VLR-01",
+      "plan": "voice-identity-language-reliability-2026-08",
+      "title": "Preserve and characterize private references and clean controls",
+      "status": "planned",
+      "gate": "Create one untracked content-addressed bundle containing read-only copies of the two maintainer references, the already reviewed manual transcript for the second reference, any reviewed transcript for the first, saved reference-language metadata, immutable runtime identities, and clean French/English transcript-backed controls. Characterize PCM integrity, silence, clipping, noise, pitch register/range, cadence, voicing, roughness, transcript/audio alignment, and warnings using stable aliases only; no name, text, path, or audio may enter tracked evidence.",
+      "sourceOfTruth": [
+        "config/voice-identity-language-reliability.json",
+        "scripts/voice_identity_language_reliability.py"
+      ],
+      "updated": "2026-08-30",
+      "notes": "The source-bound bundle builder, immutable identity checks, private/public split, and redaction fixtures are implemented. Closure still requires the operator-local reference copies and clean controls; the manually entered second-reference transcript is explicitly treated as reviewed transcript-backed conditioning and will never be overwritten."
+    },
+    {
+      "id": "VLR-02",
+      "plan": "voice-identity-language-reliability-2026-08",
+      "title": "Record truthful model input and typed enrollment-transcription evidence",
+      "status": "done",
+      "gate": "A backward-compatible request receipt must be built from the fully assembled model request and distinguish stored UI selection, detected target language, reference transcript language, final model language, language-token mode, conditioning mode, target/reference/audio digests, complete instruction identity, tokenizer/model identity, seed, variation, retry, and warm state. Enrollment must retain permission, locale order, availability, on-device support, timeout/error/empty/low-confidence state, score/confidence, and final transcript source without storing text, paths, or raw errors.",
+      "evidence": [
+        "file:Sources/QwenVoiceCore/GenerationStartupDiagnostics.swift",
+        "file:Sources/SharedSupport/Services/VoiceClipTranscriber.swift",
+        "file:Tests/VocelloCoreTests/GenerationStartupDiagnosticsTests.swift",
+        "file:Tests/VocelloCoreTests/VoiceClipEnrollmentEvidenceTests.swift"
+      ],
+      "sourceOfTruth": [
+        "Sources/QwenVoiceCore/GenerationStartupDiagnostics.swift",
+        "Sources/SharedSupport/Services/VoiceClipTranscriber.swift",
+        "Sources/QwenVoiceCore/PreparedVoiceRepository.swift"
+      ],
+      "updated": "2026-08-30",
+      "notes": "Receipt schema 2 preserves schema-1 decoding and is emitted by app, CLI, telemetry, and physical-device diagnostics from the assembled actor request. Enrollment metadata persists transactionally beside the saved reference, preserves manual and sidecar authority, and crosses the macOS XPC wire through a versioned command while legacy commands remain decodable."
+    },
+    {
+      "id": "VLR-03",
+      "plan": "voice-identity-language-reliability-2026-08",
+      "title": "Complete Clone, tokenizer, transcription, and French Voice Design matrices",
+      "status": "in-flight",
+      "gate": "Run the source-bound serial matrix with eight frozen seeds per core cell across both private references and clean controls, reviewed/corrected/audio-only transcript arms, Auto/explicit and French/English scripts, current fp16 and archived fp32 tokenizer identities when available, Consistent plus Expressive sentinels, and cold/warm sentinels. Run French Design short/medium/long across Auto/explicit, Neutral/no-delivery/non-neutral, tokenizer, seed, and variation arms. Retain every failed row without retry or replacement and require exact schema-2 receipts.",
+      "sourceOfTruth": [
+        "config/voice-identity-language-reliability.json",
+        "scripts/voice_identity_language_reliability.py",
+        "scripts/ios_device.sh"
+      ],
+      "evidence": [
+        "file:scripts/tests/test_voice_identity_language_reliability.py"
+      ],
+      "updated": "2026-08-30",
+      "notes": "The Mac/CLI plan currently contains 734 immutable serial rows and fails closed when the optional archived fp32 runtime is unavailable rather than substituting an artifact. The focused device plan contains 26 current-fp16 read-only rows and a typed transcription probe. The first live attempt on 2026-08-30 stopped before app installation or private-data access because the local Apple Development certificate had expired and no valid development identity/private key remained; the corrected preflight now reports this prerequisite before package resolution. Live private-reference, model, ASR, and physical-device execution remain pending."
+    },
+    {
+      "id": "VLR-04",
+      "plan": "voice-identity-language-reliability-2026-08",
+      "title": "Correct Clone target/reference language ownership",
+      "status": "done",
+      "gate": "For Clone Auto requests, model-facing output language must resolve from normalized target text and never from the reference transcript; an explicit output language must always win. Reference language persists as conditioning metadata only, legacy saved voices remain decodable, macOS/iOS request construction must not relabel output, and receipt tests must prove the exact stored, detected, reference, and final values.",
+      "evidence": [
+        "file:Sources/QwenVoiceCore/GenerationSemantics.swift",
+        "file:Tests/VocelloCoreTests/GenerationSemanticsLanguageTests.swift",
+        "file:Sources/iOS/Voices/IOSRecordVoiceSheet.swift"
+      ],
+      "sourceOfTruth": [
+        "Sources/QwenVoiceCore/GenerationSemantics.swift",
+        "Sources/QwenVoiceCore/GenerationStartupDiagnostics.swift"
+      ],
+      "updated": "2026-08-30",
+      "notes": "The semantic ownership defect is fixed at the shared engine boundary and both UI surfaces stopped preselecting generated-output language from enrollment metadata. VLR-07 still requires physical-device confirmation; it does not reopen this source-level ownership gate unless the receipt diverges from the model input."
+    },
+    {
+      "id": "VLR-05",
+      "plan": "voice-identity-language-reliability-2026-08",
+      "title": "Apply only the proven tokenizer or reference-quality remediation",
+      "status": "planned",
+      "gate": "If fixed-seed evidence localizes the divergence to reference/transcript quality, add actionable enrollment warnings with explicit review and no silent rewrite or identity-normalizing regeneration. If it localizes to fp16 tokenizer precision, isolate encoder/decoder sensitivity where practical and ship only the smallest qualifying immutable artifact with receipt, memory, catalog, and promotion evidence; otherwise retain current artifacts and classify the result as inconclusive.",
+      "sourceOfTruth": [
+        "Sources/QwenVoiceCore/PreparedVoiceRepository.swift",
+        "Sources/QwenVoiceCore/MLXTTSEngine.swift",
+        "Sources/Resources/qwenvoice_production_model_catalog.json"
+      ],
+      "updated": "2026-08-30",
+      "notes": "No tokenizer artifact, model pin, QC threshold, sampling default, or reference audio has changed. The current and archived tokenizer identities are frozen only as diagnostic arms."
+    },
+    {
+      "id": "VLR-06",
+      "plan": "voice-identity-language-reliability-2026-08",
+      "title": "Apply only the proven French Voice Design remediation",
+      "status": "planned",
+      "gate": "Use target-language, prompt-arm, tokenizer, seed, and variation evidence to localize French Design. A pure Auto-language ownership defect may be corrected directly; any Neutral omission/replacement or localized non-neutral prompt remains experimental under DP-31/DP-32 until blinded semantic promotion authority passes. Preserve production copy when no reproducible first divergence exists.",
+      "sourceOfTruth": [
+        "Sources/QwenVoiceCore/GenerationSemantics.swift",
+        "config/delivery-experiment-contract.json",
+        "scripts/voice_identity_language_reliability.py"
+      ],
+      "updated": "2026-08-30",
+      "notes": "Design Auto already resolves once from target text and schema-2 receipts expose that exact decision. No production Voice Design prompt or delivery copy has changed; DP-31 and DP-32 retain promotion authority."
+    },
+    {
+      "id": "VLR-07",
+      "plan": "voice-identity-language-reliability-2026-08",
+      "title": "Complete physical-device closure and publish the privacy-safe report",
+      "status": "planned",
+      "gate": "After Mac/CLI localization, complete two consecutive no-retry focused physical-iPhone passes using the private alias map and exact current source. Require typed transcription classification, correct short/medium/long French output, exact receipt parity, zero new hard QC failures, WER/CER delta <= 0.01, speaker-similarity delta >= -0.02, governed Clone prosody fidelity or explicit reference rejection, and green Built-in/English Design/enrollment/Clone controls. Publish only a digest-pinned privacy-safe historical report; keep audio, text, names, paths, raw diagnostics, and device evidence untracked.",
+      "sourceOfTruth": [
+        "scripts/ios_device.sh",
+        "scripts/voice_identity_language_reliability.py",
+        "docs/reference/delivery-harness.md"
+      ],
+      "updated": "2026-08-30",
+      "notes": "The physical-device command is implemented as an extension of the existing gated diagnostics runner, not a second UI driver. It does not mutate the saved-voice catalog, transcripts, model installation, drafts, or History and it never retries a failed row. The 2026-08-30 attempt was blocked before installation by an expired local Apple Development certificate; after a valid identity is restored, regenerate the source-bound private plan and begin the two distinct no-retry runs. Live closure and the historical report remain pending."
     }
   ]
 }

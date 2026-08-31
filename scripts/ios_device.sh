@@ -30,8 +30,10 @@
 #                                                 # fixed-seed diagnostic cohort never publishes history
 #   scripts/ios_device.sh delivery-reliability --plan PLAN.json --script-file SCRIPT.txt
 #                                                 # governed Built-in Voice startup characterization
-#   scripts/ios_device.sh voice-reliability --plan PLAN.json --private-map MAP.json
+#   scripts/ios_device.sh voice-reliability --plan PLAN.json --private-map MAP.json [--resume]
 #                                                 # read-only Clone/transcription/French Design diagnosis
+#   scripts/ios_device.sh voice-reliability-export --plan PLAN.json --evidence SUMMARY.json --output DIR
+#                                                 # digest-filtered private reference export + alias map
 #   scripts/ios_device.sh speech-assets           # resolve/install DE/ES/JA/ZH DictationTranscriber
 #   scripts/ios_device.sh enroll-clone-fixture --wav W.wav --transcript W.txt  # headless fixture voice enrollment
 #                                                 # assets and recheck Vocello's legacy Speech readiness
@@ -865,7 +867,7 @@ wait_device_diagnostics_sentinel() {
   while (( waited < timeout )); do
     sleep 10
     waited=$((waited + 10))
-    cmd_pull "$dest" >/dev/null 2>&1 || true
+    pull_device_diagnostics_run "$run_id" "$dest" >/dev/null 2>&1 || true
     # Require RUN_ID to be the sentinel's immediate parent. Profile artifacts
     # also contain RUN_ID higher in their path, so a broad */RUN_ID/* match can
     # otherwise select an unrelated historical sentinel from the pulled tree.
@@ -1002,8 +1004,10 @@ PY
 # Poll the terminal record written last by IOSStartupReliabilityRunner. A typed
 # harness-failure marker stops the poll, but never substitutes for a represented
 # per-take result.
-pull_startup_reliability_run() {
+pull_device_diagnostics_run() {
   local run_id="$1" destination="$2"
+  [[ "$run_id" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,191}$ ]] \
+    || die "diagnostic run ID is not safe for a device-container path"
   local dev; dev="$(resolve_device)"
   local run_destination="$destination/$run_id"
   mkdir -p "$run_destination"
@@ -1011,6 +1015,10 @@ pull_startup_reliability_run() {
     --domain-type appDataContainer --domain-identifier "$BUNDLE_ID" \
     --source "Library/Caches/Vocello/diagnostics/$run_id" \
     --destination "$run_destination" --timeout 60 --quiet
+}
+
+pull_startup_reliability_run() {
+  pull_device_diagnostics_run "$@"
 }
 
 # After host validation succeeds, relaunch the diagnostics build with a
@@ -1450,26 +1458,189 @@ PY
   note "lang-bench PASS · $artifacts"
 }
 
+# voice-reliability-export --plan PLAN.json --evidence SUMMARY.json --output DIR
+# Recovers only the exact saved references already bound by prior digest evidence. The private
+# audio/transcript bytes and voice IDs stay below the explicitly untracked output directory.
+cmd_voice_reliability_export() {
+  require_team
+  local plan="" evidence="" output="" timeout="${QVOICE_IOS_VOICE_RELIABILITY_EXPORT_TIMEOUT:-180}"
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --plan) plan="${2:-}"; shift 2 ;;
+      --plan=*) plan="${1#*=}"; shift ;;
+      --evidence) evidence="${2:-}"; shift 2 ;;
+      --evidence=*) evidence="${1#*=}"; shift ;;
+      --output) output="${2:-}"; shift 2 ;;
+      --output=*) output="${1#*=}"; shift ;;
+      *) die "voice-reliability-export accepts --plan, --evidence, and --output" ;;
+    esac
+  done
+  [[ -f "$plan" ]] || die "voice-reliability-export requires a readable --plan"
+  [[ -f "$evidence" ]] || die "voice-reliability-export requires readable prior --evidence"
+  [[ -n "$output" ]] || die "voice-reliability-export requires --output DIR"
+  [[ "$timeout" =~ ^[1-9][0-9]*$ ]] \
+    || die "QVOICE_IOS_VOICE_RELIABILITY_EXPORT_TIMEOUT must be a positive whole number"
+  [[ ! -e "$output" ]] || die "voice-reliability-export output already exists"
+
+  python3 "$ROOT_DIR/scripts/voice_identity_language_reliability.py" \
+    validate-device-plan --plan "$plan" >/dev/null \
+    || die "voice-reliability-export plan is invalid"
+
+  local run_id plan_digest export_run_id cleanup_run_id export_spec
+  run_id="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["runID"])' "$plan")"
+  plan_digest="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["planDigest"])' "$plan")"
+  export_run_id="${run_id}-private-export"
+  cleanup_run_id="${export_run_id}-cleanup"
+  export_spec="$(python3 - "$evidence" <<'PY'
+import json, re, sys
+summary = json.load(open(sys.argv[1]))
+expected = {"user-reference-a", "user-reference-b"}
+rows = summary.get("transcription")
+if not isinstance(rows, list):
+    raise SystemExit("prior evidence has no transcription identity rows")
+selected = []
+for row in rows:
+    if not isinstance(row, dict) or row.get("alias") not in expected:
+        continue
+    digest = row.get("referenceAudioDigest")
+    if row.get("found") is not True or not isinstance(digest, str) or not re.fullmatch(r"[0-9a-f]{64}", digest):
+        raise SystemExit(f"{row.get('alias')}: prior reference digest is unavailable")
+    selected.append({"alias": row["alias"], "audioSHA256": digest})
+if {row["alias"] for row in selected} != expected or len(selected) != 2:
+    raise SystemExit("prior evidence must bind both private reference aliases exactly once")
+print(json.dumps({"schemaVersion": 1, "references": sorted(selected, key=lambda row: row["alias"])}, separators=(",", ":")))
+PY
+)" || die "could not derive the digest-filtered export specification"
+
+  mkdir -p "$output"
+  local dest="$output/pulled" dev env_json sentinel waited=0
+  cmd_build --device-diagnostics
+  cmd_install >/dev/null
+  dev="$(resolve_device)"
+  export QVOICE_IOS_DEVICE_VOICE_RELIABILITY_EXPORT_SPEC="$export_spec"
+  export QVOICE_IOS_DEVICE_RUN_ID="$export_run_id"
+  env_json="$(python3 -c '
+import json, os
+keys=("QVOICE_IOS_DEVICE_VOICE_RELIABILITY_EXPORT_SPEC", "QVOICE_IOS_DEVICE_RUN_ID")
+print(json.dumps({"QWENVOICE_DEBUG":"1", **{key:os.environ[key] for key in keys}}, separators=(",",":")))')"
+  xcrun devicectl device process launch --device "$dev" --terminate-existing \
+    -e "$env_json" "$BUNDLE_ID" >/dev/null \
+    || die "could not launch the digest-filtered private export"
+  unset QVOICE_IOS_DEVICE_VOICE_RELIABILITY_EXPORT_SPEC QVOICE_IOS_DEVICE_RUN_ID
+
+  sentinel=""
+  while (( waited < timeout )); do
+    sleep 5
+    waited=$((waited + 5))
+    pull_device_diagnostics_run "$export_run_id" "$dest" >/dev/null 2>&1 || true
+    sentinel="$dest/$export_run_id/voice-reliability-private-export-done.json"
+    [[ -f "$sentinel" ]] || sentinel=""
+    [[ -z "$sentinel" ]] || break
+  done
+  [[ -n "$sentinel" && -f "$sentinel" ]] \
+    || die "digest-filtered private export did not finish; evidence retained at $output"
+
+  python3 - "$plan" "$plan_digest" "$sentinel" "$output" <<'PY' \
+    || die "digest-filtered private export failed validation; evidence retained at $output"
+import hashlib, json, pathlib, re, sys
+plan_path, plan_digest, sentinel_path, output_path = map(pathlib.Path, (sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]))
+plan_digest = str(plan_digest)
+record = json.load(open(sentinel_path))
+if record.get("schemaVersion") != 1 or record.get("status") != "pass":
+    raise SystemExit("private export did not pass")
+rows = record.get("references")
+if not isinstance(rows, list) or {row.get("alias") for row in rows} != {"user-reference-a", "user-reference-b"}:
+    raise SystemExit("private export aliases are incomplete")
+sentinel_dir = pathlib.Path(sentinel_path).parent
+private_rows = []
+for row in rows:
+    alias = row.get("alias")
+    voice_id = row.get("voiceID")
+    digest = row.get("referenceAudioDigest")
+    relative = row.get("audioRelativePath")
+    if not isinstance(voice_id, str) or not voice_id.strip() or not isinstance(relative, str):
+        raise SystemExit(f"{alias}: private identity is incomplete")
+    source = sentinel_dir / relative
+    if not source.is_file() or hashlib.sha256(source.read_bytes()).hexdigest() != digest:
+        raise SystemExit(f"{alias}: exported audio digest mismatch")
+    transcript_relative = row.get("transcriptRelativePath")
+    transcript_digest = row.get("transcriptDigest")
+    if transcript_relative is not None:
+        transcript = sentinel_dir / transcript_relative
+        if not transcript.is_file():
+            raise SystemExit(f"{alias}: exported transcript is missing")
+        text = transcript.read_text(encoding="utf-8").strip()
+        if hashlib.sha256(text.encode("utf-8")).hexdigest() != transcript_digest:
+            raise SystemExit(f"{alias}: exported transcript digest mismatch")
+    private_rows.append({"alias": alias, "voiceID": voice_id})
+body = {
+    "schemaVersion": 1,
+    "planDigest": plan_digest,
+    "references": sorted(private_rows, key=lambda row: row["alias"]),
+}
+destination = output_path / "private-map.json"
+temporary = destination.with_suffix(".json.tmp")
+temporary.write_text(json.dumps(body, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+temporary.replace(destination)
+PY
+
+  export QVOICE_IOS_DEVICE_VOICE_RELIABILITY_EXPORT_CLEANUP_RUN_ID="$export_run_id"
+  export QVOICE_IOS_DEVICE_RUN_ID="$cleanup_run_id"
+  env_json="$(python3 -c '
+import json, os
+keys=("QVOICE_IOS_DEVICE_VOICE_RELIABILITY_EXPORT_CLEANUP_RUN_ID", "QVOICE_IOS_DEVICE_RUN_ID")
+print(json.dumps({"QWENVOICE_DEBUG":"1", **{key:os.environ[key] for key in keys}}, separators=(",",":")))')"
+  xcrun devicectl device process launch --device "$dev" --terminate-existing \
+    -e "$env_json" "$BUNDLE_ID" >/dev/null \
+    || die "private export was collected but device-side cleanup could not launch"
+  unset QVOICE_IOS_DEVICE_VOICE_RELIABILITY_EXPORT_CLEANUP_RUN_ID QVOICE_IOS_DEVICE_RUN_ID
+
+  waited=0
+  local cleanup_sentinel="" cleanup_dest="$output/cleanup-proof"
+  while (( waited < 60 )); do
+    sleep 5
+    waited=$((waited + 5))
+    pull_device_diagnostics_run "$cleanup_run_id" "$cleanup_dest" >/dev/null 2>&1 || true
+    cleanup_sentinel="$cleanup_dest/$cleanup_run_id/voice-reliability-private-export-cleanup-done.json"
+    [[ -f "$cleanup_sentinel" ]] || cleanup_sentinel=""
+    [[ -z "$cleanup_sentinel" ]] || break
+  done
+  [[ -n "$cleanup_sentinel" && -f "$cleanup_sentinel" ]] \
+    || die "private export was collected but cleanup proof is unavailable"
+  python3 - "$cleanup_sentinel" <<'PY' \
+    || die "private export was collected but device-side cleanup failed"
+import json, sys
+record = json.load(open(sys.argv[1]))
+raise SystemExit(0 if record.get("status") == "pass" else 1)
+PY
+  note "voice-reliability private export PASS · $output"
+}
+
 # voice-reliability --plan PLAN.json --private-map MAP.json
-# Runs the bounded 26-take VLR physical-device matrix plus a read-only automatic-
+# Runs one governed VLR physical-device matrix plus a read-only automatic-
 # transcription reproduction against exact saved voices. The private map is never copied
-# into the run artifact; public evidence contains aliases and content digests only.
+# into the run artifact; public evidence contains aliases and content digests only. Resume
+# skips every previously launched row, including failed or sentinel-less attempts.
 cmd_voice_reliability() {
   require_team
-  local plan="" private_map="" timeout="${QVOICE_IOS_VOICE_RELIABILITY_CELL_TIMEOUT:-420}"
+  local plan="" private_map="" resume=0 timeout="${QVOICE_IOS_VOICE_RELIABILITY_CELL_TIMEOUT:-420}"
+  local transcription_timeout="${QVOICE_IOS_VOICE_RELIABILITY_TRANSCRIPTION_TIMEOUT:-900}"
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --plan) plan="${2:-}"; shift 2 ;;
       --plan=*) plan="${1#*=}"; shift ;;
       --private-map) private_map="${2:-}"; shift 2 ;;
       --private-map=*) private_map="${1#*=}"; shift ;;
-      *) die "voice-reliability accepts only --plan PLAN.json and --private-map MAP.json" ;;
+      --resume) resume=1; shift ;;
+      *) die "voice-reliability accepts --plan PLAN.json, --private-map MAP.json, and --resume" ;;
     esac
   done
   [[ -f "$plan" ]] || die "voice-reliability requires a readable --plan"
   [[ -f "$private_map" ]] || die "voice-reliability requires a readable --private-map"
   [[ "$timeout" =~ ^[1-9][0-9]*$ ]] \
     || die "QVOICE_IOS_VOICE_RELIABILITY_CELL_TIMEOUT must be a positive whole number"
+  [[ "$transcription_timeout" =~ ^[1-9][0-9]*$ ]] \
+    || die "QVOICE_IOS_VOICE_RELIABILITY_TRANSCRIPTION_TIMEOUT must be a positive whole number"
 
   python3 "$ROOT_DIR/scripts/voice_identity_language_reliability.py" \
     validate-device-plan --plan "$plan" --private-map "$private_map" >/dev/null \
@@ -1482,17 +1653,31 @@ cmd_voice_reliability() {
   local artifacts="$QVOICE_ARTIFACTS_IOS/voice-reliability/$run_id"
   local dest="$artifacts/device-diagnostics"
   local public_plan="$artifacts/device-plan.json"
+  local launch_ledger="$artifacts/launch-ledger.jsonl"
   mkdir -p "$artifacts"
-  [[ "$(cd "$(dirname "$plan")" && pwd)/$(basename "$plan")" == "$public_plan" ]] \
-    || cp "$plan" "$public_plan"
+  if [[ -f "$public_plan" ]]; then
+    cmp -s "$plan" "$public_plan" \
+      || die "voice-reliability resume rejected: retained plan differs"
+  elif [[ "$(cd "$(dirname "$plan")" && pwd)/$(basename "$plan")" != "$public_plan" ]]; then
+    cp "$plan" "$public_plan"
+  fi
 
   cmd_build --device-diagnostics
   cmd_install >/dev/null
   capture_benchmark_source "$artifacts"
-  rm -rf "$dest"
+  if (( resume == 0 )); then
+    rm -rf "$dest"
+    rm -f "$launch_ledger"
+    mkdir -p "$dest"
+  else
+    note "voice-reliability resume keeps prior sentinels and never relaunches represented rows"
+  fi
 
   local transcription_run_id="${run_id}-transcription"
   local transcription_spec dev env_json transcription_sentinel
+  transcription_sentinel="$(find "$dest" -type f \
+    -path "*/${transcription_run_id}/voice-reliability-transcription-done.json" \
+    2>/dev/null | head -1)"
   transcription_spec="$(python3 - "$private_map" "$plan_digest" <<'PY'
 import json, sys
 value = json.load(open(sys.argv[1]))
@@ -1507,33 +1692,39 @@ print(json.dumps({
 }, separators=(",", ":")))
 PY
 )" || die "could not assemble the private transcription diagnostic spec"
-  dev="$(resolve_device)"
-  export QVOICE_IOS_DEVICE_VOICE_RELIABILITY_TRANSCRIPTION_SPEC="$transcription_spec"
-  export QVOICE_IOS_DEVICE_RUN_ID="$transcription_run_id"
-  env_json="$(python3 -c '
+  if (( resume == 1 )) && [[ -n "$transcription_sentinel" && -f "$transcription_sentinel" ]]; then
+    note "voice-reliability transcription evidence already represented"
+  else
+    dev="$(resolve_device)"
+    export QVOICE_IOS_DEVICE_VOICE_RELIABILITY_TRANSCRIPTION_SPEC="$transcription_spec"
+    export QVOICE_IOS_DEVICE_RUN_ID="$transcription_run_id"
+    env_json="$(python3 -c '
 import json, os
 keys=("QVOICE_IOS_DEVICE_VOICE_RELIABILITY_TRANSCRIPTION_SPEC","QVOICE_IOS_DEVICE_RUN_ID")
 print(json.dumps({"QWENVOICE_DEBUG":"1", **{key:os.environ[key] for key in keys}}, separators=(",",":")))')"
-  xcrun devicectl device process launch --device "$dev" --terminate-existing \
-    -e "$env_json" "$BUNDLE_ID" >/dev/null \
-    || die "could not launch the typed transcription diagnostic"
-  unset QVOICE_IOS_DEVICE_VOICE_RELIABILITY_TRANSCRIPTION_SPEC QVOICE_IOS_DEVICE_RUN_ID
+    xcrun devicectl device process launch --device "$dev" --terminate-existing \
+      -e "$env_json" --json-output "$artifacts/transcription-launch.json" \
+      "$BUNDLE_ID" >"$artifacts/transcription-launch.log" 2>&1 \
+      || die "could not launch the typed transcription diagnostic"
+    unset QVOICE_IOS_DEVICE_VOICE_RELIABILITY_TRANSCRIPTION_SPEC QVOICE_IOS_DEVICE_RUN_ID
 
-  local waited=0
-  transcription_sentinel=""
-  while (( waited < timeout )); do
-    sleep 10
-    waited=$((waited + 10))
-    cmd_pull "$dest" >/dev/null 2>&1 || true
-    transcription_sentinel="$(find "$dest" -type f \
-      -path "*/${transcription_run_id}/voice-reliability-transcription-done.json" \
-      2>/dev/null | head -1)"
-    [[ -z "$transcription_sentinel" ]] || break
-  done
+    local waited=0
+    transcription_sentinel=""
+    while (( waited < transcription_timeout )); do
+      sleep 10
+      waited=$((waited + 10))
+      pull_device_diagnostics_run "$transcription_run_id" "$dest" \
+        >/dev/null 2>&1 || true
+      transcription_sentinel="$dest/$transcription_run_id/voice-reliability-transcription-done.json"
+      [[ -f "$transcription_sentinel" ]] || transcription_sentinel=""
+      [[ -z "$transcription_sentinel" ]] || break
+    done
+  fi
   [[ -n "$transcription_sentinel" && -f "$transcription_sentinel" ]] \
     || die "typed transcription diagnostic did not finish; evidence retained at $artifacts"
 
   export QVOICE_IOS_DEVICE_DIAGNOSTICS_VERIFY_OUTPUT=1
+  export QVOICE_IOS_DEVICE_VOICE_RELIABILITY_CAPTURE_CODEC_TRACE=1
   local row_json row_count=0 row_fail=0
   while IFS= read -r row_json; do
     [[ -n "$row_json" ]] || continue
@@ -1552,7 +1743,37 @@ print(json.dumps({"QWENVOICE_DEBUG":"1", **{key:os.environ[key] for key in keys}
     delivery="$(ROW="$row_json" python3 -c 'import json,os; print(json.loads(os.environ["ROW"]).get("deliveryInstruction") or "", end="")')"
     brief="$(python3 -c 'import json; print(json.load(open("config/voice-identity-language-reliability.json"))["voiceDesign"]["voiceBrief"], end="")')"
 
+    local represented_count launched_before
+    represented_count="$(find "$dest" -type f \
+      -path "*/${child_run_id}/device-diagnostics-done.json" 2>/dev/null | wc -l | tr -d ' ')"
+    launched_before="$(python3 - "$launch_ledger" "$take_id" <<'PY'
+import json, pathlib, sys
+path = pathlib.Path(sys.argv[1])
+take_id = sys.argv[2]
+found = False
+if path.is_file():
+    for line in path.read_text(encoding="utf-8").splitlines():
+        try:
+            found = found or json.loads(line).get("takeID") == take_id
+        except json.JSONDecodeError:
+            raise SystemExit("launch ledger is corrupt")
+print("1" if found else "0")
+PY
+)" || die "voice-reliability launch ledger is invalid"
+    if (( resume == 1 && represented_count == 1 )); then
+      note "voice-reliability skip represented take $row_count/$take_count: $take_id"
+      continue
+    fi
+    if (( resume == 1 && launched_before == 1 )); then
+      row_fail=$((row_fail + 1))
+      warn "voice-reliability preserves sentinel-less failed attempt without retry: $take_id"
+      continue
+    fi
+    (( represented_count == 0 )) \
+      || die "voice-reliability found duplicate retained sentinels for $take_id"
+
     export QVOICE_LAUNCH_RUN_ID="$child_run_id"
+    export QVOICE_MAC_BENCH_RUN_ID="$child_run_id"
     export QVOICE_MAC_BENCH_CELL="$take_id"
     export QVOICE_IOS_DEVICE_DIAGNOSTICS_SEED="$seed"
     export QVOICE_IOS_DEVICE_DIAGNOSTICS_VARIATION="$variation"
@@ -1586,6 +1807,19 @@ PY
     fi
     spec="${mode}:speed:${text}"
     note "voice-reliability take $row_count/$take_count: $take_id"
+    python3 - "$launch_ledger" "$take_id" "$child_run_id" "$plan_digest" <<'PY'
+import json, pathlib, sys
+path = pathlib.Path(sys.argv[1])
+body = {
+    "schemaVersion": 1,
+    "takeID": sys.argv[2],
+    "childRunID": sys.argv[3],
+    "planDigest": sys.argv[4],
+}
+with path.open("a", encoding="utf-8") as handle:
+    handle.write(json.dumps(body, separators=(",", ":"), sort_keys=True) + "\n")
+    handle.flush()
+PY
     QWENVOICE_NATIVE_TELEMETRY_MODE=verbose cmd_launch "$spec" >/dev/null
     set +e
     sentinel="$({ wait_device_diagnostics_sentinel "$child_run_id" "$timeout" "$dest"; })"
@@ -1611,13 +1845,13 @@ for row in json.load(open(sys.argv[1]))["takes"]:
 PY
 )
   unset QVOICE_IOS_DEVICE_DIAGNOSTICS_VERIFY_OUTPUT QVOICE_LAUNCH_RUN_ID \
-    QVOICE_MAC_BENCH_CELL QVOICE_IOS_DEVICE_DIAGNOSTICS_SEED \
+    QVOICE_IOS_DEVICE_VOICE_RELIABILITY_CAPTURE_CODEC_TRACE \
+    QVOICE_MAC_BENCH_RUN_ID QVOICE_MAC_BENCH_CELL QVOICE_IOS_DEVICE_DIAGNOSTICS_SEED \
     QVOICE_IOS_DEVICE_DIAGNOSTICS_VARIATION QVOICE_IOS_DEVICE_DIAGNOSTICS_LANGUAGE \
     QVOICE_IOS_DEVICE_DIAGNOSTICS_CLONE_VOICE_ID \
     QVOICE_IOS_DEVICE_DIAGNOSTICS_DESIGN_INSTRUCTION \
     QVOICE_IOS_DEVICE_DIAGNOSTICS_DESIGN_DELIVERY
 
-  cmd_pull "$dest" >/dev/null 2>&1 || true
   python3 "$ROOT_DIR/scripts/voice_identity_language_reliability.py" compose-device \
     --plan "$public_plan" --diagnostics "$dest" \
     --transcription "$transcription_sentinel" \
@@ -2622,6 +2856,10 @@ main() {
       require_build_free_space language-benchmark || die "iOS voice-reliability storage preflight failed"
       cmd_voice_reliability "$@"
       ;;
+    voice-reliability-export)
+      require_build_free_space language-benchmark || die "iOS voice-reliability export storage preflight failed"
+      cmd_voice_reliability_export "$@"
+      ;;
     speech-assets) cmd_speech_assets "$@" ;;
     enroll-clone-fixture) cmd_enroll_clone_fixture "$@" ;;
     crashes) cmd_crashes "$@" ;;
@@ -2644,7 +2882,7 @@ main() {
       ;;
     help|-h|--help)
       sed -n '2,/^$/p' "$0" | sed 's/^# \{0,1\}//' >&2 ;;
-    *) die "unknown subcommand '$sub' (try: doctor|build|install|launch|console|device-state|pull|bench|lang-bench|delivery-reliability|voice-reliability|speech-assets|enroll-clone-fixture|crashes|debug|logs|profile|memory|clone-conditioning|memory-field-report|preflight|gate|help)" ;;
+    *) die "unknown subcommand '$sub' (try: doctor|build|install|launch|console|device-state|pull|bench|lang-bench|delivery-reliability|voice-reliability|voice-reliability-export|speech-assets|enroll-clone-fixture|crashes|debug|logs|profile|memory|clone-conditioning|memory-field-report|preflight|gate|help)" ;;
   esac
 }
 

@@ -47,47 +47,46 @@ machine-readable status record and wins over any older prose.
 | 13 — Benchmark/history v3 | Live 2026-07-29: the first schema-v3 records are committed (three clean `phase0-cli-control-*` engine records plus one exploratory run that also exposed and fixed the summarizer's v3 pin). `benchmarks/schema-v3.json` adds the typed quality identity to generation takes (pass/warning only, five fast gates required, machine-code issues); v1/v2 records stay valid immutable history; the publisher stamps v3 only when every take carries the identity. The UI benchmark checkers folded the same identity 2026-08-01: ui-generation records now publish v3 (first: the focused `v3-fold-proof` record `macos-xcui-benchmark-20260801-003208-403989cf`); the canonical iOS matrix published its first v3 record 2026-08-01 (`ios-xcui-benchmark-20260801-132415-abbec96b`). |
 | 14 — Organization and retirement | Closed 2026-07-23 (14a + 14b): compatibility SPI retired, actor-owned loading/metadata/priming/clone artifacts, clone conditioning epoch-bound end to end. |
 
-## Resume here (2026-08-30)
+## Resume here (2026-08-31)
 
-**Voice identity/language reliability is instrumented; private live characterization remains the
-next evidence boundary.** VLR-02 and VLR-04 are implemented. Clone Auto previously allowed the
-reference transcript to determine the generated-output language; shared `GenerationSemantics` now
-resolves Auto from normalized target text, while an explicit Studio/CLI language always wins.
-Reference language is persisted only as saved-conditioning metadata. Both iOS and macOS/XPC preserve
-legacy saved voices and commands, and the enrollment sheet now requires separate reference-language
-confirmation when transcript detection is inconclusive.
+**The Voice identity/language characterization is safely paused at an immutable evidence
+boundary.** Focused run 1 completed all 26 no-retry rows (20 PASS). The larger source-bound run
+`vlr-device-20260831-characterization-04` retained terminal sentinels for takes 1–114 of 122 before
+the phone-return pause: 98 PASS, three typed post-generation QC failures, and 13 successful
+generations that failed locale-locked output verification. Take 115 was launched and interrupted;
+takes 116–122 were never launched. The append-only ledger and partial summary remain untracked under
+the governed build-artifact root, bound to plan digest
+`c1c0593ee49ee39dedff156dfb47a97282edbc08f431927631373c7b0c5eecfb` and source identity
+`e9755f40b078649d3cf97c7fd3d4dfc894aa14f8a18a33f71f7e3e598ad5989c`.
 
-Generation request receipt schema 2 is assembled from the exact native actor request rather than
-reconstructed from UI input. It retains stored/detected/reference/final languages, think/no-think,
-conditioning mode, normalized target/reference/audio identities, full Design/delivery instruction,
-model/tokenizer, seed/variation, retry, and warm/cold identity. `VoiceClipTranscriber` now emits a
-typed privacy-safe enrollment outcome with authorization, ordered locale attempts, availability,
-on-device support, timeout/error/empty/low-confidence distinctions, scores, confidence, and final
-source. Sidecar/manual text remains authoritative; in particular, the manually reviewed transcript
-already entered for the second private reference is treated as transcript-backed and cannot be
-overwritten by delayed recognition.
+Do not resume or overwrite that run after this checkpoint. A commit changes the full-tree source
+identity; take 115 must remain a sentinel-less interrupted attempt, and missing rows cannot be
+merged into a retroactive PASS. At the next phone window, generate a new source-bound run ID. The
+114 terminal rows remain valid characterization evidence, while closure still requires a complete
+new characterization plus the two clean focused runs required by VLR-07.
 
-The operator-local VLR harness freezes a 734-row serial Mac/CLI matrix across private aliases,
-clean French/English controls, transcript arms, Auto/explicit languages, fixed seeds, variation,
-current fp16, and optional exact archived fp32. It refuses missing artifacts and retains failures
-without retries. A separate 26-row physical-iPhone diagnostic reads the two existing saved voices,
-runs the real transcriber without persisting its output, and checks Clone language ownership plus
-French Design Neutral/no-delivery/Calm arms with schema-2 receipt and locale-locked ASR parity. The
-generic iPhoneOS app/logic build, focused Swift suites, shell syntax, runtime-security contract, and
-seven host fixtures pass. VLR-01/VLR-03/VLR-07 still require the untracked private bundle, Mac/CLI
-model execution, and two consecutive no-retry phone passes. First-reference pitch/fidelity, the
-second reference's original Speech failure, tokenizer causality, and French Design prompt causality
-therefore remain unlocalized. No tokenizer, model pin, prompt, sampling default, QC threshold, saved voice,
-transcript, model installation, or History entry has been changed on their behalf.
+The completed 38-row Clone block has a causal result. Reference A passed all 19 rows; reference B
+passed 17 of 19 and failed only Auto and explicit English at seed `32060821`. Both failures carried
+the same codec trace and a 7.603-second gap in the live persisted output. Exact-range incremental
+and full replay both produced clean 15.68-second audio with only 268 ms of terminal silence. The
+sampled codes, tokenizer output, and replay decoders are therefore exonerated for these rows; VLR-08
+now owns the first divergence in live publication, assembly, limiter, marking, writer, or
+finalization. No hidden retry, seed change, reference edit, tokenizer change, or QC waiver occurred.
 
-The first source-bound physical-device attempt on 2026-08-30 stopped before installation or data
-access: the login Keychain's Apple Development certificate expired that day and no valid
-development identity remained, although Developer ID and Apple Distribution identities were still
-valid. This is a host signing prerequisite, not product evidence. Device preflight now validates
-the development certificate/private-key identity and reports expiration, missing key, team
-mismatch, or absence before package resolution. The untracked 26-row plan remains unexecuted and
-must be regenerated against the eventual exact source identity after the signing prerequisite is
-repaired; no private reference, transcript, model, draft, or History state was read or changed.
+Of 76 represented French Design rows, 62 passed, 13 generated audio but failed locale-locked
+verification, and one diagnostic no-delivery long row failed mandatory dropout QC. Current Neutral
+represented all 27 core rows and passed 25; no-delivery passed 22 of 27; Calm passed 15 of 22 before
+the pause. The no-delivery QC failure reproduces through both decoder replays, so it is a sampled
+output pathology in a diagnostic arm, not a live writer defect. Locale failures span every frozen
+seed. Current Neutral remains the strongest tested arm, and this evidence does not authorize a
+production delivery-copy change; VLR-06 and DP-31/DP-32 retain that decision boundary.
+
+The typed transcription probe remains unchanged: reference A was an automatic French success;
+reference B was low confidence after empty French/English attempts and an unusable German result.
+The already reviewed manual transcript stayed authoritative. The operator-local 734-row Mac/CLI
+tokenizer/reference matrix, private control bundle, fresh complete phone characterization, and two
+focused closure passes remain pending. No model, prompt, sampling default, tokenizer, QC threshold,
+saved voice, transcript, installation, draft, or History row changed during this campaign.
 
 **The causal control-audit remediations now have corrected-source device evidence.** Accessibility
 run `ios-xcui-control-audit-20260829-174031-cae15a02` passed Default, AX-L, AX-XXXL,

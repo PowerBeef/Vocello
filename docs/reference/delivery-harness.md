@@ -133,6 +133,40 @@ and warm state. Clone Auto resolves output language from target text; reference 
 conditioning metadata only. The second private reference's operator-entered transcript is treated
 as reviewed transcript-backed conditioning and is never replaced by delayed recognition.
 
+Physical-device sentinel schema 3 preserves that schema-2 receipt when generation throws. It also
+binds the terminal `AudioQCReport`, rejected-audio and codec-trace identities, and an incremental
+versus full decoder replay. The host composer reports one `rootCause` per failed take and keeps
+missing forensic material in `evidenceGaps`; a failed generation is not reclassified as several
+receipt, language, and ASR failures. The composer returns nonzero on a FAIL result.
+
+The `focused` phone profile remains the 26-row language/prompt screen. The `characterization`
+profile is a bounded 122-row follow-up with all eight frozen seeds, explicit-language parity, and
+five Expressive sentinels. `scripts/ios_device.sh voice-reliability --resume` validates the exact
+retained plan and uses an append-only launch ledger: terminal rows and sentinel-less prior attempts
+are never relaunched. Raw audio, traces, replay WAVs, and private reference identities remain
+untracked.
+
+If an earlier sanitized summary still binds both private aliases to exact audio digests,
+`scripts/ios_device.sh voice-reliability-export` can reconstruct the untracked alias map and host
+copies without names or whole-container access. The diagnostics-only app exports only unique digest
+matches, the host rehashes audio/transcript bytes, and a second launch removes the device-side
+temporary export after verified collection.
+
+The first schema-3 characterization was paused after 114 of 122 terminal rows. Its 38-row Clone
+block was complete: alias A passed 19/19; alias B passed 17/19 and failed only the Auto/explicit
+English controls at seed `32060821`. Those two failures share a codec trace and a 7.603-second live
+persisted-output gap, while exact-range incremental and full replay both pass with only 268 ms of
+terminal silence. That is evidence of a post-decoder live publication/finalization divergence, not
+a sampled-code, tokenizer, or Mimi replay failure. VLR-08 owns the source remediation.
+
+Among 76 represented French Design rows, 62 passed locale and QC, 13 completed generation but
+failed locale-locked verification, and one diagnostic no-delivery long row failed dropout QC. The
+current Neutral arm passed 25/27 represented rows, no-delivery 22/27, and Calm 15/22 before the
+pause. The diagnostic dropout persists in incremental and full replay, while locale failures span
+all eight frozen seeds. These findings do not authorize a production prompt change: current Neutral
+is still the strongest tested arm, the run is incomplete, and DP-31/DP-32 retain semantic authority.
+The immutable pause identity and next-run procedure live in the iOS device-testing guide.
+
 No prompt, tokenizer, model pin, sampling default, or QC threshold changes from this lane alone.
 Tokenizer/reference remediation belongs to VLR-05; any Design delivery-copy candidate remains under
 DP-31/DP-32 blinded-listening authority.

@@ -211,6 +211,7 @@ class VoiceIdentityLanguageReliabilityTests(unittest.TestCase):
         self.assertEqual(
             sum(row["mode"] == "design" for row in plan["takes"]), 18
         )
+        self.assertEqual(plan["profile"], "focused")
         private_map = self.root / "device-map.json"
         private_map.write_text(json.dumps({
             "schemaVersion": 1,
@@ -230,6 +231,25 @@ class VoiceIdentityLanguageReliabilityTests(unittest.TestCase):
         private_map.write_text(json.dumps(changed), encoding="utf-8")
         with self.assertRaisesRegex(VLR.ReliabilityError, "another plan"):
             VLR.load_private_device_map(private_map, plan, self.contract)
+
+    def test_characterization_device_plan_covers_all_seeds_and_remains_bounded(self):
+        plan = VLR.build_device_plan(
+            contract=self.contract,
+            run_id="vlr-device-characterization",
+            profile="characterization",
+            source_identity="9" * 64,
+        )
+        VLR.validate_device_plan(
+            plan, self.contract, expected_source_identity="9" * 64
+        )
+
+        self.assertEqual(plan["takeCount"], 122)
+        self.assertEqual({row["seed"] for row in plan["takes"]}, set(self.contract["fixedSeeds"]))
+        self.assertEqual(sum(row["mode"] == "clone" for row in plan["takes"]), 38)
+        self.assertEqual(sum(row["mode"] == "design" for row in plan["takes"]), 84)
+        self.assertEqual(
+            sum(row["variation"] == "expressive" for row in plan["takes"]), 5
+        )
 
     def test_device_composer_fails_closed_and_redacts_voice_ids(self):
         plan = VLR.build_device_plan(
@@ -305,6 +325,7 @@ class VoiceIdentityLanguageReliabilityTests(unittest.TestCase):
         first = plan["takes"][0]
         first_path = diagnostics / first["childRunID"] / "device-diagnostics-done.json"
         tampered = json.loads(first_path.read_text(encoding="utf-8"))
+        first_receipt = copy.deepcopy(tampered["requestReceipt"])
         tampered["requestReceipt"]["finalModelLanguage"] = "chinese"
         first_path.write_text(json.dumps(tampered), encoding="utf-8")
         tampered_report = VLR.compose_device_results(
@@ -318,6 +339,130 @@ class VoiceIdentityLanguageReliabilityTests(unittest.TestCase):
         self.assertIn(
             "receipt-finalModelLanguage-mismatch",
             tampered_report["takes"][0]["failures"],
+        )
+
+        failed = {
+            "schemaVersion": 3,
+            "status": "error",
+            "mode": first["mode"],
+            "seed": first["seed"],
+            "samplingVariation": first["variation"],
+            "failureClassification": "post_generation_qc",
+            "failureCode": "audio_quality_rejected",
+            "requestReceipt": first_receipt,
+            "audioQC": {
+                "algorithmVersion": 5,
+                "instabilityVerdict": "pass",
+                "writtenOutputVerdict": "fail",
+                "verdict": "fail",
+                "flags": ["dropout:2725ms"],
+                "longestSilenceMS": 2725,
+                "longestSilenceStartMS": 3100,
+                "durationSeconds": 9.4,
+            },
+            "diagnosticArtifacts": [
+                {"kind": "codec_trace", "sha256": "c" * 64, "byteCount": 2048},
+                {"kind": "rejected_audio", "sha256": "d" * 64, "byteCount": 96044},
+            ],
+            "codecReplay": {
+                "status": "complete",
+                "failureCode": None,
+                "traceSHA256": "c" * 64,
+                "ranges": [{"start": 0, "endExclusive": 4}],
+                "incrementalAudioQC": {"verdict": "fail", "longestSilenceMS": 2725},
+                "fullAudioQC": {"verdict": "fail", "longestSilenceMS": 2725},
+            },
+        }
+        first_path.write_text(json.dumps(failed), encoding="utf-8")
+        failed_report = VLR.compose_device_results(
+            plan=plan,
+            contract=self.contract,
+            diagnostics_root=diagnostics,
+            transcription=transcription,
+            output=self.root / "failed-summary.json",
+        )
+        failed_take = failed_report["takes"][0]
+        self.assertEqual(
+            failed_take["failures"],
+            ["post_generation_qc:audio_quality_rejected"],
+        )
+        self.assertEqual(failed_take["evidenceGaps"], [])
+        self.assertEqual(failed_take["failureOwner"], "product")
+        self.assertEqual(failed_report["productFailures"], 1)
+        self.assertEqual(failed_report["harnessFailures"], 0)
+
+        legacy = {
+            "schemaVersion": 2,
+            "status": "error",
+            "mode": first["mode"],
+            "seed": first["seed"],
+            "samplingVariation": first["variation"],
+            "error": "Generation failed before evidence was retained",
+        }
+        first_path.write_text(json.dumps(legacy), encoding="utf-8")
+        legacy_report = VLR.compose_device_results(
+            plan=plan,
+            contract=self.contract,
+            diagnostics_root=diagnostics,
+            transcription=transcription,
+            output=self.root / "legacy-summary.json",
+        )
+        legacy_take = legacy_report["takes"][0]
+        self.assertEqual(legacy_take["failures"], ["unclassified_generation_failure"])
+        self.assertEqual(
+            legacy_take["evidenceGaps"],
+            ["schema-v3-terminal-evidence-unavailable"],
+        )
+        self.assertFalse(any("receipt-" in item for item in legacy_take["failures"]))
+
+    def test_device_runner_preserves_attempt_identity_and_codec_trace_wiring(self):
+        runner = (REPO / "scripts/ios_device.sh").read_text(encoding="utf-8")
+        command_start = runner.index("cmd_voice_reliability() {")
+        command_end = runner.index("\ncmd_bench() {", command_start)
+        command = runner[command_start:command_end]
+
+        self.assertIn("--resume", command)
+        self.assertIn("QVOICE_IOS_DEVICE_VOICE_RELIABILITY_CAPTURE_CODEC_TRACE=1", command)
+        self.assertIn('QVOICE_MAC_BENCH_RUN_ID="$child_run_id"', command)
+        self.assertIn('QVOICE_MAC_BENCH_CELL="$take_id"', command)
+        self.assertIn("preserves sentinel-less failed attempt without retry", command)
+        self.assertIn("QVOICE_IOS_VOICE_RELIABILITY_TRANSCRIPTION_TIMEOUT:-900", command)
+        self.assertIn('pull_device_diagnostics_run "$transcription_run_id"', command)
+        self.assertNotIn('cmd_pull "$dest"', command)
+        self.assertIn(
+            'rm -rf "$dest"\n    rm -f "$launch_ledger"\n    mkdir -p "$dest"',
+            command,
+        )
+
+        ledger_write = command.index('python3 - "$launch_ledger" "$take_id"')
+        launch = command.index('cmd_launch "$spec"')
+        self.assertLess(ledger_write, launch)
+
+        export_start = runner.index("cmd_voice_reliability_export() {")
+        export_end = runner.index("\n# voice-reliability --plan", export_start)
+        export_command = runner[export_start:export_end]
+        self.assertIn("QVOICE_IOS_DEVICE_VOICE_RELIABILITY_EXPORT_SPEC", export_command)
+        self.assertIn(
+            "QVOICE_IOS_DEVICE_VOICE_RELIABILITY_EXPORT_CLEANUP_RUN_ID",
+            export_command,
+        )
+        self.assertIn('record.get("status") == "pass"', export_command)
+        self.assertIn('hashlib.sha256(source.read_bytes()).hexdigest()', export_command)
+        self.assertIn('pull_device_diagnostics_run "$export_run_id"', export_command)
+        self.assertIn('pull_device_diagnostics_run "$cleanup_run_id"', export_command)
+        self.assertNotIn('cmd_pull "$dest"', export_command)
+        self.assertNotIn('cmd_pull "$cleanup_dest"', export_command)
+
+        debug_knobs = VLR.load_json(REPO / "config/runtime-debug-knobs.json")
+        registered = {
+            key
+            for group in debug_knobs["groups"]
+            for key in group["keys"]
+        }
+        self.assertIn("QVOICE_IOS_DEVICE_VOICE_RELIABILITY_EXPORT_SPEC", registered)
+        self.assertIn(
+            "QVOICE_IOS_DEVICE_VOICE_RELIABILITY_EXPORT_CLEANUP_RUN_ID",
+            registered,
         )
 
 

@@ -541,12 +541,17 @@ class IOSStartupReliabilityTests(unittest.TestCase):
         for helper in helpers:
             self.assertLess(source.index(helper), command_index)
 
+        shared_pull = source[
+            source.index("pull_device_diagnostics_run() {"):
+            source.index("pull_startup_reliability_run() {")
+        ]
         scoped_pull = source[
             source.index("pull_startup_reliability_run() {"):
             source.index("wait_startup_reliability_result() {")
         ]
-        self.assertIn('diagnostics/$run_id', scoped_pull)
-        self.assertIn("--timeout 60", scoped_pull)
+        self.assertIn('diagnostics/$run_id', shared_pull)
+        self.assertIn("--timeout 60", shared_pull)
+        self.assertIn('pull_device_diagnostics_run "$@"', scoped_pull)
         wait_body = source[
             source.index("wait_startup_reliability_result() {"):
             source.index("snapshot_startup_reliability_crashes() {")

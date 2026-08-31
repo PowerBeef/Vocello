@@ -52,6 +52,12 @@ enum IOSDeviceDiagnosticsRunner {
         "QVOICE_IOS_DEVICE_CLONE_CONDITIONING_ACCEPTANCE"
     private static let voiceReliabilityTranscriptionEnvironmentKey =
         "QVOICE_IOS_DEVICE_VOICE_RELIABILITY_TRANSCRIPTION_SPEC"
+    private static let voiceReliabilityExportEnvironmentKey =
+        "QVOICE_IOS_DEVICE_VOICE_RELIABILITY_EXPORT_SPEC"
+    private static let voiceReliabilityExportCleanupEnvironmentKey =
+        "QVOICE_IOS_DEVICE_VOICE_RELIABILITY_EXPORT_CLEANUP_RUN_ID"
+    private static let voiceReliabilityCodecTraceEnvironmentKey =
+        "QVOICE_IOS_DEVICE_VOICE_RELIABILITY_CAPTURE_CODEC_TRACE"
     private static let expectedCloneAudioSHA256EnvironmentKey =
         "QVOICE_IOS_DEVICE_DIAGNOSTICS_EXPECTED_CLONE_AUDIO_SHA256"
     private static let expectedCloneTranscriptSHA256EnvironmentKey =
@@ -98,6 +104,8 @@ enum IOSDeviceDiagnosticsRunner {
         #if QVOICE_DEVICE_DIAGNOSTICS
         keys.append(cloneConditioningAcceptanceEnvironmentKey)
         keys.append(voiceReliabilityTranscriptionEnvironmentKey)
+        keys.append(voiceReliabilityExportEnvironmentKey)
+        keys.append(voiceReliabilityExportCleanupEnvironmentKey)
         #endif
         return keys.contains { key in
             guard let raw = ProcessInfo.processInfo.environment[key]?
@@ -134,6 +142,18 @@ enum IOSDeviceDiagnosticsRunner {
             Task { @MainActor in
                 await runVoiceReliabilityTranscription(rawSpec: rawSpec, engine: engine)
             }
+            return
+        }
+        if let rawSpec = trimmedEnvironmentValue(voiceReliabilityExportEnvironmentKey) {
+            Task { @MainActor in
+                await runVoiceReliabilityExport(rawSpec: rawSpec, engine: engine)
+            }
+            return
+        }
+        if let exportRunID = trimmedEnvironmentValue(
+            voiceReliabilityExportCleanupEnvironmentKey
+        ) {
+            runVoiceReliabilityExportCleanup(exportRunID: exportRunID)
             return
         }
         #endif
@@ -596,6 +616,7 @@ enum IOSDeviceDiagnosticsRunner {
             buildVersion: Bundle.main.object(forInfoDictionaryKey: kCFBundleVersionKey as String) as? String
         )
         var appTimelineSubmitted = false
+        var diagnosticRequest: GenerationRequest?
 
         do {
             guard let model = ModelDescriptor.model(for: spec.mode) else {
@@ -634,8 +655,12 @@ enum IOSDeviceDiagnosticsRunner {
                 payload: payload,
                 generationID: generationID,
                 seed: seed,
-                variation: variation
+                variation: variation,
+                captureCodecTrace: ProcessInfo.processInfo.environment[
+                    voiceReliabilityCodecTraceEnvironmentKey
+                ] == "1"
             )
+            diagnosticRequest = request
             guard let capabilities = model.qwen3Capabilities else {
                 throw DiagnosticsError("model '\(model.id)' has no declared Qwen3 prompt capabilities")
             }
@@ -718,6 +743,15 @@ enum IOSDeviceDiagnosticsRunner {
             }
             record.status = "error"
             record.error = "cancelled"
+            let evidence = await terminalFailureEvidence(
+                request: diagnosticRequest,
+                generationID: generationID,
+                runID: runID,
+                script: spec.text,
+                fallbackFailureCode: "cancelled",
+                engine: engine
+            )
+            record.apply(evidence)
             print("[device-diagnostics] ✗ cancelled")
         } catch {
             if appTimelineSubmitted {
@@ -725,6 +759,16 @@ enum IOSDeviceDiagnosticsRunner {
             }
             record.status = "error"
             record.error = error.localizedDescription
+            let metadata = GenerationFailureDiagnosticLogger.errorMetadata(for: error)
+            let evidence = await terminalFailureEvidence(
+                request: diagnosticRequest,
+                generationID: generationID,
+                runID: runID,
+                script: spec.text,
+                fallbackFailureCode: metadata.code,
+                engine: engine
+            )
+            record.apply(evidence)
             print("[device-diagnostics] ✗ \(error.localizedDescription)")
         }
 
@@ -738,6 +782,152 @@ enum IOSDeviceDiagnosticsRunner {
             }
         }
         writeSentinel(record, runID: runID)
+    }
+
+    private static func terminalFailureEvidence(
+        request: GenerationRequest?,
+        generationID: UUID,
+        runID: String,
+        script: String,
+        fallbackFailureCode: String,
+        engine: TTSEngineStore
+    ) async -> FailureEvidenceCapture {
+        IOSPullableDiagnosticsMirror.syncGenerationTelemetryIfEnabled(
+            generationID: generationID
+        )
+        let records = telemetryRecords(generationID: generationID)
+        let terminal = GenerationTerminalDiagnosticEvidence.snapshot(from: records)
+        let codecReplay: CodecReplayComparison?
+        if let request,
+           let terminal,
+           requiresCodecReplay(terminal.audioQC) {
+            codecReplay = await replayCodecTraceIfAvailable(
+                request: request,
+                generationID: generationID,
+                runID: runID,
+                script: script,
+                evidence: terminal,
+                engine: engine
+            )
+        } else {
+            codecReplay = nil
+        }
+        if codecReplay != nil {
+            IOSPullableDiagnosticsMirror.syncGenerationTelemetryIfEnabled(
+                generationID: generationID
+            )
+        }
+        return FailureEvidenceCapture(
+            requestReceipt: terminal?.requestReceipt.map(RequestReceiptObservation.init(receipt:)),
+            audioQC: terminal?.audioQC,
+            failureCode: terminal?.failureCode ?? safeFailureCode(fallbackFailureCode),
+            failureClassification: terminal?.classification.rawValue
+                ?? GenerationTerminalDiagnosticEvidence.Classification
+                    .unmaterializedUnknown.rawValue,
+            diagnosticArtifacts: terminal?.diagnosticArtifacts ?? [],
+            codecReplay: codecReplay
+        )
+    }
+
+    private static func replayCodecTraceIfAvailable(
+        request: GenerationRequest,
+        generationID: UUID,
+        runID: String,
+        script: String,
+        evidence: GenerationTerminalDiagnosticEvidence,
+        engine: TTSEngineStore
+    ) async -> CodecReplayComparison? {
+        guard let traceEvidence = evidence.diagnosticArtifacts.first(where: {
+            $0.kind == .codecTrace
+        }),
+        traceEvidence.complete == true,
+        let ranges = traceEvidence.codecChunkRanges,
+        !ranges.isEmpty else {
+            return nil
+        }
+        do {
+            let trace = try StartupReliabilityDiagnosticEvidence.loadCodecTrace(
+                appSupportDirectory: AppPaths.appSupportDir,
+                runID: runID,
+                generationID: generationID
+            )
+            let replay = try await engine.replayStartupReliabilityCodecTrace(
+                request: request,
+                frames: trace.frames,
+                incrementalRanges: ranges
+            )
+            let expectedPauseCount = PersistedWAVAudioQCAnalyzer.expectedPauseCount(in: script)
+            let incremental = try StartupReliabilityDiagnosticEvidence.persistReplayAudio(
+                samples: replay.incrementalAudio,
+                sampleRate: replay.sampleRate,
+                kind: .incrementalReplayAudio,
+                appSupportDirectory: AppPaths.appSupportDir,
+                runID: runID,
+                generationID: generationID,
+                expectedPauseCount: expectedPauseCount
+            )
+            let full = try StartupReliabilityDiagnosticEvidence.persistReplayAudio(
+                samples: replay.fullAudio,
+                sampleRate: replay.sampleRate,
+                kind: .fullReplayAudio,
+                appSupportDirectory: AppPaths.appSupportDir,
+                runID: runID,
+                generationID: generationID,
+                expectedPauseCount: expectedPauseCount
+            )
+            return CodecReplayComparison(
+                status: "complete",
+                failureCode: nil,
+                traceSHA256: traceEvidence.sha256,
+                ranges: ranges,
+                incrementalArtifact: incremental.0,
+                incrementalAudioQC: incremental.1,
+                fullArtifact: full.0,
+                fullAudioQC: full.1
+            )
+        } catch {
+            return CodecReplayComparison(
+                status: "failed",
+                failureCode: GenerationFailureDiagnosticLogger.errorMetadata(for: error).code,
+                traceSHA256: traceEvidence.sha256,
+                ranges: ranges,
+                incrementalArtifact: nil,
+                incrementalAudioQC: nil,
+                fullArtifact: nil,
+                fullAudioQC: nil
+            )
+        }
+    }
+
+    private static func requiresCodecReplay(_ report: AudioQCReport?) -> Bool {
+        guard let report else { return false }
+        if report.verdict != .pass
+            || report.instabilityVerdict != .pass
+            || report.writtenOutputVerdict != .pass {
+            return true
+        }
+        return report.chunkQC?.contains(where: { $0.verdict == .fail }) == true
+    }
+
+    private static func telemetryRecords(generationID: UUID) -> [GenerationTelemetryRecord] {
+        let url = AppPaths.appSupportDir
+            .appendingPathComponent("diagnostics/engine/generations.jsonl", isDirectory: false)
+        guard let text = try? String(contentsOf: url, encoding: .utf8) else { return [] }
+        let decoder = JSONDecoder()
+        return text.split(separator: "\n").compactMap { line in
+            guard line.contains(generationID.uuidString),
+                  let data = line.data(using: .utf8),
+                  let record = try? decoder.decode(GenerationTelemetryRecord.self, from: data),
+                  record.layer == .engine,
+                  record.generationID == generationID.uuidString else { return nil }
+            return record
+        }
+    }
+
+    private static func safeFailureCode(_ raw: String) -> String {
+        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "._-"))
+        let bounded = String(raw.unicodeScalars.filter { allowed.contains($0) }.prefix(96))
+        return bounded.isEmpty ? "unknown_failure" : bounded
     }
 
     #if QVOICE_DEVICE_DIAGNOSTICS
@@ -1899,6 +2089,236 @@ enum IOSDeviceDiagnosticsRunner {
     }
 
     #if QVOICE_DEVICE_DIAGNOSTICS
+    private struct VoiceReliabilityExportSpec: Decodable {
+        struct Reference: Decodable {
+            let alias: String
+            let audioSHA256: String
+        }
+
+        let schemaVersion: Int
+        let references: [Reference]
+    }
+
+    private struct VoiceReliabilityExportReference: Encodable {
+        let alias: String
+        var found: Bool
+        var voiceID: String?
+        var referenceAudioDigest: String?
+        var audioRelativePath: String?
+        var transcriptDigest: String?
+        var transcriptRelativePath: String?
+        var storedReferenceLanguage: String?
+        var storedTranscriptSource: String?
+        var failureCode: String?
+    }
+
+    private struct VoiceReliabilityExportResult: Encodable {
+        let schemaVersion: Int
+        let runID: String
+        let startedAt: String
+        var finishedAt: String?
+        var status: String
+        var references: [VoiceReliabilityExportReference]
+        var failureCode: String?
+    }
+
+    /// Copies only references selected by an already-observed audio digest. The export lives in
+    /// the pullable diagnostics cache, never the shared saved-voice store, and its JSON deliberately
+    /// contains no voice name, transcript text, or absolute path.
+    private static func runVoiceReliabilityExport(
+        rawSpec: String,
+        engine: TTSEngineStore
+    ) async {
+        let runID = safeRunID(from: trimmedEnvironmentValue(runIDKey))
+            ?? "ios-voice-reliability-export"
+        var result = VoiceReliabilityExportResult(
+            schemaVersion: 1,
+            runID: runID,
+            startedAt: ISO8601DateFormatter().string(from: Date()),
+            status: "failed",
+            references: []
+        )
+        defer {
+            result.finishedAt = ISO8601DateFormatter().string(from: Date())
+            writeVoiceReliabilityExportResult(result, runID: runID)
+        }
+
+        guard let data = rawSpec.data(using: .utf8),
+              let spec = try? JSONDecoder().decode(VoiceReliabilityExportSpec.self, from: data),
+              spec.schemaVersion == 1,
+              (1 ... 4).contains(spec.references.count),
+              Set(spec.references.map(\.alias)).count == spec.references.count,
+              Set(spec.references.map(\.audioSHA256)).count == spec.references.count,
+              spec.references.allSatisfy({ reference in
+                  safeRunID(from: reference.alias) == reference.alias
+                      && isSHA256(reference.audioSHA256)
+              }),
+              let pullableRoot = IOSPullableDiagnosticsMirror.pullableRoot else {
+            result.failureCode = "invalid-spec"
+            return
+        }
+
+        let runRoot = pullableRoot.appendingPathComponent(runID, isDirectory: true)
+        let exportRoot = runRoot.appendingPathComponent("private-export", isDirectory: true)
+        guard !FileManager.default.fileExists(atPath: exportRoot.path) else {
+            result.failureCode = "export-root-exists"
+            return
+        }
+
+        do {
+            let voices = try await engine.listPreparedVoices()
+            var candidates: [(voice: Voice, digest: String)] = []
+            for voice in voices {
+                if let digest = try? sha256File(at: voice.audioURL) {
+                    candidates.append((voice, digest))
+                }
+            }
+            try FileManager.default.createDirectory(
+                at: exportRoot,
+                withIntermediateDirectories: true
+            )
+            try Data("voice-reliability-private-export-v1\n".utf8).write(
+                to: exportRoot.appendingPathComponent("export.marker"),
+                options: .atomic
+            )
+
+            for reference in spec.references {
+                let matches = candidates.filter { $0.digest == reference.audioSHA256 }
+                guard matches.count == 1, let match = matches.first else {
+                    result.references.append(VoiceReliabilityExportReference(
+                        alias: reference.alias,
+                        found: false,
+                        failureCode: matches.isEmpty
+                            ? "saved-voice-not-found"
+                            : "saved-voice-digest-ambiguous"
+                    ))
+                    continue
+                }
+                let aliasRoot = exportRoot.appendingPathComponent(
+                    reference.alias,
+                    isDirectory: true
+                )
+                try FileManager.default.createDirectory(
+                    at: aliasRoot,
+                    withIntermediateDirectories: true
+                )
+                let audioName = "reference-\(reference.audioSHA256).wav"
+                let audioURL = aliasRoot.appendingPathComponent(audioName, isDirectory: false)
+                try copyFileAtomically(from: match.voice.audioURL, to: audioURL)
+                guard try sha256File(at: audioURL) == reference.audioSHA256 else {
+                    throw DiagnosticsError("exported reference digest mismatch")
+                }
+
+                let transcript = try? match.voice.loadTranscript()
+                let normalizedTranscript = transcript?
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                let transcriptDigest = normalizedTranscript.flatMap { value in
+                    value.isEmpty ? nil : sha256Text(value)
+                }
+                var transcriptRelativePath: String?
+                if let normalizedTranscript,
+                   !normalizedTranscript.isEmpty,
+                   let transcriptDigest {
+                    let transcriptName = "transcript-\(transcriptDigest).txt"
+                    let transcriptURL = aliasRoot.appendingPathComponent(
+                        transcriptName,
+                        isDirectory: false
+                    )
+                    try Data((normalizedTranscript + "\n").utf8).write(
+                        to: transcriptURL,
+                        options: .atomic
+                    )
+                    transcriptRelativePath = "private-export/\(reference.alias)/\(transcriptName)"
+                }
+                result.references.append(VoiceReliabilityExportReference(
+                    alias: reference.alias,
+                    found: true,
+                    voiceID: match.voice.id,
+                    referenceAudioDigest: reference.audioSHA256,
+                    audioRelativePath: "private-export/\(reference.alias)/\(audioName)",
+                    transcriptDigest: transcriptDigest,
+                    transcriptRelativePath: transcriptRelativePath,
+                    storedReferenceLanguage: match.voice.enrollmentMetadata?
+                        .referenceLanguage?.rawValue,
+                    storedTranscriptSource: match.voice.enrollmentMetadata?
+                        .transcriptSource.rawValue,
+                    failureCode: nil
+                ))
+            }
+            result.status = result.references.count == spec.references.count
+                && result.references.allSatisfy(\.found)
+                ? "pass"
+                : "partial"
+        } catch {
+            result.failureCode = "private-export-failed"
+        }
+    }
+
+    private static func copyFileAtomically(from source: URL, to destination: URL) throws {
+        let temporary = destination.deletingLastPathComponent().appendingPathComponent(
+            ".\(destination.lastPathComponent).\(UUID().uuidString).tmp",
+            isDirectory: false
+        )
+        defer { try? FileManager.default.removeItem(at: temporary) }
+        try FileManager.default.copyItem(at: source, to: temporary)
+        try FileManager.default.moveItem(at: temporary, to: destination)
+    }
+
+    private static func isSHA256(_ value: String) -> Bool {
+        value.count == 64 && value.unicodeScalars.allSatisfy { scalar in
+            CharacterSet(charactersIn: "0123456789abcdef").contains(scalar)
+        }
+    }
+
+    private static func writeVoiceReliabilityExportResult(
+        _ record: VoiceReliabilityExportResult,
+        runID: String
+    ) {
+        guard let pullableRoot = IOSPullableDiagnosticsMirror.pullableRoot else { return }
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        guard let data = try? encoder.encode(record) else { return }
+        let url = pullableRoot
+            .appendingPathComponent(runID, isDirectory: true)
+            .appendingPathComponent(
+                "voice-reliability-private-export-done.json",
+                isDirectory: false
+            )
+        writeData(data, to: url, label: "voice reliability private export")
+    }
+
+    private static func runVoiceReliabilityExportCleanup(exportRunID: String) {
+        guard let runID = safeRunID(from: exportRunID),
+              runID == exportRunID,
+              let pullableRoot = IOSPullableDiagnosticsMirror.pullableRoot else { return }
+        let target = pullableRoot.appendingPathComponent(runID, isDirectory: true)
+        let marker = target
+            .appendingPathComponent("private-export", isDirectory: true)
+            .appendingPathComponent("export.marker", isDirectory: false)
+        guard FileManager.default.fileExists(atPath: marker.path) else { return }
+        try? FileManager.default.removeItem(at: target)
+        let cleanupRunID = String((runID + "-cleanup").prefix(120))
+        let cleanupURL = pullableRoot
+            .appendingPathComponent(cleanupRunID, isDirectory: true)
+            .appendingPathComponent(
+                "voice-reliability-private-export-cleanup-done.json",
+                isDirectory: false
+            )
+        let body = [
+            "schemaVersion": 1,
+            "runID": runID,
+            "status": FileManager.default.fileExists(atPath: target.path)
+                ? "failed"
+                : "pass",
+        ] as [String: Any]
+        guard JSONSerialization.isValidJSONObject(body),
+              let data = try? JSONSerialization.data(
+                  withJSONObject: body,
+                  options: [.prettyPrinted, .sortedKeys]
+              ) else { return }
+        writeData(data, to: cleanupURL, label: "voice reliability private export cleanup")
+    }
+
     private struct VoiceReliabilityTranscriptionSpec: Decodable {
         struct Reference: Decodable {
             let alias: String
@@ -2315,7 +2735,7 @@ enum IOSDeviceDiagnosticsRunner {
         // expression touching MainActor `UIDevice` would be evaluated in the nonisolated
         // synthesized init (Swift 6 error). So defaults stay literal/`var`, and device/
         // bundle fields are passed in from the @MainActor call site.
-        var schemaVersion = 2
+        var schemaVersion = 3
         let runID: String
         let generationID: String
         let mode: String
@@ -2344,6 +2764,11 @@ enum IOSDeviceDiagnosticsRunner {
         var realtimeFactor: Double?
         var finishReason: String?
         var requestReceipt: RequestReceiptObservation?
+        var audioQC: AudioQCReport?
+        var failureCode: String?
+        var failureClassification: String?
+        var diagnosticArtifacts: [StartupReliabilityArtifactEvidence]?
+        var codecReplay: CodecReplayComparison?
         var error: String?
         var outputVerification: GenerationOutputVerifier.Result?
         /// Typed `languageASR` quality-registry gate derived from
@@ -2358,6 +2783,37 @@ enum IOSDeviceDiagnosticsRunner {
         let systemVersion: String
         let bundleVersion: String?
         let buildVersion: String?
+
+        mutating func apply(_ evidence: FailureEvidenceCapture) {
+            requestReceipt = evidence.requestReceipt
+            audioQC = evidence.audioQC
+            failureCode = evidence.failureCode
+            failureClassification = evidence.failureClassification
+            diagnosticArtifacts = evidence.diagnosticArtifacts.isEmpty
+                ? nil
+                : evidence.diagnosticArtifacts
+            codecReplay = evidence.codecReplay
+        }
+    }
+
+    private struct FailureEvidenceCapture {
+        let requestReceipt: RequestReceiptObservation?
+        let audioQC: AudioQCReport?
+        let failureCode: String?
+        let failureClassification: String
+        let diagnosticArtifacts: [StartupReliabilityArtifactEvidence]
+        let codecReplay: CodecReplayComparison?
+    }
+
+    private struct CodecReplayComparison: Codable {
+        let status: String
+        let failureCode: String?
+        let traceSHA256: String
+        let ranges: [StartupReliabilityCodecFrameRange]
+        let incrementalArtifact: StartupReliabilityArtifactEvidence?
+        let incrementalAudioQC: AudioQCReport?
+        let fullArtifact: StartupReliabilityArtifactEvidence?
+        let fullAudioQC: AudioQCReport?
     }
 
     /// Privacy-safe mirror of the fully assembled engine receipt. It carries
@@ -2414,6 +2870,27 @@ enum IOSDeviceDiagnosticsRunner {
                 "request_receipt_model_integrity_manifest_digest"
             ]
             speechTokenizerDigest = stringFlags["request_receipt_speech_tokenizer_digest"]
+        }
+
+        init(receipt: GenerationRequestReceipt) {
+            schemaVersion = receipt.schemaVersion
+            storedLanguageSelection = receipt.storedLanguageSelection
+            detectedTargetLanguage = receipt.detectedTargetLanguage
+            referenceTranscriptLanguage = receipt.referenceTranscriptLanguage
+            instructionDigest = receipt.instructionDigest
+            instructionLanguage = receipt.instructionLanguage
+            modelFacingInstructionLanguage = receipt.modelFacingInstructionLanguage
+            finalModelLanguage = receipt.finalModelLanguage
+            languageTokenMode = receipt.languageTokenMode
+            conditioningMode = receipt.conditioningMode
+            targetTextDigest = receipt.normalizedTargetTextDigest
+            targetTextCharacters = receipt.normalizedTargetTextCharacters
+            referenceTranscriptDigest = receipt.referenceTranscriptDigest
+            referenceTranscriptCharacters = receipt.referenceTranscriptCharacters
+            referenceAudioDigest = receipt.referenceAudioDigest
+            modelArtifactVersion = receipt.modelArtifactVersion
+            modelIntegrityManifestDigest = receipt.modelIntegrityManifestDigest
+            speechTokenizerDigest = receipt.speechTokenizerDigest
         }
     }
 

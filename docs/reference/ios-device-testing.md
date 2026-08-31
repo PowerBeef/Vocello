@@ -295,9 +295,26 @@ source-bound diagnostic that extends the same headless runner. It is read-only w
 saved-voice catalog: the untracked private map resolves the two stable aliases to exact existing
 saved-voice IDs, while the tracked plan and retained reports contain aliases only.
 
+When a previous VLR summary already binds both aliases to their reference-audio digests, recover
+the map without enumerating or copying unrelated saved voices. The export matches those exact
+digests inside the diagnostics-only app, copies only the two matching WAV/transcript pairs into an
+untracked host directory, validates the copied bytes, writes `private-map.json`, and removes the
+temporary device-side export after collection:
+
+```sh
+scripts/ios_device.sh voice-reliability-export \
+  --plan /private/tmp/vlr-device-plan.json \
+  --evidence build/artifacts/ios/voice-reliability/<prior-run>/voice-reliability-summary.json \
+  --output /private/tmp/vlr-private-export
+```
+
+This route never exports by voice name or copies the whole App Group. A missing or ambiguous digest
+fails closed and leaves the bounded diagnostic export available for forensic recovery.
+
 ```sh
 python3 scripts/voice_identity_language_reliability.py device-plan \
   --run-id <new-run-id> \
+  --profile focused \
   --output /private/tmp/vlr-device-plan.json
 python3 scripts/voice_identity_language_reliability.py validate-device-plan \
   --plan /private/tmp/vlr-device-plan.json \
@@ -305,6 +322,11 @@ python3 scripts/voice_identity_language_reliability.py validate-device-plan \
 scripts/ios_device.sh voice-reliability \
   --plan /private/tmp/vlr-device-plan.json \
   --private-map /private/tmp/vlr-private-map.json
+# Resume the exact same plan after interruption without repeating any launched row:
+scripts/ios_device.sh voice-reliability \
+  --plan /private/tmp/vlr-device-plan.json \
+  --private-map /private/tmp/vlr-private-map.json \
+  --resume
 ```
 
 The private map is schema 1, binds the plan digest, and contains exactly
@@ -315,13 +337,41 @@ retains only typed authorization, locale-attempt, availability, on-device-suppor
 digest evidence. It then executes exactly 26 no-retry current-fp16 rows: eight Clone target-language
 ownership cells and eighteen French Design Auto/explicit × short/medium/long × Neutral/no-delivery/
 Calm controls. Every terminal sentinel must expose a schema-2 actor-owned receipt, exact tokenizer,
-target-text and instruction identities, mandatory QC, and locale-locked output verification.
+target-text and instruction identities, mandatory QC, and locale-locked output verification. A
+failed schema-3 row additionally retains the actor receipt, complete QC, run-scoped rejected-audio
+and codec-trace identities, and incremental/full decoder replay. The host report assigns one root
+failure and records missing evidence separately.
 
 This focused device plan is not the 734-row Mac/CLI tokenizer/reference matrix and cannot prove an
 fp16/fp32 cause. Run it only after Mac/CLI localization, twice with distinct run IDs for VLR-07.
 It installs no models, edits no transcript or reference metadata, creates no History row, and never
 retries or substitutes a failed seed. Missing Speech assets, missing model readiness, absent private
 references, source drift, or an unverifiable output are explicit failures rather than skipped proof.
+
+For causal localization before closure, generate the bounded eight-seed profile with
+`--profile characterization`. It contains 122 current-fp16 rows: 38 Clone cells across both private
+aliases, English/French scripts, Auto core seeds, explicit parity, and Expressive sentinels; plus 84
+French Design cells across short/medium/long, Neutral/no-delivery/Calm, Auto core seeds, explicit
+parity, and Expressive sentinels. It remains below the 128-take runner bound. The append-only launch
+ledger prevents `--resume` from retrying either a terminal failure or a prior launch that exited
+without a sentinel. A new run ID is required to repeat evidence.
+
+### Retained pause boundary — 2026-08-31
+
+Characterization run `vlr-device-20260831-characterization-04` is intentionally incomplete and
+immutable. It is bound to plan digest
+`c1c0593ee49ee39dedff156dfb47a97282edbc08f431927631373c7b0c5eecfb` and retained terminal
+sentinels for takes 1–114: 98 PASS, three product QC failures, and 13 locale-verification failures.
+Take 115 is a ledgered, sentinel-less interruption; takes 116–122 were not launched. Its untracked
+artifact root contains `device-plan.json`, `launch-ledger.jsonl`,
+`voice-reliability-partial-summary.json`, and `pause-checkpoint.json`, plus per-take evidence.
+
+Do not use `--resume` for that run after the 2026-08-31 tracked checkpoint: committing changes the
+full-tree source identity, and cross-source resume correctly fails closed. Do not delete, overwrite,
+or rename the retained artifact root, and do not convert its missing rows into PASS. At the next
+phone window, create a new plan and private map with a new run ID against the then-current source and
+run the complete characterization. The old 114 terminal rows remain valid historical
+characterization; they cannot be merged with the new run to satisfy a complete-run gate.
 
 F-01/ICI-4 saved-voice and direct Clone-import acceptance is separately opt-in:
 

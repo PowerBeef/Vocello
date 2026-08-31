@@ -508,17 +508,20 @@ def design_instruction(brief: str, delivery: str | None) -> str:
 
 def build_device_plan(
     *, contract: dict[str, Any], run_id: str,
+    profile: str = "focused",
     source_identity: str | None = None,
 ) -> dict[str, Any]:
     validate_contract(contract)
     if not SAFE_ID.fullmatch(run_id):
         raise ReliabilityError("device runID is invalid")
+    if profile not in {"focused", "characterization"}:
+        raise ReliabilityError("device profile must be focused or characterization")
     scripts = resolve_scripts(contract)
     sys.path.insert(0, str(REPO / "scripts"))
     from check_delivery_instructions import load_presets
     presets = load_presets(REPO)
     tokenizer = contract["tokenizerArms"]["current-fp16"]["sha256"]
-    seed = contract["fixedSeeds"][0]
+    seeds = contract["fixedSeeds"]
     rows: list[dict[str, Any]] = []
 
     def add(row_id: str, **values: Any) -> None:
@@ -526,58 +529,89 @@ def build_device_plan(
         child = f"{run_id}-t{index:02d}-{canonical_digest(row_id)[:8]}"
         rows.append(_row(row_id, childRunID=child, **values))
 
-    for alias in contract["clone"]["coreReferenceAliases"]:
-        for script_id in contract["clone"]["scriptIDs"]:
-            script = scripts[script_id]
-            for selection in contract["clone"]["languageSelections"]:
-                add(
-                    f"device-clone-{alias}-{script_id}-{selection}",
-                    mode="clone", referenceAlias=alias,
-                    scriptID=script_id, scriptDigest=script["sha256"],
-                    targetLanguage=script["language"], languageSelection=selection,
-                    expectedStoredLanguage="auto" if selection == "auto" else script["language"],
-                    expectedFinalLanguage=script["language"],
-                    expectedConditioningMode="clone_transcript_backed",
-                    expectedTokenizerDigest=tokenizer,
-                    seed=seed, variation=contract["clone"]["primaryVariation"],
-                    deliveryArm=None, deliveryInstruction=None,
-                    expectedInstructionDigest=None,
-                    expectedInstructionLanguage=None,
-                )
+    def add_clone(alias: str, script_id: str, selection: str, seed: int, variation: str) -> None:
+        script = scripts[script_id]
+        add(
+            f"device-clone-{alias}-{script_id}-{selection}-{seed}-{variation}",
+            mode="clone", referenceAlias=alias,
+            scriptID=script_id, scriptDigest=script["sha256"],
+            targetLanguage=script["language"], languageSelection=selection,
+            expectedStoredLanguage="auto" if selection == "auto" else script["language"],
+            expectedFinalLanguage=script["language"],
+            expectedConditioningMode="clone_transcript_backed",
+            expectedTokenizerDigest=tokenizer,
+            seed=seed, variation=variation,
+            deliveryArm=None, deliveryInstruction=None,
+            expectedInstructionDigest=None,
+            expectedInstructionLanguage=None,
+        )
+
+    clone = contract["clone"]
+    if profile == "focused":
+        for alias in clone["coreReferenceAliases"]:
+            for script_id in clone["scriptIDs"]:
+                for selection in clone["languageSelections"]:
+                    add_clone(alias, script_id, selection, seeds[0], clone["primaryVariation"])
+    else:
+        for alias in clone["coreReferenceAliases"]:
+            for script_id in clone["scriptIDs"]:
+                for seed in seeds:
+                    add_clone(alias, script_id, "auto", seed, clone["primaryVariation"])
+                add_clone(alias, script_id, "explicit", seeds[0], clone["primaryVariation"])
+            add_clone(alias, clone["scriptIDs"][0], "explicit", seeds[0], clone["sentinelVariation"])
 
     design = contract["voiceDesign"]
-    for script_id in design["scriptIDs"]:
+    def add_design(script_id: str, selection: str, arm: str, seed: int, variation: str) -> None:
         script = scripts[script_id]
-        for selection in design["languageSelections"]:
+        cell = design["deliveryCells"][arm]
+        delivery = None
+        if cell is not None:
+            preset_id, tier = cell.split(".", 1)
+            delivery = presets[preset_id][tier]
+        instruction = design_instruction(design["voiceBrief"], delivery)
+        add(
+            f"device-design-{script_id}-{selection}-{arm}-{seed}-{variation}",
+            mode="design", referenceAlias=None,
+            scriptID=script_id, scriptDigest=script["sha256"],
+            targetLanguage="french", languageSelection=selection,
+            expectedStoredLanguage="auto" if selection == "auto" else "french",
+            expectedFinalLanguage="french",
+            expectedConditioningMode="voice_design",
+            expectedTokenizerDigest=tokenizer,
+            seed=seed, variation=variation,
+            deliveryArm=arm, deliveryInstruction=delivery,
+            expectedInstructionDigest=text_digest(instruction),
+            expectedInstructionLanguage="english",
+        )
+
+    if profile == "focused":
+        for script_id in design["scriptIDs"]:
+            for selection in design["languageSelections"]:
+                for arm in design["deliveryArms"]:
+                    add_design(script_id, selection, arm, seeds[0], design["primaryVariation"])
+    else:
+        for script_id in design["scriptIDs"]:
             for arm in design["deliveryArms"]:
-                cell = design["deliveryCells"][arm]
-                delivery = None
-                if cell is not None:
-                    preset_id, tier = cell.split(".", 1)
-                    delivery = presets[preset_id][tier]
-                instruction = design_instruction(design["voiceBrief"], delivery)
-                add(
-                    f"device-design-{script_id}-{selection}-{arm}",
-                    mode="design", referenceAlias=None,
-                    scriptID=script_id, scriptDigest=script["sha256"],
-                    targetLanguage="french", languageSelection=selection,
-                    expectedStoredLanguage="auto" if selection == "auto" else "french",
-                    expectedFinalLanguage="french",
-                    expectedConditioningMode="voice_design",
-                    expectedTokenizerDigest=tokenizer,
-                    seed=seed, variation=design["primaryVariation"],
-                    deliveryArm=arm, deliveryInstruction=delivery,
-                    expectedInstructionDigest=text_digest(instruction),
-                    expectedInstructionLanguage="english",
-                )
+                for seed in seeds:
+                    add_design(script_id, "auto", arm, seed, design["primaryVariation"])
+                add_design(script_id, "explicit", arm, seeds[0], design["primaryVariation"])
+        for arm in design["deliveryArms"]:
+            add_design(
+                design["scriptIDs"][1], "explicit", arm, seeds[0],
+                design["sentinelVariation"],
+            )
 
     body = {
-        "schemaVersion": 1,
+        "schemaVersion": 2,
         "kind": "voice-identity-language-device-plan",
+        "profile": profile,
         "runID": run_id,
         "sourceIdentity": source_identity or tree_fingerprint(),
         "contractDigest": canonical_digest(contract),
-        "seedPolicy": "fixed-focused-v1-no-retry",
+        "seedPolicy": (
+            "fixed-focused-v2-no-retry" if profile == "focused"
+            else "fixed-eight-characterization-v2-no-retry"
+        ),
         "takeCount": len(rows),
         "takes": rows,
     }
@@ -592,8 +626,9 @@ def validate_device_plan(
     digest = body.pop("planDigest", None)
     if digest != canonical_digest(body):
         raise ReliabilityError("device plan digest mismatch")
+    schema = plan.get("schemaVersion")
     if (
-        plan.get("schemaVersion") != 1
+        schema not in {1, 2}
         or plan.get("kind") != "voice-identity-language-device-plan"
         or plan.get("contractDigest") != canonical_digest(contract)
     ):
@@ -602,8 +637,15 @@ def validate_device_plan(
     if plan.get("sourceIdentity") != expected_source:
         raise ReliabilityError("device plan source identity differs from the current repository tree")
     takes = plan.get("takes")
-    if not isinstance(takes, list) or len(takes) != 26 or plan.get("takeCount") != 26:
-        raise ReliabilityError("device plan must contain the exact 26-take focused matrix")
+    profile = "focused" if schema == 1 else plan.get("profile")
+    expected_count = 26 if profile == "focused" else 122 if profile == "characterization" else None
+    if (
+        expected_count is None
+        or not isinstance(takes, list)
+        or len(takes) != expected_count
+        or plan.get("takeCount") != expected_count
+    ):
+        raise ReliabilityError("device plan does not contain its exact governed profile")
     seen: set[str] = set()
     children: set[str] = set()
     for row in takes:
@@ -615,10 +657,22 @@ def validate_device_plan(
             raise ReliabilityError("device plan contains duplicate identities")
         seen.add(row["takeID"])
         children.add(row["childRunID"])
-        if row.get("seed") != contract["fixedSeeds"][0]:
+        allowed_seeds = {contract["fixedSeeds"][0]} if profile == "focused" else set(
+            contract["fixedSeeds"]
+        )
+        if row.get("seed") not in allowed_seeds:
             raise ReliabilityError(f"{row['takeID']}: device seed drift")
         if row.get("expectedTokenizerDigest") != contract["tokenizerArms"]["current-fp16"]["sha256"]:
             raise ReliabilityError(f"{row['takeID']}: device tokenizer drift")
+    if schema == 2:
+        expected = build_device_plan(
+            contract=contract,
+            run_id=plan["runID"],
+            profile=profile,
+            source_identity=plan["sourceIdentity"],
+        )
+        if plan != expected:
+            raise ReliabilityError("device plan differs from its exact governed profile")
 
 
 def load_private_device_map(path: Path, plan: dict[str, Any], contract: dict[str, Any]) -> dict[str, str]:
@@ -687,84 +741,208 @@ def compose_device_results(
 
     takes = []
     hard_failures = 0
+    product_failures = 0
+    harness_failures = 0
     audio_by_alias: dict[str, set[str]] = {}
     for row in plan["takes"]:
         matches = list(diagnostics_root.rglob(
             f"{row['childRunID']}/device-diagnostics-done.json"
         ))
         failures: list[str] = []
+        evidence_gaps: list[str] = []
+        root_cause: str | None = None
+        failure_owner: str | None = None
         sentinel: dict[str, Any] = {}
         if len(matches) != 1:
             failures.append("missing-or-duplicate-sentinel")
+            root_cause = "diagnostic_sentinel_unavailable"
+            failure_owner = "harness"
         else:
             sentinel = load_json(matches[0])
-            receipt = sentinel.get("requestReceipt") or {}
-            expected = {
-                "status": "ok",
+            receipt_value = sentinel.get("requestReceipt")
+            receipt = receipt_value if isinstance(receipt_value, dict) else {}
+            common_expected = {
                 "mode": row["mode"],
                 "seed": row["seed"],
                 "samplingVariation": row["variation"],
-                "resolvedLanguageHint": row["expectedFinalLanguage"],
             }
-            for key, expected_value in expected.items():
+            for key, expected_value in common_expected.items():
                 if sentinel.get(key) != expected_value:
                     failures.append(f"sentinel-{key}-mismatch")
-            receipt_expected = {
-                "schemaVersion": 2,
-                "storedLanguageSelection": row["expectedStoredLanguage"],
-                "detectedTargetLanguage": row["targetLanguage"],
-                "finalModelLanguage": row["expectedFinalLanguage"],
-                "conditioningMode": row["expectedConditioningMode"],
-                "targetTextDigest": row["scriptDigest"],
-                "speechTokenizerDigest": row["expectedTokenizerDigest"],
-                "instructionDigest": row.get("expectedInstructionDigest"),
-                "modelFacingInstructionLanguage": row.get("expectedInstructionLanguage"),
-            }
-            for key, expected_value in receipt_expected.items():
-                if receipt.get(key) != expected_value:
-                    failures.append(f"receipt-{key}-mismatch")
-            verification = sentinel.get("outputVerification") or {}
-            if verification.get("pass") is not True:
-                failures.append("output-verification-failed")
+            if sentinel.get("status") == "ok":
+                if sentinel.get("resolvedLanguageHint") != row["expectedFinalLanguage"]:
+                    failures.append("sentinel-resolvedLanguageHint-mismatch")
+                receipt_expected = {
+                    "schemaVersion": 2,
+                    "storedLanguageSelection": row["expectedStoredLanguage"],
+                    "detectedTargetLanguage": row["targetLanguage"],
+                    "finalModelLanguage": row["expectedFinalLanguage"],
+                    "conditioningMode": row["expectedConditioningMode"],
+                    "targetTextDigest": row["scriptDigest"],
+                    "speechTokenizerDigest": row["expectedTokenizerDigest"],
+                    "instructionDigest": row.get("expectedInstructionDigest"),
+                    "modelFacingInstructionLanguage": row.get("expectedInstructionLanguage"),
+                }
+                for key, expected_value in receipt_expected.items():
+                    if receipt.get(key) != expected_value:
+                        failures.append(f"receipt-{key}-mismatch")
+                verification = sentinel.get("outputVerification") or {}
+                if verification.get("pass") is not True:
+                    failures.append("output-verification-failed")
+                if failures:
+                    root_cause = "successful_take_evidence_mismatch"
+                    failure_owner = "harness"
+            elif sentinel.get("status") == "error":
+                schema = sentinel.get("schemaVersion")
+                classification = sentinel.get("failureClassification")
+                failure_code = sentinel.get("failureCode")
+                allowed_classifications = {
+                    "post_generation_qc",
+                    "post_generation_failure",
+                    "pre_audio_startup",
+                    "unmaterialized_unknown",
+                }
+                if schema == 3 and classification in allowed_classifications:
+                    safe_code = failure_code if _safe_diagnostic_identifier(failure_code) else "unknown"
+                    root_cause = f"{classification}:{safe_code}"
+                    failure_owner = (
+                        "harness" if classification == "unmaterialized_unknown" else "product"
+                    )
+                    if not receipt:
+                        evidence_gaps.append("request-receipt-unavailable")
+                    audio_qc = sentinel.get("audioQC")
+                    if classification == "post_generation_qc":
+                        if not isinstance(audio_qc, dict) or audio_qc.get("verdict") != "fail":
+                            evidence_gaps.append("failed-audio-qc-unavailable")
+                        artifacts = sentinel.get("diagnosticArtifacts") or []
+                        kinds = {
+                            artifact.get("kind")
+                            for artifact in artifacts if isinstance(artifact, dict)
+                        }
+                        for required_kind in ("codec_trace", "rejected_audio"):
+                            if required_kind not in kinds:
+                                evidence_gaps.append(f"{required_kind.replace('_', '-')}-unavailable")
+                        if not isinstance(sentinel.get("codecReplay"), dict):
+                            evidence_gaps.append("codec-replay-unavailable")
+                else:
+                    root_cause = "unclassified_generation_failure"
+                    failure_owner = "product"
+                    evidence_gaps.append("schema-v3-terminal-evidence-unavailable")
+                failures.append(root_cause)
+            else:
+                failures.append("sentinel-status-invalid")
+                root_cause = "sentinel_status_invalid"
+                failure_owner = "harness"
             if row["mode"] == "clone":
                 digest = receipt.get("referenceAudioDigest")
                 if isinstance(digest, str):
                     audio_by_alias.setdefault(row["referenceAlias"], set()).add(digest)
         if failures:
             hard_failures += 1
+            if failure_owner == "product":
+                product_failures += 1
+            if failure_owner == "harness" or evidence_gaps:
+                harness_failures += 1
         takes.append({
             "takeID": row["takeID"],
             "childRunID": row["childRunID"],
             "status": "PASS" if not failures else "HARD_FAILURE",
             "failures": failures,
+            "rootCause": root_cause,
+            "failureOwner": failure_owner,
+            "evidenceGaps": sorted(set(evidence_gaps)),
             "wordErrorRate": (sentinel.get("outputVerification") or {}).get("wordErrorRate"),
             "characterErrorRate": (sentinel.get("outputVerification") or {}).get("characterErrorRate"),
             "referenceTranscriptLanguage": (sentinel.get("requestReceipt") or {}).get(
                 "referenceTranscriptLanguage"
             ),
+            "audioQC": _public_audio_qc(sentinel.get("audioQC")),
+            "diagnosticArtifacts": _public_diagnostic_artifacts(
+                sentinel.get("diagnosticArtifacts")
+            ),
+            "codecReplay": _public_codec_replay(sentinel.get("codecReplay")),
         })
     for alias, digests in audio_by_alias.items():
         if len(digests) != 1:
             hard_failures += 1
+            harness_failures += 1
             takes.append({
                 "takeID": f"identity-{alias}",
                 "status": "HARD_FAILURE",
                 "failures": ["reference-audio-identity-drift"],
+                "rootCause": "reference_audio_identity_drift",
+                "failureOwner": "harness",
+                "evidenceGaps": [],
             })
 
     report = {
-        "schemaVersion": 1,
+        "schemaVersion": 2,
         "runID": plan["runID"],
         "planDigest": plan["planDigest"],
         "status": "PASS" if hard_failures == 0 else "FAIL",
         "planned": plan["takeCount"],
         "hardFailures": hard_failures,
+        "productFailures": product_failures,
+        "harnessFailures": harness_failures,
         "transcription": sorted(public_transcription, key=lambda row: row["alias"]),
         "takes": takes,
         "semanticPromotionAuthority": False,
     }
     atomic_json(output, report)
     return report
+
+
+def _safe_diagnostic_identifier(value: Any) -> bool:
+    return (
+        isinstance(value, str)
+        and 1 <= len(value) <= 96
+        and all(character.isalnum() or character in "._-" for character in value)
+    )
+
+
+def _public_audio_qc(value: Any) -> dict[str, Any] | None:
+    if not isinstance(value, dict):
+        return None
+    allowed = (
+        "algorithmVersion", "instabilityVerdict", "writtenOutputVerdict", "verdict",
+        "flags", "rmsDBFS", "dcOffset", "peak", "clippedSamples", "hotSamples",
+        "nonFiniteSamples", "clickEvents", "longestSilenceMS",
+        "longestSilenceStartMS", "durationSeconds",
+    )
+    return {key: value[key] for key in allowed if key in value}
+
+
+def _public_diagnostic_artifacts(value: Any) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    allowed = (
+        "kind", "sha256", "byteCount", "durationSeconds", "codecFrameCount",
+        "codeGroupRange", "codecChunkRanges", "complete",
+    )
+    return [
+        {key: artifact[key] for key in allowed if key in artifact}
+        for artifact in value if isinstance(artifact, dict)
+    ]
+
+
+def _public_codec_replay(value: Any) -> dict[str, Any] | None:
+    if not isinstance(value, dict):
+        return None
+    return {
+        "status": value.get("status"),
+        "failureCode": value.get("failureCode")
+            if _safe_diagnostic_identifier(value.get("failureCode")) else None,
+        "traceSHA256": value.get("traceSHA256"),
+        "ranges": value.get("ranges") or [],
+        "incrementalArtifact": _public_diagnostic_artifacts(
+            [value.get("incrementalArtifact")]
+        )[0] if isinstance(value.get("incrementalArtifact"), dict) else None,
+        "incrementalAudioQC": _public_audio_qc(value.get("incrementalAudioQC")),
+        "fullArtifact": _public_diagnostic_artifacts(
+            [value.get("fullArtifact")]
+        )[0] if isinstance(value.get("fullArtifact"), dict) else None,
+        "fullAudioQC": _public_audio_qc(value.get("fullAudioQC")),
+    }
 
 
 def private_assets(bundle_root: Path, public_bundle: dict[str, Any]) -> dict[str, Any]:
@@ -1209,6 +1387,9 @@ def main(argv: list[str] | None = None) -> int:
     analyze.add_argument("--speaker-similarity", action="store_true")
     device_plan = sub.add_parser("device-plan")
     device_plan.add_argument("--run-id", required=True)
+    device_plan.add_argument(
+        "--profile", choices=("focused", "characterization"), default="focused"
+    )
     device_plan.add_argument("--output", required=True, type=Path)
     validate_device = sub.add_parser("validate-device-plan")
     validate_device.add_argument("--plan", required=True, type=Path)
@@ -1229,7 +1410,9 @@ def main(argv: list[str] | None = None) -> int:
             )
             payload = {"status": "PASS", "runID": result["runID"], "bundleDigest": result["bundleDigest"]}
         elif args.command == "device-plan":
-            plan = build_device_plan(contract=contract, run_id=args.run_id)
+            plan = build_device_plan(
+                contract=contract, run_id=args.run_id, profile=args.profile
+            )
             atomic_json(args.output.expanduser().resolve(), plan)
             payload = {
                 "status": "PASS", "takeCount": plan["takeCount"],
@@ -1259,6 +1442,9 @@ def main(argv: list[str] | None = None) -> int:
                     "takeCount": report["planned"],
                     "hardFailures": report["hardFailures"],
                 }
+                if report["status"] != "PASS":
+                    print(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True))
+                    return 2
         else:
             bundle_root = args.bundle_root.expanduser().resolve()
             bundle = load_json(bundle_root / "bundle-manifest.json")

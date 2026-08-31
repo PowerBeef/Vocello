@@ -195,7 +195,7 @@ scripts/ui_test.sh ios saved-voice-lifecycle
 scripts/ui_test.sh ios control-audit --scenario inventory|stateful|external|accessibility|generation|all
 scripts/ios_device.sh gate
 # Private Clone/French diagnosis; never CI/release:
-scripts/ios_device.sh voice-reliability --plan <untracked-plan.json> --private-map <untracked-map.json>
+scripts/ios_device.sh voice-reliability --plan <untracked-plan.json> --private-map <untracked-map.json> [--resume]
 ```
 
 iOS uses a paired physical iPhone; platform gates are non-XCUITest diagnostics. `preflight`
@@ -226,7 +226,7 @@ rows; reruns get new IDs. See `docs/reference/ios-device-testing.md`.
 | `docs/reference/model-delivery.md` | download/restoration/retry diagnostics and live-proof rules |
 | `config/delivery-experiment-contract.json`, `config/delivery-evaluator-v2-contract.json`, `config/delivery-evaluation-corpus.json`, `config/delivery-evaluator-v2-candidates.json` | pre-registered prompt arms, compact local evaluator, sampling, multilingual scripts, pinned candidate models, holdouts, and semantic-promotion limits |
 | `config/audio-cadence-qc-contract.json`, `scripts/audio_cadence_qc.py` | Fast-QC cadence classification, privacy-safe calibration coverage, and held-out threshold-review authority |
-| `config/voice-identity-language-reliability.json`, `scripts/voice_identity_language_reliability.py` | Private, source-bound Clone/French matrices; reports contain aliases/digests only |
+| `config/voice-identity-language-reliability.json`, `scripts/voice_identity_language_reliability.py` | Private Clone/French matrices with privacy-safe terminal QC/replay |
 | `docs/reference/delivery-harness.md` | delivery/emotion protocol, provenance, layered evaluation, statistics, and results |
 | `website/` | marketing site governed by `website/AGENTS.md` |
 

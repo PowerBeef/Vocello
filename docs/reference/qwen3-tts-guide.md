@@ -338,7 +338,8 @@ carries the full adjudication with references. Summary:
 
 - **Custom Voice**: detect from the target text; fall back to `english`.
 - **Voice Design**: detect from the target text; fall back to `auto`.
-- **Voice Clone**: detect from the resolved transcript if available, otherwise from the target text; fall back to `auto`.
+- **Voice Clone**: detect from the target text; an explicit output-language selection always wins,
+  and the reference transcript's language remains conditioning metadata only; fall back to `auto`.
 
 ### 7.3 Delivery-instruction language routing
 

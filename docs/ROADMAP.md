@@ -16,7 +16,7 @@
 | `ios-app-store-readiness-2026-08` | active | release-qa | 1/12 (8%) |
 | `ios-control-audit-2026-08` | active | ios | 8/12 (67%) |
 | `ios-generation-startup-reliability-2026-08` | active | backend-and-platform | 4/6 (67%) |
-| `voice-identity-language-reliability-2026-08` | active | backend-and-platform | 2/9 (22%) |
+| `voice-identity-language-reliability-2026-08` | active | backend-and-platform | 6/9 (67%) |
 | `compliance-2026-08` | complete | release-qa | 2/2 (100%) |
 | `convergence-metal4-stage4-2026-08` | complete | backend-and-platform | 7/7 (100%) |
 | `doc-governance-2026-08` | complete | release-qa | 9/9 (100%) |
@@ -311,35 +311,23 @@ Narrative authority: [`docs/reference/delivery-harness.md`](reference/delivery-h
 
 | Item | Status | Title | Evidence |
 | --- | --- | --- | --- |
-| `VLR-01` | planned | Preserve and characterize private references and clean controls | — |
+| `VLR-01` | done | Preserve and characterize private references and clean controls | `doc:docs/reference/voice-identity-language-reliability-macos-2026-09-01.md` |
 | `VLR-02` | done | Record truthful model input and typed enrollment-transcription evidence | `file:Sources/QwenVoiceCore/GenerationStartupDiagnostics.swift`, `file:Sources/SharedSupport/Services/VoiceClipTranscriber.swift`, `file:Tests/VocelloCoreTests/GenerationStartupDiagnosticsTests.swift`, `file:Tests/VocelloCoreTests/VoiceClipEnrollmentEvidenceTests.swift` |
-| `VLR-03` | in-flight | Complete Clone, tokenizer, transcription, and French Voice Design matrices | `file:scripts/tests/test_voice_identity_language_reliability.py`, `file:Sources/QwenVoiceCore/GenerationTerminalDiagnosticEvidence.swift`, `file:Tests/VocelloCoreTests/GenerationTerminalDiagnosticEvidenceTests.swift` |
+| `VLR-03` | done | Complete Clone, tokenizer, transcription, and French Voice Design matrices | `file:scripts/tests/test_voice_identity_language_reliability.py`, `file:Sources/QwenVoiceCore/GenerationTerminalDiagnosticEvidence.swift`, `file:Tests/VocelloCoreTests/GenerationTerminalDiagnosticEvidenceTests.swift`, `doc:docs/reference/voice-identity-language-reliability-macos-2026-09-01.md` |
 | `VLR-04` | done | Correct Clone target/reference language ownership | `file:Sources/QwenVoiceCore/GenerationSemantics.swift`, `file:Tests/VocelloCoreTests/GenerationSemanticsLanguageTests.swift`, `file:Sources/iOS/Voices/IOSRecordVoiceSheet.swift` |
-| `VLR-05` | in-flight | Apply only the proven tokenizer or reference-quality remediation | — |
-| `VLR-06` | in-flight | Apply only the proven French Voice Design remediation | — |
+| `VLR-05` | done | Apply only the proven tokenizer or reference-quality remediation | `doc:docs/reference/voice-identity-language-reliability-macos-2026-09-01.md` |
+| `VLR-06` | done | Apply only the proven French Voice Design remediation | `doc:docs/reference/voice-identity-language-reliability-macos-2026-09-01.md` |
 | `VLR-07` | planned | Complete physical-device closure and publish the privacy-safe report | — |
 | `VLR-08` | in-flight | Repair the live Clone publication gap exposed by clean codec replay | — |
 | `VLR-09` | in-flight | Reject egregious terminal silence before publication | `file:Tests/VocelloCoreTests/GenerationTelemetrySchemaTests.swift`, `file:Tests/VocelloCoreTests/AtomicWAVPublicationTests.swift` |
 
 ### Open items in detail
 
-- **`VLR-01`** (planned) — Preserve and characterize private references and clean controls.
-  gate: Create one untracked content-addressed bundle containing read-only copies of the two maintainer references, the already reviewed manual transcript for the second reference, any reviewed transcript for the first, saved reference-language metadata, immutable runtime identities, and clean French/English transcript-backed controls. Characterize PCM integrity, silence, clipping, noise, pitch register/range, cadence, voicing, roughness, transcript/audio alignment, and warnings using stable aliases only; no name, text, path, or audio may enter tracked evidence.
-
-- **`VLR-03`** (in-flight) — Complete Clone, tokenizer, transcription, and French Voice Design matrices.
-  gate: Run the source-bound serial matrix with eight frozen seeds per core cell across both private references and clean controls, reviewed/corrected/audio-only transcript arms, Auto/explicit and French/English scripts, current fp16 and archived fp32 tokenizer identities when available, Consistent plus Expressive sentinels, and cold/warm sentinels. Run French Design short/medium/long across Auto/explicit, Neutral/no-delivery/non-neutral, tokenizer, seed, and variation arms. Retain every failed row without retry or replacement and require exact schema-2 receipts.
-
-- **`VLR-05`** (in-flight) — Apply only the proven tokenizer or reference-quality remediation.
-  gate: If fixed-seed evidence localizes the divergence to reference/transcript quality, add actionable enrollment warnings with explicit review and no silent rewrite or identity-normalizing regeneration. If it localizes to fp16 tokenizer precision, isolate encoder/decoder sensitivity where practical and ship only the smallest qualifying immutable artifact with receipt, memory, catalog, and promotion evidence; otherwise retain current artifacts and classify the result as inconclusive.
-
-- **`VLR-06`** (in-flight) — Apply only the proven French Voice Design remediation.
-  gate: Use target-language, prompt-arm, tokenizer, seed, and variation evidence to localize French Design. A pure Auto-language ownership defect may be corrected directly; any Neutral omission/replacement or localized non-neutral prompt remains experimental under DP-31/DP-32 until blinded semantic promotion authority passes. Preserve production copy when no reproducible first divergence exists.
-
 - **`VLR-07`** (planned) — Complete physical-device closure and publish the privacy-safe report.
-  gate: After Mac/CLI localization, complete two consecutive no-retry focused physical-iPhone passes using the private alias map and exact current source. Require typed transcription classification, correct short/medium/long French output, exact receipt parity, zero new hard QC failures, WER/CER delta <= 0.01, speaker-similarity delta >= -0.02, governed Clone prosody fidelity or explicit reference rejection, and green Built-in/English Design/enrollment/Clone controls. Publish only a digest-pinned privacy-safe historical report; keep audio, text, names, paths, raw diagnostics, and device evidence untracked.
+  gate: After Mac/CLI localization, complete two consecutive no-retry 14-row closure physical-iPhone passes plus one 122-row characterization using new source-bound private maps and exact current source. Require typed transcription classification, correct short/medium/long French output, exact receipt parity, zero unexplained hard QC failures, WER/CER delta <= 0.01, speaker-similarity delta >= -0.02, governed Clone prosody fidelity or explicit reference rejection, and green Built-in/English Design/enrollment/Clone controls. Publish only a digest-pinned privacy-safe physical-device report; keep audio, text, names, paths, raw diagnostics, and device evidence untracked.
 
 - **`VLR-08`** (in-flight) — Repair the live Clone publication gap exposed by clean codec replay.
-  gate: For the second-reference English seed-32060821 Auto and explicit controls, prove why the live persisted output contains a 7.603-second early gap while exact-range incremental and full replay of the identical codec trace pass. Repair only the first divergent live publication, stream assembly, limiter, marking, writer, or finalization layer; add a deterministic regression fixture; preserve seed, sampling, tokenizer, model, reference, transcript, and QC policy; and require three consecutive physical-device passes for both language-selection paths plus no regression across the remaining eight-seed Clone cohort.
+  gate: For the second-reference English seed-32060821 Auto and explicit controls, preserve proof that incremental and full replay of the identical codec trace reproduce the model-generated delayed onset. A bounded Clone-only leading-edge gate may trim only the sub-floor edge before three consecutive active windows, retain at least 80 ms pre-roll, remain duration-independent, never alter Built-in/Design or an interior pause, and expose exact metrics. Preserve seed, sampling, tokenizer, model, reference, transcript, and QC policy; require three consecutive physical-device passes for both selection paths plus no regression across the eight-seed Clone cohort.
 
 - **`VLR-09`** (in-flight) — Reject egregious terminal silence before publication.
   gate: Fast QC must retain bounded cross-chunk terminal-silence length and start evidence after audible speech begins, reject a terminal run at or above the existing context-owned egregious threshold, preserve ordinary terminal padding, decode v1-v5 reports compatibly, and emit a typed severe cadence reason. Focused deterministic tests and the full runtime suite must pass. A fresh physical-device run must prove the former take-112 shape is either clean or rejected before publication without changing the existing interior-pause thresholds, seed, prompt, sampling, or retry policy.

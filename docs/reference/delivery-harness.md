@@ -139,12 +139,13 @@ versus full decoder replay. The host composer reports one `rootCause` per failed
 missing forensic material in `evidenceGaps`; a failed generation is not reclassified as several
 receipt, language, and ASR failures. The composer returns nonzero on a FAIL result.
 
-The `focused` phone profile remains the 26-row language/prompt screen. The `characterization`
-profile is a bounded 122-row follow-up with all eight frozen seeds, explicit-language parity, and
-five Expressive sentinels. `scripts/ios_device.sh voice-reliability --resume` validates the exact
-retained plan and uses an append-only launch ledger: terminal rows and sentinel-less prior attempts
-are never relaunched. Raw audio, traces, replay WAVs, and private reference identities remain
-untracked.
+The production-only `closure` phone profile contains 14 rows: eight Clone language-ownership cells
+and six current-Neutral French Design cells. The `focused` profile remains the 26-row diagnostic
+language/prompt screen, while `characterization` is the bounded 122-row follow-up with all eight
+frozen seeds, explicit-language parity, and five Expressive sentinels.
+`scripts/ios_device.sh voice-reliability --resume` validates the exact retained plan and uses an
+append-only launch ledger: terminal rows and sentinel-less prior attempts are never relaunched. Raw
+audio, traces, replay WAVs, and private reference identities remain untracked.
 
 If an earlier sanitized summary still binds both private aliases to exact audio digests,
 `scripts/ios_device.sh voice-reliability-export` can reconstruct the untracked alias map and host
@@ -156,11 +157,19 @@ The first schema-3 characterization remains an immutable partial run with 114 of
 A distinct September 1 campaign completed all 122 rows: 103 PASS, three mandatory product-QC
 failures, and 16 successful generations that failed locale-locked output verification. Its 38-row
 Clone block repeated 36/38 PASS. The two second-alias English failures share a codec trace and a
-7.603-second live gap, but raw per-chunk QC proves the live decoder chunks were already near-silent
-before limiter/writer publication while exact replay of the identical codec IDs is clean. VLR-08
-therefore disables deferred audio materialization when the constrained memory policy clears the MLX
-allocator cache after a chunk; higher-memory paths retain pipelining. Deterministic runtime tests
-pass, but corrected-source phone acceptance has not started.
+7.603-second live gap. Exact-range incremental and full replay reproduce the same delayed onset,
+which localizes it to deterministic model-generated leading near-silence rather than deferred MLX
+materialization, limiter, writer, or stream assembly. The speculative allocator-cache workaround
+was reverted.
+
+The completed 734-row Mac/CLI matrix represented every row: 364 PASS, 360 explicit archived-fp32
+prerequisite blocks, and 10 hard failures. All 294 Design receipts had the expected French model
+language. Serial analysis covered 220 passing Clone rows with no weak speaker-similarity result;
+prosody findings remain advisory under AV-07. A bounded Clone-only leading-edge gate now requires
+three active 20 ms windows, retains up to 80 ms of pre-roll, and trims only the preceding sub-floor
+edge. Three fresh Auto/explicit Mac cohorts passed 6/6 without retries. The pinned privacy-safe
+details are in
+[`voice-identity-language-reliability-macos-2026-09-01.md`](voice-identity-language-reliability-macos-2026-09-01.md).
 
 The complete 84-row French Design block passed current Neutral 26/28, no-delivery 22/28, and Calm
 strong 19/28. One no-delivery row is a replay-confirmed sampled-output dropout; 16 rows failed
@@ -170,10 +179,11 @@ terminal silence that the interior-only v5 Fast-QC gate did not observe. VLR-09'
 the bounded open terminal run and rejects an egregious tail at the existing contextual boundary;
 ordinary terminal padding and all existing interior-pause thresholds remain unchanged.
 
-No prompt, tokenizer, model pin, sampling default, seed, or retry policy changed. Tokenizer/reference
-remediation belongs to VLR-05; any Design delivery-copy candidate remains under DP-31/DP-32 blinded-
-listening authority. The immutable run identities and next-run procedure live in the iOS device-
-testing guide.
+No prompt, tokenizer, model pin, sampling default, seed, retry policy, or QC threshold changed. The
+current fp16 artifact remains selected because it broadly passed and the immutable archived-fp32
+artifact was unavailable rather than substituted. Any Design delivery-copy candidate remains under
+DP-31/DP-32 blinded-listening authority. The immutable run identities and next-run procedure live
+in the iOS device-testing guide.
 
 ## 2. Measurement protocol — `vocello bench --delivery`
 

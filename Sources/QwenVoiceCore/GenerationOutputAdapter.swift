@@ -697,6 +697,7 @@ enum AtomicPCM16WAVWriter {
 final class PCM16ScratchBuffer: @unchecked Sendable {
     private var storage: [Int16] = []
     private var limiter = PCM16StreamLimiter()
+    private var leadingSilenceGate = PCM16LeadingSilenceGate()
 
     init() {}
 
@@ -704,17 +705,33 @@ final class PCM16ScratchBuffer: @unchecked Sendable {
         limiter.metrics
     }
 
+    var leadingSilenceMetrics: PCM16LeadingSilenceGate.Metrics {
+        leadingSilenceGate.metrics
+    }
+
+    func configureLeadingSilenceGate(
+        _ policy: PCM16LeadingSilenceGate.Policy,
+        sampleRate: Int
+    ) {
+        leadingSilenceGate = PCM16LeadingSilenceGate(
+            policy: policy,
+            sampleRate: sampleRate
+        )
+    }
+
     func convertLimited(_ samples: [Float]) -> [Int16] {
         storage.removeAll(keepingCapacity: true)
         storage.reserveCapacity(samples.count)
-        limiter.append(samples, into: &storage)
+        let filtered = leadingSilenceGate.filter(samples)
+        limiter.append(filtered, into: &storage)
         return storage
     }
 
     func convertLimited(_ samples: [Float], into destination: inout [Int16]) {
         destination.removeAll(keepingCapacity: true)
         destination.reserveCapacity(samples.count)
-        limiter.append(samples, into: &destination)
+        let filtered = leadingSilenceGate.filter(samples)
+        limiter.append(filtered, into: &destination)
     }
 
     func pcm16LittleEndianData(from pcmSamples: [Int16]) -> Data {
@@ -736,6 +753,133 @@ final class PCM16ScratchBuffer: @unchecked Sendable {
     func reset() {
         storage.removeAll(keepingCapacity: true)
         limiter = PCM16StreamLimiter()
+        leadingSilenceGate = PCM16LeadingSilenceGate()
+    }
+}
+
+/// Bounded edge conditioning for Clone output only.
+///
+/// Qwen Base can deterministically emit seconds of decoder noise before the
+/// first voiced frame for a specific reference/transcript/seed tuple. That is
+/// model output, not a transport gap, and publishing it makes an otherwise
+/// valid take unusable. This gate drops only the leading near-silent edge. It
+/// never edits an interior pause, changes a seed, regenerates a take, or turns
+/// failed QC into a pass. Three consecutive 20 ms windows must cross the same
+/// silence floor used by Fast QC; at most 80 ms of pre-roll is retained.
+/// Memory is bounded by the pre-roll and activation windows, independent of
+/// how long the model remains silent.
+struct PCM16LeadingSilenceGate: Sendable {
+    enum Policy: Sendable {
+        case disabled
+        case cloneEdgeV1
+    }
+
+    struct Metrics: Equatable, Sendable {
+        var algorithmVersion: Int?
+        var opened = false
+        var trimmedSamples = 0
+        var retainedPreRollSamples = 0
+        var maximumBufferedSamples = 0
+    }
+
+    static let algorithmVersion = 1
+    static let analysisWindowMilliseconds = 20
+    static let activationWindowCount = 3
+    static let preRollMilliseconds = 80
+
+    private let policy: Policy
+    private let sampleRate: Int
+    private let windowSampleCount: Int
+    private let preRollWindowCount: Int
+    private var pendingWindow: [Float] = []
+    private var bufferedWindows: [[Float]] = []
+    private var consecutiveActiveWindows = 0
+    private(set) var metrics: Metrics
+
+    init(policy: Policy = .disabled, sampleRate: Int = 0) {
+        self.policy = policy
+        self.sampleRate = max(0, sampleRate)
+        windowSampleCount = max(
+            1,
+            Int((Double(max(1, sampleRate))
+                * Double(Self.analysisWindowMilliseconds) / 1_000).rounded())
+        )
+        preRollWindowCount = max(
+            0,
+            Self.preRollMilliseconds / Self.analysisWindowMilliseconds
+        )
+        metrics = Metrics(
+            algorithmVersion: policy == .cloneEdgeV1 ? Self.algorithmVersion : nil
+        )
+    }
+
+    mutating func filter(_ samples: [Float]) -> [Float] {
+        guard !samples.isEmpty else { return [] }
+        guard policy == .cloneEdgeV1, sampleRate > 0 else { return samples }
+        guard !metrics.opened else { return samples }
+
+        var output: [Float] = []
+        var sourceIndex = 0
+        while sourceIndex < samples.count, !metrics.opened {
+            let needed = windowSampleCount - pendingWindow.count
+            let copyCount = min(needed, samples.count - sourceIndex)
+            pendingWindow.append(contentsOf: samples[sourceIndex ..< sourceIndex + copyCount])
+            sourceIndex += copyCount
+            guard pendingWindow.count == windowSampleCount else { break }
+
+            let completedWindow = pendingWindow
+            pendingWindow.removeAll(keepingCapacity: true)
+            bufferedWindows.append(completedWindow)
+            metrics.maximumBufferedSamples = max(
+                metrics.maximumBufferedSamples,
+                bufferedWindows.reduce(0) { $0 + $1.count }
+            )
+
+            let meanSquare = completedWindow.reduce(into: 0.0) { partial, sample in
+                let finite = sample.isFinite ? Double(sample) : 0
+                partial += finite * finite
+            } / Double(completedWindow.count)
+            if sqrt(meanSquare) >= Double(PCM16StreamLimiter.silenceFloor) {
+                consecutiveActiveWindows += 1
+            } else {
+                consecutiveActiveWindows = 0
+            }
+
+            if consecutiveActiveWindows >= Self.activationWindowCount {
+                let firstActiveWindow = bufferedWindows.count - Self.activationWindowCount
+                let flushStart = max(0, firstActiveWindow - preRollWindowCount)
+                for index in 0 ..< flushStart {
+                    metrics.trimmedSamples += bufferedWindows[index].count
+                }
+                for index in flushStart ..< bufferedWindows.count {
+                    output.append(contentsOf: bufferedWindows[index])
+                }
+                metrics.retainedPreRollSamples = max(
+                    0,
+                    (firstActiveWindow - flushStart) * windowSampleCount
+                )
+                bufferedWindows.removeAll(keepingCapacity: false)
+                metrics.opened = true
+            } else {
+                let retainedWindowCount = preRollWindowCount + consecutiveActiveWindows
+                if bufferedWindows.count > retainedWindowCount {
+                    let discardCount = bufferedWindows.count - retainedWindowCount
+                    for index in 0 ..< discardCount {
+                        metrics.trimmedSamples += bufferedWindows[index].count
+                    }
+                    bufferedWindows.removeFirst(discardCount)
+                }
+            }
+        }
+
+        if metrics.opened, sourceIndex < samples.count {
+            output.append(contentsOf: samples[sourceIndex...])
+        }
+        metrics.maximumBufferedSamples = max(
+            metrics.maximumBufferedSamples,
+            bufferedWindows.reduce(0) { $0 + $1.count } + pendingWindow.count
+        )
+        return output
     }
 }
 
@@ -1139,12 +1283,23 @@ struct StreamingExecutionContext: Sendable {
     let diagnosticAppSupportBox: DiagnosticAppSupportBox?
     let markingConfiguration: AudioMarkingConfiguration?
 
-    private func scratchBuffer() -> PCM16ScratchBuffer {
+    private func scratchBuffer(sampleRate: Int) -> PCM16ScratchBuffer {
+        let leadingSilencePolicy: PCM16LeadingSilenceGate.Policy =
+            request.mode == .clone ? .cloneEdgeV1 : .disabled
         if let pooled = pcmScratchBuffer {
             pooled.reset()
+            pooled.configureLeadingSilenceGate(
+                leadingSilencePolicy,
+                sampleRate: sampleRate
+            )
             return pooled
         }
-        return PCM16ScratchBuffer()
+        let scratch = PCM16ScratchBuffer()
+        scratch.configureLeadingSilenceGate(
+            leadingSilencePolicy,
+            sampleRate: sampleRate
+        )
+        return scratch
     }
 
     var previewTitle: String {
@@ -1253,9 +1408,11 @@ struct StreamingExecutionContext: Sendable {
         }
 
         var chunkIndex = 0
+        var publishedChunkIndex = 0
         var totalFramesWritten: Int64 = 0
         var nextAudioFrame: UInt64 = 0
         var chunkObservations: [ShippingChunkObservationV9] = []
+        var rawCodecReplayRanges: [StartupReliabilityCodecFrameRange] = []
         var modelTerminalAtNS: UInt64?
         var modelOutcomeV9: ModelTerminalOutcomeV9?
         var audioChannelSummary: AudioChannelSummaryV9?
@@ -1273,7 +1430,7 @@ struct StreamingExecutionContext: Sendable {
             await writeFailureTelemetry(error: error, usedStreaming: request.shouldStream, counters: [:])
             throw error
         }
-        let scratchBuffer = self.scratchBuffer()
+        let scratchBuffer = self.scratchBuffer(sampleRate: sampleRate)
         var pcmSamples = [Int16]()
         let finalWriter: IncrementalPCM16WAVFileWriter
         do {
@@ -1339,9 +1496,37 @@ struct StreamingExecutionContext: Sendable {
                         await telemetrySampler?.captureBoundary("first_chunk")
                     }
 
-                    scratchBuffer.convertLimited(chunkSamples, into: &pcmSamples)
-                    let frameOffset = totalFramesWritten
                     let observationIndex = chunkIndex
+                    if let start = chunk.codecStartFrame,
+                       let end = chunk.codecEndFrameExclusive,
+                       start <= UInt64(Int.max), end <= UInt64(Int.max), end > start {
+                        rawCodecReplayRanges.append(
+                            StartupReliabilityCodecFrameRange(
+                                start: Int(start),
+                                endExclusive: Int(end)
+                            )
+                        )
+                    }
+                    scratchBuffer.convertLimited(chunkSamples, into: &pcmSamples)
+                    if telemetryActive, let timings = chunk.timings {
+                        chunkTimeline.append(
+                            makeChunkTelemetry(
+                                chunkIndex: observationIndex,
+                                timings: timings,
+                                clock: telemetryClock
+                            )
+                        )
+                    }
+                    chunkIndex += 1
+                    // Clone edge conditioning may consume one or more raw
+                    // decoder chunks before speech onset. Those chunks remain
+                    // represented in raw QC and decode telemetry, but an empty
+                    // product chunk must never create a zero-frame WAV, preview,
+                    // or a gap in transport sequencing.
+                    guard !pcmSamples.isEmpty else { continue }
+
+                    let transportSequence = publishedChunkIndex
+                    let frameOffset = totalFramesWritten
                     let materializedAtNS = DispatchTime.now().uptimeNanoseconds
                     let previewAudio: StreamingAudioChunk?
                     if !request.shouldStream
@@ -1364,7 +1549,7 @@ struct StreamingExecutionContext: Sendable {
                     if let chunkWriter {
                         let chunkURL = GenerationOutputAdapter.chunkURL(
                             in: sessionDirectory,
-                            chunkIndex: chunkIndex
+                            chunkIndex: transportSequence
                         )
                         try autoreleasepool {
                             try chunkWriter.write(
@@ -1380,22 +1565,11 @@ struct StreamingExecutionContext: Sendable {
                     }
                     let writtenAtNS = DispatchTime.now().uptimeNanoseconds
 
-                    chunkIndex += 1
+                    publishedChunkIndex += 1
                     totalFramesWritten += Int64(pcmSamples.count)
                     let audioStartFrame = nextAudioFrame
                     let audioEndFrame = audioStartFrame + UInt64(pcmSamples.count)
                     nextAudioFrame = audioEndFrame
-
-                    // Bind the stashed decode-substage breakdown to this chunk.
-                    if telemetryActive, let timings = chunk.timings {
-                        chunkTimeline.append(
-                            makeChunkTelemetry(
-                                chunkIndex: observationIndex,
-                                timings: timings,
-                                clock: telemetryClock
-                            )
-                        )
-                    }
 
                     let chunkDurationSeconds = Double(pcmSamples.count) / Double(sampleRate)
                     let cumulativeDurationSeconds = Double(totalFramesWritten) / Double(sampleRate)
@@ -1415,7 +1589,7 @@ struct StreamingExecutionContext: Sendable {
                             // Transport sequencing is zero-based: the first
                             // emitted chunk is index 0, matching the XPC gap
                             // detector and accumulator contract.
-                            chunkSequence: UInt64(observationIndex)
+                            chunkSequence: UInt64(transportSequence)
                         )
                     )
 
@@ -1423,7 +1597,7 @@ struct StreamingExecutionContext: Sendable {
                     let previewDisposition: PreviewPublicationDispositionV9
                     if request.shouldStream {
                         await chunkSink(chunkEvent)
-                        if observationIndex == 0 {
+                        if transportSequence == 0 {
                             await telemetryRecorder?.mark(
                                 stage: GenerationStartupBoundary.firstPublishedStreamChunk.telemetryStage
                             )
@@ -1445,7 +1619,7 @@ struct StreamingExecutionContext: Sendable {
                         chunkObservations.append(
                             ShippingChunkObservationV9(
                                 index: observationIndex,
-                                transportSequence: UInt64(observationIndex),
+                                transportSequence: UInt64(transportSequence),
                                 codecStartFrame: chunk.codecStartFrame,
                                 codecEndFrameExclusive: chunk.codecEndFrameExclusive,
                                 audioStartFrame: audioStartFrame,
@@ -1474,7 +1648,7 @@ struct StreamingExecutionContext: Sendable {
                    trace,
                    codecChunkRanges: Self.codecReplayRanges(
                        traceFrameCount: trace.frames.count,
-                       chunkObservations: chunkObservations
+                       observedRanges: rawCodecReplayRanges
                    ),
                    appSupportDirectory: appSupportDirectory,
                    runID: benchRunID,
@@ -1525,6 +1699,19 @@ struct StreamingExecutionContext: Sendable {
             try? FileManager.default.removeItem(at: sessionDirectory)
             Memory.clearCache()
             throw error
+        }
+
+        let leadingSilenceMetrics = scratchBuffer.leadingSilenceMetrics
+        if let algorithmVersion = leadingSilenceMetrics.algorithmVersion {
+            diagnosticEvidenceNotes.merge([
+                "clone_leading_silence_gate_algorithm_version": String(algorithmVersion),
+                "clone_leading_silence_gate_opened": leadingSilenceMetrics.opened ? "true" : "false",
+                "clone_leading_silence_trimmed_frames": String(leadingSilenceMetrics.trimmedSamples),
+                "clone_leading_silence_retained_preroll_frames":
+                    String(leadingSilenceMetrics.retainedPreRollSamples),
+                "clone_leading_silence_max_buffered_frames":
+                    String(leadingSilenceMetrics.maximumBufferedSamples),
+            ]) { _, current in current }
         }
 
         if let terminalError = Self.postStreamTerminalError(
@@ -1804,26 +1991,17 @@ struct StreamingExecutionContext: Sendable {
         )
     }
 
-    private static func codecReplayRanges(
+    static func codecReplayRanges(
         traceFrameCount: Int,
-        chunkObservations: [ShippingChunkObservationV9]
+        observedRanges: [StartupReliabilityCodecFrameRange]
     ) -> [StartupReliabilityCodecFrameRange] {
         guard traceFrameCount > 0 else { return [] }
-        let observed = chunkObservations.compactMap { observation -> StartupReliabilityCodecFrameRange? in
-            guard let start = observation.codecStartFrame,
-                  let end = observation.codecEndFrameExclusive,
-                  start <= UInt64(Int.max), end <= UInt64(Int.max) else {
-                return nil
-            }
-            return StartupReliabilityCodecFrameRange(
-                start: Int(start),
-                endExclusive: Int(end)
-            )
-        }
-        if observed.first?.start == 0,
-           observed.last?.endExclusive == traceFrameCount,
-           zip(observed, observed.dropFirst()).allSatisfy({ $0.endExclusive == $1.start }) {
-            return observed
+        if observedRanges.first?.start == 0,
+           observedRanges.last?.endExclusive == traceFrameCount,
+           zip(observedRanges, observedRanges.dropFirst()).allSatisfy({
+               $0.endExclusive == $1.start
+           }) {
+            return observedRanges
         }
         // Quality-first generation has no production streaming boundaries.
         // Replay it with the canonical initial 2 s / 12.5 Hz bucket so the

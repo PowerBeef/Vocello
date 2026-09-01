@@ -2582,14 +2582,17 @@
       "id": "VLR-01",
       "plan": "voice-identity-language-reliability-2026-08",
       "title": "Preserve and characterize private references and clean controls",
-      "status": "planned",
+      "status": "done",
       "gate": "Create one untracked content-addressed bundle containing read-only copies of the two maintainer references, the already reviewed manual transcript for the second reference, any reviewed transcript for the first, saved reference-language metadata, immutable runtime identities, and clean French/English transcript-backed controls. Characterize PCM integrity, silence, clipping, noise, pitch register/range, cadence, voicing, roughness, transcript/audio alignment, and warnings using stable aliases only; no name, text, path, or audio may enter tracked evidence.",
       "sourceOfTruth": [
         "config/voice-identity-language-reliability.json",
         "scripts/voice_identity_language_reliability.py"
       ],
-      "updated": "2026-08-30",
-      "notes": "The source-bound bundle builder, immutable identity checks, private/public split, and redaction fixtures are implemented. Closure still requires the operator-local reference copies and clean controls; the manually entered second-reference transcript is explicitly treated as reviewed transcript-backed conditioning and will never be overwritten."
+      "evidence": [
+        "doc:docs/reference/voice-identity-language-reliability-macos-2026-09-01.md"
+      ],
+      "updated": "2026-09-01",
+      "notes": "The untracked content-addressed bundle contains both maintainer references, the reviewed manual transcript, clean English/French transcript-backed controls, audio-only derivatives, and immutable source/runtime identities. Serial analysis characterized 220 passing Clone rows across PCM, pitch, cadence, voicing, roughness, transcript arms, and advisory speaker similarity using stable aliases only. No personal name, transcript, path, or audio entered tracked evidence."
     },
     {
       "id": "VLR-02",
@@ -2615,7 +2618,7 @@
       "id": "VLR-03",
       "plan": "voice-identity-language-reliability-2026-08",
       "title": "Complete Clone, tokenizer, transcription, and French Voice Design matrices",
-      "status": "in-flight",
+      "status": "done",
       "gate": "Run the source-bound serial matrix with eight frozen seeds per core cell across both private references and clean controls, reviewed/corrected/audio-only transcript arms, Auto/explicit and French/English scripts, current fp16 and archived fp32 tokenizer identities when available, Consistent plus Expressive sentinels, and cold/warm sentinels. Run French Design short/medium/long across Auto/explicit, Neutral/no-delivery/non-neutral, tokenizer, seed, and variation arms. Retain every failed row without retry or replacement and require exact schema-2 receipts.",
       "sourceOfTruth": [
         "config/voice-identity-language-reliability.json",
@@ -2625,10 +2628,11 @@
       "evidence": [
         "file:scripts/tests/test_voice_identity_language_reliability.py",
         "file:Sources/QwenVoiceCore/GenerationTerminalDiagnosticEvidence.swift",
-        "file:Tests/VocelloCoreTests/GenerationTerminalDiagnosticEvidenceTests.swift"
+        "file:Tests/VocelloCoreTests/GenerationTerminalDiagnosticEvidenceTests.swift",
+        "doc:docs/reference/voice-identity-language-reliability-macos-2026-09-01.md"
       ],
       "updated": "2026-09-01",
-      "notes": "The original focused run remains complete at 20/26 PASS, and paused characterization vlr-device-20260831-characterization-04 remains immutable at 114 terminal rows plus one interrupted launch. A fresh complete campaign, vlr-device-20260901-characterization-01, represented all 122 no-retry rows under plan digest 3926f6c1383d24f9268aa056017f49400d3b16f0c4383815aac59fe096c75d53 and source identity ed3b9febae572683d295c9d5aebecaaa18838f2d66e230fe2d4e139e3c17c656: 103 PASS, three mandatory product-QC failures, and 16 composer-labelled harness output-verification failures. The latter are successful generations with failed locale-locked verification and remain failures rather than missing evidence. Raw audio, aliases, transcripts, traces, and device artifacts remain untracked under the governed run root. This characterization exposed VLR-08's live streaming divergence and VLR-09's terminal-silence QC blind spot. The 734-row Mac/CLI tokenizer/control matrix and clean-control/reference characterization still remain pending, so VLR-03 stays in flight."
+      "notes": "The 734-row Mac/CLI plan is complete with all rows represented: 364 PASS, 360 explicit archived-fp32 prerequisite blocks, and 10 hard failures without retry or seed substitution. Generator exit preceded serial analysis of 220 passing Clone rows; all 364 passing receipts were consistent and all 294 Design rows carried the expected French model language. The archived artifact remained unavailable rather than being substituted. Historical iPhone runs remain separate evidence; their corrected-source acceptance belongs only to VLR-07 through VLR-09."
     },
     {
       "id": "VLR-04",
@@ -2652,60 +2656,64 @@
       "id": "VLR-05",
       "plan": "voice-identity-language-reliability-2026-08",
       "title": "Apply only the proven tokenizer or reference-quality remediation",
-      "status": "in-flight",
+      "status": "done",
       "gate": "If fixed-seed evidence localizes the divergence to reference/transcript quality, add actionable enrollment warnings with explicit review and no silent rewrite or identity-normalizing regeneration. If it localizes to fp16 tokenizer precision, isolate encoder/decoder sensitivity where practical and ship only the smallest qualifying immutable artifact with receipt, memory, catalog, and promotion evidence; otherwise retain current artifacts and classify the result as inconclusive.",
       "sourceOfTruth": [
         "Sources/QwenVoiceCore/PreparedVoiceRepository.swift",
         "Sources/QwenVoiceCore/MLXTTSEngine.swift",
         "Sources/Resources/qwenvoice_production_model_catalog.json"
       ],
+      "evidence": [
+        "doc:docs/reference/voice-identity-language-reliability-macos-2026-09-01.md"
+      ],
       "updated": "2026-09-01",
-      "notes": "The complete fresh eight-seed characterization confirms the same 38-row Clone result: 36 PASS, with only the second-reference Auto and explicit-English seed-32060821 controls failing. Raw per-chunk QC proves chunks 0-6 were already near-silent before limiter/writer publication, while exact replay of the identical codec trace is clean. Tokenizer output, sampled codes, replay decoder, limiter, writer, and language ownership are therefore not the first divergent layer. VLR-08 owns the live deferred-materialization/cache-clear defect. Reference-fidelity/prosody characterization and the archived-fp32 comparison remain pending here; no tokenizer artifact, model pin, sampling default, reference audio, or stored transcript changed. Fast-QC algorithm v6 adds terminal-silence detection without changing existing interior-pause thresholds; VLR-09 owns its separate closure."
+      "notes": "The current fp16 tokenizer produced 364 passing matrix rows and no receipt-identity drift. The immutable archived-fp32 artifact was unavailable for all 360 planned comparison rows, so the harness failed those prerequisites closed instead of substituting current weights. Clone analysis found no weak speaker-similarity row and separated reference/transcript-conditioned pacing, pitch-register, voicing, and expressiveness observations. Those bounds remain advisory under AV-07; no tokenizer, model pin, reference audio, transcript, sampling default, or production prompt changed."
     },
     {
       "id": "VLR-06",
       "plan": "voice-identity-language-reliability-2026-08",
       "title": "Apply only the proven French Voice Design remediation",
-      "status": "in-flight",
+      "status": "done",
       "gate": "Use target-language, prompt-arm, tokenizer, seed, and variation evidence to localize French Design. A pure Auto-language ownership defect may be corrected directly; any Neutral omission/replacement or localized non-neutral prompt remains experimental under DP-31/DP-32 until blinded semantic promotion authority passes. Preserve production copy when no reproducible first divergence exists.",
       "sourceOfTruth": [
         "Sources/QwenVoiceCore/GenerationSemantics.swift",
         "config/delivery-experiment-contract.json",
         "scripts/voice_identity_language_reliability.py"
       ],
+      "evidence": [
+        "doc:docs/reference/voice-identity-language-reliability-macos-2026-09-01.md"
+      ],
       "updated": "2026-09-01",
-      "notes": "Design Auto resolves once from target text and actor receipts match explicit French. The complete fresh 84-row Design block passed 67 rows: current Neutral 26/28, no-delivery 22/28, and Calm strong 19/28. One no-delivery long seed produced a replay-confirmed sampled-output dropout; the other 16 failures are successful generations that failed locale-locked output verification. Current Neutral remains the strongest arm and no delivery-copy change is authorized. Calm take 112 additionally exposed 109.49 seconds of terminal silence that the v5 interior-only Fast-QC gate did not observe; VLR-09 owns the bounded v6 correction. Finish the Mac/CLI tokenizer comparison and corrected-source phone closure before causal closure. DP-31 and DP-32 retain semantic promotion authority."
+      "notes": "Design Auto resolves once from target text, explicit French always wins, and all 294 represented Mac Design rows carried the expected final French model language. The earlier phone characterization ranked current Neutral 26/28 above no-delivery 22/28 and Calm strong 19/28; the Mac matrix likewise found hard failures only in experimental Calm rows, not shipped Neutral. Production delivery copy is therefore preserved. DP-31 and DP-32 retain semantic prompt-promotion authority; VLR-07 retains locale-locked device ASR closure."
     },
     {
       "id": "VLR-07",
       "plan": "voice-identity-language-reliability-2026-08",
       "title": "Complete physical-device closure and publish the privacy-safe report",
       "status": "planned",
-      "gate": "After Mac/CLI localization, complete two consecutive no-retry focused physical-iPhone passes using the private alias map and exact current source. Require typed transcription classification, correct short/medium/long French output, exact receipt parity, zero new hard QC failures, WER/CER delta <= 0.01, speaker-similarity delta >= -0.02, governed Clone prosody fidelity or explicit reference rejection, and green Built-in/English Design/enrollment/Clone controls. Publish only a digest-pinned privacy-safe historical report; keep audio, text, names, paths, raw diagnostics, and device evidence untracked.",
+      "gate": "After Mac/CLI localization, complete two consecutive no-retry 14-row closure physical-iPhone passes plus one 122-row characterization using new source-bound private maps and exact current source. Require typed transcription classification, correct short/medium/long French output, exact receipt parity, zero unexplained hard QC failures, WER/CER delta <= 0.01, speaker-similarity delta >= -0.02, governed Clone prosody fidelity or explicit reference rejection, and green Built-in/English Design/enrollment/Clone controls. Publish only a digest-pinned privacy-safe physical-device report; keep audio, text, names, paths, raw diagnostics, and device evidence untracked.",
       "sourceOfTruth": [
         "scripts/ios_device.sh",
         "scripts/voice_identity_language_reliability.py",
         "docs/reference/delivery-harness.md"
       ],
       "updated": "2026-09-01",
-      "notes": "The first focused run, immutable 114-terminal-row paused run, and complete 122-row September 1 characterization remain retained as distinct source/plan-bound untracked evidence. None is corrected-source closure. VLR-08 and VLR-09 now have deterministic source fixes, but the phone was paused before preflight, install, or any new take; no corrected-source on-device run ID exists. After this commit, generate new plans and private maps and complete two distinct clean focused runs plus one complete characterization on the exact committed source. Never resume, merge, relabel, or overwrite the historical runs. The privacy-safe historical report remains pending."
+      "notes": "The Mac phase is complete and pinned in the September 1 Mac report. The first focused phone run, immutable 114-terminal-row paused run, and complete 122-row September 1 characterization remain distinct retained evidence; none is corrected-source closure. The new closure profile excludes experimental no-delivery/Calm arms and covers eight production Clone plus six current-Neutral Design cells. After the next commit, generate two new closure plans and one characterization plan with separately bound private maps. Never resume, merge, relabel, or overwrite historical runs."
     },
     {
       "id": "VLR-08",
       "plan": "voice-identity-language-reliability-2026-08",
       "title": "Repair the live Clone publication gap exposed by clean codec replay",
       "status": "in-flight",
-      "gate": "For the second-reference English seed-32060821 Auto and explicit controls, prove why the live persisted output contains a 7.603-second early gap while exact-range incremental and full replay of the identical codec trace pass. Repair only the first divergent live publication, stream assembly, limiter, marking, writer, or finalization layer; add a deterministic regression fixture; preserve seed, sampling, tokenizer, model, reference, transcript, and QC policy; and require three consecutive physical-device passes for both language-selection paths plus no regression across the remaining eight-seed Clone cohort.",
+      "gate": "For the second-reference English seed-32060821 Auto and explicit controls, preserve proof that incremental and full replay of the identical codec trace reproduce the model-generated delayed onset. A bounded Clone-only leading-edge gate may trim only the sub-floor edge before three consecutive active windows, retain at least 80 ms pre-roll, remain duration-independent, never alter Built-in/Design or an interior pause, and expose exact metrics. Preserve seed, sampling, tokenizer, model, reference, transcript, and QC policy; require three consecutive physical-device passes for both selection paths plus no regression across the eight-seed Clone cohort.",
       "sourceOfTruth": [
-        "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
-        "Packages/VocelloQwen3Core/Tests/Qwen3RuntimeTests/Qwen3DecoderPartitionTests.swift",
         "Sources/QwenVoiceCore/GenerationOutputAdapter.swift",
-        "Sources/QwenVoiceCore/AtomicWAVGenerationOutputSink.swift",
         "Sources/QwenVoiceCore/GenerationTerminalDiagnosticEvidence.swift",
+        "Tests/VocelloCoreTests/GenerationTelemetrySchemaTests.swift",
         "scripts/voice_identity_language_reliability.py"
       ],
       "updated": "2026-09-01",
-      "notes": "The complete September 1 characterization reproduced both failures. Per-chunk QC localizes the gap before limiter/writer publication: raw live decoder chunks 0-6 are near-silent, while the identical codec IDs replay cleanly. The constrained iPhone path used pipelined deferred MLX audio materialization and then cleared the allocator cache before reading that pending array. The source now forces materialization before cache clear on constrained tiers while preserving pipelining elsewhere, records the selected policy, and adds allocator-clear/partition regression tests. Full macOS core, XPC, and owned-runtime tests pass and the generic iPhoneOS app/logic build passes. Physical-device verification has not started; closure still requires the gate's repeated Auto/explicit and cohort evidence on new source-bound run IDs."
+      "notes": "Reinspection of retained replay proved both incremental and full decoders start speech at the same delayed boundary as live output, with 0.999208 post-onset waveform correlation. The earlier allocator-cache hypothesis was false and its speculative runtime change was reverted. A bounded Clone-only gate now requires three active 20 ms windows, preserves up to 80 ms pre-roll, keeps transport sequencing contiguous, and records trim/buffer metrics. Three fresh Mac Auto/explicit cohorts passed 6/6 without retry; speaker similarity remained in the strong advisory band. Physical closure still requires three consecutive device passes plus the eight-seed cohort on new run IDs."
     },
     {
       "id": "VLR-09",

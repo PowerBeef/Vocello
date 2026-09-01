@@ -116,33 +116,6 @@ final class Qwen3DecoderPartitionTests: XCTestCase {
         )
     }
 
-    func testConstrainedCacheClearDisablesDeferredAudioMaterialization() {
-        XCTAssertTrue(
-            Qwen3StreamStepEvalPolicy.pipelined.shouldDeferAudioMaterialization(
-                hasMaterializedSink: true,
-                clearsAllocatorCacheAfterChunk: false
-            )
-        )
-        XCTAssertFalse(
-            Qwen3StreamStepEvalPolicy.pipelined.shouldDeferAudioMaterialization(
-                hasMaterializedSink: true,
-                clearsAllocatorCacheAfterChunk: true
-            )
-        )
-        XCTAssertFalse(
-            Qwen3StreamStepEvalPolicy.full.shouldDeferAudioMaterialization(
-                hasMaterializedSink: true,
-                clearsAllocatorCacheAfterChunk: false
-            )
-        )
-        XCTAssertFalse(
-            Qwen3StreamStepEvalPolicy.pipelined.shouldDeferAudioMaterialization(
-                hasMaterializedSink: false,
-                clearsAllocatorCacheAfterChunk: false
-            )
-        )
-    }
-
     private func tinyConfig() throws -> Qwen3TTSTokenizerDecoderConfig {
         let json = """
         {

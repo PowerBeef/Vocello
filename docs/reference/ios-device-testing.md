@@ -314,7 +314,7 @@ fails closed and leaves the bounded diagnostic export available for forensic rec
 ```sh
 python3 scripts/voice_identity_language_reliability.py device-plan \
   --run-id <new-run-id> \
-  --profile focused \
+  --profile closure \
   --output /private/tmp/vlr-device-plan.json
 python3 scripts/voice_identity_language_reliability.py validate-device-plan \
   --plan /private/tmp/vlr-device-plan.json \
@@ -334,16 +334,19 @@ The private map is schema 1, binds the plan digest, and contains exactly
 names, IDs, transcripts, or paths in a tracked file or task log. The command first runs the genuine
 on-device enrollment transcriber against each stored reference without writing its result back; it
 retains only typed authorization, locale-attempt, availability, on-device-support, confidence, and
-digest evidence. It then executes exactly 26 no-retry current-fp16 rows: eight Clone target-language
-ownership cells and eighteen French Design Auto/explicit × short/medium/long × Neutral/no-delivery/
-Calm controls. Every terminal sentinel must expose a schema-2 actor-owned receipt, exact tokenizer,
+digest evidence. The production `closure` profile executes exactly 14 no-retry current-fp16 rows:
+eight Clone target-language ownership cells and six French Design Auto/explicit ×
+short/medium/long current-Neutral controls. The 26-row `focused` profile retains the no-delivery and
+Calm experimental arms for diagnosis; it is not the production closure gate. Every terminal
+sentinel must expose a schema-2 actor-owned receipt, exact tokenizer,
 target-text and instruction identities, mandatory QC, and locale-locked output verification. A
 failed schema-3 row additionally retains the actor receipt, complete QC, run-scoped rejected-audio
 and codec-trace identities, and incremental/full decoder replay. The host report assigns one root
 failure and records missing evidence separately.
 
-This focused device plan is not the 734-row Mac/CLI tokenizer/reference matrix and cannot prove an
-fp16/fp32 cause. Run it only after Mac/CLI localization, twice with distinct run IDs for VLR-07.
+These device plans are not the 734-row Mac/CLI tokenizer/reference matrix and cannot prove an
+fp16/fp32 cause. Run the production `closure` profile only after Mac/CLI localization, twice with
+distinct run IDs for VLR-07.
 It installs no models, edits no transcript or reference metadata, creates no History row, and never
 retries or substitutes a failed seed. Missing Speech assets, missing model readiness, absent private
 references, source drift, or an unverifiable output are explicit failures rather than skipped proof.
@@ -381,16 +384,17 @@ and source identity `ed3b9febae572683d295c9d5aebecaaa18838f2d66e230fe2d4e139e3c1
 It retained 103 PASS rows, three mandatory product-QC failures, and 16 successful-generation
 locale-verification failures. Keep that run and the August 31 partial run immutable and distinct.
 
-The resulting VLR-08 source fix materializes constrained-tier MLX audio before the per-chunk
-allocator-cache clear. VLR-09 Fast-QC v6 adds bounded terminal-silence evidence and rejects an
-egregious open tail without changing interior-pause thresholds. Deterministic macOS/XPC/Qwen3 tests
-and the generic iPhoneOS app/logic build pass. The phone was paused before preflight, installation,
-or any corrected-source take, so no new run ID exists yet and neither fix has physical-device
-acceptance.
+Replay subsequently disproved the first VLR-08 hypothesis: incremental and full decoding reproduce
+the delayed onset, so the allocator-cache workaround was reverted. The corrected source instead
+uses a bounded Clone-only leading-edge gate that preserves 80 ms of pre-roll and never edits an
+interior pause. VLR-09 Fast-QC v6 adds bounded terminal-silence evidence and rejects an egregious
+open tail without changing interior-pause thresholds. The completed Mac/CLI matrix and targeted
+three-cohort proof are pinned in the VLR Mac report. The phone has not run this corrected source, so
+neither fix has physical-device acceptance.
 
-At the next phone window, first run `scripts/ios_device.sh preflight`. Generate new focused and
+At the next phone window, first run `scripts/ios_device.sh preflight`. Generate new closure and
 characterization plans/private maps from the exact committed tree; do not resume either historical
-run. VLR-07 requires two distinct clean focused runs and one complete characterization. A failure
+run. VLR-07 requires two distinct clean 14-row closure runs and one complete characterization. A failure
 remains terminal and gets no automatic retry, seed substitution, or cross-run merge.
 
 F-01/ICI-4 saved-voice and direct Clone-import acceptance is separately opt-in:

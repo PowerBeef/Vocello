@@ -514,8 +514,10 @@ def build_device_plan(
     validate_contract(contract)
     if not SAFE_ID.fullmatch(run_id):
         raise ReliabilityError("device runID is invalid")
-    if profile not in {"focused", "characterization"}:
-        raise ReliabilityError("device profile must be focused or characterization")
+    if profile not in {"closure", "focused", "characterization"}:
+        raise ReliabilityError(
+            "device profile must be closure, focused, or characterization"
+        )
     scripts = resolve_scripts(contract)
     sys.path.insert(0, str(REPO / "scripts"))
     from check_delivery_instructions import load_presets
@@ -547,7 +549,7 @@ def build_device_plan(
         )
 
     clone = contract["clone"]
-    if profile == "focused":
+    if profile in {"closure", "focused"}:
         for alias in clone["coreReferenceAliases"]:
             for script_id in clone["scriptIDs"]:
                 for selection in clone["languageSelections"]:
@@ -584,10 +586,15 @@ def build_device_plan(
             expectedInstructionLanguage="english",
         )
 
-    if profile == "focused":
+    if profile in {"closure", "focused"}:
         for script_id in design["scriptIDs"]:
             for selection in design["languageSelections"]:
-                for arm in design["deliveryArms"]:
+                arms = (
+                    ["current-neutral"]
+                    if profile == "closure"
+                    else design["deliveryArms"]
+                )
+                for arm in arms:
                     add_design(script_id, selection, arm, seeds[0], design["primaryVariation"])
     else:
         for script_id in design["scriptIDs"]:
@@ -609,7 +616,8 @@ def build_device_plan(
         "sourceIdentity": source_identity or tree_fingerprint(),
         "contractDigest": canonical_digest(contract),
         "seedPolicy": (
-            "fixed-focused-v2-no-retry" if profile == "focused"
+            "fixed-closure-v2-no-retry" if profile == "closure"
+            else "fixed-focused-v2-no-retry" if profile == "focused"
             else "fixed-eight-characterization-v2-no-retry"
         ),
         "takeCount": len(rows),
@@ -638,7 +646,12 @@ def validate_device_plan(
         raise ReliabilityError("device plan source identity differs from the current repository tree")
     takes = plan.get("takes")
     profile = "focused" if schema == 1 else plan.get("profile")
-    expected_count = 26 if profile == "focused" else 122 if profile == "characterization" else None
+    expected_count = (
+        14 if profile == "closure"
+        else 26 if profile == "focused"
+        else 122 if profile == "characterization"
+        else None
+    )
     if (
         expected_count is None
         or not isinstance(takes, list)
@@ -657,8 +670,10 @@ def validate_device_plan(
             raise ReliabilityError("device plan contains duplicate identities")
         seen.add(row["takeID"])
         children.add(row["childRunID"])
-        allowed_seeds = {contract["fixedSeeds"][0]} if profile == "focused" else set(
-            contract["fixedSeeds"]
+        allowed_seeds = (
+            {contract["fixedSeeds"][0]}
+            if profile in {"closure", "focused"}
+            else set(contract["fixedSeeds"])
         )
         if row.get("seed") not in allowed_seeds:
             raise ReliabilityError(f"{row['takeID']}: device seed drift")
@@ -1388,7 +1403,7 @@ def main(argv: list[str] | None = None) -> int:
     device_plan = sub.add_parser("device-plan")
     device_plan.add_argument("--run-id", required=True)
     device_plan.add_argument(
-        "--profile", choices=("focused", "characterization"), default="focused"
+        "--profile", choices=("closure", "focused", "characterization"), default="focused"
     )
     device_plan.add_argument("--output", required=True, type=Path)
     validate_device = sub.add_parser("validate-device-plan")

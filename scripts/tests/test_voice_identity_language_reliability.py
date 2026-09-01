@@ -251,6 +251,25 @@ class VoiceIdentityLanguageReliabilityTests(unittest.TestCase):
             sum(row["variation"] == "expressive" for row in plan["takes"]), 5
         )
 
+    def test_closure_device_plan_excludes_experimental_design_arms(self):
+        plan = VLR.build_device_plan(
+            contract=self.contract,
+            run_id="vlr-device-closure",
+            profile="closure",
+            source_identity="8" * 64,
+        )
+        VLR.validate_device_plan(
+            plan, self.contract, expected_source_identity="8" * 64
+        )
+
+        self.assertEqual(plan["takeCount"], 14)
+        self.assertEqual(sum(row["mode"] == "clone" for row in plan["takes"]), 8)
+        design_rows = [row for row in plan["takes"] if row["mode"] == "design"]
+        self.assertEqual(len(design_rows), 6)
+        self.assertEqual({row["deliveryArm"] for row in design_rows}, {"current-neutral"})
+        self.assertEqual({row["seed"] for row in plan["takes"]}, {self.contract["fixedSeeds"][0]})
+        self.assertEqual(plan["seedPolicy"], "fixed-closure-v2-no-retry")
+
     def test_device_composer_fails_closed_and_redacts_voice_ids(self):
         plan = VLR.build_device_plan(
             contract=self.contract,

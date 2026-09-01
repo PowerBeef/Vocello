@@ -413,6 +413,113 @@ final class GenerationTelemetrySchemaTests: XCTestCase {
         XCTAssertEqual(longDeadAir.verdict, .fail)
     }
 
+    func testCloneLeadingSilenceGateDropsOnlyTheLongLeadingEdge() {
+        let sampleRate = 1_000
+        var gate = PCM16LeadingSilenceGate(
+            policy: .cloneEdgeV1,
+            sampleRate: sampleRate
+        )
+
+        XCTAssertTrue(gate.filter([Float](repeating: 0, count: 5_000)).isEmpty)
+        let voiced = gate.filter([Float](repeating: 0.2, count: 100))
+
+        XCTAssertEqual(voiced.count, 180)
+        XCTAssertEqual(voiced.prefix(80), [Float](repeating: 0, count: 80)[...])
+        XCTAssertEqual(voiced.suffix(100), [Float](repeating: 0.2, count: 100)[...])
+        XCTAssertTrue(gate.metrics.opened)
+        XCTAssertEqual(gate.metrics.trimmedSamples, 4_920)
+        XCTAssertEqual(gate.metrics.retainedPreRollSamples, 80)
+        XCTAssertLessThanOrEqual(gate.metrics.maximumBufferedSamples, 140)
+    }
+
+    func testCloneLeadingSilenceGatePreservesNaturalShortPreroll() {
+        var gate = PCM16LeadingSilenceGate(
+            policy: .cloneEdgeV1,
+            sampleRate: 1_000
+        )
+        let samples = [Float](repeating: 0, count: 60)
+            + [Float](repeating: 0.1, count: 100)
+
+        let filtered = gate.filter(samples)
+
+        XCTAssertEqual(filtered, samples)
+        XCTAssertEqual(gate.metrics.trimmedSamples, 0)
+        XCTAssertEqual(gate.metrics.retainedPreRollSamples, 60)
+    }
+
+    func testCloneLeadingSilenceGateIsBoundedForAnAllSilentClip() {
+        var gate = PCM16LeadingSilenceGate(
+            policy: .cloneEdgeV1,
+            sampleRate: 1_000
+        )
+
+        XCTAssertTrue(gate.filter([Float](repeating: 0, count: 60_000)).isEmpty)
+        XCTAssertFalse(gate.metrics.opened)
+        XCTAssertLessThanOrEqual(gate.metrics.maximumBufferedSamples, 100)
+    }
+
+    func testCloneLeadingSilenceGateDoesNotLeakAcrossScratchBufferLeases() {
+        let scratch = PCM16ScratchBuffer()
+        scratch.configureLeadingSilenceGate(.cloneEdgeV1, sampleRate: 1_000)
+        XCTAssertTrue(
+            scratch.convertLimited([Float](repeating: 0, count: 1_000)).isEmpty
+        )
+
+        scratch.reset()
+        scratch.configureLeadingSilenceGate(.cloneEdgeV1, sampleRate: 1_000)
+        let immediateSpeech = [Float](repeating: 0.1, count: 100)
+        let converted = scratch.convertLimited(immediateSpeech)
+
+        XCTAssertEqual(converted.count, immediateSpeech.count)
+        XCTAssertEqual(scratch.leadingSilenceMetrics.trimmedSamples, 0)
+    }
+
+    func testDisabledLeadingSilenceGateIsBitExact() {
+        var gate = PCM16LeadingSilenceGate(policy: .disabled, sampleRate: 24_000)
+        let samples: [Float] = [0, 0.001, -0.2, .nan, 0.5]
+
+        let filtered = gate.filter(samples)
+
+        XCTAssertEqual(filtered.count, samples.count)
+        XCTAssertEqual(filtered[0 ... 2], samples[0 ... 2])
+        XCTAssertTrue(filtered[3].isNaN)
+        XCTAssertEqual(filtered[4], samples[4])
+        XCTAssertNil(gate.metrics.algorithmVersion)
+    }
+
+    func testCodecReplayRangesPreserveRawChunksConsumedBeforeCloneOnset() {
+        let rawRanges = [
+            StartupReliabilityCodecFrameRange(start: 0, endExclusive: 25),
+            StartupReliabilityCodecFrameRange(start: 25, endExclusive: 50),
+            StartupReliabilityCodecFrameRange(start: 50, endExclusive: 75),
+        ]
+
+        let resolved = StreamingExecutionContext.codecReplayRanges(
+            traceFrameCount: 75,
+            observedRanges: rawRanges
+        )
+
+        XCTAssertEqual(resolved, rawRanges)
+    }
+
+    func testCodecReplayRangesFallBackWhenRawChunksAreIncomplete() {
+        let resolved = StreamingExecutionContext.codecReplayRanges(
+            traceFrameCount: 60,
+            observedRanges: [
+                StartupReliabilityCodecFrameRange(start: 25, endExclusive: 50),
+            ]
+        )
+
+        XCTAssertEqual(
+            resolved,
+            [
+                StartupReliabilityCodecFrameRange(start: 0, endExclusive: 25),
+                StartupReliabilityCodecFrameRange(start: 25, endExclusive: 50),
+                StartupReliabilityCodecFrameRange(start: 50, endExclusive: 60),
+            ]
+        )
+    }
+
     func testOrdinaryCrossSpeakerCadencePausesWarnInsteadOfFailing() {
         // The full 9-speaker delivery screen observed this shape in 38 complete
         // outputs: several ordinary 350-800 ms pauses, but no 1.2 s dropout.

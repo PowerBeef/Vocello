@@ -493,7 +493,7 @@ final class GenerationTelemetrySchemaTests: XCTestCase {
             durationSeconds: 0.006,
             expectedPauseCount: 0
         )
-        XCTAssertEqual(report.algorithmVersion, 5)
+        XCTAssertEqual(report.algorithmVersion, 6)
         XCTAssertEqual(report.longestSilenceMS, 4)
         XCTAssertEqual(report.longestSilenceStartMS, 1)
 
@@ -516,6 +516,49 @@ final class GenerationTelemetrySchemaTests: XCTestCase {
             from: JSONEncoder().encode(merged)
         )
         XCTAssertEqual(roundTrip.missingLayers, [.engineService, .engine])
+    }
+
+    func testEgregiousTerminalSilenceFailsBeforePublication() {
+        var limiter = PCM16StreamLimiter()
+        var destination: [Int16] = []
+        limiter.append([Float](repeating: 0.2, count: 500), into: &destination)
+        limiter.append([Float](repeating: 0, count: 2_200), into: &destination)
+
+        let report = StreamingExecutionContext.makeAudioQCReport(
+            metrics: limiter.metrics,
+            sampleRate: 1_000,
+            durationSeconds: 2.7,
+            expectedPauseCount: 1
+        )
+
+        XCTAssertEqual(report.writtenOutputVerdict, .fail)
+        XCTAssertEqual(report.trailingSilenceMS, 2_200)
+        XCTAssertEqual(report.trailingSilenceStartMS, 500)
+        XCTAssertTrue(report.flags.contains("terminal_silence:2200ms"))
+        XCTAssertEqual(report.cadence?.classification, .severe)
+        XCTAssertEqual(report.cadence?.reasons, [.egregiousTerminalSilence])
+    }
+
+    func testOrdinaryTerminalPaddingRemainsAccepted() {
+        var limiter = PCM16StreamLimiter()
+        var destination: [Int16] = []
+        let voiced = (0..<500).map { index in
+            Float(sin(2 * Double.pi * 10 * Double(index) / 1_000) * 0.2)
+        }
+        limiter.append(voiced, into: &destination)
+        limiter.append([Float](repeating: 0, count: 268), into: &destination)
+
+        let report = StreamingExecutionContext.makeAudioQCReport(
+            metrics: limiter.metrics,
+            sampleRate: 1_000,
+            durationSeconds: 0.768,
+            expectedPauseCount: 0
+        )
+
+        XCTAssertEqual(report.verdict, .pass)
+        XCTAssertEqual(report.trailingSilenceMS, 268)
+        XCTAssertEqual(report.trailingSilenceStartMS, 500)
+        XCTAssertFalse(report.flags.contains(where: { $0.hasPrefix("terminal_silence:") }))
     }
 
     func testExpectedPauseCountRecognizesCJKPunctuation() {

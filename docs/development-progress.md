@@ -47,46 +47,50 @@ machine-readable status record and wins over any older prose.
 | 13 — Benchmark/history v3 | Live 2026-07-29: the first schema-v3 records are committed (three clean `phase0-cli-control-*` engine records plus one exploratory run that also exposed and fixed the summarizer's v3 pin). `benchmarks/schema-v3.json` adds the typed quality identity to generation takes (pass/warning only, five fast gates required, machine-code issues); v1/v2 records stay valid immutable history; the publisher stamps v3 only when every take carries the identity. The UI benchmark checkers folded the same identity 2026-08-01: ui-generation records now publish v3 (first: the focused `v3-fold-proof` record `macos-xcui-benchmark-20260801-003208-403989cf`); the canonical iOS matrix published its first v3 record 2026-08-01 (`ios-xcui-benchmark-20260801-132415-abbec96b`). |
 | 14 — Organization and retirement | Closed 2026-07-23 (14a + 14b): compatibility SPI retired, actor-owned loading/metadata/priming/clone artifacts, clone conditioning epoch-bound end to end. |
 
-## Resume here (2026-08-31)
+## Resume here (2026-09-01)
 
-**The Voice identity/language characterization is safely paused at an immutable evidence
-boundary.** Focused run 1 completed all 26 no-retry rows (20 PASS). The larger source-bound run
-`vlr-device-20260831-characterization-04` retained terminal sentinels for takes 1–114 of 122 before
-the phone-return pause: 98 PASS, three typed post-generation QC failures, and 13 successful
-generations that failed locale-locked output verification. Take 115 was launched and interrupted;
-takes 116–122 were never launched. The append-only ledger and partial summary remain untracked under
-the governed build-artifact root, bound to plan digest
-`c1c0593ee49ee39dedff156dfb47a97282edbc08f431927631373c7b0c5eecfb` and source identity
-`e9755f40b078649d3cf97c7fd3d4dfc894aa14f8a18a33f71f7e3e598ad5989c`.
+**The current Voice identity/language work is source-fixed and deterministically green, but no
+corrected-source phone acceptance has started.** The historical focused run remains complete at
+20/26 PASS. The intentionally paused `vlr-device-20260831-characterization-04` remains immutable at
+114 terminal rows plus one interrupted launch and must never be resumed, merged, or overwritten.
+A separate fresh campaign, `vlr-device-20260901-characterization-01`, completed all 122 no-retry rows
+under plan digest `3926f6c1383d24f9268aa056017f49400d3b16f0c4383815aac59fe096c75d53`
+and source identity `ed3b9febae572683d295c9d5aebecaaa18838f2d66e230fe2d4e139e3c17c656`:
+103 PASS, three mandatory product-QC failures, and 16 successful generations that failed
+locale-locked output verification. Raw audio, aliases, transcripts, traces, and device evidence
+remain untracked in their governed run roots.
 
-Do not resume or overwrite that run after this checkpoint. A commit changes the full-tree source
-identity; take 115 must remain a sentinel-less interrupted attempt, and missing rows cannot be
-merged into a retroactive PASS. At the next phone window, generate a new source-bound run ID. The
-114 terminal rows remain valid characterization evidence, while closure still requires a complete
-new characterization plus the two clean focused runs required by VLR-07.
+The complete 38-row Clone block repeated the same 36/38 result. The second private reference failed
+only Auto and explicit-English at seed `32060821`; both rows contain the same 7.603-second early
+gap. Per-chunk QC now proves raw live decoder chunks 0–6 were already near-silent before the
+limiter/writer, while incremental and full replay of the identical codec IDs produce clean audio.
+The constrained iPhone path was deferring MLX audio materialization and then clearing the allocator
+cache before reading the pending array. VLR-08 now forces materialization before cache clear on
+that constrained path, retains pipelining elsewhere, and exposes the selected policy in telemetry.
+The allocator-clear and partition regression tests pass.
 
-The completed 38-row Clone block has a causal result. Reference A passed all 19 rows; reference B
-passed 17 of 19 and failed only Auto and explicit English at seed `32060821`. Both failures carried
-the same codec trace and a 7.603-second gap in the live persisted output. Exact-range incremental
-and full replay both produced clean 15.68-second audio with only 268 ms of terminal silence. The
-sampled codes, tokenizer output, and replay decoders are therefore exonerated for these rows; VLR-08
-now owns the first divergence in live publication, assembly, limiter, marking, writer, or
-finalization. No hidden retry, seed change, reference edit, tokenizer change, or QC waiver occurred.
+The complete 84-row French Design block passed 67 rows: current Neutral 26/28, no-delivery 22/28,
+and Calm strong 19/28. One no-delivery long row is a replay-confirmed sampled-output dropout; the
+other 16 failures are locale-verification failures after successful generation. Current Neutral
+remains the strongest tested arm, so no prompt or delivery copy changed and DP-31/DP-32 retain
+semantic promotion authority. Calm take 112 additionally completed with a 117.2-second WAV whose
+last 109.49 seconds were silent. Fast-QC v5 intentionally tracked only closed interior runs and
+missed that open tail. VLR-09's v6 gate now retains bounded terminal-run length/start, rejects an
+egregious tail at the existing context-owned boundary, keeps 268 ms of ordinary padding valid, and
+decodes v1–v5 evidence compatibly. Existing interior-pause thresholds did not change.
 
-Of 76 represented French Design rows, 62 passed, 13 generated audio but failed locale-locked
-verification, and one diagnostic no-delivery long row failed mandatory dropout QC. Current Neutral
-represented all 27 core rows and passed 25; no-delivery passed 22 of 27; Calm passed 15 of 22 before
-the pause. The no-delivery QC failure reproduces through both decoder replays, so it is a sampled
-output pathology in a diagnostic arm, not a live writer defect. Locale failures span every frozen
-seed. Current Neutral remains the strongest tested arm, and this evidence does not authorize a
-production delivery-copy change; VLR-06 and DP-31/DP-32 retain that decision boundary.
+Deterministic proof is green: the cadence contract and Python fixtures pass, the focused native QC
+suite passes, the complete macOS core/XPC/owned-Qwen3 runtime suite passes, and the generic
+iPhoneOS app plus logic-test targets build. The derived owned-runtime inventory and project-health
+summary were refreshed. The full quick repository gate was manually interrupted only because the
+phone pause was requested; rerun it before committing this checkpoint.
 
-The typed transcription probe remains unchanged: reference A was an automatic French success;
-reference B was low confidence after empty French/English attempts and an unusable German result.
-The already reviewed manual transcript stayed authoritative. The operator-local 734-row Mac/CLI
-tokenizer/reference matrix, private control bundle, fresh complete phone characterization, and two
-focused closure passes remain pending. No model, prompt, sampling default, tokenizer, QC threshold,
-saved voice, transcript, installation, draft, or History row changed during this campaign.
+**Next session:** start from the committed tree, run `scripts/ios_device.sh preflight`, generate new
+source-bound focused and characterization plans/private maps, then complete two clean focused runs
+and one complete characterization. No preflight, install, or corrected-source device take occurred
+after these fixes, so VLR-08, VLR-09, and VLR-07 remain open. Also pending are the operator-local
+734-row Mac/CLI tokenizer/reference matrix and clean-control/reference characterization. Do not use
+any old run ID as closure evidence.
 
 **The causal control-audit remediations now have corrected-source device evidence.** Accessibility
 run `ios-xcui-control-audit-20260829-174031-cae15a02` passed Default, AX-L, AX-XXXL,

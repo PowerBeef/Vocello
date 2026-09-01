@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "status": "calibration-required",
-  "fastQCAlgorithmVersion": 5,
+  "fastQCAlgorithmVersion": 6,
   "classificationSource": "Sources/QwenVoiceCore/GenerationOutputAdapter.swift",
   "reportSource": "Sources/QwenVoiceCore/GenerationTelemetryRecord.swift",
   "policy": {

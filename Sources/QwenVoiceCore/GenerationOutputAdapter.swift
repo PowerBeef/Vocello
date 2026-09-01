@@ -772,6 +772,11 @@ struct PCM16StreamLimiter: Sendable {
         // Absolute sample index where the longest interior silent run started.
         // nil when no interior silent run has closed. Used for dropout localization.
         var longestInteriorSilentRunStartSample: Int? = nil
+        // An open near-silent run after audible speech. Unlike interior runs,
+        // this is updated after every append and remains observable when the
+        // clip ends before audio resumes.
+        var trailingSilentRunSamples = 0
+        var trailingSilentRunStartSample: Int? = nil
         // Lengths (samples) of interior near-silent runs at/above the record
         // floor, in close order. Converted to ms and counted against the text's
         // pause budget at report build (punctuation-aware dropout calibration —
@@ -914,6 +919,8 @@ struct PCM16StreamLimiter: Sendable {
         sawAudio = localSawAudio
         currentSilentRun = localSilentRun
         currentSilentRunStartSample = localSilentRunStart
+        localMetrics.trailingSilentRunSamples = localSilentRun
+        localMetrics.trailingSilentRunStartSample = localSilentRunStart
         metrics = localMetrics
     }
 }
@@ -2286,6 +2293,8 @@ struct StreamingExecutionContext: Sendable {
         combined.longestInteriorSilentRunSamples = persisted.longestInteriorSilentRunSamples
         combined.longestInteriorSilentRunStartSample = persisted.longestInteriorSilentRunStartSample
         combined.interiorSilentRunSamples = persisted.interiorSilentRunSamples
+        combined.trailingSilentRunSamples = persisted.trailingSilentRunSamples
+        combined.trailingSilentRunStartSample = persisted.trailingSilentRunStartSample
 
         return makeAudioQCReport(
             metrics: combined,
@@ -2317,6 +2326,13 @@ struct StreamingExecutionContext: Sendable {
             : 0
         let longestSilenceStartMS: Int? = {
             guard let startSample = metrics.longestInteriorSilentRunStartSample, sampleRate > 0 else { return nil }
+            return Int(Double(startSample) * 1000 / Double(sampleRate))
+        }()
+        let trailingSilenceMS = sampleRate > 0
+            ? Int(Double(metrics.trailingSilentRunSamples) * 1000 / Double(sampleRate))
+            : 0
+        let trailingSilenceStartMS: Int? = {
+            guard let startSample = metrics.trailingSilentRunStartSample, sampleRate > 0 else { return nil }
             return Int(Double(startSample) * 1000 / Double(sampleRate))
         }()
         // Every interior silence run (≥ record floor), in ms — for the
@@ -2415,6 +2431,10 @@ struct StreamingExecutionContext: Sendable {
         } else if excessCadencePauses > 0 {
             flags.append("cadence:excess\(excessCadencePauses)(\(cadencePauseCount)/\(expectedPauseCount))"); raise(.warn, &writtenOutputVerdict)
         }
+        if trailingSilenceMS >= egregiousMS {
+            flags.append("terminal_silence:\(trailingSilenceMS)ms")
+            raise(.fail, &writtenOutputVerdict)
+        }
         if clippedFrac > clipFailFrac { flags.append("clipping"); raise(.fail, &instabilityVerdict) }
         else if clipped > 0 { flags.append("clipping"); raise(.warn, &instabilityVerdict) }
         if clickFrac > clickFailFrac { flags.append("clicks"); raise(.fail, &instabilityVerdict) }
@@ -2439,8 +2459,12 @@ struct StreamingExecutionContext: Sendable {
         } else if longestSilenceMS >= suspiciousSingleMS {
             cadenceReasons.append(.singleSuspiciousPause)
         }
+        if trailingSilenceMS >= egregiousMS {
+            cadenceReasons.append(.egregiousTerminalSilence)
+        }
         let cadenceClassification: AudioCadenceQCReport.Classification
         if cadenceReasons.contains(.egregiousInteriorSilence)
+            || cadenceReasons.contains(.egregiousTerminalSilence)
             || cadenceReasons.contains(.repeatedSuspiciousPauses) {
             cadenceClassification = .severe
         } else if !cadenceReasons.isEmpty {
@@ -2482,6 +2506,8 @@ struct StreamingExecutionContext: Sendable {
             firstNonFiniteSample: metrics.firstNonFiniteSample,
             firstClipSample: metrics.firstClipSample,
             longestSilenceStartMS: longestSilenceStartMS,
+            trailingSilenceMS: trailingSilenceMS,
+            trailingSilenceStartMS: trailingSilenceStartMS,
             cadence: cadence,
             chunkQC: chunkQC
         )

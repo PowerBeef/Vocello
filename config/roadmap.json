@@ -2627,8 +2627,8 @@
         "file:Sources/QwenVoiceCore/GenerationTerminalDiagnosticEvidence.swift",
         "file:Tests/VocelloCoreTests/GenerationTerminalDiagnosticEvidenceTests.swift"
       ],
-      "updated": "2026-08-31",
-      "notes": "Focused run: all 26 no-retry rows represented, 20 PASS, two second-reference English Clone QC failures, and four French Design locale-verification failures. Characterization run vlr-device-20260831-characterization-04 is frozen at plan digest c1c0593ee49ee39dedff156dfb47a97282edbc08f431927631373c7b0c5eecfb and source identity e9755f40b078649d3cf97c7fd3d4dfc894aa14f8a18a33f71f7e3e598ad5989c. It retained terminal sentinels for takes 1-114 of 122: 98 PASS, three typed post-generation QC failures, and 13 successful-generation locale-verification failures. Take 115 was launched then intentionally interrupted for device return; takes 116-122 were never launched. The partial composer therefore reports eight infrastructure-missing rows and cannot authorize PASS. Because this tracked checkpoint changes source identity, that run is immutable and must not be resumed or overwritten after the commit; the next phone session uses a new source-bound run ID, while the 114 existing rows remain valid characterization evidence. The 734-row Mac/CLI tokenizer/control matrix remains pending."
+      "updated": "2026-09-01",
+      "notes": "The original focused run remains complete at 20/26 PASS, and paused characterization vlr-device-20260831-characterization-04 remains immutable at 114 terminal rows plus one interrupted launch. A fresh complete campaign, vlr-device-20260901-characterization-01, represented all 122 no-retry rows under plan digest 3926f6c1383d24f9268aa056017f49400d3b16f0c4383815aac59fe096c75d53 and source identity ed3b9febae572683d295c9d5aebecaaa18838f2d66e230fe2d4e139e3c17c656: 103 PASS, three mandatory product-QC failures, and 16 composer-labelled harness output-verification failures. The latter are successful generations with failed locale-locked verification and remain failures rather than missing evidence. Raw audio, aliases, transcripts, traces, and device artifacts remain untracked under the governed run root. This characterization exposed VLR-08's live streaming divergence and VLR-09's terminal-silence QC blind spot. The 734-row Mac/CLI tokenizer/control matrix and clean-control/reference characterization still remain pending, so VLR-03 stays in flight."
     },
     {
       "id": "VLR-04",
@@ -2659,8 +2659,8 @@
         "Sources/QwenVoiceCore/MLXTTSEngine.swift",
         "Sources/Resources/qwenvoice_production_model_catalog.json"
       ],
-      "updated": "2026-08-31",
-      "notes": "The eight-seed characterization represented all 38 Clone rows: 36 passed, while the second reference failed only the Auto and explicit English rows at seed 32060821. Both failures bound the same codec trace and a 7.603-second live-output gap, yet exact-range incremental and full replay both passed QC with only 268 ms of terminal silence. That rules out sampled codes, tokenizer output, and Mimi replay for these two rows and localizes the first divergence to the live publication/finalization or persisted-output path. VLR-08 owns that independent source defect. Reference-fidelity/prosody characterization and the archived-fp32 comparison remain pending here; no tokenizer artifact, model pin, QC threshold, sampling default, reference audio, or stored transcript has changed."
+      "updated": "2026-09-01",
+      "notes": "The complete fresh eight-seed characterization confirms the same 38-row Clone result: 36 PASS, with only the second-reference Auto and explicit-English seed-32060821 controls failing. Raw per-chunk QC proves chunks 0-6 were already near-silent before limiter/writer publication, while exact replay of the identical codec trace is clean. Tokenizer output, sampled codes, replay decoder, limiter, writer, and language ownership are therefore not the first divergent layer. VLR-08 owns the live deferred-materialization/cache-clear defect. Reference-fidelity/prosody characterization and the archived-fp32 comparison remain pending here; no tokenizer artifact, model pin, sampling default, reference audio, or stored transcript changed. Fast-QC algorithm v6 adds terminal-silence detection without changing existing interior-pause thresholds; VLR-09 owns its separate closure."
     },
     {
       "id": "VLR-06",
@@ -2673,8 +2673,8 @@
         "config/delivery-experiment-contract.json",
         "scripts/voice_identity_language_reliability.py"
       ],
-      "updated": "2026-08-31",
-      "notes": "Design Auto resolves once from target text and actor receipts match explicit French. Of 76 represented characterization Design rows, 62 passed, 13 generated audio but failed locale-locked output verification, and one diagnostic no-delivery long row failed mandatory dropout QC. Current Neutral represented all 27 core rows and passed 25; no-delivery passed 22 of 27 with four locale failures plus the replay-confirmed sampled-output dropout; Calm passed 15 of 22 with seven locale failures, while its final five long rows and all three Expressive sentinels were not executed. Failures span every seed, so this is not a single-seed defect, but current Neutral remains the strongest arm and the evidence does not authorize removing or changing it. Finish a fresh source-bound campaign and the Mac/CLI tokenizer comparison before causal closure. No production Voice Design prompt or delivery copy has changed; DP-31 and DP-32 retain semantic promotion authority."
+      "updated": "2026-09-01",
+      "notes": "Design Auto resolves once from target text and actor receipts match explicit French. The complete fresh 84-row Design block passed 67 rows: current Neutral 26/28, no-delivery 22/28, and Calm strong 19/28. One no-delivery long seed produced a replay-confirmed sampled-output dropout; the other 16 failures are successful generations that failed locale-locked output verification. Current Neutral remains the strongest arm and no delivery-copy change is authorized. Calm take 112 additionally exposed 109.49 seconds of terminal silence that the v5 interior-only Fast-QC gate did not observe; VLR-09 owns the bounded v6 correction. Finish the Mac/CLI tokenizer comparison and corrected-source phone closure before causal closure. DP-31 and DP-32 retain semantic promotion authority."
     },
     {
       "id": "VLR-07",
@@ -2687,23 +2687,44 @@
         "scripts/voice_identity_language_reliability.py",
         "docs/reference/delivery-harness.md"
       ],
-      "updated": "2026-08-31",
-      "notes": "The first focused run and the 114 terminal rows from the paused characterization are retained, source/plan bound, and untracked under build/artifacts/ios/voice-reliability. They are characterization evidence, not closure. The paused run cannot become PASS: take 115 remains a sentinel-less launched attempt and takes 116-122 were never launched; a tracked commit changes its source identity, so later work must use a new run ID instead of merging or overwriting it. After VLR-08 and any separately proven language/reference remediation, complete two distinct clean focused runs and one complete characterization run on the exact corrected source. The privacy-safe historical report remains pending."
+      "updated": "2026-09-01",
+      "notes": "The first focused run, immutable 114-terminal-row paused run, and complete 122-row September 1 characterization remain retained as distinct source/plan-bound untracked evidence. None is corrected-source closure. VLR-08 and VLR-09 now have deterministic source fixes, but the phone was paused before preflight, install, or any new take; no corrected-source on-device run ID exists. After this commit, generate new plans and private maps and complete two distinct clean focused runs plus one complete characterization on the exact committed source. Never resume, merge, relabel, or overwrite the historical runs. The privacy-safe historical report remains pending."
     },
     {
       "id": "VLR-08",
       "plan": "voice-identity-language-reliability-2026-08",
       "title": "Repair the live Clone publication gap exposed by clean codec replay",
-      "status": "planned",
+      "status": "in-flight",
       "gate": "For the second-reference English seed-32060821 Auto and explicit controls, prove why the live persisted output contains a 7.603-second early gap while exact-range incremental and full replay of the identical codec trace pass. Repair only the first divergent live publication, stream assembly, limiter, marking, writer, or finalization layer; add a deterministic regression fixture; preserve seed, sampling, tokenizer, model, reference, transcript, and QC policy; and require three consecutive physical-device passes for both language-selection paths plus no regression across the remaining eight-seed Clone cohort.",
       "sourceOfTruth": [
+        "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
+        "Packages/VocelloQwen3Core/Tests/Qwen3RuntimeTests/Qwen3DecoderPartitionTests.swift",
         "Sources/QwenVoiceCore/GenerationOutputAdapter.swift",
         "Sources/QwenVoiceCore/AtomicWAVGenerationOutputSink.swift",
         "Sources/QwenVoiceCore/GenerationTerminalDiagnosticEvidence.swift",
         "scripts/voice_identity_language_reliability.py"
       ],
-      "updated": "2026-08-31",
-      "notes": "Source-proven by characterization takes 20 and 28. The live written output fails with the same 7.603-second gap and identical codec trace in Auto and explicit English, while both replay decoders produce clean 15.68-second audio. No production fix has been attempted."
+      "updated": "2026-09-01",
+      "notes": "The complete September 1 characterization reproduced both failures. Per-chunk QC localizes the gap before limiter/writer publication: raw live decoder chunks 0-6 are near-silent, while the identical codec IDs replay cleanly. The constrained iPhone path used pipelined deferred MLX audio materialization and then cleared the allocator cache before reading that pending array. The source now forces materialization before cache clear on constrained tiers while preserving pipelining elsewhere, records the selected policy, and adds allocator-clear/partition regression tests. Full macOS core, XPC, and owned-runtime tests pass and the generic iPhoneOS app/logic build passes. Physical-device verification has not started; closure still requires the gate's repeated Auto/explicit and cohort evidence on new source-bound run IDs."
+    },
+    {
+      "id": "VLR-09",
+      "plan": "voice-identity-language-reliability-2026-08",
+      "title": "Reject egregious terminal silence before publication",
+      "status": "in-flight",
+      "gate": "Fast QC must retain bounded cross-chunk terminal-silence length and start evidence after audible speech begins, reject a terminal run at or above the existing context-owned egregious threshold, preserve ordinary terminal padding, decode v1-v5 reports compatibly, and emit a typed severe cadence reason. Focused deterministic tests and the full runtime suite must pass. A fresh physical-device run must prove the former take-112 shape is either clean or rejected before publication without changing the existing interior-pause thresholds, seed, prompt, sampling, or retry policy.",
+      "sourceOfTruth": [
+        "Sources/QwenVoiceCore/GenerationOutputAdapter.swift",
+        "Sources/QwenVoiceCore/GenerationTelemetryRecord.swift",
+        "config/audio-cadence-qc-contract.json",
+        "scripts/audio_cadence_qc.py"
+      ],
+      "evidence": [
+        "file:Tests/VocelloCoreTests/GenerationTelemetrySchemaTests.swift",
+        "file:Tests/VocelloCoreTests/AtomicWAVPublicationTests.swift"
+      ],
+      "updated": "2026-09-01",
+      "notes": "Characterization take 112 completed at the app layer but its 117.2-second WAV contained 109.49 seconds of terminal silence, 93.9% pause-to-speech ratio, and empty locale-locked ASR. Algorithm v5 intentionally recorded only closed interior runs and therefore missed the open tail. Algorithm v6 now records bounded terminal-run samples/start, emits terminal_silence plus egregious_terminal_silence, and rejects it using the unchanged context-owned egregious boundary. A 2.2-second synthetic tail fails, 268 ms of normal padding passes, v1-v5 decoding remains compatible, the cadence contract and Python fixtures pass, the focused native suite passes, the full macOS/XPC/Qwen3 runtime suite passes, and the generic iPhoneOS app/logic build passes. No corrected-source device take ran before the pause."
     }
   ]
 }

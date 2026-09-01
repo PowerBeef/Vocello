@@ -152,24 +152,28 @@ copies without names or whole-container access. The diagnostics-only app exports
 matches, the host rehashes audio/transcript bytes, and a second launch removes the device-side
 temporary export after verified collection.
 
-The first schema-3 characterization was paused after 114 of 122 terminal rows. Its 38-row Clone
-block was complete: alias A passed 19/19; alias B passed 17/19 and failed only the Auto/explicit
-English controls at seed `32060821`. Those two failures share a codec trace and a 7.603-second live
-persisted-output gap, while exact-range incremental and full replay both pass with only 268 ms of
-terminal silence. That is evidence of a post-decoder live publication/finalization divergence, not
-a sampled-code, tokenizer, or Mimi replay failure. VLR-08 owns the source remediation.
+The first schema-3 characterization remains an immutable partial run with 114 of 122 terminal rows.
+A distinct September 1 campaign completed all 122 rows: 103 PASS, three mandatory product-QC
+failures, and 16 successful generations that failed locale-locked output verification. Its 38-row
+Clone block repeated 36/38 PASS. The two second-alias English failures share a codec trace and a
+7.603-second live gap, but raw per-chunk QC proves the live decoder chunks were already near-silent
+before limiter/writer publication while exact replay of the identical codec IDs is clean. VLR-08
+therefore disables deferred audio materialization when the constrained memory policy clears the MLX
+allocator cache after a chunk; higher-memory paths retain pipelining. Deterministic runtime tests
+pass, but corrected-source phone acceptance has not started.
 
-Among 76 represented French Design rows, 62 passed locale and QC, 13 completed generation but
-failed locale-locked verification, and one diagnostic no-delivery long row failed dropout QC. The
-current Neutral arm passed 25/27 represented rows, no-delivery 22/27, and Calm 15/22 before the
-pause. The diagnostic dropout persists in incremental and full replay, while locale failures span
-all eight frozen seeds. These findings do not authorize a production prompt change: current Neutral
-is still the strongest tested arm, the run is incomplete, and DP-31/DP-32 retain semantic authority.
-The immutable pause identity and next-run procedure live in the iOS device-testing guide.
+The complete 84-row French Design block passed current Neutral 26/28, no-delivery 22/28, and Calm
+strong 19/28. One no-delivery row is a replay-confirmed sampled-output dropout; 16 rows failed
+locale-locked verification after successful generation. Current Neutral remains the strongest arm,
+so the evidence does not authorize a prompt change. One Calm row also contained 109.49 seconds of
+terminal silence that the interior-only v5 Fast-QC gate did not observe. VLR-09's v6 report tracks
+the bounded open terminal run and rejects an egregious tail at the existing contextual boundary;
+ordinary terminal padding and all existing interior-pause thresholds remain unchanged.
 
-No prompt, tokenizer, model pin, sampling default, or QC threshold changes from this lane alone.
-Tokenizer/reference remediation belongs to VLR-05; any Design delivery-copy candidate remains under
-DP-31/DP-32 blinded-listening authority.
+No prompt, tokenizer, model pin, sampling default, seed, or retry policy changed. Tokenizer/reference
+remediation belongs to VLR-05; any Design delivery-copy candidate remains under DP-31/DP-32 blinded-
+listening authority. The immutable run identities and next-run procedure live in the iOS device-
+testing guide.
 
 ## 2. Measurement protocol — `vocello bench --delivery`
 

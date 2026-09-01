@@ -359,7 +359,7 @@ fileprivate enum Qwen3TextConditioningMode: String, Sendable {
     case fullTextNonStreaming = "full_text_non_streaming"
 }
 
-private enum Qwen3StreamStepEvalPolicy: String, Sendable {
+enum Qwen3StreamStepEvalPolicy: String, Sendable {
     case full
     case pipelined
     case eosOnly = "eos-only"
@@ -393,6 +393,15 @@ private enum Qwen3StreamStepEvalPolicy: String, Sendable {
             "stream_step_eval_policy_eos_only": self == .eosOnly,
             "stream_step_eval_policy_deferred": self == .deferred,
         ]
+    }
+
+    func shouldDeferAudioMaterialization(
+        hasMaterializedSink: Bool,
+        clearsAllocatorCacheAfterChunk: Bool
+    ) -> Bool {
+        self == .pipelined
+            && hasMaterializedSink
+            && !clearsAllocatorCacheAfterChunk
     }
 }
 
@@ -3159,7 +3168,20 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         let streamStepEvalPolicy = Qwen3StreamStepEvalPolicy.resolve(
             explicitPolicy: explicitStreamStepEvalPolicy
         )
+        // A constrained-tier cache clear invalidates the optimization's safety
+        // premise: the pending MLXArray would otherwise survive an allocator
+        // cache clear and materialize on the next token iteration. Materialize
+        // synchronously on that path; higher-memory tiers keep the pipeline.
+        let deferStreamChunkMaterialization = streamStepEvalPolicy.shouldDeferAudioMaterialization(
+            hasMaterializedSink: materializedEventSink != nil,
+            clearsAllocatorCacheAfterChunk: memoryPolicy.clearCacheOnStreamChunkEmit
+        )
         mergePreparationBooleanFlags(streamStepEvalPolicy.booleanFlags)
+        mergePreparationBooleanFlags([
+            "stream_audio_materialization_deferred": deferStreamChunkMaterialization,
+            "stream_audio_materialization_eager":
+                materializedEventSink != nil && !deferStreamChunkMaterialization,
+        ])
         mergePreparationBooleanFlags(generationSpeedProfile.booleanFlags)
         mergePreparationStringFlags([
             "generation_speed_profile": generationSpeedProfile.rawValue,
@@ -3750,8 +3772,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                     // it at the top of the next token step. The flush point
                     // runs before every assembly, so at most one chunk is ever
                     // pending.
-                    let deferChunkMaterialization =
-                        streamStepEvalPolicy == .pipelined && materializedEventSink != nil
+                    let deferChunkMaterialization = deferStreamChunkMaterialization
                     assert(pendingMaterializedChunk == nil)
                     let materializedSamples: [Float]?
                     if materializedEventSink != nil, !deferChunkMaterialization {

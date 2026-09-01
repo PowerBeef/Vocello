@@ -225,7 +225,7 @@ rows; reruns get new IDs. See `docs/reference/ios-device-testing.md`.
 | `scripts/ui_test.sh`, `scripts/macos_test.sh`, `scripts/ios_device.sh` | native test and diagnostic entry points |
 | `docs/reference/model-delivery.md` | download/restoration/retry diagnostics and live-proof rules |
 | `config/delivery-experiment-contract.json`, `config/delivery-evaluator-v2-contract.json`, `config/delivery-evaluation-corpus.json`, `config/delivery-evaluator-v2-candidates.json` | pre-registered prompt arms, compact local evaluator, sampling, multilingual scripts, pinned candidate models, holdouts, and semantic-promotion limits |
-| `config/audio-cadence-qc-contract.json`, `scripts/audio_cadence_qc.py` | Fast-QC cadence classification, privacy-safe calibration coverage, and held-out threshold-review authority |
+| `config/audio-cadence-qc-contract.json`, `scripts/audio_cadence_qc.py` | Fast-QC v6 cadence, calibration, and threshold-review authority |
 | `config/voice-identity-language-reliability.json`, `scripts/voice_identity_language_reliability.py` | Private Clone/French matrices with privacy-safe terminal QC/replay |
 | `docs/reference/delivery-harness.md` | delivery/emotion protocol, provenance, layered evaluation, statistics, and results |
 | `website/` | marketing site governed by `website/AGENTS.md` |

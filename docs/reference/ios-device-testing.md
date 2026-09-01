@@ -373,6 +373,26 @@ phone window, create a new plan and private map with a new run ID against the th
 run the complete characterization. The old 114 terminal rows remain valid historical
 characterization; they cannot be merged with the new run to satisfy a complete-run gate.
 
+### Corrected-source resume boundary — 2026-09-01
+
+Run `vlr-device-20260901-characterization-01` is a separate complete 122-row characterization
+bound to plan digest `3926f6c1383d24f9268aa056017f49400d3b16f0c4383815aac59fe096c75d53`
+and source identity `ed3b9febae572683d295c9d5aebecaaa18838f2d66e230fe2d4e139e3c17c656`.
+It retained 103 PASS rows, three mandatory product-QC failures, and 16 successful-generation
+locale-verification failures. Keep that run and the August 31 partial run immutable and distinct.
+
+The resulting VLR-08 source fix materializes constrained-tier MLX audio before the per-chunk
+allocator-cache clear. VLR-09 Fast-QC v6 adds bounded terminal-silence evidence and rejects an
+egregious open tail without changing interior-pause thresholds. Deterministic macOS/XPC/Qwen3 tests
+and the generic iPhoneOS app/logic build pass. The phone was paused before preflight, installation,
+or any corrected-source take, so no new run ID exists yet and neither fix has physical-device
+acceptance.
+
+At the next phone window, first run `scripts/ios_device.sh preflight`. Generate new focused and
+characterization plans/private maps from the exact committed tree; do not resume either historical
+run. VLR-07 requires two distinct clean focused runs and one complete characterization. A failure
+remains terminal and gets no automatic retry, seed substitution, or cross-run merge.
+
 F-01/ICI-4 saved-voice and direct Clone-import acceptance is separately opt-in:
 
 ```sh

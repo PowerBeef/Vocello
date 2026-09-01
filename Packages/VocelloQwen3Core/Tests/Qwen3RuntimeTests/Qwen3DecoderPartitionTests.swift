@@ -80,6 +80,69 @@ final class Qwen3DecoderPartitionTests: XCTestCase {
         assertWaveform(withTimings, matches: withoutTimings, label: "timing parity")
     }
 
+    func testDeferredMaterializationSurvivesAllocatorCacheClear() throws {
+        MLXRandom.seed(0xC0DEC0DE)
+        let decoder = Qwen3TTSSpeechTokenizerDecoder(config: try tinyConfig())
+        let codes = fixtureCodes(tokenCount: 48)
+        let firstCodes = codes[0..., 0..., 0..<12]
+        let secondCodes = codes[0..., 0..., 12..<48]
+
+        decoder.resetStreamingState()
+        let eagerFirst = decoder.streamingStep(firstCodes)
+        eval(eagerFirst)
+        let eagerFirstSamples = eagerFirst.asArray(Float.self)
+        let eagerSecond = decoder.streamingStep(secondCodes)
+        eval(eagerSecond)
+        let eagerSecondSamples = eagerSecond.asArray(Float.self)
+
+        decoder.resetStreamingState()
+        let deferredFirst = decoder.streamingStep(firstCodes)
+        asyncEval(deferredFirst)
+        Memory.clearCache()
+        let deferredFirstSamples = deferredFirst.asArray(Float.self)
+        let deferredSecond = decoder.streamingStep(secondCodes)
+        eval(deferredSecond)
+        let deferredSecondSamples = deferredSecond.asArray(Float.self)
+
+        assertWaveform(
+            deferredFirstSamples,
+            matches: eagerFirstSamples,
+            label: "deferred first chunk after cache clear"
+        )
+        assertWaveform(
+            deferredSecondSamples,
+            matches: eagerSecondSamples,
+            label: "deferred continuation after cache clear"
+        )
+    }
+
+    func testConstrainedCacheClearDisablesDeferredAudioMaterialization() {
+        XCTAssertTrue(
+            Qwen3StreamStepEvalPolicy.pipelined.shouldDeferAudioMaterialization(
+                hasMaterializedSink: true,
+                clearsAllocatorCacheAfterChunk: false
+            )
+        )
+        XCTAssertFalse(
+            Qwen3StreamStepEvalPolicy.pipelined.shouldDeferAudioMaterialization(
+                hasMaterializedSink: true,
+                clearsAllocatorCacheAfterChunk: true
+            )
+        )
+        XCTAssertFalse(
+            Qwen3StreamStepEvalPolicy.full.shouldDeferAudioMaterialization(
+                hasMaterializedSink: true,
+                clearsAllocatorCacheAfterChunk: false
+            )
+        )
+        XCTAssertFalse(
+            Qwen3StreamStepEvalPolicy.pipelined.shouldDeferAudioMaterialization(
+                hasMaterializedSink: false,
+                clearsAllocatorCacheAfterChunk: false
+            )
+        )
+    }
+
     private func tinyConfig() throws -> Qwen3TTSTokenizerDecoderConfig {
         let json = """
         {

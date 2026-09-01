@@ -34,6 +34,7 @@ REASONS = {
     "single_suspicious_pause",
     "repeated_suspicious_pauses",
     "egregious_interior_silence",
+    "egregious_terminal_silence",
 }
 
 
@@ -79,8 +80,8 @@ def load_contract(root: Path = REPO_ROOT) -> dict[str, Any]:
         raise CadenceContractError(f"contract schemaVersion must be {SCHEMA_VERSION}")
     if contract.get("status") != "calibration-required":
         raise CadenceContractError("contract status must remain calibration-required")
-    if contract.get("fastQCAlgorithmVersion") != 5:
-        raise CadenceContractError("contract must bind Fast-QC algorithm version 5")
+    if contract.get("fastQCAlgorithmVersion") != 6:
+        raise CadenceContractError("contract must bind Fast-QC algorithm version 6")
 
     policy = contract.get("policy")
     if not isinstance(policy, dict):

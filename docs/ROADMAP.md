@@ -16,7 +16,7 @@
 | `ios-app-store-readiness-2026-08` | active | release-qa | 1/12 (8%) |
 | `ios-control-audit-2026-08` | active | ios | 8/12 (67%) |
 | `ios-generation-startup-reliability-2026-08` | active | backend-and-platform | 4/6 (67%) |
-| `voice-identity-language-reliability-2026-08` | active | backend-and-platform | 2/8 (25%) |
+| `voice-identity-language-reliability-2026-08` | active | backend-and-platform | 2/9 (22%) |
 | `compliance-2026-08` | complete | release-qa | 2/2 (100%) |
 | `convergence-metal4-stage4-2026-08` | complete | backend-and-platform | 7/7 (100%) |
 | `doc-governance-2026-08` | complete | release-qa | 9/9 (100%) |
@@ -318,7 +318,8 @@ Narrative authority: [`docs/reference/delivery-harness.md`](reference/delivery-h
 | `VLR-05` | in-flight | Apply only the proven tokenizer or reference-quality remediation | — |
 | `VLR-06` | in-flight | Apply only the proven French Voice Design remediation | — |
 | `VLR-07` | planned | Complete physical-device closure and publish the privacy-safe report | — |
-| `VLR-08` | planned | Repair the live Clone publication gap exposed by clean codec replay | — |
+| `VLR-08` | in-flight | Repair the live Clone publication gap exposed by clean codec replay | — |
+| `VLR-09` | in-flight | Reject egregious terminal silence before publication | `file:Tests/VocelloCoreTests/GenerationTelemetrySchemaTests.swift`, `file:Tests/VocelloCoreTests/AtomicWAVPublicationTests.swift` |
 
 ### Open items in detail
 
@@ -337,8 +338,11 @@ Narrative authority: [`docs/reference/delivery-harness.md`](reference/delivery-h
 - **`VLR-07`** (planned) — Complete physical-device closure and publish the privacy-safe report.
   gate: After Mac/CLI localization, complete two consecutive no-retry focused physical-iPhone passes using the private alias map and exact current source. Require typed transcription classification, correct short/medium/long French output, exact receipt parity, zero new hard QC failures, WER/CER delta <= 0.01, speaker-similarity delta >= -0.02, governed Clone prosody fidelity or explicit reference rejection, and green Built-in/English Design/enrollment/Clone controls. Publish only a digest-pinned privacy-safe historical report; keep audio, text, names, paths, raw diagnostics, and device evidence untracked.
 
-- **`VLR-08`** (planned) — Repair the live Clone publication gap exposed by clean codec replay.
+- **`VLR-08`** (in-flight) — Repair the live Clone publication gap exposed by clean codec replay.
   gate: For the second-reference English seed-32060821 Auto and explicit controls, prove why the live persisted output contains a 7.603-second early gap while exact-range incremental and full replay of the identical codec trace pass. Repair only the first divergent live publication, stream assembly, limiter, marking, writer, or finalization layer; add a deterministic regression fixture; preserve seed, sampling, tokenizer, model, reference, transcript, and QC policy; and require three consecutive physical-device passes for both language-selection paths plus no regression across the remaining eight-seed Clone cohort.
+
+- **`VLR-09`** (in-flight) — Reject egregious terminal silence before publication.
+  gate: Fast QC must retain bounded cross-chunk terminal-silence length and start evidence after audible speech begins, reject a terminal run at or above the existing context-owned egregious threshold, preserve ordinary terminal padding, decode v1-v5 reports compatibly, and emit a typed severe cadence reason. Focused deterministic tests and the full runtime suite must pass. A fresh physical-device run must prove the former take-112 shape is either clean or rejected before publication without changing the existing interior-pause thresholds, seed, prompt, sampling, or retry policy.
 
 ## EU AI Act Article 50 readiness
 

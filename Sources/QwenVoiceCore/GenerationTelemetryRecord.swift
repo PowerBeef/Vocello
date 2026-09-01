@@ -980,6 +980,7 @@ public struct AudioCadenceQCReport: Hashable, Codable, Sendable {
         case singleSuspiciousPause = "single_suspicious_pause"
         case repeatedSuspiciousPauses = "repeated_suspicious_pauses"
         case egregiousInteriorSilence = "egregious_interior_silence"
+        case egregiousTerminalSilence = "egregious_terminal_silence"
     }
 
     public let classification: Classification
@@ -1038,8 +1039,9 @@ public struct AudioQCReport: Hashable, Codable, Sendable {
     /// than assuming the pre-write limited buffer and persisted file agree. v4
     /// separates ordinary cadence warnings from repeated suspicious-scale or
     /// context-sensitive egregious dead-air failures. v5 retains those exact
-    /// verdict boundaries and adds a structured, bounded cadence report.
-    public static let currentAlgorithmVersion = 5
+    /// verdict boundaries and adds a structured, bounded cadence report. v6
+    /// observes an open terminal silence run and rejects egregious dead air.
+    public static let currentAlgorithmVersion = 6
 
     public enum Verdict: String, Hashable, Codable, Sendable {
         case pass
@@ -1082,6 +1084,9 @@ public struct AudioQCReport: Hashable, Codable, Sendable {
     /// Start time of the longest interior near-silent run, in milliseconds since
     /// the start of the clip, or nil if none.
     public let longestSilenceStartMS: Int?
+    /// Open near-silent run at end of clip, after audible speech began.
+    public let trailingSilenceMS: Int
+    public let trailingSilenceStartMS: Int?
     public let durationSeconds: Double
     /// Schema-versioned cadence evidence. Optional for v1-v4 telemetry.
     public let cadence: AudioCadenceQCReport?
@@ -1106,6 +1111,8 @@ public struct AudioQCReport: Hashable, Codable, Sendable {
         firstNonFiniteSample: Int? = nil,
         firstClipSample: Int? = nil,
         longestSilenceStartMS: Int? = nil,
+        trailingSilenceMS: Int = 0,
+        trailingSilenceStartMS: Int? = nil,
         cadence: AudioCadenceQCReport? = nil,
         chunkQC: [AudioQCChunkReport]? = nil
     ) {
@@ -1126,6 +1133,8 @@ public struct AudioQCReport: Hashable, Codable, Sendable {
         self.firstNonFiniteSample = firstNonFiniteSample
         self.firstClipSample = firstClipSample
         self.longestSilenceStartMS = longestSilenceStartMS
+        self.trailingSilenceMS = trailingSilenceMS
+        self.trailingSilenceStartMS = trailingSilenceStartMS
         self.cadence = cadence
         self.chunkQC = chunkQC
     }
@@ -1151,6 +1160,8 @@ public struct AudioQCReport: Hashable, Codable, Sendable {
         self.firstNonFiniteSample = try container.decodeIfPresent(Int.self, forKey: .firstNonFiniteSample)
         self.firstClipSample = try container.decodeIfPresent(Int.self, forKey: .firstClipSample)
         self.longestSilenceStartMS = try container.decodeIfPresent(Int.self, forKey: .longestSilenceStartMS)
+        self.trailingSilenceMS = try container.decodeIfPresent(Int.self, forKey: .trailingSilenceMS) ?? 0
+        self.trailingSilenceStartMS = try container.decodeIfPresent(Int.self, forKey: .trailingSilenceStartMS)
         self.cadence = try container.decodeIfPresent(AudioCadenceQCReport.self, forKey: .cadence)
         self.chunkQC = try container.decodeIfPresent([AudioQCChunkReport].self, forKey: .chunkQC)
     }

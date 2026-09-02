@@ -91,6 +91,21 @@ class IOSStorageProtectionPolicyTests(unittest.TestCase):
         with self.assertRaisesRegex(module.PolicyError, "both host and generic-iOS"):
             module.validate(root)
 
+    def test_missing_immutable_model_reconciliation_is_rejected(self) -> None:
+        temporary, root = self.fixture()
+        self.addCleanup(temporary.cleanup)
+        source = root / "Sources/iOSSupport/Services/IOSStorageProtectionPolicy.swift"
+        source.write_text(
+            source.read_text(encoding="utf-8").replace(
+                "withMetadataWriteAccess(at: url",
+                "removedMetadataWriteAccess(at: url",
+                1,
+            ),
+            encoding="utf-8",
+        )
+        with self.assertRaisesRegex(module.PolicyError, "immutable model-file"):
+            module.validate(root)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -103,6 +103,10 @@ def validate(root: Path = ROOT) -> dict[str, object]:
         raise PolicyError("Swift policy does not write NSFileProtectionKey")
     if "values.isExcludedFromBackup = entry.backup == .excluded" not in source:
         raise PolicyError("Swift policy does not enforce backup disposition")
+    if "withMetadataWriteAccess(at: url" not in source:
+        raise PolicyError("Swift policy does not reconcile immutable model-file metadata safely")
+    if source.count(".posixPermissions: NSNumber(value: mode") != 2:
+        raise PolicyError("Swift policy must open and restore immutable model-file permissions")
 
     bootstrap = (root / BOOTSTRAP.relative_to(ROOT)).read_text(encoding="utf-8")
     if "try IOSStorageProtectionPolicy.apply(at: AppPaths.appSupportDir)" not in bootstrap:

@@ -397,6 +397,20 @@ characterization plans/private maps from the exact committed tree; do not resume
 run. VLR-07 requires two distinct clean 14-row closure runs and one complete characterization. A failure
 remains terminal and gets no automatic retry, seed substitution, or cross-run merge.
 
+### Storage-policy startup interruption — 2026-09-02
+
+Preflight passed with the paired phone unlocked, but the first attempted corrected-source private
+export never wrote its terminal sentinel and launched zero generation rows. The visible app failed
+during initialization because recursive storage-policy metadata could not be saved on the
+read-only `speech_tokenizer/model.safetensors` hard link. Preserve the failed export attempt and
+its empty source-bound plan as infrastructure/product-startup evidence; it is not a VLR closure
+run and must not be resumed, relabelled, or counted.
+
+The source correction preserves shared-component immutability by temporarily adding only owner
+write access while applying data-protection/backup metadata, then restoring the exact prior mode
+on both success and failure. After its deterministic checkpoint and commit, generate entirely new
+run IDs, plans, and private maps for both 14-row closure passes and the 122-row characterization.
+
 F-01/ICI-4 saved-voice and direct Clone-import acceptance is separately opt-in:
 
 ```sh

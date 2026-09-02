@@ -2274,8 +2274,8 @@
       "evidence": [
         "doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md"
       ],
-      "updated": "2026-09-01",
-      "notes": "The schema-v1 path contract now classifies every maintained iOS data class, applies CompleteUntilFirstUserAuthentication recursively before stores open, excludes models/downloads/caches/diagnostics from backup, and preserves backup for user outputs/voices/History. Deterministic source/negative fixtures pass. Signed-device file-attribute, locked-background, deletion, and relaunch proof remains required."
+      "updated": "2026-09-02",
+      "notes": "The schema-v1 path contract classifies every maintained iOS data class, applies CompleteUntilFirstUserAuthentication recursively before stores open, excludes models/downloads/caches/diagnostics from backup, and preserves backup for user outputs/voices/History. The first September 2 signed-device VLR export exposed a source-proven bootstrap defect before any generation row launched: recursive metadata application could not save attributes on the intentionally read-only speech_tokenizer/model.safetensors hard link. The bounded correction temporarily adds owner write permission only around metadata updates and restores the exact immutable mode on success or failure; focused policy and Swift tests cover a hard-linked replica and a thrown operation. Signed-device effective-attribute, backup-exclusion, locked-background, deletion, and relaunch proof remains required before ASR-06 closes."
     },
     {
       "id": "ASR-07",
@@ -2722,8 +2722,8 @@
         "scripts/voice_identity_language_reliability.py",
         "docs/reference/delivery-harness.md"
       ],
-      "updated": "2026-09-01",
-      "notes": "The Mac phase is complete and pinned in the September 1 Mac report. The first focused phone run, immutable 114-terminal-row paused run, and complete 122-row September 1 characterization remain distinct retained evidence; none is corrected-source closure. The new closure profile excludes experimental no-delivery/Calm arms and covers eight production Clone plus six current-Neutral Design cells. After the next commit, generate two new closure plans and one characterization plan with separately bound private maps. Never resume, merge, relabel, or overwrite historical runs."
+      "updated": "2026-09-02",
+      "notes": "The Mac phase is complete and pinned in the September 1 Mac report. The first focused phone run, immutable 114-terminal-row paused run, and complete 122-row September 1 characterization remain distinct retained evidence; none is corrected-source closure. On September 2 preflight passed, but the first private export launched zero generation rows because iOS initialization failed while applying storage metadata to an immutable shared-model hard link; that failed attempt is retained as ASR-06 startup evidence and is not a VLR run. The closure profile excludes experimental no-delivery/Calm arms and covers eight production Clone plus six current-Neutral Design cells. After the storage correction's exact commit, generate two new closure plans and one characterization plan with separately bound private maps. Never resume, merge, relabel, or overwrite historical or failed-startup runs."
     },
     {
       "id": "VLR-08",

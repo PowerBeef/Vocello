@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-09-01
+reviewed: 2026-09-02
 summary: Local-first privacy and on-disk storage layout on both platforms — what lives where, what never leaves the device, and deletion semantics.
 sourceOfTruth:
   - Sources/SharedSupport
@@ -137,6 +137,15 @@ Backup behavior is intentional rather than inherited:
   user-created data that cannot necessarily be reconstructed;
 - the policy is applied to existing descendants during bootstrap, including the SQLite database
   and its WAL/SHM sidecars, so a prior file cannot keep stale attributes indefinitely.
+
+Catalog-v2 shared model blobs are deliberately published with mode `0444` and hard-linked into
+each installed model. On 2026-09-02 a signed-device launch proved that recursively applying backup
+and data-protection metadata could fail on one of those immutable links before the app finished
+initializing. Bootstrap now opens an owner-write-only metadata window for an existing read-only
+regular file, applies the governed attributes, and restores the exact original mode even when the
+metadata operation throws. This does not weaken the protection class, make model content
+persistently writable, or create another model owner; policy application still completes before
+the engine and background delivery coordinator are created.
 
 The deterministic policy validator rejects a missing path class, a protection mismatch, or an
 unclassified maintained subtree. ASR-06 remains open until an exact signed candidate proves the

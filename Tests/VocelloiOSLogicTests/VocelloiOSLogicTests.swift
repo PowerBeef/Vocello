@@ -413,6 +413,71 @@ final class VocelloiOSLogicTests: XCTestCase {
         XCTAssertEqual(byID["history"]?.pathPrefix, "history.sqlite")
     }
 
+    func testStorageProtectionMetadataUpdateRestoresImmutableModelFile() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "vocello-storage-policy-\(UUID().uuidString)",
+            isDirectory: true
+        )
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let model = root.appendingPathComponent("model.safetensors", isDirectory: false)
+        try Data("immutable-model".utf8).write(to: model)
+        let installedModel = root.appendingPathComponent("installed-model.safetensors", isDirectory: false)
+        try FileManager.default.linkItem(at: model, to: installedModel)
+        try FileManager.default.setAttributes(
+            [.posixPermissions: NSNumber(value: 0o444)],
+            ofItemAtPath: model.path
+        )
+
+        var modeDuringMetadataUpdate: Int?
+        try IOSStorageProtectionPolicy.withMetadataWriteAccess(at: model) {
+            modeDuringMetadataUpdate = try XCTUnwrap(
+                FileManager.default.attributesOfItem(atPath: model.path)[.posixPermissions]
+                    as? NSNumber
+            ).intValue
+        }
+
+        XCTAssertEqual(modeDuringMetadataUpdate.map { $0 & 0o777 }, 0o644)
+        let restored = try XCTUnwrap(
+            FileManager.default.attributesOfItem(atPath: model.path)[.posixPermissions]
+                as? NSNumber
+        ).intValue
+        XCTAssertEqual(restored & 0o777, 0o444)
+        let linkedMode = try XCTUnwrap(
+            FileManager.default.attributesOfItem(atPath: installedModel.path)[.posixPermissions]
+                as? NSNumber
+        ).intValue
+        XCTAssertEqual(linkedMode & 0o777, 0o444)
+    }
+
+    func testStorageProtectionMetadataFailureStillRestoresImmutableModelFile() throws {
+        struct ExpectedFailure: Error {}
+
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "vocello-storage-policy-failure-\(UUID().uuidString)",
+            isDirectory: true
+        )
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let model = root.appendingPathComponent("model.safetensors", isDirectory: false)
+        try Data("immutable-model".utf8).write(to: model)
+        try FileManager.default.setAttributes(
+            [.posixPermissions: NSNumber(value: 0o444)],
+            ofItemAtPath: model.path
+        )
+
+        XCTAssertThrowsError(
+            try IOSStorageProtectionPolicy.withMetadataWriteAccess(at: model) {
+                throw ExpectedFailure()
+            }
+        )
+        let restored = try XCTUnwrap(
+            FileManager.default.attributesOfItem(atPath: model.path)[.posixPermissions]
+                as? NSNumber
+        ).intValue
+        XCTAssertEqual(restored & 0o777, 0o444)
+    }
+
     func testModelDeliveryBackgroundSessionSeparatesManagedDebugRoot() {
         let bundleIdentifier = "com.patricedery.vocello"
         let canonical = IOSModelDeliveryConfiguration.backgroundSessionIdentifier(

@@ -83,15 +83,57 @@ enum IOSStorageProtectionPolicy {
         to url: URL,
         fileManager: FileManager
     ) throws {
+        try withMetadataWriteAccess(at: url, fileManager: fileManager) {
+            try fileManager.setAttributes(
+                [.protectionKey: protectionClass],
+                ofItemAtPath: url.path
+            )
+
+            guard entry.backup != .inherited else { return }
+            var values = URLResourceValues()
+            values.isExcludedFromBackup = entry.backup == .excluded
+            var mutableURL = url
+            try mutableURL.setResourceValues(values)
+        }
+    }
+
+    /// Shared model-component files are intentionally published read-only (`0444`) after their
+    /// digest is verified. Updating their data-protection or backup metadata still requires owner
+    /// write permission on iOS. Bootstrap therefore opens the smallest possible metadata-only
+    /// window and restores the exact original mode even when the metadata operation fails.
+    ///
+    /// The app has no second model-owning process, and this runs before the engine or background
+    /// delivery coordinator is created. Hard-linked replicas share the same inode and therefore
+    /// return to the same immutable mode together.
+    @discardableResult
+    static func withMetadataWriteAccess<T>(
+        at url: URL,
+        fileManager: FileManager = .default,
+        operation: () throws -> T
+    ) throws -> T {
+        let attributes = try fileManager.attributesOfItem(atPath: url.path)
+        guard attributes[.type] as? FileAttributeType == .typeRegular,
+              let mode = (attributes[.posixPermissions] as? NSNumber)?.intValue,
+              mode & 0o200 == 0 else {
+            return try operation()
+        }
+
         try fileManager.setAttributes(
-            [.protectionKey: protectionClass],
+            [.posixPermissions: NSNumber(value: mode | 0o200)],
             ofItemAtPath: url.path
         )
-
-        guard entry.backup != .inherited else { return }
-        var values = URLResourceValues()
-        values.isExcludedFromBackup = entry.backup == .excluded
-        var mutableURL = url
-        try mutableURL.setResourceValues(values)
+        let result: Result<T, Error>
+        do {
+            result = .success(try operation())
+        } catch {
+            result = .failure(error)
+        }
+        // Restoration failure wins over the metadata result because leaving a verified model
+        // component writable would violate the shared-store immutability contract.
+        try fileManager.setAttributes(
+            [.posixPermissions: NSNumber(value: mode)],
+            ofItemAtPath: url.path
+        )
+        return try result.get()
     }
 }

@@ -47,7 +47,18 @@ machine-readable status record and wins over any older prose.
 | 13 — Benchmark/history v3 | Live 2026-07-29: the first schema-v3 records are committed (three clean `phase0-cli-control-*` engine records plus one exploratory run that also exposed and fixed the summarizer's v3 pin). `benchmarks/schema-v3.json` adds the typed quality identity to generation takes (pass/warning only, five fast gates required, machine-code issues); v1/v2 records stay valid immutable history; the publisher stamps v3 only when every take carries the identity. The UI benchmark checkers folded the same identity 2026-08-01: ui-generation records now publish v3 (first: the focused `v3-fold-proof` record `macos-xcui-benchmark-20260801-003208-403989cf`); the canonical iOS matrix published its first v3 record 2026-08-01 (`ios-xcui-benchmark-20260801-132415-abbec96b`). |
 | 14 — Organization and retirement | Closed 2026-07-23 (14a + 14b): compatibility SPI retired, actor-owned loading/metadata/priming/clone artifacts, clone conditioning epoch-bound end to end. |
 
-## Resume here (2026-09-01)
+## Resume here (2026-09-02)
+
+**The first returning-phone VLR attempt exposed an iOS bootstrap defect before any generation
+row launched.** Physical-device preflight passed, but the app failed while recursively applying
+backup/data-protection metadata to the intentionally read-only
+`speech_tokenizer/model.safetensors` hard link. The failed export is retained separately and is
+not VLR closure evidence. The source now opens a bounded owner-write metadata window and restores
+the exact immutable mode on success or failure; focused policy and Swift tests include the
+hard-linked replica and thrown-operation cases. ASR-06 remains open for signed-device attribute,
+backup, locked-background, deletion, and relaunch proof. Once this exact tree is committed, create
+new plans/private maps for two 14-row VLR closure runs and one 122-row characterization; never
+resume or merge the failed startup attempt or historical runs.
 
 **Shipping-optimization benchmark provenance and the first stable trend pair are closed.**
 The governed baseline format now binds hardware, optimization, matrix, corpus, model artifact,

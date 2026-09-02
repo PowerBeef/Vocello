@@ -354,88 +354,18 @@ if [[ "$lane" == "control-audit" ]]; then
     || die "could not generate the source-bound iOS control audit plan"
   if [[ -n "$control_resume" ]]; then
     control_resume_root="$QVOICE_ARTIFACTS_UI_TESTS/ios/$control_resume"
-    python3 - "$control_resume_root/run.json" "$control_resume_root/control-audit-plan.json" \
-      "$audit_source_id" "$out/control-audit-plan.json" "$control_scenario" \
-      "$control_resume_root/control-observations.jsonl" \
-      "$control_resume_root/control-audit-generation-correlation.json" \
-      "$out/control-resume-state.json" "$out/control-observations-prior.jsonl" \
-      >"$out/control-resume-validation.log" <<'PY' \
+    python3 "$ROOT_DIR/scripts/ios_control_audit.py" prepare-resume \
+      --run-metadata "$control_resume_root/run.json" \
+      --prior-plan "$control_resume_root/control-audit-plan.json" \
+      --source-identity "$audit_source_id" \
+      --current-plan "$out/control-audit-plan.json" \
+      --scenario "$control_scenario" \
+      --observations "$control_resume_root/control-observations.jsonl" \
+      --correlation "$control_resume_root/control-audit-generation-correlation.json" \
+      --state-output "$out/control-resume-state.json" \
+      --observations-output "$out/control-observations-prior.jsonl" \
+      >"$out/control-resume-validation.log" 2>&1 \
       || die "--resume rejected: prior run identity does not match this source and plan"
-import json, pathlib, sys
-run_path = pathlib.Path(sys.argv[1])
-prior_plan_path = pathlib.Path(sys.argv[2])
-source_identity = sys.argv[3]
-current_plan_path = pathlib.Path(sys.argv[4])
-scenario = sys.argv[5]
-observations_path = pathlib.Path(sys.argv[6])
-correlation_path = pathlib.Path(sys.argv[7])
-state_path = pathlib.Path(sys.argv[8])
-prior_output_path = pathlib.Path(sys.argv[9])
-if not run_path.is_file() or not prior_plan_path.is_file():
-    raise SystemExit("prior run is missing run.json or control-audit-plan.json")
-if not observations_path.is_file():
-    raise SystemExit("prior run is missing composed control observations")
-run = json.loads(run_path.read_text(encoding="utf-8"))
-prior = json.loads(prior_plan_path.read_text(encoding="utf-8"))
-current = json.loads(current_plan_path.read_text(encoding="utf-8"))
-if run.get("runID") != run_path.parent.name:
-    raise SystemExit("prior run directory and runID disagree")
-if run.get("treeFingerprint") != source_identity:
-    raise SystemExit("prior run source fingerprint differs")
-if prior.get("sourceIdentity") != source_identity:
-    raise SystemExit("prior plan source fingerprint differs")
-if prior.get("planDigest") != current.get("planDigest"):
-    raise SystemExit("prior and current immutable plans differ")
-if run.get("controlAuditScenario") != scenario:
-    raise SystemExit("prior and current control-audit scenarios differ")
-
-rows = [json.loads(line) for line in observations_path.read_text(encoding="utf-8").splitlines() if line.strip()]
-generation_ids = [f"generation:{take['takeID']}" for take in current["takes"]]
-represented = {row.get("controlID") for row in rows}
-contiguous = 0
-while contiguous < len(generation_ids) and generation_ids[contiguous] in represented:
-    contiguous += 1
-if any(control_id in represented for control_id in generation_ids[contiguous + 1:]):
-    raise SystemExit("prior generation observations contain a non-contiguous gap")
-
-successful_generation = [
-    row for row in rows
-    if row.get("controlID", "").startswith("generation:")
-    and row.get("classification") == "PASS"
-]
-if successful_generation:
-    if not correlation_path.is_file():
-        raise SystemExit("prior successful generation rows have no device-correlation report")
-    correlation = json.loads(correlation_path.read_text(encoding="utf-8"))
-    if correlation.get("result") != "passed":
-        raise SystemExit("prior successful generation evidence did not pass correlation")
-
-# A failed prior run has no trustworthy terminal observation for the first
-# missing take. Never rerun it automatically: leave it absent so composition
-# reports SKIPPED_AFTER_FAILURE, and continue at the following take.
-skipped = None
-start = contiguous
-if run.get("status") not in {"passed", "diagnosedFailure"} and start < len(generation_ids):
-    skipped = generation_ids[start]
-    start += 1
-if start >= len(generation_ids):
-    raise SystemExit("prior run leaves no generation take to resume")
-
-chain = list(run.get("resumeRunIDs", []))
-chain.append(run["runID"])
-if len(chain) != len(set(chain)):
-    raise SystemExit("resume chain contains a duplicate run ID")
-prior_output_path.write_text(observations_path.read_text(encoding="utf-8"), encoding="utf-8")
-state = {
-    "schemaVersion": 1,
-    "resumeRunIDs": chain,
-    "takeStart": start,
-    "representedTakeCount": contiguous,
-    "skippedAfterFailure": skipped,
-}
-state_path.write_text(json.dumps(state, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-print(f"resume identity accepted from {run['runID']}; starting take index {start}")
-PY
     control_resume_take_start="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["takeStart"])' "$out/control-resume-state.json")"
     control_resume_run_ids="$(python3 -c 'import json,sys; print(",".join(json.load(open(sys.argv[1]))["resumeRunIDs"]))' "$out/control-resume-state.json")"
     write_run_metadata running

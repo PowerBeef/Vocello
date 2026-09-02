@@ -641,5 +641,117 @@ class IOSControlAuditCompositionTests(unittest.TestCase):
         )
 
 
+class IOSControlAuditResumeTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.contract = audit.load_contract()
+        self.source_identity = "e" * 64
+        self.plan = audit.generate_plan(self.contract, self.source_identity)
+
+    def _prepare(
+        self,
+        root: pathlib.Path,
+        rows: list[dict],
+        *,
+        run_id: str = "ios-xcui-control-audit-resume-fixture",
+        resume_run_ids: list[str] | None = None,
+        prior_state: dict | None = None,
+    ) -> dict:
+        run_root = root / run_id
+        run_root.mkdir()
+        run = {
+            "runID": run_id,
+            "status": "failed",
+            "treeFingerprint": self.source_identity,
+            "controlAuditScenario": "generation",
+        }
+        if resume_run_ids is not None:
+            run["resumeRunIDs"] = resume_run_ids
+        (run_root / "run.json").write_text(json.dumps(run), encoding="utf-8")
+        plan_text = json.dumps(self.plan)
+        (run_root / "control-audit-plan.json").write_text(plan_text, encoding="utf-8")
+        current_plan = root / "current-plan.json"
+        current_plan.write_text(plan_text, encoding="utf-8")
+        observations = run_root / "control-observations.jsonl"
+        observations.write_text(
+            "".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8"
+        )
+        if any(row.get("classification") == "PASS" for row in rows):
+            (run_root / "control-audit-generation-correlation.json").write_text(
+                json.dumps({"result": "passed"}), encoding="utf-8"
+            )
+        if prior_state is not None:
+            (run_root / "control-resume-state.json").write_text(
+                json.dumps(prior_state), encoding="utf-8"
+            )
+        return audit.prepare_resume(
+            run_root / "run.json",
+            run_root / "control-audit-plan.json",
+            self.source_identity,
+            current_plan,
+            "generation",
+            observations,
+            run_root / "control-audit-generation-correlation.json",
+            root / "resume-state.json",
+            root / "prior-observations.jsonl",
+        )
+
+    def _row(self, run_id: str, index: int, classification: str) -> dict:
+        take = self.plan["takes"][index]
+        return {
+            "schemaVersion": 1,
+            "runID": run_id,
+            "sourceIdentity": self.source_identity,
+            "scenario": "generation",
+            "controlID": f"generation:{take['takeID']}",
+            "classification": classification,
+        }
+
+    def test_recorded_product_failure_resumes_at_first_unattempted_take(self) -> None:
+        run_id = "ios-xcui-control-audit-recorded-failure"
+        rows = [
+            self._row(run_id, 0, "PASS"),
+            self._row(run_id, 1, "PRODUCT_FAIL"),
+        ]
+        with tempfile.TemporaryDirectory() as directory:
+            state = self._prepare(pathlib.Path(directory), rows, run_id=run_id)
+        self.assertEqual(state["takeStart"], 2)
+        self.assertEqual(state["skippedAfterFailures"], [])
+
+    def test_unobserved_failed_take_is_skipped_without_retry(self) -> None:
+        run_id = "ios-xcui-control-audit-unobserved-failure"
+        rows = [self._row(run_id, 0, "PASS")]
+        with tempfile.TemporaryDirectory() as directory:
+            state = self._prepare(pathlib.Path(directory), rows, run_id=run_id)
+        self.assertEqual(state["takeStart"], 2)
+        self.assertEqual(state["skippedAfterFailure"], "generation:custom-002")
+        self.assertEqual(state["skippedAfterFailures"], ["generation:custom-002"])
+
+    def test_version_one_skip_is_preserved_across_a_second_recorded_failure(self) -> None:
+        run_id = "ios-xcui-control-audit-second-failure"
+        rows = [
+            self._row("ios-xcui-control-audit-first-failure", 0, "PASS"),
+            self._row("ios-xcui-control-audit-first-failure", 1, "PRODUCT_FAIL"),
+            self._row(run_id, 3, "PRODUCT_FAIL"),
+        ]
+        prior_state = {
+            "schemaVersion": 1,
+            "resumeRunIDs": ["ios-xcui-control-audit-first-failure"],
+            "takeStart": 3,
+            "representedTakeCount": 2,
+            "skippedAfterFailure": "generation:custom-003",
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            state = self._prepare(
+                pathlib.Path(directory),
+                rows,
+                run_id=run_id,
+                resume_run_ids=["ios-xcui-control-audit-first-failure"],
+                prior_state=prior_state,
+            )
+        self.assertEqual(state["takeStart"], 4)
+        self.assertEqual(state["skippedAfterFailure"], None)
+        self.assertEqual(state["skippedAfterFailures"], ["generation:custom-003"])
+
+
 if __name__ == "__main__":
     unittest.main()

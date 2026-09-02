@@ -131,9 +131,7 @@ The control-audit plan is generated before Xcode contacts the phone:
 
 ```sh
 python3 scripts/ios_control_audit.py validate
-python3 scripts/ios_control_audit.py inventory --output /tmp/vocello-ios-controls.json
 python3 scripts/ios_control_audit.py generate-plan \
-  --run-id local-review \
   --source-identity SOURCE_ID \
   --output /tmp/vocello-ios-control-plan.json
 ```
@@ -154,6 +152,14 @@ pruning even if its metadata is legacy-shaped. Before releasing the phone, recor
 terminal outcomes, remaining rows, and the next valid command in the roadmap and development
 checkpoint; then confirm each pin reports `explicitly-pinned` in a cleanup dry-run. Remove pins only
 when the evidence set is explicitly retired.
+
+Generation resume state is schema-versioned and fail-closed. A failed take that already emitted a
+terminal `PRODUCT_FAIL`, `HARNESS_FAIL`, or `INFRASTRUCTURE_FAIL` observation remains represented,
+and the next run starts at the immediately following unattempted row. If the process failed without
+a terminal observation for its in-flight row, that row is recorded as `SKIPPED_AFTER_FAILURE` and
+is not retried automatically. Version-2 state carries every such skip across multi-failure resume
+chains; version-1 retained state remains readable. A gap that is neither observed nor explicitly
+carried as a skip rejects the resume instead of silently losing matrix coverage.
 
 Warm/cold lifecycle state is always taken from the engine request receipt. The first row per mode
 is an enforced cold sentinel; ordinary rows declare their state as observed, and composition

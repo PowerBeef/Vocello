@@ -793,6 +793,135 @@ def validate_device_evidence(
     }
 
 
+def prepare_resume(
+    run_path: pathlib.Path,
+    prior_plan_path: pathlib.Path,
+    source_identity: str,
+    current_plan_path: pathlib.Path,
+    scenario: str,
+    observations_path: pathlib.Path,
+    correlation_path: pathlib.Path,
+    state_path: pathlib.Path,
+    prior_output_path: pathlib.Path,
+) -> dict[str, Any]:
+    """Validate a retained run and select the first safe continuation row.
+
+    A failed take that emitted a terminal observation is already represented and
+    must not cause the following, unattempted take to be skipped.  Conversely, a
+    failed run with no terminal observation for its in-flight take must advance
+    past that take so a resume never becomes an implicit retry.  Version-1
+    resume artifacts are accepted so campaigns started by the original runner
+    can continue without rewriting retained evidence.
+    """
+
+    if not run_path.is_file() or not prior_plan_path.is_file():
+        raise AuditError("prior run is missing run.json or control-audit-plan.json")
+    if not observations_path.is_file():
+        raise AuditError("prior run is missing composed control observations")
+    run = load_json(run_path)
+    prior = load_json(prior_plan_path)
+    current = load_json(current_plan_path)
+    if run.get("runID") != run_path.parent.name:
+        raise AuditError("prior run directory and runID disagree")
+    if run.get("treeFingerprint") != source_identity:
+        raise AuditError("prior run source fingerprint differs")
+    if prior.get("sourceIdentity") != source_identity:
+        raise AuditError("prior plan source fingerprint differs")
+    if prior.get("planDigest") != current.get("planDigest"):
+        raise AuditError("prior and current immutable plans differ")
+    if run.get("controlAuditScenario") != scenario:
+        raise AuditError("prior and current control-audit scenarios differ")
+
+    rows = _read_jsonl(observations_path)
+    generation_ids = [f"generation:{take['takeID']}" for take in current["takes"]]
+    generation_id_set = set(generation_ids)
+    represented_rows: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        control_id = row.get("controlID")
+        if control_id not in generation_id_set:
+            continue
+        if control_id in represented_rows:
+            raise AuditError(f"prior generation row {control_id!r} was observed more than once")
+        represented_rows[control_id] = row
+
+    skipped_ids: set[str] = set()
+    prior_state_path = run_path.parent / "control-resume-state.json"
+    if prior_state_path.is_file():
+        prior_state = load_json(prior_state_path)
+        state_version = prior_state.get("schemaVersion")
+        if state_version == 1:
+            skipped = prior_state.get("skippedAfterFailure")
+            if skipped:
+                skipped_ids.add(skipped)
+        elif state_version == 2:
+            values = prior_state.get("skippedAfterFailures", [])
+            if not isinstance(values, list) or any(not isinstance(value, str) for value in values):
+                raise AuditError("resume skippedAfterFailures must be an array of strings")
+            skipped_ids.update(values)
+        else:
+            raise AuditError("unsupported control resume-state schema")
+    if not skipped_ids.issubset(generation_id_set):
+        raise AuditError("resume state refers to an unknown skipped generation row")
+    if skipped_ids & set(represented_rows):
+        raise AuditError("a generation row cannot be both observed and skipped")
+
+    terminal_ids = set(represented_rows) | skipped_ids
+    contiguous = 0
+    while contiguous < len(generation_ids) and generation_ids[contiguous] in terminal_ids:
+        contiguous += 1
+    if any(control_id in terminal_ids for control_id in generation_ids[contiguous + 1 :]):
+        raise AuditError("prior generation evidence contains a non-contiguous gap")
+
+    successful_generation = [
+        row for row in rows
+        if row.get("controlID", "").startswith("generation:")
+        and row.get("classification") == "PASS"
+    ]
+    if successful_generation:
+        if not correlation_path.is_file():
+            raise AuditError("prior successful generation rows have no device-correlation report")
+        correlation = load_json(correlation_path)
+        if correlation.get("result") != "passed":
+            raise AuditError("prior successful generation evidence did not pass correlation")
+
+    newly_skipped = None
+    start = contiguous
+    if run.get("status") not in {"passed", "diagnosedFailure"} and start < len(generation_ids):
+        current_run_id = run["runID"]
+        represented_failure = any(
+            row.get("runID") == current_run_id
+            and row.get("controlID") == generation_ids[start - 1]
+            and row.get("classification")
+            in {"PRODUCT_FAIL", "HARNESS_FAIL", "INFRASTRUCTURE_FAIL"}
+            for row in rows
+        ) if start > 0 else False
+        if not represented_failure:
+            newly_skipped = generation_ids[start]
+            skipped_ids.add(newly_skipped)
+            start += 1
+    if start >= len(generation_ids):
+        raise AuditError("prior run leaves no generation take to resume")
+
+    chain = list(run.get("resumeRunIDs", []))
+    chain.append(run["runID"])
+    if len(chain) != len(set(chain)):
+        raise AuditError("resume chain contains a duplicate run ID")
+    prior_output_path.parent.mkdir(parents=True, exist_ok=True)
+    prior_output_path.write_text(observations_path.read_text(encoding="utf-8"), encoding="utf-8")
+    ordered_skips = [control_id for control_id in generation_ids if control_id in skipped_ids]
+    state = {
+        "schemaVersion": 2,
+        "resumeRunIDs": chain,
+        "takeStart": start,
+        "representedTakeCount": len(represented_rows),
+        "terminalTakeCount": contiguous + (1 if newly_skipped else 0),
+        "skippedAfterFailure": newly_skipped,
+        "skippedAfterFailures": ordered_skips,
+    }
+    atomic_write_json(state_path, state)
+    return state
+
+
 def atomic_write_json(path: pathlib.Path, payload: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f".{path.name}.next")
@@ -832,6 +961,17 @@ def main() -> int:
     device_parser.add_argument("--observations", type=pathlib.Path, required=True)
     device_parser.add_argument("--diagnostics", type=pathlib.Path, required=True)
     device_parser.add_argument("--output", type=pathlib.Path, required=True)
+
+    resume_parser = subparsers.add_parser("prepare-resume")
+    resume_parser.add_argument("--run-metadata", type=pathlib.Path, required=True)
+    resume_parser.add_argument("--prior-plan", type=pathlib.Path, required=True)
+    resume_parser.add_argument("--source-identity", required=True)
+    resume_parser.add_argument("--current-plan", type=pathlib.Path, required=True)
+    resume_parser.add_argument("--scenario", required=True)
+    resume_parser.add_argument("--observations", type=pathlib.Path, required=True)
+    resume_parser.add_argument("--correlation", type=pathlib.Path, required=True)
+    resume_parser.add_argument("--state-output", type=pathlib.Path, required=True)
+    resume_parser.add_argument("--observations-output", type=pathlib.Path, required=True)
 
     arguments = parser.parse_args()
     try:
@@ -891,6 +1031,23 @@ def main() -> int:
             atomic_write_json(arguments.output, report)
             print(arguments.output)
             return 0 if report["result"] == "passed" else 1
+        if arguments.command == "prepare-resume":
+            state = prepare_resume(
+                arguments.run_metadata,
+                arguments.prior_plan,
+                arguments.source_identity,
+                arguments.current_plan,
+                arguments.scenario,
+                arguments.observations,
+                arguments.correlation,
+                arguments.state_output,
+                arguments.observations_output,
+            )
+            print(
+                f"resume identity accepted from {state['resumeRunIDs'][-1]}; "
+                f"starting take index {state['takeStart']}"
+            )
+            return 0
     except AuditError as error:
         print(f"error: {error}", file=sys.stderr)
         return 2

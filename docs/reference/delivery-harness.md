@@ -174,6 +174,14 @@ edge. Three fresh Auto/explicit Mac cohorts passed 6/6 without retries. The pinn
 details are in
 [`voice-identity-language-reliability-macos-2026-09-01.md`](voice-identity-language-reliability-macos-2026-09-01.md).
 
+The corrected-source physical-iPhone campaign then completed two distinct 14-row closure runs and
+one complete 122-row characterization. Both closure runs passed 14/14. The characterization
+represented every row but retained two mandatory product-QC rejections and 14 locale-verification
+failures, so overall VLR closure remains open. The Clone leading-edge correction and terminal-tail
+rejection separately met their bounded physical-device gates. The privacy-safe result and exact
+remaining boundary are pinned in
+[`voice-identity-language-reliability-ios-2026-09-02.md`](voice-identity-language-reliability-ios-2026-09-02.md).
+
 The complete 84-row French Design block passed current Neutral 26/28, no-delivery 22/28, and Calm
 strong 19/28. One no-delivery row is a replay-confirmed sampled-output dropout; 16 rows failed
 locale-locked verification after successful generation. Current Neutral remains the strongest arm,

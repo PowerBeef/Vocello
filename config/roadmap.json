@@ -2715,21 +2715,24 @@
       "id": "VLR-07",
       "plan": "voice-identity-language-reliability-2026-08",
       "title": "Complete physical-device closure and publish the privacy-safe report",
-      "status": "planned",
+      "status": "in-flight",
       "gate": "After Mac/CLI localization, complete two consecutive no-retry 14-row closure physical-iPhone passes plus one 122-row characterization using new source-bound private maps and exact current source. Require typed transcription classification, correct short/medium/long French output, exact receipt parity, zero unexplained hard QC failures, WER/CER delta <= 0.01, speaker-similarity delta >= -0.02, governed Clone prosody fidelity or explicit reference rejection, and green Built-in/English Design/enrollment/Clone controls. Publish only a digest-pinned privacy-safe physical-device report; keep audio, text, names, paths, raw diagnostics, and device evidence untracked.",
       "sourceOfTruth": [
         "scripts/ios_device.sh",
         "scripts/voice_identity_language_reliability.py",
         "docs/reference/delivery-harness.md"
       ],
+      "evidence": [
+        "doc:docs/reference/voice-identity-language-reliability-ios-2026-09-02.md"
+      ],
       "updated": "2026-09-02",
-      "notes": "The Mac phase is complete and pinned in the September 1 Mac report. The first focused phone run, immutable 114-terminal-row paused run, and complete 122-row September 1 characterization remain distinct retained evidence; none is corrected-source closure. On September 2 preflight passed, but the first private export launched zero generation rows because iOS initialization failed while applying storage metadata to an immutable shared-model hard link; that failed attempt is retained as ASR-06 startup evidence and is not a VLR run. The closure profile excludes experimental no-delivery/Calm arms and covers eight production Clone plus six current-Neutral Design cells. After the storage correction's exact commit, generate two new closure plans and one characterization plan with separately bound private maps. Never resume, merge, relabel, or overwrite historical or failed-startup runs."
+      "notes": "The corrected-source September 2 campaign is complete and pinned in the privacy-safe iOS report. Two distinct no-retry closure runs each passed 14/14. The 122-row characterization represented every row with 106 PASS, two product-owned mandatory QC rejections, and 14 harness-owned successful-take output-verification failures. Typed transcription classified the first private alias as an automatic French success and the second as low confidence after empty French/English attempts; its manually reviewed transcript remained authoritative. VLR-08 and VLR-09 are closed from bounded evidence, but VLR-07 cannot close while the 14 French locale-verification mismatches and two deterministic invalid diagnostic-arm outputs remain unresolved. Preserve all three runs immutably; do not rerun, merge, relabel, or replace failed rows merely to obtain a green count."
     },
     {
       "id": "VLR-08",
       "plan": "voice-identity-language-reliability-2026-08",
       "title": "Repair the live Clone publication gap exposed by clean codec replay",
-      "status": "in-flight",
+      "status": "done",
       "gate": "For the second-reference English seed-32060821 Auto and explicit controls, preserve proof that incremental and full replay of the identical codec trace reproduce the model-generated delayed onset. A bounded Clone-only leading-edge gate may trim only the sub-floor edge before three consecutive active windows, retain at least 80 ms pre-roll, remain duration-independent, never alter Built-in/Design or an interior pause, and expose exact metrics. Preserve seed, sampling, tokenizer, model, reference, transcript, and QC policy; require three consecutive physical-device passes for both selection paths plus no regression across the eight-seed Clone cohort.",
       "sourceOfTruth": [
         "Sources/QwenVoiceCore/GenerationOutputAdapter.swift",
@@ -2737,14 +2740,17 @@
         "Tests/VocelloCoreTests/GenerationTelemetrySchemaTests.swift",
         "scripts/voice_identity_language_reliability.py"
       ],
-      "updated": "2026-09-01",
-      "notes": "Reinspection of retained replay proved both incremental and full decoders start speech at the same delayed boundary as live output, with 0.999208 post-onset waveform correlation. The earlier allocator-cache hypothesis was false and its speculative runtime change was reverted. A bounded Clone-only gate now requires three active 20 ms windows, preserves up to 80 ms pre-roll, keeps transport sequencing contiguous, and records trim/buffer metrics. Three fresh Mac Auto/explicit cohorts passed 6/6 without retry; speaker similarity remained in the strong advisory band. Physical closure still requires three consecutive device passes plus the eight-seed cohort on new run IDs."
+      "evidence": [
+        "doc:docs/reference/voice-identity-language-reliability-ios-2026-09-02.md"
+      ],
+      "updated": "2026-09-02",
+      "notes": "Reinspection of retained replay proved both incremental and full decoders start speech at the same delayed boundary as live output, invalidating the earlier allocator-cache hypothesis. The bounded Clone-only gate requires three active 20 ms windows, preserves up to 80 ms pre-roll, keeps transport sequencing contiguous, and records trim/buffer metrics. The affected second-reference English seed-32060821 Auto and explicit rows passed in both 14-row closure runs and the 122-row characterization: three independent physical-device passes for each selection path. The characterization's complete eight-seed Auto cohort also passed without a hard failure. No seed, sampling, tokenizer, model, reference, transcript, QC policy, or other generation mode changed."
     },
     {
       "id": "VLR-09",
       "plan": "voice-identity-language-reliability-2026-08",
       "title": "Reject egregious terminal silence before publication",
-      "status": "in-flight",
+      "status": "done",
       "gate": "Fast QC must retain bounded cross-chunk terminal-silence length and start evidence after audible speech begins, reject a terminal run at or above the existing context-owned egregious threshold, preserve ordinary terminal padding, decode v1-v5 reports compatibly, and emit a typed severe cadence reason. Focused deterministic tests and the full runtime suite must pass. A fresh physical-device run must prove the former take-112 shape is either clean or rejected before publication without changing the existing interior-pause thresholds, seed, prompt, sampling, or retry policy.",
       "sourceOfTruth": [
         "Sources/QwenVoiceCore/GenerationOutputAdapter.swift",
@@ -2754,10 +2760,11 @@
       ],
       "evidence": [
         "file:Tests/VocelloCoreTests/GenerationTelemetrySchemaTests.swift",
-        "file:Tests/VocelloCoreTests/AtomicWAVPublicationTests.swift"
+        "file:Tests/VocelloCoreTests/AtomicWAVPublicationTests.swift",
+        "doc:docs/reference/voice-identity-language-reliability-ios-2026-09-02.md"
       ],
-      "updated": "2026-09-01",
-      "notes": "Characterization take 112 completed at the app layer but its 117.2-second WAV contained 109.49 seconds of terminal silence, 93.9% pause-to-speech ratio, and empty locale-locked ASR. Algorithm v5 intentionally recorded only closed interior runs and therefore missed the open tail. Algorithm v6 now records bounded terminal-run samples/start, emits terminal_silence plus egregious_terminal_silence, and rejects it using the unchanged context-owned egregious boundary. A 2.2-second synthetic tail fails, 268 ms of normal padding passes, v1-v5 decoding remains compatible, the cadence contract and Python fixtures pass, the focused native suite passes, the full macOS/XPC/Qwen3 runtime suite passes, and the generic iPhoneOS app/logic build passes. No corrected-source device take ran before the pause."
+      "updated": "2026-09-02",
+      "notes": "Algorithm v6 records the bounded open terminal run, emits typed terminal-silence evidence, and rejects an egregious tail at the unchanged context-owned boundary while ordinary terminal padding and v1-v5 decoding remain valid. In the corrected-source 122-row physical-device characterization, the former take-112 cell generated the same pathological shape and was rejected before publication: live, full-replay, and incremental-replay QC each measured a 109.471-second terminal run after audible speech. The failed row remained represented and was not retried or assigned another seed. This is the required device closure for the protective publication gate; the sampled-output pathology remains visible under VLR-07 rather than being described as model correctness."
     }
   ]
 }

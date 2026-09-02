@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "generated": "python3 scripts/doc_metadata.py rebuild-index",
   "note": "Machine-readable documentation map. Query this instead of globbing docs/.",
-  "annotatedDocuments": 100,
+  "annotatedDocuments": 101,
   "unannotatedDocuments": 0,
   "documents": [
     {
@@ -873,6 +873,19 @@
         "scripts/delivery_evaluator.py",
         "scripts/delivery_promotion_decision.py"
       ]
+    },
+    {
+      "path": "docs/reference/voice-identity-language-reliability-ios-2026-09-02.md",
+      "status": "historical",
+      "owner": "backend-and-platform",
+      "summary": "Pinned privacy-safe physical-iPhone checkpoint for corrected-source Clone, transcription, and French Voice Design reliability.",
+      "sourceOfTruth": [
+        "config/voice-identity-language-reliability.json",
+        "scripts/voice_identity_language_reliability.py",
+        "Sources/QwenVoiceCore/GenerationOutputAdapter.swift",
+        "config/roadmap.json"
+      ],
+      "contentDigest": "sha256:29313890182d3cdf6d656d88e1fe927a6aec73ad65bfcd540978646ac120e99c"
     },
     {
       "path": "docs/reference/voice-identity-language-reliability-macos-2026-09-01.md",

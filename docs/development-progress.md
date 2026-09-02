@@ -49,16 +49,18 @@ machine-readable status record and wins over any older prose.
 
 ## Resume here (2026-09-02)
 
-**The first returning-phone VLR attempt exposed an iOS bootstrap defect before any generation
-row launched.** Physical-device preflight passed, but the app failed while recursively applying
-backup/data-protection metadata to the intentionally read-only
-`speech_tokenizer/model.safetensors` hard link. The failed export is retained separately and is
-not VLR closure evidence. The source now opens a bounded owner-write metadata window and restores
-the exact immutable mode on success or failure; focused policy and Swift tests include the
-hard-linked replica and thrown-operation cases. ASR-06 remains open for signed-device attribute,
-backup, locked-background, deletion, and relaunch proof. Once this exact tree is committed, create
-new plans/private maps for two 14-row VLR closure runs and one 122-row characterization; never
-resume or merge the failed startup attempt or historical runs.
+**The corrected-source physical-iPhone VLR campaign is complete and honestly non-green.** The
+read-only shared-model metadata bootstrap defect is fixed and committed. New source-bound runs
+`vlr-device-20260902-closure-fixed-01` and `-02` each passed 14/14 without retry; the complete
+`vlr-device-20260902-characterization-fixed-01` represented 122/122 rows with 106 PASS, two
+mandatory product-QC rejections, and 14 locale-verification failures. The affected Clone Auto and
+explicit tuple passed in all three runs, and its eight-seed Auto cohort passed, closing VLR-08.
+Fast-QC v6 rejected the former take-112 shape before publication with the same 109.471-second
+terminal tail in live, full-replay, and incremental-replay output, closing VLR-09. VLR-07 remains
+open for the 14 French verification mismatches and two deterministic invalid diagnostic-arm
+outputs. Do not rerun or relabel the completed evidence merely to obtain a green count. The
+privacy-safe checkpoint is pinned in
+[`voice-identity-language-reliability-ios-2026-09-02.md`](reference/voice-identity-language-reliability-ios-2026-09-02.md).
 
 **Shipping-optimization benchmark provenance and the first stable trend pair are closed.**
 The governed baseline format now binds hardware, optimization, matrix, corpus, model artifact,

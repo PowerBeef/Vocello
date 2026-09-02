@@ -182,6 +182,7 @@ Review when: link repair or archive classification only.
 - [`docs/reference/qwen3-apple-silicon-roadmap-review.md`](../docs/reference/qwen3-apple-silicon-roadmap-review.md)
 - [`docs/reference/qwen3-tts-emotion-tone-research-2026-08-22.md`](../docs/reference/qwen3-tts-emotion-tone-research-2026-08-22.md)
 - [`docs/reference/runtime-refactor-status-report.md`](../docs/reference/runtime-refactor-status-report.md)
+- [`docs/reference/voice-identity-language-reliability-ios-2026-09-02.md`](../docs/reference/voice-identity-language-reliability-ios-2026-09-02.md)
 - [`docs/reference/voice-identity-language-reliability-macos-2026-09-01.md`](../docs/reference/voice-identity-language-reliability-macos-2026-09-01.md)
 - [`docs/releases/v1.2.1.md`](../docs/releases/v1.2.1.md)
 - [`docs/releases/v1.2.2.md`](../docs/releases/v1.2.2.md)

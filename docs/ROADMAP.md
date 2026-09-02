@@ -15,7 +15,7 @@
 | `ios-app-store-readiness-2026-08` | active | release-qa | 2/12 (17%) |
 | `ios-control-audit-2026-08` | active | ios | 8/12 (67%) |
 | `ios-generation-startup-reliability-2026-08` | active | backend-and-platform | 4/6 (67%) |
-| `voice-identity-language-reliability-2026-08` | active | backend-and-platform | 6/9 (67%) |
+| `voice-identity-language-reliability-2026-08` | active | backend-and-platform | 8/9 (89%) |
 | `compliance-2026-08` | complete | release-qa | 2/2 (100%) |
 | `convergence-metal4-stage4-2026-08` | complete | backend-and-platform | 7/7 (100%) |
 | `development-workflow-performance-2026-08` | complete | release-qa | 5/5 (100%) |
@@ -284,20 +284,14 @@ Narrative authority: [`docs/reference/delivery-harness.md`](reference/delivery-h
 | `VLR-04` | done | Correct Clone target/reference language ownership | `file:Sources/QwenVoiceCore/GenerationSemantics.swift`, `file:Tests/VocelloCoreTests/GenerationSemanticsLanguageTests.swift`, `file:Sources/iOS/Voices/IOSRecordVoiceSheet.swift` |
 | `VLR-05` | done | Apply only the proven tokenizer or reference-quality remediation | `doc:docs/reference/voice-identity-language-reliability-macos-2026-09-01.md` |
 | `VLR-06` | done | Apply only the proven French Voice Design remediation | `doc:docs/reference/voice-identity-language-reliability-macos-2026-09-01.md` |
-| `VLR-07` | planned | Complete physical-device closure and publish the privacy-safe report | — |
-| `VLR-08` | in-flight | Repair the live Clone publication gap exposed by clean codec replay | — |
-| `VLR-09` | in-flight | Reject egregious terminal silence before publication | `file:Tests/VocelloCoreTests/GenerationTelemetrySchemaTests.swift`, `file:Tests/VocelloCoreTests/AtomicWAVPublicationTests.swift` |
+| `VLR-07` | in-flight | Complete physical-device closure and publish the privacy-safe report | `doc:docs/reference/voice-identity-language-reliability-ios-2026-09-02.md` |
+| `VLR-08` | done | Repair the live Clone publication gap exposed by clean codec replay | `doc:docs/reference/voice-identity-language-reliability-ios-2026-09-02.md` |
+| `VLR-09` | done | Reject egregious terminal silence before publication | `file:Tests/VocelloCoreTests/GenerationTelemetrySchemaTests.swift`, `file:Tests/VocelloCoreTests/AtomicWAVPublicationTests.swift`, `doc:docs/reference/voice-identity-language-reliability-ios-2026-09-02.md` |
 
 ### Open items in detail
 
-- **`VLR-07`** (planned) — Complete physical-device closure and publish the privacy-safe report.
+- **`VLR-07`** (in-flight) — Complete physical-device closure and publish the privacy-safe report.
   gate: After Mac/CLI localization, complete two consecutive no-retry 14-row closure physical-iPhone passes plus one 122-row characterization using new source-bound private maps and exact current source. Require typed transcription classification, correct short/medium/long French output, exact receipt parity, zero unexplained hard QC failures, WER/CER delta <= 0.01, speaker-similarity delta >= -0.02, governed Clone prosody fidelity or explicit reference rejection, and green Built-in/English Design/enrollment/Clone controls. Publish only a digest-pinned privacy-safe physical-device report; keep audio, text, names, paths, raw diagnostics, and device evidence untracked.
-
-- **`VLR-08`** (in-flight) — Repair the live Clone publication gap exposed by clean codec replay.
-  gate: For the second-reference English seed-32060821 Auto and explicit controls, preserve proof that incremental and full replay of the identical codec trace reproduce the model-generated delayed onset. A bounded Clone-only leading-edge gate may trim only the sub-floor edge before three consecutive active windows, retain at least 80 ms pre-roll, remain duration-independent, never alter Built-in/Design or an interior pause, and expose exact metrics. Preserve seed, sampling, tokenizer, model, reference, transcript, and QC policy; require three consecutive physical-device passes for both selection paths plus no regression across the eight-seed Clone cohort.
-
-- **`VLR-09`** (in-flight) — Reject egregious terminal silence before publication.
-  gate: Fast QC must retain bounded cross-chunk terminal-silence length and start evidence after audible speech begins, reject a terminal run at or above the existing context-owned egregious threshold, preserve ordinary terminal padding, decode v1-v5 reports compatibly, and emit a typed severe cadence reason. Focused deterministic tests and the full runtime suite must pass. A fresh physical-device run must prove the former take-112 shape is either clean or rejected before publication without changing the existing interior-pause thresholds, seed, prompt, sampling, or retry policy.
 
 ## EU AI Act Article 50 readiness
 

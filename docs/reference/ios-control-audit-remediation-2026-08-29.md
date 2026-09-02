@@ -245,6 +245,43 @@ The completed model runs retained MD-3's quantitative thresholds. The completed 
 governed by the existing scenario classifications; exploratory player scrubbing was not promoted to
 a confirmatory claim.
 
+### September 2 generation checkpoint
+
+Before generation, source-bound stateful run `121158`, external run `121608`, and accessibility run
+`121855` completed with only their contract-declared prerequisite and preservation-policy limits.
+Model-management diagnose `122641`, queue `123230`, and acceptance `123603` passed without a
+finding. Inventory run `120801` stopped before observations when the voice-picker confirmation did
+not disappear, and saved-voice lifecycle run `122245` reached its preview action but never observed
+the player sheet. They remain unresolved evidence gaps, not PASS results.
+
+The next source-bound attempts advanced harness truthfulness but did not complete the matrix:
+
+- `ios-xcui-control-audit-20260902-141800-7d51bfe9` passed `custom-001` through
+  `custom-003`; `custom-004` then produced a 27.28-second Dylan/German/Calm-strong take with a
+  2.085-second interior gap and was correctly rejected before History publication at frozen seed
+  `14590678627036013466`.
+- Subsequent shards exposed three independent harness defects: resume looked for an unlabeled row
+  container instead of the labeled seed-carrier action, player scrubbing always moved right even
+  when playback was already near the end, and stale audit-row cleanup searched a static label
+  instead of the row's labeled action. Each correction has focused deterministic coverage.
+- `ios-xcui-control-audit-20260902-151039-2607ad43` stopped during mode setup while the maintainer
+  received a phone call. It has no control observation and is not product evidence.
+- `ios-xcui-control-audit-20260902-151248-90976475` passed `custom-001`; `custom-002` then
+  produced a 67.84-second Aiden/Chinese/Angry-normal take with a 25.446-second interior gap and was
+  correctly rejected before History publication at frozen seed `2247811184622560891`.
+- The final current-source shard `ios-xcui-control-audit-20260902-153340-9092ff5d` was stopped on
+  explicit maintainer request during initial state capture. It produced zero observations, started
+  no generation row, and retains all 204 composed rows as `SKIPPED_AFTER_FAILURE`. Xcode and
+  XCUITest exited and the complete available forensic bundle is pinned.
+
+These runs are immutable evidence, not a mergeable campaign: their full-tree fingerprints differ.
+The last shard has no valid row-level resume boundary, and committing this checkpoint changes source
+identity again. The next phone session must start a fresh retained generation run from row 1, then
+continue source-bound shards only through the harness's governed resume path. ICA-04 remains open
+for all 201 generation takes plus final cleanup/restoration; ICA-05 remains open for the final
+deliberately re-pinned findings report. The two new silent-gap cells are retained product findings,
+not permission to weaken QC, change seeds, or add retries.
+
 ## Non-goals and remaining authority
 
 - No seed mutation, best-of-N, hidden retry, prompt rewrite, token-limit increase, or QC weakening.

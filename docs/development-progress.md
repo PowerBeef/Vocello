@@ -49,6 +49,39 @@ machine-readable status record and wins over any older prose.
 
 ## Resume here (2026-09-02)
 
+**The physical-iPhone control audit is paused at a clean pre-row boundary.** On the maintainer's
+request, generation shard `ios-xcui-control-audit-20260902-153340-9092ff5d` was interrupted during
+initial Studio state capture on source `c5d435ee`. Xcode and XCUITest exited, the runner completed
+forensic collection, the bundle is explicitly pinned, and no generation row or audit observation
+was produced. Its composed result is therefore 204 `SKIPPED_AFTER_FAILURE` rows with zero PASS,
+product, harness, or infrastructure finding. It is pause evidence, not a failed product test and
+not a usable row-level resume token. No device automation remains active and Auto-Lock was not
+changed.
+
+The September 2 generation attempts remain pinned and separate by source identity. Run
+`ios-xcui-control-audit-20260902-141800-7d51bfe9` passed `custom-001` through `custom-003`, then
+safely rejected `custom-004` for a 2.085-second interior silent gap. Run
+`ios-xcui-control-audit-20260902-151248-90976475` passed `custom-001`, then safely rejected
+`custom-002` for a 25.446-second interior silent gap. Neither invalid take entered History, and
+neither was retried or assigned another seed. Intermediate shards isolated and corrected seed-
+carrier lookup, state-aware scrubber movement, and stale History-row validation; the separate
+mode-setup interruption coincided with the maintainer's phone call and is not product evidence.
+Because this documentation checkpoint changes the frozen tree identity, the next phone window must
+start a fresh `control-audit --scenario generation --retain-result` campaign from row 1. Do not
+resume or merge these historical shards. ICA-04/ICA-05 remain in flight until all 201 takes, final
+cleanup/restoration, and the required recapture phases are represented.
+
+The same-day non-generation evidence is also retained. Stateful run `121158` completed with seven
+PASS observations, three explicit delegated prerequisites, and one preservation-policy block;
+external run `121608` completed three handoffs with the permission-preservation block; accessibility
+run `121855` passed both required groups. Model-management diagnose `122641`, queue `123230`, and
+acceptance `123603` all passed with no finding and preserved canonical model state. Inventory run
+`120801` did not emit observations after its voice picker failed to dismiss, and saved-voice run
+`122245` reached the preview action but never presented the player sheet; neither is acceptance
+evidence. The next campaign must re-evidence inventory, diagnose the saved-voice preview boundary,
+complete generation, and prove final cleanup/restoration. All named bundles survived a retention
+cleanup dry run as `explicitly-pinned`.
+
 **The corrected-source physical-iPhone VLR campaign is complete and honestly non-green.** The
 read-only shared-model metadata bootstrap defect is fixed and committed. New source-bound runs
 `vlr-device-20260902-closure-fixed-01` and `-02` each passed 14/14 without retry; the complete

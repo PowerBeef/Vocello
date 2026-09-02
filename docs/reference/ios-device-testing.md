@@ -190,6 +190,43 @@ never authorizes an automatic retry. The 2026-08-29 Messenger-interrupted run is
 for this boundary.
 See [`ios-control-audit-remediation-2026-08-29.md`](ios-control-audit-remediation-2026-08-29.md).
 
+### Control-audit pause boundary — 2026-09-02
+
+The latest generation shard, `ios-xcui-control-audit-20260902-153340-9092ff5d`, was stopped at the
+maintainer's request while the test was capturing initial Studio state. It emitted zero control
+observations and began no generation row. The retained summary consequently carries all 204
+composed controls/takes as `SKIPPED_AFTER_FAILURE`; that is an honest incomplete-run result, not a
+product, harness, or infrastructure classification. The `.xcresult`, log, plan, summary, crash
+delta, attachment manifest, exact rerun command, and explicit retention pin remain in the untracked
+run bundle. Xcode and XCUITest were confirmed stopped after collection.
+
+There is no row-level resume state to consume from that empty shard. Moreover, recording this
+checkpoint changes the full-tree source identity. At the next device window, run preflight and
+start a new frozen generation campaign from row 1:
+
+```sh
+scripts/ios_device.sh preflight
+scripts/ui_test.sh ios control-audit --scenario generation --retain-result
+```
+
+Do not pass `--resume` with the `153340` run ID and do not merge its empty summary with earlier
+source identities. The September 2 shards remain forensic inputs: `141800` passed three rows and
+then rejected the German Calm/strong row for a 2.085-second interior gap; `151248` passed one row
+and rejected the Chinese Angry/normal row for a 25.446-second interior gap. Both rejections were
+product-output audio-QC safety outcomes with no History publication, automatic retry, or seed
+substitution; one observation per cell is not a repeatability claim. Runs between them drove three
+harness corrections; the phone-call-affected
+mode-setup run remains non-product evidence. `config/roadmap.json` is the current status authority.
+
+The earlier September 2 phases remain independently useful but do not form a single-source final
+campaign. Stateful `121158` completed with explicit prerequisite/preservation limitations,
+external `121608` completed with the permission-preservation block, and accessibility `121855`
+passed. Isolated model diagnose `122641`, queue `123230`, and acceptance `123603` passed with no
+finding. Inventory `120801` stopped with zero observations after the voice picker did not dismiss;
+saved-voice lifecycle `122245` reached its preview action but never observed the player sheet. Those
+two incomplete journeys require ownership diagnosis and fresh evidence. The cleanup dry run reports
+every named bundle as `explicitly-pinned`; no raw evidence needs to be moved or rewritten.
+
 The model-delivery runner always exports the `.xcresult`, attachments, diagnostics journal,
 delivery summaries, ledger copy, sanitized storage inventories, crash delta, and host diagnosis even
 when XCTest fails. Determinate bar observations include raw and total bytes, expected and

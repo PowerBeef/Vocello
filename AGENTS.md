@@ -123,8 +123,7 @@ Exemptions require a reason in `config/surface-coverage-exemptions.json`. Read
 
 ## Optional assists (user-scoped; verify before relying)
 
-No gate can validate this table; no entry is a prerequisite. Confirm each assist and read its skill.
-Repository scripts and domain rules remain authoritative.
+No gate can validate optional assists; they are never prerequisites.
 
 | Task | Optional capability |
 | --- | --- |
@@ -200,6 +199,8 @@ fail. Model/clone lanes are opt-in. Pin bundles and resume boundaries before rel
 Runner PASS requires diagnostics/cleanup; interrupted/zero-observation runs fail without resume.
 Source changes need new, unmerged IDs. See
 `docs/reference/ios-device-testing.md`.
+
+See `docs/reference/ios-device-testing.md` for control-audit identity and reachability rules.
 
 ## Key paths
 

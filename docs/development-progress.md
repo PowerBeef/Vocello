@@ -49,7 +49,32 @@ machine-readable status record and wins over any older prose.
 
 ## Resume here (2026-09-02)
 
-**The one-hour physical-iPhone window is closed and all device processes are stopped.** Preflight
+**The seven-item phone-independent remediation block is complete and deterministically green.**
+ICA-14 now uses source-bound schema-v2 History narrowing tokens and requires the exact full
+plan-bound script plus labeled row action before any cleanup, pin, restore, or delete operation;
+the exact ICA-09 schema-v1 plan retains a digest-allowlisted, byte-exact replay path. ICA-13 now reveals the exact
+run-owned voice through the genuine Voices search field and requires finite, hittable, at-least
+44-by-44-point row/menu geometry before activation. The retained pre-test XCUITest automation-mode
+timeout was replayed as one run-level infrastructure failure with 42 skipped rows and no false
+product finding. Focused fixtures and generic iOS compilation pass for all three corrections.
+
+The retained VLR characterization is now classified at the actual evidence boundary: its 14
+successful but non-accepted French rows comprise 12 product-owned output-accuracy rejections with
+consistent French recognition and WER above the governed 0.15 threshold, plus two harness-owned
+inconclusive rows with missing or inconsistent ASR evidence. No threshold, seed, prompt, or result
+was changed. A fresh read-only App Store Connect inventory and build-number preflight again stopped
+at their bounded Keychain/private-key timeouts, made no account mutation, and left no child process.
+The exact working tree then passed 1,311 Python tests, generic iOS app and logic-test compilation,
+all macOS deterministic suites, derived validation, and the complete quick project gate.
+
+The next phone window starts from new run IDs on the final committed source: run preflight, one
+saved-voice lifecycle, a freshly generated 201-row control-audit generation plan from row 1, and
+smoke through its post-test diagnostics. Do not reuse the pre-documentation `/tmp` plan or resume
+the old 204-row shard; plan source identity must be generated after the final commit. ICA-13 and
+ICA-14 remain in flight only for those physical closure gates, while ICA-09 still needs one fresh
+bootstrap observation.
+
+**The preceding one-hour physical-iPhone window closed with all device processes stopped.** Preflight
 passed, then current-source inventory run
 `ios-xcui-control-audit-20260902-180938-42d76c39` completed with 41 `PASS`, one explicit
 `NOT_APPLICABLE`, zero failures, and zero skips. This closes the earlier voice-picker dismissal
@@ -112,12 +137,14 @@ cleanup dry run as `explicitly-pinned`.
 read-only shared-model metadata bootstrap defect is fixed and committed. New source-bound runs
 `vlr-device-20260902-closure-fixed-01` and `-02` each passed 14/14 without retry; the complete
 `vlr-device-20260902-characterization-fixed-01` represented 122/122 rows with 106 PASS, two
-mandatory product-QC rejections, and 14 locale-verification failures. The affected Clone Auto and
-explicit tuple passed in all three runs, and its eight-seed Auto cohort passed, closing VLR-08.
+mandatory product-QC rejections, 12 product-owned output-accuracy rejections, and two harness-owned
+inconclusive verifier cases. The affected Clone Auto and explicit tuple passed in all three runs,
+and its eight-seed Auto cohort passed, closing VLR-08.
 Fast-QC v6 rejected the former take-112 shape before publication with the same 109.471-second
 terminal tail in live, full-replay, and incremental-replay output, closing VLR-09. VLR-07 remains
-open for the 14 French verification mismatches and two deterministic invalid diagnostic-arm
-outputs. Do not rerun or relabel the completed evidence merely to obtain a green count. The
+open for generation/intelligibility investigation of the 12 measured rejects, decision-capable
+evidence for the two inconclusive rows, and two deterministic invalid diagnostic-arm outputs. Do
+not weaken the 0.15 WER rule or rerun/relabel the completed evidence merely to obtain a green count. The
 privacy-safe checkpoint is pinned in
 [`voice-identity-language-reliability-ios-2026-09-02.md`](reference/voice-identity-language-reliability-ios-2026-09-02.md).
 

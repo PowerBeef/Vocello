@@ -174,10 +174,16 @@ class IOSControlAuditContractTests(unittest.TestCase):
         cleanup = source.split("private func deleteStaleAuditHistoryRows", 1)[1].split(
             "private func visiblePinnedSeed", 1
         )[0]
-        self.assertIn('"historyRowTap_", expectedScript', cleanup)
-        self.assertIn("matchingScripts, count", cleanup)
+        self.assertIn("runOwnedHistoryRowIDs", cleanup)
+        identity = source.split("private func runOwnedHistoryRowIDs", 1)[1].split(
+            "private func dismissHistorySearchKeyboardIfNeeded", 1
+        )[0]
+        self.assertIn('"historyRowTap_", expectedScript', identity)
+        self.assertIn("matchingCount, resultCount", identity)
+        self.assertIn("guard matchingCount == resultCount else { return nil }", identity)
         self.assertNotIn("app.staticTexts", cleanup)
-        self.assertIn("historyRowDeleteConfirm_", cleanup)
+        self.assertIn('element("historyRowMenu_\\(rowID)")', cleanup)
+        self.assertIn('element("historyRowDeleteConfirm_\\(rowID)")', cleanup)
         self.assertIn("dismissHistorySearchKeyboardIfNeeded()", cleanup)
         keyboard_helper = source.split("private func dismissHistorySearchKeyboardIfNeeded", 1)[1].split(
             "private func visiblePinnedSeed", 1
@@ -186,11 +192,13 @@ class IOSControlAuditContractTests(unittest.TestCase):
         delete_current = source.split("private func deleteRunOwnedHistoryRow", 1)[1].split(
             "private func deleteStaleAuditHistoryRows", 1
         )[0]
-        self.assertIn("dismissHistorySearchKeyboardIfNeeded()", delete_current)
+        self.assertIn("expectedScript: String", delete_current)
+        self.assertIn('element("historyRowMenu_\\(rowID)")', delete_current)
         pin_seed = source.split("private func pinSeedFromRunOwnedHistoryRow", 1)[1].split(
             "private func unpinAuditSeed", 1
         )[0]
-        self.assertIn("dismissHistorySearchKeyboardIfNeeded()", pin_seed)
+        self.assertIn("expectedScript: String", pin_seed)
+        self.assertIn('element("historyRowMenu_\\(rowID)")', pin_seed)
 
     def test_generation_product_failure_is_terminal_without_retrying_the_row(self) -> None:
         source = (
@@ -231,14 +239,14 @@ class IOSControlAuditContractTests(unittest.TestCase):
         self.assertIn("retainedSeedCarriers", generation)
         self.assertIn("restoreRetainedAuditSeed", generation)
         self.assertIn("if completedShard", generation)
-        self.assertIn("deleteRunOwnedHistoryRow(searchToken: searchToken)", generation)
+        self.assertIn("expectedScript: take.script", generation)
         restoration = source.split("private func restoreRetainedAuditSeed", 1)[1].split(
             "private func unpinAuditSeed", 1
         )[0]
         self.assertIn("for take in priorTakes where take.mode == mode.rawValue", restoration)
         self.assertIn("pinSeedFromRunOwnedHistoryRow", restoration)
-        self.assertIn('"historyRowTap_", take.script', restoration)
-        self.assertIn("matchingRowActions.count, 1", restoration)
+        self.assertIn("expectedScript: take.script", restoration)
+        self.assertIn("rowIDs.count, 1", restoration)
         self.assertNotIn("app.staticTexts", restoration)
 
     def test_generation_resume_reuses_its_plan_bound_clone_fixture(self) -> None:
@@ -288,6 +296,7 @@ class IOSControlAuditContractTests(unittest.TestCase):
         first = audit.generate_plan(self.contract, self.source_identity)
         second = audit.generate_plan(self.contract, self.source_identity)
         self.assertEqual(first, second)
+        self.assertEqual(first["schemaVersion"], 2)
         self.assertEqual(first["takeCount"], 201)
         self.assertLessEqual(first["takeCount"], self.contract["generationMatrix"]["maxRows"])
 
@@ -310,6 +319,83 @@ class IOSControlAuditContractTests(unittest.TestCase):
                 self.assertEqual({row[name] for row in by_mode[mode]}, set(values))
             self.assertEqual(by_mode[mode][0]["warmState"], "cold")
             self.assertTrue(all(row["warmState"] == "observed" for row in by_mode[mode][1:]))
+
+    def test_search_tokens_are_source_bound_and_cross_run_disjoint(self) -> None:
+        first = audit.generate_plan(self.contract, "a" * 64)
+        second = audit.generate_plan(self.contract, "b" * 64)
+        first_tokens = {row["searchToken"] for row in first["takes"]}
+        second_tokens = {row["searchToken"] for row in second["takes"]}
+        self.assertEqual(len(first_tokens), first["takeCount"])
+        self.assertEqual(len(second_tokens), second["takeCount"])
+        self.assertFalse(first_tokens & second_tokens)
+        self.assertNotEqual(first["takes"][0]["script"], second["takes"][0]["script"])
+
+    def test_schema_one_plan_remains_replayable_with_sequential_tokens(self) -> None:
+        plan = audit.generate_plan(
+            self.contract,
+            self.source_identity,
+            schema_version=1,
+        )
+        audit.validate_plan(self.contract, plan)
+        base = self.contract["generationMatrix"]["searchTokenBase"]
+        self.assertEqual(plan["schemaVersion"], 1)
+        self.assertEqual(plan["takes"][0]["searchToken"], str(base))
+        self.assertEqual(
+            plan["takes"][-1]["searchToken"],
+            str(base + plan["takeCount"] - 1),
+        )
+
+        historical = audit.generate_plan(
+            self.contract,
+            "32d406df2d2a8f5b237754ff906cf705a60543873a67d238af0748149169fc83",
+            schema_version=1,
+        )
+        historical["contractDigest"] = next(iter(audit.LEGACY_PLAN_V1_CONTRACT_DIGESTS))
+        seen_modes: set[str] = set()
+        for row in historical["takes"]:
+            if row["mode"] in seen_modes:
+                row["warmState"] = "warm"
+            else:
+                seen_modes.add(row["mode"])
+            row["rowDigest"] = audit.digest(
+                {key: value for key, value in row.items() if key != "rowDigest"}
+            )
+        historical["planDigest"] = audit.digest(
+            {key: value for key, value in historical.items() if key != "planDigest"}
+        )
+        self.assertIn(historical["planDigest"], audit.LEGACY_PLAN_V1_PLAN_DIGESTS)
+        audit.validate_plan(self.contract, historical)
+
+        historical["takes"][0]["scriptDigest"] = "0" * 64
+        historical["takes"][0]["rowDigest"] = audit.digest(
+            {
+                key: value
+                for key, value in historical["takes"][0].items()
+                if key != "rowDigest"
+            }
+        )
+        historical["planDigest"] = audit.digest(
+            {key: value for key, value in historical.items() if key != "planDigest"}
+        )
+        with self.assertRaisesRegex(audit.AuditError, "deterministic source-bound plan"):
+            audit.validate_plan(self.contract, historical)
+
+    def test_history_collision_guard_precedes_every_mutation(self) -> None:
+        source = (
+            ROOT
+            / "Tests"
+            / "VocelloiOSUITests"
+            / "VocelloiOSControlAuditUITests.swift"
+        ).read_text(encoding="utf-8")
+        helper = source.split("private func runOwnedHistoryRowIDs", 1)[1].split(
+            "private func dismissHistorySearchKeyboardIfNeeded", 1
+        )[0]
+        self.assertIn("guard matchingCount == resultCount else { return nil }", helper)
+        self.assertNotIn("VocelloUIPrimaryAction.perform", helper)
+        cleanup = source.split("private func deleteStaleAuditHistoryRows", 1)[1].split(
+            "private func runOwnedHistoryRowIDs", 1
+        )[0]
+        self.assertLess(cleanup.index("guard let rowIDs"), cleanup.index("VocelloUIPrimaryAction.perform"))
 
     def test_corpus_matches_every_selectable_language(self) -> None:
         plan = audit.generate_plan(self.contract, self.source_identity)

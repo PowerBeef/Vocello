@@ -344,6 +344,75 @@ class VoiceIdentityLanguageReliabilityTests(unittest.TestCase):
         first = plan["takes"][0]
         first_path = diagnostics / first["childRunID"] / "device-diagnostics-done.json"
         tampered = json.loads(first_path.read_text(encoding="utf-8"))
+        passing = copy.deepcopy(tampered)
+
+        rejected = copy.deepcopy(passing)
+        rejected["outputVerification"] = {
+            "algorithmVersion": "language-output-verifier-v3",
+            "pass": False,
+            "expectedLanguage": "french",
+            "detectedLanguage": "french",
+            "languagePass": True,
+            "languageMatchScore": 0.99,
+            "accuracyMetric": "wordErrorRate",
+            "accuracyValue": 0.25,
+            "accuracyThreshold": 0.15,
+            "accuracyPass": False,
+            "recognition": {
+                "algorithmVersion": "apple-speech-file-consensus-v2",
+                "consensusStatus": "consistent",
+                "evidenceConsistency": True,
+                "selectedLocaleIdentifier": "fr-CA",
+                "repetitions": [{}, {}, {}],
+            },
+        }
+        first_path.write_text(json.dumps(rejected), encoding="utf-8")
+        rejected_report = VLR.compose_device_results(
+            plan=plan,
+            contract=self.contract,
+            diagnostics_root=diagnostics,
+            transcription=transcription,
+            output=self.root / "verification-rejected-summary.json",
+        )
+        rejected_take = rejected_report["takes"][0]
+        self.assertEqual(
+            rejected_take["failures"],
+            ["output-accuracy-verification-rejected"],
+        )
+        self.assertEqual(rejected_take["failureOwner"], "product")
+        self.assertEqual(rejected_take["evidenceGaps"], [])
+        self.assertEqual(rejected_report["productFailures"], 1)
+        self.assertEqual(rejected_report["harnessFailures"], 0)
+        self.assertNotIn("transcript", json.dumps(rejected_take["outputVerification"]))
+
+        inconclusive = copy.deepcopy(rejected)
+        inconclusive["outputVerification"]["recognition"]["consensusStatus"] = "inconsistent"
+        inconclusive["outputVerification"]["recognition"]["evidenceConsistency"] = False
+        inconclusive["outputVerification"]["skipReason"] = "speech_recognition_inconsistent"
+        inconclusive["outputVerification"]["accuracyPass"] = None
+        first_path.write_text(json.dumps(inconclusive), encoding="utf-8")
+        inconclusive_report = VLR.compose_device_results(
+            plan=plan,
+            contract=self.contract,
+            diagnostics_root=diagnostics,
+            transcription=transcription,
+            output=self.root / "verification-inconclusive-summary.json",
+        )
+        inconclusive_take = inconclusive_report["takes"][0]
+        self.assertEqual(
+            inconclusive_take["failures"],
+            ["output-verification-inconclusive:speech_recognition_inconsistent"],
+        )
+        self.assertEqual(inconclusive_take["failureOwner"], "harness")
+        self.assertEqual(
+            inconclusive_take["evidenceGaps"],
+            ["output-recognition-evidence-inconclusive"],
+        )
+        self.assertEqual(inconclusive_report["productFailures"], 0)
+        self.assertEqual(inconclusive_report["harnessFailures"], 1)
+
+        first_path.write_text(json.dumps(passing), encoding="utf-8")
+        tampered = copy.deepcopy(passing)
         first_receipt = copy.deepcopy(tampered["requestReceipt"])
         tampered["requestReceipt"]["finalModelLanguage"] = "chinese"
         first_path.write_text(json.dumps(tampered), encoding="utf-8")

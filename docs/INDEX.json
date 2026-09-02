@@ -885,7 +885,7 @@
         "Sources/QwenVoiceCore/GenerationOutputAdapter.swift",
         "config/roadmap.json"
       ],
-      "contentDigest": "sha256:29313890182d3cdf6d656d88e1fe927a6aec73ad65bfcd540978646ac120e99c"
+      "contentDigest": "sha256:a868ce4acacc1e63d0123e07c5f8efb05e68624a940136da9c7eea40667be010"
     },
     {
       "path": "docs/reference/voice-identity-language-reliability-macos-2026-09-01.md",

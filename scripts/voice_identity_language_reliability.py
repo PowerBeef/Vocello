@@ -802,11 +802,25 @@ def compose_device_results(
                     if receipt.get(key) != expected_value:
                         failures.append(f"receipt-{key}-mismatch")
                 verification = sentinel.get("outputVerification") or {}
+                verification_failure = "successful_take_evidence_mismatch"
+                verification_owner = "harness"
                 if verification.get("pass") is not True:
-                    failures.append("output-verification-failed")
+                    verification_failure, verification_owner, verification_gaps = (
+                        classify_output_verification_failure(verification)
+                    )
+                    failures.append(verification_failure)
+                    evidence_gaps.extend(verification_gaps)
                 if failures:
-                    root_cause = "successful_take_evidence_mismatch"
-                    failure_owner = "harness"
+                    receipt_or_sentinel_mismatch = any(
+                        failure.startswith(("receipt-", "sentinel-"))
+                        for failure in failures
+                    )
+                    if receipt_or_sentinel_mismatch:
+                        root_cause = "successful_take_evidence_mismatch"
+                        failure_owner = "harness"
+                    else:
+                        root_cause = verification_failure
+                        failure_owner = verification_owner
             elif sentinel.get("status") == "error":
                 schema = sentinel.get("schemaVersion")
                 classification = sentinel.get("failureClassification")
@@ -868,6 +882,9 @@ def compose_device_results(
             "evidenceGaps": sorted(set(evidence_gaps)),
             "wordErrorRate": (sentinel.get("outputVerification") or {}).get("wordErrorRate"),
             "characterErrorRate": (sentinel.get("outputVerification") or {}).get("characterErrorRate"),
+            "outputVerification": _public_output_verification(
+                sentinel.get("outputVerification")
+            ),
             "referenceTranscriptLanguage": (sentinel.get("requestReceipt") or {}).get(
                 "referenceTranscriptLanguage"
             ),
@@ -905,6 +922,74 @@ def compose_device_results(
     }
     atomic_json(output, report)
     return report
+
+
+def classify_output_verification_failure(
+    verification: dict[str, Any],
+) -> tuple[str, str, list[str]]:
+    """Separate rejected generated output from unavailable verifier evidence.
+
+    A consistent, locale-locked recognition result that violates the governed
+    language or accuracy rule is product evidence: the generated take did not
+    clear its acceptance gate. Missing, empty, inconsistent, or contradictory
+    recognition remains a harness gap and cannot be converted into a product
+    rejection. Neither branch is a PASS and neither changes the threshold.
+    """
+    recognition = verification.get("recognition")
+    if not isinstance(recognition, dict):
+        return (
+            "output-verification-inconclusive",
+            "harness",
+            ["output-recognition-evidence-unavailable"],
+        )
+    if recognition.get("evidenceConsistency") is not True:
+        reason = verification.get("skipReason")
+        safe_reason = reason if _safe_diagnostic_identifier(reason) else "unavailable"
+        return (
+            f"output-verification-inconclusive:{safe_reason}",
+            "harness",
+            ["output-recognition-evidence-inconclusive"],
+        )
+    if verification.get("languagePass") is False:
+        return ("output-language-verification-rejected", "product", [])
+    if verification.get("accuracyPass") is False:
+        return ("output-accuracy-verification-rejected", "product", [])
+    return (
+        "output-verification-contradictory",
+        "harness",
+        ["output-verification-fields-contradict-pass"],
+    )
+
+
+def _public_output_verification(value: Any) -> dict[str, Any] | None:
+    if not isinstance(value, dict):
+        return None
+    recognition = value.get("recognition")
+    public_recognition = None
+    if isinstance(recognition, dict):
+        repetitions = recognition.get("repetitions")
+        public_recognition = {
+            "algorithmVersion": recognition.get("algorithmVersion"),
+            "consensusStatus": recognition.get("consensusStatus"),
+            "evidenceConsistency": recognition.get("evidenceConsistency"),
+            "selectedLocaleIdentifier": recognition.get("selectedLocaleIdentifier"),
+            "repetitionCount": len(repetitions) if isinstance(repetitions, list) else 0,
+        }
+    return {
+        "algorithmVersion": value.get("algorithmVersion"),
+        "pass": value.get("pass"),
+        "skipReason": value.get("skipReason")
+            if _safe_diagnostic_identifier(value.get("skipReason")) else None,
+        "expectedLanguage": value.get("expectedLanguage"),
+        "detectedLanguage": value.get("detectedLanguage"),
+        "languagePass": value.get("languagePass"),
+        "languageMatchScore": value.get("languageMatchScore"),
+        "accuracyMetric": value.get("accuracyMetric"),
+        "accuracyValue": value.get("accuracyValue"),
+        "accuracyThreshold": value.get("accuracyThreshold"),
+        "accuracyPass": value.get("accuracyPass"),
+        "recognition": public_recognition,
+    }
 
 
 def _safe_diagnostic_identifier(value: Any) -> bool:

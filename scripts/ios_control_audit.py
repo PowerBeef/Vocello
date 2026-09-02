@@ -26,6 +26,17 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 CONTRACT_PATH = ROOT / "config/ios-control-audit.json"
 SCHEMA_PATH = ROOT / "config/ios-control-audit-schema-v1.json"
 UI_TEST_PATH = ROOT / "Tests/VocelloiOSUITests/VocelloiOSControlAuditUITests.swift"
+LEGACY_PLAN_V1_CONTRACT_DIGESTS = {
+    # August 29 physical-device campaign. Schema v1 used sequential History
+    # tokens and labelled every post-sentinel row `warm`; its retained plans
+    # remain self-verifying evidence after schema v2 tightened both policies.
+    "720c69792b8d8e28d3f09f06d025f3df6f59c9e2650227dab202ee93b7877d5d",
+}
+LEGACY_PLAN_V1_PLAN_DIGESTS = {
+    # Exact plan retained by ICA-09 run
+    # ios-xcui-control-audit-20260829-152245-bbe90762.
+    "d49456e622ad6491965f988648da1407ec1e966d7404ccac125c1e05a4f3ddce",
+}
 
 INTERACTIVE_RE = re.compile(
     r"\b(?:Button|Toggle|Picker|NavigationLink|Link|TextEditor|TextField|Slider)\s*\("
@@ -334,7 +345,49 @@ def tree_fingerprint(root: pathlib.Path = ROOT) -> str:
     return value
 
 
-def generate_plan(contract: dict[str, Any], source_identity: str | None = None) -> dict[str, Any]:
+def _source_bound_search_token(
+    *,
+    source_identity: str,
+    contract_digest: str,
+    take_id: str,
+    namespace_salt: int,
+    used: set[str],
+) -> str:
+    """Return one deterministic eight-digit token unique within this plan.
+
+    History search is only a narrowing aid; the UI test still proves the full
+    immutable script before touching a row. Binding the aid to the source and
+    contract prevents an older audit plan from reusing the same numeric token
+    namespace on a phone that retains its History.
+    """
+
+    for attempt in range(1_024):
+        identity = (
+            f"{source_identity}:{contract_digest}:{namespace_salt}:"
+            f"{take_id}:{attempt}"
+        )
+        value = 10_000_000 + (
+            int.from_bytes(hashlib.sha256(identity.encode("utf-8")).digest()[:8], "big")
+            % 90_000_000
+        )
+        token = str(value)
+        if token not in used:
+            used.add(token)
+            return token
+    raise AuditError("could not allocate a unique source-bound History search token")
+
+
+def generate_plan(
+    contract: dict[str, Any],
+    source_identity: str | None = None,
+    *,
+    schema_version: int = 2,
+) -> dict[str, Any]:
+    if schema_version not in {1, 2}:
+        raise AuditError("unsupported control-audit plan schema")
+    resolved_source_identity = source_identity or tree_fingerprint()
+    if not re.fullmatch(r"[0-9a-f]{64}", resolved_source_identity):
+        raise AuditError("control-audit source identity must be a SHA-256")
     resolved = catalogs()
     corpus = load_json(ROOT / "config/ios-control-audit-corpus.json")
     scripts = corpus.get("scripts", {})
@@ -343,7 +396,9 @@ def generate_plan(contract: dict[str, Any], source_identity: str | None = None) 
         extra = sorted(set(scripts) - set(resolved["languages"]))
         raise AuditError(f"control-audit corpus language drift (missing={missing}, extra={extra})")
     rows: list[dict[str, Any]] = []
-    search_token_value = int(contract["generationMatrix"]["searchTokenBase"])
+    contract_digest = digest(contract)
+    search_token_salt = int(contract["generationMatrix"]["searchTokenBase"])
+    used_search_tokens: set[str] = set()
     for mode, mode_contract in contract["generationMatrix"]["modes"].items():
         dimensions = _expand_dimensions(mode_contract["dimensions"], resolved)
         mode_rows = all_pairs_rows(dimensions, mode_contract["coldSentinel"])
@@ -353,10 +408,20 @@ def generate_plan(contract: dict[str, Any], source_identity: str | None = None) 
             script = scripts[language].get(length)
             if not isinstance(script, str) or not script.strip():
                 raise AuditError(f"missing {language}/{length} control-audit script")
-            search_token = str(search_token_value)
+            take_id = f"{mode}-{index + 1:03d}"
+            if schema_version == 1:
+                search_token = str(search_token_salt + len(rows))
+            else:
+                search_token = _source_bound_search_token(
+                    source_identity=resolved_source_identity,
+                    contract_digest=contract_digest,
+                    take_id=take_id,
+                    namespace_salt=search_token_salt,
+                    used=used_search_tokens,
+                )
             rendered_script = f"{script} {search_token}."
             row = {
-                "takeID": f"{mode}-{index + 1:03d}",
+                "takeID": take_id,
                 "mode": mode,
                 # Only the first row is an enforced cold sentinel. Ordinary UI work between
                 # subsequent rows can legitimately cross iOS's 30-second idle-unload boundary,
@@ -369,14 +434,13 @@ def generate_plan(contract: dict[str, Any], source_identity: str | None = None) 
             }
             row["rowDigest"] = digest(row)
             rows.append(row)
-            search_token_value += 1
     maximum = int(contract["generationMatrix"]["maxRows"])
     if len(rows) > maximum:
         raise AuditError(f"all-pairs matrix needs {len(rows)} rows, exceeding maxRows {maximum}")
     payload = {
-        "schemaVersion": 1,
-        "sourceIdentity": source_identity or tree_fingerprint(),
-        "contractDigest": digest(contract),
+        "schemaVersion": schema_version,
+        "sourceIdentity": resolved_source_identity,
+        "contractDigest": contract_digest,
         "catalogDigest": digest(resolved),
         "takeCount": len(rows),
         "takes": rows,
@@ -391,9 +455,57 @@ def validate_plan(contract: dict[str, Any], plan: dict[str, Any]) -> None:
     source_identity = plan.get("sourceIdentity")
     if not isinstance(source_identity, str) or not re.fullmatch(r"[0-9a-f]{64}", source_identity):
         raise AuditError("control-audit plan has no valid source identity")
-    expected = generate_plan(contract, source_identity)
+    schema_version = plan.get("schemaVersion")
+    if schema_version not in {1, 2}:
+        raise AuditError("unsupported control-audit plan schema")
+    expected = generate_plan(
+        contract,
+        source_identity,
+        schema_version=schema_version,
+    )
+    if plan == expected:
+        return
+    if (
+        schema_version == 1
+        and plan.get("contractDigest") in LEGACY_PLAN_V1_CONTRACT_DIGESTS
+        and plan.get("planDigest") in LEGACY_PLAN_V1_PLAN_DIGESTS
+    ):
+        _validate_legacy_plan_v1(contract, plan)
+        return
+    raise AuditError("control-audit plan does not match the deterministic source-bound plan")
+
+
+def _validate_legacy_plan_v1(contract: dict[str, Any], plan: dict[str, Any]) -> None:
+    """Validate retained v1 bytes without rewriting historical evidence.
+
+    The old contract digest is allowlisted, but public SHA-256 fields are not
+    signatures: accepting an arbitrary self-rehashed row would weaken the
+    source-bound plan contract. Reconstruct the complete historical plan from
+    its frozen source identity and the one known v1 semantic difference
+    (post-sentinel rows declared `warm` instead of `observed`), then require
+    byte-for-byte decoded equality. This is a compatibility decoder, not
+    permission to produce new schema-v1 plans.
+    """
+    expected = generate_plan(
+        contract,
+        plan["sourceIdentity"],
+        schema_version=1,
+    )
+    expected["contractDigest"] = plan["contractDigest"]
+    seen_modes: set[str] = set()
+    for row in expected["takes"]:
+        if row["mode"] in seen_modes:
+            row["warmState"] = "warm"
+        else:
+            seen_modes.add(row["mode"])
+        row["rowDigest"] = digest(
+            {key: value for key, value in row.items() if key != "rowDigest"}
+        )
+    expected["planDigest"] = digest(
+        {key: value for key, value in expected.items() if key != "planDigest"}
+    )
     if plan != expected:
-        raise AuditError("control-audit plan does not match the deterministic source-bound plan")
+        raise AuditError("legacy control-audit plan does not match its deterministic v1 bytes")
 
 
 def encode_plan(contract: dict[str, Any], plan: dict[str, Any]) -> str:

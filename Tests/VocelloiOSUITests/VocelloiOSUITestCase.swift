@@ -522,6 +522,67 @@ class VocelloiOSUITestCase: XCTestCase {
         )
     }
 
+    /// Reveals one exact saved voice through the production search field before
+    /// returning its row and overflow menu. Saved rows live in a lazy stack, so
+    /// `exists` alone is not activation evidence: an off-screen descendant can
+    /// exist with an invalid hit point. The filtered row must expose finite,
+    /// unobscured 44-point activation geometry before a destructive journey may
+    /// continue.
+    func revealSavedVoiceControls(
+        named voiceName: String,
+        timeout: TimeInterval = 30
+    ) -> (row: XCUIElement, menu: XCUIElement)? {
+        select(tab: .voices)
+        let searchField = app.textFields["voicesSearchField"].firstMatch
+        guard VocelloUIWait.exists(searchField, timeout: timeout) else { return nil }
+        guard VocelloUITextEntry.replace(in: searchField, with: voiceName, timeout: 20) else {
+            return nil
+        }
+
+        let row = element("voicesRow_saved_\(voiceName)")
+        guard row.waitForExistence(timeout: 5) else {
+            clearVoicesSearch()
+            return nil
+        }
+
+        let menu = element("voicesRowMenu_\(voiceName)")
+        guard VocelloUIWait.condition(
+            "saved voice row and menu to expose valid activation geometry",
+            timeout: timeout,
+            evaluate: {
+                let rowFrame = row.frame
+                let menuFrame = menu.frame
+                return row.exists
+                    && menu.exists
+                    && menu.isEnabled
+                    && self.isValidActivationFrame(rowFrame)
+                    && self.isValidActivationFrame(menuFrame)
+                    && row.isHittable
+                    && menu.isHittable
+            }
+        ) else {
+            return nil
+        }
+        return (row, menu)
+    }
+
+    func clearVoicesSearch() {
+        let searchField = app.textFields["voicesSearchField"].firstMatch
+        guard searchField.exists else { return }
+        XCTAssertTrue(VocelloUITextEntry.replace(in: searchField, with: "", timeout: 20))
+    }
+
+    private func isValidActivationFrame(_ frame: CGRect) -> Bool {
+        !frame.isNull
+            && !frame.isInfinite
+            && frame.origin.x.isFinite
+            && frame.origin.y.isFinite
+            && frame.width.isFinite
+            && frame.height.isFinite
+            && frame.width >= 44
+            && frame.height >= 44
+    }
+
     func historyRows() -> XCUIElementQuery {
         app.descendants(matching: .any)
             .matching(NSPredicate(format: "identifier BEGINSWITH %@", "historyRow_"))

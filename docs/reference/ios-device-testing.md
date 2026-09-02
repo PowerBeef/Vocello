@@ -116,7 +116,7 @@ the extended >220-character long corpus; the iPhone lane never bypasses the user
 | --- | --- |
 | Smoke | Two journeys. Standard: exact app launch, Studio mode and tab navigation, visible model and clone-reference readiness, one visible user cancellation, one run-scoped critical-memory cancellation with cancel-before-unload diagnostics, post-pressure engine reuse, no cancelled History rows, and one real completed Custom History row. Long-form: a >2,000-character script routes to a project, streams every segment with live narration, surfaces the joined output in the inline player, and History shows search-flattened rows plus the grouped project with its expandable per-segment map |
 | Benchmark | Ordered, configurable Studio matrix with pulled telemetry, readable audio, audio QC, thermal and timing evidence; the default is exactly 29 takes |
-| Control audit | Source-bound inventory plus stateful, external-system, accessibility, and deterministic all-pairs generation scenarios. The checked-in contract expands dynamic speakers, deliveries, languages, variations, and models; its current generation plan contains 201 rows. The first successful take in each mode obtains an engine seed normally, pins it through the visible History action, and binds all remaining mode rows to that observed seed without injection or substitution. One exact plan-bound History row per mode remains as a visible resume seed carrier until the final shard; a resumed launch finds that run-owned row by its immutable token and pins its exact seed through the production menu. The run-owned direct-import Clone fixture is likewise plan-bound and reused across resumed shards. Clone omits a fabricated delivery dimension because ordinary Base-model references expose no instruction channel. Resume rejects a changed source tree, app build, device, or plan. Missing, blocked, infrastructure, harness, and product results remain distinct and can never be converted to PASS. Global destructive controls are opened and cancelled; run-owned rows may be created and deleted. |
+| Control audit | Source-bound inventory plus stateful, external-system, accessibility, and deterministic all-pairs generation scenarios. The checked-in contract expands dynamic speakers, deliveries, languages, variations, and models; its current generation plan contains 201 rows. New plans use schema v2: each eight-digit search token is derived from the frozen source, contract, take, and salt, and is only a narrowing key. Before cleanup, pin/unpin, restoration, or deletion, XCUITest must prove the exact full plan-bound script in the labeled History row action and resolve one exact row identifier; ambiguity fails before mutation. The exact ICA-09 retained schema-v1 plan preserves its original sequential tokens through a digest-allowlisted, byte-exact compatibility path. The first successful take in each mode obtains an engine seed normally, pins it through the visible History action, and binds all remaining mode rows to that observed seed without injection or substitution. One exact plan-bound History row per mode remains as a visible resume seed carrier until the final shard. The run-owned direct-import Clone fixture is likewise plan-bound and reused across resumed shards. Clone omits a fabricated delivery dimension because ordinary Base-model references expose no instruction channel. Resume rejects a changed source tree, app build, device, or plan. Missing, blocked, infrastructure, harness, and product results remain distinct and can never be converted to PASS. Global destructive controls are opened and cancelled; run-owned rows may be created and deleted. |
 | Model delivery | Fixed test-owned root normalized through visible state-appropriate controls. `diagnose` covers Custom cancel/restart/process adoption/Ready/remove; `queue` proves independent active/queued cancellation; `acceptance` adds Design/Clone shared-component reuse and all-model removal; `soak` repeats the lifecycle; `recover` inspects and visibly clears retained failure state without starting a transfer. Every transfer records exact logical bytes, milestone row/bar screenshots, phase activity, action exclusivity, five-minute advancement bounds, correlated delivery events, and exact canonical-state preservation |
 | Perf | Nine frame-health scenarios (`Tests/VocelloiOSUITests/VocelloiOSPerfUITests.swift`), each a fresh app launch with the in-app `CADisplayLink` probe pinned to the app's 60 Hz cap and one marked wall-clock window; `scripts/check_ios_ui_perf.py` joins windows to the pulled 500 ms probe rows |
 
@@ -168,11 +168,12 @@ chains; version-1 retained state remains readable. A gap that is neither observe
 carried as a skip rejects the resume instead of silently losing matrix coverage.
 
 A pre-observation failure has no row-level resume boundary. In particular, the run-owned History
-carrier is established only after the harness proves the exact immutable script and labeled row
-action. A reserved search token that happens to appear in an unrelated user History row must stop
-as `HARNESS_FAIL`; it never authorizes mutation of that row, seed adoption, or matrix continuation.
+carrier is established only after the harness proves the exact immutable script in a labeled row
+action and resolves one exact row identifier. The schema-v2 search token only narrows the query; a
+zero, duplicate, or unrelated result stops before mutation, seed adoption, or matrix continuation.
 After a source correction, preserve the failed bundle and begin again at row 1 with a new frozen
-identity.
+identity. Generate that plan only after the final tracked commit, because documentation and contract
+changes also change the full-tree identity.
 
 A visible generation failure has only a production Retry action. The audit therefore records the
 failed request and ends that XCUITest shard without pressing Retry; a separately invoked,
@@ -199,8 +200,11 @@ After a test has launched, a separate classifier may report `infrastructure_exte
 only when the retained log proves a SpringBoard notification banner and
 `NotificationShortLookView`, the `.xcresult` proves exactly one identified wait timeout, and no
 product, harness, crash, generation, or QC failure coexists. It never turns the run into PASS and
-never authorizes an automatic retry. The 2026-08-29 Messenger-interrupted run is the retained proof
-for this boundary.
+never authorizes an automatic retry. Retained pre-test run
+`ios-xcui-control-audit-20260829-152245-bbe90762` was replayed on 2026-09-02 as exactly one
+run-level `INFRASTRUCTURE_FAIL` plus 42 `SKIPPED_AFTER_FAILURE` rows, with zero product/harness rows;
+the 2026-08-29 Messenger-interrupted run is the distinct post-launch proof. A fresh device bootstrap
+observation is still required to close ICA-09.
 See [`ios-control-audit-remediation-2026-08-29.md`](ios-control-audit-remediation-2026-08-29.md).
 
 ### Control-audit one-hour continuation — 2026-09-02
@@ -212,14 +216,19 @@ explicit `NOT_APPLICABLE`, zero failures, and zero skipped rows. It supersedes t
 zero-observation inventory attempt for active coverage purposes without rewriting that historical
 bundle.
 
-Two short journeys then exposed current harness/reachability gaps. Saved-voice run
+Two short journeys then exposed harness/reachability gaps. Saved-voice run
 `ios-xcui-saved-voice-lifecycle-20260902-181739-713b7367` found the run-owned imported voice but
 could not activate `voicesRowMenu_ICI Direct Clone Import`: its accessibility frame produced no
 valid activation or suggested hit point. Generation run
 `ios-xcui-control-audit-20260902-181849-9ea76d5a` stopped at its intended History-integrity guard
 because reserved token `28400003` matched a non-audit History row. No generation observation was
 written, all 204 composed rows remain `SKIPPED_AFTER_FAILURE`, and no row-level resume state exists.
-Neither failure is product-generation evidence, and neither authorizes an automatic retry.
+Neither failure is product-generation evidence, and neither authorizes an automatic retry. The
+phone-independent remediation now reveals the exact run-owned voice through the genuine Voices
+search field and requires the row/menu to be enabled, hittable, finite, and at least 44 by 44 points
+before activation. It also replaces fixed sequential tokens for new plans with schema-v2
+source-bound tokens and requires the exact full script/row identifier before every History action.
+Focused fixtures and generic iOS compilation pass; physical closure remains outstanding.
 
 Smoke run `ios-xcui-smoke-20260902-182906-25dc08ce` passed all three XCTest cases, including the
 primary cancellation/memory-recovery/Custom-History journey, the Settings accessibility layout
@@ -229,8 +238,7 @@ not a qualified smoke PASS. At the deadline, all test processes were stopped and
 bundles remained explicitly pinned.
 
 Committing this checkpoint changes the full-tree identity. The next phone window must not resume
-`181849`. First correct and deterministically validate the saved-voice activation geometry and
-generation History-token ownership, then use new run IDs:
+`181849`. Generate a fresh schema-v2 plan after the final commit, then use new run IDs:
 
 ```sh
 scripts/ios_device.sh preflight
@@ -528,8 +536,10 @@ app's Documents directory. The XCUITest uses only visible production controls: S
 and Save resolves any genuine soft warning. The test then proves the exact voice is selected in
 `studioChip_reference`, completes one Clone take, previews the durable Saved Voice, confirms the
 exact named deletion, verifies the row disappears, and verifies the matching Studio draft is
-cleared. The separate `enroll-clone-fixture` lane retains sidecar-prefilled coverage. Neither lane
-runs in smoke, benchmark, CI, or release.
+cleared. When the run-owned row is outside the lazy viewport, the test uses the genuine Voices
+search field to reveal its exact name, then requires the row and menu to be enabled, hittable,
+finite, and at least 44 by 44 points before activation. The separate `enroll-clone-fixture` lane
+retains sidecar-prefilled coverage. Neither lane runs in smoke, benchmark, CI, or release.
 
 Built-in Voice startup reliability is a separate compile-gated diagnostic, not an ordinary
 benchmark or release lane. The headless route consumes a schema-v1 ordered plan plus an exact

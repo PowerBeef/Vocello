@@ -2,7 +2,7 @@
 status: historical
 owner: backend-and-platform
 summary: Pinned privacy-safe physical-iPhone checkpoint for corrected-source Clone, transcription, and French Voice Design reliability.
-contentDigest: sha256:29313890182d3cdf6d656d88e1fe927a6aec73ad65bfcd540978646ac120e99c
+contentDigest: sha256:a868ce4acacc1e63d0123e07c5f8efb05e68624a940136da9c7eea40667be010
 sourceOfTruth:
   - config/voice-identity-language-reliability.json
   - scripts/voice_identity_language_reliability.py
@@ -23,7 +23,9 @@ The requested corrected-source campaign ran to completion without resuming, merg
 substituting a planned take. Both production-focused 14-row closure runs passed. The complete
 122-row characterization represented every planned row but failed its aggregate gate: 106 rows
 passed, two diagnostic French Voice Design rows were correctly rejected by production audio QC,
-and 14 otherwise successful French Design generations failed output verification.
+12 otherwise successful French Design generations were consistently recognized as French but
+failed the governed intelligibility threshold, and two successful generations lacked usable ASR
+evidence.
 
 The device evidence closes the two bounded source remediations:
 
@@ -36,9 +38,9 @@ The device evidence closes the two bounded source remediations:
   run. This closes VLR-09 without weakening interior-pause policy or adding a retry.
 
 VLR-07 remains open. The two closure runs prove the production-focused path, but a complete
-characterization cannot be called clean while two deterministic sampled-output defects and 14
-locale-verification mismatches remain. Those findings are retained as evidence, not converted into
-passes or hidden behind another seed.
+characterization cannot be called clean while two deterministic sampled-output defects, 12
+output-accuracy rejections, and two inconclusive verifier cases remain. Those findings are retained
+as evidence, not converted into passes or hidden behind another seed.
 
 ## Source-bound evidence
 
@@ -49,7 +51,7 @@ All three runs bind source identity
 | --- | --- | --- | --- |
 | `vlr-device-20260902-closure-fixed-01` | closure | `b7cd0b21af295b3e2e5c06440446d027c3ca2e49eb2084aef7935eb0f920301f` | 14/14 PASS |
 | `vlr-device-20260902-closure-fixed-02` | closure | `c0e00e4323f13bbe6fec1b8913a9f3f7849d11f282ebe972cb027c4a4cb195d5` | 14/14 PASS |
-| `vlr-device-20260902-characterization-fixed-01` | characterization | `a5eb871a086a30295b84ad1d1cf3fb8079f7e70a2633ff3c70049f58492ed119` | 106 PASS; 2 product QC rejects; 14 verification failures |
+| `vlr-device-20260902-characterization-fixed-01` | characterization | `a5eb871a086a30295b84ad1d1cf3fb8079f7e70a2633ff3c70049f58492ed119` | 106 PASS; 2 product QC rejects; 12 product accuracy rejects; 2 inconclusive verifier cases |
 
 The untracked run bundles retain their complete plan, append-only launch ledger, typed summaries,
 request receipts, codec traces for rejected output, crash baselines, and transcription evidence.
@@ -93,17 +95,22 @@ closure profile:
    silence after audible speech. Live output, full replay, and incremental replay all failed Fast-QC
    v6 with the same terminal-run length. No invalid WAV was published.
 
-Fourteen successful generations failed the harness's locale-locked output verification. Twelve
-contained measurable French WER/CER above the configured acceptance rule, ranging from WER 0.1667
-to 0.5897; two lacked usable ASR measurements. They span one production-Neutral row, three
-no-delivery rows, and ten Calm-strong rows. The composer correctly retains them as
-`successful_take_evidence_mismatch` owned by the verification harness: successful generation alone
-does not prove correct language delivery.
+Fourteen successful generations did not satisfy locale-locked output verification. Twelve had
+internally consistent three-pass on-device recognition, were identified as French, and contained
+measurable WER/CER above the configured 0.15 WER acceptance rule, ranging from WER 0.1667 to
+0.5897. Those are product-owned `output-accuracy-verification-rejected` outcomes: they are evidence
+of insufficient generated-output intelligibility under the governed rule, not verifier crashes or
+language-routing failures. The remaining two rows had no decision-capable ASR evidence—one
+`transcription_failed` and one `speech_recognition_inconsistent`—and are retained as harness-owned
+`output-verification-inconclusive` outcomes. The affected rows span one production-Neutral row,
+three no-delivery rows, and ten Calm-strong rows. Successful generation alone does not prove
+acceptable language delivery, while absent or contradictory measurements cannot prove a product
+failure.
 
 This pattern continues to rank shipped Neutral above the experimental alternatives, but it does
 not prove that all French delivery is acceptable. The two product QC rejects are valid protective
-behavior; the 14 verification failures require calibration and language-evidence remediation rather
-than being reclassified as product crashes.
+behavior; the 12 output-accuracy rejects require generation/intelligibility investigation, and the
+two inconclusive rows require verifier-evidence repair. None is reclassified as a product crash.
 
 ## Decision and remaining gate
 
@@ -116,8 +123,10 @@ Closed from this campaign:
 
 Still required for VLR-07:
 
-- Resolve whether the 14 output-verification failures reflect recognizer calibration, corpus
-  mismatch, or genuine French intelligibility failures; preserve missing-ASR cases explicitly.
+- Investigate the 12 consistently measured output-accuracy rejections without relaxing the 0.15
+  WER rule, changing seeds, or relabelling them as harness failures.
+- Repair or re-run only the two rows with missing or inconsistent ASR evidence; keep their current
+  outcome inconclusive until decision-capable evidence exists.
 - Decide how deterministic invalid output in diagnostic prompt arms is represented in the final
   characterization acceptance contract without weakening mandatory QC or silently retrying.
 - Run only the focused evidence needed by those proven gaps; the two completed closure runs and the

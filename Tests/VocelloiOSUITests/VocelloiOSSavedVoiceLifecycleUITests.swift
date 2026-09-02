@@ -80,8 +80,11 @@ final class VocelloiOSSavedVoiceLifecycleUITests: VocelloiOSUITestCase {
         VocelloUIScreenshot.attach(app, named: "ios-clone-import-generated")
 
         select(tab: .voices)
-        let savedRow = element("voicesRow_saved_\(voiceName)")
-        XCTAssertTrue(VocelloUIWait.exists(savedRow, timeout: 60))
+        guard let savedControls = revealSavedVoiceControls(named: voiceName, timeout: 60) else {
+            XCTFail("The newly saved voice did not expose an activatable row and menu")
+            return
+        }
+        let savedRow = savedControls.row
 
         let preview = element("voicesPreview_saved_\(voiceName)")
         XCTAssertTrue(VocelloUIWait.exists(preview, timeout: 20))
@@ -115,11 +118,10 @@ final class VocelloiOSSavedVoiceLifecycleUITests: VocelloiOSUITestCase {
     }
 
     private func deleteThrowawayVoiceIfPresent() {
-        let row = element("voicesRow_saved_\(voiceName)")
-        guard row.waitForExistence(timeout: 5) else { return }
+        guard let controls = revealSavedVoiceControls(named: voiceName) else { return }
+        let row = controls.row
 
-        let menu = element("voicesRowMenu_\(voiceName)")
-        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: menu, timeout: 20))
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: controls.menu, timeout: 20))
         let delete = element("voicesDelete_\(voiceName)")
         XCTAssertTrue(VocelloUIWait.exists(delete, timeout: 20))
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: delete, timeout: 20))
@@ -128,5 +130,6 @@ final class VocelloiOSSavedVoiceLifecycleUITests: VocelloiOSUITestCase {
         XCTAssertTrue(VocelloUIWait.exists(confirm, timeout: 20))
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: confirm, timeout: 20))
         XCTAssertTrue(VocelloUIWait.disappears(row, timeout: 60))
+        clearVoicesSearch()
     }
 }

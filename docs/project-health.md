@@ -5,7 +5,7 @@
 
 - Current source identity and dirty state: local JSON report only (kept out of the tracked snapshot to avoid self-referential drift)
 - Swift tests: 667 cases in 90 files
-- Python tests: 1412 cases in 120 files
+- Python tests: 1416 cases in 120 files
 - Required-step assurance: 97 steps across 21 workflows, all covered by forced-failure fixtures
 - Unsafe-concurrency annotations: 48 (48 registered with owner and invariant; contract complete)
 - Evidence routing: 905/905 critical paths explicit; 0 use repository-other fallback

@@ -428,7 +428,7 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
         let selected = Array(plan.takes.dropFirst(start).prefix(limit > 0 ? limit : Int.max))
         XCTAssertFalse(selected.isEmpty, "Generation audit shard must contain at least one take")
         var frozenSeeds: [String: UInt64] = [:]
-        var retainedSeedCarriers: [String: String] = [:]
+        var retainedSeedCarriers: [String: IOSControlAuditTake] = [:]
         var modesPinnedByAudit = Set<String>()
         for mode in VocelloUIBenchMatrix.Mode.allCases {
             select(mode: mode)
@@ -438,7 +438,7 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
                 from: Array(plan.takes.prefix(start))
                ) {
                 frozenSeeds[mode.rawValue] = carrier.seed
-                retainedSeedCarriers[mode.rawValue] = carrier.searchToken
+                retainedSeedCarriers[mode.rawValue] = carrier.take
                 modesPinnedByAudit.insert(mode.rawValue)
             } else if let seed = visiblePinnedSeed() {
                 frozenSeeds[mode.rawValue] = seed
@@ -451,8 +451,11 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
             // source/plan-bound resume can visibly restore the exact seed. Only
             // the shard that reaches the end removes those carriers and pins.
             if completedShard && (testRun?.failureCount ?? 0) == 0 {
-                for searchToken in retainedSeedCarriers.values.sorted() {
-                    deleteRunOwnedHistoryRow(searchToken: searchToken)
+                for take in retainedSeedCarriers.values.sorted(by: { $0.takeID < $1.takeID }) {
+                    deleteRunOwnedHistoryRow(
+                        searchToken: take.searchToken,
+                        expectedScript: take.script
+                    )
                 }
                 for modeID in modesPinnedByAudit.sorted() {
                     if let mode = VocelloUIBenchMatrix.Mode(rawValue: modeID) {
@@ -541,13 +544,20 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
             dismissCompletedPlayerAndAssertGenerateReady()
             if retainedSeedCarriers[take.mode] == nil {
                 if frozenSeed == nil {
-                    frozenSeed = pinSeedFromRunOwnedHistoryRow(searchToken: take.searchToken)
+                    guard let pinnedSeed = pinSeedFromRunOwnedHistoryRow(
+                        searchToken: take.searchToken,
+                        expectedScript: take.script
+                    ) else { return }
+                    frozenSeed = pinnedSeed
                     frozenSeeds[take.mode] = frozenSeed
                     modesPinnedByAudit.insert(take.mode)
                 }
-                retainedSeedCarriers[take.mode] = take.searchToken
+                retainedSeedCarriers[take.mode] = take
             } else {
-                deleteRunOwnedHistoryRow(searchToken: take.searchToken)
+                deleteRunOwnedHistoryRow(
+                    searchToken: take.searchToken,
+                    expectedScript: take.script
+                )
             }
             let observedSeed = frozenSeed
             XCTAssertNotNil(observedSeed, "The cold sentinel must expose a seed that can be frozen visibly")
@@ -567,7 +577,7 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
             recorder.record(
                 scenario: "generation", controlID: "generation:\(take.takeID)",
                 expected: "Visible request, engine receipt, QC, History, playback, and cleanup agree",
-                actual: retainedSeedCarriers[take.mode] == take.searchToken
+                actual: retainedSeedCarriers[take.mode]?.takeID == take.takeID
                     ? "Completed generation \(generationID); run-owned History row retained as the resume seed carrier"
                     : "Completed generation \(generationID); run-owned History row removed",
                 evidence: "generation-\(take.takeID)",
@@ -707,9 +717,7 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
     }
 
     private func deleteAuditVoiceIfPresent() {
-        select(tab: .voices)
-        let row = element("voicesRow_saved_\(directImportVoiceName)")
-        guard row.waitForExistence(timeout: 5) else { return }
+        guard revealSavedVoiceControls(named: directImportVoiceName) != nil else { return }
         // Make the run-owned voice the active Clone reference before deleting
         // it. The production deletion path then clears the draft, giving the
         // snapshot restorer an honest way to restore an originally empty
@@ -723,11 +731,14 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
             )
         )
         select(tab: .voices)
-        let selectedRow = element("voicesRow_saved_\(directImportVoiceName)")
-        XCTAssertTrue(VocelloUIWait.exists(selectedRow, timeout: 20))
+        guard let selectedControls = revealSavedVoiceControls(named: directImportVoiceName) else {
+            XCTFail("The selected audit voice did not expose an activatable row and menu")
+            return
+        }
+        let selectedRow = selectedControls.row
         XCTAssertTrue(
             VocelloUIPrimaryAction.perform(
-                on: element("voicesRowMenu_\(directImportVoiceName)"),
+                on: selectedControls.menu,
                 timeout: 20
             )
         )
@@ -744,6 +755,7 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
             )
         )
         XCTAssertTrue(VocelloUIWait.disappears(selectedRow, timeout: 60))
+        clearVoicesSearch()
     }
 
     private func restoreCloneConsentIfNeeded() {
@@ -1199,7 +1211,10 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
         let compressed = try XCTUnwrap(Data(base64Encoded: encoded))
         let data = try (compressed as NSData).decompressed(using: .zlib) as Data
         let plan = try JSONDecoder().decode(IOSControlAuditPlan.self, from: data)
-        XCTAssertEqual(plan.schemaVersion, 1)
+        XCTAssertTrue(
+            [1, 2].contains(plan.schemaVersion),
+            "Control-audit plans preserve schema-v1 replay and use schema v2 for source-bound History tokens"
+        )
         return plan
     }
 
@@ -1267,66 +1282,94 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
         return components[0] * 60 + components[1]
     }
 
-    private func deleteRunOwnedHistoryRow(searchToken: String) {
-        replaceHistorySearch(with: searchToken)
-        XCTAssertTrue(VocelloUIWait.condition("one run-owned History row", timeout: 30) {
-            self.historyRows().count == 1
-        })
-        let row = historyRows().firstMatch
+    private func deleteRunOwnedHistoryRow(searchToken: String, expectedScript: String) {
+        guard let rowIDs = runOwnedHistoryRowIDs(
+            searchToken: searchToken,
+            expectedScript: expectedScript
+        ) else { return }
+        XCTAssertEqual(rowIDs.count, 1, "A current seed carrier must identify exactly one row")
+        guard rowIDs.count == 1 else { return }
+        let rowID = rowIDs[0]
+        let row = element("historyRowTap_\(rowID)")
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: row, timeout: 20))
         XCTAssertTrue(VocelloUIWait.exists(element("iosPlayer_playPause"), timeout: 20))
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: element("iosPlayer_close"), timeout: 20))
-        let menu = app.descendants(matching: .any)
-            .matching(NSPredicate(format: "identifier BEGINSWITH %@", "historyRowMenu_"))
-            .firstMatch
+        let menu = element("historyRowMenu_\(rowID)")
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: menu, timeout: 20))
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: app.buttons["Delete"].firstMatch, timeout: 20))
-        let confirm = app.descendants(matching: .any)
-            .matching(NSPredicate(format: "identifier BEGINSWITH %@", "historyRowDeleteConfirm_"))
-            .firstMatch
+        let confirm = element("historyRowDeleteConfirm_\(rowID)")
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: confirm, timeout: 20))
-        XCTAssertTrue(VocelloUIWait.exists(element("history_noMatchesState"), timeout: 30))
+        XCTAssertTrue(VocelloUIWait.condition("run-owned History row to disappear", timeout: 30) {
+            !self.element("historyRowTap_\(rowID)").exists
+        })
         dismissHistorySearchKeyboardIfNeeded()
         select(tab: .studio)
     }
 
     private func deleteStaleAuditHistoryRows(searchToken: String, expectedScript: String) {
-        replaceHistorySearch(with: searchToken)
-        dismissHistorySearchKeyboardIfNeeded()
-
         for _ in 0..<32 {
-            let count = historyRows().count
-            guard count > 0 else {
+            guard let rowIDs = runOwnedHistoryRowIDs(
+                searchToken: searchToken,
+                expectedScript: expectedScript
+            ) else { return }
+            guard let rowID = rowIDs.first else {
                 select(tab: .studio)
                 return
             }
-            let matchingScripts = app.descendants(matching: .any).matching(
-                NSPredicate(
-                    format: "identifier BEGINSWITH %@ AND label CONTAINS %@",
-                    "historyRowTap_", expectedScript
-                )
-            ).count
-            XCTAssertEqual(
-                matchingScripts, count,
-                "Reserved token \(searchToken) matched a non-audit History row"
-            )
-            let menu = app.descendants(matching: .any)
-                .matching(NSPredicate(format: "identifier BEGINSWITH %@", "historyRowMenu_"))
-                .firstMatch
+            let count = rowIDs.count
+            let menu = element("historyRowMenu_\(rowID)")
             XCTAssertTrue(VocelloUIPrimaryAction.perform(on: menu, timeout: 20))
             XCTAssertTrue(VocelloUIPrimaryAction.perform(on: app.buttons["Delete"].firstMatch, timeout: 20))
-            let confirm = app.descendants(matching: .any)
-                .matching(NSPredicate(format: "identifier BEGINSWITH %@", "historyRowDeleteConfirm_"))
-                .firstMatch
+            let confirm = element("historyRowDeleteConfirm_\(rowID)")
             XCTAssertTrue(VocelloUIPrimaryAction.perform(on: confirm, timeout: 20))
             XCTAssertTrue(
                 VocelloUIWait.condition("stale audit History row count to decrease", timeout: 30) {
-                    self.historyRows().count < count
+                    !self.element("historyRowTap_\(rowID)").exists
                 }
             )
+            XCTAssertGreaterThanOrEqual(count, 1)
         }
         XCTFail("More than 32 stale audit rows matched reserved token \(searchToken)")
         select(tab: .studio)
+    }
+
+    /// Search tokens only narrow the visible History collection. Before any
+    /// mutation or seed adoption, every result must expose the complete
+    /// immutable plan script on its labeled row action. A substring collision
+    /// returns nil after failing the test, so callers cannot continue into a
+    /// menu action, seed pin, or generation.
+    private func runOwnedHistoryRowIDs(
+        searchToken: String,
+        expectedScript: String
+    ) -> [String]? {
+        replaceHistorySearch(with: searchToken)
+        dismissHistorySearchKeyboardIfNeeded()
+        let rows = historyRows()
+        let resultCount = rows.count
+        guard resultCount > 0 else { return [] }
+        let matchingRows = app.descendants(matching: .any).matching(
+            NSPredicate(
+                format: "identifier BEGINSWITH %@ AND label CONTAINS %@",
+                "historyRowTap_", expectedScript
+            )
+        )
+        let matchingCount = matchingRows.count
+        XCTAssertEqual(
+            matchingCount, resultCount,
+            "Reserved token \(searchToken) matched a non-audit History row"
+        )
+        guard matchingCount == resultCount else { return nil }
+        let prefix = "historyRowTap_"
+        let identifiers = (0..<matchingCount).compactMap { index -> String? in
+            let identifier = matchingRows.element(boundBy: index).identifier
+            guard identifier.hasPrefix(prefix) else { return nil }
+            return String(identifier.dropFirst(prefix.count))
+        }
+        XCTAssertEqual(identifiers.count, matchingCount)
+        XCTAssertEqual(Set(identifiers).count, identifiers.count)
+        guard identifiers.count == matchingCount,
+              Set(identifiers).count == identifiers.count else { return nil }
+        return identifiers
     }
 
     private func dismissHistorySearchKeyboardIfNeeded() {
@@ -1347,52 +1390,65 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
         return extractSeed(from: [chip.label, chip.value as? String].compactMap { $0 }.joined(separator: " "))
     }
 
-    private func pinSeedFromRunOwnedHistoryRow(searchToken: String) -> UInt64 {
-        replaceHistorySearch(with: searchToken)
-        XCTAssertTrue(VocelloUIWait.condition("one run-owned History row", timeout: 30) {
-            self.historyRows().count == 1
-        })
-        let menu = app.descendants(matching: .any)
-            .matching(NSPredicate(format: "identifier BEGINSWITH %@", "historyRowMenu_"))
-            .firstMatch
-        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: menu, timeout: 20))
+    private func pinSeedFromRunOwnedHistoryRow(
+        searchToken: String,
+        expectedScript: String
+    ) -> UInt64? {
+        guard let rowIDs = runOwnedHistoryRowIDs(
+            searchToken: searchToken,
+            expectedScript: expectedScript
+        ) else { return nil }
+        XCTAssertEqual(rowIDs.count, 1, "A seed carrier must identify exactly one audit row")
+        guard rowIDs.count == 1 else { return nil }
+        let rowID = rowIDs[0]
+        let menu = element("historyRowMenu_\(rowID)")
+        guard VocelloUIPrimaryAction.perform(on: menu, timeout: 20) else {
+            XCTFail("The exact seed-carrier menu was not activatable")
+            return nil
+        }
         let pin = app.buttons.matching(
             NSPredicate(format: "label BEGINSWITH[c] %@", "Pin seed ")
         ).firstMatch
-        XCTAssertTrue(VocelloUIWait.exists(pin, timeout: 20))
-        let seed = extractSeed(from: pin.label)
-        XCTAssertNotNil(seed, "History Pin seed action must expose its exact numeric seed")
-        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: pin, timeout: 20))
+        guard VocelloUIWait.exists(pin, timeout: 20) else {
+            XCTFail("The exact seed-carrier menu did not expose Pin seed")
+            return nil
+        }
+        guard let seed = extractSeed(from: pin.label) else {
+            XCTFail("History Pin seed action must expose its exact numeric seed")
+            return nil
+        }
+        guard VocelloUIPrimaryAction.perform(on: pin, timeout: 20) else {
+            XCTFail("The exact seed-carrier Pin seed action was not activatable")
+            return nil
+        }
         dismissHistorySearchKeyboardIfNeeded()
         select(tab: .studio)
-        XCTAssertTrue(VocelloUIWait.condition("History seed to become visibly pinned", timeout: 20) {
+        guard VocelloUIWait.condition("History seed to become visibly pinned", timeout: 20, evaluate: {
             self.visiblePinnedSeed() == seed
-        })
-        return seed ?? 0
+        }) else {
+            XCTFail("The exact History seed did not become visibly pinned")
+            return nil
+        }
+        return seed
     }
 
     private func restoreRetainedAuditSeed(
         in mode: VocelloUIBenchMatrix.Mode,
         from priorTakes: [IOSControlAuditTake]
-    ) -> (seed: UInt64, searchToken: String)? {
+    ) -> (seed: UInt64, take: IOSControlAuditTake)? {
         for take in priorTakes where take.mode == mode.rawValue {
-            replaceHistorySearch(with: take.searchToken)
-            dismissHistorySearchKeyboardIfNeeded()
-            let rows = historyRows()
-            guard rows.count > 0 else { continue }
-            XCTAssertEqual(rows.count, 1, "A retained seed token must identify exactly one audit row")
-            let matchingRowActions = app.descendants(matching: .any).matching(
-                NSPredicate(
-                    format: "identifier BEGINSWITH %@ AND label CONTAINS %@",
-                    "historyRowTap_", take.script
-                )
-            )
-            XCTAssertEqual(
-                matchingRowActions.count, 1,
-                "A retained seed carrier must expose the immutable audit script on its labeled row action"
-            )
-            let seed = pinSeedFromRunOwnedHistoryRow(searchToken: take.searchToken)
-            return (seed, take.searchToken)
+            guard let rowIDs = runOwnedHistoryRowIDs(
+                searchToken: take.searchToken,
+                expectedScript: take.script
+            ) else { return nil }
+            guard !rowIDs.isEmpty else { continue }
+            XCTAssertEqual(rowIDs.count, 1, "A retained seed carrier must identify exactly one audit row")
+            guard rowIDs.count == 1 else { return nil }
+            guard let seed = pinSeedFromRunOwnedHistoryRow(
+                searchToken: take.searchToken,
+                expectedScript: take.script
+            ) else { return nil }
+            return (seed, take)
         }
         select(tab: .studio)
         return nil

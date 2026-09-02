@@ -501,6 +501,32 @@ class IOSSmokeAcceptanceTests(unittest.TestCase):
         )
         self.assertNotIn('element("historySearchField")', search_contract)
 
+    def test_saved_voice_actions_require_filtered_valid_geometry(self) -> None:
+        test_case = (
+            ROOT / "Tests" / "VocelloiOSUITests" / "VocelloiOSUITestCase.swift"
+        ).read_text(encoding="utf-8")
+        start = test_case.index("func revealSavedVoiceControls(")
+        end = test_case.index("func historyRows()", start)
+        contract = test_case[start:end]
+
+        self.assertIn('app.textFields["voicesSearchField"].firstMatch', contract)
+        self.assertIn("VocelloUITextEntry.replace", contract)
+        self.assertIn('element("voicesRow_saved_\\(voiceName)")', contract)
+        self.assertIn('element("voicesRowMenu_\\(voiceName)")', contract)
+        self.assertIn("self.isValidActivationFrame(rowFrame)", contract)
+        self.assertIn("self.isValidActivationFrame(menuFrame)", contract)
+        self.assertIn("row.isHittable", contract)
+        self.assertIn("menu.isHittable", contract)
+        self.assertIn("frame.width >= 44", contract)
+        self.assertIn("frame.height >= 44", contract)
+
+        for path in [
+            ROOT / "Tests" / "VocelloiOSUITests" / "VocelloiOSSavedVoiceLifecycleUITests.swift",
+            ROOT / "Tests" / "VocelloiOSUITests" / "VocelloiOSControlAuditUITests.swift",
+        ]:
+            source = path.read_text(encoding="utf-8")
+            self.assertIn("revealSavedVoiceControls", source)
+
     def test_ui_runner_transport_names_are_exact_and_benchmarks_fail_closed(self) -> None:
         runner = (ROOT / "scripts" / "ui_test.sh").read_text(encoding="utf-8")
         suites = {

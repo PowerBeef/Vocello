@@ -749,7 +749,9 @@ python3 scripts/summarize_generation_telemetry.py <diag-dir> \
 ```
 
 The committed **`benchmarks/baselines/mac-gate-bench.json`** (custom/speed/medium,
-cold+warm) is what `QWENVOICE_GATE_BENCH=1 scripts/macos_test.sh gate` compares against —
+cold+warm) is a schema-v2 baseline binding the hardware profile, `-O` optimization,
+matrix/corpus, model artifact, and evidence semantics. It is what
+`QWENVOICE_GATE_BENCH=1 scripts/macos_test.sh gate` compares against —
 the gate uses an isolated runtime directory, rejects rows outside its collision-resistant run ID,
 and freezes the exact ordered generation selection in `benchmark-evidence.json` before comparing.
 Markdown snapshots (`benchmarks/baseline-*.md`) remain the human-readable full-matrix references;
@@ -773,7 +775,9 @@ source inputs, model identity, matrix, and hardware profile. Consequently a hist
 record cannot become the baseline for a new `-O` record; the first clean optimized record reports
 an explicit no-baseline state.
 
-Compare a record only against one with the same generated comparison key. That key includes lane,
+The gate rejects legacy metric-only baseline arrays because they cannot prove whether they came
+from `-Onone` or `-O`; a reviewed baseline replacement must be generated from an exact successful
+evidence manifest. Compare a history record only against one with the same generated comparison key. That key includes lane,
 platform/hardware, matrix (including CLI streaming/seed and overhead rotation settings),
 model/runtime, toolchain, and relevant input identities. Dirty,
 instrumented, partial, and forced-profile runs are excluded from canonical trends.

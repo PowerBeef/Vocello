@@ -1113,7 +1113,8 @@ PY
   if [[ -f "$GATE_BENCH_BASELINE" ]]; then
     if ! python3 "$ROOT_DIR/scripts/summarize_generation_telemetry.py" "$run_diag" \
         --run-id "$run_id" --evidence-manifest "$artifacts/benchmark-evidence.json" \
-        --engine-only --compare-baseline "$GATE_BENCH_BASELINE" >>"$log" 2>&1; then
+        --engine-only --compare-baseline "$GATE_BENCH_BASELINE" \
+        --require-baseline-identity >>"$log" 2>&1; then
       echo "gate bench: REGRESSION vs $GATE_BENCH_BASELINE (see bench.log)" >>"$log"
       return 1
     fi

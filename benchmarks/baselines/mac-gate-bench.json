@@ -1,38 +1,65 @@
-[
-  {
-    "cellKey": [
-      "custom",
-      "pro_custom_speed",
-      "cold",
-      "medium"
+{
+  "schemaVersion": 2,
+  "identity": {
+    "kind": "engine-generation",
+    "platform": "macos",
+    "matrixScope": "focused",
+    "hardwareProfile": "mac-mini-m2-8gb",
+    "optimization": "-O",
+    "matrixHash": "473d23758cbabbbc8dfb872964c7ee74af45d3e2fc3fc59e67c2cca9d460c406",
+    "corpusHash": "0300d72c6a9cc11e43253d87a90712181b304d574b3ccc513732c66a2792be84",
+    "models": [
+      {
+        "mode": "custom",
+        "modelID": "PowerBeef02/Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit",
+        "variant": "speed",
+        "quantization": "4-bit",
+        "revision": "f84295ee776abf19745312ae197f1e044a0ce53b",
+        "artifactVersion": "2026.08.06.1",
+        "integrityDigest": "7c735ff9bc182ed85b68f28bbc50a7b26b62b9363331f6bcda58842c1f5ca7b1",
+        "runtimeProfileSignature": "qwen3_tts|custom_voice|4bit|24000|qwen3_tts_tokenizer_12hz|auto,chinese,english,french,german,italian,japanese,korean,portuguese,russian,spanish|aiden,dylan,eric,ono_anna,ryan,serena,sohee,uncle_fu,vivian|pro1b7|instruction|no_x_vector_only_clone",
+        "fixtureDigest": "not-applicable"
+      }
     ],
-    "mode": "custom",
-    "modelID": "pro_custom_speed",
-    "warmState": "cold",
-    "lenBucket": "medium",
-    "n": 1,
-    "rtf": 0.8278752947340844,
-    "tokps": 10.352143152059197,
-    "ttfcMS": null,
-    "physFootMB": 2592.1432571411133,
-    "qcVerdict": "pass"
+    "telemetrySchemaVersion": 8,
+    "qcAlgorithmVersion": 6
   },
-  {
-    "cellKey": [
-      "custom",
-      "pro_custom_speed",
-      "warm",
-      "medium"
-    ],
-    "mode": "custom",
-    "modelID": "pro_custom_speed",
-    "warmState": "warm",
-    "lenBucket": "medium",
-    "n": 3,
-    "rtf": 1.0180275715800635,
-    "tokps": 12.722235051373536,
-    "ttfcMS": null,
-    "physFootMB": 2460.7057571411133,
-    "qcVerdict": "pass"
-  }
-]
+  "cells": [
+    {
+      "cellKey": [
+        "custom",
+        "pro_custom_speed",
+        "cold",
+        "medium"
+      ],
+      "mode": "custom",
+      "modelID": "pro_custom_speed",
+      "warmState": "cold",
+      "lenBucket": "medium",
+      "n": 1,
+      "rtf": 1.7604456824512535,
+      "tokps": 22.004620936969133,
+      "ttfcMS": null,
+      "physFootMB": 2477.533676147461,
+      "qcVerdict": "pass"
+    },
+    {
+      "cellKey": [
+        "custom",
+        "pro_custom_speed",
+        "warm",
+        "medium"
+      ],
+      "mode": "custom",
+      "modelID": "pro_custom_speed",
+      "warmState": "warm",
+      "lenBucket": "medium",
+      "n": 1,
+      "rtf": 1.8771225686940414,
+      "tokps": 23.47491765072537,
+      "ttfcMS": null,
+      "physFootMB": 2635.283676147461,
+      "qcVerdict": "pass"
+    }
+  ]
+}

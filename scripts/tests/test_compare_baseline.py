@@ -203,6 +203,55 @@ def test_save_and_compare_baseline_cli():
             assert sgt.main() == 2
 
 
+def _evidence(optimization="-O"):
+    return {
+        "historyRecord": {
+            "run": {"kind": "engine-generation", "platform": "macos", "matrixScope": "focused"},
+            "hardware": {"profileID": "mac-mini-m2-8gb"},
+            "toolchain": {"optimization": optimization},
+            "inputs": {"matrixHash": "a" * 64, "corpusHash": "b" * 64},
+            "models": [{
+                "mode": "custom", "modelID": "fixture", "variant": "speed",
+                "quantization": "4-bit", "revision": "c" * 40,
+                "artifactVersion": "v1", "integrityDigest": "d" * 64,
+                "runtimeProfileSignature": "fixture", "fixtureDigest": "not-applicable",
+            }],
+            "evidence": {"telemetrySchemaVersion": 8, "qcAlgorithmVersion": 6},
+        }
+    }
+
+
+def test_governed_baseline_binds_optimization_and_topology():
+    cells = [_make_cell(("custom", "fixture", "warm", "medium"), 1.0, 2.0, 3.0, 4.0, "pass")]
+    document = sgt.baseline_document(cells, _evidence("-O"))
+    assert document["schemaVersion"] == 2
+    assert document["identity"]["optimization"] == "-O"
+    assert sgt.baseline_cells(
+        document,
+        current_identity=sgt.baseline_identity_from_evidence(_evidence("-O")),
+        require_identity=True,
+    ) == cells
+    try:
+        sgt.baseline_cells(
+            document,
+            current_identity=sgt.baseline_identity_from_evidence(_evidence("-Onone")),
+            require_identity=True,
+        )
+    except ValueError as error:
+        assert "differs" in str(error)
+    else:
+        raise AssertionError("cross-optimization baseline unexpectedly passed")
+
+
+def test_governed_baseline_rejects_legacy_unidentified_metrics():
+    try:
+        sgt.baseline_cells([], current_identity={}, require_identity=True)
+    except ValueError as error:
+        assert "legacy baseline" in str(error)
+    else:
+        raise AssertionError("legacy baseline unexpectedly passed governed comparison")
+
+
 def load_tests(_loader, _tests, _pattern):
     """Expose function-style tests to the repository's unittest-only gate."""
     suite = unittest.TestSuite()

@@ -1128,6 +1128,95 @@ def load_baseline_migrations(path):
     return migrations
 
 
+BASELINE_SCHEMA_VERSION = 2
+
+
+def baseline_identity_from_evidence(payload):
+    """Return the performance-comparison identity from validated evidence.
+
+    Source and executable digests are deliberately excluded: a regression
+    baseline must survive source changes to detect their performance impact.
+    The optimization, topology, hardware, model artifact, matrix/corpus, and
+    evidence semantics remain exact so unlike lanes can never compare.
+    """
+    if not isinstance(payload, dict):
+        raise ValueError("baseline identity requires an evidence manifest")
+    history = payload.get("historyRecord")
+    if not isinstance(history, dict):
+        raise ValueError("baseline identity evidence has no historyRecord")
+    run = history.get("run")
+    hardware = history.get("hardware")
+    toolchain = history.get("toolchain")
+    inputs = history.get("inputs")
+    evidence = history.get("evidence")
+    models = history.get("models")
+    if not all(isinstance(value, dict) for value in (run, hardware, toolchain, inputs, evidence)):
+        raise ValueError("baseline identity evidence is incomplete")
+    if not isinstance(models, list) or not models or any(not isinstance(model, dict) for model in models):
+        raise ValueError("baseline identity evidence has no model identities")
+    optimization = toolchain.get("optimization")
+    if optimization not in {"-O", "-Onone"}:
+        raise ValueError("baseline identity has an unsupported optimization")
+    identity = {
+        "kind": run.get("kind"),
+        "platform": run.get("platform"),
+        "matrixScope": run.get("matrixScope"),
+        "hardwareProfile": hardware.get("profileID"),
+        "optimization": optimization,
+        "matrixHash": inputs.get("matrixHash"),
+        "corpusHash": inputs.get("corpusHash"),
+        "models": [
+            {
+                key: model.get(key)
+                for key in (
+                    "mode", "modelID", "variant", "quantization", "revision",
+                    "artifactVersion", "integrityDigest", "runtimeProfileSignature",
+                    "fixtureDigest",
+                )
+            }
+            for model in models
+        ],
+        "telemetrySchemaVersion": evidence.get("telemetrySchemaVersion"),
+        "qcAlgorithmVersion": evidence.get("qcAlgorithmVersion"),
+    }
+    missing = [key for key, value in identity.items() if value in (None, "", [])]
+    if missing:
+        raise ValueError("baseline identity is missing: " + ", ".join(sorted(missing)))
+    return identity
+
+
+def baseline_document(cells, evidence_payload=None):
+    if evidence_payload is None:
+        # Preserve the ad-hoc v1 CLI for exploratory local use. Governed callers
+        # pass --require-baseline-identity and reject this shape.
+        return cells
+    return {
+        "schemaVersion": BASELINE_SCHEMA_VERSION,
+        "identity": baseline_identity_from_evidence(evidence_payload),
+        "cells": cells,
+    }
+
+
+def baseline_cells(payload, *, current_identity=None, require_identity=False):
+    if isinstance(payload, list):
+        if require_identity:
+            raise ValueError("legacy baseline has no optimization/topology identity")
+        return payload
+    if not isinstance(payload, dict) or payload.get("schemaVersion") != BASELINE_SCHEMA_VERSION:
+        raise ValueError("baseline must be a legacy cell array or schema-v2 object")
+    cells = payload.get("cells")
+    identity = payload.get("identity")
+    if not isinstance(cells, list) or not cells:
+        raise ValueError("schema-v2 baseline has no cells")
+    if not isinstance(identity, dict):
+        raise ValueError("schema-v2 baseline has no identity")
+    if current_identity is None:
+        raise ValueError("schema-v2 baseline comparison requires current evidence identity")
+    if identity != current_identity:
+        raise ValueError("baseline optimization/topology identity differs from current evidence")
+    return cells
+
+
 def compare_summaries(baseline, current, threshold=0.05, migrations=()):
     """Return regression entries where current is worse than baseline by > threshold.
 
@@ -1308,6 +1397,11 @@ def main():
     parser.add_argument("--compare-baseline", metavar="PATH",
                         help="compare to saved baseline and highlight regressions")
     parser.add_argument(
+        "--require-baseline-identity",
+        action="store_true",
+        help="reject legacy baselines and require exact optimization/topology identity",
+    )
+    parser.add_argument(
         "--baseline-migrations",
         metavar="PATH",
         default=os.path.join(os.path.dirname(__file__), "..", "config", "benchmark-baseline-migrations.json"),
@@ -1321,9 +1415,10 @@ def main():
     cell_by_id = None
     selected_run_id = args.run_id
     strict_selection = bool(args.run_id or args.evidence_manifest)
+    evidence_payload = None
     try:
         if args.evidence_manifest:
-            _, selected_run_id, generation_ids, cell_by_id = load_evidence_selection(
+            evidence_payload, selected_run_id, generation_ids, cell_by_id = load_evidence_selection(
                 args.evidence_manifest,
                 requested_run_id=args.run_id,
             )
@@ -1350,7 +1445,8 @@ def main():
     if args.save_baseline:
         summary = build_summary(cells)
         with open(args.save_baseline, "w", encoding="utf-8") as f:
-            json.dump(summary, f, indent=2)
+            json.dump(baseline_document(summary, evidence_payload), f, indent=2)
+            f.write("\n")
 
     stamp = f"{today_str()} · {git_short_sha()}"
     if args.label:
@@ -1606,7 +1702,17 @@ def main():
     if args.compare_baseline:
         try:
             with open(args.compare_baseline, "r", encoding="utf-8") as f:
-                baseline = json.load(f)
+                baseline_payload = json.load(f)
+            current_identity = (
+                baseline_identity_from_evidence(evidence_payload)
+                if evidence_payload is not None
+                else None
+            )
+            baseline = baseline_cells(
+                baseline_payload,
+                current_identity=current_identity,
+                require_identity=args.require_baseline_identity,
+            )
             migrations = load_baseline_migrations(args.baseline_migrations)
             current = build_summary(cells)
             regressions = compare_summaries(

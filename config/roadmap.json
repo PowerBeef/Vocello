@@ -1920,7 +1920,7 @@
         "docs/reference/benchmarking-procedure.md",
         "scripts/publish_benchmark_history.py"
       ],
-      "notes": "Closed 2026-09-01. All macOS CLI benchmark/profile routes use -O whole-module compilation, publication requires a hash-matched adjacent optimized-build provenance sidecar, and comparison keys isolate optimization identities with negative fixtures rejecting -Onone/-O comparison. The clean-source canonical M2/8 GB focused record mac-gate-bench-20260901-223657-866ddfb3 validates as schema v3 with optimization -O, exact executable hash/UUID, complete telemetry, two represented cold/warm takes, memory qualification, nominal thermals, no crash, and no baseline substitution. Its soft-trim warning remains explicit and does not weaken the record's optimization identity.",
+      "notes": "Closed 2026-09-01. All macOS CLI benchmark/profile routes use -O whole-module compilation, publication requires a hash-matched adjacent optimized-build provenance sidecar, and comparison keys isolate optimization identities with negative fixtures rejecting -Onone/-O comparison. The clean-source canonical M2/8 GB focused record mac-gate-bench-20260901-223657-866ddfb3 validates as schema v3 with optimization -O, exact executable hash/UUID, complete telemetry, two represented cold/warm takes, memory qualification, nominal thermals, no crash, and no baseline substitution. A follow-up governed-baseline fix binds stored baselines to hardware, optimization, matrix, corpus, model artifact, telemetry schema, and QC identity; the gate now rejects the formerly accepted provenance-free legacy array before comparison. Its soft-trim warning remains explicit and does not weaken the record's optimization identity.",
       "updated": "2026-09-01"
     },
     {
@@ -1938,7 +1938,7 @@
         "benchmarks/README.md"
       ],
       "updated": "2026-09-01",
-      "notes": "The first clean optimized canonical-key baseline is now published as mac-gate-bench-20260901-223657-866ddfb3. Its comparison block correctly records no baseline and no deltas rather than implying a trend. AV-06 remains open until a second comparable clean record exists for the same key and the generated trend/variance output satisfies the full gate."
+      "notes": "The first clean optimized canonical-key baseline is now published as mac-gate-bench-20260901-223657-866ddfb3. Its comparison block correctly records no baseline and no deltas rather than implying a trend. A schema-v2 local comparison baseline was seeded from a separately validated optimized run after the legacy unbound array was retired. AV-06 remains open until a second comparable clean record exists for the same key and the generated trend/variance output satisfies the full gate."
     },
     {
       "id": "AV-07",

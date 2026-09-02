@@ -21,6 +21,7 @@ sourceOfTruth:
   - scripts/run_local_delivery_cascade.py
   - scripts/delivery_promotion_decision.py
   - scripts/audio_cadence_qc.py
+  - scripts/prosody_holdout_validation.py
   - scripts/voice_identity_language_reliability.py
   - scripts/delivery_separability.py
   - scripts/bench_delivery_prosody.py
@@ -30,6 +31,7 @@ sourceOfTruth:
   - config/delivery-evaluator-v2-candidates.json
   - config/delivery-evaluation-corpus.json
   - config/audio-cadence-qc-contract.json
+  - config/prosody-holdout-policy.json
   - config/voice-identity-language-reliability.json
 ---
 # The audio delivery analysis harness
@@ -87,6 +89,7 @@ the script self-test suite via `scripts/check_test_workflows.sh`.
 | `scripts/analyze_delivery.py` | Reference-free delivery acoustic analyzer (F0 median/range, syllable rate, duration, voicing) consumed by `delivery_adherence.py` and the bench sidecar | `test_analyze_delivery.py` |
 | `scripts/analyze_prosody.py` | Bounded reference-free prosody analyzer (pitch/cadence/pause/energy + `voice_*` HNR/jitter/CPP + spectral balance) | `test_analyze_prosody.py` |
 | `scripts/prosody_profile.py` | Versioned prosody profile: thresholds, delivery weights, per-preset expectations | via gate/separability tests |
+| `scripts/prosody_holdout_validation.py` | Source-bound untouched threshold holdout with audio/group leakage rejection, multilingual/length/severity coverage, and 95% Wilson confusion bounds | `test_prosody_holdout_validation.py` |
 | `scripts/prosody_quality_gate.py` | Reference-free per-take prosody gate (monotone / rushed / flat / pause issues) | `test_prosody_quality_gate.py` |
 | `scripts/check_delivery_instructions.py` | Deterministic text-level contract gate on shipped delivery copy (T1/CI) → [`config/delivery-instruction-contract.json`](../../config/delivery-instruction-contract.json) | `test_check_delivery_instructions.py` |
 
@@ -768,6 +771,26 @@ speaker/script folds and an untouched multi-speaker/script/language holdout vali
 layer records its full posterior, entropy and top-two margin: calm-to-neutral is a hypothesis, not
 a truth label, and whisper abstains from categorical emotion. Automatic scores can reject a
 candidate or identify a regression, but cannot alone authorize a delivery-copy promotion.
+
+AV-07's source boundary is now executable rather than prose-only. A calibration run stamps the
+digest of every labelled WAV plus every non-path split field into the frozen profile. Then
+`scripts/prosody_holdout_validation.py` accepts only an untouched manifest with disjoint speaker,
+script, and translation groups, at least three languages, short/medium/long coverage, good and
+multiple defect severities, and a matching analyzer version. It emits privacy-safe 95% Wilson
+intervals and grants promotion authority only when the false-positive upper bound and true-positive
+lower bound both clear `config/prosody-holdout-policy.json`:
+
+```sh
+python3 scripts/prosody_holdout_validation.py validate-contract
+python3 scripts/prosody_holdout_validation.py evaluate \
+  --calibration-labels <untracked-calibration.jsonl> \
+  --holdout-labels <untracked-holdout.jsonl> \
+  --profile <untracked-frozen-profile.json> \
+  --output build/artifacts/macos/prosody-holdout/report.json
+```
+
+Paths, audio, and annotations remain untracked. A contract PASS only proves that the evaluator is
+ready; AV-07 remains open until an independently labelled real corpus produces a qualifying report.
 
 ## 7. Pre-registration discipline
 

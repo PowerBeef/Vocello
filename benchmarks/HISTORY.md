@@ -934,6 +934,12 @@ cross-project comparisons.
 | 2026-07-12 | [`mac-lang-bench-20260712-210629-ab917917`](runs/language/mac-lang-bench-20260712-210629-ab917917.json) | partial | exploratory | passed | memory-contract-incomplete | 7 | `1ef1669326b5` dirty | `excluded` | baseline | telemetry-v7-language-quick |
 | 2026-07-12 | [`mac-lang-bench-20260712-210714-0a22efca`](runs/language/mac-lang-bench-20260712-210714-0a22efca.json) | partial | exploratory | passed | memory-contract-incomplete | 7 | `1ef1669326b5` dirty | `excluded` | baseline | telemetry-v7-language-quick |
 
+## language / macos / mac-mini-m2-8gb / config `cfe53541d2ec`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---|---|---|---|
+| 2026-09-02 | [`mac-lang-bench-20260902-024501-bd2df074`](runs/language/mac-lang-bench-20260902-024501-bd2df074.json) | partial | exploratory | passedWithWarnings | qualified-with-warnings | 19 | `f7600f678425` dirty | `excluded` | baseline | av08-mac-full-20260901 |
+
 ## memory-qualification / ios / iphone-17-pro / config `7482ce732e47`
 
 | completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |

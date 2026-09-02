@@ -67,23 +67,32 @@ generated catalog fail validation.
 ### Anonymous hosting availability
 
 `config/model-host-availability-policy.json` and `scripts/model_host_availability.py` govern the
-reviewer-availability check. The probe selects the largest file in each pinned iOS model, requests
-only byte zero, and requires an anonymous `206` response, an allowlisted Hugging Face redirect,
-and a `Content-Range` total exactly matching the catalog. Retained JSON contains model IDs,
-digests, byte totals, region labels, and timing only—never the source URL or account/device data.
+reviewer-availability check. The range probe selects the largest file in each pinned iOS model,
+requests only byte zero, and requires an anonymous `206` response, an allowlisted Hugging Face
+redirect, and a `Content-Range` total exactly matching the catalog. Regional closure additionally
+requires a bounded-memory full stream whose byte count and SHA-256 match the catalog. Retained JSON
+contains model IDs, content-verification booleans, byte totals, governed region labels, execution
+provenance digests, and timing only—never the source URL or account/device data.
 
 ```sh
 python3 scripts/model_host_availability.py validate
 python3 scripts/model_host_availability.py probe \
   --region north-america-east \
-  --output build/artifacts/app-store/model-host-north-america-east.json
+  --mode range \
+  --output build/artifacts/app-store/model-host-north-america-east-range.json
+python3 scripts/model_host_availability.py probe \
+  --region north-america-east \
+  --mode full-digest \
+  --output build/artifacts/app-store/model-host-north-america-east-full-digest.json
 ```
 
-The 2026-09-01 North America probe passed all three iOS artifacts without downloading model
-content beyond three one-byte responses. That is not global evidence: Europe and East Asia remain
-required representative probes for ASR-09. An outage never authorizes automatic host fallback or
-artifact substitution. The pinned artifact must recover unchanged, or reviewer guidance directs a
-retry/support path while the release remains blocked.
+On 2026-09-01 North America passed both the three one-byte checks and full SHA-256 verification of
+the three largest pinned iOS files (4,024,541,635 bytes total) with no retry/rate-limit header. The
+local run is useful host evidence but cannot authorize regional closure: `compose` accepts only
+fresh full-digest inputs from every declared region with a qualified external execution-authority
+and identity digest. Europe and East Asia therefore remain required. An outage never authorizes
+automatic host fallback or artifact substitution. The pinned artifact must recover unchanged, or
+reviewer guidance directs a retry/support path while the release remains blocked.
 
 Initial artifact requests remain restricted to the catalog's exact host. URLSession redirects are
 also policy-checked: only HTTPS destinations without credentials or IP/local hosts are accepted,

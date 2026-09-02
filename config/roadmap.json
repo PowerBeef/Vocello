@@ -240,7 +240,7 @@
       "id": "F-05",
       "plan": "engineering-review-remediation-2026-08",
       "title": "Medium — restore packaged macOS launch verification",
-      "status": "planned",
+      "status": "in-flight",
       "gate": "Run the existing packaged-app launch smoke on the declared macos-26 release runner. The release workflow and extracted-DMG verifier must require external startup evidence and reject a QWENVOICE_SKIP_LAUNCH_SMOKE bypass in CI. Close only after the next signed candidate records that hosted macos-26 proof.",
       "sourceOfTruth": [
         ".github/workflows/release.yml",
@@ -1141,7 +1141,7 @@
       "id": "DP-28",
       "plan": "delivery-prompting-2026-08",
       "title": "Calibrate the layered local delivery evaluator",
-      "status": "planned",
+      "status": "in-flight",
       "gate": "V1 remains valid with full SER posteriors, entropy/margin abstention, sequential acoustic/ASR/identity/UTMOS/SER composition, and ridge-v1. The versioned v2 harness adds the source-bound cache, five-region temporal contours, resumable blinded listener packets, preset-local logistic heads, elastic-net/PLS challengers, blocked validation/conformal uncertainty/OOD, and an explanatory serial cascade. LIVE EVIDENCE 2026-08-23 (operator-local and untracked): exact contract-pinned SenseVoiceSmall Q8 and DistilHuBERT assets were acquired under build/cache only. Each passed two cache-cold probes on the attested canonical Mac14,3 / 8 GiB host with zero swap growth, no pressure warning and clean post-exit recovery; observed peak RSS was 275-293 MB for SenseVoice and 677-874 MB for DistilHuBERT. A first balanced 64-row cohort was rejected in full after one fixed-seed take repeatedly produced a real 4.613-second dropout and failed mandatory Fast QC; its initial/retry states remain retained. A fresh predeclared seed block then completed 64/64 instructed rows plus 8/8 shared neutral controls across all eight presets, eight speakers, six scripts/three translation groups and English/Chinese/Japanese, and its bounded acoustic/temporal analysis passed. The v2 session is built with 64 label-blind dimensional trials, 56 non-neutral target-vs-neutral pairs, three multilingual dropout anchors and source-bound resumable responses; the zero-response readiness report correctly remains INCOMPLETE. Full SenseVoice and DistilHuBERT cascades each covered all 64 rows with valid source/report digests and abstained because no calibrated tiny head exists. Both candidates remain unadopted. Closure now requires three independent complete listener sessions with per-language fluency coverage and qualification floors, calibration-only challenger preselection, a separately generated untouched multi-speaker/script/language confirmation cohort, and demonstrated holdout gain over ridge-v1 without any VAD, preset, speaker or script-group regression. Automatic layers cannot authorize semantic promotion and production copy remains unchanged.",
       "sourceOfTruth": [
         "config/delivery-evaluator-v2-contract.json",
@@ -1179,13 +1179,14 @@
         "file:scripts/tests/test_emotion_advisory.py",
         "doc:docs/reference/autonomous-validation-audit-2026-08-21.md"
       ],
-      "updated": "2026-08-23"
+      "updated": "2026-09-01",
+      "notes": "The complete v2 evaluator, cache, temporal contour, compact-model, resource-supervisor, cascade, listener-session, qualification, and promotion-decision infrastructure remains deterministic and source-bound. On 2026-09-01 the delivery experiment/evaluator/cadence contracts and 65 focused delivery, listener, temporal, cascade, statistics, and QC fixtures passed together. This does not create semantic authority: the label-blind automatic layers still abstain without calibrated tiny heads, and closure still requires three qualified independent listener sessions plus untouched confirmation evidence that beats ridge-v1 without a preset, VAD, speaker, or script-group regression."
     },
     {
       "id": "DP-29",
       "plan": "delivery-prompting-2026-08",
       "title": "Qualify the native-language delivery corpus and cross-language sentinels",
-      "status": "planned",
+      "status": "in-flight",
       "gate": "Corpus structure is landed for nine native speaker-language cells, four fixed cross-language sentinels, three lengths and neutral/congruent/conflicting semantics across calibration/development/confirmation splits. Closure requires fluent review of every Mandarin, Japanese and Korean script, immutable review provenance and digests, no speaker/script/seed or translated-equivalent leakage, independent generated cohorts, ASR/CER/language-ID uncertainty and ignored-sample accounting, and AV-08-compliant evidence before any locale is promoted beyond provisional.",
       "sourceOfTruth": [
         "config/delivery-evaluation-corpus.json",
@@ -1195,7 +1196,8 @@
         "file:scripts/tests/test_delivery_experiment.py",
         "doc:docs/reference/autonomous-validation-audit-2026-08-21.md"
       ],
-      "updated": "2026-08-22"
+      "updated": "2026-09-01",
+      "notes": "The split-safe nine-speaker corpus, four fixed cross-language sentinels, three lengths, three semantic conditions, immutable identities, and leakage validators are implemented and revalidated. The 2026-09-01 full Mac language cohort passed 19/19 generation and hint cells across English, French, German, Spanish, Chinese, Japanese, CustomVoice, and VoiceDesign (mac-lang-bench-20260902-024501-bd2df074); the one catalog-declared Chinese warning remained explicit rather than being promoted to PASS. That cohort is useful safety evidence but cannot qualify the corpus. Fluent Mandarin, Japanese, and Korean review with immutable provenance, then independent multi-seed/script generation and AV-08 uncertainty/ignored-sample accounting, remain required."
     },
     {
       "id": "DP-30",
@@ -1946,7 +1948,7 @@
       "id": "AV-07",
       "plan": "autonomous-validation-remediation-2026-08",
       "title": "P2 — independently validate prosody thresholds",
-      "status": "planned",
+      "status": "in-flight",
       "gate": "Prosody calibration must freeze on a source-bound labeled training corpus and pass predeclared confusion/noise targets on an untouched holdout spanning speakers, scripts, lengths, languages, and defect severities before becoming promotion authority. Required closure evidence: corpus manifests and digests, annotation protocol, frozen profile, holdout report with uncertainty, analyzer noise-floor/repeatability evidence, and negative threshold-leakage fixtures.",
       "evidence": [
         "doc:docs/reference/autonomous-validation-audit-2026-08-21.md"
@@ -1955,16 +1957,19 @@
         "scripts/prosody_calibration.py",
         "scripts/prosody_profile.py",
         "scripts/analyze_prosody.py",
-        "scripts/tests/test_prosody_calibration.py"
+        "scripts/prosody_holdout_validation.py",
+        "config/prosody-holdout-policy.json",
+        "scripts/tests/test_prosody_calibration.py",
+        "scripts/tests/test_prosody_holdout_validation.py"
       ],
-      "updated": "2026-08-22",
-      "notes": "The 2026-08-22 DP-26 screen materially hardens exploratory delivery analysis: full speaker/preset outcome coverage, rejected-WAV analysis, exact instruction receipts, speaker-balanced statistics, held-speaker folds, product-vs-acoustic separation, and synthetic F0/pause validation. DP-28 adds the layered evaluator infrastructure and owns its delivery-specific calibration. Neither closes AV-07: the profile was calibrated on prior generation data, the screen uses one fixed English medium script and Speed model, separability predicts request labels rather than perceived emotion, and no independently labelled multi-script/language defect holdout exists. Thresholds therefore remain explicitly unvalidated for promotion authority."
+      "updated": "2026-09-01",
+      "notes": "The 2026-08-22 DP-26 screen materially hardened exploratory delivery analysis, and the 2026-09-01 holdout implementation now freezes a calibration/holdout contract with source-bound audio plus split metadata, speaker/script/translation-group isolation, three-language and three-length coverage, severity coverage, analyzer/profile identity, 95% Wilson uncertainty, fail-closed threshold leakage, and privacy-safe atomic reports. The project gate and focused negative fixtures validate that infrastructure. AV-07 remains open because no independently labelled real 60-clip calibration plus 30-good/30-bad-or-larger untouched holdout has been supplied; current thresholds therefore remain explicitly unvalidated for promotion authority."
     },
     {
       "id": "AV-08",
       "plan": "autonomous-validation-remediation-2026-08",
       "title": "P2 — qualify multilingual output beyond a single cohort",
-      "status": "planned",
+      "status": "in-flight",
       "gate": "Language evidence must separate ASR repeatability from independent generation variance and cover multiple scripts, lengths, speakers/voices, and seeds per claimed language/tier/mode or label the dimension advisory. Required closure evidence: privacy-safe corpus/matrix manifests, independent generated cohorts, WER/CER/language-ID uncertainty, ignored-sample accounting, and language record validation on every claimed cell.",
       "evidence": [
         "doc:docs/reference/autonomous-validation-audit-2026-08-21.md"
@@ -1975,14 +1980,14 @@
         "scripts/ios_device.sh",
         "scripts/macos_test.sh"
       ],
-      "updated": "2026-08-22",
-      "notes": "DP-29 adds the split-safe native-language delivery corpus structure and fixed cross-language sentinels. AV-08 remains open until fluent review, independent generated cohorts, ASR/CER/language-ID uncertainty, and ignored-sample accounting satisfy this item's broader language-evidence gate."
+      "updated": "2026-09-01",
+      "notes": "DP-29 supplies the split-safe native-language corpus structure and fixed cross-language sentinels. A source-bound full Mac language run on 2026-09-01 passed 19/19 cells across six languages and both CustomVoice and VoiceDesign and is published as mac-lang-bench-20260902-024501-bd2df074. This is one generated cohort, not population evidence. AV-08 remains open until fluent review, multiple independent scripts/seeds/voices per claimed cell, ASR/CER/language-ID uncertainty, and complete ignored/dropped-sample accounting satisfy the broader language gate."
     },
     {
       "id": "AV-09",
       "plan": "autonomous-validation-remediation-2026-08",
       "title": "P2 — make stateful physical-device lanes independently repeatable",
-      "status": "planned",
+      "status": "in-flight",
       "gate": "Each stateful iOS UI lane must declare and preflight exact prerequisites, use a non-destructive test-owned run namespace, and keep fixture-dependent journeys separate from generic smoke; download scheduling unit tests must use a controllable clock while retaining one real-throttle integration proof. Required closure evidence: missing/present/stale prerequisite fixtures, isolated reruns without residual-state failures, unchanged fail-closed no-retry policy, and physical-device XCUITest evidence for affected lanes.",
       "evidence": [
         "doc:docs/reference/autonomous-validation-audit-2026-08-21.md"
@@ -2096,7 +2101,7 @@
       "id": "ISR-04",
       "plan": "ios-generation-startup-reliability-2026-08",
       "title": "Complete staged exact-request characterization",
-      "status": "planned",
+      "status": "in-flight",
       "gate": "With the original exact 285-character UTF-8 script, run five fixed-seed cold launches, ten same-process warm takes, seeds 38112001 through 38112008, focused delivery/speaker/default predecessors, production/full-unload/prepared-cache-clear/prewarm-disabled arms, streaming parity, macOS CLI/headless controls, and iOS headless/visible UI parity. For seeds 38112004, 38112006, and passing control 38112001, retain complete final/chunk QC plus bounded codec traces and compare exact production-range incremental replay against full decoding across three fresh-process repetitions per output mode. Require the full-unload quiescence barrier, exact-PID process-exit composition, and sanitized CoreDevice system-crash-log delta. Stop expansion at the first decision-complete divergent boundary; preserve every attempt and crash delta.",
       "sourceOfTruth": [
         "docs/reference/ios-built-in-startup-reliability.md",
@@ -2111,8 +2116,8 @@
         "file:Tests/VocelloCoreTests/StartupReliabilityDiagnosticsV2Tests.swift",
         "file:scripts/tests/test_ios_startup_reliability.py"
       ],
-      "updated": "2026-08-25",
-      "notes": "Still blocked on the original script bytes; screenshot reconstruction is diagnostic evidence only. Earlier paired-iPhone work passed visible Vivian / Calm Strong / English request parity, five fixed-seed cold launches, ten same-process warm takes, and six of eight fixed seeds; 38112004 and 38112006 instead materialized audio and were rejected for deterministic dropouts. Fresh schema-v2 proof with the tracked 280-character sentinel captured 38112006 in streaming mode: live output, exact-range incremental replay, and full replay all retained the same approximately 980 ms silence and cadence:excess11(17/6) warning. This localizes the unusual word spacing to the sampled codec sequence rather than Mimi incremental state, chunk publication, or WAV persistence; the product keeps explicit user-controlled retry and does not mutate the seed, add hidden retries, or weaken QC. A mixed-mode run then exposed a separate quality-first memory defect: retaining lazy per-frame MLX arrays and decoding a 300-frame graph reached 6292.85 MiB footprint, zero headroom, critical pressure, and process termination without a correlated system-crash report. Materializing compact Int32 codec frames and decoding in bounded 25-frame partitions reduced two fresh cold non-streaming control runs to 2923.55 and 3023.69 MiB peak footprint with over 3.1 GiB minimum headroom, nominal thermal state, no capture failures, complete first-token/audio-code boundaries, byte-identical incremental/full replay, and no crash-log delta. A subsequent 10-take sentinel matrix completed five warm-generation/full-unload/quiescence/cold-reload cycles in one process: 10/10 represented passes, correct warm/cold receipts, every unload clear and immediately-before-request snapshot violation-free, per-take peaks 2778.30-3185.05 MiB, at least 2958.95 MiB headroom, zero capture failures, no system-crash delta, and successful evidence cleanup. The two earlier otherwise-valid commands failed only during evidence cleanup: CoreDevice requires an explicit destination filename for a file pull, while the host supplied a directory. The host now pulls to the exact marker path, and app-side cleanup is dispatched before engine startup; direct and complete-run proofs returned the expected collected_evidence_removed record. The remaining three-repetition affected-seed/output-mode matrix, other preparation/predecessor/platform arms, original-script proof, and closure grid stay open. Cross-reference AV-09 for XCUITest repeatability, F-08 for stale Studio terminal ownership, and the delivery-evaluator plan for semantic delivery analysis."
+      "updated": "2026-09-01",
+      "notes": "Still blocked on the original script bytes; screenshot reconstruction is diagnostic evidence only. Earlier paired-iPhone work passed visible Vivian / Calm Strong / English request parity, five fixed-seed cold launches, ten same-process warm takes, and six of eight fixed seeds; 38112004 and 38112006 instead materialized audio and were rejected for deterministic dropouts. Schema-v2 proof localized the unusual spacing to the sampled codec sequence rather than Mimi incremental state, chunk publication, or WAV persistence. The bounded decoder remediation then passed two cold controls and a 10-take five-cycle unload/quiescence/reload matrix with 10/10 represented passes, at least 2958.95 MiB headroom, no capture failures, no crash delta, and successful cleanup. The phone-independent macOS/CLI sentinel control is complete: 18/18 fixed rows passed across seeds 38112001/38112004/38112006, streaming and non-streaming, and three repetitions, and the schemas/fixtures were revalidated on 2026-09-01. Remaining work is inherently device/original-input bound: the three-repetition affected-seed iPhone matrix, preparation/predecessor arms, headless/visible parity, exact original script, and closure grid. Cross-reference AV-09 for XCUITest repeatability, F-08 for stale Studio terminal ownership, and the delivery-evaluator plan for semantic delivery analysis."
     },
     {
       "id": "ISR-05",
@@ -2303,13 +2308,14 @@
         "config/ExportOptions-appstore.plist",
         ".github/workflows/release.yml",
         "scripts/app_store_build_preflight.py",
+        "scripts/asc_readonly.py",
         "scripts/install_pinned_asc.sh"
       ],
       "evidence": [
         "doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md"
       ],
       "updated": "2026-09-01",
-      "notes": "The release workflow now installs digest-pinned asc 4.11.0, creates an ephemeral least-privilege Keychain profile from release secrets, and runs a required read-only exact bundle/version/build collision preflight before archive creation. Synthetic collision, ambiguity, malformed-pagination, and clean-identity cases pass; build numbers remain maintainer-owned in project.yml. Closure awaits one authenticated workflow preflight/readback because the unattended local primary profile timed out."
+      "notes": "The release workflow installs digest-pinned asc 4.11.0, creates an ephemeral least-privilege Keychain profile from release secrets, and runs a required read-only exact bundle/version/build collision preflight before archive creation. Synthetic collision, ambiguity, malformed-pagination, clean-identity, timeout, invalid-JSON, and process-group cleanup fixtures pass; build numbers remain maintainer-owned in project.yml. On 2026-09-01 local profile metadata resolved from System Keychain and Apple's API was reachable, but private-key operations produced no bytes before the governed timeout. The hardened shared asc runner now kills the complete subprocess group and leaves no orphan. Closure awaits one authenticated workflow preflight/readback after interactive Keychain access or CI secret-backed authentication."
     },
     {
       "id": "ASR-09",
@@ -2329,7 +2335,7 @@
         "doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md"
       ],
       "updated": "2026-09-01",
-      "notes": "A privacy-safe anonymous one-byte range probe now validates pinned revisions, allowlisted redirects, exact remote totals, and immutable no-fallback/no-substitution outage policy. North America passed all three 4-bit iOS artifacts on 2026-09-01. Reviewer notes now state exact bytes, Wi-Fi and approximately 2 GB per-model free-space needs, variable timing, cancellation/relaunch adoption, finishing setup, offline use, and support recovery. Europe and East Asia probes plus ongoing ownership/rate-limit monitoring remain required."
+      "notes": "The schema-v2 host contract validates pinned revisions, allowlisted redirects, exact remote totals, bounded-memory full SHA-256 streams, governed region labels, qualified execution provenance, freshness, and immutable no-fallback/no-substitution outage policy. On 2026-09-01 North America passed range and full-digest verification for all three largest 4-bit iOS files (4,024,541,635 bytes total; evidence SHA-256 1a4b00d19ff123dbae4979d5eeb171f27c7f1a796307efad00d6bcced91d1d82) with no retry or rate-limit response header. The local evidence does not claim regional closure: the composer requires fresh full-digest evidence for North America, Europe, and East Asia from qualified external execution identities. Reviewer notes cover exact bytes, Wi-Fi and approximately 2 GB per-model free-space needs, variable timing, cancellation/relaunch adoption, finishing setup, offline use, and support recovery. Europe/East Asia executions and ongoing monitoring remain external blockers."
     },
     {
       "id": "ASR-10",
@@ -2346,8 +2352,8 @@
       "evidence": [
         "doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md"
       ],
-      "updated": "2026-08-26",
-      "notes": "P0/archive-pending. No usable Distribution identity/profile, archive, IPA, or release-verification record was present. Cross-reference F-05 and F-07; the unsigned generic Release build is not substitute evidence."
+      "updated": "2026-09-01",
+      "notes": "P0/archive-pending. A read-only local inspection on 2026-09-01 found one usable Apple Distribution signing identity and two valid development profiles for Vocello, but zero App Store distribution profiles for the bundle and therefore zero profiles proven to carry both the required App Group and increased-memory entitlements. No archive, IPA, or release-verification record was created: release authority requires a separate exact-tag request, and profile creation/account mutation was not inferred. Cross-reference F-05 and ASR-07; the unsigned generic Release build is not substitute evidence."
     },
     {
       "id": "ASR-11",
@@ -2359,7 +2365,8 @@
         "docs/reference/ios-appstore-submission.md",
         "docs/reference/ios-app-store-readiness-audit-2026-08-26.md",
         "config/app-store-connect-readiness-policy.json",
-        "scripts/app_store_connect_readiness.py"
+        "scripts/app_store_connect_readiness.py",
+        "scripts/asc_readonly.py"
       ],
       "evidence": [
         "doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md",
@@ -2367,7 +2374,7 @@
         "doc:docs/reference/content-rights-review.md"
       ],
       "updated": "2026-09-01",
-      "notes": "The schema-v1 inventory contract enumerates nine mutation-free public-API reads with exact app resolution, complete pagination, explicit JSON, bounded timeouts, response digests/counts/safe-state-token retention, and pending classifications for web/owner-only privacy, agreements/financial, DSA, and regional checks. Redaction and failure fixtures pass. The unattended primary-profile read timed out before the first account response on 2026-09-01, so no new live field is claimed; the full account and qualified legal/privacy audit remains open."
+      "notes": "The schema-v1 inventory contract enumerates nine mutation-free public-API reads with exact app resolution, complete pagination, explicit JSON, process-group-bounded timeouts, response digests/counts/safe-state-token retention, and pending classifications for web/owner-only privacy, agreements/financial, DSA, and regional checks. Redaction, timeout cleanup, nonzero exit, invalid JSON, and required/optional failure fixtures pass. On 2026-09-01 the primary profile resolved one System Keychain credential and Apple API reachability returned immediately, but both private-key token creation and authenticated reads produced no bytes before timeout; no live field is inferred. The hardened runner leaves no child process. Full account and qualified legal/privacy audit remains open pending interactive Keychain authorization or CI secret-backed authentication."
     },
     {
       "id": "ASR-12",

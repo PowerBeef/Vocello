@@ -9,6 +9,7 @@ import hashlib
 import importlib.util
 import math
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -144,6 +145,22 @@ class ProsodyCalibrationTests(unittest.TestCase):
             handle.write(b"changed")
         after = corpus_digest(entries)
         self.assertNotEqual(before, after)
+
+    def test_corpus_digest_binds_metadata_but_not_paths(self):
+        labels = self._generate_corpus()
+        entries = load_labels(labels)
+        entries[0]["speakerGroup"] = "speaker-a"
+        before = corpus_digest(entries)
+        entries[0]["speakerGroup"] = "speaker-b"
+        self.assertNotEqual(before, corpus_digest(entries))
+
+        original_path = entries[0]["path"]
+        relocated = os.path.join(self.dir, "relocated.wav")
+        shutil.copyfile(original_path, relocated)
+        entries[0]["path"] = relocated
+        relocated_digest = corpus_digest(entries)
+        entries[0]["path"] = original_path
+        self.assertEqual(relocated_digest, corpus_digest(entries))
 
 
 if __name__ == "__main__":

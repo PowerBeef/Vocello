@@ -37,9 +37,11 @@ Physical-device XCUITest can be run
 independently when explicit frontend acceptance is requested; ordinary GitHub CI and archive
 packaging are deterministic-only — see
 [`testing-runbook.md`](testing-runbook.md); and the UI
-holds with no clipping at the largest accessibility Dynamic Type size. **Still maintainer-only below:** the
-**Distribution** cert + **App Store** provisioning profile (regenerated to carry `increased-memory-limit`) +
-the ASC record/metadata/upload.
+holds with no clipping at the largest accessibility Dynamic Type size. A read-only 2026-09-01
+inspection found usable local Development and Distribution identities plus two matching development
+profiles, but no App Store profile for Vocello. **Still maintainer-only below:** create the
+**App Store** provisioning profile with `increased-memory-limit` and the App Group, then authorize
+the exact-tag archive and ASC record/metadata/upload work separately.
 
 Before any local generic-device compile or archive, verify the selected Xcode installation:
 
@@ -55,12 +57,16 @@ download it automatically.
 ## 0. One-time account prerequisites
 
 - [ ] Apple Developer Program membership active; latest Program License Agreement accepted.
-- [ ] **iOS Distribution certificate** created (Developer portal → Certificates → Apple Distribution).
+- [x] **iOS Distribution certificate** installed with its private key. Read-only Keychain inspection
+      found one usable Apple Distribution identity on 2026-09-01; exact archive verification remains
+      required and this checkbox does not authorize signing or upload.
 - [ ] App ID `com.patricedery.vocello` has **App Groups** + **Increased Memory Limit** capabilities enabled.
       The `increased-memory-limit` capability is self-serve (no Apple review). It MUST be on the App Store
       provisioning profile or the multi-gigabyte model load is Jetsam-killed on a signed build.
 - [ ] **App Store provisioning profile** for `com.patricedery.vocello` (Distribution → App Store), regenerated
-      after enabling the capabilities so it carries `increased-memory-limit` + the App Group.
+      after enabling the capabilities so it carries `increased-memory-limit` + the App Group. The
+      2026-09-01 local inventory found zero matching App Store profiles and therefore zero profiles
+      qualified for ASR-10.
 - [x] App record exists in App Store Connect for `com.patricedery.vocello`; exact CLI resolution on
       2026-08-27 found iOS version 1.0 in Prepare for Submission with one `en-US` localization.
       Category and the rest of the live account remain part of ASR-11.
@@ -89,8 +95,8 @@ python3 scripts/app_store_connect_readiness.py inventory \
 The public API cannot establish App Privacy publication, agreement/tax/banking readiness, DSA
 trader status, or every regional-compliance field. The inventory marks those checks pending owner
 or web review rather than converting absence into PASS. On 2026-09-01 the unattended `primary`
-profile read timed out at its first account request; no account data was retained and ASR-11
-remains open.
+profile read timed out at its first authenticated request; the shared runner killed the complete
+CLI process group, no account data was retained, and ASR-11 remains open.
 
 - [ ] **Privacy Policy URL** = `https://vocello.vercel.app/privacy` (hosted by this repo's website; the in-app
       Settings → About → Privacy Policy row links to the same URL).
@@ -131,8 +137,9 @@ No demo account is needed (no login). Note the model download requirement so the
 non-functional under Guideline 2.1.
 
 Before using these notes, close ASR-09 with anonymous availability evidence from all representative
-regions. The 2026-09-01 North America one-byte range probe passed all three exact iOS artifacts;
-Europe and East Asia remain pending.
+regions. On 2026-09-01 the North America host passed range and full SHA-256 verification of the
+three exact iOS artifacts. Regional closure still requires qualified, fresh Europe and East Asia
+execution evidence; a locally relabeled probe is rejected by the closure composer.
 
 ## 3. Screenshots + metadata
 

@@ -8,7 +8,6 @@ import hashlib
 import json
 import os
 import re
-import subprocess
 import sys
 import tempfile
 from collections import Counter
@@ -20,6 +19,7 @@ SCRIPTS = Path(__file__).resolve().parent
 if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 import app_store_build_preflight  # noqa: E402
+import asc_readonly  # noqa: E402
 
 
 ROOT = SCRIPTS.parent
@@ -76,29 +76,10 @@ def validate_policy(root: Path = ROOT) -> dict[str, Any]:
 
 
 def _default_runner(arguments: Sequence[str], profile: str, timeout: int) -> dict[str, Any]:
-    environment = dict(os.environ)
-    environment["ASC_TELEMETRY_DISABLED"] = "1"
     try:
-        completed = subprocess.run(
-            ["asc", "--profile", profile, "--strict-auth", *arguments],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            check=False,
-            text=True,
-            timeout=timeout,
-            env=environment,
-        )
-    except subprocess.TimeoutExpired as error:
-        raise ReadinessError("App Store Connect read timed out") from error
-    if completed.returncode:
-        raise ReadinessError("App Store Connect read failed")
-    try:
-        value = json.loads(completed.stdout)
-    except json.JSONDecodeError as error:
-        raise ReadinessError("App Store Connect returned invalid JSON") from error
-    if not isinstance(value, dict):
-        raise ReadinessError("App Store Connect response root must be an object")
-    return value
+        return asc_readonly.run_json(arguments, profile, timeout)
+    except asc_readonly.ASCReadError as error:
+        raise ReadinessError(str(error)) from error
 
 
 def _rows(value: dict[str, Any]) -> list[dict[str, Any]]:

@@ -21,6 +21,7 @@
         "config/delivery-evaluator-v2-candidates.json",
         "config/delivery-evaluation-corpus.json",
         "config/audio-cadence-qc-contract.json",
+        "config/prosody-holdout-policy.json",
         "scripts/delivery_experiment.py",
         "scripts/delivery_experiment_runner.py",
         "scripts/delivery_prompt_remediation.py",
@@ -357,6 +358,7 @@
         "scripts/run_local_delivery_cascade.py",
         "scripts/delivery_promotion_decision.py",
         "scripts/audio_cadence_qc.py",
+        "scripts/prosody_holdout_validation.py",
         "scripts/voice_identity_language_reliability.py",
         "scripts/delivery_separability.py",
         "scripts/bench_delivery_prosody.py",
@@ -366,6 +368,7 @@
         "config/delivery-evaluator-v2-candidates.json",
         "config/delivery-evaluation-corpus.json",
         "config/audio-cadence-qc-contract.json",
+        "config/prosody-holdout-policy.json",
         "config/voice-identity-language-reliability.json"
       ]
     },

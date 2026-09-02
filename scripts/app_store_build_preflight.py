@@ -8,7 +8,7 @@ import hashlib
 import json
 import os
 import re
-import subprocess
+import sys
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
@@ -16,6 +16,10 @@ from typing import Any, Callable, Sequence
 
 
 ROOT = Path(__file__).resolve().parent.parent
+SCRIPTS = Path(__file__).resolve().parent
+if str(SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS))
+import asc_readonly  # noqa: E402
 
 
 class PreflightError(ValueError):
@@ -67,29 +71,10 @@ def _data(payload: Any, label: str) -> list[dict[str, Any]]:
 
 
 def _default_runner(arguments: Sequence[str], profile: str) -> dict[str, Any]:
-    environment = dict(os.environ)
-    environment["ASC_TELEMETRY_DISABLED"] = "1"
     try:
-        completed = subprocess.run(
-            ["asc", "--profile", profile, "--strict-auth", *arguments],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            check=False,
-            env=environment,
-            text=True,
-            timeout=120,
-        )
-    except subprocess.TimeoutExpired as error:
-        raise PreflightError(f"App Store Connect read timed out: {arguments[0]} {arguments[1]}") from error
-    if completed.returncode:
-        raise PreflightError(f"App Store Connect read failed: {arguments[0]} {arguments[1]}")
-    try:
-        payload = json.loads(completed.stdout)
-    except json.JSONDecodeError as error:
-        raise PreflightError("App Store Connect returned invalid JSON") from error
-    if not isinstance(payload, dict):
-        raise PreflightError("App Store Connect response root must be an object")
-    return payload
+        return asc_readonly.run_json(arguments, profile, 120)
+    except asc_readonly.ASCReadError as error:
+        raise PreflightError(str(error)) from error
 
 
 def check(

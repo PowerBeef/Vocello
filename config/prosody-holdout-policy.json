@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "confidenceLevel": 0.95,
+  "minimumCalibrationClips": 60,
+  "minimumHoldoutGoodClips": 30,
+  "minimumHoldoutBadClips": 30,
+  "minimumHoldoutSpeakerGroups": 3,
+  "minimumHoldoutScriptGroups": 3,
+  "minimumHoldoutLanguages": 3,
+  "requiredLengthClasses": ["short", "medium", "long"],
+  "requiredDefectSeverities": ["none", "mild", "moderate", "severe"],
+  "maximumFalsePositiveRateUpperBound": 0.1,
+  "minimumTruePositiveRateLowerBound": 0.7,
+  "groupIsolation": ["speakerGroup", "scriptGroup", "translationGroup"]
+}

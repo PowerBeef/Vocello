@@ -6,8 +6,10 @@ import shutil
 import sys
 import tempfile
 import unittest
+from datetime import datetime, timedelta, timezone
 from email.message import Message
 from pathlib import Path
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -41,7 +43,8 @@ class Response:
         return self._url
 
     def read(self, _size: int) -> bytes:
-        return self._body
+        body, self._body = self._body, b""
+        return body
 
 
 class ModelHostAvailabilityTests(unittest.TestCase):
@@ -73,7 +76,7 @@ class ModelHostAvailabilityTests(unittest.TestCase):
     def test_wrong_size_range_and_redirect_fail_closed(self) -> None:
         with self.assertRaisesRegex(module.AvailabilityError, "byte total"):
             module.probe(region="europe-west", opener=lambda _request, _timeout: Response(total=7))
-        with self.assertRaisesRegex(module.AvailabilityError, "byte range"):
+        with self.assertRaisesRegex(module.AvailabilityError, "probe status"):
             module.probe(
                 region="europe-west",
                 opener=lambda _request, _timeout: Response(total=7, status=200),
@@ -86,6 +89,103 @@ class ModelHostAvailabilityTests(unittest.TestCase):
                     total=first["expectedBytes"], host="untrusted.invalid"
                 ),
             )
+
+    def test_undeclared_region_and_digest_drift_fail_closed(self) -> None:
+        with self.assertRaisesRegex(module.AvailabilityError, "declared"):
+            module.probe(region="operator-invented", opener=lambda _request, _timeout: Response(total=1))
+        content = b"bounded fixture"
+        specification = {
+            "modelID": "fixture",
+            "artifactVersion": "v1",
+            "artifactRevisionDigest": "a" * 64,
+            "fileIdentityDigest": "b" * 64,
+            "expectedBytes": len(content),
+            "expectedSHA256": "0" * 64,
+            "url": "https://huggingface.co/fixture",
+            "allowedRedirectHostSuffixes": ["hf.co"],
+        }
+        with mock.patch.object(module, "validate", return_value=[specification]):
+            with self.assertRaisesRegex(module.AvailabilityError, "content digest"):
+                module.probe(
+                    region="north-america-east",
+                    mode="full-digest",
+                    opener=lambda _request, _timeout: Response(
+                        total=len(content), status=200, body=content
+                    ),
+                )
+
+    def test_full_digest_and_regional_composition(self) -> None:
+        content = b"bounded fixture"
+        specification = {
+            "modelID": "fixture",
+            "artifactVersion": "v1",
+            "artifactRevisionDigest": "a" * 64,
+            "fileIdentityDigest": "b" * 64,
+            "expectedBytes": len(content),
+            "expectedSHA256": module.hashlib.sha256(content).hexdigest(),
+            "url": "https://huggingface.co/fixture",
+            "allowedRedirectHostSuffixes": ["hf.co"],
+        }
+        with mock.patch.object(module, "validate", return_value=[specification]):
+            result = module.probe(
+                region="north-america-east",
+                mode="full-digest",
+                opener=lambda _request, _timeout: Response(
+                    total=len(content), status=200, body=content
+                ),
+            )
+        self.assertTrue(result["rows"][0]["contentDigestVerified"])
+        self.assertNotIn("expectedSHA256", json.dumps(result))
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "config").mkdir()
+            (root / "Sources/Resources").mkdir(parents=True)
+            shutil.copy2(ROOT / "config/model-host-availability-policy.json", root / "config")
+            shutil.copy2(
+                ROOT / "Sources/Resources/qwenvoice_ios_model_catalog.json",
+                root / "Sources/Resources",
+            )
+            now = datetime.now(timezone.utc)
+            inputs: list[Path] = []
+            live_models = {row["modelID"] for row in module.validate(root)}
+            catalog_sha = module.hashlib.sha256(
+                (root / "Sources/Resources/qwenvoice_ios_model_catalog.json").read_bytes()
+            ).hexdigest()
+            for region in ("north-america-east", "europe-west", "east-asia"):
+                path = root / f"{region}.json"
+                path.write_text(json.dumps({
+                    "schemaVersion": 2,
+                    "status": "PASS",
+                    "checkedAtUTC": now.isoformat().replace("+00:00", "Z"),
+                    "region": region,
+                    "probeMode": "full-digest",
+                    "executionAuthority": "qualified-cloud-region",
+                    "executionIdentityDigest": "c" * 64,
+                    "catalogSHA256": catalog_sha,
+                    "rows": [
+                        {"modelID": model, "status": "PASS", "contentDigestVerified": True}
+                        for model in live_models
+                    ],
+                }))
+                inputs.append(path)
+            composed = module.compose(inputs, root=root, now=now)
+            self.assertEqual(composed["status"], "PASS")
+            self.assertTrue(composed["fullContentDigestVerified"])
+            local = json.loads(inputs[0].read_text())
+            local["executionAuthority"] = "operator-local"
+            local["executionIdentityDigest"] = None
+            inputs[0].write_text(json.dumps(local))
+            with self.assertRaisesRegex(module.AvailabilityError, "provenance"):
+                module.compose(inputs, root=root, now=now)
+            local["executionAuthority"] = "qualified-cloud-region"
+            local["executionIdentityDigest"] = "c" * 64
+            inputs[0].write_text(json.dumps(local))
+            stale = json.loads(inputs[0].read_text())
+            stale["checkedAtUTC"] = (now - timedelta(hours=25)).isoformat().replace("+00:00", "Z")
+            inputs[0].write_text(json.dumps(stale))
+            with self.assertRaisesRegex(module.AvailabilityError, "freshness"):
+                module.compose(inputs, root=root, now=now)
 
     def test_unpinned_credentialed_and_total_drift_catalogs_fail(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

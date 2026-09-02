@@ -42,21 +42,21 @@ Narrative authority: [`docs/reference/autonomous-validation-audit-2026-08-21.md`
 | `AV-04` | done | P2 — make baseline coverage changes fail closed | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md`, `file:config/benchmark-baseline-migrations.json`, `file:scripts/tests/test_compare_baseline.py` |
 | `AV-05` | done | P2 — bind engine performance evidence to shipping optimization | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md`, `file:scripts/build.sh`, `file:scripts/publish_benchmark_history.py`, `file:benchmarks/runs/engine-generation/mac-gate-bench-20260901-223657-866ddfb3.json` |
 | `AV-06` | done | P2 — establish stable powered benchmark trends | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md`, `file:benchmarks/runs/engine-generation/mac-gate-bench-20260902-013854-f39c1c91.json`, `file:benchmarks/runs/engine-generation/mac-gate-bench-20260902-015022-591814fe.json` |
-| `AV-07` | planned | P2 — independently validate prosody thresholds | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md` |
-| `AV-08` | planned | P2 — qualify multilingual output beyond a single cohort | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md` |
-| `AV-09` | planned | P2 — make stateful physical-device lanes independently repeatable | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md` |
+| `AV-07` | in-flight | P2 — independently validate prosody thresholds | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md` |
+| `AV-08` | in-flight | P2 — qualify multilingual output beyond a single cohort | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md` |
+| `AV-09` | in-flight | P2 — make stateful physical-device lanes independently repeatable | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md` |
 | `AV-10` | done | P3 — add deterministic real-browser website smoke | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md` |
 | `AV-11` | done | P3 — make marking-equality resource hygiene enforceable | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md`, `file:scripts/check_marking_peak_equality.py`, `file:scripts/tests/test_check_marking_peak_equality.py` |
 
 ### Open items in detail
 
-- **`AV-07`** (planned) — P2 — independently validate prosody thresholds.
+- **`AV-07`** (in-flight) — P2 — independently validate prosody thresholds.
   gate: Prosody calibration must freeze on a source-bound labeled training corpus and pass predeclared confusion/noise targets on an untouched holdout spanning speakers, scripts, lengths, languages, and defect severities before becoming promotion authority. Required closure evidence: corpus manifests and digests, annotation protocol, frozen profile, holdout report with uncertainty, analyzer noise-floor/repeatability evidence, and negative threshold-leakage fixtures.
 
-- **`AV-08`** (planned) — P2 — qualify multilingual output beyond a single cohort.
+- **`AV-08`** (in-flight) — P2 — qualify multilingual output beyond a single cohort.
   gate: Language evidence must separate ASR repeatability from independent generation variance and cover multiple scripts, lengths, speakers/voices, and seeds per claimed language/tier/mode or label the dimension advisory. Required closure evidence: privacy-safe corpus/matrix manifests, independent generated cohorts, WER/CER/language-ID uncertainty, ignored-sample accounting, and language record validation on every claimed cell.
 
-- **`AV-09`** (planned) — P2 — make stateful physical-device lanes independently repeatable.
+- **`AV-09`** (in-flight) — P2 — make stateful physical-device lanes independently repeatable.
   gate: Each stateful iOS UI lane must declare and preflight exact prerequisites, use a non-destructive test-owned run namespace, and keep fixture-dependent journeys separate from generic smoke; download scheduling unit tests must use a controllable clock while retaining one real-throttle integration proof. Required closure evidence: missing/present/stale prerequisite fixtures, isolated reruns without residual-state failures, unchanged fail-closed no-retry policy, and physical-device XCUITest evidence for affected lanes.
 
 ## Delivery instruction quality and Qwen3-TTS prompting
@@ -96,8 +96,8 @@ Narrative authority: [`docs/reference/qwen3-tts-prompting-guide.md`](reference/q
 | `DP-25` | done | Measured normal-tier gate floors (prosody profile v4) for the normal-shipping presets | `file:scripts/tests/test_delivery_quality_gate.py`, `doc:docs/reference/delivery-harness.md` |
 | `DP-26` | done | Cross-speaker Custom Voice delivery screen and Fast-QC correction | `file:Tests/VocelloCoreTests/GenerationTelemetrySchemaTests.swift`, `file:scripts/tests/test_custom_delivery_matrix.py`, `doc:docs/reference/delivery-harness.md` |
 | `DP-27` | done | Pin Qwen3-TTS delivery research and structured experiment contract | `file:scripts/tests/test_delivery_experiment.py`, `file:scripts/tests/test_delivery_experiment_runner.py`, `doc:docs/reference/delivery-harness.md` |
-| `DP-28` | planned | Calibrate the layered local delivery evaluator | `file:scripts/tests/test_delivery_calibration_session.py`, `file:scripts/tests/test_delivery_evaluator.py`, `file:scripts/tests/test_delivery_listener_calibration_v2.py`, `file:scripts/tests/test_delivery_evaluator_v2.py`, `file:scripts/tests/test_delivery_analysis_cache.py`, `file:scripts/tests/test_delivery_temporal_features.py`, `file:scripts/tests/test_delivery_resource_supervisor.py`, `file:scripts/tests/test_delivery_compact_model_adapter.py`, `file:scripts/tests/test_delivery_compact_model_runtime.py`, `file:scripts/tests/test_prepare_delivery_compact_model_config.py`, `file:scripts/tests/test_qualify_delivery_compact_models.py`, `file:scripts/tests/test_prepare_delivery_listener_anchors.py`, `file:scripts/tests/test_run_local_delivery_cascade.py`, `file:scripts/tests/test_emotion_advisory.py`, `doc:docs/reference/autonomous-validation-audit-2026-08-21.md` |
-| `DP-29` | planned | Qualify the native-language delivery corpus and cross-language sentinels | `file:scripts/tests/test_delivery_experiment.py`, `doc:docs/reference/autonomous-validation-audit-2026-08-21.md` |
+| `DP-28` | in-flight | Calibrate the layered local delivery evaluator | `file:scripts/tests/test_delivery_calibration_session.py`, `file:scripts/tests/test_delivery_evaluator.py`, `file:scripts/tests/test_delivery_listener_calibration_v2.py`, `file:scripts/tests/test_delivery_evaluator_v2.py`, `file:scripts/tests/test_delivery_analysis_cache.py`, `file:scripts/tests/test_delivery_temporal_features.py`, `file:scripts/tests/test_delivery_resource_supervisor.py`, `file:scripts/tests/test_delivery_compact_model_adapter.py`, `file:scripts/tests/test_delivery_compact_model_runtime.py`, `file:scripts/tests/test_prepare_delivery_compact_model_config.py`, `file:scripts/tests/test_qualify_delivery_compact_models.py`, `file:scripts/tests/test_prepare_delivery_listener_anchors.py`, `file:scripts/tests/test_run_local_delivery_cascade.py`, `file:scripts/tests/test_emotion_advisory.py`, `doc:docs/reference/autonomous-validation-audit-2026-08-21.md` |
+| `DP-29` | in-flight | Qualify the native-language delivery corpus and cross-language sentinels | `file:scripts/tests/test_delivery_experiment.py`, `doc:docs/reference/autonomous-validation-audit-2026-08-21.md` |
 | `DP-30` | done | Run prompt, sampling, instruction-language and script-interaction screens | `file:scripts/tests/test_delivery_prompt_remediation.py`, `doc:docs/reference/delivery-harness.md` |
 | `DP-31` | planned | Confirm Speed and Quality candidates with untouched blinded listening | `file:scripts/tests/test_delivery_listening_session.py`, `file:scripts/tests/test_delivery_promotion_decision.py`, `file:scripts/tests/test_delivery_statistics.py` |
 | `DP-32` | planned | Promote only qualifying delivery changes and revalidate all modes | — |
@@ -109,10 +109,10 @@ Narrative authority: [`docs/reference/qwen3-tts-prompting-guide.md`](reference/q
 - **`DP-20`** (parked) — External delivery-control lever watch list (audit R8).
   unparkWhen: Only when a watched lever becomes runnable on-device at the 8 GB floor: a Qwen3-TTS VoiceEditing/instruct variant that combines ICL with instructions, CosyVoice 3-class instruct control in an MLX-portable form, emotion-vector steering (IndexTTS-2/EmoSteer-class) with published weights, or a quantization-robust valence result. The pinned audit's R8 section is the source list; re-verify claims against primary sources at unpark time rather than trusting the 2026-08 snapshot.
 
-- **`DP-28`** (planned) — Calibrate the layered local delivery evaluator.
+- **`DP-28`** (in-flight) — Calibrate the layered local delivery evaluator.
   gate: V1 remains valid with full SER posteriors, entropy/margin abstention, sequential acoustic/ASR/identity/UTMOS/SER composition, and ridge-v1. The versioned v2 harness adds the source-bound cache, five-region temporal contours, resumable blinded listener packets, preset-local logistic heads, elastic-net/PLS challengers, blocked validation/conformal uncertainty/OOD, and an explanatory serial cascade. LIVE EVIDENCE 2026-08-23 (operator-local and untracked): exact contract-pinned SenseVoiceSmall Q8 and DistilHuBERT assets were acquired under build/cache only. Each passed two cache-cold probes on the attested canonical Mac14,3 / 8 GiB host with zero swap growth, no pressure warning and clean post-exit recovery; observed peak RSS was 275-293 MB for SenseVoice and 677-874 MB for DistilHuBERT. A first balanced 64-row cohort was rejected in full after one fixed-seed take repeatedly produced a real 4.613-second dropout and failed mandatory Fast QC; its initial/retry states remain retained. A fresh predeclared seed block then completed 64/64 instructed rows plus 8/8 shared neutral controls across all eight presets, eight speakers, six scripts/three translation groups and English/Chinese/Japanese, and its bounded acoustic/temporal analysis passed. The v2 session is built with 64 label-blind dimensional trials, 56 non-neutral target-vs-neutral pairs, three multilingual dropout anchors and source-bound resumable responses; the zero-response readiness report correctly remains INCOMPLETE. Full SenseVoice and DistilHuBERT cascades each covered all 64 rows with valid source/report digests and abstained because no calibrated tiny head exists. Both candidates remain unadopted. Closure now requires three independent complete listener sessions with per-language fluency coverage and qualification floors, calibration-only challenger preselection, a separately generated untouched multi-speaker/script/language confirmation cohort, and demonstrated holdout gain over ridge-v1 without any VAD, preset, speaker or script-group regression. Automatic layers cannot authorize semantic promotion and production copy remains unchanged.
 
-- **`DP-29`** (planned) — Qualify the native-language delivery corpus and cross-language sentinels.
+- **`DP-29`** (in-flight) — Qualify the native-language delivery corpus and cross-language sentinels.
   gate: Corpus structure is landed for nine native speaker-language cells, four fixed cross-language sentinels, three lengths and neutral/congruent/conflicting semantics across calibration/development/confirmation splits. Closure requires fluent review of every Mandarin, Japanese and Korean script, immutable review provenance and digests, no speaker/script/seed or translated-equivalent leakage, independent generated cohorts, ASR/CER/language-ID uncertainty and ignored-sample accounting, and AV-08-compliant evidence before any locale is promoted beyond provisional.
 
 - **`DP-31`** (planned) — Confirm Speed and Quality candidates with untouched blinded listening.
@@ -135,7 +135,7 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
 | `F-02` | done | Medium — make behavior-changing diagnostics an enforceable distribution boundary | `file:Sources/QwenVoiceCore/RuntimeDebugGate.swift`, `file:Tests/VocelloCoreTests/RuntimeDebugGateTests.swift`, `file:config/runtime-debug-knobs.json`, `file:scripts/runtime_security_contract.py`, `doc:docs/decisions/runtime-hardening-and-trust-boundary.md` |
 | `F-03` | done | Medium — execute deterministic iOS policy assertions in ordinary CI | `file:Tests/VocelloiOSLogicTests/VocelloiOSLogicTests.swift`, `file:project.yml`, `file:scripts/macos_test.sh`, `file:scripts/build_foundation_targets.sh`, `file:scripts/check_test_workflows.sh`, `file:.github/workflows/ci.yml` |
 | `F-04` | done | Medium — bind public promotion to exact-source canonical evidence | `commit:f6404ce`, `file:config/quality-promotion-contract.json`, `file:.github/workflows/promote-release.yml`, `doc:docs/reference/quality-promotion.md` |
-| `F-05` | planned | Medium — restore packaged macOS launch verification | — |
+| `F-05` | in-flight | Medium — restore packaged macOS launch verification | — |
 | `F-06` | done | Medium — durably couple audio publication and History persistence | `file:Tests/VocelloCoreTests/GenerationHistoryOutboxTests.swift`, `file:Tests/VocelloCoreTests/HistoryDeletionEngineTests.swift`, `file:docs/reference/privacy-storage.md` |
 | `F-07` | done | Medium — close the main-branch administrator and security-timing gap | `file:scripts/tests/test_release_source_authority.py`, `file:scripts/tests/test_supply_chain_contract.py`, `file:docs/reference/macos-release-qa.md` |
 | `F-08` | done | Low — scope iOS Studio terminal state to a generation attempt | `file:Tests/VocelloiOSLogicTests/StudioGenerationAttemptAuthorityTests.swift`, `file:docs/reference/ios-app-guide.md` |
@@ -148,7 +148,7 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
 
 ### Open items in detail
 
-- **`F-05`** (planned) — Medium — restore packaged macOS launch verification.
+- **`F-05`** (in-flight) — Medium — restore packaged macOS launch verification.
   gate: Run the existing packaged-app launch smoke on the declared macos-26 release runner. The release workflow and extracted-DMG verifier must require external startup evidence and reject a QWENVOICE_SKIP_LAUNCH_SMOKE bypass in CI. Close only after the next signed candidate records that hosted macos-26 proof.
 
 ## iOS App Store readiness
@@ -256,13 +256,13 @@ Narrative authority: [`docs/reference/ios-built-in-startup-reliability.md`](refe
 | `ISR-01` | done | Mine and conservatively classify retained startup evidence | `file:scripts/tests/test_delivery_failure_topology.py` |
 | `ISR-02` | done | Add exact request receipts and typed startup boundaries | `file:Tests/VocelloCoreTests/GenerationStartupDiagnosticsTests.swift`, `file:Tests/VocelloCoreTests/GenerationFailureDiagnosticLoggerTests.swift` |
 | `ISR-03` | done | Add ordered physical-device runner and visible request parity | `file:scripts/tests/test_ios_startup_reliability.py`, `file:Tests/VocelloCoreTests/IOSStartupReliabilityPlanTests.swift` |
-| `ISR-04` | planned | Complete staged exact-request characterization | `file:Tests/VocelloCoreTests/StartupReliabilityDiagnosticsV2Tests.swift`, `file:scripts/tests/test_ios_startup_reliability.py` |
+| `ISR-04` | in-flight | Complete staged exact-request characterization | `file:Tests/VocelloCoreTests/StartupReliabilityDiagnosticsV2Tests.swift`, `file:scripts/tests/test_ios_startup_reliability.py` |
 | `ISR-05` | done | Implement only the evidence-supported causal fix | `file:Tests/VocelloCoreTests/GenerationStartupDiagnosticsTests.swift`, `file:Packages/VocelloQwen3Core/Tests/Qwen3RuntimeTests/Qwen3DecoderPartitionTests.swift`, `file:Packages/VocelloQwen3Core/Tests/Qwen3RuntimeTests/VocelloQwen3FacadeTests.swift` |
 | `ISR-06` | planned | Complete exact-script and broader closure evidence | — |
 
 ### Open items in detail
 
-- **`ISR-04`** (planned) — Complete staged exact-request characterization.
+- **`ISR-04`** (in-flight) — Complete staged exact-request characterization.
   gate: With the original exact 285-character UTF-8 script, run five fixed-seed cold launches, ten same-process warm takes, seeds 38112001 through 38112008, focused delivery/speaker/default predecessors, production/full-unload/prepared-cache-clear/prewarm-disabled arms, streaming parity, macOS CLI/headless controls, and iOS headless/visible UI parity. For seeds 38112004, 38112006, and passing control 38112001, retain complete final/chunk QC plus bounded codec traces and compare exact production-range incremental replay against full decoding across three fresh-process repetitions per output mode. Require the full-unload quiescence barrier, exact-PID process-exit composition, and sanitized CoreDevice system-crash-log delta. Stop expansion at the first decision-complete divergent boundary; preserve every attempt and crash delta.
 
 - **`ISR-06`** (planned) — Complete exact-script and broader closure evidence.

@@ -107,8 +107,8 @@ def corpus_digest(entries):
     """Hash the labeled corpus semantics and every referenced WAV byte.
 
     Path strings are deliberately excluded: the same corpus should identify
-    the same way after a checkout moves, while a label change, ordering change,
-    missing clip, or one-byte audio change must alter the digest.
+    the same way after a checkout moves, while a label or split-metadata change,
+    ordering change, missing clip, or one-byte audio change must alter the digest.
     """
     digest = hashlib.sha256(b"vocello-prosody-corpus-v1\0")
     for index, entry in enumerate(entries):
@@ -117,7 +117,15 @@ def corpus_digest(entries):
             raise ValueError(f"corpus clip does not exist: {clip}")
         digest.update(str(index).encode("ascii"))
         digest.update(b"\0")
-        digest.update(entry["label"].encode("ascii"))
+        semantics = {key: value for key, value in entry.items() if key != "path"}
+        digest.update(
+            json.dumps(
+                semantics,
+                ensure_ascii=False,
+                separators=(",", ":"),
+                sort_keys=True,
+            ).encode("utf-8")
+        )
         digest.update(b"\0")
         digest.update(hashlib.sha256(clip.read_bytes()).digest())
     return digest.hexdigest()
@@ -258,6 +266,7 @@ def main():
     if n_good < 2 or n_bad < 2:
         sys.exit(f"need at least 2 good and 2 bad clips (good={n_good}, bad={n_bad})")
 
+    labels_digest = corpus_digest(entries)
     thresholds = calibrate_thresholds(good, bad, args.target_fpr)
     profile = builtin_profile()
     profile["name"] = args.name
@@ -268,6 +277,7 @@ def main():
     # percentiles can drift slightly from the legacy full-array implementation.
     current_analyzer_version = analyzer_algorithm_version()
     profile["analyzer_algorithm_version"] = current_analyzer_version
+    profile["calibration_corpus_digest"] = labels_digest
 
     # Convert good/bad metric dicts to lists of dicts for evaluation.
     good_records = [dict(zip(good.keys(), vals)) for vals in zip(*good.values())]
@@ -275,7 +285,6 @@ def main():
     stats = evaluate_profile(profile, good_records, bad_records)
 
     save_profile(profile, args.out)
-    labels_digest = corpus_digest(entries)
     result = {
         "schemaVersion": 1,
         "analyzerAlgorithmVersion": current_analyzer_version,

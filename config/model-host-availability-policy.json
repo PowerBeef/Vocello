@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "catalog": "Sources/Resources/qwenvoice_ios_model_catalog.json",
   "allowedOriginHosts": [
     "huggingface.co"
@@ -11,12 +11,18 @@
   "probeSelection": "largest-file-per-model",
   "rangeBytes": "bytes=0-0",
   "timeoutSeconds": 30,
+  "digestReadChunkBytes": 1048576,
   "representativeRegions": [
     "north-america-east",
     "europe-west",
     "east-asia"
   ],
   "freshnessHours": 24,
+  "regionalClosureRequiresFullDigest": true,
+  "regionalClosureExecutionAuthorities": [
+    "github-actions-region-bound",
+    "qualified-cloud-region"
+  ],
   "outageResponse": {
     "automaticHostFallbackAllowed": false,
     "automaticArtifactSubstitutionAllowed": false,

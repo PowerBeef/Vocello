@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-mlx
-reviewed: 2026-08-29
+reviewed: 2026-09-01
 summary: Domain rule for the engine core, owned Qwen3 runtime package, model catalog, telemetry semantics, and backend invariants (prewarm, cancellation, sampling, memory policy, MLX-only).
 sourceOfTruth:
   - scripts/build_foundation_targets.sh
@@ -14,6 +14,7 @@ sourceOfTruth:
   - config/delivery-evaluator-v2-candidates.json
   - config/delivery-evaluation-corpus.json
   - config/audio-cadence-qc-contract.json
+  - config/prosody-holdout-policy.json
   - scripts/delivery_experiment.py
   - scripts/delivery_experiment_runner.py
   - scripts/delivery_prompt_remediation.py
@@ -92,7 +93,9 @@ Before changing anything in this layer, read:
   only after the generator has exited,
   `scripts/delivery_promotion_decision.py` fails closed over automatic and blinded evidence, and
   `scripts/audio_cadence_qc.py` validates independently labelled cadence evidence before any
-  Fast-QC warning or rejection boundary can be reconsidered.
+  Fast-QC warning or rejection boundary can be reconsidered, and
+  `scripts/prosody_holdout_validation.py` keeps threshold fitting isolated from its untouched
+  speaker/script/translation-group holdout.
 - When callable, use Swift/concurrency/performance skills (for example the Axiom skills) and
   authoritative MLX / Hugging Face documentation for language, isolation, and profiling decisions.
   Read each selected skill before use.

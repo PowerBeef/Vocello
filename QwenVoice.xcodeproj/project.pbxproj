@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		000297D4A6F731C7FFBCBB5E /* IOSDeviceEligibilityPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20BB17F1FD31CA3B24918AD9 /* IOSDeviceEligibilityPolicyTests.swift */; };
 		00B734817E009DFA3A4C4604 /* LiveStreamingPlaybackEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE376ADE93795C18BBBB0ED9 /* LiveStreamingPlaybackEngine.swift */; };
 		011395710E9683A28E3F28D2 /* VocelloiOSControlAuditUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 179EC612BC6E2D744AAC99DD /* VocelloiOSControlAuditUITests.swift */; };
 		01902C5209092E3E24AE9FB7 /* HuggingFaceDownloader.swift in Sources */ = {isa = PBXBuildFile; fileRef = A836AA336201DB6B2A733B80 /* HuggingFaceDownloader.swift */; };
@@ -202,9 +203,11 @@
 		588F848BBD25F811E6F294DF /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = E8941C6B2CEBC4E641A04256 /* Localizable.xcstrings */; };
 		59EF7FDB9556E1860DC2FF67 /* ContinuousVoiceDescriptionField.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70E509E03D5758CB0D6C0388 /* ContinuousVoiceDescriptionField.swift */; };
 		5B5724CE5A6934149BB907D5 /* GenerationQualityComposition.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D2353974E930C0A9785C7F2 /* GenerationQualityComposition.swift */; };
+		5C2C3E68FECD192A2F3AE0E0 /* IOSDeviceEligibilityPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51CC0B843F07119A558704B3 /* IOSDeviceEligibilityPolicy.swift */; };
 		5CEA95BA39656930F468D27B /* VocelloiOSBenchmarkUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBCE5DF7AD407A17AF522154 /* VocelloiOSBenchmarkUITests.swift */; };
 		5D23FDB4CC008D1E909414A8 /* SidebarStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16357673B0524D933999409E /* SidebarStatusView.swift */; };
 		5F53713D4A9BEDE02A972461 /* GenerationQualityCompositionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B6925284D75370993339F2 /* GenerationQualityCompositionTests.swift */; };
+		5FA23669A6B2C1F6CD5A3736 /* IOSDeviceEligibilityPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20BB17F1FD31CA3B24918AD9 /* IOSDeviceEligibilityPolicyTests.swift */; };
 		5FE8611FB168684BB5A832C1 /* VoiceCloningCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8BD934015DBE86EA1193A6B /* VoiceCloningCoordinator.swift */; };
 		603FCEB24230E8474ABC9C36 /* GenerationPersistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 220CFD2739290441DB6C2732 /* GenerationPersistence.swift */; };
 		6198E3043A7DF095FCCDD0F5 /* GenerationSeedPersistenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9883C46A7ACB237A45356BF4 /* GenerationSeedPersistenceTests.swift */; };
@@ -236,6 +239,7 @@
 		6FE8129518C5F51DF294199F /* qwenvoice_contract.json in Resources */ = {isa = PBXBuildFile; fileRef = 617BE72142511CD5043C341E /* qwenvoice_contract.json */; };
 		714A04858C5D4B87CDA7EF48 /* GenerationTerminalDiagnosticEvidence.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDEE13675F732831528D9F39 /* GenerationTerminalDiagnosticEvidence.swift */; };
 		7197E0B1B11DA77FF707BB2B /* GenerationScreenPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08A7E4D67B06F288693FEAC2 /* GenerationScreenPresentation.swift */; };
+		72E7D13A8E94E1249CCECDD7 /* IOSDeviceEligibilityPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51CC0B843F07119A558704B3 /* IOSDeviceEligibilityPolicy.swift */; };
 		734C58F78D1DD830791C7364 /* IOSModelDeliveryBackgroundEvents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B7F58AC8D59F087073797F7 /* IOSModelDeliveryBackgroundEvents.swift */; };
 		75FE70A9B451FDA8338941B8 /* IOSGenerationModeViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A5E5015EC4FD8CE25703210 /* IOSGenerationModeViews.swift */; };
 		762F645F4C3445FC461CFFD5 /* GenerationStreamingTelemetryV9Publication.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C0A82DBF4449108D5D7B70A /* GenerationStreamingTelemetryV9Publication.swift */; };
@@ -418,6 +422,7 @@
 		DACA42617143EAFB195CE0A8 /* IOSModelProgressPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F60B4BA56B3455CB8B52EDD /* IOSModelProgressPresentation.swift */; };
 		DAD34C5A369EE8338E586DDC /* NativeTelemetry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B33472B5B6CE711BEEF3244 /* NativeTelemetry.swift */; };
 		DB901031F858C01ECCED4DA4 /* IOSGenerationSetupCards.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10CE8FC9B1A2B580ED62408D /* IOSGenerationSetupCards.swift */; };
+		DC6A9E291A23DD93036F9F81 /* IOSDeviceEligibilityPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51CC0B843F07119A558704B3 /* IOSDeviceEligibilityPolicy.swift */; };
 		DC6F3137437D27289A6B3A1C /* third_party_attributions.json in Resources */ = {isa = PBXBuildFile; fileRef = 8774668822C7CF9D228AC44A /* third_party_attributions.json */; };
 		DCEF09940749A14DEB062D04 /* IOSGenerationTextLimitPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9213D3C53B12F841327ACCF /* IOSGenerationTextLimitPolicy.swift */; };
 		DD3E88340234DC509DE73A5F /* IOSReferenceAudioImportPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EBC7F199CB26F84EDCFF2BE /* IOSReferenceAudioImportPolicy.swift */; };
@@ -760,6 +765,7 @@
 		1F29561FAD2A80235462F4B6 /* MacTTSEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacTTSEngine.swift; sourceTree = "<group>"; };
 		1FB6146E31A25C9C8E0AC831 /* GenerationEventDeliveryProbeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GenerationEventDeliveryProbeTests.swift; sourceTree = "<group>"; };
 		1FE2E24D9F93A4651439BE63 /* LanguageFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LanguageFixtures.swift; sourceTree = "<group>"; };
+		20BB17F1FD31CA3B24918AD9 /* IOSDeviceEligibilityPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSDeviceEligibilityPolicyTests.swift; sourceTree = "<group>"; };
 		20DFDC83DF5FF3A21349306E /* UIPerfHistorySeeder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UIPerfHistorySeeder.swift; sourceTree = "<group>"; };
 		21943A54ED34AAA37626A252 /* StartupDiagnosticsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StartupDiagnosticsView.swift; sourceTree = "<group>"; };
 		220CFD2739290441DB6C2732 /* GenerationPersistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GenerationPersistence.swift; sourceTree = "<group>"; };
@@ -844,6 +850,7 @@
 		4FDF43695D1DF90DD0DFE831 /* IOSStorageProtectionPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSStorageProtectionPolicy.swift; sourceTree = "<group>"; };
 		50C8C4331104AAE56B2B7047 /* AppPerformanceSignposts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppPerformanceSignposts.swift; sourceTree = "<group>"; };
 		510C628D0D4B50BA8A4D9A4E /* RequestLocalSamplingPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RequestLocalSamplingPolicyTests.swift; sourceTree = "<group>"; };
+		51CC0B843F07119A558704B3 /* IOSDeviceEligibilityPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSDeviceEligibilityPolicy.swift; sourceTree = "<group>"; };
 		52196EEF0820ABCE16E045FD /* AppStateRestorationPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStateRestorationPolicy.swift; sourceTree = "<group>"; };
 		5332417B34885992BFDB5873 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		53F47C4B97AF4841FDEEB907 /* VoiceCloningView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceCloningView.swift; sourceTree = "<group>"; };
@@ -1363,6 +1370,7 @@
 		267F05FB4E0285CEAD9647C5 /* VocelloiOSLogicTests */ = {
 			isa = PBXGroup;
 			children = (
+				20BB17F1FD31CA3B24918AD9 /* IOSDeviceEligibilityPolicyTests.swift */,
 				C26F610DE0F1AA6A272C56A6 /* IOSReferenceTranscriptionReviewStateTests.swift */,
 				04EA45246C97417B07AC1F1A /* IOSSingleTakeGenerationExecutorTests.swift */,
 				2DA6CEC8BFFF52B99A74571C /* StudioGenerationAttemptAuthorityTests.swift */,
@@ -1543,6 +1551,7 @@
 				474261D7C145B2FFB657E3F7 /* IOSAppDefaults.swift */,
 				08A7675DBAF4D1D043862803 /* IOSCrashObserver.swift */,
 				23ECC0A581C6D3682E9A846A /* IOSDeviceDiagnosticsRecorder.swift */,
+				51CC0B843F07119A558704B3 /* IOSDeviceEligibilityPolicy.swift */,
 				9D187C4B7DA7A21208083FA3 /* IOSGenerationVariationPreference.swift */,
 				4335217323465DDB7EB723E8 /* IOSInterruptionRecorder.swift */,
 				4FAC50A3E9EBBE7417EBF975 /* IOSMetricKitMemoryReporter.swift */,
@@ -2517,6 +2526,7 @@
 				03F29BE5251591790C3A7750 /* IOSDesignSystemPrimitives.swift in Sources */,
 				1E717451FC0F883570018189 /* IOSDeviceDiagnosticsRecorder.swift in Sources */,
 				8819EDE2ADE83D920176B7EB /* IOSDeviceDiagnosticsRunner.swift in Sources */,
+				DC6A9E291A23DD93036F9F81 /* IOSDeviceEligibilityPolicy.swift in Sources */,
 				5534D672FF2E267DAFE941E4 /* IOSEngineLifecycleToast.swift in Sources */,
 				A82805015D03E2010AE80DDE /* IOSFlexibleTextEditor.swift in Sources */,
 				940F6E64A6613D0A4F1CD843 /* IOSGenerateFlowViews.swift in Sources */,
@@ -2632,6 +2642,8 @@
 				1A652DB3E3278260A378D4A8 /* HistoryDeletionEngineTests.swift in Sources */,
 				CE53C4508BAC6A10662AE579 /* HistoryPersistenceError.swift in Sources */,
 				64C97400A3DA665D1196F260 /* HistoryPersistenceErrorTests.swift in Sources */,
+				72E7D13A8E94E1249CCECDD7 /* IOSDeviceEligibilityPolicy.swift in Sources */,
+				5FA23669A6B2C1F6CD5A3736 /* IOSDeviceEligibilityPolicyTests.swift in Sources */,
 				138D9A0F6E35F4A3EEB50163 /* IOSModelDeliverySupport.swift in Sources */,
 				808E90DBC473912ADF6D33F7 /* IOSModelProgressPresentation.swift in Sources */,
 				DD3E88340234DC509DE73A5F /* IOSReferenceAudioImportPolicy.swift in Sources */,
@@ -2820,6 +2832,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				E180DB5FA1A255E2E4A90A27 /* AppPaths.swift in Sources */,
+				5C2C3E68FECD192A2F3AE0E0 /* IOSDeviceEligibilityPolicy.swift in Sources */,
+				000297D4A6F731C7FFBCBB5E /* IOSDeviceEligibilityPolicyTests.swift in Sources */,
 				4A73409EDBFCF8597B31A965 /* IOSModelDeliverySupport.swift in Sources */,
 				DACA42617143EAFB195CE0A8 /* IOSModelProgressPresentation.swift in Sources */,
 				20CC9A7D43FA5A361A8C5270 /* IOSReferenceAudioImportPolicy.swift in Sources */,

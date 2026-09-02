@@ -30,6 +30,7 @@ REQUIRED_SURFACES=(
     "scripts/support_contact_contract.py"
     "scripts/attribution_manifest.py"
     "scripts/ios_storage_protection_policy.py"
+    "scripts/ios_device_eligibility.py"
     "scripts/app_store_build_preflight.py"
     "scripts/app_store_connect_readiness.py"
     "scripts/model_host_availability.py"
@@ -104,6 +105,7 @@ REQUIRED_SURFACES=(
     "scripts/tests/test_support_contact_contract.py"
     "scripts/tests/test_attribution_manifest.py"
     "scripts/tests/test_ios_storage_protection_policy.py"
+    "scripts/tests/test_ios_device_eligibility.py"
     "scripts/tests/test_app_store_build_preflight.py"
     "scripts/tests/test_app_store_connect_readiness.py"
     "scripts/tests/test_model_host_availability.py"
@@ -491,6 +493,7 @@ python3 "$SCRIPT_DIR/support_contact_contract.py" validate
 python3 "$SCRIPT_DIR/attribution_manifest.py" rebuild --check
 python3 "$SCRIPT_DIR/attribution_manifest.py" validate
 python3 "$SCRIPT_DIR/ios_storage_protection_policy.py" validate
+python3 "$SCRIPT_DIR/ios_device_eligibility.py" validate
 python3 "$SCRIPT_DIR/app_store_connect_readiness.py" validate
 python3 "$SCRIPT_DIR/model_host_availability.py" validate
 python3 "$SCRIPT_DIR/ios_release_analyzer_warnings.py" validate

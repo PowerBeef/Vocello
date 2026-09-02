@@ -198,6 +198,8 @@ untracked pins with a cleanup dry-run. Remove pins only after the evidence set i
   26 toolchains, removing every compatible iOS runtime component can make the generic destination
   ineligible while `iphoneos` still appears. Restore the matching component explicitly; never
   weaken the destination or add a Simulator lane.
+- Letting the runtime hardware gate drift from App Store installation eligibility;
+  `scripts/ios_device_eligibility.py` owns their fail-closed alignment.
 - Bypassing `cancelActiveGeneration(reason:)`, treating `.cancelled` as failure, or releasing
   generation ownership before the active task reaches its terminal barrier.
 - Using raw `ScrollView` instead of `IOSScrollView`.

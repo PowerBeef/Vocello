@@ -47,6 +47,7 @@ class IOSReleaseArtifactVerificationTests(unittest.TestCase):
             "CFBundleVersion": "18",
             "CFBundlePackageType": "APPL",
             "CFBundleSupportedPlatforms": ["iPhoneOS"],
+            "UIRequiredDeviceCapabilities": ["arm64", "iphone-performance-gaming-tier"],
         }
         self.entitlements = {
             "application-identifier": f"{self.PREFIX}.{self.BUNDLE}",
@@ -121,6 +122,27 @@ class IOSReleaseArtifactVerificationTests(unittest.TestCase):
     def test_only_arm64_is_accepted(self) -> None:
         with self.assertRaisesRegex(module.VerificationError, "exactly arm64"):
             self.snapshot(architectures=["arm64", "x86_64"])
+
+    def test_device_capabilities_must_match_the_runtime_hardware_floor(self) -> None:
+        for capabilities in [
+            ["arm64"],
+            ["iphone-performance-gaming-tier"],
+            ["arm64", "gps", "iphone-performance-gaming-tier"],
+        ]:
+            with self.subTest(capabilities=capabilities):
+                info = dict(self.info, UIRequiredDeviceCapabilities=capabilities)
+                with self.assertRaisesRegex(module.VerificationError, "device capabilities"):
+                    self.snapshot(info=info)
+
+    def test_archive_and_export_device_capabilities_must_match(self) -> None:
+        archived = self.snapshot()
+        exported = replace(
+            archived,
+            label="export",
+            required_device_capabilities=("arm64",),
+        )
+        with self.assertRaisesRegex(module.VerificationError, "identities differ"):
+            module.compare_archive_and_export(archived, exported)
 
     def test_debug_entitlement_is_rejected(self) -> None:
         entitlements = dict(self.entitlements, **{"get-task-allow": True})

@@ -6,6 +6,9 @@ summary: Operator checklist for shipping Vocello for iPhone to TestFlight / the 
 sourceOfTruth:
   - project.yml
   - config/roadmap.json
+  - Sources/iOSSupport/Services/IOSDeviceEligibilityPolicy.swift
+  - scripts/ios_device_eligibility.py
+  - scripts/verify_ios_release_artifacts.py
   - docs/reference/eu-ai-act-article50-assessment.md
 ---
 # iOS App Store submission runbook
@@ -61,9 +64,10 @@ download it automatically.
 - [x] App record exists in App Store Connect for `com.patricedery.vocello`; exact CLI resolution on
       2026-08-27 found iOS version 1.0 in Prepare for Submission with one `en-US` localization.
       Category and the rest of the live account remain part of ASR-11.
-- [ ] App Store installation eligibility matches the app's runtime hardware floor. The current source
-      requires iPhone 15 Pro or newer but the Info.plist declares only `arm64`; close ASR-01 before the
-      first public version, when eligibility can still be set safely.
+- [x] App Store installation eligibility matches the app's runtime hardware floor before the first
+      public version. The built bundle requires exactly `arm64` and Apple's
+      `iphone-performance-gaming-tier`; the runtime guard independently enforces iPhone 15 Pro or
+      newer. Deterministic source and archive/IPA verification reject future drift (ASR-01).
 
 ## 1. Privacy + compliance (App Store Connect)
 

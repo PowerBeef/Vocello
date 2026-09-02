@@ -42,6 +42,7 @@ PROHIBITED_RELEASE_STRING_PATTERNS = (
     re.compile(r"QVOICE_DEVICE_DIAGNOSTICS"),
 )
 PROHIBITED_DYNAMIC_SYMBOLS = {"_dlopen", "_dlsym"}
+REQUIRED_DEVICE_CAPABILITIES = ("arm64", "iphone-performance-gaming-tier")
 
 
 class VerificationError(ValueError):
@@ -66,6 +67,7 @@ class BundleSnapshot:
     marketing_version: str
     build_number: str
     architectures: tuple[str, ...]
+    required_device_capabilities: tuple[str, ...]
     macho_uuids: tuple[str, ...]
     executable_sha256: str
     signature_normalized_executable_sha256: str
@@ -93,6 +95,7 @@ class BundleSnapshot:
             "marketingVersion": self.marketing_version,
             "buildNumber": self.build_number,
             "architectures": list(self.architectures),
+            "requiredDeviceCapabilities": list(self.required_device_capabilities),
             "machOUUIDs": list(self.macho_uuids),
             "executableSHA256": self.executable_sha256,
             "signatureNormalizedExecutableSHA256": self.signature_normalized_executable_sha256,
@@ -520,6 +523,11 @@ def validate_bundle_contract(
     normalized_architectures = tuple(sorted(architectures))
     if normalized_architectures != ("arm64",):
         raise VerificationError(f"{label} architecture must be exactly arm64")
+    required_device_capabilities = _string_tuple(info.get("UIRequiredDeviceCapabilities"))
+    if required_device_capabilities != tuple(sorted(REQUIRED_DEVICE_CAPABILITIES)):
+        raise VerificationError(
+            f"{label} device capabilities must be exactly arm64 and iphone-performance-gaming-tier"
+        )
     normalized_uuids = tuple(sorted(macho_uuids))
     if not normalized_uuids:
         raise VerificationError(f"{label} main executable has no Mach-O UUID")
@@ -618,6 +626,7 @@ def validate_bundle_contract(
         marketing_version=identity[1],
         build_number=identity[2],
         architectures=normalized_architectures,
+        required_device_capabilities=required_device_capabilities,
         macho_uuids=normalized_uuids,
         executable_sha256=executable_sha256,
         signature_normalized_executable_sha256=signature_normalized_executable_sha256,
@@ -691,6 +700,7 @@ def compare_archive_and_export(archive: BundleSnapshot, exported: BundleSnapshot
         archive.marketing_version,
         archive.build_number,
         archive.architectures,
+        archive.required_device_capabilities,
         archive.macho_uuids,
         archive.signature_normalized_executable_sha256,
         archive.application_groups,
@@ -703,6 +713,7 @@ def compare_archive_and_export(archive: BundleSnapshot, exported: BundleSnapshot
         exported.marketing_version,
         exported.build_number,
         exported.architectures,
+        exported.required_device_capabilities,
         exported.macho_uuids,
         exported.signature_normalized_executable_sha256,
         exported.application_groups,

@@ -732,6 +732,7 @@ cross-project comparisons.
 | completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
 |---|---|---|---|---|---|---:|---|---|---|---|
 | 2026-09-02 | [`mac-gate-bench-20260902-013854-f39c1c91`](runs/engine-generation/mac-gate-bench-20260902-013854-f39c1c91.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 2 | `fd3bb5d343ea` | `c4e849dcb35b` | baseline | mac-gate-bench |
+| 2026-09-02 | [`mac-gate-bench-20260902-015022-591814fe`](runs/engine-generation/mac-gate-bench-20260902-015022-591814fe.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 2 | `1fffa64de385` | `c4e849dcb35b` | vs mac-gate-bench-20260902-013854-f39c1c91: RTF +1.5%, TTFC +2.0%, RAM +3.4% | mac-gate-bench |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `c8340ad4e716`
 

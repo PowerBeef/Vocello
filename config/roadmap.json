@@ -1927,10 +1927,12 @@
       "id": "AV-06",
       "plan": "autonomous-validation-remediation-2026-08",
       "title": "P2 — establish stable powered benchmark trends",
-      "status": "planned",
+      "status": "done",
       "gate": "Define a small stable clean trend matrix per platform with controlled order, warmup, thermal/load/power qualification, minimum repeated history, variance reporting, practical thresholds, and an explicit no-baseline state. Required closure evidence: at least two comparable clean records per canonical key, robust interval/threshold fixtures, history validation, and generated trend output that cannot imply comparison when no baseline exists.",
       "evidence": [
-        "doc:docs/reference/autonomous-validation-audit-2026-08-21.md"
+        "doc:docs/reference/autonomous-validation-audit-2026-08-21.md",
+        "file:benchmarks/runs/engine-generation/mac-gate-bench-20260902-013854-f39c1c91.json",
+        "file:benchmarks/runs/engine-generation/mac-gate-bench-20260902-015022-591814fe.json"
       ],
       "sourceOfTruth": [
         "scripts/benchmark_history.py",
@@ -1938,7 +1940,7 @@
         "benchmarks/README.md"
       ],
       "updated": "2026-09-01",
-      "notes": "The first clean optimized canonical-key baseline is now published as mac-gate-bench-20260901-223657-866ddfb3. Its comparison block correctly records no baseline and no deltas rather than implying a trend. A schema-v2 local comparison baseline was seeded from a separately validated optimized run after the legacy unbound array was retired. AV-06 remains open until a second comparable clean record exists for the same key and the generated trend/variance output satisfies the full gate."
+      "notes": "Closed 2026-09-01. Two consecutive clean M2/8 GB optimized records, mac-gate-bench-20260902-013854-f39c1c91 and mac-gate-bench-20260902-015022-591814fe, share the exact governed comparison key. The second record names the first as its baseline and carries per-cell absolute/percentage deltas with no regression: cold RTF +2.66%, warm RTF +0.35%, cold physical footprint -2.61%, and warm physical footprint +9.50%, within the predeclared threshold. Both runs passed deterministic preflight, audio QC, memory qualification, nominal thermal checks, crash delta, history validation, and schema-v2 local baseline comparison; one soft trim per take remains explicit. Robust statistics, coverage-change, no-baseline, and threshold-direction fixtures remain enforced by the benchmark contracts."
     },
     {
       "id": "AV-07",
@@ -2153,18 +2155,21 @@
       "id": "ASR-01",
       "plan": "ios-app-store-readiness-2026-08",
       "title": "Align App Store installation eligibility with the runtime hardware floor",
-      "status": "planned",
+      "status": "done",
       "gate": "Before the first public version, the archived Info.plist and App Store eligibility must exclude every device rejected by IOSDeviceSupport, preferably through Apple's documented iphone-performance-gaming-tier capability for the current iPhone 15 Pro-or-newer floor, or the runtime floor must be removed only after measured support evidence. Deterministic plist/source fixtures must reject any future disagreement.",
       "sourceOfTruth": [
         "Sources/iOS/Info.plist",
         "Sources/iOS/IOSAppBootstrap.swift",
+        "Sources/iOSSupport/Services/IOSDeviceEligibilityPolicy.swift",
+        "scripts/ios_device_eligibility.py",
+        "scripts/verify_ios_release_artifacts.py",
         "project.yml"
       ],
       "evidence": [
         "doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md"
       ],
-      "updated": "2026-08-26",
-      "notes": "P1/source-proven. UIRequiredDeviceCapabilities currently declares only arm64 while the app rejects pre-iPhone 15 Pro hardware at runtime. Capability tightening after distribution is unsafe, so this is a pre-first-release decision."
+      "updated": "2026-09-01",
+      "notes": "Closed 2026-09-01 before first distribution. Info.plist now requires exactly arm64 plus Apple's documented iphone-performance-gaming-tier, which limits purchase, installation, and review to hardware with iPhone 15 Pro/Pro Max-equivalent graphics performance. The runtime guard delegates to one platform-neutral policy that admits iPhone16,1/iPhone16,2 and later iPhone identifier generations. Host and generic-iOS logic tests execute/compile the predicate; the deterministic contract rejects plist, runtime, project-membership, or archive-verifier drift; the retained generic Release app resolved both capabilities exactly. Signed archive/export verification independently rejects an omitted, extra, or changed capability and binds archive-to-IPA parity."
     },
     {
       "id": "ASR-02",

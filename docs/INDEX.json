@@ -437,6 +437,7 @@
       "summary": "Consolidated iPhone app map \u2014 every screen, element, and option from the user view, and how XCUITest drives each via stable identifiers on the paired physical device.",
       "sourceOfTruth": [
         "Sources/iOS",
+        "Sources/iOSSupport/Services/IOSDeviceEligibilityPolicy.swift",
         "Sources/iOSSupport/Services/IOSReferenceTranscriptionReviewState.swift",
         "Sources/SharedSupport/Services/VoiceClipTranscriber.swift",
         "Sources/QwenVoiceCore/GenerationSemantics.swift",
@@ -465,6 +466,9 @@
       "sourceOfTruth": [
         "project.yml",
         "config/roadmap.json",
+        "Sources/iOSSupport/Services/IOSDeviceEligibilityPolicy.swift",
+        "scripts/ios_device_eligibility.py",
+        "scripts/verify_ios_release_artifacts.py",
         "docs/reference/eu-ai-act-article50-assessment.md"
       ]
     },

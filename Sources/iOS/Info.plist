@@ -52,6 +52,7 @@
 	<key>UIRequiredDeviceCapabilities</key>
 	<array>
 		<string>arm64</string>
+		<string>iphone-performance-gaming-tier</string>
 	</array>
 	<key>UIFileSharingEnabled</key>
 	<true/>

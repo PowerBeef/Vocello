@@ -165,26 +165,12 @@ extension QVoiceiOSApp {
 
 enum IOSDeviceSupport {
     static var isSupportedHardware: Bool {
-        isSupportedIdentifier(machineIdentifier())
+        IOSDeviceEligibilityPolicy.isSupportedMachineIdentifier(machineIdentifier())
     }
 
     static var unsupportedReason: String {
         let identifier = machineIdentifier()
-        return "Vocello for iPhone currently requires iPhone 15 Pro or newer.\nCurrent device: \(identifier)"
-    }
-
-    private static func isSupportedIdentifier(_ identifier: String) -> Bool {
-        if identifier.hasPrefix("iPhone16,1") || identifier.hasPrefix("iPhone16,2") {
-            return true
-        }
-        guard identifier.hasPrefix("iPhone") else { return false }
-        let majorVersion = identifier
-            .dropFirst("iPhone".count)
-            .split(separator: ",")
-            .first
-            .map(String.init)
-            .flatMap(Int.init)
-        return (majorVersion ?? 0) >= 17
+        return "Vocello for iPhone currently requires \(IOSDeviceEligibilityPolicy.minimumHardwareDescription).\nCurrent device: \(identifier)"
     }
 
     private static func machineIdentifier() -> String {

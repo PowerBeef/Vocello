@@ -49,13 +49,22 @@ machine-readable status record and wins over any older prose.
 
 ## Resume here (2026-09-01)
 
-**The first clean shipping-optimization engine baseline is published.**
-`mac-gate-bench-20260901-223657-866ddfb3` is a schema-v3 focused record from the canonical
-M2/8 GB Mac, clean source `de5712af`, and an exact hash/UUID-bound `-O` CLI. Both cold and warm
-Custom/Speed takes are represented, memory evidence is qualified, QC passes, thermals are nominal,
-and the soft-trim warning remains explicit. AV-05 is closed. This record intentionally has no
-comparison baseline or deltas; AV-06 remains open until a second clean record for the same key can
-establish a real variance/trend comparison.
+**Shipping-optimization benchmark provenance and the first stable trend pair are closed.**
+The governed baseline format now binds hardware, optimization, matrix, corpus, model artifact,
+telemetry schema, and QC identity, and the gate rejects the former provenance-free legacy array.
+Clean canonical M2/8 GB records `mac-gate-bench-20260902-013854-f39c1c91` and
+`mac-gate-bench-20260902-015022-591814fe` share one comparison key; the second names the first as
+its baseline and contains complete per-cell deltas with no regression. Both passed deterministic
+preflight, optimized executable identity, QC, memory qualification, nominal thermals, and crash
+checks. AV-05 and AV-06 are closed; their explicit soft trims remain visible in history.
+
+**App Store installation eligibility now matches the runtime hardware floor.** Before the first
+public version, the built iOS bundle began requiring exactly `arm64` and Apple's documented
+`iphone-performance-gaming-tier`, while the defense-in-depth runtime guard moved to the shared
+`IOSDeviceEligibilityPolicy`. Host tests, generic-iOS compilation, a retained built-plist readback,
+the source contract, and signed archive/export verification all reject disagreement. ASR-01 is
+closed; this deterministic evidence does not substitute for the still-pending signed archive or
+physical-device candidate acceptance.
 
 **The phone-independent App Store and validation sprint is source-complete and its governed
 deterministic checkpoint passed.** The exact tree passed 1,278 Python tests, generic iOS app and
@@ -257,9 +266,8 @@ digest-pinned data rather than executable code, required-reason privacy declarat
 release workflow has strong source/signature/profile/entitlement/UUID/SBOM verification. Those passes
 do not substitute for the twelve `ASR-*` closure gates now owned by `config/roadmap.json`.
 
-The remaining source-proven P1 gaps are installation eligibility that advertises `arm64` while the app
-rejects pre-iPhone 15 Pro devices; the unsupported “Data Not Collected” instruction while Hugging Face
-receives model-download request metadata; and qualified content-rights/redistribution decisions beyond
+The remaining source-proven P1 gaps are the unsupported “Data Not Collected” instruction while Hugging Face
+receives model-download request metadata and qualified content-rights/redistribution decisions beyond
 the now-complete support and bundled-attribution source work. Reviewer notes/screenshots, sensitive-file protection, release
 logging/API hygiene, build-number collision prevention, and model-host reviewer availability also need
 closure. A fresh signed archive/exported IPA, read-only App Store Connect audit, qualified legal/privacy

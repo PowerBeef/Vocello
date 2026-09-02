@@ -9,10 +9,10 @@
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `autonomous-validation-remediation-2026-08` | active | release-qa | 7/11 (64%) |
+| `autonomous-validation-remediation-2026-08` | active | release-qa | 8/11 (73%) |
 | `delivery-prompting-2026-08` | active | backend-mlx | 29/34 (85%) |
 | `engineering-review-remediation-2026-08` | active | backend-and-platform | 13/14 (93%) |
-| `ios-app-store-readiness-2026-08` | active | release-qa | 1/12 (8%) |
+| `ios-app-store-readiness-2026-08` | active | release-qa | 2/12 (17%) |
 | `ios-control-audit-2026-08` | active | ios | 8/12 (67%) |
 | `ios-generation-startup-reliability-2026-08` | active | backend-and-platform | 4/6 (67%) |
 | `voice-identity-language-reliability-2026-08` | active | backend-and-platform | 6/9 (67%) |
@@ -41,7 +41,7 @@ Narrative authority: [`docs/reference/autonomous-validation-audit-2026-08-21.md`
 | `AV-03` | done | P1 — make promotion evidence capability-complete | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md`, `file:config/quality-promotion-contract.json`, `file:docs/reference/quality-promotion.md` |
 | `AV-04` | done | P2 — make baseline coverage changes fail closed | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md`, `file:config/benchmark-baseline-migrations.json`, `file:scripts/tests/test_compare_baseline.py` |
 | `AV-05` | done | P2 — bind engine performance evidence to shipping optimization | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md`, `file:scripts/build.sh`, `file:scripts/publish_benchmark_history.py`, `file:benchmarks/runs/engine-generation/mac-gate-bench-20260901-223657-866ddfb3.json` |
-| `AV-06` | planned | P2 — establish stable powered benchmark trends | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md` |
+| `AV-06` | done | P2 — establish stable powered benchmark trends | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md`, `file:benchmarks/runs/engine-generation/mac-gate-bench-20260902-013854-f39c1c91.json`, `file:benchmarks/runs/engine-generation/mac-gate-bench-20260902-015022-591814fe.json` |
 | `AV-07` | planned | P2 — independently validate prosody thresholds | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md` |
 | `AV-08` | planned | P2 — qualify multilingual output beyond a single cohort | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md` |
 | `AV-09` | planned | P2 — make stateful physical-device lanes independently repeatable | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md` |
@@ -49,9 +49,6 @@ Narrative authority: [`docs/reference/autonomous-validation-audit-2026-08-21.md`
 | `AV-11` | done | P3 — make marking-equality resource hygiene enforceable | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md`, `file:scripts/check_marking_peak_equality.py`, `file:scripts/tests/test_check_marking_peak_equality.py` |
 
 ### Open items in detail
-
-- **`AV-06`** (planned) — P2 — establish stable powered benchmark trends.
-  gate: Define a small stable clean trend matrix per platform with controlled order, warmup, thermal/load/power qualification, minimum repeated history, variance reporting, practical thresholds, and an explicit no-baseline state. Required closure evidence: at least two comparable clean records per canonical key, robust interval/threshold fixtures, history validation, and generated trend output that cannot imply comparison when no baseline exists.
 
 - **`AV-07`** (planned) — P2 — independently validate prosody thresholds.
   gate: Prosody calibration must freeze on a source-bound labeled training corpus and pass predeclared confusion/noise targets on an untouched holdout spanning speakers, scripts, lengths, languages, and defect severities before becoming promotion authority. Required closure evidence: corpus manifests and digests, annotation protocol, frozen profile, holdout report with uncertainty, analyzer noise-floor/repeatability evidence, and negative threshold-leakage fixtures.
@@ -164,7 +161,7 @@ Narrative authority: [`docs/reference/ios-app-store-readiness-audit-2026-08-26.m
 
 | Item | Status | Title | Evidence |
 | --- | --- | --- | --- |
-| `ASR-01` | planned | Align App Store installation eligibility with the runtime hardware floor | `doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md` |
+| `ASR-01` | done | Align App Store installation eligibility with the runtime hardware floor | `doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md` |
 | `ASR-02` | planned | Resolve Hugging Face processing and App Privacy disclosure | `doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md` |
 | `ASR-03` | done | Provide an accurate monitored support contact | `doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md`, `doc:docs/reference/ios-appstore-submission.md` |
 | `ASR-04` | planned | Bundle complete attributions and record content rights | `doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md`, `doc:docs/reference/content-rights-review.md` |
@@ -178,9 +175,6 @@ Narrative authority: [`docs/reference/ios-app-store-readiness-audit-2026-08-26.m
 | `ASR-12` | planned | Complete current signed-candidate physical-device acceptance | `doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md` |
 
 ### Open items in detail
-
-- **`ASR-01`** (planned) — Align App Store installation eligibility with the runtime hardware floor.
-  gate: Before the first public version, the archived Info.plist and App Store eligibility must exclude every device rejected by IOSDeviceSupport, preferably through Apple's documented iphone-performance-gaming-tier capability for the current iPhone 15 Pro-or-newer floor, or the runtime floor must be removed only after measured support evidence. Deterministic plist/source fixtures must reject any future disagreement.
 
 - **`ASR-02`** (planned) — Resolve Hugging Face processing and App Privacy disclosure.
   gate: Obtain a documented vendor-retention and qualified privacy/legal determination for every request field Hugging Face receives during model downloads; then make PrivacyInfo.xcprivacy, the website/in-app policy, App Store privacy answers, and reviewer notes mutually consistent. The current Data Not Collected assertion must not survive without evidence satisfying Apple's third-party-partner and retention definitions.

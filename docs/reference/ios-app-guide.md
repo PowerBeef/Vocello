@@ -1,10 +1,11 @@
 ---
 status: active
 owner: ios
-reviewed: 2026-08-30
+reviewed: 2026-09-01
 summary: Consolidated iPhone app map — every screen, element, and option from the user view, and how XCUITest drives each via stable identifiers on the paired physical device.
 sourceOfTruth:
   - Sources/iOS
+  - Sources/iOSSupport/Services/IOSDeviceEligibilityPolicy.swift
   - Sources/iOSSupport/Services/IOSReferenceTranscriptionReviewState.swift
   - Sources/SharedSupport/Services/VoiceClipTranscriber.swift
   - Sources/QwenVoiceCore/GenerationSemantics.swift
@@ -49,6 +50,11 @@ Three generation modes (Studio segmented control `generateSection_*`):
 
 The UI is what this guide drives. Headless, non-UI device diagnostics are documented in
 [`ios-device-testing.md`](ios-device-testing.md); that path is separate from XCUITest.
+
+The App Store bundle requires `arm64` and Apple's `iphone-performance-gaming-tier`, aligning
+installation eligibility with Vocello's iPhone 15 Pro-or-newer runtime guard before the first
+public version. `IOSDeviceEligibilityPolicy` owns the source-level predicate and description;
+archive/IPA verification rejects any capability drift.
 
 ---
 

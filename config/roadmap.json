@@ -1905,12 +1905,13 @@
       "id": "AV-05",
       "plan": "autonomous-validation-remediation-2026-08",
       "title": "P2 — bind engine performance evidence to shipping optimization",
-      "status": "planned",
+      "status": "done",
       "gate": "Engine performance records and baselines must either come from an explicitly source-bound -O executable or be contractually limited to correctness/memory semantics; cross-optimization comparison must fail. Required closure evidence: executable/optimization identity fixtures, one clean optimized focused run on canonical macOS hardware, comparison rejection across -Onone/-O, and updated benchmark claims.",
       "evidence": [
         "doc:docs/reference/autonomous-validation-audit-2026-08-21.md",
         "file:scripts/build.sh",
-        "file:scripts/publish_benchmark_history.py"
+        "file:scripts/publish_benchmark_history.py",
+        "file:benchmarks/runs/engine-generation/mac-gate-bench-20260901-223657-866ddfb3.json"
       ],
       "sourceOfTruth": [
         "scripts/build.sh",
@@ -1919,8 +1920,8 @@
         "docs/reference/benchmarking-procedure.md",
         "scripts/publish_benchmark_history.py"
       ],
-      "notes": "Implementation landed 2026-08-21 but the item remains planned until its live closure evidence exists. All macOS CLI benchmark/profile routes now use -O whole-module compilation, publication requires a hash-matched adjacent optimized-build provenance sidecar, and comparison keys isolate optimization identities. The canonical Mac successfully built the new route, the sidecar resolved to -O, and the embedded CLI identity returned vocello 2.4.0. A clean focused -O benchmark record is still required because the retained Settings work keeps this checkout dirty.",
-      "updated": "2026-08-21"
+      "notes": "Closed 2026-09-01. All macOS CLI benchmark/profile routes use -O whole-module compilation, publication requires a hash-matched adjacent optimized-build provenance sidecar, and comparison keys isolate optimization identities with negative fixtures rejecting -Onone/-O comparison. The clean-source canonical M2/8 GB focused record mac-gate-bench-20260901-223657-866ddfb3 validates as schema v3 with optimization -O, exact executable hash/UUID, complete telemetry, two represented cold/warm takes, memory qualification, nominal thermals, no crash, and no baseline substitution. Its soft-trim warning remains explicit and does not weaken the record's optimization identity.",
+      "updated": "2026-09-01"
     },
     {
       "id": "AV-06",
@@ -1936,7 +1937,8 @@
         "benchmarks/schema-v3.json",
         "benchmarks/README.md"
       ],
-      "updated": "2026-08-21"
+      "updated": "2026-09-01",
+      "notes": "The first clean optimized canonical-key baseline is now published as mac-gate-bench-20260901-223657-866ddfb3. Its comparison block correctly records no baseline and no deltas rather than implying a trend. AV-06 remains open until a second comparable clean record exists for the same key and the generated trend/variance output satisfies the full gate."
     },
     {
       "id": "AV-07",

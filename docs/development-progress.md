@@ -49,6 +49,14 @@ machine-readable status record and wins over any older prose.
 
 ## Resume here (2026-09-01)
 
+**The first clean shipping-optimization engine baseline is published.**
+`mac-gate-bench-20260901-223657-866ddfb3` is a schema-v3 focused record from the canonical
+M2/8 GB Mac, clean source `de5712af`, and an exact hash/UUID-bound `-O` CLI. Both cold and warm
+Custom/Speed takes are represented, memory evidence is qualified, QC passes, thermals are nominal,
+and the soft-trim warning remains explicit. AV-05 is closed. This record intentionally has no
+comparison baseline or deltas; AV-06 remains open until a second clean record for the same key can
+establish a real variance/trend comparison.
+
 **The phone-independent App Store and validation sprint is source-complete and its governed
 deterministic checkpoint passed.** The exact tree passed 1,278 Python tests, generic iOS app and
 logic-test compilation, all macOS deterministic suites, a production website build, and two

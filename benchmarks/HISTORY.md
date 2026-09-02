@@ -264,6 +264,12 @@ cross-project comparisons.
 |---|---|---|---|---|---|---:|---|---|---|---|
 | 2026-08-01 | [`macos-engine-20260801-043637-7ebef0f6`](runs/engine-generation/macos-engine-20260801-043637-7ebef0f6.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 3 | `3884622b632a` | `36e09e969fd5` | baseline | r2a-sadstrong-20260826 |
 
+## engine-generation / macos / mac-mini-m2-8gb / config `3b0c1682b887`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---|---|---|---|
+| 2026-09-01 | [`mac-gate-bench-20260901-223657-866ddfb3`](runs/engine-generation/mac-gate-bench-20260901-223657-866ddfb3.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 2 | `de5712afdc86` | `3b0c1682b887` | baseline | mac-gate-bench |
+
 ## engine-generation / macos / mac-mini-m2-8gb / config `3c41b6ebb9ad`
 
 | completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |

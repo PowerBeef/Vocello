@@ -9,7 +9,7 @@
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `autonomous-validation-remediation-2026-08` | active | release-qa | 6/11 (55%) |
+| `autonomous-validation-remediation-2026-08` | active | release-qa | 7/11 (64%) |
 | `delivery-prompting-2026-08` | active | backend-mlx | 29/34 (85%) |
 | `engineering-review-remediation-2026-08` | active | backend-and-platform | 13/14 (93%) |
 | `ios-app-store-readiness-2026-08` | active | release-qa | 1/12 (8%) |
@@ -40,7 +40,7 @@ Narrative authority: [`docs/reference/autonomous-validation-audit-2026-08-21.md`
 | `AV-02` | done | P1 — close evidence-impact critical-path fallbacks | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md`, `file:config/evidence-impact.json`, `file:docs/project-health.md` |
 | `AV-03` | done | P1 — make promotion evidence capability-complete | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md`, `file:config/quality-promotion-contract.json`, `file:docs/reference/quality-promotion.md` |
 | `AV-04` | done | P2 — make baseline coverage changes fail closed | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md`, `file:config/benchmark-baseline-migrations.json`, `file:scripts/tests/test_compare_baseline.py` |
-| `AV-05` | planned | P2 — bind engine performance evidence to shipping optimization | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md`, `file:scripts/build.sh`, `file:scripts/publish_benchmark_history.py` |
+| `AV-05` | done | P2 — bind engine performance evidence to shipping optimization | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md`, `file:scripts/build.sh`, `file:scripts/publish_benchmark_history.py`, `file:benchmarks/runs/engine-generation/mac-gate-bench-20260901-223657-866ddfb3.json` |
 | `AV-06` | planned | P2 — establish stable powered benchmark trends | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md` |
 | `AV-07` | planned | P2 — independently validate prosody thresholds | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md` |
 | `AV-08` | planned | P2 — qualify multilingual output beyond a single cohort | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md` |
@@ -49,9 +49,6 @@ Narrative authority: [`docs/reference/autonomous-validation-audit-2026-08-21.md`
 | `AV-11` | done | P3 — make marking-equality resource hygiene enforceable | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md`, `file:scripts/check_marking_peak_equality.py`, `file:scripts/tests/test_check_marking_peak_equality.py` |
 
 ### Open items in detail
-
-- **`AV-05`** (planned) — P2 — bind engine performance evidence to shipping optimization.
-  gate: Engine performance records and baselines must either come from an explicitly source-bound -O executable or be contractually limited to correctness/memory semantics; cross-optimization comparison must fail. Required closure evidence: executable/optimization identity fixtures, one clean optimized focused run on canonical macOS hardware, comparison rejection across -Onone/-O, and updated benchmark claims.
 
 - **`AV-06`** (planned) — P2 — establish stable powered benchmark trends.
   gate: Define a small stable clean trend matrix per platform with controlled order, warmup, thermal/load/power qualification, minimum repeated history, variance reporting, practical thresholds, and an explicit no-baseline state. Required closure evidence: at least two comparable clean records per canonical key, robust interval/threshold fixtures, history validation, and generated trend output that cannot imply comparison when no baseline exists.

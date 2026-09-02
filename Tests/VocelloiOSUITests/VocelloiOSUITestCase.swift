@@ -377,9 +377,19 @@ class VocelloiOSUITestCase: XCTestCase {
     func replaceScript(with text: String) {
         let editor = element("textInput_textEditor")
         XCTAssertTrue(VocelloUIWait.exists(editor, timeout: 20))
-        if (editor.value as? String) != text {
-            if let current = editor.value as? String, !current.isEmpty {
-                let clear = element("textInput_clearButton")
+        let clear = element("textInput_clearButton")
+        if text.isEmpty {
+            if clear.exists {
+                XCTAssertTrue(VocelloUIPrimaryAction.perform(on: clear, timeout: 20))
+                XCTAssertTrue(
+                    VocelloUIWait.condition("composer to clear through its visible control", timeout: 15) {
+                        let value = editor.value as? String
+                        return !clear.exists && (value == nil || value?.isEmpty == true)
+                    }
+                )
+            }
+        } else if (editor.value as? String) != text {
+            if clear.exists {
                 XCTAssertTrue(VocelloUIPrimaryAction.perform(on: clear, timeout: 20))
                 XCTAssertTrue(
                     VocelloUIWait.condition("composer to clear through its visible control", timeout: 15) {
@@ -394,8 +404,11 @@ class VocelloiOSUITestCase: XCTestCase {
         let lengthCount = element("textInput_lengthCount")
         XCTAssertTrue(
             VocelloUIWait.condition("composer to contain the entered script", timeout: 15) {
-                guard lengthCount.exists, let displayed = editor.value as? String else { return false }
-                return displayed == text
+                guard lengthCount.exists else { return false }
+                if text.isEmpty {
+                    return !clear.exists && lengthCount.label.hasPrefix("0 /")
+                }
+                return (editor.value as? String) == text
             }
         )
 

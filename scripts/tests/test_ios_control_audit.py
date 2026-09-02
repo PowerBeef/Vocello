@@ -110,6 +110,20 @@ class IOSControlAuditContractTests(unittest.TestCase):
         self.assertIn('element("rootTab_settings")', helper)
         self.assertIn("target.frame.maxY <= dockAnchor.frame.minY", helper)
 
+    def test_script_restoration_treats_empty_text_as_empty_not_as_a_placeholder(self) -> None:
+        source = (
+            ROOT
+            / "Tests"
+            / "VocelloiOSUITests"
+            / "VocelloiOSUITestCase.swift"
+        ).read_text(encoding="utf-8")
+        helper = source.split("func replaceScript", 1)[1].split(
+            "func startGenerationAndAssertLiveControls", 1
+        )[0]
+        self.assertIn("if text.isEmpty", helper)
+        self.assertIn('lengthCount.label.hasPrefix("0 /")', helper)
+        self.assertIn("if clear.exists", helper)
+
     def test_direct_import_dismisses_keyboard_and_reveals_save(self) -> None:
         source = (
             ROOT

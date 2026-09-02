@@ -174,7 +174,9 @@ class IOSControlAuditContractTests(unittest.TestCase):
         cleanup = source.split("private func deleteStaleAuditHistoryRows", 1)[1].split(
             "private func visiblePinnedSeed", 1
         )[0]
-        self.assertIn('NSPredicate(format: "label == %@", expectedScript)', cleanup)
+        self.assertIn('"historyRowTap_", expectedScript', cleanup)
+        self.assertIn("matchingScripts, count", cleanup)
+        self.assertNotIn("app.staticTexts", cleanup)
         self.assertIn("historyRowDeleteConfirm_", cleanup)
         self.assertIn("dismissHistorySearchKeyboardIfNeeded()", cleanup)
         keyboard_helper = source.split("private func dismissHistorySearchKeyboardIfNeeded", 1)[1].split(

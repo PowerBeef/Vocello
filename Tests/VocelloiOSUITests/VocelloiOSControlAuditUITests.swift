@@ -1300,8 +1300,11 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
                 select(tab: .studio)
                 return
             }
-            let matchingScripts = app.staticTexts.matching(
-                NSPredicate(format: "label == %@", expectedScript)
+            let matchingScripts = app.descendants(matching: .any).matching(
+                NSPredicate(
+                    format: "identifier BEGINSWITH %@ AND label CONTAINS %@",
+                    "historyRowTap_", expectedScript
+                )
             ).count
             XCTAssertEqual(
                 matchingScripts, count,

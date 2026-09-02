@@ -612,7 +612,7 @@ public enum GenerationSemantics {
             textOverride: spokenText
         )
         switch request.payload {
-        case .custom(let speakerID, let deliveryStyle):
+        case .custom(let speakerID, _):
             let canUseInstruction = capabilities.supportsInstructionControl
             let resolvedDelivery = canUseInstruction
                 ? resolvedDeliveryInstruction(

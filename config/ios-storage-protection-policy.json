@@ -1,0 +1,107 @@
+{
+  "schemaVersion": 1,
+  "platform": "iOS",
+  "defaultProtection": "completeUntilFirstUserAuthentication",
+  "paths": [
+    {
+      "id": "application-support-root",
+      "relativePath": ".",
+      "kind": "directory",
+      "backup": "inherited",
+      "protection": "completeUntilFirstUserAuthentication",
+      "recursive": false,
+      "purpose": "Container root and History database sidecars"
+    },
+    {
+      "id": "models",
+      "relativePath": "models",
+      "kind": "directory",
+      "backup": "excluded",
+      "protection": "completeUntilFirstUserAuthentication",
+      "recursive": true,
+      "purpose": "Regenerable downloaded model artifacts"
+    },
+    {
+      "id": "downloads",
+      "relativePath": "downloads",
+      "kind": "directory",
+      "backup": "excluded",
+      "protection": "completeUntilFirstUserAuthentication",
+      "recursive": true,
+      "purpose": "Background download ledger, chunks, and staging"
+    },
+    {
+      "id": "cache",
+      "relativePath": "cache",
+      "kind": "directory",
+      "backup": "excluded",
+      "protection": "completeUntilFirstUserAuthentication",
+      "recursive": true,
+      "purpose": "Imported references, prepared audio, normalized clone data, streams, and MLX cache"
+    },
+    {
+      "id": "diagnostics",
+      "relativePath": "diagnostics",
+      "kind": "directory",
+      "backup": "excluded",
+      "protection": "completeUntilFirstUserAuthentication",
+      "recursive": true,
+      "purpose": "Bounded privacy-gated diagnostics"
+    },
+    {
+      "id": "outputs",
+      "relativePath": "outputs",
+      "kind": "directory",
+      "backup": "included",
+      "protection": "completeUntilFirstUserAuthentication",
+      "recursive": true,
+      "purpose": "User-generated audio referenced by History"
+    },
+    {
+      "id": "voices",
+      "relativePath": "voices",
+      "kind": "directory",
+      "backup": "included",
+      "protection": "completeUntilFirstUserAuthentication",
+      "recursive": true,
+      "purpose": "Saved reference voices, transcripts, and enrollment metadata"
+    },
+    {
+      "id": "voice-candidates",
+      "relativePath": "voice-candidates",
+      "kind": "directory",
+      "backup": "excluded",
+      "protection": "completeUntilFirstUserAuthentication",
+      "recursive": true,
+      "purpose": "Ephemeral saved-voice candidates awaiting explicit review"
+    },
+    {
+      "id": "voice-transactions",
+      "relativePath": "voice-transactions",
+      "kind": "directory",
+      "backup": "excluded",
+      "protection": "completeUntilFirstUserAuthentication",
+      "recursive": true,
+      "purpose": "Recoverable enrollment commit, replacement, and deletion journals"
+    },
+    {
+      "id": "history-outbox",
+      "relativePath": "history-outbox",
+      "kind": "directory",
+      "backup": "included",
+      "protection": "completeUntilFirstUserAuthentication",
+      "recursive": true,
+      "purpose": "User-generated audio and metadata awaiting History publication recovery"
+    },
+    {
+      "id": "history",
+      "relativePath": "history.sqlite",
+      "pathPrefix": "history.sqlite",
+      "kind": "file-family",
+      "backup": "included",
+      "protection": "completeUntilFirstUserAuthentication",
+      "recursive": false,
+      "purpose": "Generation History database and SQLite sidecars"
+    }
+  ]
+}

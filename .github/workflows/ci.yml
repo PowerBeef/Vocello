@@ -291,6 +291,9 @@ jobs:
       - name: Install locked dependencies
         run: npm --prefix website ci
 
+      - name: Install pinned Chromium runtime
+        run: npx --prefix website playwright install --with-deps chromium
+
       - name: Lint, test, and build website
         run: npm --prefix website run check
 

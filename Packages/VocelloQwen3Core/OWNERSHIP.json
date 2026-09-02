@@ -27,7 +27,8 @@
         "AVFoundation",
         "Foundation",
         "HuggingFace",
-        "MLX"
+        "MLX",
+        "OSLog"
       ]
     },
     "MLXAudioCodecs": {

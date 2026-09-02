@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "profile": "primary",
+  "platform": "IOS",
+  "timeoutSeconds": 30,
+  "reads": [
+    {
+      "id": "app-record",
+      "arguments": ["apps", "view", "--id", "{appID}", "--output", "json"],
+      "required": true
+    },
+    {
+      "id": "versions",
+      "arguments": ["versions", "list", "--app", "{appID}", "--platform", "IOS", "--paginate", "--output", "json"],
+      "required": true
+    },
+    {
+      "id": "release-status",
+      "arguments": ["status", "--app", "{appID}", "--platform", "IOS", "--include", "app,builds,testflight,appstore,submission,review,phased-release,links", "--output", "json"],
+      "required": true
+    },
+    {
+      "id": "app-info",
+      "arguments": ["apps", "info", "view", "--app", "{appID}", "--output", "json"],
+      "required": true
+    },
+    {
+      "id": "content-rights",
+      "arguments": ["apps", "content-rights", "view", "--app", "{appID}", "--output", "json"],
+      "required": true
+    },
+    {
+      "id": "age-rating",
+      "arguments": ["age-rating", "view", "--app", "{appID}", "--output", "json"],
+      "required": true
+    },
+    {
+      "id": "pricing-availability",
+      "arguments": ["pricing", "availability", "view", "--app", "{appID}", "--output", "json"],
+      "required": true
+    },
+    {
+      "id": "review-status",
+      "arguments": ["review", "status", "--app", "{appID}", "--output", "json"],
+      "required": true
+    },
+    {
+      "id": "version-readiness",
+      "arguments": ["validate", "--app", "{appID}", "--version", "{marketingVersion}", "--platform", "IOS", "--strict", "--output", "json"],
+      "required": false
+    }
+  ],
+  "webOrOwnerOnlyChecks": [
+    "app-privacy-publication",
+    "agreements-tax-banking",
+    "dsa-trader-status",
+    "regional-compliance-fields"
+  ],
+  "forbiddenCommandTokens": [
+    "apply",
+    "cancel",
+    "create",
+    "delete",
+    "edit",
+    "publish",
+    "remove",
+    "submit",
+    "update",
+    "upload",
+    "--confirm"
+  ]
+}

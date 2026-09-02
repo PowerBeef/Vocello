@@ -153,13 +153,9 @@ Review and trust `.codex/hooks.json` with `/hooks`. Its Bash hook runs
 `scripts/hooks/precommit_gate.sh`; commits require `main` and the quick gate. Exit 2 blocks.
 `QVOICE_SKIP_COMMIT_GATE=1` bypasses validation once, never the `main` requirement or full CI.
 
-When XcodeBuildMCP is available:
-
-1. Read `axiom-xcode-mcp` and call `session_show_defaults`.
-2. Use repository profile `macos` for scheme `QwenVoice` or `ios-device` for scheme `VocelloiOS`.
-3. Resolve a physical device identifier at runtime; never commit it.
-4. Do not use Simulator, preview, or UI-automation routes for Vocello.
-5. Treat repository scripts as the final build/test verdict.
+With XcodeBuildMCP, read `axiom-xcode-mcp`, call `session_show_defaults`, use profile `macos`
+for `QwenVoice` or `ios-device` for `VocelloiOS`, and resolve physical-device IDs only at runtime.
+Never use its Simulator, preview, or UI routes; repository scripts remain authoritative.
 
 ## Verification tiers
 
@@ -217,6 +213,7 @@ rows; reruns get new IDs. See `docs/reference/ios-device-testing.md`.
 | `Tests/VocelloiOSLogicTests/` | Host-executed platform-neutral policy assertions, also compiled in a standalone generic device-SDK bundle |
 | `config/runtime-debug-knobs.json`, `config/concurrency-safety.json` | debug and concurrency exception registries |
 | `config/support-contact.json`, `config/third-party-attribution-policy.json`, `docs/reference/content-rights-review.md` | support, offline attribution, and qualified-rights gates |
+| `config/{ios-storage-protection,app-store-connect-readiness,model-host-availability-policy}.json` | Storage, account, collision, host contracts |
 | `config/model-management-diagnostics-schema-v1.json`, `scripts/check_ios_model_management.py` | correlated physical-iPhone model-delivery and progress diagnosis contract |
 | `config/ios-startup-reliability-{plan-schema-v1,result-schema-v1,result-schema-v2,sentinel}.json`, `scripts/ios_startup_reliability.py` | bounded physical-iPhone Built-in Voice startup plans, backward-compatible retained results, codec replay, memory/crash forensics, and exact request parity |
 | `config/runtime-refactor-contract.json`, `config/roadmap.json` | convergence and work-state authorities |

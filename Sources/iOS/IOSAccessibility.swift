@@ -40,13 +40,13 @@ extension EnvironmentValues {
 @MainActor
 enum IOSDisplayCapability {
     /// True on fixed-refresh (non-ProMotion) panels, which cannot idle below
-    /// their 60 Hz cadence. Resolved from the connected window scene; falls
-    /// back to the main screen before a scene attaches.
+    /// their 60 Hz cadence. Resolved from the connected window scene; before
+    /// a scene attaches the performance gate stays off.
     static var isFixedRefreshDisplay: Bool {
         let sceneMaximum = UIApplication.shared.connectedScenes
             .compactMap { ($0 as? UIWindowScene)?.screen.maximumFramesPerSecond }
             .max()
-        return (sceneMaximum ?? UIScreen.main.maximumFramesPerSecond) <= 60
+        return sceneMaximum.map { $0 <= 60 } ?? false
     }
 }
 

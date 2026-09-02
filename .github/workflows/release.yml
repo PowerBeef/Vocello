@@ -646,7 +646,9 @@ jobs:
             || python3 -m pip install --quiet "numpy==${NUMPY_PIN}"
           ./scripts/install_pinned_tools.sh
           export PATH="$HOME/.qwenvoice-pinned-tools/bin:$PATH"
+          ./scripts/install_pinned_asc.sh --prefix "$HOME/.qwenvoice-pinned-tools/bin"
           python3 -c 'import numpy; print(numpy.__version__)'
+          asc version
           python3 scripts/supply_chain_contract.py --installed native
 
       - name: Bind iOS release source and initialize required steps
@@ -747,6 +749,28 @@ jobs:
           chmod 600 "$RUNNER_TEMP/asc/AuthKey_${ASC_API_KEY_ID}.p8"
           cp "$RUNNER_TEMP/asc/AuthKey_${ASC_API_KEY_ID}.p8" ~/.appstoreconnect/private_keys/
           chmod 600 ~/.appstoreconnect/private_keys/AuthKey_${ASC_API_KEY_ID}.p8
+
+      - name: Reject an existing App Store build identity
+        env:
+          ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
+          ASC_API_ISSUER_ID: ${{ secrets.ASC_API_ISSUER_ID }}
+          ASC_TELEMETRY_DISABLED: "1"
+        run: |
+          set -euo pipefail
+          export PATH="$HOME/.qwenvoice-pinned-tools/bin:$PATH"
+          asc auth login \
+            --name vocello-release-preflight \
+            --key-type team \
+            --key-id "$ASC_API_KEY_ID" \
+            --issuer-id "$ASC_API_ISSUER_ID" \
+            --private-key "$RUNNER_TEMP/asc/AuthKey_${ASC_API_KEY_ID}.p8" \
+            --network >/dev/null
+          python3 scripts/required_step_ledger.py run \
+            --ledger "$RELEASE_STEP_LEDGER" --step build-collision-preflight \
+            --timeout-seconds 300 -- \
+            python3 scripts/app_store_build_preflight.py check \
+              --profile vocello-release-preflight \
+              --output build/dist/ios/app-store-build-preflight.json
 
       - name: Inject team id into ExportOptions
         env:
@@ -871,6 +895,7 @@ jobs:
             --source-date-epoch "$source_date_epoch" \
             --output-dir build/dist/ios \
             --artifact "$ipa" \
+            --artifact build/dist/ios/app-store-build-preflight.json \
             --artifact build/dist/ios/ios-release-artifact-verification.json \
             --source-identity "$RELEASE_SOURCE_IDENTITY" \
             --step-ledger "$RELEASE_STEP_LEDGER"
@@ -892,6 +917,7 @@ jobs:
             build/dist/ios/vocello-ios.cdx.json
             build/dist/ios/release-evidence.json
             build/dist/ios/release-verification.json
+            build/dist/ios/app-store-build-preflight.json
             build/dist/ios/ios-release-artifact-verification.json
             build/dist/ios/SHA256SUMS
           if-no-files-found: error
@@ -917,3 +943,5 @@ jobs:
           [ -z "${IOS_PROFILE_PATH:-}" ] || rm -f "$IOS_PROFILE_PATH"
           rm -rf "$RUNNER_TEMP/asc" "$RUNNER_TEMP/dist.p12" "$RUNNER_TEMP/profile.mobileprovision"
           rm -f "$HOME/.appstoreconnect/private_keys/AuthKey_${{ secrets.ASC_API_KEY_ID }}.p8"
+          export PATH="$HOME/.qwenvoice-pinned-tools/bin:$PATH"
+          asc auth logout --name vocello-release-preflight --confirm >/dev/null 2>&1 || true

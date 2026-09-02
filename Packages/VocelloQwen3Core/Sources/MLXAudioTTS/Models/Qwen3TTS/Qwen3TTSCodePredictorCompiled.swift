@@ -155,8 +155,8 @@ final class CodePredictorCompiledPlan {
                 base: attention.ropeBase, scale: 1.0, offset: offset
             )
 
-            var keyBuffer = keyBuffers[index]
-            var valueBuffer = valueBuffers[index]
+            let keyBuffer = keyBuffers[index]
+            let valueBuffer = valueBuffers[index]
             keyBuffer[.ellipsis, offset ..< (offset + seqLen), 0...] = k
             valueBuffer[.ellipsis, offset ..< (offset + seqLen), 0...] = v
             keyBuffers[index] = keyBuffer

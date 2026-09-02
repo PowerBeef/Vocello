@@ -59,6 +59,7 @@
       "sourceIdentityRequired": true,
       "requiredSteps": [
         "platform-readiness",
+        "build-collision-preflight",
         "archive",
         "archive-verification",
         "ipa-export",
@@ -76,6 +77,23 @@
               {
                 "normalized": "scripts/macos_test.sh gate && ./scripts/build_foundation_targets.sh ios"
               }
+            ]
+          }
+        ],
+        "build-collision-preflight": [
+          {
+            "id": "ios-app-store-build-collision-preflight-v1",
+            "argv": [
+              "python3",
+              "scripts/app_store_build_preflight.py",
+              "check",
+              "--profile",
+              "vocello-release-preflight",
+              "--output",
+              "build/dist/ios/app-store-build-preflight.json"
+            ],
+            "outputs": [
+              "build/dist/ios/app-store-build-preflight.json"
             ]
           }
         ],

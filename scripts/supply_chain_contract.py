@@ -198,14 +198,14 @@ def validate(root: Path, installed: str | None = None) -> list[str]:
             errors.append(f"promotion workflow is missing signed exact-SHA control: {required}")
 
     ios_release_order = re.compile(
-        r"Run process-bound iOS release readiness.*Archive VocelloiOS.*"
+        r"Run process-bound iOS release readiness.*Reject an existing App Store build identity.*Archive VocelloiOS.*"
         r"Export App Store IPA.*Verify exported IPA identity and signing contract.*"
         r"Generate and validate iOS release evidence",
         re.DOTALL,
     )
     if not ios_release_order.search(release):
         errors.append(
-            "iOS release workflow must preserve readiness -> archive -> export -> artifact verification -> evidence ordering"
+            "iOS release workflow must preserve readiness -> build-collision preflight -> archive -> export -> artifact verification -> evidence ordering"
         )
     for required in (
         "--step platform-readiness",
@@ -214,6 +214,14 @@ def validate(root: Path, installed: str | None = None) -> list[str]:
     ):
         if required not in release:
             errors.append(f"iOS release workflow is missing process-bound readiness binding: {required}")
+    for required in (
+        "scripts/install_pinned_asc.sh",
+        "--step build-collision-preflight",
+        "scripts/app_store_build_preflight.py check",
+        "app-store-build-preflight.json",
+    ):
+        if required not in release:
+            errors.append(f"iOS release workflow is missing build-collision control: {required}")
     for required in (
         "--step ipa-verification",
         "scripts/verify_ios_release_artifacts.py",

@@ -716,7 +716,8 @@
       "sourceOfTruth": [
         "Sources/QwenVoiceCore/HuggingFaceDownloader.swift",
         "Sources/QwenVoiceCore/IOSModelDownloadLedger.swift",
-        "Sources/Resources/qwenvoice_production_model_catalog.json"
+        "Sources/Resources/qwenvoice_production_model_catalog.json",
+        "config/model-host-availability-policy.json"
       ]
     },
     {
@@ -732,7 +733,9 @@
       "owner": "backend-and-platform",
       "summary": "Local-first privacy and on-disk storage layout on both platforms \u2014 what lives where, what never leaves the device, and deletion semantics.",
       "sourceOfTruth": [
-        "Sources/SharedSupport"
+        "Sources/SharedSupport",
+        "Sources/iOSSupport/Services/IOSStorageProtectionPolicy.swift",
+        "config/ios-storage-protection-policy.json"
       ]
     },
     {

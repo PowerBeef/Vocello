@@ -22,6 +22,26 @@ ROOT = Path(__file__).resolve().parents[1]
 SCHEMA_VERSION = 2
 SUMMARY_NAME = "ios-release-artifact-verification.json"
 DIGEST_PATTERN = re.compile(r"[0-9a-f]{64}")
+MACHO_MAGICS = {
+    b"\xcf\xfa\xed\xfe",
+    b"\xfe\xed\xfa\xcf",
+    b"\xca\xfe\xba\xbe",
+    b"\xbe\xba\xfe\xca",
+}
+PROHIBITED_EXECUTABLE_NAME_PATTERNS = (
+    re.compile(r"xctest", re.IGNORECASE),
+    re.compile(r"xcui", re.IGNORECASE),
+    re.compile(r"injection", re.IGNORECASE),
+    re.compile(r"viewdebug", re.IGNORECASE),
+    re.compile(r"preview", re.IGNORECASE),
+)
+PROHIBITED_RELEASE_STRING_PATTERNS = (
+    re.compile(r"/Users/"),
+    re.compile(r"/private/var/folders/"),
+    re.compile(r"VOCELLO_INTERNAL_DIAGNOSTICS"),
+    re.compile(r"QVOICE_DEVICE_DIAGNOSTICS"),
+)
+PROHIBITED_DYNAMIC_SYMBOLS = {"_dlopen", "_dlsym"}
 
 
 class VerificationError(ValueError):
@@ -360,6 +380,104 @@ def _macho_uuids(executable: Path) -> tuple[str, ...]:
     return parsed
 
 
+def _is_macho(path: Path) -> bool:
+    try:
+        with path.open("rb") as handle:
+            return handle.read(4) in MACHO_MAGICS
+    except OSError:
+        return False
+
+
+def _is_allowed_macho(relative: Path, executable_name: str) -> bool:
+    parts = relative.parts
+    if relative.as_posix() == executable_name:
+        return True
+    if len(parts) == 2 and parts[0] == "Frameworks" and relative.suffix == ".dylib":
+        return relative.name.startswith("libswift")
+    if len(parts) == 3 and parts[0] == "Frameworks" and parts[1].endswith(".framework"):
+        return parts[2] == Path(parts[1]).stem
+    return False
+
+
+def _validate_release_strings(text: str, label: str) -> None:
+    for pattern in PROHIBITED_RELEASE_STRING_PATTERNS:
+        if pattern.search(text):
+            raise VerificationError(f"{label} executable contains prohibited release diagnostic or private-path vocabulary")
+
+
+def _validate_undefined_symbols(symbols: Sequence[str], label: str) -> None:
+    normalized = {symbol.strip().split()[-1] for symbol in symbols if symbol.strip()}
+    found = sorted(normalized & PROHIBITED_DYNAMIC_SYMBOLS)
+    if found:
+        raise VerificationError(f"{label} executable imports prohibited dynamic-loading APIs")
+
+
+def _validate_framework_privacy_manifest(framework: Path, label: str) -> None:
+    info_path = framework / "Info.plist"
+    if not info_path.is_file():
+        raise VerificationError(f"{label} embedded framework has no Info.plist")
+    info = _read_plist(info_path)
+    identifier = info.get("CFBundleIdentifier")
+    if not isinstance(identifier, str) or not identifier:
+        raise VerificationError(f"{label} embedded framework has no bundle identifier")
+    if identifier.startswith(("com.apple.", "com.qwenvoice.")):
+        return
+    manifests = list(framework.rglob("PrivacyInfo.xcprivacy"))
+    if len(manifests) != 1:
+        raise VerificationError(f"{label} third-party framework must contain exactly one privacy manifest")
+    _validate_privacy_manifest(_read_plist(manifests[0]), f"{label} framework")
+
+
+def _validate_bundle_hygiene(app: Path, label: str, executable_name: str) -> dict[str, Any]:
+    machos: list[Path] = []
+    for candidate in sorted(app.rglob("*")):
+        if candidate.is_symlink():
+            resolved = candidate.resolve()
+            try:
+                resolved.relative_to(app.resolve())
+            except ValueError as error:
+                raise VerificationError(f"{label} bundle contains a symlink escaping the app") from error
+            continue
+        if not candidate.is_file():
+            continue
+        relative = candidate.relative_to(app)
+        if candidate.suffix.lower() in {".py", ".pyc", ".sh", ".command"}:
+            raise VerificationError(f"{label} bundle contains unexpected script content")
+        if not _is_macho(candidate):
+            continue
+        if not _is_allowed_macho(relative, executable_name):
+            raise VerificationError(f"{label} bundle contains an unexpected executable")
+        if any(pattern.search(candidate.name) for pattern in PROHIBITED_EXECUTABLE_NAME_PATTERNS):
+            raise VerificationError(f"{label} bundle contains a test, debug, preview, or injection executable")
+        strings, _ = _run_bytes(["/usr/bin/strings", "-a", str(candidate)])
+        _validate_release_strings(strings.decode("utf-8", errors="replace"), label)
+        symbols, _ = _run_bytes(["/usr/bin/nm", "-u", str(candidate)])
+        _validate_undefined_symbols(symbols.decode("utf-8", errors="replace").splitlines(), label)
+        machos.append(relative)
+
+    if not machos or Path(executable_name) not in machos:
+        raise VerificationError(f"{label} bundle hygiene scan did not find the main executable")
+    for framework in sorted((app / "Frameworks").glob("*.framework")) if (app / "Frameworks").is_dir() else []:
+        _validate_framework_privacy_manifest(framework, label)
+    return {
+        "verified": True,
+        "machOCount": len(machos),
+        "unexpectedExecutables": 0,
+        "prohibitedDynamicAPIs": 0,
+        "prohibitedReleaseStrings": 0,
+    }
+
+
+def _validate_dsym_uuid_match(archive: Path, executable_name: str, expected_uuids: Sequence[str]) -> None:
+    candidates = sorted((archive / "dSYMs").glob(f"{executable_name}.app.dSYM"))
+    dsym = _single_path(candidates, "application dSYM")
+    dwarf = dsym / "Contents/Resources/DWARF" / executable_name
+    if not dwarf.is_file():
+        raise VerificationError("application dSYM has no matching DWARF executable")
+    if _macho_uuids(dwarf) != tuple(sorted(expected_uuids)):
+        raise VerificationError("application dSYM UUIDs do not match the archived executable")
+
+
 def _string_tuple(value: Any) -> tuple[str, ...]:
     if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
         return ()
@@ -538,6 +656,7 @@ def _snapshot(
     executable = app / executable_name
     if not executable.is_file():
         raise VerificationError(f"{label} main executable is missing")
+    _validate_bundle_hygiene(app, label, executable_name)
     signing_leaf_certificate = _trusted_signing_leaf_certificate(app)
     return validate_bundle_contract(
         label=label,
@@ -622,6 +741,11 @@ def verify(archive: Path, export_dir: Path, expected_team_id: str, output: Path,
             expected_team_id,
             require_app_store_distribution=True,
         )
+        archive_info = _read_plist(archive_app / "Info.plist")
+        declared_executable = archive_info.get("CFBundleExecutable")
+        if not isinstance(declared_executable, str) or not declared_executable:
+            raise VerificationError("archive CFBundleExecutable is missing")
+        _validate_dsym_uuid_match(archive, declared_executable, archived.macho_uuids)
         compare_archive_and_export(archived, exported)
     payload: dict[str, Any] = {
         "schemaVersion": SCHEMA_VERSION,
@@ -640,6 +764,11 @@ def verify(archive: Path, export_dir: Path, expected_team_id: str, output: Path,
         "archive": archived.public_dict(),
         "export": exported.public_dict(),
         "archiveExportIdentityMatch": True,
+        "releaseHygiene": {
+            "archiveVerified": True,
+            "exportVerified": True,
+            "dSYMUUIDMatch": True,
+        },
         "privacy": {"containsTeamIdentifier": False, "containsAbsolutePaths": False},
     }
     _atomic_json(output, payload)

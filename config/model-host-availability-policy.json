@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "catalog": "Sources/Resources/qwenvoice_ios_model_catalog.json",
+  "allowedOriginHosts": [
+    "huggingface.co"
+  ],
+  "allowedRedirectHostSuffixes": [
+    "huggingface.co",
+    "hf.co"
+  ],
+  "probeSelection": "largest-file-per-model",
+  "rangeBytes": "bytes=0-0",
+  "timeoutSeconds": 30,
+  "representativeRegions": [
+    "north-america-east",
+    "europe-west",
+    "east-asia"
+  ],
+  "freshnessHours": 24,
+  "outageResponse": {
+    "automaticHostFallbackAllowed": false,
+    "automaticArtifactSubstitutionAllowed": false,
+    "reviewerGuidance": "Retry later on a stable network. If the pinned host remains unavailable, contact Vocello support; do not substitute an unpinned model artifact."
+  }
+}

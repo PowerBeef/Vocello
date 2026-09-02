@@ -1,7 +1,7 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-08-29
+reviewed: 2026-09-01
 summary: Operator checklist for shipping Vocello for iPhone to TestFlight / the App Store — account prerequisites, App Store Connect privacy and compliance rows, App Review notes, and the credential-bound archive/upload steps.
 sourceOfTruth:
   - project.yml
@@ -72,6 +72,22 @@ Current account checkpoint (2026-08-27): the exact `en-US` Support URL and
 No other metadata, build, TestFlight, or submission state was changed. ASR-11 still requires the
 complete read-only account and regional-compliance inventory.
 
+The guarded inventory command is read-only, paginated where applicable, and retains only response
+digests, resource counts, and safe state tokens:
+
+```sh
+python3 scripts/app_store_connect_readiness.py validate
+python3 scripts/app_store_connect_readiness.py inventory \
+  --profile primary \
+  --output build/artifacts/app-store/app-store-connect-readiness.json
+```
+
+The public API cannot establish App Privacy publication, agreement/tax/banking readiness, DSA
+trader status, or every regional-compliance field. The inventory marks those checks pending owner
+or web review rather than converting absence into PASS. On 2026-09-01 the unattended `primary`
+profile read timed out at its first account request; no account data was retained and ASR-11
+remains open.
+
 - [ ] **Privacy Policy URL** = `https://vocello.vercel.app/privacy` (hosted by this repo's website; the in-app
       Settings → About → Privacy Policy row links to the same URL).
 - [ ] **App Privacy "nutrition label"**: do not select **Data Not Collected** until ASR-02 closes.
@@ -94,19 +110,25 @@ complete read-only account and regional-compliance inventory.
 ## 2. App Review demo notes (paste into "App Review Information → Notes")
 
 > Vocello generates speech entirely on-device. It ships with **no bundled model weights** to keep the app
-> small; on first launch you install a voice model from Settings → Voice models (tap **Install** on
-> "Built-in Voice"; it downloads a ~1.7 GB 4-bit Speed model from Hugging Face over Wi-Fi). After the model
-> shows **Ready**, open Studio, type a short line, pick a built-in speaker, and tap Generate to hear on-device
-> synthesis. Voice Design and Voice Cloning each install their own model the same way. No account or login is
-> required. Voice Cloning records its reference with the in-app microphone or imports an audio file
-> the user already has rights to (Files picker on the Voices tab, or opening an audio file from the
-> Files app); Microphone + Speech permissions are only requested for the recording/transcription flow.
+> small. On first launch, open Settings → Voice Models and tap **Install** for the Studio mode you want:
+> Built-in Voice is 1,708,583,689 bytes, Voice Design is 1,708,583,196 bytes, and Voice Cloning is
+> 1,732,600,769 bytes. One model is sufficient to review its matching mode. Downloads require Wi-Fi and
+> roughly 2 GB of free space per model; completion time depends on the review network and may take several
+> minutes. Progress reports exact downloaded catalog bytes. A download can be cancelled and restarted, and
+> an interrupted background download is adopted after relaunch. Final verification/installation is shown as
+> an indeterminate finishing step. Once the model shows **Ready**, that mode works offline. Open Studio,
+> type a short line, choose a speaker where applicable, and tap Generate. No account or login is required.
+> Voice Cloning records its reference with the microphone or imports an audio file the user has rights to;
+> Microphone and Speech Recognition permissions are requested only for recording and local transcription.
+> If a pinned model host is temporarily unavailable, retry later on stable Wi-Fi or use the Support link in
+> Settings. Vocello never substitutes a different model artifact.
 
 No demo account is needed (no login). Note the model download requirement so the app is not judged
 non-functional under Guideline 2.1.
 
-Before using these notes, close ASR-09 with anonymous availability evidence for the exact catalog URLs
-and add truthful expected download time, available-space needs, retry behavior, and offline behavior.
+Before using these notes, close ASR-09 with anonymous availability evidence from all representative
+regions. The 2026-09-01 North America one-byte range probe passed all three exact iOS artifacts;
+Europe and East Asia remain pending.
 
 ## 3. Screenshots + metadata
 
@@ -136,6 +158,13 @@ and add truthful expected download time, available-space needs, retry behavior, 
       [`content-rights-review.md`](content-rights-review.md); the App Store checkbox is not legal clearance.
 
 ## 4. Build the signed IPA
+
+Before producing a signed candidate, run a generic-device Release Analyze with the repository's
+governed caches and validate its log with
+`python3 scripts/ios_release_analyzer_warnings.py check --log <log>`. Application-source warnings
+are not allowlisted. The reviewed residual MLX isolation, cross-platform shim, and no-App-Intents
+classes are count-bounded by `config/ios-release-analyzer-warning-policy.json`; a new warning or
+count increase blocks the candidate.
 
 Two paths produce the same App-Store-uploadable IPA.
 
@@ -175,7 +204,25 @@ submitting it for App Review, or releasing it publicly, produce and validate the
 `quality-promotion.json` against this exact release evidence. This preserves TestFlight as a useful
 validation environment without allowing a source-stale phone verdict to authorize public promotion.
 
+Before archiving, the workflow installs the digest-pinned `asc` binary and performs a
+least-privilege read-only collision check for the exact bundle/version/build identity. Any existing
+App Store Connect build with that identity blocks the archive. The workflow never invents or
+increments a build number. To advance it, edit `CURRENT_PROJECT_VERSION` in `project.yml`,
+regenerate the project, review the diff, and rerun deterministic validation.
+
 ### B. Local (Xcode-logged-in maintainer)
+
+Run the same collision check before resolving or archiving:
+
+```sh
+python3 scripts/app_store_build_preflight.py identity
+python3 scripts/app_store_build_preflight.py check \
+  --profile primary \
+  --output build/artifacts/app-store/build-collision-preflight.json
+```
+
+The second command performs no mutation and must PASS. A Keychain/authentication timeout is not
+permission to archive; restore the least-privilege profile and rerun it.
 
 ```sh
 export QWENVOICE_DEVELOPMENT_TEAM=<your-team-id>

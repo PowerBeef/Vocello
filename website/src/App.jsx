@@ -75,7 +75,7 @@ const App = () => {
   <>
     <a className="skip-link" href="#main-content">Skip to main content</a>
     <Nav />
-    <main id="main-content">
+    <main id="main-content" tabIndex="-1">
       <Hero />
       <div id="workflows" className="workflows-anchor">
         {WORKFLOWS.map((w, i) => (

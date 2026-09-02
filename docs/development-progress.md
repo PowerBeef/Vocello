@@ -49,6 +49,44 @@ machine-readable status record and wins over any older prose.
 
 ## Resume here (2026-09-01)
 
+**The phone-independent App Store and validation sprint is source-complete and its governed
+deterministic checkpoint passed.** The exact tree passed 1,278 Python tests, generic iOS app and
+logic-test compilation, all macOS deterministic suites, a production website build, and two
+wide/narrow real-browser journeys. The website now has a pinned Playwright/Chromium production-build lane:
+12 contract tests plus two wide/narrow real-browser journeys pass hydration, keyboard progression,
+skip navigation, internal targets, and clean console/page behavior. AV-10 is closed; CI installs the
+same pinned browser runtime only for website changes.
+
+ASR-06 through ASR-09 and ASR-11 now have enforceable source-side boundaries. Eleven iOS storage
+classes are machine-readable and bootstrap-applied with CompleteUntilFirstUserAuthentication;
+regenerable delivery/cache/diagnostic and enrollment-transaction data is backup-excluded, while
+outputs, committed voices, History, and its recovery outbox remain backup-eligible. The release
+artifact verifier rejects script payloads, unexpected executables, diagnostic/developer strings,
+dynamic loading, unsafe symlinks, absent third-party privacy manifests, and dSYM/UUID drift. The
+iOS release workflow installs digest-pinned `asc` 4.11.0 and performs a required exact
+bundle/version/build collision read before archive creation; it never invents a build number.
+
+Anonymous North America one-byte probes passed all three pinned iOS Speed artifacts with exact
+remote catalog totals and allowlisted redirects. Europe and East Asia remain required before
+ASR-09 closes. The reviewer notes now state exact model bytes, Wi-Fi/free-space requirements,
+cancellation/relaunch/finalization behavior, offline use, and the no-substitution outage posture.
+The complete App Store Connect inventory has a mutation-free, redacted nine-read contract, but the
+unattended `primary` Keychain profile timed out before its first response. No account response was
+retained and ASR-11 remains open alongside its web/owner/legal checks.
+
+The generic iOS Release Analyze also succeeds. Every application-source warning found in the first
+pass was corrected. A new fail-closed policy recognizes exactly 19 remaining diagnostics in six
+reviewed classes: MLXArray values confined to the governed single-owner generation domain, empty
+non-iOS dependency shims, and the expected no-App-Intents metadata notice. Any new warning or count
+growth now fails validation; the signed archive/export remains the ASR-07 closure boundary.
+
+**No physical-iPhone evidence was run or substituted in this sprint.** ASR-06 still needs signed-
+device attribute/backup/locked-relaunch proof; ASR-05 needs accepted-size candidate screenshots;
+ASR-07/ASR-10 need a signed archive and exported IPA; ASR-09 needs the two remaining regions;
+ASR-11 needs an authenticated account window; ASR-12 and VLR corrected-source closure remain the
+next phone session. DP-31/DP-32, AV-07, and AV-08 retain their human/fluent-listener and independent-
+holdout authority rather than being auto-closed from acoustic proxies.
+
 **The Mac/CLI Voice identity/language phase is complete; the corrected-source phone phase has not
 started.** The 734-row Mac plan represented every row: 364 PASS, 360 explicit archived-fp32
 prerequisite blocks, and 10 hard failures, with no retry or seed replacement. The generator exited

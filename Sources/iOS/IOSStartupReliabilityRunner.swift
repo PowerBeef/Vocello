@@ -1027,8 +1027,13 @@ enum IOSStartupReliabilityRunner {
 
     private struct CleanupRecord: Codable {
         var schemaVersion = 1
-        let status = "collected_evidence_removed"
+        let status: String
         let runID: String
+
+        init(runID: String) {
+            status = "collected_evidence_removed"
+            self.runID = runID
+        }
     }
 
     private enum RunnerError: String, LocalizedError {

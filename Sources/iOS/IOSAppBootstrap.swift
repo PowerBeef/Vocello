@@ -15,6 +15,7 @@ final class IOSAppDependenciesContainer: ObservableObject {
 
     init() {
         do {
+            try IOSStorageProtectionPolicy.apply(at: AppPaths.appSupportDir)
             let registry = try TTSContract.loadRegistry()
             let documentIO = LocalDocumentIO(importedReferenceDirectory: AppPaths.importedReferenceAudioDir)
             let selectedBackend = try QVoiceiOSApp.makeBackend(

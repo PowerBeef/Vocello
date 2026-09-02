@@ -67,6 +67,8 @@ jobs:
         run: ./scripts/verify_packaged_dmg.sh artifact.dmg metadata.txt
       - name: Run process-bound iOS release readiness
         run: python3 scripts/required_step_ledger.py run --step platform-readiness -- bash -euo pipefail -c 'scripts/macos_test.sh gate && ./scripts/build_foundation_targets.sh ios'
+      - name: Reject an existing App Store build identity
+        run: ./scripts/install_pinned_asc.sh && python3 scripts/required_step_ledger.py run --step build-collision-preflight -- python3 scripts/app_store_build_preflight.py check --output app-store-build-preflight.json
       - name: Archive VocelloiOS
       - name: Export App Store IPA
       - name: Verify exported IPA identity and signing contract

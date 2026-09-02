@@ -9,9 +9,8 @@
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `autonomous-validation-remediation-2026-08` | active | release-qa | 5/11 (45%) |
+| `autonomous-validation-remediation-2026-08` | active | release-qa | 6/11 (55%) |
 | `delivery-prompting-2026-08` | active | backend-mlx | 29/34 (85%) |
-| `development-workflow-performance-2026-08` | active | release-qa | 4/5 (80%) |
 | `engineering-review-remediation-2026-08` | active | backend-and-platform | 13/14 (93%) |
 | `ios-app-store-readiness-2026-08` | active | release-qa | 1/12 (8%) |
 | `ios-control-audit-2026-08` | active | ios | 8/12 (67%) |
@@ -19,6 +18,7 @@
 | `voice-identity-language-reliability-2026-08` | active | backend-and-platform | 6/9 (67%) |
 | `compliance-2026-08` | complete | release-qa | 2/2 (100%) |
 | `convergence-metal4-stage4-2026-08` | complete | backend-and-platform | 7/7 (100%) |
+| `development-workflow-performance-2026-08` | complete | release-qa | 5/5 (100%) |
 | `doc-governance-2026-08` | complete | release-qa | 9/9 (100%) |
 | `ios-clone-import-2026-08` | complete | ios | 4/4 (100%) |
 | `ios-settings-2026-08` | complete | ios | 3/3 (100%) |
@@ -45,7 +45,7 @@ Narrative authority: [`docs/reference/autonomous-validation-audit-2026-08-21.md`
 | `AV-07` | planned | P2 — independently validate prosody thresholds | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md` |
 | `AV-08` | planned | P2 — qualify multilingual output beyond a single cohort | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md` |
 | `AV-09` | planned | P2 — make stateful physical-device lanes independently repeatable | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md` |
-| `AV-10` | planned | P3 — add deterministic real-browser website smoke | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md` |
+| `AV-10` | done | P3 — add deterministic real-browser website smoke | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md` |
 | `AV-11` | done | P3 — make marking-equality resource hygiene enforceable | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md`, `file:scripts/check_marking_peak_equality.py`, `file:scripts/tests/test_check_marking_peak_equality.py` |
 
 ### Open items in detail
@@ -64,9 +64,6 @@ Narrative authority: [`docs/reference/autonomous-validation-audit-2026-08-21.md`
 
 - **`AV-09`** (planned) — P2 — make stateful physical-device lanes independently repeatable.
   gate: Each stateful iOS UI lane must declare and preflight exact prerequisites, use a non-destructive test-owned run namespace, and keep fixture-dependent journeys separate from generic smoke; download scheduling unit tests must use a controllable clock while retaining one real-throttle integration proof. Required closure evidence: missing/present/stale prerequisite fixtures, isolated reruns without residual-state failures, unchanged fail-closed no-retry policy, and physical-device XCUITest evidence for affected lanes.
-
-- **`AV-10`** (planned) — P3 — add deterministic real-browser website smoke.
-  gate: Website CI must load the hydrated production build in a real browser and verify representative keyboard navigation, links/menus, narrow/wide viewports, and a clean console without turning pixel approval into a merge prerequisite. Required closure evidence: deterministic local and CI browser tests, hydration-failure and keyboard-trap negative fixtures, and npm --prefix website run check PASS.
 
 ## Delivery instruction quality and Qwen3-TTS prompting
 
@@ -130,27 +127,6 @@ Narrative authority: [`docs/reference/qwen3-tts-prompting-guide.md`](reference/q
 - **`DP-32`** (planned) — Promote only qualifying delivery changes and revalidate all modes.
   gate: A global or per-preset prompt/compiler change may land only when DP-31 emits a qualifying fail-closed decision: positive paired listener-improvement lower bound, corrected above-chance 2AFC, distributed speaker/script improvement, no corrected per-preset regression, zero new hard PCM failures, WER/CER delta <= 0.01, median speaker-similarity delta >= -0.02, relative UTMOS delta >= -0.10 and valid runtime identities. Revalidate CustomVoice, VoiceDesign identity plus delivery, and clone emotion reference banks separately. If no candidate qualifies, preserve current prompts and directional-hint UI. No hidden best-of-N, cloud evaluator, app-bundled evaluator or automatic publication.
 
-## Fast, evidence-complete development workflow
-
-`development-workflow-performance-2026-08` · **active** · release-qa · adopted 2026-08-27
-
-Restore a fast edit/checkpoint loop without weakening deterministic publication, repository evidence routing, main-only development, generated-project authority, or explicit physical-device and release acceptance boundaries.
-
-Narrative authority: [`docs/reference/development-workflow.md`](reference/development-workflow.md)
-
-| Item | Status | Title | Evidence |
-| --- | --- | --- | --- |
-| `DWF-01` | done | Measure development-loop latency and cache invalidation | `doc:docs/reference/development-workflow.md` |
-| `DWF-02` | done | Separate fast generation and focused edit loops from checkpoints | `file:scripts/dev.sh`, `file:scripts/development_workflow.py`, `file:scripts/tests/test_development_workflow.py` |
-| `DWF-03` | done | Preserve valid Xcode and package caches | `file:scripts/build_foundation_targets.sh`, `file:scripts/lib/build_cache.sh`, `file:project.yml`, `file:scripts/tests/test_build_routing_contract.py` |
-| `DWF-04` | done | Make checkpoint reuse content-complete and fail-closed | `file:scripts/tree_fingerprint.py`, `file:scripts/tests/test_tree_fingerprint.py`, `file:scripts/hooks/precommit_gate.sh` |
-| `DWF-05` | planned | Validate and adopt the new development workflow | `doc:docs/reference/development-workflow.md`, `doc:docs/development-progress.md` |
-
-### Open items in detail
-
-- **`DWF-05`** (planned) — Validate and adopt the new development workflow.
-  gate: Focused workflow tests, shell syntax, full deterministic checkpoint, macOS tests, incremental generic iOS app/logic compile, derived-artifact validation, project/surface governance, and the in-scope direct Clone-import device lanes must pass. AGENTS.md and release/QA guidance must describe the tier boundary and remain below the instruction-size limit.
-
 ## 2026-08 engineering review remediation
 
 `engineering-review-remediation-2026-08` · **active** · backend-and-platform · adopted 2026-08-19
@@ -195,13 +171,13 @@ Narrative authority: [`docs/reference/ios-app-store-readiness-audit-2026-08-26.m
 | `ASR-02` | planned | Resolve Hugging Face processing and App Privacy disclosure | `doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md` |
 | `ASR-03` | done | Provide an accurate monitored support contact | `doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md`, `doc:docs/reference/ios-appstore-submission.md` |
 | `ASR-04` | planned | Bundle complete attributions and record content rights | `doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md`, `doc:docs/reference/content-rights-review.md` |
-| `ASR-05` | planned | Refresh reviewer notes, metadata guidance, and App Store screenshots | `doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md` |
-| `ASR-06` | planned | Define and verify sensitive-file protection and backup policy | `doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md` |
-| `ASR-07` | planned | Complete final release logging, API, symbol, and analyzer hygiene | `doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md` |
-| `ASR-08` | planned | Prevent App Store build-number collisions | `doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md` |
-| `ASR-09` | planned | Prove reviewer access to immutable model hosting | `doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md` |
+| `ASR-05` | in-flight | Refresh reviewer notes, metadata guidance, and App Store screenshots | `doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md` |
+| `ASR-06` | in-flight | Define and verify sensitive-file protection and backup policy | `doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md` |
+| `ASR-07` | in-flight | Complete final release logging, API, symbol, and analyzer hygiene | `doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md` |
+| `ASR-08` | in-flight | Prevent App Store build-number collisions | `doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md` |
+| `ASR-09` | in-flight | Prove reviewer access to immutable model hosting | `doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md` |
 | `ASR-10` | planned | Produce and verify the signed archive and exported IPA | `doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md` |
-| `ASR-11` | planned | Audit live App Store Connect and regional compliance read-only | `doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md`, `doc:docs/reference/ios-appstore-submission.md`, `doc:docs/reference/content-rights-review.md` |
+| `ASR-11` | in-flight | Audit live App Store Connect and regional compliance read-only | `doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md`, `doc:docs/reference/ios-appstore-submission.md`, `doc:docs/reference/content-rights-review.md` |
 | `ASR-12` | planned | Complete current signed-candidate physical-device acceptance | `doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md` |
 
 ### Open items in detail
@@ -215,25 +191,25 @@ Narrative authority: [`docs/reference/ios-app-store-readiness-audit-2026-08-26.m
 - **`ASR-04`** (planned) — Bundle complete attributions and record content rights.
   gate: Generate a deterministic offline attribution/NOTICE manifest from the exact SwiftPM graph and owned runtime, bundle it, expose it through an accessible in-app screen, and bind every downloadable model revision to its license, model-card terms, NOTICE, and redistribution decision. Qualified records must also cover built-in speaker names/previews, generated marketing audio, icons/fonts, and the App Store content-rights declaration.
 
-- **`ASR-05`** (planned) — Refresh reviewer notes, metadata guidance, and App Store screenshots.
+- **`ASR-05`** (in-flight) — Refresh reviewer notes, metadata guidance, and App Store screenshots.
   gate: Reviewer notes must use current Ready terminology and exact catalog-derived download/storage expectations; metadata instructions must match Apple's current one-set iPhone screenshot rule; and a current signed candidate must provide privacy-safe physical-device screenshots at an accepted 6.9-inch size, or an accepted 6.5-inch fallback, with no clipping, stale UI, diagnostics, personal data, or misleading claims.
 
-- **`ASR-06`** (planned) — Define and verify sensitive-file protection and backup policy.
+- **`ASR-06`** (in-flight) — Define and verify sensitive-file protection and backup policy.
   gate: A machine-readable path contract must classify models, downloads, caches, imported/recorded references, prepared clone data, saved voices, generated audio, History, and diagnostics by backup and data-protection policy. Source must apply the intended protection without breaking background delivery, and signed-device evidence must verify file attributes, backup exclusion, deletion, and relaunch behavior.
 
-- **`ASR-07`** (planned) — Complete final release logging, API, symbol, and analyzer hygiene.
+- **`ASR-07`** (in-flight) — Complete final release logging, API, symbol, and analyzer hygiene.
   gate: Remove or privacy-gate product-reachable raw prints that can expose absolute cache paths or model locations, resolve or register every iOS Release analyzer warning, and make the exported IPA scan fail closed on private/dynamic-loading APIs, enabled diagnostics, test or debug dylibs, forbidden environment behavior, sensitive strings, unexpected executables, missing dependency privacy manifests, and symbol/dSYM drift.
 
-- **`ASR-08`** (planned) — Prevent App Store build-number collisions.
+- **`ASR-08`** (in-flight) — Prevent App Store build-number collisions.
   gate: Before archive/upload, a least-privilege read-only App Store Connect preflight must reject an already-used bundle/version/build identity. A documented maintainer-owned operation must update CURRENT_PROJECT_VERSION through project.yml and regenerate the project; the release workflow must never silently invent or mutate a build number.
 
-- **`ASR-09`** (planned) — Prove reviewer access to immutable model hosting.
+- **`ASR-09`** (in-flight) — Prove reviewer access to immutable model hosting.
   gate: The exact anonymous catalog URLs must be probed from representative distribution regions for ownership, availability, range/download behavior, rate limits, and digest identity; a monitored outage response and digest-preserving fallback decision must be documented; and reviewer notes must state exact size, time, network/disk requirements, recovery, and offline behavior after installation.
 
 - **`ASR-10`** (planned) — Produce and verify the signed archive and exported IPA.
   gate: Against a clean exact-tag source, produce a fresh Distribution-signed archive and App Store-exported IPA using a current profile carrying the App Group and increased-memory entitlements; require the existing release verifier, signature trust, profile/team/App ID consistency, privacy manifests, architecture, executable/code continuity, UUID/dSYM, SBOM, checksums, attestation, release evidence, and absence of get-task-allow all to pass. Do not upload as part of this gate.
 
-- **`ASR-11`** (planned) — Audit live App Store Connect and regional compliance read-only.
+- **`ASR-11`** (in-flight) — Audit live App Store Connect and regional compliance read-only.
   gate: With an untracked least-privilege read-only API key, redact and validate the live app identity, platforms, categories, availability/pricing, metadata/localizations/URLs, screenshots, review contact/notes, privacy answers, content-rights and export declarations, current age rating, DSA trader and regional fields, agreements/tax/banking readiness, and all existing build states. Qualified legal/privacy decisions must be recorded; no metadata or build mutation is authorized.
 
 - **`ASR-12`** (planned) — Complete current signed-candidate physical-device acceptance.
@@ -362,6 +338,22 @@ Narrative authority: [`docs/reference/roadmap-2026-08.md`](reference/roadmap-202
 | `CM-5` | done | Phone-gated evidence battery remainder | `doc:docs/reference/roadmap-2026-08.md`, `file:benchmarks/runs/engine-generation/macos-engine-20260806-142908-12599e2c.json`, `file:benchmarks/runs/engine-generation/macos-engine-20260806-143035-941b0ea5.json`, `file:benchmarks/runs/engine-generation/macos-engine-20260806-143201-f3512027.json`, `file:benchmarks/runs/ui-generation/ios-xcui-benchmark-20260806-135457-1d545686.json`, `file:benchmarks/runs/ui-generation/ios-xcui-benchmark-20260806-141150-97c286b1.json`, `file:benchmarks/runs/memory-qualification/mac-memory-qualification-20260806-143414-d4284646.json`, `file:config/characterization-fixtures.json`, `file:Sources/iOS/IOSDeviceDiagnosticsRunner.swift` |
 | `CM-6` | done | MOS-proxy advisory column (UTMOSv2) | `file:scripts/mos_advisory.py`, `file:scripts/tests/test_mos_advisory.py`, `file:docs/reference/testing-runbook.md` |
 | `CM-7` | done | Non-streaming CLI generation publishes no WAV while reporting success | `file:Sources/QwenVoiceCore/GenerationOutputAdapter.swift`, `file:Tests/VocelloCoreTests/GenerationTerminalCleanupTests.swift`, `file:Sources/VocelloCLI/GenerateCommand.swift`, `file:Sources/VocelloCLI/BatchCommand.swift` |
+
+## Fast, evidence-complete development workflow
+
+`development-workflow-performance-2026-08` · **complete** · release-qa · adopted 2026-08-27
+
+Restore a fast edit/checkpoint loop without weakening deterministic publication, repository evidence routing, main-only development, generated-project authority, or explicit physical-device and release acceptance boundaries.
+
+Narrative authority: [`docs/reference/development-workflow.md`](reference/development-workflow.md)
+
+| Item | Status | Title | Evidence |
+| --- | --- | --- | --- |
+| `DWF-01` | done | Measure development-loop latency and cache invalidation | `doc:docs/reference/development-workflow.md` |
+| `DWF-02` | done | Separate fast generation and focused edit loops from checkpoints | `file:scripts/dev.sh`, `file:scripts/development_workflow.py`, `file:scripts/tests/test_development_workflow.py` |
+| `DWF-03` | done | Preserve valid Xcode and package caches | `file:scripts/build_foundation_targets.sh`, `file:scripts/lib/build_cache.sh`, `file:project.yml`, `file:scripts/tests/test_build_routing_contract.py` |
+| `DWF-04` | done | Make checkpoint reuse content-complete and fail-closed | `file:scripts/tree_fingerprint.py`, `file:scripts/tests/test_tree_fingerprint.py`, `file:scripts/hooks/precommit_gate.sh` |
+| `DWF-05` | done | Validate and adopt the new development workflow | `doc:docs/reference/development-workflow.md`, `doc:docs/development-progress.md` |
 
 ## Documentation governance and staleness control
 

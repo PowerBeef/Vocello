@@ -76,9 +76,22 @@
       "url": "https://github.com/koalaman/shellcheck/releases/download/v0.11.0/shellcheck-v0.11.0.darwin.aarch64.tar.xz",
       "sha256": "56affdd8de5527894dca6dc3d7e0a99a873b0f004d7aabc30ae407d3f48b0a79",
       "archivePath": "shellcheck-v0.11.0/shellcheck"
+    },
+    "asc": {
+      "version": "4.11.0",
+      "url": "https://github.com/rorkai/App-Store-Connect-CLI/releases/download/4.11.0/asc_4.11.0_macOS_arm64",
+      "sha256": "b928a12dec6be975271a2d374ba811717447a211089c6c89d3318d32c61c8202",
+      "archivePath": "asc"
     }
   },
   "release": {
+    "asc": {
+      "version": "4.11.0",
+      "versionCommand": [
+        "asc",
+        "version"
+      ]
+    },
     "gh": {
       "version": "2.96.0",
       "versionCommand": [

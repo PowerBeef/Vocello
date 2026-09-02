@@ -450,6 +450,8 @@ public func stableFacadeEntryPoint() -> Bool { true }
                         pin["state"] = {"revision": "0" * 40, "version": "2.99.0"}
                         break
                 return json.dumps(payload, sort_keys=True).encode("utf-8")
+            if path.as_posix().endswith("Sources/MLXAudioCore/ModelUtils.swift"):
+                return (runtime / "Sources/MLXAudioCore/ModelUtils.swift").read_bytes()
             return git_blob(repo_root, commit, path)
 
         with mock.patch.object(MODULE, "git_blob", side_effect=blob_with_neutral_drift):
@@ -488,6 +490,8 @@ public func stableFacadeEntryPoint() -> Bool { true }
                                 pin[field] = value
                                 break
                         return json.dumps(payload, sort_keys=True).encode("utf-8")
+                    if path.as_posix().endswith("Sources/MLXAudioCore/ModelUtils.swift"):
+                        return (runtime / "Sources/MLXAudioCore/ModelUtils.swift").read_bytes()
                     return git_blob(repo_root, commit, path)
 
                 with mock.patch.object(MODULE, "git_blob", side_effect=blob_with_source_drift):

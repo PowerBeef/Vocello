@@ -1060,10 +1060,10 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
     /// Foreground transfer configuration retained for lazily created per-worker chunk
     /// sessions (`nil` for background sessions, where chunking is unavailable). Assigned
     /// once in init and never mutated afterward.
-    private nonisolated(unsafe) let foregroundTransferConfiguration: URLSessionConfiguration?
+    private let foregroundTransferConfiguration: URLSessionConfiguration?
     /// The single serial delegate queue shared by every session this downloader owns.
     /// Assigned once in init.
-    private nonisolated(unsafe) let transferDelegateQueue: OperationQueue
+    private let transferDelegateQueue: OperationQueue
     /// Lazily created per-worker chunk sessions (`.perWorker` strategy only). Index i is
     /// worker i's session; the main `session` carries task-key namespace 0 and these carry
     /// namespaces 1...N so task identifiers never collide across sessions.
@@ -2427,7 +2427,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         // resumes, so this defer is a no-op there; it reaps the entry when no further
         // delegate event can arrive (adopted-already-terminal task, registration
         // fail-fast, parked-completion claim, cancellation).
-        defer { chunkTaskPathsBox.withLock { $0.removeValue(forKey: key) } }
+        defer { _ = chunkTaskPathsBox.withLock { $0.removeValue(forKey: key) } }
         let downloaded: DownloadedTemporaryFile = try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { continuation in
                 Task {
@@ -3146,7 +3146,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         delegateProgressGate.withLock { gate in
             gate.finish(taskID: taskID)
         }
-        chunkTaskPathsBox.withLock { $0.removeValue(forKey: taskID) }
+        _ = chunkTaskPathsBox.withLock { $0.removeValue(forKey: taskID) }
         terminalEventSequencer.complete(taskID: taskID) { [state] in
             await state.setWaitingForConnectivity(false)
             guard let error else {

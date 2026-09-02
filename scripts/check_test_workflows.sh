@@ -27,6 +27,10 @@ rg -q 'scripts/macos_test.sh tsan' .github/workflows/tsan.yml \
 for required_policy_surface in \
   config/build-output-policy.json \
   config/codex-session-storage-policy.json \
+  config/ios-storage-protection-policy.json \
+  config/app-store-connect-readiness-policy.json \
+  config/model-host-availability-policy.json \
+  config/ios-release-analyzer-warning-policy.json \
   config/documentation-contract.json \
   config/public-product-facts.json \
   config/orchestration-contract.json \
@@ -39,6 +43,12 @@ for required_policy_surface in \
   scripts/development_workflow.py \
   scripts/tree_fingerprint.py \
   scripts/codex_session_storage.py \
+  scripts/ios_storage_protection_policy.py \
+  scripts/app_store_build_preflight.py \
+  scripts/app_store_connect_readiness.py \
+  scripts/model_host_availability.py \
+  scripts/ios_release_analyzer_warnings.py \
+  scripts/install_pinned_asc.sh \
   scripts/cli_version_contract.py \
   scripts/saved_voice_lifecycle_contract.py \
   scripts/documentation_contract.py \
@@ -66,6 +76,11 @@ for required_policy_surface in \
   scripts/python_test_contract.py \
   scripts/tests/test_build_output_policy.py \
   scripts/tests/test_codex_session_storage.py \
+  scripts/tests/test_ios_storage_protection_policy.py \
+  scripts/tests/test_app_store_build_preflight.py \
+  scripts/tests/test_app_store_connect_readiness.py \
+  scripts/tests/test_model_host_availability.py \
+  scripts/tests/test_ios_release_analyzer_warnings.py \
   scripts/tests/test_codex_hook_contract.py \
   scripts/tests/test_cli_version_contract.py \
   scripts/tests/test_saved_voice_lifecycle_contract.py \

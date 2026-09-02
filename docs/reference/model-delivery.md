@@ -6,6 +6,7 @@ sourceOfTruth:
   - Sources/QwenVoiceCore/HuggingFaceDownloader.swift
   - Sources/QwenVoiceCore/IOSModelDownloadLedger.swift
   - Sources/Resources/qwenvoice_production_model_catalog.json
+  - config/model-host-availability-policy.json
 ---
 # Model delivery
 
@@ -62,6 +63,27 @@ Every covered artifact has a 40-character immutable Hugging Face revision, an al
 resolve URL, safe relative paths, positive exact byte counts, and a lowercase SHA-256 for every
 required file. Source digests make independent edits to the shared contract, iPhone catalog, or
 generated catalog fail validation.
+
+### Anonymous hosting availability
+
+`config/model-host-availability-policy.json` and `scripts/model_host_availability.py` govern the
+reviewer-availability check. The probe selects the largest file in each pinned iOS model, requests
+only byte zero, and requires an anonymous `206` response, an allowlisted Hugging Face redirect,
+and a `Content-Range` total exactly matching the catalog. Retained JSON contains model IDs,
+digests, byte totals, region labels, and timing only—never the source URL or account/device data.
+
+```sh
+python3 scripts/model_host_availability.py validate
+python3 scripts/model_host_availability.py probe \
+  --region north-america-east \
+  --output build/artifacts/app-store/model-host-north-america-east.json
+```
+
+The 2026-09-01 North America probe passed all three iOS artifacts without downloading model
+content beyond three one-byte responses. That is not global evidence: Europe and East Asia remain
+required representative probes for ASR-09. An outage never authorizes automatic host fallback or
+artifact substitution. The pinned artifact must recover unchanged, or reviewer guidance directs a
+retry/support path while the release remains blocked.
 
 Initial artifact requests remain restricted to the catalog's exact host. URLSession redirects are
 also policy-checked: only HTTPS destinations without credentials or IP/local hosts are accepted,

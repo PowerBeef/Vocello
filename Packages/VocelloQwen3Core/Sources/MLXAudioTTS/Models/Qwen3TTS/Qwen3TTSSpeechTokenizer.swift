@@ -1079,9 +1079,7 @@ final class Qwen3TTSSpeechTokenizerDecoder: Module {
         }
         let decoderBlocksMS = decoderStartedAt.elapsedMillisecondsDouble
 
-        let outputStartedAt = ContinuousClock.now
         let clipped = clip(wav, min: -1, max: 1)
-        let outputMS = outputStartedAt.elapsedMillisecondsDouble
 
         let totalMS = stepStartedAt.elapsedMillisecondsDouble
         let timings = MimiDecoderStepTimings(

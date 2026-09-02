@@ -95,7 +95,7 @@
     {
       "id": "development-workflow-performance-2026-08",
       "title": "Fast, evidence-complete development workflow",
-      "status": "active",
+      "status": "complete",
       "owner": "release-qa",
       "adopted": "2026-08-27",
       "goal": "Restore a fast edit/checkpoint loop without weakening deterministic publication, repository evidence routing, main-only development, generated-project authority, or explicit physical-device and release acceptance boundaries.",
@@ -1812,12 +1812,12 @@
       "id": "DWF-05",
       "plan": "development-workflow-performance-2026-08",
       "title": "Validate and adopt the new development workflow",
-      "status": "planned",
+      "status": "done",
       "gate": "Focused workflow tests, shell syntax, full deterministic checkpoint, macOS tests, incremental generic iOS app/logic compile, derived-artifact validation, project/surface governance, and the in-scope direct Clone-import device lanes must pass. AGENTS.md and release/QA guidance must describe the tier boundary and remain below the instruction-size limit.",
       "evidence": ["doc:docs/reference/development-workflow.md", "doc:docs/development-progress.md"],
       "sourceOfTruth": ["AGENTS.md", ".agents/rules/release-qa.md", "scripts/dev.sh", "scripts/check_project_inputs.sh"],
-      "updated": "2026-08-28",
-      "notes": "The focused router, full project-input gate, macOS deterministic suite, incremental generic-iOS app/logic build, generic iOS XCUITest build-for-testing, derived-artifact validation, and instruction-size/surface governance pass on the coherent 2026-08-28 tree. Physical-device Clone-import acceptance remains ICI-4 and is the only unfinished adoption gate; device availability remains irrelevant to ordinary commits."
+      "updated": "2026-09-01",
+      "notes": "Closed 2026-09-01. ICI-4 passed physical-device direct Clone-import acceptance on 2026-08-28. The adopted path-aware workflow completed its exact-tree deterministic checkpoint over the phone-independent hardening tree: 1,278 Python tests, incremental generic iOS app/logic compilation, all macOS deterministic suites, production website build, and two real-browser smoke journeys passed without requiring a phone."
     },
     {
       "id": "AV-01",
@@ -1995,7 +1995,7 @@
       "id": "AV-10",
       "plan": "autonomous-validation-remediation-2026-08",
       "title": "P3 — add deterministic real-browser website smoke",
-      "status": "planned",
+      "status": "done",
       "gate": "Website CI must load the hydrated production build in a real browser and verify representative keyboard navigation, links/menus, narrow/wide viewports, and a clean console without turning pixel approval into a merge prerequisite. Required closure evidence: deterministic local and CI browser tests, hydration-failure and keyboard-trap negative fixtures, and npm --prefix website run check PASS.",
       "evidence": [
         "doc:docs/reference/autonomous-validation-audit-2026-08-21.md"
@@ -2006,7 +2006,8 @@
         "website/scripts/site-contract.mjs",
         ".github/workflows/ci.yml"
       ],
-      "updated": "2026-08-21"
+      "updated": "2026-09-01",
+      "notes": "Closed 2026-09-01. Pinned Playwright 1.62.1/Chromium production-build smoke covers wide and narrow hydration, keyboard focus progression, skip-link behavior, internal route/link integrity, and clean console/page errors. Synthetic tests reject unhydrated pages, keyboard traps, and missing internal targets. CI installs the exact browser runtime, and the complete npm website check passed with 12 deterministic contract tests plus 2 real-browser journeys."
     },
     {
       "id": "AV-11",
@@ -2231,7 +2232,7 @@
       "id": "ASR-05",
       "plan": "ios-app-store-readiness-2026-08",
       "title": "Refresh reviewer notes, metadata guidance, and App Store screenshots",
-      "status": "planned",
+      "status": "in-flight",
       "gate": "Reviewer notes must use current Ready terminology and exact catalog-derived download/storage expectations; metadata instructions must match Apple's current one-set iPhone screenshot rule; and a current signed candidate must provide privacy-safe physical-device screenshots at an accepted 6.9-inch size, or an accepted 6.5-inch fallback, with no clipping, stale UI, diagnostics, personal data, or misleading claims.",
       "sourceOfTruth": [
         "docs/reference/ios-appstore-submission.md",
@@ -2241,79 +2242,87 @@
       "evidence": [
         "doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md"
       ],
-      "updated": "2026-08-26",
-      "notes": "P2/source-proven. The runbook says Active and incorrectly requires both 6.9- and 6.5-inch sets. The tracked 780x1696 iPhone image and 1440x1224 Mac images are not a current App Store set."
+      "updated": "2026-09-01",
+      "notes": "The active runbook now uses current Ready terminology, Apple's one highest-resolution iPhone-set rule with 6.9-inch preferred/6.5-inch fallback, exact catalog byte totals, Wi-Fi/free-space guidance, cancellation/adoption/finalization behavior, offline behavior, and the immutable-host outage posture. ASR-05 remains open only for privacy-safe accepted-size screenshots from the exact signed candidate and live metadata verification."
     },
     {
       "id": "ASR-06",
       "plan": "ios-app-store-readiness-2026-08",
       "title": "Define and verify sensitive-file protection and backup policy",
-      "status": "planned",
+      "status": "in-flight",
       "gate": "A machine-readable path contract must classify models, downloads, caches, imported/recorded references, prepared clone data, saved voices, generated audio, History, and diagnostics by backup and data-protection policy. Source must apply the intended protection without breaking background delivery, and signed-device evidence must verify file attributes, backup exclusion, deletion, and relaunch behavior.",
       "sourceOfTruth": [
         "Sources/iOS/QVoiceiOSApp.swift",
         "Sources/iOSSupport/Services/IOSModelDeliverySupport.swift",
         "Sources/QwenVoiceCore/GenerationFailureDiagnosticLogger.swift",
+        "Sources/iOSSupport/Services/IOSStorageProtectionPolicy.swift",
+        "config/ios-storage-protection-policy.json",
         "docs/reference/privacy-storage.md"
       ],
       "evidence": [
         "doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md"
       ],
-      "updated": "2026-08-26",
-      "notes": "P2. Backup exclusions are explicit for models and regenerable caches, while user outputs/voices/History are intentionally backed up. No explicit sensitive-file protection-class contract or signed-device proof exists."
+      "updated": "2026-09-01",
+      "notes": "The schema-v1 path contract now classifies every maintained iOS data class, applies CompleteUntilFirstUserAuthentication recursively before stores open, excludes models/downloads/caches/diagnostics from backup, and preserves backup for user outputs/voices/History. Deterministic source/negative fixtures pass. Signed-device file-attribute, locked-background, deletion, and relaunch proof remains required."
     },
     {
       "id": "ASR-07",
       "plan": "ios-app-store-readiness-2026-08",
       "title": "Complete final release logging, API, symbol, and analyzer hygiene",
-      "status": "planned",
+      "status": "in-flight",
       "gate": "Remove or privacy-gate product-reachable raw prints that can expose absolute cache paths or model locations, resolve or register every iOS Release analyzer warning, and make the exported IPA scan fail closed on private/dynamic-loading APIs, enabled diagnostics, test or debug dylibs, forbidden environment behavior, sensitive strings, unexpected executables, missing dependency privacy manifests, and symbol/dSYM drift.",
       "sourceOfTruth": [
         "Packages/VocelloQwen3Core/Sources/MLXAudioCore/ModelUtils.swift",
         "Sources/QwenVoiceCore/RuntimeDebugGate.swift",
         "config/runtime-debug-knobs.json",
+        "config/ios-release-analyzer-warning-policy.json",
+        "scripts/ios_release_analyzer_warnings.py",
         "scripts/verify_ios_release_artifacts.py"
       ],
       "evidence": [
         "doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md"
       ],
-      "updated": "2026-08-26",
-      "notes": "P2/source-proven and build-reproduced. Xcode Analyze succeeds and no owned private API use was found, but the owned runtime has raw path-bearing print calls and the generic binary retains deliberate diagnostic vocabulary. Archive behavior must be proven rather than inferred from the debug gate."
+      "updated": "2026-09-01",
+      "notes": "Path-bearing owned-runtime prints are replaced by privacy-safe Logger messages. Archive/IPA verification now rejects script payloads, unexpected/test/debug executables, enabled diagnostic strings, absolute developer paths, dynamic loading symbols, escaping symlinks, missing third-party privacy manifests, and missing or UUID-mismatched dSYMs; 26 focused verifier fixtures pass. A generic-device Release Analyze succeeded on 2026-09-01 after resolving every application-source warning. Its 19 residual diagnostics are fail-closed and count-bounded in six reviewed classes: 14 MLXArray single-owner isolation warnings, four empty cross-platform shim objects, and one intentional no-App-Intents notice. ASR-07 remains open only for the exact signed archive/export scan and confirmation that its analysis produces no unregistered warning."
     },
     {
       "id": "ASR-08",
       "plan": "ios-app-store-readiness-2026-08",
       "title": "Prevent App Store build-number collisions",
-      "status": "planned",
+      "status": "in-flight",
       "gate": "Before archive/upload, a least-privilege read-only App Store Connect preflight must reject an already-used bundle/version/build identity. A documented maintainer-owned operation must update CURRENT_PROJECT_VERSION through project.yml and regenerate the project; the release workflow must never silently invent or mutate a build number.",
       "sourceOfTruth": [
         "project.yml",
         "config/ExportOptions-appstore.plist",
-        ".github/workflows/release.yml"
+        ".github/workflows/release.yml",
+        "scripts/app_store_build_preflight.py",
+        "scripts/install_pinned_asc.sh"
       ],
       "evidence": [
         "doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md"
       ],
-      "updated": "2026-08-26",
-      "notes": "P2/source-proven and account-pending. Version 2.4.0 build 23 is fixed and automatic management is disabled; the current workflow has no duplicate-build query."
+      "updated": "2026-09-01",
+      "notes": "The release workflow now installs digest-pinned asc 4.11.0, creates an ephemeral least-privilege Keychain profile from release secrets, and runs a required read-only exact bundle/version/build collision preflight before archive creation. Synthetic collision, ambiguity, malformed-pagination, and clean-identity cases pass; build numbers remain maintainer-owned in project.yml. Closure awaits one authenticated workflow preflight/readback because the unattended local primary profile timed out."
     },
     {
       "id": "ASR-09",
       "plan": "ios-app-store-readiness-2026-08",
       "title": "Prove reviewer access to immutable model hosting",
-      "status": "planned",
+      "status": "in-flight",
       "gate": "The exact anonymous catalog URLs must be probed from representative distribution regions for ownership, availability, range/download behavior, rate limits, and digest identity; a monitored outage response and digest-preserving fallback decision must be documented; and reviewer notes must state exact size, time, network/disk requirements, recovery, and offline behavior after installation.",
       "sourceOfTruth": [
         "Sources/Resources/qwenvoice_ios_model_catalog.json",
         "Sources/Resources/qwenvoice_production_model_catalog.json",
         "docs/reference/model-delivery.md",
-        "docs/reference/ios-appstore-submission.md"
+        "docs/reference/ios-appstore-submission.md",
+        "config/model-host-availability-policy.json",
+        "scripts/model_host_availability.py"
       ],
       "evidence": [
         "doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md"
       ],
-      "updated": "2026-08-26",
-      "notes": "P1/account- and hosting-dependent. The app correctly prompts for and manages each approximately 1.7 GB download, but a reviewer can still be blocked by Hugging Face geography, rate limiting, ownership, or outage."
+      "updated": "2026-09-01",
+      "notes": "A privacy-safe anonymous one-byte range probe now validates pinned revisions, allowlisted redirects, exact remote totals, and immutable no-fallback/no-substitution outage policy. North America passed all three 4-bit iOS artifacts on 2026-09-01. Reviewer notes now state exact bytes, Wi-Fi and approximately 2 GB per-model free-space needs, variable timing, cancellation/relaunch adoption, finishing setup, offline use, and support recovery. Europe and East Asia probes plus ongoing ownership/rate-limit monitoring remain required."
     },
     {
       "id": "ASR-10",
@@ -2337,19 +2346,21 @@
       "id": "ASR-11",
       "plan": "ios-app-store-readiness-2026-08",
       "title": "Audit live App Store Connect and regional compliance read-only",
-      "status": "planned",
+      "status": "in-flight",
       "gate": "With an untracked least-privilege read-only API key, redact and validate the live app identity, platforms, categories, availability/pricing, metadata/localizations/URLs, screenshots, review contact/notes, privacy answers, content-rights and export declarations, current age rating, DSA trader and regional fields, agreements/tax/banking readiness, and all existing build states. Qualified legal/privacy decisions must be recorded; no metadata or build mutation is authorized.",
       "sourceOfTruth": [
         "docs/reference/ios-appstore-submission.md",
-        "docs/reference/ios-app-store-readiness-audit-2026-08-26.md"
+        "docs/reference/ios-app-store-readiness-audit-2026-08-26.md",
+        "config/app-store-connect-readiness-policy.json",
+        "scripts/app_store_connect_readiness.py"
       ],
       "evidence": [
         "doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md",
         "doc:docs/reference/ios-appstore-submission.md",
         "doc:docs/reference/content-rights-review.md"
       ],
-      "updated": "2026-08-27",
-      "notes": "P0/account-verified and legal-review-required. A least-privilege Keychain-backed CLI profile is now available. On 2026-08-27 exact app/version/localization resolution verified the sole iOS 1.0 en-US Support URL, and the content-rights declaration read back USES_THIRD_PARTY_CONTENT; raw responses remained temporary and untracked. The full read-only inventory of categories, availability/pricing, screenshots, review contact/notes, privacy answers, export/age/DSA/regional fields, agreements/tax/banking, and build states remains pending, as do qualified legal/privacy decisions."
+      "updated": "2026-09-01",
+      "notes": "The schema-v1 inventory contract enumerates nine mutation-free public-API reads with exact app resolution, complete pagination, explicit JSON, bounded timeouts, response digests/counts/safe-state-token retention, and pending classifications for web/owner-only privacy, agreements/financial, DSA, and regional checks. Redaction and failure fixtures pass. The unattended primary-profile read timed out before the first account response on 2026-09-01, so no new live field is claimed; the full account and qualified legal/privacy audit remains open."
     },
     {
       "id": "ASR-12",

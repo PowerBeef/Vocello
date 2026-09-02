@@ -29,6 +29,12 @@ REQUIRED_SURFACES=(
     "scripts/localization_contract.py"
     "scripts/support_contact_contract.py"
     "scripts/attribution_manifest.py"
+    "scripts/ios_storage_protection_policy.py"
+    "scripts/app_store_build_preflight.py"
+    "scripts/app_store_connect_readiness.py"
+    "scripts/model_host_availability.py"
+    "scripts/ios_release_analyzer_warnings.py"
+    "scripts/install_pinned_asc.sh"
     "scripts/saved_voice_lifecycle_contract.py"
     "scripts/documentation_contract.py"
     "scripts/model_catalog_contract.py"
@@ -97,8 +103,17 @@ REQUIRED_SURFACES=(
     "scripts/tests/test_localization_contract.py"
     "scripts/tests/test_support_contact_contract.py"
     "scripts/tests/test_attribution_manifest.py"
+    "scripts/tests/test_ios_storage_protection_policy.py"
+    "scripts/tests/test_app_store_build_preflight.py"
+    "scripts/tests/test_app_store_connect_readiness.py"
+    "scripts/tests/test_model_host_availability.py"
+    "scripts/tests/test_ios_release_analyzer_warnings.py"
     "config/support-contact.json"
     "config/third-party-attribution-policy.json"
+    "config/ios-storage-protection-policy.json"
+    "config/app-store-connect-readiness-policy.json"
+    "config/model-host-availability-policy.json"
+    "config/ios-release-analyzer-warning-policy.json"
     "config/licenses/Apache-2.0.txt"
     "config/licenses/MIT-terms.txt"
     "config/notices/swift-asn1.txt"
@@ -475,6 +490,10 @@ python3 "$SCRIPT_DIR/entitlement_contract.py" validate
 python3 "$SCRIPT_DIR/support_contact_contract.py" validate
 python3 "$SCRIPT_DIR/attribution_manifest.py" rebuild --check
 python3 "$SCRIPT_DIR/attribution_manifest.py" validate
+python3 "$SCRIPT_DIR/ios_storage_protection_policy.py" validate
+python3 "$SCRIPT_DIR/app_store_connect_readiness.py" validate
+python3 "$SCRIPT_DIR/model_host_availability.py" validate
+python3 "$SCRIPT_DIR/ios_release_analyzer_warnings.py" validate
 python3 "$SCRIPT_DIR/check_convergence_promotion_gate.py"
 # Delivery quality needs audio and models, so it can never gate ordinary CI.
 # The text-level ways the instruction copy can be wrong are deterministic, and

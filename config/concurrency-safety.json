@@ -15,12 +15,10 @@
     {
       "source": "Sources/QwenVoiceCore/HuggingFaceDownloader.swift",
       "names": [
-        "foregroundTransferConfiguration",
-        "session",
-        "transferDelegateQueue"
+        "session"
       ],
       "owner": "downloader initializer and terminal invalidation",
-      "invariant": "The URLSession reference, the retained foreground configuration, and the shared serial delegate queue are assigned once during init and never mutated; sessions (including lazily created per-worker chunk sessions behind a Mutex) are invalidated only after terminal processing.",
+      "invariant": "The URLSession reference is assigned once during init and invalidated only after terminal processing. The retained foreground configuration and serial delegate queue are checked Sendable constants and no longer require unsafe isolation escapes.",
       "reviewedAt": "2026-08-26",
       "removalCondition": "Remove these escapes when URLSession ownership can be expressed through immutable initialization without nonisolated storage or when the downloader is isolated behind one actor-compatible delegate boundary."
     },

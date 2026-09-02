@@ -239,8 +239,9 @@ final class IOSUIPerfFrameProbe: NSObject {
         }
         var line = data
         line.append(0x0A)
-        writerQueue.async {
-            try? writer.write(contentsOf: line)
+        let lineData = line
+        writerQueue.async { [writer, lineData] in
+            try? writer.write(contentsOf: lineData)
         }
     }
 

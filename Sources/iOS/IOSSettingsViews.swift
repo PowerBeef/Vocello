@@ -852,7 +852,7 @@ struct IOSModelRow: View {
     @ViewBuilder
     private var statusDetailView: some View {
         switch operationState {
-        case .downloading(let progress, let downloaded, let total, let speed, let eta, let message):
+        case .downloading(_, let downloaded, let total, let speed, let eta, let message):
             modelProgressPresentation(.transfer(
                 durableBytes: downloaded,
                 catalogBytes: total,

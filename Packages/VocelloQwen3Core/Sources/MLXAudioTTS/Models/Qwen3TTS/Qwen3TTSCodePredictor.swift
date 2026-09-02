@@ -185,7 +185,7 @@ final class CodePredictorModel: Module {
         cache: [any KVCache]? = nil,
         stepConstants: CodePredictorStepConstants? = nil
     ) -> MLXArray {
-        let (batch, seqLen, _) = (inputsEmbeds.dim(0), inputsEmbeds.dim(1), inputsEmbeds.dim(2))
+        let seqLen = inputsEmbeds.dim(1)
 
         let offset: Int = if let firstCache = cache?.first {
             firstCache.offset

@@ -135,6 +135,7 @@
 		390B34DC676C741E3D34AC12 /* VocelloUIAutomationSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = D38AA69E346AFCA89F8D0331 /* VocelloUIAutomationSupport.swift */; };
 		39A0EF5E0230EED06B24B64C /* HuggingFace in Frameworks */ = {isa = PBXBuildFile; productRef = 76CE6F0208B021202C7CDBAF /* HuggingFace */; };
 		39AA20C20D7E3716C7F67116 /* SidebarStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F84F3D2B1CF22DA6148705D /* SidebarStatus.swift */; };
+		3ACFD2029190F71999219D87 /* IOSStorageProtectionPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FDF43695D1DF90DD0DFE831 /* IOSStorageProtectionPolicy.swift */; };
 		3B14C307F432B1C28D297F2D /* AudioService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6AFCD5DBEA3DCE816F44221 /* AudioService.swift */; };
 		3B885A9409233451E01A6909 /* GenerationOutputVerifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B31FA4FAD84410F74EB19EB /* GenerationOutputVerifier.swift */; };
 		3BC28E6167D5021099334D1F /* DeliveriesCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CE81E817159879E59B5FD78 /* DeliveriesCommand.swift */; };
@@ -225,6 +226,7 @@
 		696D108B695D096D5C44E494 /* qwenvoice_contract.json in Resources */ = {isa = PBXBuildFile; fileRef = 617BE72142511CD5043C341E /* qwenvoice_contract.json */; };
 		6AE5B2B870CAB95C90447538 /* RecoverableStoreCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = EECB9DCA7AFA30E81B87B467 /* RecoverableStoreCoordinator.swift */; };
 		6B1CA378BE6796ED13971FF0 /* StudioScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E0FED1EF94E06A5363542F9 /* StudioScreen.swift */; };
+		6BDD0CB174C5C132BAE1A861 /* IOSStorageProtectionPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FDF43695D1DF90DD0DFE831 /* IOSStorageProtectionPolicy.swift */; };
 		6C329D9AE8AC56F1C930D32A /* DatabaseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B8174C5EB5C39242E7EF445 /* DatabaseService.swift */; };
 		6C51CFC163C64CE831D44BD3 /* VoicesCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D9DDDEEAEED933D8DB35472 /* VoicesCommand.swift */; };
 		6C72D281B2A7635A7EA895FE /* SpokenTextPlanningTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01B42F5235213E8CA15A0803 /* SpokenTextPlanningTests.swift */; };
@@ -370,6 +372,7 @@
 		BFB9538DB6144B9BD8E227DE /* WaveformView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 652CF3434A19FF8823B9CCA2 /* WaveformView.swift */; };
 		C13D76C100EC7CEFA73DDD96 /* aiden.wav in Resources */ = {isa = PBXBuildFile; fileRef = 9CF1799CE5C412D42C6F175D /* aiden.wav */; };
 		C15E2E05C11E1E7D0544AC7F /* AppPaths.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73645F4C6E07C717ABF11961 /* AppPaths.swift */; };
+		C1E668AE2F56D318A497E673 /* IOSStorageProtectionPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FDF43695D1DF90DD0DFE831 /* IOSStorageProtectionPolicy.swift */; };
 		C22972A5EDB39B97A7072DBE /* StartupReliabilityDiagnosticEvidence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1606AC7DF388FEC4C3D52915 /* StartupReliabilityDiagnosticEvidence.swift */; };
 		C249DAFEA220226AC8AC9A1F /* PromptLanguageDetectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99ADD3256887325626693B3B /* PromptLanguageDetectorTests.swift */; };
 		C3684C06672D5A8E577007FC /* IOSVoicesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA6073297F14DF27A347EBE6 /* IOSVoicesView.swift */; };
@@ -838,6 +841,7 @@
 		4EBD9B5E55CB6BD2079E55EE /* AudioQualityGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioQualityGate.swift; sourceTree = "<group>"; };
 		4F84F3D2B1CF22DA6148705D /* SidebarStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarStatus.swift; sourceTree = "<group>"; };
 		4FAC50A3E9EBBE7417EBF975 /* IOSMetricKitMemoryReporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSMetricKitMemoryReporter.swift; sourceTree = "<group>"; };
+		4FDF43695D1DF90DD0DFE831 /* IOSStorageProtectionPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSStorageProtectionPolicy.swift; sourceTree = "<group>"; };
 		50C8C4331104AAE56B2B7047 /* AppPerformanceSignposts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppPerformanceSignposts.swift; sourceTree = "<group>"; };
 		510C628D0D4B50BA8A4D9A4E /* RequestLocalSamplingPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RequestLocalSamplingPolicyTests.swift; sourceTree = "<group>"; };
 		52196EEF0820ABCE16E045FD /* AppStateRestorationPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStateRestorationPolicy.swift; sourceTree = "<group>"; };
@@ -1549,6 +1553,7 @@
 				6B94B8E180B89D662FDE414B /* IOSReferenceTranscriptionReviewState.swift */,
 				3F2675499CA07A2901B0A6EA /* IOSSavedOutputsDestination.swift */,
 				162BC0241C49ADB39B9C5ED8 /* IOSSingleTakeGenerationExecutor.swift */,
+				4FDF43695D1DF90DD0DFE831 /* IOSStorageProtectionPolicy.swift */,
 				C04C86F01FE11317E648BA6C /* IOSUIPerfFrameProbe.swift */,
 				28F693F3BC2648EEC62DD2CA /* IOSUIPerfHistorySeeder.swift */,
 				43033F9668B23257EDC8EEE3 /* RuntimeReleaseCoordinator.swift */,
@@ -2547,6 +2552,7 @@
 				3FAE6EA39845A555A29DCCBC /* IOSSingleTakeGenerationExecutionHooks.swift in Sources */,
 				0D0F5CF048A514F2F559E55C /* IOSSingleTakeGenerationExecutor.swift in Sources */,
 				A0F576BA7726628695B7B249 /* IOSStartupReliabilityRunner.swift in Sources */,
+				6BDD0CB174C5C132BAE1A861 /* IOSStorageProtectionPolicy.swift in Sources */,
 				F8B5F8AD8687822EBCC338CB /* IOSStudioCanvas.swift in Sources */,
 				EC8305F1E9D7786A6389F921 /* IOSStudioGenerationActions.swift in Sources */,
 				258EEA1F20457D450A2883C0 /* IOSStudioInlinePlayerCard.swift in Sources */,
@@ -2634,6 +2640,7 @@
 				B7D502AD74006574B434140B /* IOSSingleTakeGenerationExecutor.swift in Sources */,
 				78E2AAF44E7D287D0ADE2AE9 /* IOSSingleTakeGenerationExecutorTests.swift in Sources */,
 				25053A56CB221EA70CEF940F /* IOSStartupReliabilityPlanTests.swift in Sources */,
+				3ACFD2029190F71999219D87 /* IOSStorageProtectionPolicy.swift in Sources */,
 				202A2DA2AC1981459AD1F2AD /* LanguageFixtures.swift in Sources */,
 				A81C30D0CF51F4112214F107 /* LanguageSelectionPresentation.swift in Sources */,
 				FB580B67F03AAA61FA205BCE /* LanguageSelectionPresentationTests.swift in Sources */,
@@ -2820,6 +2827,7 @@
 				D20FA631689E3A4463C548ED /* IOSReferenceTranscriptionReviewStateTests.swift in Sources */,
 				C5973CAA9B4BC9040D7C4031 /* IOSSingleTakeGenerationExecutor.swift in Sources */,
 				114356812C5C0E4A9A7549B4 /* IOSSingleTakeGenerationExecutorTests.swift in Sources */,
+				C1E668AE2F56D318A497E673 /* IOSStorageProtectionPolicy.swift in Sources */,
 				18555A16C61F5482D428784A /* PendingVoiceCloningHandoff.swift in Sources */,
 				E36C809B2425122F4AD617EC /* RuntimeReleaseCoordinator.swift in Sources */,
 				FFB8F7B808241163222DFFA1 /* StudioGenerationAttemptAuthority.swift in Sources */,

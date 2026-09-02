@@ -30,9 +30,15 @@ sourceOfTruth:
   `config/project-health-contract.json`, `config/release-evidence-contract.json`,
   `config/quality-promotion-contract.json`,
   `config/benchmark-baseline-migrations.json`, and `config/marking-peak-equality.json`
-- App Store support and attribution governance:
+- App Store support, attribution, storage, account-readiness, build-collision, and model-host governance:
   `config/support-contact.json`, `config/third-party-attribution-policy.json`,
-  `scripts/support_contact_contract.py`, and `scripts/attribution_manifest.py`
+  `config/ios-storage-protection-policy.json`, `config/app-store-connect-readiness-policy.json`,
+  `config/model-host-availability-policy.json`, `config/ios-release-analyzer-warning-policy.json`,
+  `scripts/support_contact_contract.py`,
+  `scripts/attribution_manifest.py`, `scripts/ios_storage_protection_policy.py`,
+  `scripts/app_store_build_preflight.py`, `scripts/app_store_connect_readiness.py`, and
+  `scripts/model_host_availability.py`; `scripts/ios_release_analyzer_warnings.py` fails closed on
+  any unreviewed iOS Release static-analysis warning
 - `benchmarks/` schema-v1 compatibility, schema-v2 memory-qualified, and schema-v3
   quality-identity records, generated history, and preserved reference baselines
 - `docs/releases/`
@@ -77,6 +83,10 @@ Before changing scripts or CI, read:
   Uploads, edits, TestFlight changes, submission, and cancellation each require explicit user
   authorization immediately before mutation. Raw account JSON stays temporary and untracked;
   repository archive and release scripts remain authoritative.
+  The release workflow must run `scripts/app_store_build_preflight.py` before iOS archive creation;
+  an account timeout or absent response is a failed preflight, never permission to reuse a build
+  number. Read-only readiness inventories retain only digests/counts/safe state tokens, and live
+  model-host evidence uses one-byte catalog-bound range probes rather than downloading weights.
 - Optional skills may assist with test triage, performance, signing, packaging, or
   telemetry after their instructions are read. Start from script output and generated artifacts.
   Triage failing UI lanes with `axiom-testing` and focused repository commands, and symbolicate

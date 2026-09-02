@@ -378,6 +378,41 @@ final class VocelloiOSLogicTests: XCTestCase {
         )
     }
 
+    func testStorageProtectionPolicyCoversEveryPersistentIOSDataClass() {
+        XCTAssertEqual(
+            IOSStorageProtectionPolicy.protectionClass,
+            .completeUntilFirstUserAuthentication
+        )
+        XCTAssertEqual(
+            Set(IOSStorageProtectionPolicy.entries.map(\.id)),
+            Set([
+                "application-support-root",
+                "models",
+                "downloads",
+                "cache",
+                "diagnostics",
+                "outputs",
+                "voices",
+                "voice-candidates",
+                "voice-transactions",
+                "history-outbox",
+                "history",
+            ])
+        )
+
+        let byID = Dictionary(uniqueKeysWithValues: IOSStorageProtectionPolicy.entries.map {
+            ($0.id, $0)
+        })
+        for id in ["models", "downloads", "cache", "diagnostics", "voice-candidates", "voice-transactions"] {
+            XCTAssertEqual(byID[id]?.backup, .excluded)
+            XCTAssertEqual(byID[id]?.recursive, true)
+        }
+        for id in ["outputs", "voices", "history-outbox", "history"] {
+            XCTAssertEqual(byID[id]?.backup, .included)
+        }
+        XCTAssertEqual(byID["history"]?.pathPrefix, "history.sqlite")
+    }
+
     func testModelDeliveryBackgroundSessionSeparatesManagedDebugRoot() {
         let bundleIdentifier = "com.patricedery.vocello"
         let canonical = IOSModelDeliveryConfiguration.backgroundSessionIdentifier(

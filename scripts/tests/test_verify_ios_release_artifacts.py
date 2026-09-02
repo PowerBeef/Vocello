@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import hashlib
+import plistlib
 import sys
 import tempfile
 import unittest
@@ -327,6 +328,98 @@ class IOSReleaseArtifactVerificationTests(unittest.TestCase):
         self.assertEqual(expected.bundle_identifier, self.BUNDLE)
         self.assertEqual(expected.application_groups, (self.GROUP,))
         self.assertRegex(expected.privacy_manifest_sha256, r"^[0-9a-f]{64}$")
+
+    def test_release_bundle_hygiene_accepts_only_expected_macho_locations(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            app = Path(directory) / "Vocello.app"
+            frameworks = app / "Frameworks"
+            frameworks.mkdir(parents=True)
+            (app / "Vocello").write_bytes(b"\xcf\xfa\xed\xfe" + b"release")
+            (frameworks / "libswiftCore.dylib").write_bytes(b"\xcf\xfa\xed\xfe" + b"swift")
+
+            def tool(arguments: list[str]) -> tuple[bytes, bytes]:
+                if arguments[0] == "/usr/bin/strings":
+                    return b"Vocello release\n", b""
+                if arguments[0] == "/usr/bin/nm":
+                    return b"                 U _$s10Foundation\n", b""
+                self.fail(f"unexpected tool: {arguments}")
+
+            with mock.patch.object(module, "_run_bytes", side_effect=tool):
+                result = module._validate_bundle_hygiene(app, "export", "Vocello")
+            self.assertTrue(result["verified"])
+            self.assertEqual(result["machOCount"], 2)
+
+    def test_release_bundle_hygiene_rejects_scripts_and_unexpected_executables(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            app = Path(directory) / "Vocello.app"
+            app.mkdir()
+            (app / "Vocello").write_bytes(b"\xcf\xfa\xed\xfe" + b"release")
+            (app / "payload.py").write_text("print('unexpected')", encoding="utf-8")
+            with mock.patch.object(module, "_run_bytes", return_value=(b"", b"")):
+                with self.assertRaisesRegex(module.VerificationError, "script content"):
+                    module._validate_bundle_hygiene(app, "export", "Vocello")
+
+            (app / "payload.py").unlink()
+            (app / "helper").write_bytes(b"\xcf\xfa\xed\xfe" + b"helper")
+            with mock.patch.object(module, "_run_bytes", return_value=(b"", b"")):
+                with self.assertRaisesRegex(module.VerificationError, "unexpected executable"):
+                    module._validate_bundle_hygiene(app, "export", "Vocello")
+
+    def test_release_string_and_dynamic_loading_scans_fail_closed(self) -> None:
+        for leaked in [
+            str(Path("/").joinpath("Users", "operator", "private.wav")),
+            "/private/var/folders/fixture",
+            "VOCELLO_INTERNAL_DIAGNOSTICS",
+            "QVOICE_DEVICE_DIAGNOSTICS",
+        ]:
+            with self.assertRaisesRegex(module.VerificationError, "prohibited release"):
+                module._validate_release_strings(leaked, "export")
+        for symbol in ["_dlopen", "_dlsym"]:
+            with self.assertRaisesRegex(module.VerificationError, "dynamic-loading"):
+                module._validate_undefined_symbols([f"U {symbol}"], "export")
+
+    def test_third_party_framework_requires_valid_privacy_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            framework = Path(directory) / "Vendor.framework"
+            framework.mkdir()
+            (framework / "Info.plist").write_bytes(plistlib.dumps({
+                "CFBundleIdentifier": "org.vendor.library",
+            }))
+            with self.assertRaisesRegex(module.VerificationError, "privacy manifest"):
+                module._validate_framework_privacy_manifest(framework, "export")
+
+            privacy = {
+                "NSPrivacyTracking": False,
+                "NSPrivacyTrackingDomains": [],
+                "NSPrivacyCollectedDataTypes": [],
+                "NSPrivacyAccessedAPITypes": [{
+                    "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
+                    "NSPrivacyAccessedAPITypeReasons": ["CA92.1"],
+                }],
+            }
+            (framework / "PrivacyInfo.xcprivacy").write_bytes(plistlib.dumps(privacy))
+            module._validate_framework_privacy_manifest(framework, "export")
+
+    def test_dsym_must_exist_and_match_archived_executable_uuid(self) -> None:
+        uuid = "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE"
+        with tempfile.TemporaryDirectory() as directory:
+            archive = Path(directory) / "Fixture.xcarchive"
+            dwarf = archive / "dSYMs/Vocello.app.dSYM/Contents/Resources/DWARF/Vocello"
+            dwarf.parent.mkdir(parents=True)
+            dwarf.write_bytes(b"\xcf\xfa\xed\xfe")
+            with mock.patch.object(module, "_macho_uuids", return_value=(uuid,)):
+                module._validate_dsym_uuid_match(archive, "Vocello", (uuid,))
+            with mock.patch.object(module, "_macho_uuids", return_value=("11111111-2222-3333-4444-555555555555",)):
+                with self.assertRaisesRegex(module.VerificationError, "dSYM UUIDs"):
+                    module._validate_dsym_uuid_match(archive, "Vocello", (uuid,))
+
+    def test_owned_runtime_does_not_emit_raw_model_paths(self) -> None:
+        source = (
+            SCRIPTS.parent
+            / "Packages/VocelloQwen3Core/Sources/MLXAudioCore/ModelUtils.swift"
+        ).read_text(encoding="utf-8")
+        self.assertNotRegex(source, r'print\([^\n]*(modelDir|hubRepoDir)\.path')
+        self.assertIn("Logger(subsystem:", source)
 
 
 if __name__ == "__main__":

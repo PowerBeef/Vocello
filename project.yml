@@ -473,6 +473,7 @@ targets:
       - path: Sources/iOSSupport/Services/RuntimeReleaseCoordinator.swift
       - path: Sources/iOSSupport/Services/StudioGenerationAttemptAuthority.swift
       - path: Sources/iOSSupport/Services/IOSSingleTakeGenerationExecutor.swift
+      - path: Sources/iOSSupport/Services/IOSStorageProtectionPolicy.swift
     dependencies:
       - target: QwenVoiceCore
       - package: GRDB
@@ -506,6 +507,7 @@ targets:
       - path: Sources/iOSSupport/Services/RuntimeReleaseCoordinator.swift
       - path: Sources/iOSSupport/Services/StudioGenerationAttemptAuthority.swift
       - path: Sources/iOSSupport/Services/IOSSingleTakeGenerationExecutor.swift
+      - path: Sources/iOSSupport/Services/IOSStorageProtectionPolicy.swift
       - path: Sources/SharedSupport/Services/VocelloPresentationText.swift
     dependencies:
       - target: QwenVoiceCore

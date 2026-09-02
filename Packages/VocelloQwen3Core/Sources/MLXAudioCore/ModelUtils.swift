@@ -1,7 +1,10 @@
 import Foundation
 import HuggingFace
+import OSLog
 
 public enum ModelUtils {
+    private static let logger = Logger(subsystem: "app.vocello.runtime", category: "model-assets")
+
     public static func resolveModelType(
         repoID: Repo.ID,
         revision: String = "main",
@@ -39,7 +42,7 @@ public enum ModelUtils {
     ) async throws -> URL {
         let client: HubClient
         if let token = hfToken, !token.isEmpty {
-            print("Using HuggingFace token from configuration")
+            logger.debug("Using an authenticated model repository client")
             client = HubClient(host: HubClient.defaultHost, bearerToken: token, cache: cache)
         } else {
             client = HubClient(cache: cache)
@@ -100,15 +103,15 @@ public enum ModelUtils {
                 if FileManager.default.fileExists(atPath: configPath.path) {
                     if let configData = try? Data(contentsOf: configPath),
                        let _ = try? JSONSerialization.jsonObject(with: configData) {
-                        print("Using cached model at: \(modelDir.path)")
+                        logger.debug("Using a verified cached model")
                         return modelDir
                     } else {
-                        print("Cached config.json is invalid, clearing cache...")
+                        logger.notice("Cached model configuration is invalid; clearing the affected cache")
                         Self.clearCaches(modelDir: modelDir, repoID: repoID, hubCache: cache)
                     }
                 }
             } else {
-                print("Cached model appears incomplete, clearing cache...")
+                logger.notice("Cached model is incomplete; clearing the affected cache")
                 Self.clearCaches(modelDir: modelDir, repoID: repoID, hubCache: cache)
             }
         }
@@ -125,7 +128,7 @@ public enum ModelUtils {
         ]
         allowedExtensions.formUnion(additionalMatchingPatterns)
 
-        print("Downloading model \(repoID)...")
+        logger.notice("Downloading a catalog-authorized model")
         _ = try await client.downloadSnapshot(
             of: repoID,
             kind: .model,
@@ -133,7 +136,7 @@ public enum ModelUtils {
             revision: resolvedRevision,
             matching: Array(allowedExtensions),
             progressHandler: { progress in
-                print("\(progress.completedUnitCount)/\(progress.totalUnitCount) files")
+                logger.debug("Model download files: \(progress.completedUnitCount, privacy: .public)/\(progress.totalUnitCount, privacy: .public)")
             }
         )
 
@@ -152,7 +155,7 @@ public enum ModelUtils {
             throw ModelUtilsError.incompleteDownload(repoID.description)
         }
 
-        print("Model downloaded to: \(modelDir.path)")
+        logger.notice("Model download completed")
         return modelDir
     }
 
@@ -160,7 +163,7 @@ public enum ModelUtils {
         try? FileManager.default.removeItem(at: modelDir)
         let hubRepoDir = hubCache.repoDirectory(repo: repoID, kind: .model)
         if FileManager.default.fileExists(atPath: hubRepoDir.path) {
-            print("Clearing Hub cache at: \(hubRepoDir.path)")
+            logger.debug("Clearing the affected repository cache")
             try? FileManager.default.removeItem(at: hubRepoDir)
         }
     }

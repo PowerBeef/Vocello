@@ -9,7 +9,8 @@
     "test": "node --test tests/*.test.mjs && node scripts/rendered-contract.mjs",
     "build": "vite build && vite build --ssr src/entry-ssr.jsx --outDir dist-ssr && node scripts/prerender.mjs",
     "preview": "vite preview",
-    "check": "npm run lint && npm test && npm run build"
+    "test:browser": "playwright test",
+    "check": "npm run lint && npm test && npm run build && npm run test:browser"
   },
   "dependencies": {
     "@vercel/analytics": "^2.0.1",
@@ -17,6 +18,7 @@
     "react-dom": "^19.2.8"
   },
   "devDependencies": {
+    "@playwright/test": "1.62.1",
     "@vitejs/plugin-react": "^6.0.5",
     "vite": "^8.2.0"
   }

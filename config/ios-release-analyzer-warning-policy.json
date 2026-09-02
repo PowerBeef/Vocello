@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "owner": "apple-platform-release",
+  "reviewedAt": "2026-09-01",
+  "policy": "A Release static-analysis log may contain only these reviewed warnings. Application-source warnings are not allowlisted; MLX tensor isolation remains governed until MLXArray gains checked Sendable semantics.",
+  "allowedWarnings": [
+    {
+      "id": "mlx-completion-tensor-sendability",
+      "source": "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Generation.swift",
+      "messageContains": "non-Sendable type 'MLXArray'",
+      "maximumCount": 1,
+      "reason": "The completion tensor remains inside the single-owner generation domain and is materialized before product publication.",
+      "removalCondition": "Remove when the completion type returns a checked Sendable materialized value or MLXArray gains checked immutable sendability."
+    },
+    {
+      "id": "qwen3-tensor-sendability",
+      "source": "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
+      "messageContains": "type 'MLXArray' does not conform to the 'Sendable' protocol",
+      "maximumCount": 4,
+      "reason": "Qwen3 tensor mutation is serialized by the model generation gate and request-owned isolation domain.",
+      "removalCondition": "Remove when MLXArray gains checked immutable sendability or tensor results no longer cross the isolated generation helper boundary."
+    },
+    {
+      "id": "qwen3-reference-tensor-capture",
+      "source": "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
+      "messageContains": "capture of 'refAudio' with non-Sendable type 'MLXArray?'",
+      "maximumCount": 3,
+      "reason": "Reference audio is immutable request input captured by the same model-owned isolation domain for one generation.",
+      "removalCondition": "Remove when reference audio is materialized into a checked Sendable value before the isolated generation helper is created."
+    },
+    {
+      "id": "qwen3-result-tensor-sendability",
+      "source": "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
+      "messageContains": "non-Sendable 'MLXArray'-typed result",
+      "maximumCount": 6,
+      "reason": "Returned tensors remain generation-owned and are evaluated/materialized before leaving the runtime facade.",
+      "removalCondition": "Remove when generation helpers return checked Sendable materialized audio instead of MLXArray."
+    },
+    {
+      "id": "empty-cross-platform-shims",
+      "source": "tool:libtool",
+      "messageContains": "has no symbols",
+      "maximumCount": 4,
+      "reason": "Resolved Swift packages contain intentionally empty platform shim objects on iOS arm64.",
+      "removalCondition": "Remove when the pinned dependency graph no longer emits empty non-iOS shim objects."
+    },
+    {
+      "id": "no-app-intents-framework",
+      "source": "tool:appintentsmetadataprocessor",
+      "messageContains": "Metadata extraction skipped. No AppIntents.framework dependency found.",
+      "maximumCount": 1,
+      "reason": "Vocello exposes no App Intents and therefore has no AppIntents.framework metadata to extract.",
+      "removalCondition": "Remove if the target adopts App Intents or Xcode stops emitting an informational warning when the framework is absent."
+    }
+  ]
+}

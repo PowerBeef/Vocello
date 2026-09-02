@@ -1,10 +1,12 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-08-29
+reviewed: 2026-09-01
 summary: Local-first privacy and on-disk storage layout on both platforms — what lives where, what never leaves the device, and deletion semantics.
 sourceOfTruth:
   - Sources/SharedSupport
+  - Sources/iOSSupport/Services/IOSStorageProtectionPolicy.swift
+  - config/ios-storage-protection-policy.json
 ---
 # Privacy And Local Storage
 
@@ -117,6 +119,30 @@ Maintained iPhone subtrees:
 
 The iPhone app intentionally keeps shared state constrained to the App Group app-support subtree. It does not use a parallel shared-user-defaults channel for model or voice state.
 
+### Data protection and backup policy
+
+`config/ios-storage-protection-policy.json` is the path-level authority. During bootstrap,
+`IOSStorageProtectionPolicy` applies `NSFileProtectionCompleteUntilFirstUserAuthentication` to the
+managed Vocello root and every governed subtree. This keeps local voice and generation data
+encrypted while the device has not been unlocked after boot, while still allowing the established
+background model-delivery session to finish after the first unlock. The app does not use the weaker
+`NSFileProtectionNone` class and does not silently upgrade delivery state to
+`NSFileProtectionComplete`, which would break background completion while the device is locked.
+
+Backup behavior is intentional rather than inherited:
+
+- downloaded models, delivery staging/ledger state, regenerable caches, candidates, transactions,
+  and diagnostics are excluded from backup;
+- generated outputs, committed saved voices, History, and its recoverable outbox remain included because they are
+  user-created data that cannot necessarily be reconstructed;
+- the policy is applied to existing descendants during bootstrap, including the SQLite database
+  and its WAL/SHM sidecars, so a prior file cannot keep stale attributes indefinitely.
+
+The deterministic policy validator rejects a missing path class, a protection mismatch, or an
+unclassified maintained subtree. ASR-06 remains open until an exact signed candidate proves the
+effective file attributes, backup exclusions, deletion behavior, and locked/relaunch behavior on a
+physical iPhone.
+
 ## Voice Cloning Consent
 
 Voice cloning accepts user-provided reference audio — recorded in the app or imported through the
@@ -192,6 +218,7 @@ block byte-for-byte, so a manifest change cannot silently leave documentation st
 | `build/artifacts/diagnostics/` | Cross-platform logs, crash deltas, and local diagnostics | `artifact` | `governed` | Validator-owned; preserve unresolved failure and publication-repair evidence |
 | `build/artifacts/project-health/` | Generated project-health inventory and release-readiness diagnostics | `artifact` | `routine` | Local detailed reports are disposable; the compact reproducible snapshot is tracked under docs |
 | `build/artifacts/quality-promotion/` | Source-bound public-promotion manifests and managed quality receipts | `artifact` | `preserve` | Preserve the current candidate manifest until promotion or explicit candidate retirement |
+| `build/artifacts/app-store/` | Redacted App Store Connect, build-collision, and model-host readiness probes | `artifact` | `preserve` | Preserve the current candidate readiness summaries until closure or explicit candidate retirement |
 | `build/artifacts/symbols/macos/` | macOS build and release identity checks | `artifact` | `preserve` | Keep only symbols whose UUIDs match the current macOS app and XPC products |
 | `build/artifacts/symbols/ios/` | Physical-device iOS build and archive identity checks | `artifact` | `preserve` | Keep only symbols whose UUIDs match the current iOS app product |
 | `build/artifacts/foundation/` | Foundation compile-safety result bundles and logs | `artifact` | `routine` | Compile-safety result bundles and logs are disposable after the command verdict |

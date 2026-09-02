@@ -148,15 +148,20 @@ class IOSControlAuditContractTests(unittest.TestCase):
             "private func deleteRunOwnedHistoryRow", 1
         )[0]
         self.assertIn("scrubber.swipeRight()", player)
+        self.assertIn("scrubber.swipeLeft()", player)
+        self.assertIn("waitForPlaybackValueChange", player)
+        self.assertIn("XCTNSPredicateExpectation", player)
         self.assertNotIn("adjust(toNormalizedSliderPosition", player)
         self.assertNotIn("coordinate(withNormalizedOffset", player)
         generation = source.split("let generationID = generateAndWaitForCompletedPlayer", 1)[1].split(
             "if frozenSeed == nil", 1
         )[0]
         self.assertLess(
-            generation.index("exerciseCompletedPlayer()"),
+            generation.index("let playerIssue = exerciseCompletedPlayer()"),
             generation.index("dismissCompletedPlayerAndAssertGenerateReady()"),
         )
+        self.assertIn('actual: playerIssue', source)
+        self.assertIn('classification: "PRODUCT_FAIL"', source)
 
     def test_generation_normalizes_only_exact_reserved_history_rows(self) -> None:
         source = (

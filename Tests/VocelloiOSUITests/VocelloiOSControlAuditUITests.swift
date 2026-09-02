@@ -537,7 +537,7 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
             // Ending this shard is the only way to preserve the failed request
             // without retrying it. `prepare-resume` advances to the next row.
             guard !generationID.isEmpty else { return }
-            exerciseCompletedPlayer()
+            let playerIssue = exerciseCompletedPlayer()
             dismissCompletedPlayerAndAssertGenerateReady()
             if retainedSeedCarriers[take.mode] == nil {
                 if frozenSeed == nil {
@@ -551,6 +551,19 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
             }
             let observedSeed = frozenSeed
             XCTAssertNotNil(observedSeed, "The cold sentinel must expose a seed that can be frozen visibly")
+            if let playerIssue {
+                recorder.record(
+                    scenario: "generation", controlID: "generation:\(take.takeID)",
+                    classification: "PRODUCT_FAIL",
+                    expected: "Completed output remains playable and its scrubber reports a changed position",
+                    actual: playerIssue,
+                    evidence: "generation-\(take.takeID)-player-controls",
+                    take: take,
+                    generationID: generationID,
+                    observedSeed: observedSeed
+                )
+                return
+            }
             recorder.record(
                 scenario: "generation", controlID: "generation:\(take.takeID)",
                 expected: "Visible request, engine receipt, QC, History, playback, and cleanup agree",
@@ -1198,7 +1211,7 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
         return exists
     }
 
-    private func exerciseCompletedPlayer() {
+    private func exerciseCompletedPlayer() -> String? {
         let playPause = element("studio_inlinePlayer_playPause")
         XCTAssertTrue(VocelloUIWait.exists(playPause, timeout: 20))
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: playPause, timeout: 20))
@@ -1210,13 +1223,48 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
             // Exercise its production DragGesture through an element-anchored
             // swipe; coordinate automation and slider-only XCTest APIs are
             // both inappropriate for this accessibility surface.
-            scrubber.swipeRight()
-            XCTAssertTrue(
-                VocelloUIWait.condition("inline player scrubber value to change", timeout: 15) {
-                    (scrubber.value as? String) != priorValue
+            // Autoplay can leave a short clip one rounded second from its end.
+            // Swiping right there legitimately preserves the same accessibility
+            // value, so move away from the nearest boundary first and try the
+            // opposite element-anchored gesture only when needed.
+            let currentSeconds = priorValue.flatMap(playbackSeconds)
+            if (currentSeconds ?? 0) > 0 {
+                scrubber.swipeLeft()
+            } else {
+                scrubber.swipeRight()
+            }
+            if !waitForPlaybackValueChange(scrubber, from: priorValue, timeout: 5) {
+                if (currentSeconds ?? 0) > 0 {
+                    scrubber.swipeRight()
+                } else {
+                    scrubber.swipeLeft()
                 }
-            )
+                guard waitForPlaybackValueChange(scrubber, from: priorValue, timeout: 10) else {
+                    return "Inline player scrubber remained at \(priorValue ?? "an unknown value") after both semantic swipe directions"
+                }
+            }
         }
+        return nil
+    }
+
+    private func waitForPlaybackValueChange(
+        _ scrubber: XCUIElement,
+        from priorValue: String?,
+        timeout: TimeInterval
+    ) -> Bool {
+        let expectation = XCTNSPredicateExpectation(
+            predicate: NSPredicate { _, _ in
+                (scrubber.value as? String) != priorValue
+            },
+            object: NSObject()
+        )
+        return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
+    }
+
+    private func playbackSeconds(_ value: String) -> Int? {
+        let components = value.split(separator: ":").compactMap { Int($0) }
+        guard components.count == 2 else { return nil }
+        return components[0] * 60 + components[1]
     }
 
     private func deleteRunOwnedHistoryRow(searchToken: String) {

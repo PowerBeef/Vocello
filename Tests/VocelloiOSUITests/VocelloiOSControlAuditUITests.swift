@@ -148,9 +148,10 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
     private var recorder: IOSControlAuditRecorder!
     private let stagedImportFileName = "ICI Direct Clone Import"
     private var cloneConsentWasEnabledBeforeAudit: Bool?
+    private var generationAuditVoiceName: String?
 
     private var directImportVoiceName: String {
-        "ICA \(recorder.runID.suffix(8))"
+        generationAuditVoiceName ?? "ICA \(recorder.runID.suffix(8))"
     }
 
     func testConfiguredControlAuditScenario() throws {
@@ -421,19 +422,38 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
         let originalVariation = selectedVariationID()
         let originalMode = selectedMode()
         let originalStudio = captureStudioSnapshot()
+        let environment = ProcessInfo.processInfo.environment
+        let start = Int(environment["QVOICE_IOS_CONTROL_AUDIT_TAKE_START"] ?? "0") ?? 0
+        let limit = Int(environment["QVOICE_IOS_CONTROL_AUDIT_TAKE_LIMIT"] ?? "0") ?? 0
+        let selected = Array(plan.takes.dropFirst(start).prefix(limit > 0 ? limit : Int.max))
+        XCTAssertFalse(selected.isEmpty, "Generation audit shard must contain at least one take")
         var frozenSeeds: [String: UInt64] = [:]
+        var retainedSeedCarriers: [String: String] = [:]
+        var modesPinnedByAudit = Set<String>()
         for mode in VocelloUIBenchMatrix.Mode.allCases {
             select(mode: mode)
-            if let seed = visiblePinnedSeed() {
+            if start > 0,
+               let carrier = restoreRetainedAuditSeed(
+                in: mode,
+                from: Array(plan.takes.prefix(start))
+               ) {
+                frozenSeeds[mode.rawValue] = carrier.seed
+                retainedSeedCarriers[mode.rawValue] = carrier.searchToken
+                modesPinnedByAudit.insert(mode.rawValue)
+            } else if let seed = visiblePinnedSeed() {
                 frozenSeeds[mode.rawValue] = seed
             }
         }
-        var modesPinnedByAudit = Set<String>()
+        var completedShard = false
         defer {
-            // A failed run deliberately retains only the test-owned seed pin so
-            // a source/plan-bound resume can continue without silently changing
-            // the sampling identity. The resumed successful run removes it.
-            if (testRun?.failureCount ?? 0) == 0 {
+            // A terminal product failure ends this shard without retrying the
+            // failed request. Retain one run-owned History row per mode so a
+            // source/plan-bound resume can visibly restore the exact seed. Only
+            // the shard that reaches the end removes those carriers and pins.
+            if completedShard && (testRun?.failureCount ?? 0) == 0 {
+                for searchToken in retainedSeedCarriers.values.sorted() {
+                    deleteRunOwnedHistoryRow(searchToken: searchToken)
+                }
                 for modeID in modesPinnedByAudit.sorted() {
                     if let mode = VocelloUIBenchMatrix.Mode(rawValue: modeID) {
                         unpinAuditSeed(in: mode)
@@ -445,11 +465,6 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
                 select(mode: originalMode)
             }
         }
-        let environment = ProcessInfo.processInfo.environment
-        let start = Int(environment["QVOICE_IOS_CONTROL_AUDIT_TAKE_START"] ?? "0") ?? 0
-        let limit = Int(environment["QVOICE_IOS_CONTROL_AUDIT_TAKE_LIMIT"] ?? "0") ?? 0
-        let selected = Array(plan.takes.dropFirst(start).prefix(limit > 0 ? limit : Int.max))
-        XCTAssertFalse(selected.isEmpty, "Generation audit shard must contain at least one take")
         let needsDirectImport = selected.contains {
             $0.mode == "clone" && $0.reference == "direct-import"
         }
@@ -457,11 +472,14 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
             && selected.contains { $0.mode == "clone" }
         let createsAuditVoice = needsDirectImport || needsRestorationVoice
         if createsAuditVoice {
-            ensureDirectImportVoice()
+            generationAuditVoiceName = "ICA \(plan.planDigest.prefix(8))"
+            ensureDirectImportVoice(reuseExisting: start > 0)
         }
         defer {
             if createsAuditVoice {
-                deleteAuditVoiceIfPresent()
+                if completedShard && (testRun?.failureCount ?? 0) == 0 {
+                    deleteAuditVoiceIfPresent()
+                }
                 restoreCloneConsentIfNeeded()
             }
             restoreStudioSnapshot(originalStudio)
@@ -501,6 +519,7 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
             }
             let generationID = generateAndWaitForCompletedPlayer(
                 timeout: take.length == "long" ? 360 : 300,
+                failTestOnVisibleError: false,
                 onVisibleError: { [weak self] visibleError in
                     guard let self else { return }
                     self.recorder.record(
@@ -512,24 +531,32 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
                         take: take,
                         observedSeed: frozenSeed
                     )
-                    self.recorder.attach(to: self)
                 }
             )
+            // The production failure surface has a single visible Retry action.
+            // Ending this shard is the only way to preserve the failed request
+            // without retrying it. `prepare-resume` advances to the next row.
             guard !generationID.isEmpty else { return }
             exerciseCompletedPlayer()
             dismissCompletedPlayerAndAssertGenerateReady()
-            if frozenSeed == nil {
-                frozenSeed = pinSeedFromRunOwnedHistoryRow(searchToken: take.searchToken)
-                frozenSeeds[take.mode] = frozenSeed
-                modesPinnedByAudit.insert(take.mode)
+            if retainedSeedCarriers[take.mode] == nil {
+                if frozenSeed == nil {
+                    frozenSeed = pinSeedFromRunOwnedHistoryRow(searchToken: take.searchToken)
+                    frozenSeeds[take.mode] = frozenSeed
+                    modesPinnedByAudit.insert(take.mode)
+                }
+                retainedSeedCarriers[take.mode] = take.searchToken
+            } else {
+                deleteRunOwnedHistoryRow(searchToken: take.searchToken)
             }
-            deleteRunOwnedHistoryRow(searchToken: take.searchToken)
             let observedSeed = frozenSeed
             XCTAssertNotNil(observedSeed, "The cold sentinel must expose a seed that can be frozen visibly")
             recorder.record(
                 scenario: "generation", controlID: "generation:\(take.takeID)",
                 expected: "Visible request, engine receipt, QC, History, playback, and cleanup agree",
-                actual: "Completed generation \(generationID); run-owned History row removed",
+                actual: retainedSeedCarriers[take.mode] == take.searchToken
+                    ? "Completed generation \(generationID); run-owned History row retained as the resume seed carrier"
+                    : "Completed generation \(generationID); run-owned History row removed",
                 evidence: "generation-\(take.takeID)",
                 take: take,
                 generationID: generationID,
@@ -551,6 +578,7 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
             expected: "Completed output remains playable and adjustable",
             actual: "Inline player controls were exercised before row cleanup"
         )
+        completedShard = true
     }
 
     private func beginAuditSession(arguments: [String] = []) {
@@ -601,8 +629,13 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
         XCTAssertFalse(element("textInput_installModelButton").exists)
     }
 
-    private func ensureDirectImportVoice() {
+    private func ensureDirectImportVoice(reuseExisting: Bool = false) {
         select(tab: .voices)
+        if reuseExisting,
+           VocelloUIWait.exists(element("voicesRow_saved_\(directImportVoiceName)"), timeout: 20) {
+            select(tab: .studio)
+            return
+        }
         deleteAuditVoiceIfPresent()
         select(tab: .settings)
         let consent = element("voiceCloning_consentAcknowledgment")
@@ -1285,6 +1318,27 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
             self.visiblePinnedSeed() == seed
         })
         return seed ?? 0
+    }
+
+    private func restoreRetainedAuditSeed(
+        in mode: VocelloUIBenchMatrix.Mode,
+        from priorTakes: [IOSControlAuditTake]
+    ) -> (seed: UInt64, searchToken: String)? {
+        for take in priorTakes where take.mode == mode.rawValue {
+            replaceHistorySearch(with: take.searchToken)
+            dismissHistorySearchKeyboardIfNeeded()
+            let rows = historyRows()
+            guard rows.count > 0 else { continue }
+            XCTAssertEqual(rows.count, 1, "A retained seed token must identify exactly one audit row")
+            XCTAssertTrue(
+                rows.firstMatch.label.contains(take.searchToken),
+                "A retained seed carrier must match the immutable audit script"
+            )
+            let seed = pinSeedFromRunOwnedHistoryRow(searchToken: take.searchToken)
+            return (seed, take.searchToken)
+        }
+        select(tab: .studio)
+        return nil
     }
 
     private func unpinAuditSeed(in mode: VocelloUIBenchMatrix.Mode) {

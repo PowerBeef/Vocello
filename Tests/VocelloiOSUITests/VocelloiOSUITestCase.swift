@@ -518,6 +518,7 @@ class VocelloiOSUITestCase: XCTestCase {
     /// the completed inline player after it, and no visible generation error.
     func generateAndWaitForCompletedPlayer(
         timeout: TimeInterval,
+        failTestOnVisibleError: Bool = true,
         onVisibleError: ((String) -> Void)? = nil
     ) -> String {
         let generate = element("textInput_generateButton")
@@ -560,7 +561,9 @@ class VocelloiOSUITestCase: XCTestCase {
             .filter { !$0.isEmpty }
             .joined(separator: " | ")
             onVisibleError?(visibleError.isEmpty ? "Visible generation error" : visibleError)
-            XCTFail("Generation exposed its visible error control: \(visibleError)")
+            if failTestOnVisibleError {
+                XCTFail("Generation exposed its visible error control: \(visibleError)")
+            }
             return ""
         }
         XCTAssertTrue(VocelloUIWait.exists(completedPlayer, timeout: 5))

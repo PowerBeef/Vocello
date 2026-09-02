@@ -171,6 +171,74 @@ class IOSControlAuditContractTests(unittest.TestCase):
         )[0]
         self.assertIn("dismissHistorySearchKeyboardIfNeeded()", pin_seed)
 
+    def test_generation_product_failure_is_terminal_without_retrying_the_row(self) -> None:
+        source = (
+            ROOT
+            / "Tests"
+            / "VocelloiOSUITests"
+            / "VocelloiOSControlAuditUITests.swift"
+        ).read_text(encoding="utf-8")
+        generation = source.split("private func runGenerationAudit", 1)[1].split(
+            "private func beginAuditSession", 1
+        )[0]
+        self.assertIn("failTestOnVisibleError: false", generation)
+        self.assertIn("guard !generationID.isEmpty else { return }", generation)
+        self.assertNotIn("perform(on: generationError", generation)
+
+        helper_source = (
+            ROOT
+            / "Tests"
+            / "VocelloiOSUITests"
+            / "VocelloiOSUITestCase.swift"
+        ).read_text(encoding="utf-8")
+        helper = helper_source.split("func generateAndWaitForCompletedPlayer", 1)[1].split(
+            "func dismissCompletedPlayerAndAssertGenerateReady", 1
+        )[0]
+        self.assertIn("failTestOnVisibleError: Bool = true", helper)
+        self.assertIn("if failTestOnVisibleError", helper)
+
+    def test_generation_retains_and_restores_a_visible_seed_carrier(self) -> None:
+        source = (
+            ROOT
+            / "Tests"
+            / "VocelloiOSUITests"
+            / "VocelloiOSControlAuditUITests.swift"
+        ).read_text(encoding="utf-8")
+        generation = source.split("private func runGenerationAudit", 1)[1].split(
+            "private func beginAuditSession", 1
+        )[0]
+        self.assertIn("retainedSeedCarriers", generation)
+        self.assertIn("restoreRetainedAuditSeed", generation)
+        self.assertIn("if completedShard", generation)
+        self.assertIn("deleteRunOwnedHistoryRow(searchToken: searchToken)", generation)
+        restoration = source.split("private func restoreRetainedAuditSeed", 1)[1].split(
+            "private func unpinAuditSeed", 1
+        )[0]
+        self.assertIn("for take in priorTakes where take.mode == mode.rawValue", restoration)
+        self.assertIn("pinSeedFromRunOwnedHistoryRow", restoration)
+        self.assertIn("rows.firstMatch.label.contains(take.searchToken)", restoration)
+        self.assertNotIn("app.staticTexts", restoration)
+
+    def test_generation_resume_reuses_its_plan_bound_clone_fixture(self) -> None:
+        source = (
+            ROOT
+            / "Tests"
+            / "VocelloiOSUITests"
+            / "VocelloiOSControlAuditUITests.swift"
+        ).read_text(encoding="utf-8")
+        generation = source.split("private func runGenerationAudit", 1)[1].split(
+            "private func beginAuditSession", 1
+        )[0]
+        self.assertIn('generationAuditVoiceName = "ICA \\(plan.planDigest.prefix(8))"', generation)
+        self.assertIn("ensureDirectImportVoice(reuseExisting: start > 0)", generation)
+        self.assertIn("if createsAuditVoice", generation)
+        self.assertIn("if completedShard", generation)
+        fixture = source.split("private func ensureDirectImportVoice", 1)[1].split(
+            "private func deleteAuditVoiceIfPresent", 1
+        )[0]
+        self.assertIn("reuseExisting", fixture)
+        self.assertIn('voicesRow_saved_\\(directImportVoiceName)', fixture)
+
     def test_new_interactive_source_fails_closed(self) -> None:
         hits = audit.interactive_sources()
         hits["Sources/iOS/NewUnownedControl.swift"] = [12]

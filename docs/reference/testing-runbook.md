@@ -1,7 +1,7 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-08-29
+reviewed: 2026-09-02
 summary: The cross-platform testing runbook — deterministic lanes as the routine contract, explicit XCUITest acceptance, model readiness, and the authority order for test guidance.
 sourceOfTruth:
   - scripts/check_project_inputs.sh
@@ -113,6 +113,21 @@ terminal ran. A launched test blocked by a SpringBoard notification may use the 
 interruption classification only with an identified wait timeout, banner evidence, and no product,
 crash, generation, QC, or harness failure. Unexecuted rows remain `SKIPPED_AFTER_FAILURE`; any
 manual rerun receives a new run ID and never overwrites the failed bundle.
+
+The repository runner's terminal status owns lane qualification. A green XCTest suite is necessary
+but not sufficient when the lane also requires diagnostics, crash deltas, artifact composition,
+audio or memory validation, or cleanup. If any required post-test collection is interrupted, retain
+the `.xcresult` as partial evidence, leave the overall run failed/unqualified, and rerun with a new
+run ID. Do not edit or merge the first bundle.
+
+Multi-run generation campaigns resume only from schema-validated, source/build/device/plan-bound
+state containing terminal observations or explicit carried skips. A shard that fails before its
+first terminal observation has no row-level resume authority. History carrier lookup must prove the
+exact plan-owned script and action identity; a reserved numeric token matching an unrelated user
+History row is `HARNESS_FAIL`, and the harness must neither mutate that row nor continue the matrix.
+After correcting source or harness code, restart the generation campaign from row 1 on one new
+frozen identity. The current source-bound checkpoint and exact next commands live in
+[`ios-device-testing.md`](ios-device-testing.md#control-audit-one-hour-continuation--2026-09-02).
 
 ## Model readiness
 

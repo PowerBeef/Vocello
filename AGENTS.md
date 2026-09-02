@@ -196,9 +196,10 @@ scripts/ios_device.sh voice-reliability --plan <untracked-plan.json> --private-m
 
 iOS uses a paired physical iPhone; platform gates are non-XCUITest diagnostics. `preflight`
 requires an Apple Development identity/private key; team, expired, and distribution-only states
-fail. Model/clone lanes are opt-in. Pin multi-run audits until closure and record their resume
-boundary before releasing the phone. Bootstrap/notification interruptions stay failed with skipped
-rows; reruns get new IDs. See `docs/reference/ios-device-testing.md`.
+fail. Model/clone lanes are opt-in. Pin bundles and resume boundaries before release.
+Runner PASS requires diagnostics/cleanup; interrupted/zero-observation runs fail without resume.
+Source changes need new, unmerged IDs. See
+`docs/reference/ios-device-testing.md`.
 
 ## Key paths
 

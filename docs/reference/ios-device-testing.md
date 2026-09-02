@@ -153,6 +153,12 @@ terminal outcomes, remaining rows, and the next valid command in the roadmap and
 checkpoint; then confirm each pin reports `explicitly-pinned` in a cleanup dry-run. Remove pins only
 when the evidence set is explicitly retired.
 
+Lane qualification is deliberately stricter than the XCTest counter. The `ui_test.sh` terminal
+status is authoritative because it also owns post-test diagnostics, crash deltas, artifact
+composition, policy validators, and cleanup. If those required phases are stopped after all XCTest
+cases pass, the `.xcresult` remains useful partial evidence but the lane remains failed and must be
+rerun with a new ID. Never relabel the retained bundle or cite its test count as a complete PASS.
+
 Generation resume state is schema-versioned and fail-closed. A failed take that already emitted a
 terminal `PRODUCT_FAIL`, `HARNESS_FAIL`, or `INFRASTRUCTURE_FAIL` observation remains represented,
 and the next run starts at the immediately following unattempted row. If the process failed without
@@ -160,6 +166,13 @@ a terminal observation for its in-flight row, that row is recorded as `SKIPPED_A
 is not retried automatically. Version-2 state carries every such skip across multi-failure resume
 chains; version-1 retained state remains readable. A gap that is neither observed nor explicitly
 carried as a skip rejects the resume instead of silently losing matrix coverage.
+
+A pre-observation failure has no row-level resume boundary. In particular, the run-owned History
+carrier is established only after the harness proves the exact immutable script and labeled row
+action. A reserved search token that happens to appear in an unrelated user History row must stop
+as `HARNESS_FAIL`; it never authorizes mutation of that row, seed adoption, or matrix continuation.
+After a source correction, preserve the failed bundle and begin again at row 1 with a new frozen
+identity.
 
 A visible generation failure has only a production Retry action. The audit therefore records the
 failed request and ends that XCUITest shard without pressing Retry; a separately invoked,

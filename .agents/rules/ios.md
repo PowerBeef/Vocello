@@ -1,7 +1,7 @@
 ---
 status: active
 owner: ios
-reviewed: 2026-08-29
+reviewed: 2026-09-02
 summary: Domain rule for the VocelloiOS target — boundaries, physical-device-only testing, typed cancellation, Dynamic Type/Reduce Motion invariants, stable identifiers, and the frame-health perf lane.
 sourceOfTruth:
   - scripts/ios_device.sh
@@ -125,6 +125,13 @@ For a multi-run campaign, pass `--retain-result` before each member starts. Befo
 leaves, stop after a completed scenario, record exact run IDs, findings, blocked/skipped rows, and
 the next valid command in `config/roadmap.json` plus `docs/development-progress.md`, then verify the
 untracked pins with a cleanup dry-run. Remove pins only after the evidence set is explicitly closed.
+The runner verdict, not the raw XCTest count, owns lane qualification: post-test diagnostics,
+crash-delta collection, artifact validation, and cleanup required by that lane must all finish. If
+collection is cancelled after XCTest passes, retain the partial proof but keep the lane failed and
+rerun it under a new ID. A generation run that emits no terminal observation has no row-level resume
+boundary. History seed carriers must be resolved through exact run/plan-owned content; a numeric
+search-token collision with an unrelated History row is a harness-integrity failure, never evidence
+about product generation and never permission to delete or mutate that row.
 
 ## Invariants (do not regress)
 
@@ -188,6 +195,10 @@ untracked pins with a cleanup dry-run. Remove pins only after the evidence set i
 - **Device-campaign checkpoints are source-bound.** Pause only between completed scenarios. Never
   merge a prior failure with a later pass, resume after a source/build/device/plan identity change,
   or represent pruned raw evidence as retained. Record missing evidence as a recapture requirement.
+  Passed XCTest cases do not qualify a lane whose required runner-owned evidence collection or
+  validation was interrupted. A zero-observation generation shard is preserved as failed evidence
+  but cannot supply a resume cursor; after any corrective source change, start again with a new run
+  ID and frozen identity.
 
 ## Common mistakes
 

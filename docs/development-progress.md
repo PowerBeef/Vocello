@@ -55,15 +55,16 @@ passed, then current-source inventory run
 `NOT_APPLICABLE`, zero failures, and zero skips. This closes the earlier voice-picker dismissal
 evidence gap. Saved-voice run `ios-xcui-saved-voice-lifecycle-20260902-181739-713b7367` then
 failed before preview because the run-owned imported voice row menu had an invalid activation frame
-and no suggested hit point. Preserve that run as unresolved harness/UI-geometry evidence; it is not
-a saved-voice acceptance pass.
+and no suggested hit point. ICA-13 now owns that unresolved harness/UI-geometry boundary. Preserve
+the run; it is not a saved-voice acceptance pass.
 
 Generation run `ios-xcui-control-audit-20260902-181849-9ea76d5a` reached its fail-closed History
 correlation guard, which found reserved token `28400003` on a non-audit History row. The run emitted
 no terminal observations, its summary honestly retains all 204 composed rows as
 `SKIPPED_AFTER_FAILURE`, and it has no usable resume state. This is a harness-integrity finding, not
 voice-output evidence. Do not resume or merge it. Localize the token collision, then start a fresh
-201-take generation campaign on one new frozen tree identity.
+201-take generation campaign on one new frozen tree identity. ICA-14 owns the collision-proof
+History-carrier remediation and its deterministic fixtures.
 
 Smoke run `ios-xcui-smoke-20260902-182906-25dc08ce` passed all three XCTest cases: the primary
 cancellation/memory-recovery/Custom-History journey, Settings accessibility layout walk, and

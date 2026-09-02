@@ -13,7 +13,7 @@
 | `delivery-prompting-2026-08` | active | backend-mlx | 29/34 (85%) |
 | `engineering-review-remediation-2026-08` | active | backend-and-platform | 13/14 (93%) |
 | `ios-app-store-readiness-2026-08` | active | release-qa | 2/12 (17%) |
-| `ios-control-audit-2026-08` | active | ios | 8/12 (67%) |
+| `ios-control-audit-2026-08` | active | ios | 8/14 (57%) |
 | `ios-generation-startup-reliability-2026-08` | active | backend-and-platform | 4/6 (67%) |
 | `voice-identity-language-reliability-2026-08` | active | backend-and-platform | 8/9 (89%) |
 | `compliance-2026-08` | complete | release-qa | 2/2 (100%) |
@@ -228,6 +228,8 @@ Narrative authority: [`docs/reference/ios-on-device-control-audit-2026-08-28.md`
 | `ICA-10` | done | P2 — restore Studio mode-selector 44-point targets | `doc:docs/reference/ios-control-audit-remediation-2026-08-29.md` |
 | `ICA-11` | done | P2 — separate forced-size walks from XCTest Dynamic Type audit | `doc:docs/reference/ios-control-audit-remediation-2026-08-29.md` |
 | `ICA-12` | done | P2 — make the stable Studio surface respond to Dynamic Type | `doc:docs/reference/ios-control-audit-remediation-2026-08-29.md` |
+| `ICA-13` | in-flight | P1 — restore deterministic saved-voice row-menu reachability | `doc:docs/reference/ios-control-audit-remediation-2026-08-29.md`, `doc:docs/reference/ios-device-testing.md` |
+| `ICA-14` | in-flight | P1 — make generation History carrier correlation collision-proof | `doc:docs/reference/ios-control-audit-remediation-2026-08-29.md`, `doc:docs/reference/ios-device-testing.md` |
 
 ### Open items in detail
 
@@ -242,6 +244,12 @@ Narrative authority: [`docs/reference/ios-on-device-control-audit-2026-08-28.md`
 
 - **`ICA-09`** (in-flight) — P2 — classify pre-test XCUITest bootstrap failures without false product rows.
   gate: When Xcode times out enabling automation before the first test case launches, the retained xcresult and log must prove zero launched tests and no app assertion, generation request, crash, or QC result. The composed control-audit summary must expose one run-level INFRASTRUCTURE_FAIL while every unexecuted control remains SKIPPED_AFTER_FAILURE; it must preserve the failed result and exact manual rerun command, reject mismatched run identity or any coexistence with observations, and never retry or convert the first run to PASS.
+
+- **`ICA-13`** (in-flight) — P1 — restore deterministic saved-voice row-menu reachability.
+  gate: Localize whether the run-owned saved-voice menu failure is production accessibility geometry or XCUITest readiness. The voicesRowMenu_<voice-id> semantic control must expose a stable, finite, at-least-44-point activation frame and become hittable through condition polling without coordinates or label fallbacks. Closure requires deterministic geometry/query coverage and one complete physical-device saved-voice-lifecycle run that imports, transcribes, saves, previews, clones, deletes, and clears the draft without automatic retry.
+
+- **`ICA-14`** (in-flight) — P1 — make generation History carrier correlation collision-proof.
+  gate: Replace numeric-substring ownership assumptions with exact immutable run/plan script identity and the labeled History row action for stale-row cleanup, seed-carrier restoration, seed pinning, and deletion. An unrelated row containing a reserved token must be rejected without mutation, seed adoption, or matrix continuation. Closure requires deterministic collision, ambiguity, stale-row, and cross-run fixtures plus a fresh physical-device generation campaign that emits terminal observations from row 1 under one frozen source identity.
 
 ## iOS Built-in Voice startup reliability
 

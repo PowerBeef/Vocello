@@ -36,6 +36,19 @@ warnings, or treating an unlaunched XCUITest as product evidence.
 
 ## Physical acceptance checkpoint
 
+The September 2 one-hour continuation adds four current-source bundles. Inventory run
+`ios-xcui-control-audit-20260902-180938-42d76c39` completed with 41 `PASS`, one explicit
+`NOT_APPLICABLE`, and no failures or skips, closing the earlier picker-dismissal recapture gap.
+Saved-voice run `ios-xcui-saved-voice-lifecycle-20260902-181739-713b7367` failed when the
+run-owned imported voice row menu exposed an invalid activation frame. Generation run
+`ios-xcui-control-audit-20260902-181849-9ea76d5a` stopped before any terminal observation when its
+guard proved reserved token `28400003` belonged to a non-audit History row; all 204 composed rows
+therefore remain skipped and the run has no valid resume token. Smoke run
+`ios-xcui-smoke-20260902-182906-25dc08ce` passed all three XCTest cases, but its post-test
+diagnostics pull was cancelled at the maintainer's one-hour deadline, so it remains unqualified.
+These results localize two harness blockers without changing product behavior. The next campaign
+must use a new frozen tree identity after correcting them.
+
 Corrected-source run `ios-xcui-control-audit-20260829-174031-cae15a02` passed Default, AX-L,
 AX-XXXL, pseudo-AX-XXXL, and the separate unforced unfiltered XCTest accessibility audit without
 retry. It closes ICA-07, ICA-10, ICA-11, and ICA-12. The iterative first divergences also corrected

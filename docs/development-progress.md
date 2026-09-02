@@ -49,6 +49,31 @@ machine-readable status record and wins over any older prose.
 
 ## Resume here (2026-09-02)
 
+**The one-hour physical-iPhone window is closed and all device processes are stopped.** Preflight
+passed, then current-source inventory run
+`ios-xcui-control-audit-20260902-180938-42d76c39` completed with 41 `PASS`, one explicit
+`NOT_APPLICABLE`, zero failures, and zero skips. This closes the earlier voice-picker dismissal
+evidence gap. Saved-voice run `ios-xcui-saved-voice-lifecycle-20260902-181739-713b7367` then
+failed before preview because the run-owned imported voice row menu had an invalid activation frame
+and no suggested hit point. Preserve that run as unresolved harness/UI-geometry evidence; it is not
+a saved-voice acceptance pass.
+
+Generation run `ios-xcui-control-audit-20260902-181849-9ea76d5a` reached its fail-closed History
+correlation guard, which found reserved token `28400003` on a non-audit History row. The run emitted
+no terminal observations, its summary honestly retains all 204 composed rows as
+`SKIPPED_AFTER_FAILURE`, and it has no usable resume state. This is a harness-integrity finding, not
+voice-output evidence. Do not resume or merge it. Localize the token collision, then start a fresh
+201-take generation campaign on one new frozen tree identity.
+
+Smoke run `ios-xcui-smoke-20260902-182906-25dc08ce` passed all three XCTest cases: the primary
+cancellation/memory-recovery/Custom-History journey, Settings accessibility layout walk, and
+long-form project journey. The maintainer's deadline arrived during the subsequent diagnostics
+pull, which was cancelled immediately. The runner therefore remains overall failed/unqualified;
+the XCTest result is useful partial evidence but does not substitute for the missing post-test
+memory/crash diagnostics gate. The next phone window must rerun smoke to completion after fixing
+the two harness blockers above. All four runs are explicitly retained, no device automation remains
+active, and this documentation checkpoint requires new source-bound run IDs.
+
 **The physical-iPhone control audit is paused at a clean pre-row boundary.** On the maintainer's
 request, generation shard `ios-xcui-control-audit-20260902-153340-9092ff5d` was interrupted during
 initial Studio state capture on source `c5d435ee`. Xcode and XCUITest exited, the runner completed

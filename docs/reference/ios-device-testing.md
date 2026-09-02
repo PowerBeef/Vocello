@@ -190,7 +190,46 @@ never authorizes an automatic retry. The 2026-08-29 Messenger-interrupted run is
 for this boundary.
 See [`ios-control-audit-remediation-2026-08-29.md`](ios-control-audit-remediation-2026-08-29.md).
 
-### Control-audit pause boundary — 2026-09-02
+### Control-audit one-hour continuation — 2026-09-02
+
+The next one-hour device window ran on source identity
+`ee2e7d4e245bd8d95b47fa0cc0064783fd9d4be7edc5ef8211728d017d45996e`. Preflight passed and
+inventory run `ios-xcui-control-audit-20260902-180938-42d76c39` completed with 41 `PASS`, one
+explicit `NOT_APPLICABLE`, zero failures, and zero skipped rows. It supersedes the earlier
+zero-observation inventory attempt for active coverage purposes without rewriting that historical
+bundle.
+
+Two short journeys then exposed current harness/reachability gaps. Saved-voice run
+`ios-xcui-saved-voice-lifecycle-20260902-181739-713b7367` found the run-owned imported voice but
+could not activate `voicesRowMenu_ICI Direct Clone Import`: its accessibility frame produced no
+valid activation or suggested hit point. Generation run
+`ios-xcui-control-audit-20260902-181849-9ea76d5a` stopped at its intended History-integrity guard
+because reserved token `28400003` matched a non-audit History row. No generation observation was
+written, all 204 composed rows remain `SKIPPED_AFTER_FAILURE`, and no row-level resume state exists.
+Neither failure is product-generation evidence, and neither authorizes an automatic retry.
+
+Smoke run `ios-xcui-smoke-20260902-182906-25dc08ce` passed all three XCTest cases, including the
+primary cancellation/memory-recovery/Custom-History journey, the Settings accessibility layout
+walk, and the long-form project journey. The one-hour deadline arrived during the later diagnostics
+pull. That pull was cancelled, so the overall runner remains failed and the XCTest-only result is
+not a qualified smoke PASS. At the deadline, all test processes were stopped and the four run
+bundles remained explicitly pinned.
+
+Committing this checkpoint changes the full-tree identity. The next phone window must not resume
+`181849`. First correct and deterministically validate the saved-voice activation geometry and
+generation History-token ownership, then use new run IDs:
+
+```sh
+scripts/ios_device.sh preflight
+scripts/ui_test.sh ios saved-voice-lifecycle --retain-result
+scripts/ui_test.sh ios control-audit --scenario generation --retain-result
+scripts/ui_test.sh ios smoke --retain-result
+```
+
+The generation campaign starts at row 1. Preserve the historical silent-gap findings, do not merge
+source identities, and complete cleanup/restoration only from the final source-bound shard.
+
+### Earlier control-audit pause boundary — 2026-09-02
 
 The latest generation shard, `ios-xcui-control-audit-20260902-153340-9092ff5d`, was stopped at the
 maintainer's request while the test was capturing initial Studio state. It emitted zero control

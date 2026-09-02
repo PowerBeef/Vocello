@@ -230,7 +230,8 @@ class IOSControlAuditContractTests(unittest.TestCase):
         )[0]
         self.assertIn("for take in priorTakes where take.mode == mode.rawValue", restoration)
         self.assertIn("pinSeedFromRunOwnedHistoryRow", restoration)
-        self.assertIn("rows.firstMatch.label.contains(take.searchToken)", restoration)
+        self.assertIn('"historyRowTap_", take.script', restoration)
+        self.assertIn("matchingRowActions.count, 1", restoration)
         self.assertNotIn("app.staticTexts", restoration)
 
     def test_generation_resume_reuses_its_plan_bound_clone_fixture(self) -> None:

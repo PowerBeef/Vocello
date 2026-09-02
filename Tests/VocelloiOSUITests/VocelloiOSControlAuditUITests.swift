@@ -1330,9 +1330,15 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
             let rows = historyRows()
             guard rows.count > 0 else { continue }
             XCTAssertEqual(rows.count, 1, "A retained seed token must identify exactly one audit row")
-            XCTAssertTrue(
-                rows.firstMatch.label.contains(take.searchToken),
-                "A retained seed carrier must match the immutable audit script"
+            let matchingRowActions = app.descendants(matching: .any).matching(
+                NSPredicate(
+                    format: "identifier BEGINSWITH %@ AND label CONTAINS %@",
+                    "historyRowTap_", take.script
+                )
+            )
+            XCTAssertEqual(
+                matchingRowActions.count, 1,
+                "A retained seed carrier must expose the immutable audit script on its labeled row action"
             )
             let seed = pinSeedFromRunOwnedHistoryRow(searchToken: take.searchToken)
             return (seed, take.searchToken)

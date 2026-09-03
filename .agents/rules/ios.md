@@ -10,6 +10,8 @@ sourceOfTruth:
   - scripts/build_foundation_targets.sh
   - scripts/localization_contract.py
   - config/localization-unlocalized-baseline.json
+  - Sources/SharedSupport/Services/ReferenceTranscriptionReviewState.swift
+  - Sources/SharedSupport/Services/VoiceClipTranscriber.swift
 ---
 # iOS domain rule
 
@@ -156,6 +158,13 @@ about product generation and never permission to delete or mutate that row.
   assembly and mode-specific preparation, but common timeline, engine, cancellation cleanup,
   playback, persistence, and export sequencing belongs to `IOSSingleTakeGenerationExecutor`.
   Do not fork that lifecycle back into individual mode views.
+- **Enrollment review is one cross-platform policy.** `ReferenceTranscriptionReviewState` owns
+  awaiting-audio, automatic, manual, unavailable, and explicit audio-only states for both apps.
+  Save is disabled while recognition is unresolved; operation generations reject delayed results,
+  and user edits win. Build persisted metadata only through
+  `VoiceClipTranscriber.preparedVoiceEnrollmentMetadata(...)`. Reference language describes the
+  conditioning clip and must never select Clone output: Auto follows target text and an explicit
+  Studio language always wins.
 - **Use `IOSScrollView`.** iOS vertical scroll surfaces use `IOSScrollView`, not raw `ScrollView`.
 - **Mode color pairs with icon/label/position.** No color-only signal.
 - **Honor Reduce Motion / Reduce Transparency.** Animations route through `appAnimation` /

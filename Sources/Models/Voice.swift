@@ -1,4 +1,5 @@
 import Foundation
+import QwenVoiceCore
 import QwenVoiceNative
 
 /// An enrolled voice reference for voice cloning.
@@ -15,6 +16,10 @@ struct Voice: Identifiable, Hashable {
     /// dialogs at enrollment + indicator badges in the saved-voices
     /// list.
     let qualityWarnings: [String]
+    /// Privacy-safe enrollment provenance persisted by the prepared-voice repository.
+    /// Reference language describes the saved clip only; it never overrides a future
+    /// Clone request's independently selected output language.
+    let enrollmentMetadata: PreparedVoiceEnrollmentMetadata?
     /// Cached `headline` for the first warning token. Computed once at
     /// init time so the saved-voices list rendering doesn't re-run the
     /// `PreparedVoiceQualityWarning.headline(for:)` lookup for every
@@ -32,13 +37,15 @@ struct Voice: Identifiable, Hashable {
         name: String,
         wavPath: String,
         hasTranscript: Bool,
-        qualityWarnings: [String] = []
+        qualityWarnings: [String] = [],
+        enrollmentMetadata: PreparedVoiceEnrollmentMetadata? = nil
     ) {
         self.id = name
         self.name = name
         self.wavPath = wavPath
         self.hasTranscript = hasTranscript
         self.qualityWarnings = qualityWarnings
+        self.enrollmentMetadata = enrollmentMetadata
         self.qualityHeadline = qualityWarnings.first.flatMap(PreparedVoiceQualityWarning.headline(for:))
     }
 
@@ -48,7 +55,7 @@ struct Voice: Identifiable, Hashable {
         self.wavPath = preparedVoice.audioPath
         self.hasTranscript = preparedVoice.hasTranscript
         self.qualityWarnings = preparedVoice.qualityWarnings
+        self.enrollmentMetadata = preparedVoice.enrollmentMetadata
         self.qualityHeadline = preparedVoice.qualityWarnings.first.flatMap(PreparedVoiceQualityWarning.headline(for:))
     }
 }
-

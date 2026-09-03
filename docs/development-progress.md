@@ -49,6 +49,19 @@ machine-readable status record and wins over any older prose.
 
 ## Resume here (2026-09-02)
 
+**The audited macOS Clone/language parity gap is closed under VLR-10.** Saved Voices now uses
+the same operation-generation transcription-review state and privacy-safe evidence builder as
+iPhone, including an honest awaiting-audio state, explicit audio-only confirmation, and separate
+reference-language confirmation. That metadata crosses the existing versioned XPC candidate
+command, survives prepared-voice reload/replacement, and never selects the language of a later
+Clone output. The macOS Clone and Voice Design coordinators now delegate request assembly to one
+pure boundary whose deterministic tests prove Auto target-text routing, explicit-language
+precedence, exact reference transcript/ID, prompt, seed, variation, and generation identity. No
+model, prompt copy, sampling default, quality threshold, or engine behavior changed. The shared
+lifecycle contract, focused Swift tests, generic iOS compile, full macOS deterministic suites, and
+the quick project gate are the closure evidence; native macOS XCUITest remains explicit frontend
+acceptance rather than an ordinary publication prerequisite.
+
 **The seven-item phone-independent remediation block is complete and deterministically green.**
 ICA-14 now uses source-bound schema-v2 History narrowing tokens and requires the exact full
 plan-bound script plus labeled row action before any cleanup, pin, restore, or delete operation;

@@ -44,6 +44,68 @@ final class VoiceClipEnrollmentEvidenceTests: XCTestCase {
         )
     }
 
+    func testPreparedVoiceMetadataBindsReviewedSourceLanguageAndStableEvidence() throws {
+        var review = ReferenceTranscriptionReviewState(initialTranscript: "")
+        let generation = review.beginAutomaticTranscription()
+        XCTAssertTrue(
+            review.acceptAutomaticTranscript(
+                "Recognized words",
+                generation: generation,
+                currentTranscript: ""
+            )
+        )
+        let evidence = VoiceClipTranscriber.EnrollmentEvidence(
+            schemaVersion: VoiceClipTranscriber.EnrollmentEvidence.currentSchemaVersion,
+            algorithmVersion: VoiceClipTranscriber.EnrollmentEvidence.currentAlgorithmVersion,
+            authorizationStatus: .authorized,
+            outcome: .success,
+            attempts: [attempt(status: .finalResult, digest: String(repeating: "b", count: 64))],
+            bestLanguage: "english",
+            bestLanguageScore: 0.94,
+            bestTranscriptConfidence: 0.88
+        )
+
+        let first = try VoiceClipTranscriber.preparedVoiceEnrollmentMetadata(
+            referenceLanguage: .english,
+            reviewState: review,
+            evidence: evidence
+        )
+        let second = try VoiceClipTranscriber.preparedVoiceEnrollmentMetadata(
+            referenceLanguage: .english,
+            reviewState: review,
+            evidence: evidence
+        )
+
+        XCTAssertEqual(first.referenceLanguage, .english)
+        XCTAssertEqual(first.transcriptSource, .automatic)
+        XCTAssertEqual(first.automaticTranscriptionOutcome, "success")
+        XCTAssertEqual(first.transcriptionEvidenceDigest, second.transcriptionEvidenceDigest)
+        XCTAssertEqual(first.transcriptionEvidenceDigest?.count, 64)
+    }
+
+    func testManualAndAudioOnlyMetadataRemainExplicitWithoutEvidence() throws {
+        var manual = ReferenceTranscriptionReviewState(initialTranscript: "")
+        manual.userEditedTranscript("Reviewed text")
+        let manualMetadata = try VoiceClipTranscriber.preparedVoiceEnrollmentMetadata(
+            referenceLanguage: .french,
+            reviewState: manual,
+            evidence: nil
+        )
+        XCTAssertEqual(manualMetadata.referenceLanguage, .french)
+        XCTAssertEqual(manualMetadata.transcriptSource, .manual)
+        XCTAssertNil(manualMetadata.automaticTranscriptionOutcome)
+        XCTAssertNil(manualMetadata.transcriptionEvidenceDigest)
+
+        var audioOnly = ReferenceTranscriptionReviewState(initialTranscript: "")
+        audioOnly.confirmAudioOnly()
+        let audioOnlyMetadata = try VoiceClipTranscriber.preparedVoiceEnrollmentMetadata(
+            referenceLanguage: .auto,
+            reviewState: audioOnly,
+            evidence: nil
+        )
+        XCTAssertEqual(audioOnlyMetadata.transcriptSource, .audioOnly)
+    }
+
     private func attempt(
         status: VoiceClipTranscriber.RecognitionFinalStatus,
         digest: String? = nil

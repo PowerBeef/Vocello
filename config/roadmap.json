@@ -1733,7 +1733,7 @@
       "gate": "Studio Clone exposes Record new clip and Import audio file through stable visible controls. Direct import dismisses the custom reference panel before the system Files picker, preserves the security-scoped URL into the canonical importer, and presents the existing permanent enrollment flow. A neighboring text sidecar wins; otherwise the one on-device VoiceClipTranscriber produces an editable transcript. Save remains disabled while recognition is unresolved; an unavailable or empty result requires manual text or an explicit Use audio only decision. Stale or cancelled recognition cannot overwrite a user edit. Confirmed enrollment adds one Saved Voice and hands its exact voice ID, WAV, reviewed transcript, and language back to Clone. Generic iPhoneOS app/logic compilation and deterministic state tests pass without changing the saved-voice schema or Clone request format.",
       "evidence": [
         "file:Sources/iOSSupport/Services/IOSReferenceAudioImportPolicy.swift",
-        "file:Sources/iOSSupport/Services/IOSReferenceTranscriptionReviewState.swift",
+        "file:Sources/SharedSupport/Services/ReferenceTranscriptionReviewState.swift",
         "file:Sources/iOS/Voices/IOSRecordVoiceSheet.swift",
         "file:Sources/iOS/App/RootView.swift",
         "file:Tests/VocelloiOSLogicTests/IOSReferenceTranscriptionReviewStateTests.swift",
@@ -1743,7 +1743,7 @@
         "Sources/iOS/App/RootView.swift",
         "Sources/iOS/Sheets/IOSBottomSheets.swift",
         "Sources/iOS/Voices/IOSRecordVoiceSheet.swift",
-        "Sources/iOSSupport/Services/IOSReferenceTranscriptionReviewState.swift"
+        "Sources/SharedSupport/Services/ReferenceTranscriptionReviewState.swift"
       ],
       "updated": "2026-08-29",
       "notes": "Implemented on main. The direct Clone action uses the same WAV/MP3/AIFF/M4A policy and secure materializer as Voices and Open in Vocello. The operation-generation state prevents a late recognition result from replacing manual text, and the old unused session-only Add Audio helper was removed. Core tests and the generic physical-device SDK app/logic builds pass; physical-device closure remains ICI-4."
@@ -2675,7 +2675,7 @@
         "Sources/QwenVoiceCore/PreparedVoiceRepository.swift"
       ],
       "updated": "2026-08-30",
-      "notes": "Receipt schema 2 preserves schema-1 decoding and is emitted by app, CLI, telemetry, and physical-device diagnostics from the assembled actor request. Enrollment metadata persists transactionally beside the saved reference, preserves manual and sidecar authority, and crosses the macOS XPC wire through a versioned command while legacy commands remain decodable."
+      "notes": "Receipt schema 2 preserves schema-1 decoding and is emitted by app, CLI, telemetry, and physical-device diagnostics from the assembled actor request. Enrollment metadata persists transactionally beside the saved reference, preserves manual and sidecar authority, and crosses the macOS XPC wire through a versioned command while legacy commands remain decodable. VLR-10 closes the later-audited macOS UI parity gap by feeding the shared typed review state and metadata builder into that wire path."
     },
     {
       "id": "VLR-03",
@@ -2803,6 +2803,27 @@
       ],
       "updated": "2026-09-02",
       "notes": "Algorithm v6 records the bounded open terminal run, emits typed terminal-silence evidence, and rejects an egregious tail at the unchanged context-owned boundary while ordinary terminal padding and v1-v5 decoding remain valid. In the corrected-source 122-row physical-device characterization, the former take-112 cell generated the same pathological shape and was rejected before publication: live, full-replay, and incremental-replay QC each measured a 109.471-second terminal run after audible speech. The failed row remained represented and was not retried or assigned another seed. This is the required device closure for the protective publication gate; the sampled-output pathology remains visible under VLR-07 rather than being described as model correctness."
+    },
+    {
+      "id": "VLR-10",
+      "plan": "voice-identity-language-reliability-2026-08",
+      "title": "Close macOS enrollment metadata and request-boundary parity",
+      "status": "done",
+      "gate": "macOS Saved Voices must use the same operation-generation transcription review policy and privacy-safe metadata builder as iOS, block save while transcription is unresolved, require explicit audio-only confirmation, require a separately confirmed reference language for transcript-backed enrollment, send metadata through the versioned XPC candidate command, and preserve it when a prepared voice is reloaded or replaced. Pure request-boundary tests must prove that macOS Clone Auto follows target text rather than reference language, explicit output language wins, and Voice Design preserves the selected language, prompt, seed, and variation.",
+      "sourceOfTruth": [
+        "Sources/SharedSupport/Services/ReferenceTranscriptionReviewState.swift",
+        "Sources/SharedSupport/Services/VoiceClipTranscriber.swift",
+        "Sources/Views/Library/SavedVoiceSheet.swift",
+        "Sources/Services/MacStudioGenerationRequestFactory.swift"
+      ],
+      "evidence": [
+        "file:Tests/VocelloiOSLogicTests/IOSReferenceTranscriptionReviewStateTests.swift",
+        "file:Tests/VocelloCoreTests/VoiceClipEnrollmentEvidenceTests.swift",
+        "file:Tests/VocelloCoreTests/MacStudioGenerationRequestFactoryTests.swift",
+        "doc:docs/reference/macos-app-guide.md"
+      ],
+      "updated": "2026-09-02",
+      "notes": "The platform-neutral review state now represents awaiting-audio, active transcription, typed failure, reviewed text, and explicit audio-only decisions on both Apple frontends. macOS uses typed enrollment evidence and the v2 XPC candidate command, keeps reference-language metadata when voices reload or their reference is replaced, and exposes stable status/language/audio-only identifiers. Clone and Voice Design coordinators delegate to one pure request factory whose focused tests bind exact target language, conditioning transcript, seed, variation, prompt, and generation identity. No model, delivery prompt, sampling default, QC threshold, or output behavior changed."
     }
   ]
 }

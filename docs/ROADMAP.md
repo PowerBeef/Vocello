@@ -15,7 +15,7 @@
 | `ios-app-store-readiness-2026-08` | active | release-qa | 2/12 (17%) |
 | `ios-control-audit-2026-08` | active | ios | 8/14 (57%) |
 | `ios-generation-startup-reliability-2026-08` | active | backend-and-platform | 4/6 (67%) |
-| `voice-identity-language-reliability-2026-08` | active | backend-and-platform | 8/9 (89%) |
+| `voice-identity-language-reliability-2026-08` | active | backend-and-platform | 9/10 (90%) |
 | `compliance-2026-08` | complete | release-qa | 2/2 (100%) |
 | `convergence-metal4-stage4-2026-08` | complete | backend-and-platform | 7/7 (100%) |
 | `development-workflow-performance-2026-08` | complete | release-qa | 5/5 (100%) |
@@ -295,6 +295,7 @@ Narrative authority: [`docs/reference/delivery-harness.md`](reference/delivery-h
 | `VLR-07` | in-flight | Complete physical-device closure and publish the privacy-safe report | `doc:docs/reference/voice-identity-language-reliability-ios-2026-09-02.md` |
 | `VLR-08` | done | Repair the live Clone publication gap exposed by clean codec replay | `doc:docs/reference/voice-identity-language-reliability-ios-2026-09-02.md` |
 | `VLR-09` | done | Reject egregious terminal silence before publication | `file:Tests/VocelloCoreTests/GenerationTelemetrySchemaTests.swift`, `file:Tests/VocelloCoreTests/AtomicWAVPublicationTests.swift`, `doc:docs/reference/voice-identity-language-reliability-ios-2026-09-02.md` |
+| `VLR-10` | done | Close macOS enrollment metadata and request-boundary parity | `file:Tests/VocelloiOSLogicTests/IOSReferenceTranscriptionReviewStateTests.swift`, `file:Tests/VocelloCoreTests/VoiceClipEnrollmentEvidenceTests.swift`, `file:Tests/VocelloCoreTests/MacStudioGenerationRequestFactoryTests.swift`, `doc:docs/reference/macos-app-guide.md` |
 
 ### Open items in detail
 
@@ -380,7 +381,7 @@ Narrative authority: [`docs/reference/ios-app-guide.md`](reference/ios-app-guide
 | --- | --- | --- | --- |
 | `ICI-1` | done | Full restore of the Files-import clone-reference route | `doc:docs/reference/ios-app-guide.md`, `file:Tests/VocelloiOSUITests/VocelloiOSFixtureEnrollmentUITests.swift` |
 | `ICI-2` | done | Device acceptance of the restored import route | `doc:docs/development-progress.md` |
-| `ICI-3` | done | Direct Clone import with permanent enrollment and transcript review | `file:Sources/iOSSupport/Services/IOSReferenceAudioImportPolicy.swift`, `file:Sources/iOSSupport/Services/IOSReferenceTranscriptionReviewState.swift`, `file:Sources/iOS/Voices/IOSRecordVoiceSheet.swift`, `file:Sources/iOS/App/RootView.swift`, `file:Tests/VocelloiOSLogicTests/IOSReferenceTranscriptionReviewStateTests.swift`, `doc:docs/reference/ios-app-guide.md` |
+| `ICI-3` | done | Direct Clone import with permanent enrollment and transcript review | `file:Sources/iOSSupport/Services/IOSReferenceAudioImportPolicy.swift`, `file:Sources/SharedSupport/Services/ReferenceTranscriptionReviewState.swift`, `file:Sources/iOS/Voices/IOSRecordVoiceSheet.swift`, `file:Sources/iOS/App/RootView.swift`, `file:Tests/VocelloiOSLogicTests/IOSReferenceTranscriptionReviewStateTests.swift`, `doc:docs/reference/ios-app-guide.md` |
 | `ICI-4` | done | Physical-device direct-import, transcription, Clone-generation, and cleanup acceptance | `file:Tests/VocelloiOSUITests/VocelloiOSSavedVoiceLifecycleUITests.swift`, `file:scripts/ui_test.sh`, `doc:docs/reference/ios-device-testing.md` |
 
 ## iOS Settings information architecture and visual alignment

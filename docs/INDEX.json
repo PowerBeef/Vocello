@@ -58,7 +58,9 @@
         "scripts/ios_control_audit.py",
         "scripts/build_foundation_targets.sh",
         "scripts/localization_contract.py",
-        "config/localization-unlocalized-baseline.json"
+        "config/localization-unlocalized-baseline.json",
+        "Sources/SharedSupport/Services/ReferenceTranscriptionReviewState.swift",
+        "Sources/SharedSupport/Services/VoiceClipTranscriber.swift"
       ]
     },
     {
@@ -69,7 +71,10 @@
       "sourceOfTruth": [
         "scripts/macos_test.sh",
         "scripts/ui_test.sh",
-        "scripts/build.sh"
+        "scripts/build.sh",
+        "Sources/SharedSupport/Services/ReferenceTranscriptionReviewState.swift",
+        "Sources/SharedSupport/Services/VoiceClipTranscriber.swift",
+        "Sources/Services/MacStudioGenerationRequestFactory.swift"
       ]
     },
     {
@@ -441,7 +446,7 @@
       "sourceOfTruth": [
         "Sources/iOS",
         "Sources/iOSSupport/Services/IOSDeviceEligibilityPolicy.swift",
-        "Sources/iOSSupport/Services/IOSReferenceTranscriptionReviewState.swift",
+        "Sources/SharedSupport/Services/ReferenceTranscriptionReviewState.swift",
         "Sources/SharedSupport/Services/VoiceClipTranscriber.swift",
         "Sources/QwenVoiceCore/GenerationSemantics.swift",
         "Tests/VocelloiOSUITests/VocelloiOSUITestCase.swift"
@@ -626,7 +631,9 @@
       "summary": "Consolidated macOS app map \u2014 screens, elements, and options, and how XCUITest addresses each through the stable accessibility surface.",
       "sourceOfTruth": [
         "Sources/Views",
-        "Sources/ContentView.swift"
+        "Sources/ContentView.swift",
+        "Sources/SharedSupport/Services/ReferenceTranscriptionReviewState.swift",
+        "Sources/Services/MacStudioGenerationRequestFactory.swift"
       ]
     },
     {
@@ -657,7 +664,9 @@
       "summary": "macOS test lanes \u2014 deterministic development verification, the platform gate, model fixtures, explicit XCUITest smoke/benchmark/perf acceptance with the ui-perf baseline protocol (copy reports out between runs; discard-and-replace on concurrent use), and crash/profile evidence.",
       "sourceOfTruth": [
         "scripts/macos_test.sh",
-        "scripts/ui_test.sh"
+        "scripts/ui_test.sh",
+        "Tests/VocelloCoreTests/MacStudioGenerationRequestFactoryTests.swift",
+        "Tests/VocelloCoreTests/VoiceClipEnrollmentEvidenceTests.swift"
       ]
     },
     {

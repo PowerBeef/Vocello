@@ -336,7 +336,7 @@ struct IOSSaveVoiceSheet: View {
     let title: String
     @Binding var suggestedName: String
     @Binding var transcript: String
-    var transcriptionReview: IOSReferenceTranscriptionReviewState? = nil
+    var transcriptionReview: ReferenceTranscriptionReviewState? = nil
     var referenceLanguage: Binding<Qwen3SupportedLanguage>? = nil
     var requiresReferenceLanguageConfirmation = false
     let errorMessage: String?
@@ -486,7 +486,7 @@ struct IOSSaveVoiceSheet: View {
 
     @ViewBuilder
     private func transcriptionStatus(
-        _ review: IOSReferenceTranscriptionReviewState
+        _ review: ReferenceTranscriptionReviewState
     ) -> some View {
         let status = review.status
         VStack(alignment: .leading, spacing: 10) {

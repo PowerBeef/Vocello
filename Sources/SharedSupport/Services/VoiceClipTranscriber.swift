@@ -221,6 +221,35 @@ enum VoiceClipTranscriber {
             .joined()
     }
 
+    /// Produces the privacy-safe enrollment metadata persisted beside a prepared voice.
+    /// The evidence digest uses sorted JSON keys so identical typed evidence has one stable
+    /// identity on macOS and iOS. The evidence itself remains transient and never stores the
+    /// transcript, source path, or raw framework error.
+    static func preparedVoiceEnrollmentMetadata(
+        referenceLanguage: Qwen3SupportedLanguage,
+        reviewState: ReferenceTranscriptionReviewState,
+        evidence: EnrollmentEvidence?
+    ) throws -> PreparedVoiceEnrollmentMetadata {
+        let evidenceDigest: String?
+        if let evidence {
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.sortedKeys]
+            let data = try encoder.encode(evidence)
+            evidenceDigest = SHA256.hash(data: data)
+                .map { String(format: "%02x", $0) }
+                .joined()
+        } else {
+            evidenceDigest = nil
+        }
+
+        return PreparedVoiceEnrollmentMetadata(
+            referenceLanguage: referenceLanguage,
+            transcriptSource: reviewState.preparedVoiceTranscriptSource,
+            automaticTranscriptionOutcome: evidence?.outcome.rawValue,
+            transcriptionEvidenceDigest: evidenceDigest
+        )
+    }
+
     static func transcribe(url: URL) async -> (text: String, language: Qwen3SupportedLanguage)? {
         let result = await enrollmentResult(url: url)
         guard let text = result.text else { return nil }

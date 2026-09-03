@@ -206,7 +206,8 @@ private extension VoicesView {
         voiceBeingReplaced = voice
         savedVoiceSheetConfiguration = .replaceReference(
             name: voice.name,
-            transcript: transcript
+            transcript: transcript,
+            referenceLanguage: voice.enrollmentMetadata?.referenceLanguage ?? .auto
         )
     }
 

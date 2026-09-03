@@ -1,4 +1,5 @@
 import AppKit
+import QwenVoiceCore
 import QwenVoiceNative
 import SwiftUI
 import UniformTypeIdentifiers
@@ -11,6 +12,8 @@ struct SavedVoiceSheetConfiguration: Identifiable, Sendable {
     let initialName: String
     let initialAudioPath: String
     let initialTranscript: String
+    let initialReferenceLanguage: Qwen3SupportedLanguage
+    let initialTranscriptReadySource: ReferenceTranscriptionReviewState.ReadySource
     /// Normalized name of an existing saved voice that this enrollment
     /// is intended to replace. The duplicate-name guard ignores this
     /// name so the user can keep the same identifier; the caller is
@@ -25,6 +28,8 @@ struct SavedVoiceSheetConfiguration: Identifiable, Sendable {
         initialName: String,
         initialAudioPath: String,
         initialTranscript: String,
+        initialReferenceLanguage: Qwen3SupportedLanguage = .auto,
+        initialTranscriptReadySource: ReferenceTranscriptionReviewState.ReadySource = .existing,
         replacingNormalizedName: String? = nil
     ) {
         self.title = title
@@ -33,6 +38,8 @@ struct SavedVoiceSheetConfiguration: Identifiable, Sendable {
         self.initialName = initialName
         self.initialAudioPath = initialAudioPath
         self.initialTranscript = initialTranscript
+        self.initialReferenceLanguage = initialReferenceLanguage
+        self.initialTranscriptReadySource = initialTranscriptReadySource
         self.replacingNormalizedName = replacingNormalizedName
     }
 
@@ -56,7 +63,8 @@ struct SavedVoiceSheetConfiguration: Identifiable, Sendable {
             confirmLabel: "Save to Saved Voices",
             initialName: suggestedName,
             initialAudioPath: audioPath,
-            initialTranscript: transcript
+            initialTranscript: transcript,
+            initialReferenceLanguage: PromptLanguageDetector.detect(transcript)
         )
     }
 
@@ -71,7 +79,8 @@ struct SavedVoiceSheetConfiguration: Identifiable, Sendable {
             confirmLabel: "Save to Saved Voices",
             initialName: SavedVoiceNameSuggestion.designResultName(from: voiceDescription),
             initialAudioPath: audioPath,
-            initialTranscript: transcript
+            initialTranscript: transcript,
+            initialReferenceLanguage: PromptLanguageDetector.detect(transcript)
         )
     }
 
@@ -84,7 +93,8 @@ struct SavedVoiceSheetConfiguration: Identifiable, Sendable {
     /// `VoicesView.handleSavedVoiceSheetCompletion`).
     static func replaceReference(
         name: String,
-        transcript: String
+        transcript: String,
+        referenceLanguage: Qwen3SupportedLanguage = .auto
     ) -> SavedVoiceSheetConfiguration {
         SavedVoiceSheetConfiguration(
             title: "Replace Voice Reference",
@@ -93,6 +103,9 @@ struct SavedVoiceSheetConfiguration: Identifiable, Sendable {
             initialName: name,
             initialAudioPath: "",
             initialTranscript: transcript,
+            initialReferenceLanguage: referenceLanguage == .auto
+                ? PromptLanguageDetector.detect(transcript)
+                : referenceLanguage,
             replacingNormalizedName: SavedVoiceNameSanitizer.normalizedName(name)
         )
     }
@@ -153,6 +166,9 @@ struct SavedVoiceSheet: View {
     @State private var name: String
     @State private var audioPath: String
     @State private var transcript: String
+    @State private var referenceLanguage: Qwen3SupportedLanguage
+    @State private var transcriptionReview: ReferenceTranscriptionReviewState
+    @State private var transcriptionEvidence: VoiceClipTranscriber.EnrollmentEvidence?
     @State private var isSaving = false
     @State private var errorMessage: String?
     @State private var existingNormalizedNames: Set<String> = []
@@ -163,7 +179,6 @@ struct SavedVoiceSheet: View {
     @State private var pendingVoiceForReview: PreparedVoiceCandidate?
     @State private var isReviewDecisionInFlight = false
     @State private var isRecordSheetPresented = false
-    @State private var isTranscribing = false
     @State private var transcriptionTask: Task<Void, Never>?
     @State private var speechAvailability: VoiceClipTranscriber.TranscriptionAvailability = .available
 
@@ -176,6 +191,14 @@ struct SavedVoiceSheet: View {
         _name = State(initialValue: configuration.initialName)
         _audioPath = State(initialValue: configuration.initialAudioPath)
         _transcript = State(initialValue: configuration.initialTranscript)
+        _referenceLanguage = State(initialValue: configuration.initialReferenceLanguage)
+        _transcriptionReview = State(
+            initialValue: ReferenceTranscriptionReviewState(
+                initialTranscript: configuration.initialTranscript,
+                readySource: configuration.initialTranscriptReadySource
+            )
+        )
+        _transcriptionEvidence = State(initialValue: nil)
     }
 
     private var trimmedName: String {
@@ -209,6 +232,23 @@ struct SavedVoiceSheet: View {
             && !audioPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             && validationMessage == nil
             && !isSaving
+            && transcriptionReview.allowsSave(transcript: transcript)
+            && !requiresReferenceLanguageConfirmation
+    }
+
+    private var requiresReferenceLanguageConfirmation: Bool {
+        !transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && referenceLanguage == .auto
+    }
+
+    private var transcriptBinding: Binding<String> {
+        Binding(
+            get: { transcript },
+            set: { newValue in
+                transcript = newValue
+                handleTranscriptEdit(newValue)
+            }
+        )
     }
 
     var body: some View {
@@ -265,20 +305,9 @@ struct SavedVoiceSheet: View {
                 }
 
                 VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 6) {
-                        Text("Transcript (recommended for reusable clones)")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.secondary)
-
-                        if isTranscribing {
-                            ProgressView()
-                                .controlSize(.mini)
-                            Text("Transcribing on-device…")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .accessibilityIdentifier("voicesEnroll_transcribeStatus")
-                        }
-                    }
+                    Text("Transcript (recommended for reusable clones)")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
 
                     if let issue = speechIssueMessage {
                         HStack(spacing: 6) {
@@ -298,7 +327,7 @@ struct SavedVoiceSheet: View {
                         }
                     }
 
-                    TextEditor(text: $transcript)
+                    TextEditor(text: transcriptBinding)
                         .font(.body)
                         .vocelloFocusRing(AppTheme.accent, radius: 10)
                         .frame(minHeight: 100)
@@ -318,6 +347,44 @@ struct SavedVoiceSheet: View {
                             }
                         }
                         .accessibilityIdentifier("voicesEnroll_transcriptField")
+
+                    transcriptionStatus
+
+                    if transcriptionReview.offersAudioOnlyConfirmation {
+                        Button {
+                            confirmAudioOnly()
+                        } label: {
+                            Label(VocelloPresentationText.useAudioOnly, systemImage: "waveform")
+                        }
+                        .buttonStyle(.bordered)
+                        .accessibilityHint(VocelloPresentationText.useAudioOnlyHint)
+                        .accessibilityIdentifier("voicesEnroll_useAudioOnlyButton")
+                    }
+
+                    HStack(alignment: .firstTextBaseline, spacing: 12) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(VocelloPresentationText.referenceLanguageTitle)
+                                .font(.caption.weight(.semibold))
+                            Text(requiresReferenceLanguageConfirmation
+                                ? VocelloPresentationText.referenceLanguageConfirmation
+                                : VocelloPresentationText.referenceLanguageDetail)
+                                .font(.caption)
+                                .foregroundStyle(requiresReferenceLanguageConfirmation ? .orange : .secondary)
+                        }
+
+                        Spacer(minLength: 8)
+
+                        Picker(VocelloPresentationText.referenceLanguageTitle, selection: $referenceLanguage) {
+                            Text(VocelloPresentationText.referenceLanguagePlaceholder)
+                                .tag(Qwen3SupportedLanguage.auto)
+                            ForEach(Qwen3SupportedLanguage.selectableCases, id: \.self) { language in
+                                Text(language.displayName).tag(language)
+                            }
+                        }
+                        .labelsHidden()
+                        .frame(minWidth: 170)
+                        .accessibilityIdentifier("voicesEnroll_referenceLanguagePicker")
+                    }
 
                     Text("Transcript-backed voices can reuse prepared Qwen3 clone prompts; audio-only voices remain available as a lower-guidance fallback.")
                         .font(.caption)
@@ -363,7 +430,17 @@ struct SavedVoiceSheet: View {
             errorMessage = nil
         }
         .onChange(of: audioPath) { _, newPath in
-            autoTranscribeIfNeeded(path: newPath)
+            let trimmedPath = newPath.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmedPath.isEmpty {
+                transcriptionTask?.cancel()
+                transcriptionTask = nil
+                transcriptionEvidence = nil
+                if transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    transcriptionReview.awaitAudio()
+                }
+            } else {
+                autoTranscribeIfNeeded(path: newPath)
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             // The user may have just granted speech recognition in System
@@ -378,6 +455,7 @@ struct SavedVoiceSheet: View {
         }
         .onDisappear {
             transcriptionTask?.cancel()
+            transcriptionReview.invalidate()
         }
         .sheet(isPresented: $isRecordSheetPresented) {
             RecordReferenceClipSheet { url in
@@ -460,30 +538,115 @@ struct SavedVoiceSheet: View {
         }
     }
 
-    /// Best-effort on-device transcription of a freshly picked/recorded clip.
-    /// Only fills the transcript if the user hasn't typed one by the time the
-    /// pass finishes; never blocks enrollment (degrades to nothing on failure).
+    /// Starts the existing on-device transcriber and binds its result to one operation
+    /// generation. Cancellation is cooperative, so the generation check is the final authority.
     private func autoTranscribeIfNeeded(path: String) {
         speechAvailability = VoiceClipTranscriber.availability()
         transcriptionTask?.cancel()
-        isTranscribing = false
 
         let trimmedPath = path.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedPath.isEmpty,
               transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
               FileManager.default.fileExists(atPath: trimmedPath) else { return }
 
-        isTranscribing = true
-        transcriptionTask = Task {
-            defer { isTranscribing = false }
-            guard let result = await VoiceClipTranscriber.transcribe(
+        transcriptionEvidence = nil
+        let generation = transcriptionReview.beginAutomaticTranscription()
+        transcriptionTask = Task { @MainActor in
+            let result = await VoiceClipTranscriber.enrollmentResult(
                 url: URL(fileURLWithPath: trimmedPath)
-            ) else { return }
+            )
             guard !Task.isCancelled, audioPath == path else { return }
-            if transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                transcript = result.text
+            transcriptionEvidence = result.evidence
+
+            if let recognizedText = result.text {
+                let applied = transcriptionReview.acceptAutomaticTranscript(
+                    recognizedText,
+                    generation: generation,
+                    currentTranscript: transcript
+                )
+                if applied {
+                    transcript = recognizedText
+                    if referenceLanguage == .auto {
+                        referenceLanguage = result.language
+                    }
+                }
+            } else {
+                transcriptionReview.finishWithoutTranscript(
+                    reason: unavailableReason(for: result.evidence),
+                    generation: generation,
+                    currentTranscript: transcript
+                )
+            }
+
+            if transcriptionReview.isCurrent(generation: generation) {
+                transcriptionTask = nil
             }
         }
+    }
+
+    private func handleTranscriptEdit(_ newValue: String) {
+        transcriptionTask?.cancel()
+        transcriptionTask = nil
+        transcriptionReview.userEditedTranscript(newValue)
+        if referenceLanguage == .auto {
+            referenceLanguage = PromptLanguageDetector.detect(newValue)
+        }
+    }
+
+    private func confirmAudioOnly() {
+        transcriptionTask?.cancel()
+        transcriptionTask = nil
+        transcript = ""
+        transcriptionReview.confirmAudioOnly()
+    }
+
+    private func unavailableReason(
+        for evidence: VoiceClipTranscriber.EnrollmentEvidence
+    ) -> ReferenceTranscriptionReviewState.UnavailableReason {
+        if evidence.authorizationStatus == .siriDisabled {
+            return .siriDisabled
+        }
+        switch evidence.outcome {
+        case .permissionDenied, .authorizationTimedOut:
+            return .permissionDenied
+        case .noCandidateLocales, .recognizerUnavailable:
+            return .recognizerUnavailable
+        case .onDeviceRecognitionUnsupported:
+            return .onDeviceRecognitionUnsupported
+        case .recognitionTimedOut:
+            return .recognitionTimedOut
+        case .recognitionFailed:
+            return .recognitionFailed
+        case .emptyResult:
+            return .emptyResult
+        case .lowConfidence:
+            return .lowConfidence
+        case .success:
+            return .emptyResult
+        }
+    }
+
+    @ViewBuilder
+    private var transcriptionStatus: some View {
+        let status = transcriptionReview.status
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            if status.showsProgress {
+                ProgressView()
+                    .controlSize(.mini)
+                    .accessibilityHidden(true)
+            } else {
+                Image(systemName: status.symbolName)
+                    .foregroundStyle(AppTheme.accent)
+                    .accessibilityHidden(true)
+            }
+            Text(status.message)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(status.message)
+        .accessibilityIdentifier("voicesEnroll_transcriptionStatus")
     }
 
     private func browseForAudio() {
@@ -508,7 +671,12 @@ struct SavedVoiceSheet: View {
                     transcript: transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                         ? nil
                         : transcript.trimmingCharacters(in: .whitespacesAndNewlines),
-                    replacingVoiceID: configuration.replacingNormalizedName
+                    replacingVoiceID: configuration.replacingNormalizedName,
+                    enrollmentMetadata: try VoiceClipTranscriber.preparedVoiceEnrollmentMetadata(
+                        referenceLanguage: referenceLanguage,
+                        reviewState: transcriptionReview,
+                        evidence: transcriptionEvidence
+                    )
                 )
                 await MainActor.run {
                     pendingVoiceForReview = candidate.qualityWarnings.isEmpty ? nil : candidate

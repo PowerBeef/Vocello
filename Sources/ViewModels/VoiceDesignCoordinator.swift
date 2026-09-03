@@ -198,18 +198,13 @@ final class VoiceDesignCoordinator {
         model: TTSModel,
         outputPath: String
     ) -> GenerationRequest {
-        GenerationRequest(
+        MacStudioGenerationRequestFactory.voiceDesign(
             modelID: model.id,
             text: draft.text,
             outputPath: outputPath,
-            shouldStream: true,
-            streamingTitle: String(draft.text.prefix(40)),
-            languageHint: draft.selectedLanguage.rawValue,
-            payload: .design(
-                voiceDescription: draft.voiceDescription,
-                deliveryStyle: draft.emotion
-            ),
-            generationID: UUID(),
+            language: draft.selectedLanguage,
+            voiceDescription: draft.voiceDescription,
+            deliveryStyle: draft.emotion,
             seed: draft.pinnedSeed,
             variation: GenerationVariationPreference.requestValue()
         )

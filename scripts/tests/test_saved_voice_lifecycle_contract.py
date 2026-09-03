@@ -31,7 +31,7 @@ class SavedVoiceLifecycleContractTests(unittest.TestCase):
             "Sources/iOS/IOSGenerationModeViews.swift",
             "Sources/iOS/App/RootView.swift",
             "Sources/iOS/Sheets/IOSBottomSheets.swift",
-            "Sources/iOSSupport/Services/IOSReferenceTranscriptionReviewState.swift",
+            "Sources/SharedSupport/Services/ReferenceTranscriptionReviewState.swift",
             "Sources/Views/Library/SavedVoiceSheet.swift",
             "Sources/iOS/IOSVoicesView.swift",
             "Tests/VocelloiOSUITests/VocelloiOSSavedVoiceLifecycleUITests.swift",

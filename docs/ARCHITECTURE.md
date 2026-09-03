@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-08-29
+reviewed: 2026-09-02
 summary: System architecture — engine core, macOS XPC request lifecycle, iOS in-process lifecycle, model management, telemetry layers, and the engine invariants each surface must preserve.
 sourceOfTruth:
   - project.yml
@@ -15,9 +15,9 @@ sourceOfTruth:
 > lifecycle, persistence, model management, and telemetry. When this doc disagrees
 > with the code, **the code wins** — fix this doc.
 >
-> Last reviewed: 2026-08-29. The latest `project.yml` change registers the iOS offline-license
-> screen/resource only; target boundaries, engine hosting, model delivery, and runtime topology are
-> unchanged.
+> Last reviewed: 2026-09-02. The latest `project.yml` change moves clone-reference transcription
+> review into SharedSupport and registers the pure macOS Design/Clone request factory with its
+> deterministic tests; engine hosting, model delivery, and runtime topology are unchanged.
 
 ## TL;DR
 
@@ -570,6 +570,7 @@ a single envelope method —
 `prefetchInteractiveReadinessIfNeeded`, `ensureCloneReferencePrimed`,
 `cancelClonePreparationIfNeeded`, `generate`,
 `cancelActiveGeneration`, `listPreparedVoices`, `preparePreparedVoiceCandidate`,
+`preparePreparedVoiceCandidateV2`,
 `commitPreparedVoiceCandidate`, `discardPreparedVoiceCandidate`, `enrollPreparedVoice`,
 `deletePreparedVoice`, `clearGenerationActivity`, `clearVisibleError`,
 `shutdownWhenIdle`.
@@ -598,7 +599,11 @@ UI review's wave 2): the executor owns the single-take prepare/run/cancel
 sequencing against `TTSEngineStore.generate(...)` — a nil prepared take aborts
 silently, a throw is the failure path, and `cancelActiveWork` resets task,
 generating-flag, and player state in one place. `VoiceCloningCoordinator`
-additionally primes the clone reference via `ensureCloneReferencePrimed(...)`.
+additionally primes the clone reference via `ensureCloneReferencePrimed(...)`. Design and Clone
+request assembly is centralized in the pure `MacStudioGenerationRequestFactory`, which preserves
+the exact UI language, reference transcript/voice identity, prompt, seed, variation, and generation
+identity at the pre-XPC boundary. Clone Auto is then resolved by shared `GenerationSemantics` from
+the target text; reference-language metadata never selects output language.
 
 ---
 
@@ -739,7 +744,8 @@ goes to stderr. Full reference: [`reference/cli.md`](reference/cli.md).
   FIFO buffer bookkeeping and graph control live there, session policy stays in
   the view model),
   `ReferenceClipRecorder` + `ClipReviewPlayer` (reference capture),
-  `VoiceClipTranscriber` (on-device transcription), `GenerationPersistence`
+  `ReferenceTranscriptionReviewState` (operation-generation review and explicit audio-only policy),
+  `VoiceClipTranscriber` (on-device transcription plus privacy-safe enrollment metadata), `GenerationPersistence`
   (async GRDB writes), `LanguageSelectionPresentation`, `VoiceDesignBriefCatalog`,
   `AppGenerationTimeline` + `MainThreadStallWatchdog` (telemetry), and
   `Database/GenerationMigrations.swift`.
@@ -750,6 +756,11 @@ goes to stderr. Full reference: [`reference/cli.md`](reference/cli.md).
 - macOS uses `Sources/Services/` + the XPC stack; iOS uses `Sources/iOS/` +
   `iOSSupport/` + the in-process engine. The divergence point is exactly the
   XPC-vs-in-process choice from [§3](#3-runtime-architecture-three-engine-hosts).
+- Both frontends persist the reviewed transcript source and separately confirmed reference
+  language as `PreparedVoiceEnrollmentMetadata`. The legacy prepared-candidate command remains
+  decode-compatible; new metadata-bearing macOS enrollment uses the versioned v2 command. That
+  reference language describes conditioning only and cannot override explicit or target-text Auto
+  output-language resolution.
 
 ---
 

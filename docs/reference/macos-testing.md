@@ -1,16 +1,25 @@
 ---
 status: active
 owner: macos
-reviewed: 2026-08-29
+reviewed: 2026-09-02
 summary: macOS test lanes — deterministic development verification, the platform gate, model fixtures, explicit XCUITest smoke/benchmark/perf acceptance with the ui-perf baseline protocol (copy reports out between runs; discard-and-replace on concurrent use), and crash/profile evidence.
 sourceOfTruth:
   - scripts/macos_test.sh
   - scripts/ui_test.sh
+  - Tests/VocelloCoreTests/MacStudioGenerationRequestFactoryTests.swift
+  - Tests/VocelloCoreTests/VoiceClipEnrollmentEvidenceTests.swift
 ---
 # macOS testing
 
 Vocello separates routine deterministic development verification from explicit native-app UI
 acceptance. XCUITest is the sole autonomous macOS app UI driver.
+
+Clone/enrollment parity is part of ordinary deterministic verification. The core suite exercises
+the shared transcription-review/evidence policy and the pure macOS Design/Clone request factory,
+including manual-edit precedence, stale-result rejection, explicit audio-only enrollment,
+reference-language metadata, target-text Auto routing, explicit-language precedence, and exact
+reference/prompt/seed/variation identity. These tests guard the pre-XPC boundary; native visual and
+interaction acceptance remains the explicitly requested XCUITest lane below.
 
 ## Ordinary development
 

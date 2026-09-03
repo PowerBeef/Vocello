@@ -174,7 +174,11 @@ server, on macOS or iPhone. The review stays editable, Save is blocked while rec
 unresolved, and unavailable recognition requires manual text or an explicit Use audio only choice.
 Operation generations and cancellation prevent a stale recognizer result from replacing a newer
 file or a user's edit. Transcripts are stored only as the local `.txt` sidecar next to the voice's
-WAV. On macOS, transcription additionally requires Siri to be enabled (an OS gate — the system
+WAV. The prepared voice also stores privacy-safe enrollment metadata: a separately confirmed
+reference-language value, transcript-source classification, automatic-transcription outcome, and
+digest of the typed evidence. It stores no recognized text, raw error, or source path. Reference
+language describes the conditioning clip only; it never selects the language of a future Clone
+output. On macOS, transcription additionally requires Siri to be enabled (an OS gate — the system
 silently refuses speech-recognition authorization otherwise); the app detects this and links the
 relevant System Settings panes. Full permission model: [`macos-permissions.md`](macos-permissions.md).
 

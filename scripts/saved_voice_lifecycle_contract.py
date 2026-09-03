@@ -36,7 +36,7 @@ def validate(root: Path) -> None:
     ios_voices = _read(root, "Sources/iOS/IOSVoicesView.swift")
     ios_root = _read(root, "Sources/iOS/App/RootView.swift")
     ios_reference_sheet = _read(root, "Sources/iOS/Sheets/IOSBottomSheets.swift")
-    ios_transcription = _read(root, "Sources/iOSSupport/Services/IOSReferenceTranscriptionReviewState.swift")
+    transcription_policy = _read(root, "Sources/SharedSupport/Services/ReferenceTranscriptionReviewState.swift")
     engine = _read(root, "Sources/QwenVoiceCore/MLXTTSEngine.swift")
     wire = _read(root, "Sources/QwenVoiceEngineSupport/EngineServiceIPC.swift")
     ios_ui_test = _read(root, "Tests/VocelloiOSUITests/VocelloiOSSavedVoiceLifecycleUITests.swift")
@@ -139,18 +139,30 @@ def validate(root: Path) -> None:
         "allowsSave(transcript:",
         "offersAudioOnlyConfirmation",
     ):
-        if token not in ios_transcription:
+        if token not in transcription_policy:
             raise ContractError(f"transcription review policy is missing {token!r}")
 
     ios_record_sheet = _read(root, "Sources/iOS/Voices/IOSRecordVoiceSheet.swift")
     for token in (
         "VoiceClipTranscriber.enrollmentResult(url: url)",
         "transcriptionReview.allowsSave(transcript: transcript)",
-        "PreparedVoiceEnrollmentMetadata(",
+        "VoiceClipTranscriber.preparedVoiceEnrollmentMetadata(",
         "referenceLanguage: $detectedLanguage",
     ):
         if token not in ios_record_sheet:
             raise ContractError(f"transcription review enrollment is missing {token!r}")
+
+    mac_saved_voice_sheet = _read(root, "Sources/Views/Library/SavedVoiceSheet.swift")
+    for token in (
+        "ReferenceTranscriptionReviewState(",
+        "VoiceClipTranscriber.enrollmentResult(",
+        "VoiceClipTranscriber.preparedVoiceEnrollmentMetadata(",
+        '"voicesEnroll_transcriptionStatus"',
+        '"voicesEnroll_referenceLanguagePicker"',
+        '"voicesEnroll_useAudioOnlyButton"',
+    ):
+        if token not in mac_saved_voice_sheet:
+            raise ContractError(f"macOS transcription review parity is missing {token!r}")
 
     ios_save_sheet = _read(root, "Sources/iOS/IOSGenerationInputControls.swift")
     for token in (

@@ -41,20 +41,38 @@ final class IOSReferenceTranscriptionReviewStateTests: XCTestCase {
     }
 
     func testSidecarTranscriptIsImmediatelyReady() {
-        let state = IOSReferenceTranscriptionReviewState(sidecarTranscript: "Existing transcript")
+        let state = ReferenceTranscriptionReviewState(initialTranscript: "Existing transcript")
         XCTAssertEqual(state.phase, .ready(.sidecar))
         XCTAssertTrue(state.allowsSave(transcript: "Existing transcript"))
     }
 
     func testSaveIsBlockedWhileTranscriptionIsUnresolved() {
-        var state = IOSReferenceTranscriptionReviewState(sidecarTranscript: "")
+        var state = ReferenceTranscriptionReviewState(initialTranscript: "")
+        XCTAssertEqual(state.phase, .awaitingAudio)
+        XCTAssertFalse(state.allowsSave(transcript: ""))
+
         _ = state.beginAutomaticTranscription()
         XCTAssertEqual(state.phase, .transcribing)
         XCTAssertFalse(state.allowsSave(transcript: ""))
     }
 
+    func testClearingAudioReturnsToAwaitingStateAndInvalidatesOldResult() {
+        var state = ReferenceTranscriptionReviewState(initialTranscript: "")
+        let staleGeneration = state.beginAutomaticTranscription()
+        state.awaitAudio()
+
+        XCTAssertEqual(state.phase, .awaitingAudio)
+        XCTAssertFalse(
+            state.acceptAutomaticTranscript(
+                "Stale words",
+                generation: staleGeneration,
+                currentTranscript: ""
+            )
+        )
+    }
+
     func testAutomaticTranscriptBecomesEditableReadyState() {
-        var state = IOSReferenceTranscriptionReviewState(sidecarTranscript: "")
+        var state = ReferenceTranscriptionReviewState(initialTranscript: "")
         let generation = state.beginAutomaticTranscription()
         XCTAssertTrue(
             state.acceptAutomaticTranscript(
@@ -68,7 +86,7 @@ final class IOSReferenceTranscriptionReviewStateTests: XCTestCase {
     }
 
     func testManualEditWinsOverDelayedRecognition() {
-        var state = IOSReferenceTranscriptionReviewState(sidecarTranscript: "")
+        var state = ReferenceTranscriptionReviewState(initialTranscript: "")
         let staleGeneration = state.beginAutomaticTranscription()
         state.userEditedTranscript("My corrected words")
 
@@ -84,7 +102,7 @@ final class IOSReferenceTranscriptionReviewStateTests: XCTestCase {
     }
 
     func testCancelledAndStaleResultsCannotResolveNewReview() {
-        var state = IOSReferenceTranscriptionReviewState(sidecarTranscript: "")
+        var state = ReferenceTranscriptionReviewState(initialTranscript: "")
         let staleGeneration = state.beginAutomaticTranscription()
         state.invalidate()
 
@@ -99,7 +117,7 @@ final class IOSReferenceTranscriptionReviewStateTests: XCTestCase {
     }
 
     func testUnavailableRecognitionRequiresTextOrExplicitAudioOnly() {
-        var state = IOSReferenceTranscriptionReviewState(sidecarTranscript: "")
+        var state = ReferenceTranscriptionReviewState(initialTranscript: "")
         let generation = state.beginAutomaticTranscription()
         state.finishWithoutTranscript(
             reason: .permissionDenied,
@@ -116,7 +134,7 @@ final class IOSReferenceTranscriptionReviewStateTests: XCTestCase {
     }
 
     func testTypingAfterUnavailableRecognitionRestoresTranscriptBackedSave() {
-        var state = IOSReferenceTranscriptionReviewState(sidecarTranscript: "")
+        var state = ReferenceTranscriptionReviewState(initialTranscript: "")
         let generation = state.beginAutomaticTranscription()
         state.finishWithoutTranscript(
             reason: .emptyResult,

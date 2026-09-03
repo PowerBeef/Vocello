@@ -166,6 +166,11 @@
       "extractionState" : "manual",
       "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Audio-only enrollment selected. The transcript will remain empty." } } }
     },
+    "vocello.enrollment.transcription.awaiting_audio" : {
+      "comment" : "Enrollment status before a reference audio clip has been selected.",
+      "extractionState" : "manual",
+      "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Choose or record an audio clip to begin on-device transcription." } } }
+    },
     "vocello.enrollment.transcription.automatic_ready" : {
       "comment" : "Enrollment status after on-device speech recognition supplied editable text.",
       "extractionState" : "manual",
@@ -182,9 +187,9 @@
       "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "No automatic transcript was found. Enter one or use audio only." } } }
     },
     "vocello.enrollment.transcription.in_progress" : {
-      "comment" : "Enrollment status while on-device speech recognition processes the reference clip.",
+      "comment" : "Enrollment status while local speech recognition processes the reference clip.",
       "extractionState" : "manual",
-      "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Transcribing on this iPhone…" } } }
+      "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Transcribing on this device…" } } }
     },
     "vocello.enrollment.transcription.manual_ready" : {
       "comment" : "Enrollment status after the user edits or enters the transcript.",

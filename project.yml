@@ -463,13 +463,14 @@ targets:
       - path: Sources/SharedSupport/Database/GenerationMigrations.swift
       - path: Sources/SharedSupport/Database/GenerationHistoryOutbox.swift
       - path: Sources/SharedSupport/Services/VocelloPresentationText.swift
+      - path: Sources/Services/MacStudioGenerationRequestFactory.swift
       - path: Sources/Models/Generation.swift
       - path: Sources/iOSSupport/Models/PendingVoiceCloningHandoff.swift
       - path: Sources/iOSSupport/Services/AppPaths.swift
       - path: Sources/iOSSupport/Services/IOSModelDeliverySupport.swift
       - path: Sources/iOSSupport/Services/IOSModelProgressPresentation.swift
       - path: Sources/iOSSupport/Services/IOSReferenceAudioImportPolicy.swift
-      - path: Sources/iOSSupport/Services/IOSReferenceTranscriptionReviewState.swift
+      - path: Sources/SharedSupport/Services/ReferenceTranscriptionReviewState.swift
       - path: Sources/iOSSupport/Services/RuntimeReleaseCoordinator.swift
       - path: Sources/iOSSupport/Services/StudioGenerationAttemptAuthority.swift
       - path: Sources/iOSSupport/Services/IOSSingleTakeGenerationExecutor.swift
@@ -504,7 +505,7 @@ targets:
       - path: Sources/iOSSupport/Services/IOSModelDeliverySupport.swift
       - path: Sources/iOSSupport/Services/IOSModelProgressPresentation.swift
       - path: Sources/iOSSupport/Services/IOSReferenceAudioImportPolicy.swift
-      - path: Sources/iOSSupport/Services/IOSReferenceTranscriptionReviewState.swift
+      - path: Sources/SharedSupport/Services/ReferenceTranscriptionReviewState.swift
       - path: Sources/iOSSupport/Services/RuntimeReleaseCoordinator.swift
       - path: Sources/iOSSupport/Services/StudioGenerationAttemptAuthority.swift
       - path: Sources/iOSSupport/Services/IOSSingleTakeGenerationExecutor.swift

@@ -1,10 +1,13 @@
 ---
 status: active
 owner: macos
+reviewed: 2026-09-02
 summary: Consolidated macOS app map — screens, elements, and options, and how XCUITest addresses each through the stable accessibility surface.
 sourceOfTruth:
   - Sources/Views
   - Sources/ContentView.swift
+  - Sources/SharedSupport/Services/ReferenceTranscriptionReviewState.swift
+  - Sources/Services/MacStudioGenerationRequestFactory.swift
 ---
 # Vocello for Mac — app guide + test-driving reference
 
@@ -109,7 +112,7 @@ database-first transaction before removing pending entries or files.
 |---|---|
 | Enroll | `voices_enrollButton` (toolbar) |
 | Row | `voicesRow_<voiceID>` / `voicesRow_play_<voiceID>` / `voicesRow_use_<voiceID>` / `voicesRow_delete_<voiceID>` |
-| Enrollment sheet | `voicesEnroll_nameField` / `_audioPathField` / `_browseButton` / `_recordButton` / `_transcriptField` / `_confirmButton` / `_cancelButton` |
+| Enrollment sheet | `voicesEnroll_nameField` / `_audioPathField` / `_browseButton` / `_recordButton` / `_transcriptField` / `_transcriptionStatus` / `_referenceLanguagePicker` / `_useAudioOnlyButton` / `_confirmButton` / `_cancelButton` |
 
 Confirm prepares a private candidate first. A clean candidate commits immediately; a warned
 candidate commits only on Keep, while Discard, Cancel, and outside dismissal discard it. Editing a
@@ -117,6 +120,15 @@ voice supplies replacement intent to the same transaction, so the old assets rem
 until the new audio crosses the publication boundary. Row deletion stops a matching preview before
 the engine atomically removes that voice's audio, transcript, and prepared prompt artifacts.
 Voice-bank siblings are independent and never cascade.
+
+Imported and recorded references use the same operation-generation transcription-review policy as
+iPhone. Save stays disabled until on-device transcription resolves; a delayed recognizer result
+cannot overwrite edited text. If recognition cannot provide text, the user must enter a transcript
+or choose **Use audio only** explicitly. Transcript-backed enrollment also requires a separately
+confirmed reference language. That language is persisted as reference metadata through the
+versioned XPC candidate command and never selects a later Clone output language. Clone Auto follows
+the target script; an explicit output language always wins. Voice Design uses the same target-text
+language boundary.
 
 ### Settings (`sidebar_settings` → `screen_settings`)
 

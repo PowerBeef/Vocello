@@ -1,12 +1,15 @@
 ---
 status: active
 owner: macos
-reviewed: 2026-08-29
+reviewed: 2026-09-02
 summary: Domain rule for the macOS app and XPC stack — boundaries, XPC lifecycle invariants, gated Liquid Glass, accessibility rules, and the macOS test lanes.
 sourceOfTruth:
   - scripts/macos_test.sh
   - scripts/ui_test.sh
   - scripts/build.sh
+  - Sources/SharedSupport/Services/ReferenceTranscriptionReviewState.swift
+  - Sources/SharedSupport/Services/VoiceClipTranscriber.swift
+  - Sources/Services/MacStudioGenerationRequestFactory.swift
 ---
 # macOS domain rule
 
@@ -139,6 +142,20 @@ scripts/macos_test.sh gate            # deterministic macOS platform gate
   visible mid-generation Cancel and asserts a clean reset: Generate re-enabled, no backend
   error/crash badge, and zero History rows for the cancelled take. Do not regress the engine
   semantics it protects (user cancel is `.cancelled`, never an error, never persisted).
+- **Saved-voice review is shared and typed.** macOS and iOS use
+  `ReferenceTranscriptionReviewState` for awaiting-audio, automatic, manual, unavailable, and
+  explicitly confirmed audio-only states. Save remains blocked while recognition is unresolved;
+  operation generations make delayed recognition stale, and a user edit always wins. Build
+  persisted `PreparedVoiceEnrollmentMetadata` only through
+  `VoiceClipTranscriber.preparedVoiceEnrollmentMetadata(...)`, then send it through the versioned
+  prepared-candidate command. Do not restore a macOS-only transcription state or a nil/Auto
+  ambiguity.
+- **Reference and output languages have different owners.** A saved voice's reference language is
+  conditioning metadata only. Clone Auto resolves from the target script, while an explicit
+  Studio language always wins. Voice Design follows the same target-text boundary. Construct
+  macOS Design and Clone requests through `MacStudioGenerationRequestFactory` so language,
+  transcript/voice identity, seed, variation, prompt, and generation identity stay testable before
+  the XPC boundary.
 - **App sandbox disabled.** `Sources/QwenVoice.entitlements` keeps sandbox off for MLX; do not
   re-enable it.
 - **Entitlements are role-scoped and exact.** The app uses `QwenVoice.entitlements`; the engine XPC
@@ -156,5 +173,7 @@ scripts/macos_test.sh gate            # deterministic macOS platform gate
 - Performing XPC event draining on `MainActor`.
 - Showing error UI when the XPC service retires normally.
 - Blocking the main thread during model load or generation.
+- Using saved-reference language as Clone output language, or assembling Design/Clone requests
+  directly in a view/coordinator instead of `MacStudioGenerationRequestFactory`.
 - Adding a generic `#if DEBUG` behavior fork instead of runtime `DebugMode.isEnabled` or a narrowly
   named test-target condition.

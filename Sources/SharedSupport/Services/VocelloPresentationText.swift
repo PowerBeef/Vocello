@@ -15,6 +15,7 @@ enum VocelloPresentationText {
     }
 
     enum EnrollmentTranscriptionStatus: Sendable {
+        case awaitingAudio
         case sidecarReady
         case transcribing
         case automaticReady
@@ -59,6 +60,12 @@ enum VocelloPresentationText {
         _ status: EnrollmentTranscriptionStatus
     ) -> String {
         switch status {
+        case .awaitingAudio:
+            return String(
+                localized: "vocello.enrollment.transcription.awaiting_audio",
+                defaultValue: "Choose or record an audio clip to begin on-device transcription.",
+                comment: "Enrollment status before a reference audio clip has been selected."
+            )
         case .sidecarReady:
             return String(
                 localized: "vocello.enrollment.transcription.sidecar_ready",
@@ -68,8 +75,8 @@ enum VocelloPresentationText {
         case .transcribing:
             return String(
                 localized: "vocello.enrollment.transcription.in_progress",
-                defaultValue: "Transcribing on this iPhone…",
-                comment: "Enrollment status while on-device speech recognition processes the reference clip."
+                defaultValue: "Transcribing on this device…",
+                comment: "Enrollment status while local speech recognition processes the reference clip."
             )
         case .automaticReady:
             return String(

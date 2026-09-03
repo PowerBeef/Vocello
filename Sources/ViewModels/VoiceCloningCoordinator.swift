@@ -231,23 +231,14 @@ final class VoiceCloningCoordinator {
         model: TTSModel,
         outputPath: String
     ) -> GenerationRequest? {
-        guard let referenceAudioPath = draft.referenceAudioPath else { return nil }
-        guard draft.hasText else { return nil }
-        return GenerationRequest(
+        MacStudioGenerationRequestFactory.voiceClone(
             modelID: model.id,
             text: draft.text,
             outputPath: outputPath,
-            shouldStream: true,
-            streamingTitle: String(draft.text.prefix(40)),
-            languageHint: draft.selectedLanguage.rawValue,
-            payload: .clone(
-                reference: CloneReference(
-                    audioPath: referenceAudioPath,
-                    transcript: draft.trimmedReferenceTranscript,
-                    preparedVoiceID: draft.selectedSavedVoiceID
-                )
-            ),
-            generationID: UUID(),
+            language: draft.selectedLanguage,
+            referenceAudioPath: draft.referenceAudioPath,
+            referenceTranscript: draft.trimmedReferenceTranscript,
+            preparedVoiceID: draft.selectedSavedVoiceID,
             seed: draft.pinnedSeed,
             variation: GenerationVariationPreference.requestValue()
         )

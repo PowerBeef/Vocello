@@ -1,4 +1,3 @@
-import CryptoKit
 import QwenVoiceCore
 import SwiftUI
 
@@ -33,7 +32,7 @@ struct IOSRecordVoiceSheet: View {
     @State private var enrollError: String?
     @State private var pendingVoiceForReview: PreparedVoiceCandidate?
     @State private var isReviewDecisionInFlight = false
-    @State private var transcriptionReview: IOSReferenceTranscriptionReviewState
+    @State private var transcriptionReview: ReferenceTranscriptionReviewState
     @State private var transcriptionEvidence: VoiceClipTranscriber.EnrollmentEvidence?
     @State private var transcriptionTask: Task<Void, Never>?
 
@@ -62,8 +61,8 @@ struct IOSRecordVoiceSheet: View {
         _enrollError = State(initialValue: nil)
         _pendingVoiceForReview = State(initialValue: nil)
         _transcriptionReview = State(
-            initialValue: IOSReferenceTranscriptionReviewState(
-                sidecarTranscript: importedTranscript
+            initialValue: ReferenceTranscriptionReviewState(
+                initialTranscript: importedTranscript
             )
         )
         _transcriptionTask = State(initialValue: nil)
@@ -83,8 +82,8 @@ struct IOSRecordVoiceSheet: View {
                         capturedURL = stable
                         suggestedName = ""
                         transcript = ""
-                        transcriptionReview = IOSReferenceTranscriptionReviewState(
-                            sidecarTranscript: ""
+                        transcriptionReview = ReferenceTranscriptionReviewState(
+                            initialTranscript: ""
                         )
                         enrollError = nil
                         phase = .naming
@@ -208,7 +207,7 @@ struct IOSRecordVoiceSheet: View {
 
     private func unavailableReason(
         for evidence: VoiceClipTranscriber.EnrollmentEvidence
-    ) -> IOSReferenceTranscriptionReviewState.UnavailableReason {
+    ) -> ReferenceTranscriptionReviewState.UnavailableReason {
         if evidence.authorizationStatus == .siriDisabled {
             return .siriDisabled
         }
@@ -281,7 +280,11 @@ struct IOSRecordVoiceSheet: View {
                 audioPath: url.path,
                 transcript: trimmedTranscript.isEmpty ? nil : trimmedTranscript,
                 replacingVoiceID: nil,
-                enrollmentMetadata: enrollmentMetadata
+                enrollmentMetadata: try VoiceClipTranscriber.preparedVoiceEnrollmentMetadata(
+                    referenceLanguage: detectedLanguage,
+                    reviewState: transcriptionReview,
+                    evidence: transcriptionEvidence
+                )
             )
             if candidate.qualityWarnings.isEmpty {
                 do {
@@ -352,31 +355,6 @@ struct IOSRecordVoiceSheet: View {
             await savedVoicesViewModel.refresh(using: ttsEngine)
             onEnrolled(voice, confirmed, language)
         }
-    }
-
-    private var enrollmentMetadata: PreparedVoiceEnrollmentMetadata {
-        PreparedVoiceEnrollmentMetadata(
-            referenceLanguage: detectedLanguage,
-            transcriptSource: transcriptSource,
-            automaticTranscriptionOutcome: transcriptionEvidence?.outcome.rawValue,
-            transcriptionEvidenceDigest: transcriptionEvidenceDigest
-        )
-    }
-
-    private var transcriptSource: PreparedVoiceTranscriptSource {
-        switch transcriptionReview.phase {
-        case .ready(.sidecar): return .sidecar
-        case .ready(.automatic): return .automatic
-        case .ready(.manual): return .manual
-        case .audioOnlyConfirmed: return .audioOnly
-        case .transcribing, .unavailable: return .unknown
-        }
-    }
-
-    private var transcriptionEvidenceDigest: String? {
-        guard let transcriptionEvidence,
-              let data = try? JSONEncoder().encode(transcriptionEvidence) else { return nil }
-        return SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
     }
 
     private var reviewAlertTitle: String {

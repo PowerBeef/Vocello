@@ -357,6 +357,19 @@ class BuildRoutingContractTests(unittest.TestCase):
         policy = self.text("scripts/build_output_policy.py")
         self.assertIn("_symbol_identity_violations", policy)
 
+    def test_incremental_ios_checkpoint_preserves_its_final_dsym(self) -> None:
+        foundation = self.text("scripts/build_foundation_targets.sh")
+        build_ios = foundation.split("build_ios()", 1)[1].split(
+            'case "$MODE" in', 1
+        )[0]
+        logic_build = build_ios.index('run_foundation_build "iOS logic-test target"')
+        preserve = build_ios.index(
+            'preserve_ios_dsym "$app_dsym" "$preserved_dsym" "$app_bundle/Vocello"'
+        )
+        self.assertLess(logic_build, preserve)
+        self.assertIn("if (( INCREMENTAL == 1 )); then", build_ios[:preserve])
+        self.assertIn('write_build_provenance "$QVOICE_SYMBOLS_IOS/last-build.json"', build_ios)
+
     def test_benchmark_take_identity_uses_platform_appropriate_temporary_storage(self) -> None:
         context = self.text("Sources/QwenVoiceCore/BenchRunContext.swift")
         self.assertIn("#if os(iOS)", context)

@@ -67,6 +67,13 @@ to the frozen plan before cleanup, pinning, restoration, or deletion. Focused co
 the retained failed run has no terminal observation stream and is not resumable after this source
 change.
 
+The first post-checkpoint device preflight also exposed a build-workflow ordering defect: the
+incremental generic iOS build replaced the shared app binary after the earlier project-input gate
+had validated its preserved dSYM, leaving the final binary and retained symbols at different UUIDs.
+The incremental foundation route now preserves and UUID-validates the final sibling dSYM after both
+app and logic-test builds. Its focused contract, a real incremental build, and the immediately
+following device preflight all pass without cache deletion.
+
 Resume on the final committed source with:
 
 ```sh

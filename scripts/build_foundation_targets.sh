@@ -193,6 +193,26 @@ build_ios() {
     "scripts/build_foundation_targets.sh ios logic" VocelloiOSLogic Release \
     "generic/platform=iOS" arm64 "$provenance_optimization" disabled \
     "$derived_data_path" "$SOURCE_PACKAGES_DIR"
+
+  # The incremental checkpoint deliberately shares the physical-device
+  # DerivedData tree. Its second build can replace the app product after the
+  # project-input gate has already validated/repaired retained symbols, so
+  # preserve the final sibling dSYM here. This keeps a successful checkpoint
+  # immediately consumable by `ios_device.sh preflight` instead of leaving a
+  # stale UUID pair until another policy validation happens to repair it.
+  if (( INCREMENTAL == 1 )); then
+    local products="$derived_data_path/Build/Products/Release-iphoneos"
+    local app_bundle="$products/Vocello.app"
+    local app_dsym="$products/Vocello.app.dSYM"
+    local preserved_dsym="$QVOICE_SYMBOLS_IOS/Vocello.app.dSYM"
+    preserve_ios_dsym "$app_dsym" "$preserved_dsym" "$app_bundle/Vocello"
+    /usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$app_bundle/Info.plist" \
+      > "$(dirname "$preserved_dsym")/build-version.txt" 2>/dev/null || true
+    write_build_provenance "$QVOICE_SYMBOLS_IOS/last-build.json" \
+      "scripts/build_foundation_targets.sh ios --incremental" VocelloiOS Release \
+      "generic/platform=iOS" arm64 "$provenance_optimization" disabled \
+      "$derived_data_path" "$SOURCE_PACKAGES_DIR"
+  fi
 }
 
 case "$MODE" in

@@ -49,7 +49,10 @@ explicitly asks for their evidence.
   generation. Normal iteration uses `--fast`, followed by one checkpoint.
 - `./scripts/build_foundation_targets.sh ios --incremental` reuses the governed
   `build/cache/xcode/ios-device` DerivedData and matches physical-device Release optimization. The
-  default command retains disposable clean DerivedData for isolated or CI-style proof.
+  default command retains disposable clean DerivedData for isolated or CI-style proof. After the
+  shared app and logic-test builds finish, the incremental route UUID-validates and preserves the
+  final sibling app dSYM so `scripts/ios_device.sh preflight` cannot inherit stale symbols from the
+  product that existed before the checkpoint.
 - Internal diagnostic flags are target settings rather than package-wide `OTHER_SWIFT_FLAGS`, so
   diagnostics do not rebuild MLX, GRDB, NIO, Swift Collections, and every other dependency.
 - Foundation and UI lanes retain full Xcode output under `build/artifacts/` while showing concise

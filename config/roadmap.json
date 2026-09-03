@@ -1818,8 +1818,8 @@
       "gate": "Focused workflow tests, shell syntax, full deterministic checkpoint, macOS tests, incremental generic iOS app/logic compile, derived-artifact validation, project/surface governance, and the in-scope direct Clone-import device lanes must pass. AGENTS.md and release/QA guidance must describe the tier boundary and remain below the instruction-size limit.",
       "evidence": ["doc:docs/reference/development-workflow.md", "doc:docs/development-progress.md"],
       "sourceOfTruth": ["AGENTS.md", ".agents/rules/release-qa.md", "scripts/dev.sh", "scripts/check_project_inputs.sh"],
-      "updated": "2026-09-01",
-      "notes": "Closed 2026-09-01. ICI-4 passed physical-device direct Clone-import acceptance on 2026-08-28. The adopted path-aware workflow completed its exact-tree deterministic checkpoint over the phone-independent hardening tree: 1,278 Python tests, incremental generic iOS app/logic compilation, all macOS deterministic suites, production website build, and two real-browser smoke journeys passed without requiring a phone."
+      "updated": "2026-09-03",
+      "notes": "Closed 2026-09-01. ICI-4 passed physical-device direct Clone-import acceptance on 2026-08-28. The adopted path-aware workflow completed its exact-tree deterministic checkpoint over the phone-independent hardening tree: 1,278 Python tests, incremental generic iOS app/logic compilation, all macOS deterministic suites, production website build, and two real-browser smoke journeys passed without requiring a phone. Revalidated 2026-09-03 after the incremental checkpoint exposed an ordering gap between its final shared app product and the previously preserved iOS dSYM. The foundation route now UUID-validates and preserves the final sibling dSYM after both app and logic-test builds; the focused routing contract, real incremental compile, and immediately following physical-device preflight pass without cache deletion."
     },
     {
       "id": "AV-01",

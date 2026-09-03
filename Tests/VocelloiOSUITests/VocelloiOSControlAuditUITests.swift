@@ -1333,11 +1333,13 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
         select(tab: .studio)
     }
 
-    /// Search tokens only narrow the visible History collection. Before any
-    /// mutation or seed adoption, every result must expose the complete
-    /// immutable plan script on its labeled row action. A substring collision
-    /// returns nil after failing the test, so callers cannot continue into a
-    /// menu action, seed pin, or generation.
+    /// Search tokens only narrow the visible History collection. History rows
+    /// deliberately render a 60-character preview, so the read-only player is
+    /// the production surface that proves the complete immutable plan script.
+    /// Before any mutation or seed adoption, open every result and require its
+    /// accessible player transcript to equal the plan script byte-for-byte. A
+    /// substring collision returns nil after failing the test, so callers
+    /// cannot continue into a menu action, seed pin, or generation.
     private func runOwnedHistoryRowIDs(
         searchToken: String,
         expectedScript: String
@@ -1347,28 +1349,37 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
         let rows = historyRows()
         let resultCount = rows.count
         guard resultCount > 0 else { return [] }
-        let matchingRows = app.descendants(matching: .any).matching(
-            NSPredicate(
-                format: "identifier BEGINSWITH %@ AND label CONTAINS %@",
-                "historyRowTap_", expectedScript
-            )
-        )
-        let matchingCount = matchingRows.count
-        XCTAssertEqual(
-            matchingCount, resultCount,
-            "Reserved token \(searchToken) matched a non-audit History row"
-        )
-        guard matchingCount == resultCount else { return nil }
-        let prefix = "historyRowTap_"
-        let identifiers = (0..<matchingCount).compactMap { index -> String? in
-            let identifier = matchingRows.element(boundBy: index).identifier
-            guard identifier.hasPrefix(prefix) else { return nil }
-            return String(identifier.dropFirst(prefix.count))
+        let rowPrefix = "historyRow_"
+        let identifiers = (0..<resultCount).compactMap { index -> String? in
+            let identifier = rows.element(boundBy: index).identifier
+            guard identifier.hasPrefix(rowPrefix) else { return nil }
+            return String(identifier.dropFirst(rowPrefix.count))
         }
-        XCTAssertEqual(identifiers.count, matchingCount)
+        XCTAssertEqual(identifiers.count, resultCount)
         XCTAssertEqual(Set(identifiers).count, identifiers.count)
-        guard identifiers.count == matchingCount,
+        guard identifiers.count == resultCount,
               Set(identifiers).count == identifiers.count else { return nil }
+
+        for identifier in identifiers {
+            let rowAction = element("historyRowTap_\(identifier)")
+            guard VocelloUIPrimaryAction.perform(on: rowAction, timeout: 20) else {
+                XCTFail("Reserved token \(searchToken) matched a row whose player could not be opened")
+                return nil
+            }
+            let transcript = element("iosPlayer_transcript")
+            guard VocelloUIWait.exists(transcript, timeout: 20) else { return nil }
+            let matches = (transcript.value as? String) == expectedScript
+            let close = element("iosPlayer_close")
+            guard VocelloUIPrimaryAction.perform(on: close, timeout: 20) else { return nil }
+            guard VocelloUIWait.disappears(transcript, timeout: 20) else { return nil }
+            guard matches else {
+                XCTFail(
+                    "Reserved token \(searchToken) matched a non-audit History row "
+                        + "whose complete player transcript differs from the frozen plan"
+                )
+                return nil
+            }
+        }
         return identifiers
     }
 

@@ -34,8 +34,8 @@ warnings, or treating an unlaunched XCUITest as product evidence.
 | ICA-11 Dynamic Type audit | All Default geometry passed; XCTest successively attached History, Models & Files, then Studio as font experiments moved the first reported element | The harness forced `UIPreferredContentSizeCategoryName` while asking XCTest's Dynamic Type audit to vary that category | Keep four explicit category walks, but run the full unfiltered audit in a fifth launch with no content-size override; revert unnecessary product font changes | **Closed:** four walks plus unforced audit in `174031` |
 | ICA-08 priority inversion | Playback cancellation reached `stopAndReset()` | MainActor synchronously waited for `AVAudioEngine.stop()`/resource teardown | Silence immediately, transfer exclusive retired-graph ownership, and stop/reset on a utility task | **Closed:** 9/9 perf `180027`, no inversion signature |
 | ICA-09 bootstrap timeout | Xcode never launched a test case | Automation-session infrastructure failed before product execution; row-level composition had no run classification | Reuse the narrow zero-test bootstrap classifier and add a run-level `INFRASTRUCTURE_FAIL` while rows remain skipped | Positive/negative fixtures, retained-run replay, and one fresh no-retry device bootstrap |
-| ICA-13 saved-voice menu reachability | The run-owned imported voice existed, but its menu exposed no valid activation point | The original failure queried an offscreen lazy row; after search-driven reachability passed on device, the next failure was a still-visible search keyboard covering the floating tab dock | Reveal the exact voice through genuine search, require semantic 44-point row/menu geometry, then submit search and prove keyboard dismissal before tab navigation | Search/menu/delete physically proven in `162649`; one complete no-retry saved-voice lifecycle still required |
-| ICA-14 generation carrier collision | No generation row started; reserved token `28400003` matched an unrelated History row | Numeric substring search is not sufficient proof of run-owned carrier identity | Bind lookup to immutable plan/run script identity and the labeled row action; reject collisions without touching user data | Collision fixtures plus a fresh source-bound generation campaign with terminal observations |
+| ICA-13 saved-voice menu reachability | The run-owned imported voice existed, but its menu exposed no valid activation point | The original failure queried an offscreen lazy row; after search-driven reachability passed on device, the next failure was a still-visible search keyboard covering the floating tab dock | Reveal the exact voice through genuine search, require semantic 44-point row/menu geometry, then submit search and prove keyboard dismissal before tab navigation | **Closed:** complete no-retry saved-voice lifecycle `164233` |
+| ICA-14 generation carrier collision | Numeric token collision was guarded; the next run rejected its own second long-script row | Search tokens cannot authorize ownership, and a History row intentionally exposes only the first 60 characters | Resolve the narrowed row, open its genuine read-only player, and require the full accessible transcript to equal the frozen plan before mutation | Contract fixtures pass; fresh source-bound generation campaign still required |
 
 ## Physical acceptance checkpoint
 
@@ -49,8 +49,17 @@ voice through the real search field, activated its semantic menu, and completed 
 failed because the software keyboard remained over the floating dock after search text was cleared,
 making `rootTab_settings` non-hittable. The shared test helper now submits the search field and
 condition-polls for keyboard absence before tab navigation. Focused and exact-tree checkpoint gates
-pass; the fixed source still needs one fresh complete physical-device lifecycle before ICA-13 can
-close.
+passed, followed by complete no-retry run
+`ios-xcui-saved-voice-lifecycle-20260903-164233-e71568b3`. The full import, automatic
+transcription, enrollment, Clone selection/generation, preview, deletion, draft cleanup, and runner
+diagnostics journey passed; ICA-13 is closed.
+
+Generation run `ios-xcui-control-audit-20260903-164806-affcc06a` then completed its first two
+visible Custom takes and stopped before History mutation because the second long frozen script did
+not equal the row's intentional 60-character preview. That is a harness identity defect, not a
+product-generation failure. The corrected guard opens the genuine read-only player and requires its
+full accessible transcript to equal the frozen plan before any cleanup, pin, restore, or delete
+action. The failed bundle is preserved and cannot resume after this source change.
 
 The September 2 one-hour continuation adds four current-source bundles. Inventory run
 `ios-xcui-control-audit-20260902-180938-42d76c39` completed with 41 `PASS`, one explicit

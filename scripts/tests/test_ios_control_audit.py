@@ -163,7 +163,7 @@ class IOSControlAuditContractTests(unittest.TestCase):
         self.assertIn('actual: playerIssue', source)
         self.assertIn('classification: "PRODUCT_FAIL"', source)
 
-    def test_generation_normalizes_only_exact_reserved_history_rows(self) -> None:
+    def test_generation_normalizes_only_exact_player_verified_history_rows(self) -> None:
         source = (
             ROOT
             / "Tests"
@@ -178,9 +178,13 @@ class IOSControlAuditContractTests(unittest.TestCase):
         identity = source.split("private func runOwnedHistoryRowIDs", 1)[1].split(
             "private func dismissHistorySearchKeyboardIfNeeded", 1
         )[0]
-        self.assertIn('"historyRowTap_", expectedScript', identity)
-        self.assertIn("matchingCount, resultCount", identity)
-        self.assertIn("guard matchingCount == resultCount else { return nil }", identity)
+        self.assertIn('let rowPrefix = "historyRow_"', identity)
+        self.assertIn('element("historyRowTap_\\(identifier)")', identity)
+        self.assertIn('element("iosPlayer_transcript")', identity)
+        self.assertIn('(transcript.value as? String) == expectedScript', identity)
+        self.assertIn('element("iosPlayer_close")', identity)
+        self.assertIn("guard matches else", identity)
+        self.assertNotIn("label CONTAINS", identity)
         self.assertNotIn("app.staticTexts", cleanup)
         self.assertIn('element("historyRowMenu_\\(rowID)")', cleanup)
         self.assertIn('element("historyRowDeleteConfirm_\\(rowID)")', cleanup)
@@ -380,7 +384,7 @@ class IOSControlAuditContractTests(unittest.TestCase):
         with self.assertRaisesRegex(audit.AuditError, "deterministic source-bound plan"):
             audit.validate_plan(self.contract, historical)
 
-    def test_history_collision_guard_precedes_every_mutation(self) -> None:
+    def test_history_full_transcript_guard_precedes_every_mutation(self) -> None:
         source = (
             ROOT
             / "Tests"
@@ -390,8 +394,14 @@ class IOSControlAuditContractTests(unittest.TestCase):
         helper = source.split("private func runOwnedHistoryRowIDs", 1)[1].split(
             "private func dismissHistorySearchKeyboardIfNeeded", 1
         )[0]
-        self.assertIn("guard matchingCount == resultCount else { return nil }", helper)
-        self.assertNotIn("VocelloUIPrimaryAction.perform", helper)
+        self.assertIn('(transcript.value as? String) == expectedScript', helper)
+        self.assertIn("guard matches else", helper)
+        self.assertIn('element("historyRowTap_\\(identifier)")', helper)
+        self.assertIn('element("iosPlayer_transcript")', helper)
+        self.assertIn('element("iosPlayer_close")', helper)
+        self.assertNotIn("historyRowMenu_", helper)
+        self.assertNotIn("historyRowDeleteConfirm_", helper)
+        self.assertNotIn("historyRowPinSeed_", helper)
         cleanup = source.split("private func deleteStaleAuditHistoryRows", 1)[1].split(
             "private func runOwnedHistoryRowIDs", 1
         )[0]

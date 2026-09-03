@@ -50,27 +50,27 @@ machine-readable status record and wins over any older prose.
 ## Resume here (2026-09-03)
 
 **The September 3 device continuation is preserved at its exact evidence boundaries.** Preflight
-passed on the paired iPhone. Saved-voice run
-`ios-xcui-saved-voice-lifecycle-20260903-162036-6f4e3996` and generation run
-`ios-xcui-control-audit-20260903-162348-77a58a4e` each failed before a test case launched while
-Xcode was enabling automation; they remain separate infrastructure evidence and contain no product
-result. After the maintainer manually unlocked the device, new saved-voice run
-`ios-xcui-saved-voice-lifecycle-20260903-162649-37ad8335` launched, revealed the exact run-owned
-voice through the real search field, activated its semantic row menu, and deleted it through the
-visible confirmation. That physically proves the earlier ICA-13 lazy-row/menu correction.
+passed on the paired iPhone. Two initial runs stopped before any test launched while Xcode enabled
+automation and remain separate infrastructure evidence. After unlock, saved-voice run `162649`
+proved the corrected lazy-row/menu path, then exposed a harness-owned search keyboard covering the
+floating tab dock. The semantic keyboard-dismissal correction was followed by complete no-retry run
+`ios-xcui-saved-voice-lifecycle-20260903-164233-e71568b3`: import, automatic transcription,
+enrollment, exact Clone selection, one Clone generation, saved-row preview, deletion, draft
+clearing, cleanup, and runner diagnostics all passed. ICA-13 is closed.
 
-The same run then exposed a new harness cleanup boundary: clearing the search text left the software
-keyboard visible over the floating tab dock, so `rootTab_settings` could not become hittable. The
-shared XCUITest helper now submits the genuine search field and condition-polls until the keyboard
-is absent before attempting a tab transition. Focused verification and the exact-tree deterministic
-checkpoint pass. This is not yet a complete saved-voice acceptance result; the fixed source needs a
-fresh run ID after it is committed.
+Generation run `ios-xcui-control-audit-20260903-164806-affcc06a` then completed the first two
+visible Custom takes but stopped at the ownership guard before any History mutation. The guard
+compared the second long frozen script against the row's deliberate 60-character preview, so a
+genuine audit row produced a false harness rejection. The corrected guard derives the narrowed row
+identifier, opens the genuine read-only player, and compares its full accessible transcript exactly
+to the frozen plan before cleanup, pinning, restoration, or deletion. Focused contract tests pass;
+the retained failed run has no terminal observation stream and is not resumable after this source
+change.
 
 Resume on the final committed source with:
 
 ```sh
 scripts/ios_device.sh preflight
-scripts/ui_test.sh ios saved-voice-lifecycle --retain-result
 scripts/ui_test.sh ios control-audit --scenario generation --retain-result
 scripts/ui_test.sh ios smoke --retain-result
 ```

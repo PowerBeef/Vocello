@@ -116,7 +116,7 @@ the extended >220-character long corpus; the iPhone lane never bypasses the user
 | --- | --- |
 | Smoke | Two journeys. Standard: exact app launch, Studio mode and tab navigation, visible model and clone-reference readiness, one visible user cancellation, one run-scoped critical-memory cancellation with cancel-before-unload diagnostics, post-pressure engine reuse, no cancelled History rows, and one real completed Custom History row. Long-form: a >2,000-character script routes to a project, streams every segment with live narration, surfaces the joined output in the inline player, and History shows search-flattened rows plus the grouped project with its expandable per-segment map |
 | Benchmark | Ordered, configurable Studio matrix with pulled telemetry, readable audio, audio QC, thermal and timing evidence; the default is exactly 29 takes |
-| Control audit | Source-bound inventory plus stateful, external-system, accessibility, and deterministic all-pairs generation scenarios. The checked-in contract expands dynamic speakers, deliveries, languages, variations, and models; its current generation plan contains 201 rows. New plans use schema v2: each eight-digit search token is derived from the frozen source, contract, take, and salt, and is only a narrowing key. Before cleanup, pin/unpin, restoration, or deletion, XCUITest must prove the exact full plan-bound script in the labeled History row action and resolve one exact row identifier; ambiguity fails before mutation. The exact ICA-09 retained schema-v1 plan preserves its original sequential tokens through a digest-allowlisted, byte-exact compatibility path. The first successful take in each mode obtains an engine seed normally, pins it through the visible History action, and binds all remaining mode rows to that observed seed without injection or substitution. One exact plan-bound History row per mode remains as a visible resume seed carrier until the final shard. The run-owned direct-import Clone fixture is likewise plan-bound and reused across resumed shards. Clone omits a fabricated delivery dimension because ordinary Base-model references expose no instruction channel. Resume rejects a changed source tree, app build, device, or plan. Missing, blocked, infrastructure, harness, and product results remain distinct and can never be converted to PASS. Global destructive controls are opened and cancelled; run-owned rows may be created and deleted. |
+| Control audit | Source-bound inventory plus stateful, external-system, accessibility, and deterministic all-pairs generation scenarios. The checked-in contract expands dynamic speakers, deliveries, languages, variations, and models; its current generation plan contains 201 rows. New plans use schema v2: each eight-digit search token is derived from the frozen source, contract, take, and salt, and is only a narrowing key. Before cleanup, pin/unpin, restoration, or deletion, XCUITest resolves the narrowed row identifier, opens its genuine read-only player, and requires the full accessible transcript to equal the exact plan-bound script; ambiguity or mismatch fails before mutation. The exact ICA-09 retained schema-v1 plan preserves its original sequential tokens through a digest-allowlisted, byte-exact compatibility path. The first successful take in each mode obtains an engine seed normally, pins it through the visible History action, and binds all remaining mode rows to that observed seed without injection or substitution. One exact plan-bound History row per mode remains as a visible resume seed carrier until the final shard. The run-owned direct-import Clone fixture is likewise plan-bound and reused across resumed shards. Clone omits a fabricated delivery dimension because ordinary Base-model references expose no instruction channel. Resume rejects a changed source tree, app build, device, or plan. Missing, blocked, infrastructure, harness, and product results remain distinct and can never be converted to PASS. Global destructive controls are opened and cancelled; run-owned rows may be created and deleted. |
 | Model delivery | Fixed test-owned root normalized through visible state-appropriate controls. `diagnose` covers Custom cancel/restart/process adoption/Ready/remove; `queue` proves independent active/queued cancellation; `acceptance` adds Design/Clone shared-component reuse and all-model removal; `soak` repeats the lifecycle; `recover` inspects and visibly clears retained failure state without starting a transfer. Every transfer records exact logical bytes, milestone row/bar screenshots, phase activity, action exclusivity, five-minute advancement bounds, correlated delivery events, and exact canonical-state preservation |
 | Perf | Nine frame-health scenarios (`Tests/VocelloiOSUITests/VocelloiOSPerfUITests.swift`), each a fresh app launch with the in-app `CADisplayLink` probe pinned to the app's 60 Hz cap and one marked wall-clock window; `scripts/check_ios_ui_perf.py` joins windows to the pulled 500 ms probe rows |
 
@@ -226,14 +226,22 @@ voice-lifecycle failure.
 
 Any XCUITest journey leaving an active search surface for the floating root dock must dismiss the
 keyboard semantically and condition-poll for keyboard absence before selecting a tab. The shared
-helper now submits the genuine search field and enforces that condition; focused and checkpoint
-verification pass. A fresh source-bound saved-voice lifecycle is still required.
+helper now submits the genuine search field and enforces that condition. Fresh no-retry run
+`ios-xcui-saved-voice-lifecycle-20260903-164233-e71568b3` subsequently passed the complete import,
+automatic transcription, enrollment, Clone selection/generation, preview, deletion, draft cleanup,
+and runner-diagnostics journey. ICA-13 is closed.
+
+Fresh generation run `ios-xcui-control-audit-20260903-164806-affcc06a` completed two visible Custom
+takes, then stopped at the identity guard because a long exact script cannot equal the History
+row's intentional 60-character preview. No History mutation followed the mismatch, no terminal
+observation stream was retained, and the run cannot resume after the source correction. The guard
+now opens each narrowed row's genuine read-only player and requires its full accessible transcript
+to equal the frozen plan before cleanup, pinning, restoration, or deletion.
 
 After the correction is committed, resume with new run IDs:
 
 ```sh
 scripts/ios_device.sh preflight
-scripts/ui_test.sh ios saved-voice-lifecycle --retain-result
 scripts/ui_test.sh ios control-audit --scenario generation --retain-result
 scripts/ui_test.sh ios smoke --retain-result
 ```

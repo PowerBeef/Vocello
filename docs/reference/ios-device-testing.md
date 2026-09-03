@@ -153,6 +153,14 @@ terminal outcomes, remaining rows, and the next valid command in the roadmap and
 checkpoint; then confirm each pin reports `explicitly-pinned` in a cleanup dry-run. Remove pins only
 when the evidence set is explicitly retired.
 
+For a time-limited phone window, set the stop deadline before launching a lane and reserve time
+for its diagnostics and teardown. Do not launch work that cannot fit the remaining window.
+Finish device collection and confirm test-owned app termination before releasing the phone;
+documentation, deterministic checks, and publication can continue on the host afterward. If work
+must be interrupted, stop only the exact owned process, preserve its failure/partial evidence,
+and record the last terminal observation plus unattempted work. A passing XCTest counter alone
+cannot authorize a passing lane or a resume token.
+
 Lane qualification is deliberately stricter than the XCTest counter. The `ui_test.sh` terminal
 status is authoritative because it also owns post-test diagnostics, crash deltas, artifact
 composition, policy validators, and cleanup. If those required phases are stopped after all XCTest
@@ -203,8 +211,10 @@ product, harness, crash, generation, or QC failure coexists. It never turns the 
 never authorizes an automatic retry. Retained pre-test run
 `ios-xcui-control-audit-20260829-152245-bbe90762` was replayed on 2026-09-02 as exactly one
 run-level `INFRASTRUCTURE_FAIL` plus 42 `SKIPPED_AFTER_FAILURE` rows, with zero product/harness rows;
-the 2026-08-29 Messenger-interrupted run is the distinct post-launch proof. A fresh device bootstrap
-observation is still required to close ICA-09.
+the 2026-08-29 Messenger-interrupted run is the distinct post-launch proof. Fresh no-retry smoke
+`ios-xcui-smoke-20260903-184747-dc032d1b` subsequently launched all three tests and passed its full
+ledger, closing ICA-09's remaining bootstrap observation. This does not guarantee that Xcode
+bootstrap cannot fail again or reclassify any original failure.
 See [`ios-control-audit-remediation-2026-08-29.md`](ios-control-audit-remediation-2026-08-29.md).
 
 ### Control-audit continuation — 2026-09-03
@@ -238,16 +248,38 @@ observation stream was retained, and the run cannot resume after the source corr
 now opens each narrowed row's genuine read-only player and requires its full accessible transcript
 to equal the frozen plan before cleanup, pinning, restoration, or deletion.
 
-After the correction is committed, resume with new run IDs:
+Corrected-source generation `ios-xcui-control-audit-20260903-172247-b8fc963e` then emitted four
+`PASS` observations and one independently diagnosed `PRODUCT_FAIL` at `custom-005`, leaving 199
+composed rows skipped. Full-transcript ownership passed through the long scripts, closing ICA-14;
+the Eric/Calm Strong/Italian sampled-output failure belongs to ICA-15. Two separate four-cell
+diagnostics (`174346` and `180139`) preserve its warm/cold and streaming/non-streaming failures,
+codec replay, exact seed, healthy memory, and absence from History. Do not silently retry that row.
+
+Final smoke `ios-xcui-smoke-20260903-184747-dc032d1b` passed all three tests and its entire runner
+ledger. Crash delta and scoped diagnostics completed at 19:02:42/19:02:44 UTC, before the phone
+deadline; teardown terminated Vocello. The host-only retention phase also passed. The earlier
+`181935` run remains failed/unqualified after its whole-mirror collection was stopped. ICA-16 is
+closed by the fresh run, not by relabelling the older test-only success. All named bundles remain
+explicitly pinned; do not repeat accepted smoke or saved-voice phases solely to obtain green counts.
+
+The validated next probe is retained in an ignored directory and has **zero launched takes**:
 
 ```sh
 scripts/ios_device.sh preflight
-scripts/ui_test.sh ios control-audit --scenario generation --retain-result
-scripts/ui_test.sh ios smoke --retain-result
+scripts/ios_device.sh delivery-reliability \
+  --plan build/artifacts/diagnostics/ios/startup-reliability/ica15-marker-ablation-pending/plan.json \
+  --script-file build/artifacts/diagnostics/ios/startup-reliability/ica15-marker-ablation-pending/script.txt
 ```
 
-Generation starts at row 1 on a newly composed schema-v2 plan. No September 2 or September 3 shard
-is a valid resume source for that campaign.
+This independent two-take diagnostic removes the spoken numeric History marker while holding
+the failing speaker, preset, language, variation, and seed fixed. The host revalidates exact script
+bytes before launch. Compare it with the retained original-text evidence; marker causality is not
+yet demonstrated. It cannot replace the failed row or qualify a production change by itself.
+After localization and any qualifying remediation, freeze the final committed source and use
+`scripts/ui_test.sh ios control-audit --scenario generation --retain-result` from row 1 on a new
+schema-v2 plan. No September 2/3 shard may resume across this checkpoint's source change.
+ICA-04/ICA-05 retain generation, final restoration/reporting, and preservation-blocked coverage;
+ICA-06 still needs its exact-seed confirmation. VLR-07 retains its separate accuracy/ASR closure.
 
 ### Control-audit one-hour continuation — 2026-09-02
 
@@ -355,7 +387,10 @@ machine-readable diagnosis/summary, visual measurements, and a milestone contact
 isolated root remains available to the next `diagnose` or `recover` run; ordinary app data and
 canonical model state are never used as the test root.
 
-The smoke runner pulls its exact diagnostics and fails unless the one-shot event sequence is
+The smoke runner pulls only `Library/Caches/Vocello/diagnostics/<run-id>` through the shared
+60-second bounded collector; it never copies the complete historical mirror. Copy failure remains
+fatal even when XCTest passed, and a separate later inspection cannot rewrite that failed run.
+The unchanged acceptance checker fails unless the one-shot event sequence is
 `debug_force_critical_once` → `critical_memory_action` → typed `memory_pressure` cancellation →
 `fullUnload`, followed by a successful generation from the same relaunched app process.
 

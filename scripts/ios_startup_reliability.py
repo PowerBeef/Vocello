@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import os
 import re
 import struct
@@ -382,12 +383,12 @@ def validate_audio_qc(value: Any, field: str) -> None:
         raise ContractError(f"{field}.longestSilenceStartMS is invalid")
     trailing_silence = value.get("trailingSilenceMS")
     if trailing_silence is not None and (
-        not isinstance(trailing_silence, int) or trailing_silence < 0
+        type(trailing_silence) is not int or trailing_silence < 0
     ):
         raise ContractError(f"{field}.trailingSilenceMS is invalid")
     trailing_start = value.get("trailingSilenceStartMS")
     if trailing_start is not None and (
-        not isinstance(trailing_start, int) or trailing_start < 0
+        type(trailing_start) is not int or trailing_start < 0
     ):
         raise ContractError(f"{field}.trailingSilenceStartMS is invalid")
     if not isinstance(value["durationSeconds"], (int, float)) or value["durationSeconds"] <= 0:
@@ -413,7 +414,7 @@ def validate_audio_qc(value: Any, field: str) -> None:
         }
         if not isinstance(cadence, dict) or set(cadence) != cadence_required:
             raise ContractError(f"{field}.cadence does not match AudioCadenceQCReport")
-        if cadence["classification"] not in {"withinFastGate", "unusual", "severe"}:
+        if not isinstance(cadence["classification"], str) or cadence["classification"] not in {"withinFastGate", "unusual", "severe"}:
             raise ContractError(f"{field}.cadence.classification is invalid")
         allowed_reasons = {
             "excess_cadence_pauses", "single_suspicious_pause",
@@ -421,28 +422,28 @@ def validate_audio_qc(value: Any, field: str) -> None:
             "egregious_terminal_silence",
         }
         reasons = cadence["reasons"]
-        if not isinstance(reasons, list) or len(reasons) != len(set(reasons)) or any(
+        if not isinstance(reasons, list) or any(
             not isinstance(reason, str) or reason not in allowed_reasons for reason in reasons
-        ):
+        ) or len(reasons) != len(set(reasons)):
             raise ContractError(f"{field}.cadence.reasons is invalid")
         for key in (
             "expectedPauseCount", "cadencePauseThresholdMS", "suspiciousPauseThresholdMS",
             "observedCadencePauseCount", "excessCadencePauseCount",
             "suspiciousPauseCount", "totalInteriorSilenceMS", "totalCadenceSilenceMS",
         ):
-            if not isinstance(cadence[key], int) or cadence[key] < 0:
+            if type(cadence[key]) is not int or cadence[key] < 0:
                 raise ContractError(f"{field}.cadence.{key} is invalid")
         pauses = cadence["recordedInteriorPausesMS"]
         if not isinstance(pauses, list) or len(pauses) > 64 or any(
-            not isinstance(pause, int) or pause < 0 for pause in pauses
+            type(pause) is not int or pause < 0 for pause in pauses
         ):
             raise ContractError(f"{field}.cadence.recordedInteriorPausesMS is invalid")
         for key in ("medianCadencePauseMS", "p90CadencePauseMS"):
             child = cadence[key]
-            if child is not None and (not isinstance(child, int) or child < 0):
+            if child is not None and (type(child) is not int or child < 0):
                 raise ContractError(f"{field}.cadence.{key} is invalid")
         ratio = cadence["cadenceSilenceRatio"]
-        if not isinstance(ratio, (int, float)) or isinstance(ratio, bool) or ratio < 0 or ratio > 1:
+        if not isinstance(ratio, (int, float)) or isinstance(ratio, bool) or not math.isfinite(ratio) or ratio < 0 or ratio > 1:
             raise ContractError(f"{field}.cadence.cadenceSilenceRatio is invalid")
     chunk_qc = value.get("chunkQC")
     if chunk_qc is not None:

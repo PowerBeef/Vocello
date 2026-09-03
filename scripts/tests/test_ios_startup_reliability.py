@@ -351,6 +351,25 @@ class IOSStartupReliabilityTests(unittest.TestCase):
         with self.assertRaisesRegex(MODULE.ContractError, "trailingSilenceMS"):
             MODULE.validate_audio_qc(malformed, "take.audioQC")
 
+        for key, invalid in (
+            ("classification", {}), ("reasons", [{}]),
+            ("reasons", ["single_suspicious_pause"] * 2),
+            ("expectedPauseCount", True), ("recordedInteriorPausesMS", [False]),
+            ("medianCadencePauseMS", True), ("cadenceSilenceRatio", float("nan")),
+        ):
+            with self.subTest(key=key, invalid=invalid):
+                malformed = json.loads(json.dumps(qc))
+                malformed["cadence"][key] = invalid
+                with self.assertRaises(MODULE.ContractError):
+                    MODULE.validate_audio_qc(malformed, "take.audioQC")
+
+        for key in ("trailingSilenceMS", "trailingSilenceStartMS"):
+            with self.subTest(key=key):
+                malformed = json.loads(json.dumps(qc))
+                malformed[key] = True
+                with self.assertRaises(MODULE.ContractError):
+                    MODULE.validate_audio_qc(malformed, "take.audioQC")
+
     def test_v2_failed_codec_replay_is_typed_and_carries_no_partial_success(self):
         codec = {
             "schemaVersion": 1, "kind": "codec_trace", "sha256": "a" * 64,

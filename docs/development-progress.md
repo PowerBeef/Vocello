@@ -49,10 +49,33 @@ machine-readable status record and wins over any older prose.
 
 ## Resume here (2026-09-03)
 
+**Phone released before the ten-minute deadline; device work is paused.** Final smoke run
+`ios-xcui-smoke-20260903-184747-dc032d1b` passed all three cases: primary journey (239.819 s),
+Settings accessibility (288.281 s), and long-form with segment regeneration (336.142 s). Crash
+delta passed at 19:02:42 UTC and scoped diagnostics at 19:02:44 UTC, including memory-pressure
+cancellation, full unload, and successful recovery. The final required-step ledger passed with no
+missing steps. Test teardown terminated Vocello; no Xcode test or device-collection process
+remained when the phone was released. Remaining retention/checkpoint work was host-only.
+The cleanup dry-run confirmed explicit pins for the saved-voice, generation, interrupted-smoke,
+and final-smoke bundles. ICA-09, ICA-14, and ICA-16 now meet their individual closure gates;
+ICA-04/ICA-05 and ICA-15 remain open. These separate-source runs are not a complete current-source
+control-audit PASS.
+
+**Smoke collection is now bounded to the current run.** Earlier run
+`ios-xcui-smoke-20260903-181935-a051e519` passed all three XCTest cases (standard,
+Settings accessibility, and long-form), then its legacy whole-mirror collector transferred over
+365 MB of unrelated historical diagnostics and was deliberately stopped after eight minutes.
+The original runner remains failed/unqualified. Its already-collected 1.6 MB current-run subtree
+independently passes the unchanged memory cancellation/unload/reuse checker; this does not rewrite
+the runner result. ICA-16 replaces the whole-mirror pull with the existing run-scoped, 60-second
+collector. Focused fixtures prove acceptance equivalence, rejection of malformed current evidence,
+historical isolation, and copy-failure propagation. The separate `184747` run supplies complete
+no-retry device acceptance without rewriting the interrupted run.
+
 **The latest current-source generation attempt is retained as a product-safety diagnosis, not a
 partial audit pass.** Run `ios-xcui-control-audit-20260903-172247-b8fc963e` completed four Custom
 takes and then correctly rejected `custom-005` before History publication. The exact failing cell
-was Eric, Calm Strong, Italian, Consistent, with the frozen 60-character script and seed
+was Eric, Calm Strong, Italian, Consistent, with the frozen 71-character script and seed
 `17323406037040967292`; Fast-QC measured a 1.851-second interior gap followed by 11.096 seconds of
 terminal silence. The control-audit composer therefore reports four `PASS`, one `PRODUCT_FAIL`, and
 199 `SKIPPED_AFTER_FAILURE`. No failed row was retried or assigned another seed.
@@ -79,6 +102,14 @@ before any production budget changes. Because the diagnostic source and governed
 changed after the failed audit run, no retained generation shard is resumable. The next complete
 control-audit generation campaign must start at row 1 on a newly frozen committed source identity.
 
+Retained QC-PASS `custom-002` (Aiden/Chinese) used 331 codec frames for 49 target tokens; restoring
+the former six-times budget would stop it at 294. A blanket rollback is therefore unsafe. The audit
+also appends an eight-digit spoken History marker. A two-take marker-removal ablation is validated
+and retained under ignored `build/artifacts/diagnostics/ios/startup-reliability/ica15-marker-ablation-pending`,
+but **has not run (0/2)**. It keeps the failing speaker, delivery, language, seed, and variation
+while changing only the marker-bearing text. It is an independent localization probe, not a retry
+or replacement of the failed audit row and not evidence for a production change.
+
 **The September 3 device continuation is preserved at its exact evidence boundaries.** Preflight
 passed on the paired iPhone. Two initial runs stopped before any test launched while Xcode enabled
 automation and remain separate infrastructure evidence. After unlock, saved-voice run `162649`
@@ -104,16 +135,23 @@ The incremental foundation route now preserves and UUID-validates the final sibl
 app and logic-test builds. Its focused contract, a real incremental build, and the immediately
 following device preflight all pass without cache deletion.
 
-Resume on the final committed source with:
+When the phone is available again, first run the prepared independent diagnostic:
 
 ```sh
 scripts/ios_device.sh preflight
-scripts/ui_test.sh ios control-audit --scenario generation --retain-result
-scripts/ui_test.sh ios smoke --retain-result
+scripts/ios_device.sh delivery-reliability \
+  --plan build/artifacts/diagnostics/ios/startup-reliability/ica15-marker-ablation-pending/plan.json \
+  --script-file build/artifacts/diagnostics/ios/startup-reliability/ica15-marker-ablation-pending/script.txt
 ```
 
-The generation campaign starts from row 1 with a newly generated schema-v2 plan. Do not resume,
-merge, or relabel either September 3 bootstrap failure or any earlier source-bound shard.
+Then compare retained codec/QC evidence and qualify any causal remediation before restarting the
+complete generation campaign with `scripts/ui_test.sh ios control-audit --scenario generation --retain-result`.
+That campaign starts from row 1 with a new schema-v2 plan on the final frozen committed tree.
+Do not merge or relabel prior failures, use a cross-source resume token, repeat accepted phases
+merely for a green aggregate, or remove bounded test-owned carriers without exact ownership proof.
+Remaining device work includes the untested generation rows, ICA-06 exact-seed confirmation,
+final cleanup/restoration, preservation-blocked recording permissions, and VLR-07's separately
+governed accuracy/inconclusive evidence. Smoke and saved-voice closure no longer need a blind rerun.
 
 **The audited macOS Clone/language parity gap is closed under VLR-10.** Saved Voices now uses
 the same operation-generation transcription-review state and privacy-safe evidence builder as
@@ -146,12 +184,10 @@ at their bounded Keychain/private-key timeouts, made no account mutation, and le
 The exact working tree then passed 1,311 Python tests, generic iOS app and logic-test compilation,
 all macOS deterministic suites, derived validation, and the complete quick project gate.
 
-The next phone window starts from new run IDs on the final committed source: run preflight, one
-saved-voice lifecycle, a freshly generated 201-row control-audit generation plan from row 1, and
-smoke through its post-test diagnostics. Do not reuse the pre-documentation `/tmp` plan or resume
-the old 204-row shard; plan source identity must be generated after the final commit. ICA-13 and
-ICA-14 remain in flight only for those physical closure gates, while ICA-09 still needs one fresh
-bootstrap observation.
+The subsequent September 3 device window supplied the previously missing saved-voice,
+full-transcript ownership, fresh-bootstrap, and complete smoke closure evidence listed above.
+The current resume sequence supersedes the earlier pre-documentation `/tmp` plan. Generation and
+VLR accuracy closure remain separate, and no historical 204-row shard becomes a current-source PASS.
 
 **The preceding one-hour physical-iPhone window closed with all device processes stopped.** Preflight
 passed, then current-source inventory run

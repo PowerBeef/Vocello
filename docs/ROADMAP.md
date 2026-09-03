@@ -13,7 +13,7 @@
 | `delivery-prompting-2026-08` | active | backend-mlx | 29/34 (85%) |
 | `engineering-review-remediation-2026-08` | active | backend-and-platform | 13/14 (93%) |
 | `ios-app-store-readiness-2026-08` | active | release-qa | 2/12 (17%) |
-| `ios-control-audit-2026-08` | active | ios | 9/15 (60%) |
+| `ios-control-audit-2026-08` | active | ios | 12/16 (75%) |
 | `ios-generation-startup-reliability-2026-08` | active | backend-and-platform | 4/6 (67%) |
 | `voice-identity-language-reliability-2026-08` | active | backend-and-platform | 9/10 (90%) |
 | `compliance-2026-08` | complete | release-qa | 2/2 (100%) |
@@ -224,13 +224,14 @@ Narrative authority: [`docs/reference/ios-on-device-control-audit-2026-08-28.md`
 | `ICA-06` | in-flight | P1 — localize the long-Chinese non-EOS generation failure and terminal message | `doc:docs/reference/ios-on-device-control-audit-2026-08-28.md` |
 | `ICA-07` | done | P2 — restore the Voices root-tab 44-point target | `doc:docs/reference/ios-on-device-control-audit-2026-08-28.md` |
 | `ICA-08` | done | P2 — investigate UI cadence warnings and playback priority inversion | `benchmark:ios-xcui-perf-20260829-180027-45adde8a`, `doc:docs/reference/ios-on-device-control-audit-2026-08-28.md` |
-| `ICA-09` | in-flight | P2 — classify pre-test XCUITest bootstrap failures without false product rows | `doc:docs/reference/ios-on-device-control-audit-2026-08-28.md` |
+| `ICA-09` | done | P2 — classify pre-test XCUITest bootstrap failures without false product rows | `doc:docs/reference/ios-on-device-control-audit-2026-08-28.md` |
 | `ICA-10` | done | P2 — restore Studio mode-selector 44-point targets | `doc:docs/reference/ios-control-audit-remediation-2026-08-29.md` |
 | `ICA-11` | done | P2 — separate forced-size walks from XCTest Dynamic Type audit | `doc:docs/reference/ios-control-audit-remediation-2026-08-29.md` |
 | `ICA-12` | done | P2 — make the stable Studio surface respond to Dynamic Type | `doc:docs/reference/ios-control-audit-remediation-2026-08-29.md` |
 | `ICA-13` | done | P1 — restore deterministic saved-voice row-menu reachability | `doc:docs/reference/ios-control-audit-remediation-2026-08-29.md`, `doc:docs/reference/ios-device-testing.md` |
-| `ICA-14` | in-flight | P1 — make generation History carrier correlation collision-proof | `doc:docs/reference/ios-control-audit-remediation-2026-08-29.md`, `doc:docs/reference/ios-device-testing.md` |
+| `ICA-14` | done | P1 — make generation History carrier correlation collision-proof | `doc:docs/reference/ios-control-audit-remediation-2026-08-29.md`, `doc:docs/reference/ios-device-testing.md` |
 | `ICA-15` | in-flight | P1 — bound deterministic CustomVoice over-continuation without truncating valid speech | `doc:docs/reference/ios-control-audit-remediation-2026-08-29.md`, `doc:docs/reference/ios-device-testing.md` |
+| `ICA-16` | done | P2 — bound smoke evidence collection to the exact run | `doc:docs/reference/ios-control-audit-remediation-2026-08-29.md`, `doc:docs/reference/ios-device-testing.md` |
 
 ### Open items in detail
 
@@ -242,12 +243,6 @@ Narrative authority: [`docs/reference/ios-on-device-control-audit-2026-08-28.md`
 
 - **`ICA-06`** (in-flight) — P1 — localize the long-Chinese non-EOS generation failure and terminal message.
   gate: Using the exact custom-002 request identity retained by ios-xcui-control-audit-20260828-160326-950de77a, prove the first divergent boundary when Aiden with angry.normal, Chinese output, Consistent variation, and the long corpus script reaches maxNewTokens without EOS after publishing audio. Preserve the request, seed, maximum-token policy, sampling defaults, prompts, QC, and one-take policy. A deterministic sampled-output non-EOS result may remain rejected, but it must surface as typed post-generation incomplete audio, never startup failure; no incomplete output may enter History. The receipt remains authoritative for actual warm/cold state, and the plan must require genuine observed warm coverage instead of inferring it from sequence. Closure requires deterministic regression coverage and one no-retry physical reproduction proving the correct visible terminal, exact request receipt, safety discard, and no seed substitution before restarting the broader matrix.
-
-- **`ICA-09`** (in-flight) — P2 — classify pre-test XCUITest bootstrap failures without false product rows.
-  gate: When Xcode times out enabling automation before the first test case launches, the retained xcresult and log must prove zero launched tests and no app assertion, generation request, crash, or QC result. The composed control-audit summary must expose one run-level INFRASTRUCTURE_FAIL while every unexecuted control remains SKIPPED_AFTER_FAILURE; it must preserve the failed result and exact manual rerun command, reject mismatched run identity or any coexistence with observations, and never retry or convert the first run to PASS.
-
-- **`ICA-14`** (in-flight) — P1 — make generation History carrier correlation collision-proof.
-  gate: Replace numeric-substring ownership assumptions with exact immutable run/plan script identity proven through the genuine read-only player's full accessible transcript for stale-row cleanup, seed-carrier restoration, seed pinning, and deletion. An unrelated row containing a reserved token must be rejected without mutation, seed adoption, or matrix continuation. Closure requires deterministic collision, ambiguity, stale-row, and cross-run fixtures plus a fresh physical-device generation campaign that emits terminal observations from row 1 under one frozen source identity.
 
 - **`ICA-15`** (in-flight) — P1 — bound deterministic CustomVoice over-continuation without truncating valid speech.
   gate: Preserve the exact custom-005 Eric, Calm Strong, Italian, Consistent request and independently reproduce its sampled-output failure across warm/cold and streaming/non-streaming paths. The retained codec traces, full and incremental decoder replays, final model counters, EOS/token-cap state, AudioQC, memory, and publication outcome must identify the first divergent layer. Evaluate any continuation-budget candidate on a pre-registered representative CustomVoice corpus spanning script lengths, languages, deliveries, speakers, seeds, and both output modes. A production change qualifies only if it prevents the reproduced pathological continuation without converting valid speech to token-cap/incomplete failures, worsening WER/CER or delivery evidence, changing sampling defaults, or weakening mandatory QC. If no candidate qualifies, preserve fail-closed rejection and explicit user-controlled retry; never trim, silently regenerate, or substitute a seed.

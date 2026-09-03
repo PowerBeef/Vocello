@@ -1042,9 +1042,8 @@ PY
 
 validate_ios_smoke() {
   local diagnostics="$out/diagnostics"
-  rm -rf "$diagnostics"
-  "$ROOT_DIR/scripts/ios_device.sh" pull "$diagnostics" >/dev/null \
-    || return 1
+  pull_ios_run_diagnostics "$device" "$run_id" "$diagnostics" \
+    "$out/smoke-diagnostics-pull.log" || return 1
   python3 "$ROOT_DIR/scripts/check_ios_smoke_acceptance.py" "$diagnostics" \
     --run-id "$run_id" | tee "$out/smoke-gate.txt"
 }

@@ -120,6 +120,54 @@ class IOSSmokeAcceptanceTests(unittest.TestCase):
                 completed = self.run_checker(root)
                 self.assertNotEqual(completed.returncode, 0)
 
+    def test_scoped_collection_preserves_acceptance_without_historical_contamination(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.make_valid_fixture(root)
+            before = self.run_checker(root / "pull")
+            scoped = root / "pull" / RUN_ID
+            (scoped / "app").mkdir()
+            (root / "pull" / "app" / "generations.jsonl").rename(
+                scoped / "app" / "generations.jsonl"
+            )
+            historical = root / "pull" / "old-run" / "app" / "generations.jsonl"
+            historical.parent.mkdir(parents=True)
+            historical.write_text("interrupted historical JSON", encoding="utf-8")
+            after = self.run_checker(scoped)
+            contaminated = self.run_checker(root / "pull")
+        self.assertEqual(before.returncode, 0, before.stderr)
+        self.assertEqual(after.returncode, 0, after.stderr)
+        self.assertEqual(json.loads(before.stdout), json.loads(after.stdout))
+        self.assertNotEqual(contaminated.returncode, 0)
+        self.assertIn("invalid JSON", contaminated.stderr)
+
+    def test_smoke_collector_is_run_scoped_bounded_and_propagates_copy_failure(self) -> None:
+        runner = (ROOT / "scripts" / "ui_test.sh").read_text(encoding="utf-8")
+        smoke = runner.split("validate_ios_smoke() {", 1)[1].split(
+            "validate_ios_ui_perf() {", 1
+        )[0]
+        collector = runner.split("pull_ios_run_diagnostics() {", 1)[1].split(
+            "pull_ios_model_download_diagnostics() {", 1
+        )[0]
+        self.assertIn('pull_ios_run_diagnostics "$device" "$run_id"', smoke)
+        self.assertNotIn('ios_device.sh" pull', smoke)
+        self.assertIn('diagnostics/$target_run_id"', collector)
+        self.assertIn('--timeout 60', collector)
+        for copy_status in (0, 1):
+            with self.subTest(copy_status=copy_status), tempfile.TemporaryDirectory() as directory:
+                stub = (
+                    'pull_ios_run_diagnostics() { return ' + str(copy_status) + '; }\n'
+                    'python3() { echo validator_called; }\n'
+                    'validate_ios_smoke() {' + smoke + '\n'
+                    'validate_ios_smoke\n'
+                )
+                completed = subprocess.run(
+                    ["bash", "-c", stub], text=True, capture_output=True,
+                    env={"out": directory, "device": "fixture", "run_id": RUN_ID},
+                )
+                self.assertEqual(completed.returncode, copy_status, completed.stderr)
+                self.assertEqual("validator_called" in completed.stdout, copy_status == 0)
+
     def test_rejects_wrong_cancellation_reason_and_trim_level(self) -> None:
         for field, value in (("reason", "active_generation_sample"), ("trimLevel", "hardTrim")):
             with self.subTest(field=field), tempfile.TemporaryDirectory() as directory:

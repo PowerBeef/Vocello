@@ -193,14 +193,12 @@ scripts/ios_device.sh gate
 scripts/ios_device.sh voice-reliability --plan <untracked-plan.json> --private-map <untracked-map.json> [--resume]
 ```
 
-iOS uses a paired physical iPhone; platform gates are non-XCUITest diagnostics. `preflight`
-requires an Apple Development identity/private key; team, expired, and distribution-only states
-fail. Model/clone lanes are opt-in. Pin bundles and resume boundaries before release.
-Runner PASS requires diagnostics/cleanup; interrupted/zero-observation runs fail without resume.
-Source changes need new, unmerged IDs. See
+Device `preflight` requires a valid Apple Development identity/private key; team-only, expired,
+and distribution-only states fail. Model/clone lanes are opt-in. For timed sessions, reserve
+collection/cleanup time and stop before the deadline. Pin runs and record completed/failed/untested
+boundaries. Runner PASS requires diagnostics/cleanup. Interrupted runs stay failed; zero-observation
+runs cannot resume. Source changes need new IDs. Identity, reachability, and safe-resume procedures:
 `docs/reference/ios-device-testing.md`.
-
-See `docs/reference/ios-device-testing.md` for control-audit identity and reachability rules.
 
 ## Key paths
 

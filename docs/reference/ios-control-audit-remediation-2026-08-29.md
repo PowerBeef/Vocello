@@ -16,7 +16,7 @@ sourceOfTruth:
 # iOS control-audit remediation — 2026-08-29
 
 > **Active implementation checkpoint.** This report explains the causal decisions behind
-> ICA-06 through ICA-15 and the corrected-source re-closure of MD-3. `config/roadmap.json`, source, tests, and retained
+> ICA-06 through ICA-16 and the corrected-source re-closure of MD-3. `config/roadmap.json`, source, tests, and retained
 > untracked run artifacts remain authoritative. It does not replace the pinned 2026-08-28 audit.
 
 ## Executive assessment
@@ -33,12 +33,28 @@ warnings, or treating an unlaunched XCUITest as product evidence.
 | ICA-10 Studio mode selector | Root tabs passed on the corrected source; the first Studio segment measured 36.51 points high | The 36-point visual pill plus rail padding defined the semantic Button frame | Keep the pill visual at 36 points but move the 44-point activation height onto each Button inside the existing 44-point rail | **Closed:** accessibility `174031` |
 | ICA-11 Dynamic Type audit | All Default geometry passed; XCTest successively attached History, Models & Files, then Studio as font experiments moved the first reported element | The harness forced `UIPreferredContentSizeCategoryName` while asking XCTest's Dynamic Type audit to vary that category | Keep four explicit category walks, but run the full unfiltered audit in a fifth launch with no content-size override; revert unnecessary product font changes | **Closed:** four walks plus unforced audit in `174031` |
 | ICA-08 priority inversion | Playback cancellation reached `stopAndReset()` | MainActor synchronously waited for `AVAudioEngine.stop()`/resource teardown | Silence immediately, transfer exclusive retired-graph ownership, and stop/reset on a utility task | **Closed:** 9/9 perf `180027`, no inversion signature |
-| ICA-09 bootstrap timeout | Xcode never launched a test case | Automation-session infrastructure failed before product execution; row-level composition had no run classification | Reuse the narrow zero-test bootstrap classifier and add a run-level `INFRASTRUCTURE_FAIL` while rows remain skipped | Positive/negative fixtures, retained-run replay, and one fresh no-retry device bootstrap |
+| ICA-09 bootstrap timeout | Xcode never launched a test case | Automation-session infrastructure failed before product execution; row-level composition had no run classification | Reuse the narrow zero-test bootstrap classifier and add a run-level `INFRASTRUCTURE_FAIL` while rows remain skipped | **Closed:** positive/negative fixtures, retained-run replay, and fresh no-retry smoke `184747`; no original failure rewritten |
 | ICA-13 saved-voice menu reachability | The run-owned imported voice existed, but its menu exposed no valid activation point | The original failure queried an offscreen lazy row; after search-driven reachability passed on device, the next failure was a still-visible search keyboard covering the floating tab dock | Reveal the exact voice through genuine search, require semantic 44-point row/menu geometry, then submit search and prove keyboard dismissal before tab navigation | **Closed:** complete no-retry saved-voice lifecycle `164233` |
-| ICA-14 generation carrier collision | Numeric token collision was guarded; the next run rejected its own second long-script row | Search tokens cannot authorize ownership, and a History row intentionally exposes only the first 60 characters | Resolve the narrowed row, open its genuine read-only player, and require the full accessible transcript to equal the frozen plan before mutation | Contract fixtures pass; fresh source-bound generation campaign still required |
+| ICA-14 generation carrier collision | Numeric token collision was guarded; the next run rejected its own second long-script row | Search tokens cannot authorize ownership, and a History row intentionally exposes only the first 60 characters | Resolve the narrowed row, open its genuine read-only player, and require the full accessible transcript to equal the frozen plan before mutation | **Closed:** contract fixtures and fresh generation `172247` with four PASS observations before the separate ICA-15 product failure |
 | ICA-15 Custom sampled over-continuation | Exact request, receipt, model start, decoded chunks, and publication all matched before mandatory QC | The model emitted 373 streaming or 547 non-streaming codec frames for 28 target tokens, voluntarily ended by EOS, and encoded long silence in the trace | Preserve fail-closed rejection; retain terminal diagnostics and evaluate any bounded-continuation candidate across representative valid speech before changing production | Two independent four-cell device diagnostics reproduce every warm/cold and streaming/non-streaming failure; production mitigation remains in flight |
+| ICA-16 smoke evidence collection | Three XCTest cases passed, then collection copied unrelated historical evidence for eight minutes | Smoke used the unbounded whole-mirror pull instead of the existing run-scoped collector | Pull only the run namespace with a 60-second bound and propagate copy/validation failure | **Closed:** scoped/corrupt/copy-failure fixtures and complete no-retry smoke `184747` |
 
 ## Physical acceptance checkpoint
+
+Smoke run `ios-xcui-smoke-20260903-181935-a051e519` passed all three XCTest cases but its
+legacy post-test collector then copied more than 365 MB of historical diagnostics. After eight
+minutes the redundant copy was deliberately terminated, preserving the failed runner rather than
+claiming XCTest-only acceptance. Its 1.6 MB current-run subtree independently passes the existing
+memory-pressure checker. ICA-16 uses the already-established run-scoped collector with a 60-second
+timeout and leaves every acceptance requirement unchanged. Fixtures cover equivalent scoped
+evidence, historical corruption isolation, and copy-failure propagation. Fresh no-retry smoke
+`ios-xcui-smoke-20260903-184747-dc032d1b` subsequently passed the primary journey (239.819 s),
+Settings accessibility (288.281 s), and long-form plus segment regeneration (336.142 s). Crash
+delta passed at 19:02:42 UTC; scoped collection and memory cancellation/full-unload/recovery
+validation passed at 19:02:44 UTC. The final required-step ledger and host retention phase passed.
+Test teardown terminated the app, and device execution/collection ended before the maintainer's
+deadline. This closes ICA-16 and the fresh-bootstrap portion of ICA-09. All prior interrupted
+results remain unqualified and pinned; these separate-source results do not close the full audit.
 
 The September 3 continuation preserves three new bundles. Saved-voice run
 `ios-xcui-saved-voice-lifecycle-20260903-162036-6f4e3996` and generation run
@@ -75,6 +91,15 @@ voluntary EOS rather than token-cap termination, and 373 or 547 codec frames. Me
 healthy, no crash delta appeared, and invalid output never entered History. This localizes the first
 divergence to sampled CustomVoice continuation. ICA-15 owns the remaining bounded-policy research;
 no trimming, hidden retry, seed change, prompt/sampling change, or QC weakening was applied.
+
+The first four accepted rows also rule out a blanket rollback to the former six-times target-token
+budget: QC-PASS `custom-002` (Aiden/Chinese) used 331 codec frames for 49 target tokens, exceeding
+the hypothetical 294-frame cap. The audit appends an eight-digit spoken History marker; a two-take
+marker-removal ablation is validated and retained in the ignored diagnostic directory named by the
+testing guide, but remains **prepared, not run (0/2)**. Marker causality is only a hypothesis.
+The exact original-text failures remain immutable controls. Upstream `non_streaming_mode` also
+changes text conditioning, so unequal cross-mode traces alone are not proof of RNG corruption;
+see the [official inference source](https://github.com/QwenLM/Qwen3-TTS/blob/main/qwen_tts/inference/qwen3_tts_model.py).
 
 The September 2 one-hour continuation adds four current-source bundles. Inventory run
 `ios-xcui-control-audit-20260902-180938-42d76c39` completed with 41 `PASS`, one explicit

@@ -207,6 +207,40 @@ the 2026-08-29 Messenger-interrupted run is the distinct post-launch proof. A fr
 observation is still required to close ICA-09.
 See [`ios-control-audit-remediation-2026-08-29.md`](ios-control-audit-remediation-2026-08-29.md).
 
+### Control-audit continuation — 2026-09-03
+
+Preflight passed on the paired iPhone. Saved-voice run
+`ios-xcui-saved-voice-lifecycle-20260903-162036-6f4e3996` and generation run
+`ios-xcui-control-audit-20260903-162348-77a58a4e` each stopped before any test case launched with
+the Xcode automation-mode bootstrap timeout. Preserve both bundles independently: they are
+infrastructure evidence, contain no product observation, and never authorize an automatic retry or
+a merged PASS.
+
+After the maintainer manually unlocked the phone, distinct saved-voice run
+`ios-xcui-saved-voice-lifecycle-20260903-162649-37ad8335` launched normally. It used the real Voices
+search field to reveal `ICI Direct Clone Import`, proved the semantic row/menu was hittable, and
+completed its visible delete confirmation. The run then stopped when the cleared search field left
+the software keyboard covering the root tab dock, preventing `rootTab_settings` from becoming
+hittable. This is a harness cleanup failure after the original row-menu boundary, not a product
+voice-lifecycle failure.
+
+Any XCUITest journey leaving an active search surface for the floating root dock must dismiss the
+keyboard semantically and condition-poll for keyboard absence before selecting a tab. The shared
+helper now submits the genuine search field and enforces that condition; focused and checkpoint
+verification pass. A fresh source-bound saved-voice lifecycle is still required.
+
+After the correction is committed, resume with new run IDs:
+
+```sh
+scripts/ios_device.sh preflight
+scripts/ui_test.sh ios saved-voice-lifecycle --retain-result
+scripts/ui_test.sh ios control-audit --scenario generation --retain-result
+scripts/ui_test.sh ios smoke --retain-result
+```
+
+Generation starts at row 1 on a newly composed schema-v2 plan. No September 2 or September 3 shard
+is a valid resume source for that campaign.
+
 ### Control-audit one-hour continuation — 2026-09-02
 
 The next one-hour device window ran on source identity

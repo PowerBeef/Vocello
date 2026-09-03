@@ -47,7 +47,36 @@ machine-readable status record and wins over any older prose.
 | 13 — Benchmark/history v3 | Live 2026-07-29: the first schema-v3 records are committed (three clean `phase0-cli-control-*` engine records plus one exploratory run that also exposed and fixed the summarizer's v3 pin). `benchmarks/schema-v3.json` adds the typed quality identity to generation takes (pass/warning only, five fast gates required, machine-code issues); v1/v2 records stay valid immutable history; the publisher stamps v3 only when every take carries the identity. The UI benchmark checkers folded the same identity 2026-08-01: ui-generation records now publish v3 (first: the focused `v3-fold-proof` record `macos-xcui-benchmark-20260801-003208-403989cf`); the canonical iOS matrix published its first v3 record 2026-08-01 (`ios-xcui-benchmark-20260801-132415-abbec96b`). |
 | 14 — Organization and retirement | Closed 2026-07-23 (14a + 14b): compatibility SPI retired, actor-owned loading/metadata/priming/clone artifacts, clone conditioning epoch-bound end to end. |
 
-## Resume here (2026-09-02)
+## Resume here (2026-09-03)
+
+**The September 3 device continuation is preserved at its exact evidence boundaries.** Preflight
+passed on the paired iPhone. Saved-voice run
+`ios-xcui-saved-voice-lifecycle-20260903-162036-6f4e3996` and generation run
+`ios-xcui-control-audit-20260903-162348-77a58a4e` each failed before a test case launched while
+Xcode was enabling automation; they remain separate infrastructure evidence and contain no product
+result. After the maintainer manually unlocked the device, new saved-voice run
+`ios-xcui-saved-voice-lifecycle-20260903-162649-37ad8335` launched, revealed the exact run-owned
+voice through the real search field, activated its semantic row menu, and deleted it through the
+visible confirmation. That physically proves the earlier ICA-13 lazy-row/menu correction.
+
+The same run then exposed a new harness cleanup boundary: clearing the search text left the software
+keyboard visible over the floating tab dock, so `rootTab_settings` could not become hittable. The
+shared XCUITest helper now submits the genuine search field and condition-polls until the keyboard
+is absent before attempting a tab transition. Focused verification and the exact-tree deterministic
+checkpoint pass. This is not yet a complete saved-voice acceptance result; the fixed source needs a
+fresh run ID after it is committed.
+
+Resume on the final committed source with:
+
+```sh
+scripts/ios_device.sh preflight
+scripts/ui_test.sh ios saved-voice-lifecycle --retain-result
+scripts/ui_test.sh ios control-audit --scenario generation --retain-result
+scripts/ui_test.sh ios smoke --retain-result
+```
+
+The generation campaign starts from row 1 with a newly generated schema-v2 plan. Do not resume,
+merge, or relabel either September 3 bootstrap failure or any earlier source-bound shard.
 
 **The audited macOS Clone/language parity gap is closed under VLR-10.** Saved Voices now uses
 the same operation-generation transcription-review state and privacy-safe evidence builder as

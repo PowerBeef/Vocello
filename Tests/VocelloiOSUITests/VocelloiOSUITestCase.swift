@@ -570,6 +570,17 @@ class VocelloiOSUITestCase: XCTestCase {
         let searchField = app.textFields["voicesSearchField"].firstMatch
         guard searchField.exists else { return }
         XCTAssertTrue(VocelloUITextEntry.replace(in: searchField, with: "", timeout: 20))
+        if app.keyboards.firstMatch.exists {
+            // The floating tab dock is fully covered by the software keyboard.
+            // Submit the genuine search field and prove the keyboard is gone
+            // before a caller attempts a tab transition.
+            searchField.typeText("\n")
+            XCTAssertTrue(
+                VocelloUIWait.condition("Voices search keyboard to dismiss", timeout: 15) {
+                    !self.app.keyboards.firstMatch.exists
+                }
+            )
+        }
     }
 
     private func isValidActivationFrame(_ frame: CGRect) -> Bool {

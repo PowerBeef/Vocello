@@ -1,7 +1,7 @@
 ---
 status: active
 owner: ios
-reviewed: 2026-09-02
+reviewed: 2026-09-03
 summary: Evidence-driven remediation plan for the generation, model-progress, accessibility, playback-performance, and XCUITest bootstrap findings from the August 2026 physical-iPhone control audit.
 sourceOfTruth:
   - config/roadmap.json
@@ -34,10 +34,23 @@ warnings, or treating an unlaunched XCUITest as product evidence.
 | ICA-11 Dynamic Type audit | All Default geometry passed; XCTest successively attached History, Models & Files, then Studio as font experiments moved the first reported element | The harness forced `UIPreferredContentSizeCategoryName` while asking XCTest's Dynamic Type audit to vary that category | Keep four explicit category walks, but run the full unfiltered audit in a fifth launch with no content-size override; revert unnecessary product font changes | **Closed:** four walks plus unforced audit in `174031` |
 | ICA-08 priority inversion | Playback cancellation reached `stopAndReset()` | MainActor synchronously waited for `AVAudioEngine.stop()`/resource teardown | Silence immediately, transfer exclusive retired-graph ownership, and stop/reset on a utility task | **Closed:** 9/9 perf `180027`, no inversion signature |
 | ICA-09 bootstrap timeout | Xcode never launched a test case | Automation-session infrastructure failed before product execution; row-level composition had no run classification | Reuse the narrow zero-test bootstrap classifier and add a run-level `INFRASTRUCTURE_FAIL` while rows remain skipped | Positive/negative fixtures, retained-run replay, and one fresh no-retry device bootstrap |
-| ICA-13 saved-voice menu reachability | The run-owned imported voice existed, but its menu exposed no valid activation point | Current ownership is not yet localized between production accessibility geometry and XCUITest query timing | Prove the semantic menu owns a stable 44-point activation frame and make the lifecycle wait for that exact control without coordinate fallback | Deterministic geometry/query coverage plus one complete no-retry saved-voice lifecycle run |
+| ICA-13 saved-voice menu reachability | The run-owned imported voice existed, but its menu exposed no valid activation point | The original failure queried an offscreen lazy row; after search-driven reachability passed on device, the next failure was a still-visible search keyboard covering the floating tab dock | Reveal the exact voice through genuine search, require semantic 44-point row/menu geometry, then submit search and prove keyboard dismissal before tab navigation | Search/menu/delete physically proven in `162649`; one complete no-retry saved-voice lifecycle still required |
 | ICA-14 generation carrier collision | No generation row started; reserved token `28400003` matched an unrelated History row | Numeric substring search is not sufficient proof of run-owned carrier identity | Bind lookup to immutable plan/run script identity and the labeled row action; reject collisions without touching user data | Collision fixtures plus a fresh source-bound generation campaign with terminal observations |
 
 ## Physical acceptance checkpoint
+
+The September 3 continuation preserves three new bundles. Saved-voice run
+`ios-xcui-saved-voice-lifecycle-20260903-162036-6f4e3996` and generation run
+`ios-xcui-control-audit-20260903-162348-77a58a4e` both stopped before launching a test while Xcode
+enabled automation. They remain separate `INFRASTRUCTURE_FAIL` evidence and contain no product
+observation. After the maintainer unlocked the phone, saved-voice run
+`ios-xcui-saved-voice-lifecycle-20260903-162649-37ad8335` launched, revealed the exact run-owned
+voice through the real search field, activated its semantic menu, and completed deletion. It then
+failed because the software keyboard remained over the floating dock after search text was cleared,
+making `rootTab_settings` non-hittable. The shared test helper now submits the search field and
+condition-polls for keyboard absence before tab navigation. Focused and exact-tree checkpoint gates
+pass; the fixed source still needs one fresh complete physical-device lifecycle before ICA-13 can
+close.
 
 The September 2 one-hour continuation adds four current-source bundles. Inventory run
 `ios-xcui-control-audit-20260902-180938-42d76c39` completed with 41 `PASS`, one explicit

@@ -604,6 +604,23 @@ loaded Mimi decoder replays that trace both incrementally at the captured produc
 and as one full decode; both replay WAVs receive ordinary persisted-WAV QC. No path, script, codec
 ID, or raw error enters retained JSON.
 
+Post-generation rejection evidence must use the terminal model-diagnostic snapshot, not the
+pre-loop timing snapshot. It therefore retains the final target-token and effective-token-budget
+counters, bounded hot-loop timings, allowlisted EOS/token-cap flags, chunk/channel state, and the
+model-versus-product terminal timeline alongside Fast-QC. Result schema v2 accepts the complete
+Fast-QC v6 trailing-silence and cadence block while keeping earlier v2 result bytes valid. A host
+validator that predates a producer's registered optional QC fields is a harness failure; update and
+revalidate the retained bytes rather than relabelling the take.
+
+When one codec trace reproduces the same defect through incremental and full Mimi decoding, the
+decoder, channel, and WAV writer are downstream of the first divergence. If the model-terminal
+snapshot also proves voluntary EOS rather than a token cap, classify the row as a deterministic
+sampled-output pathology. Keep the ordinary fail-closed publication decision and explicit
+user-controlled retry. Do not trim around interior silence, retry invisibly, mutate the seed,
+weaken QC, or infer that a lower token budget is safe from one failing sample. Any continuation
+budget candidate needs a pre-registered representative matrix showing that it prevents the
+pathology without truncating valid speech or converting good rows into incomplete-output failures.
+
 Full-unload preparation records memory before unload, after owned references release and MLX cache
 clearing, immediately before a request, and after reload. A request starts only after three stable
 one-second samples prove no active generation/operation/reservation/model, a cleared MLX cache, at

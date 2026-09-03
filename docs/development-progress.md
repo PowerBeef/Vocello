@@ -49,6 +49,36 @@ machine-readable status record and wins over any older prose.
 
 ## Resume here (2026-09-03)
 
+**The latest current-source generation attempt is retained as a product-safety diagnosis, not a
+partial audit pass.** Run `ios-xcui-control-audit-20260903-172247-b8fc963e` completed four Custom
+takes and then correctly rejected `custom-005` before History publication. The exact failing cell
+was Eric, Calm Strong, Italian, Consistent, with the frozen 60-character script and seed
+`17323406037040967292`; Fast-QC measured a 1.851-second interior gap followed by 11.096 seconds of
+terminal silence. The control-audit composer therefore reports four `PASS`, one `PRODUCT_FAIL`, and
+199 `SKIPPED_AFTER_FAILURE`. No failed row was retried or assigned another seed.
+
+Two separate four-cell physical-iPhone diagnostics preserve the failure across streaming,
+non-streaming, warm, and forced-unload/cold execution. Run
+`ios-startup-reliability-20260903-174346-f3006528` first exposed that the host validator had not yet
+adopted Fast-QC v6 cadence and trailing-silence fields. The backward-compatible validator/schema
+correction now accepts that complete retained result. Corrected-source run
+`ios-startup-reliability-20260903-180139-ecb380f1` then reproduced all four failures with healthy
+memory, no crash delta, complete AudioQC, and finalized model-terminal evidence. Warm/cold
+streaming traces are byte-identical to each other, as are the two non-streaming traces; both the
+incremental and full Mimi decoder replays reproduce their respective gaps. The 28-target-token
+request ended by model EOS rather than the 2,048-token cap after 373 streaming or 547
+non-streaming codec frames. The first divergent layer is therefore the sampled CustomVoice codec
+sequence/continuation, not UI request assembly, memory admission, chunk publication, incremental
+decode, WAV persistence, or History.
+
+Production behavior remains deliberately unchanged: invalid audio is discarded with an explicit
+retry path. Trimming, hidden regeneration, seed substitution, prompt/sampling changes, or weaker
+QC would conceal rather than repair the deterministic failure. ICA-15 now owns a bounded
+continuation-policy experiment that must demonstrate safety across representative valid speech
+before any production budget changes. Because the diagnostic source and governed documentation
+changed after the failed audit run, no retained generation shard is resumable. The next complete
+control-audit generation campaign must start at row 1 on a newly frozen committed source identity.
+
 **The September 3 device continuation is preserved at its exact evidence boundaries.** Preflight
 passed on the paired iPhone. Two initial runs stopped before any test launched while Xcode enabled
 automation and remain separate infrastructure evidence. After unlock, saved-voice run `162649`

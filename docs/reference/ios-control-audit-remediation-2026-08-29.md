@@ -16,7 +16,7 @@ sourceOfTruth:
 # iOS control-audit remediation — 2026-08-29
 
 > **Active implementation checkpoint.** This report explains the causal decisions behind
-> ICA-06 through ICA-14 and the corrected-source re-closure of MD-3. `config/roadmap.json`, source, tests, and retained
+> ICA-06 through ICA-15 and the corrected-source re-closure of MD-3. `config/roadmap.json`, source, tests, and retained
 > untracked run artifacts remain authoritative. It does not replace the pinned 2026-08-28 audit.
 
 ## Executive assessment
@@ -36,6 +36,7 @@ warnings, or treating an unlaunched XCUITest as product evidence.
 | ICA-09 bootstrap timeout | Xcode never launched a test case | Automation-session infrastructure failed before product execution; row-level composition had no run classification | Reuse the narrow zero-test bootstrap classifier and add a run-level `INFRASTRUCTURE_FAIL` while rows remain skipped | Positive/negative fixtures, retained-run replay, and one fresh no-retry device bootstrap |
 | ICA-13 saved-voice menu reachability | The run-owned imported voice existed, but its menu exposed no valid activation point | The original failure queried an offscreen lazy row; after search-driven reachability passed on device, the next failure was a still-visible search keyboard covering the floating tab dock | Reveal the exact voice through genuine search, require semantic 44-point row/menu geometry, then submit search and prove keyboard dismissal before tab navigation | **Closed:** complete no-retry saved-voice lifecycle `164233` |
 | ICA-14 generation carrier collision | Numeric token collision was guarded; the next run rejected its own second long-script row | Search tokens cannot authorize ownership, and a History row intentionally exposes only the first 60 characters | Resolve the narrowed row, open its genuine read-only player, and require the full accessible transcript to equal the frozen plan before mutation | Contract fixtures pass; fresh source-bound generation campaign still required |
+| ICA-15 Custom sampled over-continuation | Exact request, receipt, model start, decoded chunks, and publication all matched before mandatory QC | The model emitted 373 streaming or 547 non-streaming codec frames for 28 target tokens, voluntarily ended by EOS, and encoded long silence in the trace | Preserve fail-closed rejection; retain terminal diagnostics and evaluate any bounded-continuation candidate across representative valid speech before changing production | Two independent four-cell device diagnostics reproduce every warm/cold and streaming/non-streaming failure; production mitigation remains in flight |
 
 ## Physical acceptance checkpoint
 
@@ -60,6 +61,20 @@ not equal the row's intentional 60-character preview. That is a harness identity
 product-generation failure. The corrected guard opens the genuine read-only player and requires its
 full accessible transcript to equal the frozen plan before any cleanup, pin, restore, or delete
 action. The failed bundle is preserved and cannot resume after this source change.
+
+The next current-source run, `ios-xcui-control-audit-20260903-172247-b8fc963e`, passed four Custom
+rows and then correctly rejected `custom-005` before History publication. That cell is Eric, Calm
+Strong, Italian, Consistent, seed `17323406037040967292`; Fast-QC measured a 1.851-second interior
+gap followed by 11.096 seconds of terminal silence. Diagnostic runs
+`ios-startup-reliability-20260903-174346-f3006528` and
+`ios-startup-reliability-20260903-180139-ecb380f1` independently reproduced the failure in all four
+streaming/non-streaming and warm/forced-unload cells. The retained warm/cold trace in each output
+mode is byte-identical, and both incremental and full Mimi replay reproduce the gaps. The corrected
+second run also retains finalized model evidence: 28 target tokens, a 2,048 effective budget,
+voluntary EOS rather than token-cap termination, and 373 or 547 codec frames. Memory stayed
+healthy, no crash delta appeared, and invalid output never entered History. This localizes the first
+divergence to sampled CustomVoice continuation. ICA-15 owns the remaining bounded-policy research;
+no trimming, hidden retry, seed change, prompt/sampling change, or QC weakening was applied.
 
 The September 2 one-hour continuation adds four current-source bundles. Inventory run
 `ios-xcui-control-audit-20260902-180938-42d76c39` completed with 41 `PASS`, one explicit

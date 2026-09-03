@@ -1306,6 +1306,48 @@ struct StreamingExecutionContext: Sendable {
         String(request.text.prefix(40))
     }
 
+    /// Merge diagnostics only after the model session has reached its terminal
+    /// boundary. Hot-loop timings and token-budget counters are finalized there,
+    /// so both success rows and post-generation failure rows must use this view.
+    static func finalizedGenerationTimings(
+        base: [String: Int],
+        modelDiagnostics: VocelloQwen3GenerationDiagnostics,
+        signpost: [String: Int],
+        includeModelDiagnostics: Bool
+    ) -> [String: Int] {
+        let withModel = includeModelDiagnostics
+            ? base.merging(modelDiagnostics.timingsMilliseconds) { _, terminal in terminal }
+            : base
+        return withModel.merging(signpost) { _, terminal in terminal }
+    }
+
+    /// Persist only the bounded model-terminal vocabulary needed to explain a
+    /// failed take. The provider contract says every diagnostic scalar is
+    /// privacy-safe, but an explicit allowlist prevents a future string flag from
+    /// accidentally becoming durable telemetry without review.
+    static func modelTerminalDiagnosticNotes(
+        booleanFlags: [String: Bool],
+        stringFlags: [String: String]
+    ) -> [String: String] {
+        let allowedPrefixes = ["generation", "custom_generation", "design_generation", "clone_generation"]
+        var notes: [String: String] = [:]
+        for (key, value) in stringFlags {
+            guard key.hasSuffix("_end_reason"),
+                  allowedPrefixes.contains(where: { key == "\($0)_end_reason" }),
+                  ["eos", "token_cap", "failed"].contains(value) else { continue }
+            notes[key] = value
+        }
+        for (key, value) in booleanFlags {
+            let isTerminalFlag = key.hasSuffix("_ended_by_eos") || key.hasSuffix("_hit_token_cap")
+            guard isTerminalFlag,
+                  allowedPrefixes.contains(where: {
+                      key == "\($0)_ended_by_eos" || key == "\($0)_hit_token_cap"
+                  }) else { continue }
+            notes[key] = value ? "true" : "false"
+        }
+        return notes
+    }
+
 
     /// Logs a warning when the PCM limiter had to scrub NaN/Inf samples
     /// from the model output. Non-zero counts here are a signal that the
@@ -1682,6 +1724,7 @@ struct StreamingExecutionContext: Sendable {
                 )
             }
         } catch {
+            signpostTimingsMS["native_generation_stream_ms"] = generationStreamStartedAt.elapsedMilliseconds
             GenerationFailureDiagnosticLogger.shared.log(
                 surfacedMessage: "Streaming execution failed",
                 stage: NativeRuntimeStage.streamFailed.description,
@@ -1692,7 +1735,25 @@ struct StreamingExecutionContext: Sendable {
             await writeFailureTelemetry(
                 error: error,
                 usedStreaming: request.shouldStream,
-                counters: ["chunkCount": chunkIndex]
+                counters: ["chunkCount": chunkIndex],
+                timingsMS: Self.finalizedGenerationTimings(
+                    base: timingOverridesMS,
+                    modelDiagnostics: finalizedDiagnostics,
+                    signpost: signpostTimingsMS,
+                    includeModelDiagnostics: telemetryActive
+                ),
+                diagnosticBooleanFlags: booleanFlags.merging(finalizedDiagnostics.booleanFlags) { _, terminal in terminal },
+                diagnosticStringFlags: stringFlags.merging(finalizedDiagnostics.stringFlags) { _, terminal in terminal },
+                mlxMemoryByStage: telemetryActive ? mlxMemorySnapshots : nil,
+                chunkTimeline: chunkTimeline.isEmpty ? nil : chunkTimeline,
+                streamingChunkObservations: chunkObservations,
+                streamingAudioChannel: audioChannelSummary,
+                streamingTerminals: GenerationTerminalTimelineV9(
+                    modelTerminalAtNS: modelTerminalAtNS,
+                    productTerminalAtNS: DispatchTime.now().uptimeNanoseconds,
+                    modelOutcome: modelOutcomeV9,
+                    productOutcome: error is CancellationError ? .cancelled : .failed
+                )
             )
             finalWriter.discard()
             try? FileManager.default.removeItem(at: outputURL)
@@ -1718,10 +1779,29 @@ struct StreamingExecutionContext: Sendable {
             totalFramesWritten: totalFramesWritten,
             isTaskCancelled: Task.isCancelled
         ) {
+            signpostTimingsMS["native_generation_stream_ms"] = generationStreamStartedAt.elapsedMilliseconds
             await writeFailureTelemetry(
                 error: terminalError,
                 usedStreaming: request.shouldStream,
-                counters: ["chunkCount": chunkIndex]
+                counters: ["chunkCount": chunkIndex],
+                timingsMS: Self.finalizedGenerationTimings(
+                    base: timingOverridesMS,
+                    modelDiagnostics: finalizedDiagnostics,
+                    signpost: signpostTimingsMS,
+                    includeModelDiagnostics: telemetryActive
+                ),
+                diagnosticBooleanFlags: booleanFlags.merging(finalizedDiagnostics.booleanFlags) { _, terminal in terminal },
+                diagnosticStringFlags: stringFlags.merging(finalizedDiagnostics.stringFlags) { _, terminal in terminal },
+                mlxMemoryByStage: telemetryActive ? mlxMemorySnapshots : nil,
+                chunkTimeline: chunkTimeline.isEmpty ? nil : chunkTimeline,
+                streamingChunkObservations: chunkObservations,
+                streamingAudioChannel: audioChannelSummary,
+                streamingTerminals: GenerationTerminalTimelineV9(
+                    modelTerminalAtNS: modelTerminalAtNS,
+                    productTerminalAtNS: DispatchTime.now().uptimeNanoseconds,
+                    modelOutcome: modelOutcomeV9,
+                    productOutcome: .failed
+                )
             )
             finalWriter.discard()
             try? FileManager.default.removeItem(at: outputURL)
@@ -1818,12 +1898,32 @@ struct StreamingExecutionContext: Sendable {
                 finalWriteSignpost,
                 "runID=\(benchRunID, privacy: .public) generationID=\(generationID.uuidString, privacy: .public) takeIndex=\(benchTakeIndex, privacy: .public) cell=\(benchCell, privacy: .public)"
             )
+            signpostTimingsMS["native_final_wav_finish_ms"] = finalWAVFinishStartedAt.elapsedMilliseconds
+            signpostTimingsMS["native_generation_stream_ms"] = generationStreamStartedAt.elapsedMilliseconds
             await writeFailureTelemetry(
                 error: error,
                 usedStreaming: request.shouldStream,
                 counters: ["chunkCount": chunkIndex],
                 audioQC: rejectedAudioQC,
-                additionalNotes: diagnosticEvidenceNotes
+                additionalNotes: diagnosticEvidenceNotes,
+                timingsMS: Self.finalizedGenerationTimings(
+                    base: timingOverridesMS,
+                    modelDiagnostics: finalizedDiagnostics,
+                    signpost: signpostTimingsMS,
+                    includeModelDiagnostics: telemetryActive
+                ),
+                diagnosticBooleanFlags: booleanFlags.merging(finalizedDiagnostics.booleanFlags) { _, terminal in terminal },
+                diagnosticStringFlags: stringFlags.merging(finalizedDiagnostics.stringFlags) { _, terminal in terminal },
+                mlxMemoryByStage: telemetryActive ? mlxMemorySnapshots : nil,
+                chunkTimeline: chunkTimeline.isEmpty ? nil : chunkTimeline,
+                streamingChunkObservations: chunkObservations,
+                streamingAudioChannel: audioChannelSummary,
+                streamingTerminals: GenerationTerminalTimelineV9(
+                    modelTerminalAtNS: modelTerminalAtNS,
+                    productTerminalAtNS: DispatchTime.now().uptimeNanoseconds,
+                    modelOutcome: modelOutcomeV9,
+                    productOutcome: .failed
+                )
             )
             throw error
         }
@@ -1869,9 +1969,12 @@ struct StreamingExecutionContext: Sendable {
         // token-loop total, generated-code count) are only finalized post-loop, so
         // the pre-loop `timingOverridesMS` snapshot misses them entirely.
         signpostTimingsMS["native_generation_stream_ms"] = generationStreamStartedAt.elapsedMilliseconds
-        var finalTimingsMS = telemetryActive
-            ? timingOverridesMS.merging(finalizedDiagnostics.timingsMilliseconds) { _, new in new }.merging(signpostTimingsMS) { _, new in new }
-            : timingOverridesMS.merging(signpostTimingsMS) { _, new in new }
+        var finalTimingsMS = Self.finalizedGenerationTimings(
+            base: timingOverridesMS,
+            modelDiagnostics: finalizedDiagnostics,
+            signpost: signpostTimingsMS,
+            includeModelDiagnostics: telemetryActive
+        )
         if telemetryActive,
            let info = latestInfo,
            let tokenLoopMS = finalTimingsMS["qwen_token_loop_total"],
@@ -1958,6 +2061,8 @@ struct StreamingExecutionContext: Sendable {
             counters: ["chunkCount": chunkIndex],
             notes: successNotes,
             timingsMS: finalTimingsMS,
+            diagnosticBooleanFlags: finalBooleanFlags,
+            diagnosticStringFlags: finalStringFlags,
             derivedMetrics: derivedMetrics,
             mlxMemoryByStage: telemetryActive ? mlxMemorySnapshots : nil,
             chunkTimeline: chunkTimeline.isEmpty ? nil : chunkTimeline,
@@ -2064,7 +2169,15 @@ struct StreamingExecutionContext: Sendable {
         usedStreaming: Bool,
         counters: [String: Int],
         audioQC: AudioQCReport? = nil,
-        additionalNotes: [String: String] = [:]
+        additionalNotes: [String: String] = [:],
+        timingsMS: [String: Int]? = nil,
+        diagnosticBooleanFlags: [String: Bool]? = nil,
+        diagnosticStringFlags: [String: String]? = nil,
+        mlxMemoryByStage: [String: NativeMLXMemorySnapshot]? = nil,
+        chunkTimeline: [GenerationChunkTelemetry]? = nil,
+        streamingChunkObservations: [ShippingChunkObservationV9] = [],
+        streamingAudioChannel: AudioChannelSummaryV9? = nil,
+        streamingTerminals: GenerationTerminalTimelineV9? = nil
     ) async {
         let reason = NativeGenerationTerminalClassifier.reason(for: error)
         await telemetrySampler?.captureBoundary(
@@ -2096,8 +2209,16 @@ struct StreamingExecutionContext: Sendable {
             finishReason: reason.rawValue,
             counters: counters,
             notes: failureNotes,
+            timingsMS: timingsMS,
+            diagnosticBooleanFlags: diagnosticBooleanFlags,
+            diagnosticStringFlags: diagnosticStringFlags,
+            mlxMemoryByStage: mlxMemoryByStage,
+            chunkTimeline: chunkTimeline,
             audioQC: audioQC,
-            rawSamples: NativeTelemetryMode.current().persistsRawSamples ? rawSamples : nil
+            rawSamples: NativeTelemetryMode.current().persistsRawSamples ? rawSamples : nil,
+            streamingChunkObservations: streamingChunkObservations,
+            streamingAudioChannel: streamingAudioChannel,
+            streamingTerminals: streamingTerminals
         )
     }
 
@@ -2138,6 +2259,8 @@ struct StreamingExecutionContext: Sendable {
         counters: [String: Int],
         notes: [String: String],
         timingsMS: [String: Int]? = nil,
+        diagnosticBooleanFlags: [String: Bool]? = nil,
+        diagnosticStringFlags: [String: String]? = nil,
         derivedMetrics: [String: Double]? = nil,
         mlxMemoryByStage: [String: NativeMLXMemorySnapshot]? = nil,
         chunkTimeline: [GenerationChunkTelemetry]? = nil,
@@ -2150,6 +2273,8 @@ struct StreamingExecutionContext: Sendable {
         guard TelemetryGate.resolvedEnabled else { return }
         guard let appSupportDirectory = diagnosticAppSupportBox?.url else { return }
         guard await telemetryTerminalGate.claim() else { return }
+        let effectiveBooleanFlags = booleanFlags.merging(diagnosticBooleanFlags ?? [:]) { _, terminal in terminal }
+        let effectiveStringFlags = stringFlags.merging(diagnosticStringFlags ?? [:]) { _, terminal in terminal }
         // Stamp the resolved device-memory tier so each row self-identifies which
         // policy it ran under — confirms a forced-tier benchmark took effect.
         // Reuses the free-form notes field; a caller-supplied key wins on collision.
@@ -2201,20 +2326,20 @@ struct StreamingExecutionContext: Sendable {
             tierNotes["spokenTextTransformations"] = String(spokenTextPlan.transformationCount)
             tierNotes["spokenTextDigest"] = spokenTextPlan.spokenTextDigest
         }
-        if let algorithmVersion = stringFlags["sampling_algorithm_version"] {
+        if let algorithmVersion = effectiveStringFlags["sampling_algorithm_version"] {
             tierNotes["samplingAlgorithmVersion"] = algorithmVersion
         }
-        if let effectiveSeed = stringFlags["sampling_effective_seed"] {
+        if let effectiveSeed = effectiveStringFlags["sampling_effective_seed"] {
             // `samplingSeed` now means the resolved effective seed. This keeps
             // the existing telemetry field while ensuring unseeded requests
             // are reproducible from their evidence.
             tierNotes["samplingSeed"] = effectiveSeed
             tierNotes["samplingSeedSource"] = request.seed == nil ? "generated" : "requested"
         }
-        if let talkerTopK = stringFlags["sampling_talker_top_k"] {
+        if let talkerTopK = effectiveStringFlags["sampling_talker_top_k"] {
             tierNotes["samplingTalkerTopK"] = talkerTopK
         }
-        if let subtalkerTopK = stringFlags["sampling_subtalker_top_k"] {
+        if let subtalkerTopK = effectiveStringFlags["sampling_subtalker_top_k"] {
             tierNotes["samplingSubtalkerTopK"] = subtalkerTopK
         }
         if let simLimit = IOSMemorySnapshot.simulatedProcessLimitBytes {
@@ -2243,14 +2368,14 @@ struct StreamingExecutionContext: Sendable {
         // unavailable in the v9 bridge rather than being synthesized here.
         let v9IdentityNotes: [(source: String, digest: String, version: String, versionValue: String)] = [
             ("generation_plan_shadow_complete_digest", "streamingV9PlanDigest", "streamingV9PlanVersion", "1"),
-            ("generation_plan_shadow_sampling_digest", "streamingV9SamplingDigest", "streamingV9SamplingVersion", stringFlags["sampling_algorithm_version"] ?? "1"),
+            ("generation_plan_shadow_sampling_digest", "streamingV9SamplingDigest", "streamingV9SamplingVersion", effectiveStringFlags["sampling_algorithm_version"] ?? "1"),
             ("generation_plan_shadow_chunking_digest", "streamingV9ChunkDigest", "streamingV9ChunkVersion", "1"),
             ("generation_plan_shadow_memory_digest", "streamingV9MemoryDigest", "streamingV9MemoryVersion", "1"),
             ("generation_plan_shadow_output_digest", "streamingV9OutputPolicyDigest", "streamingV9OutputPolicyVersion", "1"),
             ("generation_plan_shadow_quality_digest", "streamingV9QualityPolicyDigest", "streamingV9QualityPolicyVersion", "1"),
         ]
         for identity in v9IdentityNotes {
-            guard let digest = stringFlags[identity.source] else { continue }
+            guard let digest = effectiveStringFlags[identity.source] else { continue }
             tierNotes[identity.digest] = digest
             tierNotes[identity.version] = identity.versionValue
         }
@@ -2294,6 +2419,10 @@ struct StreamingExecutionContext: Sendable {
         }
         var notesWithTier = tierNotes
             .merging(notes) { _, caller in caller }
+            .merging(Self.modelTerminalDiagnosticNotes(
+                booleanFlags: effectiveBooleanFlags,
+                stringFlags: effectiveStringFlags
+            )) { current, _ in current }
             .merging(currentTaskQOSNotes()) { current, _ in current }
             .merging(currentProcessSchedulingNotes()) { current, _ in current }
             .merging(BenchRunContext.telemetryNotes(intendedWarmState: warmState.rawValue)) { current, _ in current }
@@ -2357,14 +2486,14 @@ struct StreamingExecutionContext: Sendable {
             audioQC: audioQC,
             modelRuntimeIdentity: ModelRuntimeIdentity(
                 resolvedModelID: request.modelID,
-                modelVariant: stringFlags["model_identity_variant"],
-                modelRepository: stringFlags["model_identity_repository"],
-                huggingFaceRevision: stringFlags["model_identity_revision"],
-                artifactVersion: stringFlags["model_identity_artifact_version"],
-                quantization: stringFlags["model_identity_quantization"],
-                integrityManifestDigest: stringFlags["model_identity_integrity_manifest_digest"],
-                speechTokenizerDigest: stringFlags["model_identity_speech_tokenizer_digest"],
-                runtimeProfileSignature: stringFlags["qwen3_runtime_profile_signature"],
+                modelVariant: effectiveStringFlags["model_identity_variant"],
+                modelRepository: effectiveStringFlags["model_identity_repository"],
+                huggingFaceRevision: effectiveStringFlags["model_identity_revision"],
+                artifactVersion: effectiveStringFlags["model_identity_artifact_version"],
+                quantization: effectiveStringFlags["model_identity_quantization"],
+                integrityManifestDigest: effectiveStringFlags["model_identity_integrity_manifest_digest"],
+                speechTokenizerDigest: effectiveStringFlags["model_identity_speech_tokenizer_digest"],
+                runtimeProfileSignature: effectiveStringFlags["qwen3_runtime_profile_signature"],
                 nativeLoadCapabilityProfile: loadCapabilityProfile.rawValue,
                 fixtureDigest: fixtureDigest
             ),

@@ -2642,6 +2642,27 @@
       "notes": "The deterministic remediation is complete. New schema-v2 plans derive each eight-digit narrowing token from the frozen source identity, control-contract digest, take ID, and salt; the token never authorizes mutation. XCUITest initially compared the exact full plan-bound script to the labeled History row action, but run ios-xcui-control-audit-20260903-164806-affcc06a proved that production correctly truncates long row previews to 60 characters. The corrected guard derives exact row identifiers from the narrowed collection, opens each genuine read-only player, and requires its full accessible transcript to equal the frozen plan before cleanup, seed pin/unpin, restoration, or deletion; zero, duplicate, or colliding matches fail before any action. The exact ICA-09 retained schema-v1 plan keeps its original sequential-token allocator and validates through a digest-allowlisted, byte-exact compatibility path with self-rehash tamper rejection. Sixty-one focused control-audit/startup fixtures, a 201-row schema-v2 transport round trip, and generic iOS compilation pass. The corrected contract fixtures pass. Closure still requires a fresh physical-device generation campaign from row 1 under the then-current committed source identity."
     },
     {
+      "id": "ICA-15",
+      "plan": "ios-control-audit-2026-08",
+      "title": "P1 — bound deterministic CustomVoice over-continuation without truncating valid speech",
+      "status": "in-flight",
+      "gate": "Preserve the exact custom-005 Eric, Calm Strong, Italian, Consistent request and independently reproduce its sampled-output failure across warm/cold and streaming/non-streaming paths. The retained codec traces, full and incremental decoder replays, final model counters, EOS/token-cap state, AudioQC, memory, and publication outcome must identify the first divergent layer. Evaluate any continuation-budget candidate on a pre-registered representative CustomVoice corpus spanning script lengths, languages, deliveries, speakers, seeds, and both output modes. A production change qualifies only if it prevents the reproduced pathological continuation without converting valid speech to token-cap/incomplete failures, worsening WER/CER or delivery evidence, changing sampling defaults, or weakening mandatory QC. If no candidate qualifies, preserve fail-closed rejection and explicit user-controlled retry; never trim, silently regenerate, or substitute a seed.",
+      "sourceOfTruth": [
+        "Sources/QwenVoiceCore/GenerationOutputAdapter.swift",
+        "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
+        "config/ios-startup-reliability-result-schema-v2.json",
+        "scripts/ios_startup_reliability.py",
+        "config/audio-cadence-qc-contract.json",
+        "docs/reference/ios-device-testing.md"
+      ],
+      "evidence": [
+        "doc:docs/reference/ios-control-audit-remediation-2026-08-29.md",
+        "doc:docs/reference/ios-device-testing.md"
+      ],
+      "updated": "2026-09-03",
+      "notes": "Current-source run ios-xcui-control-audit-20260903-172247-b8fc963e completed four Custom rows and rejected custom-005 before History publication for a 1.851-second interior gap plus 11.096 seconds of terminal silence. Two independent four-cell diagnostics, ios-startup-reliability-20260903-174346-f3006528 and corrected-source ios-startup-reliability-20260903-180139-ecb380f1, reproduced failure in every warm/cold and streaming/non-streaming cell with healthy memory and no crash delta. Warm/cold trace pairs are byte-identical. Incremental and full Mimi replays reproduce each trace's failure, excluding UI, memory admission, publication, decoder state, and WAV persistence as the first divergence. Finalized terminal diagnostics show 28 target tokens, a 2,048 effective budget, voluntary EOS rather than token-cap termination, and 373 streaming or 547 non-streaming codec frames. The host validator now accepts complete Fast-QC v6 cadence/trailing-silence evidence, and failure telemetry retains the terminal model counters and outcome. No production token-budget change is yet justified: a lower cap could merely turn valid output into an incomplete failure."
+    },
+    {
       "id": "VLR-01",
       "plan": "voice-identity-language-reliability-2026-08",
       "title": "Preserve and characterize private references and clean controls",

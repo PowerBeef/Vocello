@@ -316,6 +316,41 @@ class IOSStartupReliabilityTests(unittest.TestCase):
         with self.assertRaisesRegex(MODULE.ContractError, "incomplete"):
             MODULE.validate_codec_replay(replay, "take.codecReplay", [codec, incremental, full])
 
+    def test_audio_qc_accepts_v6_terminal_silence_and_cadence(self):
+        qc = {
+            "algorithmVersion": 6, "instabilityVerdict": "pass",
+            "writtenOutputVerdict": "fail", "verdict": "fail",
+            "flags": ["terminal_silence:11096ms"], "rmsDBFS": -20.0,
+            "dcOffset": 0.0, "peak": 0.7, "clippedSamples": 0,
+            "hotSamples": 0, "nonFiniteSamples": 0, "clickEvents": 0,
+            "longestSilenceMS": 1851, "longestSilenceStartMS": 12351,
+            "trailingSilenceMS": 11096, "trailingSilenceStartMS": 18743,
+            "durationSeconds": 29.84,
+            "cadence": {
+                "classification": "severe",
+                "reasons": ["single_suspicious_pause", "egregious_terminal_silence"],
+                "expectedPauseCount": 1, "cadencePauseThresholdMS": 350,
+                "suspiciousPauseThresholdMS": 1200, "observedCadencePauseCount": 2,
+                "excessCadencePauseCount": 1, "suspiciousPauseCount": 1,
+                "recordedInteriorPausesMS": [1851, 564],
+                "totalInteriorSilenceMS": 2415, "totalCadenceSilenceMS": 2415,
+                "medianCadencePauseMS": 564, "p90CadencePauseMS": 1851,
+                "cadenceSilenceRatio": 0.08093,
+            },
+            "chunkQC": [],
+        }
+        MODULE.validate_audio_qc(qc, "take.audioQC")
+
+        malformed = json.loads(json.dumps(qc))
+        malformed["cadence"]["cadenceSilenceRatio"] = 1.01
+        with self.assertRaisesRegex(MODULE.ContractError, "cadenceSilenceRatio"):
+            MODULE.validate_audio_qc(malformed, "take.audioQC")
+
+        malformed = json.loads(json.dumps(qc))
+        malformed["trailingSilenceMS"] = -1
+        with self.assertRaisesRegex(MODULE.ContractError, "trailingSilenceMS"):
+            MODULE.validate_audio_qc(malformed, "take.audioQC")
+
     def test_v2_failed_codec_replay_is_typed_and_carries_no_partial_success(self):
         codec = {
             "schemaVersion": 1, "kind": "codec_trace", "sha256": "a" * 64,

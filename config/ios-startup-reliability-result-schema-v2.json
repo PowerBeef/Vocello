@@ -108,8 +108,30 @@
         "nonFiniteSamples": {"type": "integer", "minimum": 0}, "clickEvents": {"type": "integer", "minimum": 0},
         "longestSilenceMS": {"type": "integer", "minimum": 0}, "firstNonFiniteSample": {"type": ["integer", "null"], "minimum": 0},
         "firstClipSample": {"type": ["integer", "null"], "minimum": 0}, "longestSilenceStartMS": {"type": ["integer", "null"], "minimum": 0},
+        "trailingSilenceMS": {"type": "integer", "minimum": 0}, "trailingSilenceStartMS": {"type": ["integer", "null"], "minimum": 0},
         "durationSeconds": {"type": "number", "minimum": 0},
+        "cadence": {"oneOf": [{"$ref": "#/$defs/audioCadenceQC"}, {"type": "null"}]},
         "chunkQC": {"type": ["array", "null"], "items": {"$ref": "#/$defs/audioQCChunk"}}
+      }
+    },
+    "audioCadenceQC": {
+      "type": "object", "additionalProperties": false,
+      "required": ["classification", "reasons", "expectedPauseCount", "cadencePauseThresholdMS", "suspiciousPauseThresholdMS", "observedCadencePauseCount", "excessCadencePauseCount", "suspiciousPauseCount", "recordedInteriorPausesMS", "totalInteriorSilenceMS", "totalCadenceSilenceMS", "medianCadencePauseMS", "p90CadencePauseMS", "cadenceSilenceRatio"],
+      "properties": {
+        "classification": {"enum": ["withinFastGate", "unusual", "severe"]},
+        "reasons": {"type": "array", "uniqueItems": true, "items": {"enum": ["excess_cadence_pauses", "single_suspicious_pause", "repeated_suspicious_pauses", "egregious_interior_silence", "egregious_terminal_silence"]}},
+        "expectedPauseCount": {"type": "integer", "minimum": 0},
+        "cadencePauseThresholdMS": {"type": "integer", "minimum": 0},
+        "suspiciousPauseThresholdMS": {"type": "integer", "minimum": 0},
+        "observedCadencePauseCount": {"type": "integer", "minimum": 0},
+        "excessCadencePauseCount": {"type": "integer", "minimum": 0},
+        "suspiciousPauseCount": {"type": "integer", "minimum": 0},
+        "recordedInteriorPausesMS": {"type": "array", "maxItems": 64, "items": {"type": "integer", "minimum": 0}},
+        "totalInteriorSilenceMS": {"type": "integer", "minimum": 0},
+        "totalCadenceSilenceMS": {"type": "integer", "minimum": 0},
+        "medianCadencePauseMS": {"type": ["integer", "null"], "minimum": 0},
+        "p90CadencePauseMS": {"type": ["integer", "null"], "minimum": 0},
+        "cadenceSilenceRatio": {"type": "number", "minimum": 0, "maximum": 1}
       }
     },
     "codecReplay": {

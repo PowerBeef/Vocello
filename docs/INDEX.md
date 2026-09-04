@@ -85,6 +85,7 @@ Review when: target or scheme changes; runtime topology; telemetry schema; test 
 - [`docs/reference/quality-promotion.md`](../docs/reference/quality-promotion.md)
 - [`docs/reference/qwen3-tts-guide.md`](../docs/reference/qwen3-tts-guide.md)
 - [`docs/reference/qwen3-tts-prompting-guide.md`](../docs/reference/qwen3-tts-prompting-guide.md)
+- [`docs/reference/release-3-0-candidate-notes.md`](../docs/reference/release-3-0-candidate-notes.md)
 - [`docs/reference/release-first-execution-2026-09.md`](../docs/reference/release-first-execution-2026-09.md)
 - [`docs/reference/repository-self-verification.md`](../docs/reference/repository-self-verification.md)
 - [`docs/reference/roadmap-2026-08.md`](../docs/reference/roadmap-2026-08.md)

@@ -22,8 +22,8 @@ configs:
 # and App Store Connect rejected the embedded frameworks (upload error 90057).
 settings:
   base:
-    MARKETING_VERSION: "2.4.0"
-    CURRENT_PROJECT_VERSION: "23"
+    MARKETING_VERSION: "3.0.0"
+    CURRENT_PROJECT_VERSION: "24"
     LOCALIZATION_PREFERS_STRING_CATALOGS: YES
     STRING_CATALOG_GENERATE_SYMBOLS: YES
     SWIFT_EMIT_LOC_STRINGS: YES

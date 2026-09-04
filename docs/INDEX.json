@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "generated": "python3 scripts/doc_metadata.py rebuild-index",
   "note": "Machine-readable documentation map. Query this instead of globbing docs/.",
-  "annotatedDocuments": 102,
+  "annotatedDocuments": 103,
   "unannotatedDocuments": 0,
   "documents": [
     {
@@ -821,6 +821,21 @@
         "Sources/QwenVoiceCore/EmotionPreset.swift",
         "scripts/delivery_experiment.py",
         "scripts/delivery_experiment_runner.py"
+      ]
+    },
+    {
+      "path": "docs/reference/release-3-0-candidate-notes.md",
+      "status": "active",
+      "owner": "release-qa",
+      "summary": "Prepared 3.0.0 candidate notes and reviewer test focus; not a publication announcement or candidate acceptance record.",
+      "sourceOfTruth": [
+        "project.yml",
+        "config/roadmap.json",
+        "config/public-product-facts.json",
+        "Sources/QwenVoiceCore/EmotionPreset.swift",
+        "Sources/ViewModels/VoiceDesignCoordinator.swift",
+        "Sources/SharedSupport/Services/GenerationPersistence.swift",
+        "scripts/cli_package.py"
       ]
     },
     {

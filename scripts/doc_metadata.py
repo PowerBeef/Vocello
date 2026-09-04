@@ -155,13 +155,17 @@ def derive_facts(root: pathlib.Path) -> dict:
     )
     speakers = len(contract.get("speakerMetadata") or {})
 
-    # project.yml is the version authority; public-product-facts.json is checked
-    # against it elsewhere, so deriving from the manifest skips the intermediary.
+    # Build identity and the published stable release can differ during candidate
+    # preparation. Public currency claims must never advertise the unpublished build.
     manifest = (root / "project.yml").read_text(encoding="utf-8")
     version_match = re.search(r'MARKETING_VERSION:\s*"([0-9]+\.[0-9]+\.[0-9]+)"', manifest)
     if not version_match:
         raise ValueError("MARKETING_VERSION not found in project.yml")
     version = version_match.group(1)
+    public = json.loads((root / "config/public-product-facts.json").read_text(encoding="utf-8"))
+    stable_version = public["stableMacRelease"]["version"]
+    if not isinstance(stable_version, str) or not re.fullmatch(r"\d+\.\d+\.\d+", stable_version):
+        raise ValueError("invalid stable release version in public-product-facts.json")
 
     # The canonical benchmark machine is flagged in the profile registry itself,
     # so the chip name is a derived fact rather than a policy restatement.
@@ -206,6 +210,10 @@ def derive_facts(root: pathlib.Path) -> dict:
                 "source": "Sources/Resources/qwenvoice_contract.json",
             },
             "stableMacReleaseVersion": {
+                "value": stable_version,
+                "source": "config/public-product-facts.json",
+            },
+            "currentBuildVersion": {
                 "value": version,
                 "source": "project.yml",
             },

@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import plistlib
+import signal
 import subprocess
 import sys
 import tempfile
@@ -192,6 +193,165 @@ class CLIPackageTests(unittest.TestCase):
             with self.subTest(failure=failure), mock.patch.object(package, "command", side_effect=changed):
                 with self.assertRaises(ValueError):
                     package.smoke(self.output, self.release)
+
+    def test_qualification_runs_all_modes_serially_and_redacts_private_paths(self):
+        model_store = self.root / "model store"
+        model_store.mkdir()
+        reference = self.root / "private reference.wav"
+        reference.write_bytes(b"RIFF" + b"\0" * 4 + b"WAVE" + b"fixture audio" * 8)
+        calls = []
+
+        def generate(argv, cwd, environment, timeout):
+            calls.append((list(argv), cwd, dict(environment), timeout))
+            mode = argv[argv.index("--mode") + 1]
+            language = argv[argv.index("--language") + 1]
+            output = Path(argv[argv.index("--out") + 1])
+            output.write_bytes(b"RIFF" + b"\0" * 4 + b"WAVE" + b"generated audio" * 8)
+            return {
+                "audioPath": str(output),
+                "audioQC": {"verdict": "pass"},
+                "durationSeconds": 1.25,
+                "finalModelLanguage": language,
+                "finishReason": "eos",
+                "mode": mode,
+                "modelID": f"pro_{mode}_speed",
+                "variant": "speed",
+            }
+
+        def cancel(argv, cwd, environment, timeout):
+            calls.append((list(argv), cwd, dict(environment), timeout))
+            return {"generationStartObserved": True, "exitStatus": 130}
+
+        with mock.patch.object(package, "command", return_value="") as failure_runner:
+            report = package.qualify(
+                self.output, self.release, model_store, reference,
+                generation_runner=generate, cancellation_runner=cancel,
+            )
+
+        self.assertEqual([row["mode"] for row in report["runs"]], ["custom", "design", "clone"])
+        self.assertEqual(report["cancellation"]["exitStatus"], 130)
+        self.assertTrue(report["serialExecution"])
+        self.assertEqual(failure_runner.call_count, 2)
+        self.assertNotIn(str(self.root), json.dumps(report))
+        self.assertTrue(all("QWENVOICE_DEBUG" not in call[2] for call in calls))
+        self.assertTrue(all(call[3] == 900 for call in calls))
+        self.assertNotIn("--transcript", calls[2][0])
+        self.assertEqual(report["runs"][0]["requestedSeed"], "30000001")
+        self.assertNotIn("seed", report["runs"][0])
+
+    def test_qualification_retains_failure_and_refuses_report_reuse(self):
+        model_store = self.root / "model store"
+        model_store.mkdir()
+        reference = self.root / "reference.wav"
+        reference.write_bytes(b"RIFF" + b"\0" * 4 + b"WAVE" + b"fixture audio" * 8)
+        transcript = self.root / "private.txt"
+        transcript.write_text("The reviewed reference words.")
+        report = self.root / "qualification.json"
+
+        def fail(argv, _cwd, _environment, _timeout):
+            self.assertEqual(argv[argv.index("--transcript") + 1], transcript.read_text())
+            raise ValueError("private raw error")
+
+        # Reach the Clone cell after two valid synthetic predecessors.
+        def generate(argv, cwd, environment, timeout):
+            mode = argv[argv.index("--mode") + 1]
+            if mode == "clone":
+                return fail(argv, cwd, environment, timeout)
+            output = Path(argv[argv.index("--out") + 1])
+            output.write_bytes(b"RIFF" + b"\0" * 4 + b"WAVE" + b"audio" * 32)
+            return {"audioPath": str(output), "audioQC": {"verdict": "pass"},
+                    "durationSeconds": 1, "finalModelLanguage": argv[argv.index("--language") + 1],
+                    "finishReason": "eos", "mode": mode, "variant": "speed", "modelID": f"pro_{mode}_speed"}
+
+        with self.assertRaises(ValueError):
+            package.qualify(self.output, self.release, model_store, reference,
+                            clone_transcript=transcript, report=report, generation_runner=generate)
+        saved = json.loads(report.read_text())
+        self.assertEqual(saved["status"], "failed")
+        self.assertEqual(saved["stage"], "clone")
+        self.assertEqual(len(saved["runs"]), 2)
+        self.assertTrue((report.parent / saved["artifactDirectory"] / "qualification outputs/custom.wav").is_file())
+        for private in (str(self.root), "private raw error", transcript.read_text()):
+            self.assertNotIn(private, report.read_text())
+        with self.assertRaisesRegex(ValueError, "overwrite"):
+            package.qualify(self.output, self.release, model_store, reference, report=report,
+                            generation_runner=generate)
+
+    def test_cancellation_observes_unterminated_progress_line(self):
+        code = "import os,signal,time; signal.signal(signal.SIGINT, lambda *_: os._exit(130)); os.write(2,b'generating (fixture)'); time.sleep(30)"
+        result = package._run_qualification_cancellation(
+            [sys.executable, "-c", code], self.root, dict(os.environ), 3)
+        self.assertEqual(result, {"generationStartObserved": True, "exitStatus": 130})
+
+    def test_partial_progress_timeout_terminates_process(self):
+        with self.assertRaisesRegex(ValueError, "did not reach generation"):
+            package._run_qualification_cancellation(
+                [sys.executable, "-c", "import os,time; os.write(2,b'loading'); time.sleep(30)"],
+                self.root, dict(os.environ), 0.2)
+
+    def test_generation_timeout_cleans_up_process_group(self):
+        process = mock.Mock(pid=987654)
+        process.communicate.side_effect = [subprocess.TimeoutExpired("private", 1), ("", "")]
+        with mock.patch.object(package.subprocess, "Popen", return_value=process), \
+             mock.patch.object(package.os, "killpg") as kill:
+            with self.assertRaises(subprocess.TimeoutExpired):
+                package._run_qualification_generation(["fixture"], self.root, {}, 1)
+        kill.assert_called_once_with(process.pid, signal.SIGKILL)
+        self.assertEqual(process.communicate.call_count, 2)
+
+    def test_qualification_rejects_hard_qc_failure(self):
+        model_store = self.root / "model store"
+        model_store.mkdir()
+        reference = self.root / "reference.wav"
+        reference.write_bytes(b"RIFF" + b"\0" * 4 + b"WAVE" + b"fixture audio" * 8)
+
+        def failed_qc(argv, _cwd, _environment, _timeout):
+            output = Path(argv[argv.index("--out") + 1])
+            output.write_bytes(b"RIFF" + b"\0" * 4 + b"WAVE" + b"generated audio" * 8)
+            return {
+                "audioPath": str(output), "audioQC": {"verdict": "fail"},
+                "durationSeconds": 1.0, "finalModelLanguage": "english",
+                "finishReason": "eos", "mode": "custom",
+                "modelID": "pro_custom_speed", "variant": "speed",
+            }
+
+        with self.assertRaisesRegex(ValueError, "QC verdict"):
+            package.qualify(
+                self.output, self.release, model_store, reference,
+                generation_runner=failed_qc,
+                cancellation_runner=lambda *_args: {},
+            )
+
+    def test_qualification_rejects_warning_or_wrong_model_identity(self):
+        model_store = self.root / "model store"
+        model_store.mkdir()
+        reference = self.root / "reference.wav"
+        reference.write_bytes(b"RIFF" + b"\0" * 4 + b"WAVE" + b"fixture audio" * 8)
+
+        def result_with(*, verdict="pass", model_id="pro_custom_speed"):
+            def generate(argv, _cwd, _environment, _timeout):
+                output = Path(argv[argv.index("--out") + 1])
+                output.write_bytes(b"RIFF" + b"\0" * 4 + b"WAVE" + b"generated audio" * 8)
+                return {
+                    "audioPath": str(output), "audioQC": {"verdict": verdict},
+                    "durationSeconds": 1.0, "finalModelLanguage": "english",
+                    "finishReason": "eos", "mode": "custom",
+                    "modelID": model_id, "variant": "speed",
+                }
+            return generate
+
+        with self.assertRaisesRegex(ValueError, "passing QC verdict"):
+            package.qualify(
+                self.output, self.release, model_store, reference,
+                generation_runner=result_with(verdict="warn"),
+                cancellation_runner=lambda *_args: {},
+            )
+        with self.assertRaisesRegex(ValueError, "identity mismatch"):
+            package.qualify(
+                self.output, self.release, model_store, reference,
+                generation_runner=result_with(model_id="unexpected_model"),
+                cancellation_runner=lambda *_args: {},
+            )
 
     def test_subprocess_failure_is_redacted_and_timeout_not_waived(self):
         result = subprocess.CompletedProcess([], 1, "private output", "private path")

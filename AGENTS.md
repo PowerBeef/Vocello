@@ -16,9 +16,8 @@ The historical `QwenVoice` checkout contains macOS/XPC and iOS/in-process apps, 
 automation, benchmarks, and a React/Vite site. No bundled weights or cloud inference;
 approved assets download from Hugging Face through the production catalog.
 
-Derive public facts from `project.yml`, `config/public-product-facts.json`, and the benchmark
-catalog. Check them before quoting version, hardware, preset, or speaker counts. Release only on
-an explicit maintainer request.
+Check version, hardware and counts against `project.yml`, `config/public-product-facts.json` and benchmarks.
+`candidateRelease` tracks unpublished source; public links use `stableMacRelease`. Release only on explicit request.
 
 Source-of-truth order:
 

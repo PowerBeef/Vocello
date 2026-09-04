@@ -268,6 +268,34 @@ class DocumentationContractTests(unittest.TestCase):
         )
         self.assertEqual(DOCUMENTATION.validate_readme_public_contract(self.root), [])
 
+    def test_published_release_identity_remains_backward_compatible(self) -> None:
+        public = {"stableMacRelease": {"version": "2.4.0", "tag": "v2.4.0"}}
+        self.assertEqual(DOCUMENTATION.validate_release_identity(public, '  MARKETING_VERSION: "2.4.0"\n'), [])
+        self.assertTrue(DOCUMENTATION.validate_release_identity(public, '  MARKETING_VERSION: "3.0.0"\n'))
+
+    def test_unpublished_candidate_does_not_change_public_download_version(self) -> None:
+        public = {"stableMacRelease": {"version": "2.4.0", "tag": "v2.4.0"},
+                  "candidateRelease": {"version": "3.0.0", "tag": "v3.0.0", "distributionStatus": "unpublished"}}
+        self.assertEqual(DOCUMENTATION.validate_release_identity(public, '  MARKETING_VERSION: "3.0.0"\n'), [])
+        self.assertEqual(public["stableMacRelease"]["version"], "2.4.0")
+        self.assertTrue(DOCUMENTATION.validate_release_identity(public, '  MARKETING_VERSION: "3.0.1"\n'))
+
+    def test_candidate_rejects_invalid_version_tag_status_or_fields(self) -> None:
+        candidate = {"version": "3.0.0", "tag": "v3.0.0", "distributionStatus": "unpublished"}
+        for invalid in (None, {}, {**candidate, "version": 3}, {**candidate, "version": "3.0"},
+                        {**candidate, "version": "2.4.0", "tag": "v2.4.0"},
+                        {**candidate, "version": "2.3.0", "tag": "v2.3.0"},
+                        {**candidate, "tag": "v4.0.0"}, {**candidate, "distributionStatus": "published"},
+                        {**candidate, "bypass": True}):
+            with self.subTest(candidate=invalid):
+                public = {"stableMacRelease": {"version": "2.4.0", "tag": "v2.4.0"}, "candidateRelease": invalid}
+                self.assertTrue(DOCUMENTATION.validate_release_identity(public, '  MARKETING_VERSION: "3.0.0"\n'))
+
+    def test_release_identity_rejects_duplicate_or_missing_project_version(self) -> None:
+        public = {"stableMacRelease": {"version": "2.4.0", "tag": "v2.4.0"}}
+        for project in ('', 'MARKETING_VERSION: "2.4.0"\nMARKETING_VERSION: "2.4.0"\n'):
+            self.assertTrue(DOCUMENTATION.validate_release_identity(public, project))
+
     def test_historical_snapshot_paths_are_excluded_from_active_inventory(self) -> None:
         active = self.write(
             "README.md",

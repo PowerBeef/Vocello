@@ -17,7 +17,7 @@ sourceOfTruth:
 > **Distribution checkpoint (2026-09-04):** RF-08 adds CLI packaging to the existing macOS
 > release workflow for the upcoming 3.0.0 programme. No new public CLI release is implied;
 > signed/notarized real-generation qualification remains under RF-10/F-17. The current configured
-> binary version remains owned by `project.yml` until candidate freeze.
+> source identity is 3.0.0/build 24 in `project.yml`; it is not a published or frozen candidate.
 
 `vocello` is a headless macOS command-line surface over the same in-process MLX engine the app uses.
 It serves two roles:
@@ -62,9 +62,41 @@ files; any present built catalog must match the source before staging.
 `verify_packaged_dmg.sh … --include-cli` also verifies the signed/stapled CLI DMG, copies its folder
 to a path containing spaces, and runs model-free discovery from an unrelated working directory.
 Its command-bound `cli-package-verification.json` is explicitly **not** all-mode generation,
-cancellation, memory, or audio-quality acceptance. Those checks use the copied, signed candidate
-under RF-10, never the development binary. The existing two-argument app-only verifier remains
-available for historical candidates; the current release workflow requires both DMGs.
+cancellation, memory, or audio-quality acceptance. The opt-in `qualify` command supplies that
+operator check against an already copied payload:
+
+```sh
+python3 scripts/cli_package.py qualify \
+  --directory "/path with spaces/Vocello CLI" \
+  --version 3.0.0 --build <unused-build> --commit <exact-sha> \
+  --model-store "/existing/model/store" \
+  --clone-reference "/test-owned/reference.wav" \
+  --report build/artifacts/macos/release/cli-generation-qualification.json
+```
+
+It first revalidates every packaged byte, then runs Built-in English, French Voice Design, and
+English Clone serially with fixed seeds and the Speed models. Clone uses audio-only conditioning
+unless `--clone-transcript-file /path/to/reviewed.txt` supplies the actual reference transcript;
+the qualifier never invents one. Each row must return the exact model,
+language, output path, finite positive duration, normal EOS, RIFF/WAVE bytes, and a strict QC `pass`.
+Seed and streaming fields are explicitly **requested**, not claimed observed engine receipts.
+It then interrupts
+a live Built-in take only after observing generation start, requires exit 130, removes any partial
+output, and verifies the public unknown-command and invalid-mode exits. The isolated runtime links
+only to an existing operator-provided model store; it downloads nothing. Its privacy-safe report
+contains digests, sizes, timings, public identities, and verdicts—not prompts, transcripts, audio,
+or absolute paths—and carries `publicationAuthority: none`. The relative `artifactDirectory`
+points to retained WAVs below the report's ignored directory. Successful rows and the active stage
+are written atomically before the next subprocess; failure or interruption preserves that record
+and audio, with sanitized failure types. Reusing a report is refused: use a new report path for
+each attempt. Timeouts terminate and await the process group before any next model can launch;
+progress detection handles output without a newline. This is package execution/QC proof, not a
+perceptual Clone-fidelity or multilingual accuracy claim.
+
+RF-10 runs this check on the copied, signed candidate. Development/ad-hoc qualification can diagnose
+the packaging contract but cannot substitute for Developer ID, notarization, or candidate evidence.
+The existing two-argument app-only verifier remains available for historical candidates; the current
+release workflow requires both DMGs.
 
 The CLI target embeds `project.yml`'s `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` in its
 Mach-O Info.plist section. `vocello --version`, `vocello version`, and `vocello -v` therefore share

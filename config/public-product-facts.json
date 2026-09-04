@@ -7,6 +7,11 @@
     "minimumOS": "macOS 26.0",
     "distribution": "signed-notarized-dmg"
   },
+  "candidateRelease": {
+    "version": "3.0.0",
+    "tag": "v3.0.0",
+    "distributionStatus": "unpublished"
+  },
   "fallbackMacRelease": {
     "version": "1.2.3",
     "tag": "v1.2.3",

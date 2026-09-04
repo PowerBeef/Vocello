@@ -378,6 +378,33 @@ def benchmark_baseline_status(root: Path, platform: str) -> bool:
     return False
 
 
+def validate_release_identity(public: dict, project: str) -> list[str]:
+    """Keep published downloads truthful while preparing an explicitly unpublished version."""
+    errors: list[str] = []
+    stable = public.get("stableMacRelease", {})
+    version = stable.get("version")
+    if not isinstance(version, str) or not re.fullmatch(r"\d+\.\d+\.\d+", version):
+        return ["public-product-facts: invalid stable release version"]
+    if stable.get("tag") != f"v{version}":
+        errors.append("public-product-facts: stable tag/version mismatch")
+    candidate = public.get("candidateRelease")
+    if "candidateRelease" in public:
+        if not isinstance(candidate, dict) or set(candidate) != {"version", "tag", "distributionStatus"}:
+            return errors + ["public-product-facts: invalid candidate release fields"]
+        candidate_version = candidate.get("version")
+        if not isinstance(candidate_version, str) or not re.fullmatch(r"\d+\.\d+\.\d+", candidate_version):
+            return errors + ["public-product-facts: invalid candidate version"]
+        if (candidate.get("tag") != f"v{candidate_version}"
+                or candidate.get("distributionStatus") != "unpublished"
+                or tuple(map(int, candidate_version.split("."))) <= tuple(map(int, version.split(".")))):
+            errors.append("public-product-facts: candidate must be unpublished, newer than stable, and tag-matched")
+        version = candidate_version
+    configured = re.findall(r'^\s*MARKETING_VERSION:\s*"([^"\n]+)"\s*$', project, re.M)
+    if configured != [version]:
+        errors.append("public-product-facts: project version must exactly match the declared candidate or stable release")
+    return errors
+
+
 def validate_facts(root: Path) -> list[str]:
     errors: list[str] = []
     public = load_json(root / PUBLIC_FACTS_PATH)
@@ -413,8 +440,7 @@ def validate_facts(root: Path) -> list[str]:
     if not models.get("models") or not models.get("speakers"):
         errors.append("qwenvoice_contract.json: public model/speaker contract is empty")
     version = public["stableMacRelease"]["version"]
-    if f'MARKETING_VERSION: "{version}"' not in project:
-        errors.append("public-product-facts stable Mac version differs from project.yml")
+    errors.extend(validate_release_identity(public, project))
     readme = (root / "README.md").read_text(encoding="utf-8")
     website = "\n".join(
         path.read_text(encoding="utf-8")

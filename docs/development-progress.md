@@ -66,9 +66,11 @@ their authority; research and broad harness/runtime redesign are deferred. No pu
 authorized by this implementation checkpoint.
 
 **The next release is 3.0.0, not 2.5.0**, by maintainer direction on September 4. The shared
-iOS/macOS/CLI version and pending App Store record will be reconciled at candidate freeze;
-the build number remains separately collision-checked. This planning decision does not change
-the currently configured binary version or authorize an account mutation or publication.
+iOS/macOS/CLI source identity is now **3.0.0/build 24**, set through `project.yml` and project
+regeneration. The September 4 read-only preflight found zero matching builds with complete
+pagination. This is not a reservation: repeat collision validation before archive. The live App
+Store version still requires separately authorized reconciliation; no account mutation or
+publication occurred.
 
 F-15 source correction now preserves the full macOS Design draft and snapshots variation before
 asynchronous startup. Production-coordinator tests and adjacent request-factory tests passed
@@ -133,8 +135,9 @@ The guarded inventory also confirms the existing third-party-content declaration
 app/version/review/age-rating surfaces. It remains incomplete because pricing/availability is not
 initialized/readable, accessibility declarations are empty, and App Privacy publication,
 agreements/tax/banking, DSA, regional compliance, and qualified privacy/rights decisions require
-owner/web review. The configured 2.4.0/build 23 is not reusable; 3.0.0's unused build number remains
-an RF-09 freeze decision. Raw account responses and identifiers remain untracked.
+owner/web review. The formerly configured 2.4.0/build 23 is not reusable. RF-09 now selects
+3.0.0/build 24 with a passing read-only collision check. Raw account responses and identifiers
+remain untracked.
 
 RF-07 now has source implementation of immediate sequenced stage attachments, explicit encoding
 failure, early player identity, separately observed selections, pause/play/scrub proof, History
@@ -143,7 +146,8 @@ exits. Shard success is separate from whole-campaign completion. Unrepresented i
 or missing restoration stop resume instead of guessing ownership. New failure fixtures and the
 generic device-SDK XCUITest build-for-testing passed (`rf07-ui-compile.log` under foundation
 artifacts). This compile does not execute a test; physical pilot acceptance remains pending.
-No device was contacted. RF-08 standalone CLI packaging is the next independent engineering step.
+No device was contacted. RF-08's source mechanism is now implemented below; RF-09 host candidate
+preparation is the current phone-independent step.
 
 **Release-first source checkpoint:** commit `089328d3` passed the guarded project gate with all
 1,450 Python tests and was pushed to `origin/main`. This records the product repairs and RF-07;
@@ -166,10 +170,46 @@ The subsequent complete ad-hoc DMG round trip also passed: the 11,969,269-byte a
 copied to a path with spaces, validated 32 files/identity/linkage, ran discovery, detached cleanly,
 and retained its untracked report under `rf08-cli-dmg-roundtrip-20260904`. It remains unsigned-
 distribution/development evidence and performed no generation.
-RF-08/F-17 remain in-flight for signed DMG and all-mode/cancellation qualification under RF-10.
-No model, phone, App Store mutation, signing credential, notarization service, or publication was used.
-The coherent RF-08 deterministic checkpoint passed all project-input checks and 1,468 Python tests,
-including the 34 focused package/release-evidence tests plus runtime-security and supply-chain rules.
+
+The same copied payload then passed the new opt-in serial generation qualifier using existing local
+Speed models: Built-in English (3.28 s), French Design (7.68 s), and English Clone (4.08 s) all
+returned the exact model/language identity and strict audio-QC PASS. Cancellation was issued only
+after a real generation-start event and exited 130; the public invalid-mode/unknown-command exits
+remained 1/2. The privacy-safe ignored report records output digests rather than paths, audio, text,
+or transcripts and has no publication authority. This was the ad-hoc 2.4.0/build 23 artifact at
+source `089328d3`, not a signed/notarized 3.0.0 candidate. RF-08/F-17 therefore remain in-flight for
+the candidate repetition under RF-10, while the package-generation mechanism is now live-proven.
+No model was downloaded or changed, and no phone, App Store mutation, signing credential,
+notarization service, or publication was used.
+The coherent RF-08 qualification checkpoint passed all project-input checks and 1,472 Python tests,
+including 21 focused CLI-package tests plus runtime-security and supply-chain rules. The run refreshed
+and revalidated the derived catalogs before recording the exact-tree commit-gate PASS marker.
+
+The resumed qualifier now uses audio-only Clone unless supplied the actual reference transcript;
+the earlier hardcoded transcript is removed. That historical Clone result proves execution/QC,
+not perceptual reference fidelity. Current reports label seed/streaming as requested, require
+normal EOS, preserve WAVs and atomic partial results on failure, refuse overwrite, and terminate/
+await process groups on timeout. Newline-free progress cannot stall cancellation. All 25 focused
+package fixtures pass. RF-09 now prepares the shared 3.0.0/build 24 identity; the full host
+checkpoint and signed-candidate qualification are separate milestones. The iPhone remains unused.
+
+**RF-09 host verification passed:** full project inputs and 1,481 Python tests (105 + 1,376),
+all macOS core/transport/owned-runtime suites (`mac-test-20260904-160540`), macOS app build,
+generic iOS app and logic-target builds, CLI build with `vocello 3.0.0`, and website check including
+both production-browser layouts. Logs are retained under ignored macOS release artifacts in
+`rf09-host-checkpoint-20260904`. The initial gate caught stable-versus-candidate identity,
+version-bound attribution, and guidance-budget issues; all were corrected without weakening gates.
+Existing advisory documentation/roadmap currency warnings remain, not hidden or called closed.
+Public download facts remain 2.4.0; candidate identity is separately validated and unpublished.
+The prepared [candidate notes](reference/release-3-0-candidate-notes.md) pass the release-notes
+structure check but are not an announcement or signed-candidate proof.
+
+**Next boundary:** validate/commit this coherent documentation checkpoint, then observe exact-SHA
+CI and Security. A verified tag/signed-candidate workflow and live App Store version reconciliation
+need explicit authorization; RF-02's qualified rights/account decisions remain external. After
+candidate production, RF-10 qualifies the signed desktop/CLI. The next phone session starts with
+RF-06 scoped codec/rejected-audio collection and RF-07's small physical pilot, not an inherited
+201-take cursor. RF-11/RF-12 and the original failed/unverified device evidence remain unchanged.
 
 **Later same-source device evidence supersedes the earlier unrun checkpoint below.** The
 `065457-e2ec8911` campaign retained seven correlated passes and marker-free `custom-008`

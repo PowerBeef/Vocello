@@ -1,22 +1,29 @@
 #!/usr/bin/env python3
 """Stage/seal and smoke-check the CLI payload used by the existing macOS release lane.
 
-No model installation, generation, publication, or shell-profile modification. The manifest
-is an integrity inventory, not independent signing or quality-promotion authority.
+Model generation runs only through the opt-in qualify command. No model installation,
+publication, or shell-profile modification. The manifest is an integrity inventory,
+not independent signing or quality-promotion authority.
 """
 from __future__ import annotations
 
 import argparse
+from contextlib import contextmanager
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import plistlib
 import re
+import select
 import shutil
+import signal
 import stat
 import subprocess
 import tempfile
+import time
+from typing import Callable
 
 ROOT = Path(__file__).resolve().parents[1]
 BUNDLES = ("mlx-swift_Cmlx.bundle", "swift-transformers_Hub.bundle",
@@ -227,9 +234,299 @@ def smoke(directory: Path, expected: dict) -> dict:
             "generationQualification": "not-performed"}
 
 
+def _qualification_environment(temporary: str) -> dict[str, str]:
+    """Build a release-like environment without development runtime overrides."""
+
+    return {
+        "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+        **{key: os.environ[key] for key in ("HOME",) if key in os.environ},
+        "TMPDIR": temporary,
+        "LANG": "en_US.UTF-8",
+    }
+
+
+def _run_qualification_generation(
+    argv: list[str], cwd: Path, environment: dict[str, str], timeout: int = 900
+) -> dict:
+    process = subprocess.Popen(
+        argv, cwd=cwd, env=environment, stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+        start_new_session=True,
+    )
+    try:
+        stdout, _stderr = process.communicate(timeout=timeout)
+    except BaseException:
+        _stop_qualification_process(process)
+        raise
+    if process.returncode != 0:
+        raise ValueError("CLI qualification generation failed")
+    try:
+        payload = json.loads(stdout)
+    except json.JSONDecodeError as error:
+        raise ValueError("CLI qualification generation returned invalid JSON") from error
+    if not isinstance(payload, dict):
+        raise ValueError("CLI qualification generation returned a non-object")
+    return payload
+
+
+def _stop_qualification_process(process: subprocess.Popen) -> None:
+    try:
+        os.killpg(process.pid, signal.SIGKILL)
+    except ProcessLookupError:
+        pass
+    process.communicate()
+
+
+def _run_qualification_cancellation(
+    argv: list[str], cwd: Path, environment: dict[str, str], timeout: int = 900
+) -> dict:
+    process = subprocess.Popen(
+        argv, cwd=cwd, env=environment, stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        start_new_session=True,
+    )
+    deadline = time.monotonic() + timeout
+    generation_started = False
+    try:
+        assert process.stderr is not None and process.stdout is not None
+        pipes = [process.stderr, process.stdout]
+        pending = b""
+        output = bytearray()
+        while time.monotonic() < deadline:
+            if not pipes:
+                break
+            ready, _, _ = select.select(pipes, [], [], max(0, min(1.0, deadline - time.monotonic())))
+            for pipe in ready:
+                chunk = os.read(pipe.fileno(), 4096)
+                if not chunk:
+                    pipes.remove(pipe)
+                    continue
+                if pipe is process.stdout:
+                    output.extend(chunk)
+                    if len(output) > 65536:
+                        raise ValueError("CLI cancellation probe returned unexpected output")
+                    continue
+                pending = (pending + chunk)[-65536:]
+                if b"generating (" in pending:
+                    generation_started = True
+                    os.killpg(process.pid, signal.SIGINT)
+                    break
+            if generation_started:
+                break
+        if not generation_started:
+            raise ValueError("CLI cancellation probe did not reach generation")
+        stdout, _stderr = process.communicate(timeout=max(1.0, deadline - time.monotonic()))
+    except BaseException:
+        _stop_qualification_process(process)
+        raise
+    if process.returncode != 130 or output.strip() or stdout.strip():
+        raise ValueError("CLI cancellation probe did not terminate cleanly")
+    return {"generationStartObserved": True, "exitStatus": 130}
+
+
+@contextmanager
+def _qualification_workspace(report: Path | None, state: dict):
+    """Retain operator QA audio and partial results on success, failure or interruption."""
+    if report is None:
+        with tempfile.TemporaryDirectory(prefix="vocello-cli-qualification-") as temporary:
+            yield temporary
+        return
+    if report.exists() or report.is_symlink():
+        raise ValueError("refusing to overwrite a CLI qualification report")
+    report.parent.mkdir(parents=True, exist_ok=True)
+    temporary = tempfile.mkdtemp(prefix="cli-qualification-", dir=report.parent.resolve())
+    state["artifactDirectory"] = Path(temporary).name
+    atomic_json(report, state)
+    try:
+        yield temporary
+    except BaseException as error:
+        state["status"] = "interrupted" if isinstance(error, KeyboardInterrupt) else "failed"
+        state["failureType"] = type(error).__name__
+        atomic_json(report, state)
+        raise
+
+
+def qualify(
+    directory: Path,
+    expected: dict,
+    model_store: Path,
+    clone_reference: Path,
+    *,
+    clone_transcript: Path | None = None,
+    report: Path | None = None,
+    generation_runner: Callable[[list[str], Path, dict[str, str], int], dict] = _run_qualification_generation,
+    cancellation_runner: Callable[[list[str], Path, dict[str, str], int], dict] = _run_qualification_cancellation,
+) -> dict:
+    """Run opt-in serial real-generation checks against a copied CLI payload.
+
+    This is operator QA for an already-produced package. It is deliberately not
+    called by deterministic packaging, CI, signing, notarization, or publication.
+    """
+
+    payload = verify(directory, expected)
+    if model_store.is_symlink() or not model_store.is_dir():
+        raise ValueError("CLI qualification model store must be a real directory")
+    if clone_reference.is_symlink() or not clone_reference.is_file():
+        raise ValueError("CLI qualification clone reference must be a real file")
+    if clone_reference.stat().st_size <= 44 or clone_reference.stat().st_size > 100 * 1024**2:
+        raise ValueError("CLI qualification clone reference is outside bounds")
+    clone_arguments = ["--reference", str(clone_reference.resolve())]
+    if clone_transcript is not None:
+        if clone_transcript.is_symlink() or not clone_transcript.is_file() or clone_transcript.stat().st_size > 65536:
+            raise ValueError("CLI qualification transcript must be a bounded real file")
+        transcript = clone_transcript.read_text(encoding="utf-8").strip()
+        if not transcript:
+            raise ValueError("CLI qualification transcript is empty")
+        clone_arguments += ["--transcript", transcript]
+
+    binary = str((directory / "vocello").resolve())
+    fixed_runs = (
+        {
+            "mode": "custom", "language": "english", "seed": "30000001",
+            "modelID": "pro_custom_speed",
+            "extra": ["--speaker", "aiden", "--delivery-cell", "neutral.normal"],
+            "text": "This packaged voice is running entirely on this Mac.",
+        },
+        {
+            "mode": "design", "language": "french", "seed": "30000002",
+            "modelID": "pro_design_speed",
+            "extra": ["--voice-brief", "Une voix française chaleureuse, claire et posée."],
+            "text": "Cette vérification confirme que la voix française fonctionne localement.",
+        },
+        {
+            "mode": "clone", "language": "english", "seed": "30000003",
+            "modelID": "pro_clone_speed",
+            "extra": clone_arguments,
+            "text": "This clone qualification uses a test-owned reference clip.",
+        },
+    )
+
+    runs: list[dict] = []
+    state = {
+        "schemaVersion": 1, "status": "running", "release": payload["release"],
+        "manifestSHA256": digest(directory / MANIFEST), "runs": runs,
+        "serialExecution": True, "publicationAuthority": "none",
+    }
+    with _qualification_workspace(report, state) as temporary:
+        work = Path(temporary) / "unrelated working folder"
+        runtime = Path(temporary) / "isolated runtime"
+        outputs = Path(temporary) / "qualification outputs"
+        work.mkdir()
+        runtime.mkdir()
+        outputs.mkdir()
+        (runtime / "models").symlink_to(model_store.resolve(), target_is_directory=True)
+        environment = _qualification_environment(temporary)
+        for specification in fixed_runs:
+            state["stage"] = specification["mode"]
+            if report:
+                atomic_json(report, state)
+            output = outputs / f"{specification['mode']}.wav"
+            argv = [
+                binary, "generate", "--mode", specification["mode"],
+                "--variant", "speed", "--language", specification["language"],
+                "--seed", specification["seed"], "--variation", "consistent",
+                "--text", specification["text"], "--out", str(output),
+                "--data-dir", str(runtime), "--json", *specification["extra"],
+            ]
+            result = generation_runner(argv, work, environment, 900)
+            reported = Path(str(result.get("audioPath", ""))).resolve()
+            header = b""
+            if output.is_file():
+                with output.open("rb") as stream:
+                    header = stream.read(12)
+            if (
+                reported != output.resolve()
+                or not output.is_file()
+                or output.stat().st_size <= 44
+                or header[:4] != b"RIFF"
+                or header[8:12] != b"WAVE"
+            ):
+                raise ValueError("CLI qualification output identity is invalid")
+            qc = result.get("audioQC")
+            if not isinstance(qc, dict) or qc.get("verdict") != "pass":
+                raise ValueError("CLI qualification output lacks a passing QC verdict")
+            if (
+                result.get("mode") != specification["mode"]
+                or result.get("variant") != "speed"
+                or result.get("finalModelLanguage") != specification["language"]
+                or result.get("modelID") != specification["modelID"]
+                or type(result.get("durationSeconds")) not in (int, float)
+                or not math.isfinite(result["durationSeconds"])
+                or result["durationSeconds"] <= 0
+                or result.get("finishReason") != "eos"
+            ):
+                raise ValueError("CLI qualification request/result identity mismatch")
+            runs.append({
+                "mode": specification["mode"],
+                "modelID": result.get("modelID"),
+                "language": result.get("finalModelLanguage"),
+                "requestedSeed": specification["seed"],
+                "requestedStreaming": True,
+                "durationSeconds": result["durationSeconds"],
+                "finishReason": result.get("finishReason"),
+                "audioQCVerdict": qc["verdict"],
+                "audioSHA256": digest(output),
+                "audioBytes": output.stat().st_size,
+            })
+            if report:
+                atomic_json(report, state)
+
+        state["stage"] = "cancellation"
+        if report:
+            atomic_json(report, state)
+        cancellation_output = outputs / "cancelled.wav"
+        long_text = " ".join(["The cancellation probe remains intentionally unfinished."] * 80)
+        cancellation = cancellation_runner([
+            binary, "generate", "--mode", "custom", "--variant", "speed",
+            "--speaker", "aiden", "--language", "english", "--seed", "30000004",
+            "--variation", "consistent", "--text", long_text,
+            "--out", str(cancellation_output), "--data-dir", str(runtime), "--json",
+        ], work, environment, 900)
+        if cancellation_output.exists():
+            cancellation["partialOutputRemoved"] = True
+            cancellation_output.unlink()
+        else:
+            cancellation["partialOutputRemoved"] = False
+        state["cancellation"] = cancellation
+        state["stage"] = "failure-exits"
+        if report:
+            atomic_json(report, state)
+
+        # Stable failure exits are part of the public CLI contract and must not
+        # depend on a model launch or a repository checkout.
+        command([binary, "unknown-package-qualification-command"], work, environment, expected=2)
+        command([
+            binary, "generate", "--mode", "invalid", "--text", "Invalid mode fixture.",
+        ], work, environment, expected=1)
+
+    encoded = json.dumps(runs, sort_keys=True, separators=(",", ":")).encode()
+    result = {
+        **state,
+        "status": "passed",
+        "stage": "complete",
+        "release": payload["release"],
+        "manifestSHA256": digest(directory / MANIFEST),
+        "modelStore": "operator-provided-existing",
+        "cloneReference": {
+            "sha256": digest(clone_reference),
+            "bytes": clone_reference.stat().st_size,
+            "transcriptSHA256": digest(clone_transcript) if clone_transcript else None,
+        },
+        "runs": runs,
+        "runsDigest": hashlib.sha256(encoded).hexdigest(),
+        "cancellation": cancellation,
+        "failureExitChecks": {"unknownCommand": 2, "invalidMode": 1},
+        "serialExecution": True,
+        "publicationAuthority": "none",
+    }
+    if report:
+        atomic_json(report, result)
+    return result
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("stage", "seal", "verify", "smoke"))
+    parser.add_argument("command", choices=("stage", "seal", "verify", "smoke", "qualify"))
     parser.add_argument("--directory", required=True, type=Path)
     parser.add_argument("--products", type=Path)
     parser.add_argument("--version")
@@ -237,6 +534,9 @@ def main() -> int:
     parser.add_argument("--commit")
     parser.add_argument("--report", type=Path)
     parser.add_argument("--artifact", type=Path)
+    parser.add_argument("--model-store", type=Path)
+    parser.add_argument("--clone-reference", type=Path)
+    parser.add_argument("--clone-transcript-file", type=Path)
     args = parser.parse_args()
     try:
         if args.command == "stage":
@@ -247,14 +547,25 @@ def main() -> int:
             if not all((args.version, args.build, args.commit)):
                 raise ValueError("exact version/build/commit are required")
             release = identity(args.version, args.build, args.commit)
-            action = {"seal": seal, "verify": verify, "smoke": smoke}[args.command]
-            result = action(args.directory, release)
-            if args.report:
+            if args.command == "qualify":
+                if not args.model_store or not args.clone_reference or not args.report:
+                    raise ValueError("qualification requires model store, clone reference, and report")
+                result = qualify(
+                    args.directory, release,
+                    args.model_store, args.clone_reference,
+                    clone_transcript=args.clone_transcript_file,
+                    report=args.report,
+                )
+            else:
+                action = {"seal": seal, "verify": verify, "smoke": smoke}[args.command]
+                result = action(args.directory, release)
+            if args.report and args.command != "qualify":
                 if args.command != "smoke" or not args.artifact or not args.artifact.is_file():
                     raise ValueError("report requires a smoke check and its DMG artifact")
-                result["artifact"] = {"name": args.artifact.name, "bytes": args.artifact.stat().st_size,
-                                      "sha256": digest(args.artifact)}
-                atomic_json(args.report, result)
+                else:
+                    result["artifact"] = {"name": args.artifact.name, "bytes": args.artifact.stat().st_size,
+                                          "sha256": digest(args.artifact)}
+                    atomic_json(args.report, result)
         print("CLI package " + args.command + ": PASS")
         return 0
     except (ValueError, KeyError, TypeError, OSError, subprocess.SubprocessError):

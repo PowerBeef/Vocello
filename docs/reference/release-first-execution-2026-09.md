@@ -28,7 +28,14 @@ Qualify macOS and a separately downloadable, signed CLI without waiting for iOS-
 The maintainer-selected next release is **3.0.0**, marking the new phase of Vocello across
 iOS, macOS, and the downloadable CLI. This supersedes the original 2.5.0 planning default.
 Reconcile the App Store Connect version and select an unused build number through the existing
-collision preflight before freezing. The current binary version is unchanged until that checkpoint.
+collision preflight before freezing. The September 4 source-preparation checkpoint sets
+`project.yml` to 3.0.0/build 24 and regenerates the project. A complete read-only account preflight
+found zero matching builds. This is not a reservation; repeat it immediately before archive.
+The live App Store version still requires separately authorized reconciliation.
+`candidateRelease` in the public-facts contract is version/tag-matched, explicitly unpublished,
+and strictly newer than `stableMacRelease`; public links and stable-version fact scans do not
+advertise the candidate. Remove the candidate declaration when an authorized publication moves
+the stable release forward. Build numbers remain solely owned by `project.yml`.
 Candidate verification is distinct from implementation completion and from explicit publication
 or submission authorization. No release, account mutation, or legal conclusion follows from a
 source checkpoint.
@@ -195,9 +202,9 @@ permitting empty shaders/data. No Swift resource-lookup change was necessary.
 
 Local report: `cli-packaging-local-20260904.json` in ignored macOS release artifacts; executable
 SHA-256 `8ba1c5a3ef95e5098e26251b320eb17966f0a113a3e026f4bcc8456fc8fa7217`.
-It declares development/internal-diagnostics scope, not candidate acceptance. All-mode generation,
-cancellation, Developer ID/notarized DMG qualification and RF-10 promotion remain open. The
-configured binary is still 2.4.0/build 23 until the separate 3.0.0 candidate-freeze step.
+It declares development/internal-diagnostics scope, not candidate acceptance. The later all-mode
+and cancellation proof below uses that same 2.4.0/build 23 development artifact. Developer ID/
+notarized DMG qualification and RF-10 promotion remain open; current source is 3.0.0/build 24.
 
 The real ad-hoc DMG route then passed independently: a 11,969,269-byte image with SHA-256
 `ad109cb15c610d8964fc3429daac46fab9622ca2e9816b9fd2fc95b88816ca69` attached read-only,
@@ -205,7 +212,52 @@ copied its `Vocello CLI` folder to a path with spaces, repeated all nine model-f
 detached cleanly. The ignored proof bundle is `rf08-cli-dmg-roundtrip-20260904`. Ad-hoc signing
 and no-generation scope are explicit; this is not Developer ID, notarization or RF-10 evidence.
 
+The package verifier now also has an opt-in, privacy-safe real-generation qualifier. It revalidates
+the copied payload before using an isolated runtime and an already-installed model store, runs all
+three Speed modes serially, requires exact request/result identities and strict QC PASS, observes
+live cancellation before sending SIGINT, and checks stable failure exits. The existing ad-hoc
+2.4.0/build 23 DMG passed: Built-in English (3.28 s), French Voice Design (7.68 s), and English
+Clone (4.08 s) each produced a valid QC-PASS WAV with the exact expected model; live cancellation
+exited 130, unknown command exited 2, and invalid mode exited 1. The ignored report is
+`rf08-cli-dmg-roundtrip-20260904/cli-generation-qualification.json`. It records no source text,
+transcript, path, or audio and explicitly grants no publication authority. Because the artifact is
+an older ad-hoc development package at source `089328d3`, this proves the qualification mechanism
+and package self-containment only; RF-10 must repeat it on the signed/notarized 3.0.0 candidate.
+
+The resumed qualifier additionally removes an assumed Clone transcript: use audio-only conditioning
+or provide the actual reviewed reference transcript. The historical Clone take therefore proves
+execution/QC only, not reference fidelity. Current qualification retains WAVs, atomic partial rows,
+the active stage, and sanitized failure types on failure/interruption. It refuses report reuse,
+terminates/awaits process groups on timeout, and handles newline-free progress output. Its 25 focused
+fixtures pass; requested seed/streaming fields are not claimed as observed engine receipts.
+
+## RF-09 host verification and safe next step (September 4)
+
+The full project-input gate passed all 1,481 Python tests. macOS core, XPC transport and owned-runtime
+tests passed (`mac-test-20260904-160540`); macOS app and 3.0.0 CLI builds, generic iOS app/logic
+compiles, and the complete website check (including both rendered browser layouts) passed.
+Ignored logs in `rf09-host-checkpoint-20260904` preserve the initial failed gate attempts as well
+as the successful run. Version separation, attribution regeneration and the guidance byte budget
+were corrected, not waived. Advisory currency warnings remain distinct from required failures.
+
+The existing classifier against `v2.4.0` requires eight promotion lanes for each platform:
+engine, Quality-engine, delivery, language, model lifecycle, retained memory, UI benchmark and UI
+performance. `quality_promotion.py` filters them by platform; desktop qualification is independent
+of the phone. Recompute from the exact committed candidate before expensive execution. These are
+promotion requirements, not commit/candidate-build prerequisites, and unsupported dimensions must
+remain explicit in the contract's capability coverage.
+
+Phone-independent source work is ready for a coherent commit. Exact-SHA CI/Security, the authorized
+verified tag and signed candidate remain separate; do not call source preparation a frozen release.
+No iPhone or Simulator ran. RF-06 and RF-07's focused physical proof precede RF-11's fresh campaign;
+the seven earlier correlated passes, one product failure and five unverified attempts are preserved.
+
 ## External decisions and final gates
+
+The [prepared 3.0 candidate notes](release-3-0-candidate-notes.md) cover the user-facing changes,
+delivery-roster correction, complete-folder CLI installation and candidate-specific What to Test.
+They are active preparation, not a published release or an immutable acceptance record. Move the
+finished text into the exact tag's governed release notes only at an authorized candidate freeze.
 
 RF-02's September 4 read-only checkpoint now proves a valid Keychain profile, usable local Apple
 Development, Apple Distribution, and Developer ID identities, one active matching App Store profile,
@@ -215,12 +267,13 @@ that no matching App Store profile was available. It does not prove the profile 
 entitlements or produce an archive/IPA; those remain ASR-10/RF-12 gates.
 
 The account inventory remains incomplete: pricing/availability has no readable initialized record;
-the current 2.4.0/build 23 identity is already used; accessibility declarations are empty; and App
+the old 2.4.0/build 23 identity is already used; accessibility declarations are empty; and App
 Privacy publication, agreements/tax/banking, DSA trader status, and regional compliance require
 owner/web or qualified review. The iOS plist already declares non-exempt encryption false and the
 API reports no separate encryption-declaration resource, but the processed 3.0.0 candidate must still
-confirm export-compliance behavior. No account value changed during this inspection. The unused
-3.0.0 build identity is selected only at RF-09.
+confirm export-compliance behavior. No account value changed during this inspection. RF-09 now
+selects source 3.0.0/build 24 with a passing read-only collision check; the live version still needs
+an authorized edit and archive-time collision revalidation.
 
 Use the existing [content-rights review](content-rights-review.md),
 [App Store submission procedure](ios-appstore-submission.md), and

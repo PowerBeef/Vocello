@@ -17,6 +17,10 @@
     },
     "stableMacReleaseVersion": {
       "value": "2.4.0",
+      "source": "config/public-product-facts.json"
+    },
+    "currentBuildVersion": {
+      "value": "3.0.0",
       "source": "project.yml"
     },
     "canonicalMacBenchmarkChip": {

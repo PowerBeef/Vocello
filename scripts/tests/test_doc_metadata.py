@@ -6,13 +6,17 @@ saying "10 x 3" must be caught even though the commit that broke it *did* edit
 the document, which is exactly why a git co-change check alone is not enough.
 """
 import os
+import json
+from pathlib import Path
 import sys
+import tempfile
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from doc_metadata import (  # noqa: E402
     body_digest,
+    derive_facts,
     render_index,
     scan_text,
     split_frontmatter,
@@ -83,6 +87,25 @@ class FactScanTests(unittest.TestCase):
 
 class ReleaseFactTests(unittest.TestCase):
     """AGENTS.md and README.md are fact-scanned; these are the claims that drift."""
+
+    def test_derived_stable_version_does_not_advertise_unpublished_build(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            files = {
+                "Sources/QwenVoiceCore/EmotionPreset.swift": 'public enum EmotionIntensity {\n case normal = 1\n}\npublic static let all: [EmotionPreset] = [\n id: "neutral"\n]',
+                "Sources/Resources/qwenvoice_contract.json": json.dumps({"speakerMetadata": {"fixture": {}}}),
+                "project.yml": 'MARKETING_VERSION: "3.0.0"\n',
+                "config/public-product-facts.json": json.dumps({"stableMacRelease": {"version": "2.4.0"}}),
+                "benchmarks/hardware-profiles.json": json.dumps({"profiles": [{"canonical": True, "platform": "macos", "chip": "Apple M2"}]}),
+            }
+            for name, content in files.items():
+                path = root / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(content)
+            facts = derive_facts(root)["facts"]
+            self.assertEqual(facts["stableMacReleaseVersion"]["value"], "2.4.0")
+            self.assertEqual(facts["stableMacReleaseVersion"]["source"], "config/public-product-facts.json")
+            self.assertEqual(facts["currentBuildVersion"]["value"], "3.0.0")
 
     def test_a_stale_current_release_claim_is_caught(self):
         self.assertTrue(matched("macOS **2.3.0** is the current release"))

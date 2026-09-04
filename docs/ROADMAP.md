@@ -49,7 +49,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `RF-06` | in-flight | Step 6 — localize the remaining natural-text audio failures | `doc:docs/reference/release-first-execution-2026-09.md#rf-06-retained-evidence-review-and-bounded-follow-up-september-4` |
 | `RF-07` | in-flight | Step 7 — finish only the acceptance-blocking harness repairs | — |
 | `RF-08` | in-flight | Step 8 — package the downloadable optimized CLI | — |
-| `RF-09` | planned | Step 9 — verify the coherent tree and freeze the 3.0.0 candidate | — |
+| `RF-09` | in-flight | Step 9 — verify the coherent tree and freeze the 3.0.0 candidate | — |
 | `RF-10` | planned | Step 10 — independently qualify macOS and downloadable CLI | — |
 | `RF-11` | planned | Step 11 — account for the full frozen-source 201-take iOS campaign | — |
 | `RF-12` | planned | Step 12 — verify the distribution iOS candidate and finish submission preparation | — |
@@ -68,7 +68,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 - **`RF-08`** (in-flight) — Step 8 — package the downloadable optimized CLI.
   gate: Implement F-17 in the existing release workflow: separate optimized arm64 CLI DMG, complete libraries/resources/notices/instructions, checkout-independent discovery, signatures, notarization/stapling, checksums and source/version supply-chain identity. Copied-package tests cover paths with spaces, version/JSON, all three modes, cancellation, failure exits and resource loading. No Homebrew route, privileged installer, shell-profile edits, or second release system.
 
-- **`RF-09`** (planned) — Step 9 — verify the coherent tree and freeze the 3.0.0 candidate.
+- **`RF-09`** (in-flight) — Step 9 — verify the coherent tree and freeze the 3.0.0 candidate.
   gate: Run derived refresh/validation, full project-input gate, macOS deterministic tests/app build, generic physical-iOS SDK compile, website check and affected release/privacy/attribution/supply-chain fixtures. Set shared version 3.0.0 through project.yml, reconcile the pending iOS version and collision-check an unused build number under ASR-08. Commit main and require exact-SHA CI/security, verified annotated-tag authority and command-bound candidate evidence; compute required promotion lanes before expensive QA. No unrelated source/docs edits during the frozen campaign or full-tree identity bypass.
 
 - **`RF-10`** (planned) — Step 10 — independently qualify macOS and downloadable CLI.

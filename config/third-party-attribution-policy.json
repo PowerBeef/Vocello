@@ -25,7 +25,7 @@
     {"identity":"yyjson","displayName":"yyjson","sourceURL":"https://github.com/ibireme/yyjson","licenseID":"MIT","upstreamLicenseSHA256":"45e384d3d52c73cba3a64d6e6c25d47cd738cd8a55c30629e3201046eda62947","copyrightNotice":"Copyright (c) 2020 YaoYuan <ibireme@gmail.com>"}
   ],
   "ownedComponents": [
-    {"identity":"vocello","displayName":"Vocello","version":"2.4.0","sourceURL":"https://github.com/PowerBeef/Vocello","licenseID":"MIT","licensePath":"LICENSE","copyrightNotice":"Copyright (c) 2026 PowerBeef"},
+    {"identity":"vocello","displayName":"Vocello","version":"3.0.0","sourceURL":"https://github.com/PowerBeef/Vocello","licenseID":"MIT","licensePath":"LICENSE","copyrightNotice":"Copyright (c) 2026 PowerBeef"},
     {"identity":"vocello-qwen3-core","displayName":"Vocello Qwen3 Core","version":"owned runtime","sourceURL":"https://github.com/PowerBeef/Vocello/tree/main/Packages/VocelloQwen3Core","licenseID":"MIT","licensePath":"Packages/VocelloQwen3Core/LICENSE","noticePath":"Packages/VocelloQwen3Core/NOTICES.md","originsPath":"Packages/VocelloQwen3Core/ORIGINS.md"}
   ],
   "modelCards": [

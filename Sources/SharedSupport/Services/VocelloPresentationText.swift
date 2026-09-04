@@ -7,6 +7,30 @@ import Foundation
 /// gives translators stable semantic keys, context, substitutions, and plural
 /// rules before any broad translation work begins.
 enum VocelloPresentationText {
+    static var exportRecoveryFiles: String {
+        String(localized: "vocello.history.export_recovery_files",
+               defaultValue: "Export Recovery Files",
+               comment: "User-directed export of retained audio and private recovery journals; not an upload or repair.")
+    }
+
+    static var longFormRecoveryDetail: String {
+        String(localized: "vocello.history.long_form_recovery_detail",
+               defaultValue: "Long-form recovery is incomplete. Unrelated clips remain readable; project changes are blocked. Retry a temporary storage failure, or export recovery files for repair. These private files may contain script text and local paths. Exporting does not repair or delete them.",
+               comment: "Explains non-destructive recovery and the privacy implications of exporting an unresolved project journal.")
+    }
+
+    static var longFormSegmentHistoryFailed: String {
+        String(localized: "vocello.long_form.segment_history_failed",
+               defaultValue: "The segment audio was generated, but History could not finish saving it. Open History to retry storage or export the retained audio before quitting. The project has not been accepted.",
+               comment: "Successful segment synthesis is distinct from History persistence and whole-project acceptance.")
+    }
+
+    static func recoveryExportFailure(_ count: Int) -> String {
+        String.localizedStringWithFormat(String(localized: "vocello.history.recovery_export_failure",
+            defaultValue: "%lld recovery files could not be exported.",
+            comment: "Number of recovery files that failed a user-directed local export; originals remain retained."), count)
+    }
+
     static var historyUnqueuedTitle: String {
         String(localized: "vocello.history.unqueued_title",
                defaultValue: "Audio ready — History not saved",

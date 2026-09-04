@@ -55,6 +55,7 @@ Review when: target or scheme changes; runtime topology; telemetry schema; test 
 - [`docs/reference/delivery-harness.md`](../docs/reference/delivery-harness.md)
 - [`docs/reference/development-workflow.md`](../docs/reference/development-workflow.md)
 - [`docs/reference/emotion-reference-banks.md`](../docs/reference/emotion-reference-banks.md)
+- [`docs/reference/engineering-audit-grounding-2026-09-04.md`](../docs/reference/engineering-audit-grounding-2026-09-04.md)
 - [`docs/reference/eu-ai-act-article50-assessment.md`](../docs/reference/eu-ai-act-article50-assessment.md)
 - [`docs/reference/evidence-impact.md`](../docs/reference/evidence-impact.md)
 - [`docs/reference/interactive-ui-qa.md`](../docs/reference/interactive-ui-qa.md)

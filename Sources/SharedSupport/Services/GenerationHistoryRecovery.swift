@@ -7,6 +7,9 @@ enum GenerationHistoryRecovery {
     static let outboxStore = GenerationHistoryOutboxStore(
         rootURL: AppPaths.appSupportDir.appendingPathComponent("history-outbox", isDirectory: true)
     )
+    static let longFormStore = LongFormHistoryAcceptanceStore(
+        rootURL: AppPaths.appSupportDir.appendingPathComponent("history-outbox/long-form", isDirectory: true)
+    )
 
     static let coordinator = GenerationHistoryRecoveryCoordinator(
         store: outboxStore,
@@ -54,12 +57,20 @@ enum GenerationHistoryRecovery {
         return GenerationHistoryRecoverySnapshot(pendingCount: durable.pendingCount,
             availableAudioCount: durable.availableAudioCount + available,
             issueCount: durable.issueCount, clearRecoveryPending: durable.clearRecoveryPending,
-            unqueuedCount: unqueuedCount)
+            unqueuedCount: unqueuedCount, longFormRecoveryPending: longFormStore.hasPendingRecovery)
     }
 
     static func pendingAudioURLs() async -> [URL] {
         let durable = await coordinator.pendingAudioURLs()
         return Array(Set(durable + (await unqueued.availableAudioURLs))).sorted { $0.path < $1.path }
+    }
+
+    static func recoveryExportURLs() async -> [URL] {
+        let audio = await pendingAudioURLs()
+        // Failure leaves the banner visible and never exports an unbounded or
+        // redirected file. Ordinary queued audio remains exportable.
+        let journals = (try? longFormStore.recoveryExportURLs()) ?? []
+        return audio + journals
     }
 
     static func clearAll(deleteAudio: Bool) async throws -> GenerationHistoryClearOutcome {

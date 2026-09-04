@@ -1138,6 +1138,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
     ) async throws -> GenerationResult {
         try ensureInitialized()
         do {
+            try GenerationSemantics.validateOutputOwnership(for: request)
             try GenerationSemantics.validateDeliveryInstructionIdentity(for: request)
         } catch {
             throw MLXTTSEngineError.unsupportedRequest(error.localizedDescription)
@@ -1204,7 +1205,6 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
             // user pressed Cancel. Mirrors the clone-preparation catch above.
             if NativeGenerationTerminalClassifier.reason(for: error) == .cancelled {
                 loadState = .loaded(modelID: request.modelID)
-                try? FileManager.default.removeItem(at: URL(fileURLWithPath: request.outputPath))
                 // Preserve the UI's no-visible-error cancellation contract while
                 // still closing the service-layer transport accumulator.
                 let coordinatorReason = await activeGenerationCoordinator.currentCancellationReason
@@ -1243,7 +1243,6 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
                     appSupportDirectory: diagnosticAppSupportBox.url
                 )
                 let cleanupStartedAt = ContinuousClock.now
-                try? FileManager.default.removeItem(at: URL(fileURLWithPath: request.outputPath))
                 Memory.clearCache()
                 await runtime.unloadModel()
                 let cleanupMS = cleanupStartedAt.elapsedMilliseconds
@@ -1277,7 +1276,6 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
                 } catch {
                     if NativeGenerationTerminalClassifier.reason(for: error) == .cancelled {
                         loadState = .loaded(modelID: request.modelID)
-                        try? FileManager.default.removeItem(at: URL(fileURLWithPath: request.outputPath))
                         let coordinatorReason = await activeGenerationCoordinator.currentCancellationReason
                         let reason = cancellationIngress.reason ?? coordinatorReason ?? .user
                         await yieldEvent(

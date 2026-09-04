@@ -661,6 +661,8 @@ final class IOSLongFormProjectRunner {
                 record.seed = Int64(bitPattern: request.plan.segments[index].evidence.effectiveSubseed)
                 segments[index].historyRecord = record
                 segments[index].generationID = generationID
+                let persistence = await GenerationPersistence.persist(record, caller: "IOSLongFormSegment")
+                try persistence.requireSavedLongFormSegment()
                 segments[index].status = .saved(audioPath: result.audioPath)
                 publish(active: index, message: "Generated segment \(index + 1) of \(total); project not yet saved")
             } catch {

@@ -319,9 +319,11 @@ def _run_qualification_cancellation(
     except BaseException:
         _stop_qualification_process(process)
         raise
-    if process.returncode != 130 or output.strip() or stdout.strip():
+    if (process.returncode != 130 or output.strip() or stdout.strip()
+            or b"Cancelled; command cleanup completed." not in _stderr
+            or b"forced exit" in _stderr):
         raise ValueError("CLI cancellation probe did not terminate cleanly")
-    return {"generationStartObserved": True, "exitStatus": 130}
+    return {"generationStartObserved": True, "exitStatus": 130, "cleanupAcknowledged": True}
 
 
 @contextmanager
@@ -482,11 +484,15 @@ def qualify(
             "--variation", "consistent", "--text", long_text,
             "--out", str(cancellation_output), "--data-dir", str(runtime), "--json",
         ], work, environment, 900)
-        if cancellation_output.exists():
-            cancellation["partialOutputRemoved"] = True
-            cancellation_output.unlink()
-        else:
-            cancellation["partialOutputRemoved"] = False
+        # Qualification observes cleanup; it must never perform it for the CLI.
+        if (cancellation_output.exists() or cancellation_output.is_symlink()
+                or list(outputs.glob(".cancelled.*.tmp.wav"))
+                or cancellation.get("exitStatus") != 130
+                or cancellation.get("cleanupAcknowledged") is not True):
+            state["cancellation"] = cancellation
+            raise ValueError("CLI cancellation left output/staging or lacks cleanup acknowledgement")
+        cancellation["outputAbsent"] = True
+        cancellation["hostCleanupPerformed"] = False
         state["cancellation"] = cancellation
         state["stage"] = "failure-exits"
         if report:

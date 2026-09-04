@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 
 enum PreparedVoiceRepositoryError: LocalizedError, Equatable {
     case invalidName
@@ -8,6 +9,8 @@ enum PreparedVoiceRepositoryError: LocalizedError, Equatable {
     case candidateMissing
     case voiceMissing(String)
     case malformedCandidate
+    case recoveryRequired
+    case storeBusy
 
     var errorDescription: String? {
         switch self {
@@ -25,6 +28,10 @@ enum PreparedVoiceRepositoryError: LocalizedError, Equatable {
             return "Voice '\(id)' does not exist."
         case .malformedCandidate:
             return "The saved-voice review data is invalid. Save the reference again."
+        case .recoveryRequired:
+            return "Saved Voice recovery could not finish. Your recovery files have been retained. Retry before changing saved voices."
+        case .storeBusy:
+            return "Another Vocello process is updating Saved Voices. Try again when it finishes."
         }
     }
 }
@@ -35,6 +42,7 @@ struct PreparedVoiceStorageRecord: Sendable, Equatable {
     let audioURL: URL
     let hasTranscript: Bool
     let enrollmentMetadata: PreparedVoiceEnrollmentMetadata?
+    var cleanupPending = false
 }
 
 /// Serializes every mutation of the saved-voice store.
@@ -47,7 +55,7 @@ actor PreparedVoiceRepository {
     static let candidateSchemaVersion = 2
     static let supportedCandidateSchemaVersions: Set<Int> = [1, 2]
     static let candidateLifetime: TimeInterval = 24 * 60 * 60
-    private static let transactionSchemaVersion = 1
+    private static let transactionSchemaVersion = 2
     private static let transactionManifestFileName = "transaction.json"
 
     private struct CandidateManifest: Codable, Sendable {
@@ -62,6 +70,7 @@ actor PreparedVoiceRepository {
         let createdAt: Date
     }
 
+    private enum CommitPhase: String, Codable { case prepared, backedUp, rolledBack }
     private struct CommitTransactionManifest: Codable, Sendable {
         let schemaVersion: Int
         let candidateID: UUID
@@ -69,6 +78,8 @@ actor PreparedVoiceRepository {
         let newAudioFileName: String
         let newTranscriptFileName: String?
         let newMetadataFileName: String?
+        var phase: CommitPhase? = nil
+        var audioDigest: String? = nil
     }
 
     private struct DeleteTransactionManifest: Codable, Sendable {
@@ -82,12 +93,15 @@ actor PreparedVoiceRepository {
     private let supportedAudioExtensions: Set<String>
     private let fileManager: FileManager
     private let now: @Sendable () -> Date
+    enum FaultPoint: Sendable { case beforeCandidatePublication, beforeAudioPublication, beforeRestoreAsset, beforeCandidateCleanup, beforeTransactionCleanup }
+    private let fault: @Sendable (FaultPoint) throws -> Void
 
     init(
         appSupportDirectory: URL,
         supportedAudioExtensions: Set<String>,
         fileManager: FileManager = .default,
-        now: @escaping @Sendable () -> Date = Date.init
+        now: @escaping @Sendable () -> Date = Date.init,
+        fault: @escaping @Sendable (FaultPoint) throws -> Void = { _ in }
     ) {
         voicesDirectory = appSupportDirectory.appendingPathComponent("voices", isDirectory: true)
         candidatesDirectory = appSupportDirectory.appendingPathComponent("voice-candidates", isDirectory: true)
@@ -95,11 +109,35 @@ actor PreparedVoiceRepository {
         self.supportedAudioExtensions = supportedAudioExtensions
         self.fileManager = fileManager
         self.now = now
+        self.fault = fault
     }
 
     func reconcile() throws {
-        try createRoots()
+        let lock = try acquireStoreLock()
+        defer { releaseStoreLock(lock) }
+        try reconcileLocked()
+    }
 
+    private func reconcileLocked() throws {
+        try createRoots()
+        // Transactions can still own expired/partially-cleaned candidates.
+        // Recover them before applying ordinary candidate retention.
+        for url in try directoryContents(at: transactionsDirectory) {
+            if try directoryContents(at: url).isEmpty {
+                try fileManager.removeItem(at: url)
+                continue
+            }
+            if url.lastPathComponent.hasPrefix("delete-") {
+                try reconcileDeleteTransaction(at: url)
+            } else if url.lastPathComponent.hasPrefix("commit-") {
+                try reconcileCommitTransaction(at: url)
+            } else {
+                // Unknown transaction state is not safe to interpret. Keep it
+                // for diagnosis instead of guessing whether its assets should
+                // be restored or deleted.
+                throw PreparedVoiceRepositoryError.malformedCandidate
+            }
+        }
         for url in try directoryContents(at: candidatesDirectory) {
             if url.lastPathComponent.hasPrefix(".partial-") {
                 try fileManager.removeItem(at: url)
@@ -113,23 +151,12 @@ actor PreparedVoiceRepository {
                 try fileManager.removeItem(at: url)
             }
         }
-
-        for url in try directoryContents(at: transactionsDirectory) {
-            if url.lastPathComponent.hasPrefix("delete-") {
-                try reconcileDeleteTransaction(at: url)
-            } else if url.lastPathComponent.hasPrefix("commit-") {
-                try reconcileCommitTransaction(at: url)
-            } else {
-                // Unknown transaction state is not safe to interpret. Keep it
-                // for diagnosis instead of guessing whether its assets should
-                // be restored or deleted.
-                throw PreparedVoiceRepositoryError.malformedCandidate
-            }
-        }
     }
 
     func list() throws -> [PreparedVoiceStorageRecord] {
-        try createRoots()
+        let lock = try acquireStoreLock()
+        defer { releaseStoreLock(lock) }
+        try reconcileLocked()
         return try directoryContents(at: voicesDirectory)
             .filter { supportedAudioExtensions.contains($0.pathExtension.lowercased()) }
             .map { audioURL in
@@ -157,7 +184,9 @@ actor PreparedVoiceRepository {
         enrollmentMetadata: PreparedVoiceEnrollmentMetadata? = nil,
         replacingVoiceID: String?
     ) throws -> PreparedVoiceCandidate {
-        try createRoots()
+        let lock = try acquireStoreLock()
+        defer { releaseStoreLock(lock) }
+        try reconcileLocked()
         guard fileManager.fileExists(atPath: sourceURL.path) else {
             throw PreparedVoiceRepositoryError.sourceMissing
         }
@@ -211,6 +240,7 @@ actor PreparedVoiceRepository {
                 to: partialDirectory.appendingPathComponent("manifest.json"),
                 options: [.atomic]
             )
+            try fault(.beforeCandidatePublication)
             try fileManager.moveItem(at: partialDirectory, to: candidateDirectory)
         } catch {
             if fileManager.fileExists(atPath: partialDirectory.path) {
@@ -229,7 +259,9 @@ actor PreparedVoiceRepository {
     }
 
     func commit(id: UUID) throws -> PreparedVoiceStorageRecord {
-        try createRoots()
+        let lock = try acquireStoreLock()
+        defer { releaseStoreLock(lock) }
+        try reconcileLocked()
         let candidateDirectory = candidateDirectory(for: id)
         guard fileManager.fileExists(atPath: candidateDirectory.path) else {
             throw PreparedVoiceRepositoryError.candidateMissing
@@ -259,23 +291,19 @@ actor PreparedVoiceRepository {
             "commit-\(UUID().uuidString.lowercased())",
             isDirectory: true
         )
+        var transaction = CommitTransactionManifest(
+            schemaVersion: Self.transactionSchemaVersion,
+            candidateID: id,
+            newVoiceName: manifest.name,
+            newAudioFileName: destinationAudioURL.lastPathComponent,
+            newTranscriptFileName: manifest.transcriptFileName == nil ? nil : destinationTranscriptURL.lastPathComponent,
+            newMetadataFileName: manifest.enrollmentMetadata == nil ? nil : destinationMetadataURL.lastPathComponent,
+            phase: .prepared,
+            audioDigest: try SamplingTakeEvidence.sha256FileDigest(at: stagedAudioURL)
+        )
         do {
             try fileManager.createDirectory(at: transactionDirectory, withIntermediateDirectories: false)
-            try writeTransactionManifest(
-                CommitTransactionManifest(
-                    schemaVersion: Self.transactionSchemaVersion,
-                    candidateID: id,
-                    newVoiceName: manifest.name,
-                    newAudioFileName: destinationAudioURL.lastPathComponent,
-                    newTranscriptFileName: manifest.transcriptFileName == nil
-                        ? nil
-                        : destinationTranscriptURL.lastPathComponent,
-                    newMetadataFileName: manifest.enrollmentMetadata == nil
-                        ? nil
-                        : destinationMetadataURL.lastPathComponent
-                ),
-                to: transactionDirectory
-            )
+            try writeTransactionManifest(transaction, to: transactionDirectory)
         } catch {
             if fileManager.fileExists(atPath: transactionDirectory.path) {
                 try? fileManager.removeItem(at: transactionDirectory)
@@ -283,13 +311,12 @@ actor PreparedVoiceRepository {
             throw error
         }
 
-        var publishedTranscript = false
-        var publishedMetadata = false
-        var publishedAudio = false
         do {
             if let replacingVoiceID = manifest.replacingVoiceID {
                 try moveVoiceAssets(id: replacingVoiceID, into: transactionDirectory)
             }
+            transaction.phase = .backedUp
+            try writeTransactionManifest(transaction, to: transactionDirectory)
 
             if let transcriptFileName = manifest.transcriptFileName {
                 let stagedTranscriptURL = candidateDirectory.appendingPathComponent(transcriptFileName)
@@ -299,8 +326,7 @@ actor PreparedVoiceRepository {
                 if fileManager.fileExists(atPath: destinationTranscriptURL.path) {
                     try fileManager.removeItem(at: destinationTranscriptURL)
                 }
-                try fileManager.moveItem(at: stagedTranscriptURL, to: destinationTranscriptURL)
-                publishedTranscript = true
+                try fileManager.copyItem(at: stagedTranscriptURL, to: destinationTranscriptURL)
             }
 
             if let enrollmentMetadata = manifest.enrollmentMetadata {
@@ -308,53 +334,50 @@ actor PreparedVoiceRepository {
                     to: destinationMetadataURL,
                     options: [.atomic]
                 )
-                publishedMetadata = true
             }
 
             // Publication boundary: listing discovers the voice only after
             // this final move succeeds.
+            try fault(.beforeAudioPublication)
             try fileManager.moveItem(at: stagedAudioURL, to: destinationAudioURL)
-            publishedAudio = true
-            try fileManager.removeItem(at: candidateDirectory)
-            try fileManager.removeItem(at: transactionDirectory)
         } catch {
-            if publishedAudio, fileManager.fileExists(atPath: destinationAudioURL.path) {
-                try? fileManager.moveItem(at: destinationAudioURL, to: stagedAudioURL)
-            }
-            if publishedTranscript, fileManager.fileExists(atPath: destinationTranscriptURL.path) {
-                let transcriptFileName = manifest.transcriptFileName ?? "transcript.txt"
-                try? fileManager.moveItem(
-                    at: destinationTranscriptURL,
-                    to: candidateDirectory.appendingPathComponent(transcriptFileName)
-                )
-            }
-            if publishedMetadata, fileManager.fileExists(atPath: destinationMetadataURL.path) {
-                try? fileManager.removeItem(at: destinationMetadataURL)
-            }
-            try? restoreVoiceAssets(from: transactionDirectory)
-            if fileManager.fileExists(atPath: transactionDirectory.path) {
-                try? fileManager.removeItem(at: transactionDirectory)
+            do {
+                try reconcileCommitTransaction(at: transactionDirectory)
+            } catch {
+                // Never discard the only recoverable backup after a second
+                // filesystem error. Retry observes the same durable witness.
+                throw PreparedVoiceRepositoryError.recoveryRequired
             }
             throw error
         }
-
+        // Publication succeeded. Cleanup is forward-only, never rollback.
+        var cleanupPending = false
+        do {
+            try finishCommittedCandidate(candidateDirectory, transactionDirectory: transactionDirectory)
+        } catch { cleanupPending = true }
         return PreparedVoiceStorageRecord(
             id: manifest.name,
             name: manifest.name,
             audioURL: destinationAudioURL,
             hasTranscript: manifest.transcriptFileName != nil,
-            enrollmentMetadata: manifest.enrollmentMetadata
+            enrollmentMetadata: manifest.enrollmentMetadata,
+            cleanupPending: cleanupPending
         )
     }
 
     func discard(id: UUID) throws {
+        let lock = try acquireStoreLock()
+        defer { releaseStoreLock(lock) }
+        try reconcileLocked()
         let directory = candidateDirectory(for: id)
         guard fileManager.fileExists(atPath: directory.path) else { return }
         try fileManager.removeItem(at: directory)
     }
 
     func delete(id: String) throws {
-        try createRoots()
+        let lock = try acquireStoreLock()
+        defer { releaseStoreLock(lock) }
+        try reconcileLocked()
         try validateIdentifier(id)
         let audioURLs = supportedAudioExtensions
             .map { voicesDirectory.appendingPathComponent("\(id).\($0)") }
@@ -379,14 +402,51 @@ actor PreparedVoiceRepository {
                 options: [.atomic]
             )
             try moveVoiceAssets(id: id, into: transactionDirectory)
-            try fileManager.removeItem(at: transactionDirectory)
         } catch {
-            try? restoreVoiceAssets(from: transactionDirectory)
-            if fileManager.fileExists(atPath: transactionDirectory.path) {
-                try? fileManager.removeItem(at: transactionDirectory)
-            }
-            throw error
+            // A durable delete journal means user-confirmed forward recovery.
+            // Do not restore a partially removed tombstone, then destroy it.
+            throw PreparedVoiceRepositoryError.recoveryRequired
         }
+        // All assets are tombstoned: a cleanup failure cannot resurrect them.
+        try? removeTransaction(transactionDirectory)
+    }
+
+    /// Cross-process exclusion, not just actor isolation. Never block a Swift
+    /// executor waiting for another app/CLI process and never unlink this inode.
+    private func acquireStoreLock() throws -> Int32 {
+        let root = voicesDirectory.deletingLastPathComponent()
+        try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
+        let fd = Darwin.open(root.appendingPathComponent(".voice-store.lock").path, O_CREAT | O_RDWR | O_CLOEXEC | O_NOFOLLOW, S_IRUSR | S_IWUSR)
+        guard fd >= 0 else { throw PreparedVoiceRepositoryError.recoveryRequired }
+        guard flock(fd, LOCK_EX | LOCK_NB) == 0 else {
+            let failure = errno
+            Darwin.close(fd)
+            throw failure == EWOULDBLOCK || failure == EAGAIN
+                ? PreparedVoiceRepositoryError.storeBusy : PreparedVoiceRepositoryError.recoveryRequired
+        }
+        return fd
+    }
+
+    private func releaseStoreLock(_ fd: Int32) {
+        flock(fd, LOCK_UN)
+        Darwin.close(fd)
+    }
+
+    private func removeTransaction(_ directory: URL) throws {
+        try fault(.beforeTransactionCleanup)
+        // Preserve the witness until every backed-up asset has been removed.
+        for url in try directoryContents(at: directory) where url.lastPathComponent != Self.transactionManifestFileName {
+            try fileManager.removeItem(at: url)
+        }
+        let manifest = directory.appendingPathComponent(Self.transactionManifestFileName)
+        if fileManager.fileExists(atPath: manifest.path) { try fileManager.removeItem(at: manifest) }
+        try fileManager.removeItem(at: directory)
+    }
+
+    private func finishCommittedCandidate(_ candidate: URL, transactionDirectory: URL) throws {
+        try fault(.beforeCandidateCleanup)
+        if fileManager.fileExists(atPath: candidate.path) { try fileManager.removeItem(at: candidate) }
+        try removeTransaction(transactionDirectory)
     }
 
     private func createRoots() throws {
@@ -438,11 +498,14 @@ actor PreparedVoiceRepository {
         guard fileManager.fileExists(atPath: transactionDirectory.path) else { return }
         for sourceURL in try directoryContents(at: transactionDirectory)
             where sourceURL.lastPathComponent != Self.transactionManifestFileName {
+            try fault(.beforeRestoreAsset)
             let destinationURL = voicesDirectory.appendingPathComponent(sourceURL.lastPathComponent)
             if fileManager.fileExists(atPath: destinationURL.path) {
                 try fileManager.removeItem(at: destinationURL)
             }
-            try fileManager.moveItem(at: sourceURL, to: destinationURL)
+            // Keep backups through the entire restore. A second failure must
+            // leave retryable evidence even for assets already restored.
+            try fileManager.copyItem(at: sourceURL, to: destinationURL)
         }
     }
 
@@ -458,11 +521,11 @@ actor PreparedVoiceRepository {
 
     private func reconcileCommitTransaction(at transactionDirectory: URL) throws {
         let manifestURL = transactionDirectory.appendingPathComponent(Self.transactionManifestFileName)
-        let manifest = try JSONDecoder().decode(
+        var manifest = try JSONDecoder().decode(
             CommitTransactionManifest.self,
             from: Data(contentsOf: manifestURL)
         )
-        guard manifest.schemaVersion == Self.transactionSchemaVersion,
+        guard [1, Self.transactionSchemaVersion].contains(manifest.schemaVersion),
               NativeSavedVoiceNaming.normalizedName(manifest.newVoiceName) == manifest.newVoiceName,
               !manifest.newVoiceName.isEmpty,
               URL(fileURLWithPath: manifest.newAudioFileName).lastPathComponent == manifest.newAudioFileName,
@@ -477,14 +540,56 @@ actor PreparedVoiceRepository {
 
         let candidateDirectory = candidateDirectory(for: manifest.candidateID)
         let publishedAudioURL = voicesDirectory.appendingPathComponent(manifest.newAudioFileName)
-        if fileManager.fileExists(atPath: publishedAudioURL.path) {
+        // An unreadable candidate is not evidence that publication consumed it.
+        let candidateContents: [URL]
+        do { candidateContents = try directoryContents(at: candidateDirectory) }
+        catch let error as CocoaError where error.code == .fileReadNoSuchFile || error.code == .fileNoSuchFile {
+            candidateContents = [] // A completed candidate cleanup is legitimate.
+        }
+        let stagedAudioExists = candidateContents.contains {
+            supportedAudioExtensions.contains($0.pathExtension.lowercased())
+        }
+        let committed: Bool
+        if manifest.phase == .rolledBack {
+            try removeTransaction(transactionDirectory)
+            return
+        }
+        if manifest.schemaVersion == 2 {
+            guard let digest = manifest.audioDigest, digest.count == 64, manifest.phase != nil else {
+                throw PreparedVoiceRepositoryError.malformedCandidate
+            }
+            if manifest.phase == .backedUp && !stagedAudioExists {
+                // The publication source was consumed. An unreadable, missing,
+                // or changed destination is ambiguous, never rollback authority.
+                guard (try? SamplingTakeEvidence.sha256FileDigest(at: publishedAudioURL)) == digest else {
+                    throw PreparedVoiceRepositoryError.recoveryRequired
+                }
+                committed = true
+            } else { committed = false }
+        } else {
+            committed = fileManager.fileExists(atPath: publishedAudioURL.path) && !stagedAudioExists
+        }
+        if committed {
             // Audio is the publication boundary. A crash after that move
             // completed the commit, so discard the stale candidate and old
             // replacement backup rather than rolling the visible voice back.
-            if fileManager.fileExists(atPath: candidateDirectory.path) {
-                try fileManager.removeItem(at: candidateDirectory)
+            try finishCommittedCandidate(candidateDirectory, transactionDirectory: transactionDirectory)
+            return
+        }
+
+        if manifest.schemaVersion == 2 {
+            // Prepared means backup may be partial; untouched old destinations
+            // must not be mistaken for newly published sidecars.
+            if manifest.phase == .backedUp {
+                for name in [manifest.newTranscriptFileName, manifest.newMetadataFileName].compactMap({ $0 }) {
+                    let url = voicesDirectory.appendingPathComponent(name)
+                    if fileManager.fileExists(atPath: url.path) { try fileManager.removeItem(at: url) }
+                }
             }
-            try fileManager.removeItem(at: transactionDirectory)
+            try restoreVoiceAssets(from: transactionDirectory)
+            manifest.phase = .rolledBack
+            try writeTransactionManifest(manifest, to: transactionDirectory)
+            try removeTransaction(transactionDirectory)
             return
         }
 
@@ -518,7 +623,9 @@ actor PreparedVoiceRepository {
         // boundary. Restore any replaced voice and leave the candidate ready
         // for a safe retry.
         try restoreVoiceAssets(from: transactionDirectory)
-        try fileManager.removeItem(at: transactionDirectory)
+        manifest.phase = .rolledBack
+        try writeTransactionManifest(manifest, to: transactionDirectory)
+        try removeTransaction(transactionDirectory)
     }
 
     private func reconcileDeleteTransaction(at transactionDirectory: URL) throws {
@@ -528,7 +635,7 @@ actor PreparedVoiceRepository {
                 contentsOf: transactionDirectory.appendingPathComponent(Self.transactionManifestFileName)
             )
         )
-        guard manifest.schemaVersion == Self.transactionSchemaVersion else {
+        guard [1, Self.transactionSchemaVersion].contains(manifest.schemaVersion) else {
             throw PreparedVoiceRepositoryError.malformedCandidate
         }
         try validateIdentifier(manifest.voiceID)
@@ -537,7 +644,7 @@ actor PreparedVoiceRepository {
         // after journaling but before every move, finish moving any remaining
         // audio/transcript/prompt assets into the tombstone, then remove it.
         try moveVoiceAssets(id: manifest.voiceID, into: transactionDirectory)
-        try fileManager.removeItem(at: transactionDirectory)
+        try removeTransaction(transactionDirectory)
     }
 
     private func loadManifest(from directory: URL) throws -> CandidateManifest {

@@ -329,7 +329,7 @@ private struct IOSHistoryLibrarySection: View {
                     .accessibilityIdentifier("historyRecovery_retry")
                 if !recoveryAudioURLs.isEmpty {
                     ShareLink(items: recoveryAudioURLs) {
-                        Label("Export Audio", systemImage: "square.and.arrow.up")
+                        Label(VocelloPresentationText.exportRecoveryFiles, systemImage: "square.and.arrow.up")
                     }
                     .iosAdaptiveUtilityButtonStyle(tint: Theme.Brand.library)
                     .accessibilityIdentifier("historyRecovery_export")
@@ -343,6 +343,9 @@ private struct IOSHistoryLibrarySection: View {
     }
 
     private var recoveryMessage: String {
+        if recoverySnapshot.longFormRecoveryPending {
+            return VocelloPresentationText.longFormRecoveryDetail
+        }
         if recoverySnapshot.unqueuedCount > 0 {
             return VocelloPresentationText.historyUnqueuedDetail
         }
@@ -429,7 +432,7 @@ private struct IOSHistoryLibrarySection: View {
     private func refreshRecoveryState() {
         Task {
             let snapshot = await GenerationHistoryRecovery.snapshot()
-            let urls = await GenerationHistoryRecovery.pendingAudioURLs()
+            let urls = await GenerationHistoryRecovery.recoveryExportURLs()
             guard !Task.isCancelled else { return }
             recoverySnapshot = snapshot
             recoveryAudioURLs = urls

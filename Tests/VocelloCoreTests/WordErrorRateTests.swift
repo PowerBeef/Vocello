@@ -3,6 +3,19 @@ import QwenVoiceCore
 import XCTest
 
 final class WordErrorRateTests: XCTestCase {
+    func testLiveUnreadableAudioFailsBeforeSpeechWithoutInventingDuration() async throws {
+        let result = await GenerationOutputVerifier.verify(
+            audioURL: URL(fileURLWithPath: "/missing/\(UUID()).wav"),
+            expectedScript: "Hello there.", expectedLanguage: .english
+        )
+        XCTAssertFalse(result.pass)
+        XCTAssertEqual(result.skipReason, "source_audio_duration_unavailable")
+        XCTAssertNil(result.sourceAudioDurationSeconds)
+        XCTAssertEqual(result.recognition.repetitions.count, 0)
+        XCTAssertEqual(result.recognition.authorizationStatus, .unknown)
+        XCTAssertEqual(result.languageASRGateResult().outcome, .unavailable)
+    }
+
     func testIdenticalReferenceAndHypothesis() {
         let wer = VoiceClipTranscriber.wordErrorRate(
             reference: "The train left the station.",
@@ -554,6 +567,23 @@ final class WordErrorRateTests: XCTestCase {
         )
         XCTAssertTrue(result.pass)
         XCTAssertEqual(result.sourceAudioDurationSeconds, 16)
+
+        let missingLiveDuration = GenerationOutputVerifier.evaluate(
+            recognition: recognition, expectedScript: transcript, expectedLanguage: .french,
+            requiresSourceAudioDuration: true
+        )
+        XCTAssertFalse(missingLiveDuration.pass)
+        XCTAssertEqual(missingLiveDuration.skipReason, "source_audio_duration_unavailable")
+        // Edge timestamps alone cannot establish interior speech coverage.
+        // The same edge-valid transcript still fails when middle words are absent.
+        let missingInterior = GenerationOutputVerifier.evaluate(
+            recognition: recognition,
+            expectedScript: "Le train du matin avec tous les voyageurs et leurs bagages a quitté la gare",
+            expectedLanguage: .french, sourceAudioDurationSeconds: 16,
+            requiresSourceAudioDuration: true
+        )
+        XCTAssertTrue(VoiceClipTranscriber.hasAudioEdgeCoverage(recognition, sourceAudioDurationSeconds: 16))
+        XCTAssertFalse(missingInterior.pass)
 
         var trailingOnly = recognition
         trailingOnly.repetitions = trailingOnly.repetitions.map { repetition in

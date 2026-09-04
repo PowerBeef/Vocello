@@ -49,19 +49,65 @@ machine-readable status record and wins over any older prose.
 
 ## Resume here (2026-09-04)
 
+**Latest action: phone-independent preservation and lifecycle amendment implemented and verified.** The September 4
+[external audit disposition](reference/engineering-audit-grounding-2026-09-04.md) remains a review
+of `75ecb740`; the current working tree implements its bounded follow-ups:
+
+- **F-18:** only staging is removed on failure/cancellation; successful replacement is a single
+  rename, and Clone reference/output aliases are refused.
+- **F-01/F-22:** phase/digest-bound Saved Voice recovery retains backups through secondary faults;
+  an OS-backed nonblocking lock excludes app/CLI mutation and startup reconciliation.
+- **F-19:** the actual macOS executor reproduced the stale-A/new-B defect (four red assertions).
+  Attempt/player ownership now guards completion and cleanup; redundant unscoped cancel is removed.
+  A separate late-cancel/publication test reproduced lost History ownership (one red assertion);
+  a returned completed take now persists without stealing the next take's playback.
+- **F-20/F-21:** owned CLI signal cancellation, explicit forced-exit distinction and full partial-batch
+  row accounting are implemented. The package qualifier no longer deletes output to manufacture a
+  cleanup pass. Native SIGINT/SIGTERM and two-process Saved Voice fixtures pass; copied-candidate
+  qualification remains separate.
+- **F-16/F-06:** completed segments gain individual History ownership before continuing; superseded
+  joined outputs remain deletable. Corrupt journals retain private export and unrelated History
+  readability while ambiguous project writes stay blocked.
+- **VLR-07/RF-06:** missing live WAV duration now refuses verification before Speech access. Edge
+  coverage is named precisely; an interior omission must still fail WER. Historical decoding stays
+  compatible. This does not resolve the retained French/device accuracy cases.
+
+The final source checkpoint passed:
+
+- Full project-input gate: 121 Python modules, **1,484 tests** (105 + 1,379), including negative fixtures.
+- macOS `mac-test-20260904-183347`: **562 core + 19 transport + 109 runtime**, zero failures;
+  two opt-in AudioSeal tests skipped because their external fixtures were absent.
+- Canonical macOS app and 3.0.0 CLI builds; generic physical-iOS SDK app and logic-test builds.
+- Website check, including wide/narrow production-browser smoke; 35 focused localization/package
+  tests and four model-free built-CLI input/error checks also passed.
+
+Native signal tests first exposed a Swift 6 Dispatch-callback actor trap, corrected with explicit
+Sendable isolation before the passing runs. The full gate caught new recovery literals; the shared
+catalog now owns them, with plural validation and no baseline exemption. The first website check
+could not bind its local server inside the sandbox; the authorized outside-sandbox run passed.
+Staging the new Swift files changed the tracked-file health inventory; the final freshness fixtures
+caught that stale summary and required a post-staging derived refresh. That failed check is retained.
+Logs remain ignored under `build/artifacts/macos/tests/rf-amendment-*`, the named macOS test run,
+and `build/artifacts/foundation/rf-amendment-*`. Earlier red runs are retained, not recast as passes.
+AGENTS.md was reviewed; its existing durable rules remain accurate and need no run-specific edits.
+No device, model acquisition, account mutation, release tag, upload, or publication occurred.
+Remaining candidate/device checks retain their original owners and gates; this is implementation
+and deterministic verification, not submission readiness. Blocking CLI stdin/playback/benchmark
+subprocess stages are not qualified by the task-supervisor fixtures.
+
 **Primary roadmap: `release-first-3-0-2026-09`, RF-01 through RF-12.** It is selected by
 the `primaryPlan` field in `config/roadmap.json` and appears first in the generated roadmap and status command.
 RF-01 reconciliation and RF-03 source request-preservation proof are complete; RF-02 account/rights
 work continues in parallel. RF-04 long-form durability and RF-05 History-save visibility have source
 implementation and focused verification; their referenced defects still need corrected-candidate
-acceptance. The coherent-tree checkpoint passed. The remaining
+acceptance. The bounded amendment above now has a fresh passing source checkpoint. The remaining
 milestones are not complete. Existing subsystem records retain their technical closure authority;
 older active research workstreams are not the current execution queue.
 
-**Release-first implementation is now authorized.** Follow the ordered
+**The adopted release-first programme remains the implementation plan.** Follow the ordered
 [release-first programme](reference/release-first-execution-2026-09.md): F-15 macOS Design request
 capture, F-16 long-form transactions, reopened F-06 enqueue recovery, bounded ICA-18 harness repair,
-and F-17 downloadable CLI packaging before candidate freeze. Existing ASR/ICA/VLR items retain
+and F-17 downloadable CLI packaging, plus the bounded September 4 amendment, before candidate freeze. Existing ASR/ICA/VLR items retain
 their authority; research and broad harness/runtime redesign are deferred. No publication is
 authorized by this implementation checkpoint.
 
@@ -204,7 +250,7 @@ Public download facts remain 2.4.0; candidate identity is separately validated a
 The prepared [candidate notes](reference/release-3-0-candidate-notes.md) pass the release-notes
 structure check but are not an announcement or signed-candidate proof.
 
-**Next boundary:** validate/commit this coherent documentation checkpoint, then observe exact-SHA
+**Next boundary:** commit/push the verified source/documentation checkpoint, then observe exact-SHA
 CI and Security. A verified tag/signed-candidate workflow and live App Store version reconciliation
 need explicit authorization; RF-02's qualified rights/account decisions remain external. After
 candidate production, RF-10 qualifies the signed desktop/CLI. The next phone session starts with

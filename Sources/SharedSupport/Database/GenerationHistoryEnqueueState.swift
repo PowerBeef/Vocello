@@ -5,6 +5,17 @@ enum GenerationHistoryPersistenceOutcome: Equatable, Sendable {
     case saved
     case queuedForRecovery
     case unableToQueue
+
+    func requireSavedLongFormSegment() throws {
+        guard self == .saved else { throw LongFormSegmentHistoryError.recoveryRequired }
+    }
+}
+
+enum LongFormSegmentHistoryError: LocalizedError {
+    case recoveryRequired
+    var errorDescription: String? {
+        VocelloPresentationText.longFormSegmentHistoryFailed
+    }
 }
 
 /// Only the failure to create a durable outbox record is retained here. This

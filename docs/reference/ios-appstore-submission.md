@@ -140,7 +140,7 @@ CLI process group, no account data was retained, and ASR-11 remains open.
 > small. On first launch, open Settings → Voice Models and tap **Install** for the Studio mode you want:
 > Built-in Voice is 1,708,583,689 bytes, Voice Design is 1,708,583,196 bytes, and Voice Cloning is
 > 1,732,600,769 bytes. One model is sufficient to review its matching mode. Downloads require Wi-Fi and
-> roughly 2 GB of free space per model; completion time depends on the review network and may take several
+> at least 4 GB of free space available before each installation; completion time depends on the review network and may take several
 > minutes. Progress reports exact downloaded catalog bytes. A download can be cancelled and restarted, and
 > an interrupted background download is adopted after relaunch. Final verification/installation is shown as
 > an indeterminate finishing step. Once the model shows **Ready**, that mode works offline. Open Studio,
@@ -152,6 +152,13 @@ CLI process group, no account data was retained, and ASR-11 remains open.
 
 No demo account is needed (no login). Note the model download requirement so the app is not judged
 non-functional under Guideline 2.1.
+
+Storage guidance is grounded in `IOSModelDeliverySupport.ensureSufficientDiskSpace`:
+`max(2 × catalog bytes, catalog bytes + 256 MiB)`. The coordinator supplies the full model
+catalog total, even when components can be reused. Current admission needs are approximately
+3.42–3.47 GB of available space; the 4 GB advice provides reviewer headroom, not a different
+runtime policy or a guarantee against concurrent storage use. Recheck against the candidate
+catalog before pasting these notes into App Store Connect.
 
 Before using these notes, close ASR-09 with anonymous availability evidence from all representative
 regions. On 2026-09-01 the North America host passed range and full SHA-256 verification of the

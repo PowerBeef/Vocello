@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "generated": "python3 scripts/doc_metadata.py rebuild-index",
   "note": "Machine-readable documentation map. Query this instead of globbing docs/.",
-  "annotatedDocuments": 103,
+  "annotatedDocuments": 104,
   "unannotatedDocuments": 0,
   "documents": [
     {
@@ -414,6 +414,23 @@
       ]
     },
     {
+      "path": "docs/reference/engineering-audit-grounding-2026-09-04.md",
+      "status": "active",
+      "owner": "backend-and-platform",
+      "summary": "Current-source disposition of the September 4 external engineering audit, with bounded pre-freeze corrections under the existing 3.0 release programme.",
+      "sourceOfTruth": [
+        "config/roadmap.json",
+        "Sources/QwenVoiceCore/GenerationOutputAdapter.swift",
+        "Sources/QwenVoiceCore/MLXTTSEngine.swift",
+        "Sources/QwenVoiceCore/PreparedVoiceRepository.swift",
+        "Sources/ViewModels/GenerationLifecycleExecutor.swift",
+        "Sources/VocelloCLI/VocelloMain.swift",
+        "Sources/VocelloCLI/BatchCommand.swift",
+        "Sources/SharedSupport/Services/GenerationOutputVerifier.swift",
+        "Sources/SharedSupport/Database/LongFormHistoryAcceptance.swift"
+      ]
+    },
+    {
       "path": "docs/reference/eu-ai-act-article50-assessment.md",
       "status": "active",
       "owner": "release-qa",
@@ -624,6 +641,8 @@
       "sourceOfTruth": [
         "Sources/QwenVoiceCore/LongFormPlanning.swift",
         "Sources/iOS/Studio/IOSLongFormProject.swift",
+        "Sources/Services/BatchGenerationRunner.swift",
+        "Sources/SharedSupport/Database/LongFormHistoryAcceptance.swift",
         "config/runtime-refactor-contract.json"
       ]
     },
@@ -752,7 +771,7 @@
       "path": "docs/reference/privacy-storage.md",
       "status": "active",
       "owner": "backend-and-platform",
-      "summary": "Local-first privacy and on-disk storage layout on both platforms \u2014 what lives where, what never leaves the device, and deletion semantics.",
+      "summary": "Local-first privacy and on-disk storage layout on both platforms \u2014 app transfers, operating-system backups, and deletion semantics.",
       "sourceOfTruth": [
         "Sources/SharedSupport",
         "Sources/iOSSupport/Services/IOSStorageProtectionPolicy.swift",

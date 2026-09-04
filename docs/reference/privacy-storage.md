@@ -2,7 +2,7 @@
 status: active
 owner: backend-and-platform
 reviewed: 2026-09-04
-summary: Local-first privacy and on-disk storage layout on both platforms — what lives where, what never leaves the device, and deletion semantics.
+summary: Local-first privacy and on-disk storage layout on both platforms — app transfers, operating-system backups, and deletion semantics.
 sourceOfTruth:
   - Sources/SharedSupport
   - Sources/iOSSupport/Services/IOSStorageProtectionPolicy.swift
@@ -10,7 +10,13 @@ sourceOfTruth:
 ---
 # Privacy And Local Storage
 
-QwenVoice/Vocello is local-first. Prompts, recorded or imported reference clips, transcripts, saved voices, generated audio, model files, and history stay on the user's device unless the user explicitly exports, shares, or uploads them elsewhere.
+QwenVoice/Vocello performs generation and reference transcription locally; the app does not upload
+prompts, reference clips, transcripts, saved voices, generated audio, or History for inference.
+Users can explicitly export or share their content. Separately, operating-system backups may
+include user data: the iOS storage policy includes voices, outputs, History, and its outbox in
+backup, while excluding models, caches, staged downloads, and diagnostics. Local-first processing
+does not mean backup is disabled. Model-download request metadata and qualified privacy-disclosure
+decisions remain separate from these local-processing guarantees.
 
 ## macOS Storage
 
@@ -52,7 +58,7 @@ Maintained macOS subtrees and preferences:
 - `history-outbox/` queues published single-take audio for its pending History write when storage permits.
   The local schema-v1 JSON entry contains the generation record and is removed only after an
   idempotent SQLite commit. Startup and History entry reconcile it; the macOS recovery banner
-  exposes Retry, Reveal Audio, and Export Audio without putting script or path data in telemetry.
+  exposes Retry, Reveal Audio, and Export Recovery Files without putting script or path data in telemetry.
   A separate atomic clear transaction deletes database rows before pending entries or WAVs, so a
   database failure cannot leave live History rows pointing to files clear-all already removed.
   If the queue write itself fails, a visible app-wide warning offers Retry History Save and Export
@@ -66,6 +72,15 @@ Maintained macOS subtrees and preferences:
   the prior manifest and removes only newly owned, unreferenced candidate audio. Accepted audio
   is never deleted as rollback cleanup. Corrupt/unrecoverable journals remain for visible recovery;
   their private paths and generation records never enter telemetry or tracked evidence.
+  Unrelated standalone History remains readable; project reads and all mutations remain gated.
+  Explicit Export Recovery Files includes bounded regular-file journals without interpreting their
+  embedded paths. The UI warns that exports may contain private script text and paths; export
+  does not repair, quarantine, upload, or delete a journal.
+  Completed initial segments are saved individually before the next take/assembly, so abandoning a
+  draft or relaunching does not orphan them. Whole-project acceptance still requires joined QC and
+  manifest/database commit. Superseded joined outputs retain visible History rows and are deleted
+  only through ordinary user-directed History deletion; no background garbage collector removes
+  audio that might still be playing or exporting.
 - Active macOS model-quality choices are stored in app preferences, keyed per generation mode. `DebugMode` isolates preferences to `com.qwenvoice.app.debug`; Release builds use `UserDefaults.standard`.
 
 Delete local macOS app data by quitting the app and removing the app support root or the specific
@@ -73,6 +88,13 @@ subtree above. Use the model manager for an individual model so shared component
 by another installed manifest remain valid. Deleting the whole `models/` root removes both model
 folders and the component store and requires downloading them again; it does not by itself clear
 normal app preferences such as the active model-quality choice.
+
+Saved Voice operations hold one nonblocking OS file lock (`.voice-store.lock`) over reconciliation
+and mutation for app/CLI coexistence; contention returns a typed busy error. The lock inode is
+never unlinked. Commit journals v2 record publication phase and staged-audio digest; v1 remains
+readable. Backups survive restoration failure, and a rolled-back witness protects them across
+cleanup interruption. Once audio is published, candidate/transaction cleanup is forward-only and
+cannot roll the new voice back. A cleanup failure is retained for the next reconciliation.
 
 ## iPhone Storage
 
@@ -129,7 +151,9 @@ Maintained iPhone subtrees:
   every requested pending-entry and audio cleanup has completed.
   The same app-session-only enqueue-failure warning and bounded `long-form/` acceptance journal
   apply on iOS. Long-form generation continuation remains session-scoped: retained segments are
-  not a durably accepted History project until joined QC and the entire acceptance commit succeed.
+  individually durable History takes, but not an accepted project until joined QC and the entire
+  acceptance commit succeed. Saved Voice locking/recovery and private recovery-file export use the
+  same shared implementations on both platforms.
 
 The iPhone app intentionally keeps shared state constrained to the App Group app-support subtree. It does not use a parallel shared-user-defaults channel for model or voice state.
 

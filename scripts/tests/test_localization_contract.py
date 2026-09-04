@@ -39,7 +39,7 @@ targets:
 def valid_catalog() -> dict[str, object]:
     strings: dict[str, object] = {}
     for key in localization_contract.REQUIRED_KEYS:
-        if key == "vocello.models.ready_count":
+        if key in localization_contract.REQUIRED_PLURAL_KEYS:
             english: dict[str, object] = {
                 "variations": {
                     "plural": {
@@ -168,6 +168,34 @@ class LocalizationContractTests(unittest.TestCase):
                 with self.assertRaisesRegex(localization_contract.ContractError, message):
                     localization_contract.validate(self.root)
         catalog_path.write_text(json.dumps(valid_catalog()), encoding="utf-8")
+
+    def test_recovery_export_plural_cannot_be_replaced_with_uninflected_text(self) -> None:
+        catalog = valid_catalog()
+        catalog["strings"]["vocello.history.recovery_export_failure"]["localizations"]["en"] = {
+            "stringUnit": {"state": "translated", "value": "%lld files failed"}
+        }
+        (self.root / localization_contract.CATALOG).write_text(json.dumps(catalog), encoding="utf-8")
+        with self.assertRaisesRegex(localization_contract.ContractError, "plural one"):
+            localization_contract.validate(self.root)
+
+    def test_additional_plural_keys_validate_categories_and_reject_malformed_payloads(self) -> None:
+        for plural in (
+            {"one": {"stringUnit": {"value": "one"}}, "other": {"stringUnit": {"value": "many"}}},
+            [], {"one": None}, {"one": {"stringUnit": []}},
+            {"one": {"stringUnit": {"value": ""}}},
+        ):
+            with self.subTest(plural=plural):
+                catalog = valid_catalog()
+                catalog["strings"]["vocello.fixture.count"] = {
+                    "comment": "Fixture count", "extractionState": "manual",
+                    "localizations": {"en": {"variations": {"plural": plural}}},
+                }
+                (self.root / localization_contract.CATALOG).write_text(json.dumps(catalog), encoding="utf-8")
+                if isinstance(plural, dict) and "other" in plural:
+                    self.assertEqual(localization_contract.validate(self.root), 1)
+                else:
+                    with self.assertRaises(localization_contract.ContractError):
+                        localization_contract.validate(self.root)
 
     def test_new_literal_is_rejected_but_baseline_removal_is_allowed(self) -> None:
         self.literal_source.write_text(

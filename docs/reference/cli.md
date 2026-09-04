@@ -81,8 +81,8 @@ the qualifier never invents one. Each row must return the exact model,
 language, output path, finite positive duration, normal EOS, RIFF/WAVE bytes, and a strict QC `pass`.
 Seed and streaming fields are explicitly **requested**, not claimed observed engine receipts.
 It then interrupts
-a live Built-in take only after observing generation start, requires exit 130, removes any partial
-output, and verifies the public unknown-command and invalid-mode exits. The isolated runtime links
+a live Built-in take only after observing generation start, requires exit 130 plus an explicit cleanup acknowledgement, rejects leftover final/staging
+output without deleting it, and verifies the public unknown-command and invalid-mode exits. The isolated runtime links
 only to an existing operator-provided model store; it downloads nothing. Its privacy-safe report
 contains digests, sizes, timings, public identities, and verdicts—not prompts, transcripts, audio,
 or absolute paths—and carries `publicationAuthority: none`. The relative `artifactDirectory`
@@ -117,7 +117,10 @@ set) and forces telemetry on.
 - `--json` switches stdout to a structured JSON object/array (on `generate`, `batch`, `voices list`,
   `speakers list`, `models`).
 - `--quiet` suppresses the stderr notes; `--verbose` adds per-step detail.
-- Exit codes: `0` success · `1` error · `2` usage / unknown command · `130` interrupted (Ctrl-C).
+- Exit codes: `0` success · `1` error · `2` usage / unknown command · `130` interrupted (Ctrl-C) · `143` terminated (SIGTERM).
+- The first SIGINT/SIGTERM cancels the owned command and awaits its cleanup. A second signal or
+  30-second deadline forces exit with an explicit stderr warning; exit status alone is not proof
+  of clean cancellation. Model/loading/finalization cleanup remains engine-owned.
 
 ## Commands
 
@@ -148,8 +151,8 @@ vocello generate --mode custom|design|clone --variant speed|quality \
 Streaming is now the default for `vocello generate`. It mirrors the app's engine streaming path (same
 `streamingInterval` and chunk delivery) and reports the user-perceived first-chunk latency, but it does
 **not** play audio as it generates — there is no live preview player; `--play` plays the completed file.
-Generation output is identical to the non-streaming path. Use `--no-stream` to force the old
-accumulate-then-decode behavior.
+Streaming and non-streaming are separately qualified paths; identical sampling settings do not
+guarantee identical output across them. Use `--no-stream` for accumulate-then-decode behavior.
 
 **Selecting a mode** — three equivalent ways: the shortcut subcommands `vocello custom|design|clone …`
 (a `--file` makes them route to `batch`), the explicit `--mode <mode>` flag, or — when you omit `--mode`
@@ -159,6 +162,12 @@ at an interactive terminal — a numbered picker. Scripted/piped runs without `-
 Prints the output WAV path on stdout (or a JSON object: `audioPath`, `durationSeconds`, `wallSeconds`,
 `realtimeFactor`, `finishReason`, `mode`, `variant`, `modelID`, and — when `--stream` — `firstChunkMS`
 and `chunks`).
+
+Explicit `--out` permits atomic replacement on successful QC/publication. Failed startup, QC,
+cancellation and publication preserve any previous destination. Only attempt-owned staging is
+discarded. Clone rejects a reference/output alias (including symlink and hardlink aliases).
+Two successful writers to the same destination use last-publication-wins; use distinct paths when
+both outputs must be retained.
 
 ### `batch` — synthesize many clips with a single model load
 
@@ -172,6 +181,13 @@ through **one loaded model** — far faster than repeated `generate` calls. Read
 omitted or `-`. Prints one output WAV path per line (or a JSON summary with `--json`). Also accepts
 `--seed` (applied to every item — re-running the batch reproduces it, and a fixed seed steadies
 cross-segment character) and `--variation`, like `generate`.
+
+Batch stops at the first failure. Its failure-only JSON is versioned (`schemaVersion: 2`) and
+contains every planned index/generation identity with `completed`, `failed`, `cancelled`, or
+`not_attempted` status; completed paths are retained. Failure exits nonzero. All-success JSON stays
+compatible. There is no automatic retry, seed substitution, or implicit resume. Batch uses Auto
+language per text and non-streaming output; `--language`, `--stream`, and `--out` are rejected
+instead of silently ignored (use `generate` or batch `--out-dir`).
 
 ### `voices` — manage saved clone voices
 

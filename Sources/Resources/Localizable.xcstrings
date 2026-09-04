@@ -1,6 +1,29 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "vocello.history.export_recovery_files" : {
+      "comment" : "User-directed export of retained audio and private recovery journals; not an upload or repair.",
+      "extractionState" : "manual",
+      "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Export Recovery Files" } } }
+    },
+    "vocello.history.long_form_recovery_detail" : {
+      "comment" : "Explains non-destructive recovery and the privacy implications of exporting an unresolved project journal.",
+      "extractionState" : "manual",
+      "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Long-form recovery is incomplete. Unrelated clips remain readable; project changes are blocked. Retry a temporary storage failure, or export recovery files for repair. These private files may contain script text and local paths. Exporting does not repair or delete them." } } }
+    },
+    "vocello.long_form.segment_history_failed" : {
+      "comment" : "Successful segment synthesis is distinct from History persistence and whole-project acceptance.",
+      "extractionState" : "manual",
+      "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "The segment audio was generated, but History could not finish saving it. Open History to retry storage or export the retained audio before quitting. The project has not been accepted." } } }
+    },
+    "vocello.history.recovery_export_failure" : {
+      "comment" : "Number of recovery files that failed a user-directed local export; originals remain retained.",
+      "extractionState" : "manual",
+      "localizations" : { "en" : { "variations" : { "plural" : {
+        "one" : { "stringUnit" : { "state" : "translated", "value" : "%lld recovery file could not be exported." } },
+        "other" : { "stringUnit" : { "state" : "translated", "value" : "%lld recovery files could not be exported." } }
+      } } } }
+    },
     "vocello.history.unqueued_title" : {
       "comment" : "Successful synthesis with a failure to durably queue its History record; not an engine failure.",
       "extractionState" : "manual",

@@ -1,5 +1,6 @@
 import AVFoundation
 import CryptoKit
+import Darwin
 import Foundation
 import MLX
 @preconcurrency import VocelloQwen3Core
@@ -439,16 +440,17 @@ final class GenerationOutputAdapter: GenerationOutputAdapting, @unchecked Sendab
     /// What the generation exit path may delete. Three terminal states:
     /// a completed streaming take keeps both the final WAV and the chunk
     /// session directory (the player replays chunks from it); a completed
-    /// non-streaming take keeps only the final WAV; anything that did not
-    /// complete (throw, cancellation) removes both so partial artifacts
-    /// cannot leak. The final output is a product artifact, never session
+    /// non-streaming take keeps only the final WAV. Unfinished takes remove
+    /// their session; the writer alone removes its UUID-owned staging file.
+    /// The requested destination may predate this attempt and is NEVER cleanup
+    /// authority. The final output is a product artifact, never session
     /// state — CM-7 was this table wrongly coupling its fate to streaming.
     nonisolated static func terminalCleanup(
         didCompleteProduct: Bool,
         usedStreaming: Bool
     ) -> (removeSession: Bool, removeOutput: Bool) {
         guard didCompleteProduct else {
-            return (removeSession: true, removeOutput: true)
+            return (removeSession: true, removeOutput: false)
         }
         return (removeSession: !usedStreaming, removeOutput: false)
     }
@@ -529,17 +531,17 @@ private enum AtomicFilePublisher {
     }
 
     static func publishAtomically(temporaryURL: URL, finalURL: URL) throws {
-        let fileManager = FileManager.default
-        if fileManager.fileExists(atPath: finalURL.path) {
-            _ = try fileManager.replaceItemAt(
-                finalURL,
-                withItemAt: temporaryURL,
-                backupItemName: nil,
-                options: []
-            )
-        } else {
-            try fileManager.moveItem(at: temporaryURL, to: finalURL)
+        // Same-directory staging guarantees one filesystem. rename is the
+        // single commit point: replace-or-create without an existence TOCTOU
+        // window. A failed publication leaves the previous destination intact.
+        // Concurrent explicit replacements are ordered by this commit point;
+        // neither writer may subsequently unlink the other's published file.
+        let result = temporaryURL.withUnsafeFileSystemRepresentation { source in
+            finalURL.withUnsafeFileSystemRepresentation { destination in
+                Darwin.rename(source!, destination!)
+            }
         }
+        guard result == 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
     }
 }
 
@@ -1233,6 +1235,7 @@ final class IncrementalPCM16WAVFileWriter {
             )
         }
         guard !published else { return }
+        try Task.checkCancellation()
         try AtomicFilePublisher.publishAtomically(
             temporaryURL: temporaryURL,
             finalURL: finalURL
@@ -1428,10 +1431,9 @@ struct StreamingExecutionContext: Sendable {
             throw error
         }
 
-        // Cleanup is decided per artifact on the way out. Any error or
-        // cancellation between directory creation and successful return
-        // removes both the session directory and the partially-written
-        // output file so they cannot leak (Tier 1.5). A completed take
+        // The writer owns its private staging file. The destination is not
+        // scratch: a failed attempt must preserve an existing caller-owned WAV.
+        // Cleanup here owns only the session directory. A completed take
         // always keeps its final WAV — retention of the *session directory*
         // is a streaming-only concern and must never delete the product
         // output with it (CM-7: every non-streaming success published a
@@ -1443,9 +1445,6 @@ struct StreamingExecutionContext: Sendable {
         defer {
             if terminalCleanup.removeSession {
                 try? FileManager.default.removeItem(at: sessionDirectory)
-            }
-            if terminalCleanup.removeOutput {
-                try? FileManager.default.removeItem(at: outputURL)
             }
         }
 
@@ -1756,7 +1755,6 @@ struct StreamingExecutionContext: Sendable {
                 )
             )
             finalWriter.discard()
-            try? FileManager.default.removeItem(at: outputURL)
             try? FileManager.default.removeItem(at: sessionDirectory)
             Memory.clearCache()
             throw error
@@ -1804,7 +1802,6 @@ struct StreamingExecutionContext: Sendable {
                 )
             )
             finalWriter.discard()
-            try? FileManager.default.removeItem(at: outputURL)
             try? FileManager.default.removeItem(at: sessionDirectory)
             Memory.clearCache()
             throw terminalError
@@ -1887,11 +1884,8 @@ struct StreamingExecutionContext: Sendable {
                 throw Self.finalAudioQCRejectionError(flags: finalAudioQC.flags)
             }
             try finalWriter.publish()
-            guard Self.isReadableWAV(at: outputURL) else {
-                throw MLXTTSEngineError.generationFailed(
-                    "The atomically published streaming WAV could not be reopened for reading."
-                )
-            }
+            // The exact staged bytes were validated above. Publication commits
+            // them; a later destination lookup could observe another writer.
         } catch {
             NativeStreamingSignposts.signposter.endInterval(
                 "Native Final WAV Finish",

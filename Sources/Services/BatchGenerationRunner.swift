@@ -118,12 +118,24 @@ struct BatchGenerationItemState: Identifiable, Equatable {
 @MainActor
 protocol GenerationPersisting {
     func saveGeneration(_ generation: Generation) async throws -> Generation
+    func retainLongFormSegment(_ generation: Generation) async throws
     func acceptLongFormProject(_ input: LongFormHistoryAcceptance) async throws -> Generation
+}
+
+extension GenerationPersisting {
+    func retainLongFormSegment(_ generation: Generation) async throws {
+        _ = try await saveGeneration(generation)
+    }
 }
 
 extension DatabaseService: GenerationPersisting {
     func saveGeneration(_ generation: Generation) async throws -> Generation {
         try await GenerationHistoryRecovery.persist(generation)
+    }
+
+    func retainLongFormSegment(_ generation: Generation) async throws {
+        let outcome = await GenerationPersistence.persist(generation, caller: "LongFormSegment")
+        try outcome.requireSavedLongFormSegment()
     }
 
 }
@@ -850,13 +862,17 @@ final class BatchGenerationRunner {
 
                 let generation = request.makeHistoryRecord(for: line, result: result)
                 if request.segmentationMode == .longForm {
-                    // A completed segment is session-resumable, not yet an
-                    // accepted project. Commit all rows only after joined QC.
+                    // Retain the accepted individual take before continuing.
+                    // Without a joined row it is an ordinary, exportable and
+                    // deletable History segment, not an accepted project.
                     items[index].historyRecord = generation
                     if let plan = request.longFormPlan {
                         items[index].historyRecord?.seed = Int64(bitPattern: plan.segments[index].evidence.effectiveSubseed)
                     }
                     items[index].generationID = generationID
+                    if let record = items[index].historyRecord {
+                        try await store.retainLongFormSegment(record)
+                    }
                 } else {
                     let savedGeneration = try await store.saveGeneration(generation)
                     generationEvents.announceGenerationAppended(savedGeneration)

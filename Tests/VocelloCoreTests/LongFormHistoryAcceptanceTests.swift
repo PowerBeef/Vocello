@@ -17,7 +17,7 @@ final class LongFormHistoryAcceptanceTests: XCTestCase {
         let saved = try await f.store.commit(f.input, using: f.queue)
         XCTAssertNotNil(saved.id)
         XCTAssertEqual(try Data(contentsOf: f.input.manifestURL), try f.input.manifest.canonicalJSONData())
-        XCTAssertEqual(try rowCount(f.queue), 3)
+        XCTAssertEqual(try rowCount(f.queue), 4)
         XCTAssertTrue(FileManager.default.fileExists(atPath: f.oldJoined.path))
         XCTAssertTrue(try journalURLs(f.store).isEmpty)
     }
@@ -60,7 +60,7 @@ final class LongFormHistoryAcceptanceTests: XCTestCase {
         try f.queue.write { db in try f.store.reconcile(in: db) }
         try f.queue.write { db in try f.store.reconcile(in: db) }
         XCTAssertTrue(try journalURLs(f.store).isEmpty)
-        XCTAssertEqual(try rowCount(f.queue), 3)
+        XCTAssertEqual(try rowCount(f.queue), 4)
         XCTAssertTrue(FileManager.default.fileExists(atPath: f.input.joined.audioPath))
         XCTAssertEqual(try Data(contentsOf: f.input.manifestURL), try f.input.manifest.canonicalJSONData())
     }
@@ -116,14 +116,14 @@ final class LongFormHistoryAcceptanceTests: XCTestCase {
         let first = try await f.store.commit(f.input, using: f.queue)
         let second = try await f.store.commit(f.input, using: f.queue)
         XCTAssertEqual(first.id, second.id)
-        XCTAssertEqual(try rowCount(f.queue), 3)
+        XCTAssertEqual(try rowCount(f.queue), 4)
         var different = f.input.joined
         different.seed = 99
         let bad = LongFormHistoryAcceptance(manifestURL: f.input.manifestURL, manifest: f.input.manifest,
             segments: f.input.segments, joined: different, joinedQCPassed: true, ownedAudioURLs: f.input.ownedAudioURLs)
         do { _ = try await f.store.commit(bad, using: f.queue); XCTFail("Cross-request identity accepted") } catch {}
         XCTAssertTrue(FileManager.default.fileExists(atPath: f.input.joined.audioPath))
-        XCTAssertEqual(try rowCount(f.queue), 3)
+        XCTAssertEqual(try rowCount(f.queue), 4)
     }
 
     func testUnrelatedManifestEditIsNeverOverwrittenByRecovery() throws {
@@ -186,6 +186,58 @@ final class LongFormHistoryAcceptanceTests: XCTestCase {
         let old = try JSONDecoder().decode(LongFormSegmentExecutionEvidence.self, from: oldSegment)
         XCTAssertNil(old.generationID)
         XCTAssertNil(old.effectiveSeed)
+    }
+
+    func testCorruptJournalAllowsOnlyUnrelatedReadAndBoundedPrivateExport() throws {
+        let f = try fixture()
+        var standalone = f.input.segments[0]
+        standalone.longFormProjectID = nil
+        standalone.longFormRole = nil
+        try f.queue.write { db in
+            try standalone.insert(db)
+            try f.store.prepare(f.input, in: db)
+        }
+        let journal = try XCTUnwrap(journalURLs(f.store).first)
+        let corrupt = Data("corrupt fixture with private text".utf8)
+        try corrupt.write(to: journal)
+        let readable = try f.queue.write { try f.store.readableHistory(in: $0) }
+        XCTAssertEqual(readable.map(\.audioPath), [standalone.audioPath])
+        XCTAssertTrue(f.store.hasPendingRecovery)
+        XCTAssertEqual(try f.store.recoveryExportURLs(), [journal])
+        XCTAssertEqual(try Data(contentsOf: journal), corrupt)
+        XCTAssertThrowsError(try f.queue.write { try f.store.reconcile(in: $0) })
+        XCTAssertEqual(try rowCount(f.queue), 2)
+        try FileManager.default.removeItem(at: journal)
+        try FileManager.default.createSymbolicLink(at: journal, withDestinationURL: f.oldJoined)
+        XCTAssertThrowsError(try f.store.recoveryExportURLs(), "Never export a redirected private file")
+    }
+
+    func testRetainedSegmentsSurviveJoinFailureAndSupersededOutputRemainsOwned() async throws {
+        let f = try fixture()
+        try await f.queue.write { db in
+            for var segment in f.input.segments { try segment.insert(db) }
+        }
+        let rejected = LongFormHistoryAcceptance(manifestURL: f.input.manifestURL, manifest: f.input.manifest,
+            segments: f.input.segments, joined: f.input.joined, joinedQCPassed: false,
+            ownedAudioURLs: f.input.ownedAudioURLs)
+        do { _ = try await f.store.commit(rejected, using: f.queue); XCTFail("Joined QC must reject acceptance") }
+        catch {}
+        let retained = try await f.queue.read { try Generation.fetchAll($0) }
+        XCTAssertEqual(Set(retained.map(\.audioPath)), Set(f.input.segments.map(\.audioPath) + [f.oldJoined.path]))
+        XCTAssertEqual(try Data(contentsOf: f.input.manifestURL), f.oldManifest)
+        for segment in f.input.segments {
+            XCTAssertEqual(try Data(contentsOf: URL(fileURLWithPath: segment.audioPath)), Data("fixture audio".utf8))
+        }
+        let saved = try await f.store.commit(f.input, using: f.queue)
+        XCTAssertNotNil(saved.id)
+        let rows = try await f.queue.read { try Generation.fetchAll($0) }
+        XCTAssertEqual(rows.count, 4)
+        XCTAssertEqual(rows.first { $0.audioPath == f.oldJoined.path }?.longFormRole, "superseded")
+        XCTAssertEqual(rows.filter { $0.longFormRole == "joined" }.count, 1)
+        XCTAssertEqual(Set(rows.map(\.audioPath)), Set(f.input.segments.map(\.audioPath) + [f.input.joined.audioPath, f.oldJoined.path]))
+        XCTAssertNoThrow(try GenerationHistoryPersistenceOutcome.saved.requireSavedLongFormSegment())
+        XCTAssertThrowsError(try GenerationHistoryPersistenceOutcome.queuedForRecovery.requireSavedLongFormSegment())
+        XCTAssertThrowsError(try GenerationHistoryPersistenceOutcome.unableToQueue.requireSavedLongFormSegment())
     }
 
     private struct Fixture: Sendable {

@@ -148,7 +148,7 @@ struct LongFormHistoryAcceptanceStore: Sendable {
                 try segment.insert(db)
             }
         }
-        try db.execute(sql: "DELETE FROM generations WHERE longFormProjectID = ? AND longFormRole = 'joined'",
+        try db.execute(sql: "UPDATE generations SET longFormRole = 'superseded' WHERE longFormProjectID = ? AND longFormRole = 'joined'",
                        arguments: [input.joined.longFormProjectID])
         var joined = input.joined
         try joined.insert(db)
@@ -199,6 +199,36 @@ struct LongFormHistoryAcceptanceStore: Sendable {
                 // History's existing degraded-state/Retry flow. No raw path leaks.
                 throw LongFormAcceptanceError.recoveryRequired
             }
+        }
+    }
+
+    /// A damaged project must not hide unrelated standalone recordings. Project
+    /// rows remain withheld and all mutations still require successful recovery.
+    func readableHistory(in db: Database) throws -> [Generation] {
+        do { try reconcile(in: db) }
+        catch LongFormAcceptanceError.recoveryRequired {
+            return try Generation
+                .filter(Generation.Columns.longFormProjectID == nil && Generation.Columns.longFormRole == nil)
+                .order(Generation.Columns.createdAt.desc).fetchAll(db)
+        }
+        return try Generation.order(Generation.Columns.createdAt.desc).fetchAll(db)
+    }
+
+    var hasPendingRecovery: Bool {
+        do { return try !journalURLs().isEmpty }
+        catch { return true }
+    }
+
+    /// Explicit, user-controlled local export only. Never follow paths decoded
+    /// from an untrusted journal, erase it, or pretend exporting repairs it.
+    /// The UI warns that these private records contain text and local paths.
+    func recoveryExportURLs() throws -> [URL] {
+        try journalURLs().map { url in
+            try requireRegularFile(url)
+            guard (try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0) <= Self.maximumJournalBytes else {
+                throw LongFormAcceptanceError.recoveryRequired
+            }
+            return url
         }
     }
 

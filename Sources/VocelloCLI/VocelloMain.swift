@@ -6,10 +6,11 @@ import Foundation
 @MainActor
 enum VocelloMain {
     static func main() async {
-        // Exit cleanly on Ctrl-C (130 = 128 + SIGINT) instead of dumping a stack.
-        // Partial output left mid-generation is acceptable for a dev/bench tool.
-        signal(SIGINT) { _ in exit(130) }
+        let code = await CLIProcessSupervisor.run { await execute() }
+        if code != 0 { exit(code) }
+    }
 
+    private static func execute() async -> Int32 {
         var argv = Array(CommandLine.arguments.dropFirst())
         guard let sub = argv.first else { printUsage(); exit(2) }
         argv.removeFirst()
@@ -48,10 +49,14 @@ enum VocelloMain {
                 printUsage()
                 exit(2)
             }
+        } catch is CancellationError {
+            FileHandle.standardError.write(Data("Cancelled; command cleanup completed.\n".utf8))
+            return 130
         } catch {
             FileHandle.standardError.write(Data("error: \(error)\n".utf8))
-            exit(1)
+            return 1
         }
+        return 0
     }
 
     static func printUsage() {

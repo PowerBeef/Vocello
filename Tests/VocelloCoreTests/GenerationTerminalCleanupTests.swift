@@ -25,13 +25,13 @@ final class GenerationTerminalCleanupTests: XCTestCase {
         XCTAssertFalse(cleanup.removeSession, "the player replays chunks from the session directory")
     }
 
-    func testUnfinishedTakeRemovesEverything() {
+    func testUnfinishedTakeCannotDeleteCallerDestination() {
         for streaming in [false, true] {
             let cleanup = GenerationOutputAdapter.terminalCleanup(
                 didCompleteProduct: false,
                 usedStreaming: streaming
             )
-            XCTAssertTrue(cleanup.removeOutput, "partial output must not leak (streaming=\(streaming))")
+            XCTAssertFalse(cleanup.removeOutput, "only the writer owns private staging (streaming=\(streaming))")
             XCTAssertTrue(cleanup.removeSession, "partial session must not leak (streaming=\(streaming))")
         }
     }

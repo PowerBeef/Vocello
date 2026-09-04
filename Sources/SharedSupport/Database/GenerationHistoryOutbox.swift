@@ -96,9 +96,10 @@ struct GenerationHistoryRecoverySnapshot: Equatable, Sendable {
     let issueCount: Int
     let clearRecoveryPending: Bool
     var unqueuedCount: Int = 0
+    var longFormRecoveryPending: Bool = false
 
     var needsAttention: Bool {
-        pendingCount > 0 || unqueuedCount > 0 || issueCount > 0 || clearRecoveryPending
+        pendingCount > 0 || unqueuedCount > 0 || issueCount > 0 || clearRecoveryPending || longFormRecoveryPending
     }
 }
 

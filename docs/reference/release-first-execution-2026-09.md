@@ -61,6 +61,42 @@ edit unrelated source or documentation and then bypass the full-tree identity ch
 results in the roadmap at the next source checkpoint. A changed product needs fresh applicable
 acceptance; old results remain historical evidence, not replacement candidate proof.
 
+## September 4 current-source amendment
+
+The [engineering audit grounding](engineering-audit-grounding-2026-09-04.md) reviews the new
+HTML report against `75ecb740`, not merely its `616fdfe2` baseline. All 12 findings have an
+evidence-qualified disposition. The primary programme and 3.0.0 target are unchanged.
+
+Before RF-09 freezes the next candidate, complete this bounded source amendment in order:
+
+1. Protect existing output bytes (**F-18**) and repair secondary Saved Voice rollback failure
+   (**reopened F-01**).
+2. Prove or refute stale macOS terminal ownership (**F-19**) and cross-process Saved Voice
+   interference (**F-22**) with controlled tests; implement only the narrow evidenced correction.
+3. Finish graceful CLI interruption (**F-20**) and truthful partial-batch reporting (**F-21**)
+   under existing F-17/RF-08 packaging work.
+4. Complete corrupt-journal recovery and retained-artifact ownership checks under **F-16/F-06**,
+   and strict live-duration/accurate edge-coverage semantics under **VLR-07/RF-06**.
+5. Run focused verification per patch, then one coherent RF-09 checkpoint and exact-SHA CI/Security.
+
+These are source prerequisites, not circular dependencies on those items' later candidate/device
+closure. RF-03/04/05 still record their earlier implementation milestones; they do not close new
+failure schedules. RF-10 through RF-12 retain packaged acceptance, the full 201-take iPhone
+campaign, and qualified external decisions. Existing successes and failures remain immutable.
+No additional harness, prompt study, or engine rewrite is part of this amendment.
+
+The amendment's source work and deterministic verification are now complete; see the
+[current checkpoint](../development-progress.md#resume-here-2026-09-04) for the exact native,
+Python, build and website results, including retained red-to-green reproductions. This does not
+close the referenced corrected-candidate gates. RF-09 still requires exact-SHA CI/Security and
+authorized tag/account preparation before freeze; RF-10 owns signed-package proof, RF-06/RF-07
+own the next focused iPhone session, and RF-02 retains qualified owner/privacy/rights decisions.
+
+Reviewer free-space guidance and the stale dependency table were corrected during review;
+App Store Connect metadata and product behavior were not changed. AGENTS.md already expresses
+the required authority, ownership and verification boundaries; run-specific progress belongs here
+and in the roadmap, not in its durable instructions.
+
 ## Audit finding disposition
 
 | External finding | Grounded disposition and authority |

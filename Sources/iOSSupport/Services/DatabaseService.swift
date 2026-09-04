@@ -108,8 +108,8 @@ final class DatabaseService: @unchecked Sendable {
         }
     }
 
-    /// Deletes any existing joined-output row for the generation's long-form
-    /// project, then saves the new one — one joined record per project.
+    /// Retains older joined outputs as individually deletable History rows, then
+    /// saves the new accepted output — one current joined record per project.
     func replaceLongFormJoinedGenerationAsync(_ generation: Generation) async throws -> Generation {
         try await replaceLongFormJoinedGenerationIfMissingAsync(generation)
     }
@@ -126,7 +126,7 @@ final class DatabaseService: @unchecked Sendable {
                 }
                 if let projectID = generation.longFormProjectID {
                     try db.execute(
-                        sql: "DELETE FROM generations WHERE longFormProjectID = ? AND longFormRole = 'joined'",
+                        sql: "UPDATE generations SET longFormRole = 'superseded' WHERE longFormProjectID = ? AND longFormRole = 'joined'",
                         arguments: [projectID]
                     )
                 }
@@ -143,8 +143,7 @@ final class DatabaseService: @unchecked Sendable {
         let dbQueue = try requireQueue(for: .read)
         do {
             return try dbQueue.write { db in
-                try longFormAcceptance.reconcile(in: db)
-                return try Generation.order(Generation.Columns.createdAt.desc).fetchAll(db)
+                return try longFormAcceptance.readableHistory(in: db)
             }
         } catch {
             throw HistoryPersistenceError.classify(error, operation: .read)

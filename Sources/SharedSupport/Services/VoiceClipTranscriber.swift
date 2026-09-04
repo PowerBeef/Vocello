@@ -562,11 +562,10 @@ enum VoiceClipTranscriber {
         return recomputed.status == .consistent && recomputed.transcript == transcript
     }
 
-    /// Validates that every otherwise-consistent Speech pass represents the complete source WAV,
-    /// rather than one internally consistent utterance somewhere inside it. This is deliberately a
-    /// pure seam: retained timing evidence and the immutable WAV duration are sufficient for tests
-    /// and host-side diagnosis, and no requested text or label influences the decision.
-    static func hasCompleteTemporalCoverage(
+    /// Checks first/last recognized timestamps against the WAV edges. This does
+    /// NOT establish coverage of interior speech or prove language/intelligibility;
+    /// consensus, WER/CER, and PCM/cadence checks remain independent requirements.
+    static func hasAudioEdgeCoverage(
         _ evidence: VerificationEvidence,
         sourceAudioDurationSeconds: Double
     ) -> Bool {
@@ -596,6 +595,11 @@ enum VoiceClipTranscriber {
                 && end >= latestRequiredEnd
                 && end <= latestPermittedEnd
         }
+    }
+
+    /// Compatibility name for retained test/diagnostic callers; edge-only semantics.
+    static func hasCompleteTemporalCoverage(_ evidence: VerificationEvidence, sourceAudioDurationSeconds: Double) -> Bool {
+        hasAudioEdgeCoverage(evidence, sourceAudioDurationSeconds: sourceAudioDurationSeconds)
     }
 
     /// NaturalLanguage probability mass that the text is in `expected` (handles script/region

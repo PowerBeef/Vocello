@@ -208,9 +208,15 @@ Long-form generation and segment regeneration await the shared journaled accepta
 Unique candidate audio, segment/joined QC, and manifest serialization precede accepted History
 mutation. A failed replacement retains the previous accepted project; interrupted commits are
 reconciled before History is read or written. Progress counts unique completed segments, including
-reused ones, once. Completed segment audio is retained for in-session continuation and is not
-reported as a saved project until whole-project acceptance succeeds. Manifest v4 stays compatible;
+reused ones, once. Completed segments are individually saved and remain exportable/deletable in History after
+abandonment or relaunch; project continuation is still in-session only. They are not reported as
+a saved project until whole-project acceptance succeeds. Manifest v4 stays compatible;
 generation continuation is not restored across app launches.
+
+A corrupt long-form journal does not hide unrelated standalone History. Project rows stay withheld
+and mutations fail closed; Export Recovery Files can retain the private bounded journals for repair.
+The warning explains that exports may include script text and local paths; exporting does not repair
+or delete the originals.
 
 ### Settings tab — `Sources/iOS/Settings/SettingsScreen.swift`
 

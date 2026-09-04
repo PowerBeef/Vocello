@@ -15,9 +15,11 @@ sourceOfTruth:
 > lifecycle, persistence, model management, and telemetry. When this doc disagrees
 > with the code, **the code wins** — fix this doc.
 >
-> Last reviewed: 2026-09-02. The latest `project.yml` change moves clone-reference transcription
+> Architecture review checkpoint: 2026-09-02. At that checkpoint, `project.yml` moved clone-reference transcription
 > review into SharedSupport and registers the pure macOS Design/Clone request factory with its
 > deterministic tests; engine hosting, model delivery, and runtime topology are unchanged.
+> A bounded September 4 audit correction updates the resolved swift-transformers entry below;
+> it does not represent a new whole-architecture review.
 
 ## TL;DR
 
@@ -175,7 +177,7 @@ Resolved versions (`QwenVoice.xcodeproj/.../Package.resolved`):
 | **VocelloQwen3Core** | owned package derived from `mlx-audio-swift` `v0.1.2` | Stable first-party `VocelloQwen3Core` facade for model-bundle, capability, sampling, memory, synthesis, terminal, cancellation, and diagnostic contracts. Compatibility-preserved `MLXAudioCore`, `MLXAudioCodecs`, and `MLXAudioTTS` modules remain implementation surfaces for Qwen3-TTS load, tokenize, and decode. |
 | **GRDB.swift** | `7.10.0` | SQLite for local `history.sqlite`. |
 | **SwiftHuggingFace** | `0.9.0` | Hugging Face model download / hub client. |
-| **swift-transformers** | `1.1.9` | Hub/Tokenizers implementation — a **direct** dependency of `MLXAudioTTS` since the mlx-swift-lm 3.x bump (pinned to the exact version the 2.x graph resolved). |
+| **swift-transformers** | `1.3.3` | Hub/Tokenizers implementation — a **direct**, exact-pinned dependency of `MLXAudioTTS`; the owned package manifest and resolved graph are authoritative. |
 | swift-jinja | `2.4.2` | Chat/template formatting (transitive via swift-transformers). |
 | yyjson | `0.12.0` | JSON parsing (transitive via swift-transformers). |
 | swift-nio | `2.100.0` | Networking primitives (transitive, via SwiftHuggingFace/EventSource); minimum security baseline includes the `ByteBuffer` bounds fix. |

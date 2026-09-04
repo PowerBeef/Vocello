@@ -3,6 +3,229 @@ import Foundation
 import XCTest
 
 final class PreparedVoiceRepositoryTests: XCTestCase {
+    private enum Injected: Error { case filesystem }
+
+    func testNativeStoreWorker() async throws {
+        let environment = ProcessInfo.processInfo.environment
+        guard let path = environment["VOCELLO_TEST_STORE_ROOT"], let phase = environment["VOCELLO_TEST_STORE_PHASE"] else { return }
+        let shared = URL(fileURLWithPath: path)
+        let source = shared.appendingPathComponent("source.wav")
+        try Data([1, 2, 3]).write(to: source)
+        let normal = PreparedVoiceRepository(appSupportDirectory: shared, supportedAudioExtensions: ["wav"])
+        if phase != "prepare" {
+            let old = try await normal.prepare(name: "Same", audioURL: source, transcript: "old", qualityWarnings: [], replacingVoiceID: nil)
+            _ = try await normal.commit(id: old.id)
+        }
+        let worker = PreparedVoiceRepository(appSupportDirectory: shared, supportedAudioExtensions: ["wav"], fault: { point in
+            let matches: Bool
+            switch point {
+            case .beforeCandidatePublication: matches = phase == "prepare"
+            case .beforeAudioPublication: matches = phase == "replace"
+            case .beforeTransactionCleanup: matches = phase == "delete"
+            default: matches = false
+            }
+            guard matches else { return }
+            try Data("locked".utf8).write(to: shared.appendingPathComponent("locked"), options: .atomic)
+            let deadline = Date().addingTimeInterval(15)
+            while !FileManager.default.fileExists(atPath: shared.appendingPathComponent("release").path) {
+                guard Date() < deadline else { throw Injected.filesystem }
+                Thread.sleep(forTimeInterval: 0.02) // Test-only bounded condition poll inside the held operation.
+            }
+        })
+        switch phase {
+        case "prepare":
+            _ = try await worker.prepare(name: "New", audioURL: source, transcript: "new", qualityWarnings: [], replacingVoiceID: nil)
+        case "replace":
+            let candidate = try await normal.prepare(name: "Same", audioURL: source, transcript: "new", qualityWarnings: [], replacingVoiceID: "Same")
+            _ = try await worker.commit(id: candidate.id)
+        case "delete":
+            _ = try await worker.delete(id: "Same")
+        default: XCTFail("Unknown fixture phase")
+        }
+    }
+
+    func testTwoNativeProcessesExcludePreparationReplacementAndDeletion() async throws {
+        for phase in ["prepare", "replace", "delete"] {
+            let shared = root.appendingPathComponent(phase)
+            try FileManager.default.createDirectory(at: shared, withIntermediateDirectories: true)
+            let child = Process()
+            child.executableURL = URL(fileURLWithPath: "/usr/bin/xcrun")
+            child.arguments = ["xctest", "-XCTest", "VocelloCoreTests.PreparedVoiceRepositoryTests/testNativeStoreWorker", Bundle(for: Self.self).bundleURL.path]
+            var environment = ProcessInfo.processInfo.environment
+            environment["VOCELLO_TEST_STORE_ROOT"] = shared.path
+            environment["VOCELLO_TEST_STORE_PHASE"] = phase
+            child.environment = environment
+            child.standardOutput = FileHandle.nullDevice
+            child.standardError = FileHandle.nullDevice
+            try child.run()
+            defer { if child.isRunning { kill(child.processIdentifier, SIGKILL); child.waitUntilExit() } }
+            let deadline = ContinuousClock.now + .seconds(15)
+            while !FileManager.default.fileExists(atPath: shared.appendingPathComponent("locked").path), child.isRunning, ContinuousClock.now < deadline {
+                try await Task.sleep(for: .milliseconds(20))
+            }
+            XCTAssertTrue(FileManager.default.fileExists(atPath: shared.appendingPathComponent("locked").path))
+            let competing = PreparedVoiceRepository(appSupportDirectory: shared, supportedAudioExtensions: ["wav"])
+            do { _ = try await competing.list(); XCTFail("Live operation must exclude startup reconciliation") }
+            catch { XCTAssertEqual(error as? PreparedVoiceRepositoryError, .storeBusy) }
+            do { try await competing.reconcile(); XCTFail("Live transaction must not be recovered") }
+            catch { XCTAssertEqual(error as? PreparedVoiceRepositoryError, .storeBusy) }
+            try Data().write(to: shared.appendingPathComponent("release"), options: .atomic)
+            while child.isRunning, ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(20)) }
+            XCTAssertFalse(child.isRunning)
+            guard !child.isRunning else { continue }
+            XCTAssertEqual(child.terminationStatus, 0)
+            let voices = try await competing.list()
+            XCTAssertEqual(voices.map(\.id), phase == "replace" ? ["Same"] : [])
+            if phase == "replace" {
+                XCTAssertEqual(try Data(contentsOf: voices[0].audioURL), Data([1, 2, 3]))
+                XCTAssertEqual(try String(contentsOf: shared.appendingPathComponent("voices/Same.txt"), encoding: .utf8), "new")
+            }
+        }
+    }
+
+    func testFailedRollbackRetainsBackupAndRecoveryIsIdempotent() async throws {
+        let repository = makeRepository()
+        let source = try writeSource(named: "old.wav", bytes: [1, 2, 3])
+        let original = try await repository.prepare(name: "Same", audioURL: source, transcript: "old",
+            qualityWarnings: [], replacingVoiceID: nil)
+        _ = try await repository.commit(id: original.id)
+        let next = try writeSource(named: "new.wav", bytes: [4, 5, 6])
+        let candidate = try await repository.prepare(name: "Same", audioURL: next, transcript: "new",
+            qualityWarnings: [], replacingVoiceID: "Same")
+        let failing = PreparedVoiceRepository(appSupportDirectory: root, supportedAudioExtensions: extensions, fault: { point in
+            switch point {
+            case .beforeAudioPublication, .beforeRestoreAsset: throw Injected.filesystem
+            default: break
+            }
+        })
+        do {
+            _ = try await failing.commit(id: candidate.id)
+            XCTFail("injected failure must surface")
+        } catch { XCTAssertEqual(error as? PreparedVoiceRepositoryError, .recoveryRequired) }
+        let transactions = try FileManager.default.contentsOfDirectory(at: root.appendingPathComponent("voice-transactions"), includingPropertiesForKeys: nil)
+        let journal = try XCTUnwrap(transactions.first)
+        XCTAssertEqual(try Data(contentsOf: journal.appendingPathComponent("Same.wav")), Data([1, 2, 3]))
+        try await repository.reconcile()
+        try await repository.reconcile()
+        XCTAssertEqual(try Data(contentsOf: root.appendingPathComponent("voices/Same.wav")), Data([1, 2, 3]))
+        XCTAssertEqual(try String(contentsOf: root.appendingPathComponent("voices/Same.txt"), encoding: .utf8), "old")
+        _ = try await repository.commit(id: candidate.id)
+        XCTAssertEqual(try Data(contentsOf: root.appendingPathComponent("voices/Same.wav")), Data([4, 5, 6]))
+    }
+
+    func testCommittedCleanupFailureNeverRollsBackNewVoice() async throws {
+        let repository = makeRepository()
+        let source = try writeSource(named: "old.wav", bytes: [1])
+        let original = try await repository.prepare(name: "Same", audioURL: source, transcript: "old", qualityWarnings: [], replacingVoiceID: nil)
+        _ = try await repository.commit(id: original.id)
+        let next = try writeSource(named: "new.wav", bytes: [2])
+        let candidate = try await repository.prepare(name: "Same", audioURL: next, transcript: "new", qualityWarnings: [], replacingVoiceID: "Same")
+        let failing = PreparedVoiceRepository(appSupportDirectory: root, supportedAudioExtensions: extensions, fault: { point in
+            if case .beforeTransactionCleanup = point { throw Injected.filesystem }
+        })
+        let committed = try await failing.commit(id: candidate.id)
+        XCTAssertTrue(committed.cleanupPending)
+        XCTAssertEqual(try Data(contentsOf: committed.audioURL), Data([2]))
+        try await repository.reconcile()
+        try await repository.reconcile()
+        XCTAssertEqual(try Data(contentsOf: committed.audioURL), Data([2]))
+        XCTAssertEqual(try String(contentsOf: root.appendingPathComponent("voices/Same.txt"), encoding: .utf8), "new")
+    }
+
+    func testRollbackCleanupFailureDoesNotDeleteRestoredSidecarsOnRetry() async throws {
+        let repository = makeRepository()
+        let source = try writeSource(named: "old.wav", bytes: [1])
+        let original = try await repository.prepare(name: "Same", audioURL: source, transcript: "old", qualityWarnings: [], replacingVoiceID: nil)
+        _ = try await repository.commit(id: original.id)
+        let candidate = try await repository.prepare(name: "Same", audioURL: source, transcript: "new", qualityWarnings: [], replacingVoiceID: "Same")
+        let failing = PreparedVoiceRepository(appSupportDirectory: root, supportedAudioExtensions: extensions, fault: { point in
+            switch point {
+            case .beforeAudioPublication, .beforeTransactionCleanup: throw Injected.filesystem
+            default: break
+            }
+        })
+        await XCTAssertThrowsErrorAsync { _ = try await failing.commit(id: candidate.id) }
+        try await repository.reconcile()
+        XCTAssertEqual(try String(contentsOf: root.appendingPathComponent("voices/Same.txt"), encoding: .utf8), "old")
+        XCTAssertEqual(try Data(contentsOf: root.appendingPathComponent("voices/Same.wav")), Data([1]))
+    }
+
+    func testChangedPublishedAudioRetainsBothVersionsInsteadOfGuessingRollback() async throws {
+        let repository = makeRepository()
+        let source = try writeSource(named: "old.wav", bytes: [1])
+        let original = try await repository.prepare(name: "Same", audioURL: source, transcript: "old", qualityWarnings: [], replacingVoiceID: nil)
+        _ = try await repository.commit(id: original.id)
+        let newer = try writeSource(named: "new.wav", bytes: [2])
+        let candidate = try await repository.prepare(name: "Same", audioURL: newer, transcript: "new", qualityWarnings: [], replacingVoiceID: "Same")
+        let failing = PreparedVoiceRepository(appSupportDirectory: root, supportedAudioExtensions: extensions, fault: { point in
+            if case .beforeCandidateCleanup = point { throw Injected.filesystem }
+        })
+        let committed = try await failing.commit(id: candidate.id)
+        XCTAssertTrue(committed.cleanupPending)
+        try Data([3]).write(to: committed.audioURL)
+        for _ in 0..<2 {
+            do { try await repository.reconcile(); XCTFail("Changed publication must remain unresolved") }
+            catch { XCTAssertEqual(error as? PreparedVoiceRepositoryError, .recoveryRequired) }
+        }
+        let transaction = try XCTUnwrap(FileManager.default.contentsOfDirectory(at: root.appendingPathComponent("voice-transactions"), includingPropertiesForKeys: nil).first)
+        XCTAssertEqual(try Data(contentsOf: transaction.appendingPathComponent("Same.wav")), Data([1]))
+        XCTAssertEqual(try Data(contentsOf: committed.audioURL), Data([3]))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: transaction.appendingPathComponent("transaction.json").path))
+        // Once exact published bytes are restored, forward recovery is safe.
+        try Data([2]).write(to: committed.audioURL)
+        try await repository.reconcile()
+        XCTAssertEqual(try Data(contentsOf: committed.audioURL), Data([2]))
+    }
+
+    func testDeleteCleanupFailureRetainsWitnessAndFinishesWithoutResurrection() async throws {
+        let repository = makeRepository()
+        let source = try writeSource(named: "source.wav")
+        let candidate = try await repository.prepare(name: "Delete", audioURL: source, transcript: "delete", qualityWarnings: [], replacingVoiceID: nil)
+        _ = try await repository.commit(id: candidate.id)
+        let failing = PreparedVoiceRepository(appSupportDirectory: root, supportedAudioExtensions: extensions, fault: { point in
+            if case .beforeTransactionCleanup = point { throw Injected.filesystem }
+        })
+        try await failing.delete(id: "Delete")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: root.appendingPathComponent("voices/Delete.wav").path))
+        try await repository.reconcile()
+        try await repository.reconcile()
+        let listed = try await repository.list()
+        XCTAssertTrue(listed.isEmpty)
+    }
+
+    #if os(macOS)
+    func testAnotherProcessLockRefusesAllOperationsWithoutReconciliation() async throws {
+        let repository = makeRepository()
+        try await repository.reconcile()
+        let partial = root.appendingPathComponent("voice-candidates/.partial-active")
+        try FileManager.default.createDirectory(at: partial, withIntermediateDirectories: true)
+        let process = Process()
+        let output = Pipe()
+        let input = Pipe()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/python3")
+        process.arguments = ["-c", "import fcntl,sys; f=open(sys.argv[1],'a'); fcntl.flock(f,fcntl.LOCK_EX); print('locked',flush=True); sys.stdin.read(1)", root.appendingPathComponent(".voice-store.lock").path]
+        process.standardOutput = output
+        process.standardInput = input
+        try process.run()
+        defer { try? input.fileHandleForWriting.close(); process.waitUntilExit() }
+        XCTAssertEqual(String(data: output.fileHandleForReading.availableData, encoding: .utf8), "locked\n")
+        for action in 0..<6 {
+            do {
+                switch action {
+                case 0: try await repository.reconcile()
+                case 1: _ = try await repository.list()
+                case 2: _ = try await repository.prepare(name: "test", audioURL: root, transcript: nil, qualityWarnings: [], replacingVoiceID: nil)
+                case 3: _ = try await repository.commit(id: UUID())
+                case 4: try await repository.discard(id: UUID())
+                default: try await repository.delete(id: "test")
+                }
+                XCTFail("must reject while the other process holds the lock")
+            } catch { XCTAssertEqual(error as? PreparedVoiceRepositoryError, .storeBusy) }
+        }
+        XCTAssertTrue(FileManager.default.fileExists(atPath: partial.path), "must not sweep another process's active staging")
+    }
+    #endif
+
     private var root: URL!
     private let extensions: Set<String> = ["wav", "mp3", "aiff", "m4a"]
 

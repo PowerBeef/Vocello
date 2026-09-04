@@ -5,6 +5,8 @@ summary: The shipping long-form v4 path on both platforms — planner-owned segm
 sourceOfTruth:
   - Sources/QwenVoiceCore/LongFormPlanning.swift
   - Sources/iOS/Studio/IOSLongFormProject.swift
+  - Sources/Services/BatchGenerationRunner.swift
+  - Sources/SharedSupport/Database/LongFormHistoryAcceptance.swift
   - config/runtime-refactor-contract.json
 ---
 # Long-form generation
@@ -13,10 +15,11 @@ This reference describes the shipping long-form v4 path — macOS since 2026-07-
 iOS since 2026-07-24 — and what remains open. Source and `config/runtime-refactor-contract.json`
 (`longForm`, `longFormV4`) remain higher authority.
 
-Currency review (2026-08-27): iOS long-form start, regeneration, cancellation, progress, and terminal
-callbacks now carry the same attempt token as single-take Studio generation. Stale callbacks cannot
-clear or overwrite a newer take, and cancellation errors are surfaced. Planning, manifests, segment
-identity, resume, and joined-audio semantics are unchanged.
+Currency review (2026-09-04): the release-first F-16/F-06 amendment retains each completed initial
+segment through the shared History outbox before continuing. Whole-project acceptance uses a
+bounded journal, atomic manifest replacement and a transactional History commit. The old accepted
+project survives ordinary failure; ambiguous recovery blocks project writes without hiding unrelated
+standalone History. These source corrections still require corrected-candidate acceptance.
 
 ## Shipping path (macOS)
 
@@ -32,21 +35,25 @@ segmenter's historical threshold, kept so routing behavior is unchanged) into a 
    Fast QC, standard streaming telemetry, and live segment preview (auto-play-gated; the
    request-local `suppressStreamingPreview` flag remains available for silent contexts). Batch
    markers are never sent; the legacy XPC `generateBatch` route was retired 2026-07-24 (the
-   in-process engine batch API remains for the CLI).
+   in-process engine batch API remains available, while the CLI now owns per-item result accounting).
 3. **Bounded assembly.** `BoundedLongFormAssembler` joins the persisted PCM16 segment WAVs in fixed
    blocks (bounded gain, edge trim/fade over verified non-speech, declared pauses, atomic publish)
    and the joined output passes its own duration-aware Fast QC with the plan's pause budget.
 4. **Manifest v4.** `LongFormManifestV4` records plan + execution + assembly + replacement
    evidence and validates fail-closed. Schema-v3 documents remain readable only as a limited
    legacy summary; missing plan identity is never fabricated.
-5. **History.** Migration v5 adds project columns keyed by the plan digest. The joined output is
-   the project's single accepted History row; History groups projects with an expandable
-   per-segment map (`history_longFormSegmentsToggle_<digest8>`). Per-project filenames
-   (`long_form_joined_<digest8>.wav` / `long_form_manifest_<digest8>.json`) prevent cross-project
-   overwrites.
+5. **History.** Migration v5 adds project columns keyed by the plan digest. Completed initial
+   segments are individually saved before continuing, so failed assembly does not orphan them.
+   Only successful segment QC, joined QC and journaled acceptance publish the current joined row.
+   History groups projects with an expandable per-segment map
+   (`history_longFormSegmentsToggle_<digest8>`). New joined audio uses a UUID-qualified
+   `long_form_joined_<digest8>_<uuid>.wav`; the manifest remains
+   `long_form_manifest_<digest8>.json` and is atomically replaced. Superseded audio retains
+   History ownership and remains deletable; cleanup never deletes accepted/referenced audio.
 6. **Resume and replacement.** In-session resume reuses saved takes (long-form retry never
    degrades to line-separated), and single-segment regeneration appends fail-closed
    accepted-replacement history (revision ≥ 2, strictly increasing, with recorded seeds).
+   This is session-scoped generation continuation, not restart-after-relaunch support.
 
 Ordinary line-separated batch runs on the same sequential streaming path with the same QC,
 telemetry, and preview semantics; only the planning and assembly stages are long-form-specific.
@@ -55,16 +62,17 @@ whole run — segments, QC, and assembly — so the UI performance posture match
 
 Evidence stays privacy-safe: manifests and assembly evidence carry digests, versions, ranges,
 counts, frame maps, and typed risks — never original text, spoken text, transcripts, paths, or
-audio bytes.
+audio bytes. The separate app-local transaction journal is private recovery data and can contain
+History text and paths. Its bounded Export Recovery Files action is user-directed, not telemetry
+or publication, and does not delete or automatically repair a corrupt journal.
 
 ## QC calibration
 
 The acceptance arc calibrated the joined-output gates: the app-side audio gate consumes the plan's
 expected pause count (a zero budget rejects healthy narration), and dropout thresholds are
-duration-aware (content ≥ 45 s: long-pause 600 ms, suspicious-single 1,500 ms, egregious
-2,000 ms; short content keeps 350/900/1,200 ms). QC failures record their flags in the error
-message and retain the rejected staged WAV under `stream_sessions/failed-audio-qc/`
-(TelemetryGate-gated, newest only) for triage.
+duration-aware. Current thresholds and rejected-audio retention are owned by the engine's
+audio-QC implementation and `config/audio-cadence-qc-contract.json`, not historical numbers in
+this guide. Diagnostic rejected audio stays untracked and is not an accepted History clip.
 
 ## Measured performance
 
@@ -115,5 +123,9 @@ disclosure. The iOS smoke lane now runs both journeys (standard + long-form).
 - **Segment-count scaling evidence at audiobook scale** — the 12-segment run above proves flat
   steady-state memory through ~10 minutes of joined audio; a ~100-segment (multi-hour) proof
   remains open, and the scaled smoke journey currently caps at 12 segments per run.
-- **Single-take spoken-text normalization** — single takes do not yet consume the spoken-text
-  plan; it drives long-form only.
+- **Corrected-candidate acceptance** — exercise long-form, segment replacement, interruption,
+  recovery export and retained-output deletion on the RF-10 desktop and RF-11/RF-12 iPhone
+  candidates. Older measured runs above are historical, not evidence for changed source.
+
+Single-take spoken-text normalization is already implemented at the shared generation entry;
+it is not an outstanding long-form task.

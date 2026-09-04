@@ -41,11 +41,19 @@ REQUIRED_KEYS = {
     "vocello.error.install_model",
     "vocello.error.long_form_planning_failed",
     "vocello.error.reference_audio_required",
+    "vocello.history.export_recovery_files",
+    "vocello.history.long_form_recovery_detail",
+    "vocello.history.recovery_export_failure",
+    "vocello.long_form.segment_history_failed",
     "vocello.models.ready_count",
     "vocello.status.checking_downloaded_files",
     "vocello.status.generation_failed",
     "vocello.status.making_model_available_offline",
     "vocello.status.ready",
+}
+REQUIRED_PLURAL_KEYS = {
+    "vocello.models.ready_count",
+    "vocello.history.recovery_export_failure",
 }
 
 
@@ -132,10 +140,17 @@ def _validate_catalog(root: Path) -> None:
         if not isinstance(comment, str) or not comment.strip():
             raise ContractError(f"manual catalog key {key} requires translator context")
         english = _english_payload(raw_entry, key)
-        if key == "vocello.models.ready_count":
-            plural = english.get("variations", {}).get("plural", {})
+        variations = english.get("variations", {})
+        if not isinstance(variations, dict):
+            raise ContractError(f"catalog key {key} has malformed English variations")
+        if key in REQUIRED_PLURAL_KEYS or "plural" in variations:
+            plural = variations.get("plural", {})
+            if not isinstance(plural, dict):
+                raise ContractError(f"{key} requires English plural categories")
             for category in ("one", "other"):
-                value = plural.get(category, {}).get("stringUnit", {}).get("value")
+                variant = plural.get(category, {})
+                unit = variant.get("stringUnit", {}) if isinstance(variant, dict) else {}
+                value = unit.get("value") if isinstance(unit, dict) else None
                 if not isinstance(value, str) or not value.strip():
                     raise ContractError(f"{key} requires non-empty English plural {category}")
         else:

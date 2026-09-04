@@ -43,6 +43,7 @@ final class VoiceDesignCoordinator {
     var actionAlert: VoiceDesignActionAlert?
     var latestSavedVoiceCandidate: VoiceDesignSavedVoiceCandidate?
     @ObservationIgnored private var generationTask: Task<Void, Never>?
+    @ObservationIgnored private let generationAuthority = GenerationLifecycleExecutor.Authority()
 
     func currentSavedVoiceCandidate(for draft: VoiceDesignDraft) -> VoiceDesignSavedVoiceCandidate? {
         guard let latestSavedVoiceCandidate,
@@ -131,6 +132,7 @@ final class VoiceDesignCoordinator {
         let variation = GenerationVariationPreference.requestValue()
 
         generationTask = GenerationLifecycleExecutor.run(
+            authority: generationAuthority,
             ttsEngineStore: ttsEngineStore,
             audioPlayer: audioPlayer,
             setErrorMessage: { [weak self] message in self?.errorMessage = message },
@@ -186,6 +188,7 @@ final class VoiceDesignCoordinator {
         audioPlayer: AudioPlayerViewModel
     ) {
         GenerationLifecycleExecutor.cancelActiveWork(
+            authority: generationAuthority,
             generationTask: &generationTask,
             isGenerating: &isGenerating,
             errorMessage: &errorMessage,

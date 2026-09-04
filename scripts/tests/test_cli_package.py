@@ -220,7 +220,7 @@ class CLIPackageTests(unittest.TestCase):
 
         def cancel(argv, cwd, environment, timeout):
             calls.append((list(argv), cwd, dict(environment), timeout))
-            return {"generationStartObserved": True, "exitStatus": 130}
+            return {"generationStartObserved": True, "exitStatus": 130, "cleanupAcknowledged": True}
 
         with mock.patch.object(package, "command", return_value="") as failure_runner:
             report = package.qualify(
@@ -238,6 +238,22 @@ class CLIPackageTests(unittest.TestCase):
         self.assertNotIn("--transcript", calls[2][0])
         self.assertEqual(report["runs"][0]["requestedSeed"], "30000001")
         self.assertNotIn("seed", report["runs"][0])
+
+        for leftover in ("final", "staging"):
+            retained = self.root / f"{leftover}-failure.json"
+            leftovers = []
+            def dirty_cancel(argv, cwd, environment, timeout):
+                output = Path(argv[argv.index("--out") + 1])
+                target = output if leftover == "final" else output.parent / ".cancelled.fixture.tmp.wav"
+                target.write_bytes(b"must remain forensic evidence")
+                leftovers.append(target)
+                return {"generationStartObserved": True, "exitStatus": 130, "cleanupAcknowledged": True}
+            with mock.patch.object(package, "command", return_value=""):
+                with self.assertRaisesRegex(ValueError, "left output/staging"):
+                    package.qualify(self.output, self.release, model_store, reference,
+                                    report=retained, generation_runner=generate, cancellation_runner=dirty_cancel)
+            self.assertEqual(leftovers[0].read_bytes(), b"must remain forensic evidence")
+            self.assertEqual(json.loads(retained.read_text())["status"], "failed")
 
     def test_qualification_retains_failure_and_refuses_report_reuse(self):
         model_store = self.root / "model store"
@@ -278,10 +294,16 @@ class CLIPackageTests(unittest.TestCase):
                             generation_runner=generate)
 
     def test_cancellation_observes_unterminated_progress_line(self):
-        code = "import os,signal,time; signal.signal(signal.SIGINT, lambda *_: os._exit(130)); os.write(2,b'generating (fixture)'); time.sleep(30)"
+        code = "import os,signal,time; signal.signal(signal.SIGINT, lambda *_: (os.write(2,b'Cancelled; command cleanup completed.'),os._exit(130))); os.write(2,b'generating (fixture)'); time.sleep(30)"
         result = package._run_qualification_cancellation(
             [sys.executable, "-c", code], self.root, dict(os.environ), 3)
-        self.assertEqual(result, {"generationStartObserved": True, "exitStatus": 130})
+        self.assertEqual(result, {"generationStartObserved": True, "exitStatus": 130, "cleanupAcknowledged": True})
+
+    def test_forced_signal_exit_is_not_clean_cancellation(self):
+        code = "import os,signal,time; signal.signal(signal.SIGINT, lambda *_: os._exit(130)); os.write(2,b'generating (fixture)'); time.sleep(30)"
+        with self.assertRaisesRegex(ValueError, "terminate cleanly"):
+            package._run_qualification_cancellation(
+                [sys.executable, "-c", code], self.root, dict(os.environ), 3)
 
     def test_partial_progress_timeout_terminates_process(self):
         with self.assertRaisesRegex(ValueError, "did not reach generation"):

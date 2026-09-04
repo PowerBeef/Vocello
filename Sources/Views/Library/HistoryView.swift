@@ -476,7 +476,7 @@ struct HistoryView: View {
             Button("Reveal Audio") { NSWorkspace.shared.open(AppPaths.outputsDir) }
                 .disabled(recoverySnapshot.availableAudioCount == 0)
                 .accessibilityIdentifier("historyRecovery_reveal")
-            Button("Export Audio…") { exportPendingAudio() }
+            Button(VocelloPresentationText.exportRecoveryFiles) { exportPendingAudio() }
                 .disabled(recoveryAudioURLs.isEmpty)
                 .accessibilityIdentifier("historyRecovery_export")
         }
@@ -488,6 +488,9 @@ struct HistoryView: View {
     }
 
     private var recoveryMessage: String {
+        if recoverySnapshot.longFormRecoveryPending {
+            return VocelloPresentationText.longFormRecoveryDetail
+        }
         if recoverySnapshot.unqueuedCount > 0 {
             return VocelloPresentationText.historyUnqueuedDetail
         }
@@ -721,7 +724,7 @@ private extension HistoryView {
             var target = destination.appendingPathComponent(source.lastPathComponent)
             if FileManager.default.fileExists(atPath: target.path) {
                 target = destination.appendingPathComponent(
-                    "\(source.deletingPathExtension().lastPathComponent)-\(UUID().uuidString.prefix(8)).wav"
+                    "\(source.deletingPathExtension().lastPathComponent)-\(UUID().uuidString.prefix(8)).\(source.pathExtension)"
                 )
             }
             do {
@@ -733,7 +736,7 @@ private extension HistoryView {
         if failures > 0 {
             presentActionAlert(
                 title: "Export Warning",
-                message: "\(failures) pending audio file\(failures == 1 ? "" : "s") could not be exported."
+                message: VocelloPresentationText.recoveryExportFailure(failures)
             )
         }
     }
@@ -741,7 +744,7 @@ private extension HistoryView {
     func refreshRecoveryState() {
         Task {
             let snapshot = await GenerationHistoryRecovery.snapshot()
-            let urls = await GenerationHistoryRecovery.pendingAudioURLs()
+            let urls = await GenerationHistoryRecovery.recoveryExportURLs()
             guard !Task.isCancelled else { return }
             recoverySnapshot = snapshot
             recoveryAudioURLs = urls

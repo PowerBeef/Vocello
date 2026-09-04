@@ -44,6 +44,7 @@ enum GenerationOutputVerifier {
                 "speech_recognition_unavailable",
                 "speech_recognition_unauthorized",
                 "speech_authorization_timed_out",
+                "source_audio_duration_unavailable",
             ]
             let outcome: GenerationQualityOutcome
             if pass {
@@ -106,9 +107,26 @@ enum GenerationOutputVerifier {
     ) async -> Result {
         let sourceAudioDurationSeconds: Double? = try? {
             let file = try AVAudioFile(forReading: audioURL)
-            guard file.fileFormat.sampleRate > 0, file.length > 0 else { return nil }
+            guard file.fileFormat.sampleRate.isFinite, file.fileFormat.sampleRate > 0, file.length > 0 else { return nil }
             return Double(file.length) / file.fileFormat.sampleRate
         }()
+        guard let sourceAudioDurationSeconds, sourceAudioDurationSeconds.isFinite, sourceAudioDurationSeconds > 0 else {
+            // Do not request Speech permission or launch recognition on an
+            // unreadable/empty source and then misrepresent its extent.
+            let unavailable = VoiceClipTranscriber.VerificationEvidence(
+                schemaVersion: VoiceClipTranscriber.VerificationEvidence.currentSchemaVersion,
+                algorithmVersion: VoiceClipTranscriber.VerificationEvidence.currentAlgorithmVersion,
+                expectedLanguage: expectedLanguage.rawValue, selectedLocaleIdentifier: nil,
+                authorizationStatus: .unknown, recognizerAvailable: false,
+                supportsOnDeviceRecognition: false,
+                requiredPassCount: VoiceClipTranscriber.VerificationEvidence.requiredPassCount,
+                recognitionDurationSeconds: 0, repetitions: [], evidenceConsistency: false,
+                consensusStatus: .unavailable, transcript: nil
+            )
+            return evaluate(recognition: unavailable, expectedScript: expectedScript,
+                expectedLanguage: expectedLanguage, requiresSourceAudioDuration: true,
+                maxWordErrorRate: maxWordErrorRate)
+        }
         let recognition = await VoiceClipTranscriber.verificationEvidence(
             url: audioURL,
             expectedLanguage: expectedLanguage
@@ -119,6 +137,7 @@ enum GenerationOutputVerifier {
             expectedScript: expectedScript,
             expectedLanguage: expectedLanguage,
             sourceAudioDurationSeconds: sourceAudioDurationSeconds,
+            requiresSourceAudioDuration: true,
             maxWordErrorRate: maxWordErrorRate
         )
     }
@@ -130,11 +149,17 @@ enum GenerationOutputVerifier {
         expectedScript: String,
         expectedLanguage: Qwen3SupportedLanguage,
         sourceAudioDurationSeconds: Double? = nil,
+        requiresSourceAudioDuration: Bool = false,
         maxWordErrorRate: Double = VoiceClipTranscriber.outputVerificationDefaultMaxWordErrorRate
     ) -> Result {
         let expectedToken = expectedLanguage.rawValue
         let accuracyMetric = accuracyMetric(for: expectedLanguage)
         let accuracyThreshold = maxWordErrorRate
+        if requiresSourceAudioDuration && sourceAudioDurationSeconds == nil {
+            return failed(expectedLanguage: expectedLanguage, recognition: recognition,
+                accuracyMetric: accuracyMetric, accuracyThreshold: accuracyThreshold.isFinite ? accuracyThreshold : -1,
+                sourceAudioDurationSeconds: nil, reason: "source_audio_duration_unavailable")
+        }
 
         guard accuracyThreshold.isFinite, (0 ... 1).contains(accuracyThreshold) else {
             return failed(
@@ -172,7 +197,7 @@ enum GenerationOutputVerifier {
                 )
             }
             if let sourceAudioDurationSeconds,
-               !VoiceClipTranscriber.hasCompleteTemporalCoverage(
+               !VoiceClipTranscriber.hasAudioEdgeCoverage(
                    recognition,
                    sourceAudioDurationSeconds: sourceAudioDurationSeconds
                ) {

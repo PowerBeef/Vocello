@@ -110,6 +110,10 @@ If enqueue itself fails, `historyUnqueued_banner` appears above the main content
 record is app-session memory only until safely queued. No storage failure is reported as failed
 synthesis, and clear-all refuses to discard unqueued records. Export before quitting if retry fails.
 
+Corrupt long-form journals leave unrelated standalone clips readable while project rows and writes
+remain gated. Export Recovery Files retains bounded journals for repair with a private-text/path
+warning; it does not repair or delete them.
+
 ### Saved Voices (`sidebar_voices` → `screen_voices`)
 
 | Element | Identifier |
@@ -170,11 +174,13 @@ language boundary.
 Every item — line-separated and long-form — is an ordinary sequential streaming take (mandatory
 engine Fast QC, streaming telemetry, live preview). Long-form additionally plans segments, joins
 them into one WAV, and lands a single project row in History.
-Segments are retained for in-session continuation, but segment completion is not project acceptance.
+Segments are saved individually to History before continuing and remain exportable/deletable
+after abandoning a draft or relaunching. Segment completion is not project acceptance.
 Both initial completion and segment replacement await the shared `LongFormHistoryAcceptanceStore`:
 QC-checked unique candidate WAVs, throwing manifest serialization, atomic manifest replacement,
 and one journaled SQLite transaction. Failed replacement preserves the previous accepted project;
-recovery runs before History reads/writes. Unchanged segments retain their QC, effective seeds,
+recovery runs before History reads/writes. Superseded joined outputs retain individually deletable
+History rows rather than becoming unowned WAVs. Unchanged segments retain their QC, effective seeds,
 and generation identities. Old manifest-v4 files remain readable; this adds no cross-launch
 generation-resume feature. A joined-row commit reloads the complete History project.
 

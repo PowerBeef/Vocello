@@ -11,6 +11,7 @@ final class CustomVoiceCoordinator {
     var errorMessage: String?
     var presentedSheet: CustomVoicePresentedSheet?
     @ObservationIgnored private var generationTask: Task<Void, Never>?
+    @ObservationIgnored private let generationAuthority = GenerationLifecycleExecutor.Authority()
 
     func presentBatch(draft: CustomVoiceDraft) {
         presentedSheet = .batch(.custom(draft: draft))
@@ -51,6 +52,7 @@ final class CustomVoiceCoordinator {
         errorMessage = nil
 
         generationTask = GenerationLifecycleExecutor.run(
+            authority: generationAuthority,
             ttsEngineStore: ttsEngineStore,
             audioPlayer: audioPlayer,
             setErrorMessage: { [weak self] message in self?.errorMessage = message },
@@ -95,6 +97,7 @@ final class CustomVoiceCoordinator {
         audioPlayer: AudioPlayerViewModel
     ) {
         GenerationLifecycleExecutor.cancelActiveWork(
+            authority: generationAuthority,
             generationTask: &generationTask,
             isGenerating: &isGenerating,
             errorMessage: &errorMessage,

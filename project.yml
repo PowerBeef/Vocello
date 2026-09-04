@@ -468,6 +468,9 @@ targets:
       - path: Sources/Services/MacStudioGenerationRequestFactory.swift
       - path: Sources/Models/VoiceDesignDraft.swift
       - path: Sources/ViewModels/VoiceDesignCoordinator.swift
+      - path: Sources/ViewModels/GenerationLifecycleExecutor.swift
+      - path: Sources/VocelloCLI/CLIProcessSupervisor.swift
+      - path: Sources/VocelloCLI/CLIBatchExecution.swift
       - path: Sources/Models/Generation.swift
       - path: Sources/iOSSupport/Models/PendingVoiceCloningHandoff.swift
       - path: Sources/iOSSupport/Services/AppPaths.swift

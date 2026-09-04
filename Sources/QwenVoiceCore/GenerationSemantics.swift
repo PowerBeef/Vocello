@@ -2,6 +2,22 @@ import CryptoKit
 import Foundation
 
 public enum GenerationSemantics {
+    /// A caller may replace an output, but never the Clone conditioning asset.
+    /// Resolve symlinks and hard links as well as lexical aliases before work.
+    static func validateOutputOwnership(for request: GenerationRequest) throws {
+        guard case .clone(let reference) = request.payload else { return }
+        let output = URL(fileURLWithPath: request.outputPath).resolvingSymlinksInPath().standardizedFileURL
+        let input = URL(fileURLWithPath: reference.audioPath).resolvingSymlinksInPath().standardizedFileURL
+        let outputAttributes = try? FileManager.default.attributesOfItem(atPath: output.path)
+        let inputAttributes = try? FileManager.default.attributesOfItem(atPath: input.path)
+        let sameInode = outputAttributes?[.systemFileNumber] as? NSNumber != nil
+            && outputAttributes?[.systemFileNumber] as? NSNumber == inputAttributes?[.systemFileNumber] as? NSNumber
+            && outputAttributes?[.systemNumber] as? NSNumber == inputAttributes?[.systemNumber] as? NSNumber
+        guard output != input, !sameInode else {
+            throw MLXTTSEngineError.unsupportedRequest("The output must not replace the Clone reference audio. Choose a different output file.")
+        }
+    }
+
     public enum DesignWarmBucket: String, Hashable, Sendable {
         case short
         case long

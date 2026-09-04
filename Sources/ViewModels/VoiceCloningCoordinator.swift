@@ -30,6 +30,7 @@ final class VoiceCloningCoordinator {
     /// transcript exists or transcription becomes available again.
     var transcriptionUnavailableMessage: String?
     @ObservationIgnored private var generationTask: Task<Void, Never>?
+    @ObservationIgnored private let generationAuthority = GenerationLifecycleExecutor.Authority()
     @ObservationIgnored private var transcriptionTask: Task<Void, Never>?
 
     func presentBatch(draft: VoiceCloningDraft) {
@@ -138,6 +139,7 @@ final class VoiceCloningCoordinator {
         errorMessage = nil
 
         generationTask = GenerationLifecycleExecutor.run(
+            authority: generationAuthority,
             ttsEngineStore: ttsEngineStore,
             audioPlayer: audioPlayer,
             setErrorMessage: { [weak self] message in self?.errorMessage = message },
@@ -211,6 +213,7 @@ final class VoiceCloningCoordinator {
         audioPlayer: AudioPlayerViewModel
     ) {
         GenerationLifecycleExecutor.cancelActiveWork(
+            authority: generationAuthority,
             generationTask: &generationTask,
             isGenerating: &isGenerating,
             errorMessage: &errorMessage,

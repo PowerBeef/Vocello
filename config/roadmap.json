@@ -36,7 +36,7 @@
       "status": "active",
       "owner": "backend-and-platform",
       "adopted": "2026-08-19",
-      "goal": "Resolve the code-grounded findings from VOCELLO_ENGINEERING_REVIEW_2026-08-19.md without weakening Vocello's local-first architecture, physical-device policy, deterministic gates, or main-only development workflow. The external report is descriptive; this roadmap is the status authority.",
+      "goal": "Resolve the code-grounded findings from VOCELLO_ENGINEERING_REVIEW_2026-08-19.md without weakening Vocello's local-first architecture, physical-device policy, deterministic gates, or main-only development workflow. The external report is descriptive; this roadmap is the status authority. The September 4 current-source audit extends this existing defect authority under primary release-first-3-0-2026-09; it does not schedule another programme.",
       "authority": "docs/development-progress.md"
     },
     {
@@ -164,18 +164,27 @@
       "title": "Step 1 — reconcile the audit and preserve the exact testing checkpoint",
       "status": "done",
       "gate": "Map every audit finding to its existing defect authority or one independent product defect; preserve seven correlated passes, one product failure, and five additional unverified engine attempts. Inspect retained attachments once without inventing observations. Register the ordered primary programme and pass roadmap/documentation validation.",
-      "evidence": ["doc:docs/reference/release-first-execution-2026-09.md#audit-finding-disposition", "doc:docs/reference/release-first-execution-2026-09.md#preserved-september-4-device-boundary"],
+      "evidence": [
+        "doc:docs/reference/release-first-execution-2026-09.md#audit-finding-disposition",
+        "doc:docs/reference/release-first-execution-2026-09.md#preserved-september-4-device-boundary"
+      ],
       "updated": "2026-09-04",
-      "notes": "VRA-001 through VRA-022 are mapped. F-15/F-16/F-17 own the new independent gaps; F-06 is reopened. A bounded scan of the retained 1710-attachment manifest and Staging found no canonical recoverable observation stream. ICA-04/ICA-05/ICA-18 keep the original failed/unverified attempts, not a fabricated PASS or safe-resume cursor. This closes reconciliation only, not any acceptance campaign."
+      "notes": "VRA-001 through VRA-022 are mapped. F-15/F-16/F-17 own the new independent gaps; F-06 is reopened. A bounded scan of the retained 1710-attachment manifest and Staging found no canonical recoverable observation stream. ICA-04/ICA-05/ICA-18 keep the original failed/unverified attempts, not a fabricated PASS or safe-resume cursor. This closes reconciliation only, not any acceptance campaign. The September 4 HTML audit of 616fdfe2 was separately grounded at 75ecb740: all 12 V26 findings have dispositions in docs/reference/engineering-audit-grounding-2026-09-04.md. F-01 is reopened; F-18 through F-22 capture independent output/lifecycle/CLI/shared-store issues; F-16, F-06, VLR-07 and ASR items retain overlapping authority. Concurrency schedules remain risks until tested. This is review completion, not remediation or new candidate evidence."
     },
     {
       "id": "RF-02",
       "plan": "release-first-3-0-2026-09",
       "title": "Step 2 — complete Apple prerequisites and the consolidated qualified-decision packet",
       "status": "in-flight",
-      "blockedBy": ["RF-01"],
+      "blockedBy": [
+        "RF-01"
+      ],
       "gate": "Under ASR-02/ASR-04/ASR-08/ASR-10/ASR-11, complete bounded read-only account, distribution-key/profile/entitlement, agreement, version, and collision checks. Reuse support and bundled attribution; consolidate provider metadata/retention, model distribution, previews, marketing audio/artwork, privacy, content rights, age rating, export, and regional decisions. Every field has evidence or a named external dependency; qualified legal/privacy decisions are recorded before closure. Authentication failures remain failures.",
-      "sourceOfTruth": ["scripts/app_store_connect_readiness.py", "scripts/app_store_build_preflight.py", "docs/reference/content-rights-review.md"],
+      "sourceOfTruth": [
+        "scripts/app_store_connect_readiness.py",
+        "scripts/app_store_build_preflight.py",
+        "docs/reference/content-rights-review.md"
+      ],
       "updated": "2026-09-04",
       "notes": "Runs alongside engineering rather than blocking RF-03 through RF-09. The September 4 primary-profile authenticated read succeeded without mutation. Local Keychain inspection found usable Development, Distribution, and Developer ID identities; the exact remote App ID exposes App Groups and Increased Memory Limit; and one matching active IOS_APP_STORE profile expires in 2027. This does not prove the profile payload or candidate entitlements. The sanitized inventory remains INCOMPLETE: pricing/availability is uninitialized or unreadable, accessibility declarations are empty, and App Privacy publication, agreements/tax/banking, DSA, regional compliance, and qualified privacy/rights decisions need owner/web review. RF-09 selects source 3.0.0/build 24 after a complete paginated read-only preflight found zero matching builds; repeat before archive because this is not a reservation. Raw account identifiers/responses remain untracked."
     },
@@ -184,10 +193,20 @@
       "plan": "release-first-3-0-2026-09",
       "title": "Step 3 — implement and behavior-test macOS Design request preservation",
       "status": "done",
-      "blockedBy": ["RF-01"],
+      "blockedBy": [
+        "RF-01"
+      ],
       "gate": "Implement F-15's immutable full-draft and variation snapshot before asynchronous preparation. Execute the actual coordinator request path for French/Auto, pinned/default seed, description/delivery, and edits during startup; focused macOS tests and app compilation pass. This is source implementation proof, not signed-candidate UI acceptance.",
-      "sourceOfTruth": ["Sources/ViewModels/VoiceDesignCoordinator.swift", "Sources/Models/VoiceDesignDraft.swift", "Tests/VocelloCoreTests/VoiceDesignCoordinatorTests.swift"],
-      "evidence": ["file:Sources/ViewModels/VoiceDesignCoordinator.swift", "file:Tests/VocelloCoreTests/VoiceDesignCoordinatorTests.swift", "doc:docs/development-progress.md#resume-here-2026-09-04"],
+      "sourceOfTruth": [
+        "Sources/ViewModels/VoiceDesignCoordinator.swift",
+        "Sources/Models/VoiceDesignDraft.swift",
+        "Tests/VocelloCoreTests/VoiceDesignCoordinatorTests.swift"
+      ],
+      "evidence": [
+        "file:Sources/ViewModels/VoiceDesignCoordinator.swift",
+        "file:Tests/VocelloCoreTests/VoiceDesignCoordinatorTests.swift",
+        "doc:docs/development-progress.md#resume-here-2026-09-04"
+      ],
       "updated": "2026-09-04",
       "notes": "Seven production-coordinator/adjacent-factory tests and the full coherent-tree checkpoint passed, including generic iOS compilation and macOS core/transport/runtime suites. F-15 remains in-flight for RF-10 packaged-candidate parity. No model/device acceptance is claimed."
     },
@@ -196,22 +215,44 @@
       "plan": "release-first-3-0-2026-09",
       "title": "Step 4 — repair long-form durability on both platforms",
       "status": "done",
-      "blockedBy": ["RF-03"],
+      "blockedBy": [
+        "RF-03"
+      ],
       "gate": "Implement F-16: stage segment/joined audio and throwing manifests, require segment/assembly/joined QC, atomically replace the manifest and transactionally update History through a bounded recoverable journal. Await accepted persistence, preserve prior content and unchanged QC/seeds/identities, remove only operation-owned unreferenced rejects, count unique resumed segments, and distinguish segment completion from whole-project acceptance. Fault tests cover encoding/write/assembly/QC/database/cancellation/interruption and idempotent reconciliation; existing manifests remain compatible and continuation remains session-scoped.",
-      "sourceOfTruth": ["Sources/iOS/Studio/IOSLongFormProject.swift", "Sources/Services/BatchGenerationRunner.swift", "Sources/SharedSupport/Database/LongFormHistoryAcceptance.swift", "Tests/VocelloCoreTests/LongFormHistoryAcceptanceTests.swift"],
-      "evidence": ["file:Tests/VocelloCoreTests/LongFormHistoryAcceptanceTests.swift", "doc:docs/development-progress.md#resume-here-2026-09-04"],
+      "sourceOfTruth": [
+        "Sources/iOS/Studio/IOSLongFormProject.swift",
+        "Sources/Services/BatchGenerationRunner.swift",
+        "Sources/SharedSupport/Database/LongFormHistoryAcceptance.swift",
+        "Tests/VocelloCoreTests/LongFormHistoryAcceptanceTests.swift"
+      ],
+      "evidence": [
+        "file:Tests/VocelloCoreTests/LongFormHistoryAcceptanceTests.swift",
+        "doc:docs/development-progress.md#resume-here-2026-09-04"
+      ],
       "updated": "2026-09-04",
-      "notes": "Source implementation complete: shared writer-owned acceptance journal, unique candidates, throwing manifests, transactional History, pre-read/write recovery, preserved QC/seed/generation identity, and unique iOS progress. The 66-test focused set and coherent-tree checkpoint passed (1,436 Python tests, iOS app/logic builds, macOS core/transport/runtime suites). RF-09 candidate freeze is separate. F-16 stays in-flight for corrected-candidate long-form/regeneration acceptance under RF-10/RF-11/RF-12. Continuation remains session-scoped."
+      "notes": "Source implementation complete: shared writer-owned acceptance journal, unique candidates, throwing manifests, transactional History, pre-read/write recovery, preserved QC/seed/generation identity, and unique iOS progress. The 66-test focused set and coherent-tree checkpoint passed (1,436 Python tests, iOS app/logic builds, macOS core/transport/runtime suites). RF-09 candidate freeze is separate. F-16 stays in-flight for corrected-candidate long-form/regeneration acceptance under RF-10/RF-11/RF-12. Continuation remains session-scoped. The September 4 V26-08/V26-10 review adds corrupt-journal recovery UX and retained-artifact ownership checks to F-16. This done milestone records the earlier source implementation only; the new bounded source work is required before RF-09 and corrected-candidate acceptance remains open. September 4 recovery/retention source amendment is implemented under F-16/F-06: non-destructive bounded recovery export, unrelated History reads, individually persisted initial segments, and retained/deletable superseded outputs. Focused regression tests pass; corrected-candidate acceptance remains separate."
     },
     {
       "id": "RF-05",
       "plan": "release-first-3-0-2026-09",
       "title": "Step 5 — expose recoverable History-save outcomes",
       "status": "done",
-      "blockedBy": ["RF-04"],
+      "blockedBy": [
+        "RF-04"
+      ],
       "gate": "Complete F-06's remaining source work: typed saved/queued-for-recovery/unable-to-queue outcomes, playable successful audio, visible retry/export when durable enqueue fails, existing outbox reuse for database failures, and idempotent retry. Enqueue/database/retry/duplicate/playback/long-form tests cover both platform paths. Never report a storage failure as failed synthesis.",
-      "sourceOfTruth": ["Sources/SharedSupport/Services/GenerationPersistence.swift", "Sources/SharedSupport/Services/GenerationHistoryRecovery.swift", "Sources/SharedSupport/Database/GenerationHistoryEnqueueState.swift", "Sources/SharedSupport/Views/GenerationHistoryEnqueueWarning.swift", "Tests/VocelloCoreTests/GenerationHistoryEnqueueStateTests.swift"],
-      "evidence": ["file:Tests/VocelloCoreTests/GenerationHistoryEnqueueStateTests.swift", "file:Tests/VocelloCoreTests/GenerationHistoryOutboxTests.swift", "doc:docs/development-progress.md#resume-here-2026-09-04"],
+      "sourceOfTruth": [
+        "Sources/SharedSupport/Services/GenerationPersistence.swift",
+        "Sources/SharedSupport/Services/GenerationHistoryRecovery.swift",
+        "Sources/SharedSupport/Database/GenerationHistoryEnqueueState.swift",
+        "Sources/SharedSupport/Views/GenerationHistoryEnqueueWarning.swift",
+        "Tests/VocelloCoreTests/GenerationHistoryEnqueueStateTests.swift"
+      ],
+      "evidence": [
+        "file:Tests/VocelloCoreTests/GenerationHistoryEnqueueStateTests.swift",
+        "file:Tests/VocelloCoreTests/GenerationHistoryOutboxTests.swift",
+        "doc:docs/development-progress.md#resume-here-2026-09-04"
+      ],
       "updated": "2026-09-04",
       "notes": "Source implementation complete: typed saved/queued/unable-to-queue results and shared visible Retry/Export warning. Six focused enqueue-state tests plus the existing outbox/acceptance/request set passed (66 total); macOS production compilation and generic iOS app/logic compilation passed. Audio remains playable; failed enqueue identity is explicitly app-session memory. Existing outbox/deletion retained; clear-all refuses unqueued identity. F-06 remains in-flight for corrected-candidate acceptance, not implicitly closed by this source milestone."
     },
@@ -220,12 +261,22 @@
       "plan": "release-first-3-0-2026-09",
       "title": "Step 6 — localize the remaining natural-text audio failures",
       "status": "in-flight",
-      "blockedBy": ["RF-05"],
+      "blockedBy": [
+        "RF-05"
+      ],
       "gate": "Under ICA-15/VLR-07, review retained WAV/code/receipt/ASR evidence before new generation; separate the completed numeric-marker regression, marker-free French Custom failure, and French Design production versus experimental results. Locate the first divergent request/language/code/decoder/assembly/QC boundary, add a targeted fixture, and run only qualifying fixed-seed confirmations. Keep QC, seeds, prompts, token caps and model pins unchanged absent causal proof. Any unresolved sampled-output pathology remains an explicit release blocker/decision, never harness PASS.",
-      "sourceOfTruth": ["Sources/SharedSupport/Services/GenerationOutputVerifier.swift", "Sources/SharedSupport/Services/VoiceClipTranscriber.swift", "scripts/voice_identity_language_reliability.py", "scripts/ios_startup_reliability.py", "docs/reference/delivery-harness.md"],
+      "sourceOfTruth": [
+        "Sources/SharedSupport/Services/GenerationOutputVerifier.swift",
+        "Sources/SharedSupport/Services/VoiceClipTranscriber.swift",
+        "scripts/voice_identity_language_reliability.py",
+        "scripts/ios_startup_reliability.py",
+        "docs/reference/delivery-harness.md"
+      ],
       "updated": "2026-09-04",
-      "evidence": ["doc:docs/reference/release-first-execution-2026-09.md#rf-06-retained-evidence-review-and-bounded-follow-up-september-4"],
-      "notes": "Retained review localizes custom-008's near-silence to pre-write decoded samples (6.16-18.48s); receipt language/seed/retry are correct. Three exact current-source fresh-process Mac reproductions pass without retry: streaming is stable twice at 199 codec frames/15.92s, non-streaming is 325 frames/26.00s, versus the retained iPhone's 1,347 frames/107.76s. The missing device codec trace still prevents iPhone sampling-versus-decoder attribution. Separately, cached serial independent full-file ASR covered all 14 retained successful-audio Design verifier problems: 12/14 meet WER 0.15 (both shipped Neutral, all four no-delivery, and six of eight Calm); only two short Calm controls remain at WER 0.167. Four of the 12 original numeric rejects have incomplete Apple Speech edge coverage. Live output verification now fail-closes on incomplete WAV-edge coverage and VLR classifies the typed result as harness-inconclusive. Fresh current-source Mac regeneration of the exact shipped-Neutral short/long rows passed Fast-QC, receipt parity, and diagnostic full-file WER 0.000 for both. The coherent source checkpoint passed 1,468 Python tests/contracts, generic iOS app/logic builds, and all macOS suites (mac-test-20260904-145600). The retained short row still has full-edge Apple WER 0.167 versus diagnostic WER 0.083 and remains unresolved. Historical evidence is unchanged; diagnostic ASR and Mac evidence have no device-promotion authority. Next: exact iPhone codec/rejected-WAV capture/replay and fixed-source physical confirmation. No prompt/QC/token-cap/model change."
+      "evidence": [
+        "doc:docs/reference/release-first-execution-2026-09.md#rf-06-retained-evidence-review-and-bounded-follow-up-september-4"
+      ],
+      "notes": "Retained review localizes custom-008's near-silence to pre-write decoded samples (6.16-18.48s); receipt language/seed/retry are correct. Three exact current-source fresh-process Mac reproductions pass without retry: streaming is stable twice at 199 codec frames/15.92s, non-streaming is 325 frames/26.00s, versus the retained iPhone's 1,347 frames/107.76s. The missing device codec trace still prevents iPhone sampling-versus-decoder attribution. Separately, cached serial independent full-file ASR covered all 14 retained successful-audio Design verifier problems: 12/14 meet WER 0.15 (both shipped Neutral, all four no-delivery, and six of eight Calm); only two short Calm controls remain at WER 0.167. Four of the 12 original numeric rejects have incomplete Apple Speech edge coverage. Live output verification now fail-closes on incomplete WAV-edge coverage and VLR classifies the typed result as harness-inconclusive. Fresh current-source Mac regeneration of the exact shipped-Neutral short/long rows passed Fast-QC, receipt parity, and diagnostic full-file WER 0.000 for both. The coherent source checkpoint passed 1,468 Python tests/contracts, generic iOS app/logic builds, and all macOS suites (mac-test-20260904-145600). The retained short row still has full-edge Apple WER 0.167 versus diagnostic WER 0.083 and remains unresolved. Historical evidence is unchanged; diagnostic ASR and Mac evidence have no device-promotion authority. Next: exact iPhone codec/rejected-WAV capture/replay and fixed-source physical confirmation. No prompt/QC/token-cap/model change. September 4 review at 75ecb740 adds V26-06/V26-07 under VLR-07: fail closed when a new live WAV has no valid duration, preserve historical optional-field compatibility, and narrow edge-coverage claims with targeted fixtures. These bounded phone-independent source corrections remain before RF-09; they do not resolve the retained French accuracy or iPhone codec evidence gaps. The September 4 missing-live-duration and edge-semantics source corrections are now implemented and focused-test verified under VLR-07. They do not close the retained language disagreement or device codec attribution gaps."
     },
     {
       "id": "RF-07",
@@ -233,7 +284,11 @@
       "title": "Step 7 — finish only the acceptance-blocking harness repairs",
       "status": "in-flight",
       "gate": "Under ICA-18/AV-09, extend the existing runner with incremental durable observations, early generation identity capture, explicit serialization failure, visible History-focus polling, observed-versus-expected selections, genuine playback/scrub evidence, terminal ledgers on every exit, and default five-take shards through existing start/limit controls. Interrupted/lost-focus/missing-observation/collection/stale-resume/duplicate fixtures pass; collection and cleanup plus one small physical pilot pass before the full campaign. No parallel harness, automatic retry, or fabricated observation.",
-      "sourceOfTruth": ["scripts/ui_test.sh", "scripts/ios_control_audit.py", "Tests/VocelloiOSUITests/VocelloiOSControlAuditUITests.swift"],
+      "sourceOfTruth": [
+        "scripts/ui_test.sh",
+        "scripts/ios_control_audit.py",
+        "Tests/VocelloiOSUITests/VocelloiOSControlAuditUITests.swift"
+      ],
       "updated": "2026-09-04",
       "notes": "Source repairs now flush sequenced observation-v2 attachments per request/player/terminal/restoration, separate planned and observed controls, require paused scrub evidence, wait for the History keyboard, default to five-take shards, distinguish incomplete campaign from passed shard, and finalize ledgers before run PASS. Collection and resume fail closed on gaps or in-flight stages lacking terminal/restoration proof; legacy evidence remains readable. Focused fixtures and generic device-SDK XCUITest build-for-testing pass. A small physical pilot remains; compilation is not device acceptance. RF-06 is still open but does not block these independent repairs. No broader harness expansion is scheduled."
     },
@@ -243,28 +298,47 @@
       "title": "Step 8 — package the downloadable optimized CLI",
       "status": "in-flight",
       "gate": "Implement F-17 in the existing release workflow: separate optimized arm64 CLI DMG, complete libraries/resources/notices/instructions, checkout-independent discovery, signatures, notarization/stapling, checksums and source/version supply-chain identity. Copied-package tests cover paths with spaces, version/JSON, all three modes, cancellation, failure exits and resource loading. No Homebrew route, privileged installer, shell-profile edits, or second release system.",
-      "sourceOfTruth": ["scripts/release.sh", "scripts/cli_package.py", "scripts/verify_packaged_cli.sh", "scripts/release_evidence.py", "config/orchestration-contract.json", ".github/workflows/release.yml"],
+      "sourceOfTruth": [
+        "scripts/release.sh",
+        "scripts/cli_package.py",
+        "scripts/verify_packaged_cli.sh",
+        "scripts/release_evidence.py",
+        "config/orchestration-contract.json",
+        ".github/workflows/release.yml"
+      ],
       "updated": "2026-09-04",
-      "notes": "Resumed September 4 without the phone. The existing release workflow and copied-package qualifier are implemented. Historical ad-hoc 2.4.0/build 23 source 089328d3 passed Built-in English, French Design and English Clone strict-QC checks (3.28/7.68/4.08 s), live cancellation exit 130, and public failure exits 2/1. That old result is execution/QC evidence, not Clone perceptual fidelity or signed-candidate proof. The current qualifier removes the assumed Clone transcript, accepts an optional real transcript, retains WAVs and atomic partial results after failures, refuses report overwrite, and kills/awaits subprocess groups on deadlines. Requested seed/streaming are not represented as observed receipts. All 25 focused package tests pass. No new model downloads or device calls occurred. RF-09 host verification passed the full 1,481-test project gate, macOS suites/app/CLI, generic iOS app/logic builds and website check; signed/notarized 3.0.0 repetition remains RF-10/F-17, so this milestone remains in-flight."
+      "notes": "Resumed September 4 without the phone. The existing release workflow and copied-package qualifier are implemented. Historical ad-hoc 2.4.0/build 23 source 089328d3 passed Built-in English, French Design and English Clone strict-QC checks (3.28/7.68/4.08 s), live cancellation exit 130, and public failure exits 2/1. That old result is execution/QC evidence, not Clone perceptual fidelity or signed-candidate proof. The current qualifier removes the assumed Clone transcript, accepts an optional real transcript, retains WAVs and atomic partial results after failures, refuses report overwrite, and kills/awaits subprocess groups on deadlines. Requested seed/streaming are not represented as observed receipts. The initial 25 focused package tests passed. No new model downloads or device calls occurred. RF-09 host verification passed the full 1,481-test project gate, macOS suites/app/CLI, generic iOS app/logic builds and website check; signed/notarized 3.0.0 repetition remains RF-10/F-17, so this milestone remains in-flight. September 4 V26-04/V26-05 follow-ups are F-20 (graceful CLI cancellation) and F-21 (partial batch reporting), with F-18 output ownership and F-22 shared-store qualification. The prior exit-130/host-cleanup result is not graceful-cancellation proof. Implement and test those bounded product paths before RF-09, then repeat applicable copied-candidate proof under RF-10. September 4 F-18/F-20/F-21/F-22 source corrections are implemented with focused tests; the current CLI compiles as 3.0.0. Exit 130 alone is no longer accepted as cancellation evidence, and host artifact cleanup cannot create PASS. Native SIGINT/SIGTERM and two-process Saved Voice coexistence tests now pass, as do 26 package fixtures and built-CLI empty/unsupported-input checks. Copied signed-candidate qualification remains RF-10, not implied by source fixtures."
     },
     {
       "id": "RF-09",
       "plan": "release-first-3-0-2026-09",
       "title": "Step 9 — verify the coherent tree and freeze the 3.0.0 candidate",
       "status": "in-flight",
-      "gate": "Run derived refresh/validation, full project-input gate, macOS deterministic tests/app build, generic physical-iOS SDK compile, website check and affected release/privacy/attribution/supply-chain fixtures. Set shared version 3.0.0 through project.yml, reconcile the pending iOS version and collision-check an unused build number under ASR-08. Commit main and require exact-SHA CI/security, verified annotated-tag authority and command-bound candidate evidence; compute required promotion lanes before expensive QA. No unrelated source/docs edits during the frozen campaign or full-tree identity bypass.",
-      "sourceOfTruth": ["project.yml", "scripts/release_source_authority.py", "scripts/release_evidence.py", "scripts/evidence_impact.py"],
+      "gate": "Run derived refresh/validation, full project-input gate, macOS deterministic tests/app build, generic physical-iOS SDK compile, website check and affected release/privacy/attribution/supply-chain fixtures. Set shared version 3.0.0 through project.yml, reconcile the pending iOS version and collision-check an unused build number under ASR-08. Commit main and require exact-SHA CI/security, verified annotated-tag authority and command-bound candidate evidence; compute required promotion lanes before expensive QA. No unrelated source/docs edits during the frozen campaign or full-tree identity bypass. The September 4 pre-freeze source amendment must first qualify F-18/F-01 preservation, F-19 terminal ownership, F-22 shared-store exclusion, F-20/F-21 CLI lifecycle/accounting, F-16 recovery/retention, and VLR-07 live-duration/edge semantics. This means their bounded source corrections/tests, not their later device or signed-candidate closure gates; do not introduce a dependency cycle or replace RF-10 through RF-12.",
+      "sourceOfTruth": [
+        "project.yml",
+        "scripts/release_source_authority.py",
+        "scripts/release_evidence.py",
+        "scripts/evidence_impact.py"
+      ],
       "updated": "2026-09-04",
-      "notes": "Phone-independent source preparation and host verification complete on September 4: project.yml/shared targets/CLI and governed notices are 3.0.0/build 24. The read-only paginated collision preflight found zero matches; repeat before archive. Public stable facts/downloads remain 2.4.0 through a validated unpublished-candidate distinction, including derived fact scans. Prepared candidate notes cover the real delivery roster and installation/reviewer journey without publication claims. The full project gate passed 1,481 Python tests; all macOS core/transport/runtime suites passed (mac-test-20260904-160540), macOS app and CLI builds passed, generic iOS app/logic builds passed, and website check including both production-browser layouts passed. Logs are retained in the ignored rf09-host-checkpoint-20260904 bundle; initial identity/attribution/guidance-budget gate failures were corrected, not waived. Existing advisory document/roadmap currency warnings remain. Final documentation checkpoint and commit precede exact-SHA CI/security observation. The live iOS version edit, verified annotated tag and signed candidate workflow require explicit authority; no account mutation, tag, upload or publication occurred. Source is not yet a frozen acceptance candidate."
+      "notes": "The September 4 bounded pre-freeze source amendment is implemented and deterministically verified on main: F-18 caller-owned output preservation; F-01 secondary rollback/digest-witness recovery; F-19 production-executor stale-terminal and late-cancel/published-History ownership; F-22 native two-process store exclusion; F-20 signal-driven task cancellation; F-21 partial batch accounting; F-16/F-06 recovery export and retained-output ownership; VLR-07 strict live duration and precise edge semantics. Final macOS run mac-test-20260904-183347 passed 562 core and 19 transport tests plus 109 runtime tests with two optional AudioSeal fixture skips and no failures. The full project gate passed all 1,484 Python tests in 121 modules. Canonical app/3.0.0 CLI builds, generic iOS app/logic builds, website production-browser checks, 35 focused localization/package tests and four model-free CLI input checks passed. Native signal fixtures caught and corrected a Swift 6 Dispatch actor-isolation trap; a late-cancel publication regression was also red before the fix. Recovery UI uses shared catalog keys with plural fixtures, not a literal-baseline exemption. Earlier failed and passing evidence is retained under ignored rf-amendment logs and the named test run; no old device or candidate result is relabeled. Source remains 3.0.0/build 24 and public stable downloads 2.4.0. Repeat collision preflight before archive. Commit/push and exact-SHA CI/Security precede authorized tag/account preparation and candidate freeze. Live App Store version reconciliation and verified annotated-tag/signed-candidate workflow still require explicit authority; RF-02's qualified decisions, RF-10 package acceptance and RF-11/RF-12 device gates remain open. No phone, model acquisition, account mutation, tag, upload or publication occurred. AGENTS.md was reviewed and its durable rules remain accurate."
     },
     {
       "id": "RF-10",
       "plan": "release-first-3-0-2026-09",
       "title": "Step 10 — independently qualify macOS and downloadable CLI",
       "status": "planned",
-      "blockedBy": ["RF-09"],
-      "gate": "Close F-05 with actual signed/notarized packaged-app startup/XPC evidence, verify Built-in, French Design pinned seed, Clone/enrollment, History recovery, long-form/regeneration, and applicable canonical benchmark/promotion lanes. Qualify F-17's copied CLI independently. Product defects, distribution rights, artifact verification and applicable promotion evidence must be clear before publication; an explicit maintainer publication authorization is still required. iOS-only blockers do not prevent desktop/CLI qualification or separately authorized publication.",
-      "sourceOfTruth": ["scripts/release.sh", "scripts/macos_test.sh", "scripts/quality_promotion.py", "docs/reference/macos-release-qa.md"],
+      "blockedBy": [
+        "RF-09"
+      ],
+      "gate": "Close F-05 with actual signed/notarized packaged-app startup/XPC evidence, verify Built-in, French Design pinned seed, Clone/enrollment, History recovery, long-form/regeneration, and applicable canonical benchmark/promotion lanes. Qualify F-17's copied CLI independently. Product defects, distribution rights, artifact verification and applicable promotion evidence must be clear before publication; an explicit maintainer publication authorization is still required. iOS-only blockers do not prevent desktop/CLI qualification or separately authorized publication. Copied CLI qualification also verifies signal-driven owned cleanup, complete partial-batch accounting, pre-existing-output preservation and app/CLI Saved Voice coexistence under F-18 through F-22; do not substitute host cleanup or source-only fixtures for artifact behavior.",
+      "sourceOfTruth": [
+        "scripts/release.sh",
+        "scripts/macos_test.sh",
+        "scripts/quality_promotion.py",
+        "docs/reference/macos-release-qa.md"
+      ],
       "updated": "2026-09-04",
       "notes": "F-15 source tests are not packaged UI-to-engine proof. RF-02's qualified rights decisions remain applicable to these artifacts, even when iOS account/device dependencies do not."
     },
@@ -273,9 +347,16 @@
       "plan": "release-first-3-0-2026-09",
       "title": "Step 11 — account for the full frozen-source 201-take iOS campaign",
       "status": "planned",
-      "blockedBy": ["RF-07", "RF-09"],
+      "blockedBy": [
+        "RF-07",
+        "RF-09"
+      ],
       "gate": "Complete ICA-04/ICA-05's full 201-take plan in bounded mode-grouped shards with frozen seeds/corpus, all original failures/attempts retained, terminal state and preservation before each next cell, and correlated UI/receipt/QC/History/playback/cleanup after every shard. Complete applicable outstanding controls/accessibility/model/perf acceptance, reserve collection before device deadlines and verify unattended screen protection/termination/cleanup. Accounted-for is not PASS; no difficult, failed or missing row may be dropped or substituted.",
-      "sourceOfTruth": ["scripts/ui_test.sh", "scripts/ios_control_audit.py", "docs/reference/ios-device-testing.md"],
+      "sourceOfTruth": [
+        "scripts/ui_test.sh",
+        "scripts/ios_control_audit.py",
+        "docs/reference/ios-device-testing.md"
+      ],
       "updated": "2026-09-04",
       "notes": "Corrected frozen-candidate campaign has not started. Preserve the earlier seven correlated passes, one product failure and five unverified engine attempts as historical evidence, not acceptance for changed source. Desktop and iOS qualification may proceed independently after freeze."
     },
@@ -284,9 +365,15 @@
       "plan": "release-first-3-0-2026-09",
       "title": "Step 12 — verify the distribution iOS candidate and finish submission preparation",
       "status": "planned",
-      "blockedBy": ["RF-11"],
+      "blockedBy": [
+        "RF-11"
+      ],
       "gate": "Under ASR-05 through ASR-12, verify archive/IPA entitlements/privacy/notices/architecture/UUID identity and absence of internal diagnostics. Separately authorize any internal TestFlight upload, then black-box test the processed candidate through the same XCUITest stack without replacing it with a diagnostics build. Preserve personal data during upgrade; fresh install needs another phone or explicit verified backup/reinstallation authorization. Verify reviewer-critical downloads/modes/import/transcription/permissions/offline/recovery/long-form/export, storage/screenshots, manual-only gaps, fresh regional hosting and all qualified account/privacy/rights decisions. No unexplained required failure; App Review submission requires separate explicit authorization and approval is not guaranteed.",
-      "sourceOfTruth": ["scripts/verify_ios_release_artifacts.py", "scripts/app_store_connect_readiness.py", "docs/reference/ios-appstore-submission.md"],
+      "sourceOfTruth": [
+        "scripts/verify_ios_release_artifacts.py",
+        "scripts/app_store_connect_readiness.py",
+        "docs/reference/ios-appstore-submission.md"
+      ],
       "updated": "2026-09-04",
       "notes": "This milestone concerns the App Store distribution candidate, not the diagnostics-enabled development build. External credentials, owner/legal judgments, additional fresh-install capacity and upload/submission authorization must remain explicit blockers."
     },
@@ -296,19 +383,30 @@
       "title": "P1 — preserve macOS Voice Design language, seed, and variation at launch",
       "status": "in-flight",
       "gate": "Capture the complete Design draft and variation before asynchronous startup. Behavioral request-path tests prove explicit French, Auto, pinned/default seed, and subsequent UI edits cannot change the prepared request. Focused tests and macOS build pass; candidate acceptance proves visible selection-to-engine parity.",
-      "sourceOfTruth": ["Sources/ViewModels/VoiceDesignCoordinator.swift", "Sources/Services/MacStudioGenerationRequestFactory.swift"],
+      "sourceOfTruth": [
+        "Sources/ViewModels/VoiceDesignCoordinator.swift",
+        "Sources/Services/MacStudioGenerationRequestFactory.swift"
+      ],
       "updated": "2026-09-04",
-      "notes": "Source-confirmed VRA-001 at 2f392484. The coordinator now captures the complete immutable Design draft and variation before asynchronous preparation instead of reconstructing a partial draft. Production coordinator/draft behavioral coverage plus adjacent factory coverage passed 7/7 deterministic tests on 2026-09-04; the same build-for-testing compiled the production macOS app. No model or device was used. Full coherent-tree checkpoint and signed-candidate visible selection-to-engine parity remain pending; keep in-flight. Owner: macos. Source implementation, candidate verification, and release authorization are separate milestones. See docs/reference/release-first-execution-2026-09.md."
+      "notes": "Source-confirmed VRA-001 at 2f392484. The coordinator now captures the complete immutable Design draft and variation before asynchronous preparation instead of reconstructing a partial draft. Production coordinator/draft behavioral coverage plus adjacent factory coverage passed 7/7 deterministic tests on 2026-09-04; the same build-for-testing compiled the production macOS app. No model or device was used. The full coherent-tree checkpoint subsequently passed; signed-candidate visible selection-to-engine parity remains pending, so keep in-flight. Owner: macos. Source implementation, candidate verification, and release authorization are separate milestones. See docs/reference/release-first-execution-2026-09.md. September 4 V26-03 is separately owned by F-19: request snapshot tests use a lifecycle-executor test double and do not qualify actual stale terminal interleavings. Do not reopen the completed iOS F-08 correction."
     },
     {
       "id": "F-16",
       "plan": "engineering-review-remediation-2026-08",
       "title": "P1 — transactionally accept long-form projects and replacement segments",
       "status": "in-flight",
-      "gate": "Both platforms stage and QC candidate segment/joined audio and a throwing manifest before accepted History mutation. Journaled atomic-file/database recovery is idempotent; normal failure preserves the accepted project and removes only unreferenced owned candidates. Fault tests cover serialization, writes, assembly, QC, database commits, cancellation and interruption; unchanged QC/seeds survive replacement, reused segments count once, and segment/project terminals are distinct. Existing manifests decode. Native long-form/regeneration acceptance passes on both platforms.",
-      "sourceOfTruth": ["Sources/iOS/Studio/IOSLongFormProject.swift", "Sources/Services/BatchGenerationRunner.swift", "Sources/SharedSupport/Database/LongFormHistoryAcceptance.swift", "Tests/VocelloCoreTests/LongFormHistoryAcceptanceTests.swift"],
+      "gate": "Both platforms stage and QC candidate segment/joined audio and a throwing manifest before accepted History mutation. Journaled atomic-file/database recovery is idempotent; normal failure preserves the accepted project and removes only unreferenced owned candidates. Fault tests cover serialization, writes, assembly, QC, database commits, cancellation and interruption; unchanged QC/seeds survive replacement, reused segments count once, and segment/project terminals are distinct. Existing manifests decode. Native long-form/regeneration acceptance passes on both platforms. Before RF-09 freeze, qualify recoveryRequired with an actual non-destructive recovery/export path and usable unrelated History where safe, cross-referencing F-06. Define accepted/candidate/recovery/session-resume/discardable ownership and test abandon/new-project/relaunch/replacement/delete/clear-all; retain anything referenced by accepted History, a journal, pending outbox, active playback or export. Intentional retention must be bounded and documented, not silently deleted.",
+      "sourceOfTruth": [
+        "Sources/iOS/Studio/IOSLongFormProject.swift",
+        "Sources/Services/BatchGenerationRunner.swift",
+        "Sources/SharedSupport/Database/LongFormHistoryAcceptance.swift",
+        "Tests/VocelloCoreTests/LongFormHistoryAcceptanceTests.swift",
+        "Sources/Services/DatabaseService.swift",
+        "Sources/iOSSupport/Services/DatabaseService.swift",
+        "Sources/QwenVoiceCore/HistoryDeletionEngine.swift"
+      ],
       "updated": "2026-09-04",
-      "notes": "Shared journaled acceptance is implemented on both platform paths; focused fault tests cover rollback/reconcile, corrupt state, identity refusal, and compatibility, alongside real bounded-assembly tests. Current-tree checkpoint and native corrected-candidate acceptance remain. Groups VRA-002 through VRA-007; VRA-020 remains session-only continuation, not a new feature. Owner: backend-and-platform. Cross-reference F-06 for enqueue failure and F-08 for terminal ownership."
+      "notes": "Shared journaled acceptance is implemented on both platform paths; focused fault tests cover rollback/reconcile, corrupt state, identity refusal, and compatibility, alongside real bounded-assembly tests. The coherent-tree checkpoint passed; native corrected-candidate acceptance remains. Groups VRA-002 through VRA-007; VRA-020 remains session-only continuation, not a new feature. Owner: backend-and-platform. Cross-reference F-06 for enqueue failure and F-08 for terminal ownership. September 4 V26-08/V26-10 extend this existing authority: corrupt long-form journals correctly fail closed but can block all History operations without an effective repair journey; replaced joined WAVs and abandoned session candidates also need an explicit retention/ownership policy. Current platform catch paths already retain candidates on recoveryRequired; do not misclassify that deliberate preservation as rollback deletion. See docs/reference/engineering-audit-grounding-2026-09-04.md. September 4 bounded amendment implemented: readableHistory withholds ambiguous project rows but returns unrelated standalone clips after a corrupt-journal failure; all mutations still require successful reconciliation. Existing recovery export now includes bounded regular-file private journals with explicit privacy/repair messaging. Initial QC-passing segments are persisted individually before continuation, and superseded joined outputs retain visible/deletable History ownership. Enqueue failures use the existing unqueued warning; no crash durability is claimed when storage refuses writing. Focused corruption, retained-row, strict-persistence, identity and idempotent transaction fixtures pass. Both-platform candidate long-form/regeneration/deletion acceptance remains open."
     },
     {
       "id": "F-17",
@@ -316,16 +414,121 @@
       "title": "P1 release dependency — distribute an optimized standalone CLI package",
       "status": "in-flight",
       "gate": "The existing release workflow produces a separate arm64 CLI DMG containing all required runtime resources/libraries and notices, Developer ID signatures, notarization/stapling, checksums and source/version provenance. The copied package works outside the checkout and in paths with spaces; version/JSON discovery, all three modes, cancellation and error exits pass. No Homebrew route or privileged installer. Public promotion requires the existing exact-source gate and separate authorization.",
-      "sourceOfTruth": ["project.yml", "scripts/release.sh", "scripts/cli_package.py", "scripts/verify_packaged_cli.sh", "scripts/release_evidence.py", ".github/workflows/release.yml"],
+      "sourceOfTruth": [
+        "project.yml",
+        "scripts/release.sh",
+        "scripts/cli_package.py",
+        "scripts/verify_packaged_cli.sh",
+        "scripts/release_evidence.py",
+        ".github/workflows/release.yml"
+      ],
       "updated": "2026-09-04",
-      "notes": "RF-08's existing-workflow CLI DMG packaging and opt-in serial qualifier are implemented. Historical ad-hoc 2.4.0/build 23 source 089328d3 passed three-mode strict QC, cancellation 130 and failure exits; it is not a signed/notarized candidate or Clone-fidelity proof. The current patch retains partial results/WAVs, accepts the actual optional Clone transcript instead of an invented one, labels requested seed/streaming honestly, and terminates process groups on timeout. The 25 focused fixtures pass. RF-09 now prepares shared 3.0.0/build 24 after a read-only zero-collision result. RF-09 full host verification now passes; RF-10 still owns signed/notarized package repetition; no public download is claimed. Owner: release-qa. Cross-reference F-05; iOS-only blockers need not delay separately qualified and authorized desktop/CLI publication."
+      "notes": "RF-08's existing-workflow CLI DMG packaging and opt-in serial qualifier are implemented. Historical ad-hoc 2.4.0/build 23 source 089328d3 passed three-mode strict QC, cancellation 130 and failure exits; it is not a signed/notarized candidate or Clone-fidelity proof. The current patch retains partial results/WAVs, accepts the actual optional Clone transcript instead of an invented one, labels requested seed/streaming honestly, and terminates process groups on timeout. The 25 focused fixtures pass. RF-09 now prepares shared 3.0.0/build 24 after a read-only zero-collision result. RF-09 full host verification now passes; RF-10 still owns signed/notarized package repetition; no public download is claimed. Owner: release-qa. Cross-reference F-05; iOS-only blockers need not delay separately qualified and authorized desktop/CLI publication. September 4 V26-04/V26-05 follow-ups are F-20 (graceful CLI cancellation) and F-21 (partial batch reporting), with F-18 output ownership and F-22 shared-store qualification. The prior exit-130/host-cleanup result is not graceful-cancellation proof. Implement and test those bounded product paths before RF-09, then repeat applicable copied-candidate proof under RF-10."
+    },
+    {
+      "id": "F-18",
+      "title": "P1 — preserve pre-existing generation destinations across failure and cancellation",
+      "gate": "Define publication ownership and the no-clobber or explicit atomic-replacement policy before touching an existing destination. Failed startup, QC rejection, cancellation, allocation retry and publication failure must preserve pre-existing bytes; clean only operation-owned staging/output. Native sentinel-hash fixtures cover successful replacement, reference/output aliasing and two writers targeting one path. Qualify corrected app and copied-CLI paths without hidden retry.",
+      "sourceOfTruth": [
+        "Sources/QwenVoiceCore/GenerationOutputAdapter.swift",
+        "Sources/QwenVoiceCore/MLXTTSEngine.swift",
+        "Sources/VocelloCLI/GenerateCommand.swift",
+        "Tests/VocelloCoreTests/AtomicWAVGenerationOutputSinkTests.swift"
+      ],
+      "notes": "September 4 source correction implemented: only UUID staging is removed on failure; successful output replacement uses one same-directory rename. Engine cancellation/allocation-retry paths no longer remove caller-owned destinations. Clone rejects canonical-path/symlink/hardlink reference aliases. Native sentinel fixtures pass for QC rejection, abort, publication failure, atomic replacement and late cleanup by a competing writer. Corrected app/copied-CLI acceptance remains RF-10/RF-12; no user audio was used.",
+      "plan": "engineering-review-remediation-2026-08",
+      "status": "in-flight",
+      "updated": "2026-09-04",
+      "evidence": [
+        "file:Tests/VocelloCoreTests/AtomicWAVGenerationOutputSinkTests.swift",
+        "file:Tests/VocelloCoreTests/GenerationTerminalCleanupTests.swift"
+      ]
+    },
+    {
+      "id": "F-19",
+      "title": "P1 — guard macOS attempt-scoped terminal and cancellation ownership",
+      "gate": "Test the real GenerationLifecycleExecutor, not its coordinator-test double. Hold attempt A in preparation/persistence, cancel it, start B, then release A's success/error/defer and delayed engine-cancel dispatch. Reproduce or refute whether A can clear B's task/generating/player/error state. If reproduced, apply the smallest attempt-owned mutation/cancellation fix and prove B survives every stale terminal path plus ordinary cancellation. Candidate acceptance remains separate.",
+      "sourceOfTruth": [
+        "Sources/ViewModels/GenerationLifecycleExecutor.swift",
+        "Sources/ViewModels/VoiceDesignCoordinator.swift",
+        "Sources/ViewModels/CustomVoiceCoordinator.swift",
+        "Sources/ViewModels/VoiceCloningCoordinator.swift",
+        "Sources/QwenVoiceNative/TTSEngineStore.swift",
+        "Tests/VocelloCoreTests/VoiceDesignCoordinatorTests.swift"
+      ],
+      "notes": "September 4 deterministic reproduction executed the production macOS executor, not its old test double: cancel A during persistence, start B, then release A produced four failed assertions before the fix. Authority tokens now guard coordinator terminal callbacks and shared-player cleanup; cancelling the owned task replaces the redundant delayed unscoped engine cancellation. Production-executor/coordinator regressions pass; additional late-preparation/error schedules are included. No engine admission, sampling or iOS behavior change. Packaged acceptance remains RF-10. A final-review cancellation-after-publication counterexample also reproduced missing History persistence (one red assertion). The completed result is now persisted without autoplay or stale success callbacks; B retains its player state. The native regression passed in mac-test-20260904-183347.",
+      "plan": "engineering-review-remediation-2026-08",
+      "status": "in-flight",
+      "updated": "2026-09-04",
+      "evidence": [
+        "file:Tests/VocelloCoreTests/GenerationLifecycleExecutorTests.swift",
+        "file:Tests/VocelloCoreTests/VoiceDesignCoordinatorTests.swift"
+      ]
+    },
+    {
+      "id": "F-20",
+      "title": "P2 — make CLI signal cancellation graceful and bounded",
+      "gate": "Bridge SIGINT and SIGTERM to the existing owned generation cancellation lifecycle, await terminal cleanup, and preserve documented cancellation exit codes. Bound shutdown and explicitly distinguish a forced second-signal/timeout from graceful completion. Native isolated-process tests prove cleanup, accepted-output preservation and no live child/task; copied-package qualification repeats the affected paths. Host removal of partial output alone cannot satisfy this gate.",
+      "sourceOfTruth": [
+        "Sources/VocelloCLI/VocelloMain.swift",
+        "Sources/VocelloCLI/CLIRuntime.swift",
+        "Sources/QwenVoiceCore/MLXTTSEngine.swift",
+        "scripts/cli_package.py"
+      ],
+      "notes": "September 4 implementation adds a Dispatch-signal/Mutex command supervisor: first SIGINT/SIGTERM cancels the owned task and waits; second signal or 30-second deadline explicitly reports forced termination. Deterministic tests cover before-attach, first/second signals and cleanup/deadline states, and native child-process SIGINT/SIGTERM fixtures passing. Package qualification now requires a cleanup acknowledgement and absent final/staging output; it never deletes artifacts to manufacture PASS. Native OS signals exposed a Swift 6 actor-isolation trap in the Dispatch callback; explicit Sendable callback isolation corrected it and both signal fixtures now pass. Copied-candidate generation cleanup remains required before claiming graceful shutdown for the actual distributed CLI. Blocking stdin/playback/benchmark subprocess stages are not qualified by these task-supervisor fixtures. No hidden retry.",
+      "plan": "engineering-review-remediation-2026-08",
+      "status": "in-flight",
+      "updated": "2026-09-04",
+      "evidence": [
+        "file:Tests/VocelloCoreTests/CLIExecutionTests.swift",
+        "file:scripts/tests/test_cli_package.py"
+      ]
+    },
+    {
+      "id": "F-21",
+      "title": "P2 — report every CLI batch row after partial failure",
+      "gate": "Return a stable row identity/index and completed/failed/cancelled/not-attempted state for every planned CLI batch input, preserving successful WAVs and nonzero failure exits. Test a later-row error, cancellation, empty input and all-success compatibility; use an explicit versioned migration if output shape changes. Document or reject unsupported mode-shortcut/language/streaming options without silently promising parity. Do not add hidden retry, seed substitution or a new resume product.",
+      "sourceOfTruth": [
+        "Sources/VocelloCLI/BatchCommand.swift",
+        "Sources/VocelloCLI/VocelloMain.swift",
+        "Sources/QwenVoiceCore/MLXTTSEngine.swift",
+        "docs/reference/cli.md"
+      ],
+      "notes": "September 4 implementation preserves all-success JSON and adds failure-only schemaVersion 2 with stable indices/generation identities and completed/failed/cancelled/not_attempted rows. Completed WAVs survive later failure; later inputs are not run. Unique batch filenames prevent concurrent timestamp collisions. Unsupported batch language/stream/output options are rejected before engine bootstrap. Core fixtures cover third-row failure, missing output and cancellation; CLI compiles as 3.0.0 and help/version execute. Built-binary empty-stdin and unsupported --language/--stream/--out checks all return exit 1 before engine bootstrap. Copied-candidate behavior remains RF-10/F-17.",
+      "plan": "engineering-review-remediation-2026-08",
+      "status": "in-flight",
+      "updated": "2026-09-04",
+      "evidence": [
+        "file:Tests/VocelloCoreTests/CLIExecutionTests.swift",
+        "file:Sources/VocelloCLI/BatchCommand.swift"
+      ]
+    },
+    {
+      "id": "F-22",
+      "title": "P1 risk — qualify shared Saved Voice transactions across app and CLI processes",
+      "gate": "Use two native processes on one disposable support root: pause candidate preparation, replacement or deletion in A while B initializes/reconciles/lists/mutates. Prove no live transaction is mistaken for an abandoned one and audio/transcript/metadata remain content-bound. If exclusion is missing, reuse a narrow process-wide operation lock or typed busy refusal; do not silently split production stores. Review model mutation entry points against the existing shared-component lock rather than asserting all storage is unlocked.",
+      "sourceOfTruth": [
+        "Sources/QwenVoiceCore/PreparedVoiceRepository.swift",
+        "Sources/QwenVoiceCore/MLXTTSEngine.swift",
+        "Sources/VocelloCLI/CLIRuntime.swift",
+        "Sources/VocelloCLI/Support.swift",
+        "Sources/QwenVoiceCore/SharedModelComponentStore.swift",
+        "Tests/VocelloCoreTests/PreparedVoiceRepositoryTests.swift"
+      ],
+      "notes": "September 4 source correction uses one nonblocking flock over every Saved Voice reconcile/list/prepare/commit/discard/delete operation. Contention returns typed storeBusy and cannot treat live work as abandoned. The lock inode is never unlinked. Kernel cross-process refusal fixtures pass for all operations; two native processes successfully exercised paused real preparation/replacement/deletion with competing startup/list checks on disposable roots. No concurrent personal-store corruption was asserted or reproduced. SharedModelComponentStore retains its existing separate lock; packaged coexistence remains RF-10.",
+      "plan": "engineering-review-remediation-2026-08",
+      "status": "in-flight",
+      "updated": "2026-09-04",
+      "evidence": [
+        "file:Tests/VocelloCoreTests/PreparedVoiceRepositoryTests.swift"
+      ]
     },
     {
       "id": "F-01",
       "plan": "engineering-review-remediation-2026-08",
       "title": "High — make saved-voice review transactional and add iOS deletion",
-      "status": "done",
-      "gate": "Interactive saved-voice review must stage an opaque, catalog-invisible candidate and publish only on explicit commit; Cancel, Discard, and outside dismissal must remove it. Replacement and delete must be recoverable across interruption. iOS must confirm individual deletion, stop a matching preview, clear engine and Studio state, preserve voice-bank siblings, and surface retryable failure. Deterministic repository, wire, source-surface, macOS test/build, and generic iOS device-SDK compilation must pass; physical-device UI acceptance remains explicit QA.",
+      "status": "in-flight",
+      "gate": "Interactive saved-voice review must stage an opaque, catalog-invisible candidate and publish only on explicit commit; Cancel, Discard, and outside dismissal must remove it. Replacement and delete must be recoverable across interruption. iOS must confirm individual deletion, stop a matching preview, clear engine and Studio state, preserve voice-bank siblings, and surface retryable failure. Deterministic repository, wire, source-surface, macOS test/build, and generic iOS device-SDK compilation must pass; physical-device UI acceptance remains explicit QA. Secondary-failure fixtures must inject backup-restore failure, post-publication cleanup failure and same-name replacement interruptions. Retain the last recoverable audio/transcript/metadata and journal until recovery succeeds, distinguish committed-but-needs-cleanup from rollback failure, and prove restart reconciliation is idempotent without relying only on target existence.",
       "evidence": [
         "file:Sources/QwenVoiceCore/PreparedVoiceRepository.swift",
         "file:Tests/VocelloCoreTests/PreparedVoiceRepositoryTests.swift",
@@ -339,10 +542,12 @@
         "Sources/iOS/Voices/IOSRecordVoiceSheet.swift",
         "Sources/iOS/IOSGenerationModeViews.swift",
         "Sources/Views/Library/SavedVoiceSheet.swift",
-        "Sources/iOS/IOSVoicesView.swift"
+        "Sources/iOS/IOSVoicesView.swift",
+        "Sources/QwenVoiceCore/PreparedVoiceRepository.swift",
+        "Tests/VocelloCoreTests/PreparedVoiceRepositoryTests.swift"
       ],
-      "updated": "2026-08-29",
-      "notes": "Closed in source and deterministic verification on 2026-08-20. The product lifecycle no longer commits before review, and iOS deletion no longer requires a one-off build. Physical-device acceptance then passed on the paired iPhone in ios-xcui-saved-voice-lifecycle-20260820-061924-73065027: the genuine picker flow imported the staged reference, previewed the committed voice, handed it to Clone, deleted the exact named row, and proved the matching Studio state was cleared. The single XCUITest passed in 82.362 seconds with source-provenance, crash-baseline, xcuitest, crash-delta, and result-retention steps all passing."
+      "updated": "2026-09-04",
+      "notes": "Closed in source and deterministic verification on 2026-08-20. The product lifecycle no longer commits before review, and iOS deletion no longer requires a one-off build. Physical-device acceptance then passed on the paired iPhone in ios-xcui-saved-voice-lifecycle-20260820-061924-73065027: the genuine picker flow imported the staged reference, previewed the committed voice, handed it to Clone, deleted the exact named row, and proved the matching Studio state was cleared. The single XCUITest passed in 82.362 seconds with source-provenance, crash-baseline, xcuitest, crash-delta, and result-retention steps all passing. Reopened September 4 for V26-02 at 75ecb740: replacement/delete error handlers suppress a failed backup restore and then remove the transaction directory. Post-publication cleanup also shares the rollback path. Prior source/device evidence above remains valid for its tested schedules, not secondary restoration failure. Source-proven P1 preservation defect; no personal-data loss was reproduced in this review. Owner: backend-and-platform. See docs/reference/engineering-audit-grounding-2026-09-04.md. September 4 implementation now separates pre-publication rollback from post-publication forward cleanup. Version-2 journals bind phase/audio digest, retain v1 decoding and rolled-back cleanup witnesses, retain backups on secondary restoration failure, and expose committed cleanupPending internally. Restore, partial-cleanup, same-name and delete-recovery fixtures pass; no personal voices changed. Corrected-candidate UI acceptance remains open. A consumed staging source with missing, unreadable or digest-changed publication now refuses reconciliation rather than rolling back over possibly newer content; deterministic drift/retry tests retain both target and backups."
     },
     {
       "id": "F-02",
@@ -446,7 +651,7 @@
         "file:docs/reference/privacy-storage.md"
       ],
       "updated": "2026-09-04",
-      "notes": "VRA-008 source correction now returns typed saved/queued/unable-to-queue outcomes through the shared single-take pipeline. Failed enqueue exposes app-wide Retry/Export on macOS/iOS and retains exact identity in app-session memory without claiming durability or failed synthesis. Existing outbox and database-first deletion remain. Focused/current-tree verification and corrected-candidate acceptance remain separate from implementation and release authorization."
+      "notes": "VRA-008 source correction now returns typed saved/queued/unable-to-queue outcomes through the shared single-take pipeline. Failed enqueue exposes app-wide Retry/Export on macOS/iOS and retains exact identity in app-session memory without claiming durability or failed synthesis. Existing outbox and database-first deletion remain. Focused/current-tree verification and corrected-candidate acceptance remain separate from implementation and release authorization. The coherent-tree source checkpoint subsequently passed. V26-08's corrupt long-form journal recovery UX is owned by F-16 and cross-referenced here; a generic reopen/retry must not be presented as repair of an unchanged corrupt journal. Keep single-take retry/export and playable audio intact. September 4 long-form integration now awaits individual segment persistence through the shared saved/queued/unable-to-queue policy before continuation. Storage failures retain the existing outbox or explicit app-session export owner, not a false accepted project. Superseded joined files remain enumerable by History deletion. F-16 owns non-destructive corrupt-journal export and unrelated read access; candidate acceptance remains open."
     },
     {
       "id": "F-07",
@@ -1947,8 +2152,15 @@
       "title": "Measure development-loop latency and cache invalidation",
       "status": "done",
       "gate": "Record source-proven causes and measured cold/warm timings for project regeneration, focused tests, generic iOS compilation, XCUITest output, package-cache invalidation, and the pre-commit fingerprint without treating one machine's timing as a permanent contract.",
-      "evidence": ["doc:docs/reference/development-workflow.md"],
-      "sourceOfTruth": ["scripts/regenerate_project.sh", "scripts/build_foundation_targets.sh", "scripts/ui_test.sh", "scripts/hooks/precommit_gate.sh"],
+      "evidence": [
+        "doc:docs/reference/development-workflow.md"
+      ],
+      "sourceOfTruth": [
+        "scripts/regenerate_project.sh",
+        "scripts/build_foundation_targets.sh",
+        "scripts/ui_test.sh",
+        "scripts/hooks/precommit_gate.sh"
+      ],
       "updated": "2026-08-29",
       "notes": "The audit reproduced redundant full-gate regeneration, disposable generic-iOS DerivedData, package-wide diagnostics flag invalidation, unfocused core tests, multi-megabyte console streams, and an index-sensitive commit marker."
     },
@@ -1958,8 +2170,16 @@
       "title": "Separate fast generation and focused edit loops from checkpoints",
       "status": "done",
       "gate": "A path-aware repository command must infer adjacent Python tests and changed XCTest classes, offer a sub-second project-only regeneration path, run focused checks without device/model prerequisites, and retain the existing full project gate as the checkpoint and CI authority.",
-      "evidence": ["file:scripts/dev.sh", "file:scripts/development_workflow.py", "file:scripts/tests/test_development_workflow.py"],
-      "sourceOfTruth": ["scripts/dev.sh", "scripts/development_workflow.py", "scripts/regenerate_project.sh"],
+      "evidence": [
+        "file:scripts/dev.sh",
+        "file:scripts/development_workflow.py",
+        "file:scripts/tests/test_development_workflow.py"
+      ],
+      "sourceOfTruth": [
+        "scripts/dev.sh",
+        "scripts/development_workflow.py",
+        "scripts/regenerate_project.sh"
+      ],
       "updated": "2026-08-29",
       "notes": "scripts/dev.sh plan|focused|checkpoint owns local routing. Explicit XCUITest, model, benchmark, signing, and release lanes are never inferred."
     },
@@ -1969,8 +2189,18 @@
       "title": "Preserve valid Xcode and package caches",
       "status": "done",
       "gate": "Local checkpoints must reuse governed DerivedData, diagnostic defines must be target-scoped rather than package-global, project-generation stamps must update atomically after successful generation, and heavy Xcode output must be retained in governed logs while the console stays concise.",
-      "evidence": ["file:scripts/build_foundation_targets.sh", "file:scripts/lib/build_cache.sh", "file:project.yml", "file:scripts/tests/test_build_routing_contract.py"],
-      "sourceOfTruth": ["config/build-output-policy.json", "project.yml", "scripts/build_foundation_targets.sh", "scripts/lib/build_cache.sh"],
+      "evidence": [
+        "file:scripts/build_foundation_targets.sh",
+        "file:scripts/lib/build_cache.sh",
+        "file:project.yml",
+        "file:scripts/tests/test_build_routing_contract.py"
+      ],
+      "sourceOfTruth": [
+        "config/build-output-policy.json",
+        "project.yml",
+        "scripts/build_foundation_targets.sh",
+        "scripts/lib/build_cache.sh"
+      ],
       "updated": "2026-08-29",
       "notes": "The first clean-cache iOS app+logic compile took 239 seconds; the immediate governed warm checkpoint took 12.5 seconds. These observations characterize one host and are not hard thresholds."
     },
@@ -1980,8 +2210,15 @@
       "title": "Make checkpoint reuse content-complete and fail-closed",
       "status": "done",
       "gate": "The commit PASS cache must bind HEAD, final tracked content, and every non-ignored untracked path and byte; re-editing invalidates it, staging identical bytes does not, checkpoint completion records the exact-tree marker, and synthetic tests cover hit, content, path, staging, and ignored-file behavior.",
-      "evidence": ["file:scripts/tree_fingerprint.py", "file:scripts/tests/test_tree_fingerprint.py", "file:scripts/hooks/precommit_gate.sh"],
-      "sourceOfTruth": ["scripts/tree_fingerprint.py", "scripts/hooks/precommit_gate.sh"],
+      "evidence": [
+        "file:scripts/tree_fingerprint.py",
+        "file:scripts/tests/test_tree_fingerprint.py",
+        "file:scripts/hooks/precommit_gate.sh"
+      ],
+      "sourceOfTruth": [
+        "scripts/tree_fingerprint.py",
+        "scripts/hooks/precommit_gate.sh"
+      ],
       "updated": "2026-08-29",
       "notes": "The prior key could reuse a stale PASS after re-editing an already-dirty file. The final-content identity closes that false-green while avoiding a second gate after staging."
     },
@@ -1991,8 +2228,16 @@
       "title": "Validate and adopt the new development workflow",
       "status": "done",
       "gate": "Focused workflow tests, shell syntax, full deterministic checkpoint, macOS tests, incremental generic iOS app/logic compile, derived-artifact validation, project/surface governance, and the in-scope direct Clone-import device lanes must pass. AGENTS.md and release/QA guidance must describe the tier boundary and remain below the instruction-size limit.",
-      "evidence": ["doc:docs/reference/development-workflow.md", "doc:docs/development-progress.md"],
-      "sourceOfTruth": ["AGENTS.md", ".agents/rules/release-qa.md", "scripts/dev.sh", "scripts/check_project_inputs.sh"],
+      "evidence": [
+        "doc:docs/reference/development-workflow.md",
+        "doc:docs/development-progress.md"
+      ],
+      "sourceOfTruth": [
+        "AGENTS.md",
+        ".agents/rules/release-qa.md",
+        "scripts/dev.sh",
+        "scripts/check_project_inputs.sh"
+      ],
       "updated": "2026-09-03",
       "notes": "Closed 2026-09-01. ICI-4 passed physical-device direct Clone-import acceptance on 2026-08-28. The adopted path-aware workflow completed its exact-tree deterministic checkpoint over the phone-independent hardening tree: 1,278 Python tests, incremental generic iOS app/logic compilation, all macOS deterministic suites, production website build, and two real-browser smoke journeys passed without requiring a phone. Revalidated 2026-09-03 after the incremental checkpoint exposed an ordering gap between its final shared app product and the previously preserved iOS dSYM. The foundation route now UUID-validates and preserves the final sibling dSYM after both app and logic-test builds; the focused routing contract, real incremental compile, and immediately following physical-device preflight pass without cache deletion."
     },
@@ -2429,8 +2674,8 @@
       "evidence": [
         "doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md"
       ],
-      "updated": "2026-09-01",
-      "notes": "The active runbook now uses current Ready terminology, Apple's one highest-resolution iPhone-set rule with 6.9-inch preferred/6.5-inch fallback, exact catalog byte totals, Wi-Fi/free-space guidance, cancellation/adoption/finalization behavior, offline behavior, and the immutable-host outage posture. ASR-05 remains open only for privacy-safe accepted-size screenshots from the exact signed candidate and live metadata verification."
+      "updated": "2026-09-04",
+      "notes": "The active runbook now uses current Ready terminology, Apple's one highest-resolution iPhone-set rule with 6.9-inch preferred/6.5-inch fallback, exact catalog byte totals, Wi-Fi/free-space guidance, cancellation/adoption/finalization behavior, offline behavior, and the immutable-host outage posture. ASR-05 remains open only for privacy-safe accepted-size screenshots from the exact signed candidate and live metadata verification. V26-11 review on September 4 corrected the local reviewer free-space advice to at least 4 GB available before each install. IOSModelDeliverySupport requires max(2 * catalog bytes, catalog bytes + 256 MiB), approximately 3.42-3.47 GB for the current iOS models; the coordinator passes full catalog bytes. No runtime threshold or live App Store Connect field was changed. Candidate screenshots and live metadata verification remain open."
     },
     {
       "id": "ASR-06",
@@ -2509,8 +2754,8 @@
       "evidence": [
         "doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md"
       ],
-      "updated": "2026-09-01",
-      "notes": "The schema-v2 host contract validates pinned revisions, allowlisted redirects, exact remote totals, bounded-memory full SHA-256 streams, governed region labels, qualified execution provenance, freshness, and immutable no-fallback/no-substitution outage policy. On 2026-09-01 North America passed range and full-digest verification for all three largest 4-bit iOS files (4,024,541,635 bytes total; evidence SHA-256 1a4b00d19ff123dbae4979d5eeb171f27c7f1a796307efad00d6bcced91d1d82) with no retry or rate-limit response header. The local evidence does not claim regional closure: the composer requires fresh full-digest evidence for North America, Europe, and East Asia from qualified external execution identities. Reviewer notes cover exact bytes, Wi-Fi and approximately 2 GB per-model free-space needs, variable timing, cancellation/relaunch adoption, finishing setup, offline use, and support recovery. Europe/East Asia executions and ongoing monitoring remain external blockers."
+      "updated": "2026-09-04",
+      "notes": "The schema-v2 host contract validates pinned revisions, allowlisted redirects, exact remote totals, bounded-memory full SHA-256 streams, governed region labels, qualified execution provenance, freshness, and immutable no-fallback/no-substitution outage policy. On 2026-09-01 North America passed range and full-digest verification for all three largest 4-bit iOS files (4,024,541,635 bytes total; evidence SHA-256 1a4b00d19ff123dbae4979d5eeb171f27c7f1a796307efad00d6bcced91d1d82) with no retry or rate-limit response header. The local evidence does not claim regional closure: the composer requires fresh full-digest evidence for North America, Europe, and East Asia from qualified external execution identities. Reviewer notes cover exact bytes, Wi-Fi and at least 4 GB free before each model install (corrected September 4 from the full-catalog admission policy), variable timing, cancellation/relaunch adoption, finishing setup, offline use, and support recovery. Europe/East Asia executions and ongoing monitoring remain external blockers. V26-11 source-grounding corrected local reviewer guidance only; it is not renewed host evidence, account verification or an admission-policy change."
     },
     {
       "id": "ASR-10",
@@ -3008,7 +3253,7 @@
       "plan": "voice-identity-language-reliability-2026-08",
       "title": "Complete physical-device closure and publish the privacy-safe report",
       "status": "in-flight",
-      "gate": "After Mac/CLI localization, complete two consecutive no-retry 14-row closure physical-iPhone passes plus one 122-row characterization using new source-bound private maps and exact current source. Require typed transcription classification, correct short/medium/long French output, exact receipt parity, zero unexplained hard QC failures, WER/CER delta <= 0.01, speaker-similarity delta >= -0.02, governed Clone prosody fidelity or explicit reference rejection, and green Built-in/English Design/enrollment/Clone controls. Publish only a digest-pinned privacy-safe physical-device report; keep audio, text, names, paths, raw diagnostics, and device evidence untracked.",
+      "gate": "After Mac/CLI localization, complete two consecutive no-retry 14-row closure physical-iPhone passes plus one 122-row characterization using new source-bound private maps and exact current source. Require typed transcription classification, correct short/medium/long French output, exact receipt parity, zero unexplained hard QC failures, WER/CER delta <= 0.01, speaker-similarity delta >= -0.02, governed Clone prosody fidelity or explicit reference rejection, and green Built-in/English Design/enrollment/Clone controls. Publish only a digest-pinned privacy-safe physical-device report; keep audio, text, names, paths, raw diagnostics, and device evidence untracked. Before RF-09 freeze, new live verification must refuse absent, unreadable, zero or non-finite source duration instead of silently bypassing timing checks. Preserve legacy evidence decoding separately. Describe the current min-start/max-end predicate as edge coverage only, add an interior-omission counterexample alongside WER checks, and do not claim complete speech-interval coverage without independent evidence.",
       "sourceOfTruth": [
         "Sources/SharedSupport/Services/GenerationOutputVerifier.swift",
         "Sources/SharedSupport/Services/VoiceClipTranscriber.swift",
@@ -3020,7 +3265,7 @@
         "doc:docs/reference/voice-identity-language-reliability-ios-2026-09-02.md"
       ],
       "updated": "2026-09-04",
-      "notes": "The corrected-source September 2 campaign is complete and pinned in the privacy-safe iOS report. Two distinct no-retry closure runs each passed 14/14. The 122-row characterization represented every row with 106 PASS, two product-owned mandatory QC rejections, 12 then-product-owned output-accuracy rejections, and two harness-owned inconclusive verifier cases. Cached serial independent full-file ASR reviewed all 14 successful-audio verifier problems: 12 meet WER 0.15 (both shipped Neutral, all four no-delivery, and six of eight Calm); only two short Calm controls remain at WER 0.167. Four of the 12 numeric rejects have incomplete Apple Speech edge coverage; current live verification now produces a typed harness-inconclusive result for that condition. Fresh current-source Mac regeneration of the exact shipped-Neutral short/long rows passed Fast-QC, receipt parity, and diagnostic full-file WER 0.000. The retained Neutral short row has full-edge Apple WER 0.167 versus diagnostic WER 0.083 and is not promoted by disagreement or Mac evidence. Focused Swift/Python fixtures pass and historical evidence remains unchanged. Typed transcription results and the manually reviewed transcript remain unchanged. VLR-07 remains open for fixed-source phone confirmation, unresolved evaluator disagreement, the two original inconclusive rows, and two deterministic invalid diagnostic-arm outputs. Preserve all three runs immutably; do not weaken thresholds, retry, merge, relabel, or replace failed rows merely to obtain a green count."
+      "notes": "The corrected-source September 2 campaign is complete and pinned in the privacy-safe iOS report. Two distinct no-retry closure runs each passed 14/14. The 122-row characterization represented every row with 106 PASS, two product-owned mandatory QC rejections, 12 then-product-owned output-accuracy rejections, and two harness-owned inconclusive verifier cases. Cached serial independent full-file ASR reviewed all 14 successful-audio verifier problems: 12 meet WER 0.15 (both shipped Neutral, all four no-delivery, and six of eight Calm); only two short Calm controls remain at WER 0.167. Four of the 12 numeric rejects have incomplete Apple Speech edge coverage; current live verification now produces a typed harness-inconclusive result for that condition. Fresh current-source Mac regeneration of the exact shipped-Neutral short/long rows passed Fast-QC, receipt parity, and diagnostic full-file WER 0.000. The retained Neutral short row has full-edge Apple WER 0.167 versus diagnostic WER 0.083 and is not promoted by disagreement or Mac evidence. Focused Swift/Python fixtures pass and historical evidence remains unchanged. Typed transcription results and the manually reviewed transcript remain unchanged. VLR-07 remains open for fixed-source phone confirmation, unresolved evaluator disagreement, the two original inconclusive rows, and two deterministic invalid diagnostic-arm outputs. Preserve all three runs immutably; do not weaken thresholds, retry, merge, relabel, or replace failed rows merely to obtain a green count. September 4 V26-06/V26-07 extend existing verifier authority, not a new analyzer project: the live AVAudioFile duration read uses try? and optional duration can bypass edge checks. The current predicate measures outer edges, not interior speech completeness. This review proves the source limitation, not an actual unreadable-WAV PASS; WER may still reject interior omissions. Source correction and precise semantics are required before freeze; historical records and unresolved recognizer disagreement stay unchanged. September 4 bounded verifier correction implemented and focused tests pass: live absent/invalid WAV duration returns source_audio_duration_unavailable before Speech authorization; legacy optional-duration decoding/offline evaluation stays compatible. The helper is named hasAudioEdgeCoverage with a compatibility wrapper. A full-edge interior-omission fixture still fails WER, so endpoints never imply complete speech coverage. No QC threshold, prompt, tokenizer, model or fixed seed changed; unresolved retained/device cases remain open."
     },
     {
       "id": "VLR-08",

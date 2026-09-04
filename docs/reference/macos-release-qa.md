@@ -173,6 +173,11 @@ This deterministic smoke does not run synthesis. RF-10 additionally qualifies al
 French Design with a pinned seed, Clone, cancellation, generation-error exit status, and resource
 loading during real inference on the copied **signed candidate**. Record those results separately;
 neither a development CLI smoke nor a valid manifest closes F-17 or authorizes publication.
+Cancellation qualification requires the command's cleanup acknowledgement, exit 130, and absence
+of both the cancelled destination and its UUID staging WAV. A forced exit or host-side deletion
+cannot produce PASS. Keep failed output and the partial report for investigation. Native signal
+and shared-store subprocess fixtures are deterministic prerequisites, not a substitute for this
+copied-candidate run.
 
 ## Release notes are a release artifact (both stores, fail-closed)
 

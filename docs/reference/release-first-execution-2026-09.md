@@ -105,10 +105,10 @@ No phone work is active at this checkpoint. The previous run did not prove final
 restoration, or screen lock; verify those before the next unattended run. Do not assume ownership
 of existing History rows from text alone.
 
-## RF-06 retained-evidence review (September 4)
+## RF-06 retained-evidence review and bounded follow-up (September 4)
 
-No new audio was generated and no original result was rewritten. The review narrows the next
-diagnostic rather than claiming these release findings are resolved.
+No original result was rewritten. The review and three bounded Mac reproductions narrow the next
+device diagnostic rather than claiming the remaining release finding is resolved.
 
 - **Marker-free Custom:** `custom-008` in `065457-e2ec8911` has a correct French model-facing
   receipt, the recorded seed, zero allocation retries, and voluntary EOS. Persisted QC locates
@@ -116,31 +116,67 @@ diagnostic rather than claiming these release findings are resolved.
   cover 6.16–18.48 seconds with RMS between −77.16 and −69.26 dBFS. These reports are computed
   from decoded samples before the final writer (`GenerationOutputAdapter.swift`), so the defect
   is already observable upstream of file assembly/History/playback. The retained bundle has the
-  rejected-WAV digest but no matching WAV or codec trace; it cannot yet distinguish sampling
-  from decoding. Next: the exact existing row/seed with scoped codec/rejected-audio collection,
-  then incremental/full replay. Do not infer an RNG or decoder fix from telemetry alone.
+  rejected-WAV digest but no matching WAV or codec trace. The exact current-source request then
+  passed three fresh Mac processes without a retry: streaming produced 199 codec frames and a
+  15.92-second clip twice with identical QC, while non-streaming produced 325 frames and a
+  26.00-second clip. The retained iPhone row produced 1,347 frames and 107.76 seconds of audio.
+  This rules out the tracked script, instruction/language routing, and final WAV writer as a shared
+  deterministic cause, and establishes stable same-path Mac sampling. It does not distinguish an
+  iPhone-specific sampled continuation from code-to-audio decoding because the device codec trace
+  is missing. Next: the exact existing row/seed on the physical phone with scoped codec/rejected-
+  audio collection, then incremental/full replay. Do not infer an RNG, decoder, prompt, token-cap,
+  or QC fix from telemetry alone.
 - **French Design:** the September 2 corrected characterization has 28 rows per arm. Shipped
   Neutral has 26 passing output verifications and two accuracy rejects; no-delivery has 23 passes,
   four verification rejects and one mandatory QC rejection; Calm has 19 passes, eight verification
   rejects and one mandatory QC rejection. These are this run's counts, not the earlier cohort's.
   Keep the original terminal results and prompt copy.
-- **Verifier completeness needs examination before attribution:** the shipped Neutral long row,
+- **Verifier completeness was the first divergence for one shipped Design row:** the shipped Neutral long row,
   seed `32060824` (`t96-60c01edf`), is a 16-second WAV. All three `fr-CA` recognition passes cover
   only 8.16–15.84 seconds; the score counts 20 deletions out of 39 reference words. The first
-  eight seconds are not blank: one-second RMS windows range from −37.7 to −15.9 dBFS. This
-  establishes unscored audio, not whether that audio contains the intended words. The current
-  transcriber accepts the first final `bestTranscription`; consensus validates internal timing
-  consistency but not whole-file speech coverage. Apple's [result documentation](https://developer.apple.com/documentation/speech/sfspeechrecognitionresult)
-  describes transcriptions of the current utterance, not a guarantee of whole-file coverage.
-  A bounded first-half/second-half recognition comparison on this same retained WAV is the next
-  localization step. Preserve the original rejection; neither repeated agreement nor energy alone
-  proves a model intelligibility defect or authorizes a PASS.
+  eight seconds are not blank: one-second RMS windows range from −37.7 to −15.9 dBFS. An offline,
+  locally cached Whisper Small analysis of the immutable WAV then transcribed the complete file.
+  Its hypothesis has three edits over 39 normalized words (WER 0.077),
+  below the unchanged 0.15 threshold; the first half has high speech probability. This establishes
+  that Apple Speech consistently discarded the first utterance in this row. It is verifier evidence
+  failure, not proof of a French synthesis defect, and the independent analyzer remains diagnostic
+  rather than promotion authority.
+- **Narrow source correction:** current live verification now binds the Speech timing ranges to the
+  immutable WAV duration. Every consensus pass must cover both source edges within the bounded
+  one-second/15%-of-duration allowance, capped at 2.5 seconds. A partial but internally consistent
+  utterance produces `speech_recognition_incomplete_temporal_coverage`, no WER/CER score, and a
+  harness-owned inconclusive VLR result. Historical records remain decodable and unchanged. The
+  focused Swift and Python tests cover the retained 8.16–15.84/16-second shape and complete-edge
+  control. This is fail-closed classification, not a retroactive PASS or a replacement ASR result.
+- **Complete retained Design screen:** the same offline, cached, serial full-file analysis was
+  applied to all 14 rows whose successful audio had not cleared the original verifier. Every WAV
+  is shorter than the analyzer's 30-second context, so no artificial split boundary was needed.
+  Twelve fall at or below WER 0.15: both shipped Neutral rows, all four no-delivery rows, and six
+  of eight Calm rows. The only two remaining diagnostic misses are short Calm controls at WER
+  0.167. Of the 12 original numeric accuracy rejects, four have incomplete Apple Speech edge
+  coverage; the other eight cover the WAV but still contain evaluator disagreement. The two
+  shipped Neutral rows are 2/2 under the diagnostic analyzer, but the short row remains an Apple
+  Speech 0.167 failure versus diagnostic WER 0.083 and is not promoted by the independent result.
+  This preserves the distinction between proven temporal truncation, unresolved evaluator
+  disagreement, and actual experimental-arm defects.
+- **Exact current-source Mac confirmation:** the retained short and long shipped-Neutral French
+  requests were regenerated in fresh CLI processes with their exact scripts, briefs, delivery,
+  and seeds `32060828` and `32060824`. Both passed mandatory Fast-QC, emitted matching request
+  receipts, and scored diagnostic full-file WER 0.000. This is useful same-source Mac evidence;
+  it is not physical-iPhone or Apple Speech closure.
 
 Evidence stays in the original ignored UI/VLR run bundles. Engine JSONL SHA-256 for the Custom
 row's bundle: `09d6a537b4da25a5434a30c79a47943acb7fec6a82b4030936a9270d57aa5b3a`.
 The current VLR composer correctly refuses to qualify historical input against the changed full
-tree; that guard was not bypassed. The observations above are a read-only review, not newly
-qualified candidate evidence. RF-06 remains open; independent RF-07/RF-08 engineering may continue.
+tree; that guard was not bypassed. The observations above are diagnostic, not newly qualified
+candidate evidence. RF-06 remains open for the iPhone codec/replay boundary, the shipped Neutral
+short-row Apple/Whisper disagreement, and fixed-source physical-device confirmation of the
+coverage classifier; independent RF-07/RF-08 engineering may continue.
+
+The coherent source checkpoint passed the full project-input gate (121 Python modules and 1,468
+declared tests), generic physical-iOS SDK app and logic-test builds, and all deterministic macOS
+core, transport, and owned-runtime suites (`mac-test-20260904-145600`). No phone, model download,
+or release action was used by that checkpoint.
 
 ## RF-08 source checkpoint (September 4)
 

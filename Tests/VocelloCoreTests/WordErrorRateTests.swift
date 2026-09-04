@@ -1,3 +1,4 @@
+import Foundation
 import QwenVoiceCore
 import XCTest
 
@@ -473,6 +474,123 @@ final class WordErrorRateTests: XCTestCase {
             XCTAssertNil(result.characterErrorRate)
             XCTAssertFalse(result.pass)
         }
+    }
+
+    func testVerifierRejectsConsistentTranscriptThatCoversOnlyOneUtterance() {
+        let transcript = "Les voyageurs regardaient la rivière"
+        let latePasses = (1 ... 3).map { index in
+            var value = pass(
+                index: index,
+                transcript: transcript,
+                localeIdentifier: "fr-CA"
+            )
+            value.segmentStartSeconds = 8.16
+            value.segmentEndSeconds = 15.84
+            value.timingCoverageSeconds = 7.68
+            return value
+        }
+        let recognition = evidence(
+            authorization: .authorized,
+            consensus: .consistent,
+            repetitions: latePasses,
+            transcript: transcript,
+            expectedLanguage: .french
+        )
+
+        XCTAssertFalse(
+            VoiceClipTranscriber.hasCompleteTemporalCoverage(
+                recognition,
+                sourceAudioDurationSeconds: 16
+            )
+        )
+        let result = GenerationOutputVerifier.evaluate(
+            recognition: recognition,
+            expectedScript: "Le train du matin a quitté la gare. Les voyageurs regardaient la rivière.",
+            expectedLanguage: .french,
+            sourceAudioDurationSeconds: 16
+        )
+        XCTAssertEqual(
+            result.skipReason,
+            "speech_recognition_incomplete_temporal_coverage"
+        )
+        XCTAssertEqual(result.sourceAudioDurationSeconds, 16)
+        XCTAssertNil(result.wordErrorRate)
+        XCTAssertNil(result.accuracyPass)
+        XCTAssertFalse(result.pass)
+    }
+
+    func testVerifierAcceptsConsensusCoveringBothAudioEdges() {
+        let transcript = "Le train du matin a quitté la gare"
+        let completePasses = (1 ... 3).map { index in
+            var value = pass(
+                index: index,
+                transcript: transcript,
+                localeIdentifier: "fr-CA"
+            )
+            value.segmentStartSeconds = 0.32
+            value.segmentEndSeconds = 15.4
+            value.timingCoverageSeconds = 15.08
+            return value
+        }
+        let recognition = evidence(
+            authorization: .authorized,
+            consensus: .consistent,
+            repetitions: completePasses,
+            transcript: transcript,
+            expectedLanguage: .french
+        )
+
+        XCTAssertTrue(
+            VoiceClipTranscriber.hasCompleteTemporalCoverage(
+                recognition,
+                sourceAudioDurationSeconds: 16
+            )
+        )
+        let result = GenerationOutputVerifier.evaluate(
+            recognition: recognition,
+            expectedScript: transcript,
+            expectedLanguage: .french,
+            sourceAudioDurationSeconds: 16
+        )
+        XCTAssertTrue(result.pass)
+        XCTAssertEqual(result.sourceAudioDurationSeconds, 16)
+
+        var trailingOnly = recognition
+        trailingOnly.repetitions = trailingOnly.repetitions.map { repetition in
+            var repetition = repetition
+            repetition.segmentEndSeconds = 8
+            repetition.timingCoverageSeconds = 7.68
+            return repetition
+        }
+        XCTAssertFalse(
+            VoiceClipTranscriber.hasCompleteTemporalCoverage(
+                trailingOnly,
+                sourceAudioDurationSeconds: 16
+            )
+        )
+    }
+
+    func testVerifierSchemaThreeDecodesWithoutAddedAudioDuration() throws {
+        let transcript = "Hello world"
+        let recognition = evidence(
+            authorization: .authorized,
+            consensus: .consistent,
+            repetitions: (1 ... 3).map { pass(index: $0, transcript: transcript) },
+            transcript: transcript
+        )
+        let original = GenerationOutputVerifier.evaluate(
+            recognition: recognition,
+            expectedScript: transcript,
+            expectedLanguage: .english
+        )
+        let data = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(
+            GenerationOutputVerifier.Result.self,
+            from: data
+        )
+
+        XCTAssertNil(decoded.sourceAudioDurationSeconds)
+        XCTAssertEqual(decoded, original)
     }
 
     private func pass(

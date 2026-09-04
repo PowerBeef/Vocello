@@ -1,3 +1,4 @@
+import AVFoundation
 import Foundation
 import QwenVoiceCore
 
@@ -87,6 +88,9 @@ enum GenerationOutputVerifier {
         var characterSubstitutions: Int?
         var characterInsertions: Int?
         var characterDeletions: Int?
+        /// Added compatibly in schema v3. Historical v3 records decode with `nil`; current live
+        /// verification always binds the Speech timing evidence to the immutable WAV duration.
+        var sourceAudioDurationSeconds: Double?
         var languagePass: Bool
         var accuracyPass: Bool?
         var pass: Bool
@@ -100,6 +104,11 @@ enum GenerationOutputVerifier {
         expectedLanguage: Qwen3SupportedLanguage,
         maxWordErrorRate: Double = VoiceClipTranscriber.outputVerificationDefaultMaxWordErrorRate
     ) async -> Result {
+        let sourceAudioDurationSeconds: Double? = try? {
+            let file = try AVAudioFile(forReading: audioURL)
+            guard file.fileFormat.sampleRate > 0, file.length > 0 else { return nil }
+            return Double(file.length) / file.fileFormat.sampleRate
+        }()
         let recognition = await VoiceClipTranscriber.verificationEvidence(
             url: audioURL,
             expectedLanguage: expectedLanguage
@@ -109,6 +118,7 @@ enum GenerationOutputVerifier {
             recognition: recognition,
             expectedScript: expectedScript,
             expectedLanguage: expectedLanguage,
+            sourceAudioDurationSeconds: sourceAudioDurationSeconds,
             maxWordErrorRate: maxWordErrorRate
         )
     }
@@ -119,6 +129,7 @@ enum GenerationOutputVerifier {
         recognition: VoiceClipTranscriber.VerificationEvidence,
         expectedScript: String,
         expectedLanguage: Qwen3SupportedLanguage,
+        sourceAudioDurationSeconds: Double? = nil,
         maxWordErrorRate: Double = VoiceClipTranscriber.outputVerificationDefaultMaxWordErrorRate
     ) -> Result {
         let expectedToken = expectedLanguage.rawValue
@@ -131,7 +142,19 @@ enum GenerationOutputVerifier {
                 recognition: recognition,
                 accuracyMetric: accuracyMetric,
                 accuracyThreshold: accuracyThreshold.isFinite ? accuracyThreshold : -1,
+                sourceAudioDurationSeconds: sourceAudioDurationSeconds,
                 reason: "accuracy_threshold_invalid"
+            )
+        }
+        if let sourceAudioDurationSeconds,
+           (!sourceAudioDurationSeconds.isFinite || sourceAudioDurationSeconds <= 0) {
+            return failed(
+                expectedLanguage: expectedLanguage,
+                recognition: recognition,
+                accuracyMetric: accuracyMetric,
+                accuracyThreshold: accuracyThreshold,
+                sourceAudioDurationSeconds: nil,
+                reason: "source_audio_duration_invalid"
             )
         }
         if recognition.consensusStatus == .consistent {
@@ -144,7 +167,22 @@ enum GenerationOutputVerifier {
                     recognition: recognition,
                     accuracyMetric: accuracyMetric,
                     accuracyThreshold: accuracyThreshold,
+                    sourceAudioDurationSeconds: sourceAudioDurationSeconds,
                     reason: "speech_recognition_evidence_invalid"
+                )
+            }
+            if let sourceAudioDurationSeconds,
+               !VoiceClipTranscriber.hasCompleteTemporalCoverage(
+                   recognition,
+                   sourceAudioDurationSeconds: sourceAudioDurationSeconds
+               ) {
+                return failed(
+                    expectedLanguage: expectedLanguage,
+                    recognition: recognition,
+                    accuracyMetric: accuracyMetric,
+                    accuracyThreshold: accuracyThreshold,
+                    sourceAudioDurationSeconds: sourceAudioDurationSeconds,
+                    reason: "speech_recognition_incomplete_temporal_coverage"
                 )
             }
         }
@@ -157,6 +195,7 @@ enum GenerationOutputVerifier {
                 recognition: recognition,
                 accuracyMetric: accuracyMetric,
                 accuracyThreshold: accuracyThreshold,
+                sourceAudioDurationSeconds: sourceAudioDurationSeconds,
                 reason: failureReason(for: recognition)
             )
         }
@@ -207,6 +246,7 @@ enum GenerationOutputVerifier {
             characterSubstitutions: characterMetrics.substitutions,
             characterInsertions: characterMetrics.insertions,
             characterDeletions: characterMetrics.deletions,
+            sourceAudioDurationSeconds: sourceAudioDurationSeconds,
             languagePass: languagePass,
             accuracyPass: accuracyPass,
             pass: languagePass && accuracyPass,
@@ -220,6 +260,7 @@ enum GenerationOutputVerifier {
         recognition: VoiceClipTranscriber.VerificationEvidence,
         accuracyMetric: AccuracyMetric,
         accuracyThreshold: Double,
+        sourceAudioDurationSeconds: Double?,
         reason: String
     ) -> Result {
         Result(
@@ -245,6 +286,7 @@ enum GenerationOutputVerifier {
             characterSubstitutions: nil,
             characterInsertions: nil,
             characterDeletions: nil,
+            sourceAudioDurationSeconds: sourceAudioDurationSeconds,
             languagePass: false,
             accuracyPass: nil,
             pass: false,

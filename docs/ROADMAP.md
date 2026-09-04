@@ -46,7 +46,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `RF-03` | done | Step 3 — implement and behavior-test macOS Design request preservation | `file:Sources/ViewModels/VoiceDesignCoordinator.swift`, `file:Tests/VocelloCoreTests/VoiceDesignCoordinatorTests.swift`, `doc:docs/development-progress.md#resume-here-2026-09-04` |
 | `RF-04` | done | Step 4 — repair long-form durability on both platforms | `file:Tests/VocelloCoreTests/LongFormHistoryAcceptanceTests.swift`, `doc:docs/development-progress.md#resume-here-2026-09-04` |
 | `RF-05` | done | Step 5 — expose recoverable History-save outcomes | `file:Tests/VocelloCoreTests/GenerationHistoryEnqueueStateTests.swift`, `file:Tests/VocelloCoreTests/GenerationHistoryOutboxTests.swift`, `doc:docs/development-progress.md#resume-here-2026-09-04` |
-| `RF-06` | in-flight | Step 6 — localize the remaining natural-text audio failures | `doc:docs/reference/release-first-execution-2026-09.md#rf-06-retained-evidence-review-september-4` |
+| `RF-06` | in-flight | Step 6 — localize the remaining natural-text audio failures | `doc:docs/reference/release-first-execution-2026-09.md#rf-06-retained-evidence-review-and-bounded-follow-up-september-4` |
 | `RF-07` | in-flight | Step 7 — finish only the acceptance-blocking harness repairs | — |
 | `RF-08` | in-flight | Step 8 — package the downloadable optimized CLI | — |
 | `RF-09` | planned | Step 9 — verify the coherent tree and freeze the 3.0.0 candidate | — |

@@ -96,13 +96,34 @@ before regeneration; the regenerated follow-up passed. The coherent checkpoint p
 Python tests/project inputs, generic iOS app/logic builds, and macOS core/transport/owned-runtime
 suites (`mac-test-20260904-131523`). This is not candidate proof. The original numeric-dropout v2 plan and row digests remain unchanged using
 a digest-pinned historical control contract; tampered/self-rehashed rows still fail validation. No physical
-device or model run was started. RF-06 retained-audio review now localizes custom-008's low energy
-before the WAV writer, but lacks the retained codec/WAV needed to split sampling from decoding.
-French Design's shipped long reject has three agreeing transcripts that cover only the latter
-half of a nonempty 16-second WAV; whole-file recognition completeness needs direct investigation
-before attributing its 20 missing words to synthesis. See the programme's RF-06 review. Original
-failures remain unchanged and no prompt/QC change is justified yet. Next: bounded RF-06 follow-up,
-RF-07 acceptance repairs, and RF-08 standalone CLI packaging.
+device or model run was started. RF-06 retained-audio review localizes custom-008's low energy
+before the WAV writer. Three later fresh-process Mac reproductions of the exact request/seed all
+pass: the streaming path repeats at 199 codec frames and 15.92 seconds, while non-streaming uses
+325 frames and 26.00 seconds; the failed iPhone row had 1,347 frames and 107.76 seconds. The missing
+device codec/WAV still prevents splitting iPhone sampling from decoding, so no prompt/QC/token-cap
+change is justified.
+
+The retained French Design long reject is now localized separately. Independent cached full-file
+ASR recovered the complete French content at 3/39 normalized word edits (WER 0.077), while all
+three Apple Speech passes had consistently omitted 0–8.16 seconds and
+reported WER 0.565. Live verification now binds recognition timing to WAV duration and reports
+`speech_recognition_incomplete_temporal_coverage` without scoring a partial transcript; the VLR
+composer owns that as a harness-inconclusive result. The same serial offline full-file pass covered
+all 14 successful-audio verifier problems: 12/14 meet WER 0.15 (both shipped Neutral rows, all four
+no-delivery rows, and six of eight Calm rows); only two short Calm controls remain at WER 0.167.
+Four of the 12 original numeric rejects have incomplete Apple edge coverage; eight have full
+coverage and retain their original outcome pending evaluator resolution. Fresh current-source Mac
+regeneration of the exact short and long shipped-Neutral requests passed Fast-QC, receipt parity,
+and diagnostic full-file WER 0.000 for both rows. Focused Swift and Python tests pass. This does not
+rewrite old results, promote diagnostic ASR, or substitute Mac evidence for device acceptance.
+RF-06 remains open for exact iPhone codec capture/replay, the shipped Neutral short-row
+Apple/Whisper disagreement, and fixed-source physical-device confirmation; RF-07's physical pilot
+also remains.
+
+The coherent RF-06 source checkpoint passed the full project-input gate (121 Python modules and
+1,468 declared tests), generic physical-iOS SDK app and logic-test builds, and all deterministic
+macOS core, transport, and owned-runtime suites (`mac-test-20260904-145600`). No physical phone or
+release operation was involved.
 
 RF-07 now has source implementation of immediate sequenced stage attachments, explicit encoding
 failure, early player identity, separately observed selections, pause/play/scrub proof, History

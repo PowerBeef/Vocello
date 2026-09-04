@@ -128,6 +128,12 @@ delivery control and it cannot establish semantic emotion or French correctness 
 French correctness remains conditional on locale-locked ASR; speaker identity and prosody metrics
 are advisory until AV-07/AV-08 calibration closes.
 
+Locale-locked consensus is necessary but not sufficient. Current live output verification also
+binds every Speech pass to the immutable WAV duration and requires bounded coverage of both audio
+edges. Three identical transcripts that cover only one utterance are reported as
+`speech_recognition_incomplete_temporal_coverage`, remain harness-inconclusive, and produce no
+WER/CER score. Independent local ASR may diagnose the omitted region but cannot promote the take.
+
 The schema-2 generation receipt is assembled from the exact native actor request. It distinguishes
 stored UI language, target-text detection, reference-transcript language, final model-facing
 language, think/no-think token mode, transcript-backed versus audio-only conditioning, target and

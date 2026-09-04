@@ -935,6 +935,13 @@ def classify_output_verification_failure(
     recognition remains a harness gap and cannot be converted into a product
     rejection. Neither branch is a PASS and neither changes the threshold.
     """
+    reason = verification.get("skipReason")
+    if reason == "speech_recognition_incomplete_temporal_coverage":
+        return (
+            f"output-verification-inconclusive:{reason}",
+            "harness",
+            ["output-recognition-temporal-coverage-incomplete"],
+        )
     recognition = verification.get("recognition")
     if not isinstance(recognition, dict):
         return (
@@ -943,7 +950,6 @@ def classify_output_verification_failure(
             ["output-recognition-evidence-unavailable"],
         )
     if recognition.get("evidenceConsistency") is not True:
-        reason = verification.get("skipReason")
         safe_reason = reason if _safe_diagnostic_identifier(reason) else "unavailable"
         return (
             f"output-verification-inconclusive:{safe_reason}",
@@ -968,12 +974,24 @@ def _public_output_verification(value: Any) -> dict[str, Any] | None:
     public_recognition = None
     if isinstance(recognition, dict):
         repetitions = recognition.get("repetitions")
+        temporal_coverage = []
+        if isinstance(repetitions, list):
+            for repetition in repetitions:
+                if not isinstance(repetition, dict):
+                    continue
+                temporal_coverage.append({
+                    "passIndex": repetition.get("passIndex"),
+                    "segmentStartSeconds": repetition.get("segmentStartSeconds"),
+                    "segmentEndSeconds": repetition.get("segmentEndSeconds"),
+                    "timingCoverageSeconds": repetition.get("timingCoverageSeconds"),
+                })
         public_recognition = {
             "algorithmVersion": recognition.get("algorithmVersion"),
             "consensusStatus": recognition.get("consensusStatus"),
             "evidenceConsistency": recognition.get("evidenceConsistency"),
             "selectedLocaleIdentifier": recognition.get("selectedLocaleIdentifier"),
             "repetitionCount": len(repetitions) if isinstance(repetitions, list) else 0,
+            "temporalCoverage": temporal_coverage,
         }
     return {
         "algorithmVersion": value.get("algorithmVersion"),
@@ -988,6 +1006,7 @@ def _public_output_verification(value: Any) -> dict[str, Any] | None:
         "accuracyValue": value.get("accuracyValue"),
         "accuracyThreshold": value.get("accuracyThreshold"),
         "accuracyPass": value.get("accuracyPass"),
+        "sourceAudioDurationSeconds": value.get("sourceAudioDurationSeconds"),
         "recognition": public_recognition,
     }
 

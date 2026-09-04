@@ -210,6 +210,13 @@ enum VoiceClipTranscriber {
     private static let confidentLanguageScore = 0.5
     static let outputVerificationLanguagePassScore = 0.5
     static let outputVerificationDefaultMaxWordErrorRate = 0.15
+    /// A file-level recognition pass is not whole-file evidence when Speech returns only a late
+    /// utterance (or stops materially before the WAV ends). Keep the allowance large enough for a
+    /// natural opening/closing pause, while rejecting the retained 8-second omission in a 16-second
+    /// clip. The absolute cap prevents long-form clips from gaining an unbounded blind edge.
+    private static let outputVerificationMinimumEdgeAllowanceSeconds = 1.0
+    private static let outputVerificationMaximumEdgeAllowanceSeconds = 2.5
+    private static let outputVerificationEdgeAllowanceFraction = 0.15
     private static let earlyExitScore = 0.85
     private static let minimumUsableScore = 0.2
     private static let authorizationTimeout: Duration = .seconds(30)
@@ -553,6 +560,42 @@ enum VoiceClipTranscriber {
             requiredPassCount: evidence.requiredPassCount
         )
         return recomputed.status == .consistent && recomputed.transcript == transcript
+    }
+
+    /// Validates that every otherwise-consistent Speech pass represents the complete source WAV,
+    /// rather than one internally consistent utterance somewhere inside it. This is deliberately a
+    /// pure seam: retained timing evidence and the immutable WAV duration are sufficient for tests
+    /// and host-side diagnosis, and no requested text or label influences the decision.
+    static func hasCompleteTemporalCoverage(
+        _ evidence: VerificationEvidence,
+        sourceAudioDurationSeconds: Double
+    ) -> Bool {
+        guard sourceAudioDurationSeconds.isFinite,
+              sourceAudioDurationSeconds > 0,
+              evidence.repetitions.count == evidence.requiredPassCount else {
+            return false
+        }
+
+        let proportionalAllowance = sourceAudioDurationSeconds
+            * outputVerificationEdgeAllowanceFraction
+        let edgeAllowance = min(
+            outputVerificationMaximumEdgeAllowanceSeconds,
+            max(outputVerificationMinimumEdgeAllowanceSeconds, proportionalAllowance)
+        )
+        let latestRequiredEnd = max(0, sourceAudioDurationSeconds - edgeAllowance)
+        let latestPermittedEnd = sourceAudioDurationSeconds + 0.25
+
+        return evidence.repetitions.allSatisfy { pass in
+            guard let start = pass.segmentStartSeconds,
+                  let end = pass.segmentEndSeconds,
+                  start.isFinite,
+                  end.isFinite else {
+                return false
+            }
+            return start <= edgeAllowance
+                && end >= latestRequiredEnd
+                && end <= latestPermittedEnd
+        }
     }
 
     /// NaturalLanguage probability mass that the text is in `expected` (handles script/region

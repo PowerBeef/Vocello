@@ -411,6 +411,57 @@ class VoiceIdentityLanguageReliabilityTests(unittest.TestCase):
         self.assertEqual(inconclusive_report["productFailures"], 0)
         self.assertEqual(inconclusive_report["harnessFailures"], 1)
 
+        incomplete_coverage = copy.deepcopy(rejected)
+        incomplete_coverage["outputVerification"]["skipReason"] = (
+            "speech_recognition_incomplete_temporal_coverage"
+        )
+        incomplete_coverage["outputVerification"]["languagePass"] = False
+        incomplete_coverage["outputVerification"]["accuracyPass"] = None
+        incomplete_coverage["outputVerification"]["sourceAudioDurationSeconds"] = 16.0
+        for index, repetition in enumerate(
+            incomplete_coverage["outputVerification"]["recognition"]["repetitions"],
+            start=1,
+        ):
+            repetition.update({
+                "passIndex": index,
+                "segmentStartSeconds": 8.16,
+                "segmentEndSeconds": 15.84,
+                "timingCoverageSeconds": 7.68,
+            })
+        first_path.write_text(json.dumps(incomplete_coverage), encoding="utf-8")
+        coverage_report = VLR.compose_device_results(
+            plan=plan,
+            contract=self.contract,
+            diagnostics_root=diagnostics,
+            transcription=transcription,
+            output=self.root / "verification-coverage-summary.json",
+        )
+        coverage_take = coverage_report["takes"][0]
+        self.assertEqual(
+            coverage_take["failures"],
+            [
+                "output-verification-inconclusive:"
+                "speech_recognition_incomplete_temporal_coverage"
+            ],
+        )
+        self.assertEqual(coverage_take["failureOwner"], "harness")
+        self.assertEqual(
+            coverage_take["evidenceGaps"],
+            ["output-recognition-temporal-coverage-incomplete"],
+        )
+        self.assertEqual(
+            coverage_take["outputVerification"]["sourceAudioDurationSeconds"],
+            16.0,
+        )
+        self.assertEqual(
+            len(
+                coverage_take["outputVerification"]["recognition"]["temporalCoverage"]
+            ),
+            3,
+        )
+        self.assertEqual(coverage_report["productFailures"], 0)
+        self.assertEqual(coverage_report["harnessFailures"], 1)
+
         first_path.write_text(json.dumps(passing), encoding="utf-8")
         tampered = copy.deepcopy(passing)
         first_receipt = copy.deepcopy(tampered["requestReceipt"])

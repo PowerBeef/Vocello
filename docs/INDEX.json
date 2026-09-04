@@ -285,7 +285,10 @@
         "project.yml",
         "Sources/VocelloCLI",
         "scripts/build.sh",
-        "scripts/cli_version_contract.py"
+        "scripts/cli_version_contract.py",
+        "scripts/cli_package.py",
+        "scripts/release.sh",
+        "scripts/verify_packaged_cli.sh"
       ]
     },
     {
@@ -654,7 +657,9 @@
       "sourceOfTruth": [
         "scripts/release.sh",
         ".github/workflows/release.yml",
-        "scripts/macos_test.sh"
+        "scripts/macos_test.sh",
+        "scripts/cli_package.py",
+        "scripts/verify_packaged_cli.sh"
       ]
     },
     {

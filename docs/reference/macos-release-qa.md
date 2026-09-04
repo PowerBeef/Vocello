@@ -1,12 +1,14 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-08-29
+reviewed: 2026-09-04
 summary: The standing macOS release-QA checklist — deterministic gates, the per-candidate smoke step, release-notes and performance-surface obligations, packaging and verification.
 sourceOfTruth:
   - scripts/release.sh
   - .github/workflows/release.yml
   - scripts/macos_test.sh
+  - scripts/cli_package.py
+  - scripts/verify_packaged_cli.sh
 ---
 # macOS Release QA — the desktop release gate
 
@@ -109,7 +111,7 @@ upload depend on deterministic release-readiness and artifact checks.
    and apply only the bounded cleanup it reports; never delete `build/dist/` or the canonical
    development caches merely to satisfy the release lane.
    Release builds use isolated `build/scratch/derived-data/release-macos/` state and place the
-   signed app, metadata, and DMG under `build/dist/macos/`; they never invalidate the persistent
+   signed app, metadata, desktop DMG and separate CLI DMG under `build/dist/macos/`; they never invalidate the persistent
    development cache. Routine cleanup does not remove these distribution outputs.
    An attended launch or generation pass can be performed when models are available, but it is not
    part of the packaging gate.
@@ -123,8 +125,10 @@ upload depend on deterministic release-readiness and artifact checks.
    source-authority job also proves that the tag commit is contained in `origin/main` and that both
    required checks belong to that exact SHA before any platform job starts. CI then verifies
    tag/source/version identity, builds, signs, notarizes, staples,
-   verifies (`verify_packaged_dmg.sh`), emits SPDX and CycloneDX inventories, writes
-   `SHA256SUMS` plus `release-evidence.json`, and attests the DMG. Only then does it create or reuse
+   verifies (`verify_packaged_dmg.sh … --include-cli`), emits SPDX and CycloneDX inventories, writes
+   `SHA256SUMS` plus `release-evidence.json`, and attests both DMGs. The CLI report is a required,
+   hashed output of the managed artifact-verification step and binds the exact CLI DMG and
+   source/version/build. Only then does it create or reuse
    a draft GitHub Release, upload the candidate, download every asset, and verify the digests.
    Reusing a draft first removes every prior asset; the workflow then requires the remote asset-name
    set to match the current candidate exactly before downloading and validating it. The workflow
@@ -148,6 +152,27 @@ upload depend on deterministic release-readiness and artifact checks.
    deterministic candidate and the promotion manifest before changing the draft to public. Device
    or model availability can delay public promotion, but never candidate building, signing,
    notarization, attestation, or draft upload.
+
+## CLI distribution and qualification
+
+The same `release.sh` invocation builds optimized arm64 `VocelloCLI` without internal diagnostic
+capabilities. It stages the executable with source-bound catalogs, dependency resource bundles,
+MLX metallib, project license, and notices rendered from `third_party_attributions.json`.
+No model weights or Python are bundled. The entire `Vocello CLI` folder must remain together.
+The executable is signed with hardened runtime; its separate DMG follows the same opt-in
+Developer ID notarization and stapling sequence as the app. A staging failure does not replace
+any accepted user installation; temporary payloads are removed at exit.
+
+The copied-package verifier checks content digests, arm64-only architecture, system-only dynamic
+linkage, embedded version/build, JSON mode/speaker discovery, and invalid-command exit status
+from a working directory outside the checkout. Missing or newly dynamic non-system dependencies
+fail closed and must be deliberately packaged and verified before release. No resource lookup
+rewrite was needed by the initial relocation proof.
+
+This deterministic smoke does not run synthesis. RF-10 additionally qualifies all three modes,
+French Design with a pinned seed, Clone, cancellation, generation-error exit status, and resource
+loading during real inference on the copied **signed candidate**. Record those results separately;
+neither a development CLI smoke nor a valid manifest closes F-17 or authorizes publication.
 
 ## Release notes are a release artifact (both stores, fail-closed)
 

@@ -239,6 +239,10 @@ Coding agents should also read [`AGENTS.md`](AGENTS.md). Deeper references:
 
 The source tree also builds `vocello`, a headless interface to the same local Swift and MLX engine. It is not included in the app download.
 
+The upcoming 3.0 release programme adds a separate CLI DMG containing the complete runtime-resource
+folder. Packaging source is in place; signed candidate and generation qualification remain pending.
+Use the source-build instructions below until a qualified CLI asset is published.
+
 ```sh
 ./scripts/build.sh cli
 build/vocello modes

@@ -768,6 +768,31 @@ def validate_ios_release_artifact_verification(
         raise ValueError("iOS verification summary privacy declaration is invalid")
 
 
+def validate_cli_artifact_verification(payload: dict[str, Any], release: dict[str, Any], artifacts: list[dict[str, Any]]) -> None:
+    """Bind the managed CLI smoke report to its exact DMG and source. Legacy app-only stays valid."""
+    if set(payload) != {"schemaVersion", "status", "release", "manifestSHA256", "fileCount", "checks",
+                        "generationQualification", "artifact"}:
+        raise ValueError("CLI artifact verification contains unexpected fields")
+    expected_release = {key: release.get(key) for key in ("marketingVersion", "buildNumber", "commitSHA")}
+    if payload.get("schemaVersion") != 1 or payload.get("status") != "passed" or payload.get("release") != expected_release:
+        raise ValueError("CLI artifact verification source/status mismatch")
+    artifact = payload.get("artifact", {})
+    if not isinstance(artifact, dict) or set(artifact) != {"name", "bytes", "sha256"}:
+        raise ValueError("CLI artifact verification has malformed DMG identity")
+    matches = [entry for entry in artifacts if entry.get("name") == artifact.get("name")]
+    if (len(matches) != 1 or not str(artifact.get("name", "")).endswith("-cli.dmg")
+            or any(matches[0].get(key) != artifact.get(key) for key in ("sha256", "bytes"))):
+        raise ValueError("CLI artifact verification DMG binding mismatch")
+    required = {"content-integrity", "arm64", "system-linkage", "embedded-version", "embedded-build",
+                "json-modes", "bundled-speakers", "usage-exit-status", "checkout-independent-cwd"}
+    checks = payload.get("checks", [])
+    if (not isinstance(checks, list) or len(checks) != len(required) or set(checks) != required
+            or not re.fullmatch(r"[0-9a-f]{64}", str(payload.get("manifestSHA256", "")))
+            or type(payload.get("fileCount")) is not int or payload["fileCount"] <= 0
+            or payload.get("generationQualification") != "not-performed"):
+        raise ValueError("CLI artifact smoke must not claim generation qualification")
+
+
 def validate(output_dir: Path) -> dict[str, Any]:
     output_dir = output_dir.resolve()
     evidence_path = output_dir / EVIDENCE_NAME
@@ -792,6 +817,14 @@ def validate(output_dir: Path) -> dict[str, Any]:
     if platform == "ios":
         summary = load_json(output_dir / IOS_ARTIFACT_VERIFICATION_NAME)
         validate_ios_release_artifact_verification(summary, release, evidence.get("artifacts", []))
+    if platform == "macos":
+        artifacts = evidence.get("artifacts", [])
+        has_cli = any(str(item.get("name", "")).endswith("-cli.dmg") for item in artifacts)
+        has_cli_report = any(item.get("name") == "cli-package-verification.json" for item in artifacts)
+        if has_cli and not has_cli_report:
+            raise ValueError("CLI DMG requires its managed verification report")
+        if has_cli_report:
+            validate_cli_artifact_verification(load_json(output_dir / "cli-package-verification.json"), release, artifacts)
 
     bundle_path = output_dir / VERIFICATION_BUNDLE_NAME
     bundle = load_json(bundle_path)

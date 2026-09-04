@@ -10,12 +10,13 @@ fail() {
     exit 1
 }
 
-if [ $# -ne 2 ]; then
-    fail "Usage: $0 /path/to/Vocello-macos26.dmg /path/to/release-metadata.txt"
+if [ $# -lt 2 ] || [ $# -gt 3 ] || { [ $# -eq 3 ] && [ "$3" != "--include-cli" ]; }; then
+    fail "Usage: $0 /path/to/Vocello-macos26.dmg /path/to/release-metadata.txt [--include-cli]"
 fi
 
 DMG_PATH="$1"
 METADATA_PATH="$2"
+INCLUDE_CLI="${3:-}"
 
 [ -f "$DMG_PATH" ] || fail "DMG not found: $DMG_PATH"
 [ -f "$METADATA_PATH" ] || fail "Metadata file not found: $METADATA_PATH"
@@ -152,6 +153,9 @@ echo ""
 
 echo "[4/5] Validating packaged bundle contents..."
 "$SCRIPT_DIR/verify_release_bundle.sh" "$COPIED_APP"
+if [ "$INCLUDE_CLI" = "--include-cli" ]; then
+    bash "$SCRIPT_DIR/verify_packaged_cli.sh" "$METADATA_PATH"
+fi
 echo "[4/5] Packaged bundle validation passed"
 echo ""
 

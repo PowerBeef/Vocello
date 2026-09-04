@@ -142,6 +142,33 @@ The current VLR composer correctly refuses to qualify historical input against t
 tree; that guard was not bypassed. The observations above are a read-only review, not newly
 qualified candidate evidence. RF-06 remains open; independent RF-07/RF-08 engineering may continue.
 
+## RF-08 source checkpoint (September 4)
+
+The existing release workflow now produces and verifies the separate CLI DMG through the same
+managed build/artifact steps, with backward-compatible app-only historical verification. The
+payload includes the executable, MLX/dependency resource bundles, two source-bound catalogs,
+project license, complete governed attribution JSON, rendered notices and usage instructions.
+Both DMGs enter checksums, attestation, draft upload and exact remote-asset validation together.
+
+The optimized development CLI built successfully and its 32-file copied payload passed real
+model-free discovery outside the checkout, including a path containing spaces. The first test
+demonstrated that Xcode's tool product omitted the catalog JSON; release staging now copies the
+authoritative source bytes explicitly and refuses a mismatching built catalog. Ad-hoc resource
+signatures legitimately have empty CMS placeholders; a narrow fixture covers these without
+permitting empty shaders/data. No Swift resource-lookup change was necessary.
+
+Local report: `cli-packaging-local-20260904.json` in ignored macOS release artifacts; executable
+SHA-256 `8ba1c5a3ef95e5098e26251b320eb17966f0a113a3e026f4bcc8456fc8fa7217`.
+It declares development/internal-diagnostics scope, not candidate acceptance. All-mode generation,
+cancellation, Developer ID/notarized DMG qualification and RF-10 promotion remain open. The
+configured binary is still 2.4.0/build 23 until the separate 3.0.0 candidate-freeze step.
+
+The real ad-hoc DMG route then passed independently: a 11,969,269-byte image with SHA-256
+`ad109cb15c610d8964fc3429daac46fab9622ca2e9816b9fd2fc95b88816ca69` attached read-only,
+copied its `Vocello CLI` folder to a path with spaces, repeated all nine model-free checks, and
+detached cleanly. The ignored proof bundle is `rf08-cli-dmg-roundtrip-20260904`. Ad-hoc signing
+and no-generation scope are explicit; this is not Developer ID, notarization or RF-10 evidence.
+
 ## External decisions and final gates
 
 Use the existing [content-rights review](content-rights-review.md),

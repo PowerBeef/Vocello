@@ -111,7 +111,7 @@ Details for runtime, lifecycle, and event-channel invariants live in `docs/ARCHI
 | Check | Contract |
 | --- | --- |
 | `build_output_policy.py` | output ownership and storage floors |
-| `cli_version_contract.py` | embedded CLI build identity and exact source-built version output |
+| `cli_version_contract.py`, `cli_package.py` | CLI identity, resources and packaged smoke |
 | `saved_voice_lifecycle_contract.py` | transactional review, deletion, XPC, cache, and iOS accessibility surfaces |
 | `documentation_contract.py`, `doc_metadata.py`, `check_surface_coverage.py` | links, lifecycle, facts, pinned bodies, and guidance completeness |
 | `roadmap.py`, `project_health.py`, `evidence_impact.py` | work authority, health, and change-to-evidence mapping |

@@ -31,8 +31,7 @@ SIGNING_IDENTITY="${QWENVOICE_SIGNING_IDENTITY:-}"
 CODESIGN_KEYCHAIN="${QWENVOICE_CODESIGN_KEYCHAIN:-}"
 RELEASE_TEAM_ID="${QWENVOICE_DEVELOPMENT_TEAM:-${APPLE_TEAM_ID:-}}"
 # Notarization is opt-in. Either pass --notarize or set QWENVOICE_NOTARIZE=1.
-# Only valid with --signing-mode developer-id. Requires APPLE_ID +
-# APPLE_APP_SPECIFIC_PASSWORD env vars plus a Team ID (already read above).
+# Only valid with --signing-mode developer-id and the opt-in API key flow below.
 NOTARIZE="${QWENVOICE_NOTARIZE:-0}"
 
 release_fail() {
@@ -44,7 +43,7 @@ usage() {
     cat >&2 <<EOF
 Usage: $0 [--skip-build] [--output-name <basename>] [--preflight none|full] [--signing-mode ad-hoc|developer-id] [--signing-identity <identity>] [--codesign-keychain <path>] [--notarize]
 
-Build the macOS Release app, sign it, package it into a DMG, and emit release metadata.
+Build the macOS app and CLI, sign and package separate DMGs, and emit release metadata.
 
 --notarize submits the DMG to Apple's notarization service via the
 App Store Connect API key flow, then staples the ticket. Requires
@@ -294,6 +293,20 @@ fi
 echo "[3/7] Build Release — done ($(step_time "$STEP_START"))"
 echo ""
 
+# Use the same isolated Release products and optimization as the app. The public
+# CLI must not inherit developer-only runtime capabilities from build.sh.
+if ! $SKIP_BUILD; then
+    xcb_run -project "$PROJECT_FILE" -scheme VocelloCLI \
+        -configuration "$CONFIGURATION" -destination "platform=macOS,arch=arm64" \
+        -clonedSourcePackagesDirPath "$SOURCE_PACKAGES_DIR" \
+        -disableAutomaticPackageResolution -onlyUsePackageVersionsFromResolvedFile \
+        -derivedDataPath "$DERIVED_DATA_PATH" \
+        CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="-" ONLY_ACTIVE_ARCH=YES ARCHS=arm64 \
+        QVOICE_INTERNAL_DIAGNOSTICS_SWIFT_FLAG="" \
+        SWIFT_OPTIMIZATION_LEVEL="-O" SWIFT_COMPILATION_MODE="wholemodule" GCC_OPTIMIZATION_LEVEL="s" \
+        build 2>&1 | tee "$RELEASE_ARTIFACT_DIR/xcodebuild-cli-release.log"
+fi
+
 STEP_START="$(date +%s)"
 echo "[4/7] Resolving and copying built app..."
 xcb_run -project "$PROJECT_FILE" \
@@ -307,6 +320,11 @@ xcb_run -project "$PROJECT_FILE" \
     QWENVOICE_DEVELOPMENT_TEAM="$RELEASE_TEAM_ID" \
     -showBuildSettings > "$SHOW_BUILD_SETTINGS_LOG"
 resolve_build_metadata "$SHOW_BUILD_SETTINGS_LOG"
+COMMIT_SHA="$(git -C "$PROJECT_DIR" rev-parse HEAD)"
+CLI_STAGE_ROOT="$(mktemp -d "$BUILD_DIR/cli-stage.XXXXXX")"
+trap 'rm -rf "$CLI_STAGE_ROOT"' EXIT
+CLI_PATH="$CLI_STAGE_ROOT/Vocello CLI"
+python3 "$SCRIPT_DIR/cli_package.py" stage --products "$BUILT_PRODUCTS_DIR" --directory "$CLI_PATH"
 
 APP_SOURCE="$BUILT_PRODUCTS_DIR/$WRAPPER_NAME"
 [ -d "$APP_SOURCE" ] || release_fail "Built app not found at $APP_SOURCE"
@@ -359,11 +377,27 @@ else
 fi
 echo "[5/7] Final app bundle verified ($(step_time "$STEP_START"))"
 echo ""
+for resource_bundle in "$CLI_PATH"/*.bundle; do
+    run_codesign "$resource_bundle"
+done
+run_codesign "$CLI_PATH/vocello" --options runtime
+codesign --verify --strict "$CLI_PATH/vocello"
+python3 "$SCRIPT_DIR/cli_package.py" seal --directory "$CLI_PATH" \
+    --version "$MARKETING_VERSION" --build "$CURRENT_PROJECT_VERSION" --commit "$COMMIT_SHA"
+python3 "$SCRIPT_DIR/cli_package.py" smoke --directory "$CLI_PATH" \
+    --version "$MARKETING_VERSION" --build "$CURRENT_PROJECT_VERSION" --commit "$COMMIT_SHA"
 
 STEP_START="$(date +%s)"
 echo "[6/7] Creating and signing the DMG..."
 "$SCRIPT_DIR/create_dmg.sh" "$APP_PATH" "$OUTPUT_NAME"
 DMG_PATH="$BUILD_DIR/${OUTPUT_NAME}.dmg"
+CLI_DMG_NAME="${OUTPUT_NAME}-cli"
+QWENVOICE_DMG_DISPLAY_NAME="Vocello CLI" \
+    "$SCRIPT_DIR/create_dmg.sh" "$CLI_PATH" "$CLI_DMG_NAME" cli
+CLI_DMG_PATH="$BUILD_DIR/${CLI_DMG_NAME}.dmg"
+# Both artifacts use the existing signing/notarization path; neither is published here.
+APP_DMG_PATH="$DMG_PATH"
+for DMG_PATH in "$APP_DMG_PATH" "$CLI_DMG_PATH"; do
 [ -f "$DMG_PATH" ] || release_fail "Created DMG is missing: $DMG_PATH"
 run_codesign "$DMG_PATH"
 codesign --verify --verbose=4 "$DMG_PATH"
@@ -400,6 +434,8 @@ if [ "$NOTARIZE" = "1" ]; then
     xcrun stapler validate "$DMG_PATH"
     echo "  Notarization OK and ticket stapled."
 fi
+done
+DMG_PATH="$APP_DMG_PATH"
 
 echo "[6/7] DMG ready at $DMG_PATH ($(step_time "$STEP_START"))"
 echo ""
@@ -435,6 +471,8 @@ METADATA_PATH="$BUILD_DIR/release-metadata.txt"
     echo "marketing_version=$MARKETING_VERSION"
     echo "build_number=$CURRENT_PROJECT_VERSION"
     echo "dmg_name=$OUTPUT_NAME.dmg"
+    echo "cli_dmg_name=$CLI_DMG_NAME.dmg"
+    echo "cli_manifest_sha256=$(shasum -a 256 "$CLI_PATH/package-manifest.json" | awk '{print $1}')"
     echo "app_wrapper_name=$WRAPPER_NAME"
     echo "app_executable_name=$EXECUTABLE_NAME"
     echo "built_at_utc=$(date -u +"%Y-%m-%dT%H:%M:%SZ")"

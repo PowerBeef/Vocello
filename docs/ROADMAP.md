@@ -48,7 +48,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `RF-05` | done | Step 5 — expose recoverable History-save outcomes | `file:Tests/VocelloCoreTests/GenerationHistoryEnqueueStateTests.swift`, `file:Tests/VocelloCoreTests/GenerationHistoryOutboxTests.swift`, `doc:docs/development-progress.md#resume-here-2026-09-04` |
 | `RF-06` | in-flight | Step 6 — localize the remaining natural-text audio failures | `doc:docs/reference/release-first-execution-2026-09.md#rf-06-retained-evidence-review-september-4` |
 | `RF-07` | in-flight | Step 7 — finish only the acceptance-blocking harness repairs | — |
-| `RF-08` | planned | Step 8 — package the downloadable optimized CLI | — |
+| `RF-08` | in-flight | Step 8 — package the downloadable optimized CLI | — |
 | `RF-09` | planned | Step 9 — verify the coherent tree and freeze the 3.0.0 candidate | — |
 | `RF-10` | planned | Step 10 — independently qualify macOS and downloadable CLI | — |
 | `RF-11` | planned | Step 11 — account for the full frozen-source 201-take iOS campaign | — |
@@ -65,7 +65,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 - **`RF-07`** (in-flight) — Step 7 — finish only the acceptance-blocking harness repairs.
   gate: Under ICA-18/AV-09, extend the existing runner with incremental durable observations, early generation identity capture, explicit serialization failure, visible History-focus polling, observed-versus-expected selections, genuine playback/scrub evidence, terminal ledgers on every exit, and default five-take shards through existing start/limit controls. Interrupted/lost-focus/missing-observation/collection/stale-resume/duplicate fixtures pass; collection and cleanup plus one small physical pilot pass before the full campaign. No parallel harness, automatic retry, or fabricated observation.
 
-- **`RF-08`** (planned) — Step 8 — package the downloadable optimized CLI.
+- **`RF-08`** (in-flight) — Step 8 — package the downloadable optimized CLI.
   gate: Implement F-17 in the existing release workflow: separate optimized arm64 CLI DMG, complete libraries/resources/notices/instructions, checkout-independent discovery, signatures, notarization/stapling, checksums and source/version supply-chain identity. Copied-package tests cover paths with spaces, version/JSON, all three modes, cancellation, failure exits and resource loading. No Homebrew route, privileged installer, shell-profile edits, or second release system.
 
 - **`RF-09`** (planned) — Step 9 — verify the coherent tree and freeze the 3.0.0 candidate.
@@ -201,7 +201,7 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
 | `F-14` | done | Low — schedule Thread Sanitizer and enforce concurrency-debt quality | `file:scripts/tests/test_runtime_security_contract.py`, `file:scripts/macos_test.sh`, `doc:docs/reference/macos-testing.md` |
 | `F-15` | in-flight | P1 — preserve macOS Voice Design language, seed, and variation at launch | — |
 | `F-16` | in-flight | P1 — transactionally accept long-form projects and replacement segments | — |
-| `F-17` | planned | P1 release dependency — distribute an optimized standalone CLI package | — |
+| `F-17` | in-flight | P1 release dependency — distribute an optimized standalone CLI package | — |
 
 ### Open items in detail
 
@@ -217,7 +217,7 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
 - **`F-16`** (in-flight) — P1 — transactionally accept long-form projects and replacement segments.
   gate: Both platforms stage and QC candidate segment/joined audio and a throwing manifest before accepted History mutation. Journaled atomic-file/database recovery is idempotent; normal failure preserves the accepted project and removes only unreferenced owned candidates. Fault tests cover serialization, writes, assembly, QC, database commits, cancellation and interruption; unchanged QC/seeds survive replacement, reused segments count once, and segment/project terminals are distinct. Existing manifests decode. Native long-form/regeneration acceptance passes on both platforms.
 
-- **`F-17`** (planned) — P1 release dependency — distribute an optimized standalone CLI package.
+- **`F-17`** (in-flight) — P1 release dependency — distribute an optimized standalone CLI package.
   gate: The existing release workflow produces a separate arm64 CLI DMG containing all required runtime resources/libraries and notices, Developer ID signatures, notarization/stapling, checksums and source/version provenance. The copied package works outside the checkout and in paths with spaces; version/JSON discovery, all three modes, cancellation and error exits pass. No Homebrew route or privileged installer. Public promotion requires the existing exact-source gate and separate authorization.
 
 ## iOS App Store readiness

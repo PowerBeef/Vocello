@@ -1,19 +1,23 @@
 ---
 status: active
 owner: backend-mlx
-reviewed: 2026-08-29
+reviewed: 2026-09-04
 summary: The vocello CLI — user-facing generation surface and deterministic benchmark/test driver over the same in-process MLX engine as the app.
 sourceOfTruth:
   - project.yml
   - Sources/VocelloCLI
   - scripts/build.sh
   - scripts/cli_version_contract.py
+  - scripts/cli_package.py
+  - scripts/release.sh
+  - scripts/verify_packaged_cli.sh
 ---
 # The `vocello` CLI
 
-> **Currency review (2026-08-27):** the latest project-manifest edits add iOS support/attribution
-> sources only. CLI target membership and its single-source `2.4.0` bundle identity remain unchanged;
-> `scripts/cli_version_contract.py` still passes.
+> **Distribution checkpoint (2026-09-04):** RF-08 adds CLI packaging to the existing macOS
+> release workflow for the upcoming 3.0.0 programme. No new public CLI release is implied;
+> signed/notarized real-generation qualification remains under RF-10/F-17. The current configured
+> binary version remains owned by `project.yml` until candidate freeze.
 
 `vocello` is a headless macOS command-line surface over the same in-process MLX engine the app uses.
 It serves two roles:
@@ -44,10 +48,23 @@ build/vocello <command> [options]      # run the already-built binary
 
 `build/vocello` is the public symlink to the real binary under the policy-owned
 `build/cache/xcode/macos/…` product tree; macOS resolves it so the adjacent MLX shader bundle
-(`default.metallib`) stays reachable. **Don't copy the binary elsewhere** —
-it must run in place. The contract (`qwenvoice_contract.json`) is bundled into the tool, and is also
-discovered repo-relative, so the CLI works from the repo root or any subdirectory; pass `--manifest`
-to override.
+(`default.metallib`) stays reachable. **Do not copy only the binary**: keep the adjacent resource
+bundles and catalogs. The release workflow stages a complete `Vocello CLI` folder in a separate
+`<desktop-output-name>-cli.dmg`; copy the whole folder to any user-owned location and invoke the
+quoted executable path. No checkout, Python, privileged install, Homebrew formula, or shell-profile
+edit is needed for that payload. Model weights remain separate, explicitly installed data.
+
+`scripts/cli_package.py` inventories the executable, source-bound catalogs, MLX shader and dependency
+resources, and existing governed license/NOTICE material. It rejects missing/stale resources,
+extra executable code, symlinks, digest drift, or mismatched source/version/build identity. Packaging
+explicitly copies the catalogs because Xcode's tool product does not reliably emit those resource
+files; any present built catalog must match the source before staging.
+`verify_packaged_dmg.sh … --include-cli` also verifies the signed/stapled CLI DMG, copies its folder
+to a path containing spaces, and runs model-free discovery from an unrelated working directory.
+Its command-bound `cli-package-verification.json` is explicitly **not** all-mode generation,
+cancellation, memory, or audio-quality acceptance. Those checks use the copied, signed candidate
+under RF-10, never the development binary. The existing two-argument app-only verifier remains
+available for historical candidates; the current release workflow requires both DMGs.
 
 The CLI target embeds `project.yml`'s `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` in its
 Mach-O Info.plist section. `vocello --version`, `vocello version`, and `vocello -v` therefore share

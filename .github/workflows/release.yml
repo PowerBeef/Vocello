@@ -335,10 +335,14 @@ jobs:
           output_name="${{ inputs.output_name }}"
           [ -z "$output_name" ] && output_name="Vocello-macos26"
           dmg="build/dist/macos/${output_name}.dmg"
+          cli_dmg="build/dist/macos/${output_name}-cli.dmg"
           metadata="build/dist/macos/release-metadata.txt"
           [ -f "$dmg" ] || { echo "missing: $dmg" >&2; ls -la build/dist/macos/ >&2; exit 1; }
+          [ -f "$cli_dmg" ] || { echo "missing CLI DMG" >&2; exit 1; }
           [ -f "$metadata" ] || { echo "missing: $metadata" >&2; exit 1; }
           echo "dmg=$dmg" >> "$GITHUB_OUTPUT"
+          echo "cli_dmg=$cli_dmg" >> "$GITHUB_OUTPUT"
+          echo "cli_verification=build/dist/macos/cli-package-verification.json" >> "$GITHUB_OUTPUT"
           echo "metadata=$metadata" >> "$GITHUB_OUTPUT"
           echo "output_name=$output_name" >> "$GITHUB_OUTPUT"
           echo "spdx=build/dist/macos/vocello-macos.spdx.json" >> "$GITHUB_OUTPUT"
@@ -358,7 +362,7 @@ jobs:
             --timeout-seconds 900 -- \
             ./scripts/verify_packaged_dmg.sh \
               "${{ steps.artifacts.outputs.dmg }}" \
-              "${{ steps.artifacts.outputs.metadata }}"
+              "${{ steps.artifacts.outputs.metadata }}" --include-cli
 
       - name: Surface release metadata in log
         run: |
@@ -376,6 +380,8 @@ jobs:
             --source-date-epoch "$SOURCE_DATE_EPOCH" \
             --output-dir build/dist/macos \
             --artifact "${{ steps.artifacts.outputs.dmg }}" \
+            --artifact "${{ steps.artifacts.outputs.cli_dmg }}" \
+            --artifact "${{ steps.artifacts.outputs.cli_verification }}" \
             --metadata "${{ steps.artifacts.outputs.metadata }}" \
             --source-identity "$RELEASE_SOURCE_IDENTITY" \
             --step-ledger "$RELEASE_STEP_LEDGER"
@@ -384,7 +390,9 @@ jobs:
       - name: Attest verified DMG provenance
         uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
         with:
-          subject-path: ${{ steps.artifacts.outputs.dmg }}
+          subject-path: |
+            ${{ steps.artifacts.outputs.dmg }}
+            ${{ steps.artifacts.outputs.cli_dmg }}
 
       - name: Upload verified candidate as workflow artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -392,6 +400,8 @@ jobs:
           name: ${{ steps.artifacts.outputs.output_name }}-release-candidate
           path: |
             ${{ steps.artifacts.outputs.dmg }}
+            ${{ steps.artifacts.outputs.cli_dmg }}
+            ${{ steps.artifacts.outputs.cli_verification }}
             ${{ steps.artifacts.outputs.metadata }}
             ${{ steps.artifacts.outputs.spdx }}
             ${{ steps.artifacts.outputs.cyclonedx }}
@@ -452,6 +462,8 @@ jobs:
           set -euo pipefail
           gh release upload "$RELEASE_TAG" --clobber \
             "${{ steps.artifacts.outputs.dmg }}" \
+            "${{ steps.artifacts.outputs.cli_dmg }}" \
+            "${{ steps.artifacts.outputs.cli_verification }}" \
             "${{ steps.artifacts.outputs.metadata }}" \
             "${{ steps.artifacts.outputs.spdx }}" \
             "${{ steps.artifacts.outputs.cyclonedx }}" \
@@ -471,6 +483,8 @@ jobs:
           python3 - \
             "$RUNNER_TEMP/release-assets.json" \
             "${{ steps.artifacts.outputs.dmg }}" \
+            "${{ steps.artifacts.outputs.cli_dmg }}" \
+            "${{ steps.artifacts.outputs.cli_verification }}" \
             "${{ steps.artifacts.outputs.metadata }}" \
             "${{ steps.artifacts.outputs.spdx }}" \
             "${{ steps.artifacts.outputs.cyclonedx }}" \

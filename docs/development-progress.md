@@ -113,6 +113,32 @@ generic device-SDK XCUITest build-for-testing passed (`rf07-ui-compile.log` unde
 artifacts). This compile does not execute a test; physical pilot acceptance remains pending.
 No device was contacted. RF-08 standalone CLI packaging is the next independent engineering step.
 
+**Release-first source checkpoint:** commit `089328d3` passed the guarded project gate with all
+1,450 Python tests and was pushed to `origin/main`. This records the product repairs and RF-07;
+it is not exact-SHA candidate CI, signed packaging, physical acceptance, or publication evidence.
+
+RF-08 now extends the existing release workflow with an optimized, separately signed/notarized
+CLI DMG, source-bound catalogs, dependency bundles and governed notices. The managed artifact step
+checks the copied folder and binds its exact DMG/source/version/build report into release evidence,
+checksums, attestations and the remote asset set; historical app-only evidence stays valid.
+The fresh optimized **development** CLI build and real model-free relocation smoke passed at
+configured version 2.4.0/build 23: 32 inventoried files, paths with spaces, unrelated cwd,
+embedded identity, JSON modes/speakers and usage failure. The first real attempt exposed absent
+tool-product catalog copies; the packager now explicitly supplies the source-bound JSON and rejects
+any stale built copy. The next attempt exposed normal zero-length ad-hoc signature placeholders;
+only those exact resource signature paths may be empty, never shaders or required data.
+The successful local report is `cli-packaging-local-20260904.json` under ignored macOS release
+artifacts and explicitly cannot authorize release. Temporary payload/runtime directories were removed.
+The subsequent complete ad-hoc DMG round trip also passed: the 11,969,269-byte artifact
+(`ad109cb15c610d8964fc3429daac46fab9622ca2e9816b9fd2fc95b88816ca69`) mounted read-only,
+copied to a path with spaces, validated 32 files/identity/linkage, ran discovery, detached cleanly,
+and retained its untracked report under `rf08-cli-dmg-roundtrip-20260904`. It remains unsigned-
+distribution/development evidence and performed no generation.
+RF-08/F-17 remain in-flight for signed DMG and all-mode/cancellation qualification under RF-10.
+No model, phone, App Store mutation, signing credential, notarization service, or publication was used.
+The coherent RF-08 deterministic checkpoint passed all project-input checks and 1,468 Python tests,
+including the 34 focused package/release-evidence tests plus runtime-security and supply-chain rules.
+
 **Later same-source device evidence supersedes the earlier unrun checkpoint below.** The
 `065457-e2ec8911` campaign retained seven correlated passes and marker-free `custom-008`
 PRODUCT_FAIL. Successor `151935-164b4ee3` failed History keyboard focus and retained five new

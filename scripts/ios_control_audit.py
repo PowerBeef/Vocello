@@ -381,9 +381,9 @@ def generate_plan(
     contract: dict[str, Any],
     source_identity: str | None = None,
     *,
-    schema_version: int = 2,
+    schema_version: int = 3,
 ) -> dict[str, Any]:
-    if schema_version not in {1, 2}:
+    if schema_version not in {1, 2, 3}:
         raise AuditError("unsupported control-audit plan schema")
     resolved_source_identity = source_identity or tree_fingerprint()
     if not re.fullmatch(r"[0-9a-f]{64}", resolved_source_identity):
@@ -411,7 +411,7 @@ def generate_plan(
             take_id = f"{mode}-{index + 1:03d}"
             if schema_version == 1:
                 search_token = str(search_token_salt + len(rows))
-            else:
+            elif schema_version == 2:
                 search_token = _source_bound_search_token(
                     source_identity=resolved_source_identity,
                     contract_digest=contract_digest,
@@ -419,7 +419,10 @@ def generate_plan(
                     namespace_salt=search_token_salt,
                     used=used_search_tokens,
                 )
-            rendered_script = f"{script} {search_token}."
+            # v1/v2 remain exact historical regression protocols. v3 never
+            # injects bookkeeping into the utterance: ownership comes from a
+            # before/after History census plus the completed generation UUID.
+            rendered_script = script if schema_version == 3 else f"{script} {search_token}."
             row = {
                 "takeID": take_id,
                 "mode": mode,
@@ -430,8 +433,9 @@ def generate_plan(
                 **values,
                 "script": rendered_script,
                 "scriptDigest": hashlib.sha256(rendered_script.encode("utf-8")).hexdigest(),
-                "searchToken": search_token,
             }
+            if schema_version < 3:
+                row["searchToken"] = search_token
             row["rowDigest"] = digest(row)
             rows.append(row)
     maximum = int(contract["generationMatrix"]["maxRows"])
@@ -456,7 +460,7 @@ def validate_plan(contract: dict[str, Any], plan: dict[str, Any]) -> None:
     if not isinstance(source_identity, str) or not re.fullmatch(r"[0-9a-f]{64}", source_identity):
         raise AuditError("control-audit plan has no valid source identity")
     schema_version = plan.get("schemaVersion")
-    if schema_version not in {1, 2}:
+    if schema_version not in {1, 2, 3}:
         raise AuditError("unsupported control-audit plan schema")
     expected = generate_plan(
         contract,
@@ -757,6 +761,38 @@ def compose(
     return summary
 
 
+def validate_history_ownership(take: dict[str, Any], observation: dict[str, Any]) -> dict[str, Any]:
+    """Validate observation-only ownership; matching speech is never authority."""
+    binding = observation.get("historyOwnership")
+    if not isinstance(binding, dict) or type(binding.get("schemaVersion")) is not int or binding["schemaVersion"] != 1:
+        raise AuditError("missing versioned History ownership")
+    if set(binding) != {"schemaVersion", "rowID", "beforeRowIDs", "afterRowIDs", "finalRowIDs", "transcriptMatched", "retainedAsSeedCarrier", "pinOwnedByAudit"}:
+        raise AuditError("History ownership contains missing or unapproved fields")
+    if observation.get("scriptDigest") != take["scriptDigest"]:
+        raise AuditError("History ownership script digest mismatch")
+    row_id = binding.get("rowID")
+    if not isinstance(row_id, str) or not re.fullmatch(r"generation-[1-9][0-9]*", row_id):
+        raise AuditError("History ownership requires a persisted row ID")
+    sets = {}
+    for name in ("beforeRowIDs", "afterRowIDs", "finalRowIDs"):
+        values = binding.get(name)
+        if not isinstance(values, list) or len(values) > 4096 or any(
+            not isinstance(value, str) or not re.fullmatch(r"generation-[1-9][0-9]*", value)
+            for value in values
+        ) or len(set(values)) != len(values):
+            raise AuditError(f"invalid History ownership {name}")
+        sets[name] = set(values)
+    before, after, final = (sets[name] for name in ("beforeRowIDs", "afterRowIDs", "finalRowIDs"))
+    if not before.issubset(after) or after - before != {row_id}:
+        raise AuditError("History ownership requires exactly one new row and preserves the baseline")
+    if binding.get("transcriptMatched") is not True:
+        raise AuditError("History ownership requires exact full-player transcript proof")
+    retained = binding.get("retainedAsSeedCarrier")
+    if type(retained) is not bool or type(binding.get("pinOwnedByAudit")) is not bool or final != (after if retained else before):
+        raise AuditError("History ownership cleanup or carrier preservation mismatch")
+    return binding
+
+
 def validate_device_evidence(
     contract: dict[str, Any],
     plan: dict[str, Any],
@@ -768,6 +804,8 @@ def validate_device_evidence(
     validate_plan(contract, plan)
     planned = {take["takeID"]: take for take in plan["takes"]}
     generation_observations: dict[str, dict[str, Any]] = {}
+    seen_generations: set[str] = set()
+    seen_history: set[str] = set()
     for observation in observations:
         take_id = observation.get("takeID")
         generation_id = observation.get("generationID")
@@ -785,6 +823,14 @@ def validate_device_evidence(
             r"[0-9A-Fa-f]{8}(?:-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}", generation_id
         ):
             raise AuditError(f"take {take_id} has no valid generation identity")
+        if generation_id.lower() in seen_generations:
+            raise AuditError("device observations reuse a generation identity")
+        seen_generations.add(generation_id.lower())
+        if plan["schemaVersion"] >= 3:
+            binding = validate_history_ownership(planned[take_id], observation)
+            if binding["rowID"] in seen_history:
+                raise AuditError("device observations reuse a History row identity")
+            seen_history.add(binding["rowID"])
         generation_observations[take_id] = observation
 
     engine_rows: dict[str, list[dict[str, Any]]] = {}
@@ -868,6 +914,8 @@ def validate_device_evidence(
                 "issues": issues,
             }
         )
+        if plan["schemaVersion"] >= 3:
+            results[-1]["historyOwnershipDigest"] = digest(observation["historyOwnership"])
 
     seeds_by_mode: dict[str, set[int]] = {}
     for observation in generation_observations.values():
@@ -945,6 +993,11 @@ def prepare_resume(
         raise AuditError("prior and current control-audit scenarios differ")
 
     rows = _read_jsonl(observations_path)
+    if current.get("schemaVersion", 1) >= 3:
+        validate_plan(load_contract(), current)
+        validate_plan(load_contract(), prior)
+        if not any(row.get("takeID") for row in rows):
+            raise AuditError("zero-observation generation run cannot resume")
     generation_ids = [f"generation:{take['takeID']}" for take in current["takes"]]
     generation_id_set = set(generation_ids)
     represented_rows: dict[str, dict[str, Any]] = {}
@@ -989,12 +1042,62 @@ def prepare_resume(
         if row.get("controlID", "").startswith("generation:")
         and row.get("classification") == "PASS"
     ]
+    carriers: list[dict[str, Any]] = []
     if successful_generation:
         if not correlation_path.is_file():
             raise AuditError("prior successful generation rows have no device-correlation report")
         correlation = load_json(correlation_path)
         if correlation.get("result") != "passed":
             raise AuditError("prior successful generation evidence did not pass correlation")
+        if current.get("schemaVersion", 1) >= 3:
+            allowed_runs = set(run.get("resumeRunIDs", [])) | {run["runID"]}
+            planned = {take["takeID"]: take for take in current["takes"]}
+            if correlation.get("planDigest") != current["planDigest"]:
+                raise AuditError("resume correlation plan identity mismatch")
+            correlations = {run["runID"]: correlation}
+            modes: set[str] = set()
+            history_ids: set[str] = set()
+            generation_ids_seen: set[str] = set()
+            for observation in successful_generation:
+                take = planned.get(observation.get("takeID"))
+                if take is None or observation.get("runID") not in allowed_runs or observation.get("sourceIdentity") != source_identity:
+                    raise AuditError("resume History ownership crosses run/source identity")
+                origin = observation["runID"]
+                if origin not in correlations:
+                    if not isinstance(origin, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", origin):
+                        raise AuditError("unsafe resume run identity")
+                    origin_root = run_path.parent.parent / origin
+                    origin_metadata = load_json(origin_root / "run.json")
+                    origin_plan = load_json(origin_root / "control-audit-plan.json")
+                    if origin_metadata.get("runID") != origin or origin_metadata.get("treeFingerprint") != source_identity or origin_plan != current:
+                        raise AuditError("original resume evidence crosses source/plan identity")
+                    correlations[origin] = load_json(origin_root / "control-audit-generation-correlation.json")
+                origin_proof = correlations[origin]
+                if origin_proof.get("result") != "passed" or origin_proof.get("planDigest") != current["planDigest"]:
+                    raise AuditError("original resume correlation did not pass for this plan")
+                correlated = {row["takeID"]: row for row in origin_proof.get("rows", [])}
+                binding = validate_history_ownership(take, observation)
+                proof = correlated.get(take["takeID"], {})
+                generation_id = str(observation.get("generationID", "")).lower()
+                if not re.fullmatch(r"[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}", generation_id) or proof.get("status") != "PASS" or proof.get("generationID") != generation_id or proof.get("historyOwnershipDigest") != digest(binding):
+                    raise AuditError("resume History ownership has no exact correlated generation")
+                if binding["rowID"] in history_ids or generation_id in generation_ids_seen:
+                    raise AuditError("resume reuses History or generation identity")
+                history_ids.add(binding["rowID"])
+                generation_ids_seen.add(generation_id)
+                seed = observation.get("seed")
+                if type(seed) is not int or not 0 <= seed <= 2**64 - 1:
+                    raise AuditError("resume carrier seed must be an exact UInt64")
+                if binding["retainedAsSeedCarrier"]:
+                    if take["mode"] in modes:
+                        raise AuditError("resume has multiple retained carriers for a mode")
+                    modes.add(take["mode"])
+                    carriers.append({
+                        "takeID": take["takeID"], "mode": take["mode"],
+                        "rowID": binding["rowID"], "seed": seed,
+                        "generationID": generation_id, "scriptDigest": take["scriptDigest"],
+                        "pinOwnedByAudit": binding["pinOwnedByAudit"],
+                    })
 
     newly_skipped = None
     start = contiguous
@@ -1030,6 +1133,8 @@ def prepare_resume(
         "skippedAfterFailure": newly_skipped,
         "skippedAfterFailures": ordered_skips,
     }
+    if current.get("schemaVersion", 1) >= 3:
+        state["seedCarriers"] = carriers
     atomic_write_json(state_path, state)
     return state
 

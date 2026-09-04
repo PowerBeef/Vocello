@@ -1262,6 +1262,11 @@ else
     export TEST_RUNNER_QVOICE_IOS_CONTROL_AUDIT_SCENARIO="$control_scenario"
     export TEST_RUNNER_QVOICE_IOS_CONTROL_AUDIT_PLAN_B64="$(<"$out/control-audit-plan.zlib.b64")"
     export TEST_RUNNER_QVOICE_IOS_CONTROL_AUDIT_TAKE_START="$control_resume_take_start"
+    # Test-runner metadata only; never added to spoken text or application state.
+    export TEST_RUNNER_QVOICE_IOS_CONTROL_AUDIT_CARRIERS_B64="W10="
+    if [[ -n "$control_resume" ]]; then
+      export TEST_RUNNER_QVOICE_IOS_CONTROL_AUDIT_CARRIERS_B64="$(python3 -c 'import base64,json,sys; print(base64.b64encode(json.dumps(json.load(open(sys.argv[1]))["seedCarriers"]).encode()).decode())' "$out/control-resume-state.json")"
+    fi
   else
     only_test="VocelloiOSUITests/VocelloiOSModelDownloadUITests/testConfiguredModelManagementScenario"
     export TEST_RUNNER_QVOICE_IOS_MODEL_MANAGEMENT_RUN_ID="$run_id"

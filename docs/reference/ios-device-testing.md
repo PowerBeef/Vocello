@@ -116,7 +116,7 @@ the extended >220-character long corpus; the iPhone lane never bypasses the user
 | --- | --- |
 | Smoke | Two journeys. Standard: exact app launch, Studio mode and tab navigation, visible model and clone-reference readiness, one visible user cancellation, one run-scoped critical-memory cancellation with cancel-before-unload diagnostics, post-pressure engine reuse, no cancelled History rows, and one real completed Custom History row. Long-form: a >2,000-character script routes to a project, streams every segment with live narration, surfaces the joined output in the inline player, and History shows search-flattened rows plus the grouped project with its expandable per-segment map |
 | Benchmark | Ordered, configurable Studio matrix with pulled telemetry, readable audio, audio QC, thermal and timing evidence; the default is exactly 29 takes |
-| Control audit | Source-bound inventory plus stateful, external-system, accessibility, and deterministic all-pairs generation scenarios. The checked-in contract expands dynamic speakers, deliveries, languages, variations, and models; its current generation plan contains 201 rows. New plans use schema v2: each eight-digit search token is derived from the frozen source, contract, take, and salt, and is only a narrowing key. Before cleanup, pin/unpin, restoration, or deletion, XCUITest resolves the narrowed row identifier, opens its genuine read-only player, and requires the full accessible transcript to equal the exact plan-bound script; ambiguity or mismatch fails before mutation. The exact ICA-09 retained schema-v1 plan preserves its original sequential tokens through a digest-allowlisted, byte-exact compatibility path. The first successful take in each mode obtains an engine seed normally, pins it through the visible History action, and binds all remaining mode rows to that observed seed without injection or substitution. One exact plan-bound History row per mode remains as a visible resume seed carrier until the final shard. The run-owned direct-import Clone fixture is likewise plan-bound and reused across resumed shards. Clone omits a fabricated delivery dimension because ordinary Base-model references expose no instruction channel. Resume rejects a changed source tree, app build, device, or plan. Missing, blocked, infrastructure, harness, and product results remain distinct and can never be converted to PASS. Global destructive controls are opened and cancelled; run-owned rows may be created and deleted. |
+| Control audit | Source-bound inventory, stateful, external-system, accessibility, and 201-row all-pairs generation scenarios. Schema-v3 plans speak the exact tracked corpus without ownership markers. Bounded read-only before/after History censuses must prove exactly one new persisted row, followed by exact full-player transcript verification before pin/delete. Versioned observations bind row ID, generation UUID, script digest, exact seed, and preserved cleanup baseline. Existing identical user text is never normalized away. Host validation preserves byte-exact v1/v2 historical plans, including original numeric stress failures. One verified History carrier per mode freezes the normally obtained seed; test-runner-only resume metadata identifies that exact row and requires visible seed agreement before pinning. Resume rejects changed source, build, device, plan, uncorrelated ownership, or zero observations. Final-plan cleanup removes only verified carriers and the plan-owned Clone fixture. Clone has no fabricated delivery dimension. Missing, blocked, infrastructure, harness, and product outcomes remain distinct; global destruction is cancelled, never counted as exercised. |
 | Model delivery | Fixed test-owned root normalized through visible state-appropriate controls. `diagnose` covers Custom cancel/restart/process adoption/Ready/remove; `queue` proves independent active/queued cancellation; `acceptance` adds Design/Clone shared-component reuse and all-model removal; `soak` repeats the lifecycle; `recover` inspects and visibly clears retained failure state without starting a transfer. Every transfer records exact logical bytes, milestone row/bar screenshots, phase activity, action exclusivity, five-minute advancement bounds, correlated delivery events, and exact canonical-state preservation |
 | Perf | Nine frame-health scenarios (`Tests/VocelloiOSUITests/VocelloiOSPerfUITests.swift`), each a fresh app launch with the in-app `CADisplayLink` probe pinned to the app's 60 Hz cap and one marked wall-clock window; `scripts/check_ios_ui_perf.py` joins windows to the pulled 500 ms probe rows |
 
@@ -175,10 +175,12 @@ is not retried automatically. Version-2 state carries every such skip across mul
 chains; version-1 retained state remains readable. A gap that is neither observed nor explicitly
 carried as a skip rejects the resume instead of silently losing matrix coverage.
 
-A pre-observation failure has no row-level resume boundary. In particular, the run-owned History
-carrier is established only after the harness proves the exact immutable script in a labeled row
-action and resolves one exact row identifier. The schema-v2 search token only narrows the query; a
-zero, duplicate, or unrelated result stops before mutation, seed adoption, or matrix continuation.
+A pre-observation failure has no row-level resume boundary. Schema-v3 ownership requires one new
+persisted History row relative to the complete pre-generation census and an exact full-player
+transcript match. Search text only narrows the list; identical preexisting user rows grant no
+ownership. The optional observation block records before/after/final row IDs, transcript agreement,
+and whether the row remains a seed carrier, alongside the genuine completed generation UUID.
+Missing, duplicate, or inconsistent identities stop before mutation or seed adoption.
 After a source correction, preserve the failed bundle and begin again at row 1 with a new frozen
 identity. Generate that plan only after the final tracked commit, because documentation and contract
 changes also change the full-tree identity.
@@ -186,10 +188,14 @@ changes also change the full-tree identity.
 A visible generation failure has only a production Retry action. The audit therefore records the
 failed request and ends that XCUITest shard without pressing Retry; a separately invoked,
 source-bound resume continues at the next row. The shard keeps its first successful run-owned
-History row for each reached mode instead of deleting it. A resumed launch searches only prior
-plan tokens, proves the exact script match, and invokes that row's visible Pin seed action before
+History row for each reached mode instead of deleting it. The host validates the exact prior
+run/source/plan chain and telemetry correlation, including the ownership digest, before passing
+carrier metadata to the test runner. The resumed launch locates that exact row ID, proves its full
+transcript and recorded UInt64 seed, and invokes that row's visible Pin seed action before
 continuing. The final shard removes every carrier, any plan-bound imported Clone fixture, and every
-audit-owned seed pin. A failed or interrupted shard retains those bounded artifacts as forensic and
+audit-owned seed pin. `pinOwnedByAudit` preserves seed pins that predated the campaign; resume
+checks every carried row against its original run's correlation, not only the latest shard's report.
+A failed or interrupted shard retains those bounded artifacts as forensic and
 resume state; it never falls back to a new session seed or recreates the Clone identity silently.
 
 Warm/cold lifecycle state is always taken from the engine request receipt. The first row per mode
@@ -288,7 +294,7 @@ identity from spoken text, keeping the exact numeric failures as independent str
 strip digits from product input or silently replace a failed matrix row.
 After localization and any qualifying remediation, freeze the final committed source and use
 `scripts/ui_test.sh ios control-audit --scenario generation --retain-result` from row 1 on a new
-schema-v2 plan. No September 2/3 shard may resume across this checkpoint's source change.
+schema-v3 plan. No September 2/3 shard may resume across this checkpoint's source change.
 ICA-04/ICA-05 retain generation, final restoration/reporting, and preservation-blocked coverage;
 ICA-06 still needs its exact-seed confirmation. VLR-07 retains its separate accuracy/ASR closure.
 

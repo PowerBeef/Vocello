@@ -49,6 +49,19 @@ machine-readable status record and wins over any older prose.
 
 ## Resume here (2026-09-04)
 
+**ICA-18 implements metadata-only History ownership.** New schema-v3 control plans keep the
+tracked corpus text unchanged; v1/v2 generation and validation remain available for immutable
+historical evidence, including the exact ICA-15 numeric regression. The test compares bounded,
+read-only History censuses before and after generation, requires exactly one new persisted row,
+then verifies its full player transcript before pinning or deleting. Versioned observations bind
+that row to the completed generation UUID, script digest, seed, and cleanup baseline. Resume uses
+host-validated exact carrier metadata, never a text-only match or a new seed. Ordinary existing
+History is not normalized. The deterministic checkpoint, generic iOS app/logic compilation, and
+macOS core/transport/runtime tests pass; six focused ownership/resume fixtures also cover the
+final multi-run and preexisting-pin safeguards. New physical proof is pending. Freeze
+the final committed source before starting generation at row 1; previous-source shards cannot
+resume. ICA-15 stays open, and accepted smoke/saved-voice coverage is not being blindly repeated.
+
 **The prepared marker-removal diagnostic has now run.** With the original exact seed, Eric,
 Calm Strong, Italian, and Consistent variation, all four marker-free observations pass Fast-QC:
 streaming is 8.72 seconds with a 267 ms longest interior pause and 65 ms terminal silence;
@@ -75,9 +88,9 @@ controls, and incremental/full replays reproduce the failures. The diagnostic ru
 successfully with the honest `diagnosed_failure` result, no crash delta, and verified cleanup.
 All six new takes are represented across three pinned local bundles; no device run remains active.
 
-ICA-15 remains open for the original marker-bearing sampled-output failure. The next step is a
-harness-only design for metadata-based History ownership that does not alter ordinary spoken
-scripts, while retaining the exact numeric failures as separate immutable stress cases. Never
+ICA-15 remains open for the original marker-bearing sampled-output failure. ICA-18 owns the
+harness-only implementation and verification of metadata-based History ownership while
+retaining the exact numeric failures as separate immutable stress cases. Never
 strip digits from user input, replace these failures, or change production sampling/QC. The complete
 generation audit has not restarted; prior shards cannot resume across source changes. Do not
 repeat accepted smoke or saved-voice coverage or convert this bounded experiment into a full audit

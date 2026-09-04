@@ -16,7 +16,7 @@ sourceOfTruth:
 # iOS control-audit remediation — 2026-08-29
 
 > **Active implementation checkpoint.** This report explains the causal decisions behind
-> ICA-06 through ICA-17 and the corrected-source re-closure of MD-3. `config/roadmap.json`, source, tests, and retained
+> ICA-06 through ICA-18 and the corrected-source re-closure of MD-3. `config/roadmap.json`, source, tests, and retained
 > untracked run artifacts remain authoritative. It does not replace the pinned 2026-08-28 audit.
 
 ## Executive assessment
@@ -41,6 +41,33 @@ warnings, or treating an unlaunched XCUITest as product evidence.
 | ICA-17 optional cadence statistics | Both no-marker takes passed app QC and wrote complete results | Host/schema required median/p90 fields that Swift legitimately omits when nil | Match Codable optionality while retaining required-field, type, and unknown-key rejection | **Closed:** red/green fixture, 83 adjacent tests, retained-evidence validation, and complete reverse-order device run `054340` |
 
 ## Physical acceptance checkpoint
+
+### Metadata-only History ownership (ICA-18)
+
+The new schema-v3 control plan speaks the exact tracked language corpus. It does not append a
+numeric suffix. Old v1/v2 generators and validators remain byte-exact; a deterministic fixture pins
+the original ICA-15 plan, row, and script digests. Removing test metadata is not a numeric-input
+product fix, and does not replace or invalidate the failed original takes.
+
+The genuine completed player exposes a generation UUID, while History exposes a separate persisted
+database row ID. The harness does not pretend these are the same identifier. Instead it records a
+read-only, bounded census of matching History rows before generation, then requires exactly one
+new row afterward without losing any prior row. Before every pin/delete action it opens that exact
+row and compares the full accessible transcript. Existing identical user text is preserved, never
+treated as stale audit state. Observations record versioned before/after/final row identities,
+transcript agreement, carrier disposition, and the correlated generation UUID/seed/script digest.
+Post-deletion census must equal the original baseline.
+
+Resume validates the exact source/plan/run chain, terminal telemetry correlation and ownership
+digest, then supplies the exact retained row ID to the test runner. Its visible seed must match the
+recorded UInt64 before pinning. Missing, cross-run, ambiguous, or zero-observation evidence fails
+closed; no text scan can adopt a different seed. Multi-shard resume checks each original run's
+correlation, and explicit pin ownership preserves preexisting user pins. Only the actual final
+plan shard removes carriers.
+No runtime, product UI, model, prompt, sampler, or QC policy is changed. The deterministic
+checkpoint, generic iOS app/logic build, macOS core/transport/runtime tests, and focused
+ownership/resume fixtures pass. The final tree is revalidated before commit. Fresh physical
+verification remains pending; ICA-18 and the complete generation audit remain open.
 
 ### September 4 marker-removal and validator diagnosis
 

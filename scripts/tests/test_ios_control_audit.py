@@ -163,46 +163,16 @@ class IOSControlAuditContractTests(unittest.TestCase):
         self.assertIn('actual: playerIssue', source)
         self.assertIn('classification: "PRODUCT_FAIL"', source)
 
-    def test_generation_normalizes_only_exact_player_verified_history_rows(self) -> None:
-        source = (
-            ROOT
-            / "Tests"
-            / "VocelloiOSUITests"
-            / "VocelloiOSControlAuditUITests.swift"
-        ).read_text(encoding="utf-8")
-        self.assertIn("deleteStaleAuditHistoryRows(", source)
-        cleanup = source.split("private func deleteStaleAuditHistoryRows", 1)[1].split(
-            "private func visiblePinnedSeed", 1
-        )[0]
-        self.assertIn("runOwnedHistoryRowIDs", cleanup)
-        identity = source.split("private func runOwnedHistoryRowIDs", 1)[1].split(
-            "private func dismissHistorySearchKeyboardIfNeeded", 1
-        )[0]
-        self.assertIn('let rowPrefix = "historyRow_"', identity)
-        self.assertIn('element("historyRowTap_\\(identifier)")', identity)
-        self.assertIn('element("iosPlayer_transcript")', identity)
-        self.assertIn('(transcript.value as? String) == expectedScript', identity)
-        self.assertIn('element("iosPlayer_close")', identity)
-        self.assertIn("guard matches else", identity)
-        self.assertNotIn("label CONTAINS", identity)
-        self.assertNotIn("app.staticTexts", cleanup)
-        self.assertIn('element("historyRowMenu_\\(rowID)")', cleanup)
-        self.assertIn('element("historyRowDeleteConfirm_\\(rowID)")', cleanup)
-        self.assertIn("dismissHistorySearchKeyboardIfNeeded()", cleanup)
-        keyboard_helper = source.split("private func dismissHistorySearchKeyboardIfNeeded", 1)[1].split(
-            "private func visiblePinnedSeed", 1
-        )[0]
-        self.assertIn('searchField.typeText("\\n")', keyboard_helper)
-        delete_current = source.split("private func deleteRunOwnedHistoryRow", 1)[1].split(
-            "private func deleteStaleAuditHistoryRows", 1
-        )[0]
-        self.assertIn("expectedScript: String", delete_current)
-        self.assertIn('element("historyRowMenu_\\(rowID)")', delete_current)
-        pin_seed = source.split("private func pinSeedFromRunOwnedHistoryRow", 1)[1].split(
-            "private func unpinAuditSeed", 1
-        )[0]
-        self.assertIn("expectedScript: String", pin_seed)
-        self.assertIn('element("historyRowMenu_\\(rowID)")', pin_seed)
+    def test_generation_never_deletes_preexisting_matching_speech(self) -> None:
+        source = audit.UI_TEST_PATH.read_text()
+        self.assertNotIn("deleteStaleAuditHistoryRows", source)
+        generation = source.split("private func runGenerationAudit", 1)[1].split("private func beginAuditSession", 1)[0]
+        self.assertLess(generation.index("let beforeRowIDs"), generation.index("generateAndWaitForCompletedPlayer"))
+        self.assertIn("added.count == 1", generation)
+        self.assertIn("isSubset(of: Set(afterRowIDs))", generation)
+        self.assertIn("historyOwnership: ownership", generation)
+        self.assertIn("start + selected.count == plan.takes.count", generation)
+        self.assertNotIn("searchToken", source)
 
     def test_generation_product_failure_is_terminal_without_retrying_the_row(self) -> None:
         source = (
@@ -231,27 +201,16 @@ class IOSControlAuditContractTests(unittest.TestCase):
         self.assertIn("if failTestOnVisibleError", helper)
 
     def test_generation_retains_and_restores_a_visible_seed_carrier(self) -> None:
-        source = (
-            ROOT
-            / "Tests"
-            / "VocelloiOSUITests"
-            / "VocelloiOSControlAuditUITests.swift"
-        ).read_text(encoding="utf-8")
-        generation = source.split("private func runGenerationAudit", 1)[1].split(
-            "private func beginAuditSession", 1
-        )[0]
-        self.assertIn("retainedSeedCarriers", generation)
-        self.assertIn("restoreRetainedAuditSeed", generation)
-        self.assertIn("if completedShard", generation)
-        self.assertIn("expectedScript: take.script", generation)
-        restoration = source.split("private func restoreRetainedAuditSeed", 1)[1].split(
-            "private func unpinAuditSeed", 1
-        )[0]
-        self.assertIn("for take in priorTakes where take.mode == mode.rawValue", restoration)
-        self.assertIn("pinSeedFromRunOwnedHistoryRow", restoration)
-        self.assertIn("expectedScript: take.script", restoration)
-        self.assertIn("rowIDs.count, 1", restoration)
-        self.assertNotIn("app.staticTexts", restoration)
+        source = audit.UI_TEST_PATH.read_text()
+        self.assertIn("retainedSeedCarriers", source)
+        self.assertIn("QVOICE_IOS_CONTROL_AUDIT_CARRIERS_B64", source)
+        self.assertIn("if carrier.pinOwnedByAudit", source)
+        self.assertIn("UUID(uuidString: carrier.generationID)", source)
+        self.assertIn("take.scriptDigest == carrier.scriptDigest", source)
+        self.assertIn("expectedSeed: carrier.seed", source)
+        pin = source.split("private func pinSeedFromRunOwnedHistoryRow", 1)[1].split("private func decodeSeedCarriers", 1)[0]
+        self.assertLess(pin.index("seed == expectedSeed"), pin.index("perform(on: pin"))
+        self.assertNotIn("for take in priorTakes", source)
 
     def test_generation_resume_reuses_its_plan_bound_clone_fixture(self) -> None:
         source = (
@@ -300,7 +259,7 @@ class IOSControlAuditContractTests(unittest.TestCase):
         first = audit.generate_plan(self.contract, self.source_identity)
         second = audit.generate_plan(self.contract, self.source_identity)
         self.assertEqual(first, second)
-        self.assertEqual(first["schemaVersion"], 2)
+        self.assertEqual(first["schemaVersion"], 3)
         self.assertEqual(first["takeCount"], 201)
         self.assertLessEqual(first["takeCount"], self.contract["generationMatrix"]["maxRows"])
 
@@ -308,8 +267,9 @@ class IOSControlAuditContractTests(unittest.TestCase):
         by_mode: dict[str, list[dict]] = {}
         for row in first["takes"]:
             by_mode.setdefault(row["mode"], []).append(row)
-            self.assertEqual(len(row["searchToken"]), 8)
-            self.assertIn(row["searchToken"], row["script"])
+            self.assertNotIn("searchToken", row)
+            corpus = audit.load_json(ROOT / "config/ios-control-audit-corpus.json")
+            self.assertEqual(row["script"], corpus["scripts"][row["language"]][row["length"]])
 
         for mode, mode_contract in self.contract["generationMatrix"]["modes"].items():
             dimensions = audit._expand_dimensions(mode_contract["dimensions"], resolved)
@@ -325,8 +285,8 @@ class IOSControlAuditContractTests(unittest.TestCase):
             self.assertTrue(all(row["warmState"] == "observed" for row in by_mode[mode][1:]))
 
     def test_search_tokens_are_source_bound_and_cross_run_disjoint(self) -> None:
-        first = audit.generate_plan(self.contract, "a" * 64)
-        second = audit.generate_plan(self.contract, "b" * 64)
+        first = audit.generate_plan(self.contract, "a" * 64, schema_version=2)
+        second = audit.generate_plan(self.contract, "b" * 64, schema_version=2)
         first_tokens = {row["searchToken"] for row in first["takes"]}
         second_tokens = {row["searchToken"] for row in second["takes"]}
         self.assertEqual(len(first_tokens), first["takeCount"])
@@ -384,28 +344,34 @@ class IOSControlAuditContractTests(unittest.TestCase):
         with self.assertRaisesRegex(audit.AuditError, "deterministic source-bound plan"):
             audit.validate_plan(self.contract, historical)
 
+    def test_original_numeric_dropout_is_preserved_as_exact_v2_regression(self) -> None:
+        plan = audit.generate_plan(self.contract, "5a978f32c2bd62725784ab954ad903cd2fe1f0e84de28519c8b6ddaf34952397", schema_version=2)
+        audit.validate_plan(self.contract, plan)
+        self.assertEqual(plan["planDigest"], "668187234e95f732fdfe32c12605bdeb16d765e64400ec7dcb13f58471f9645e")
+        row = next(row for row in plan["takes"] if row["takeID"] == "custom-005")
+        self.assertEqual(row["scriptDigest"], "9b1afb9406b135f61cf312fa27314db98185a636cbfb3bba4673571b3cdbfa56")
+        self.assertEqual(row["rowDigest"], "e611c724cd2bd83fde037627ac89d6e364ef1fd485c6b3146afaabb85b44f337")
+
+    def test_v3_source_changes_never_change_spoken_corpus(self) -> None:
+        first = audit.generate_plan(self.contract, "a" * 64)
+        second = audit.generate_plan(self.contract, "b" * 64)
+        self.assertNotEqual(first["planDigest"], second["planDigest"])
+        self.assertEqual(first["takes"], second["takes"])
+
     def test_history_full_transcript_guard_precedes_every_mutation(self) -> None:
-        source = (
-            ROOT
-            / "Tests"
-            / "VocelloiOSUITests"
-            / "VocelloiOSControlAuditUITests.swift"
-        ).read_text(encoding="utf-8")
-        helper = source.split("private func runOwnedHistoryRowIDs", 1)[1].split(
-            "private func dismissHistorySearchKeyboardIfNeeded", 1
-        )[0]
+        source = audit.UI_TEST_PATH.read_text()
+        helper = source.split("private func verifyHistoryTranscript", 1)[1].split("private func deleteRunOwnedHistoryRow", 1)[0]
         self.assertIn('(transcript.value as? String) == expectedScript', helper)
         self.assertIn("guard matches else", helper)
-        self.assertIn('element("historyRowTap_\\(identifier)")', helper)
         self.assertIn('element("iosPlayer_transcript")', helper)
         self.assertIn('element("iosPlayer_close")', helper)
         self.assertNotIn("historyRowMenu_", helper)
-        self.assertNotIn("historyRowDeleteConfirm_", helper)
-        self.assertNotIn("historyRowPinSeed_", helper)
-        cleanup = source.split("private func deleteStaleAuditHistoryRows", 1)[1].split(
-            "private func runOwnedHistoryRowIDs", 1
-        )[0]
-        self.assertLess(cleanup.index("guard let rowIDs"), cleanup.index("VocelloUIPrimaryAction.perform"))
+        for name, end in (("deleteRunOwnedHistoryRow", "dismissHistorySearchKeyboardIfNeeded"),
+                          ("pinSeedFromRunOwnedHistoryRow", "decodeSeedCarriers")):
+            mutation = source.split(f"private func {name}", 1)[1].split(f"private func {end}", 1)[0]
+            self.assertLess(mutation.index("verifyHistoryTranscript"), mutation.index('element("historyRowMenu_'))
+        cleanup = source.split("private func deleteRunOwnedHistoryRow", 1)[1].split("private func dismissHistorySearchKeyboardIfNeeded", 1)[0]
+        self.assertIn("Set(before).subtracting([rowID])", cleanup)
 
     def test_corpus_matches_every_selectable_language(self) -> None:
         plan = audit.generate_plan(self.contract, self.source_identity)
@@ -435,7 +401,7 @@ class IOSControlAuditCompositionTests(unittest.TestCase):
     def setUp(self) -> None:
         self.contract = audit.load_contract()
         self.source_identity = "b" * 64
-        self.plan = audit.generate_plan(self.contract, self.source_identity)
+        self.plan = audit.generate_plan(self.contract, self.source_identity, schema_version=2)
         self.metadata = {
             "runID": "ios-xcui-control-audit-fixture",
             "treeFingerprint": self.source_identity,
@@ -831,7 +797,7 @@ class IOSControlAuditResumeTests(unittest.TestCase):
     def setUp(self) -> None:
         self.contract = audit.load_contract()
         self.source_identity = "e" * 64
-        self.plan = audit.generate_plan(self.contract, self.source_identity)
+        self.plan = audit.generate_plan(self.contract, self.source_identity, schema_version=2)
 
     def _prepare(
         self,
@@ -841,6 +807,7 @@ class IOSControlAuditResumeTests(unittest.TestCase):
         run_id: str = "ios-xcui-control-audit-resume-fixture",
         resume_run_ids: list[str] | None = None,
         prior_state: dict | None = None,
+        correlation: dict | None = None,
     ) -> dict:
         run_root = root / run_id
         run_root.mkdir()
@@ -863,7 +830,7 @@ class IOSControlAuditResumeTests(unittest.TestCase):
         )
         if any(row.get("classification") == "PASS" for row in rows):
             (run_root / "control-audit-generation-correlation.json").write_text(
-                json.dumps({"result": "passed"}), encoding="utf-8"
+                json.dumps(correlation or {"result": "passed"}), encoding="utf-8"
             )
         if prior_state is not None:
             (run_root / "control-resume-state.json").write_text(
@@ -937,6 +904,139 @@ class IOSControlAuditResumeTests(unittest.TestCase):
         self.assertEqual(state["takeStart"], 4)
         self.assertEqual(state["skippedAfterFailure"], None)
         self.assertEqual(state["skippedAfterFailures"], ["generation:custom-003"])
+
+
+class IOSControlAuditHistoryOwnershipTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.contract = audit.load_contract()
+        self.plan = audit.generate_plan(self.contract, "e" * 64)
+        self.take = self.plan["takes"][0]
+        self.observation = {
+            "scriptDigest": self.take["scriptDigest"],
+            "historyOwnership": {
+                "schemaVersion": 1, "rowID": "generation-42",
+                "beforeRowIDs": ["generation-41"],
+                "afterRowIDs": ["generation-41", "generation-42"],
+                "finalRowIDs": ["generation-41", "generation-42"],
+                "transcriptMatched": True, "retainedAsSeedCarrier": True, "pinOwnedByAudit": False,
+            },
+        }
+
+    def test_carrier_and_exact_deletion_preserve_identical_existing_text(self) -> None:
+        audit.validate_history_ownership(self.take, self.observation)
+        binding = self.observation["historyOwnership"]
+        binding["retainedAsSeedCarrier"] = False
+        binding["finalRowIDs"] = ["generation-41"]
+        audit.validate_history_ownership(self.take, self.observation)
+
+    def test_missing_or_ambiguous_ownership_fails_closed(self) -> None:
+        mutations = [
+            {"rowID": "generation-41"},  # preexisting matching speech
+            {"afterRowIDs": ["generation-42"]},  # lost baseline
+            {"afterRowIDs": ["generation-41", "generation-42", "generation-43"]},
+            {"beforeRowIDs": ["generation-41", "generation-41"]},
+            {"rowID": "unsaved-private-path"},
+            {"transcriptMatched": False},
+            {"retainedAsSeedCarrier": "true"},
+            {"finalRowIDs": []},
+            {"schemaVersion": 2},
+            {"pinOwnedByAudit": "false"},
+            {"unexpectedPrivateContent": "not permitted"},
+        ]
+        for mutation in mutations:
+            with self.subTest(mutation=mutation):
+                observation = copy.deepcopy(self.observation)
+                observation["historyOwnership"].update(mutation)
+                with self.assertRaises(audit.AuditError):
+                    audit.validate_history_ownership(self.take, observation)
+        for observation in ({}, {**self.observation, "scriptDigest": "0" * 64}):
+            with self.assertRaises(audit.AuditError):
+                audit.validate_history_ownership(self.take, observation)
+
+    def test_device_correlation_requires_ownership_before_reading_telemetry(self) -> None:
+        observation = {"takeID": self.take["takeID"], "classification": "PASS",
+                       "generationID": "00000000-0000-4000-8000-000000000001"}
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaisesRegex(audit.AuditError, "History ownership"):
+                audit.validate_device_evidence(self.contract, self.plan, [observation], pathlib.Path(directory))
+
+    def test_v3_resume_exact_binding_and_uint64_seed(self) -> None:
+        helper = IOSControlAuditResumeTests()
+        helper.setUp()
+        helper.plan = self.plan
+        run_id = "ios-xcui-control-audit-v3-resume"
+        row = helper._row(run_id, 0, "PASS")
+        row.update(self.observation)
+        row.update(takeID=self.take["takeID"], mode=self.take["mode"],
+                   seed=17323406037040967292, generationID="00000000-0000-4000-8000-000000000001")
+        failure = helper._row(run_id, 1, "PRODUCT_FAIL")
+        failure["takeID"] = self.plan["takes"][1]["takeID"]
+        proof = {"result": "passed", "planDigest": self.plan["planDigest"], "rows": [{
+            "takeID": row["takeID"], "generationID": row["generationID"], "status": "PASS",
+            "historyOwnershipDigest": audit.digest(row["historyOwnership"]),
+        }]}
+        original_load = audit.load_json
+        def load(path):
+            return proof if path.name == "control-audit-generation-correlation.json" else original_load(path)
+        with tempfile.TemporaryDirectory() as directory, mock.patch.object(audit, "load_json", side_effect=load):
+            state = helper._prepare(pathlib.Path(directory), [row, failure], run_id=run_id)
+        self.assertEqual(state["takeStart"], 2)
+        self.assertEqual(state["seedCarriers"][0]["rowID"], "generation-42")
+        self.assertEqual(state["seedCarriers"][0]["seed"], 17323406037040967292)
+        self.assertFalse(state["seedCarriers"][0]["pinOwnedByAudit"])
+        for key, value in (("runID", "foreign-run"), ("sourceIdentity", "a" * 64),
+                           ("seed", float(row["seed"])), ("generationID", "00000000-0000-4000-8000-000000000002")):
+            bad = {**row, key: value}
+            with self.subTest(key=key), tempfile.TemporaryDirectory() as directory, mock.patch.object(audit, "load_json", side_effect=load):
+                with self.assertRaises(audit.AuditError):
+                    helper._prepare(pathlib.Path(directory), [bad, failure], run_id=run_id)
+
+    def test_v3_resume_refuses_zero_observations(self) -> None:
+        helper = IOSControlAuditResumeTests()
+        helper.setUp()
+        helper.plan = self.plan
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaisesRegex(audit.AuditError, "zero-observation"):
+                helper._prepare(pathlib.Path(directory), [])
+
+    def test_v3_resume_uses_each_original_runs_correlation(self) -> None:
+        helper = IOSControlAuditResumeTests()
+        helper.setUp()
+        helper.plan = self.plan
+        first_id = "ios-xcui-control-audit-original"
+        second_id = "ios-xcui-control-audit-next"
+        first = {**helper._row(first_id, 0, "PASS"), **copy.deepcopy(self.observation),
+                 "takeID": self.take["takeID"], "mode": self.take["mode"], "seed": 2**64 - 1,
+                 "generationID": "00000000-0000-4000-8000-000000000001"}
+        second = {**copy.deepcopy(first), **helper._row(second_id, 1, "PASS"),
+                  "takeID": self.plan["takes"][1]["takeID"],
+                  "scriptDigest": self.plan["takes"][1]["scriptDigest"],
+                  "generationID": "00000000-0000-4000-8000-000000000002"}
+        second["historyOwnership"].update(rowID="generation-43", afterRowIDs=["generation-41", "generation-43"],
+                                          finalRowIDs=["generation-41"], retainedAsSeedCarrier=False)
+        def proof(row):
+            return {"result": "passed", "planDigest": self.plan["planDigest"], "rows": [{
+                "takeID": row["takeID"], "generationID": row["generationID"], "status": "PASS",
+                "historyOwnershipDigest": audit.digest(row["historyOwnership"]),
+            }]}
+        for corrupt in (False, True):
+            with self.subTest(corrupt=corrupt), tempfile.TemporaryDirectory() as directory:
+                root = pathlib.Path(directory)
+                origin = root / first_id
+                origin.mkdir()
+                (origin / "run.json").write_text(json.dumps({"runID": first_id, "treeFingerprint": self.plan["sourceIdentity"]}))
+                (origin / "control-audit-plan.json").write_text(json.dumps(self.plan))
+                original_proof = proof(first)
+                if corrupt:
+                    original_proof["rows"][0]["historyOwnershipDigest"] = "0" * 64
+                (origin / "control-audit-generation-correlation.json").write_text(json.dumps(original_proof))
+                if corrupt:
+                    with self.assertRaisesRegex(audit.AuditError, "exact correlated generation"):
+                        helper._prepare(root, [first, second], run_id=second_id, resume_run_ids=[first_id], correlation=proof(second))
+                else:
+                    state = helper._prepare(root, [first, second], run_id=second_id, resume_run_ids=[first_id], correlation=proof(second))
+                    self.assertEqual(state["seedCarriers"][0]["generationID"], first["generationID"])
+                    self.assertEqual(state["seedCarriers"][0]["seed"], 2**64 - 1)
 
 
 if __name__ == "__main__":

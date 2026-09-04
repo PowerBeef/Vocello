@@ -13,7 +13,7 @@
 | `delivery-prompting-2026-08` | active | backend-mlx | 29/34 (85%) |
 | `engineering-review-remediation-2026-08` | active | backend-and-platform | 13/14 (93%) |
 | `ios-app-store-readiness-2026-08` | active | release-qa | 2/12 (17%) |
-| `ios-control-audit-2026-08` | active | ios | 13/17 (76%) |
+| `ios-control-audit-2026-08` | active | ios | 13/18 (72%) |
 | `ios-generation-startup-reliability-2026-08` | active | backend-and-platform | 4/6 (67%) |
 | `voice-identity-language-reliability-2026-08` | active | backend-and-platform | 9/10 (90%) |
 | `compliance-2026-08` | complete | release-qa | 2/2 (100%) |
@@ -233,6 +233,7 @@ Narrative authority: [`docs/reference/ios-on-device-control-audit-2026-08-28.md`
 | `ICA-15` | in-flight | P1 — bound deterministic CustomVoice over-continuation without truncating valid speech | `doc:docs/reference/ios-control-audit-remediation-2026-08-29.md`, `doc:docs/reference/ios-device-testing.md` |
 | `ICA-16` | done | P2 — bound smoke evidence collection to the exact run | `doc:docs/reference/ios-control-audit-remediation-2026-08-29.md`, `doc:docs/reference/ios-device-testing.md` |
 | `ICA-17` | done | P2 — accept omitted optional cadence quantiles in device evidence | `doc:docs/reference/ios-control-audit-remediation-2026-08-29.md`, `doc:docs/reference/ios-device-testing.md`, `file:scripts/tests/test_ios_startup_reliability.py` |
+| `ICA-18` | in-flight | P2 — keep control-audit History ownership out of spoken scripts | `doc:docs/reference/ios-control-audit-remediation-2026-08-29.md`, `doc:docs/reference/ios-device-testing.md`, `file:scripts/tests/test_ios_control_audit.py` |
 
 ### Open items in detail
 
@@ -247,6 +248,9 @@ Narrative authority: [`docs/reference/ios-on-device-control-audit-2026-08-28.md`
 
 - **`ICA-15`** (in-flight) — P1 — bound deterministic CustomVoice over-continuation without truncating valid speech.
   gate: Preserve the exact custom-005 Eric, Calm Strong, Italian, Consistent request and independently reproduce its sampled-output failure across warm/cold and streaming/non-streaming paths. The retained codec traces, full and incremental decoder replays, final model counters, EOS/token-cap state, AudioQC, memory, and publication outcome must identify the first divergent layer. Evaluate any continuation-budget candidate on a pre-registered representative CustomVoice corpus spanning script lengths, languages, deliveries, speakers, seeds, and both output modes. A production change qualifies only if it prevents the reproduced pathological continuation without converting valid speech to token-cap/incomplete failures, worsening WER/CER or delivery evidence, changing sampling defaults, or weakening mandatory QC. If no candidate qualifies, preserve fail-closed rejection and explicit user-controlled retry; never trim, silently regenerate, or substitute a seed.
+
+- **`ICA-18`** (in-flight) — P2 — keep control-audit History ownership out of spoken scripts.
+  gate: New schema-v3 plans speak the exact tracked language corpus without numeric ownership markers. Preserve byte-exact v1/v2 plan validation and the original ICA-15 numeric failure digests. Before any History mutation, XCUITest must prove one new persisted row against a complete before/after census and verify its full player transcript. Record row identity with the completed generation UUID, script digest, exact UInt64 seed, and cleanup baseline. Resume requires a matching source/plan/run chain, correlated ownership digest, retained row ID and visible seed; missing or ambiguous ownership fails before mutation or seed substitution. Deterministic negative fixtures, native compilation, and a fresh source-bound physical generation run must prove ownership, seed retention, and non-carrier deletion while preserving unrelated History. This closes harness contamination only, not ICA-15 sampled-output failures or ICA-04 full-matrix acceptance.
 
 ## iOS Built-in Voice startup reliability
 

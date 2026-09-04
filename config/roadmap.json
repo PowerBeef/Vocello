@@ -2701,6 +2701,26 @@
       "notes": "Run ios-startup-reliability-20260904-053757-ed201aef completed two on-device audio-QC passes but failed host validation because nil cadence quantiles are omitted by Swift Codable. The original runner stays failed. The source-proven host/schema correction passes 22 startup fixtures and 83 adjacent startup/control-audit/smoke tests; corrected validation of the immutable evidence and the existing exact-run device cleanup both pass. Independent reverse-order confirmation ios-startup-reliability-20260904-054340-c307ab41 passes both takes and the full runner with no crash delta and verified cleanup. Only JSON optionality changed; production audio, prompts, seeds, sampling, and QC policy are unchanged. Prelaunch checking separately corrected rounded seed literals in an unrun plan to the exact retained UInt64 value; no attempted row was changed."
     },
     {
+      "id": "ICA-18",
+      "plan": "ios-control-audit-2026-08",
+      "title": "P2 — keep control-audit History ownership out of spoken scripts",
+      "status": "in-flight",
+      "gate": "New schema-v3 plans speak the exact tracked language corpus without numeric ownership markers. Preserve byte-exact v1/v2 plan validation and the original ICA-15 numeric failure digests. Before any History mutation, XCUITest must prove one new persisted row against a complete before/after census and verify its full player transcript. Record row identity with the completed generation UUID, script digest, exact UInt64 seed, and cleanup baseline. Resume requires a matching source/plan/run chain, correlated ownership digest, retained row ID and visible seed; missing or ambiguous ownership fails before mutation or seed substitution. Deterministic negative fixtures, native compilation, and a fresh source-bound physical generation run must prove ownership, seed retention, and non-carrier deletion while preserving unrelated History. This closes harness contamination only, not ICA-15 sampled-output failures or ICA-04 full-matrix acceptance.",
+      "sourceOfTruth": [
+        "scripts/ios_control_audit.py",
+        "scripts/ui_test.sh",
+        "Tests/VocelloiOSUITests/VocelloiOSControlAuditUITests.swift",
+        "scripts/tests/test_ios_control_audit.py"
+      ],
+      "evidence": [
+        "doc:docs/reference/ios-control-audit-remediation-2026-08-29.md",
+        "doc:docs/reference/ios-device-testing.md",
+        "file:scripts/tests/test_ios_control_audit.py"
+      ],
+      "updated": "2026-09-04",
+      "notes": "Harness-only implementation follows the four marker-free QC passes and two exact-marker failures retained under ICA-15/ICA-17. Schema-v3 generation retains corpus text verbatim and keeps History ownership in optional versioned observation metadata. Existing identical user text is never normalized or deleted. Source-bound carrier transport is test-runner-only; no production UI, model, prompt, sampler, seed, or QC changes. Final-shard cleanup now requires reaching the actual plan end. The deterministic checkpoint, generic iOS app/logic builds, macOS core/transport/runtime suites, and final ownership/resume fixtures pass. Multi-shard correlation uses each original run and explicit pin ownership preserves preexisting user pins. Fresh physical proof is pending; do not resume a historical source or relabel the original numeric failures."
+    },
+    {
       "id": "VLR-01",
       "plan": "voice-identity-language-reliability-2026-08",
       "title": "Preserve and characterize private references and clean controls",

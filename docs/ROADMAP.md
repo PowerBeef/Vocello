@@ -13,7 +13,7 @@
 | `delivery-prompting-2026-08` | active | backend-mlx | 29/34 (85%) |
 | `engineering-review-remediation-2026-08` | active | backend-and-platform | 13/14 (93%) |
 | `ios-app-store-readiness-2026-08` | active | release-qa | 2/12 (17%) |
-| `ios-control-audit-2026-08` | active | ios | 12/16 (75%) |
+| `ios-control-audit-2026-08` | active | ios | 13/17 (76%) |
 | `ios-generation-startup-reliability-2026-08` | active | backend-and-platform | 4/6 (67%) |
 | `voice-identity-language-reliability-2026-08` | active | backend-and-platform | 9/10 (90%) |
 | `compliance-2026-08` | complete | release-qa | 2/2 (100%) |
@@ -232,6 +232,7 @@ Narrative authority: [`docs/reference/ios-on-device-control-audit-2026-08-28.md`
 | `ICA-14` | done | P1 — make generation History carrier correlation collision-proof | `doc:docs/reference/ios-control-audit-remediation-2026-08-29.md`, `doc:docs/reference/ios-device-testing.md` |
 | `ICA-15` | in-flight | P1 — bound deterministic CustomVoice over-continuation without truncating valid speech | `doc:docs/reference/ios-control-audit-remediation-2026-08-29.md`, `doc:docs/reference/ios-device-testing.md` |
 | `ICA-16` | done | P2 — bound smoke evidence collection to the exact run | `doc:docs/reference/ios-control-audit-remediation-2026-08-29.md`, `doc:docs/reference/ios-device-testing.md` |
+| `ICA-17` | done | P2 — accept omitted optional cadence quantiles in device evidence | `doc:docs/reference/ios-control-audit-remediation-2026-08-29.md`, `doc:docs/reference/ios-device-testing.md`, `file:scripts/tests/test_ios_startup_reliability.py` |
 
 ### Open items in detail
 

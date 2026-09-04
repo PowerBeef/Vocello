@@ -116,7 +116,7 @@
     },
     "audioCadenceQC": {
       "type": "object", "additionalProperties": false,
-      "required": ["classification", "reasons", "expectedPauseCount", "cadencePauseThresholdMS", "suspiciousPauseThresholdMS", "observedCadencePauseCount", "excessCadencePauseCount", "suspiciousPauseCount", "recordedInteriorPausesMS", "totalInteriorSilenceMS", "totalCadenceSilenceMS", "medianCadencePauseMS", "p90CadencePauseMS", "cadenceSilenceRatio"],
+      "required": ["classification", "reasons", "expectedPauseCount", "cadencePauseThresholdMS", "suspiciousPauseThresholdMS", "observedCadencePauseCount", "excessCadencePauseCount", "suspiciousPauseCount", "recordedInteriorPausesMS", "totalInteriorSilenceMS", "totalCadenceSilenceMS", "cadenceSilenceRatio"],
       "properties": {
         "classification": {"enum": ["withinFastGate", "unusual", "severe"]},
         "reasons": {"type": "array", "uniqueItems": true, "items": {"enum": ["excess_cadence_pauses", "single_suspicious_pause", "repeated_suspicious_pauses", "egregious_interior_silence", "egregious_terminal_silence"]}},

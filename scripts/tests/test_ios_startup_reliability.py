@@ -80,6 +80,17 @@ class IOSStartupReliabilityTests(unittest.TestCase):
         with self.assertRaisesRegex(MODULE.ContractError, "predecessor"):
             MODULE.load_plan(path)
 
+    def test_prepare_preserves_full_width_unsigned_seeds(self):
+        seeds = [17323406037040967292, 2**64 - 1]
+        for take, seed in zip(self.plan["takes"], seeds):
+            take["seed"] = seed
+        self.plan_path.write_text(json.dumps(self.plan), encoding="utf-8")
+        sanitized, launch = self.root / "sanitized.json", self.root / "launch.json"
+        MODULE.prepare(self.plan_path, self.script_path, "run-1", sanitized, launch)
+        self.assertEqual([t["seed"] for t in json.loads(sanitized.read_text())["takes"]], seeds)
+        payload = json.loads(launch.read_text())
+        self.assertEqual([t["seed"] for t in payload["plan"]["takes"]], seeds)
+
     def test_bounds_invalid_ids_and_unknown_fields_fail(self):
         for mutation in (
             lambda p: p["takes"][0].update({"deliveryID": "calm"}),
@@ -369,6 +380,48 @@ class IOSStartupReliabilityTests(unittest.TestCase):
                 malformed[key] = True
                 with self.assertRaises(MODULE.ContractError):
                     MODULE.validate_audio_qc(malformed, "take.audioQC")
+
+    def test_audio_qc_allows_omitted_optional_cadence_quantiles(self):
+        # Swift's synthesized Codable omits nil quantiles when no pause reaches
+        # the cadence threshold. Shorter interior pauses can still be recorded.
+        qc = {
+            "algorithmVersion": 6, "instabilityVerdict": "pass",
+            "writtenOutputVerdict": "pass", "verdict": "pass", "flags": [],
+            "peak": 0.4, "clippedSamples": 0, "hotSamples": 0,
+            "nonFiniteSamples": 0, "clickEvents": 0, "longestSilenceMS": 140,
+            "durationSeconds": 7.52,
+            "cadence": {
+                "classification": "withinFastGate", "reasons": [],
+                "expectedPauseCount": 0, "cadencePauseThresholdMS": 350,
+                "suspiciousPauseThresholdMS": 900, "observedCadencePauseCount": 0,
+                "excessCadencePauseCount": 0, "suspiciousPauseCount": 0,
+                "recordedInteriorPausesMS": [140], "totalInteriorSilenceMS": 140,
+                "totalCadenceSilenceMS": 0, "cadenceSilenceRatio": 0,
+            },
+        }
+        quantiles = {"medianCadencePauseMS", "p90CadencePauseMS"}
+        schema = json.loads((ROOT / "config/ios-startup-reliability-result-schema-v2.json").read_text())
+        cadence_schema = schema["$defs"]["audioCadenceQC"]
+        self.assertTrue(quantiles.isdisjoint(cadence_schema["required"]))
+        self.assertEqual(set(cadence_schema["properties"]) - set(cadence_schema["required"]), quantiles)
+        MODULE.validate_audio_qc(qc, "take.audioQC")
+        for key in quantiles:
+            with self.subTest(key=key):
+                explicit_null = json.loads(json.dumps(qc))
+                explicit_null["cadence"][key] = None
+                MODULE.validate_audio_qc(explicit_null, "take.audioQC")
+                for bad in (True, -1, "140", 1.5, {}):
+                    explicit_null["cadence"][key] = bad
+                    with self.assertRaises(MODULE.ContractError):
+                        MODULE.validate_audio_qc(explicit_null, "take.audioQC")
+        for key in qc["cadence"]:
+            incomplete = json.loads(json.dumps(qc))
+            incomplete["cadence"].pop(key)
+            with self.assertRaises(MODULE.ContractError):
+                MODULE.validate_audio_qc(incomplete, "take.audioQC")
+        qc["cadence"]["unexpected"] = None
+        with self.assertRaises(MODULE.ContractError):
+            MODULE.validate_audio_qc(qc, "take.audioQC")
 
     def test_v2_failed_codec_replay_is_typed_and_carries_no_partial_success(self):
         codec = {

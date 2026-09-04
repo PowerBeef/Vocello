@@ -47,7 +47,44 @@ machine-readable status record and wins over any older prose.
 | 13 — Benchmark/history v3 | Live 2026-07-29: the first schema-v3 records are committed (three clean `phase0-cli-control-*` engine records plus one exploratory run that also exposed and fixed the summarizer's v3 pin). `benchmarks/schema-v3.json` adds the typed quality identity to generation takes (pass/warning only, five fast gates required, machine-code issues); v1/v2 records stay valid immutable history; the publisher stamps v3 only when every take carries the identity. The UI benchmark checkers folded the same identity 2026-08-01: ui-generation records now publish v3 (first: the focused `v3-fold-proof` record `macos-xcui-benchmark-20260801-003208-403989cf`); the canonical iOS matrix published its first v3 record 2026-08-01 (`ios-xcui-benchmark-20260801-132415-abbec96b`). |
 | 14 — Organization and retirement | Closed 2026-07-23 (14a + 14b): compatibility SPI retired, actor-owned loading/metadata/priming/clone artifacts, clone conditioning epoch-bound end to end. |
 
-## Resume here (2026-09-03)
+## Resume here (2026-09-04)
+
+**The prepared marker-removal diagnostic has now run.** With the original exact seed, Eric,
+Calm Strong, Italian, and Consistent variation, all four marker-free observations pass Fast-QC:
+streaming is 8.72 seconds with a 267 ms longest interior pause and 65 ms terminal silence;
+non-streaming is 7.52 seconds with 140 ms and 44 ms respectively. The reverse-order confirmation
+proves the same codec digest for each mode in cold and warm execution (109 streaming / 94
+non-streaming frames, voluntary EOS). There was no allocation retry, crash delta, model change,
+prompt change, or threshold change. This localizes a text interaction, not a general perceptual fix.
+
+Run `ios-startup-reliability-20260904-053757-ed201aef` passed both app takes but exposed ICA-17:
+the host/schema required optional cadence quantiles that Swift omits when no qualifying pause
+exists. Its original runner remains failed. Corrected validation of the immutable evidence and
+separate exact-run cleanup pass. Independent reverse-order confirmation
+`ios-startup-reliability-20260904-054340-c307ab41` passes the entire runner, both takes, crash
+collection, validation, and cleanup. The two quantiles are now optional; required fields and numeric
+validation remain strict. All 83 adjacent startup/control-audit/smoke fixtures pass. A rounded seed
+in the unrun preparation was restored to the original UInt64 before launch; receipts prove the
+exact value, and a new fixture covers full-width launch transport.
+
+**The same-build marker control reproduces the original failure.** Run
+`ios-startup-reliability-20260904-054601-0770b988` retains both QC failures at the exact original
+71-character model-facing text and seed: streaming has a 1.851-second interior gap and 11.096-second
+tail; non-streaming has an 8.206-second interior gap. Its 373/547-frame traces match the historical
+controls, and incremental/full replays reproduce the failures. The diagnostic runner completes
+successfully with the honest `diagnosed_failure` result, no crash delta, and verified cleanup.
+All six new takes are represented across three pinned local bundles; no device run remains active.
+
+ICA-15 remains open for the original marker-bearing sampled-output failure. The next step is a
+harness-only design for metadata-based History ownership that does not alter ordinary spoken
+scripts, while retaining the exact numeric failures as separate immutable stress cases. Never
+strip digits from user input, replace these failures, or change production sampling/QC. The complete
+generation audit has not restarted; prior shards cannot resume across source changes. Do not
+repeat accepted smoke or saved-voice coverage or convert this bounded experiment into a full audit
+PASS. The active [remediation report](reference/ios-control-audit-remediation-2026-08-29.md) and
+`config/roadmap.json` retain the current experiment results and next boundary.
+
+## Previous checkpoint (2026-09-03)
 
 **Phone released before the ten-minute deadline; device work is paused.** Final smoke run
 `ios-xcui-smoke-20260903-184747-dc032d1b` passed all three cases: primary journey (239.819 s),
@@ -106,7 +143,7 @@ Retained QC-PASS `custom-002` (Aiden/Chinese) used 331 codec frames for 49 targe
 the former six-times budget would stop it at 294. A blanket rollback is therefore unsafe. The audit
 also appends an eight-digit spoken History marker. A two-take marker-removal ablation is validated
 and retained under ignored `build/artifacts/diagnostics/ios/startup-reliability/ica15-marker-ablation-pending`,
-but **has not run (0/2)**. It keeps the failing speaker, delivery, language, seed, and variation
+and was **unrun at that pause**; the September 4 checkpoint above supersedes this boundary. It keeps the failing speaker, delivery, language, seed, and variation
 while changing only the marker-bearing text. It is an independent localization probe, not a retry
 or replacement of the failed audit row and not evidence for a production change.
 
@@ -135,7 +172,8 @@ The incremental foundation route now preserves and UUID-validates the final sibl
 app and logic-test builds. Its focused contract, a real incremental build, and the immediately
 following device preflight all pass without cache deletion.
 
-When the phone is available again, first run the prepared independent diagnostic:
+The next command recorded at the September 3 pause was the prepared independent diagnostic
+(now completed; do not launch it again merely to update this checkpoint):
 
 ```sh
 scripts/ios_device.sh preflight

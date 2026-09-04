@@ -262,7 +262,8 @@ deadline; teardown terminated Vocello. The host-only retention phase also passed
 closed by the fresh run, not by relabelling the older test-only success. All named bundles remain
 explicitly pinned; do not repeat accepted smoke or saved-voice phases solely to obtain green counts.
 
-The validated next probe is retained in an ignored directory and has **zero launched takes**:
+The probe prepared at that pause is retained in the ignored directory below. It was executed on
+September 4; these commands are historical reproduction instructions, not an outstanding run:
 
 ```sh
 scripts/ios_device.sh preflight
@@ -273,13 +274,30 @@ scripts/ios_device.sh delivery-reliability \
 
 This independent two-take diagnostic removes the spoken numeric History marker while holding
 the failing speaker, preset, language, variation, and seed fixed. The host revalidates exact script
-bytes before launch. Compare it with the retained original-text evidence; marker causality is not
-yet demonstrated. It cannot replace the failed row or qualify a production change by itself.
+bytes before launch. The initial two takes and a separate reverse-order confirmation all pass
+on-device QC, with identical per-mode cold/warm codec traces. The initial host runner remains
+failed because of ICA-17's now-corrected optional cadence-quantile mismatch; its retained bytes
+validate after correction. Run `ios-startup-reliability-20260904-054340-c307ab41` independently
+passes the entire runner, crash collection, and cleanup. See the active remediation report for
+exact observations. These probes cannot replace the failed original-text row or qualify a
+production change by themselves.
+The current-build marker control `ios-startup-reliability-20260904-054601-0770b988` reproduces both
+historical codec digests and QC rejections; its complete runner reports `diagnosed_failure` and
+cleans up successfully. All six new takes remain represented. Next separate ordinary audit History
+identity from spoken text, keeping the exact numeric failures as independent stress cases; do not
+strip digits from product input or silently replace a failed matrix row.
 After localization and any qualifying remediation, freeze the final committed source and use
 `scripts/ui_test.sh ios control-audit --scenario generation --retain-result` from row 1 on a new
 schema-v2 plan. No September 2/3 shard may resume across this checkpoint's source change.
 ICA-04/ICA-05 retain generation, final restoration/reporting, and preservation-blocked coverage;
 ICA-06 still needs its exact-seed confirmation. VLR-07 retains its separate accuracy/ASR closure.
+
+Diagnostic plan preparation must preserve UInt64 seeds exactly. Do not round-trip them through
+JavaScript Number or another floating-point JSON parser. Compare with the retained exact integer
+using integer-preserving tooling before launch, then verify receipt parity. Optional Swift Codable
+fields may be absent when nil: cadence median/p90 remain optional in result-v2 validation, while
+all required fields, numeric types, and unknown-key rejection remain enforced. A corrected validator
+may recheck retained immutable evidence but never rewrite the original runner outcome.
 
 ### Control-audit one-hour continuation — 2026-09-02
 

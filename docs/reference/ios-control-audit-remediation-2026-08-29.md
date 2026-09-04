@@ -1,7 +1,7 @@
 ---
 status: active
 owner: ios
-reviewed: 2026-09-03
+reviewed: 2026-09-04
 summary: Evidence-driven remediation plan for the generation, model-progress, accessibility, playback-performance, and XCUITest bootstrap findings from the August 2026 physical-iPhone control audit.
 sourceOfTruth:
   - config/roadmap.json
@@ -16,7 +16,7 @@ sourceOfTruth:
 # iOS control-audit remediation — 2026-08-29
 
 > **Active implementation checkpoint.** This report explains the causal decisions behind
-> ICA-06 through ICA-16 and the corrected-source re-closure of MD-3. `config/roadmap.json`, source, tests, and retained
+> ICA-06 through ICA-17 and the corrected-source re-closure of MD-3. `config/roadmap.json`, source, tests, and retained
 > untracked run artifacts remain authoritative. It does not replace the pinned 2026-08-28 audit.
 
 ## Executive assessment
@@ -38,8 +38,60 @@ warnings, or treating an unlaunched XCUITest as product evidence.
 | ICA-14 generation carrier collision | Numeric token collision was guarded; the next run rejected its own second long-script row | Search tokens cannot authorize ownership, and a History row intentionally exposes only the first 60 characters | Resolve the narrowed row, open its genuine read-only player, and require the full accessible transcript to equal the frozen plan before mutation | **Closed:** contract fixtures and fresh generation `172247` with four PASS observations before the separate ICA-15 product failure |
 | ICA-15 Custom sampled over-continuation | Exact request, receipt, model start, decoded chunks, and publication all matched before mandatory QC | The model emitted 373 streaming or 547 non-streaming codec frames for 28 target tokens, voluntarily ended by EOS, and encoded long silence in the trace | Preserve fail-closed rejection; retain terminal diagnostics and evaluate any bounded-continuation candidate across representative valid speech before changing production | Two independent four-cell device diagnostics reproduce every warm/cold and streaming/non-streaming failure; production mitigation remains in flight |
 | ICA-16 smoke evidence collection | Three XCTest cases passed, then collection copied unrelated historical evidence for eight minutes | Smoke used the unbounded whole-mirror pull instead of the existing run-scoped collector | Pull only the run namespace with a 60-second bound and propagate copy/validation failure | **Closed:** scoped/corrupt/copy-failure fixtures and complete no-retry smoke `184747` |
+| ICA-17 optional cadence statistics | Both no-marker takes passed app QC and wrote complete results | Host/schema required median/p90 fields that Swift legitimately omits when nil | Match Codable optionality while retaining required-field, type, and unknown-key rejection | **Closed:** red/green fixture, 83 adjacent tests, retained-evidence validation, and complete reverse-order device run `054340` |
 
 ## Physical acceptance checkpoint
+
+### September 4 marker-removal and validator diagnosis
+
+The originally prepared no-marker run is complete, not pending. Exact-receipt checks confirm the
+original UInt64 seed `17323406037040967292`, Eric, Calm Strong, Italian, and Consistent variation.
+The 62-character input file normalizes to the intended 61-character sentence. The unrun plan's
+rounded seed literals were corrected before launch using the retained control identity; no attempted
+seed or prior result changed.
+
+| Run / observation | Actual residency | Fast-QC | Duration | Longest interior / terminal silence | Codec frames |
+| --- | --- | --- | --- | --- | --- |
+| `053757-ed201aef` / streaming | Cold | PASS | 8.72 s | 267 / 65 ms | 109 |
+| `053757-ed201aef` / non-streaming | Warm | PASS | 7.52 s | 140 / 44 ms | 94 |
+| `054340-c307ab41` / non-streaming | Cold | PASS | 7.52 s | 140 / 44 ms | 94 |
+| `054340-c307ab41` / streaming | Warm | PASS | 8.72 s | 267 / 65 ms | 109 |
+
+Full run IDs begin `ios-startup-reliability-20260904-`. Each mode's cold/warm codec digest is
+identical; all four takes end by model EOS at retry attempt zero. The complete receipts, QC,
+codec binaries, build provenance, and cleanup acknowledgements are retained under the ignored
+startup-reliability artifact root. WAV digests are not equated across generation-scoped publication
+metadata. These are bounded integrity/cadence observations, not ASR, semantic delivery, or general
+numeric-input acceptance.
+
+**ICA-17 is a separate, corrected host defect.** The first run's app result was PASS but its runner
+failed because `medianCadencePauseMS` and `p90CadencePauseMS` were incorrectly required by the
+host/schema. Swift's source declares them optional and omits them when nil. The correction accepts
+omission or null and continues rejecting missing required fields, unknown keys, and malformed
+numbers. A red/green fixture reproduces the shape; all 83 adjacent fixtures pass. Corrected
+validation of the original bytes and a separate exact-run cleanup pass, without rewriting the
+original failed runner. The reverse-order confirmation passes its full runner, crash checks, and
+cleanup, closing ICA-17. No production source or audio-QC threshold changed.
+
+**Current-build paired control:** `ios-startup-reliability-20260904-054601-0770b988` restores the
+exact original 71-character normalized script, including its original marker, at the same seed and
+request settings. Both takes fail QC: streaming is 29.84 seconds with 1,851 ms interior and
+11,096 ms terminal silence; non-streaming is 43.76 seconds with 8,206 ms interior silence. The
+373/547-frame codec digests match the historical controls, and both incremental and full decoder
+replays fail in the same intervals. Receipts preserve exact text identity and retry attempt zero.
+The runner exits successfully with `diagnosed_failure`, no crash delta, and verified cleanup; this
+is successful diagnosis of failed audio, not successful generation acceptance.
+
+The six observations establish an interaction with this exact text/suffix/seed under both modes.
+They do not prove that all numeric text fails or that emotion/language fidelity is solved. ICA-15
+remains open. The next harness work should move ordinary History ownership to existing visible
+generation metadata without contaminating spoken scripts, retaining the original numeric cases
+as immutable stress evidence. That work must preserve exact ownership, ambiguity rejection,
+source-bound resume, user-data protection, and the original failures. It must never strip digits
+from production input or substitute a fresh seed. The full control campaign remains unrun on a new
+final frozen source; earlier accepted smoke/saved-voice phases need no blind rerun.
+
+### September 3 retained checkpoint
 
 Smoke run `ios-xcui-smoke-20260903-181935-a051e519` passed all three XCTest cases but its
 legacy post-test collector then copied more than 365 MB of historical diagnostics. After eight
@@ -95,8 +147,8 @@ no trimming, hidden retry, seed change, prompt/sampling change, or QC weakening 
 The first four accepted rows also rule out a blanket rollback to the former six-times target-token
 budget: QC-PASS `custom-002` (Aiden/Chinese) used 331 codec frames for 49 target tokens, exceeding
 the hypothetical 294-frame cap. The audit appends an eight-digit spoken History marker; a two-take
-marker-removal ablation is validated and retained in the ignored diagnostic directory named by the
-testing guide, but remains **prepared, not run (0/2)**. Marker causality is only a hypothesis.
+marker-removal ablation was prepared at that pause. Its September 4 execution and reverse-order
+confirmation are recorded above; neither replaces the original failed control.
 The exact original-text failures remain immutable controls. Upstream `non_streaming_mode` also
 changes text conditioning, so unequal cross-mode traces alone are not proof of RNG corruption;
 see the [official inference source](https://github.com/QwenLM/Qwen3-TTS/blob/main/qwen_tts/inference/qwen3_tts_model.py).

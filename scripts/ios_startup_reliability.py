@@ -410,9 +410,12 @@ def validate_audio_qc(value: Any, field: str) -> None:
             "observedCadencePauseCount", "excessCadencePauseCount",
             "suspiciousPauseCount", "recordedInteriorPausesMS",
             "totalInteriorSilenceMS", "totalCadenceSilenceMS",
-            "medianCadencePauseMS", "p90CadencePauseMS", "cadenceSilenceRatio",
+            "cadenceSilenceRatio",
         }
-        if not isinstance(cadence, dict) or set(cadence) != cadence_required:
+        # AudioCadenceQCReport's optional quantiles are omitted by Swift Codable
+        # when no interior pause reaches the cadence threshold.
+        cadence_allowed = cadence_required | {"medianCadencePauseMS", "p90CadencePauseMS"}
+        if not isinstance(cadence, dict) or not cadence_required.issubset(cadence) or set(cadence) - cadence_allowed:
             raise ContractError(f"{field}.cadence does not match AudioCadenceQCReport")
         if not isinstance(cadence["classification"], str) or cadence["classification"] not in {"withinFastGate", "unusual", "severe"}:
             raise ContractError(f"{field}.cadence.classification is invalid")
@@ -439,7 +442,7 @@ def validate_audio_qc(value: Any, field: str) -> None:
         ):
             raise ContractError(f"{field}.cadence.recordedInteriorPausesMS is invalid")
         for key in ("medianCadencePauseMS", "p90CadencePauseMS"):
-            child = cadence[key]
+            child = cadence.get(key)
             if child is not None and (type(child) is not int or child < 0):
                 raise ContractError(f"{field}.cadence.{key} is invalid")
         ratio = cadence["cadenceSilenceRatio"]

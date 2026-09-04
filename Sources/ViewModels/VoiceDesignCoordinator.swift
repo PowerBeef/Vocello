@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import QwenVoiceCore
 import QwenVoiceNative
 import SwiftUI
 
@@ -125,6 +126,9 @@ final class VoiceDesignCoordinator {
         let text = draft.text
         let voiceDescription = draft.voiceDescription
         let emotion = draft.emotion
+        // Capture the full request before the executor can suspend. Rebuilding a
+        // partial draft here silently reset language and the pinned seed to Auto/nil.
+        let variation = GenerationVariationPreference.requestValue()
 
         generationTask = GenerationLifecycleExecutor.run(
             ttsEngineStore: ttsEngineStore,
@@ -142,13 +146,10 @@ final class VoiceDesignCoordinator {
             let outputPath = makeOutputPath(subfolder: model.outputSubfolder, text: text)
             return GenerationLifecycleExecutor.PreparedTake(
                 request: Self.makeGenerationRequest(
-                    draft: VoiceDesignDraft(
-                        voiceDescription: voiceDescription,
-                        emotion: emotion,
-                        text: text
-                    ),
+                    draft: draft,
                     model: model,
-                    outputPath: outputPath
+                    outputPath: outputPath,
+                    variation: variation
                 ),
                 text: text,
                 persistCaller: "VoiceDesignCoordinator",
@@ -196,7 +197,8 @@ final class VoiceDesignCoordinator {
     nonisolated static func makeGenerationRequest(
         draft: VoiceDesignDraft,
         model: TTSModel,
-        outputPath: String
+        outputPath: String,
+        variation: Qwen3SamplingVariation?
     ) -> GenerationRequest {
         MacStudioGenerationRequestFactory.voiceDesign(
             modelID: model.id,
@@ -206,7 +208,7 @@ final class VoiceDesignCoordinator {
             voiceDescription: draft.voiceDescription,
             deliveryStyle: draft.emotion,
             seed: draft.pinnedSeed,
-            variation: GenerationVariationPreference.requestValue()
+            variation: variation
         )
     }
 

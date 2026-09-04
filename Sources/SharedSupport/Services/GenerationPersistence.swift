@@ -18,31 +18,18 @@ typealias PersistenceGenerationResult = QwenVoiceCore.GenerationResult
 @MainActor
 enum GenerationPersistence {
 
-    /// Hands off playback synchronously, durably queues the finished take,
-    /// then schedules its idempotent SQLite commit off the main actor. The
-    /// outbox intent exists before this method returns, so a process exit or
-    /// database failure cannot silently orphan a published WAV.
-    ///
-    /// Behavior change from May 2026: persistence errors that occur
-    /// AFTER playback handoff are no longer thrown — they're logged via
-    /// `print()` only when runtime diagnostics are enabled. Rationale: the user
-    /// already heard their
-    /// audio play. A persistence failure means the generation won't
-    /// appear in History, which is a quiet non-blocking failure that
-    /// doesn't affect the immediate UX. Surfacing it via a thrown error
-    /// previously caused an alert that landed AFTER playback was already
-    /// running, confusing users who weren't sure what failed.
-    ///
-    /// UI win: the synchronous DB save (5-30ms blocking on @MainActor)
-    /// is gone. UI rendering of the just-completed generation is no
-    /// longer hitched by the SQLite write.
+    /// Playback is handed off before any storage work. A typed result separates
+    /// successful synthesis from History acceptance; failed enqueue is visibly
+    /// recoverable during this app session and never claimed crash-safe. GRDB
+    /// commits off MainActor through the existing coordinator and writer queue.
+    @discardableResult
     static func persistAndAutoplay(
         _ generation: Generation,
         result: PersistenceGenerationResult,
         text: String,
         audioPlayer: AudioPlayerViewModel,
         caller: String
-    ) {
+    ) async -> GenerationHistoryPersistenceOutcome {
         emitClonePromptMetricsIfNeeded(result: result, caller: caller)
         AppPerformanceSignposts.emit("Final File Ready")
 
@@ -65,18 +52,19 @@ enum GenerationPersistence {
             }
         }
 
-        schedulePersistence(generation, caller: caller)
+        return await saveToHistory(generation, caller: caller)
     }
 
-    /// Schedules only the SQLite save + history-event broadcast. iOS
+    /// Performs only the SQLite save + history-event broadcast. iOS
     /// Studio uses this when the generated output is owned by the inline
     /// player instead of the global now-playing model.
+    @discardableResult
     static func persist(
         _ generation: Generation,
         caller: String
-    ) {
+    ) async -> GenerationHistoryPersistenceOutcome {
         AppPerformanceSignposts.emit("Final File Ready")
-        schedulePersistence(generation, caller: caller)
+        return await saveToHistory(generation, caller: caller)
     }
 
     private static func emitClonePromptMetricsIfNeeded(
@@ -125,54 +113,31 @@ enum GenerationPersistence {
         AppPerformanceSignposts.emit("Clone Prompt Metrics", message: fields.joined(separator: " "))
     }
 
-    private static func schedulePersistence(
+    private static func saveToHistory(
         _ generation: Generation,
         caller: String
-    ) {
-        let entry: GenerationHistoryOutboxEntry
-        do {
-            entry = try GenerationHistoryRecovery.enqueue(generation)
-        } catch {
-            if TelemetryGate.resolvedEnabled {
-                print("[Performance][\(caller)] history_outbox_enqueue_failed")
-            }
-            announceRecoveryStateChanged()
-            return
-        }
-
-        // The task is deliberately unstructured because persistence must
-        // outlive the initiating view. Unlike the retired Task.detached route,
-        // it preserves task-local provenance while explicitly leaving
-        // MainActor; durability and retry are owned by the outbox.
-        Task { @concurrent in
-            let saveStart = DispatchTime.now().uptimeNanoseconds
-            let savedGeneration: Generation
-            do {
-                savedGeneration = try await GenerationHistoryRecovery.coordinator.commit(entry)
-            } catch {
-                if TelemetryGate.resolvedEnabled {
-                    print("[Performance][\(caller)] db_save_deferred_to_history_outbox")
-                }
-                await MainActor.run { announceRecoveryStateChanged() }
-                return
-            }
-            let saveMS = elapsedMs(since: saveStart)
-            if TelemetryGate.resolvedEnabled {
-                print("[Performance][\(caller)] db_save_wall_ms=\(saveMS) (off-main)")
-            }
-            await MainActor.run {
-                let notificationStart = DispatchTime.now().uptimeNanoseconds
+    ) async -> GenerationHistoryPersistenceOutcome {
+        // Durable intent exists before this suspension. Cancellation, view
+        // teardown, or database failure cannot discard the pending record.
+        let saveStart = DispatchTime.now().uptimeNanoseconds
+        let outcome = await GenerationHistoryRecovery.unqueued.persist(
+            generation,
+            enqueue: { try GenerationHistoryRecovery.enqueue($0) },
+            commit: { try await GenerationHistoryRecovery.coordinator.commit($0) },
+            onSaved: { savedGeneration in
                 #if canImport(QwenVoiceNative)
                 GenerationLibraryEvents.shared.announceGenerationAppended(savedGeneration)
                 #else
                 NotificationCenter.default.post(name: .generationSaved, object: nil)
                 #endif
-                if TelemetryGate.resolvedEnabled {
-                    print("[Performance][\(caller)] history_notification_wall_ms=\(elapsedMs(since: notificationStart))")
-                }
-                announceRecoveryStateChanged()
             }
+        )
+        let saveMS = elapsedMs(since: saveStart)
+        if TelemetryGate.resolvedEnabled {
+            print("[Performance][\(caller)] history_save_outcome=\(outcome) wall_ms=\(saveMS)")
         }
+        announceRecoveryStateChanged()
+        return outcome
     }
 
     private static func announceRecoveryStateChanged() {

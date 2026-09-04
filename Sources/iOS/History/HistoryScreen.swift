@@ -343,6 +343,9 @@ private struct IOSHistoryLibrarySection: View {
     }
 
     private var recoveryMessage: String {
+        if recoverySnapshot.unqueuedCount > 0 {
+            return VocelloPresentationText.historyUnqueuedDetail
+        }
         if recoverySnapshot.issueCount > 0 {
             return "Vocello preserved the recovery record but could not verify or commit it. Retry before clearing History."
         }

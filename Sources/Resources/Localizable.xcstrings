@@ -1,6 +1,46 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "vocello.history.unqueued_title" : {
+      "comment" : "Successful synthesis with a failure to durably queue its History record; not an engine failure.",
+      "extractionState" : "manual",
+      "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Audio ready — History not saved" } } }
+    },
+    "vocello.history.unqueued_detail" : {
+      "comment" : "Warning that unqueued History identity is held only in app-session memory, not crash-safe storage.",
+      "extractionState" : "manual",
+      "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Audio is still available. Retry saving or export it before quitting; recovery has not been safely queued." } } }
+    },
+    "vocello.history.retry_save" : {
+      "comment" : "Retries storage only, never speech generation.",
+      "extractionState" : "manual",
+      "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Retry History Save" } } }
+    },
+    "vocello.history.export_audio" : {
+      "comment" : "Explicit system share/export action for finished audio.",
+      "extractionState" : "manual",
+      "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Export Audio" } } }
+    },
+    "vocello.player.dismiss_detail" : {
+      "comment" : "Player dismissal does not guarantee that the take's History write succeeded.",
+      "extractionState" : "manual",
+      "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "This closes the player without deleting the audio file. Saved takes can be replayed from History." } } }
+    },
+    "vocello.long_form.save_failed" : {
+      "comment" : "Long-form transaction rolled back without changing the prior accepted project.",
+      "extractionState" : "manual",
+      "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "The long-form project could not be saved safely. The previous accepted project is unchanged." } } }
+    },
+    "vocello.long_form.recovery_required" : {
+      "comment" : "An interrupted or invalid long-form transaction needs reconciliation; retained audio must not be deleted.",
+      "extractionState" : "manual",
+      "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Long-form storage needs recovery. Open History and retry before changing this project. Its audio has been retained." } } }
+    },
+    "vocello.long_form.segment_generated" : {
+      "comment" : "Segment audio exists, but whole-project acceptance may still be pending.",
+      "extractionState" : "manual",
+      "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Generated" } } }
+    },
     "vocello.licenses.back" : {
       "comment" : "VoiceOver label for returning from one attribution detail.",
       "extractionState" : "manual",

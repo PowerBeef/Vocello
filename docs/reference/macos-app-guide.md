@@ -1,7 +1,7 @@
 ---
 status: active
 owner: macos
-reviewed: 2026-09-02
+reviewed: 2026-09-04
 summary: Consolidated macOS app map — screens, elements, and options, and how XCUITest addresses each through the stable accessibility surface.
 sourceOfTruth:
   - Sources/Views
@@ -101,10 +101,14 @@ Tests assert these visible production surfaces directly.
 | Pending-history recovery | `historyRecovery_banner` with `historyRecovery_retry`, `historyRecovery_reveal`, and `historyRecovery_export` |
 
 Database failures are typed and fail closed: an unavailable store is not shown as empty History.
-Every published WAV is durably queued before its idempotent database write. Startup and History
+Published single takes are queued before their idempotent database write when storage permits. Startup and History
 entry retry pending writes; if recovery still needs attention, the visible banner can retry,
 reveal the local outputs folder, or export the pending audio. Clear-all records a resumable
 database-first transaction before removing pending entries or files.
+If enqueue itself fails, `historyUnqueued_banner` appears above the main content with
+`historyUnqueued_retry` and `historyUnqueued_export`. Audio remains playable; the exact retry
+record is app-session memory only until safely queued. No storage failure is reported as failed
+synthesis, and clear-all refuses to discard unqueued records. Export before quitting if retry fails.
 
 ### Saved Voices (`sidebar_voices` → `screen_voices`)
 
@@ -166,6 +170,13 @@ language boundary.
 Every item — line-separated and long-form — is an ordinary sequential streaming take (mandatory
 engine Fast QC, streaming telemetry, live preview). Long-form additionally plans segments, joins
 them into one WAV, and lands a single project row in History.
+Segments are retained for in-session continuation, but segment completion is not project acceptance.
+Both initial completion and segment replacement await the shared `LongFormHistoryAcceptanceStore`:
+QC-checked unique candidate WAVs, throwing manifest serialization, atomic manifest replacement,
+and one journaled SQLite transaction. Failed replacement preserves the previous accepted project;
+recovery runs before History reads/writes. Unchanged segments retain their QC, effective seeds,
+and generation identities. Old manifest-v4 files remain readable; this adds no cross-launch
+generation-resume feature. A joined-row commit reloads the complete History project.
 
 ---
 

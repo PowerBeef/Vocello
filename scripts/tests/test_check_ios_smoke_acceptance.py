@@ -460,7 +460,8 @@ class IOSSmokeAcceptanceTests(unittest.TestCase):
         self.assertIn("runQueueScenario", model_download_test)
         self.assertIn("runRecoveryScenario", model_download_test)
         runner = (ROOT / "scripts" / "ui_test.sh").read_text(encoding="utf-8")
-        self.assertIn("write_run_metadata diagnosedFailure", runner)
+        self.assertIn('final_run_status="diagnosedFailure"', runner)
+        self.assertIn('write_run_metadata "$final_run_status" "$finished_at" 0', runner)
         self.assertIn("DIAGNOSTIC COMPLETE (diagnosedFailure)", runner)
         wait_helper = model_download_test[
             model_download_test.index("private func waitForInstalledModel(") :

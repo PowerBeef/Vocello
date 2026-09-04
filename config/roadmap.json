@@ -1,7 +1,17 @@
 {
   "schemaVersion": 1,
+  "primaryPlan": "release-first-3-0-2026-09",
   "description": "Single source of truth for plans, items, and progress. Narrative documents cite this file rather than restating it. Validated by scripts/roadmap.py: every evidence reference is resolved against the repository, so an item cannot claim completion by asserting it. Rendered to docs/ROADMAP.md.",
   "plans": [
+    {
+      "id": "release-first-3-0-2026-09",
+      "title": "Vocello 3.0 — primary release-first execution plan",
+      "status": "active",
+      "owner": "release-qa",
+      "adopted": "2026-09-04",
+      "goal": "Execute RF-01 through RF-12 in order for the maintainer-selected 3.0.0 release, with Apple/qualified-rights prerequisites continuing alongside engineering and independent macOS/CLI qualification. This is the primary work-selection plan from now on. RF items are delivery milestones, not duplicate defects: existing F/ASR/ICA/VLR/AV items retain their technical closure gates and evidence. Keep long-form, account for all 201 iOS takes, and defer unrelated research or harness/runtime redesign. Implementation complete, candidate verified, and publication/submission authorized are separate milestones; milestone percentages are not release-readiness scores. No account mutation, upload, publication, or submission is implicitly authorized.",
+      "authority": "docs/reference/release-first-execution-2026-09.md"
+    },
     {
       "id": "convergence-metal4-stage4-2026-08",
       "title": "Convergence residuals, Metal 4 study, and Stage 4",
@@ -149,6 +159,168 @@
   ],
   "items": [
     {
+      "id": "RF-01",
+      "plan": "release-first-3-0-2026-09",
+      "title": "Step 1 — reconcile the audit and preserve the exact testing checkpoint",
+      "status": "done",
+      "gate": "Map every audit finding to its existing defect authority or one independent product defect; preserve seven correlated passes, one product failure, and five additional unverified engine attempts. Inspect retained attachments once without inventing observations. Register the ordered primary programme and pass roadmap/documentation validation.",
+      "evidence": ["doc:docs/reference/release-first-execution-2026-09.md#audit-finding-disposition", "doc:docs/reference/release-first-execution-2026-09.md#preserved-september-4-device-boundary"],
+      "updated": "2026-09-04",
+      "notes": "VRA-001 through VRA-022 are mapped. F-15/F-16/F-17 own the new independent gaps; F-06 is reopened. A bounded scan of the retained 1710-attachment manifest and Staging found no canonical recoverable observation stream. ICA-04/ICA-05/ICA-18 keep the original failed/unverified attempts, not a fabricated PASS or safe-resume cursor. This closes reconciliation only, not any acceptance campaign."
+    },
+    {
+      "id": "RF-02",
+      "plan": "release-first-3-0-2026-09",
+      "title": "Step 2 — complete Apple prerequisites and the consolidated qualified-decision packet",
+      "status": "in-flight",
+      "blockedBy": ["RF-01"],
+      "gate": "Under ASR-02/ASR-04/ASR-08/ASR-10/ASR-11, complete bounded read-only account, distribution-key/profile/entitlement, agreement, version, and collision checks. Reuse support and bundled attribution; consolidate provider metadata/retention, model distribution, previews, marketing audio/artwork, privacy, content rights, age rating, export, and regional decisions. Every field has evidence or a named external dependency; qualified legal/privacy decisions are recorded before closure. Authentication failures remain failures.",
+      "sourceOfTruth": ["scripts/app_store_connect_readiness.py", "scripts/app_store_build_preflight.py", "docs/reference/content-rights-review.md"],
+      "updated": "2026-09-04",
+      "notes": "Runs alongside engineering rather than blocking RF-03 through RF-09. The September 4 primary-profile authenticated read succeeded, but the sanitized readiness inventory is INCOMPLETE for pricing/availability and owner-only fields; the existing configured 2.4.0/build 23 collides. No account data changed. Fresh distribution/profile checks and qualified decisions remain. Next release version is 3.0.0; select its unused build number separately at freeze."
+    },
+    {
+      "id": "RF-03",
+      "plan": "release-first-3-0-2026-09",
+      "title": "Step 3 — implement and behavior-test macOS Design request preservation",
+      "status": "done",
+      "blockedBy": ["RF-01"],
+      "gate": "Implement F-15's immutable full-draft and variation snapshot before asynchronous preparation. Execute the actual coordinator request path for French/Auto, pinned/default seed, description/delivery, and edits during startup; focused macOS tests and app compilation pass. This is source implementation proof, not signed-candidate UI acceptance.",
+      "sourceOfTruth": ["Sources/ViewModels/VoiceDesignCoordinator.swift", "Sources/Models/VoiceDesignDraft.swift", "Tests/VocelloCoreTests/VoiceDesignCoordinatorTests.swift"],
+      "evidence": ["file:Sources/ViewModels/VoiceDesignCoordinator.swift", "file:Tests/VocelloCoreTests/VoiceDesignCoordinatorTests.swift", "doc:docs/development-progress.md#resume-here-2026-09-04"],
+      "updated": "2026-09-04",
+      "notes": "Seven production-coordinator/adjacent-factory tests and the full coherent-tree checkpoint passed, including generic iOS compilation and macOS core/transport/runtime suites. F-15 remains in-flight for RF-10 packaged-candidate parity. No model/device acceptance is claimed."
+    },
+    {
+      "id": "RF-04",
+      "plan": "release-first-3-0-2026-09",
+      "title": "Step 4 — repair long-form durability on both platforms",
+      "status": "done",
+      "blockedBy": ["RF-03"],
+      "gate": "Implement F-16: stage segment/joined audio and throwing manifests, require segment/assembly/joined QC, atomically replace the manifest and transactionally update History through a bounded recoverable journal. Await accepted persistence, preserve prior content and unchanged QC/seeds/identities, remove only operation-owned unreferenced rejects, count unique resumed segments, and distinguish segment completion from whole-project acceptance. Fault tests cover encoding/write/assembly/QC/database/cancellation/interruption and idempotent reconciliation; existing manifests remain compatible and continuation remains session-scoped.",
+      "sourceOfTruth": ["Sources/iOS/Studio/IOSLongFormProject.swift", "Sources/Services/BatchGenerationRunner.swift", "Sources/SharedSupport/Database/LongFormHistoryAcceptance.swift", "Tests/VocelloCoreTests/LongFormHistoryAcceptanceTests.swift"],
+      "evidence": ["file:Tests/VocelloCoreTests/LongFormHistoryAcceptanceTests.swift", "doc:docs/development-progress.md#resume-here-2026-09-04"],
+      "updated": "2026-09-04",
+      "notes": "Source implementation complete: shared writer-owned acceptance journal, unique candidates, throwing manifests, transactional History, pre-read/write recovery, preserved QC/seed/generation identity, and unique iOS progress. The 66-test focused set and coherent-tree checkpoint passed (1,436 Python tests, iOS app/logic builds, macOS core/transport/runtime suites). RF-09 candidate freeze is separate. F-16 stays in-flight for corrected-candidate long-form/regeneration acceptance under RF-10/RF-11/RF-12. Continuation remains session-scoped."
+    },
+    {
+      "id": "RF-05",
+      "plan": "release-first-3-0-2026-09",
+      "title": "Step 5 — expose recoverable History-save outcomes",
+      "status": "done",
+      "blockedBy": ["RF-04"],
+      "gate": "Complete F-06's remaining source work: typed saved/queued-for-recovery/unable-to-queue outcomes, playable successful audio, visible retry/export when durable enqueue fails, existing outbox reuse for database failures, and idempotent retry. Enqueue/database/retry/duplicate/playback/long-form tests cover both platform paths. Never report a storage failure as failed synthesis.",
+      "sourceOfTruth": ["Sources/SharedSupport/Services/GenerationPersistence.swift", "Sources/SharedSupport/Services/GenerationHistoryRecovery.swift", "Sources/SharedSupport/Database/GenerationHistoryEnqueueState.swift", "Sources/SharedSupport/Views/GenerationHistoryEnqueueWarning.swift", "Tests/VocelloCoreTests/GenerationHistoryEnqueueStateTests.swift"],
+      "evidence": ["file:Tests/VocelloCoreTests/GenerationHistoryEnqueueStateTests.swift", "file:Tests/VocelloCoreTests/GenerationHistoryOutboxTests.swift", "doc:docs/development-progress.md#resume-here-2026-09-04"],
+      "updated": "2026-09-04",
+      "notes": "Source implementation complete: typed saved/queued/unable-to-queue results and shared visible Retry/Export warning. Six focused enqueue-state tests plus the existing outbox/acceptance/request set passed (66 total); macOS production compilation and generic iOS app/logic compilation passed. Audio remains playable; failed enqueue identity is explicitly app-session memory. Existing outbox/deletion retained; clear-all refuses unqueued identity. F-06 remains in-flight for corrected-candidate acceptance, not implicitly closed by this source milestone."
+    },
+    {
+      "id": "RF-06",
+      "plan": "release-first-3-0-2026-09",
+      "title": "Step 6 — localize the remaining natural-text audio failures",
+      "status": "in-flight",
+      "blockedBy": ["RF-05"],
+      "gate": "Under ICA-15/VLR-07, review retained WAV/code/receipt/ASR evidence before new generation; separate the completed numeric-marker regression, marker-free French Custom failure, and French Design production versus experimental results. Locate the first divergent request/language/code/decoder/assembly/QC boundary, add a targeted fixture, and run only qualifying fixed-seed confirmations. Keep QC, seeds, prompts, token caps and model pins unchanged absent causal proof. Any unresolved sampled-output pathology remains an explicit release blocker/decision, never harness PASS.",
+      "sourceOfTruth": ["scripts/voice_identity_language_reliability.py", "scripts/ios_startup_reliability.py", "docs/reference/delivery-harness.md"],
+      "updated": "2026-09-04",
+      "evidence": ["doc:docs/reference/release-first-execution-2026-09.md#rf-06-retained-evidence-review-september-4"],
+      "notes": "Retained review localizes custom-008's near-silence to pre-write decoded samples (6.16-18.48s); receipt language/seed/retry are correct, but missing retained WAV/codec prevents a sampling-versus-decoder conclusion. Shipped Neutral Design has 26/28 verification passes in the corrected September 2 cohort. Its long reject's three agreeing transcripts cover only 8.16-15.84s of a nonempty 16s WAV, so recognition completeness must be examined before synthesis attribution. Original failures and guards are unchanged; historical composition refused current-tree qualification and was not bypassed. Next: exact-row scoped codec/rejected-WAV capture and retained Design WAV subrange recognition. No prompt/QC change yet. Independent RF-07/RF-08 engineering may continue, not release."
+    },
+    {
+      "id": "RF-07",
+      "plan": "release-first-3-0-2026-09",
+      "title": "Step 7 — finish only the acceptance-blocking harness repairs",
+      "status": "in-flight",
+      "gate": "Under ICA-18/AV-09, extend the existing runner with incremental durable observations, early generation identity capture, explicit serialization failure, visible History-focus polling, observed-versus-expected selections, genuine playback/scrub evidence, terminal ledgers on every exit, and default five-take shards through existing start/limit controls. Interrupted/lost-focus/missing-observation/collection/stale-resume/duplicate fixtures pass; collection and cleanup plus one small physical pilot pass before the full campaign. No parallel harness, automatic retry, or fabricated observation.",
+      "sourceOfTruth": ["scripts/ui_test.sh", "scripts/ios_control_audit.py", "Tests/VocelloiOSUITests/VocelloiOSControlAuditUITests.swift"],
+      "updated": "2026-09-04",
+      "notes": "Source repairs now flush sequenced observation-v2 attachments per request/player/terminal/restoration, separate planned and observed controls, require paused scrub evidence, wait for the History keyboard, default to five-take shards, distinguish incomplete campaign from passed shard, and finalize ledgers before run PASS. Collection and resume fail closed on gaps or in-flight stages lacking terminal/restoration proof; legacy evidence remains readable. Focused fixtures and generic device-SDK XCUITest build-for-testing pass. A small physical pilot remains; compilation is not device acceptance. RF-06 is still open but does not block these independent repairs. No broader harness expansion is scheduled."
+    },
+    {
+      "id": "RF-08",
+      "plan": "release-first-3-0-2026-09",
+      "title": "Step 8 — package the downloadable optimized CLI",
+      "status": "planned",
+      "gate": "Implement F-17 in the existing release workflow: separate optimized arm64 CLI DMG, complete libraries/resources/notices/instructions, checkout-independent discovery, signatures, notarization/stapling, checksums and source/version supply-chain identity. Copied-package tests cover paths with spaces, version/JSON, all three modes, cancellation, failure exits and resource loading. No Homebrew route, privileged installer, shell-profile edits, or second release system.",
+      "sourceOfTruth": ["scripts/release.sh", "scripts/build.sh", "Sources/VocelloCLI/CLIRuntime.swift", ".github/workflows/release.yml"],
+      "updated": "2026-09-04",
+      "notes": "Engineering follows RF-07's source work; a missing phone for its pilot must not prevent independent CLI implementation. Signed real-package qualification is completed under RF-10 with available credentials."
+    },
+    {
+      "id": "RF-09",
+      "plan": "release-first-3-0-2026-09",
+      "title": "Step 9 — verify the coherent tree and freeze the 3.0.0 candidate",
+      "status": "planned",
+      "gate": "Run derived refresh/validation, full project-input gate, macOS deterministic tests/app build, generic physical-iOS SDK compile, website check and affected release/privacy/attribution/supply-chain fixtures. Set shared version 3.0.0 through project.yml, reconcile the pending iOS version and collision-check an unused build number under ASR-08. Commit main and require exact-SHA CI/security, verified annotated-tag authority and command-bound candidate evidence; compute required promotion lanes before expensive QA. No unrelated source/docs edits during the frozen campaign or full-tree identity bypass.",
+      "sourceOfTruth": ["project.yml", "scripts/release_source_authority.py", "scripts/release_evidence.py", "scripts/evidence_impact.py"],
+      "updated": "2026-09-04",
+      "notes": "Candidate preparation is independent of unresolved iOS-only legal/device acceptance; none of those dependencies may be reported closed. Applicable source fixes and harness source work must be coherent before freeze. Account edits and release operations retain their explicit authorization requirements."
+    },
+    {
+      "id": "RF-10",
+      "plan": "release-first-3-0-2026-09",
+      "title": "Step 10 — independently qualify macOS and downloadable CLI",
+      "status": "planned",
+      "blockedBy": ["RF-09"],
+      "gate": "Close F-05 with actual signed/notarized packaged-app startup/XPC evidence, verify Built-in, French Design pinned seed, Clone/enrollment, History recovery, long-form/regeneration, and applicable canonical benchmark/promotion lanes. Qualify F-17's copied CLI independently. Product defects, distribution rights, artifact verification and applicable promotion evidence must be clear before publication; an explicit maintainer publication authorization is still required. iOS-only blockers do not prevent desktop/CLI qualification or separately authorized publication.",
+      "sourceOfTruth": ["scripts/release.sh", "scripts/macos_test.sh", "scripts/quality_promotion.py", "docs/reference/macos-release-qa.md"],
+      "updated": "2026-09-04",
+      "notes": "F-15 source tests are not packaged UI-to-engine proof. RF-02's qualified rights decisions remain applicable to these artifacts, even when iOS account/device dependencies do not."
+    },
+    {
+      "id": "RF-11",
+      "plan": "release-first-3-0-2026-09",
+      "title": "Step 11 — account for the full frozen-source 201-take iOS campaign",
+      "status": "planned",
+      "blockedBy": ["RF-07", "RF-09"],
+      "gate": "Complete ICA-04/ICA-05's full 201-take plan in bounded mode-grouped shards with frozen seeds/corpus, all original failures/attempts retained, terminal state and preservation before each next cell, and correlated UI/receipt/QC/History/playback/cleanup after every shard. Complete applicable outstanding controls/accessibility/model/perf acceptance, reserve collection before device deadlines and verify unattended screen protection/termination/cleanup. Accounted-for is not PASS; no difficult, failed or missing row may be dropped or substituted.",
+      "sourceOfTruth": ["scripts/ui_test.sh", "scripts/ios_control_audit.py", "docs/reference/ios-device-testing.md"],
+      "updated": "2026-09-04",
+      "notes": "Corrected frozen-candidate campaign has not started. Preserve the earlier seven correlated passes, one product failure and five unverified engine attempts as historical evidence, not acceptance for changed source. Desktop and iOS qualification may proceed independently after freeze."
+    },
+    {
+      "id": "RF-12",
+      "plan": "release-first-3-0-2026-09",
+      "title": "Step 12 — verify the distribution iOS candidate and finish submission preparation",
+      "status": "planned",
+      "blockedBy": ["RF-11"],
+      "gate": "Under ASR-05 through ASR-12, verify archive/IPA entitlements/privacy/notices/architecture/UUID identity and absence of internal diagnostics. Separately authorize any internal TestFlight upload, then black-box test the processed candidate through the same XCUITest stack without replacing it with a diagnostics build. Preserve personal data during upgrade; fresh install needs another phone or explicit verified backup/reinstallation authorization. Verify reviewer-critical downloads/modes/import/transcription/permissions/offline/recovery/long-form/export, storage/screenshots, manual-only gaps, fresh regional hosting and all qualified account/privacy/rights decisions. No unexplained required failure; App Review submission requires separate explicit authorization and approval is not guaranteed.",
+      "sourceOfTruth": ["scripts/verify_ios_release_artifacts.py", "scripts/app_store_connect_readiness.py", "docs/reference/ios-appstore-submission.md"],
+      "updated": "2026-09-04",
+      "notes": "This milestone concerns the App Store distribution candidate, not the diagnostics-enabled development build. External credentials, owner/legal judgments, additional fresh-install capacity and upload/submission authorization must remain explicit blockers."
+    },
+    {
+      "id": "F-15",
+      "plan": "engineering-review-remediation-2026-08",
+      "title": "P1 — preserve macOS Voice Design language, seed, and variation at launch",
+      "status": "in-flight",
+      "gate": "Capture the complete Design draft and variation before asynchronous startup. Behavioral request-path tests prove explicit French, Auto, pinned/default seed, and subsequent UI edits cannot change the prepared request. Focused tests and macOS build pass; candidate acceptance proves visible selection-to-engine parity.",
+      "sourceOfTruth": ["Sources/ViewModels/VoiceDesignCoordinator.swift", "Sources/Services/MacStudioGenerationRequestFactory.swift"],
+      "updated": "2026-09-04",
+      "notes": "Source-confirmed VRA-001 at 2f392484. The coordinator now captures the complete immutable Design draft and variation before asynchronous preparation instead of reconstructing a partial draft. Production coordinator/draft behavioral coverage plus adjacent factory coverage passed 7/7 deterministic tests on 2026-09-04; the same build-for-testing compiled the production macOS app. No model or device was used. Full coherent-tree checkpoint and signed-candidate visible selection-to-engine parity remain pending; keep in-flight. Owner: macos. Source implementation, candidate verification, and release authorization are separate milestones. See docs/reference/release-first-execution-2026-09.md."
+    },
+    {
+      "id": "F-16",
+      "plan": "engineering-review-remediation-2026-08",
+      "title": "P1 — transactionally accept long-form projects and replacement segments",
+      "status": "in-flight",
+      "gate": "Both platforms stage and QC candidate segment/joined audio and a throwing manifest before accepted History mutation. Journaled atomic-file/database recovery is idempotent; normal failure preserves the accepted project and removes only unreferenced owned candidates. Fault tests cover serialization, writes, assembly, QC, database commits, cancellation and interruption; unchanged QC/seeds survive replacement, reused segments count once, and segment/project terminals are distinct. Existing manifests decode. Native long-form/regeneration acceptance passes on both platforms.",
+      "sourceOfTruth": ["Sources/iOS/Studio/IOSLongFormProject.swift", "Sources/Services/BatchGenerationRunner.swift", "Sources/SharedSupport/Database/LongFormHistoryAcceptance.swift", "Tests/VocelloCoreTests/LongFormHistoryAcceptanceTests.swift"],
+      "updated": "2026-09-04",
+      "notes": "Shared journaled acceptance is implemented on both platform paths; focused fault tests cover rollback/reconcile, corrupt state, identity refusal, and compatibility, alongside real bounded-assembly tests. Current-tree checkpoint and native corrected-candidate acceptance remain. Groups VRA-002 through VRA-007; VRA-020 remains session-only continuation, not a new feature. Owner: backend-and-platform. Cross-reference F-06 for enqueue failure and F-08 for terminal ownership."
+    },
+    {
+      "id": "F-17",
+      "plan": "engineering-review-remediation-2026-08",
+      "title": "P1 release dependency — distribute an optimized standalone CLI package",
+      "status": "planned",
+      "gate": "The existing release workflow produces a separate arm64 CLI DMG containing all required runtime resources/libraries and notices, Developer ID signatures, notarization/stapling, checksums and source/version provenance. The copied package works outside the checkout and in paths with spaces; version/JSON discovery, all three modes, cancellation and error exits pass. No Homebrew route or privileged installer. Public promotion requires the existing exact-source gate and separate authorization.",
+      "sourceOfTruth": ["project.yml", "scripts/build.sh", "scripts/release.sh", "Sources/VocelloCLI/CLIRuntime.swift", ".github/workflows/release.yml"],
+      "updated": "2026-09-04",
+      "notes": "Maintainer selected a downloadable CLI and next release version 3.0.0 (superseding the 2.5.0 planning default on 2026-09-04); current README explicitly describes source-only distribution. Reconcile the shared iOS/macOS/CLI version at candidate freeze and select an unused build number separately under ASR-08. Owner: release-qa. Cross-reference F-05 for packaged desktop startup; iOS-only blockers need not delay qualified macOS/CLI publication."
+    },
+    {
       "id": "F-01",
       "plan": "engineering-review-remediation-2026-08",
       "title": "High — make saved-voice review transactional and add iOS deletion",
@@ -254,12 +426,15 @@
       "id": "F-06",
       "plan": "engineering-review-remediation-2026-08",
       "title": "Medium — durably couple audio publication and History persistence",
-      "status": "done",
-      "gate": "Add a durable pending-history outbox/sidecar after atomic WAV publication, clear it only after the database commit, reconcile it at startup and History open, and expose privacy-safe retry/reveal/export state. Make clear-all resumable or database-first so a database failure cannot leave live rows pointing to already-deleted files. Current schedulePersistence uses an unstructured detached task with no retry, and clearAll deletes files before deleting rows.",
+      "status": "in-flight",
+      "gate": "Preserve the implemented durable History outbox, startup/open reconciliation and database-first deletion. Close the remaining enqueue-failure gap with typed saved/queued-for-recovery/unable-to-queue outcomes, visible retry/export while successful audio remains playable, idempotent retry and long-form integration on both platform paths. Prove enqueue/database failures and recovery cannot duplicate History, delete referenced audio, or mislabel successful synthesis as an engine failure. Source tests and applicable corrected-candidate acceptance are required.",
       "sourceOfTruth": [
         "Sources/SharedSupport/Services/GenerationPersistence.swift",
         "Sources/SharedSupport/Database/GenerationHistoryOutbox.swift",
         "Sources/SharedSupport/Services/GenerationHistoryRecovery.swift",
+        "Sources/SharedSupport/Database/GenerationHistoryEnqueueState.swift",
+        "Sources/SharedSupport/Views/GenerationHistoryEnqueueWarning.swift",
+        "Tests/VocelloCoreTests/GenerationHistoryEnqueueStateTests.swift",
         "Sources/QwenVoiceCore/HistoryDeletionEngine.swift",
         "Sources/Services/DatabaseService.swift",
         "Sources/iOSSupport/Services/DatabaseService.swift",
@@ -270,8 +445,8 @@
         "file:Tests/VocelloCoreTests/HistoryDeletionEngineTests.swift",
         "file:docs/reference/privacy-storage.md"
       ],
-      "updated": "2026-08-26",
-      "notes": "Closed 2026-08-26. Every published take is atomically queued in a schema-v1 app-support outbox before its idempotent audioPath-bound SQLite write; startup and History entry reconcile pending work, and visible recovery offers retry plus platform-appropriate reveal/export. Interrupted entry and clear-marker writes recover fail closed. Clear-all now persists a resumable transaction, deletes database rows first, then removes outbox entries and requested audio, so database failure preserves live rows and files. Deterministic tests cover commit/removal ordering, database failure and replay, duplicate identity, corrupt/interrupted records, missing audio, clear resumption, and database-first deletion."
+      "updated": "2026-09-04",
+      "notes": "VRA-008 source correction now returns typed saved/queued/unable-to-queue outcomes through the shared single-take pipeline. Failed enqueue exposes app-wide Retry/Export on macOS/iOS and retains exact identity in app-session memory without claiming durability or failed synthesis. Existing outbox and database-first deletion remain. Focused/current-tree verification and corrected-candidate acceptance remain separate from implementation and release authorization."
     },
     {
       "id": "F-07",
@@ -2314,8 +2489,8 @@
       "evidence": [
         "doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md"
       ],
-      "updated": "2026-09-02",
-      "notes": "The release workflow installs digest-pinned asc 4.11.0, creates an ephemeral least-privilege Keychain profile from release secrets, and runs a required read-only exact bundle/version/build collision preflight before archive creation. Synthetic collision, ambiguity, malformed-pagination, clean-identity, timeout, invalid-JSON, and process-group cleanup fixtures pass; build numbers remain maintainer-owned in project.yml. On 2026-09-02 the 12 focused read-only/auth/preflight fixtures and the nine-row policy validator passed, while a fresh live primary-profile inventory timed out at the governed 30-second boundary and the collision preflight timed out at 120 seconds without response bytes. The bounded process-group runner left no orphan and made no account mutation. Closure awaits one authenticated workflow preflight/readback after interactive Keychain access or CI secret-backed authentication."
+      "updated": "2026-09-04",
+      "notes": "RF-02/RF-09 schedule this dependency. The workflow uses digest-pinned asc 4.11.0, an ephemeral Keychain profile and required read-only exact bundle/version/build collision preflight; deterministic ambiguity/pagination/timeout/cleanup fixtures pass. September 2 authentication timeouts remain historical failures. On September 4 authentication succeeded and the live preflight correctly rejected the already-used configured 2.4.0/build 23 identity. No account mutation occurred. Next release is maintainer-selected 3.0.0; closure awaits selecting its unused build number through project.yml and an exact candidate workflow preflight/readback. Authentication is no longer the observed blocker."
     },
     {
       "id": "ASR-09",
@@ -2373,8 +2548,8 @@
         "doc:docs/reference/ios-appstore-submission.md",
         "doc:docs/reference/content-rights-review.md"
       ],
-      "updated": "2026-09-02",
-      "notes": "The schema-v1 inventory contract enumerates nine mutation-free public-API reads with exact app resolution, complete pagination, explicit JSON, process-group-bounded timeouts, response digests/counts/safe-state-token retention, and pending classifications for web/owner-only privacy, agreements/financial, DSA, and regional checks. Redaction, timeout cleanup, nonzero exit, invalid JSON, and required/optional failure fixtures pass. On 2026-09-02 a fresh read-only inventory attempt against Keychain profile primary timed out at the governed 30-second boundary without response bytes; direct credential validation also blocked until terminated. No live field was inferred, no account mutation occurred, and the hardened runner left no child process. Full account and qualified legal/privacy audit remains open pending interactive Keychain authorization or CI secret-backed authentication."
+      "updated": "2026-09-04",
+      "notes": "RF-02/RF-12 schedule this dependency. The existing inventory keeps exact app resolution, paginated JSON, process-group deadlines and redacted digests/counts/state tokens; its deterministic failure/redaction fixtures pass. September 2 Keychain timeouts remain retained historical failures. The September 4 authenticated read-only inventory succeeded for app resolution and multiple account surfaces but remains INCOMPLETE: required pricing-availability and optional version-readiness reads failed, while privacy publication, agreements/financial, DSA and regional owner/web checks remain pending. The sanitized release-first-20260904-readiness.json remains untracked. No account mutation occurred. Complete the unavailable reads and field-level candidate/qualified decisions; successful authentication alone is not account readiness."
     },
     {
       "id": "ASR-12",
@@ -2465,7 +2640,7 @@
       ],
       "updated": "2026-09-03",
       "retentionCheckpoint": "Device execution and collection ended by 2026-09-03T19:02:44Z, before the maintainer's deadline. XCUITest terminated Vocello; no xcodebuild or devicectl remained. Complete smoke ios-xcui-smoke-20260903-184747-dc032d1b passed all three tests, crash delta, scoped diagnostics, memory-pressure cancellation/unload/recovery, and the final required-step ledger. Explicit pins preserve that run, failed smoke ios-xcui-smoke-20260903-181935-a051e519, saved-voice ios-xcui-saved-voice-lifecycle-20260903-164233-e71568b3, and generation ios-xcui-control-audit-20260903-172247-b8fc963e; the cleanup dry-run confirmed explicitly-pinned retention. Generation remains four PASS, one PRODUCT_FAIL, and 199 SKIPPED_AFTER_FAILURE. The validated two-take ICA-15 marker ablation remains prepared, not launched (0/2), under ignored build/artifacts/diagnostics/ios/startup-reliability/ica15-marker-ablation-pending. No further device work this window. Next window: preflight, new independent ICA-15 diagnostic; after a qualifying causal decision, freeze the final committed tree and start the complete generation campaign from row 1. No historical shard can resume across this checkpoint's source change. Preserve bounded test-owned carriers and forensic evidence without modifying unrelated History, voices, or models.",
-      "notes": "The 2026-08-28 campaign completed inventory, stateful, external, saved-voice, queue, acceptance, smoke, and all nine performance scenarios before pausing. Corrected-source work on 2026-08-29 closed accessibility with no-retry run ios-xcui-control-audit-20260829-174031-cae15a02, closed performance with 9/9 PASS run ios-xcui-perf-20260829-180027-45adde8a, and re-closed MD-3. The September 2 recapture passed stateful run 121158 with seven PASS plus three explicit prerequisites and one preservation-policy block, external run 121608 with three PASS plus the permission-preservation block, accessibility run 121855 with two PASS, and model diagnose/queue/acceptance runs 122641/123230/123603 with no findings. The later current-source inventory run 180938 resolved the earlier picker-dismissal gap: it completed 41 PASS rows, one explicit NOT_APPLICABLE row, zero failures, and zero skips. Current-source saved-voice run 181739 failed before preview because voicesRowMenu_ICI Direct Clone Import existed with an invalid activation frame and no suggested hit point; ICA-13 owns localization and closure, and the run is not acceptance evidence. Current-source generation run 181849 was stopped by its fail-closed History-integrity assertion because reserved token 28400003 matched a non-audit History row; ICA-14 owns collision-proof carrier correlation. No terminal observations were collected and all 204 composed rows remain SKIPPED_AFTER_FAILURE, so the run cannot be resumed or counted as product evidence. Current-source smoke run 182906 passed all three XCTest cases: the primary cancellation/memory-recovery/Custom-History journey, Settings accessibility layout walk, and long-form project journey. The maintainer's one-hour deadline arrived during the subsequent diagnostics pull, which was cancelled; the overall runner correctly remains failed/unqualified rather than promoting the XCTest-only result. Earlier September 2 generation work produced two independent product-safety findings on historical source identities: run 141800 passed custom-001 through custom-003 and rejected custom-004 (Dylan, German, calm.strong, Balanced, seed 14590678627036013466) for a 2.085-second interior gap; run 151248 passed custom-001 and rejected custom-002 (Aiden, Chinese, angry.normal, Consistent, seed 2247811184622560891) for a 25.446-second interior gap. Both invalid outputs were absent from History and neither was retried or assigned another seed. Intermediate runs 143246, 144914, and 152328 drove fixes for seed-carrier lookup, state-aware player scrubbing, and stale History-row validation; run 151039 coincided with a phone call and is not product evidence. These retained runs cannot be merged into one current-source PASS campaign. On 2026-09-02 the phone-independent portions of ICA-13 and ICA-14 were corrected and deterministically verified: exact search-driven menu reachability, source-bound schema-v2 tokens, exact-script row ownership, and schema-v1 replay compatibility now pass focused tests and generic iOS compilation. On 2026-09-03 two new runs failed before any test launched while Xcode enabled automation; they remain distinct infrastructure evidence. A maintainer-unlock then allowed saved-voice run 162649 to prove the search-driven row/menu and deletion path on device. Its first new divergence was harness-owned: clearing the Voices search did not dismiss the software keyboard, so the dock was covered and rootTab_settings could not become hittable. clearVoicesSearch now submits the genuine search field and condition-polls for keyboard absence before tab navigation; the exact-tree focused and checkpoint gates pass. Saved-voice run 164233 subsequently passed the complete lifecycle and diagnostics, closing ICA-13. Generation run 164806 completed the first two visible Custom takes but exposed a second harness-owned History identity gap: long scripts cannot equal the intentionally truncated 60-character row preview. Full identity proof now opens the genuine read-only player and requires its complete accessible transcript to equal the frozen plan before any mutation. Remaining work is a new 201-take generation campaign from row 1 on the corrected committed tree, smoke with complete post-test diagnostics, final cleanup/restoration, the recording-permission preservation boundary, and ICA-06 exact-seed physical confirmation. Final September 3 checkpoint: saved-voice lifecycle closed ICA-13; generation 172247 proved full-transcript ownership and closed ICA-14; complete no-retry smoke 184747 closed ICA-09/ICA-16. The generation campaign now has an independently diagnosed ICA-15 sampled-output failure; 199 composed rows remain skipped. Remaining work is causal ICA-15 qualification, the complete 201-take generation plan on one new frozen identity, final cleanup/restoration, the recording-permission preservation boundary, ICA-06 exact-seed confirmation, and ICA-05's final report. Prior-source passing phases are historical evidence, not an exact-current-source aggregate."
+      "notes": "September 4 release-first checkpoint: ios-xcui-control-audit-20260904-065457-e2ec8911 retained seven correlated PASS and marker-free custom-008 PRODUCT_FAIL. Successor ios-xcui-control-audit-20260904-151935-164b4ee3 failed History keyboard focus, with five additional engine attempts but no accepted current-run UI observation stream. Thus 193 generation cells remain unvalidated, not all unattempted. All 1710 attachments and original failed ledgers remain pinned; no authentic structured observations recovered in the bounded read-only inspection. Do not resume either cursor silently. Required implementation: incremental observation capture before History, verified focus/playback/scrub, terminal ledger finalization and bounded five-take shards. Cross-reference AV-09 and ICA-15; preserve full-tree identity and original failures. No phone run active; release acceptance remains pending. Earlier evidence: The 2026-08-28 campaign completed inventory, stateful, external, saved-voice, queue, acceptance, smoke, and all nine performance scenarios before pausing. Corrected-source work on 2026-08-29 closed accessibility with no-retry run ios-xcui-control-audit-20260829-174031-cae15a02, closed performance with 9/9 PASS run ios-xcui-perf-20260829-180027-45adde8a, and re-closed MD-3. The September 2 recapture passed stateful run 121158 with seven PASS plus three explicit prerequisites and one preservation-policy block, external run 121608 with three PASS plus the permission-preservation block, accessibility run 121855 with two PASS, and model diagnose/queue/acceptance runs 122641/123230/123603 with no findings. The later current-source inventory run 180938 resolved the earlier picker-dismissal gap: it completed 41 PASS rows, one explicit NOT_APPLICABLE row, zero failures, and zero skips. Current-source saved-voice run 181739 failed before preview because voicesRowMenu_ICI Direct Clone Import existed with an invalid activation frame and no suggested hit point; ICA-13 owns localization and closure, and the run is not acceptance evidence. Current-source generation run 181849 was stopped by its fail-closed History-integrity assertion because reserved token 28400003 matched a non-audit History row; ICA-14 owns collision-proof carrier correlation. No terminal observations were collected and all 204 composed rows remain SKIPPED_AFTER_FAILURE, so the run cannot be resumed or counted as product evidence. Current-source smoke run 182906 passed all three XCTest cases: the primary cancellation/memory-recovery/Custom-History journey, Settings accessibility layout walk, and long-form project journey. The maintainer's one-hour deadline arrived during the subsequent diagnostics pull, which was cancelled; the overall runner correctly remains failed/unqualified rather than promoting the XCTest-only result. Earlier September 2 generation work produced two independent product-safety findings on historical source identities: run 141800 passed custom-001 through custom-003 and rejected custom-004 (Dylan, German, calm.strong, Balanced, seed 14590678627036013466) for a 2.085-second interior gap; run 151248 passed custom-001 and rejected custom-002 (Aiden, Chinese, angry.normal, Consistent, seed 2247811184622560891) for a 25.446-second interior gap. Both invalid outputs were absent from History and neither was retried or assigned another seed. Intermediate runs 143246, 144914, and 152328 drove fixes for seed-carrier lookup, state-aware player scrubbing, and stale History-row validation; run 151039 coincided with a phone call and is not product evidence. These retained runs cannot be merged into one current-source PASS campaign. On 2026-09-02 the phone-independent portions of ICA-13 and ICA-14 were corrected and deterministically verified: exact search-driven menu reachability, source-bound schema-v2 tokens, exact-script row ownership, and schema-v1 replay compatibility now pass focused tests and generic iOS compilation. On 2026-09-03 two new runs failed before any test launched while Xcode enabled automation; they remain distinct infrastructure evidence. A maintainer-unlock then allowed saved-voice run 162649 to prove the search-driven row/menu and deletion path on device. Its first new divergence was harness-owned: clearing the Voices search did not dismiss the software keyboard, so the dock was covered and rootTab_settings could not become hittable. clearVoicesSearch now submits the genuine search field and condition-polls for keyboard absence before tab navigation; the exact-tree focused and checkpoint gates pass. Saved-voice run 164233 subsequently passed the complete lifecycle and diagnostics, closing ICA-13. Generation run 164806 completed the first two visible Custom takes but exposed a second harness-owned History identity gap: long scripts cannot equal the intentionally truncated 60-character row preview. Full identity proof now opens the genuine read-only player and requires its complete accessible transcript to equal the frozen plan before any mutation. Remaining work is a new 201-take generation campaign from row 1 on the corrected committed tree, smoke with complete post-test diagnostics, final cleanup/restoration, the recording-permission preservation boundary, and ICA-06 exact-seed physical confirmation. Final September 3 checkpoint: saved-voice lifecycle closed ICA-13; generation 172247 proved full-transcript ownership and closed ICA-14; complete no-retry smoke 184747 closed ICA-09/ICA-16. The generation campaign now has an independently diagnosed ICA-15 sampled-output failure; 199 composed rows remain skipped. Remaining work is causal ICA-15 qualification, the complete 201-take generation plan on one new frozen identity, final cleanup/restoration, the recording-permission preservation boundary, ICA-06 exact-seed confirmation, and ICA-05's final report. Prior-source passing phases are historical evidence, not an exact-current-source aggregate."
     },
     {
       "id": "ICA-05",
@@ -2479,7 +2654,7 @@
         "scripts/ios_control_audit.py"
       ],
       "updated": "2026-09-03",
-      "notes": "The pinned historical report contains the 2026-08-28 pause checkpoint, exact run IDs, findings, performance measurements, blocked coverage, and its original resume boundary. The active remediation report and this roadmap record the September 2 generation shards, their source identities, two product-owned silent-gap rejections, corrected harness defects, the phone-call interruption candidate, and the one-hour resumed window. That window closed the inventory re-evidence gap with 41 PASS plus one explicit NOT_APPLICABLE row, reproduced a saved-voice lazy-row reachability failure, exposed a fail-closed generation History-token collision before any terminal row, and passed all three smoke XCTest cases while leaving the post-test diagnostics gate incomplete at the deadline. The two harness defects now have deterministic source corrections, and retained pre-test automation bootstrap failures are represented without false product rows. On September 3, two separate zero-test bootstrap failures were preserved; after manual unlock, saved-voice run 162649 proved exact row-menu deletion and exposed a keyboard-cleanup harness defect before Settings navigation. Saved-voice run ios-xcui-saved-voice-lifecycle-20260903-164233-e71568b3 then passed the complete journey and runner diagnostics, closing ICA-13. Generation run ios-xcui-control-audit-20260903-164806-affcc06a completed two visible takes and exposed a harness mismatch between long frozen scripts and the row's intentional 60-character preview; ownership proof now uses the genuine player's full accessible transcript before any mutation. ICA-05 cannot close until ICA-04 completes on the final committed source, every required matrix row has a terminal observation, restoration is proven, and the final evidence set is deliberately re-pinned under the documentation contract."
+      "notes": "September 4 release-first checkpoint: ios-xcui-control-audit-20260904-065457-e2ec8911 retained seven correlated PASS and marker-free custom-008 PRODUCT_FAIL. Successor ios-xcui-control-audit-20260904-151935-164b4ee3 failed History keyboard focus, with five additional engine attempts but no accepted current-run UI observation stream. Thus 193 generation cells remain unvalidated, not all unattempted. All 1710 attachments and original failed ledgers remain pinned; no authentic structured observations recovered in the bounded read-only inspection. Do not resume either cursor silently. Required implementation: incremental observation capture before History, verified focus/playback/scrub, terminal ledger finalization and bounded five-take shards. Cross-reference AV-09 and ICA-15; preserve full-tree identity and original failures. No phone run active; release acceptance remains pending. Earlier evidence: The pinned historical report contains the 2026-08-28 pause checkpoint, exact run IDs, findings, performance measurements, blocked coverage, and its original resume boundary. The active remediation report and this roadmap record the September 2 generation shards, their source identities, two product-owned silent-gap rejections, corrected harness defects, the phone-call interruption candidate, and the one-hour resumed window. That window closed the inventory re-evidence gap with 41 PASS plus one explicit NOT_APPLICABLE row, reproduced a saved-voice lazy-row reachability failure, exposed a fail-closed generation History-token collision before any terminal row, and passed all three smoke XCTest cases while leaving the post-test diagnostics gate incomplete at the deadline. The two harness defects now have deterministic source corrections, and retained pre-test automation bootstrap failures are represented without false product rows. On September 3, two separate zero-test bootstrap failures were preserved; after manual unlock, saved-voice run 162649 proved exact row-menu deletion and exposed a keyboard-cleanup harness defect before Settings navigation. Saved-voice run ios-xcui-saved-voice-lifecycle-20260903-164233-e71568b3 then passed the complete journey and runner diagnostics, closing ICA-13. Generation run ios-xcui-control-audit-20260903-164806-affcc06a completed two visible takes and exposed a harness mismatch between long frozen scripts and the row's intentional 60-character preview; ownership proof now uses the genuine player's full accessible transcript before any mutation. ICA-05 cannot close until ICA-04 completes on the final committed source, every required matrix row has a terminal observation, restoration is proven, and the final evidence set is deliberately re-pinned under the documentation contract."
     },
     {
       "id": "ICA-06",
@@ -2718,7 +2893,7 @@
         "file:scripts/tests/test_ios_control_audit.py"
       ],
       "updated": "2026-09-04",
-      "notes": "Harness-only implementation follows the four marker-free QC passes and two exact-marker failures retained under ICA-15/ICA-17. Schema-v3 generation retains corpus text verbatim and keeps History ownership in optional versioned observation metadata. Existing identical user text is never normalized or deleted. Source-bound carrier transport is test-runner-only; no production UI, model, prompt, sampler, seed, or QC changes. Final-shard cleanup now requires reaching the actual plan end. The deterministic checkpoint, generic iOS app/logic builds, macOS core/transport/runtime suites, and final ownership/resume fixtures pass. Multi-shard correlation uses each original run and explicit pin ownership preserves preexisting user pins. Fresh physical proof is pending; do not resume a historical source or relabel the original numeric failures."
+      "notes": "September 4 release-first checkpoint: ios-xcui-control-audit-20260904-065457-e2ec8911 retained seven correlated PASS and marker-free custom-008 PRODUCT_FAIL. Successor ios-xcui-control-audit-20260904-151935-164b4ee3 failed History keyboard focus, with five additional engine attempts but no accepted current-run UI observation stream. Thus 193 generation cells remain unvalidated, not all unattempted. All 1710 attachments and original failed ledgers remain pinned; no authentic structured observations recovered in the bounded read-only inspection. Do not resume either cursor silently. Required implementation: incremental observation capture before History, verified focus/playback/scrub, terminal ledger finalization and bounded five-take shards. Cross-reference AV-09 and ICA-15; preserve full-tree identity and original failures. No phone run active; release acceptance remains pending. Earlier evidence: Harness-only implementation follows the four marker-free QC passes and two exact-marker failures retained under ICA-15/ICA-17. Schema-v3 generation retains corpus text verbatim and keeps History ownership in optional versioned observation metadata. Existing identical user text is never normalized or deleted. Source-bound carrier transport is test-runner-only; no production UI, model, prompt, sampler, seed, or QC changes. Final-shard cleanup now requires reaching the actual plan end. The deterministic checkpoint, generic iOS app/logic builds, macOS core/transport/runtime suites, and final ownership/resume fixtures pass. Multi-shard correlation uses each original run and explicit pin ownership preserves preexisting user pins. Fresh physical proof is pending; do not resume a historical source or relabel the original numeric failures."
     },
     {
       "id": "VLR-01",

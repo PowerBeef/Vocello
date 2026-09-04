@@ -45,7 +45,7 @@ Usage:
   scripts/ui_test.sh ios delivery-cohort --text SCRIPT [--takes 20] [--label RUN_ID]
   scripts/ui_test.sh ios startup-parity --script-file UNTRACKED.txt
   scripts/ui_test.sh ios model-download [--scenario diagnose|queue|acceptance|soak|recover] [--iterations 3] [--engine-profile legacy|chunked|chunked-multisession]
-  scripts/ui_test.sh ios control-audit [--scenario inventory|stateful|external|accessibility|generation|all] [--resume RUN_ID]
+  scripts/ui_test.sh ios control-audit [--scenario inventory|stateful|external|accessibility|generation|all] [--take-limit 5] [--resume RUN_ID]
   scripts/ui_test.sh ios enroll-clone-fixture
   scripts/ui_test.sh ios saved-voice-lifecycle
 
@@ -106,6 +106,8 @@ control_scenario="all"
 control_resume=""
 control_resume_run_ids=""
 control_resume_take_start=0
+control_take_limit=5
+control_take_limit_explicit=0
 retain_result=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -127,6 +129,8 @@ while [[ $# -gt 0 ]]; do
     --label=*) label="${1#*=}"; shift ;;
     --takes) cohort_takes="${2:?--takes requires a value}"; shift 2 ;;
     --takes=*) cohort_takes="${1#*=}"; shift ;;
+    --take-limit) control_take_limit="${2:?--take-limit requires a value}"; control_take_limit_explicit=1; shift 2 ;;
+    --take-limit=*) control_take_limit="${1#*=}"; control_take_limit_explicit=1; shift ;;
     --text) cohort_text="${2:?--text requires a value}"; shift 2 ;;
     --text=*) cohort_text="${1#*=}"; shift ;;
     --script-file) startup_parity_script_file="${2:?--script-file requires a value}"; shift 2 ;;
@@ -151,6 +155,11 @@ fi
 if [[ -n "$control_resume" && "$lane" != "control-audit" ]]; then
   die "--resume is accepted only by control-audit"
 fi
+if (( control_take_limit_explicit == 1 )) && [[ "$lane" != "control-audit" || ( "$control_scenario" != "generation" && "$control_scenario" != "all" ) ]]; then
+  die "--take-limit is accepted only by control-audit generation/all"
+fi
+[[ "$control_take_limit" =~ ^[1-9][0-9]{0,2}$ ]] && (( control_take_limit <= 201 )) \
+  || die "--take-limit must be between 1 and 201"
 
 if [[ "$lane" != "benchmark" && "$lane" != "delivery-cohort" && "$lane" != "perf" ]] && [[ -n "$label" ]]; then
   die "--label is accepted only by the benchmark, delivery-cohort, and perf lanes"
@@ -284,7 +293,8 @@ write_run_metadata() {
   local status="$1" finished_at="${2:-}" exit_code="${3:-}"
   python3 - "$out/run.json" "$platform" "$lane" "$run_id" "$modes" "$lengths" \
     "$warm" "${label:-$run_id}" "$started_at" "$finished_at" "$status" "$exit_code" \
-    "$audit_source_id" "$control_scenario" "$control_resume" "$control_resume_run_ids" <<'PY'
+    "$audit_source_id" "$control_scenario" "$control_resume" "$control_resume_run_ids" \
+    "$control_resume_take_start" "$control_take_limit" <<'PY'
 import json, os, pathlib, sys, tempfile
 
 path = pathlib.Path(sys.argv[1])
@@ -299,6 +309,9 @@ payload = {
 if sys.argv[13]:
     payload["treeFingerprint"] = sys.argv[13]
     payload["controlAuditScenario"] = sys.argv[14]
+    payload["controlObservationSchemaVersion"] = 2
+    payload["controlTakeStart"] = int(sys.argv[17])
+    payload["controlTakeLimit"] = int(sys.argv[18])
 if sys.argv[15]:
     payload["resumedFrom"] = sys.argv[15]
 if sys.argv[16]:
@@ -331,6 +344,7 @@ record_early_failure() {
   trap - EXIT
   set +e
   write_test_summary || true
+  required_steps_finalize "$step_ledger" >"$out/required-steps-finalization.log" 2>&1 || true
   write_run_metadata failed "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$status"
   exit "$status"
 }
@@ -548,6 +562,8 @@ cleanup_ui_run() {
   set +e
   [[ "$platform" != "macos" ]] || cleanup_macos_run
   if (( run_finalized == 0 )); then
+    (( status != 0 )) || status=1
+    required_steps_finalize "$step_ledger" >"$out/required-steps-finalization.log" 2>&1 || true
     write_run_metadata failed "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$status"
   fi
   exit "$status"
@@ -1262,6 +1278,7 @@ else
     export TEST_RUNNER_QVOICE_IOS_CONTROL_AUDIT_SCENARIO="$control_scenario"
     export TEST_RUNNER_QVOICE_IOS_CONTROL_AUDIT_PLAN_B64="$(<"$out/control-audit-plan.zlib.b64")"
     export TEST_RUNNER_QVOICE_IOS_CONTROL_AUDIT_TAKE_START="$control_resume_take_start"
+    export TEST_RUNNER_QVOICE_IOS_CONTROL_AUDIT_TAKE_LIMIT="$control_take_limit"
     # Test-runner metadata only; never added to spoken text or application state.
     export TEST_RUNNER_QVOICE_IOS_CONTROL_AUDIT_CARRIERS_B64="W10="
     if [[ -n "$control_resume" ]]; then
@@ -1403,7 +1420,8 @@ PY
 
   control_audit_status=0
   if [[ "$lane" == "control-audit" ]]; then
-    if ! python3 "$ROOT_DIR/scripts/ios_control_audit.py" collect-observations \
+    if ! required_step_run "$step_ledger" control-observation-collection \
+        python3 "$ROOT_DIR/scripts/ios_control_audit.py" collect-observations \
         --manifest "$out/attachments/manifest.json" \
         --attachments "$out/attachments" \
         --output "$out/control-observations-current.jsonl" \
@@ -1500,11 +1518,15 @@ final_run_status="passed"
 if [[ "$platform" == "ios" && "$lane" == "model-download" \
     && "$model_scenario" == "diagnose" && "${model_diagnosis_result:-passed}" == "diagnosedFailure" ]]; then
   final_run_status="diagnosedFailure"
-  write_run_metadata diagnosedFailure "$finished_at" 0
-else
+fi
+
+# Preserve the existing PASS-only history publisher input for these two lanes.
+# This is provisional: run_finalized stays false and the exit trap overwrites
+# it with failed if publication or required-step finalization fails. Control
+# audits never take this path; their status stays running until finalization.
+if [[ "$lane" == "benchmark" || "$lane" == "perf" ]]; then
   write_run_metadata passed "$finished_at" 0
 fi
-run_finalized=1
 
 if [[ "$lane" == "benchmark" ]]; then
   if ! history_record="$(required_step_run "$step_ledger" history-publication \
@@ -1525,9 +1547,8 @@ if [[ "$lane" == "perf" && -f "$out/benchmark-evidence.json" ]]; then
   note "tracked ui-perf record → $history_record"
 fi
 
-# Keep the most recent passing result for each platform/lane only after this
-# run is durably marked as passed (and, for benchmarks, after history
-# publication). Cleanup failure must not rewrite an otherwise valid UI verdict.
+# Control audits remain running until all required steps finish. Retention
+# leaves their unfinalized bundle untouched and can prune older completed runs.
 retention_status=0
 if [[ "$final_run_status" == "diagnosedFailure" ]]; then
   note "retained correctly classified diagnostic failure evidence"
@@ -1542,6 +1563,8 @@ required_step_record "$step_ledger" result-retention "$retention_status"
 
 required_steps_finalize "$step_ledger" \
   || die "$platform $lane required-step ledger did not pass"
+write_run_metadata "$final_run_status" "$finished_at" 0
+run_finalized=1
 
 if [[ "$final_run_status" == "diagnosedFailure" ]]; then
   note "$platform $lane DIAGNOSTIC COMPLETE (diagnosedFailure) · $out"

@@ -122,6 +122,7 @@ struct QwenVoiceApp: App {
                 .frame(minWidth: 520, minHeight: 420)
             } else {
                 ContentView(ttsEngineStore: ttsEngineStore)
+                    .safeAreaInset(edge: .top, spacing: 0) { GenerationHistoryEnqueueWarning() }
                     .environment(ttsEngineStore)
                     .environmentObject(audioPlayer)
                     .environmentObject(audioPlayer.playbackProgress)

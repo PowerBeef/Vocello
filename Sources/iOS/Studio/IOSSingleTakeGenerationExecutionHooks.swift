@@ -54,7 +54,7 @@ final class IOSStudioSingleTakeGenerationHooks: IOSSingleTakeGenerationExecution
             generationID: plan.generationID
         )
 
-        GenerationPersistence.persist(
+        await GenerationPersistence.persist(
             Generation(
                 text: plan.request.text,
                 mode: plan.request.mode.rawValue,

@@ -228,6 +228,15 @@ def validate(root: pathlib.Path, today: _dt.date | None = None) -> dict:
                 errors.append(f"plan {pid}: authority {problem}")
 
     items = {}
+    # One optional execution priority, not another status ledger. Older roadmaps
+    # remain valid; all milestones and technical defects stay in the item table.
+    if "primaryPlan" in data:
+        primary = data["primaryPlan"]
+        if not isinstance(primary, str) or primary not in plans:
+            errors.append("primaryPlan must reference an existing plan")
+        elif plans[primary].get("status") != "active":
+            errors.append("primaryPlan must reference an active plan")
+
     legacy_seen = {}
     for item in data["items"]:
         iid = item.get("id")
@@ -333,7 +342,7 @@ def validate(root: pathlib.Path, today: _dt.date | None = None) -> dict:
 def progress(root: pathlib.Path) -> dict:
     data = load(root)
     out = []
-    for plan in data["plans"]:
+    for plan in sorted(data["plans"], key=lambda p: p["id"] != data.get("primaryPlan")):
         owned = [i for i in data["items"] if i.get("plan") == plan["id"]]
         counts = {status: sum(1 for i in owned if i.get("status") == status)
                   for status in ITEM_STATUSES}
@@ -364,8 +373,16 @@ def render(root: pathlib.Path) -> str:
         "",
     ]
     order = {"active": 0, "parked": 1, "complete": 2, "superseded": 3}
-    plans = sorted(data["plans"], key=lambda p: (order.get(p.get("status"), 9), p["id"]))
+    plans = sorted(data["plans"], key=lambda p: (
+        p["id"] != data.get("primaryPlan"), order.get(p.get("status"), 9), p["id"]
+    ))
     summary = {p["id"]: p for p in report["plans"]}
+
+    if data.get("primaryPlan") in summary:
+        primary = summary[data["primaryPlan"]]
+        lines += [f"**Current execution plan: {primary['title']}** (`{primary['id']}`).",
+                  "Follow its ordered milestones; the other plans retain the underlying defect records",
+                  "and deferred backlog. Milestone progress is not a release-readiness score.", ""]
 
     lines += ["## Plans", "",
               "| Plan | Status | Owner | Progress |", "| --- | --- | --- | --- |"]

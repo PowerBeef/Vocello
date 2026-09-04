@@ -11,11 +11,10 @@
 
 ## Product and authority
 
-**Vocello** is a local-first text-to-speech application for Apple Silicon using Qwen3-TTS and
-MLX with Swift 6. The checkout and Xcode project retain the historical `QwenVoice` name. The
-repository ships macOS/XPC and iOS/in-process apps, the `vocello` CLI, automation, benchmarks, and
-a React/Vite website for macOS and iOS 26+. No weights are bundled or cloud inference used;
-approved artifacts download from Hugging Face through the production model catalog.
+**Vocello** is local-first Qwen3-TTS/MLX speech synthesis in Swift 6 for Apple Silicon.
+The historical `QwenVoice` checkout contains macOS/XPC and iOS/in-process apps, `vocello` CLI,
+automation, benchmarks, and a React/Vite site. No bundled weights or cloud inference;
+approved assets download from Hugging Face through the production catalog.
 
 Derive public facts from `project.yml`, `config/public-product-facts.json`, and the benchmark
 catalog. Check them before quoting version, hardware, preset, or speaker counts. Release only on
@@ -38,7 +37,9 @@ machine-readable contract invalidates documentation, update the documentation in
    `python3 scripts/roadmap.py status`. If `main` cannot be checked out without risking existing
    work, stop and ask; do not continue implementation on another branch. Do not overwrite unrelated
    user changes.
-2. Read `docs/development-progress.md` and verify its checkpoint.
+2. Read `docs/development-progress.md` and verify its checkpoint. Follow the plan selected by
+   `primaryPlan` in `config/roadmap.json`; older active plans retain their defect/evidence authority
+   but are not competing next-work queues.
 3. Read the applicable file under `.agents/rules/` and the authoritative subsystem reference.
 4. Inspect the exact code, tests, and contracts before deciding on an implementation.
 5. Read every selected skill completely and verify optional tools are callable.
@@ -46,15 +47,24 @@ machine-readable contract invalidates documentation, update the documentation in
 7. Land source, tests, evidence, contracts, and narrative updates together. After a dense workstream,
    perform a documentation currency pass before starting another arc.
 
-When task scope, target platform, or requested acceptance level is genuinely ambiguous, ask. The
-default development checkpoint is deterministic verification; model downloads, a paired phone,
-and UI evidence are never prerequisites for preserving ordinary work.
+Ask when scope/platform/acceptance is ambiguous. Ordinary checkpoints require deterministic
+verification, never model downloads, a phone, or UI evidence.
+
+### Release-first execution
+
+Follow [`docs/reference/release-first-execution-2026-09.md`](docs/reference/release-first-execution-2026-09.md)
+in primary-roadmap order: product fixes before long campaigns; only necessary harness repairs;
+retained evidence before new generation. Stop diagnostics at the causal boundary. Keep heavy
+generation/analysis serial on the 8 GB Mac; verify focused changes, then the coherent tree.
+Distinguish implementation, candidate verification, and publication approval. macOS/CLI need not
+wait for iOS-only blockers. Keep external account/signing/rights decisions explicit. Version and
+run progress live in the roadmap/checkpoint, not here; implementation never authorizes publication.
 
 ## Hard invariants
 
 | Invariant | Required behavior |
 | --- | --- |
-| **Development work is `main`-only** | Start, resume, edit, validate, and commit directly on the local `main` branch. Never create, switch to, or continue implementation on another local branch. If returning to `main` is not safe, stop and ask instead of moving or discarding work. GitHub pull-request refs and detached CI checkouts remain valid execution contexts, but agents do not develop from them. |
+| **Development work is `main`-only** | Develop and commit only on local `main`; never create or use another development branch. If returning to `main` risks existing work, stop and ask. PR refs and detached CI checkouts are execution contexts, not agent development branches. |
 | **iOS runtime and UI use a physical device** | Never select Simulator. XCUITest is the only autonomous native UI driver. `scripts/build_foundation_targets.sh ios` is a generic physical-device SDK compile and needs no phone; `scripts/lib/ios_platform_preflight.py check` verifies host platform support without downloading or starting a Simulator. |
 | **XCUITest owns app UI** | Native macOS and iOS UI evidence comes only from `scripts/ui_test.sh` and the checked-in XCUITest targets. Computer-use, browser, coordinate, vision, simulator, and MCP UI automation never drive Vocello or substitute for XCUITest evidence. Computer-use may assist with the development environment only. |
 | **No hidden test UI** | Tests observe genuine visible controls. Shippable targets contain no preview routes, invisible state markers, seeded UI state, or onboarding bypasses. Test-only behavior stays in test targets. |
@@ -131,18 +141,16 @@ No gate can validate optional assists; they are never prerequisites.
 | Swift design, concurrency, data, networking, security, media, accessibility, testing | `axiom-swift`, `axiom-concurrency`, `axiom-data`, `axiom-networking`, `axiom-security`, `axiom-media`, `axiom-accessibility`, `axiom-testing` |
 | Build/environment diagnosis | `axiom-build`; diagnose environment before source and never apply generic Simulator/cache-clean advice against repository policy |
 | MLX/Qwen runtime | `swift-mlx`, `swift-mlx-lm`; exact checked-in catalogs and pins still win |
-| Xcode inner loop | `axiom-xcode-mcp` plus XcodeBuildMCP: call `session_show_defaults`, select only `macos` or `ios-device`, set a physical device ID only at runtime, and never use its Simulator/UI automation routes |
-| macOS implementation/release | Applicable `build-macos-apps:*` skills for build/debug, SwiftUI/AppKit, Liquid Glass, signing, notarization, telemetry, windows, and test triage |
-| iOS SwiftUI implementation | Applicable `build-ios-apps:swiftui-*` skills; exclude simulator-centric debugger/browser workflows |
-| GitHub context, CI, reviews, publication | `github:github`, `github:gh-fix-ci`, `github:gh-address-comments`, `github:yeet`; use `gh` when the connector is unavailable |
-| Model repository/source research | Hugging Face connector and `hugging-face:hf-cli`; never infer production artifact identity from a live listing |
-| Website inspection | `browser:control-in-app-browser`; Chrome only for explicitly needed signed-in state; computer-use never drives Vocello UI |
+| Xcode inner loop | `axiom-xcode-mcp`; physical-device/macOS profiles only, see below |
+| macOS / iOS implementation | Applicable `build-macos-apps:*` / `build-ios-apps:swiftui-*` skills; no Simulator routes |
+| GitHub context | Available GitHub connector or `gh`; verify capabilities first |
+| Model source research | Hugging Face connector or `hugging-face:hf-cli`; catalog identity still wins |
+| Website inspection | Available browser tool; signed-in Chrome only when needed; never Vocello UI |
 | App Store Connect | `app-store-connect-cli`; exact IDs, paginated JSON, read-only default, explicit mutation authorization |
 | Codex instructions, hooks, skills, or settings | `openai-docs` and current official OpenAI documentation |
 | Current third-party library APIs | Context7, then primary vendor documentation |
 
-Install or connect external plugins only when the user requests one or in-scope work genuinely
-requires unavailable external data.
+External assists require user request or a genuine in-scope need; discovery must confirm availability.
 
 <!-- END OPTIONAL ASSISTS -->
 
@@ -170,11 +178,8 @@ and never schedules UI/model/release work; see
   aggregate required context remains authoritative.
 - **T3:** explicit release evidence, signing, notarization, archive, and artifact verification.
 
-Development is performed directly on `main`. Commit coherent checkpoints and push when
-deterministic verification passes. Do not create feature, experiment, throwaway, or worktree
-branches for repository development, including MLX pin work. If a task cannot be performed safely
-on `main`, stop and ask rather than changing branches. Never release implicitly because roadmap
-work landed.
+Commit coherent checkpoints on `main` and push after deterministic verification. This never
+authorizes a release. The main-only invariant also applies to experiments and MLX pin work.
 
 ### Explicit frontend acceptance
 
@@ -213,11 +218,12 @@ runs cannot resume. Source changes need new IDs. Identity, reachability, and saf
 | `Tests/VocelloiOSLogicTests/` | Host-executed platform-neutral policy assertions, also compiled in a standalone generic device-SDK bundle |
 | `config/runtime-debug-knobs.json`, `config/concurrency-safety.json` | debug and concurrency exception registries |
 | `config/support-contact.json`, `config/third-party-attribution-policy.json`, `docs/reference/content-rights-review.md` | support, offline attribution, and qualified-rights gates |
-| `config/{ios-storage-protection,app-store-connect-readiness,model-host-availability-policy}.json` | Storage, account, collision, host contracts |
+| `config/{ios-storage-protection-policy,app-store-connect-readiness-policy,model-host-availability-policy}.json` | Storage, account, collision, host contracts |
 | `config/model-management-diagnostics-schema-v1.json`, `scripts/check_ios_model_management.py` | correlated physical-iPhone model-delivery and progress diagnosis contract |
 | `config/ios-startup-reliability-{plan-schema-v1,result-schema-v1,result-schema-v2,sentinel}.json`, `scripts/ios_startup_reliability.py` | bounded physical-iPhone Built-in Voice startup plans, backward-compatible retained results, codec replay, memory/crash forensics, and exact request parity |
 | `config/runtime-refactor-contract.json`, `config/roadmap.json` | convergence and work-state authorities |
 | `config/language-bench-*.json` | language corpus and matrices |
+| `config/ios-control-audit-contract-20260904.json` | digest-pinned v2/v3 historical control-plan compatibility; never current-source acceptance |
 | `benchmarks/`, `scripts/benchmark_history.py` | privacy-safe PASS registry and generated history |
 | `scripts/ui_test.sh`, `scripts/macos_test.sh`, `scripts/ios_device.sh` | native test and diagnostic entry points |
 | `docs/reference/model-delivery.md` | download/restoration/retry diagnostics and live-proof rules |

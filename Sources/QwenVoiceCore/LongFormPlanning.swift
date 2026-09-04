@@ -588,6 +588,9 @@ public struct LongFormSegmentExecutionEvidence: Codable, Equatable, Hashable, Se
     public let qcPassed: Bool?
     public let qcRequiredFailures: [String]
     public let qcWarnings: [String]
+    /// Optional additions preserve decoding of already-published v4 manifests.
+    public let generationID: UUID?
+    public let effectiveSeed: UInt64?
 
     public init(
         index: Int,
@@ -596,7 +599,9 @@ public struct LongFormSegmentExecutionEvidence: Codable, Equatable, Hashable, Se
         audioDurationSeconds: Double? = nil,
         qcPassed: Bool? = nil,
         qcRequiredFailures: [String] = [],
-        qcWarnings: [String] = []
+        qcWarnings: [String] = [],
+        generationID: UUID? = nil,
+        effectiveSeed: UInt64? = nil
     ) {
         self.index = index
         self.segmentID = segmentID
@@ -605,6 +610,8 @@ public struct LongFormSegmentExecutionEvidence: Codable, Equatable, Hashable, Se
         self.qcPassed = qcPassed
         self.qcRequiredFailures = qcRequiredFailures
         self.qcWarnings = qcWarnings
+        self.generationID = generationID
+        self.effectiveSeed = effectiveSeed
     }
 }
 

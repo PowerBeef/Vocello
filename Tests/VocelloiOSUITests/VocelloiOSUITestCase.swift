@@ -514,7 +514,17 @@ class VocelloiOSUITestCase: XCTestCase {
         // an `.any.firstMatch` lookup.
         let searchField = app.textFields["historySearchField"].firstMatch
         XCTAssertTrue(VocelloUIWait.exists(searchField, timeout: 30))
-        XCTAssertTrue(VocelloUITextEntry.replace(in: searchField, with: query, timeout: 20))
+        // Do not send keystrokes during the tab/keyboard transition. Dismiss a
+        // Activate this actual text field, then wait for the system keyboard
+        // before one (non-retried) replacement.
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: searchField, timeout: 20))
+        XCTAssertTrue(VocelloUIWait.condition("History keyboard ready", timeout: 15) {
+            searchField.isHittable && self.app.keyboards.firstMatch.exists
+        })
+        if let current = searchField.value as? String, current != searchField.placeholderValue {
+            searchField.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: current.count))
+        }
+        searchField.typeText(query)
         XCTAssertTrue(
             VocelloUIWait.condition("History search to match the requested token", timeout: 15) {
                 (searchField.value as? String) == query

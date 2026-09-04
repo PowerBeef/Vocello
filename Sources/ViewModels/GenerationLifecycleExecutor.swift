@@ -58,7 +58,7 @@ enum GenerationLifecycleExecutor {
                 )
                 let result = try await ttsEngineStore.generate(prepared.request)
                 let generation = prepared.makeGeneration(result)
-                GenerationPersistence.persistAndAutoplay(
+                await GenerationPersistence.persistAndAutoplay(
                     generation,
                     result: result,
                     text: prepared.text,

@@ -26,6 +26,8 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 CONTRACT_PATH = ROOT / "config/ios-control-audit.json"
 SCHEMA_PATH = ROOT / "config/ios-control-audit-schema-v1.json"
 UI_TEST_PATH = ROOT / "Tests/VocelloiOSUITests/VocelloiOSControlAuditUITests.swift"
+LEGACY_CONTRACT_PATH = ROOT / "config/ios-control-audit-contract-20260904.json"
+LEGACY_CONTRACT_DIGEST = "cbaa65d7e33e708bb7bf23b7f3715d34eab4a501c840e98bb9151707d97811e5"
 LEGACY_PLAN_V1_CONTRACT_DIGESTS = {
     # August 29 physical-device campaign. Schema v1 used sequential History
     # tokens and labelled every post-sentinel row `warm`; its retained plans
@@ -155,7 +157,11 @@ def catalogs() -> dict[str, list[str]]:
 
 def interactive_sources(root: pathlib.Path = ROOT) -> dict[str, list[int]]:
     result: dict[str, list[int]] = {}
-    for path in sorted((root / "Sources/iOS").rglob("*.swift")):
+    paths = list((root / "Sources/iOS").rglob("*.swift"))
+    shared_warning = root / "Sources/SharedSupport/Views/GenerationHistoryEnqueueWarning.swift"
+    if shared_warning.exists():
+        paths.append(shared_warning)
+    for path in sorted(paths):
         lines = path.read_text(encoding="utf-8").splitlines()
         hits = [index for index, line in enumerate(lines, start=1) if INTERACTIVE_RE.search(line)]
         if hits:
@@ -215,6 +221,9 @@ def validate_contract(contract: dict[str, Any], root: pathlib.Path = ROOT) -> di
     source_text = "\n".join(
         path.read_text(encoding="utf-8") for path in sorted((root / "Sources/iOS").rglob("*.swift"))
     )
+    shared_warning = root / "Sources/SharedSupport/Views/GenerationHistoryEnqueueWarning.swift"
+    if shared_warning.exists():
+        source_text += "\n" + shared_warning.read_text(encoding="utf-8")
     family_ids: set[str] = set()
     for family in contract.get("controlFamilies", []):
         family_id = family.get("id")
@@ -469,6 +478,15 @@ def validate_plan(contract: dict[str, Any], plan: dict[str, Any]) -> None:
     )
     if plan == expected:
         return
+    if schema_version in {2, 3} and plan.get("contractDigest") == LEGACY_CONTRACT_DIGEST:
+        # Retained evidence predating the visible enqueue warning must keep its
+        # exact script/seed identity, especially v2's contract-salted numeric
+        # suffix. This is a pinned compatibility decoder, not a resume waiver.
+        legacy = load_json(LEGACY_CONTRACT_PATH)
+        if digest(legacy) != LEGACY_CONTRACT_DIGEST:
+            raise AuditError("historical control-audit contract digest mismatch")
+        if plan == generate_plan(legacy, source_identity, schema_version=schema_version):
+            return
     if (
         schema_version == 1
         and plan.get("contractDigest") in LEGACY_PLAN_V1_CONTRACT_DIGESTS
@@ -585,15 +603,71 @@ def collect_observations(
         raise AuditError("xcresult contains no control-observations attachment")
     if not rows:
         raise AuditError("control-observations attachment contains no rows")
+    if len({row.get("runID") for row in rows}) != 1:
+        raise AuditError("cross-run attachment collection rejected")
+    rows = ordered_observations(rows)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(
+    temporary = output_path.with_name(f".{output_path.name}.next")
+    temporary.write_text(
         "".join(
             json.dumps(row, sort_keys=True, separators=(",", ":"), ensure_ascii=False) + "\n"
             for row in rows
         ),
         encoding="utf-8",
     )
+    temporary.replace(output_path)
     return rows
+
+
+def ordered_observations(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """v1 is immutable legacy; v2 is an immediate, gap-checked stage stream."""
+    if not rows or all(row.get("schemaVersion") == 1 for row in rows):
+        return rows
+    if any(row.get("schemaVersion") != 2 for row in rows):
+        raise AuditError("mixed observation schemas rejected")
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    for row in rows:
+        if not isinstance(row.get("runID"), str) or not row["runID"]:
+            raise AuditError("observation stream lacks run identity")
+        sequence = row.get("sequence")
+        if type(sequence) is not int or sequence < 1:
+            raise AuditError("observation stream lacks a positive sequence")
+        phase = row.get("phase")
+        if phase not in {"request-prepared", "player-visible", "terminal", "restored"}:
+            raise AuditError("unknown observation phase")
+        if phase != "terminal" and row.get("classification") != "IN_PROGRESS":
+            raise AuditError("nonterminal observation cannot claim a verdict")
+        grouped.setdefault(row["runID"], []).append(row)
+    ordered = []
+    for run_rows in grouped.values():
+        run_rows.sort(key=lambda row: row["sequence"])
+        if [row["sequence"] for row in run_rows] != list(range(1, len(run_rows) + 1)):
+            raise AuditError("duplicate or gapped observation sequence")
+        if len({row.get("sourceIdentity") for row in run_rows}) != 1:
+            raise AuditError("cross-source observation stream")
+        if any(row["phase"] == "restored" for row in run_rows[:-1]):
+            raise AuditError("observation appended after restoration boundary")
+        ordered.extend(run_rows)
+    return ordered
+
+
+def is_terminal_observation(row: dict[str, Any]) -> bool:
+    version = row.get("schemaVersion", 1)
+    if version not in {1, 2}:
+        raise AuditError("unsupported observation schema")
+    return version == 1 or row.get("phase") == "terminal"
+
+
+def generation_shard(metadata: dict[str, Any], plan: dict[str, Any]) -> tuple[int, int] | None:
+    if metadata.get("controlObservationSchemaVersion") != 2:
+        return None
+    if metadata.get("controlAuditScenario") not in {"generation", "all"}:
+        return None
+    start, limit = metadata.get("controlTakeStart"), metadata.get("controlTakeLimit")
+    count = len(plan["takes"])
+    if type(start) is not int or type(limit) is not int or not 0 <= start < count or not 1 <= limit <= count:
+        raise AuditError("invalid generation shard bounds")
+    return start, min(start + limit, count)
 
 
 def compose(
@@ -669,11 +743,23 @@ def compose(
     accepted_run_ids.update(resume_run_ids)
 
     by_control: dict[str, list[dict[str, Any]]] = {}
-    for row in observations:
+    stages = []
+    shard = generation_shard(run_metadata, plan)
+    future_ids = {f"generation:{take['takeID']}" for take in plan["takes"][shard[1]:]} if shard else set()
+    scheduled_ids = {f"generation:{take['takeID']}" for take in plan["takes"][shard[0]:shard[1]]} if shard else set()
+    for row in ordered_observations(observations):
         if row.get("runID") not in accepted_run_ids:
             raise AuditError("cross-run observation rejected")
         if row.get("sourceIdentity") != source_identity:
             raise AuditError("cross-source observation rejected")
+        if shard and row.get("controlID", "").startswith("generation:"):
+            if row["controlID"] in future_ids or (row["runID"] == run_id and row["controlID"] not in scheduled_ids):
+                raise AuditError("observation outside the declared generation shard")
+        if not is_terminal_observation(row):
+            if row.get("controlID") not in expected_control_ids | {"audit-restoration"}:
+                raise AuditError("stage refers to an unknown control")
+            stages.append(row)
+            continue
         status = row.get("classification")
         if status not in TERMINAL:
             raise AuditError(f"invalid observation classification {status!r}")
@@ -683,6 +769,8 @@ def compose(
             by_control.setdefault(control_id, []).append(row)
     composed_rows: list[dict[str, Any]] = []
     for control in inventory:
+        if control["controlID"] in future_ids:
+            continue
         matches = by_control.get(control["controlID"], [])
         if control["controlID"].startswith("generation:") and len(matches) > 1:
             raise AuditError(
@@ -742,6 +830,29 @@ def compose(
         "counts": counts,
         "rows": composed_rows,
     }
+    if run_metadata.get("controlObservationSchemaVersion") == 2:
+        current_stages = [row for row in stages if row["runID"] == run_id]
+        restored = bool(current_stages and current_stages[-1]["phase"] == "restored")
+        if shard is not None:
+            start, end = shard
+            current_ids = {f"generation:{row['takeID']}" for row in plan["takes"][start:end]}
+            current_ids.update(row["controlID"] for row in inventory if not row["controlID"].startswith("generation:"))
+            # Keep prior/current missing/failed rows visible. Only this explicit
+            # bounded shard can succeed; it cannot certify the other 196 takes.
+            shard_rows = [row for row in composed_rows if row["controlID"] in current_ids]
+            shard_passed = restored and all(row["classification"] == "PASS" for row in shard_rows)
+            for control_id in current_ids:
+                if not any(row.get("runID") == run_id for row in by_control.get(control_id, [])):
+                    shard_passed = False
+            summary["shard"] = {"takeStart": start, "takeEndExclusive": end, "result": "passed" if shard_passed else "failed"}
+            summary["remainingTakeCount"] = len(plan["takes"]) - end
+            summary["unscheduledTakeIDs"] = [take["takeID"] for take in plan["takes"][end:]]
+            if future_ids and summary["result"] == "passed":
+                summary["result"] = "incomplete"
+        summary["restorationObserved"] = restored
+        summary["stageObservationCount"] = len(stages)
+        if not restored:
+            summary["result"] = "failed"
     if bootstrap_classification is not None:
         summary["infrastructureFailure"] = {
             "status": bootstrap_classification["status"],
@@ -807,6 +918,8 @@ def validate_device_evidence(
     seen_generations: set[str] = set()
     seen_history: set[str] = set()
     for observation in observations:
+        if not is_terminal_observation(observation):
+            continue
         take_id = observation.get("takeID")
         generation_id = observation.get("generationID")
         if not take_id and not generation_id:
@@ -855,6 +968,21 @@ def validate_device_evidence(
         generation_id = observation["generationID"].lower()
         candidates = engine_rows.get(generation_id, [])
         issues: list[str] = []
+        if observation.get("schemaVersion") == 2:
+            selections = observation.get("observedSelections") or {}
+            for key in ("mode", "speaker", "delivery", "language", "variation"):
+                if take.get(key) is not None and selections.get(key) != take[key]:
+                    issues.append(f"visible_{key}_mismatch")
+            if take["mode"] == "clone" and not selections.get("referenceRowID"):
+                issues.append("missing_visible_reference")
+            player = observation.get("playerEvidence") or {}
+            if player.get("playingLabel") != "Pause" or player.get("pausedLabel") != "Play":
+                issues.append("missing_playback_transition")
+            if player.get("scrubPlaybackLabel") != "Play" or not all(
+                isinstance(player.get(key), str) and re.fullmatch(r"[0-9]+:[0-5][0-9]", player[key])
+                for key in ("scrubBefore", "scrubAfter")
+            ) or player.get("scrubBefore") == player.get("scrubAfter"):
+                issues.append("missing_paused_scrub_transition")
         if not candidates:
             issues.append("missing_engine_terminal")
             terminal: dict[str, Any] = {}
@@ -992,7 +1120,15 @@ def prepare_resume(
     if run.get("controlAuditScenario") != scenario:
         raise AuditError("prior and current control-audit scenarios differ")
 
-    rows = _read_jsonl(observations_path)
+    stream = ordered_observations(_read_jsonl(observations_path))
+    rows = [row for row in stream if is_terminal_observation(row)]
+    if run.get("controlObservationSchemaVersion") == 2:
+        current_stages = [row for row in stream if row.get("runID") == run["runID"] and not is_terminal_observation(row)]
+        if not current_stages or current_stages[-1].get("phase") != "restored":
+            raise AuditError("resume requires collected restoration evidence")
+        terminal_takes = {row.get("takeID") for row in rows}
+        if any(row.get("takeID") and row["takeID"] not in terminal_takes for row in current_stages):
+            raise AuditError("in-flight stage has no terminal observation; manual forensic reconciliation required")
     if current.get("schemaVersion", 1) >= 3:
         validate_plan(load_contract(), current)
         validate_plan(load_contract(), prior)
@@ -1110,7 +1246,11 @@ def prepare_resume(
             in {"PRODUCT_FAIL", "HARNESS_FAIL", "INFRASTRUCTURE_FAIL"}
             for row in rows
         ) if start > 0 else False
-        if not represented_failure:
+        shard = generation_shard(run, current)
+        at_shard_boundary = shard is not None and start == shard[1]
+        if not represented_failure and not at_shard_boundary:
+            if run.get("controlObservationSchemaVersion") == 2:
+                raise AuditError("failed shard has no safe terminal boundary")
             newly_skipped = generation_ids[start]
             skipped_ids.add(newly_skipped)
             start += 1
@@ -1237,7 +1377,7 @@ def main() -> int:
             )
             atomic_write_json(arguments.output, summary)
             print(arguments.output)
-            return 0 if summary["result"] in {"passed", "completed-with-limitations"} else 1
+            return 0 if summary.get("shard", {}).get("result", summary["result"]) in {"passed", "completed-with-limitations"} else 1
         if arguments.command == "validate-device":
             report = validate_device_evidence(
                 contract,

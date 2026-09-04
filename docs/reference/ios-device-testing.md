@@ -92,7 +92,7 @@ scripts/ui_test.sh ios control-audit --scenario inventory --retain-result
 scripts/ui_test.sh ios control-audit --scenario stateful --retain-result
 scripts/ui_test.sh ios control-audit --scenario external --retain-result
 scripts/ui_test.sh ios control-audit --scenario accessibility --retain-result
-scripts/ui_test.sh ios control-audit --scenario generation --retain-result
+scripts/ui_test.sh ios control-audit --scenario generation --take-limit 5 --retain-result
 scripts/ui_test.sh ios control-audit --scenario all --retain-result
 scripts/ui_test.sh ios control-audit --scenario all --resume RUN_ID --retain-result
 
@@ -153,6 +153,23 @@ terminal outcomes, remaining rows, and the next valid command in the roadmap and
 checkpoint; then confirm each pin reports `explicitly-pinned` in a cleanup dry-run. Remove pins only
 when the evidence set is explicitly retired.
 
+The RF-07 runner defaults generation/all to **five takes per invocation**; `--take-limit 1..201`
+sets an explicit bounded shard and `--resume` selects its source-bound start. The immutable plan
+still contains all 201 rows. The summary separates `shard.result` from the campaign `result`, lists
+`unscheduledTakeIDs`/`remainingTakeCount`, and preserves prior failures. A passing shard is never a
+passing campaign; missing observations *inside* the scheduled range remain failures.
+
+Observation schema v2 flushes each request-prepared, player-visible, terminal, and final-restoration
+event immediately as a retained XCTest attachment, with a run-local contiguous sequence. Collection
+rejects missing/corrupt bytes, mixed runs, duplicate/gapped sequences, and does not replace existing
+output on failure. Nonterminal stages retain early identity but cannot manufacture a terminal PASS.
+Legacy plan fields in each row describe the expectation; `observedSelections` separately records
+selected UI IDs. `playerEvidence` requires Play/Pause transitions and a changed scrub position while
+paused, so missing controls or natural playback advance cannot qualify as successful scrubbing.
+History text entry waits for the real field and keyboard before one replacement, then verifies its
+value. No automatic test/generation retry is added. These source repairs require a physical pilot.
+Runner PASS is written only after required-step finalization; failure exits also finalize the ledger.
+
 For a time-limited phone window, set the stop deadline before launching a lane and reserve time
 for its diagnostics and teardown. Do not launch work that cannot fit the remaining window.
 Finish device collection and confirm test-owned app termination before releasing the phone;
@@ -169,11 +186,15 @@ rerun with a new ID. Never relabel the retained bundle or cite its test count as
 
 Generation resume state is schema-versioned and fail-closed. A failed take that already emitted a
 terminal `PRODUCT_FAIL`, `HARNESS_FAIL`, or `INFRASTRUCTURE_FAIL` observation remains represented,
-and the next run starts at the immediately following unattempted row. If the process failed without
+and the next run starts at the immediately following unattempted row. In legacy observation streams, if the process failed without
 a terminal observation for its in-flight row, that row is recorded as `SKIPPED_AFTER_FAILURE` and
 is not retried automatically. Version-2 state carries every such skip across multi-failure resume
 chains; version-1 retained state remains readable. A gap that is neither observed nor explicitly
 carried as a skip rejects the resume instead of silently losing matrix coverage.
+New observation-v2 runs additionally require collected restoration and a terminal observation for
+each staged take. An interrupted stage cannot be skipped by guessing: retain it for forensic
+reconciliation. A clean, fully represented shard boundary never skips the next take merely because
+later host finalization failed. Zero-observation and cross-source resumes remain forbidden.
 
 A pre-observation failure has no row-level resume boundary. Schema-v3 ownership requires one new
 persisted History row relative to the complete pre-generation census and an exact full-player

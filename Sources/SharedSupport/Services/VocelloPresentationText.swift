@@ -7,6 +7,54 @@ import Foundation
 /// gives translators stable semantic keys, context, substitutions, and plural
 /// rules before any broad translation work begins.
 enum VocelloPresentationText {
+    static var historyUnqueuedTitle: String {
+        String(localized: "vocello.history.unqueued_title",
+               defaultValue: "Audio ready — History not saved",
+               comment: "Successful synthesis with a failure to durably queue its History record; not an engine failure.")
+    }
+
+    static var historyUnqueuedDetail: String {
+        String(localized: "vocello.history.unqueued_detail",
+               defaultValue: "Audio is still available. Retry saving or export it before quitting; recovery has not been safely queued.",
+               comment: "Warning that unqueued History identity is held only in app-session memory, not crash-safe storage.")
+    }
+
+    static var retryHistorySave: String {
+        String(localized: "vocello.history.retry_save",
+               defaultValue: "Retry History Save",
+               comment: "Retries storage only, never speech generation.")
+    }
+
+    static var exportAudio: String {
+        String(localized: "vocello.history.export_audio",
+               defaultValue: "Export Audio",
+               comment: "Explicit system share/export action for finished audio.")
+    }
+
+    static var dismissPlayerDetail: String {
+        String(localized: "vocello.player.dismiss_detail",
+               defaultValue: "This closes the player without deleting the audio file. Saved takes can be replayed from History.",
+               comment: "Player dismissal does not guarantee that the take's History write succeeded.")
+    }
+
+    static var longFormSaveFailed: String {
+        String(localized: "vocello.long_form.save_failed",
+               defaultValue: "The long-form project could not be saved safely. The previous accepted project is unchanged.",
+               comment: "Long-form transaction rolled back without changing the prior accepted project.")
+    }
+
+    static var longFormRecoveryRequired: String {
+        String(localized: "vocello.long_form.recovery_required",
+               defaultValue: "Long-form storage needs recovery. Open History and retry before changing this project. Its audio has been retained.",
+               comment: "An interrupted or invalid long-form transaction needs reconciliation; retained audio must not be deleted.")
+    }
+
+    static var longFormSegmentGenerated: String {
+        String(localized: "vocello.long_form.segment_generated",
+               defaultValue: "Generated",
+               comment: "Segment audio exists, but whole-project acceptance may still be pending.")
+    }
+
     enum Status: Sendable {
         case ready
         case generationFailed

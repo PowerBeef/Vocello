@@ -22,6 +22,9 @@ final class DatabaseService: @unchecked Sendable {
     static let shared = DatabaseService()
 
     private let store: RecoverableStoreCoordinator<DatabaseQueue, HistoryPersistenceError>
+    private let longFormAcceptance = LongFormHistoryAcceptanceStore(
+        rootURL: AppPaths.appSupportDir.appendingPathComponent("history-outbox/long-form", isDirectory: true)
+    )
 
     private init() {
         let dbPath = AppPaths.appSupportDir.appendingPathComponent("history.sqlite").path
@@ -56,6 +59,10 @@ final class DatabaseService: @unchecked Sendable {
 
     // MARK: - CRUD
 
+    func acceptLongFormProject(_ input: LongFormHistoryAcceptance) async throws -> Generation {
+        try await longFormAcceptance.commit(input, using: requireQueue(for: .write))
+    }
+
     /// Synchronous variant. Kept for legacy / migration call sites that
     /// can't be moved to async (e.g. from `@MainActor` synchronous
     /// contexts during init). New off-main callers should prefer
@@ -64,6 +71,7 @@ final class DatabaseService: @unchecked Sendable {
         let dbQueue = try requireQueue(for: .write)
         do {
             try dbQueue.write { db in
+                try longFormAcceptance.reconcile(in: db)
                 try generation.save(db)
             }
         } catch {
@@ -85,6 +93,7 @@ final class DatabaseService: @unchecked Sendable {
         let dbQueue = try requireQueue(for: .write)
         do {
             return try await dbQueue.write { db in
+                try self.longFormAcceptance.reconcile(in: db)
                 if let existing = try Generation
                     .filter(Generation.Columns.audioPath == generation.audioPath)
                     .fetchOne(db) {
@@ -109,6 +118,7 @@ final class DatabaseService: @unchecked Sendable {
         let dbQueue = try requireQueue(for: .write)
         do {
             return try await dbQueue.write { db in
+                try self.longFormAcceptance.reconcile(in: db)
                 if let existing = try Generation
                     .filter(Generation.Columns.audioPath == generation.audioPath)
                     .fetchOne(db) {
@@ -132,8 +142,9 @@ final class DatabaseService: @unchecked Sendable {
     func fetchAllGenerations() throws -> [Generation] {
         let dbQueue = try requireQueue(for: .read)
         do {
-            return try dbQueue.read { db in
-                try Generation.order(Generation.Columns.createdAt.desc).fetchAll(db)
+            return try dbQueue.write { db in
+                try longFormAcceptance.reconcile(in: db)
+                return try Generation.order(Generation.Columns.createdAt.desc).fetchAll(db)
             }
         } catch {
             throw HistoryPersistenceError.classify(error, operation: .read)
@@ -144,6 +155,7 @@ final class DatabaseService: @unchecked Sendable {
         let dbQueue = try requireQueue(for: .delete)
         do {
             try dbQueue.write { db in
+                try longFormAcceptance.reconcile(in: db)
                 _ = try Generation.deleteOne(db, id: id)
             }
         } catch {
@@ -155,6 +167,7 @@ final class DatabaseService: @unchecked Sendable {
         let dbQueue = try requireQueue(for: .delete)
         do {
             try dbQueue.write { db in
+                try longFormAcceptance.reconcile(in: db)
                 _ = try Generation.deleteAll(db)
             }
         } catch {

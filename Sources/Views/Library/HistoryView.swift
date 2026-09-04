@@ -488,6 +488,9 @@ struct HistoryView: View {
     }
 
     private var recoveryMessage: String {
+        if recoverySnapshot.unqueuedCount > 0 {
+            return VocelloPresentationText.historyUnqueuedDetail
+        }
         if recoverySnapshot.issueCount > 0 {
             return "Vocello preserved the recovery record but could not verify or commit it. Retry before clearing History."
         }
@@ -509,6 +512,13 @@ private extension HistoryView {
     /// constructor still does a `FileManager.fileExists` check, but
     /// only once per appended generation — not once per existing row.
     func handleGenerationAppended(_ generation: Generation) {
+        if generation.longFormRole == "joined" {
+            // Project acceptance atomically adds segments and replaces the old
+            // joined row. An append-only update would leave stale accepted rows
+            // visible and omit the new segment children.
+            reloadHistory()
+            return
+        }
         databaseUnavailable = false
         if let existingIndex = items.firstIndex(where: { $0.generation.id == generation.id && generation.id != nil }) {
             items[existingIndex] = HistoryListItem(generation: generation)

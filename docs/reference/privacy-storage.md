@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-09-02
+reviewed: 2026-09-04
 summary: Local-first privacy and on-disk storage layout on both platforms — what lives where, what never leaves the device, and deletion semantics.
 sourceOfTruth:
   - Sources/SharedSupport
@@ -49,12 +49,23 @@ Maintained macOS subtrees and preferences:
 - `history.sqlite` stores local generation history. Database initialization, migration, read,
   write, or delete failures are typed and fail closed: the UI shows a degraded state and disables
   destructive history actions instead of presenting an unavailable database as empty.
-- `history-outbox/` durably couples each atomically published WAV to its pending History write.
+- `history-outbox/` queues published single-take audio for its pending History write when storage permits.
   The local schema-v1 JSON entry contains the generation record and is removed only after an
   idempotent SQLite commit. Startup and History entry reconcile it; the macOS recovery banner
   exposes Retry, Reveal Audio, and Export Audio without putting script or path data in telemetry.
   A separate atomic clear transaction deletes database rows before pending entries or WAVs, so a
   database failure cannot leave live History rows pointing to files clear-all already removed.
+  If the queue write itself fails, a visible app-wide warning offers Retry History Save and Export
+  Audio without interrupting playback. The exact pending record is retained only in app-session
+  memory; it is **not** crash-safe until retry creates the outbox entry. The WAV remains on disk.
+  Clear-all refuses to discard an unqueued record; no storage retry regenerates audio.
+- `history-outbox/long-form/` holds bounded, digest-checked acceptance journals (at most 64 pending
+  entries, 8 MiB each). Candidate segments and joined WAVs have unique names. Segment/assembly/joined
+  QC and manifest serialization precede the atomic manifest and transactional History update.
+  Before History reads or writes, reconciliation either confirms the database commit or restores
+  the prior manifest and removes only newly owned, unreferenced candidate audio. Accepted audio
+  is never deleted as rollback cleanup. Corrupt/unrecoverable journals remain for visible recovery;
+  their private paths and generation records never enter telemetry or tracked evidence.
 - Active macOS model-quality choices are stored in app preferences, keyed per generation mode. `DebugMode` isolates preferences to `com.qwenvoice.app.debug`; Release builds use `UserDefaults.standard`.
 
 Delete local macOS app data by quitting the app and removing the app support root or the specific
@@ -116,6 +127,9 @@ Maintained iPhone subtrees:
   macOS. The iPhone recovery banner exposes Retry and an explicit system share/export action for
   available pending audio. Clear-all is resumable and database-first; its local marker remains until
   every requested pending-entry and audio cleanup has completed.
+  The same app-session-only enqueue-failure warning and bounded `long-form/` acceptance journal
+  apply on iOS. Long-form generation continuation remains session-scoped: retained segments are
+  not a durably accepted History project until joined QC and the entire acceptance commit succeed.
 
 The iPhone app intentionally keeps shared state constrained to the App Group app-support subtree. It does not use a parallel shared-user-defaults channel for model or voice state.
 

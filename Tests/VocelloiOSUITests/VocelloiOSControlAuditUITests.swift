@@ -64,6 +64,10 @@ private struct IOSControlAuditStudioSnapshot {
 
 private struct IOSControlAuditObservation: Codable {
     let schemaVersion: Int
+    let sequence: Int
+    let phase: String
+    let observedSelections: [String: String]?
+    let playerEvidence: [String: String]?
     let runID: String
     let sourceIdentity: String
     let scenario: String
@@ -95,18 +99,20 @@ private final class IOSControlAuditRecorder {
         "root-tabs", "studio-modes", "composer", "speaker-options", "speaker-previews",
         "delivery-options", "delivery-editor", "language-options", "variation-options",
         "studio-chips", "reference-actions", "voice-enrollment", "voices-surface",
-        "saved-voice-rows", "history-surface", "history-rows", "settings-preferences",
+        "saved-voice-rows", "history-surface", "history-unqueued", "history-rows", "settings-preferences",
         "settings-links", "model-rows", "player-controls", "recording-controls",
         "attribution-controls", "onboarding-controls", "sheet-navigation",
     ]
 
     let runID: String
     let sourceIdentity: String
-    private(set) var observations: [IOSControlAuditObservation] = []
+    private var sequence = 0
+    private weak var testCase: XCTestCase?
 
-    init(runID: String, sourceIdentity: String) {
+    init(runID: String, sourceIdentity: String, testCase: XCTestCase) {
         self.runID = runID
         self.sourceIdentity = sourceIdentity
+        self.testCase = testCase
     }
 
     func record(
@@ -119,11 +125,18 @@ private final class IOSControlAuditRecorder {
         take: IOSControlAuditTake? = nil,
         generationID: String? = nil,
         observedSeed: UInt64? = nil,
-        historyOwnership: IOSControlAuditHistoryOwnership? = nil
+        historyOwnership: IOSControlAuditHistoryOwnership? = nil,
+        phase: String = "terminal",
+        observedSelections: [String: String]? = nil,
+        playerEvidence: [String: String]? = nil
     ) {
-        observations.append(
-            IOSControlAuditObservation(
-                schemaVersion: 1,
+        sequence += 1
+        let observation = IOSControlAuditObservation(
+                schemaVersion: 2,
+                sequence: sequence,
+                phase: phase,
+                observedSelections: observedSelections,
+                playerEvidence: playerEvidence,
                 runID: runID,
                 sourceIdentity: sourceIdentity,
                 scenario: scenario,
@@ -146,20 +159,20 @@ private final class IOSControlAuditRecorder {
                 historyOwnership: historyOwnership,
                 capturedAtEpochMS: Int64(Date().timeIntervalSince1970 * 1_000)
             )
-        )
-    }
-
-    func attach(to testCase: XCTestCase) {
+        // Flush each stage to XCTest immediately. Teardown may never execute
+        // after a process/device interruption; it must not own the only copy.
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
-        let lines = observations.compactMap { observation -> String? in
-            guard let data = try? encoder.encode(observation) else { return nil }
-            return String(data: data, encoding: .utf8)
+        do {
+            let data = try encoder.encode(observation)
+            let attachment = XCTAttachment(data: data + Data([10]), uniformTypeIdentifier: "public.json")
+            attachment.name = "control-observations.jsonl"
+            attachment.lifetime = .keepAlways
+            guard let testCase else { return XCTFail("Control observation owner disappeared") }
+            testCase.add(attachment)
+        } catch {
+            XCTFail("Control observation serialization failed; this run cannot qualify")
         }
-        let attachment = XCTAttachment(string: lines.joined(separator: "\n") + "\n")
-        attachment.name = "control-observations.jsonl"
-        attachment.lifetime = .keepAlways
-        testCase.add(attachment)
     }
 }
 
@@ -172,6 +185,7 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
     private let stagedImportFileName = "ICI Direct Clone Import"
     private var cloneConsentWasEnabledBeforeAudit: Bool?
     private var generationAuditVoiceName: String?
+    private var playerEvidence: [String: String] = [:]
 
     private var directImportVoiceName: String {
         generationAuditVoiceName ?? "ICA \(recorder.runID.suffix(8))"
@@ -182,8 +196,16 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
         let runID = try XCTUnwrap(environment["QVOICE_IOS_CONTROL_AUDIT_RUN_ID"])
         let sourceIdentity = try XCTUnwrap(environment["QVOICE_IOS_CONTROL_AUDIT_SOURCE_ID"])
         let scenario = try XCTUnwrap(environment["QVOICE_IOS_CONTROL_AUDIT_SCENARIO"])
-        recorder = IOSControlAuditRecorder(runID: runID, sourceIdentity: sourceIdentity)
-        defer { recorder.attach(to: self) }
+        recorder = IOSControlAuditRecorder(runID: runID, sourceIdentity: sourceIdentity, testCase: self)
+        defer {
+            if (testRun?.failureCount ?? 1) == 0 {
+                recorder.record(
+                    scenario: scenario, controlID: "audit-restoration", classification: "IN_PROGRESS",
+                    expected: "All session restoration assertions finish", actual: "Scenario and restoration returned without XCTest failure",
+                    phase: "restored"
+                )
+            }
+        }
 
         switch scenario {
         case "inventory":
@@ -295,6 +317,12 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
         leaveVoiceModels()
 
         select(tab: .history)
+        recorder.record(
+            scenario: "stateful", controlID: "history-unqueued",
+            classification: "BLOCKED_PRESERVATION_POLICY",
+            expected: "Failed durable enqueue exposes Retry and Export without claiming failed synthesis",
+            actual: "Storage faults are deterministic fixtures; this campaign does not corrupt storage or retry user-owned audio"
+        )
         let clearMenu = element("historyClearMenu")
         if clearMenu.exists && clearMenu.isHittable {
             XCTAssertTrue(VocelloUIPrimaryAction.perform(on: clearMenu, timeout: 20))
@@ -447,8 +475,11 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
         let originalStudio = captureStudioSnapshot()
         let environment = ProcessInfo.processInfo.environment
         let start = Int(environment["QVOICE_IOS_CONTROL_AUDIT_TAKE_START"] ?? "0") ?? 0
-        let limit = Int(environment["QVOICE_IOS_CONTROL_AUDIT_TAKE_LIMIT"] ?? "0") ?? 0
-        let selected = Array(plan.takes.dropFirst(start).prefix(limit > 0 ? limit : Int.max))
+        let limit = Int(environment["QVOICE_IOS_CONTROL_AUDIT_TAKE_LIMIT"] ?? "5") ?? 5
+        guard start >= 0, limit > 0, limit <= plan.takes.count else {
+            return XCTFail("Invalid bounded generation shard")
+        }
+        let selected = Array(plan.takes.dropFirst(start).prefix(limit))
         XCTAssertFalse(selected.isEmpty, "Generation audit shard must contain at least one take")
         var frozenSeeds: [String: UInt64] = [:]
         var retainedSeedCarriers: [String: IOSControlAuditSeedCarrier] = [:]
@@ -532,11 +563,13 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
 
             prepare(take: take, mode: mode)
             selectVariation(take.variation)
-            if let speaker = take.speaker { selectSpeaker(speaker) }
+            var selections = ["mode": selectedMode()?.rawValue ?? "unknown", "variation": selectedVariationID()]
+            if let speaker = take.speaker { selections["speaker"] = selectSpeaker(speaker) }
             if let delivery = take.delivery, element("studioChip_delivery").exists {
-                selectDelivery(delivery)
+                selections["delivery"] = selectDelivery(delivery)
             }
-            if element("studioChip_language").exists { selectLanguage(take.language) }
+            if element("studioChip_language").exists { selections["language"] = selectLanguage(take.language) }
+            if mode == .clone { selections["referenceRowID"] = captureCloneReferenceSelection() }
             replaceScript(with: take.script)
             if let frozenSeed {
                 XCTAssertEqual(
@@ -544,6 +577,11 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
                     "Every post-sentinel take must use the one visibly pinned seed"
                 )
             }
+            recorder.record(
+                scenario: "generation", controlID: "generation:\(take.takeID)", classification: "IN_PROGRESS",
+                expected: "Visible request is prepared before Generate", actual: "Selected production controls observed",
+                take: take, observedSeed: frozenSeed, phase: "request-prepared", observedSelections: selections
+            )
             let generationID = generateAndWaitForCompletedPlayer(
                 timeout: take.length == "long" ? 360 : 300,
                 failTestOnVisibleError: false,
@@ -556,7 +594,8 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
                         actual: visibleError,
                         evidence: "ios-generation-visible-error",
                         take: take,
-                        observedSeed: frozenSeed
+                        observedSeed: frozenSeed,
+                        observedSelections: selections
                     )
                 }
             )
@@ -564,6 +603,12 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
             // Ending this shard is the only way to preserve the failed request
             // without retrying it. `prepare-resume` advances to the next row.
             guard !generationID.isEmpty else { return }
+            recorder.record(
+                scenario: "generation", controlID: "generation:\(take.takeID)", classification: "IN_PROGRESS",
+                expected: "Completed player exposes generation identity", actual: "Identity captured before player and History navigation",
+                take: take, generationID: generationID, observedSeed: frozenSeed,
+                phase: "player-visible", observedSelections: selections
+            )
             let playerIssue = exerciseCompletedPlayer()
             dismissCompletedPlayerAndAssertGenerateReady()
             guard let afterRowIDs = historyRowCensus(expectedScript: take.script) else { return }
@@ -617,7 +662,8 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
                     take: take,
                     generationID: generationID,
                     observedSeed: observedSeed,
-                    historyOwnership: ownership
+                    historyOwnership: ownership,
+                    observedSelections: selections, playerEvidence: playerEvidence
                 )
                 return
             }
@@ -631,7 +677,8 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
                 take: take,
                 generationID: generationID,
                 observedSeed: observedSeed,
-                historyOwnership: ownership
+                historyOwnership: ownership,
+                observedSelections: selections, playerEvidence: playerEvidence
             )
         }
         recorder.record(
@@ -1124,27 +1171,42 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
         )
     }
 
-    private func selectSpeaker(_ id: String) {
+    @discardableResult
+    private func selectSpeaker(_ id: String) -> String {
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: element("studioChip_voice"), timeout: 20))
-        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: reveal("voicePickerRow_\(id)"), timeout: 20))
+        let row = reveal("voicePickerRow_\(id)")
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: row, timeout: 20))
+        XCTAssertTrue(VocelloUIWait.condition("speaker selected", timeout: 10) { row.isSelected })
+        let observed = row.isSelected ? String(row.identifier.dropFirst("voicePickerRow_".count)) : "unknown"
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: element("voicePicker_confirm"), timeout: 20))
         XCTAssertTrue(VocelloUIWait.disappears(element("voicePicker_confirm"), timeout: 20))
+        return observed
     }
 
-    private func selectDelivery(_ id: String) {
+    @discardableResult
+    private func selectDelivery(_ id: String) -> String {
         select(tab: .studio)
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: element("studioChip_delivery"), timeout: 20))
-        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: reveal("deliveryPickerPreset_\(id)"), timeout: 20))
+        let row = reveal("deliveryPickerPreset_\(id)")
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: row, timeout: 20))
+        XCTAssertTrue(VocelloUIWait.condition("delivery selected", timeout: 10) { row.isSelected })
+        let observed = row.isSelected ? String(row.identifier.dropFirst("deliveryPickerPreset_".count)) : "unknown"
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: element("deliveryPicker_confirm"), timeout: 20))
         XCTAssertTrue(VocelloUIWait.disappears(element("deliveryPicker_confirm"), timeout: 20))
+        return observed
     }
 
-    private func selectLanguage(_ id: String) {
+    @discardableResult
+    private func selectLanguage(_ id: String) -> String {
         select(tab: .studio)
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: element("studioChip_language"), timeout: 20))
-        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: reveal("languagePicker_\(id)"), timeout: 20))
+        let row = reveal("languagePicker_\(id)")
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: row, timeout: 20))
+        XCTAssertTrue(VocelloUIWait.condition("language selected", timeout: 10) { row.isSelected })
+        let observed = row.isSelected ? String(row.identifier.dropFirst("languagePicker_".count)) : "unknown"
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: element("languagePicker_confirm"), timeout: 20))
         XCTAssertTrue(VocelloUIWait.disappears(element("languagePicker_confirm"), timeout: 20))
+        return observed
     }
 
     private func selectVariation(_ id: String) {
@@ -1167,7 +1229,9 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
         select(tab: .studio)
         if value.contains("balanced") { return "balanced" }
         if value.contains("consistent") { return "consistent" }
-        return "expressive"
+        if value.contains("expressive") { return "expressive" }
+        XCTFail("Variation control did not expose a known selection")
+        return "unknown"
     }
 
     private func restoreVariation(_ id: String) {
@@ -1274,13 +1338,40 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
     }
 
     private func exerciseCompletedPlayer() -> String? {
+        playerEvidence = [:]
         let playPause = element("studio_inlinePlayer_playPause")
-        XCTAssertTrue(VocelloUIWait.exists(playPause, timeout: 20))
-        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: playPause, timeout: 20))
-        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: playPause, timeout: 20))
+        guard VocelloUIWait.exists(playPause, timeout: 20), playPause.isHittable else {
+            return "Completed player Play/Pause control is unavailable"
+        }
+        if playPause.label == "Pause" {
+            guard VocelloUIPrimaryAction.perform(on: playPause, timeout: 20),
+                  VocelloUIWait.condition("autoplay paused", timeout: 10, evaluate: { playPause.label == "Play" }) else {
+                return "Completed player could not pause autoplay"
+            }
+        }
+        guard playPause.label == "Play",
+              VocelloUIPrimaryAction.perform(on: playPause, timeout: 20),
+              VocelloUIWait.condition("playback started", timeout: 10, evaluate: { playPause.label == "Pause" }) else {
+            return "Play action did not expose active playback"
+        }
+        playerEvidence["playingLabel"] = playPause.label
+        guard VocelloUIPrimaryAction.perform(on: playPause, timeout: 20),
+              VocelloUIWait.condition("playback paused", timeout: 10, evaluate: { playPause.label == "Play" }) else {
+            return "Pause action did not expose paused playback"
+        }
+        playerEvidence["pausedLabel"] = playPause.label
         let scrubber = element("studio_inlinePlayer_scrubber")
-        if scrubber.exists && scrubber.isHittable {
+        guard scrubber.exists && scrubber.isHittable,
+              scrubber.frame.width.isFinite, scrubber.frame.width > 0,
+              scrubber.frame.height.isFinite, scrubber.frame.height > 0 else {
+            return "Completed player scrubber is missing, obscured, or has invalid geometry"
+        }
+        do {
             let priorValue = scrubber.value as? String
+            guard let priorValue, playbackSeconds(priorValue) != nil else {
+                return "Completed player scrubber has no measurable position"
+            }
+            playerEvidence["scrubBefore"] = priorValue
             // The waveform is a custom adjustable Button, not UISlider.
             // Exercise its production DragGesture through an element-anchored
             // swipe; coordinate automation and slider-only XCTest APIs are
@@ -1289,7 +1380,7 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
             // Swiping right there legitimately preserves the same accessibility
             // value, so move away from the nearest boundary first and try the
             // opposite element-anchored gesture only when needed.
-            let currentSeconds = priorValue.flatMap(playbackSeconds)
+            let currentSeconds = playbackSeconds(priorValue)
             if (currentSeconds ?? 0) > 0 {
                 scrubber.swipeLeft()
             } else {
@@ -1302,9 +1393,15 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
                     scrubber.swipeLeft()
                 }
                 guard waitForPlaybackValueChange(scrubber, from: priorValue, timeout: 10) else {
-                    return "Inline player scrubber remained at \(priorValue ?? "an unknown value") after both semantic swipe directions"
+                    return "Inline player scrubber remained at \(priorValue) after both semantic swipe directions"
                 }
             }
+            guard playPause.label == "Play", let after = scrubber.value as? String,
+                  playbackSeconds(after) != nil, after != priorValue else {
+                return "Scrub position change was not observed with playback paused"
+            }
+            playerEvidence["scrubAfter"] = after
+            playerEvidence["scrubPlaybackLabel"] = playPause.label
         }
         return nil
     }

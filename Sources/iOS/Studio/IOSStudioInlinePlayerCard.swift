@@ -185,7 +185,8 @@ struct IOSStudioPlayerCard: View {
             titleVisibility: .visible
         ) {
             Button("Dismiss", role: .destructive) {
-                // The take is already saved in History, so this only clears it from Studio.
+                // Only clears the player. Storage acceptance is reported
+                // independently; failed enqueue still has an export warning.
                 // Stop the shared player too, so dismissing doesn't leave audio playing with
                 // no visible card.
                 audioPlayer.dismiss()
@@ -194,7 +195,7 @@ struct IOSStudioPlayerCard: View {
             .accessibilityIdentifier("studio_inlinePlayer_dismissConfirm")
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Your generation is saved in History — you can replay it anytime.")
+            Text(VocelloPresentationText.dismissPlayerDetail)
         }
     }
 

@@ -67,6 +67,7 @@ struct RootView: View {
         }
         .iosAppAnimation(Theme.Motion.easeOut, value: appModel.tab)
         .iosAppAnimation(Theme.Motion.modePillSlide, value: appModel.studioMode)
+        .safeAreaInset(edge: .top, spacing: 0) { GenerationHistoryEnqueueWarning() }
         // The dock is the only persistent bottom chrome. Playback is
         // presented inline in Studio or through IOSPlayerSheet.
         .safeAreaInset(edge: .bottom, spacing: 0) {

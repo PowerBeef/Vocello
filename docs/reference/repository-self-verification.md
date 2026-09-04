@@ -61,7 +61,7 @@ T1 hook and on every push through CI. None of it needs a model, a device, or XCU
 | `documentation_contract.py` | contradiction | Doc lifecycle groups, link and anchor resolution, public-fact consistency |
 | `doc_metadata.py validate` | contradiction + drift + integrity | Per-file status, pinned bodies, derived-fact contradictions in docs, `AGENTS.md`, and `README.md` |
 | `check_surface_coverage.py` | omission | Every enforced gate and contract is named in guidance; the optional-assists section survives |
-| `roadmap.py validate` | evidence | Plans and items; every evidence reference resolved against the repository |
+| `roadmap.py validate` | evidence + contradiction | Plans and items; every evidence reference resolved against the repository; an optional primary execution plan must exist and remain active |
 | `check_delivery_instructions.py` | contradiction | Delivery-copy tier parity, repeated intensifiers, direction conflicts |
 | `prepare_delivery_compact_model_config.py --validate-only` | omission + integrity | Experimental local evaluator candidates, exact source/weight/runtime pins, research-only boundary, and untouched-holdout adoption gates |
 | `model_catalog_contract.py` | integrity | Catalog reproducibility and completeness |

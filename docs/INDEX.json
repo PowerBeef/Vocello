@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "generated": "python3 scripts/doc_metadata.py rebuild-index",
   "note": "Machine-readable documentation map. Query this instead of globbing docs/.",
-  "annotatedDocuments": 101,
+  "annotatedDocuments": 102,
   "unannotatedDocuments": 0,
   "documents": [
     {
@@ -816,6 +816,18 @@
         "Sources/QwenVoiceCore/EmotionPreset.swift",
         "scripts/delivery_experiment.py",
         "scripts/delivery_experiment_runner.py"
+      ]
+    },
+    {
+      "path": "docs/reference/release-first-execution-2026-09.md",
+      "status": "active",
+      "owner": "release-qa",
+      "summary": "Finite release-first execution order for iOS, macOS, and the downloadable CLI; maps the September audit to existing defect authorities.",
+      "sourceOfTruth": [
+        "config/roadmap.json",
+        "config/quality-promotion-contract.json",
+        "config/release-evidence-contract.json",
+        "project.yml"
       ]
     },
     {

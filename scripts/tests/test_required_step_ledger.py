@@ -104,6 +104,7 @@ class RequiredStepLedgerTests(unittest.TestCase):
                 "control-plan-encoding",
                 "crash-baseline",
                 "xcuitest",
+                "control-observation-collection",
                 "control-audit-composition",
                 "crash-delta",
             ],

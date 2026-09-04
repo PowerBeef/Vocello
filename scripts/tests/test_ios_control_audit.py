@@ -5,6 +5,7 @@ import base64
 import importlib.util
 import json
 import pathlib
+import subprocess
 import tempfile
 import unittest
 from unittest import mock
@@ -345,12 +346,37 @@ class IOSControlAuditContractTests(unittest.TestCase):
             audit.validate_plan(self.contract, historical)
 
     def test_original_numeric_dropout_is_preserved_as_exact_v2_regression(self) -> None:
-        plan = audit.generate_plan(self.contract, "5a978f32c2bd62725784ab954ad903cd2fe1f0e84de28519c8b6ddaf34952397", schema_version=2)
+        legacy = audit.load_json(audit.LEGACY_CONTRACT_PATH)
+        self.assertEqual(audit.digest(legacy), audit.LEGACY_CONTRACT_DIGEST)
+        plan = audit.generate_plan(legacy, "5a978f32c2bd62725784ab954ad903cd2fe1f0e84de28519c8b6ddaf34952397", schema_version=2)
         audit.validate_plan(self.contract, plan)
         self.assertEqual(plan["planDigest"], "668187234e95f732fdfe32c12605bdeb16d765e64400ec7dcb13f58471f9645e")
         row = next(row for row in plan["takes"] if row["takeID"] == "custom-005")
         self.assertEqual(row["scriptDigest"], "9b1afb9406b135f61cf312fa27314db98185a636cbfb3bba4673571b3cdbfa56")
         self.assertEqual(row["rowDigest"], "e611c724cd2bd83fde037627ac89d6e364ef1fd485c6b3146afaabb85b44f337")
+
+    def test_retained_v2_v3_contract_cannot_authorize_rehashed_substitutions(self) -> None:
+        legacy = audit.load_json(audit.LEGACY_CONTRACT_PATH)
+        for version in (2, 3):
+            plan = audit.generate_plan(legacy, "a" * 64, schema_version=version)
+            audit.validate_plan(self.contract, plan)
+            plan["takes"][0]["script"] += " altered"
+            row = plan["takes"][0]
+            row["scriptDigest"] = audit.hashlib.sha256(row["script"].encode()).hexdigest()
+            row["rowDigest"] = audit.digest({k: v for k, v in row.items() if k != "rowDigest"})
+            plan["planDigest"] = audit.digest({k: v for k, v in plan.items() if k != "planDigest"})
+            with self.assertRaisesRegex(audit.AuditError, "deterministic source-bound plan"):
+                audit.validate_plan(self.contract, plan)
+
+    def test_historical_contract_corruption_fails_closed(self) -> None:
+        legacy = audit.load_json(audit.LEGACY_CONTRACT_PATH)
+        plan = audit.generate_plan(legacy, "a" * 64, schema_version=2)
+        original_load = audit.load_json
+        with mock.patch.object(audit, "load_json", side_effect=lambda path: (
+            {**legacy, "tampered": True} if path == audit.LEGACY_CONTRACT_PATH else original_load(path)
+        )):
+            with self.assertRaisesRegex(audit.AuditError, "historical.*digest mismatch"):
+                audit.validate_plan(self.contract, plan)
 
     def test_v3_source_changes_never_change_spoken_corpus(self) -> None:
         first = audit.generate_plan(self.contract, "a" * 64)
@@ -793,6 +819,136 @@ class IOSControlAuditCompositionTests(unittest.TestCase):
         )
 
 
+class IOSControlAuditIncrementalEvidenceTests(unittest.TestCase):
+    setUp = IOSControlAuditCompositionTests.setUp
+    observation = IOSControlAuditCompositionTests.observation
+    def event(self, index: int, control: str, phase: str = "terminal", **fields) -> dict:
+        return dict(self.observation(control), schemaVersion=2, sequence=index, phase=phase,
+                    classification="PASS" if phase == "terminal" else "IN_PROGRESS", **fields)
+
+    def shard_metadata(self) -> dict:
+        return dict(self.metadata, controlAuditScenario="generation", controlObservationSchemaVersion=2,
+                    controlTakeStart=0, controlTakeLimit=1)
+
+    def completed_shard(self) -> list[dict]:
+        take = self.plan["takes"][0]
+        return [
+            self.event(1, f"generation:{take['takeID']}", "request-prepared", takeID=take["takeID"]),
+            self.event(2, f"generation:{take['takeID']}", "player-visible", takeID=take["takeID"]),
+            self.event(3, f"generation:{take['takeID']}", takeID=take["takeID"]),
+            self.event(4, "composer"), self.event(5, "history-rows"), self.event(6, "player-controls"),
+            self.event(7, "audit-restoration", "restored"),
+        ]
+
+    def test_shard_pass_is_not_full_campaign_pass(self) -> None:
+        summary = audit.compose(self.contract, self.shard_metadata(), self.plan, self.completed_shard())
+        self.assertEqual(summary["shard"]["result"], "passed")
+        self.assertEqual(summary["result"], "incomplete")
+        self.assertEqual(summary["remainingTakeCount"], len(self.plan["takes"]) - 1)
+        self.assertEqual(len(summary["rows"]), 4)
+
+    def test_restoration_missing_cannot_qualify_shard(self) -> None:
+        summary = audit.compose(self.contract, self.shard_metadata(), self.plan, self.completed_shard()[:-1])
+        self.assertEqual(summary["shard"]["result"], "failed")
+        self.assertFalse(summary["restorationObserved"])
+
+    def test_stages_cannot_replace_missing_terminal_observation(self) -> None:
+        rows = self.completed_shard()
+        rows.pop(2)
+        for i, row in enumerate(rows):
+            row["sequence"] = i + 1
+        summary = audit.compose(self.contract, self.shard_metadata(), self.plan, rows)
+        self.assertEqual(summary["shard"]["result"], "failed")
+        self.assertEqual(summary["counts"]["PASS"], 3)
+
+    def test_out_of_shard_take_rejected(self) -> None:
+        row = self.event(1, f"generation:{self.plan['takes'][1]['takeID']}")
+        with self.assertRaisesRegex(audit.AuditError, "outside"):
+            audit.compose(self.contract, self.shard_metadata(), self.plan, [row])
+
+    def test_shard_bounds_fail_closed(self) -> None:
+        for value in (0, -1, True, 202):
+            with self.subTest(value=value), self.assertRaises(audit.AuditError):
+                audit.generation_shard(dict(self.shard_metadata(), controlTakeLimit=value), self.plan)
+
+    def test_stream_is_sorted_but_gaps_duplicates_and_cross_source_are_rejected(self) -> None:
+        rows = self.completed_shard()
+        self.assertEqual(audit.ordered_observations(list(reversed(rows))), rows)
+        for bad in (rows[1:], rows + [rows[0]], [dict(rows[0], sourceIdentity="x")] + rows[1:]):
+            with self.assertRaises(audit.AuditError):
+                audit.ordered_observations(bad)
+
+    def test_partial_collection_is_atomic_and_does_not_overwrite_prior_output(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            output = root / "out.jsonl"
+            output.write_text("previous\n")
+            (root / "first.txt").write_text(json.dumps(self.event(1, "root-tabs")))
+            (root / "bad.txt").write_text("{broken")
+            manifest = root / "manifest.json"
+            manifest.write_text(json.dumps([{"attachments": [
+                {"suggestedHumanReadableName": "control-observations.jsonl", "exportedFileName": name}
+                for name in ("first.txt", "bad.txt")
+            ]}]))
+            with self.assertRaises(audit.AuditError):
+                audit.collect_observations(manifest, root, output)
+            self.assertEqual(output.read_text(), "previous\n")
+
+    def test_missing_visible_selection_and_scrub_cannot_be_engine_pass(self) -> None:
+        take = self.plan["takes"][0]
+        row = self.event(1, f"generation:{take['takeID']}", takeID=take["takeID"],
+                         generationID="00000000-0000-4000-8000-000000000001")
+        with tempfile.TemporaryDirectory() as directory:
+            report = audit.validate_device_evidence(self.contract, self.plan, [row], pathlib.Path(directory))
+        self.assertIn("visible_language_mismatch", report["rows"][0]["issues"])
+        self.assertIn("missing_paused_scrub_transition", report["rows"][0]["issues"])
+
+    def test_recorder_flushes_immediately_and_never_swallows_encoding_failure(self) -> None:
+        source = audit.UI_TEST_PATH.read_text()
+        recorder = source.split("private final class IOSControlAuditRecorder", 1)[1].split("/// Explicit physical", 1)[0]
+        self.assertIn("testCase.add(attachment)", recorder)
+        self.assertIn("XCTFail(\"Control observation serialization failed", recorder)
+        self.assertNotIn("compactMap", recorder)
+        self.assertNotIn("try?", recorder)
+        self.assertNotIn("defer { recorder.attach", source)
+
+    def test_control_run_pass_is_written_only_after_required_step_finalization(self) -> None:
+        source = (ROOT / "scripts/ui_test.sh").read_text()
+        ending = source[source.index('finished_at="$(date'):]
+        self.assertLess(ending.index('required_steps_finalize "$step_ledger"'), ending.index('write_run_metadata "$final_run_status"'))
+        self.assertIn('control_take_limit=5', source)
+        self.assertIn('TEST_RUNNER_QVOICE_IOS_CONTROL_AUDIT_TAKE_LIMIT', source)
+        self.assertGreaterEqual(source.count('required_steps_finalize "$step_ledger"'), 3)
+
+    def test_legacy_history_publisher_still_receives_pass_only_input(self) -> None:
+        source = (ROOT / "scripts/ui_test.sh").read_text()
+        block = source.split('# Preserve the existing PASS-only history publisher input', 1)[1].split(
+            'if [[ "$lane" == "benchmark" ]]; then', 1)[0]
+        for lane in ("benchmark", "perf", "control-audit", "smoke", "model-download"):
+            with self.subTest(lane=lane):
+                command = 'write_run_metadata() { printf "%s" "$1"; }; lane="$1"; finished_at=fixture;\n'
+                completed = subprocess.run(["bash", "-c", command + "#" + block, "fixture", lane],
+                                           capture_output=True, text=True, check=True)
+                self.assertEqual(completed.stdout, "passed" if lane in {"benchmark", "perf"} else "")
+
+    def test_model_diagnosis_keeps_its_distinct_terminal_status(self) -> None:
+        source = (ROOT / "scripts/ui_test.sh").read_text()
+        block = source.split('final_run_status="passed"', 1)[1].split(
+            '# Preserve the existing PASS-only history publisher input', 1)[0]
+        for lane, scenario, diagnosis, expected in (
+            ("model-download", "diagnose", "diagnosedFailure", "diagnosedFailure"),
+            ("model-download", "diagnose", "passed", "passed"),
+            ("model-download", "acceptance", "diagnosedFailure", "passed"),
+            ("control-audit", "diagnose", "diagnosedFailure", "passed"),
+        ):
+            with self.subTest(lane=lane, scenario=scenario, diagnosis=diagnosis):
+                setup = 'platform=ios; lane="$1"; model_scenario="$2"; model_diagnosis_result="$3"; final_run_status=passed;\n'
+                completed = subprocess.run(
+                    ["bash", "-c", setup + block + 'printf "%s" "$final_run_status"',
+                     "fixture", lane, scenario, diagnosis], capture_output=True, text=True, check=True)
+                self.assertEqual(completed.stdout, expected)
+
+
 class IOSControlAuditResumeTests(unittest.TestCase):
     def setUp(self) -> None:
         self.contract = audit.load_contract()
@@ -808,6 +964,7 @@ class IOSControlAuditResumeTests(unittest.TestCase):
         resume_run_ids: list[str] | None = None,
         prior_state: dict | None = None,
         correlation: dict | None = None,
+        metadata: dict | None = None,
     ) -> dict:
         run_root = root / run_id
         run_root.mkdir()
@@ -817,6 +974,7 @@ class IOSControlAuditResumeTests(unittest.TestCase):
             "treeFingerprint": self.source_identity,
             "controlAuditScenario": "generation",
         }
+        run.update(metadata or {})
         if resume_run_ids is not None:
             run["resumeRunIDs"] = resume_run_ids
         (run_root / "run.json").write_text(json.dumps(run), encoding="utf-8")
@@ -868,6 +1026,23 @@ class IOSControlAuditResumeTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             state = self._prepare(pathlib.Path(directory), rows, run_id=run_id)
         self.assertEqual(state["takeStart"], 2)
+
+    def test_new_stream_refuses_resume_without_restoration_or_terminal_stage(self) -> None:
+        run_id = "ios-xcui-control-audit-interrupted"
+        rows = [dict(self._row(run_id, 0, "PASS"), schemaVersion=2, phase="terminal", sequence=1)]
+        metadata = {"controlObservationSchemaVersion": 2, "controlTakeStart": 0, "controlTakeLimit": 1}
+        with tempfile.TemporaryDirectory() as directory, self.assertRaisesRegex(audit.AuditError, "restoration"):
+            self._prepare(pathlib.Path(directory), rows, run_id=run_id, metadata=metadata)
+
+    def test_failed_finalization_at_clean_shard_boundary_never_skips_next_take(self) -> None:
+        run_id = "ios-xcui-control-audit-clean-boundary"
+        rows = [dict(self._row(run_id, 0, "PASS"), schemaVersion=2, phase="terminal", sequence=1)]
+        rows.append(dict(rows[0], controlID="audit-restoration", classification="IN_PROGRESS", phase="restored", sequence=2))
+        metadata = {"controlObservationSchemaVersion": 2, "controlTakeStart": 0, "controlTakeLimit": 1}
+        with tempfile.TemporaryDirectory() as directory:
+            state = self._prepare(pathlib.Path(directory), rows, run_id=run_id, metadata=metadata)
+        self.assertEqual(state["takeStart"], 1)
+        self.assertIsNone(state["skippedAfterFailure"])
         self.assertEqual(state["skippedAfterFailures"], [])
 
     def test_unobserved_failed_take_is_skipped_without_retry(self) -> None:

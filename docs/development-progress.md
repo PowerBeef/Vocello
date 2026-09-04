@@ -49,6 +49,80 @@ machine-readable status record and wins over any older prose.
 
 ## Resume here (2026-09-04)
 
+**Primary roadmap: `release-first-3-0-2026-09`, RF-01 through RF-12.** It is selected by
+the `primaryPlan` field in `config/roadmap.json` and appears first in the generated roadmap and status command.
+RF-01 reconciliation and RF-03 source request-preservation proof are complete; RF-02 account/rights
+work continues in parallel. RF-04 long-form durability and RF-05 History-save visibility have source
+implementation and focused verification; their referenced defects still need corrected-candidate
+acceptance. The coherent-tree checkpoint passed. The remaining
+milestones are not complete. Existing subsystem records retain their technical closure authority;
+older active research workstreams are not the current execution queue.
+
+**Release-first implementation is now authorized.** Follow the ordered
+[release-first programme](reference/release-first-execution-2026-09.md): F-15 macOS Design request
+capture, F-16 long-form transactions, reopened F-06 enqueue recovery, bounded ICA-18 harness repair,
+and F-17 downloadable CLI packaging before candidate freeze. Existing ASR/ICA/VLR items retain
+their authority; research and broad harness/runtime redesign are deferred. No publication is
+authorized by this implementation checkpoint.
+
+**The next release is 3.0.0, not 2.5.0**, by maintainer direction on September 4. The shared
+iOS/macOS/CLI version and pending App Store record will be reconciled at candidate freeze;
+the build number remains separately collision-checked. This planning decision does not change
+the currently configured binary version or authorize an account mutation or publication.
+
+F-15 source correction now preserves the full macOS Design draft and snapshots variation before
+asynchronous startup. Production-coordinator tests and adjacent request-factory tests passed
+7/7 via `scripts/macos_test.sh core-test --only VoiceDesignCoordinatorTests,MacStudioGenerationRequestFactoryTests`;
+the same build-for-testing compiled the production app. The first build exposed a missing explicit
+Core import, corrected before the passing run. No model or phone was used. F-15 remains in-flight
+for candidate UI/engine parity; the coherent-tree checkpoint now passes.
+
+F-16 now uses one shared bounded acceptance journal on the existing GRDB writer: unique candidate
+audio, throwing manifest serialization, atomic manifest replacement, transactional project History,
+and reconciliation before History reads/writes. Failed replacement preserves accepted content;
+unchanged segment QC/seeds/identities survive, and iOS counts reused segments once. Long-form
+continuation remains session-scoped. The 60-test focused coordinator/outbox/planning/assembly/
+acceptance set passed, including pre/post-commit interruption, encoding/QC/database failure,
+cleanup refusal, corruption, identity mismatch, cancellation, and old-manifest decoding.
+
+RF-05 source work adds typed saved/queued/unable-to-queue outcomes and a visible shared Retry/Export
+warning without turning successful synthesis into an engine error. Unqueued identity is explicitly
+app-session memory, not claimed durable. Existing outbox recovery remains the database-failure path.
+The combined 66 focused Swift tests passed, and both production apps compiled; the generic iOS
+logic-test bundle also compiled. Initial enqueue fixtures incorrectly compared subsecond timestamps
+against the existing outbox's ISO-8601 storage precision; fixed-time fixtures now verify exact
+retained request identity. An earlier overlapping iOS compile caught new-source target membership
+before regeneration; the regenerated follow-up passed. The coherent checkpoint passed all 1,436
+Python tests/project inputs, generic iOS app/logic builds, and macOS core/transport/owned-runtime
+suites (`mac-test-20260904-131523`). This is not candidate proof. The original numeric-dropout v2 plan and row digests remain unchanged using
+a digest-pinned historical control contract; tampered/self-rehashed rows still fail validation. No physical
+device or model run was started. RF-06 retained-audio review now localizes custom-008's low energy
+before the WAV writer, but lacks the retained codec/WAV needed to split sampling from decoding.
+French Design's shipped long reject has three agreeing transcripts that cover only the latter
+half of a nonempty 16-second WAV; whole-file recognition completeness needs direct investigation
+before attributing its 20 missing words to synthesis. See the programme's RF-06 review. Original
+failures remain unchanged and no prompt/QC change is justified yet. Next: bounded RF-06 follow-up,
+RF-07 acceptance repairs, and RF-08 standalone CLI packaging.
+
+RF-07 now has source implementation of immediate sequenced stage attachments, explicit encoding
+failure, early player identity, separately observed selections, pause/play/scrub proof, History
+keyboard readiness, default five-take shards, and final ledgers on failed as well as successful
+exits. Shard success is separate from whole-campaign completion. Unrepresented in-flight stages
+or missing restoration stop resume instead of guessing ownership. New failure fixtures and the
+generic device-SDK XCUITest build-for-testing passed (`rf07-ui-compile.log` under foundation
+artifacts). This compile does not execute a test; physical pilot acceptance remains pending.
+No device was contacted. RF-08 standalone CLI packaging is the next independent engineering step.
+
+**Later same-source device evidence supersedes the earlier unrun checkpoint below.** The
+`065457-e2ec8911` campaign retained seven correlated passes and marker-free `custom-008`
+PRODUCT_FAIL. Successor `151935-164b4ee3` failed History keyboard focus and retained five new
+engine attempts without accepted UI observations. Those are attempted/unverified, not unattempted
+or passing; 193 generation cells remain unvalidated. Both full run IDs and the preserved boundary
+are in the programme. The failed run cannot safely resume or inherit an earlier cursor. Original
+results, Staging, and 1710 exported attachments remain pinned. No phone work is active.
+
+### Earlier September 4 source checkpoint
+
 **ICA-18 implements metadata-only History ownership.** New schema-v3 control plans keep the
 tracked corpus text unchanged; v1/v2 generation and validation remain available for immutable
 historical evidence, including the exact ICA-15 numeric regression. The test compares bounded,

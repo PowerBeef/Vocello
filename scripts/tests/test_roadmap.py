@@ -13,6 +13,7 @@ import pathlib
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -126,6 +127,20 @@ class ObligationTests(Harness):
 
 
 class IntegrityTests(Harness):
+    def test_primary_plan_must_exist(self):
+        self.assertIn("primaryPlan must reference an existing plan",
+                      self.errors_from(lambda d: d.update(primaryPlan="missing")))
+
+    def test_primary_plan_must_be_active(self):
+        def mutate(data):
+            data["primaryPlan"] = "p1"
+            data["plans"][0]["status"] = "parked"
+        self.assertIn("primaryPlan must reference an active plan", self.errors_from(mutate))
+
+    def test_primary_plan_rejects_invalid_type(self):
+        self.assertIn("primaryPlan must reference an existing plan",
+                      self.errors_from(lambda d: d.update(primaryPlan=[])))
+
     def _two_items(self, data):
         data["items"].append({"id": "A-2", "plan": "p1", "title": "second",
                               "status": "planned", "updated": "2026-08-02"})
@@ -197,6 +212,20 @@ class StalenessTests(Harness):
 
 
 class ProgressTests(unittest.TestCase):
+    def test_primary_plan_is_first_in_status_and_render_without_hiding_other_plans(self):
+        data = copy.deepcopy(MINIMAL)
+        data["plans"].append(dict(data["plans"][0], id="z-primary", title="Primary programme"))
+        data["items"].append(dict(data["items"][0], id="RF-01", plan="z-primary"))
+        data["primaryPlan"] = "z-primary"
+        with mock.patch.object(roadmap, "load", return_value=data):
+            self.assertEqual([p["id"] for p in roadmap.progress(REPO_ROOT)["plans"]],
+                             ["z-primary", "p1"])
+            rendered = roadmap.render(REPO_ROOT)
+        self.assertIn("Current execution plan: Primary programme", rendered)
+        self.assertLess(rendered.index("## Primary programme"), rendered.index("## Plan one"))
+        self.assertIn("`A-1`", rendered)
+        self.assertIn("`RF-01`", rendered)
+
     def test_the_shipped_roadmap_is_valid_and_tracks_several_plans(self):
         report = roadmap.validate(REPO_ROOT)
         self.assertTrue(report["ok"], "; ".join(report["errors"]))

@@ -3,6 +3,7 @@ import Foundation
 /// Live adapter binding the shared outbox/coordinator to each platform's
 /// app-support root and DatabaseService implementation.
 enum GenerationHistoryRecovery {
+    @MainActor static let unqueued = GenerationHistoryEnqueueState()
     static let outboxStore = GenerationHistoryOutboxStore(
         rootURL: AppPaths.appSupportDir.appendingPathComponent("history-outbox", isDirectory: true)
     )
@@ -41,18 +42,30 @@ enum GenerationHistoryRecovery {
     }
 
     static func reconcile() async -> GenerationHistoryReconciliationResult {
-        await coordinator.reconcile()
+        await unqueued.retry { try enqueue($0) }
+        let result = await coordinator.reconcile()
+        return GenerationHistoryReconciliationResult(committed: result.committed, snapshot: await snapshot())
     }
 
     static func snapshot() async -> GenerationHistoryRecoverySnapshot {
-        await coordinator.snapshot()
+        let durable = await coordinator.snapshot()
+        let unqueuedCount = await unqueued.records.count
+        let available = await unqueued.availableAudioURLs.count
+        return GenerationHistoryRecoverySnapshot(pendingCount: durable.pendingCount,
+            availableAudioCount: durable.availableAudioCount + available,
+            issueCount: durable.issueCount, clearRecoveryPending: durable.clearRecoveryPending,
+            unqueuedCount: unqueuedCount)
     }
 
     static func pendingAudioURLs() async -> [URL] {
-        await coordinator.pendingAudioURLs()
+        let durable = await coordinator.pendingAudioURLs()
+        return Array(Set(durable + (await unqueued.availableAudioURLs))).sorted { $0.path < $1.path }
     }
 
     static func clearAll(deleteAudio: Bool) async throws -> GenerationHistoryClearOutcome {
-        try await coordinator.clearAll(deleteAudio: deleteAudio)
+        // Never discard unqueued identity or silently exclude its audio from
+        // the durable clear transaction. First retry saving or export it.
+        guard await unqueued.records.isEmpty else { throw GenerationHistoryOutboxError.clearUnavailable }
+        return try await coordinator.clearAll(deleteAudio: deleteAudio)
     }
 }

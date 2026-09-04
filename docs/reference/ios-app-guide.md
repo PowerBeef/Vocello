@@ -1,7 +1,7 @@
 ---
 status: active
 owner: ios
-reviewed: 2026-09-02
+reviewed: 2026-09-04
 summary: Consolidated iPhone app map — every screen, element, and option from the user view, and how XCUITest drives each via stable identifiers on the paired physical device.
 sourceOfTruth:
   - Sources/iOS
@@ -195,10 +195,22 @@ Yesterday / Previous 7/30 Days / Earlier.
 
 Database failures are typed and fail closed. The error state does not masquerade as empty History;
 destructive actions remain disabled until `historyRetryButton` completes a successful read.
-Every atomically published take is also written to the local `history-outbox/` before its
+Published single takes are written to the local `history-outbox/`, when storage permits, before their
 idempotent SQLite commit. Startup and History entry reconcile pending rows. If attention remains,
 `historyRecovery_banner` exposes `historyRecovery_retry` and `historyRecovery_export`; clear-all
 uses a resumable database-first marker so a database failure cannot delete audio behind live rows.
+If the outbox write itself fails, the app-wide `historyUnqueued_banner` offers
+`historyUnqueued_retry` and `historyUnqueued_export` while successful audio stays playable.
+That retry identity is app-session memory, not crash-safe recovery; export before quitting if
+retry fails. Manual storage retry never regenerates audio. Clear-all refuses unqueued records.
+
+Long-form generation and segment regeneration await the shared journaled acceptance boundary.
+Unique candidate audio, segment/joined QC, and manifest serialization precede accepted History
+mutation. A failed replacement retains the previous accepted project; interrupted commits are
+reconciled before History is read or written. Progress counts unique completed segments, including
+reused ones, once. Completed segment audio is retained for in-session continuation and is not
+reported as a saved project until whole-project acceptance succeeds. Manifest v4 stays compatible;
+generation continuation is not restored across app launches.
 
 ### Settings tab — `Sources/iOS/Settings/SettingsScreen.swift`
 

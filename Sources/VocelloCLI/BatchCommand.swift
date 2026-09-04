@@ -77,23 +77,18 @@ enum BatchCommand {
         // cross-segment timbre drift; GitHub #30/#47).
         let seed = try GenerateCommand.parseSeed(args)
         let variation = try GenerateCommand.parseVariation(args)
-        var requests: [GenerationRequest] = []
-        requests.reserveCapacity(lines.count)
-        for (i, line) in lines.enumerated() {
-            let out = outDir.appendingPathComponent("\(stamp)_\(mode.rawValue)_\(String(format: "%03d", i)).wav").path
-            requests.append(GenerationRequest(
-                mode: mode, modelID: modelID, text: line, outputPath: out,
-                shouldStream: false, batchIndex: i, batchTotal: lines.count,
-                payload: payload, generationID: UUID(),
-                seed: seed, variation: variation,
-                deliveryInstructionCellID: deliveryInstructionCellID))
-        }
+        let requests = CLIBatchExecution.makeRequests(
+            lines: lines, mode: mode, modelID: modelID, outputDirectory: outDir,
+            filenamePrefix: stamp, payload: payload, seed: seed, variation: variation,
+            deliveryInstructionCellID: deliveryInstructionCellID
+        )
 
         note("loading \(modelID)…")
         note("generating \(requests.count) clip(s), one model load…")
         let wallStart = Date()
-        let outcome = await CLIBatchExecution.run(requests) { request in
-            noteVerbose("item \((request.batchIndex ?? 0) + 1)/\(requests.count)")
+        let outcome = await CLIBatchExecution.run(requests, progress: { index, total in
+            noteVerbose("item \(index + 1)/\(total)")
+        }) { request in
             return try await runtime.engine.generate(request)
         }
         let results = outcome.results

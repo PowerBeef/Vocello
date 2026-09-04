@@ -23,6 +23,7 @@ import stat
 import subprocess
 import tempfile
 import time
+import wave
 from typing import Callable
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -258,6 +259,10 @@ def _run_qualification_generation(
     except BaseException:
         _stop_qualification_process(process)
         raise
+    if len(argv) > 1 and argv[1] == "batch" and stdout:
+        # Raw command output stays beside the ignored QA audio, including partial
+        # failure rows. Never copy paths/text from this file into the safe report.
+        (cwd / "batch-result.json").write_text(stdout, encoding="utf-8")
     if process.returncode != 0:
         raise ValueError("CLI qualification generation failed")
     try:
@@ -348,6 +353,69 @@ def _qualification_workspace(report: Path | None, state: dict):
         raise
 
 
+def qualify_batch(binary: str, work: Path, runtime: Path, outputs: Path,
+                  environment: dict[str, str], generation_runner: Callable) -> dict:
+    """Two real items in ONE CLI process; keep the legacy success JSON unchanged."""
+    lines = ["The first clip checks the packaged batch command.",
+             "The second clip must complete in the same batch."]
+    source = work / "batch-input.txt"
+    source.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    destination = outputs / "batch"
+    destination.mkdir()
+    result = generation_runner([
+        binary, "batch", "--mode", "custom", "--variant", "speed",
+        "--speaker", "aiden", "--seed", "30000005", "--variation", "consistent",
+        "--file", str(source), "--out-dir", str(destination),
+        "--data-dir", str(runtime), "--json",
+    ], work, environment, 900)
+    if (result.get("mode") != "custom" or result.get("variant") != "speed"
+            or result.get("modelID") != "pro_custom_speed"
+            or type(result.get("count")) is not int or result["count"] != len(lines)
+            or "schemaVersion" in result or not isinstance(result.get("items"), list)
+            or len(result["items"]) != len(lines)):
+        raise ValueError("CLI batch qualification lacks two successful rows")
+    rows = []
+    paths: set[Path] = set()
+    for index, (item, text) in enumerate(zip(result["items"], lines, strict=True)):
+        if (not isinstance(item, dict) or type(item.get("index")) is not int
+                or item["index"] != index or item.get("text") != text
+                or item.get("finishReason") != "eos"
+                or type(item.get("durationSeconds")) not in (int, float)
+                or not math.isfinite(item["durationSeconds"]) or item["durationSeconds"] <= 0
+                or not isinstance(item.get("audioPath"), str)):
+            raise ValueError("CLI batch qualification row identity is invalid")
+        path = Path(item["audioPath"])
+        if (path.is_symlink() or not path.is_file() or path.parent.resolve() != destination.resolve()
+                or path.resolve() in paths or path.suffix != ".wav"):
+            raise ValueError("CLI batch qualification output identity is invalid")
+        paths.add(path.resolve())
+        try:
+            with wave.open(str(path), "rb") as audio:
+                rate, frames = audio.getframerate(), audio.getnframes()
+                if audio.getnchannels() != 1 or audio.getsampwidth() != 2 or rate <= 0 or frames <= 0:
+                    raise ValueError("invalid PCM shape")
+                actual = 0
+                audible = False
+                while block := audio.readframes(4096):
+                    actual += len(block)
+                    audible |= any(block)
+                if actual != frames * 2 or not audible or abs(frames / rate - item["durationSeconds"]) > 0.01:
+                    raise ValueError("invalid PCM length, silence, or duration")
+        except (wave.Error, EOFError, ValueError) as error:
+            raise ValueError("CLI batch qualification PCM integrity failed") from error
+        rows.append({"index": index, "durationSeconds": item["durationSeconds"],
+                     "audioSHA256": digest(path), "audioBytes": path.stat().st_size,
+                     "finishReason": "eos"})
+    entries = list(destination.iterdir())
+    if (len(entries) != len(paths) or any(path.is_symlink() for path in entries)
+            or {path.resolve() for path in entries} != paths):
+        raise ValueError("CLI batch qualification left unexpected output or staging")
+    return {"status": "passed", "count": len(rows), "rows": rows,
+            "requestedSeed": "30000005", "requestedStreaming": False,
+            "oneCommandInvocation": True, "pcmIntegrity": "passed",
+            "qualityEvidence": "engine-accepted; per-item QC not exposed by legacy batch JSON"}
+
+
 def qualify(
     directory: Path,
     expected: dict,
@@ -405,7 +473,7 @@ def qualify(
 
     runs: list[dict] = []
     state = {
-        "schemaVersion": 1, "status": "running", "release": payload["release"],
+        "schemaVersion": 2, "status": "running", "release": payload["release"],
         "manifestSHA256": digest(directory / MANIFEST), "runs": runs,
         "serialExecution": True, "publicationAuthority": "none",
     }
@@ -473,6 +541,10 @@ def qualify(
             if report:
                 atomic_json(report, state)
 
+        state["stage"] = "batch"
+        if report:
+            atomic_json(report, state)
+        state["batch"] = qualify_batch(binary, work, runtime, outputs, environment, generation_runner)
         state["stage"] = "cancellation"
         if report:
             atomic_json(report, state)

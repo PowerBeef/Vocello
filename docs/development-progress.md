@@ -49,7 +49,35 @@ machine-readable status record and wins over any older prose.
 
 ## Resume here (2026-09-04)
 
-**Latest action: phone-independent preservation and lifecycle amendment implemented and verified.** The September 4
+**Latest action: focused F-21 CLI batch-admission remediation.** The external follow-up on
+`78142e07` correctly identified engine-only batch fields reaching the single-take API. Extracting
+the command's actual request builder and checking all three modes against the real engine policy
+reproduced **18 failed assertions across six requests** before the correction. The builder now
+preserves ordinary request identity/text/mode/payload/seed/variation while batch position and
+progress remain CLI bookkeeping. The engine rejection guard is unchanged, with negative controls.
+
+- **10 CLIExecutionTests and 29 package tests pass.** Partial-result/cancellation behavior and
+  legacy all-success JSON remain intact. No engine, prompt, model, sampling or QC rule changed.
+- The canonical CLI builds as **3.0.0/build 24**. Its complete copied development payload passed
+  discovery/integrity checks and a real **two-item batch in one process**, using seed `30000005`
+  and existing Speed models, from a path with spaces and an unrelated working directory outside
+  the checkout. Both outputs reached EOS, retained distinct WAVs with matching finite durations
+  and valid PCM, and left no unexpected outputs/staging. No model download or personal voice was used.
+- The existing opt-in package qualifier now requires that batch and emits schema-v2 reports.
+  It retains raw failure rows privately and fails on missing, duplicated, reordered, malformed,
+  silent, truncated or leftover outputs. Legacy batch JSON lacks per-item QC receipts; this block
+  claims engine acceptance/PCM integrity, not invented strict-QC or perceptual evidence.
+- Ignored evidence: `build/artifacts/macos/tests/cli-batch-*` and
+  `build/artifacts/macos/release/cli-batch-regression-20260904/development-batch-proof.json`.
+  The development proof explicitly records dirty-tree/base-commit and diff/binary digests; it
+  cannot authorize publication or substitute for the copied **signed** candidate under RF-10.
+  F-21/RF-08/RF-10 retain the work; no parallel plan or broader harness project was added.
+
+The coherent-tree deterministic checkpoint follows this focused proof. Signed-candidate/UI
+qualification, account/rights and physical-device gates remain open. AGENTS.md needs no procedural
+change; no UI run, device access, signing, tag, account mutation or publication occurred.
+
+**Previous action: phone-independent preservation and lifecycle amendment implemented and verified.** The September 4
 [external audit disposition](reference/engineering-audit-grounding-2026-09-04.md) remains a review
 of `75ecb740`; the current working tree implements its bounded follow-ups:
 

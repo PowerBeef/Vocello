@@ -10,6 +10,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import wave
 from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -24,6 +25,24 @@ def plist_dump(info: dict) -> str:
 
 
 class CLIPackageTests(unittest.TestCase):
+    def batch_result(self, argv):
+        self.assertEqual(argv[1], "batch")
+        self.assertNotIn("--language", argv)
+        self.assertNotIn("--stream", argv)
+        self.assertEqual(argv[argv.index("--seed") + 1], "30000005")
+        lines = Path(argv[argv.index("--file") + 1]).read_text().splitlines()
+        destination = Path(argv[argv.index("--out-dir") + 1])
+        items = []
+        for index, text in enumerate(lines):
+            path = destination / f"fixture_custom_{index:03d}.wav"
+            with wave.open(str(path), "wb") as audio:
+                audio.setparams((1, 2, 24000, 0, "NONE", "not compressed"))
+                audio.writeframes(b"\x10\x00" * 24000)
+            items.append({"index": index, "text": text, "audioPath": str(path),
+                          "durationSeconds": 1.0, "finishReason": "eos"})
+        return {"mode": "custom", "variant": "speed", "modelID": "pro_custom_speed",
+                "count": len(items), "wallSeconds": 2.0, "items": items}
+
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
         self.root = Path(self.temporary.name)
@@ -203,6 +222,8 @@ class CLIPackageTests(unittest.TestCase):
 
         def generate(argv, cwd, environment, timeout):
             calls.append((list(argv), cwd, dict(environment), timeout))
+            if argv[1] == "batch":
+                return self.batch_result(argv)
             mode = argv[argv.index("--mode") + 1]
             language = argv[argv.index("--language") + 1]
             output = Path(argv[argv.index("--out") + 1])
@@ -238,6 +259,30 @@ class CLIPackageTests(unittest.TestCase):
         self.assertNotIn("--transcript", calls[2][0])
         self.assertEqual(report["runs"][0]["requestedSeed"], "30000001")
         self.assertNotIn("seed", report["runs"][0])
+        self.assertEqual(report["schemaVersion"], 2)
+        self.assertEqual(report["batch"]["count"], 2)
+        self.assertEqual(report["batch"]["pcmIntegrity"], "passed")
+        self.assertEqual([call[0][1] for call in calls], ["generate", "generate", "generate", "batch", "generate"])
+
+        def failed_batch(argv, cwd, environment, timeout):
+            if argv[1] == "batch":
+                result = self.batch_result(argv)
+                result["count"] = 1
+                return result
+            return generate(argv, cwd, environment, timeout)
+
+        retained_batch = self.root / "batch-failure.json"
+        with mock.patch.object(package, "command", return_value=""):
+            with self.assertRaisesRegex(ValueError, "two successful rows"):
+                package.qualify(self.output, self.release, model_store, reference,
+                                report=retained_batch, generation_runner=failed_batch,
+                                cancellation_runner=lambda *_: self.fail("No next process after batch failure"))
+        failed = json.loads(retained_batch.read_text())
+        self.assertEqual(failed["stage"], "batch")
+        self.assertEqual(failed["status"], "failed")
+        self.assertEqual(len(failed["runs"]), 3)
+        self.assertEqual(len(list((retained_batch.parent / failed["artifactDirectory"] / "qualification outputs/batch").glob("*.wav"))), 2)
+        self.assertNotIn(str(self.root), retained_batch.read_text())
 
         for leftover in ("final", "staging"):
             retained = self.root / f"{leftover}-failure.json"
@@ -292,6 +337,61 @@ class CLIPackageTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "overwrite"):
             package.qualify(self.output, self.release, model_store, reference, report=report,
                             generation_runner=generate)
+
+    def test_batch_qualification_rejects_missing_mismatched_and_invalid_outputs(self):
+        faults = ["count", "schema", "missing-row", "order", "text", "duplicate", "missing-file",
+                  "symlink", "outside", "nan", "duration", "finish", "pcm", "silent", "truncated", "staging"]
+        for fault in faults:
+            with self.subTest(fault=fault):
+                work = self.root / fault
+                work.mkdir()
+                def generate(argv, _cwd, _environment, _timeout):
+                    result = self.batch_result(argv)
+                    item = result["items"][1]
+                    path = Path(item["audioPath"])
+                    if fault == "count": result["count"] = 1
+                    elif fault == "schema": result["schemaVersion"] = 2
+                    elif fault == "missing-row": result["items"].pop()
+                    elif fault == "order": result["items"].reverse()
+                    elif fault == "text": item["text"] = "different input"
+                    elif fault == "duplicate": item["audioPath"] = result["items"][0]["audioPath"]
+                    elif fault == "missing-file": path.unlink()
+                    elif fault == "symlink":
+                        path.unlink()
+                        path.symlink_to(result["items"][0]["audioPath"])
+                    elif fault == "outside":
+                        outside = work / "outside.wav"
+                        path.rename(outside)
+                        item["audioPath"] = str(outside)
+                    elif fault == "nan": item["durationSeconds"] = float("nan")
+                    elif fault == "duration": item["durationSeconds"] = 2.0
+                    elif fault == "finish": item["finishReason"] = "cancelled"
+                    elif fault == "pcm": path.write_bytes(b"not a WAV")
+                    elif fault == "silent": path.write_bytes(path.read_bytes()[:44] + b"\0" * 48000)
+                    elif fault == "truncated": path.write_bytes(path.read_bytes()[:-2])
+                    elif fault == "staging": (path.parent / ".leftover.tmp.wav").write_bytes(b"owned staging")
+                    return result
+                runner = mock.Mock(side_effect=generate)
+                with self.assertRaises(ValueError):
+                    package.qualify_batch("copied/vocello", work, work, work, {}, runner)
+                self.assertEqual(runner.call_count, 1, "Never retry a failed batch")
+                self.assertTrue((work / "batch/fixture_custom_000.wav").is_file())
+
+    def test_failed_batch_subprocess_retains_raw_rows_without_exposing_them(self):
+        rows = json.dumps({"schemaVersion": 2, "items": [{"audioPath": "private/path"}]})
+        process = mock.Mock(returncode=1)
+        process.communicate.return_value = (rows, "private error")
+        with mock.patch.object(package.subprocess, "Popen", return_value=process):
+            with self.assertRaisesRegex(ValueError, "CLI qualification generation failed"):
+                package._run_qualification_generation(["vocello", "batch"], self.root, {})
+        self.assertEqual((self.root / "batch-result.json").read_text(), rows)
+
+    def test_batch_command_uses_policy_tested_production_builder(self):
+        root = Path(__file__).resolve().parents[2]
+        command = (root / "Sources/VocelloCLI/BatchCommand.swift").read_text()
+        self.assertIn("CLIBatchExecution.makeRequests(", command)
+        self.assertNotIn("GenerationRequest(", command)
+        self.assertNotIn("request.batchIndex", command)
 
     def test_cancellation_observes_unterminated_progress_line(self):
         code = "import os,signal,time; signal.signal(signal.SIGINT, lambda *_: (os.write(2,b'Cancelled; command cleanup completed.'),os._exit(130))); os.write(2,b'generating (fixture)'); time.sleep(30)"

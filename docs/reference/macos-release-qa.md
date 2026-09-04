@@ -170,7 +170,7 @@ fail closed and must be deliberately packaged and verified before release. No re
 rewrite was needed by the initial relocation proof.
 
 This deterministic smoke does not run synthesis. RF-10 additionally qualifies all three modes,
-French Design with a pinned seed, Clone, cancellation, generation-error exit status, and resource
+French Design with a pinned seed, Clone, one two-item batch in a single process, cancellation, generation-error exit status, and resource
 loading during real inference on the copied **signed candidate**. Record those results separately;
 neither a development CLI smoke nor a valid manifest closes F-17 or authorizes publication.
 Cancellation qualification requires the command's cleanup acknowledgement, exit 130, and absence
@@ -178,6 +178,11 @@ of both the cancelled destination and its UUID staging WAV. A forced exit or hos
 cannot produce PASS. Keep failed output and the partial report for investigation. Native signal
 and shared-store subprocess fixtures are deterministic prerequisites, not a substitute for this
 copied-candidate run.
+
+The schema-v2 qualifier records batch order, distinct WAV digests/durations, EOS, PCM integrity,
+and absence of unexpected output/staging. Legacy batch success JSON remains unchanged and lacks
+per-item QC receipts; do not represent the batch block as strict-QC or perceptual evidence.
+Failure retains raw batch rows alongside the ignored WAVs, never in the privacy-safe summary.
 
 ## Release notes are a release artifact (both stores, fail-closed)
 

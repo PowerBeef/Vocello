@@ -80,6 +80,11 @@ unless `--clone-transcript-file /path/to/reviewed.txt` supplies the actual refer
 the qualifier never invents one. Each row must return the exact model,
 language, output path, finite positive duration, normal EOS, RIFF/WAVE bytes, and a strict QC `pass`.
 Seed and streaming fields are explicitly **requested**, not claimed observed engine receipts.
+The schema-v2 qualification report also requires one two-item Built-in batch process at seed
+`30000005`. It verifies ordered legacy-success JSON, distinct retained WAVs, finite matching
+durations, EOS, bounded PCM integrity, and no leftover outputs/staging. Batch JSON does not expose
+per-item QC receipts: this block reports engine acceptance and PCM integrity, not an invented
+strict-QC or semantic verdict. Raw batch JSON, including failure rows, stays with the ignored audio.
 It then interrupts
 a live Built-in take only after observing generation start, requires exit 130 plus an explicit cleanup acknowledgement, rejects leftover final/staging
 output without deleting it, and verifies the public unknown-command and invalid-mode exits. The isolated runtime links
@@ -181,6 +186,11 @@ through **one loaded model** — far faster than repeated `generate` calls. Read
 omitted or `-`. Prints one output WAV path per line (or a JSON summary with `--json`). Also accepts
 `--seed` (applied to every item — re-running the batch reproduces it, and a fixed seed steadies
 cross-segment character) and `--variation`, like `generate`.
+
+Each item is an ordinary single-take engine request. Batch index, total, progress and outcome
+accounting belong to the CLI; engine-only batch fields must not be passed to `generate`.
+The command uses the same request builder exercised against the real engine support policy in
+`CLIExecutionTests`, including negative controls that retain the single-take rejection guard.
 
 Batch stops at the first failure. Its failure-only JSON is versioned (`schemaVersion: 2`) and
 contains every planned index/generation identity with `completed`, `failed`, `cancelled`, or

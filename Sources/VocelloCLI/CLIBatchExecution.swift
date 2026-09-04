@@ -5,6 +5,26 @@ import QwenVoiceCore
 /// retry, replacement seed, or implicit resume is performed.
 @MainActor
 enum CLIBatchExecution {
+    /// Batch bookkeeping belongs to the CLI. Each request uses the ordinary
+    /// single-take API; do not attach engine batch-only fields here.
+    static func makeRequests(
+        lines: [String], mode: GenerationMode, modelID: String,
+        outputDirectory: URL, filenamePrefix: String,
+        payload: GenerationRequest.Payload, seed: UInt64?, variation: Qwen3SamplingVariation?,
+        deliveryInstructionCellID: String?
+    ) -> [GenerationRequest] {
+        lines.enumerated().map { index, text in
+            let name = "\(filenamePrefix)_\(mode.rawValue)_\(String(format: "%03d", index)).wav"
+            return GenerationRequest(
+                mode: mode, modelID: modelID, text: text,
+                outputPath: outputDirectory.appendingPathComponent(name).path,
+                shouldStream: false,
+                payload: payload, generationID: UUID(), seed: seed, variation: variation,
+                deliveryInstructionCellID: deliveryInstructionCellID
+            )
+        }
+    }
+
     enum Status: String, Codable { case completed, failed, cancelled, notAttempted = "not_attempted" }
     struct Row: Encodable {
         let index: Int
@@ -24,6 +44,7 @@ enum CLIBatchExecution {
 
     static func run(
         _ requests: [GenerationRequest],
+        progress: (Int, Int) -> Void = { _, _ in },
         generate: (GenerationRequest) async throws -> GenerationResult
     ) async -> Outcome {
         var rows = requests.enumerated().map { Row(index: $0.offset, generationID: $0.element.generationID) }
@@ -31,6 +52,7 @@ enum CLIBatchExecution {
         for (index, request) in requests.enumerated() {
             do {
                 try Task.checkCancellation()
+                progress(index, requests.count)
                 let result = try await generate(request)
                 // Publication is an irreversible commit. Preserve a returned
                 // successful result even if a signal arrived immediately after.

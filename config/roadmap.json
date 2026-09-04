@@ -297,7 +297,7 @@
       "plan": "release-first-3-0-2026-09",
       "title": "Step 8 — package the downloadable optimized CLI",
       "status": "in-flight",
-      "gate": "Implement F-17 in the existing release workflow: separate optimized arm64 CLI DMG, complete libraries/resources/notices/instructions, checkout-independent discovery, signatures, notarization/stapling, checksums and source/version supply-chain identity. Copied-package tests cover paths with spaces, version/JSON, all three modes, cancellation, failure exits and resource loading. No Homebrew route, privileged installer, shell-profile edits, or second release system.",
+      "gate": "Implement F-17 in the existing release workflow: separate optimized arm64 CLI DMG, complete libraries/resources/notices/instructions, checkout-independent discovery, signatures, notarization/stapling, checksums and source/version supply-chain identity. Copied-package tests cover paths with spaces, version/JSON, all three modes, a real two-item batch, cancellation, failure exits and resource loading. The F-21 batch-admission regression must use production-built requests against the real engine policy; keep index/total outside ordinary requests. No Homebrew route, privileged installer, shell-profile edits, or second release system.",
       "sourceOfTruth": [
         "scripts/release.sh",
         "scripts/cli_package.py",
@@ -332,7 +332,7 @@
       "blockedBy": [
         "RF-09"
       ],
-      "gate": "Close F-05 with actual signed/notarized packaged-app startup/XPC evidence, verify Built-in, French Design pinned seed, Clone/enrollment, History recovery, long-form/regeneration, and applicable canonical benchmark/promotion lanes. Qualify F-17's copied CLI independently. Product defects, distribution rights, artifact verification and applicable promotion evidence must be clear before publication; an explicit maintainer publication authorization is still required. iOS-only blockers do not prevent desktop/CLI qualification or separately authorized publication. Copied CLI qualification also verifies signal-driven owned cleanup, complete partial-batch accounting, pre-existing-output preservation and app/CLI Saved Voice coexistence under F-18 through F-22; do not substitute host cleanup or source-only fixtures for artifact behavior.",
+      "gate": "Close F-05 with actual signed/notarized packaged-app startup/XPC evidence, verify Built-in, French Design pinned seed, Clone/enrollment, History recovery, long-form/regeneration, and applicable canonical benchmark/promotion lanes. Qualify F-17's copied CLI independently. Product defects, distribution rights, artifact verification and applicable promotion evidence must be clear before publication; an explicit maintainer publication authorization is still required. iOS-only blockers do not prevent desktop/CLI qualification or separately authorized publication. Copied CLI qualification also verifies one real two-item batch with ordered legacy-success JSON and retained WAVs, signal-driven owned cleanup, complete partial-batch accounting, pre-existing-output preservation and app/CLI Saved Voice coexistence under F-18 through F-22; do not substitute host cleanup or source-only fixtures for artifact behavior.",
       "sourceOfTruth": [
         "scripts/release.sh",
         "scripts/macos_test.sh",
@@ -486,15 +486,16 @@
     },
     {
       "id": "F-21",
-      "title": "P2 — report every CLI batch row after partial failure",
-      "gate": "Return a stable row identity/index and completed/failed/cancelled/not-attempted state for every planned CLI batch input, preserving successful WAVs and nonzero failure exits. Test a later-row error, cancellation, empty input and all-success compatibility; use an explicit versioned migration if output shape changes. Document or reject unsupported mode-shortcut/language/streaming options without silently promising parity. Do not add hidden retry, seed substitution or a new resume product.",
+      "title": "P1 — restore CLI batch admission and preserve partial outcomes",
+      "gate": "Build ordinary single-take requests with CLI-owned index/total bookkeeping, preserving per-item identities, text, mode, delivery and seeds. Test the production builder against the real engine support policy for every mode while retaining rejection of batch-only fields. Return stable row identities and completed/failed/cancelled/not-attempted states for every input, preserving successful WAVs and nonzero exits. Test later-row error, cancellation, empty input and legacy success compatibility. Qualify one actual two-item batch from the copied signed CLI under RF-10. Reject unsupported options explicitly; no hidden retry, seed substitution or new resume feature.",
       "sourceOfTruth": [
         "Sources/VocelloCLI/BatchCommand.swift",
+        "Sources/VocelloCLI/CLIBatchExecution.swift",
         "Sources/VocelloCLI/VocelloMain.swift",
         "Sources/QwenVoiceCore/MLXTTSEngine.swift",
         "docs/reference/cli.md"
       ],
-      "notes": "September 4 implementation preserves all-success JSON and adds failure-only schemaVersion 2 with stable indices/generation identities and completed/failed/cancelled/not_attempted rows. Completed WAVs survive later failure; later inputs are not run. Unique batch filenames prevent concurrent timestamp collisions. Unsupported batch language/stream/output options are rejected before engine bootstrap. Core fixtures cover third-row failure, missing output and cancellation; CLI compiles as 3.0.0 and help/version execute. Built-binary empty-stdin and unsupported --language/--stream/--out checks all return exit 1 before engine bootstrap. Copied-candidate behavior remains RF-10/F-17.",
+      "notes": "September 4 follow-up confirmed the external audit: batchIndex/batchTotal on ordinary generate requests rejected every mode before synthesis. A regression using the production request builder and real engine supportDecision reproduced 18 assertions across six requests. The CLI now owns batch metadata outside the requests; the engine guard is unchanged. All 10 CLIExecutionTests and 29 package tests pass, covering actual admission, identities, partial outcomes, cancellation and negative policy controls. The schema-v2 copied-package qualifier requires one two-item batch with ordered legacy JSON, distinct WAVs, EOS, finite duration/PCM integrity and no leftover outputs, retaining failure rows privately. Per-item strict-QC receipts are not invented from legacy JSON. Copied signed-candidate qualification remains RF-10/F-17; source and development-package evidence do not close that gate.",
       "plan": "engineering-review-remediation-2026-08",
       "status": "in-flight",
       "updated": "2026-09-04",

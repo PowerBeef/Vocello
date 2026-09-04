@@ -177,7 +177,7 @@
       "gate": "Under ASR-02/ASR-04/ASR-08/ASR-10/ASR-11, complete bounded read-only account, distribution-key/profile/entitlement, agreement, version, and collision checks. Reuse support and bundled attribution; consolidate provider metadata/retention, model distribution, previews, marketing audio/artwork, privacy, content rights, age rating, export, and regional decisions. Every field has evidence or a named external dependency; qualified legal/privacy decisions are recorded before closure. Authentication failures remain failures.",
       "sourceOfTruth": ["scripts/app_store_connect_readiness.py", "scripts/app_store_build_preflight.py", "docs/reference/content-rights-review.md"],
       "updated": "2026-09-04",
-      "notes": "Runs alongside engineering rather than blocking RF-03 through RF-09. The September 4 primary-profile authenticated read succeeded, but the sanitized readiness inventory is INCOMPLETE for pricing/availability and owner-only fields; the existing configured 2.4.0/build 23 collides. No account data changed. Fresh distribution/profile checks and qualified decisions remain. Next release version is 3.0.0; select its unused build number separately at freeze."
+      "notes": "Runs alongside engineering rather than blocking RF-03 through RF-09. The September 4 primary-profile authenticated read succeeded without mutation. Local Keychain inspection found usable Development, Distribution, and Developer ID identities; the exact remote App ID exposes App Groups and Increased Memory Limit; and one matching active IOS_APP_STORE profile expires in 2027. This supersedes the September 1 missing-profile observation but does not prove the profile payload or candidate entitlements. The sanitized inventory remains INCOMPLETE: pricing/availability is uninitialized or unreadable, accessibility declarations are empty, and App Privacy publication, agreements/tax/banking, DSA, regional compliance, and qualified privacy/rights decisions need owner/web review. The configured 2.4.0/build 23 collides. Next release is 3.0.0; select its unused build number at RF-09. Raw account identifiers/responses remain untracked."
     },
     {
       "id": "RF-03",
@@ -2527,8 +2527,8 @@
       "evidence": [
         "doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md"
       ],
-      "updated": "2026-09-01",
-      "notes": "P0/archive-pending. A read-only local inspection on 2026-09-01 found one usable Apple Distribution signing identity and two valid development profiles for Vocello, but zero App Store distribution profiles for the bundle and therefore zero profiles proven to carry both the required App Group and increased-memory entitlements. No archive, IPA, or release-verification record was created: release authority requires a separate exact-tag request, and profile creation/account mutation was not inferred. Cross-reference F-05 and ASR-07; the unsigned generic Release build is not substitute evidence."
+      "updated": "2026-09-04",
+      "notes": "P0/archive-pending. The September 4 read-only checkpoint found one usable local Apple Distribution identity, one active matching remote IOS_APP_STORE profile, and the exact App ID's registered App Group and Increased Memory Limit capabilities. This supersedes the September 1 zero-profile observation. The profile payload has not been downloaded/decoded and no archive, IPA, or release-verification record exists, so the emitted entitlements and signing chain remain unproven. Candidate archive/export requires RF-09 exact-source freeze and separate authorization; the unsigned generic Release build is not substitute evidence. Cross-reference F-05 and ASR-07."
     },
     {
       "id": "ASR-11",
@@ -2549,7 +2549,7 @@
         "doc:docs/reference/content-rights-review.md"
       ],
       "updated": "2026-09-04",
-      "notes": "RF-02/RF-12 schedule this dependency. The existing inventory keeps exact app resolution, paginated JSON, process-group deadlines and redacted digests/counts/state tokens; its deterministic failure/redaction fixtures pass. September 2 Keychain timeouts remain retained historical failures. The September 4 authenticated read-only inventory succeeded for app resolution and multiple account surfaces but remains INCOMPLETE: required pricing-availability and optional version-readiness reads failed, while privacy publication, agreements/financial, DSA and regional owner/web checks remain pending. The sanitized release-first-20260904-readiness.json remains untracked. No account mutation occurred. Complete the unavailable reads and field-level candidate/qualified decisions; successful authentication alone is not account readiness."
+      "notes": "RF-02/RF-12 schedule this dependency. The existing inventory keeps exact app resolution, paginated JSON, process-group deadlines and redacted digests/counts/state tokens; it now normalizes current asc snake_case state fields without exposing payload values. September 2 Keychain timeouts remain historical failures. The September 4 authenticated read-only inventory succeeded for app/version/release/localization/app-info/content-rights/age-rating/review surfaces and confirms USES_THIRD_PARTY_CONTENT. It remains INCOMPLETE: pricing/availability is uninitialized or unreadable; strict readiness for configured 2.4.0 is unavailable; accessibility declarations are empty; and App Privacy publication, agreements/financial, DSA and regional owner/web checks remain pending. Sources declare non-exempt encryption false and the API has no separate encryption-declaration resource, subject to processed-candidate confirmation. Sanitized summaries remain untracked; no account mutation occurred."
     },
     {
       "id": "ASR-12",

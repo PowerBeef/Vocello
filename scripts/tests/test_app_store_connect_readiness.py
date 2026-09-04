@@ -64,6 +64,28 @@ class AppStoreConnectReadinessTests(unittest.TestCase):
         self.assertIn("appStoreState=PREPARE_FOR_SUBMISSION", encoded)
         self.assertTrue(all("--output" in call for call in calls))
 
+    def test_safe_tokens_normalize_current_asc_snake_case_without_exposing_payload(self) -> None:
+        summary = module._summary(
+            "content-rights",
+            {
+                "content_rights_declaration": "USES_THIRD_PARTY_CONTENT",
+                "review_state": "NOT_SUBMITTED",
+                "contact_email": "private@example.invalid",
+                "id": "private-resource-id",
+            },
+        )
+
+        self.assertEqual(
+            summary["safeStateTokens"],
+            [
+                "contentRightsDeclaration=USES_THIRD_PARTY_CONTENT",
+                "reviewState=NOT_SUBMITTED",
+            ],
+        )
+        encoded = json.dumps(summary)
+        self.assertNotIn("private@example", encoded)
+        self.assertNotIn("private-resource-id", encoded)
+
     def test_required_read_failure_is_incomplete_but_optional_is_retained(self) -> None:
         def runner(arguments: list[str], _profile: str, _timeout: int) -> dict[str, object]:
             if arguments[:2] == ["apps", "list"]:

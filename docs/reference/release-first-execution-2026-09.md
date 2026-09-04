@@ -207,6 +207,21 @@ and no-generation scope are explicit; this is not Developer ID, notarization or 
 
 ## External decisions and final gates
 
+RF-02's September 4 read-only checkpoint now proves a valid Keychain profile, usable local Apple
+Development, Apple Distribution, and Developer ID identities, one active matching App Store profile,
+and registered App Group plus Increased Memory Limit capabilities for the exact iOS bundle. It also
+confirms the existing third-party-content declaration. This supersedes the September 1 observation
+that no matching App Store profile was available. It does not prove the profile payload's
+entitlements or produce an archive/IPA; those remain ASR-10/RF-12 gates.
+
+The account inventory remains incomplete: pricing/availability has no readable initialized record;
+the current 2.4.0/build 23 identity is already used; accessibility declarations are empty; and App
+Privacy publication, agreements/tax/banking, DSA trader status, and regional compliance require
+owner/web or qualified review. The iOS plist already declares non-exempt encryption false and the
+API reports no separate encryption-declaration resource, but the processed 3.0.0 candidate must still
+confirm export-compliance behavior. No account value changed during this inspection. The unused
+3.0.0 build identity is selected only at RF-09.
+
 Use the existing [content-rights review](content-rights-review.md),
 [App Store submission procedure](ios-appstore-submission.md), and
 [quality-promotion contract](quality-promotion.md). Qualified privacy/rights judgment, signing

@@ -125,6 +125,17 @@ The coherent RF-06 source checkpoint passed the full project-input gate (121 Pyt
 macOS core, transport, and owned-runtime suites (`mac-test-20260904-145600`). No physical phone or
 release operation was involved.
 
+RF-02's fresh read-only account/signing checkpoint succeeded without mutation. The local keychain
+has usable Development, Distribution, and Developer ID identities; the exact remote App ID exposes
+App Groups and Increased Memory Limit; and one matching active iOS App Store profile expires in
+2027. The profile payload and emitted candidate entitlements still require archive/IPA verification.
+The guarded inventory also confirms the existing third-party-content declaration and readable
+app/version/review/age-rating surfaces. It remains incomplete because pricing/availability is not
+initialized/readable, accessibility declarations are empty, and App Privacy publication,
+agreements/tax/banking, DSA, regional compliance, and qualified privacy/rights decisions require
+owner/web review. The configured 2.4.0/build 23 is not reusable; 3.0.0's unused build number remains
+an RF-09 freeze decision. Raw account responses and identifiers remain untracked.
+
 RF-07 now has source implementation of immediate sequenced stage attachments, explicit encoding
 failure, early player identity, separately observed selections, pause/play/scrub proof, History
 keyboard readiness, default five-take shards, and final ledgers on failed as well as successful

@@ -1,7 +1,7 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-09-01
+reviewed: 2026-09-04
 summary: Operator checklist for shipping Vocello for iPhone to TestFlight / the App Store — account prerequisites, App Store Connect privacy and compliance rows, App Review notes, and the credential-bound archive/upload steps.
 sourceOfTruth:
   - project.yml
@@ -33,15 +33,15 @@ Development certificate (no `QWENVOICE_DEVELOPMENT_TEAM` needed for local dev bu
 offline manual signing if no Apple ID is in Xcode). The development provisioning profile already carries
 `increased-memory-limit`, and that dated run passed its generation and audio-QC checks. Current performance
 and memory truth comes from the schema-v2 records in `benchmarks/HISTORY.md`, not these historical figures.
-Physical-device XCUITest can be run
-independently when explicit frontend acceptance is requested; ordinary GitHub CI and archive
-packaging are deterministic-only — see
-[`testing-runbook.md`](testing-runbook.md); and the UI
-holds with no clipping at the largest accessibility Dynamic Type size. A read-only 2026-09-01
-inspection found usable local Development and Distribution identities plus two matching development
-profiles, but no App Store profile for Vocello. **Still maintainer-only below:** create the
-**App Store** provisioning profile with `increased-memory-limit` and the App Group, then authorize
-the exact-tag archive and ASC record/metadata/upload work separately.
+Physical-device XCUITest can be run independently when explicit frontend acceptance is requested;
+ordinary GitHub CI and archive packaging are deterministic-only — see
+[`testing-runbook.md`](testing-runbook.md); and the UI holds with no clipping at the largest
+accessibility Dynamic Type size. A read-only 2026-09-04 inspection found usable local Development,
+Distribution, and Developer ID identities, one active matching App Store profile, and the exact App
+ID's registered App Group and Increased Memory Limit capabilities. The profile payload has not yet
+been downloaded and decoded, and no signed archive/IPA exists. **Still maintainer-authorized below:**
+select the unused 3.0.0 build identity at freeze, verify the profile's emitted entitlements through
+the exact archive/export, and authorize any ASC metadata change, upload, or submission separately.
 
 Before any local generic-device compile or archive, verify the selected Xcode installation:
 
@@ -60,15 +60,19 @@ download it automatically.
 - [x] **iOS Distribution certificate** installed with its private key. Read-only Keychain inspection
       found one usable Apple Distribution identity on 2026-09-01; exact archive verification remains
       required and this checkbox does not authorize signing or upload.
-- [ ] App ID `com.patricedery.vocello` has **App Groups** + **Increased Memory Limit** capabilities enabled.
+- [x] App ID `com.patricedery.vocello` has **App Groups** + **Increased Memory Limit** capabilities enabled.
       The `increased-memory-limit` capability is self-serve (no Apple review). It MUST be on the App Store
-      provisioning profile or the multi-gigabyte model load is Jetsam-killed on a signed build.
+      provisioning profile or the multi-gigabyte model load is Jetsam-killed on a signed build. The
+      exact remote App ID reported both capabilities on 2026-09-04; archive verification remains the
+      authority for what the signed candidate actually receives.
 - [ ] **App Store provisioning profile** for `com.patricedery.vocello` (Distribution → App Store), regenerated
       after enabling the capabilities so it carries `increased-memory-limit` + the App Group. The
-      2026-09-01 local inventory found zero matching App Store profiles and therefore zero profiles
-      qualified for ASR-10.
+      2026-09-04 read-only account inventory found one active matching `IOS_APP_STORE` profile with a
+      2027-07-25 expiry. Keep this row open until its payload or the exported IPA proves both required
+      entitlements and the exact signing identity; an active account record alone is insufficient.
 - [x] App record exists in App Store Connect for `com.patricedery.vocello`; exact CLI resolution on
-      2026-08-27 found iOS version 1.0 in Prepare for Submission with one `en-US` localization.
+      2026-09-04 found configured 2.4.0/build 23 state and one `en-US` localization. The next candidate
+      is 3.0.0, but its unused build number and account version are not selected until RF-09.
       Category and the rest of the live account remain part of ASR-11.
 - [x] App Store installation eligibility matches the app's runtime hardware floor before the first
       public version. The built bundle requires exactly `arm64` and Apple's
@@ -77,10 +81,14 @@ download it automatically.
 
 ## 1. Privacy + compliance (App Store Connect)
 
-Current account checkpoint (2026-08-27): the exact `en-US` Support URL and
-`USES_THIRD_PARTY_CONTENT` declaration were read back after explicit maintainer-authorized changes.
-No other metadata, build, TestFlight, or submission state was changed. ASR-11 still requires the
-complete read-only account and regional-compliance inventory.
+Current account checkpoint (2026-09-04): authentication and exact app resolution succeeded in a
+bounded read-only inventory. The exact `en-US` Support URL and `USES_THIRD_PARTY_CONTENT`
+declaration remain configured. App/version, release, localization, app-info, content-rights,
+age-rating, and review-state reads succeeded; no metadata, build, TestFlight, or submission state
+changed. Pricing/availability has no readable initialized record, strict readiness for the currently
+configured 2.4.0 version is unavailable, and App Privacy publication, agreements/tax/banking, DSA,
+and regional fields still require owner/web or qualified review. Empty accessibility and encryption
+declaration lists are observations, not completed questionnaires.
 
 The guarded inventory command is read-only, paginated where applicable, and retains only response
 digests, resource counts, and safe state tokens:
@@ -105,11 +113,20 @@ CLI process group, no account data was retained, and ASR-11 remains open.
       network request metadata during model downloads. Record the vendor retention and qualified
       privacy/legal determination, then make the App Store answers, `PrivacyInfo.xcprivacy`, policy,
       and review notes agree. Apple requires third-party partner processing in the answers.
-- [ ] **Encryption**: `ITSAppUsesNonExemptEncryption=false` is already in `Sources/iOS/Info.plist` → answer
-      "No" to non-exempt encryption (only HTTPS + CryptoKit SHA-256 for download integrity).
+- [ ] **Encryption**: `ITSAppUsesNonExemptEncryption=false` is already in `Sources/iOS/Info.plist`,
+      and the 2026-09-04 API read returned no separate encryption-declaration resource. Answer "No"
+      to non-exempt encryption (only HTTPS + CryptoKit SHA-256 for download integrity), then verify
+      that the processed 3.0.0 candidate does not request additional export-compliance information.
 - [ ] **Age rating**: complete the current App Store Connect questionnaire from actual product and
-      content-rights behavior. Do not predeclare a rating from this runbook; preserve the account result
-      as read-only evidence under ASR-11.
+      content-rights behavior. A declaration is readable and contains three answered fields, but that
+      does not establish a complete/current rating. Do not predeclare a rating from this runbook;
+      preserve the account result as read-only evidence under ASR-11.
+- [ ] **Accessibility declaration**: the 2026-09-04 API read returned no declaration. Complete it only
+      from the exact-candidate accessibility evidence; do not infer supported features from source or
+      historical device runs.
+- [ ] **Pricing and availability**: initialize and review the intended territories, price/free status,
+      preorder/release behavior, and new-territory policy. The read-only API currently returns no
+      availability record, so absence is a submission dependency rather than a passing default.
 - [ ] **Account deletion / Sign in with Apple**: N/A — there is no account and no third-party login.
 - [ ] EU DSA trader status: complete if distributing in the EU.
 - [ ] **EU AI Act Article 50**: published audio must ship with the built-in AI marking enabled

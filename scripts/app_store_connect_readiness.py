@@ -91,8 +91,23 @@ def _rows(value: dict[str, Any]) -> list[dict[str, Any]]:
 
 def _tokens(value: Any) -> list[str]:
     safe_keys = {
-        "status", "state", "platform", "appStoreState", "processingState",
-        "submissionState", "reviewState", "severity", "result", "category", "code",
+        "status": "status",
+        "state": "state",
+        "platform": "platform",
+        "appStoreState": "appStoreState",
+        "app_store_state": "appStoreState",
+        "processingState": "processingState",
+        "processing_state": "processingState",
+        "submissionState": "submissionState",
+        "submission_state": "submissionState",
+        "reviewState": "reviewState",
+        "review_state": "reviewState",
+        "contentRightsDeclaration": "contentRightsDeclaration",
+        "content_rights_declaration": "contentRightsDeclaration",
+        "severity": "severity",
+        "result": "result",
+        "category": "category",
+        "code": "code",
     }
     found: list[str] = []
 
@@ -106,7 +121,7 @@ def _tokens(value: Any) -> list[str]:
         elif key in safe_keys and isinstance(node, (str, bool, int)):
             text = str(node)
             if len(text) <= 80 and re.fullmatch(r"[A-Za-z0-9_.:-]+", text):
-                found.append(f"{key}={text}")
+                found.append(f"{safe_keys[key]}={text}")
 
     walk(value)
     return sorted(set(found))

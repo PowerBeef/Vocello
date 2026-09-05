@@ -47,6 +47,116 @@ machine-readable status record and wins over any older prose.
 | 13 — Benchmark/history v3 | Live 2026-07-29: the first schema-v3 records are committed (three clean `phase0-cli-control-*` engine records plus one exploratory run that also exposed and fixed the summarizer's v3 pin). `benchmarks/schema-v3.json` adds the typed quality identity to generation takes (pass/warning only, five fast gates required, machine-code issues); v1/v2 records stay valid immutable history; the publisher stamps v3 only when every take carries the identity. The UI benchmark checkers folded the same identity 2026-08-01: ui-generation records now publish v3 (first: the focused `v3-fold-proof` record `macos-xcui-benchmark-20260801-003208-403989cf`); the canonical iOS matrix published its first v3 record 2026-08-01 (`ios-xcui-benchmark-20260801-132415-abbec96b`). |
 | 14 — Organization and retirement | Closed 2026-07-23 (14a + 14b): compatibility SPI retired, actor-owned loading/metadata/priming/clone artifacts, clone conditioning epoch-bound end to end. |
 
+## September 5 ordered host follow-up
+
+The requested five host priorities were advanced in order. **No iPhone interaction, new synthesis,
+model download, account mutation, release tag, upload or publication occurred.** The phone's
+previously verified French three-minute Auto-Lock setting remains untouched. RF-06/08/09/10/02
+retain their independent closure gates; diagnostics and preparation are not candidate acceptance.
+
+### 1–2. Resource measurement and independent decoder
+
+The exact retained 1,347-frame French trace was decoded, not regenerated. The repeat Mac
+experiment added Apple's exact-PID physical-footprint observations to the previous RSS-only
+measurement. Peak footprint was **5.194 GiB**, versus **766 MiB RSS**; host swap grew **1.580 GiB**.
+The process exited normally after 32.75 s, but resource qualification failed. RSS alone had hidden
+most of the charged residency. The existing replay loads the full TTS model, not just the decoder;
+this measurement does not prove an allocation leak or isolate a retaining owner. Do not change
+production memory policy from this result or sum RSS and footprint.
+
+An independent CPU implementation uses the official Qwen tokenizer source at
+`022e286b98fbec7e1e916cb940cdf532cd9f488e`, the receipt's exact tokenizer weights, and the existing
+operator-local PyTorch environment. It loads only decoder parameters, strictly matches the state
+dictionary and computes float32 from the installed fp16 weights. Source/configuration/binary/weight,
+trace, take, script and output digests are retained. No new model or runtime was acquired.
+
+| Experiment | Resource outcome | Audio result |
+| --- | --- | --- |
+| Full-TTS Mac replay with footprint probes | 5.194 GiB peak footprint; swap growth; unqualified | Prior gross gap reproduced; not another generated take |
+| Official CPU decoder, default 300-frame blocks | 5.720 GiB footprint observed; explicitly terminated at the provisional ceiling; no audio | Retained failure, not a completed decode |
+| Official CPU decoder, 25-frame blocks / 25-frame left context | 2.034 GiB footprint, 2.096 GiB RSS, 42.95 s, no swap growth, before/after pressure clear and recovery qualified | 107.76 s decoded; **11.997 s interior gap starting at 6.053 s** |
+
+The independent raw float output and rounded PCM16 WAV show the same 11.997 s gap. A bounded
+one-second reader applies the production silence floor of 0.001; the original iPhone WAVs produce
+the exact existing 12.817 s / 6.074 s measurements under that reader. This is diagnostic silence
+measurement, **not a fabricated production AudioQCReport or audio PASS**. All 12 original artifacts
+remain hash-identical. Official overlapping-block decoding is independent of Swift's streaming
+implementation, but is not a whole-sequence decode. The substantial waveform/energy differences
+remain explicit; float precision, scheduling and shared tokenizer weights are not independently
+eliminated. The same codes reproduce a gross failure without iPhone UI, publication, limiter or
+Swift streaming ownership. This supports preserving rejection, not a speculative source repair
+or a claim that every sampled-output/quantization question is solved. RF-06 remains open.
+
+The separate Chinese EOS/trailing-silence and long-form token-limit cases remain at their recorded
+evidence gaps. They were not retried or conflated with this trace. Stop expanding this diagnostic
+until a specific remaining causal question justifies another experiment.
+
+The narrow supervisor correction enforces sampled RSS and optional exact-PID footprint ceilings,
+terminates/awaits its owned child on measurement failure, and labels older RSS-only reports
+distinctly. Eleven focused fixtures pass, including real child termination, missing/invalid probe
+failure, exception cleanup, ceiling equality and legacy behavior. No production synthesis or
+memory threshold changes. Existing cache identities bind the changed supervisor source.
+
+Evidence roots under ignored `build/artifacts/diagnostics/macos/`:
+`replay-resource-20260905-01`, `independent-codec-20260905-01` (failed default schedule), and
+`independent-codec-20260905-block25`. The comparison digest is
+`f8a96dcb2fbd7ef65f33baf5bebe3fecb51e7cea893ec0a8dbb05f6286d81e43`;
+the successful decode's resource-report digest is
+`082c077c360a2914e5d2ecd49c706dac2c0eb3bd084f896df952603aa627d36e`.
+These are operator diagnostics with exact artifact binding, not promotion records. No benchmark
+PASS was published. Preserve the original interrupted result as well as its host terminal summary.
+
+### 3–4. Candidate preparation and signed-package boundary
+
+The checked commit `a11cfa88` has successful `CI required`; Swift CodeQL/Security was still running
+at the recorded read. No 3.0 tag exists. The current patch needs its own deterministic checkpoint
+and exact-SHA checks before candidate freeze. The release-source validator remains fail closed.
+
+The release-notes check first failed because `docs/releases/v3.0.0.md` did not exist. Curated
+**unpublished candidate** notes now pass that check and explicitly describe delivery migration,
+preservation/import/CLI changes, outstanding audio failures and unperformed candidate acceptance.
+Stable public links remain 2.4.0; no new performance improvement is claimed. The CLI/package,
+release-source and promotion fixture selection passes **52 tests**. Existing model-free copied-CLI
+proof is retained rather than rerun as if it qualified real inference.
+
+Local Keychain inspection found one valid identity each for Apple Development, Apple Distribution
+and Developer ID Application. The retained Mac app has a Developer ID signature, but there is no
+matching command-bound release-evidence/verification bundle in that distribution directory.
+It is not the current qualified 3.0 candidate. RF-10 actual signed/notarized app/CLI smoke,
+three-mode generation, two-item batch, cancellation and packaged coexistence await the governed
+candidate. Do not generate a substitute ad-hoc package or relabel development evidence.
+
+### 5. Apple and qualified-decision packet
+
+The existing read-only `asc` 4.11.0 inventory authenticated successfully. Complete pagination
+found no collision for **3.0.0/build 24** (not a reservation), one iOS version record and **zero
+matching 3.0.0 versions**. The current localization's Support URL exactly matches the contract;
+the deployed URL returns HTTP 200 with the configured contact. Support and attribution contracts
+pass. App Store Connect still reports `USES_THIRD_PARTY_CONTENT` and no submitted review.
+The inventory remains **INCOMPLETE**: pricing/availability is unavailable, configured-version
+readiness cannot be read, and App Privacy publication, agreements/financial, DSA and regional
+checks still require owner/web evidence. This is not an authentication failure or a readiness PASS.
+
+Sanitized results are under ignored `build/artifacts/app-store/rf02-20260905-readonly/`.
+The existing [content-rights packet](reference/content-rights-review.md) now consolidates provider
+metadata/retention, privacy labels, content rights, age rating, export and regional decisions with
+owner classes and acceptance records. Qualified decisions cannot be supplied by the agent;
+ASR-02/04/08/10/11 remain authoritative. Neither existing attribution nor the truthful account
+declaration is legal clearance. No automatic metadata update or agreement acceptance occurred.
+
+Verification: the combined supervisor/account/package/source/promotion selection passed **72
+tests**. `scripts/dev.sh checkpoint` passed derived refresh/validation, the full quick project-input
+gate (1,506 Python tests across both discovery roots), the generic physical-iOS SDK app/logic
+builds and macOS deterministic tests. Native run `mac-test-20260905-091356` passed **578 core,
+19 transport and 109 runtime tests**, with two optional AudioSeal fixture tests skipped and no
+failures. The fixture-generated UI/performance reports are not new live frontend evidence.
+No phone, app UI campaign or release artifact qualification ran as part of that checkpoint.
+
+Next safe work: obtain exact-SHA security/source authority and
+explicit candidate workflow authorization, then qualify actual packages under RF-10. Keep the
+three RF-06 audio cases open at their precise boundaries. Phone-bound RF-07/11/12 remain deferred.
+AGENTS.md was reviewed; no durable workflow change is needed.
+
 ## September 5 phone-independent codec checkpoint
 
 **No phone interaction. RF-06 remains in-flight; no production synthesis, prompt, model,

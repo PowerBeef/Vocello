@@ -1,7 +1,7 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-09-04
+reviewed: 2026-09-05
 summary: The standing macOS release-QA checklist — deterministic gates, the per-candidate smoke step, release-notes and performance-surface obligations, packaging and verification.
 sourceOfTruth:
   - scripts/release.sh
@@ -200,13 +200,9 @@ communication, written for both non-technical and technical readers:
   the build's Test Details in App Store Connect at distribution time. Automating that
   through the ASC API after upload is a recorded enhancement; until it lands, the
   paste is a required step of TestFlight distribution, not an optional nicety.
-- **Standing item for the next release's notes** (recorded 2026-08-04): explain the
-  delivery-roster change. The shipped v2.4.0 notes advertise `dramatic`, `surprised`,
-  and `excited` as verified/strengthened presets; since then `excited` folded into
-  `happy`, `dramatic` was retired, and the picker now presents four distinct
-  deliveries (Neutral/Calm/Whisper/Sad) plus four directional hints with honest
-  advisory copy. The first notes that ship those app changes must say so plainly,
-  including what happens to old drafts. Remove this item in the same change.
+- The unpublished 3.0.0 notes explain the delivery-roster change and preserved raw
+  instructions. Keep that explanation when preparing the final release body; the
+  shipped v2.4.0 notes remain immutable historical copy.
 - Write dual-audience: lead each item with the user-visible change in plain language,
   then the technical grounding. The 2.2.0 notes are the reference standard; the
   v2.3.0 auto-generated stub (caught and fixed post-publication 2026-07-31) is the

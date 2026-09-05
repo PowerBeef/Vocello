@@ -102,6 +102,24 @@ def _digest(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+def _terminate_owned_process(process: subprocess.Popen) -> None:
+    """Signal this invocation's group and reap its child, including on probe failure."""
+    if process.poll() is not None:
+        return
+    try:
+        os.killpg(process.pid, signal.SIGTERM)
+    except ProcessLookupError:
+        pass
+    try:
+        process.wait(timeout=2)
+    except subprocess.TimeoutExpired:
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        process.wait()
+
+
 def run_supervised(
     command: Sequence[str], *, lock_root: Path,
     timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
@@ -110,6 +128,8 @@ def run_supervised(
     snapshotter: Callable[[], HostSnapshot] = host_snapshot,
     rss_sampler: Callable[[int], int] = _process_rss_bytes,
     recovery_timeout_seconds: float = DEFAULT_RECOVERY_TIMEOUT_SECONDS,
+    physical_footprint_sampler: Callable[[int], int | None] | None = None,
+    maximum_physical_footprint_bytes: int = PROVISIONAL_MAXIMUM_RSS_BYTES,
 ) -> SupervisedResult:
     if not command or any(not isinstance(item, str) or not item for item in command):
         raise ResourceSupervisorError("supervised command must be a non-empty string vector")
@@ -117,6 +137,8 @@ def run_supervised(
         raise ResourceSupervisorError("timeout must be positive and finite")
     if maximum_rss_bytes <= 0:
         raise ResourceSupervisorError("maximum RSS must be positive")
+    if maximum_physical_footprint_bytes <= 0:
+        raise ResourceSupervisorError("maximum physical footprint must be positive")
     if not math.isfinite(recovery_timeout_seconds) or recovery_timeout_seconds < 0:
         raise ResourceSupervisorError("recovery timeout must be finite and nonnegative")
     lock_root.mkdir(parents=True, exist_ok=True)
@@ -132,30 +154,41 @@ def run_supervised(
         started = time.monotonic()
         timed_out = False
         peak_rss = 0
+        peak_footprint = 0
+        footprint_samples = 0
+        resource_limit_terminated = False
+        resource_probe_failed = False
         with tempfile.TemporaryFile() as stdout_file, tempfile.TemporaryFile() as stderr_file:
             process = subprocess.Popen(
                 list(command), stdout=stdout_file, stderr=stderr_file,
                 env=environment, start_new_session=True,
             )
-            while process.poll() is None:
-                peak_rss = max(peak_rss, rss_sampler(process.pid))
-                if time.monotonic() - started > timeout_seconds:
-                    timed_out = True
+            try:
+                while process.poll() is None:
                     try:
-                        os.killpg(process.pid, signal.SIGTERM)
-                    except ProcessLookupError:
-                        pass
-                    try:
-                        process.wait(timeout=2)
-                    except subprocess.TimeoutExpired:
-                        try:
-                            os.killpg(process.pid, signal.SIGKILL)
-                        except ProcessLookupError:
-                            pass
-                    break
-                time.sleep(SAMPLE_INTERVAL_SECONDS)
+                        peak_rss = max(peak_rss, rss_sampler(process.pid))
+                        if physical_footprint_sampler is not None:
+                            footprint = physical_footprint_sampler(process.pid)
+                            if type(footprint) is not int or footprint <= 0:
+                                # A process may exit between the liveness check and
+                                # the probe; missing live measurements fail closed.
+                                resource_probe_failed = process.poll() is None
+                            else:
+                                footprint_samples += 1
+                                peak_footprint = max(peak_footprint, footprint)
+                    except Exception:
+                        resource_probe_failed = True
+                    resource_limit_terminated = (
+                        peak_rss > maximum_rss_bytes
+                        or peak_footprint > maximum_physical_footprint_bytes
+                    )
+                    timed_out = time.monotonic() - started > timeout_seconds
+                    if timed_out or resource_limit_terminated or resource_probe_failed:
+                        break
+                    time.sleep(SAMPLE_INTERVAL_SECONDS)
+            finally:
+                _terminate_owned_process(process)
             return_code = process.wait()
-            peak_rss = max(peak_rss, rss_sampler(process.pid))
             stdout_file.seek(0)
             stderr_file.seek(0)
             stdout = stdout_file.read()
@@ -196,6 +229,14 @@ def run_supervised(
             failures.append("peak-rss-unavailable")
         elif peak_rss > maximum_rss_bytes:
             failures.append("provisional-rss-ceiling-exceeded")
+        if physical_footprint_sampler is not None and footprint_samples == 0:
+            failures.append("physical-footprint-unavailable")
+        if peak_footprint > maximum_physical_footprint_bytes:
+            failures.append("provisional-physical-footprint-ceiling-exceeded")
+        if resource_probe_failed:
+            failures.append("resource-probe-failed")
+        if resource_limit_terminated:
+            failures.append("resource-limit-termination")
         if not pressure_clean:
             failures.append("host-pressure-not-clean")
         if not swap_clean:
@@ -210,10 +251,15 @@ def run_supervised(
             "timeoutSeconds": timeout_seconds,
             "timedOut": timed_out,
             "returnCode": return_code,
-            "cleanExit": return_code == 0 and not timed_out,
+            "cleanExit": return_code == 0 and not (timed_out or resource_limit_terminated or resource_probe_failed),
             "wallSeconds": wall_seconds,
             "peakRSSBytes": peak_rss,
             "maximumAllowedRSSBytes": maximum_rss_bytes,
+            "physicalFootprintMeasurementRequested": physical_footprint_sampler is not None,
+            "peakPhysicalFootprintBytes": peak_footprint if footprint_samples else None,
+            "physicalFootprintSampleCount": footprint_samples,
+            "maximumAllowedPhysicalFootprintBytes": maximum_physical_footprint_bytes,
+            "resourceLimitTerminated": resource_limit_terminated,
             "hostBefore": before.report(),
             "hostAfter": after.report(),
             "swapDeltaBytes": swap_delta,

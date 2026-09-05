@@ -198,3 +198,4 @@ Review when: link repair or archive classification only.
 - [`docs/releases/v2.2.2.md`](../docs/releases/v2.2.2.md)
 - [`docs/releases/v2.3.0.md`](../docs/releases/v2.3.0.md)
 - [`docs/releases/v2.4.0.md`](../docs/releases/v2.4.0.md)
+- [`docs/releases/v3.0.0.md`](../docs/releases/v3.0.0.md)

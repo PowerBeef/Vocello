@@ -326,10 +326,11 @@ the seven earlier correlated passes, one product failure and five unverified att
 
 ## External decisions and final gates
 
-The [prepared 3.0 candidate notes](release-3-0-candidate-notes.md) cover the user-facing changes,
-delivery-roster correction, complete-folder CLI installation and candidate-specific What to Test.
-They are active preparation, not a published release or an immutable acceptance record. Move the
-finished text into the exact tag's governed release notes only at an authorized candidate freeze.
+The [candidate-notes route](release-3-0-candidate-notes.md) now points to the single governed
+[unpublished v3.0.0 body](../releases/v3.0.0.md), including delivery migration, complete-folder CLI
+installation, known limitations and What to Test. Preparing that file does not freeze or publish
+a candidate. Reconcile exact candidate evidence at the authorized freeze; pin its body only after
+publication, and never change historical release notes.
 
 RF-02's September 4 read-only checkpoint now proves a valid Keychain profile, usable local Apple
 Development, Apple Distribution, and Developer ID identities, one active matching App Store profile,

@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "generated": "python3 scripts/doc_metadata.py rebuild-index",
   "note": "Machine-readable documentation map. Query this instead of globbing docs/.",
-  "annotatedDocuments": 104,
+  "annotatedDocuments": 105,
   "unannotatedDocuments": 0,
   "documents": [
     {
@@ -847,15 +847,12 @@
       "path": "docs/reference/release-3-0-candidate-notes.md",
       "status": "active",
       "owner": "release-qa",
-      "summary": "Prepared 3.0.0 candidate notes and reviewer test focus; not a publication announcement or candidate acceptance record.",
+      "summary": "Routing note for the single governed unpublished 3.0.0 release body and candidate evidence boundary.",
       "sourceOfTruth": [
         "project.yml",
         "config/roadmap.json",
         "config/public-product-facts.json",
-        "Sources/QwenVoiceCore/EmotionPreset.swift",
-        "Sources/ViewModels/VoiceDesignCoordinator.swift",
-        "Sources/SharedSupport/Services/GenerationPersistence.swift",
-        "scripts/cli_package.py"
+        "docs/releases/v3.0.0.md"
       ]
     },
     {
@@ -1037,6 +1034,17 @@
       "owner": "release-qa",
       "summary": "Vocello 2.4.0. Published release notes, copied verbatim into the GitHub Release. Pinned: the shipped text of a release cannot change retroactively.",
       "contentDigest": "sha256:a18499f60e4ceaaceb2c2af08fd18c9a78582d34a29718344040303189a92bf3"
+    },
+    {
+      "path": "docs/releases/v3.0.0.md",
+      "status": "active",
+      "owner": "release-qa",
+      "summary": "Unpublished Vocello 3.0.0 candidate notes and build-24 qualification instructions; not a release or submission approval.",
+      "sourceOfTruth": [
+        "project.yml",
+        "config/public-product-facts.json",
+        "config/roadmap.json"
+      ]
     },
     {
       "path": "docs/research/README.md",

@@ -69,7 +69,7 @@ the script self-test suite via `scripts/check_test_workflows.sh`.
 | `scripts/prepare_delivery_compact_model_config.py` | Validates the tracked candidate contract and exact local weights/runtime/dependencies, then emits an untracked path-bearing adapter configuration | `test_prepare_delivery_compact_model_config.py` |
 | `scripts/qualify_delivery_compact_models.py` | Runs exactly two cache-cold probes, retains sanitized resource evidence, and refuses holdout bake-off on any unqualified run | `test_qualify_delivery_compact_models.py` |
 | `scripts/prepare_delivery_listener_anchors.py` | Builds label-blind naturalness/attention anchors by pairing a real clip with a deterministic dropout control; audio and manifest remain untracked | `test_prepare_delivery_listener_anchors.py` |
-| `scripts/delivery_resource_supervisor.py` | Single-process lock, peak RSS/pressure/swap/timeout capture, and post-exit memory-recovery qualification for heavy local analyzers | `test_delivery_resource_supervisor.py` |
+| `scripts/delivery_resource_supervisor.py` | Single-process lock, enforced RSS/optional physical-footprint ceilings, pressure/swap/timeout capture, and post-exit memory-recovery qualification for heavy local analyzers | `test_delivery_resource_supervisor.py` |
 | `scripts/run_local_delivery_cascade.py` | Existing-harness post-generation composer for always-on, ambiguous-only, finalist-only, abstention, rejection, and manual-listening routes | `test_run_local_delivery_cascade.py` |
 | `scripts/delivery_promotion_decision.py` | Fail-closed decision over blinded listener evidence, paired statistics, multiplicity correction, acoustic guardrails, and runtime invariants | `test_delivery_promotion_decision.py` |
 | `scripts/audio_cadence_qc.py` | Validates the Fast-QC cadence policy and audits untracked, privacy-safe, independently labelled calibration/development/confirmation cohorts before a threshold review | `test_audio_cadence_qc.py` |
@@ -408,6 +408,17 @@ start. Post-exit recovery samples for up to 15 seconds because one immediate hos
 sample proved too noisy; the five-point recovery threshold itself remains fail closed. The runner
 does not accept a caller-authored host label: it checks `hw.model` and `hw.memsize` against the
 tracked canonical macOS hardware profile and binds the qualifier source in its report.
+
+RSS does not measure total MLX/Metal residency. Callers diagnosing those allocations must supply
+an exact-PID `physical_footprint_sampler` to `run_supervised`; it is not silently enabled for
+existing CPU-analyzer callers. The additive envelope fields identify whether it was requested,
+the measured peak and sample count, and the separate provisional ceiling. Never add RSS to
+physical footprint or relabel older RSS-only reports as footprint-qualified. Missing/invalid
+requested measurements and probe exceptions fail closed. A sampled RSS or footprint breach now
+terminates and awaits the owned child instead of merely rejecting its report after completion;
+the bound remains provisional, and sampling is not a hard real-time memory cap. Probe failures
+also reap the child before post-exit recovery or another governed layer. No production generation
+memory threshold, historical evidence, or model qualification is changed by this diagnostic fix.
 
 The versioned listener workflow remains under `delivery_calibration_session.py`:
 

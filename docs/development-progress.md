@@ -47,6 +47,73 @@ machine-readable status record and wins over any older prose.
 | 13 — Benchmark/history v3 | Live 2026-07-29: the first schema-v3 records are committed (three clean `phase0-cli-control-*` engine records plus one exploratory run that also exposed and fixed the summarizer's v3 pin). `benchmarks/schema-v3.json` adds the typed quality identity to generation takes (pass/warning only, five fast gates required, machine-code issues); v1/v2 records stay valid immutable history; the publisher stamps v3 only when every take carries the identity. The UI benchmark checkers folded the same identity 2026-08-01: ui-generation records now publish v3 (first: the focused `v3-fold-proof` record `macos-xcui-benchmark-20260801-003208-403989cf`); the canonical iOS matrix published its first v3 record 2026-08-01 (`ios-xcui-benchmark-20260801-132415-abbec96b`). |
 | 14 — Organization and retirement | Closed 2026-07-23 (14a + 14b): compatibility SPI retired, actor-owned loading/metadata/priming/clone artifacts, clone conditioning epoch-bound end to end. |
 
+## September 5 phone-independent codec checkpoint
+
+**No phone interaction. RF-06 remains in-flight; no production synthesis, prompt, model,
+sampling, seed, token-cap or QC behavior changed.** The existing `vocello bench` diagnostic
+command now replays an authenticated collected startup-reliability take on the Mac. It validates
+the original take digest, trace bytes, complete 16-group code shape and contiguous chunk ranges,
+then authenticates every installed file against the pinned production catalog. Source and local
+installation manifests are retained as separate identities, not presumed byte-identical.
+
+The first preflight in `codec-replay-20260905` stopped before model loading because it incorrectly
+required equal installation-manifest digests. The local manifest has an older revision and
+installation timestamp; all **14 actual model files match the current catalog bytes**, including
+the exact receipt tokenizer. The corrected run retains both manifest identities and the catalog
+binding. The failed preflight remains unchanged, not converted to PASS.
+
+`codec-replay-20260905-catalog-bound` replayed the retained 1,347-frame French streaming trace:
+
+| Schedule | iPhone / Mac gap | Whole-clip relative PCM RMSE |
+| --- | --- | --- |
+| Original incremental boundaries | 12.817 s starting at 6.074 s on both hosts | 1.23% |
+| Production non-streaming, 25 frames | 12.817 s starting at 6.074 s on both hosts | 1.03% |
+
+Both outputs are 107.76 s and fail unchanged mandatory QC. Historical `full` replay calls the
+production non-streaming **chunked** decoder, not an independent decoder or whole-sequence pass.
+The Mac report names this schedule explicitly. This excludes an iPhone-only origin for this gap,
+not a common-decoder defect versus pathological generated codes. PCM bytes differ; equal silence
+boundaries are not waveform identity. The retained warm take has identical codes/ranges and does
+not count as another executed Mac take. All 12 original iPhone artifacts remain digest-identical.
+
+The replay itself completed in **30.61 s**; its separate resource envelope **failed** because host
+swap grew **1.73 GiB**. Peak sampled process RSS was 631.83 MiB, post-exit free-memory recovery
+passed and before/after pressure flags were clear. RSS is not total MLX/Metal physical footprint;
+these facts do not qualify generation memory or attribute all host swap to the child. The serial
+runner stopped before the second distinct 571-frame trace. No hidden retry or heavy follow-on
+qualification was performed. The PCM comparison uses a bounded one-second buffer and no model.
+
+Retained long-form telemetry independently confirms the existing 2,048-code limit was reached.
+Without that attempt's codec/WAV capture, its overrun cause remains unknown; no cap increase or
+seed replacement is justified. The previous device checkpoint and its failed rows remain valid
+history, not current-source acceptance.
+
+Evidence stays ignored under `build/artifacts/diagnostics/macos/codec-replay-20260905*`: original
+source snapshot, take/trace hashes, per-run resource reports, replay WAVs and
+`cross-host-comparison.json`. Its replay report digest is
+`5c15ad63e6bb6ee6d6ca95557485afa22186137c293d7e12749c6579e0ffedde`.
+The existing replay test class now has **12 passing tests**, including three new corruption,
+shape and source-binding cases; the optimized 3.0.0 CLI build passes. The coherent checkpoint
+passed all **1,500 Python tests**, generic iOS app/logic SDK builds, and `mac-test-20260905-081829`:
+**578 core, 19 transport and 109 runtime tests**, with the existing two optional AudioSeal skips
+and no failures. The first broad gate found three freshness failures after a late evidence-link
+edit made the generated roadmap stale; its log is retained, regeneration corrected the input,
+and the complete unchanged-tree rerun passed. AGENTS.md remains accurate; no new durable rule
+or alternate harness is needed.
+
+Model-free copied-package follow-up uses the existing `cli_package.py` stage/seal/verify/smoke
+route after the source commit, with a spaced payload path and unrelated working directory.
+Its local report belongs under `build/artifacts/macos/release/host-codec-verified-20260905/`.
+This is not signed-candidate or generation qualification. The diagnostic master-gate refusal
+already passed without a model launch. Verification logs are retained under the existing ignored
+`build/artifacts/macos/host-codec-verification-20260905/` root.
+
+Next: retain this bounded result, investigate resource qualification before another heavy run,
+and obtain an independent decoder comparison of the same codes before changing production.
+RF-09 freeze, RF-10 actual signed/notarized package acceptance, account/rights decisions and
+RF-11/RF-12 physical-candidate acceptance remain separate. The phone stays untouched and its
+previously verified French three-minute Auto-Lock setting is unchanged.
+
 ## September 5 physical-device checkpoint
 
 **Device work has stopped; the 201-take release campaign is not complete.** All current results

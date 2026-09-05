@@ -176,6 +176,11 @@ enum BenchCommand {
         if args.flag("help") { printHelp(); return }
         CLIOutput.configure(args)
 
+        if args.string("codec-replay") != nil || args.flag("codec-replay") {
+            try await BenchCodecReplay.run(args)
+            return
+        }
+
         // Invariant: the filename length token is derived via the same lenBucket
         // the summarizer uses, so producer and consumer agree by construction.
         try BenchMatrixSpec.validateCorpus()
@@ -1608,6 +1613,10 @@ enum BenchCommand {
           --keep         append to existing diagnostics (default: clear first)
           --force        allow clearing even the real (non-debug) app data dir
           --no-summary   skip the aggregator and registry; parent diagnostic lane owns publication
+          --codec-replay <take.json> --take-sha256 <digest> --codec-trace <trace.bin>
+                         --output-dir <new-directory>: internal diagnostics only;
+                         replay collected CustomVoice Speed codes without synthesis
+                         or publication. Requires QWENVOICE_DEBUG=1 and exact model identity.
           --quiet|--verbose   suppress / expand stderr progress notes
         """)
     }

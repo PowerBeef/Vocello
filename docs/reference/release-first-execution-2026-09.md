@@ -63,6 +63,15 @@ acceptance; old results remain historical evidence, not replacement candidate pr
 
 ## September 5 device checkpoint and next boundary
 
+The later [phone-independent codec checkpoint](../development-progress.md#september-5-phone-independent-codec-checkpoint)
+reproduces the 12.817-second French gap on the Mac using the exact retained iPhone codes and
+catalog-verified model bytes. Historical `full` replay means the production non-streaming
+25-frame chunk schedule, not an independent decoder. This excludes an iPhone-only origin for
+that gap but leaves common decoder versus sampled codes unresolved. Its resource envelope fails
+on host swap growth, so the second distinct trace and further heavy qualification were not run.
+Retain the diagnostic result without treating it as audio or memory PASS; no production change
+or phone interaction occurred.
+
 The [active checkpoint](../development-progress.md#september-5-physical-device-checkpoint)
 records the exact runs, fixes and limitations. Two new 14/14 Clone/French Design closures,
 inventory, bounded stateful/external checks, corrected four-size layout review and nine performance

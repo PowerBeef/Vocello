@@ -5,6 +5,63 @@ import VocelloQwen3Core
 import XCTest
 
 final class StartupReliabilityDiagnosticsV2Tests: XCTestCase {
+    func testCollectedReplayAuthenticatesExactBytesAndRanges() throws {
+        let trace = VocelloQwen3CodecTrace(frames: [Array(repeating: 1, count: 16), Array(repeating: 2, count: 16)], droppedFrameCount: 0)
+        let data = StartupReliabilityDiagnosticEvidence.encode(trace)
+        let evidence = replayEvidence(data)
+        XCTAssertEqual(try StartupReliabilityDiagnosticEvidence.verifiedReplayTrace(data: data, evidence: evidence), trace)
+        var changed = data
+        changed[changed.count - 4] ^= 1
+        XCTAssertThrowsError(try StartupReliabilityDiagnosticEvidence.verifiedReplayTrace(data: changed, evidence: evidence))
+        XCTAssertThrowsError(try StartupReliabilityDiagnosticEvidence.verifiedReplayTrace(data: data.dropLast(), evidence: evidence))
+    }
+
+    func testCollectedReplayRejectsMissingOrChangedEvidence() throws {
+        let data = StartupReliabilityDiagnosticEvidence.encode(VocelloQwen3CodecTrace(
+            frames: [Array(repeating: 1, count: 16), Array(repeating: 2, count: 16)], droppedFrameCount: 0
+        ))
+        let valid = replayEvidence(data)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(valid)) as? [String: Any])
+        for key in ["sha256", "byteCount", "codecFrameCount", "complete", "codeGroupRange", "codecChunkRanges"] {
+            var missing = json
+            missing.removeValue(forKey: key)
+            do {
+                let evidence = try JSONDecoder().decode(StartupReliabilityArtifactEvidence.self, from: JSONSerialization.data(withJSONObject: missing))
+                XCTAssertThrowsError(try StartupReliabilityDiagnosticEvidence.verifiedReplayTrace(data: data, evidence: evidence), key)
+            } catch { /* Required decode fields also fail closed. */ }
+        }
+        for (key, value) in [("schemaVersion", 2 as Any), ("kind", "rejected_audio"), ("complete", false),
+                             ("codecFrameCount", 3), ("codecChunkRanges", [["start": 1, "endExclusive": 2]])] {
+            var changed = json
+            changed[key] = value
+            let evidence = try JSONDecoder().decode(StartupReliabilityArtifactEvidence.self, from: JSONSerialization.data(withJSONObject: changed))
+            XCTAssertThrowsError(try StartupReliabilityDiagnosticEvidence.verifiedReplayTrace(data: data, evidence: evidence), key)
+        }
+    }
+
+    func testCollectedReplayRejectsDroppedWrongWidthAndInvalidCodes() {
+        var negative = Array(repeating: Int32(1), count: 16); negative[0] = -1
+        var invalidSemantic = negative; invalidSemantic[0] = 4_096
+        var invalidAcoustic = Array(repeating: Int32(1), count: 16); invalidAcoustic[1] = 2_048
+        for frames in [[], [[1], [2]], [negative, negative], [invalidSemantic, invalidSemantic], [invalidAcoustic, invalidAcoustic]] {
+            let data = StartupReliabilityDiagnosticEvidence.encode(VocelloQwen3CodecTrace(frames: frames, droppedFrameCount: 0))
+            XCTAssertThrowsError(try StartupReliabilityDiagnosticEvidence.verifiedReplayTrace(data: data, evidence: replayEvidence(data)))
+        }
+        let dropped = StartupReliabilityDiagnosticEvidence.encode(VocelloQwen3CodecTrace(
+            frames: [Array(repeating: 1, count: 16), Array(repeating: 1, count: 16)], droppedFrameCount: 1
+        ))
+        XCTAssertThrowsError(try StartupReliabilityDiagnosticEvidence.verifiedReplayTrace(data: dropped, evidence: replayEvidence(dropped)))
+    }
+
+    private func replayEvidence(_ data: Data) -> StartupReliabilityArtifactEvidence {
+        StartupReliabilityArtifactEvidence(
+            kind: .codecTrace,
+            sha256: SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined(), byteCount: data.count,
+            codecFrameCount: 2, codeGroupRange: .init(minimum: 16, maximum: 16),
+            codecChunkRanges: [.init(start: 0, endExclusive: 1), .init(start: 1, endExclusive: 2)], complete: true
+        )
+    }
+
     func testCaptureRunIdentitySupportsUIAndBenchmarkWithoutAnonymousFallback() {
         let ui = "QVOICE_IOS_DEVICE_RUN_ID"
         let bench = "QVOICE_MAC_BENCH_RUN_ID"

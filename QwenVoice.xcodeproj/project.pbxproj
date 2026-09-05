@@ -270,6 +270,7 @@
 		7A9F81946572691F7F9CDBF8 /* VocelloMacBenchmarkUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0699EDC590E2AF981A1D618 /* VocelloMacBenchmarkUITests.swift */; };
 		7AEC94A29502B06EC158E40A /* QwenVoiceNative.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 405DF32499EDF28E20D73FEA /* QwenVoiceNative.framework */; };
 		7BFB123069CFDB62A000E6AA /* CLIBatchExecution.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27AF7C0700A42D7B19A46D20 /* CLIBatchExecution.swift */; };
+		7C315A9633791C161C52023B /* BenchCodecReplay.swift in Sources */ = {isa = PBXBuildFile; fileRef = C96B689D4A9F4B436CDE8899 /* BenchCodecReplay.swift */; };
 		7D03D989EE55E8E630CCB17E /* dylan.wav in Resources */ = {isa = PBXBuildFile; fileRef = EDAF51C92D6D16B455C573AC /* dylan.wav */; };
 		7D30E58A5CFD37D1C86785DB /* PreparedVoiceRepositoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3C8069408F17906219C6376 /* PreparedVoiceRepositoryTests.swift */; };
 		7ECA6A624A437F94E9F8AF13 /* ModelDownloadChunkSchedulingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73837959F0AFE6F93055215B /* ModelDownloadChunkSchedulingTests.swift */; };
@@ -1075,6 +1076,7 @@
 		C66191A5DDE964FBA36052A3 /* MainThreadStallWatchdog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainThreadStallWatchdog.swift; sourceTree = "<group>"; };
 		C69234A301AA6DDDBFDFD7BD /* AppEngineSelection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppEngineSelection.swift; sourceTree = "<group>"; };
 		C69C3458DCE937BF476B182E /* VocelloiOSFixtureEnrollmentUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VocelloiOSFixtureEnrollmentUITests.swift; sourceTree = "<group>"; };
+		C96B689D4A9F4B436CDE8899 /* BenchCodecReplay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BenchCodecReplay.swift; sourceTree = "<group>"; };
 		C9DFF46140E21950EEDD4721 /* MLXModelLoadCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MLXModelLoadCoordinator.swift; sourceTree = "<group>"; };
 		CA5974A09F87BE439B9D9B92 /* AudioQualityGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioQualityGate.swift; sourceTree = "<group>"; };
 		CAC079A66AD5DB1CFDD33485 /* IOSOnboardingCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSOnboardingCard.swift; sourceTree = "<group>"; };
@@ -1949,6 +1951,7 @@
 			isa = PBXGroup;
 			children = (
 				FBD264895A6D236200B068D4 /* BatchCommand.swift */,
+				C96B689D4A9F4B436CDE8899 /* BenchCodecReplay.swift */,
 				29686361B012B6250B0DB709 /* BenchCommand.swift */,
 				27AF7C0700A42D7B19A46D20 /* CLIBatchExecution.swift */,
 				0319BDB3EC4DB2FF5CDCEF82 /* CLIProcessSupervisor.swift */,
@@ -3008,6 +3011,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				5689BE482459B9DFDA157DBF /* BatchCommand.swift in Sources */,
+				7C315A9633791C161C52023B /* BenchCodecReplay.swift in Sources */,
 				03E4608C9E1EBA775FF6A306 /* BenchCommand.swift in Sources */,
 				93C367D91CF159A1C1565B35 /* CLIBatchExecution.swift in Sources */,
 				6C10558CB1E9F8E9D4F98B36 /* CLIProcessSupervisor.swift in Sources */,

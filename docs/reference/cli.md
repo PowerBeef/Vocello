@@ -276,7 +276,7 @@ vocello bench [--modes custom,design,clone] [--variants speed,quality] \
 ```
 
 Per cell: 1 cold (medium) for Custom/Design + N warm per length; Voice Cloning is warm-only.
-Telemetry defaults to lightweight; use `--telemetry off` for engine-only WAV diagnostics without
+Telemetry defaults to verbose; use `--telemetry off` for engine-only WAV diagnostics without
 history publication. Results land in `<data>/diagnostics`, carry a collision-resistant run ID, and
 are summarized from the exact run evidence by `scripts/summarize_generation_telemetry.py` when the
 CLI is run from a Vocello checkout (skipped when `--telemetry off` or repository tools are absent).
@@ -286,11 +286,11 @@ CLI is run from a Vocello checkout (skipped when `--telemetry off` or repository
 | `--modes` / `--variants` / `--lengths` | strict comma-list matrix axes: `custom,design,clone` / `speed,quality` / `short,medium,long`; empty, unknown, or duplicate values fail before runtime bootstrap |
 | `--warm` | warm reps per (cell × length); default 3 |
 | `--voice` / `--voice-brief` | clone voice name / design brief |
-| `--delivery [list]` | add **instruct-bearing delivery cells** (Custom/Design, warm, medium text, 1 take each): comma list of `<preset>[.<intensity>]` values (e.g. `happy.strong,calm.normal`); the bare flag runs `happy.strong,calm.normal,whisper.normal`. Rows are stamped `notes.delivery` and summarized in their own block; the plain warm takes double as the neutral reference for prosody/delivery A/Bs. Prosody analysis selects only WAVs named by the current run manifest and runs before the final summary. Delivery evidence remains inside the parent engine-generation record. |
+| `--delivery [list]` | add **instruct-bearing delivery cells** (Custom/Design, warm, medium text, 1 take each): comma list of `<preset>[.<intensity>]` values (e.g. `happy.strong,calm.normal`); the bare flag runs `happy.strong,calm.strong,whisper.strong`. Rows are stamped `notes.delivery` and summarized in their own block; the plain warm takes double as the neutral reference for prosody/delivery A/Bs. Prosody analysis selects only WAVs named by the current run manifest and runs before the final summary. Delivery evidence remains inside the parent engine-generation record. |
 | `--label <opaque-id>` | stamp a privacy-safe identifier using only letters, numbers, `.`, `_`, and `-` |
 | `--run-id <id>` | supply a collision-resistant run ID for orchestration; normal invocations mint one automatically |
 | `--force-class` | **dev/diagnostic only** — force a constrained memory tier on any Mac: `8gb` · `16gb` · `high` · `iphone` (sets the `QWENVOICE_FORCE_MEMORY_CLASS` knob, relayed to the engine over the `initialize` handshake; stamps `notes.deviceClass`) |
-| `--telemetry` | `off` · `lightweight` (default) · `verbose` (raw per-sample sidecars) |
+| `--telemetry` | `off` · `lightweight` · `verbose` (default; raw per-sample sidecars) |
 | `--seed` | deterministic sampling seed applied to every benchmark take |
 | `--no-stream` | accumulate the full result before decoding (old bench behavior) |
 | `--ttfc` | add an engine first-chunk-latency probe per cell → table + `diagnostics/bench-ttfc.json` |
@@ -334,6 +334,25 @@ history. When the CLI runs outside a checkout it retains local WAVs and the immu
 tools without turning a successful generation into a failure, and prints the retained manifest path.
 If publication alone fails, rerun the printed idempotent
 `python3 scripts/benchmark_history.py record --artifact-dir <dir>` repair command.
+
+### Collected codec replay (internal diagnostics only)
+
+`bench --codec-replay <startup-reliability-take.json> --take-sha256 <sha256>
+--codec-trace <codec-trace-v1.bin> --output-dir <new-untracked-directory>` reuses the
+startup-reliability replay API on the Mac without generating text or downloading models.
+It requires an internal-diagnostics binary and `QWENVOICE_DEBUG=1`. The original v2
+CustomVoice Speed receipt and trace digest/shape/chunk boundaries are validated. Every installed
+model file must match the pinned catalog bytes, including the receipt's tokenizer digest.
+Source and local manifest digests are recorded separately: installation timestamps and older
+revision metadata can differ even when all model bytes match. The output directory must not exist;
+source artifacts remain untouched, partial results survive failure, and no benchmark history
+is published. Use the ordinary resource supervisor and source snapshot for local runs.
+
+The original replay field named `full` is the **production non-streaming 25-frame decoder
+schedule**, not an independent implementation or a whole-sequence decoder call. The Mac result
+names it `productionNonStreaming` and records this distinction. `replay_complete` means the
+diagnostic finished; the separately recorded audio QC may still fail. No replay result alone
+establishes a sampled-model pathology or authorizes a product/model/QC change.
 
 ## Examples
 

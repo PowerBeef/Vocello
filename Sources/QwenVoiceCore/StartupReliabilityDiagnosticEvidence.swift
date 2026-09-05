@@ -203,6 +203,34 @@ public enum StartupReliabilityDiagnosticEvidence {
         return try decode(Data(contentsOf: directory.appendingPathComponent("codec-trace-v1.bin")))
     }
 
+    /// Authenticate a collected trace against its original take before replaying
+    /// it on another host. Merely decoding a valid binary is not source binding.
+    public static func verifiedReplayTrace(
+        data: Data,
+        evidence: StartupReliabilityArtifactEvidence
+    ) throws -> VocelloQwen3CodecTrace {
+        guard evidence.schemaVersion == 1, evidence.kind == .codecTrace,
+              evidence.complete == true, evidence.byteCount == data.count,
+              data.count <= 16 + maximumCodecFrames * (2 + 64 * 4),
+              sha256(data) == evidence.sha256 else {
+            throw EvidenceError.corruptTrace
+        }
+        let trace = try decode(data)
+        guard trace.isComplete, !trace.frames.isEmpty,
+              evidence.codecFrameCount == trace.frames.count,
+              evidence.codeGroupRange?.minimum == 16,
+              evidence.codeGroupRange?.maximum == 16,
+              trace.frames.allSatisfy({ frame in
+                  frame.count == 16 && frame.enumerated().allSatisfy {
+                      $0.element >= 0 && $0.element < ($0.offset == 0 ? 4_096 : 2_048)
+                  }
+              }), let ranges = evidence.codecChunkRanges else {
+            throw EvidenceError.traceOutOfBounds
+        }
+        try validate(ranges: ranges, frameCount: trace.frames.count)
+        return trace
+    }
+
     public static func persistReplayAudio(
         samples: [Float],
         sampleRate: Int,

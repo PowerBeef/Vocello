@@ -62,6 +62,18 @@ edit-count decompositions remain evidence. The Python gate and history publisher
 recompute the metrics from the tracked corpus and untracked consensus transcript before accepting
 the Swift verdict.
 
+The host checker also enforces the app's existing **outer-edge** timing rule whenever the
+verification declares `sourceAudioDurationSeconds` or the record includes WAV `outputEvidence`:
+all three recognitions must start within `min(2.5, max(1.0, duration × 0.15))` seconds of the
+beginning and end within that allowance of the end, without exceeding the duration by more
+than 0.25 seconds. Supplied durations must be positive, finite and mutually consistent. Missing
+timings, invalid durations or incomplete edges cannot authorize a claimed PASS. The VLR composer
+classifies this as a harness/evidence gap, preserving already typed incomplete-coverage results.
+Legacy reports lacking both duration fields retain historical validation; they are not fresh
+full-WAV proof. Edge coverage does **not** establish interior completeness or waive WER/CER.
+Independent recognizers disagreeing on the same WAV remain diagnostic evidence; never choose
+the better score, substitute their transcripts, or relabel a retained failure automatically.
+
 **One-time setup (on the iPhone — Settings app, not Vocello):**
 
 1. **Keyboards:** Settings → General → Keyboard → Keyboards → Add keyboard — e.g.

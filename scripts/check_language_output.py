@@ -174,10 +174,55 @@ def recomputed_accuracy(
     return word, character
 
 
+def audio_edge_evidence_issues(
+    verification: dict[str, Any], *, output_evidence: Any = None,
+) -> list[str]:
+    """Mirror VoiceClipTranscriber's existing edge rule, not speech coverage.
+
+    Legacy reports without either duration retain their historical validation.
+    A supplied duration may never be ignored, including null/nonfinite values.
+    When available, bind the declared duration to the separate WAV evidence.
+    This check cannot establish interior completeness or waive WER/CER.
+    """
+    duration = None
+    if "sourceAudioDurationSeconds" in verification:
+        duration = finite_number(verification["sourceAudioDurationSeconds"])
+        if duration is None or duration <= 0:
+            return ["output-audio-duration-invalid"]
+    if output_evidence is not None:
+        observed = finite_number(output_evidence.get("durationSeconds")) if isinstance(output_evidence, dict) else None
+        if observed is None or observed <= 0:
+            return ["output-audio-duration-invalid"]
+        if duration is not None and not math.isclose(duration, observed, rel_tol=1e-9, abs_tol=1e-6):
+            return ["output-audio-duration-mismatch"]
+        duration = observed
+    if duration is None:
+        return []
+    recognition = verification.get("recognition")
+    repetitions = recognition.get("repetitions") if isinstance(recognition, dict) else None
+    if not isinstance(repetitions, list) or len(repetitions) != 3:
+        return ["output-audio-edge-evidence-missing"]
+    # Same min/max/proportion and end tolerance as the shipping Swift policy.
+    allowance = min(2.5, max(1.0, duration * 0.15))
+    for repetition in repetitions:
+        if not isinstance(repetition, dict):
+            return ["output-audio-edge-evidence-missing"]
+        start = finite_number(repetition.get("segmentStartSeconds"))
+        end = finite_number(repetition.get("segmentEndSeconds"))
+        if start is None or end is None or start < 0 or end <= start:
+            return ["output-audio-edge-evidence-missing"]
+        if start > allowance or end < max(0, duration - allowance) or end > duration + 0.25:
+            return ["output-audio-edge-coverage-incomplete"]
+    return []
+
+
 def validate_structured_verification(
-    verification: dict[str, Any], expected_language: str, expected_script: str, identity: str
+    verification: dict[str, Any], expected_language: str, expected_script: str, identity: str,
+    *, output_evidence: Any = None,
 ) -> list[str]:
     failures: list[str] = []
+    failures.extend(f"{identity}: {issue}" for issue in audio_edge_evidence_issues(
+        verification, output_evidence=output_evidence))
     schema = verification.get("schemaVersion")
     if schema != 3:
         failures.append(f"{identity}: outputVerification schemaVersion must be 3")
@@ -517,7 +562,8 @@ def main() -> int:
             continue
         failures.extend(
             validate_structured_verification(
-                verification, expected_hint, expected_script, identity
+                verification, expected_hint, expected_script, identity,
+                output_evidence=record.get("outputEvidence"),
             )
         )
         if not verification.get("languagePass"):

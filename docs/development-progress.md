@@ -47,6 +47,82 @@ machine-readable status record and wins over any older prose.
 | 13 — Benchmark/history v3 | Live 2026-07-29: the first schema-v3 records are committed (three clean `phase0-cli-control-*` engine records plus one exploratory run that also exposed and fixed the summarizer's v3 pin). `benchmarks/schema-v3.json` adds the typed quality identity to generation takes (pass/warning only, five fast gates required, machine-code issues); v1/v2 records stay valid immutable history; the publisher stamps v3 only when every take carries the identity. The UI benchmark checkers folded the same identity 2026-08-01: ui-generation records now publish v3 (first: the focused `v3-fold-proof` record `macos-xcui-benchmark-20260801-003208-403989cf`); the canonical iOS matrix published its first v3 record 2026-08-01 (`ios-xcui-benchmark-20260801-132415-abbec96b`). |
 | 14 — Organization and retirement | Closed 2026-07-23 (14a + 14b): compatibility SPI retired, actor-owned loading/metadata/priming/clone artifacts, clone conditioning epoch-bound end to end. |
 
+## September 5 bounded audio localization and host-verifier correction
+
+**RF-06 remains in-flight. No production engine, tokenizer, prompt, seed, sampling, or audio-QC
+change is justified by this checkpoint. No phone operation or new full campaign was started.**
+RF-07's earlier pilot remains historical source-bound evidence, not qualification for this tree.
+
+The requested three-step follow-up reviewed retained audio before new synthesis. One offline
+CPU decoder process used the already-pinned official Qwen implementation and exact installed
+fp16 weights, evaluated in float32. All five diagnostic cases completed in 187.52 seconds:
+
+| Retained code input / fresh decode | Observation |
+| --- | --- |
+| Take 1 audible frames 0–64, single forward | Audible control; peak 0.2594, RMS −28.96 dBFS. |
+| Take 1 gap frames 80–144, single forward without preceding context | Entire 5.12 seconds below the existing 0.001 sample-amplitude floor; peak 0.0006942. |
+| Take 1 gap frames 144–208, another fresh forward | Entire 5.12 seconds below the same floor; peak 0.0007348. |
+| Take 1, all 1,347 frames, block 13 / left context 37 | 107.76 seconds output; 11.9765-second interior gap starting at 6.07446 seconds. |
+| Take 3, all 571 distinct frames, block 13 / left context 37 | 45.68 seconds output; 15.00967-second interior gap starting at 6.00679 seconds. |
+
+Per-sample PCM measurements use a fixed 24,000-frame buffer; they are diagnostic comparisons,
+not substituted production QC. Together with the earlier independent 25/25 schedule, fresh gap
+decoding argues against stale streaming state, overlap scheduling, the iPhone publication path,
+or the final writer as the cause. It localizes near-silence to retained code sequences decoded
+with the current tokenizer weights. **Shared-weight/precision versus sampled-code pathology is
+not resolved**; do not describe this as a proven upstream generator defect or roll back weights.
+All 12 original artifacts and three take receipts remain hash-identical.
+
+The resource supervisor raised `PermissionError` while stopping its child process group after
+all five results were written. A separate exact-PID check confirmed the child had exited; no
+follow-on heavy task was launched. The 1,865 retained footprint samples reached 2.040 GiB, but
+the final resource envelope/exit code and host recovery evidence are missing. This is **failed
+supervision, not resource qualification**, and its cause remains unproven. Retain the failure
+before any later heavy experiment; no automatic retry or speculative supervisor change.
+
+Fourteen retained French Design WAVs, corpus digests, Apple receipts and cached full-file Whisper
+results were rechecked without launching another recognizer: eight have differing hypotheses
+despite valid outer-edge evidence, four have incomplete Apple edges, and two lack conclusive
+Apple consensus. Missing consensus has no invented numeric score. In the shipped Neutral short
+row, Apple reports 2/12 word errors and Whisper 1/12 on the identical WAV, with different errors.
+Choosing the lower score cannot establish correct speech or authorize a prompt change. Original
+results remain unchanged; experimental no-delivery/Calm arms remain separate from production.
+
+One concrete host bug was reproduced: `check_language_output.py` accepted a claimed PASS whose
+three timestamp intervals covered only the latter portion of a declared 16-second WAV. The host
+checker and VLR composer now enforce the existing Swift outer-edge rule, reject invalid or
+conflicting declared/WAV durations, and classify missing coverage as a harness gap. Legacy
+records without either duration retain historical validation, and already typed incomplete-edge
+results retain their classification. This does not waive WER/CER or prove interior completeness.
+**30 focused tests pass**, including the real checker command, false-PASS composition, invalid
+durations, boundary cases, legacy decoding, and full-edge word-error rejection. The initial
+three-test pre-fix reproduction had 12 failing assertions; it was not a native audio failure.
+
+The 18.8-second Chinese cadence warning remains a separate retained finding: its original WAV
+was not captured. The later 13.44-second clean pilot uses another seed and cannot clear it. Do
+not conflate either with the earlier 98-second Chinese EOS/trailing-silence failure.
+
+Ignored evidence: `build/artifacts/diagnostics/macos/rf06-causal-20260905/` contains scripts, the
+five WAVs, source snapshot, footprint samples, `decoder-result.json` and `causal-review-v2.json`.
+The preliminary review is retained but v2 supersedes its missing-consensus score presentation.
+Decoder result SHA-256: `f7b8cf1539423e36e03f9ef13e076238da3a66d7f199f7aa4227118c9719815e`;
+review v2: `89524e90eab62e9a7f3fab0ea5b1c098308b2e0aeb6d6c2648bce4b2f9625fc8`.
+No generated audio, transcript, personal identifier or raw diagnostic is tracked or published.
+
+Deterministic checkpoint completed in 477.8 seconds: derived refresh/validation, the quick
+project-input gate (1,524 Python tests), both generic iOS targets and macOS native tests pass
+(581 core, 19 transport, 109 runtime; two optional AudioSeal fixture tests skipped).
+Native evidence: `build/artifacts/macos/tests/mac-test-20260905-115008/`; generic build logs and
+summaries remain under `build/artifacts/foundation/`. Existing documentation/roadmap currency
+advisories are warnings, not newly closed work. No physical acceptance is implied.
+
+Next: RF-06/VLR-07 stay open
+for the unresolved shared tokenizer/code question, French recognizer disagreement and exact
+Chinese warning evidence. Any further experiment needs a distinct causal question and valid
+resource supervision; repeating the same decoder schedules or restarting the 201-take campaign
+will not close these findings. RF-09 candidate freeze still precedes RF-11 full acceptance.
+AGENTS.md's existing evidence-first, serial-resource and no-speculative-fix rules remain current.
+
 ## September 5 correlation and capture correction — verified
 
 RF-07/ICA-18/AV-09 retain ownership. New correlation schema v2 joins mandatory engine evidence

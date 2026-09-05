@@ -205,6 +205,89 @@ def write_planned_fixture(diag: str, run_id: str, plan_path: str) -> dict:
 
 
 class CheckLanguageOutputTests(unittest.TestCase):
+    def test_cli_checks_separate_wav_duration_instead_of_trusting_pass(self) -> None:
+        with tempfile.TemporaryDirectory() as diag:
+            write_fixture(diag, "edge-fixture")
+            path = next(Path(diag).rglob("device-diagnostics-done.json"))
+            record = json.loads(path.read_text(encoding="utf-8"))
+            record["outputEvidence"] = {"durationSeconds": 16.0}
+            path.write_text(json.dumps(record), encoding="utf-8")
+            result = self.run_checker(diag, "edge-fixture")
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("audio-edge-coverage-incomplete", result.stdout + result.stderr)
+
+    def test_separate_wav_evidence_binds_duration_and_cannot_waive_accuracy(self) -> None:
+        for declared, observed, issue in (
+            (1.5, 1.5, None),
+            (1.5, 16.0, "audio-duration-mismatch"),
+            (1.5, 0.0, "audio-duration-invalid"),
+        ):
+            with self.subTest(declared=declared, observed=observed):
+                value = verification("french")
+                value["sourceAudioDurationSeconds"] = declared
+                failures = validate_structured_verification(
+                    value, "french", "Le train a quitté la gare à l'aube.", "fixture",
+                    output_evidence={"durationSeconds": observed})
+                if issue is None:
+                    self.assertEqual(failures, [])
+                else:
+                    self.assertTrue(any(issue in f for f in failures), failures)
+        value = verification("french", transcript_override="Bonjour.")
+        failures = validate_structured_verification(
+            value, "french", "Le train a quitté la gare à l'aube.", "fixture",
+            output_evidence={"durationSeconds": 1.5})
+        self.assertTrue(failures, "Full edge coverage must never waive word errors")
+
+    def test_duration_requires_all_pass_timestamps_but_legacy_remains_valid(self) -> None:
+        value = verification("french")
+        self.assertEqual(validate_structured_verification(
+            value, "french", "Le train a quitté la gare à l'aube.", "legacy"), [])
+        value["sourceAudioDurationSeconds"] = 1.5
+        value["recognition"]["repetitions"][1].pop("segmentEndSeconds")
+        failures = validate_structured_verification(
+            value, "french", "Le train a quitté la gare à l'aube.", "fixture")
+        self.assertTrue(any("audio-edge-evidence-missing" in f for f in failures), failures)
+
+    def test_declared_wav_duration_rejects_partial_edge_pass(self) -> None:
+        value = verification("french")
+        value["sourceAudioDurationSeconds"] = 16.0
+        for repetition in value["recognition"]["repetitions"]:
+            repetition.update(segmentStartSeconds=8.16, segmentEndSeconds=15.9,
+                              timingCoverageSeconds=7.74)
+        failures = validate_structured_verification(
+            value, "french", "Le train a quitté la gare à l'aube.", "fixture")
+        self.assertTrue(any("audio-edge-coverage-incomplete" in f for f in failures), failures)
+
+    def test_invalid_declared_wav_duration_fails_closed(self) -> None:
+        for duration in (None, True, 0, -1, float("nan"), float("inf"), "16"):
+            with self.subTest(duration=duration):
+                value = verification("french")
+                value["sourceAudioDurationSeconds"] = duration
+                failures = validate_structured_verification(
+                    value, "french", "Le train a quitté la gare à l'aube.", "fixture")
+                self.assertTrue(any("audio-duration-invalid" in f for f in failures), failures)
+
+    def test_audio_edge_allowance_matches_existing_app_boundaries(self) -> None:
+        for duration, start, end, accepted in (
+            (1.5, 0.0, 1.5, True),
+            (16.0, 2.4, 13.6, True),
+            (16.0, 2.40001, 13.6, False),
+            (16.0, 0.0, 13.59999, False),
+            (16.0, 0.0, 16.25, True),
+            (16.0, 0.0, 16.25001, False),
+            (100.0, 2.5, 97.5, True),
+            (100.0, 2.50001, 97.5, False),
+        ):
+            with self.subTest(duration=duration, start=start, end=end):
+                value = verification("french")
+                value["sourceAudioDurationSeconds"] = duration
+                for repetition in value["recognition"]["repetitions"]:
+                    repetition.update(segmentStartSeconds=start, segmentEndSeconds=end,
+                                      timingCoverageSeconds=end - start)
+                failures = validate_structured_verification(
+                    value, "french", "Le train a quitté la gare à l'aube.", "fixture")
+                self.assertEqual(not failures, accepted, failures)
+
     def run_checker(self, diag: str, run_id: str, plan_path: str | None = None) -> subprocess.CompletedProcess[str]:
         command = [
                 sys.executable,

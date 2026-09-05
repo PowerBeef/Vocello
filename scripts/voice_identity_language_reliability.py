@@ -22,6 +22,8 @@ import tempfile
 import wave
 from typing import Any
 
+from check_language_output import audio_edge_evidence_issues
+
 
 REPO = Path(__file__).resolve().parents[1]
 DEFAULT_CONTRACT = REPO / "config/voice-identity-language-reliability.json"
@@ -804,7 +806,18 @@ def compose_device_results(
                 verification = sentinel.get("outputVerification") or {}
                 verification_failure = "successful_take_evidence_mismatch"
                 verification_owner = "harness"
-                if verification.get("pass") is not True:
+                edge_issues = audio_edge_evidence_issues(
+                    verification, output_evidence=sentinel.get("outputEvidence"))
+                already_classified_coverage_failure = (
+                    verification.get("pass") is not True
+                    and verification.get("skipReason")
+                    == "speech_recognition_incomplete_temporal_coverage"
+                )
+                if edge_issues and not already_classified_coverage_failure:
+                    verification_failure = "output-verification-inconclusive:audio-edge-evidence"
+                    failures.append(verification_failure)
+                    evidence_gaps.extend(edge_issues)
+                elif verification.get("pass") is not True:
                     verification_failure, verification_owner, verification_gaps = (
                         classify_output_verification_failure(verification)
                     )

@@ -462,6 +462,31 @@ class VoiceIdentityLanguageReliabilityTests(unittest.TestCase):
         self.assertEqual(coverage_report["productFailures"], 0)
         self.assertEqual(coverage_report["harnessFailures"], 1)
 
+        # A claimed PASS must not bypass the same edge rule the app enforces.
+        false_pass = copy.deepcopy(incomplete_coverage)
+        false_pass["outputVerification"].update({
+            "pass": True, "languagePass": True, "accuracyPass": True,
+        })
+        false_pass["outputVerification"].pop("skipReason")
+        for declared in (True, False):
+            with self.subTest(declared_duration=declared):
+                supplied = copy.deepcopy(false_pass)
+                if not declared:
+                    supplied["outputVerification"].pop("sourceAudioDurationSeconds")
+                supplied["outputEvidence"] = {"durationSeconds": 16.0}
+                first_path.write_text(json.dumps(supplied), encoding="utf-8")
+                false_pass_report = VLR.compose_device_results(
+                    plan=plan, contract=self.contract,
+                    diagnostics_root=diagnostics, transcription=transcription,
+                    output=self.root / "verification-false-pass-summary.json",
+                )
+                self.assertEqual(false_pass_report["status"], "FAIL")
+                take = false_pass_report["takes"][0]
+                self.assertEqual(take["failureOwner"], "harness")
+                self.assertIn("output-audio-edge-coverage-incomplete", take["evidenceGaps"])
+                self.assertEqual(false_pass_report["productFailures"], 0)
+                self.assertEqual(false_pass_report["harnessFailures"], 1)
+
         first_path.write_text(json.dumps(passing), encoding="utf-8")
         tampered = copy.deepcopy(passing)
         first_receipt = copy.deepcopy(tampered["requestReceipt"])

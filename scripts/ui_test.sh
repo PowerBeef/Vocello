@@ -293,7 +293,11 @@ out="$QVOICE_ARTIFACTS_UI_TESTS/$platform/$run_id"
 result="$out/result.xcresult"
 mkdir -p "$out"
 step_ledger="$out/required-steps.json"
-required_steps_init "$step_ledger" "ui-$platform-$lane" "$run_id"
+step_workflow="ui-$platform-$lane"
+if [[ "$lane" == "control-audit" && ( "$control_scenario" == "generation" || "$control_scenario" == "all" ) ]]; then
+  step_workflow="ui-ios-control-audit-generation"
+fi
+required_steps_init "$step_ledger" "$step_workflow" "$run_id"
 started_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 printf '%s\n' "$started_at" >"$out/started-at.txt"
 printf '%s\n' "${label:-$run_id}" >"$out/label.txt"
@@ -319,6 +323,7 @@ if sys.argv[13]:
     payload["treeFingerprint"] = sys.argv[13]
     payload["controlAuditScenario"] = sys.argv[14]
     payload["controlObservationSchemaVersion"] = 2
+    payload["controlEvidenceVersion"] = 2
     payload["controlTakeStart"] = int(sys.argv[17])
     payload["controlTakeLimit"] = int(sys.argv[18])
 if sys.argv[15]:
@@ -1467,6 +1472,7 @@ PY
             --plan "$out/control-audit-plan.json" \
             --observations "$out/control-observations-current.jsonl" \
             --diagnostics "$out/control-audit-diagnostics" \
+            --evidence-version 2 --attachments "$out/attachments" \
             --output "$out/control-audit-generation-correlation.json" \
           >"$out/control-audit-generation-validator.log" 2>&1; then
         control_audit_status=1
@@ -1534,6 +1540,14 @@ finished_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 note "per-test results:"
 write_test_summary || true
 final_run_status="passed"
+if [[ "$lane" == "control-audit" && -f "$out/control-audit-summary.json" ]]; then
+  final_run_status="$(python3 - "$out/control-audit-summary.json" <<'PY'
+import json, pathlib, sys
+summary = json.loads(pathlib.Path(sys.argv[1]).read_text())
+print("passedWithWarnings" if summary.get("shard", {}).get("result") == "passedWithWarnings" else "passed")
+PY
+)"
+fi
 if [[ "$platform" == "ios" && "$lane" == "model-download" \
     && "$model_scenario" == "diagnose" && "${model_diagnosis_result:-passed}" == "diagnosedFailure" ]]; then
   final_run_status="diagnosedFailure"
@@ -1587,6 +1601,8 @@ run_finalized=1
 
 if [[ "$final_run_status" == "diagnosedFailure" ]]; then
   note "$platform $lane DIAGNOSTIC COMPLETE (diagnosedFailure) · $out"
+elif [[ "$final_run_status" == "passedWithWarnings" ]]; then
+  note "$platform $lane COMPLETED WITH QUALITY WARNINGS (not promotion PASS) · $out"
 else
   note "$platform $lane PASS · $out"
 fi

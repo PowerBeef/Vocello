@@ -32,9 +32,22 @@ enum IOSPullableDiagnosticsMirror {
     /// generation. This avoids copying the App Group's historical diagnostics
     /// corpus after every XCUITest take; the shell validator still filters the
     /// pullable log by the benchmark run id.
-    static func syncGenerationTelemetryIfEnabled(generationID: UUID) {
+    static func syncGenerationTelemetryIfEnabled(generationID: UUID, publishedAudioURL: URL? = nil) {
         guard TelemetryGate.resolvedEnabled else { return }
         guard let pullableRoot else { return }
+        if let publishedAudioURL {
+            do {
+                _ = try captureAuditOutput(
+                    from: publishedAudioURL, generationID: generationID,
+                    environment: ProcessInfo.processInfo.environment,
+                    telemetryEnabled: TelemetryGate.resolvedEnabled, pullableRoot: pullableRoot
+                )
+            } catch {
+                // The host requires the exact WAV digest; missing capture fails
+                // qualification without misreporting successful synthesis.
+                print("[IOSPullableDiagnosticsMirror] audit output capture failed")
+            }
+        }
         let generationID = generationID.uuidString
         syncGenerationTelemetry(
             generationID: generationID,
@@ -65,6 +78,42 @@ enum IOSPullableDiagnosticsMirror {
             )
         }
     }
+
+    /// Diagnostic-only copy of an already published file, before test-owned
+    /// History cleanup. No decoding, normalization, model residency or source
+    /// removal. The engine's existing samplingWAVDigest authenticates it later.
+    static func captureAuditOutput(
+        from source: URL, generationID: UUID, environment: [String: String],
+        telemetryEnabled: Bool, pullableRoot: URL
+    ) throws -> URL? {
+        guard let runID = StartupReliabilityDiagnosticEvidence.captureRunID(
+            environment: environment, telemetryEnabled: telemetryEnabled
+        ), runID.hasPrefix("ios-xcui-control-audit-") else { return nil }
+        let fm = FileManager.default
+        let attributes = try fm.attributesOfItem(atPath: source.path)
+        let size = (attributes[.size] as? NSNumber)?.intValue ?? 0
+        guard attributes[.type] as? FileAttributeType == .typeRegular,
+              (44...64 * 1024 * 1024).contains(size) else { throw AuditCaptureError.outOfBounds }
+        let directory = pullableRoot.appendingPathComponent(runID, isDirectory: true)
+            .appendingPathComponent("outputs", isDirectory: true)
+        try fm.createDirectory(at: directory, withIntermediateDirectories: true)
+        let destination = directory.appendingPathComponent("\(generationID.uuidString).wav")
+        if fm.fileExists(atPath: destination.path) {
+            guard try SamplingTakeEvidence.sha256FileDigest(at: destination)
+                == SamplingTakeEvidence.sha256FileDigest(at: source) else { throw AuditCaptureError.identityCollision }
+            return destination
+        }
+        let files = try fm.contentsOfDirectory(at: directory, includingPropertiesForKeys: [.fileSizeKey])
+        let total = try files.reduce(0) { try $0 + ($1.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0) }
+        guard files.count < 201, total + size <= 256 * 1024 * 1024 else { throw AuditCaptureError.outOfBounds }
+        let staging = directory.appendingPathComponent(".capture-\(UUID().uuidString)")
+        defer { try? fm.removeItem(at: staging) }
+        try fm.copyItem(at: source, to: staging)
+        try fm.moveItem(at: staging, to: destination)
+        return destination
+    }
+
+    enum AuditCaptureError: Error { case outOfBounds, identityCollision }
 
     static func syncGenerationTelemetry(
         generationID: String,

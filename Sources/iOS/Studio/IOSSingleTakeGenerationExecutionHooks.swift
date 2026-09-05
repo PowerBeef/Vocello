@@ -51,7 +51,8 @@ final class IOSStudioSingleTakeGenerationHooks: IOSSingleTakeGenerationExecution
             summary: result.telemetrySummary
         )
         IOSPullableDiagnosticsMirror.syncGenerationTelemetryIfEnabled(
-            generationID: plan.generationID
+            generationID: plan.generationID,
+            publishedAudioURL: URL(fileURLWithPath: result.audioPath)
         )
 
         await GenerationPersistence.persist(

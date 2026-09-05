@@ -17,6 +17,8 @@ import pathlib
 import re
 import subprocess
 import sys
+import struct
+import wave
 import zlib
 from dataclasses import dataclass
 from typing import Any, Iterable
@@ -81,7 +83,8 @@ def load_json(path: pathlib.Path) -> Any:
     try:
         return json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
-        raise AuditError(f"cannot read {path.relative_to(ROOT)}: {error}") from error
+        # Collection errors must not expose private host/device paths.
+        raise AuditError(f"cannot read {path.name}: {type(error).__name__}") from error
 
 
 def load_contract(path: pathlib.Path = CONTRACT_PATH) -> dict[str, Any]:
@@ -677,6 +680,7 @@ def compose(
     observations: list[dict[str, Any]],
     bootstrap_classification: dict[str, Any] | None = None,
     external_interruption_classification: dict[str, Any] | None = None,
+    correlations: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     validate_plan(contract, plan)
     run_id = run_metadata.get("runID")
@@ -793,6 +797,39 @@ def compose(
             }
         )
 
+    # v2 correlation is deliberately separate from the immutable UI observation.
+    # Missing device evidence is a harness failure, not proof of bad synthesis.
+    correlation_rows: dict[str, dict[str, Any]] = {}
+    quality_warnings: list[str] = []
+    required_correlation = run_metadata.get("controlEvidenceVersion") == 2 and scenario in {"generation", "all"}
+    if required_correlation:
+        for proof in correlations or []:
+            owner = proof.get("runID")
+            owner_observations = [row for row in observations if row.get("runID") == owner]
+            if (proof.get("schemaVersion") != 2 or owner not in accepted_run_ids
+                    or proof.get("sourceIdentity") != source_identity
+                    or proof.get("planDigest") != plan["planDigest"]
+                    or proof.get("observationDigest") != digest(owner_observations)
+                    or proof.get("correlationDigest") != digest({k: v for k, v in proof.items() if k != "correlationDigest"})):
+                raise AuditError("cross-run, corrupt, or stale device correlation")
+            for row in proof["rows"]:
+                if row.get("status") not in {"PASS", "PRODUCT_FAIL", "HARNESS_FAIL"}:
+                    raise AuditError("invalid correlation classification")
+                control_id = f"generation:{row['takeID']}"
+                if control_id in correlation_rows:
+                    raise AuditError("duplicate correlated take")
+                if not any(o.get("takeID") == row["takeID"] and o.get("generationID", "").lower() == row["generationID"]
+                           for o in owner_observations):
+                    raise AuditError("correlation has no matching owned observation")
+                correlation_rows[control_id] = row
+        for row in composed_rows:
+            if row["controlID"].startswith("generation:") and row["classification"] == "PASS":
+                proof = correlation_rows.get(row["controlID"])
+                row["classification"] = proof["status"] if proof else "HARNESS_FAIL"
+                row["correlationIssues"] = proof["issues"] if proof else ["missing_device_correlation"]
+                if proof and proof.get("qualityVerdict") == "warning":
+                    quality_warnings.append(row["controlID"])
+
     counts = {status: 0 for status in sorted(TERMINAL)}
     for row in composed_rows:
         counts[row["classification"]] += 1
@@ -868,6 +905,27 @@ def compose(
             "xcodebuildLogSHA256": external_interruption_classification.get("xcodebuildLogSHA256"),
             "xcresultSummarySHA256": external_interruption_classification.get("xcresultSummarySHA256"),
         }
+    if required_correlation:
+        # Coverage belongs to the complete source-bound chain, never to an
+        # individual ordinary row or a five-take shard. No order-inferred warmth.
+        coverage = []
+        campaign_end = shard is None or shard[1] == len(plan["takes"])
+        for mode in contract["generationMatrix"]["modes"]:
+            mode_ids = {f"generation:{take['takeID']}" for take in plan["takes"] if take["mode"] == mode}
+            warm_ids = sorted(key for key, value in correlation_rows.items()
+                              if key in mode_ids and value["status"] == "PASS" and value.get("observedWarmState") == "warm")
+            coverage.append({"mode": mode, "warmTakeIDs": warm_ids,
+                             "status": "PASS" if warm_ids else ("FAIL" if campaign_end else "PENDING")})
+        summary["warmCoverage"] = coverage
+        summary["qualityWarnings"] = sorted(quality_warnings)
+        summary["promotionEligible"] = summary["result"] == "passed" and not quality_warnings and all(row["status"] == "PASS" for row in coverage)
+        if campaign_end and (quality_warnings or any(row["status"] == "FAIL" for row in coverage)):
+            summary["result"] = "failed"
+            if shard: summary["shard"]["result"] = "failed"
+        elif shard and summary["shard"]["result"] == "passed" and any(
+            f"generation:{take['takeID']}" in quality_warnings for take in plan["takes"][shard[0]:shard[1]]
+        ):
+            summary["shard"]["result"] = "passedWithWarnings"
     summary["summaryDigest"] = digest(summary)
     return summary
 
@@ -904,15 +962,130 @@ def validate_history_ownership(take: dict[str, Any], observation: dict[str, Any]
     return binding
 
 
+def generation_artifacts(
+    attachment_root: pathlib.Path, diagnostics_root: pathlib.Path,
+    observation: dict[str, Any], terminal: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """Bind genuine checkpoint PNGs and the exact published WAV; no paths from telemetry."""
+    manifest = load_json(attachment_root / "manifest.json")
+    take_id, generation_id = observation["takeID"], observation["generationID"].upper()
+    if not isinstance(manifest, list) or any(not isinstance(test, dict) or not isinstance(test.get("attachments", []), list) for test in manifest):
+        raise AuditError("invalid_screenshot_manifest")
+    artifacts = []
+    for checkpoint in ("request", "player", "controls"):
+        name = f"generation-{take_id}-{checkpoint}"
+        pattern = re.compile(rf"^{re.escape(name)}(?:_[0-9]+_[0-9A-Fa-f-]+)?(?:\.png)?$")
+        matches = [item for test in manifest for item in test.get("attachments", [])
+                   if pattern.fullmatch(item.get("suggestedHumanReadableName", ""))]
+        if len(matches) != 1:
+            raise AuditError(f"missing_or_duplicate_{checkpoint}_screenshot")
+        filename = matches[0].get("exportedFileName")
+        if not isinstance(filename, str) or pathlib.Path(filename).name != filename:
+            raise AuditError("unsafe_screenshot_reference")
+        path = attachment_root / filename
+        if path.is_symlink() or not path.is_file() or path.stat().st_size > 32 * 1024 * 1024:
+            raise AuditError("invalid_screenshot_file")
+        data = path.read_bytes()
+        if len(data) < 45 or data[:8] != b"\x89PNG\r\n\x1a\n" or data[12:16] != b"IHDR":
+            raise AuditError("invalid_screenshot_png")
+        width, height = struct.unpack(">II", data[16:24])
+        cursor, ended, image_data = 8, False, bytearray()
+        while cursor + 12 <= len(data):
+            size = struct.unpack(">I", data[cursor:cursor + 4])[0]
+            end = cursor + 12 + size
+            if end > len(data) or zlib.crc32(data[cursor + 4:end - 4]) != struct.unpack(">I", data[end - 4:end])[0]:
+                raise AuditError("corrupt_screenshot_png")
+            ended = data[cursor + 4:cursor + 8] == b"IEND"
+            if data[cursor + 4:cursor + 8] == b"IDAT":
+                image_data.extend(data[cursor + 8:end - 4])
+            cursor = end
+            if ended: break
+        if not ended or cursor != len(data) or not 44 <= width <= 8192 or not 44 <= height <= 8192:
+            raise AuditError("incomplete_screenshot_png")
+        # XCUITest exports non-interlaced 8-bit RGB/RGBA PNGs. Verify the
+        # compressed raster too, not merely a plausible header and valid CRCs.
+        if data[8:12] != struct.pack(">I", 13) or data[24] != 8 or data[25] not in {2, 6} or data[26:29] != b"\0\0\0":
+            raise AuditError("unsupported_screenshot_png")
+        raster_size = height * (1 + width * (3 if data[25] == 2 else 4))
+        if raster_size > 128 * 1024 * 1024: raise AuditError("screenshot_raster_out_of_bounds")
+        try:
+            decoder = zlib.decompressobj()
+            raster = decoder.decompress(image_data, raster_size + 1)
+        except zlib.error as error:
+            raise AuditError("corrupt_screenshot_raster") from error
+        if len(raster) != raster_size or not decoder.eof or decoder.unused_data or decoder.unconsumed_tail:
+            raise AuditError("incomplete_screenshot_raster")
+        artifacts.append({"kind": checkpoint, "file": f"attachments/{filename}",
+                          "sha256": hashlib.sha256(data).hexdigest(), "width": width, "height": height})
+    # The app exports only the current audit's successful publications. The
+    # engine's pre-existing sampling digest is the authority, not a new receipt.
+    run_id = observation["runID"]
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", run_id):
+        raise AuditError("unsafe_audio_run_identity")
+    candidates = list(diagnostics_root.glob(f"{run_id}/outputs/{generation_id}.wav"))
+    if len(candidates) != 1 or candidates[0].is_symlink():
+        raise AuditError("missing_audio_artifact")
+    audio = candidates[0]
+    if not 44 <= audio.stat().st_size <= 64 * 1024 * 1024:
+        raise AuditError("audio_artifact_out_of_bounds")
+    with audio.open("rb") as stream:
+        sha = hashlib.file_digest(stream, "sha256").hexdigest()
+    if sha != (terminal.get("notes") or {}).get("samplingWAVDigest"):
+        raise AuditError("audio_artifact_digest_mismatch")
+    try:
+        with wave.open(str(audio), "rb") as wav:
+            if wav.getnframes() < 1 or wav.getnchannels() != 1 or wav.getsampwidth() != 2:
+                raise AuditError("invalid_audio_artifact")
+            expected = wav.getnframes() * wav.getnchannels() * wav.getsampwidth()
+            read = 0
+            while block := wav.readframes(16_384): read += len(block)
+            if read != expected: raise AuditError("truncated_audio_artifact")
+            duration = wav.getnframes() / wav.getframerate()
+    except (wave.Error, EOFError, ZeroDivisionError) as error:
+        raise AuditError("invalid_audio_artifact") from error
+    artifacts.append({"kind": "published-audio", "file": audio.relative_to(diagnostics_root).as_posix(),
+                      "sha256": sha, "byteCount": audio.stat().st_size, "durationSeconds": duration})
+    return artifacts
+
+
+def verify_retained_artifacts(run_root: pathlib.Path, proof: dict[str, Any]) -> None:
+    """A once-valid correlation cannot authorize resume after evidence drift."""
+    if proof.get("correlationDigest") != digest({k: v for k, v in proof.items() if k != "correlationDigest"}):
+        raise AuditError("corrupt retained correlation")
+    for row in proof.get("rows", []):
+        if row.get("status") != "PASS": continue
+        artifacts = row.get("artifacts", [])
+        if sorted(item.get("kind", "") for item in artifacts) != ["controls", "player", "published-audio", "request"]:
+            raise AuditError("incomplete retained generation artifacts")
+        for item in artifacts:
+            relative = pathlib.PurePosixPath(item["file"])
+            if relative.is_absolute() or ".." in relative.parts:
+                raise AuditError("unsafe retained artifact reference")
+            base = run_root / "control-audit-diagnostics" if item["kind"] == "published-audio" else run_root
+            path = base / relative
+            if path.is_symlink() or not path.is_file() or not path.resolve().is_relative_to(base.resolve()):
+                raise AuditError("missing retained generation artifact")
+            with path.open("rb") as stream:
+                actual = hashlib.file_digest(stream, "sha256").hexdigest()
+            if actual != item["sha256"]:
+                raise AuditError("retained generation artifact digest mismatch")
+
+
 def validate_device_evidence(
     contract: dict[str, Any],
     plan: dict[str, Any],
     observations: list[dict[str, Any]],
     diagnostics_root: pathlib.Path,
+    *, evidence_version: int = 1, attachment_root: pathlib.Path | None = None,
 ) -> dict[str, Any]:
     """Correlate every visible completed take with its exact engine terminal row."""
 
     validate_plan(contract, plan)
+    if evidence_version not in {1, 2}:
+        raise AuditError("unsupported correlation schema")
+    if evidence_version == 2 and (len({row.get("runID") for row in observations}) != 1
+                                or any(row.get("sourceIdentity") != plan["sourceIdentity"] for row in observations)):
+        raise AuditError("correlation requires one source-bound run")
     planned = {take["takeID"]: take for take in plan["takes"]}
     generation_observations: dict[str, dict[str, Any]] = {}
     seen_generations: set[str] = set()
@@ -968,6 +1141,7 @@ def validate_device_evidence(
         generation_id = observation["generationID"].lower()
         candidates = engine_rows.get(generation_id, [])
         issues: list[str] = []
+        artifacts: list[dict[str, Any]] = []
         if observation.get("schemaVersion") == 2:
             selections = observation.get("observedSelections") or {}
             for key in ("mode", "speaker", "delivery", "language", "variation"):
@@ -1033,6 +1207,14 @@ def validate_device_evidence(
                 issues.append("mandatory_quality_gate_failed")
             if (terminal.get("audioQC") or {}).get("verdict") == "fail":
                 issues.append("audio_qc_failed")
+        if evidence_version == 2:
+            if receipt.get("warmState") not in {"cold", "warm"}:
+                issues.append("missing_observed_warm_state")
+            try:
+                if attachment_root is None: raise AuditError("missing_attachment_root")
+                artifacts = generation_artifacts(attachment_root, diagnostics_root, observation, terminal)
+            except (AuditError, OSError) as error:
+                issues.append(str(error) if isinstance(error, AuditError) else "unreadable_generation_artifact")
         results.append(
             {
                 "takeID": take_id,
@@ -1044,6 +1226,13 @@ def validate_device_evidence(
         )
         if plan["schemaVersion"] >= 3:
             results[-1]["historyOwnershipDigest"] = digest(observation["historyOwnership"])
+        if evidence_version == 2:
+            product_issues = {issue for issue in issues if issue.startswith(("receipt_", "visible_"))
+                              or issue in {"engine_finish_not_eos", "audio_qc_failed", "mandatory_quality_gate_failed", "script_digest_mismatch", "engine_mode_mismatch"}}
+            results[-1]["status"] = "PRODUCT_FAIL" if product_issues else ("HARNESS_FAIL" if issues else "PASS")
+            results[-1]["qualityVerdict"] = (terminal.get("notes") or {}).get("quality_registry_outcome", "unknown")
+            results[-1]["audioQC"] = terminal.get("audioQC")
+            results[-1]["artifacts"] = artifacts
 
     seeds_by_mode: dict[str, set[int]] = {}
     for observation in generation_observations.values():
@@ -1059,7 +1248,7 @@ def validate_device_evidence(
                     if "mode_seed_not_frozen" not in row["issues"]:
                         row["issues"].append("mode_seed_not_frozen")
 
-    for mode in sorted({planned[take_id]["mode"] for take_id in generation_observations}):
+    for mode in sorted({planned[take_id]["mode"] for take_id in generation_observations}) if evidence_version == 1 else []:
         ordinary_rows = [
             row for row in results
             if planned[row["takeID"]]["mode"] == mode
@@ -1071,14 +1260,19 @@ def validate_device_evidence(
                 if "missing_observed_warm_coverage" not in row["issues"]:
                     row["issues"].append("missing_observed_warm_coverage")
 
-    return {
-        "schemaVersion": 1,
+    report = {
+        "schemaVersion": evidence_version,
         "result": "passed" if results and all(row["status"] == "PASS" for row in results) else "failed",
         "planDigest": plan["planDigest"],
         "observedTakeCount": len(results),
         "passingTakeCount": sum(row["status"] == "PASS" for row in results),
         "rows": results,
     }
+    if evidence_version == 2:
+        report.update(runID=observations[0]["runID"], sourceIdentity=plan["sourceIdentity"],
+                      observationDigest=digest(observations))
+        report["correlationDigest"] = digest(report)
+    return report
 
 
 def prepare_resume(
@@ -1209,6 +1403,13 @@ def prepare_resume(
                         raise AuditError("original resume evidence crosses source/plan identity")
                     correlations[origin] = load_json(origin_root / "control-audit-generation-correlation.json")
                 origin_proof = correlations[origin]
+                if run.get("controlEvidenceVersion") == 2:
+                    owner_rows = [row for row in stream if row.get("runID") == origin]
+                    if (origin_proof.get("schemaVersion") != 2 or origin_proof.get("runID") != origin
+                            or origin_proof.get("sourceIdentity") != source_identity
+                            or origin_proof.get("observationDigest") != digest(owner_rows)):
+                        raise AuditError("resume correlation observation identity mismatch")
+                    verify_retained_artifacts(run_path.parent.parent / origin, origin_proof)
                 if origin_proof.get("result") != "passed" or origin_proof.get("planDigest") != current["planDigest"]:
                     raise AuditError("original resume correlation did not pass for this plan")
                 correlated = {row["takeID"]: row for row in origin_proof.get("rows", [])}
@@ -1237,7 +1438,7 @@ def prepare_resume(
 
     newly_skipped = None
     start = contiguous
-    if run.get("status") not in {"passed", "diagnosedFailure"} and start < len(generation_ids):
+    if run.get("status") not in {"passed", "passedWithWarnings", "diagnosedFailure"} and start < len(generation_ids):
         current_run_id = run["runID"]
         represented_failure = any(
             row.get("runID") == current_run_id
@@ -1317,6 +1518,8 @@ def main() -> int:
     device_parser.add_argument("--plan", type=pathlib.Path, required=True)
     device_parser.add_argument("--observations", type=pathlib.Path, required=True)
     device_parser.add_argument("--diagnostics", type=pathlib.Path, required=True)
+    device_parser.add_argument("--evidence-version", type=int, choices=(1, 2), default=1)
+    device_parser.add_argument("--attachments", type=pathlib.Path)
     device_parser.add_argument("--output", type=pathlib.Path, required=True)
 
     resume_parser = subparsers.add_parser("prepare-resume")
@@ -1359,9 +1562,21 @@ def main() -> int:
             print(f"collected {len(rows)} control observations")
             return 0
         if arguments.command == "compose":
+            metadata = load_json(arguments.run_metadata)
+            proofs = None
+            if metadata.get("controlEvidenceVersion") == 2:
+                proofs = []
+                roots = [arguments.run_metadata.parent]
+                for run_id in metadata.get("resumeRunIDs", []):
+                    if not isinstance(run_id, str) or not re.fullmatch(r"ios-xcui-control-audit-[A-Za-z0-9_-]+", run_id):
+                        raise AuditError("unsafe prior correlation reference")
+                    roots.append(arguments.run_metadata.parent.parent / run_id)
+                for root in roots:
+                    path = root / "control-audit-generation-correlation.json"
+                    if path.is_file(): proofs.append(load_json(path))
             summary = compose(
                 contract,
-                load_json(arguments.run_metadata),
+                metadata,
                 load_json(arguments.plan),
                 _read_jsonl(arguments.observations),
                 (
@@ -1374,16 +1589,18 @@ def main() -> int:
                     if arguments.external_interruption_classification
                     else None
                 ),
+                correlations=proofs,
             )
             atomic_write_json(arguments.output, summary)
             print(arguments.output)
-            return 0 if summary.get("shard", {}).get("result", summary["result"]) in {"passed", "completed-with-limitations"} else 1
+            return 0 if summary.get("shard", {}).get("result", summary["result"]) in {"passed", "passedWithWarnings", "completed-with-limitations"} else 1
         if arguments.command == "validate-device":
             report = validate_device_evidence(
                 contract,
                 load_json(arguments.plan),
                 _read_jsonl(arguments.observations),
                 arguments.diagnostics,
+                evidence_version=arguments.evidence_version, attachment_root=arguments.attachments,
             )
             atomic_write_json(arguments.output, report)
             print(arguments.output)

@@ -4,12 +4,15 @@ import copy
 import base64
 import importlib.util
 import json
+import hashlib
 import pathlib
+import struct
 import subprocess
 import tempfile
 import unittest
 from unittest import mock
 import zlib
+import wave
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -996,6 +999,154 @@ class IOSControlAuditIncrementalEvidenceTests(unittest.TestCase):
                     ["bash", "-c", setup + block + 'printf "%s" "$final_run_status"',
                      "fixture", lane, scenario, diagnosis], capture_output=True, text=True, check=True)
                 self.assertEqual(completed.stdout, expected)
+
+
+class IOSControlAuditCorrelationV2Tests(unittest.TestCase):
+    setUp = IOSControlAuditCompositionTests.setUp
+    observation = IOSControlAuditCompositionTests.observation
+    event = IOSControlAuditIncrementalEvidenceTests.event
+    shard_metadata = IOSControlAuditIncrementalEvidenceTests.shard_metadata
+    completed_shard = IOSControlAuditIncrementalEvidenceTests.completed_shard
+
+    def proof(self, rows: list[dict], *, warm: str = "cold", quality: str = "pass", status: str = "PASS") -> dict:
+        take = self.plan["takes"][0]
+        rows[2].update(generationID="00000000-0000-4000-8000-000000000001")
+        report = {"schemaVersion": 2, "runID": self.metadata["runID"], "sourceIdentity": self.source_identity,
+                  "planDigest": self.plan["planDigest"], "observationDigest": audit.digest(rows),
+                  "result": "passed" if status == "PASS" else "failed", "rows": [{
+                      "takeID": take["takeID"], "generationID": rows[2]["generationID"],
+                      "status": status, "issues": [] if status == "PASS" else ["missing_audio_artifact"],
+                      "qualityVerdict": quality, "observedWarmState": warm}]}
+        report["correlationDigest"] = audit.digest(report)
+        return report
+
+    def test_missing_correlation_fails_summary_and_shard_not_product(self) -> None:
+        result = audit.compose(self.contract, dict(self.shard_metadata(), controlEvidenceVersion=2),
+                               self.plan, self.completed_shard())
+        self.assertEqual(result["result"], "failed")
+        self.assertEqual(result["shard"]["result"], "failed")
+        self.assertEqual(result["counts"]["HARNESS_FAIL"], 1)
+        self.assertEqual(result["counts"]["PRODUCT_FAIL"], 0)
+
+    def test_cold_shard_is_valid_but_campaign_warm_coverage_stays_pending(self) -> None:
+        rows = self.completed_shard()
+        proof = self.proof(rows)
+        result = audit.compose(self.contract, dict(self.shard_metadata(), controlEvidenceVersion=2),
+                               self.plan, rows, correlations=[proof])
+        self.assertEqual(result["shard"]["result"], "passed")
+        self.assertEqual(result["result"], "incomplete")
+        self.assertTrue(all(row["status"] == "PENDING" for row in result["warmCoverage"]))
+        self.assertFalse(result["promotionEligible"])
+
+    def test_correlation_failure_overrides_ui_only_pass(self) -> None:
+        rows = self.completed_shard()
+        proof = self.proof(rows, status="HARNESS_FAIL")
+        result = audit.compose(self.contract, dict(self.shard_metadata(), controlEvidenceVersion=2),
+                               self.plan, rows, correlations=[proof])
+        self.assertEqual(result["shard"]["result"], "failed")
+        self.assertEqual(result["counts"]["HARNESS_FAIL"], 1)
+
+    def test_warning_is_explicit_and_never_promotion_pass(self) -> None:
+        rows = self.completed_shard()
+        proof = self.proof(rows, quality="warning")
+        result = audit.compose(self.contract, dict(self.shard_metadata(), controlEvidenceVersion=2),
+                               self.plan, rows, correlations=[proof])
+        self.assertEqual(result["shard"]["result"], "passedWithWarnings")
+        self.assertEqual(result["qualityWarnings"], ["generation:custom-001"])
+        self.assertFalse(result["promotionEligible"])
+
+    def test_changed_observation_cross_run_or_corrupt_proof_is_rejected(self) -> None:
+        rows = self.completed_shard()
+        proof = self.proof(rows)
+        for field, value in (("runID", "another-run"), ("sourceIdentity", "f" * 64),
+                             ("observationDigest", "f" * 64), ("correlationDigest", "f" * 64)):
+            with self.subTest(field=field), self.assertRaises(audit.AuditError):
+                audit.compose(self.contract, dict(self.shard_metadata(), controlEvidenceVersion=2),
+                              self.plan, rows, correlations=[dict(proof, **{field: value})])
+
+    def test_warm_coverage_uses_receipt_and_final_campaign_cannot_hide_missing_modes(self) -> None:
+        rows = self.completed_shard()
+        proof = self.proof(rows, warm="warm")
+        result = audit.compose(self.contract, dict(self.shard_metadata(), controlEvidenceVersion=2),
+                               self.plan, rows, correlations=[proof])
+        self.assertEqual(result["warmCoverage"][0]["status"], "PASS")
+        metadata = dict(self.shard_metadata(), controlEvidenceVersion=2, controlTakeLimit=len(self.plan["takes"]))
+        result = audit.compose(self.contract, metadata, self.plan, rows, correlations=[proof])
+        self.assertEqual(result["result"], "failed")
+        self.assertTrue(any(row["status"] == "FAIL" for row in result["warmCoverage"]))
+
+    def test_generation_correlation_is_required_only_for_generation_workflow(self) -> None:
+        contract = json.loads((ROOT / "config/orchestration-contract.json").read_text())
+        workflows = contract["workflows"]
+        self.assertIn("control-audit-device-correlation", workflows["ui-ios-control-audit-generation"]["requiredSteps"])
+        self.assertNotIn("control-audit-device-correlation", workflows["ui-ios-control-audit"]["requiredSteps"])
+
+
+class IOSControlAuditArtifactTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root = pathlib.Path(self.temp.name)
+        self.attachments = self.root / "attachments"
+        self.diagnostics = self.root / "control-audit-diagnostics"
+        self.attachments.mkdir()
+        self.observation = {"takeID": "custom-001", "generationID": "00000000-0000-4000-8000-000000000001", "runID": "ios-xcui-control-audit-fixture"}
+        def chunk(kind: bytes, data: bytes) -> bytes:
+            return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data))
+        self.png = b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", 44, 44, 8, 6, 0, 0, 0)) + chunk(b"IDAT", zlib.compress((b"\0" + b"\xff" * 176) * 44)) + chunk(b"IEND", b"")
+        self.manifest = [{"attachments": []}]
+        for kind in ("request", "player", "controls"):
+            filename = f"{kind}.png"
+            (self.attachments / filename).write_bytes(self.png)
+            self.manifest[0]["attachments"].append({"exportedFileName": filename, "suggestedHumanReadableName": f"generation-custom-001-{kind}_0_AAAAAAAA-0000-4000-8000-000000000001.png"})
+        (self.attachments / "manifest.json").write_text(json.dumps(self.manifest))
+        self.audio = self.diagnostics / self.observation["runID"] / "outputs" / f"{self.observation['generationID']}.wav"
+        self.audio.parent.mkdir(parents=True)
+        with wave.open(str(self.audio), "wb") as wav:
+            wav.setnchannels(1); wav.setsampwidth(2); wav.setframerate(24000)
+            wav.writeframes(b"\0\0" * 24000)
+        self.terminal = {"notes": {"samplingWAVDigest": hashlib.sha256(self.audio.read_bytes()).hexdigest()}}
+
+    def capture(self) -> list[dict]:
+        return audit.generation_artifacts(self.attachments, self.diagnostics, self.observation, self.terminal)
+
+    def test_real_png_and_wav_are_digest_bound_and_private_paths_absent(self) -> None:
+        artifacts = self.capture()
+        self.assertEqual(len(artifacts), 4)
+        self.assertEqual(artifacts[-1]["durationSeconds"], 1)
+        self.assertNotIn(str(self.root), json.dumps(artifacts))
+
+    def test_missing_duplicate_corrupt_screenshots_fail_closed(self) -> None:
+        for content in (b"", self.png[:-1], self.png[:35] + self.png[-12:]):
+            with self.subTest(size=len(content)):
+                (self.attachments / "player.png").write_bytes(content)
+                with self.assertRaises(audit.AuditError): self.capture()
+        (self.attachments / "player.png").write_bytes(self.png)
+        self.manifest[0]["attachments"].append(self.manifest[0]["attachments"][0])
+        (self.attachments / "manifest.json").write_text(json.dumps(self.manifest))
+        with self.assertRaisesRegex(audit.AuditError, "duplicate"): self.capture()
+
+    def test_changed_wav_and_cross_run_rejected(self) -> None:
+        self.audio.write_bytes(self.audio.read_bytes() + b"drift")
+        with self.assertRaisesRegex(audit.AuditError, "digest_mismatch"): self.capture()
+        self.observation["runID"] = "other-run"
+        with self.assertRaisesRegex(audit.AuditError, "missing_audio"): self.capture()
+
+    def test_resume_requires_unchanged_artifact_bytes_and_correlated_report(self) -> None:
+        proof = {"rows": [{"status": "PASS", "artifacts": self.capture()}]}
+        proof["correlationDigest"] = audit.digest(proof)
+        audit.verify_retained_artifacts(self.root, proof)
+        self.audio.write_bytes(self.audio.read_bytes() + b"drift")
+        with self.assertRaisesRegex(audit.AuditError, "digest mismatch"):
+            audit.verify_retained_artifacts(self.root, proof)
+        proof["rows"][0]["artifacts"].pop()
+        with self.assertRaisesRegex(audit.AuditError, "corrupt retained"):
+            audit.verify_retained_artifacts(self.root, proof)
+
+    def test_missing_manifest_error_is_sanitized(self) -> None:
+        (self.attachments / "manifest.json").unlink()
+        with self.assertRaises(audit.AuditError) as caught: self.capture()
+        self.assertNotIn(str(self.root), str(caught.exception))
 
 
 class IOSControlAuditResumeTests(unittest.TestCase):

@@ -63,13 +63,23 @@ acceptance; old results remain historical evidence, not replacement candidate pr
 
 ## September 5 device checkpoint and next boundary
 
+The [correlation/capture correction](../development-progress.md#september-5-correlation-and-capture-correction--verified)
+now passes a fresh two-take physical pilot with all required collection, correlation and restoration
+steps. RF-07/ICA-18's bounded harness gates are complete; RF-09's candidate freeze still precedes
+RF-11. Six genuine screenshots and two engine-digest-bound WAVs are retained, including the output
+whose test-owned History row was deleted. Both new takes pass Fast QC, but use a different seed
+from the earlier warning; no audio-quality finding is silently closed. Full-campaign warm coverage
+remains pending and 199 pilot-plan takes are unscheduled. Screen protection is verified and the
+phone is locked. Do not reuse this development pilot as full acceptance for a later changed tree.
+
 The [later two-take pilot](../development-progress.md#september-5-later-physical-pilot--resume-checkpoint)
 on `1ba75045` completed both UI/player/History journeys and restoration, but the runner failed
 missing warm coverage (both authoritative receipts were cold). English passed QC; Chinese had
 an excess-cadence warning. Keep that warning distinct from both a hard rejection and promotion
-PASS. The host's optional correlation step and absent generation screenshots remain bounded
-RF-07/AV-09 work; no failed result was rewritten or resumed. RF-11's full campaign remains gated
-by RF-07 and RF-09. Final French Settings readback confirms three-minute Auto-Lock; the independent
+PASS. The host's optional correlation step and absent generation screenshots are addressed by
+the verified correlation-v2/capture correction under RF-07/AV-09; no failed result was rewritten
+or resumed. RF-11's full campaign remains gated by RF-09. The historical final French Settings
+readback confirms three-minute Auto-Lock; the independent
 13:59 UTC CoreDevice observation confirms the phone is locked. No further device UI work followed.
 
 The later [phone-independent codec checkpoint](../development-progress.md#september-5-phone-independent-codec-checkpoint)

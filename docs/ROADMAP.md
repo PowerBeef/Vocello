@@ -13,12 +13,12 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `release-first-3-0-2026-09` | active | release-qa | 4/12 (33%) |
+| `release-first-3-0-2026-09` | active | release-qa | 5/12 (42%) |
 | `autonomous-validation-remediation-2026-08` | active | release-qa | 8/11 (73%) |
 | `delivery-prompting-2026-08` | active | backend-mlx | 29/34 (85%) |
 | `engineering-review-remediation-2026-08` | active | backend-and-platform | 11/23 (48%) |
 | `ios-app-store-readiness-2026-08` | active | release-qa | 2/12 (17%) |
-| `ios-control-audit-2026-08` | active | ios | 14/19 (74%) |
+| `ios-control-audit-2026-08` | active | ios | 15/19 (79%) |
 | `ios-generation-startup-reliability-2026-08` | active | backend-and-platform | 4/6 (67%) |
 | `voice-identity-language-reliability-2026-08` | active | backend-and-platform | 9/10 (90%) |
 | `compliance-2026-08` | complete | release-qa | 2/2 (100%) |
@@ -47,7 +47,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `RF-04` | done | Step 4 — repair long-form durability on both platforms | `file:Tests/VocelloCoreTests/LongFormHistoryAcceptanceTests.swift`, `doc:docs/development-progress.md#resume-here-2026-09-04` |
 | `RF-05` | done | Step 5 — expose recoverable History-save outcomes | `file:Tests/VocelloCoreTests/GenerationHistoryEnqueueStateTests.swift`, `file:Tests/VocelloCoreTests/GenerationHistoryOutboxTests.swift`, `doc:docs/development-progress.md#resume-here-2026-09-04` |
 | `RF-06` | in-flight | Step 6 — localize the remaining natural-text audio failures | `doc:docs/reference/release-first-execution-2026-09.md#rf-06-retained-evidence-review-and-bounded-follow-up-september-4`, `doc:docs/development-progress.md#september-5-phone-independent-codec-checkpoint` |
-| `RF-07` | in-flight | Step 7 — finish only the acceptance-blocking harness repairs | — |
+| `RF-07` | done | Step 7 — finish only the acceptance-blocking harness repairs | `doc:docs/development-progress.md#september-5-correlation-and-capture-correction--verified`, `file:Tests/VocelloiOSLogicTests/IOSAuditOutputCaptureTests.swift` |
 | `RF-08` | in-flight | Step 8 — package the downloadable optimized CLI | — |
 | `RF-09` | in-flight | Step 9 — verify the coherent tree and freeze the 3.0.0 candidate | — |
 | `RF-10` | planned | Step 10 — independently qualify macOS and downloadable CLI | — |
@@ -61,9 +61,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`RF-06`** (in-flight) — Step 6 — localize the remaining natural-text audio failures.
   gate: Under ICA-15/VLR-07, review retained WAV/code/receipt/ASR evidence before new generation; separate the completed numeric-marker regression, marker-free French Custom failure, and French Design production versus experimental results. Locate the first divergent request/language/code/decoder/assembly/QC boundary, add a targeted fixture, and run only qualifying fixed-seed confirmations. Keep QC, seeds, prompts, token caps and model pins unchanged absent causal proof. Any unresolved sampled-output pathology remains an explicit release blocker/decision, never harness PASS.
-
-- **`RF-07`** (in-flight) — Step 7 — finish only the acceptance-blocking harness repairs.
-  gate: Under ICA-18/AV-09, extend the existing runner with incremental durable observations, early generation identity capture, explicit serialization failure, visible History-focus polling, observed-versus-expected selections, genuine playback/scrub evidence, terminal ledgers on every exit, and default five-take shards through existing start/limit controls. Interrupted/lost-focus/missing-observation/collection/stale-resume/duplicate fixtures pass; collection and cleanup plus one small physical pilot pass before the full campaign. No parallel harness, automatic retry, or fabricated observation.
 
 - **`RF-08`** (in-flight) — Step 8 — package the downloadable optimized CLI.
   gate: Implement F-17 in the existing release workflow: separate optimized arm64 CLI DMG, complete libraries/resources/notices/instructions, checkout-independent discovery, signatures, notarization/stapling, checksums and source/version supply-chain identity. Copied-package tests cover paths with spaces, version/JSON, all three modes, a real two-item batch, cancellation, failure exits and resource loading. The F-21 batch-admission regression must use production-built requests against the real engine policy; keep index/total outside ordinary requests. No Homebrew route, privileged installer, shell-profile edits, or second release system.
@@ -329,7 +326,7 @@ Narrative authority: [`docs/reference/ios-on-device-control-audit-2026-08-28.md`
 | `ICA-15` | in-flight | P1 — bound deterministic CustomVoice over-continuation without truncating valid speech | `doc:docs/reference/ios-control-audit-remediation-2026-08-29.md`, `doc:docs/reference/ios-device-testing.md` |
 | `ICA-16` | done | P2 — bound smoke evidence collection to the exact run | `doc:docs/reference/ios-control-audit-remediation-2026-08-29.md`, `doc:docs/reference/ios-device-testing.md` |
 | `ICA-17` | done | P2 — accept omitted optional cadence quantiles in device evidence | `doc:docs/reference/ios-control-audit-remediation-2026-08-29.md`, `doc:docs/reference/ios-device-testing.md`, `file:scripts/tests/test_ios_startup_reliability.py` |
-| `ICA-18` | in-flight | P2 — keep control-audit History ownership out of spoken scripts | `doc:docs/reference/ios-control-audit-remediation-2026-08-29.md`, `doc:docs/reference/ios-device-testing.md`, `file:scripts/tests/test_ios_control_audit.py` |
+| `ICA-18` | done | P2 — keep control-audit History ownership out of spoken scripts | `doc:docs/reference/ios-control-audit-remediation-2026-08-29.md`, `doc:docs/reference/ios-device-testing.md`, `file:scripts/tests/test_ios_control_audit.py`, `doc:docs/development-progress.md#september-5-correlation-and-capture-correction--verified`, `file:Tests/VocelloiOSLogicTests/IOSAuditOutputCaptureTests.swift` |
 | `ICA-19` | done | P2 — remove largest-size Settings tab truncation | `doc:docs/development-progress.md#september-5-physical-device-checkpoint` |
 
 ### Open items in detail
@@ -345,9 +342,6 @@ Narrative authority: [`docs/reference/ios-on-device-control-audit-2026-08-28.md`
 
 - **`ICA-15`** (in-flight) — P1 — bound deterministic CustomVoice over-continuation without truncating valid speech.
   gate: Preserve the exact custom-005 Eric, Calm Strong, Italian, Consistent request and independently reproduce its sampled-output failure across warm/cold and streaming/non-streaming paths. The retained codec traces, full and incremental decoder replays, final model counters, EOS/token-cap state, AudioQC, memory, and publication outcome must identify the first divergent layer. Evaluate any continuation-budget candidate on a pre-registered representative CustomVoice corpus spanning script lengths, languages, deliveries, speakers, seeds, and both output modes. A production change qualifies only if it prevents the reproduced pathological continuation without converting valid speech to token-cap/incomplete failures, worsening WER/CER or delivery evidence, changing sampling defaults, or weakening mandatory QC. If no candidate qualifies, preserve fail-closed rejection and explicit user-controlled retry; never trim, silently regenerate, or substitute a seed.
-
-- **`ICA-18`** (in-flight) — P2 — keep control-audit History ownership out of spoken scripts.
-  gate: New schema-v3 plans speak the exact tracked language corpus without numeric ownership markers. Preserve byte-exact v1/v2 plan validation and the original ICA-15 numeric failure digests. Before any History mutation, XCUITest must prove one new persisted row against a complete before/after census and verify its full player transcript. Record row identity with the completed generation UUID, script digest, exact UInt64 seed, and cleanup baseline. Resume requires a matching source/plan/run chain, correlated ownership digest, retained row ID and visible seed; missing or ambiguous ownership fails before mutation or seed substitution. Deterministic negative fixtures, native compilation, and a fresh source-bound physical generation run must prove ownership, seed retention, and non-carrier deletion while preserving unrelated History. This closes harness contamination only, not ICA-15 sampled-output failures or ICA-04 full-matrix acceptance.
 
 ## iOS Built-in Voice startup reliability
 

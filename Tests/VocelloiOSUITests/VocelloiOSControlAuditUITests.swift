@@ -593,9 +593,11 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
                     "Every post-sentinel take must use the one visibly pinned seed"
                 )
             }
+            VocelloUIScreenshot.attach(app, named: "generation-\(take.takeID)-request")
             recorder.record(
                 scenario: "generation", controlID: "generation:\(take.takeID)", classification: "IN_PROGRESS",
                 expected: "Visible request is prepared before Generate", actual: "Selected production controls observed",
+                evidence: "generation-\(take.takeID)-request",
                 take: take, observedSeed: frozenSeed, phase: "request-prepared", observedSelections: selections
             )
             let generationID = generateAndWaitForCompletedPlayer(
@@ -619,9 +621,11 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
             // Ending this shard is the only way to preserve the failed request
             // without retrying it. `prepare-resume` advances to the next row.
             guard !generationID.isEmpty else { return }
+            VocelloUIScreenshot.attach(app, named: "generation-\(take.takeID)-player")
             recorder.record(
                 scenario: "generation", controlID: "generation:\(take.takeID)", classification: "IN_PROGRESS",
                 expected: "Completed player exposes generation identity", actual: "Identity captured before player and History navigation",
+                evidence: "generation-\(take.takeID)-player",
                 take: take, generationID: generationID, observedSeed: frozenSeed,
                 phase: "player-visible", observedSelections: selections
             )
@@ -643,6 +647,7 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
                 dismissCompletedPlayerAndAssertGenerateReady()
                 return
             }
+            VocelloUIScreenshot.attach(app, named: "generation-\(take.takeID)-controls")
             dismissCompletedPlayerAndAssertGenerateReady()
             guard let afterRowIDs = historyRowCensus(expectedScript: take.script) else { return }
             let added = Set(afterRowIDs).subtracting(beforeRowIDs)
@@ -691,7 +696,7 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
                 actual: retainedSeedCarriers[take.mode]?.takeID == take.takeID
                     ? "Completed generation \(generationID); run-owned History row retained as the resume seed carrier"
                     : "Completed generation \(generationID); run-owned History row removed",
-                evidence: "generation-\(take.takeID)",
+                evidence: "generation-\(take.takeID)-controls",
                 take: take,
                 generationID: generationID,
                 observedSeed: observedSeed,

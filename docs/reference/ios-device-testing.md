@@ -225,12 +225,30 @@ value. No automatic test/generation retry is added. These source repairs require
 Runner PASS is written only after required-step finalization; failure exits also finalize the ledger.
 
 The [later September 5 pilot checkpoint](../development-progress.md#september-5-later-physical-pilot--resume-checkpoint)
-records an unresolved exception in the current runner: device correlation fails on missing warm
+records an exception in the historical runner: device correlation fails on missing warm
 coverage while its required-step entry is optional and the UI-only summary says the shard passed.
 Use `run.json` plus the correlation and all underlying observations, never the ledger subtotal alone.
 That failed run cannot resume. Its generation evidence labels have no corresponding PNGs; do not
 claim screenshot acceptance from the structured player observations. RF-07/AV-09 own the bounded
 correction; the warm cohort and promotion treatment of cadence warnings remain required.
+
+New generation/all runs declare `controlEvidenceVersion: 2`. Their dedicated
+`ui-ios-control-audit-generation` required-step workflow makes device correlation mandatory.
+Correlation schema v2 overrides UI-only row PASS on missing or divergent evidence; missing
+evidence is a harness failure, not a synthetic product defect. Warm coverage is evaluated across
+the source-bound campaign chain: incomplete shards may leave it PENDING, but complete campaigns
+must prove genuine warm receipts in every mode. Row order never establishes warm state.
+Whole-output quality warnings remain explicit `passedWithWarnings` shard outcomes and cannot
+authorize promotion or a clean complete campaign.
+
+Each completed take requires real request/player/controls PNGs (CRC and raster checked) and the
+published PCM WAV matching the engine's existing `samplingWAVDigest`. The diagnostics-only mirror
+copies audio before run-owned History cleanup, never moves the accepted output, and bounds each
+run to 201 files / 256 MiB, with a 64 MiB per-file ceiling. These private copies stay in the app's
+purgeable Caches diagnostics root and the ignored, pinned host run bundle; capture failure fails
+host qualification rather than synthesis. Retain failed/warning evidence for investigation.
+Resume validates correlation/observation digests and all retained artifact bytes before selecting
+the next row. Original schema-v1 reports remain historical evidence; do not upgrade or rewrite them.
 
 For a time-limited phone window, set the stop deadline before launching a lane and reserve time
 for its diagnostics and teardown. Do not launch work that cannot fit the remaining window.

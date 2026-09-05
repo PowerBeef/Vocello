@@ -47,6 +47,61 @@ machine-readable status record and wins over any older prose.
 | 13 — Benchmark/history v3 | Live 2026-07-29: the first schema-v3 records are committed (three clean `phase0-cli-control-*` engine records plus one exploratory run that also exposed and fixed the summarizer's v3 pin). `benchmarks/schema-v3.json` adds the typed quality identity to generation takes (pass/warning only, five fast gates required, machine-code issues); v1/v2 records stay valid immutable history; the publisher stamps v3 only when every take carries the identity. The UI benchmark checkers folded the same identity 2026-08-01: ui-generation records now publish v3 (first: the focused `v3-fold-proof` record `macos-xcui-benchmark-20260801-003208-403989cf`); the canonical iOS matrix published its first v3 record 2026-08-01 (`ios-xcui-benchmark-20260801-132415-abbec96b`). |
 | 14 — Organization and retirement | Closed 2026-07-23 (14a + 14b): compatibility SPI retired, actor-owned loading/metadata/priming/clone artifacts, clone conditioning epoch-bound end to end. |
 
+## September 5 correlation and capture correction — verified
+
+RF-07/ICA-18/AV-09 retain ownership. New correlation schema v2 joins mandatory engine evidence
+into row/shard composition, leaves unobserved warm coverage pending until campaign completion,
+and exposes warning takes as non-promotion `passedWithWarnings`. Genuine request/player/controls
+screenshots and bounded diagnostic-only published WAV copies replace unbacked evidence names.
+Resume revalidates the retained bytes. Original failed pilot artifacts below are unchanged.
+No model, prompt, seed, memory-policy or QC rule changed.
+
+Fresh pilot `ios-xcui-control-audit-20260905-144115-105f8d0b`, on `7a5da8d8` plus this patch,
+passed XCTest in **785.058 seconds** and passed the complete runner, required correlation,
+composition, crash delta and retention. Its frozen tree is
+`3d8333f2e5fde91551c6244d0901c7775182fe7bace4bd32dd18fb2f383d96ff`.
+
+| Take | Collected result |
+| --- | --- |
+| `custom-001` | English / Aiden / Neutral / Balanced: 2.48 s, EOS, Fast-QC PASS, no cadence pauses, real playback and paused scrub. |
+| `custom-002` | Chinese / Aiden / Angry / Consistent: 13.44 s, EOS, Fast-QC PASS, one cadence pause versus four expected, longest interior pause 546 ms, real playback and paused scrub. |
+
+Both receipts are cold, retry attempt zero, and use the same exact run-frozen seed. This seed is
+different from the earlier warning run; **this pilot does not remediate or erase that warning**.
+Memory capture and boundary coverage are 100%, capture failures zero, pressure healthy and
+thermals nominal. This is diagnostic coverage, not a new published memory qualification.
+
+Ten contiguous observations, six 1206×2622 PNGs and both published PCM WAVs are retained under
+the ignored, pinned run bundle. PNG headers, CRCs and raster data validate; WAV digests match the
+engine receipts. Direct screenshot inspection shows genuine visible player/controls without
+obstruction at the captured default size, not a complete accessibility audit. The second
+run-owned History row was removed and its WAV remains available; the first remains the explicit
+seed carrier. Preexisting History rows and the original Studio state were preserved.
+
+`run.json`, `required-steps.json`, correlation and `shard.result` all pass. Campaign result is
+**incomplete: 199 unscheduled; warm coverage PENDING in all modes; promotionEligible false**.
+The real `prepare-resume` validator rechecked the files and selected index 2 without launching
+another take. That checkpoint applies only to the exact tree above; this documentation checkpoint
+must not be used to bypass source identity. RF-07 and ICA-18's bounded implementation/pilot gates
+are complete. RF-11 still needs RF-09's candidate freeze, the full matrix including genuine warm
+coverage, and all applicable quality evidence. Prior failures remain under their existing owners.
+
+Evidence SHA-256: observations `b62482dd45af099ba64a6da2d82be00f836e8665e57b8da9ab716590a76cbaee`;
+correlation `37d028b7c4ff72e8104d8369de3d57de6bcf015154df554a0f2f7ce439e6bdba`;
+summary `b402eb62bb2a90eff1e4b27820c3052e0f9fd801d65125e1702ae4bc96719953`.
+
+Verification: 81 focused control-audit Python tests, 16 required-step ledger tests, three native
+capture tests, the 1,518-test project-input gate, and generic iOS app/logic compilation passed.
+The complete macOS deterministic run `mac-test-20260905-110211` passed all core, XPC transport
+and owned-runtime suites (581 core, 19 transport, 109 runtime, zero failures). Two optional
+AudioSeal fixture tests were skipped because exported external fixtures were not configured.
+Derived refresh and validation passed; the final commit gate revalidates the documentation checkpoint.
+
+Final phone action: `ios-xcui-screen-protection-20260905-145850-4f27d79c` passed in 32.640 s,
+including runner/retention. Its French Settings screenshot confirms **3 minutes**, Always-On
+**Non**. The separate read-only `lock-state-observation-01.json` returned
+`passcodeRequired: true`: the phone is confirmed locked. No later device UI is scheduled.
+
 ## September 5 later physical pilot — resume checkpoint
 
 On unchanged `main` at `1ba75045`, preflight passed and the bounded two-take pilot

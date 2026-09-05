@@ -4,11 +4,11 @@
 > execute models, devices, UI tests, signing, or network checks.
 
 - Current source identity and dirty state: local JSON report only (kept out of the tracked snapshot to avoid self-referential drift)
-- Swift tests: 746 cases in 98 files
-- Python tests: 1506 cases in 121 files
-- Required-step assurance: 102 steps across 22 workflows, all covered by forced-failure fixtures
+- Swift tests: 749 cases in 99 files
+- Python tests: 1518 cases in 121 files
+- Required-step assurance: 112 steps across 23 workflows, all covered by forced-failure fixtures
 - Unsafe-concurrency annotations: 48 (48 registered with owner and invariant; contract complete)
-- Evidence routing: 927/927 critical paths explicit; 0 use repository-other fallback
+- Evidence routing: 928/928 critical paths explicit; 0 use repository-other fallback
 
 ## Hardware evidence by domain selector
 
@@ -28,8 +28,8 @@
 | generation-terminal | backend | 4 | 2 / 16 | macos-ui-generation: fresh, ios-ui-generation: stale |
 | clone-conditioning | backend | 33 | 2 / 32 | macos-ui-generation: fresh, ios-ui-generation: stale |
 | event-delivery | backend | 3 | 2 / 10 | macos-ui-generation: stale, ios-ui-generation: stale |
-| memory-policy | backend-platform | 6 | 7 / 61 | macos-memory-qualification: stale, ios-memory-qualification: stale |
-| model-delivery | backend-platform | 17 | 8 / 79 | external promotion: macos-model-download-lifecycle, ios-model-download-lifecycle |
+| memory-policy | backend-platform | 6 | 8 / 64 | macos-memory-qualification: stale, ios-memory-qualification: stale |
+| model-delivery | backend-platform | 17 | 9 / 82 | external promotion: macos-model-download-lifecycle, ios-model-download-lifecycle |
 | ui-performance | platform | 79 | 18 / 59 | macos-ui-performance: stale, ios-ui-performance: stale |
 | xpc-transport | macos | 3 | 4 / 19 | macos-ui-generation: fresh |
 | benchmark-validation | release-qa | 6 | 4 / 126 | macos-ui-generation: stale, ios-ui-generation: stale |

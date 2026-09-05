@@ -187,6 +187,16 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
     private var generationAuditVoiceName: String?
     private var playerEvidence: [String: String] = [:]
 
+    override func tearDown() {
+        // XCTest's stop-on-failure exception can bypass Swift defer. Always
+        // release the test-owned app session, including pending Auto-play
+        // restoration. This does not certify other restoration after an abort;
+        // the host still requires the explicit audit-restoration observation.
+        continueAfterFailure = true
+        endSession()
+        super.tearDown()
+    }
+
     private var directImportVoiceName: String {
         generationAuditVoiceName ?? "ICA \(recorder.runID.suffix(8))"
     }
@@ -445,13 +455,19 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
                 assertAccessibleTarget(element(identifier), category: name)
             }
             VocelloUIScreenshot.attach(app, named: "ios-control-audit-accessibility-\(name)")
+            // Geometry and the full accessibility label can pass while the rendered title
+            // is ellipsized. Check clipping at the actual forced size; do not ask the
+            // system Dynamic Type audit to vary a launch-pinned content-size category.
+            try app.performAccessibilityAudit(for: .textClipped)
             endSession()
         }
 
         // A forced UIPreferredContentSizeCategoryName intentionally pins the app to one layout
         // category, so XCTest's own Dynamic Type audit cannot vary it and reports every Text as
         // unsupported. Run the unfiltered system audit in a distinct launch without that override;
-        // the four deterministic launches above remain the geometry/reflow authority.
+        // the four deterministic launches above retain geometry checks and screenshots.
+        // A textClipped PASS does not prove that an ellipsized title is fully visible;
+        // review the retained screenshots before claiming untruncated visual reflow.
         beginAuditSession()
         try app.performAccessibilityAudit()
         endSession()
@@ -610,6 +626,23 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
                 phase: "player-visible", observedSelections: selections
             )
             let playerIssue = exerciseCompletedPlayer()
+            if let playerIssue {
+                // Preserve the failed output and its identity before any
+                // further navigation. A History assertion must not erase the
+                // first observed failure, and failed evidence is not scratch.
+                VocelloUIScreenshot.attach(app, named: "generation-\(take.takeID)-player-controls")
+                recorder.record(
+                    scenario: "generation", controlID: "generation:\(take.takeID)",
+                    classification: playerEvidence["failureOwner"] == "harness" ? "HARNESS_FAIL" : "PRODUCT_FAIL",
+                    expected: "Completed output remains playable and its scrubber reports a changed position",
+                    actual: playerIssue,
+                    evidence: "generation-\(take.takeID)-player-controls",
+                    take: take, generationID: generationID, observedSeed: frozenSeed,
+                    observedSelections: selections, playerEvidence: playerEvidence
+                )
+                dismissCompletedPlayerAndAssertGenerateReady()
+                return
+            }
             dismissCompletedPlayerAndAssertGenerateReady()
             guard let afterRowIDs = historyRowCensus(expectedScript: take.script) else { return }
             let added = Set(afterRowIDs).subtracting(beforeRowIDs)
@@ -652,21 +685,6 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
             select(tab: .studio)
             let observedSeed = frozenSeed
             XCTAssertNotNil(observedSeed, "The cold sentinel must expose a seed that can be frozen visibly")
-            if let playerIssue {
-                recorder.record(
-                    scenario: "generation", controlID: "generation:\(take.takeID)",
-                    classification: "PRODUCT_FAIL",
-                    expected: "Completed output remains playable and its scrubber reports a changed position",
-                    actual: playerIssue,
-                    evidence: "generation-\(take.takeID)-player-controls",
-                    take: take,
-                    generationID: generationID,
-                    observedSeed: observedSeed,
-                    historyOwnership: ownership,
-                    observedSelections: selections, playerEvidence: playerEvidence
-                )
-                return
-            }
             recorder.record(
                 scenario: "generation", controlID: "generation:\(take.takeID)",
                 expected: "Visible request, engine receipt, QC, History, playback, and cleanup agree",
@@ -1339,27 +1357,36 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
 
     private func exerciseCompletedPlayer() -> String? {
         playerEvidence = [:]
+        // Action helpers may themselves report XCTest failures. Let their
+        // false result reach this method's typed failure and normal restoration
+        // instead of jumping directly out of the test body.
+        let priorFailurePolicy = continueAfterFailure
+        continueAfterFailure = true
+        defer { continueAfterFailure = priorFailurePolicy }
         let playPause = element("studio_inlinePlayer_playPause")
         guard VocelloUIWait.exists(playPause, timeout: 20), playPause.isHittable else {
             return "Completed player Play/Pause control is unavailable"
         }
         if playPause.label == "Pause" {
-            guard VocelloUIPrimaryAction.perform(on: playPause, timeout: 20),
-                  VocelloUIWait.condition("autoplay paused", timeout: 10, evaluate: { playPause.label == "Play" }) else {
+            guard tapReadyPlaybackControl(playPause, expected: "Pause"),
+                  waitForPlaybackLabel(playPause, expected: "Play", timeout: 10) else {
                 return "Completed player could not pause autoplay"
             }
+            playerEvidence["autoplayPausedPosition"] = playerEvidence["lastPlaybackPosition"]
         }
         guard playPause.label == "Play",
-              VocelloUIPrimaryAction.perform(on: playPause, timeout: 20),
-              VocelloUIWait.condition("playback started", timeout: 10, evaluate: { playPause.label == "Pause" }) else {
+              tapReadyPlaybackControl(playPause, expected: "Play"),
+              waitForPlaybackLabel(playPause, expected: "Pause", timeout: 10) else {
             return "Play action did not expose active playback"
         }
         playerEvidence["playingLabel"] = playPause.label
-        guard VocelloUIPrimaryAction.perform(on: playPause, timeout: 20),
-              VocelloUIWait.condition("playback paused", timeout: 10, evaluate: { playPause.label == "Play" }) else {
+        playerEvidence["playingPosition"] = playerEvidence["lastPlaybackPosition"]
+        guard tapReadyPlaybackControl(playPause, expected: "Pause"),
+              waitForPlaybackLabel(playPause, expected: "Play", timeout: 10) else {
             return "Pause action did not expose paused playback"
         }
         playerEvidence["pausedLabel"] = playPause.label
+        playerEvidence["pausedPosition"] = playerEvidence["lastPlaybackPosition"]
         let scrubber = element("studio_inlinePlayer_scrubber")
         guard scrubber.exists && scrubber.isHittable,
               scrubber.frame.width.isFinite, scrubber.frame.width > 0,
@@ -1404,6 +1431,42 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
             playerEvidence["scrubPlaybackLabel"] = playPause.label
         }
         return nil
+    }
+
+    private func tapReadyPlaybackControl(_ control: XCUIElement, expected: String) -> Bool {
+        // This control was just observed. Waiting for an already-hittable
+        // toggle adds a polling interval during which a near-end clip can
+        // finish, turning the intended Pause into a new Play. Act once on
+        // current visible state; never repeat an action after a failed check.
+        guard control.exists && control.isEnabled && control.isHittable else { return false }
+        let label = control.label
+        guard label == expected else {
+            playerEvidence["failureOwner"] = "harness"
+            playerEvidence["preActionLabel"] = label
+            playerEvidence["expectedActionLabel"] = expected
+            return false
+        }
+        playerEvidence["\(expected.lowercased())ActionUptime"] = String(ProcessInfo.processInfo.systemUptime)
+        control.tap()
+        return true
+    }
+
+    private func waitForPlaybackLabel(
+        _ control: XCUIElement,
+        expected: String,
+        timeout: TimeInterval
+    ) -> Bool {
+        var matched = control.exists && control.label == expected
+        if !matched {
+            let expectation = XCTNSPredicateExpectation(
+                predicate: NSPredicate { _, _ in control.exists && control.label == expected },
+                object: NSObject()
+            )
+            matched = XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
+        }
+        playerEvidence["lastPlaybackLabel"] = control.exists ? control.label : "unavailable"
+        playerEvidence["lastPlaybackPosition"] = element("studio_inlinePlayer_scrubber").value as? String ?? "unavailable"
+        return matched
     }
 
     private func waitForPlaybackValueChange(

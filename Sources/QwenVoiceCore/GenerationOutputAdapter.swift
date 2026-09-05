@@ -1378,6 +1378,10 @@ struct StreamingExecutionContext: Sendable {
     ) async throws -> GenerationResult {
         let benchNotes = BenchRunContext.telemetryNotes()
         let benchRunID = benchNotes["benchRunID"] ?? "not-bench"
+        let diagnosticRunID = StartupReliabilityDiagnosticEvidence.captureRunID(
+            environment: ProcessInfo.processInfo.environment,
+            telemetryEnabled: TelemetryGate.resolvedEnabled
+        )
         let benchTakeIndex = benchNotes["benchTakeIndex"] ?? "not-bench"
         let benchCell = benchNotes["benchCell"] ?? "not-bench"
         let signpostCorrelation = NativeSignpostCorrelation(
@@ -1683,6 +1687,7 @@ struct StreamingExecutionContext: Sendable {
             finalizedDiagnostics = terminal.diagnostics ?? finalizedDiagnostics
             if request.captureCodecTrace == true,
                TelemetryGate.resolvedEnabled,
+               let diagnosticRunID,
                let trace = terminal.codecTrace,
                let appSupportDirectory = diagnosticAppSupportBox?.url,
                let evidence = try? StartupReliabilityDiagnosticEvidence.persistCodecTrace(
@@ -1692,7 +1697,7 @@ struct StreamingExecutionContext: Sendable {
                        observedRanges: rawCodecReplayRanges
                    ),
                    appSupportDirectory: appSupportDirectory,
-                   runID: benchRunID,
+                   runID: diagnosticRunID,
                    generationID: generationID
                ) {
                 diagnosticEvidenceNotes.merge(evidence.telemetryNotes) { _, new in new }
@@ -1871,11 +1876,12 @@ struct StreamingExecutionContext: Sendable {
             guard finalAudioQC.verdict != .fail else {
                 rejectedAudioQC = finalAudioQC
                 if TelemetryGate.resolvedEnabled,
+                   let diagnosticRunID,
                    let appSupportDirectory = diagnosticAppSupportBox?.url,
                    let evidence = try? StartupReliabilityDiagnosticEvidence.persistRejectedAudio(
                        from: stagingURL,
                        appSupportDirectory: appSupportDirectory,
-                       runID: benchRunID,
+                       runID: diagnosticRunID,
                        generationID: generationID,
                        durationSeconds: finalAudioQC.durationSeconds
                    ) {

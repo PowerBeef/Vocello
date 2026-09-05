@@ -26,6 +26,62 @@ SPEC.loader.exec_module(ledger_module)
 
 
 class RequiredStepLedgerTests(unittest.TestCase):
+    def test_failed_ios_smoke_still_collects_diagnostics_without_retry(self) -> None:
+        runner = UI_RUNNER.read_text()
+        start = runner.index("  crash_delta_status=0\n")
+        end = runner.index('  write_build_provenance "$IOS_DERIVED/last-build.json"', start)
+        # Execute the production finalization stanza, not a reimplementation.
+        # The collector can succeed after XCTest fails without changing that failure.
+        for lane, test_status, collector_status, expected in (
+            ("smoke", 65, 0, 27),
+            ("smoke", 0, 1, 27),
+            ("smoke", 65, 1, 27),
+            ("smoke", 0, 0, 0),
+            ("screen-protection", 0, 1, 0),
+            ("screen-protection", 65, 0, 27),
+        ):
+            with self.subTest(lane=lane, test_status=test_status, collector_status=collector_status):
+                setup = f"""
+set -euo pipefail
+lane={lane}
+xcuitest_status={test_status}
+collector_status={collector_status}
+dsym_status=0; model_diagnostics_status=0; startup_parity_status=0
+control_audit_status=0; step_ledger=fixture; out=fixture
+required_step_run() {{ shift 2; "$@"; }}
+check_ios_crash_delta() {{ return 0; }}
+validate_ios_smoke() {{ echo collected; return "$collector_status"; }}
+warn() {{ :; }}
+die() {{ exit 27; }}
+"""
+                result = subprocess.run(
+                    ["bash", "-c", setup + runner[start:end]],
+                    text=True, capture_output=True, check=False,
+                )
+                self.assertEqual(result.returncode, expected, result.stderr)
+                self.assertEqual(result.stdout.count("collected"), int(lane == "smoke"))
+
+    def test_screen_protection_is_explicit_and_ledger_bound(self) -> None:
+        contract = json.loads(CONTRACT.read_text())
+        lane = contract["workflows"]["ui-ios-screen-protection"]
+        self.assertEqual(lane["producer"], "scripts/ui_test.sh")
+        self.assertIn("xcuitest", lane["requiredSteps"])
+        self.assertIn("crash-delta", lane["requiredSteps"])
+        runner = UI_RUNNER.read_text()
+        self.assertIn('scenario_argument="${scenario_argument:-inspect}"', runner)
+        self.assertIn('[[ "$lane" != "screen-protection" || "$platform" == "ios" ]]', runner)
+        source = (ROOT / "Tests/VocelloiOSUITests/VocelloiOSSmokeUITests.swift").read_text()
+        protection = source.split("final class VocelloiOSScreenProtectionUITests", 1)[1].split(
+            "final class VocelloiOSSmokeUITests", 1
+        )[0]
+        self.assertIn('if action == "enable" {\n            tap(threeMinutes)', protection)
+        self.assertIn("three-minute Auto-Lock readback", protection)
+        self.assertIn("Verrouillage automatique", protection)
+        self.assertIn('settings.navigationBars["Verrouillage auto."]', protection)
+        self.assertIn('"3\\u{00A0}minutes"', protection)
+        self.assertNotIn("app.launchEnvironment", protection)
+        self.assertNotIn("Thread.sleep", protection)
+
     @staticmethod
     def write_source_identity(path: Path) -> None:
         payload = {

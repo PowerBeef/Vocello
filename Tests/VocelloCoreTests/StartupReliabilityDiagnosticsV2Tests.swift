@@ -1,9 +1,91 @@
+import CryptoKit
 import Foundation
 @testable import QwenVoiceCore
 import VocelloQwen3Core
 import XCTest
 
 final class StartupReliabilityDiagnosticsV2Tests: XCTestCase {
+    func testCaptureRunIdentitySupportsUIAndBenchmarkWithoutAnonymousFallback() {
+        let ui = "QVOICE_IOS_DEVICE_RUN_ID"
+        let bench = "QVOICE_MAC_BENCH_RUN_ID"
+        for environment in [[ui: "run-1"], [bench: "run-1"], [ui: "run-1", bench: "run-1"]] {
+            XCTAssertEqual(StartupReliabilityDiagnosticEvidence.captureRunID(
+                environment: environment, telemetryEnabled: true
+            ), "run-1")
+            XCTAssertNil(StartupReliabilityDiagnosticEvidence.captureRunID(
+                environment: environment, telemetryEnabled: false
+            ))
+        }
+        XCTAssertEqual(StartupReliabilityDiagnosticEvidence.captureRunID(
+            environment: [ui: " run-1\n", bench: "run-1"], telemetryEnabled: true
+        ), "run-1")
+        for environment in [[:], [ui: "run-1", bench: "run-2"], [ui: "", bench: "run-1"]] {
+            XCTAssertNil(StartupReliabilityDiagnosticEvidence.captureRunID(
+                environment: environment, telemetryEnabled: true
+            ))
+        }
+        for value in ["", " ", ".", "..", "../escape", "a/b", "not-bench", String(repeating: "x", count: 97)] {
+            for key in [ui, bench] {
+                XCTAssertNil(StartupReliabilityDiagnosticEvidence.captureRunID(
+                    environment: [key: value], telemetryEnabled: true
+                ), "Invalid or unowned diagnostic identity must not be captured")
+            }
+        }
+    }
+
+    func testUIOnlyRejectedAudioUsesTheSameRunDirectoryAsTheCollector() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let staged = root.appendingPathComponent("staged.wav")
+        try AtomicPCM16WAVWriter.write(
+            pcmSamples: Array(repeating: 0, count: 240), sampleRate: 24_000, outputURL: staged
+        )
+        let original = try Data(contentsOf: staged)
+        let generationID = UUID()
+        let environment = ["QVOICE_IOS_DEVICE_RUN_ID": "ui-run-1"]
+        let writerRunID = try XCTUnwrap(StartupReliabilityDiagnosticEvidence.captureRunID(
+            environment: environment, telemetryEnabled: true
+        ))
+        let evidence = try StartupReliabilityDiagnosticEvidence.persistRejectedAudio(
+            from: staged, appSupportDirectory: root, runID: writerRunID,
+            generationID: generationID, durationSeconds: 0.01
+        )
+        let collectorRunID = try XCTUnwrap(StartupReliabilityDiagnosticEvidence.captureRunID(
+            environment: environment, telemetryEnabled: true
+        ))
+        let directory = try StartupReliabilityDiagnosticEvidence.evidenceDirectory(
+            appSupportDirectory: root, runID: collectorRunID, generationID: generationID
+        )
+        XCTAssertEqual(try Data(contentsOf: directory.appendingPathComponent("rejected.wav")), original)
+        XCTAssertEqual(try Data(contentsOf: staged), original)
+        XCTAssertEqual(evidence.byteCount, original.count)
+        XCTAssertEqual(evidence.sha256, SHA256.hash(data: original).map { String(format: "%02x", $0) }.joined())
+        let json = String(decoding: try JSONEncoder().encode(evidence), as: UTF8.self)
+        XCTAssertFalse(json.contains(root.path))
+        XCTAssertFalse(json.contains("staged.wav"))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: root.appendingPathComponent(
+            "diagnostics/startup-reliability-evidence/not-bench"
+        ).path))
+    }
+
+    func testDotRunIdentifiersCannotAddressOrRemoveTheEvidenceRoot() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let marker = root.appendingPathComponent("diagnostics/startup-reliability-evidence/kept.bin")
+        try FileManager.default.createDirectory(at: marker.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data([1, 2, 3]).write(to: marker)
+        defer { try? FileManager.default.removeItem(at: root) }
+        for value in [".", ".."] {
+            XCTAssertThrowsError(try StartupReliabilityDiagnosticEvidence.evidenceDirectory(
+                appSupportDirectory: root, runID: value, generationID: UUID()
+            ))
+            XCTAssertThrowsError(try StartupReliabilityDiagnosticEvidence.removeRun(
+                appSupportDirectory: root, runID: value
+            ))
+            XCTAssertEqual(try Data(contentsOf: marker), Data([1, 2, 3]))
+        }
+    }
+
     func testCodecTraceEncodingAndPersistenceAreDeterministicAndGenerationScoped() throws {
         let trace = VocelloQwen3CodecTrace(
             frames: [[1, 2, 3], [4, 5, 6]],

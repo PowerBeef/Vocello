@@ -175,6 +175,55 @@ class IOSControlAuditContractTests(unittest.TestCase):
         self.assertIn("start + selected.count == plan.takes.count", generation)
         self.assertNotIn("searchToken", source)
 
+    def test_playback_failure_is_flushed_before_history_and_session_teardown_is_guaranteed(self) -> None:
+        source = audit.UI_TEST_PATH.read_text()
+        failure = source.split("let playerIssue = exerciseCompletedPlayer()", 1)[1].split(
+            "guard let afterRowIDs", 1
+        )[0]
+        self.assertLess(failure.index("recorder.record("), failure.index("dismissCompletedPlayerAndAssertGenerateReady()"))
+        self.assertIn('playerEvidence["failureOwner"] == "harness" ? "HARNESS_FAIL" : "PRODUCT_FAIL"', failure)
+        self.assertNotIn("deleteRunOwnedHistoryRow", failure)
+        waiter = source.split("private func waitForPlaybackLabel", 1)[1].split(
+            "private func waitForPlaybackValueChange", 1
+        )[0]
+        self.assertIn("XCTWaiter.wait", waiter)
+        self.assertNotIn("XCTFail", waiter)
+        self.assertIn('playerEvidence["lastPlaybackPosition"]', waiter)
+        teardown = source.split("override func tearDown()", 1)[1].split("private var directImportVoiceName", 1)[0]
+        self.assertIn("endSession()", teardown)
+        self.assertIn("continueAfterFailure = true", teardown)
+        self.assertNotIn('phase: "restored"', teardown)
+
+    def test_ready_playback_action_has_no_extra_poll_and_checks_current_label(self) -> None:
+        source = audit.UI_TEST_PATH.read_text()
+        action = source.split("private func tapReadyPlaybackControl", 1)[1].split(
+            "private func waitForPlaybackLabel", 1
+        )[0]
+        self.assertIn("control.isEnabled && control.isHittable", action)
+        self.assertLess(action.index("guard label == expected"), action.index("control.tap()"))
+        self.assertIn('playerEvidence["failureOwner"] = "harness"', action)
+        self.assertNotIn("VocelloUIWait", action)
+        self.assertNotIn("XCTWaiter", action)
+        self.assertEqual(action.count("control.tap()"), 1)
+        waiter = source.split("private func waitForPlaybackLabel", 1)[1].split(
+            "private func waitForPlaybackValueChange", 1
+        )[0]
+        self.assertLess(waiter.index("var matched = control.exists"), waiter.index("if !matched"))
+        self.assertLess(waiter.index("if !matched"), waiter.index("XCTWaiter.wait"))
+        for key in ("autoplayPausedPosition", "playingPosition", "pausedPosition"):
+            self.assertIn(f'playerEvidence["{key}"]', source)
+
+    def test_user_play_uses_resume_policy_not_automatic_stream_completion(self) -> None:
+        source = (ROOT / "Sources/SharedSupport/ViewModels/AudioPlayerViewModel.swift").read_text()
+        play = source.split("func play()", 1)[1].split("func pause()", 1)[0]
+        self.assertIn("if liveFinalFilePath != nil", play)
+        self.assertIn("AudioPlaybackResumePolicy.explicitPlay", play)
+        self.assertIn("preserveCurrentTime: decision.position", play)
+        self.assertIn("autoPlay: decision.shouldPlay", play)
+        self.assertNotIn("finalPlaybackHandoff", play)
+        self.assertNotIn("liveAutoplayEnabled", play)
+        self.assertIn("attemptLivePlay()", play)
+
     def test_generation_product_failure_is_terminal_without_retrying_the_row(self) -> None:
         source = (
             ROOT

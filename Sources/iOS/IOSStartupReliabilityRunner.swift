@@ -874,7 +874,11 @@ enum IOSStartupReliabilityRunner {
         maximumBytes: Int
     ) throws {
         let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        // Chunk QC and codec ranges can dominate a rejected take. Whitespace
+        // must not exhaust the bounded evidence budget before recording it.
+        // Keep every field and the existing byte limits; host tools pretty-print
+        // for inspection after collection.
+        encoder.outputFormatting = [.sortedKeys]
         let data = try encoder.encode(record)
         try writeData(data, name: name, runID: runID, maximumBytes: maximumBytes)
     }

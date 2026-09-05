@@ -47,8 +47,9 @@ enum IOSPullableDiagnosticsMirror {
         // rows into that run directory so request-receipt parity can be proven
         // without copying unrelated prior runs. Keep the global destination
         // above for existing benchmark and acceptance consumers.
-        if let runID = safeRunID(
-            from: ProcessInfo.processInfo.environment["QVOICE_IOS_DEVICE_RUN_ID"]
+        if let runID = StartupReliabilityDiagnosticEvidence.captureRunID(
+            environment: ProcessInfo.processInfo.environment,
+            telemetryEnabled: TelemetryGate.resolvedEnabled
         ) {
             let runRoot = pullableRoot.appendingPathComponent(runID, isDirectory: true)
             syncGenerationTelemetry(
@@ -176,17 +177,4 @@ enum IOSPullableDiagnosticsMirror {
         }
     }
 
-    private static func safeRunID(from rawValue: String?) -> String? {
-        guard let value = rawValue?.trimmingCharacters(in: .whitespacesAndNewlines),
-              (1...96).contains(value.count),
-              value.unicodeScalars.allSatisfy({ scalar in
-                  CharacterSet.alphanumerics.contains(scalar)
-                      || scalar == "."
-                      || scalar == "_"
-                      || scalar == "-"
-              }) else {
-            return nil
-        }
-        return value
-    }
 }

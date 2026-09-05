@@ -91,6 +91,36 @@ class IOSStartupReliabilityTests(unittest.TestCase):
         payload = json.loads(launch.read_text())
         self.assertEqual([t["seed"] for t in payload["plan"]["takes"]], seeds)
 
+    def test_chunk_heavy_rejection_uses_compact_lossless_records(self):
+        # A long rejected stream carries per-chunk QC plus codec range evidence.
+        # Pretty printing used to exhaust the take budget before its row landed.
+        chunk = {
+            "chunkIndex": 0, "frameOffset": 147840, "frameCount": 13440,
+            "durationSeconds": 0.56, "peak": 0.00042696218588389456,
+            "rmsDBFS": -77.16177859287684, "verdict": "fail",
+            "flags": ["near_silent"], "nonFiniteSamples": 0,
+            "clippedSamples": 0, "hotSamples": 0, "clickEvents": 0,
+            "longestSilenceMS": 0,
+        }
+        ranges = [{"start": i * 7, "endExclusive": (i + 1) * 7} for i in range(240)]
+        payload = {
+            "audioQC": {"chunkQC": [{**chunk, "chunkIndex": i} for i in range(240)]},
+            "diagnosticArtifacts": [{"codecChunkRanges": ranges}],
+            "codecReplay": {"ranges": ranges},
+            "requestReceipt": {"seed": 5642585693820595106},
+        }
+        compact = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+        self.assertEqual(json.loads(compact), payload)
+        self.assertLess(len(compact.encode()), 128 * 1024)
+        self.assertGreater(len(json.dumps(payload, indent=2).encode()), 128 * 1024)
+        source = (ROOT / "Sources/iOS/IOSStartupReliabilityRunner.swift").read_text()
+        writer = source.split("private static func writeRecord<T: Encodable>", 1)[1].split(
+            "private static func writeData", 1
+        )[0]
+        self.assertIn("encoder.outputFormatting = [.sortedKeys]", writer)
+        self.assertNotIn(".prettyPrinted", writer)
+        self.assertIn("maximumBytes: 128 * 1_024", source)
+
     def test_bounds_invalid_ids_and_unknown_fields_fail(self):
         for mutation in (
             lambda p: p["takes"][0].update({"deliveryID": "calm"}),
@@ -741,7 +771,8 @@ class IOSStartupReliabilityTests(unittest.TestCase):
             ROOT / "Sources" / "iOSSupport" / "Services" /
             "IOSPullableDiagnosticsMirror.swift"
         ).read_text(encoding="utf-8")
-        self.assertIn('environment["QVOICE_IOS_DEVICE_RUN_ID"]', mirror_source)
+        self.assertIn("StartupReliabilityDiagnosticEvidence.captureRunID(", mirror_source)
+        self.assertIn("environment: ProcessInfo.processInfo.environment", mirror_source)
         self.assertIn(
             "pullableRoot.appendingPathComponent(runID, isDirectory: true)",
             mirror_source,
@@ -753,6 +784,18 @@ class IOSStartupReliabilityTests(unittest.TestCase):
         )
         self.assertIn("classify-xcui-bootstrap", ui_source)
         self.assertIn("exact-manual-rerun-command.txt", ui_source)
+
+
+    def test_rejected_audio_and_codec_export_share_the_ui_run_identity(self):
+        adapter = (ROOT / "Sources/QwenVoiceCore/GenerationOutputAdapter.swift").read_text()
+        mirror = (ROOT / "Sources/iOSSupport/Services/IOSPullableDiagnosticsMirror.swift").read_text()
+        self.assertIn("StartupReliabilityDiagnosticEvidence.captureRunID(", adapter)
+        self.assertIn("StartupReliabilityDiagnosticEvidence.captureRunID(", mirror)
+        for call in ("persistRejectedAudio(", "persistCodecTrace("):
+            start = adapter.index("StartupReliabilityDiagnosticEvidence." + call)
+            binding = adapter[start:adapter.index("generationID: generationID", start)]
+            self.assertIn("runID: diagnosticRunID", binding)
+            self.assertNotIn("runID: benchRunID", binding)
 
 
 if __name__ == "__main__":

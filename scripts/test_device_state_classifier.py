@@ -52,6 +52,27 @@ class CoreDeviceProbeTests(unittest.TestCase):
         self.assertFalse(lock["unlockedSinceBoot"])
         self.assertTrue(lock["passcodeRequired"])
 
+    def test_current_lock_is_not_historical_unlock(self) -> None:
+        # A normally used phone has unlockedSinceBoot=true even after Auto-Lock.
+        for nested in (False, True):
+            for required in (True, False):
+                with self.subTest(nested=nested, required=required):
+                    fields = {"unlockedSinceBoot": True, "passcodeRequired": required}
+                    raw = {"result": {"lockState": fields} if nested else fields}
+                    result = probe.summarize_lock_state(raw)
+                    self.assertEqual(result["state"], "known")
+                    self.assertIs(result["deviceLocked"], required)
+                    self.assertIs(result["unlockedSinceBoot"], True)
+
+    def test_missing_or_malformed_current_lock_remains_unknown(self) -> None:
+        for value in (None, "false", "true", 0, 1):
+            with self.subTest(value=value):
+                result = probe.summarize_lock_state({"result": {
+                    "unlockedSinceBoot": True, "passcodeRequired": value,
+                }})
+                self.assertEqual(result["state"], "unknown")
+                self.assertIsNone(result["deviceLocked"])
+
     def test_automation_readiness_does_not_use_lock_state(self) -> None:
         core = {
             "reachable": True,

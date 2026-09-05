@@ -16,9 +16,9 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 | `release-first-3-0-2026-09` | active | release-qa | 4/12 (33%) |
 | `autonomous-validation-remediation-2026-08` | active | release-qa | 8/11 (73%) |
 | `delivery-prompting-2026-08` | active | backend-mlx | 29/34 (85%) |
-| `engineering-review-remediation-2026-08` | active | backend-and-platform | 11/22 (50%) |
+| `engineering-review-remediation-2026-08` | active | backend-and-platform | 11/23 (48%) |
 | `ios-app-store-readiness-2026-08` | active | release-qa | 2/12 (17%) |
-| `ios-control-audit-2026-08` | active | ios | 13/18 (72%) |
+| `ios-control-audit-2026-08` | active | ios | 14/19 (74%) |
 | `ios-generation-startup-reliability-2026-08` | active | backend-and-platform | 4/6 (67%) |
 | `voice-identity-language-reliability-2026-08` | active | backend-and-platform | 9/10 (90%) |
 | `compliance-2026-08` | complete | release-qa | 2/2 (100%) |
@@ -207,6 +207,7 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
 | `F-20` | in-flight | P2 — make CLI signal cancellation graceful and bounded | `file:Tests/VocelloCoreTests/CLIExecutionTests.swift`, `file:scripts/tests/test_cli_package.py` |
 | `F-21` | in-flight | P1 — restore CLI batch admission and preserve partial outcomes | `file:Tests/VocelloCoreTests/CLIExecutionTests.swift`, `file:Sources/VocelloCLI/BatchCommand.swift` |
 | `F-22` | in-flight | P1 risk — qualify shared Saved Voice transactions across app and CLI processes | `file:Tests/VocelloCoreTests/PreparedVoiceRepositoryTests.swift` |
+| `F-23` | in-flight | P2 — preserve explicit Play intent across live-to-file finalization | `file:Tests/VocelloCoreTests/AudioPlaybackResumePolicyTests.swift` |
 
 ### Open items in detail
 
@@ -242,6 +243,9 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
 
 - **`F-22`** (in-flight) — P1 risk — qualify shared Saved Voice transactions across app and CLI processes.
   gate: Use two native processes on one disposable support root: pause candidate preparation, replacement or deletion in A while B initializes/reconciles/lists/mutates. Prove no live transaction is mistaken for an abandoned one and audio/transcript/metadata remain content-bound. If exclusion is missing, reuse a narrow process-wide operation lock or typed busy refusal; do not silently split production stores. Review model mutation entry points against the existing shared-component lock rather than asserting all storage is unlocked.
+
+- **`F-23`** (in-flight) — P2 — preserve explicit Play intent across live-to-file finalization.
+  gate: Explicit Play after finalization resumes heard currentTime (or restarts at end), independently of Auto-play and buffered duration. Deterministic fixtures pass; a source-bound long-clip UI pilot and applicable packaged macOS playback prove play/pause/scrub/History. Preserve failed pilots; unavailable controls never count as exercised.
 
 ## iOS App Store readiness
 
@@ -326,6 +330,7 @@ Narrative authority: [`docs/reference/ios-on-device-control-audit-2026-08-28.md`
 | `ICA-16` | done | P2 — bound smoke evidence collection to the exact run | `doc:docs/reference/ios-control-audit-remediation-2026-08-29.md`, `doc:docs/reference/ios-device-testing.md` |
 | `ICA-17` | done | P2 — accept omitted optional cadence quantiles in device evidence | `doc:docs/reference/ios-control-audit-remediation-2026-08-29.md`, `doc:docs/reference/ios-device-testing.md`, `file:scripts/tests/test_ios_startup_reliability.py` |
 | `ICA-18` | in-flight | P2 — keep control-audit History ownership out of spoken scripts | `doc:docs/reference/ios-control-audit-remediation-2026-08-29.md`, `doc:docs/reference/ios-device-testing.md`, `file:scripts/tests/test_ios_control_audit.py` |
+| `ICA-19` | done | P2 — remove largest-size Settings tab truncation | `doc:docs/development-progress.md#september-5-physical-device-checkpoint` |
 
 ### Open items in detail
 

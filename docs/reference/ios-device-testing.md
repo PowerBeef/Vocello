@@ -78,7 +78,51 @@ visible Settings → Voice models section; neither device scripts nor normal UI 
 The sole exception is the separately selected `scripts/ui_test.sh ios model-download` lifecycle
 diagnostic, which uses an isolated app-support root and is never part of smoke or benchmark.
 
+### Explicit screen protection after device work
+
+When the maintainer authorizes Auto-Lock restoration, use the existing physical-device XCUITest
+runner to inspect the real Settings route before unattended work, then enable the timer after
+all device work and collection have ended:
+
+```sh
+scripts/ui_test.sh ios screen-protection --scenario inspect --retain-result
+scripts/ui_test.sh ios screen-protection --scenario enable --retain-result
+```
+
+The default is read-only `inspect`. Only explicit `enable` chooses **3 minutes** and verifies the
+persisted value on the parent Settings row. English and French Settings are supported, including
+**Luminosité et affichage → Verrouillage automatique**; an unknown, restricted, or unavailable
+control fails rather than claiming protection. No other setting or Vocello data is changed.
+The test returns to Home; its retained `screen-protection.json` and screenshots distinguish
+route inspection from a verified timer change. It never runs implicitly during another lane.
+Auto-Lock readback is not proof the screen is already locked or that Always-On Display is off.
+Confirm the eventual lock separately with the read-only CoreDevice `device info lockState`
+command using the device identifier resolved by preflight and an untracked JSON output file.
+Use the raw current `passcodeRequired` field; `unlockedSinceBoot` describes historical unlocking,
+not whether the device is currently unlocked. The corrected probe derives `deviceLocked` only
+from a typed current `passcodeRequired` value; missing or malformed values stay unknown. Older
+probe outputs using historical unlock state are not protection evidence. Retain raw readbacks
+privately. `scripts/ios_device.sh device-state` proves reachability, not lock state. Do not start
+another device lane after final protection. If this route fails, stop unattended device work and
+report that protection still requires operator action.
+
 ## Explicit XCUITest lanes
+
+Smoke diagnostics are collected before the aggregate failure exit, including when XCTest fails.
+A passing memory-pressure diagnostic subset cannot override a failed UI or long-form test.
+If an older runner omitted collection, preserve its failed ledger and put any recovered telemetry
+in a separate supplemental bundle with original run identity and digests; never rewrite the run
+as PASS. The September 5 production-stanza fixtures cover failed XCTest, failed collection,
+both failures, success, and non-smoke routes without rerunning device work.
+
+Serialize macOS and iOS `xcodebuild` commands: the governed shared SwiftPM-store lock is held
+throughout XCTest, not just build/package resolution. Concurrent native commands can time out
+waiting for that lock. Run read-only analysis or Python fixtures alongside a device lane instead;
+do not bypass the lock or clear a cache to resolve legitimate contention.
+
+Stage newly created owned source/test files before the final derived refresh: project-health
+counts Git-tracked files. Refresh and stage the resulting summary before the exact-content commit
+gate, so adding a new file does not invalidate a previously checked inventory.
 
 ```sh
 scripts/ui_test.sh ios smoke
@@ -119,6 +163,11 @@ the extended >220-character long corpus; the iPhone lane never bypasses the user
 | Control audit | Source-bound inventory, stateful, external-system, accessibility, and 201-row all-pairs generation scenarios. Schema-v3 plans speak the exact tracked corpus without ownership markers. Bounded read-only before/after History censuses must prove exactly one new persisted row, followed by exact full-player transcript verification before pin/delete. Versioned observations bind row ID, generation UUID, script digest, exact seed, and preserved cleanup baseline. Existing identical user text is never normalized away. Host validation preserves byte-exact v1/v2 historical plans, including original numeric stress failures. One verified History carrier per mode freezes the normally obtained seed; test-runner-only resume metadata identifies that exact row and requires visible seed agreement before pinning. Resume rejects changed source, build, device, plan, uncorrelated ownership, or zero observations. Final-plan cleanup removes only verified carriers and the plan-owned Clone fixture. Clone has no fabricated delivery dimension. Missing, blocked, infrastructure, harness, and product outcomes remain distinct; global destruction is cancelled, never counted as exercised. |
 | Model delivery | Fixed test-owned root normalized through visible state-appropriate controls. `diagnose` covers Custom cancel/restart/process adoption/Ready/remove; `queue` proves independent active/queued cancellation; `acceptance` adds Design/Clone shared-component reuse and all-model removal; `soak` repeats the lifecycle; `recover` inspects and visibly clears retained failure state without starting a transfer. Every transfer records exact logical bytes, milestone row/bar screenshots, phase activity, action exclusivity, five-minute advancement bounds, correlated delivery events, and exact canonical-state preservation |
 | Perf | Nine frame-health scenarios (`Tests/VocelloiOSUITests/VocelloiOSPerfUITests.swift`), each a fresh app launch with the in-app `CADisplayLink` probe pinned to the app's 60 Hz cap and one marked wall-clock window; `scripts/check_ios_ui_perf.py` joins windows to the pulled 500 ms probe rows |
+
+The control-audit accessibility lane checks targets and `.textClipped` at Default, AX-L,
+AX-XXXL, and pseudo-AX-XXXL, then runs the complete system audit without a forced size. The system
+clipping audit can pass an ellipsized label whose accessibility name is complete. Inspect the
+retained screenshots as well; automatic PASS alone does not establish untruncated visual reflow.
 
 Every lane uses the paired physical-device destination. Tests use stable accessibility identifiers,
 condition-based waits, XCTest activities, screenshots, and failure attachments. Coordinate tables,
@@ -166,6 +215,11 @@ output on failure. Nonterminal stages retain early identity but cannot manufactu
 Legacy plan fields in each row describe the expectation; `observedSelections` separately records
 selected UI IDs. `playerEvidence` requires Play/Pause transitions and a changed scrub position while
 paused, so missing controls or natural playback advance cannot qualify as successful scrubbing.
+Playback probes preserve a typed failure and the generation identity before further navigation;
+their predicate timeout must not bypass restoration via XCTest's stop-on-failure exception.
+XCTest teardown always ends the audit's app session, but session termination alone cannot supply
+a missing restoration observation or qualify an interrupted shard. Failed playback outputs stay
+retained; no unobserved History-row identity grants permission to delete them.
 History text entry waits for the real field and keyboard before one replacement, then verifies its
 value. No automatic test/generation retry is added. These source repairs require a physical pilot.
 Runner PASS is written only after required-step finalization; failure exits also finalize the ledger.
@@ -684,6 +738,12 @@ loaded Mimi decoder replays that trace both incrementally at the captured produc
 and as one full decode; both replay WAVs receive ordinary persisted-WAV QC. No path, script, codec
 ID, or raw error enters retained JSON.
 
+The diagnostic writer and iOS pullable mirror share one validated capture run ID from the
+registered device and benchmark keys. UI-only runs use their device run ID without needing
+benchmark metadata. Missing, unsafe, anonymous, or conflicting identities refuse artifact capture;
+they never fall back to a shared `not-bench` directory. Older misplaced artifacts remain failed
+collection evidence and must not be relabelled or deleted as though successfully collected.
+
 Post-generation rejection evidence must use the terminal model-diagnostic snapshot, not the
 pre-loop timing snapshot. It therefore retains the final target-token and effective-token-budget
 counters, bounded hot-loop timings, allowlisted EOS/token-cap flags, chunk/channel state, and the
@@ -692,10 +752,12 @@ Fast-QC v6 trailing-silence and cadence block while keeping earlier v2 result by
 validator that predates a producer's registered optional QC fields is a harness failure; update and
 revalidate the retained bytes rather than relabelling the take.
 
-When one codec trace reproduces the same defect through incremental and full Mimi decoding, the
-decoder, channel, and WAV writer are downstream of the first divergence. If the model-terminal
-snapshot also proves voluntary EOS rather than a token cap, classify the row as a deterministic
-sampled-output pathology. Keep the ordinary fail-closed publication decision and explicit
+When one codec trace reproduces the same defect through incremental and full Mimi decoding, that
+excludes incremental scheduling, UI publication, and the final writer as necessary causes. It
+does **not** distinguish invalid sampled codes from a defect shared by both decoder paths or
+platform numerics. Voluntary EOS excludes a token-cap termination, not a common decoder defect.
+Keep the cause qualified until independent code/decoder evidence distinguishes those branches.
+Keep the ordinary fail-closed publication decision and explicit
 user-controlled retry. Do not trim around interior silence, retry invisibly, mutate the seed,
 weaken QC, or infer that a lower token budget is safe from one failing sample. Any continuation
 budget candidate needs a pre-registered representative matrix showing that it prevents the

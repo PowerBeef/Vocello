@@ -48,6 +48,7 @@ Usage:
   scripts/ui_test.sh ios control-audit [--scenario inventory|stateful|external|accessibility|generation|all] [--take-limit 5] [--resume RUN_ID]
   scripts/ui_test.sh ios enroll-clone-fixture
   scripts/ui_test.sh ios saved-voice-lifecycle
+  scripts/ui_test.sh ios screen-protection --scenario inspect|enable
 
 The iOS destination is the paired physical iPhone only. Simulator destinations are unsupported.
 `localization` runs the focused pseudo-localization, long-string, and accessibility-size layout walk
@@ -68,6 +69,9 @@ visible Files-import flow; stage the reference WAV and .txt sidecar in the app's
 the lane begins in Studio Clone, imports, auto-transcribes, saves, generates, previews, and deletes
 that throwaway voice through visible production UI.
 No lane retries automatically. A failed run keeps its log, xcresult, screenshots, and diagnostics.
+`screen-protection` inspects the real iOS Auto-Lock screen (English/French Settings).
+Only explicit `--scenario enable` selects and verifies 3 minutes; no other setting is changed.
+It never runs as part of another lane. Run it after all device work, before leaving the phone idle.
 Append `--retain-result` to explicitly pin a campaign member against routine UI-result pruning;
 remove its untracked `retention-pin.json` only after the evidence set is retired.
 RUN_ID is an opaque 1-96 character identifier using letters, digits, dot, underscore, or hyphen.
@@ -80,13 +84,14 @@ platform="$1"
 lane="$2"
 shift 2
 [[ "$platform" == "macos" || "$platform" == "ios" ]] || usage
-[[ "$lane" == "localization" || "$lane" == "smoke" || "$lane" == "benchmark" || "$lane" == "model-download" || "$lane" == "control-audit" || "$lane" == "delivery-cohort" || "$lane" == "startup-parity" || "$lane" == "perf" || "$lane" == "enroll-clone-fixture" || "$lane" == "saved-voice-lifecycle" ]] || usage
+[[ "$lane" == "localization" || "$lane" == "smoke" || "$lane" == "benchmark" || "$lane" == "model-download" || "$lane" == "control-audit" || "$lane" == "delivery-cohort" || "$lane" == "startup-parity" || "$lane" == "perf" || "$lane" == "enroll-clone-fixture" || "$lane" == "saved-voice-lifecycle" || "$lane" == "screen-protection" ]] || usage
 [[ "$lane" != "model-download" || "$platform" == "ios" ]] || usage
 [[ "$lane" != "control-audit" || "$platform" == "ios" ]] || usage
 [[ "$lane" != "delivery-cohort" || "$platform" == "ios" ]] || usage
 [[ "$lane" != "startup-parity" || "$platform" == "ios" ]] || usage
 [[ "$lane" != "enroll-clone-fixture" || "$platform" == "ios" ]] || usage
 [[ "$lane" != "saved-voice-lifecycle" || "$platform" == "ios" ]] || usage
+[[ "$lane" != "screen-protection" || "$platform" == "ios" ]] || usage
 
 modes="custom,design,clone"
 lengths="short,medium,long"
@@ -149,8 +154,12 @@ if [[ "$lane" == "model-download" ]]; then
   model_scenario="${scenario_argument:-acceptance}"
 elif [[ "$lane" == "control-audit" ]]; then
   control_scenario="${scenario_argument:-all}"
+elif [[ "$lane" == "screen-protection" ]]; then
+  scenario_argument="${scenario_argument:-inspect}"
+  [[ "$scenario_argument" == "inspect" || "$scenario_argument" == "enable" ]] \
+    || die "screen-protection --scenario must be inspect or enable"
 elif [[ -n "$scenario_argument" ]]; then
-  die "--scenario is accepted only by model-download and control-audit"
+  die "--scenario is accepted only by model-download, control-audit, and screen-protection"
 fi
 if [[ -n "$control_resume" && "$lane" != "control-audit" ]]; then
   die "--resume is accepted only by control-audit"
@@ -1271,6 +1280,10 @@ else
     only_test="VocelloiOSUITests/VocelloiOSFixtureEnrollmentUITests/testEnrollBenchmarkCloneFixtureFromDocuments"
   elif [[ "$lane" == "saved-voice-lifecycle" ]]; then
     only_test="VocelloiOSUITests/VocelloiOSSavedVoiceLifecycleUITests/testImportPreviewHandoffAndDeleteSavedVoice"
+  elif [[ "$lane" == "screen-protection" ]]; then
+    only_test="VocelloiOSUITests/VocelloiOSScreenProtectionUITests/testConfiguredAutoLockAction"
+    # Runner-only authorization; never forwarded into a product process.
+    export TEST_RUNNER_QVOICE_IOS_SCREEN_PROTECTION_ACTION="$scenario_argument"
   elif [[ "$lane" == "control-audit" ]]; then
     only_test="VocelloiOSUITests/VocelloiOSControlAuditUITests/testConfiguredControlAuditScenario"
     export TEST_RUNNER_QVOICE_IOS_CONTROL_AUDIT_RUN_ID="$run_id"
@@ -1491,12 +1504,18 @@ PY
     crash_delta_status=1
     warn "could not establish a clean post-run iPhone crash delta"
   fi
-  if (( xcuitest_status != 0 || dsym_status != 0 || model_diagnostics_status != 0 || startup_parity_status != 0 || control_audit_status != 0 || crash_delta_status != 0 )); then
+  # Collect failed smoke evidence before the aggregate exit. A passing diagnostic
+  # subset never converts a failed XCTest into a successful run.
+  smoke_diagnostics_status=0
+  if [[ "$lane" == "smoke" ]]; then
+    if ! required_step_run "$step_ledger" smoke-diagnostics validate_ios_smoke; then
+      smoke_diagnostics_status=1
+      warn "iOS smoke memory-pressure diagnostics gate failed"
+    fi
+  fi
+  if (( xcuitest_status != 0 || dsym_status != 0 || model_diagnostics_status != 0 || startup_parity_status != 0 || control_audit_status != 0 || crash_delta_status != 0 || smoke_diagnostics_status != 0 )); then
     die "physical-iPhone $lane failed; complete available forensics are preserved in $out"
   fi
-  [[ "$lane" != "smoke" ]] || required_step_run "$step_ledger" \
-    smoke-diagnostics validate_ios_smoke \
-    || die "iOS smoke memory-pressure diagnostics gate failed"
   write_build_provenance "$IOS_DERIVED/last-build.json" \
     "scripts/ui_test.sh ios $lane" VocelloiOSUI Release "id=$device" arm64 \
     O automatic "$IOS_DERIVED" "$QVOICE_XCODE_SOURCE_PACKAGES"

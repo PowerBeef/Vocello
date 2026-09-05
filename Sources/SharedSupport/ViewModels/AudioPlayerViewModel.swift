@@ -430,7 +430,21 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
     func play() {
         switch playbackMode {
         case .live:
-            attemptLivePlay()
+            if liveFinalFilePath != nil {
+                // An explicit Play must resume the heard position, even when
+                // the entire finalized preview is still queued. The automatic
+                // drain policy intentionally avoids replay, so cannot own this
+                // user action (or gate it on the Auto-play preference).
+                let decision = AudioPlaybackResumePolicy.explicitPlay(
+                    currentTime: currentTime, duration: duration
+                )
+                switchToFinalFilePlayback(
+                    preserveCurrentTime: decision.position,
+                    autoPlay: decision.shouldPlay
+                )
+            } else {
+                attemptLivePlay()
+            }
         case .file:
             attemptFilePlay()
         case .none:

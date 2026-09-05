@@ -47,7 +47,140 @@ machine-readable status record and wins over any older prose.
 | 13 — Benchmark/history v3 | Live 2026-07-29: the first schema-v3 records are committed (three clean `phase0-cli-control-*` engine records plus one exploratory run that also exposed and fixed the summarizer's v3 pin). `benchmarks/schema-v3.json` adds the typed quality identity to generation takes (pass/warning only, five fast gates required, machine-code issues); v1/v2 records stay valid immutable history; the publisher stamps v3 only when every take carries the identity. The UI benchmark checkers folded the same identity 2026-08-01: ui-generation records now publish v3 (first: the focused `v3-fold-proof` record `macos-xcui-benchmark-20260801-003208-403989cf`); the canonical iOS matrix published its first v3 record 2026-08-01 (`ios-xcui-benchmark-20260801-132415-abbec96b`). |
 | 14 — Organization and retirement | Closed 2026-07-23 (14a + 14b): compatibility SPI retired, actor-owned loading/metadata/priming/clone artifacts, clone conditioning epoch-bound end to end. |
 
+## September 5 physical-device checkpoint
+
+**Device work has stopped; the 201-take release campaign is not complete.** All current results
+remain development evidence, not signed-candidate acceptance. `RF-06`, `RF-07`, `RF-09` and
+`RF-11` retain their gates. The earlier September 4 seven correlated passes, one product failure,
+and five additional unverified engine attempts are unchanged. No failed row was retried or given
+a replacement seed. Failed and successful bundles are explicitly pinned under the existing
+ignored artifact roots; the roadmap remains the work-status authority.
+
+### Evidence and fixes
+
+Run IDs below are complete and source-bound; a PASS subtotal does not qualify the whole campaign.
+
+| Run | Result and remaining boundary |
+| --- | --- |
+| `ios-xcui-control-audit-20260905-075120-6f36dd81` | Two scheduled generation cells; first fully correlated PASS, second QC-passing output without qualifying playback/restoration. Failed run retained. |
+| `ios-xcui-control-audit-20260905-081153-b20f419d` | Inventory: 41 PASS, one onboarding NOT_APPLICABLE; restoration and required steps pass. |
+| `ios-xcui-control-audit-20260905-083404-9ce8a457` | Two scheduled cells: one PASS, one typed player PRODUCT_FAIL; restoration passes. Later failure timing is not proof the original product classification was wrong. |
+| `ios-xcui-control-audit-20260905-085144-fa4e6ef1` | Two scheduled cells: first playback/History PASS, second mandatory-QC PRODUCT_FAIL; restoration passes. Chinese output reaches EOS at 98 s with 86.392 s trailing silence, not token-cap termination. |
+| `ios-xcui-control-audit-20260905-090509-93f1dd47` | Stateful: seven PASS, three prerequisite blocks, two preservation-policy blocks; restoration passes. |
+| `ios-xcui-control-audit-20260905-091000-5f58d6ec` | External: three PASS and one permission-preservation block; restoration passes. |
+| `ios-xcui-control-audit-20260905-094217-25466c27` | Corrected layout: two aggregate PASS, restoration true, all four layout screenshots directly reviewed. |
+| `ios-xcui-perf-20260905-091655-27a05a63` | Nine performance bodies, validation, crash delta, publication, retention and required steps PASS. |
+| `vlr-device-20260905-closure-01`, `vlr-device-20260905-closure-02` | Two distinct 14/14 PASS closures; exact receipts and zero retries. Not calibrated pitch/identity qualification. |
+| `ios-xcui-smoke-20260905-101844-8467a386` | Physical journey PASS (241.820 s), layout walk PASS (288.146 s), long-form journey FAIL (224.010 s). No full smoke PASS. |
+
+The three generation pilots each leave **199 unscheduled cells**, plus separately classified
+aggregate controls. Their seeds and source identities differ; do not merge them into one
+accepted campaign. Only a short take proves all observed playback/scrub/History actions in each.
+The first pilot's unproven restoration and test-owned carrier/performance fixture residue remain
+explicit; no unrelated user History, Saved Voice or canonical model cleanup is authorized.
+
+Performance probe coverage is 97.45–99.93%, with fair thermals throughout the nine scenarios.
+The exploratory generation scenario has a 1,204.15 ms maximum main-loop gap; its passing lane
+status is not a claim of universally smooth generation or fully qualified generation memory.
+The existing synthetic History/scrubbing fixture and cleanup limitations remain explicit.
+
+**F-23:** an explicit Play after stream finalization could follow the automatic-drain policy,
+using queued duration rather than the position actually heard, and depend on Auto-play.
+`AudioPlaybackResumePolicy` now owns explicit intent: resume currentTime, restart at end, reject
+invalid duration. Four deterministic fixtures pass. Shared macOS/iOS implementation and short
+iPhone UI proof do not replace long-clip or packaged-Mac acceptance.
+
+**ICA-19:** the largest Settings tab displayed an ellipsis despite automated PASS in
+`091306-ff4aaa5a`; adding XCTest `.textClipped` also passed in `093556-95b02139` while the visual
+defect remained. `TabDock` now measures the real title width and falls back to icon-above-title.
+Default, AX-L, AX-XXXL and pseudo-AX-XXXL screenshots in `094217-25466c27` are readable without
+overlap. Narrow defect closed; ASR-12's complete candidate accessibility gate stays open.
+
+**RF-06:** `ios-startup-reliability-20260905-082230-4cc4a107` is a complete **diagnosed failure**,
+not audio PASS: three of three exact French attempts reject with QC. Cold/warm streaming traces
+match at 1,347 frames/107.76 s; full mode produces 571 frames/45.68 s. Both replay decoders
+reproduce each trace's gap. This excludes an incremental-only/UI/final-writer origin, not a
+common-decoder/platform-numerics problem versus sampled codes. The modes have different text
+conditioning, so differing generated codes alone do not establish RNG corruption. Twelve
+artifacts were digest-verified and collected before scoped device cleanup. The earlier oversized
+JSON run `ios-startup-reliability-20260905-074425-0476c238` remains failed; compact serialization
+now fits the existing bound and a 240-chunk fixture verifies it. No audio/QC policy changed.
+
+The independent Chinese pilot's rejected WAV was not mirrored under its registered iOS run ID.
+Shared gated run-ID resolution now binds capture and mirroring, rejects conflicting/invalid IDs,
+and has deterministic digest/corruption/retention tests. The original `not-bench` artifact is
+retained, not reparented or represented as recovered evidence.
+
+**VLR-07:** each new closure has eight transcript-backed Clone and six French Design cells.
+The first twelve WER values are zero; both long Design rows have WER **0.051282** and CER
+**0.034826**, within existing limits. Corresponding results match both new runs and the
+September 2 closure exactly (paired delta zero). Current on-device recognition succeeds for
+reference A and returns `lowConfidence` for B with permission authorized; reviewed stored
+transcripts are unchanged. This does not prove the original historical recognition cause,
+pitch/speaker fidelity, or resolve the old 122-row characterization/evaluator disagreements.
+
+**Final smoke failure:** first long-form segment `22B3D434-069C-4E86-AE4B-652A87A222C2`
+has a truthful Aiden/English/Consistent receipt for 859 characters. It reaches 2,048 generated
+codes and 293 decoded/published chunks, then fails at 128.557 s before final audio acceptance.
+Peak footprint is 2,578.534 MiB, minimum headroom 3,565.466 MiB, zero capture failures/missed
+deadlines, healthy memory band, but **serious thermal state**. The grouped History and segment
+regeneration assertions were never reached. Codec/WAV capture was not enabled for this attempt;
+random alphabetic test ownership text and thermal load are confounders, not proven causes.
+No retry, seed substitution or cap change was made. Device generation stopped at this boundary.
+
+**AV-09/RF-07 collection repair:** the runner exited on failed XCTest before the required smoke
+diagnostic pull. Supplemental telemetry was recovered separately, hashed, and its existing
+memory-pressure validator passed; original failed XCTest/missing-step status is unchanged.
+The production-stanza regression reproduced two missing-collection assertions. Collection now
+precedes aggregate exit, preserving XCTest failure even when the diagnostic subset passes.
+Six outcome combinations and all 35 adjacent tests pass. No new harness was introduced.
+
+### Verification and safe resume
+
+Pre-documentation source verification: `mac-test-20260905-060529` passed **575 core, 19 transport,
+109 runtime** tests, with two optional AudioSeal fixture skips and no failures. The full project
+gate passed **1,497 Python tests** in 121 modules; macOS app build passed. A simultaneous CLI build
+timed out on the shared package-store lock held during iOS XCTest; its failure is retained.
+The serial optimized CLI build subsequently passed and reports `vocello 3.0.0`. Generic iOS
+app and logic SDK builds passed without contacting the phone; website contract/accessibility,
+production build and both wide/narrow browser checks passed. The first post-documentation gate
+caught the combined AGENTS.md size budget; duplicated wording was condensed without removing
+safety rules. Surface coverage and the final full project gate pass: **1,500 Python tests** in
+121 modules (107 standalone plus 1,393 discovered), zero failures. Derived artifacts validate;
+the existing 64 documentation-freshness and 144 roadmap warnings remain advisory, not silently
+cleared. Final source/docs bytes receive the exact-content quick commit gate. No tag, upload,
+App Store change or publication is authorized by this checkpoint.
+
+Final screen-protection run `ios-xcui-screen-protection-20260905-104057-686c28fa` passed the
+French Settings route and persisted **Verrouillage auto. → 3 minutes**. Its readback screenshot
+also shows **Écran toujours allumé → Non**, already configured and not changed. XCTest returned
+to Home; independent CoreDevice lock-state queries report `passcodeRequired: true` while
+`unlockedSinceBoot: true` (the latter is historical, not a current-unlocked indication).
+No device UI runs follow final protection. Raw lock/device evidence remains untracked.
+The legacy probe inferred current lock from `unlockedSinceBoot`; replaying its original mapping
+against the observed field shape reproduced two false-unlocked assertions. The corrected shared
+parser uses typed current `passcodeRequired`, leaves malformed/missing values unknown, and all
+nine offline device-state tests pass. No additional phone interaction was needed for this fix.
+
+Next, in order: finish the coherent host checkpoint and commit/push; inspect retained exact
+French codes and long-form request evidence without speculative engine changes; require a new
+source-bound bounded playback/generation pilot after thermal recovery before scheduling the
+full 201-take campaign. Do not resume a historical cursor across source changes or silently
+repeat its failed cell. Existing MD-3/ICI closure stays historical; no unrelated model downloads.
+Signed-package, account, privacy/rights and candidate acceptance remain separate gates.
+
+Evidence roots: `build/artifacts/ui-tests/ios/`, `build/artifacts/ios/voice-reliability/`,
+`build/artifacts/diagnostics/ios/startup-reliability/`, and the untracked
+`build/artifacts/diagnostics/ios-session-20260905/` supplemental/hash/resume bundle.
+The final diagnostic source identity is
+`1db9f37d1496f31d302348074676168fb62a06860231c043b5a396a524201e7b`;
+perf uses `8946c11ba6c41b1192643df9c5db736502ca4c12e11b41ca5cd44161a7691caa`.
+Neither can become final candidate evidence merely by updating this document.
+
 ## Resume here (2026-09-04)
+
+This preserved anchor contains earlier checkpoints. The September 5 physical-device checkpoint
+above and `config/roadmap.json` supersede its next-action statements.
 
 **Latest repair (2026-09-05): profile publication and CLI Clone warm-state accounting are corrected.**
 Production-producer regression fixtures reproduced the schema-v3 retention rejection before the

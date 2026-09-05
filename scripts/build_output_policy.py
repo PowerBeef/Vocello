@@ -94,6 +94,7 @@ HEAVY_LANE_IDS = {
     "ui-control-audit",
     "ui-enroll-clone-fixture",
     "ui-saved-voice-lifecycle",
+    "ui-screen-protection",
     "release",
 }
 

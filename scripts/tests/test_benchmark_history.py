@@ -967,7 +967,7 @@ class BenchmarkHistoryTests(unittest.TestCase):
                 args, trace_digest="f" * 64,
                 original_ephemeral_path=summary["artifact"], trace_summary=summary,
             )
-            return publisher.record_shell(
+            manifest = publisher.record_shell(
                 kind="instrument-profile", platform="macos", run_id=run_id,
                 label="fixture", started_at=fixture["run"]["startedAt"],
                 finished_at=fixture["run"]["finishedAt"], matrix_scope="instrumented",
@@ -986,6 +986,11 @@ class BenchmarkHistoryTests(unittest.TestCase):
                     "summary": summary, **retention,
                 },
             )
+            # This fixture qualifies retention/schema composition, not a local
+            # build. Supply the synthetic executable identity explicitly so
+            # cache cleanup cannot change which validation rule is exercised.
+            manifest["historyRecord"]["toolchain"].update(fixture["toolchain"])
+            return manifest
 
     def test_production_profile_retention_publishes_v2_and_v3_without_downgrade(self) -> None:
         for quality in (False, True):

@@ -115,17 +115,22 @@ def query_lock_state(device_id: str) -> dict[str, Any]:
     finally:
         tmp.unlink(missing_ok=True)
 
+    return summarize_lock_state(raw)
+
+
+def summarize_lock_state(raw: dict[str, Any]) -> dict[str, Any]:
     result = raw.get("result") or raw
     lock = result.get("lockState") or result
     unlocked = lock.get("unlockedSinceBoot")
     passcode = lock.get("passcodeRequired")
-    if unlocked is None and passcode is None:
-        return {"state": "unknown", "raw": result}
+    # unlockedSinceBoot survives later Auto-Lock; it is not current lock state.
+    # Keep missing/malformed current evidence unknown, never coerce strings.
+    current_known = isinstance(passcode, bool)
     return {
-        "state": "known",
-        "unlockedSinceBoot": bool(unlocked) if unlocked is not None else None,
-        "passcodeRequired": bool(passcode) if passcode is not None else None,
-        "deviceLocked": unlocked is False,
+        "state": "known" if current_known else "unknown",
+        "unlockedSinceBoot": unlocked if isinstance(unlocked, bool) else None,
+        "passcodeRequired": passcode if current_known else None,
+        "deviceLocked": passcode if current_known else None,
     }
 
 

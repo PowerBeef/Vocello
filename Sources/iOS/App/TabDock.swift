@@ -100,9 +100,16 @@ private struct TabDockButton: View {
         Button(action: action) {
             Group {
                 if horizontalLayout {
-                    HStack(spacing: 8) {
-                        tabIcon
-                        tabTitle
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: 8) {
+                            tabIcon
+                            // Evaluate the real title width, not an ellipsized fit.
+                            tabTitle.fixedSize(horizontal: true, vertical: false)
+                        }
+                        VStack(spacing: 4) {
+                            tabIcon
+                            tabTitle
+                        }
                     }
                 } else {
                     VStack(spacing: 4) {
@@ -143,7 +150,9 @@ private struct TabDockButton: View {
         Text(tab.title)
             .font(.caption2.weight(.semibold))
             .tracking(0.05)
-            .lineLimit(1)
+            .lineLimit(horizontalLayout ? nil : 1)
+            .fixedSize(horizontal: false, vertical: true)
+            .multilineTextAlignment(.center)
     }
 }
 

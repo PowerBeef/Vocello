@@ -1,5 +1,126 @@
 import XCTest
 
+/// Explicit operator cleanup, isolated from every Vocello acceptance journey.
+/// No product launch environment or hidden app UI participates in this action.
+@MainActor
+final class VocelloiOSScreenProtectionUITests: XCTestCase {
+    override func tearDown() {
+        // XCTest assertion failures can abort before a Swift defer executes.
+        XCUIDevice.shared.press(.home)
+        super.tearDown()
+    }
+
+    func testConfiguredAutoLockAction() throws {
+        continueAfterFailure = false
+        let action = ProcessInfo.processInfo.environment["QVOICE_IOS_SCREEN_PROTECTION_ACTION"]
+        guard action == "inspect" || action == "enable" else {
+            XCTFail("Use the explicit screen-protection lane; authorization is missing")
+            return
+        }
+        let settings = XCUIApplication(bundleIdentifier: "com.apple.Preferences")
+        settings.launch()
+        defer { XCUIDevice.shared.press(.home) }
+        XCTAssertTrue(VocelloUIWait.condition("Settings foreground", timeout: 20) {
+            settings.state == .runningForeground
+        })
+
+        func cell(_ names: [String]) -> XCUIElement {
+            // iOS 26 Settings places the accessible name on a Button inside an
+            // anonymous Cell. Match the actual named control, not its wrapper.
+            let labels = names.map { name in
+                NSPredicate(format: "label == %@ OR label BEGINSWITH %@", name, name + ",")
+            }
+            return settings.descendants(matching: .any).matching(NSCompoundPredicate(
+                orPredicateWithSubpredicates: [NSPredicate(format: "identifier IN %@", names)] + labels
+            )).firstMatch
+        }
+        func tap(_ control: XCUIElement) {
+            XCTAssertTrue(VocelloUIPrimaryAction.perform(on: control, timeout: 15))
+        }
+        let display = cell(["DISPLAY", "Display & Brightness", "Luminosité et affichage", "Affichage et luminosité"])
+        let autoLock = cell(["AUTOLOCK", "Auto-Lock", "Verrouillage automatique"])
+        // The observed French picker uses a nonbreaking space and a seconds ID.
+        let threeMinutes = cell(["180", "3 minutes", "3\u{00A0}minutes", "3 Minutes", "3 min"])
+        func onAutoLockPage() -> Bool {
+            settings.navigationBars["Auto-Lock"].exists
+                || settings.navigationBars["Verrouillage automatique"].exists
+                || settings.navigationBars["Verrouillage auto."].exists
+        }
+
+        // Settings can reopen an unrelated subpage. Only navigate back or scroll;
+        // never touch another setting to reach Display & Brightness.
+        var rootRewound = false
+        for _ in 0..<12 {
+            if autoLock.exists || onAutoLockPage() { break }
+            if display.exists && display.isHittable {
+                tap(display)
+                XCTAssertTrue(VocelloUIWait.exists(autoLock, timeout: 15))
+                break
+            }
+            let atRoot = settings.navigationBars["Settings"].exists
+                || settings.navigationBars["Réglages"].exists
+            if atRoot {
+                if !rootRewound {
+                    for _ in 0..<4 { settings.swipeDown() }
+                    rootRewound = true
+                } else {
+                    settings.swipeUp()
+                }
+            } else {
+                let back = settings.navigationBars.buttons.firstMatch
+                XCTAssertTrue(VocelloUIWait.exists(back, timeout: 10))
+                tap(back)
+            }
+        }
+        if !onAutoLockPage() {
+            for _ in 0..<6 {
+                if autoLock.exists && autoLock.isHittable { break }
+                settings.swipeUp()
+            }
+            XCTAssertTrue(VocelloUIWait.exists(autoLock, timeout: 15))
+            tap(autoLock)
+        }
+        XCTAssertTrue(VocelloUIWait.condition("Auto-Lock settings page", timeout: 15) {
+            onAutoLockPage()
+        })
+        XCTAssertTrue(VocelloUIWait.exists(threeMinutes, timeout: 15))
+        XCTAssertTrue(threeMinutes.isEnabled, "Three-minute Auto-Lock is restricted or unavailable")
+        VocelloUIScreenshot.attach(settings, named: "ios-auto-lock-before-\(action!)")
+
+        if action == "enable" {
+            tap(threeMinutes)
+        }
+        // Read back the parent row after leaving the picker: a tap alone never
+        // proves the setting persisted. Inspect follows the same read-only path.
+        tap(settings.navigationBars.buttons.firstMatch)
+        XCTAssertTrue(VocelloUIWait.exists(autoLock, timeout: 15))
+        if action == "enable" {
+            XCTAssertTrue(VocelloUIWait.condition("three-minute Auto-Lock readback", timeout: 15) {
+                let value = String(describing: autoLock.value ?? "")
+                    .split(whereSeparator: \.isWhitespace).joined(separator: " ").lowercased()
+                return value == "3 minutes" || value == "3 min"
+                    || autoLock.staticTexts["3 minutes"].exists
+                    || autoLock.staticTexts["3\u{00A0}minutes"].exists
+            })
+        }
+        let evidence: [String: Any] = [
+            "schemaVersion": 1,
+            "action": action!,
+            "autoLockValue": String(describing: autoLock.value ?? ""),
+            "threeMinuteOptionAvailable": true,
+            "threeMinutesVerified": action == "enable",
+        ]
+        let attachment = XCTAttachment(
+            data: try JSONSerialization.data(withJSONObject: evidence, options: [.sortedKeys]),
+            uniformTypeIdentifier: "public.json"
+        )
+        attachment.name = "screen-protection.json"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        VocelloUIScreenshot.attach(settings, named: "ios-auto-lock-readback-\(action!)")
+    }
+}
+
 /// One explicit physical-device journey. It exercises visible production UI
 /// in a single app session, cancels one active streamed Custom generation,
 /// and then completes exactly one Custom generation.

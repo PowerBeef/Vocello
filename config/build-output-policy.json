@@ -16,6 +16,7 @@
         "control-audit",
         "model-download",
         "startup-parity",
+        "screen-protection",
         "perf"
       ],
       "keepPassingPerPlatformLane": 1,
@@ -101,6 +102,10 @@
         "cleanupHint": "scripts/clean_build_caches.sh --prune-ui-results"
       },
       "ui-saved-voice-lifecycle": {
+        "requiredFreeBytes": 12884901888,
+        "cleanupHint": "scripts/clean_build_caches.sh --prune-ui-results"
+      },
+      "ui-screen-protection": {
         "requiredFreeBytes": 12884901888,
         "cleanupHint": "scripts/clean_build_caches.sh --prune-ui-results"
       },

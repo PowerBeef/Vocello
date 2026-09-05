@@ -87,10 +87,29 @@ public struct StartupReliabilityArtifactEvidence: Hashable, Codable, Sendable {
     }
 }
 
-/// Generation-scoped, bounded persistence used only by the physical-device
-/// reliability runner. Callers must additionally enforce TelemetryGate.
+/// Generation-scoped, bounded persistence for internal device/UI/CLI diagnostics.
+/// Callers must additionally enforce TelemetryGate.
 public enum StartupReliabilityDiagnosticEvidence {
     public static let maximumCodecFrames = 8_192
+
+    /// The writer and pullable mirror must use one registered run identity.
+    /// UI-only runs need no benchmark metadata. Conflicting or missing identities
+    /// cannot fall back to a shared anonymous directory containing unrelated takes.
+    public static func captureRunID(
+        environment: [String: String],
+        telemetryEnabled: Bool
+    ) -> String? {
+        guard telemetryEnabled else { return nil }
+        var identity: String?
+        for key in ["QVOICE_IOS_DEVICE_RUN_ID", "QVOICE_MAC_BENCH_RUN_ID"] {
+            guard let raw = environment[key] else { continue }
+            let value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard isSafeIdentifier(value), value != "not-bench",
+                  identity == nil || identity == value else { return nil }
+            identity = value
+        }
+        return identity
+    }
 
     public static func evidenceDirectory(
         appSupportDirectory: URL,
@@ -320,7 +339,8 @@ public enum StartupReliabilityDiagnosticEvidence {
     }
 
     private static func isSafeIdentifier(_ value: String) -> Bool {
-        (1...96).contains(value.count) && value.unicodeScalars.allSatisfy {
+        value != "." && value != ".."
+            && (1...96).contains(value.count) && value.unicodeScalars.allSatisfy {
             CharacterSet.alphanumerics.contains($0) || $0 == "." || $0 == "_" || $0 == "-"
         }
     }

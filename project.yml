@@ -455,6 +455,7 @@ targets:
     sources:
       - path: Tests/VocelloCoreTests
       - path: Tests/VocelloiOSLogicTests
+      - path: Sources/SharedSupport/Services/AudioPlaybackResumePolicy.swift
       - path: Sources/SharedSupport/Services/LanguageSelectionPresentation.swift
       - path: Sources/SharedSupport/Services/GenerationOutputVerifier.swift
       - path: Sources/SharedSupport/Services/VoiceClipTranscriber.swift

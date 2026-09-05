@@ -61,6 +61,33 @@ edit unrelated source or documentation and then bypass the full-tree identity ch
 results in the roadmap at the next source checkpoint. A changed product needs fresh applicable
 acceptance; old results remain historical evidence, not replacement candidate proof.
 
+## September 5 device checkpoint and next boundary
+
+The [active checkpoint](../development-progress.md#september-5-physical-device-checkpoint)
+records the exact runs, fixes and limitations. Two new 14/14 Clone/French Design closures,
+inventory, bounded stateful/external checks, corrected four-size layout review and nine performance
+scenarios completed. They are not the full 201-take campaign or signed-candidate proof.
+
+Before another long campaign:
+
+1. Finish RF-09's coherent host verification/commit. F-23 corrects explicit Play after stream
+   finalization; ICA-19 closes the directly observed largest-size tab-title truncation.
+2. RF-06 keeps three distinct audio cases: the retained numeric-marker regression, reproducible
+   marker-free French/Chinese EOS failures, and the new long-form first-segment token-cap failure.
+   Both decoder replay paths reproduce the French gap; common decoder/platform numerics versus
+   sampled codes are still unresolved. The long-form failure occurred at serious thermal load,
+   with healthy memory. No speculative prompt/token-cap/seed/model/QC changes are justified.
+3. RF-07's original failed pilot and smoke results stay failed. Scope the next physical pilot to
+   the remaining long-player/request boundary. Failure diagnostics now collect before aggregate
+   exit; separately recovered smoke telemetry cannot retrospectively turn the runner green.
+4. Only after a complete pilot and candidate freeze schedule RF-11's full matrix. Preserve every
+   source/seed-bound attempt; the three new two-take pilots are not a merged campaign or retries.
+
+French Settings Auto-Lock was restored to three minutes and verified separately from product
+acceptance; no further device UI runs follow final screen protection. Unrelated user data and
+retained test-owned forensic residue must not be deleted on inference. RF-10 desktop/CLI package
+qualification can proceed independently; account/rights/signing decisions remain explicit.
+
 ## September 4 current-source amendment
 
 The [engineering audit grounding](engineering-audit-grounding-2026-09-04.md) reviews the new

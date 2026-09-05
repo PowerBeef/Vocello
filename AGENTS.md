@@ -11,9 +11,8 @@
 
 ## Product and authority
 
-**Vocello** is local-first Qwen3-TTS/MLX speech synthesis in Swift 6 for Apple Silicon.
-The historical `QwenVoice` checkout contains macOS/XPC and iOS/in-process apps, `vocello` CLI,
-automation, benchmarks, and a React/Vite site. No bundled weights or cloud inference;
+**Vocello** is local-first Qwen3-TTS/MLX in Swift 6: macOS/XPC, iOS/in-process, `vocello` CLI,
+automation, benchmarks and React/Vite website. No bundled weights or cloud inference;
 approved assets download from Hugging Face through the production catalog.
 
 Check version, hardware and counts against `project.yml`, `config/public-product-facts.json` and benchmarks.
@@ -32,32 +31,27 @@ machine-readable contract invalidates documentation, update the documentation in
 
 ## Start and resume work
 
-1. Run `git status --short --branch` and require the local branch to be exactly `main`, then run
-   `python3 scripts/roadmap.py status`. If `main` cannot be checked out without risking existing
-   work, stop and ask; do not continue implementation on another branch. Do not overwrite unrelated
-   user changes.
-2. Read `docs/development-progress.md` and verify its checkpoint. Follow the plan selected by
-   `primaryPlan` in `config/roadmap.json`; older active plans retain their defect/evidence authority
-   but are not competing next-work queues.
+1. Run `git status --short --branch`, require local `main`, then `python3 scripts/roadmap.py status`.
+   Stop if returning to `main` risks existing work; preserve unrelated changes.
+2. Verify `docs/development-progress.md`; follow `config/roadmap.json`'s `primaryPlan`.
+   Other plans retain defect/evidence authority, not competing work queues.
 3. Read the applicable file under `.agents/rules/` and the authoritative subsystem reference.
 4. Inspect the exact code, tests, and contracts before deciding on an implementation.
 5. Read every selected skill completely and verify optional tools are callable.
 6. Make the smallest coherent change. Preserve module boundaries and stable accessibility IDs.
-7. Land source, tests, evidence, contracts, and narrative updates together. After a dense workstream,
-   perform a documentation currency pass before starting another arc.
+7. Land source, tests, evidence, contracts and narrative together; check documentation currency
+   before another workstream.
 
-Ask when scope/platform/acceptance is ambiguous. Ordinary checkpoints require deterministic
-verification, never model downloads, a phone, or UI evidence.
+Clarify ambiguous scope. Ordinary checkpoints need deterministic checks, never models or a phone.
 
 ### Release-first execution
 
 Follow [`docs/reference/release-first-execution-2026-09.md`](docs/reference/release-first-execution-2026-09.md)
-in primary-roadmap order: product fixes before long campaigns; only necessary harness repairs;
-retained evidence before new generation. Stop diagnostics at the causal boundary. Keep heavy
-generation/analysis serial on the 8 GB Mac; verify focused changes, then the coherent tree.
-Distinguish implementation, candidate verification, and publication approval. macOS/CLI need not
-wait for iOS-only blockers. Keep external account/signing/rights decisions explicit. Version and
-run progress live in the roadmap/checkpoint, not here; implementation never authorizes publication.
+in primary-roadmap order: product fixes before campaigns, necessary harness repairs only, retained
+evidence before generation. Stop at the causal boundary. Keep heavy workloads serial on the 8 GB
+Mac; verify focused changes then the tree. Implementation, candidate proof and publication approval
+are separate. macOS/CLI need not wait for iOS. Keep account/signing/rights dependencies explicit;
+version and run progress belong in the roadmap/checkpoint.
 
 ## Hard invariants
 
@@ -149,7 +143,7 @@ No gate can validate optional assists; they are never prerequisites.
 | Codex instructions, hooks, skills, or settings | `openai-docs` and current official OpenAI documentation |
 | Current third-party library APIs | Context7, then primary vendor documentation |
 
-External assists require user request or a genuine in-scope need; discovery must confirm availability.
+Discover optional assists only for an in-scope need or user request.
 
 <!-- END OPTIONAL ASSISTS -->
 
@@ -169,6 +163,9 @@ Use `scripts/dev.sh plan`, repeat `scripts/dev.sh focused` while editing, then r
 `scripts/dev.sh checkpoint` for the coherent tree. This path-aware router preserves governed caches
 and never schedules UI/model/release work; see
 [`docs/reference/development-workflow.md`](docs/reference/development-workflow.md).
+
+Serialize native Xcode commands: the shared SwiftPM lock spans XCTest. Parallelize read-only/Python
+work instead; never bypass the lock or clear caches to evade contention.
 
 - **T0:** fast generation, adjacent Python tests, and changed XCTest classes.
 - **T1:** derived refresh, the full project-input gate, and path-required native evidence. The
@@ -203,6 +200,11 @@ collection/cleanup time and stop before the deadline. Pin runs and record comple
 boundaries. Runner PASS requires diagnostics/cleanup. Interrupted runs stay failed; zero-observation
 runs cannot resume. Source changes need new IDs. Identity, reachability, and safe-resume procedures:
 `docs/reference/ios-device-testing.md`.
+
+When authorized, finish with `scripts/ui_test.sh ios screen-protection --scenario enable --retain-result`.
+Verify English/French Settings' three-minute readback, return Home, then independently verify lock
+after the timer; `unlockedSinceBoot` is historical. No device UI follows final protection. This is
+cleanup, not product acceptance; details live in the device-testing guide.
 
 ## Key paths
 

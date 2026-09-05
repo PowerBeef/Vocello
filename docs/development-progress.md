@@ -47,6 +47,73 @@ machine-readable status record and wins over any older prose.
 | 13 — Benchmark/history v3 | Live 2026-07-29: the first schema-v3 records are committed (three clean `phase0-cli-control-*` engine records plus one exploratory run that also exposed and fixed the summarizer's v3 pin). `benchmarks/schema-v3.json` adds the typed quality identity to generation takes (pass/warning only, five fast gates required, machine-code issues); v1/v2 records stay valid immutable history; the publisher stamps v3 only when every take carries the identity. The UI benchmark checkers folded the same identity 2026-08-01: ui-generation records now publish v3 (first: the focused `v3-fold-proof` record `macos-xcui-benchmark-20260801-003208-403989cf`); the canonical iOS matrix published its first v3 record 2026-08-01 (`ios-xcui-benchmark-20260801-132415-abbec96b`). |
 | 14 — Organization and retirement | Closed 2026-07-23 (14a + 14b): compatibility SPI retired, actor-owned loading/metadata/priming/clone artifacts, clone conditioning epoch-bound end to end. |
 
+## September 5 later physical pilot — resume checkpoint
+
+On unchanged `main` at `1ba75045`, preflight passed and the bounded two-take pilot
+`ios-xcui-control-audit-20260905-133921-8541d6f1` ran once. **XCTest passed in 792.825 s;
+the complete runner failed device correlation.** No automatic retry or additional campaign
+shard followed. This is development evidence, not a frozen or signed-candidate campaign.
+
+| Take | Observed outcome |
+| --- | --- |
+| `custom-001` — short English / Aiden / Neutral / Balanced | 2.88 s audio, Fast-QC PASS, EOS, real Play/Pause and paused scrub, verified History ownership. |
+| `custom-002` — long-corpus Chinese / Aiden / Angry / Consistent | 18.80 s audio, EOS, real Play/Pause and paused scrub, verified History ownership; Fast-QC **warning**, one excess cadence pause (5 observed / 4 expected), longest interior pause 834 ms. Not promotion-quality PASS. |
+
+The same exact seed was retained across both requests; receipts report **cold for both** and
+`retryAttempt: 0`. Both captured thermal envelopes were nominal; peak physical footprints were
+1,923.690 and 2,275.940 MiB, minimum headroom 4,220.310 and 3,868.060 MiB, respectively.
+Sampler memory coverage was 100% with no capture failures; the collected crash delta was empty.
+No new hard whole-output QC rejection occurred. Chunk-local silence flags remain in the complete
+report and must not be confused with the whole-output verdict.
+
+Ten contiguous observation attachments include the original selections, early generation IDs,
+terminal player/History evidence and final restoration. The second run-owned History row was
+deleted after identity verification; the first remains an explicitly identified seed carrier.
+Original Studio drafts/selections and variation were restored by the lane. This does not erase
+older forensic residue or establish blanket cleanup of every prior campaign.
+
+### Remaining RF-07 / AV-09 gaps exposed by this run
+
+- `validate_device_evidence` requires warm coverage among ordinary rows in each invocation, so
+  this two-row shard labels the cold second row `PRODUCT_FAIL` with the sole issue
+  `missing_observed_warm_coverage`. This is missing coverage, not proof that synthesis failed.
+  The required warm cohort is still absent; neither a PASS receipt nor row order can invent it.
+- `run.json` correctly records failure/exit 1, but `control-audit-summary.json` reports a passed
+  UI shard and `required-steps.json` says passed because device correlation is registered optional.
+  Preserve all three originals. Make generation correlation required and keep overall, per-row
+  and coverage outcomes consistent before treating another shard as qualified.
+- The attachment manifest contains ten JSON observations and **no generation PNGs or WAVs**.
+  `generation-custom-*` evidence labels are not screenshot files. Structured player actions are
+  genuine evidence, but cannot support a screenshot/layout review or retrospective waveform/ASR
+  analysis of the deleted second output. Add actual bounded checkpoint attachments and retain
+  warning evidence through the existing lane; do not reconstruct missing observations.
+
+The next bounded correction belongs to existing RF-07/ICA-18/AV-09: separate per-take agreement
+from campaign warm-coverage obligations, prove a genuine warm cohort without hidden state,
+retain warnings as non-promotion evidence, and enforce required correlation/artifact availability.
+Use retained fixtures first; no engine memory, sampling, seed or QC change is justified here.
+**Do not resume this run at `custom-003`:** its failed correlation is explicitly rejected by the
+current resume validator. Both attempted rows remain represented, with **199 unscheduled**;
+they are not a completed or passing 201-take campaign. RF-11 remains gated by RF-07 and RF-09.
+Previously completed inventory, stateful, external, layout, performance and VLR phases were not
+rerun merely to produce another green subtotal. Signed-candidate and original-script-only work
+remains blocked on its existing prerequisites.
+
+Artifacts are pinned under ignored `build/artifacts/ui-tests/ios/<run-id>/`: original `.xcresult`,
+ten attachments, observations, engine/app telemetry, plan, correlation, summaries and crash delta.
+Observation SHA-256: `b8fed7d82686b978da85cdc8a971574482b6600ef4684d6816ab04fbf03d8423`;
+correlation SHA-256: `914e9bbc8ec18cbd9948d0b5a81367a84e247b81968cb372c444dbc03eb72eb6`.
+
+Screen protection is separate: inspection `ios-xcui-screen-protection-20260905-133538-aa7372f6`
+showed French **Jamais** and Always-On **Non**. Final enable run
+`ios-xcui-screen-protection-20260905-135518-6bf1f906` passed in 32.590 s with runner collection
+and retention PASS; its readback screenshot visibly confirms **3 minutes** and Always-On **Non**.
+No device UI work follows that final action. At 13:59 UTC, the separate read-only CoreDevice
+observation returned `passcodeRequired: true`; the phone is confirmed locked, not merely configured
+to lock. Both raw lock observations remain untracked in the enable-run directory. Its retention
+report confirms all three current-session bundles are explicitly pinned. AGENTS.md was reviewed;
+its existing source-binding, failure-retention and screen-protection procedures remain accurate.
+
 ## September 5 ordered host follow-up
 
 The requested five host priorities were advanced in order. **No iPhone interaction, new synthesis,

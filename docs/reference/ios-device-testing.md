@@ -224,6 +224,14 @@ History text entry waits for the real field and keyboard before one replacement,
 value. No automatic test/generation retry is added. These source repairs require a physical pilot.
 Runner PASS is written only after required-step finalization; failure exits also finalize the ledger.
 
+The [later September 5 pilot checkpoint](../development-progress.md#september-5-later-physical-pilot--resume-checkpoint)
+records an unresolved exception in the current runner: device correlation fails on missing warm
+coverage while its required-step entry is optional and the UI-only summary says the shard passed.
+Use `run.json` plus the correlation and all underlying observations, never the ledger subtotal alone.
+That failed run cannot resume. Its generation evidence labels have no corresponding PNGs; do not
+claim screenshot acceptance from the structured player observations. RF-07/AV-09 own the bounded
+correction; the warm cohort and promotion treatment of cadence warnings remain required.
+
 For a time-limited phone window, set the stop deadline before launching a lane and reserve time
 for its diagnostics and teardown. Do not launch work that cannot fit the remaining window.
 Finish device collection and confirm test-owned app termination before releasing the phone;

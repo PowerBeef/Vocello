@@ -63,6 +63,15 @@ acceptance; old results remain historical evidence, not replacement candidate pr
 
 ## September 5 device checkpoint and next boundary
 
+The [later two-take pilot](../development-progress.md#september-5-later-physical-pilot--resume-checkpoint)
+on `1ba75045` completed both UI/player/History journeys and restoration, but the runner failed
+missing warm coverage (both authoritative receipts were cold). English passed QC; Chinese had
+an excess-cadence warning. Keep that warning distinct from both a hard rejection and promotion
+PASS. The host's optional correlation step and absent generation screenshots remain bounded
+RF-07/AV-09 work; no failed result was rewritten or resumed. RF-11's full campaign remains gated
+by RF-07 and RF-09. Final French Settings readback confirms three-minute Auto-Lock; the independent
+13:59 UTC CoreDevice observation confirms the phone is locked. No further device UI work followed.
+
 The later [phone-independent codec checkpoint](../development-progress.md#september-5-phone-independent-codec-checkpoint)
 reproduces the 12.817-second French gap on the Mac using the exact retained iPhone codes and
 catalog-verified model bytes. Historical `full` replay means the production non-streaming

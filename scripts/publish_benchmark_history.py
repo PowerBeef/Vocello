@@ -1044,6 +1044,16 @@ def engine_take(
         raise PublicationError(f"generation {generation_id} has the wrong ordered cell")
     if row.get("mode") != take.get("mode") or row.get("modelID") != take.get("modelID"):
         raise PublicationError(f"generation {generation_id} telemetry identity does not match bench results")
+    # Planned labels cannot turn a model-loading take into a warm measurement.
+    # Older telemetry may omit the receipt, but every available observed layer
+    # must agree before a new record can enter the PASS-only registry.
+    warm_state = row.get("warmState")
+    if warm_state not in ("cold", "warm") or take.get("warmState") != warm_state:
+        raise PublicationError(f"generation {generation_id} observed warm state does not match bench results")
+    for layer in ("backendMetrics", "requestReceipt"):
+        evidence = row.get(layer)
+        if isinstance(evidence, dict) and "warmState" in evidence and evidence["warmState"] != warm_state:
+            raise PublicationError(f"generation {generation_id} {layer} warm state contradicts engine telemetry")
     mode = str(take.get("mode"))
     model_id = str(take.get("modelID"))
     identity = runtime_identity(row, mode=mode, model_id=model_id)
@@ -1060,7 +1070,7 @@ def engine_take(
         "mode": mode,
         "modelID": model_id,
         "variant": str(take.get("variant", "speed")),
-        "warmState": str(take.get("warmState", row.get("warmState", "unknown"))),
+        "warmState": warm_state,
         "length": str(take.get("length", "not-applicable")),
         "finishReason": "completed",
         "status": "passedWithWarnings" if qc["verdict"] == "warn" else "passed",

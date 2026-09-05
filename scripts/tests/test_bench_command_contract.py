@@ -95,6 +95,18 @@ class BenchCommandSourceContractTests(unittest.TestCase):
         self.assertIn("telemetryOff || telemetryVerbose || noSummary", self.source)
         self.assertIn("schema-v2 memory evidence", self.source)
 
+    def test_ordinary_clone_warm_measurements_await_load_without_hidden_take(self) -> None:
+        unload = self.source.index("try await runtime.engine.unloadModel()")
+        preparation = self.source.index("if mode == .clone, memoryQualification == nil {", unload)
+        loop = self.source.index("for len in lengths {", preparation)
+        block = self.source[preparation:loop]
+        self.assertIn("try await runtime.engine.loadModel(id: modelID)", block)
+        self.assertNotIn("try?", block)
+        self.assertNotIn("await take(", block)
+        self.assertNotIn(".generate(", block)
+        self.assertNotIn("Task {", block)
+        self.assertNotIn("try? await runtime.engine.unloadModel()", self.source)
+
     def test_zero_warm_is_an_explicit_cold_only_diagnostic_contract(self) -> None:
         self.assertIn("parsedWarm >= 0", self.source)
         self.assertIn("--warm must be a non-negative whole number", self.source)

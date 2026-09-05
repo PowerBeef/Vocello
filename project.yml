@@ -467,6 +467,7 @@ targets:
       - path: Sources/SharedSupport/Services/VocelloPresentationText.swift
       - path: Sources/Services/MacStudioGenerationRequestFactory.swift
       - path: Sources/Models/VoiceDesignDraft.swift
+      - path: Sources/Models/ScriptTextState.swift
       - path: Sources/ViewModels/VoiceDesignCoordinator.swift
       - path: Sources/ViewModels/GenerationLifecycleExecutor.swift
       - path: Sources/VocelloCLI/CLIProcessSupervisor.swift

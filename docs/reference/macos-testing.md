@@ -117,7 +117,7 @@ source). Thresholds are set only after repeated baselines establish spread.
 
 | Lane | Scope |
 | --- | --- |
-| Smoke | Seven ordered focused journeys, each in a fresh app session with no persisted state left behind: (1) navigation + visible model/clone readiness, (2) one real Custom generation with the completed take asserted exactly once in History, (3) mid-generation cancellation — clean reset, no error badge, no History row, (4) the virtual-microphone recording flow through capture and review (registered `QWENVOICE_FAKE_MIC_WAV` knob, `/tmp` fixture; cancels before the permission-sensitive accept), (5) library surfaces, (6) a long-form project (default ~1,900-character script → two sequential streaming segments; `--long-form-segments N` scales the same journey up to 12 planned segments for local memory-scaling evidence — the summary then adds a per-segment engine physical-footprint table and retains the compact per-generation diagnostics beside the run artifacts; joined WAV, one History project row with a working segment map; the lane prints the project wall clock and writes `long-form-project-summary.txt`), (7) a two-line batch (two streamed takes → two History rows) |
+| Smoke | Seven ordered focused journeys, each in a fresh app session; generated diagnostic-store audio and History are retained, not automatically erased: (1) navigation + visible model/clone readiness, (2) one real Custom generation with the completed take asserted exactly once in History, (3) mid-generation cancellation — clean reset, no error badge, no History row, (4) the virtual-microphone recording flow through capture and review (registered `QWENVOICE_FAKE_MIC_WAV` knob, `/tmp` fixture; cancels before the permission-sensitive accept), (5) library surfaces, (6) a long-form project (default ~1,900-character script; report the actual planner segment count rather than assuming a fixed count; `--long-form-segments N` scales the same journey up to 12 planned segments for local memory-scaling evidence — the summary then adds a per-segment engine physical-footprint table and retains the compact per-generation diagnostics beside the run artifacts; joined WAV, one History project row with a working segment map; the lane prints the project wall clock and writes `long-form-project-summary.txt`), (7) a two-line batch (two streamed takes → two History rows) |
 | Benchmark | Ordered, configurable Custom/Design/Clone matrix with cold/warm classification and per-take deterministic proof; the default is exactly 29 takes |
 
 The runner targets the configured native Vocello test host. Before launch it resolves every matching
@@ -173,6 +173,13 @@ Critical pressure, app memory warning/exit, `hardTrim`, or `fullUnload` fails pu
 does a marking peak-equality breach (CP-2: within every take, no post-marking footprint sample may
 exceed the pre-marking peak beyond tolerance — `config/marking-peak-equality.json`). Guarded
 pressure, `softTrim`, or 95–<100% coverage publishes only as an explicit warning.
+
+Do not infer an OS memory-pressure event from `memory.pressure.soft_trim` alone. Inspect the
+typed event's kind, source and reason: routine `post-generation` cache cleanup also emits a
+`trim-action` with reason `post_generation_cache_clear`. Keep the existing qualification warning
+and report its origin separately; zero pressure signals is not proof of leak freedom. Use the
+policy-owned retained-memory lane below for bounded within-mode growth, rather than comparing
+unrelated peaks or interpreting initial model/cache residency as a leak.
 
 Smoke is intentionally smaller: it asserts visible completion and History plus the runner's
 single-process/crash-delta checks; it does not claim the benchmark's per-take telemetry matrix.

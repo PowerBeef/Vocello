@@ -655,7 +655,8 @@
         "Sources/Views",
         "Sources/ContentView.swift",
         "Sources/SharedSupport/Services/ReferenceTranscriptionReviewState.swift",
-        "Sources/Services/MacStudioGenerationRequestFactory.swift"
+        "Sources/Services/MacStudioGenerationRequestFactory.swift",
+        "Sources/Models/ScriptTextState.swift"
       ]
     },
     {

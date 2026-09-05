@@ -49,7 +49,145 @@ machine-readable status record and wins over any older prose.
 
 ## Resume here (2026-09-04)
 
-**Latest action: focused F-21 CLI batch-admission remediation.** The external follow-up on
+**Latest repair (2026-09-05): profile publication and CLI Clone warm-state accounting are corrected.**
+Production-producer regression fixtures reproduced the schema-v3 retention rejection before the
+fix. The validator now accepts the existing v2 and v3 retention contract, preserving quality,
+digest, exact-PID, path, completeness and corruption checks; no schema downgrade was introduced.
+New profile `mac-cpu-profile-20260905-045133-ea3bfd91` completed two Built-in takes with QC pass,
+8,349 exact-PID CPU samples and 157 correlated signposts, then published schema 3 and removed only
+its own raw trace after validation. Its compact summary/record remain; the original failed
+`mac-cpu-profile-20260905-035610-672805f1` is pinned and its raw digest is unchanged.
+
+Ordinary CLI Clone now awaits model loading before its warm-only matrix, without a hidden
+generation; unload failures propagate. The retained-memory protocol deliberately keeps its first
+Clone take cold. Publication rejects planned/observed/backend/receipt warm-state disagreement.
+Those counterexamples were also red before repair. New fixed-seed run
+`clone-warm-repair-20260905-045240-e3a6fcbe` completed exactly two 7.2-second takes, with seed
+19790615, zero retries, passing QC and agreement across all four warm-state surfaces. The
+canonical publisher verified unchanged source; all three Speed model inventories and the copied
+fixture match their before/after digests. An auxiliary post-run readback initially sought the
+manifest in the wrong directory and used an unfiltered fingerprint including generated registry
+files. That failure is retained separately; read-only verification of the actual frozen per-run
+artifacts succeeded without repeating audio or replacing the original terminal record.
+
+All 140 focused benchmark/profile/CLI tests pass, and the optimized CLI builds. Both new records
+remain exploratory `passedWithWarnings` for the existing routine soft-trim warning, not public
+promotion evidence. RF-10 retains the UI responsiveness warnings, unresolved version-to-version
+speed attribution and signed-candidate work. No synthesis, marking, tokenizer, prompt, seed,
+sampling, QC or memory policy changed. Raw repair evidence/readback and final verification log:
+`build/artifacts/macos/benchmark-repair-20260905/`. AGENTS.md was reviewed; its durable procedure
+needs no change. The performance/MLX review did not identify a justified decoder optimization;
+do not describe these measurement repairs as a generation-speed improvement.
+
+**Previous follow-up (2026-09-05): the fixed-seed marking comparison is complete; retain marking and fp16.**
+The existing optimized CLI ran 64/64 successful Speed/long takes across four fixed seeds and all
+three modes, alternating marking-on/off order. All 32 pairs matched model-facing request identity,
+token count and duration; repeated PCM was identical within each arm. Actual receipts classify
+the first Clone take as cold, so it is excluded from warm statistics. Mean warm synthesis-time
+changes with marking were −0.08% Built-in, +0.20% Design and +0.33% Clone; four seed blocks are
+exploratory, not proof of zero overhead. Mean added completion times were 1.112/1.633/1.241 s.
+Marking was 99.52% of finalization at the pooled median; final QC remained a few milliseconds.
+All 32 marked takes passed the existing within-take peak check. Sampling had zero failures/missed
+deadlines, nominal thermals and no non-routine memory events. The three Speed catalogs' files,
+test-owned Clone fixture, frozen source and binary were verified unchanged. No production policy,
+model, prompt or source change was made by this investigation, and no take was retried.
+
+Separate CPU/signpost capture `mac-cpu-profile-20260905-035610-672805f1` completed two QC-passing
+takes and validated exact-PID correlation, but the runner **failed at history publication**:
+`benchmark_history.py`'s then-current retention guard accepted only schema 2 while the profile producer emitted
+schema 3. Preserve the failed run; do not downgrade, replace it with PASS, or repeat the audio.
+The retained capture localizes warm CPU work primarily to MLX evaluation, not WAV writing, but
+does not isolate GPU decoder precision costs or justify a source optimization. It is excluded
+from speed statistics. RF-10 owns the now-verified repair above and existing UI/
+candidate gaps. The prior 2.4 comparison remains unmatched; this is not a new version-to-version
+benchmark. Ignored report and exact evidence: `build/artifacts/macos/generation-speed-paired-20260905-033641/report.md`.
+All generators/profilers exited. AGENTS.md's procedures remain accurate; no new harness or release
+gate was introduced.
+
+**Previous follow-up: the macOS editor's measured foreign-string hotspot is corrected; broader
+responsiveness warnings remain open.** `ScriptTextState` materializes exact native UTF-8 once per
+AppKit edit, caches the synchronized value, and keeps native binding echoes from rewriting the
+editor. The coordinator refreshes its current binding; counting occurs once per render. Four new
+value-boundary tests and four request-factory tests passed. No request language, delivery, seed,
+model, memory/QC policy or iOS behavior changed. These fixtures do not claim full live IME coverage.
+
+All live follow-up checks completed on one frozen working-tree source identity (not a signed
+candidate): one profiled nine-scenario diagnostic, three uninstrumented nine-scenario runs
+(27/27), seven smoke journeys including a 12-segment project and two-item batch, then the canonical
+11-take retained-memory sequence. The profiled run is excluded from timing comparisons. Typing,
+navigation and menu warnings remain 3/3, with one additional idle outlier retained. Typing median
+excess main-loop time was 685.703 ms/s; its 466.996–686.755 range overlaps the prior baseline and
+does not establish a short-typing improvement. Sidebar/menu CPU traces contain substantial
+XCTest/AX work without a localized product-only cause, so neither a speculative rewrite nor a
+threshold change was made. The long-script trace now attributes 0.006% of main-thread sample
+weight to draft equality (earlier trace 29.42%); this is not an equivalent wall-time speedup.
+
+Smoke `macos-xcui-smoke-20260905-022944-40e2d991` passed 7/7: 651.4 s joined audio in 394.0 s
+generation/QC/assembly wall time, 1.65× audio/wall throughput, 2925.0 MiB diagnostic engine peak.
+The synthetic entry step was 549.72 s versus 902.61 s previously, with different profiler loads;
+do not present that difference as isolated production speedup. Its +248.5 MiB segment-end growth
+is a duration-correlated diagnostic, not a leak finding. Segment regeneration was not invoked.
+`mac-memory-qualification-20260905-025522-110bccc2` passed 11/11, retention and marking gates:
+maximum within-mode growth **3.890625 MiB / 0.047493% of host RAM** versus the unchanged 5% bound.
+Every take recorded zero pressure signals, memory warnings/exits and capture failures. The
+`memory.pressure.soft_trim` warning remains: review of all 29 prior UI takes traced it to routine
+`post_generation_cache_clear`, not an OS pressure event. No cleanup or warning was disabled.
+
+The first smoke command rejected an unsupported `--label` before launching any test; the error
+and separately corrected command remain recorded. No failed UI take was retried. Follow-up raw
+evidence, source/binary hashes, per-run comparison and report are under the ignored
+`build/artifacts/macos/ui-followup-20260905/`; benchmark records are repository-generated.
+RF-10 remains planned for RF-09 and signed app/CLI qualification; the warnings are not waived,
+and these results do not establish blanket optimization, leak freedom, French pinned-seed parity,
+segment regeneration or candidate promotion. `scripts/dev.sh checkpoint` passed: derived refresh
+and validation, 1,487 Python tests, generic iOS app/logic compilation, and the macOS native suites
+(568 core, 19 transport, 109 runtime; zero failures, two optional AudioSeal fixtures skipped).
+The optimized app also compiled for the live XCUITest runs. All test-owned app, engine and
+profiler processes exited; the retained run artifacts and diagnostic History were not erased.
+
+**Prior baseline: autonomous macOS UI/resource campaign on `14dc148c` (3.0.0/build 24).**
+The requested development-build QA ran serially on the canonical M2/8 GB host, through the existing
+XCUITest lanes only: standard smoke 7/7, localization/navigation 1/1, extended smoke 7/7 with a
+12-segment long-form project, one excluded perf warm-up plus five counted nine-scenario runs
+(54/54 interactions), and the full 29-take Custom/Design/Clone benchmark. All ten runners and
+required-step ledgers passed; no failed test was automatically retried. The benchmark correlated
+all 29 app/service/engine attempts, with all audio QC passing and zero transport gaps or underruns.
+
+This is **not a clean performance verdict or signed-candidate acceptance**. Typing, sidebar
+navigation and delivery menus exceeded warn-only ceilings in all five counted runs. Median
+typing excess main-loop time was 622.869 ms/s (60 ceiling), navigation worst gap 768.49 ms
+(340 ceiling), and menu worst gap 169.64 ms (140 ceiling). These are cadence proxies, not
+compositor FPS. A valid exact-PID 20.5-second long-text Time Profiler/Hitches capture attributed
+29.42% of main-thread sample weight inclusively to whole-draft equality; this localizes work to
+investigate, not a completed source fix or proof for every shorter typing window. Native SwiftUI
+graph captures failed bounded collection/readability checks and remain retained as failed tools.
+
+Generation memory was `qualifiedWithWarnings`: maximum time-aligned app-plus-engine footprint
+3,323.2 MiB (3.25 GiB), 100% sampler/alignment coverage, zero capture failures, application memory
+warnings, pressure-signal events or exits, and nominal thermal state. Every take retained one
+`memory.pressure.soft_trim` warning. The 12-segment diagnostic showed +167.6 MiB segment-end
+growth, not proof of a leak. Do not waive warnings or sum independent peaks/unified-memory categories.
+
+Privacy-safe records live in `benchmarks/runs/ui-perf/macos-xcui-perf-20260905-*.json` and
+`benchmarks/runs/ui-generation/macos-xcui-benchmark-20260905-012117-0b234262.json`.
+All seven records are canonical: benchmark provenance explicitly excludes generated history
+records, while all other tested source stayed unchanged. The warm-up is excluded from the local
+aggregate. Raw results, screenshots, failed/valid traces, five-run statistics and the complete
+report remain ignored under `build/artifacts/macos/ui-audit-20260904/` and the named UI run bundles.
+All test-owned app/engine/profiler processes stopped. Generated diagnostic History/audio remain
+retained, Clone consent may persist, and temporary Auto-play changes are restored; this is not a
+claim of complete app-state restoration. No personal voice or canonical model was deleted.
+
+That baseline identified the typing/navigation/menu costs and soft-trim qualification for the
+follow-up recorded above. RF-10 retains the residual warnings and signed-candidate gap.
+French/pinned-seed UI parity, segment regeneration,
+real microphone/permission recovery, broader accessibility and packaged-app proof remain untested
+by the baseline campaign. No phone, production source change, release, tag, upload or publication
+occurred during that baseline; the editor source change belongs to the subsequent follow-up.
+AGENTS.md's durable rules remain accurate; the testing guide now states the actual retained-data
+behavior instead of claiming smoke leaves no persisted state.
+
+**Previous action: focused F-21 CLI batch-admission remediation.** The external follow-up on
 `78142e07` correctly identified engine-only batch fields reaching the single-take API. Extracting
 the command's actual request builder and checking all three modes against the real engine policy
 reproduced **18 failed assertions across six requests** before the correction. The builder now
@@ -75,7 +213,7 @@ progress remain CLI bookkeeping. The engine rejection guard is unchanged, with n
 
 The coherent-tree deterministic checkpoint follows this focused proof. Signed-candidate/UI
 qualification, account/rights and physical-device gates remain open. AGENTS.md needs no procedural
-change; no UI run, device access, signing, tag, account mutation or publication occurred.
+change; that focused remediation used no UI run, device access, signing, tag, account mutation or publication.
 
 **Previous action: phone-independent preservation and lifecycle amendment implemented and verified.** The September 4
 [external audit disposition](reference/engineering-audit-grounding-2026-09-04.md) remains a review

@@ -627,6 +627,54 @@ class PublisherTests(unittest.TestCase):
         with self.assertRaisesRegex(publisher.PublicationError, "benchRunID"):
             publisher.engine_take(1, take, wrong, None, run_id="run-one")
 
+    def test_engine_take_requires_observed_warm_state_agreement(self) -> None:
+        take = {
+            "generationID": "selected",
+            "cell": "custom/speed/medium/warm#0",
+            "mode": "custom",
+            "modelID": "pro_custom_speed",
+            "variant": "speed",
+            "warmState": "warm",
+            "length": "medium",
+        }
+        for observed in ("cold", "unknown", "", None):
+            row = engine_row("selected")
+            row["warmState"] = observed
+            with self.subTest(observed=observed), self.assertRaisesRegex(
+                publisher.PublicationError, "warm state"
+            ):
+                publisher.engine_take(1, take, row, None, run_id="run-one")
+        for layer in ("backendMetrics", "requestReceipt"):
+            row = engine_row("selected")
+            row.setdefault(layer, {})["warmState"] = "cold"
+            with self.subTest(layer=layer), self.assertRaisesRegex(
+                publisher.PublicationError, "warm state"
+            ):
+                publisher.engine_take(1, take, row, None, run_id="run-one")
+        row = engine_row("selected")
+        del row["warmState"]
+        with self.assertRaisesRegex(publisher.PublicationError, "warm state"):
+            publisher.engine_take(1, take, row, None, run_id="run-one")
+
+        # Older rows need not carry a request receipt, but never override the engine.
+        row = engine_row("selected")
+        built = publisher.engine_take(1, take, row, None, run_id="run-one")
+        self.assertEqual(built["warmState"], "warm")
+        row["requestReceipt"] = {"warmState": "warm"}
+        self.assertEqual(
+            publisher.engine_take(1, take, row, None, run_id="run-one")["warmState"],
+            "warm",
+        )
+        # A retained-memory cell can truthfully be cold despite its neutral cell name.
+        cold = dict(take, warmState="cold", cell="custom/speed/medium/retained#0")
+        row["notes"]["benchCell"] = cold["cell"]
+        row["warmState"] = row["backendMetrics"]["warmState"] = "cold"
+        row["requestReceipt"]["warmState"] = "cold"
+        self.assertEqual(
+            publisher.engine_take(1, cold, row, None, run_id="run-one")["warmState"],
+            "cold",
+        )
+
     def test_quality_identity_folds_into_takes_and_selects_schema_v3(self) -> None:
         take = {
             "generationID": "selected",

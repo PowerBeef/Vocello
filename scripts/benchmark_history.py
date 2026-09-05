@@ -1887,6 +1887,7 @@ def validate_trace_retention(record: dict[str, Any], trace: dict[str, Any]) -> N
     """Validate the summary-only retention contract for newly published traces.
 
     Older v1/v2 records predate this metadata and remain read-only compatible.
+    Schema v3 adds quality identity and preserves the v2 retention contract.
     Once a record carries any retention field, however, all fields are required
     so a raw trace path can never be mistaken for proof that the trace remains.
     """
@@ -1894,8 +1895,8 @@ def validate_trace_retention(record: dict[str, Any], trace: dict[str, Any]) -> N
     present = TRACE_RETENTION_KEYS.intersection(trace)
     if not present:
         return
-    if record.get("schemaVersion") != 2:
-        raise HistoryError("trace-retention metadata requires benchmark history schema v2")
+    if record.get("schemaVersion") not in {2, 3}:
+        raise HistoryError("trace-retention metadata requires benchmark history schema v2 or v3")
     if missing := sorted(TRACE_RETENTION_KEYS - set(trace)):
         raise HistoryError("trace-retention metadata is incomplete: " + ", ".join(missing))
 

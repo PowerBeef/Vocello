@@ -224,7 +224,12 @@ QWENVOICE_DEBUG=1 ./build/vocello bench \
   --variants speed,quality --lengths short,medium,long --warm 3 --label "full-matrix"
 ```
 
-**Clone is warm-only by design** — no cold clone cell; rows always show `warmState=warm`.
+**The ordinary Clone matrix is warm-only by design.** The CLI awaits explicit model loading
+before its measured Clone takes, without generating an extra warm-up take. `warmState` means
+model residency, not that every conditioning/decoder cache is hot. New engine records require
+the result label to agree with engine telemetry and any backend/receipt warm-state evidence;
+missing or contradictory state blocks publication. The separate retained-memory protocol below
+does not preload Clone: its first `retained#0` take remains cold. Historical records are immutable.
 
 ### 4.4 Floor-tier forced run
 
@@ -439,7 +444,10 @@ validates the trace through `xctrace export --toc`; there is no blind startup sl
 to the exact `QwenVoiceEngineService` PID while generating via UI. Traces remain untracked. On
 success the registry retains the digest, settings, extracted summary, original ephemeral path, and
 retention policy, then the runner removes the raw trace. Pass `--keep-trace` to retain it
-explicitly. The tracer stage requires at least 5 GiB free for CPU profiles and 15 GiB for memory
+explicitly. The same complete retention validation applies to schema-v2 records and quality-bearing
+schema-v3 records; neither a schema downgrade nor omission of quality evidence is allowed to repair
+a failed publication. Verify a source repair in a new run while preserving the original failure.
+The tracer stage requires at least 5 GiB free for CPU profiles and 15 GiB for memory
 profiles. The prerequisite macOS CLI build has an 8 GiB floor, so the complete CPU-profile command
 effectively requires 8 GiB; memory remains 15 GiB because Allocations can emit tens of megabytes
 per second.
@@ -577,7 +585,9 @@ Defined in `BenchMatrixSpec` (`Sources/QwenVoiceCore/BenchMatrixSpec.swift`; sha
 | Design | 1× | `--warm` × each length |
 | Clone | **none** (warm-by-design) | `--warm` × each length |
 
-CLI forces cold via explicit unload before cold take. UI cold uses app relaunch +
+CLI forces cold via awaited explicit unload before the cold take; unload/load failure stops the
+matrix instead of inventing a warm/cold label. Ordinary Clone uses explicit model loading before
+its first measurement, as described in §4.3. UI cold uses app relaunch +
 `QWENVOICE_DEBUG=1` + `QWENVOICE_SUPPRESS_WARMUP=1` + `QWENVOICE_BENCH_FORCE_COLD=1`
 (see §4.10).
 

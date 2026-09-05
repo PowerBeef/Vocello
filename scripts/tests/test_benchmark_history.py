@@ -6,6 +6,7 @@ import importlib.util
 import json
 import sys
 import tempfile
+from types import SimpleNamespace
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -17,6 +18,7 @@ assert SPEC and SPEC.loader
 history = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = history
 SPEC.loader.exec_module(history)
+import publish_benchmark_history as publisher
 
 
 DIGEST = "d" * 64
@@ -931,6 +933,94 @@ class BenchmarkHistoryTests(unittest.TestCase):
             }
             with self.assertRaises(history.HistoryError):
                 self.publish(record, f"profile-invalid-{index}")
+
+    def profile_producer_manifest(self, run_id: str, *, quality: bool, policy: str) -> dict:
+        """Exercise the production schema selector and retention writer together."""
+        fixture = record_fixture(run_id=run_id, kind="instrument-profile")
+        take = fixture["takes"][0]
+        take.update(memoryStatus="qualified", sampleSidecarDigest="b" * 64)
+        take["metrics"].update({key: 0.0 for key in history.MEMORY_REQUIRED_METRICS})
+        take["metrics"].update({
+            "samplerCoverage": 1.0, "samplerSampleCount": 10.0,
+            "samplerBoundarySampleCount": 8.0, "samplerPeriodicSampleCount": 1.0,
+            "gpuRecommendedWorkingSetMB": 4096.0, "mlxActivePeakMB": 100.0,
+            "mlxCachePeakMB": 10.0, "mlxPeakMB": 110.0,
+        })
+        if quality:
+            take["qualityRegistryOutcome"] = "pass"
+            take["qualityRegistryRequiredGates"] = sorted(history.QUALITY_FAST_GATES)
+        trace_path = self.root / "build" / f"{run_id}.trace"
+        trace_path.mkdir(parents=True)
+        (trace_path / "fixture.data").write_bytes(b"synthetic trace")
+        summary = {**trace_summary(), "artifact": f"build/{run_id}.trace"}
+        args = SimpleNamespace(
+            trace=trace_path, run_id=run_id, template="CPU Profiler + os_signpost",
+            duration=10.0, target_process="vocello", profile_kind="cpu",
+            retention_policy=policy,
+        )
+        with (
+            mock.patch.object(publisher, "ROOT", self.root),
+            mock.patch.object(publisher, "source_from_snapshot", return_value=fixture["source"]),
+            mock.patch.object(publisher, "verify_canonical_hardware", return_value=fixture["hardware"]),
+        ):
+            retention = publisher.write_trace_summary_artifact(
+                args, trace_digest="f" * 64,
+                original_ephemeral_path=summary["artifact"], trace_summary=summary,
+            )
+            return publisher.record_shell(
+                kind="instrument-profile", platform="macos", run_id=run_id,
+                label="fixture", started_at=fixture["run"]["startedAt"],
+                finished_at=fixture["run"]["finishedAt"], matrix_scope="instrumented",
+                artifact_dir=trace_path.parent, snapshot=self.root / "snapshot.json",
+                takes=[take], raw_digest=history.sha256_bytes(run_id.encode()),
+                telemetry_schema=8, qc_algorithm=2, optimization="-O",
+                inputs=fixture["inputs"], models=fixture["models"],
+                classification="instrumented", crash_delta={"passed": True, "count": 0},
+                memory_evidence={
+                    "memoryContractVersion": 1, "memoryQualified": True,
+                    "sampleSidecarCount": 1, "sampleSidecarsDigest": "a" * 64,
+                },
+                trace={
+                    "digest": "f" * 64, "template": args.template,
+                    "durationSeconds": args.duration, "validated": True,
+                    "summary": summary, **retention,
+                },
+            )
+
+    def test_production_profile_retention_publishes_v2_and_v3_without_downgrade(self) -> None:
+        for quality in (False, True):
+            for policy in ("summaryOnly", "keptExplicitly"):
+                run_id = f"profile-producer-v{3 if quality else 2}-{policy}"
+                with self.subTest(quality=quality, policy=policy):
+                    manifest = self.profile_producer_manifest(run_id, quality=quality, policy=policy)
+                    directory = self.write_manifest(manifest, run_id)
+                    path = history.record_manifest(directory)
+                    record = json.loads(path.read_text())
+                    self.assertEqual(record["schemaVersion"], 3 if quality else 2)
+                    self.assertEqual(record["evidence"]["trace"]["retentionPolicy"], policy)
+                    self.assertEqual("qualityRegistryOutcome" in record["takes"][0], quality)
+                    before = path.read_bytes()
+                    self.assertEqual(history.record_manifest(directory).read_bytes(), before)
+                    self.assertTrue((self.root / "build" / f"{run_id}.trace").is_dir())
+        history.validate_all()
+
+    def test_v3_profile_retention_still_rejects_corruption_and_missing_quality(self) -> None:
+        for name, mutate in (
+            ("missing-retention", lambda record: record["evidence"]["trace"].pop("summaryArtifact")),
+            ("capture-digest", lambda record: record["evidence"]["trace"].__setitem__("captureSettingsDigest", "0" * 64)),
+            ("retention-policy", lambda record: record["evidence"]["trace"].__setitem__("rawTraceRetained", True)),
+            ("unsafe-path", lambda record: record["evidence"]["trace"]["summaryArtifact"].__setitem__("path", "../private.json")),
+            ("missing-quality", lambda record: record["takes"][0].pop("qualityRegistryOutcome")),
+            ("unknown-schema", lambda record: record.__setitem__("schemaVersion", 4)),
+            ("v1-retention", lambda record: record.__setitem__("schemaVersion", 1)),
+        ):
+            run_id = f"profile-v3-invalid-{name}"
+            manifest = self.profile_producer_manifest(run_id, quality=True, policy="summaryOnly")
+            mutate(manifest["historyRecord"])
+            with self.subTest(name=name), self.assertRaises(history.HistoryError):
+                history.record_manifest(self.write_manifest(manifest, run_id))
+            self.assertFalse(list(self.runs.rglob("*.json")))
+            self.assertTrue((self.root / "build" / f"{run_id}.trace").is_dir())
 
     def test_memory_instrument_profile_requires_and_accepts_target_rows(self) -> None:
         record = record_fixture(run_id="profile-memory-valid", kind="instrument-profile")

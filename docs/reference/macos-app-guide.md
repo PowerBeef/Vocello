@@ -8,6 +8,7 @@ sourceOfTruth:
   - Sources/ContentView.swift
   - Sources/SharedSupport/Services/ReferenceTranscriptionReviewState.swift
   - Sources/Services/MacStudioGenerationRequestFactory.swift
+  - Sources/Models/ScriptTextState.swift
 ---
 # Vocello for Mac — app guide + test-driving reference
 
@@ -43,6 +44,13 @@ has **both Speed (4-bit) and Quality (8-bit)** variants.
 ---
 
 ## 2. Screen-by-screen element + identifier map
+
+The shared macOS script editor materializes native UTF-8 once per AppKit edit using
+`ScriptTextState`, without normalizing or trimming text. Its coordinator compares the last
+synchronized snapshot and refreshes its binding on updates; a native edit's binding echo does
+not rewrite the text view. This avoids repeated foreign-NSString comparisons while preserving
+the exact request text. Language, seed and delivery resolution remain in the existing request
+factory/engine, not the editor.
 
 ### Semantic state surfaces
 

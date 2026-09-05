@@ -148,8 +148,9 @@ struct TextInputView: View {
     /// accessibility label give non-color-perceiving users the same
     /// information.
     private var characterCount: some View {
-        let isLong = text.count > 500
-        let baseLabel = "\(text.count) characters"
+        let count = text.count
+        let isLong = count > 500
+        let baseLabel = "\(count) characters"
         return HStack(spacing: 6) {
             if isLong {
                 Image(systemName: "exclamationmark.circle.fill")
@@ -204,7 +205,7 @@ struct ScriptTextEditor: NSViewRepresentable {
         textView.textContainerInset = NSSize(width: 0, height: 4)
         textView.textContainer?.lineFragmentPadding = 4
         textView.delegate = context.coordinator
-        textView.string = text
+        textView.string = context.coordinator.textState.text
         textView.placeholderString = placeholder
         textView.identifier = NSUserInterfaceItemIdentifier(accessibilityIdentifier)
         textView.setAccessibilityIdentifier(accessibilityIdentifier)
@@ -231,28 +232,31 @@ struct ScriptTextEditor: NSViewRepresentable {
     }
 
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
+        context.coordinator.parent = self
         guard let textView = scrollView.documentView as? PlaceholderTextView else { return }
         if textView.identifier?.rawValue != accessibilityIdentifier {
             textView.identifier = NSUserInterfaceItemIdentifier(accessibilityIdentifier)
             textView.setAccessibilityIdentifier(accessibilityIdentifier)
         }
-        if textView.string != text {
+        if context.coordinator.textState.recordExternalEdit(text) {
             let selectedRanges = textView.selectedRanges
-            textView.string = text
+            textView.string = context.coordinator.textState.text
             textView.selectedRanges = selectedRanges
         }
     }
 
     final class Coordinator: NSObject, NSTextViewDelegate {
         var parent: ScriptTextEditor
+        var textState: ScriptTextState
 
         init(_ parent: ScriptTextEditor) {
             self.parent = parent
+            textState = ScriptTextState(parent.text)
         }
 
         func textDidChange(_ notification: Notification) {
             guard let textView = notification.object as? NSTextView else { return }
-            parent.text = textView.string
+            parent.text = textState.recordNativeEdit(textView.string)
         }
     }
 }

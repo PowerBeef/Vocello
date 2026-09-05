@@ -411,7 +411,7 @@ enum BenchCommand {
 
                 // Force cold for this cell: unload whatever's loaded so the next
                 // generate loads inside the call (records warmState=cold).
-                try? await runtime.engine.unloadModel()
+                try await runtime.engine.unloadModel()
 
                 // Cold sample (Custom/Design only — Clone is warm-by-design).
                 if mode != .clone, let coldLen {
@@ -441,6 +441,14 @@ enum BenchCommand {
                         ))
                     }
                 }
+                // The ordinary Clone matrix is warm-only. Establish model residency
+                // explicitly, without an unrecorded generation or a seed-consuming
+                // warm-up take. Retained-memory qualification deliberately measures
+                // its first Clone take cold and must not use this preparation.
+                if mode == .clone, memoryQualification == nil {
+                    try await runtime.engine.loadModel(id: modelID)
+                }
+
                 // Warm samples per requested length.
                 for len in lengths {
                     let t = try requiredText(for: len)

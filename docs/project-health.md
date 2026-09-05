@@ -4,11 +4,11 @@
 > execute models, devices, UI tests, signing, or network checks.
 
 - Current source identity and dirty state: local JSON report only (kept out of the tracked snapshot to avoid self-referential drift)
-- Swift tests: 731 cases in 96 files
-- Python tests: 1487 cases in 121 files
+- Swift tests: 735 cases in 97 files
+- Python tests: 1491 cases in 121 files
 - Required-step assurance: 98 steps across 21 workflows, all covered by forced-failure fixtures
 - Unsafe-concurrency annotations: 48 (48 registered with owner and invariant; contract complete)
-- Evidence routing: 922/922 critical paths explicit; 0 use repository-other fallback
+- Evidence routing: 924/924 critical paths explicit; 0 use repository-other fallback
 
 ## Hardware evidence by domain selector
 
@@ -18,21 +18,21 @@
 | ios-ui-generation | ios / ui-generation | `ios-xcui-benchmark-20260801-132415-abbec96b` | 2026-08-01T13:38:28Z |
 | ios-ui-performance | ios / ui-perf | `ios-xcui-perf-20260815-173719-6e425c28` | 2026-08-15T17:47:07Z |
 | macos-memory-qualification | macos / memory-qualification | `mac-memory-qualification-20260807-022819-3eb4d25b` | 2026-08-07T02:29:39Z |
-| macos-ui-generation | macos / ui-generation | `macos-xcui-benchmark-20260801-182943-b0b5a448` | 2026-08-01T18:43:00Z |
-| macos-ui-performance | macos / ui-perf | `macos-xcui-perf-20260805-202246-f7d85c1e` | 2026-08-05T20:30:14Z |
+| macos-ui-generation | macos / ui-generation | `macos-xcui-benchmark-20260905-012117-0b234262` | 2026-09-05T01:32:17Z |
+| macos-ui-performance | macos / ui-perf | `macos-xcui-perf-20260905-011217-c4d5591f` | 2026-09-05T01:19:19Z |
 
 ## Critical-domain coverage and freshness
 
 | Domain | Owner | Production files | Direct test files / cases | Hardware evidence |
 | --- | --- | ---: | ---: | --- |
-| generation-terminal | backend | 4 | 2 / 16 | macos-ui-generation: stale, ios-ui-generation: stale |
-| clone-conditioning | backend | 33 | 2 / 32 | macos-ui-generation: stale, ios-ui-generation: stale |
-| event-delivery | backend | 3 | 2 / 10 | macos-ui-generation: stale, ios-ui-generation: stale |
+| generation-terminal | backend | 4 | 2 / 16 | macos-ui-generation: fresh, ios-ui-generation: stale |
+| clone-conditioning | backend | 33 | 2 / 32 | macos-ui-generation: fresh, ios-ui-generation: stale |
+| event-delivery | backend | 3 | 2 / 10 | macos-ui-generation: fresh, ios-ui-generation: stale |
 | memory-policy | backend-platform | 6 | 7 / 61 | macos-memory-qualification: stale, ios-memory-qualification: stale |
 | model-delivery | backend-platform | 17 | 8 / 79 | external promotion: macos-model-download-lifecycle, ios-model-download-lifecycle |
 | ui-performance | platform | 79 | 18 / 58 | macos-ui-performance: stale, ios-ui-performance: stale |
-| xpc-transport | macos | 3 | 4 / 19 | macos-ui-generation: stale |
-| benchmark-validation | release-qa | 6 | 4 / 123 | macos-ui-generation: stale, ios-ui-generation: stale |
+| xpc-transport | macos | 3 | 4 / 19 | macos-ui-generation: fresh |
+| benchmark-validation | release-qa | 6 | 4 / 126 | macos-ui-generation: stale, ios-ui-generation: stale |
 | orchestration-assurance | release-qa | 3 | 1 / 14 | not hardware-gated |
 | release-supply-chain | release-qa | 12 | 5 / 82 | not hardware-gated |
 | persistence-privacy | platform-release-qa | 4 | 2 / 8 | not hardware-gated |

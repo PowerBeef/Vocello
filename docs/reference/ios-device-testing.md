@@ -764,6 +764,15 @@ loaded Mimi decoder replays that trace both incrementally at the captured produc
 and as one full decode; both replay WAVs receive ordinary persisted-WAV QC. No path, script, codec
 ID, or raw error enters retained JSON.
 
+Current startup result-v2 producers additionally set `publishedAudioCaptureRequired: true` and
+copy every published pass/warning WAV to the same bounded run-scoped `outputs/<generation>.wav`
+mirror used by control-audit, before removing diagnostic scratch output. The host must authenticate
+its generation, SHA-256, byte count, complete mono PCM16 payload, duration and pre-sentinel write
+ordering before cleanup. Capture failure is a failed collection, not an engine failure or a
+qualified PASS. Older v1/v2 records without the field retain historical decoding; they do not
+retroactively prove that published audio was captured. Failed/rejected audio and codec replay keep
+their existing separate identities. This is diagnostic-only and does not create History entries.
+
 The diagnostic writer and iOS pullable mirror share one validated capture run ID from the
 registered device and benchmark keys. UI-only runs use their device run ID without needing
 benchmark metadata. Missing, unsafe, anonymous, or conflicting identities refuse artifact capture;

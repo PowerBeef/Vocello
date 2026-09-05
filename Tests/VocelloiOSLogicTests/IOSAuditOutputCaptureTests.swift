@@ -2,6 +2,26 @@ import Foundation
 import XCTest
 
 final class IOSAuditOutputCaptureTests: XCTestCase {
+    func testStartupPublishedOutputSurvivesScratchCleanup() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let source = root.appendingPathComponent("source.wav")
+        let bytes = Data(repeating: 7, count: 128)
+        try bytes.write(to: source)
+        let id = UUID()
+        let run = "ios-startup-reliability-fixture"
+        let environment = ["QVOICE_IOS_DEVICE_RUN_ID": run, "QVOICE_MAC_BENCH_RUN_ID": run]
+        let capture = try XCTUnwrap(IOSPullableDiagnosticsMirror.captureAuditOutput(
+            from: source, generationID: id, environment: environment,
+            telemetryEnabled: true, pullableRoot: root
+        ))
+        XCTAssertEqual(capture, root.appendingPathComponent(run)
+            .appendingPathComponent("outputs").appendingPathComponent("\(id.uuidString).wav"))
+        try FileManager.default.removeItem(at: source)
+        XCTAssertEqual(try Data(contentsOf: capture), bytes)
+    }
+
     func testGatedAtomicCopyPreservesSourceAndRejectsIdentityCollision() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
@@ -35,6 +55,8 @@ final class IOSAuditOutputCaptureTests: XCTestCase {
         let missing = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         for (enabled, environment) in [
             (false, ["QVOICE_IOS_DEVICE_RUN_ID": "ios-xcui-control-audit-fixture"]),
+            (false, ["QVOICE_IOS_DEVICE_RUN_ID": "ios-startup-reliability-fixture"]),
+            (true, ["QVOICE_IOS_DEVICE_RUN_ID": "ios-startup-reliability-fixture", "QVOICE_MAC_BENCH_RUN_ID": "other"]),
             (true, [:]), (true, ["QVOICE_IOS_DEVICE_RUN_ID": "ios-xcui-smoke-fixture"]),
             (true, ["QVOICE_IOS_DEVICE_RUN_ID": "ios-xcui-control-audit-../escape"]),
             (true, ["QVOICE_IOS_DEVICE_RUN_ID": "ios-xcui-control-audit-fixture", "QVOICE_MAC_BENCH_RUN_ID": "other"])

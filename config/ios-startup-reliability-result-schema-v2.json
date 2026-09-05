@@ -7,6 +7,7 @@
   "required": ["schemaVersion", "status", "runID", "scriptSHA256", "scriptCharacters", "plannedTakeCount", "representedTakeCount", "startedAt", "finishedAt", "startingDeviceState", "finishingDeviceState", "takes"],
   "properties": {
     "schemaVersion": {"const": 2},
+    "publishedAudioCaptureRequired": {"const": true, "description": "Current diagnostic producers require generation-scoped published WAV capture. Absent only in historical v2 results."},
     "status": {"enum": ["pass", "diagnosed_failure"]},
     "runID": {"$ref": "#/$defs/safeID"},
     "scriptSHA256": {"$ref": "#/$defs/sha256"},

@@ -1,9 +1,11 @@
 import hashlib
 import importlib.util
 import json
+import os
 import sys
 import tempfile
 import unittest
+import wave
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -249,6 +251,86 @@ class IOSStartupReliabilityTests(unittest.TestCase):
     def test_private_fields_are_rejected(self):
         with self.assertRaisesRegex(MODULE.ContractError, "forbidden"):
             MODULE.recursively_reject_private_fields({"nested": {"error": "raw"}})
+
+    def published_fixture(self):
+        generation = "00000000-0000-0000-0000-000000000001"
+        capture = self.root / "run-1" / "outputs" / f"{generation}.wav"
+        capture.parent.mkdir(parents=True)
+        with wave.open(str(capture), "wb") as handle:
+            handle.setparams((1, 2, 24000, 0, "NONE", "not compressed"))
+            handle.writeframes(b"\x01\x00" * 24000)
+        value = {"sha256": hashlib.sha256(capture.read_bytes()).hexdigest(),
+                 "byteCount": capture.stat().st_size, "durationSeconds": 1.0}
+        return generation, capture, value
+
+    def test_published_capture_authenticates_every_byte_duration_and_generation(self):
+        generation, capture, value = self.published_fixture()
+        root = capture.parent.parent
+        self.assertEqual(MODULE.validate_published_audio(value, root, generation), capture)
+        for changes in ({"sha256": "0" * 64}, {"byteCount": 1}, {"durationSeconds": 2.0},
+                        {"durationSeconds": float("nan")}):
+            with self.subTest(changes=changes), self.assertRaises(MODULE.ContractError):
+                MODULE.validate_published_audio({**value, **changes}, root, generation)
+        for other_root, other_id in ((self.root / "other-run", generation), (root, "other-generation")):
+            with self.assertRaisesRegex(MODULE.ContractError, "missing"):
+                MODULE.validate_published_audio(value, other_root, other_id)
+        original = capture.read_bytes()
+        capture.write_bytes(original[:-2])
+        truncated = {**value, "byteCount": capture.stat().st_size,
+                     "sha256": hashlib.sha256(capture.read_bytes()).hexdigest()}
+        with self.assertRaisesRegex(MODULE.ContractError, "truncated"):
+            MODULE.validate_published_audio(truncated, root, generation)
+        capture.unlink()
+        capture.symlink_to(self.script_path)
+        with self.assertRaisesRegex(MODULE.ContractError, "unsafe"):
+            MODULE.validate_published_audio(value, root, generation)
+
+    def test_v2_capture_requirement_is_opt_in_for_history_but_fail_closed_when_present(self):
+        generation, capture, value = self.published_fixture()
+        root = capture.parent.parent
+        planned = self.plan["takes"][0]
+        self.plan["takes"] = [planned]
+        self.plan_path.write_text(json.dumps(self.plan))
+        state = {"lowPowerModeEnabled": False, "thermalState": "nominal", "modelInstalled": True}
+        sample = {"stage": "before_preparation", "sequence": 0, "capturedAtUptimeSeconds": 1,
+                  "hasActiveGeneration": False, "memoryActionInFlight": False,
+                  "modelOperationInFlight": False, "generationReservationInFlight": False,
+                  "engineLifecycle": "idle", "violations": []}
+        # Even a published output with missing receipt must retain its WAV;
+        # evidence collection does not turn this typed failed take into PASS.
+        take = {"takeIndex": 1, "takeID": planned["takeID"], "generationID": generation,
+                "status": "failed", "failureCode": "request_receipt_unavailable",
+                "preparation": planned["preparation"], "attempts": [], "startupTimeline": [],
+                "classification": "unmaterialized_unknown", "output": value,
+                "prePreparationStoreWarmState": "cold", "preRequestStoreWarmState": "cold",
+                "preparationEvidence": [sample], "audioQC": None, "diagnosticArtifacts": []}
+        result = {"schemaVersion": 2, "status": "diagnosed_failure", "runID": "run-1",
+                  "scriptSHA256": self.plan["scriptSHA256"], "scriptCharacters": len(self.script),
+                  "plannedTakeCount": 1, "representedTakeCount": 1,
+                  "startedAt": "2026-09-05T00:00:00Z", "finishedAt": "2026-09-05T00:01:00Z",
+                  "startingDeviceState": state, "finishingDeviceState": state, "takes": [take]}
+        terminal = root / "startup-reliability-result.json"
+        def validate():
+            terminal.write_text(json.dumps(result))
+            return MODULE.validate_result(self.plan_path, root, "run-1")
+        self.assertEqual(validate()["failedTakeCount"], 1)  # old v2 still valid
+        result["publishedAudioCaptureRequired"] = True
+        self.assertEqual(validate()["failedTakeCount"], 1)
+        # Copy before the terminal barrier; a later audio write fails ordering.
+        os.utime(capture, ns=(terminal.stat().st_mtime_ns + 10**10,) * 2)
+        with self.assertRaisesRegex(MODULE.ContractError, "sentinel"):
+            MODULE.validate_result(self.plan_path, root, "run-1")
+        capture.unlink()
+        with self.assertRaisesRegex(MODULE.ContractError, "missing"):
+            validate()
+        result["publishedAudioCaptureRequired"] = False
+        with self.assertRaisesRegex(MODULE.ContractError, "must be true"):
+            validate()
+        del result["publishedAudioCaptureRequired"]
+        self.assertEqual(validate()["failedTakeCount"], 1)  # no retroactive rewrite
+        source = (ROOT / "Sources/iOS/IOSStartupReliabilityRunner.swift").read_text()
+        self.assertIn("var publishedAudioCaptureRequired = true", source)
+        self.assertIn("generationID: generationID, publishedAudioURL: outputURL", source)
 
     def test_v2_preparation_evidence_requires_operation_and_reservation_state(self):
         evidence = {

@@ -283,7 +283,13 @@ enum IOSStartupReliabilityRunner {
                 summary: generationResult.telemetrySummary
             )
             submitted = false
-            IOSPullableDiagnosticsMirror.syncGenerationTelemetryIfEnabled(generationID: generationID)
+            // Capture every published diagnostic output (including warning
+            // takes) before deferred scratch cleanup. The host validates the
+            // copied bytes before authorizing run cleanup; capture failure is
+            // a collection failure, never a synthesis failure or a false PASS.
+            IOSPullableDiagnosticsMirror.syncGenerationTelemetryIfEnabled(
+                generationID: generationID, publishedAudioURL: outputURL
+            )
 
             let records = telemetryRecords(generationID: generationID)
             guard let final = terminalTelemetryRecord(in: records),
@@ -1009,6 +1015,7 @@ enum IOSStartupReliabilityRunner {
 
     private struct ResultRecord: Codable {
         var schemaVersion = 2
+        var publishedAudioCaptureRequired = true
         let status: String
         let runID: String
         let scriptSHA256: String

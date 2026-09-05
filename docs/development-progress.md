@@ -47,6 +47,79 @@ machine-readable status record and wins over any older prose.
 | 13 — Benchmark/history v3 | Live 2026-07-29: the first schema-v3 records are committed (three clean `phase0-cli-control-*` engine records plus one exploratory run that also exposed and fixed the summarizer's v3 pin). `benchmarks/schema-v3.json` adds the typed quality identity to generation takes (pass/warning only, five fast gates required, machine-code issues); v1/v2 records stay valid immutable history; the publisher stamps v3 only when every take carries the identity. The UI benchmark checkers folded the same identity 2026-08-01: ui-generation records now publish v3 (first: the focused `v3-fold-proof` record `macos-xcui-benchmark-20260801-003208-403989cf`); the canonical iOS matrix published its first v3 record 2026-08-01 (`ios-xcui-benchmark-20260801-132415-abbec96b`). |
 | 14 — Organization and retirement | Closed 2026-07-23 (14a + 14b): compatibility SPI retired, actor-owned loading/metadata/priming/clone artifacts, clone conditioning epoch-bound end to end. |
 
+## September 5 host follow-up completed — phone approval pending
+
+The requested steps 1–3 are complete as **diagnostic work, not audio-defect closure**.
+RF-06/VLR-07 remain in-flight. No phone command, new synthesis, model download, production
+prompt, seed, tokenizer, sampling or QC change occurred. RF-07's prior pilot remains historical;
+the 201-take campaign has not restarted. Step 4 waits for explicit device approval.
+
+1. **Supervisor evidence loss repaired.** A native lightweight child reproduced the denied
+   process-group signal escaping before the report was returned. Shutdown now records sanitized
+   signal failures, waits a bounded two seconds per TERM/KILL stage, and retains stdout/stderr
+   digests and the observed exit status. An unconfirmed exit cannot claim complete capture or
+   memory recovery. The child inherits the serial lock, preventing another governed layer while
+   it remains alive. Two separate lightweight host probes qualify with no pressure warning,
+   swap growth or recovery failure. This does not establish the OS cause of the signal denial.
+2. **Exact archived fp32 comparison completed.** The existing immutable component store contains
+   the July fp32 tokenizer (`836b7b35…1258`, 682,293,092 bytes); its full digest matches the
+   registered historical arm. No replacement/download was necessary. Separate serial CPU
+   processes decoded identical retained frames through the same pinned official implementation.
+   Both used float32 arithmetic, isolating stored-weight precision rather than iOS arithmetic:
+
+   | Codec frames / fresh context | Current fp16 RMS | Archived fp32 RMS |
+   | --- | --- | --- |
+   | 0–64, audible control | −28.96349 dBFS | −28.96257 dBFS |
+   | 80–144, gap | −74.69906 dBFS | −74.69423 dBFS |
+   | 144–208, gap | −72.00955 dBFS | −72.00652 dBFS |
+
+   Each gap slice remains entirely below 0.001 amplitude for 5.12 seconds in both arms; their
+   PCM16 samples differ by at most one least-significant bit. **fp16 decoder-weight rounding does
+   not explain these CPU-replayed slices.** Full-sequence archived-fp32 and encoder behavior were
+   not tested; a shared decoder defect or platform numerics remains distinct from sampled-code
+   pathology. No rollback is justified. Both children exited with code zero, but both heavy-run
+   resource envelopes remain **unqualified** because host-free-memory recovery missed the existing
+   bound. The fp32 run additionally recorded a live-probe failure and denied group signal; the
+   repaired supervisor retained its report and confirmed exit. Peaks were 1.985/1.821 GiB physical
+   footprint respectively, with no observed pressure warning or swap growth. These are diagnostic
+   measurements, not qualification or proof of a leak. No further heavy analyzer was launched.
+3. **French retained evidence revalidated.** All 14 WAVs were read completely with bounded buffers;
+   30 original input files remain hash-identical. There are 39 represented Apple recognition passes
+   and three unrepresented passes, not 42 completed passes. Eight rows have full outer edges but
+   differing recognizer hypotheses (six Apple-only above WER 0.15, two both above); four have
+   incomplete Apple edges; two have inconclusive Apple consensus. All independent retained
+   transcripts have outer-edge timing, which does not prove interior correctness. The shipped
+   Neutral short row remains Apple 2/12 versus independent 1/12 word errors. No lower-score
+   substitution, new recognizer, semantic promotion or production prompt change occurred.
+
+**Prepared step 4:** one fresh-process Chinese/Aiden/Angry-normal/Consistent/streaming diagnostic,
+original UInt64 seed `11842053760559927849`, exact 64-character tracked script. Plan SHA-256 is
+`ec705ce969d3bffe2eb29e46d48cdfa3cde0a8a0d8dd007859895718b8fcddc3`.
+This is not a replay of the preceding UI-session history or a replacement for its lost warning WAV.
+Preparation exposed a second capture gap: the startup runner deleted published pass/warning audio
+after retaining only its digest. It now reuses the bounded, gated pullable output copy before
+scratch cleanup. Current result-v2 records require that capture; host validation authenticates
+generation, bytes, PCM completeness, duration and terminal ordering before device cleanup. Missing
+capture is a harness failure, not a synthesis failure or PASS. Older v1/v2 records remain valid.
+
+The next authorized session needs a new source-bound run ID, normal preservation/screen-protection
+preflight, this one take without retry/seed substitution, then complete collection/cleanup. Do not
+run even preflight before renewed approval. All private artifacts remain ignored under
+`build/artifacts/diagnostics/macos/rf06-followup-20260905/`, including the pending phone plan/script.
+`comparison.json` SHA-256: `a9eff280bbb60797fa3f23ebae28c73ed6c06e19c633aeab4ed4ccd9518bbfcf`;
+`french-review-v2.json`: `88f4d81d265ccbdd4084bfa52ea88c8c717aba62dc0e4eda913d9ce22dc0ed09`.
+The earlier French review is retained; v2 corrects its independent timing-field lookup, not any
+original recognition record. No raw audio, transcript or device identity is tracked/published.
+
+Focused verification: 46 Python supervisor/adapter/startup tests and four native
+`IOSAuditOutputCaptureTests` pass. The coherent deterministic checkpoint completed in 430.7 seconds:
+derived refresh/validation, quick project-input gate (1,530 Python tests), both generic iOS targets
+and macOS tests pass (582 core, 19 transport, 109 runtime; two optional AudioSeal fixture tests
+skipped). Native logs: `build/artifacts/macos/tests/mac-test-20260905-122924/`; generic logs remain
+under `build/artifacts/foundation/`. Existing currency advisories are not newly closed work.
+AGENTS.md's existing serial execution, evidence-first and explicit-device rules remain accurate;
+no procedural override is needed.
+
 ## September 5 bounded audio localization and host-verifier correction
 
 **RF-06 remains in-flight. No production engine, tokenizer, prompt, seed, sampling, or audio-QC

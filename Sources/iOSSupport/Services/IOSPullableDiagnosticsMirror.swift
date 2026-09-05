@@ -88,7 +88,8 @@ enum IOSPullableDiagnosticsMirror {
     ) throws -> URL? {
         guard let runID = StartupReliabilityDiagnosticEvidence.captureRunID(
             environment: environment, telemetryEnabled: telemetryEnabled
-        ), runID.hasPrefix("ios-xcui-control-audit-") else { return nil }
+        ), runID.hasPrefix("ios-xcui-control-audit-")
+            || runID.hasPrefix("ios-startup-reliability-") else { return nil }
         let fm = FileManager.default
         let attributes = try fm.attributesOfItem(atPath: source.path)
         let size = (attributes[.size] as? NSNumber)?.intValue ?? 0

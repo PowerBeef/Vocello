@@ -417,7 +417,14 @@ physical footprint or relabel older RSS-only reports as footprint-qualified. Mis
 requested measurements and probe exceptions fail closed. A sampled RSS or footprint breach now
 terminates and awaits the owned child instead of merely rejecting its report after completion;
 the bound remains provisional, and sampling is not a hard real-time memory cap. Probe failures
-also reap the child before post-exit recovery or another governed layer. No production generation
+request bounded shutdown before post-exit recovery or another governed layer. Signal denial or
+failure is retained in `shutdownFailures`, not thrown away with the completed analyzer output.
+TERM/KILL each wait at most two seconds; only an observed exit sets `processExitConfirmed` and
+`outputCaptureComplete`. An unconfirmed exit records no recovery samples, and the child's inherited
+lock continues refusing overlap until it exits. These additive schema-1 fields preserve historical
+envelopes; a denied signal or incomplete exit remains unqualified even when useful diagnostic
+results exist. Never infer OS termination cause, model qualification or a memory leak from it.
+No production generation
 memory threshold, historical evidence, or model qualification is changed by this diagnostic fix.
 
 The versioned listener workflow remains under `delivery_calibration_session.py`:

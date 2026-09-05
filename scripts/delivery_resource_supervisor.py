@@ -29,6 +29,7 @@ DEFAULT_TIMEOUT_SECONDS = 900.0
 SAMPLE_INTERVAL_SECONDS = 0.05
 DEFAULT_RECOVERY_TIMEOUT_SECONDS = 15.0
 RECOVERY_SAMPLE_INTERVAL_SECONDS = 0.5
+SHUTDOWN_WAIT_SECONDS = 2.0
 
 
 class ResourceSupervisorError(RuntimeError):
@@ -102,22 +103,30 @@ def _digest(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def _terminate_owned_process(process: subprocess.Popen) -> None:
-    """Signal this invocation's group and reap its child, including on probe failure."""
+def _terminate_owned_process(process: subprocess.Popen) -> list[str]:
+    """Bounded shutdown; a signal error never proves exit or discards evidence."""
+    failures: list[str] = []
     if process.poll() is not None:
-        return
-    try:
-        os.killpg(process.pid, signal.SIGTERM)
-    except ProcessLookupError:
-        pass
-    try:
-        process.wait(timeout=2)
-    except subprocess.TimeoutExpired:
+        return failures
+    for sig in (signal.SIGTERM, signal.SIGKILL):
         try:
-            os.killpg(process.pid, signal.SIGKILL)
+            os.killpg(process.pid, sig)
         except ProcessLookupError:
+            # The child may have exited between poll and killpg; wait still
+            # owns the authoritative exit status, not the signal result.
             pass
-        process.wait()
+        except PermissionError:
+            failures.append("process-group-signal-denied")
+        except OSError:
+            failures.append("process-group-signal-failed")
+        try:
+            process.wait(timeout=SHUTDOWN_WAIT_SECONDS)
+            return sorted(set(failures))
+        except subprocess.TimeoutExpired:
+            continue
+    if process.poll() is None:
+        failures.append("process-exit-unconfirmed")
+    return sorted(set(failures))
 
 
 def run_supervised(
@@ -162,6 +171,10 @@ def run_supervised(
             process = subprocess.Popen(
                 list(command), stdout=stdout_file, stderr=stderr_file,
                 env=environment, start_new_session=True,
+                # Preserve exclusion if shutdown cannot reap the child or the
+                # supervisor itself exits. Do not unlock this shared description
+                # explicitly: the inherited descriptor lasts until child exit.
+                pass_fds=(lock.fileno(),),
             )
             try:
                 while process.poll() is None:
@@ -187,8 +200,9 @@ def run_supervised(
                         break
                     time.sleep(SAMPLE_INTERVAL_SECONDS)
             finally:
-                _terminate_owned_process(process)
-            return_code = process.wait()
+                shutdown_failures = _terminate_owned_process(process)
+            return_code = process.poll()
+            exit_confirmed = return_code is not None
             stdout_file.seek(0)
             stderr_file.seek(0)
             stdout = stdout_file.read()
@@ -197,8 +211,8 @@ def run_supervised(
         # Snapshot only after the child has exited: a next layer may not start
         # while its predecessor still owns resident model pages.
         recovery_started = time.monotonic()
-        after = snapshotter()
-        recovery_snapshot_count = 1
+        after = snapshotter() if exit_confirmed else HostSnapshot(None, None, None)
+        recovery_snapshot_count = int(exit_confirmed)
         while (
             before.free_percent is not None
             and after.free_percent is not None
@@ -220,10 +234,10 @@ def run_supervised(
             before.free_percent is not None and after.free_percent is not None
             and after.free_percent >= before.free_percent - 5.0
         )
-        failures: list[str] = []
+        failures: list[str] = list(shutdown_failures)
         if timed_out:
             failures.append("timeout")
-        if return_code != 0:
+        if return_code is not None and return_code != 0:
             failures.append("nonzero-exit")
         if peak_rss <= 0:
             failures.append("peak-rss-unavailable")
@@ -251,7 +265,10 @@ def run_supervised(
             "timeoutSeconds": timeout_seconds,
             "timedOut": timed_out,
             "returnCode": return_code,
-            "cleanExit": return_code == 0 and not (timed_out or resource_limit_terminated or resource_probe_failed),
+            "cleanExit": return_code == 0 and not (timed_out or resource_limit_terminated or resource_probe_failed or shutdown_failures),
+            "processExitConfirmed": exit_confirmed,
+            "outputCaptureComplete": exit_confirmed,
+            "shutdownFailures": shutdown_failures,
             "wallSeconds": wall_seconds,
             "peakRSSBytes": peak_rss,
             "maximumAllowedRSSBytes": maximum_rss_bytes,

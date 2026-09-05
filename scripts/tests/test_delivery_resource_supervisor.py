@@ -5,10 +5,13 @@ from __future__ import annotations
 
 import fcntl
 import os
+import signal
+import subprocess
 from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -62,6 +65,92 @@ class DeliveryResourceSupervisorTests(unittest.TestCase):
                     lock_root=self.root, snapshotter=self._snapshot,
                     rss_sampler=lambda _pid: 12 * 1024**2,
                 )
+
+    def test_denied_shutdown_preserves_output_and_observed_exit(self) -> None:
+        # An exit racing killpg must not discard the resource envelope. EPERM
+        # is not proof of either successful termination or a dead process.
+        with patch("delivery_resource_supervisor.os.killpg", side_effect=PermissionError("private details")):
+            result = run_supervised(
+                [sys.executable, "-c", "import time; print('completed', flush=True); time.sleep(.15)"],
+                lock_root=self.root, snapshotter=self._snapshot,
+                rss_sampler=lambda _: 6 * 1024**3,
+            )
+        self.assertEqual(result.stdout.strip(), b"completed")
+        self.assertEqual(result.report["returnCode"], 0)
+        self.assertTrue(result.report["processExitConfirmed"])
+        self.assertFalse(result.report["qualified"])
+        self.assertIn("process-group-signal-denied", result.report["qualificationFailures"])
+        self.assertNotIn("private details", str(result.report))
+
+    def test_unconfirmed_exit_retains_serial_lock_and_never_claims_recovery(self) -> None:
+        children = []
+        spawn = subprocess.Popen
+
+        def capture(*args, **kwargs):
+            child = spawn(*args, **kwargs)
+            children.append(child)
+            return child
+
+        try:
+            with patch("delivery_resource_supervisor.subprocess.Popen", side_effect=capture), \
+                 patch("delivery_resource_supervisor.os.killpg", side_effect=PermissionError()), \
+                 patch("delivery_resource_supervisor.SHUTDOWN_WAIT_SECONDS", .01), \
+                 patch("delivery_resource_supervisor.time.sleep"), \
+                 patch.object(self, "_snapshot", wraps=self._snapshot) as snapshots:
+                result = run_supervised(
+                    [sys.executable, "-c", "import time; time.sleep(.5)"],
+                    lock_root=self.root, snapshotter=snapshots,
+                    rss_sampler=lambda _: 6 * 1024**3,
+                )
+                self.assertEqual(snapshots.call_count, 1)
+            self.assertIsNone(result.report["returnCode"])
+            self.assertFalse(result.report["processExitConfirmed"])
+            self.assertFalse(result.report["outputCaptureComplete"])
+            self.assertFalse(result.report["postExitMemoryRecovered"])
+            self.assertEqual(result.report["recoverySnapshotCount"], 0)
+            self.assertIn("process-exit-unconfirmed", result.report["qualificationFailures"])
+            with self.assertRaisesRegex(ResourceSupervisorError, "already active"):
+                run_supervised([sys.executable, "-c", "print('forbidden overlap')"], lock_root=self.root)
+        finally:
+            for child in children:
+                child.wait(timeout=3)
+        # No permanently stale lock after the owned child really exits.
+        result = run_supervised(
+            [sys.executable, "-c", "import time; time.sleep(.1)"],
+            lock_root=self.root, snapshotter=self._snapshot, rss_sampler=lambda _: 1024,
+        )
+        self.assertTrue(result.report["qualified"])
+
+    def test_denied_term_escalates_to_owned_group_kill_and_reaps(self) -> None:
+        killpg = os.killpg
+        signals = []
+
+        def deny_term(pid, sig):
+            signals.append(sig)
+            if sig == signal.SIGTERM:
+                raise PermissionError()
+            killpg(pid, sig)
+
+        with patch("delivery_resource_supervisor.os.killpg", side_effect=deny_term), \
+             patch("delivery_resource_supervisor.SHUTDOWN_WAIT_SECONDS", .05):
+            result = run_supervised(
+                [sys.executable, "-c", "import time; time.sleep(30)"],
+                lock_root=self.root, snapshotter=self._snapshot, rss_sampler=lambda _: 6 * 1024**3,
+            )
+        self.assertEqual(signals, [signal.SIGTERM, signal.SIGKILL])
+        self.assertEqual(result.report["returnCode"], -signal.SIGKILL)
+        self.assertTrue(result.report["processExitConfirmed"])
+        self.assertFalse(result.report["qualified"])
+
+    def test_group_disappears_during_exit_still_reaps_child(self) -> None:
+        with patch("delivery_resource_supervisor.os.killpg", side_effect=ProcessLookupError()):
+            result = run_supervised(
+                [sys.executable, "-c", "import time; print('done'); time.sleep(.1)"],
+                lock_root=self.root, snapshotter=self._snapshot, rss_sampler=lambda _: 6 * 1024**3,
+            )
+        self.assertEqual(result.report["returnCode"], 0)
+        self.assertTrue(result.report["processExitConfirmed"])
+        self.assertEqual(result.report["shutdownFailures"], [])
 
     def test_physical_footprint_stops_child_even_when_rss_is_small(self) -> None:
         child_ids = []

@@ -12,6 +12,7 @@ import re
 import struct
 import tempfile
 import uuid
+import wave
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -315,6 +316,40 @@ def validate_output(value: Any, field: str) -> None:
         raise ContractError(f"{field}.byteCount is invalid")
     if not isinstance(value["durationSeconds"], (int, float)) or value["durationSeconds"] <= 0:
         raise ContractError(f"{field}.durationSeconds is invalid")
+
+
+def validate_published_audio(value: dict[str, Any], run_root: Path, generation_id: str) -> Path:
+    """Authenticate bounded published PCM without retaining audio or paths in JSON."""
+    candidate = run_root / "outputs" / f"{generation_id}.wav"
+    try:
+        if candidate.is_symlink() or candidate.parent.is_symlink() or not candidate.is_file():
+            raise ContractError("published audio capture is missing or unsafe")
+        size = candidate.stat().st_size
+        if not 44 <= size <= 64 * 1024 * 1024 or size != value["byteCount"]:
+            raise ContractError("published audio capture size mismatch")
+        digest = hashlib.sha256()
+        with candidate.open("rb") as handle:
+            while chunk := handle.read(1024 * 1024):
+                digest.update(chunk)
+        if digest.hexdigest() != value["sha256"]:
+            raise ContractError("published audio capture digest mismatch")
+        with wave.open(str(candidate), "rb") as handle:
+            if handle.getnchannels() != 1 or handle.getsampwidth() != 2:
+                raise ContractError("published audio capture is not mono PCM16")
+            frames, rate = handle.getnframes(), handle.getframerate()
+            duration = value["durationSeconds"]
+            if frames <= 0 or rate <= 0 or not math.isfinite(duration) or not math.isclose(
+                frames / rate, duration, rel_tol=0, abs_tol=1 / rate
+            ):
+                raise ContractError("published audio capture duration mismatch")
+            observed_bytes = 0
+            while block := handle.readframes(24000):
+                observed_bytes += len(block)
+            if observed_bytes != frames * 2:
+                raise ContractError("published audio capture PCM is truncated")
+    except (OSError, EOFError, wave.Error) as error:
+        raise ContractError("published audio capture is unreadable") from error
+    return candidate
 
 
 def validate_preparation_evidence(value: Any, field: str) -> None:
@@ -625,8 +660,13 @@ def validate_result(plan_path: Path, artifact_dir: Path, run_id: str) -> dict[st
     if result_version not in RESULT_SCHEMA_VERSIONS or result.get("runID") != run_id:
         raise ContractError("terminal result identity is invalid")
     required_result = {"schemaVersion", "status", "runID", "scriptSHA256", "scriptCharacters", "plannedTakeCount", "representedTakeCount", "startedAt", "finishedAt", "startingDeviceState", "finishingDeviceState", "takes"}
-    if set(result) != required_result or result.get("status") not in {"pass", "diagnosed_failure"}:
+    allowed_result = required_result | ({"publishedAudioCaptureRequired"} if result_version == 2 else set())
+    if not required_result.issubset(result) or set(result) - allowed_result or result.get("status") not in {"pass", "diagnosed_failure"}:
         raise ContractError(f"terminal result does not match result schema v{result_version}")
+    capture_required = "publishedAudioCaptureRequired" in result
+    if capture_required and result["publishedAudioCaptureRequired"] is not True:
+        raise ContractError("publishedAudioCaptureRequired must be true when present")
+    captured_audio: list[Path] = []
     started_at = parse_timestamp(result["startedAt"], "startedAt")
     finished_at = parse_timestamp(result["finishedAt"], "finishedAt")
     if finished_at < started_at:
@@ -660,6 +700,12 @@ def validate_result(plan_path: Path, artifact_dir: Path, run_id: str) -> dict[st
             raise ContractError("take preparation drifted")
         if observed.get("output") is not None:
             validate_output(observed["output"], "take.output")
+            if capture_required:
+                captured_audio.append(validate_published_audio(
+                    observed["output"], result_path.parent, observed["generationID"]
+                ))
+        elif capture_required and observed["status"] == "pass":
+            raise ContractError("passing take lacks published output identity")
         if result_version == 2:
             for key in ("prePreparationStoreWarmState", "preRequestStoreWarmState"):
                 if observed.get(key) not in {"cold", "warm"}:
@@ -807,7 +853,7 @@ def validate_result(plan_path: Path, artifact_dir: Path, run_id: str) -> dict[st
             or path.name.startswith("startup-reliability-take-")
         )
     ]
-    if other_files and any(path.stat().st_mtime_ns > result_path.stat().st_mtime_ns for path in other_files):
+    if any(path.stat().st_mtime_ns > result_path.stat().st_mtime_ns for path in other_files + captured_audio):
         raise ContractError("terminal sentinel was not written last")
     summary = {
         "schemaVersion": result_version,

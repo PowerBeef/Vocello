@@ -543,6 +543,7 @@
       "sourceOfTruth": [
         "scripts/ios_device.sh",
         "scripts/ui_test.sh",
+        "scripts/ios_candidate_acceptance.py",
         "scripts/ios_control_audit.py",
         "config/ios-control-audit.json",
         "scripts/check_ios_ui_perf.py",

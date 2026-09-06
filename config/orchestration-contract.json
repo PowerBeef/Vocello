@@ -378,6 +378,24 @@
         "result-retention"
       ]
     },
+    "ui-ios-candidate-smoke": {
+      "producer": "scripts/ui_test.sh",
+      "requiredSteps": [
+        "source-provenance",
+        "candidate-evidence",
+        "candidate-before",
+        "candidate-crash-baseline",
+        "candidate-runner-build",
+        "candidate-runner-configuration",
+        "candidate-runner-install",
+        "xcuitest",
+        "candidate-after",
+        "candidate-crash-delta",
+        "candidate-attachments",
+        "candidate-result"
+      ],
+      "optionalSteps": ["result-retention"]
+    },
     "ui-ios-localization": {
       "producer": "scripts/ui_test.sh",
       "requiredSteps": [

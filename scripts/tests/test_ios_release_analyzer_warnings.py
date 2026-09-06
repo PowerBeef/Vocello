@@ -48,6 +48,17 @@ class IOSReleaseAnalyzerWarningPolicyTests(unittest.TestCase):
         self.assertEqual(result["status"], "PASS")
         self.assertEqual(result["registeredCounts"]["no-app-intents-framework"], 1)
 
+    def test_legacy_audio_event_warning_is_not_covered_by_completion_allowance(self) -> None:
+        result = module.analyze_log(
+            "/opt/work/QwenVoice/Packages/VocelloQwen3Core/Sources/MLXAudioCore/Generation/GenerationTypes.swift:272:10: "
+            "warning: associated value 'audio' of 'Sendable'-conforming enum 'AudioGeneration' "
+            "has non-Sendable type 'MLXArray'\n",
+            self.policy,
+        )
+        self.assertEqual(result["status"], "FAIL")
+        self.assertEqual(len(result["unexpected"]), 1)
+        self.assertEqual(result["registeredCounts"]["mlx-completion-tensor-sendability"], 0)
+
     def test_allowance_count_cannot_grow_silently(self) -> None:
         row = self.policy["allowedWarnings"][0]
         line = (

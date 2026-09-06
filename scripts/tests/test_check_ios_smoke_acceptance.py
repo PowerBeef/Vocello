@@ -66,6 +66,19 @@ def write_jsonl(path: Path, rows: list[dict]) -> None:
 
 
 class IOSSmokeAcceptanceTests(unittest.TestCase):
+    def test_long_form_fixture_uses_natural_text_and_persisted_ownership(self) -> None:
+        source = (ROOT / "Tests/VocelloiOSUITests/VocelloiOSSmokeUITests.swift").read_text()
+        journey = source.split("func testZLongFormProjectJourney()", 1)[1]
+        self.assertNotIn("randomElement", journey)
+        self.assertNotIn("nonce", journey)
+        self.assertIn('let searchTitle = "An evening by the harbor."', journey)
+        self.assertLess(journey.index("beforeTitleIDs = historyRowCensus"), journey.index("generateAndWaitForCompletedPlayer"))
+        self.assertIn("Set(afterJoinedIDs).isSubset(of: Set(regeneratedJoinedIDs))", journey)
+        self.assertIn("verifyHistoryTranscript(rowID: replacementID, expectedScript: script)", journey)
+        support = (ROOT / "Tests/VocelloiOSUITests/VocelloiOSUITestCase.swift").read_text()
+        self.assertIn("func historyRowCensus(expectedScript:", support)
+        self.assertIn("History census exceeded its bound", support)
+
     def run_checker(self, root: Path, run_id: str = RUN_ID) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
             [sys.executable, str(CHECKER), str(root), "--run-id", run_id],

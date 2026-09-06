@@ -5,6 +5,7 @@ summary: iOS physical-device testing — deterministic compile lanes, explicit o
 sourceOfTruth:
   - scripts/ios_device.sh
   - scripts/ui_test.sh
+  - scripts/ios_candidate_acceptance.py
   - scripts/ios_control_audit.py
   - config/ios-control-audit.json
   - scripts/check_ios_ui_perf.py
@@ -57,6 +58,38 @@ does not expose a device execution command for this target. Physical runtime ass
 the existing headless diagnostics and genuine XCUITest lanes; no Simulator substitute is used.
 
 ## Device preparation
+
+### Already installed distribution candidate
+
+After separately authorized signing/upload and installation, use:
+
+```sh
+scripts/ui_test.sh ios smoke --preinstalled-candidate <verified-release-directory> --retain-result
+```
+
+This is a **black-box navigation route proof**, not the instrumented smoke suite or complete
+processed-candidate acceptance. The helper validates command-bound iOS release evidence and requires
+the exact clean source commit. CoreDevice must identify exactly one matching bundle/version/build
+with `isBuiltByDeveloper == false`, before and after testing; unknown origin fails closed. This
+binds the unique version/build to approved IPA evidence but does **not** claim to measure the
+installed TestFlight binary's digest.
+
+The standalone `VocelloiOSCandidateUI` scheme has no production-app dependency. Only its test runner
+is built and installed. Xcode's documented `UseDestinationArtifacts` mode prevents installation
+during `test-without-building`. Runner configuration rejects target-app build products and removes
+all app launch arguments/overrides. It never pulls the distribution app's private data container.
+The genuine tab and Settings-version journey retains screenshots and its candidate identity,
+restores the original tab, terminates the app and returns Home. A missing/failed/duplicate test or
+missing identity attachment fails the route. Collection of post-run identity, attachments and
+system-crash deltas is attempted even after failure/interruption; new system reports require review.
+
+Keep this evidence separate from instrumented engine receipts and the 201-take campaign. Full
+downloads/generation/enrollment/long-form/permission/upgrade acceptance must still be performed on
+the processed candidate. Do not uninstall or bypass onboarding here: fresh-install acceptance needs
+verified recovery and immediate maintainer approval. Finish authorized device work with the screen
+protection procedure below, not an implicit global Settings mutation.
+
+### Development-device preflight
 
 ```sh
 scripts/ios_device.sh preflight

@@ -415,16 +415,16 @@ def validate_facts(root: Path) -> list[str]:
     schemes = _top_level_names(project, "schemes")
     cli_template = root / "config/xcode-schemes/VocelloCLI.xcscheme.template"
     ios_logic_template = root / "config/xcode-schemes/VocelloiOSLogic.xcscheme.template"
-    if len(targets) != 13:
-        errors.append(f"project.yml: expected 13 targets, found {len(targets)}")
-    if len(schemes) != 4 or not cli_template.is_file() or not ios_logic_template.is_file():
+    if len(targets) != 14:
+        errors.append(f"project.yml: expected 14 targets, found {len(targets)}")
+    if len(schemes) != 5 or not cli_template.is_file() or not ios_logic_template.is_file():
         errors.append(
-            "project schemes must contain four XcodeGen schemes plus the generated "
+            "project schemes must contain five XcodeGen schemes plus the generated "
             "VocelloCLI and VocelloiOSLogic schemes"
         )
     architecture = (root / "docs/ARCHITECTURE.md").read_text(encoding="utf-8")
-    if "13 targets" not in architecture or "six shared schemes" not in architecture.lower():
-        errors.append("docs/ARCHITECTURE.md: target/scheme inventory must state 13 targets and six shared schemes")
+    if "14 targets" not in architecture or "seven shared schemes" not in architecture.lower():
+        errors.append("docs/ARCHITECTURE.md: target/scheme inventory must state 14 targets and seven shared schemes")
     if re.search(r"QwenVoiceBackendCore[^\n]{0,120}(?:Low-level MLX|MLX/audio primitives|owns model load|owns codecs)", architecture, re.I):
         errors.append("docs/ARCHITECTURE.md: BackendCore is incorrectly described as the MLX/codec implementation boundary")
     qwen = (root / "docs/reference/qwen3-tts-guide.md").read_text(encoding="utf-8")

@@ -47,11 +47,11 @@ Clarify ambiguous scope. Ordinary checkpoints need deterministic checks, never m
 ### Release-first execution
 
 Follow [`docs/reference/release-first-execution-2026-09.md`](docs/reference/release-first-execution-2026-09.md)
-in primary-roadmap order: product fixes before campaigns, necessary harness repairs only, retained
-evidence before generation. Stop at the causal boundary. Keep heavy workloads serial on the 8 GB
-Mac; verify focused changes then the tree. Implementation, candidate proof and publication approval
-are separate. macOS/CLI need not wait for iOS. Keep account/signing/rights dependencies explicit;
-version and run progress belong in the roadmap/checkpoint.
+iOS-first: defer Mac/CLI-only qualification. Keep all modes, long-form and the 201-take gate.
+Use retained evidence; stop after two predeclared experiments per finding for a decision checkpoint.
+No broad harness work. Serialize heavy work; verify focused changes then the tree.
+Freeze source/docs during campaigns; checkpoint runs untracked. Implementation, instrumented QA,
+processed-candidate proof and submission approval differ. Keep external dependencies explicit.
 
 ## Hard invariants
 
@@ -143,7 +143,7 @@ No gate can validate optional assists; they are never prerequisites.
 | Codex instructions, hooks, skills, or settings | `openai-docs` and current official OpenAI documentation |
 | Current third-party library APIs | Context7, then primary vendor documentation |
 
-Discover optional assists only for an in-scope need or user request.
+Discover assists only when needed.
 
 <!-- END OPTIONAL ASSISTS -->
 
@@ -160,8 +160,7 @@ Never use its Simulator, preview, or UI routes; repository scripts remain author
 ## Verification tiers
 
 Use `scripts/dev.sh plan`, repeat `scripts/dev.sh focused` while editing, then run one
-`scripts/dev.sh checkpoint` for the coherent tree. This path-aware router preserves governed caches
-and never schedules UI/model/release work; see
+`scripts/dev.sh checkpoint` for the coherent tree. The router preserves caches without UI/model/release work; see
 [`docs/reference/development-workflow.md`](docs/reference/development-workflow.md).
 
 Serialize native Xcode commands: the shared SwiftPM lock spans XCTest. Parallelize read-only/Python
@@ -200,6 +199,7 @@ collection/cleanup time and stop before the deadline. Pin runs and record comple
 boundaries. Runner PASS requires diagnostics/cleanup. Interrupted runs stay failed; zero-observation
 runs cannot resume. Source changes need new IDs. Identity, reachability, and safe-resume procedures:
 `docs/reference/ios-device-testing.md`.
+Candidate guards: `scripts/ios_candidate_acceptance.py`.
 
 When authorized, finish with `scripts/ui_test.sh ios screen-protection --scenario enable --retain-result`.
 Verify English/French Settings' three-minute readback, return Home, then independently verify lock

@@ -37,6 +37,9 @@ class QualityPromotionTests(unittest.TestCase):
         (self.root / "config").mkdir()
         for name in ("quality-promotion-contract.json", "evidence-impact.json"):
             shutil.copy2(REPO_ROOT / "config" / name, self.root / "config" / name)
+        model_path = self.root / PROMOTION.MODEL_CONTRACT_PATH
+        model_path.parent.mkdir(parents=True)
+        shutil.copy2(REPO_ROOT / PROMOTION.MODEL_CONTRACT_PATH, model_path)
         self.git("init", "-q")
         self.git("config", "user.email", "fixture@example.invalid")
         self.git("config", "user.name", "Fixture")
@@ -159,6 +162,100 @@ class QualityPromotionTests(unittest.TestCase):
         )
         self.assertIn("multilingual-output:independent-generation-cohorts", unsupported)
         self.assertIn("delivery-evaluation:independent-holdout-calibration", unsupported)
+
+    def test_ios_quality_is_explicitly_unsupported_without_omitting_speed_or_other_lanes(self) -> None:
+        contract = PROMOTION.load_contract(self.root)
+        PROMOTION.validate_contract(contract, root=self.root)
+        impact = {"promotionCapabilities": list(contract["capabilities"]),
+                  "promotionRequiredEvidence": ["ios-retained-memory", "ios-ui-performance"]}
+        required = PROMOTION.required_evidence(contract, impact, "ios")
+        self.assertNotIn("ios-quality-engine-benchmark", required)
+        self.assertEqual(set(required), {
+            "ios-ui-benchmark", "ios-language-benchmark", "ios-delivery-benchmark",
+            "ios-model-download-lifecycle", "ios-retained-memory", "ios-ui-performance",
+        })
+        coverage, unsupported = PROMOTION.capability_coverage(contract, impact, "ios")
+        self.assertEqual(coverage["quality-generation"]["platformApplicability"]["status"], "unsupported")
+        self.assertIn("quality-generation:platform-ios", unsupported)
+        self.assertEqual(coverage["speed-generation"]["platformApplicability"]["status"], "applicable")
+
+    def test_applicability_cannot_waive_supported_platforms_or_claim_unsupported(self) -> None:
+        for capability, platform in (("speed-generation", "ios"), ("quality-generation", "macos"),
+                                     ("quality-generation", "ios")):
+            with self.subTest(capability=capability, platform=platform):
+                contract = PROMOTION.load_contract(self.root)
+                definition = contract["capabilities"][capability]
+                definition["platformApplicability"][platform] = not definition["platformApplicability"][platform]
+                with self.assertRaisesRegex(PROMOTION.PromotionError, "applicability disagrees"):
+                    PROMOTION.validate_contract(contract, root=self.root)
+
+    def test_applicable_lane_cannot_be_empty_or_applicability_removed(self) -> None:
+        for mutation in ("empty", "removed", "unrelated-waiver", "invalid-bool"):
+            with self.subTest(mutation=mutation):
+                contract = PROMOTION.load_contract(self.root)
+                speed = contract["capabilities"]["speed-generation"]
+                if mutation == "empty":
+                    speed["evidenceByPlatform"]["ios"] = []
+                elif mutation == "removed":
+                    del speed["platformApplicability"]
+                elif mutation == "invalid-bool":
+                    speed["platformApplicability"]["ios"] = 1
+                else:
+                    contract["capabilities"]["delivery-evaluation"]["platformApplicability"] = {"ios": False}
+                with self.assertRaises(PROMOTION.PromotionError):
+                    PROMOTION.validate_contract(contract, root=self.root)
+
+    def test_applicability_source_drift_or_substitution_fails_closed(self) -> None:
+        contract = PROMOTION.load_contract(self.root)
+        path = self.root / PROMOTION.MODEL_CONTRACT_PATH
+        path.write_bytes(path.read_bytes() + b"\n")
+        with self.assertRaisesRegex(PROMOTION.PromotionError, "source digest"):
+            PROMOTION.validate_contract(contract, root=self.root)
+        contract["modelApplicabilitySource"]["path"] = "config/waiver.json"
+        with self.assertRaisesRegex(PROMOTION.PromotionError, "production model contract"):
+            PROMOTION.validate_contract(contract, root=self.root)
+
+    def test_quality_lane_cannot_be_replaced_by_speed_or_capability_deleted(self) -> None:
+        for mutation in ("speed", "deleted"):
+            contract = PROMOTION.load_contract(self.root)
+            if mutation == "speed":
+                contract["capabilities"]["quality-generation"]["evidenceByPlatform"]["macos"] = ["macos-ui-benchmark"]
+            else:
+                del contract["capabilities"]["quality-generation"]
+            with self.assertRaises(PROMOTION.PromotionError):
+                PROMOTION.validate_contract(contract, root=self.root)
+    def test_new_ios_quality_or_partial_support_requires_contract_migration(self) -> None:
+        for count in (1, 3):
+            with self.subTest(supported_modes=count):
+                path = self.root / PROMOTION.MODEL_CONTRACT_PATH
+                source = json.loads((REPO_ROOT / PROMOTION.MODEL_CONTRACT_PATH).read_text())
+                for model in source["models"][:count]:
+                    variant = next(v for v in model["variants"] if v["kind"] == "quality")
+                    variant["platforms"].append("iOS")
+                    variant["iosDownloadEligible"] = True
+                self.write_json(path, source)
+                contract = PROMOTION.load_contract(self.root)
+                contract["modelApplicabilitySource"]["sha256"] = PROMOTION.file_digest(path)
+                with self.assertRaises(PROMOTION.PromotionError):
+                    PROMOTION.validate_contract(contract, root=self.root)
+
+    def test_historical_v2_contract_and_manifest_round_trip_preserves_old_requirements(self) -> None:
+        contract = PROMOTION.load_contract(self.root)
+        contract["schemaVersion"] = 2
+        del contract["modelApplicabilitySource"]
+        for definition in contract["capabilities"].values():
+            definition.pop("platformApplicability", None)
+        contract["capabilities"]["quality-generation"]["evidenceByPlatform"]["ios"] = ["ios-quality-engine-benchmark"]
+        self.write_json(self.root / PROMOTION.CONTRACT_PATH, contract)
+        PROMOTION.validate_contract(contract, root=self.root)
+        impact = {"promotionCapabilities": ["quality-generation"]}
+        self.assertIn("ios-quality-engine-benchmark", PROMOTION.required_evidence(contract, impact, "ios"))
+        coverage, _ = PROMOTION.capability_coverage(contract, impact, "ios")
+        self.assertNotIn("platformApplicability", coverage["quality-generation"])
+        manifest = PROMOTION.create(self.create_args())
+        path = self.root / "historical.json"
+        self.write_json(path, manifest)
+        self.assertEqual(PROMOTION.validate_manifest(self.validation_args(path)), manifest)
 
     def test_speed_record_cannot_substitute_for_quality_evidence(self) -> None:
         contract = PROMOTION.load_contract(self.root)

@@ -261,9 +261,12 @@ class BuildRoutingContractTests(unittest.TestCase):
             "macos-test": [("QwenVoice", "Release", "platform=macOS,arch=arm64")],
             "ios-device": [("VocelloiOS", "Release", "generic/platform=iOS")],
             "ui-macos": [("VocelloMacUI", "Release", "platform=macOS,arch=arm64")],
-            "ui-ios": [("VocelloiOSUI", "Release", "generic/platform=iOS")],
+            "ui-ios": [("$ios_scheme", "Release", "generic/platform=iOS")],
         }
         self.assertEqual(calls, expected)
+        ui = self.text("scripts/ui_test.sh")
+        self.assertIn("ios_scheme=VocelloiOSUI", ui)
+        self.assertIn('[[ -z "$candidate_evidence" ]] || ios_scheme=VocelloiOSCandidateUI', ui)
 
     def test_ios_platform_preflight_precedes_every_local_build_side_effect(self) -> None:
         cache = self.text("scripts/lib/build_cache.sh")

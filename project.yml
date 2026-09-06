@@ -121,6 +121,24 @@ schemes:
     archive:
       config: Release
 
+  VocelloiOSCandidateUI:
+    build:
+      targets:
+        VocelloiOSCandidateUITests: [test]
+    run:
+      config: Release
+    test:
+      config: Release
+      preferredScreenCaptureFormat: screenshots
+      targets:
+        - VocelloiOSCandidateUITests
+    profile:
+      config: Release
+    analyze:
+      config: Release
+    archive:
+      config: Release
+
 targets:
   QwenVoice:
     type: application
@@ -590,6 +608,8 @@ targets:
     sources:
       - path: Tests/UIAutomationSupport
       - path: Tests/VocelloiOSUITests
+        excludes:
+          - VocelloiOSCandidateAcceptanceUITests.swift
     dependencies:
       - target: VocelloiOS
     settings:
@@ -598,6 +618,28 @@ targets:
         PRODUCT_NAME: VocelloiOSUITests
         PRODUCT_MODULE_NAME: VocelloiOSUITests
         TEST_TARGET_NAME: VocelloiOS
+        SWIFT_VERSION: "6"
+        IPHONEOS_DEPLOYMENT_TARGET: "26.0"
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: $(QWENVOICE_DEVELOPMENT_TEAM)
+        GENERATE_INFOPLIST_FILE: YES
+        TARGETED_DEVICE_FAMILY: "1"
+        SUPPORTS_MACCATALYST: NO
+        SWIFT_STRICT_CONCURRENCY: minimal
+
+  # Standalone runner for an already installed distribution app. Deliberately
+  # no VocelloiOS dependency or TEST_TARGET_NAME: it must not build the app.
+  VocelloiOSCandidateUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: Tests/UIAutomationSupport
+      - path: Tests/VocelloiOSUITests/VocelloiOSCandidateAcceptanceUITests.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.patricedery.vocello.candidateuitests
+        PRODUCT_NAME: VocelloiOSCandidateUITests
+        PRODUCT_MODULE_NAME: VocelloiOSCandidateUITests
         SWIFT_VERSION: "6"
         IPHONEOS_DEPLOYMENT_TARGET: "26.0"
         CODE_SIGN_STYLE: Automatic

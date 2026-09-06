@@ -47,6 +47,70 @@ machine-readable status record and wins over any older prose.
 | 13 — Benchmark/history v3 | Live 2026-07-29: the first schema-v3 records are committed (three clean `phase0-cli-control-*` engine records plus one exploratory run that also exposed and fixed the summarizer's v3 pin). `benchmarks/schema-v3.json` adds the typed quality identity to generation takes (pass/warning only, five fast gates required, machine-code issues); v1/v2 records stay valid immutable history; the publisher stamps v3 only when every take carries the identity. The UI benchmark checkers folded the same identity 2026-08-01: ui-generation records now publish v3 (first: the focused `v3-fold-proof` record `macos-xcui-benchmark-20260801-003208-403989cf`); the canonical iOS matrix published its first v3 record 2026-08-01 (`ios-xcui-benchmark-20260801-132415-abbec96b`). |
 | 14 — Organization and retirement | Closed 2026-07-23 (14a + 14b): compatibility SPI retired, actor-owned loading/metadata/priming/clone artifacts, clone conditioning epoch-bound end to end. |
 
+## September 6 accelerated iOS submission implementation
+
+The approved accelerated plan now governs the existing primary roadmap. RF-03/04/05/07 stay
+implementation-complete; RF-08/RF-10 are parked off the iOS critical path with explicit unpark
+conditions, not waived acceptance. The active release-first reference maps the ten execution
+steps and four work classes to existing owners/gates. AGENTS.md now carries the durable iOS-first,
+two-experiment decision boundary and source/documentation-freeze rules. The consolidated RF-02
+packet identifies outstanding owner/privacy/IP/signing decisions and regional providers; no
+account mutation, legal approval, candidate operation or device run has occurred.
+
+**Implemented verification gaps:** promotion contract v3 derives Speed/Quality applicability from
+the digest-bound production model contract. iOS retains all applicable Speed requirements;
+unsupported Quality is explicit, while macOS Quality and historical v2 semantics remain intact.
+The existing UI runner now has a standalone, preinstalled-candidate navigation route: it validates
+command-bound release evidence and installed identity before/after, installs only the test runner,
+uses destination artifacts, and collects crashes/attachments without debug inputs or private app
+container access. Deterministic refusal tests and generic SDK compilation are not proof of a
+processed TestFlight candidate; full distribution acceptance remains pending.
+
+**Bounded RF-06 result:** the original 859-character first segment and UInt64 seed were recovered
+against the recorded text digest. One fresh-process Mac take reached EOS with 54.8 seconds of audio,
+98 chunks and Fast-QC PASS. The engine receipt is **warm**, whereas the failed iPhone receipt is
+cold. Repository revision, Speed variant, tokenizer digest, instruction, text and seed match, but
+installed integrity-manifest digest, load profile, platform and thermal state differ (Mac nominal;
+original iPhone serious). This is an unmatched diagnostic comparison, not a planner fix or iOS
+acceptance. Original WAV/codec evidence is unavailable; the new CLI capture has typed boundaries,
+not a binary codec trace. No production prompt/model/planner/cap/QC change is justified.
+
+The supervisor confirmed clean process exit, a 2,834,646,936-byte physical-footprint peak, no
+before/after pressure warning and memory recovery, but **460,985,466 bytes of swap growth** made
+the run unqualified. It stopped before experiment two; neither take was retried. The later host
+read showed 68% free memory and no pressure warning, permitting serial deterministic builds only;
+it does not retroactively qualify that run. The untracked decision is
+`build/artifacts/diagnostics/macos/rf06-longform-recovery-20260906/decision.json`, SHA-256
+`3bc5f46f2a8920cde6584dbcb4153300e5e2f5996e5cfa86e73776e09b1d38a9`.
+
+The long-form XCUITest now speaks deterministic natural text and owns outputs through visible
+History row IDs/transcript checks, preserving previous joined outputs across regeneration. Removing
+the fixture's random spoken marker does not close the original failure. The first divergent product
+layer remains unproven; RF-06 and the 201-take campaign remain blocked. No source freeze,
+candidate operation, phone run, legal approval or submission-ready verdict is claimed.
+
+Resume with the bounded original-seed iOS long-form comparison only after preflight/receipt identity
+and existing codec capture are confirmed. Do not repeat excluded French/Chinese decoder variants.
+Independent full-WAV recognition/cadence evidence and the severe gaps remain separate blockers.
+The RF-02 packet needs qualified owner decisions; RF-12 needs an authorized processed candidate.
+**Verification:** the coherent `scripts/dev.sh checkpoint` passed all 1,567 Python tests,
+582 core, 19 transport and 109 owned-runtime tests (two optional AudioSeal fixture skips),
+and generic iOS app/logic compilation. The optimized CLI, macOS app, ordinary iOS UI target
+and standalone candidate UI target built successfully. Website checks passed lint, 12 tests,
+rendered accessibility, production build and two browser sizes. Evidence is retained under
+`build/artifacts/ios/candidate-route-20260906` and native run `mac-test-20260906-145620`.
+
+**Additional pre-freeze blocker (RF-09/ASR-10):** Release Analyze completed, but the unchanged
+warning policy rejected `AudioGeneration.audio(MLXArray)` claiming `Sendable`. Nineteen other
+warnings matched the six existing bounded classes; this twentieth warning is not waived.
+The shipping `Qwen3MaterializedGenerationEvent` already transports `[Float]`. Removing the legacy
+conformance alone fails compilation at `generateSamplesStream` → `proxyAudioStream`'s Sendable
+input requirement, so that attempted patch was reverted completely. The failed compile and original
+warning report remain retained; no production/runtime change or new concurrency exemption landed.
+Next action: correct the legacy adapter's tensor-transfer contract without weakening isolation or
+changing the shipping PCM boundary, then pass native regressions and Release Analyze before freeze.
+The normal deterministic checkpoint PASS does **not** replace this failed candidate-warning gate.
+
 ## September 6 evaluator corrections and product priority
 
 **The two bounded evaluator corrections are implemented; RF-06/VLR-07 remain in-flight.** No

@@ -23,6 +23,8 @@ import evidence_impact
 ROOT = Path(__file__).resolve().parents[1]
 CONTRACT_PATH = Path("config/quality-promotion-contract.json")
 SCHEMA_VERSION = 2
+CONTRACT_SCHEMA_VERSION = 3
+MODEL_CONTRACT_PATH = Path("Sources/Resources/qwenvoice_contract.json")
 DIGEST_RE = re.compile(r"[0-9a-f]{64}")
 COMMIT_RE = re.compile(r"[0-9a-f]{40}")
 TAG_RE = re.compile(r"v\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?")
@@ -74,9 +76,56 @@ def load_contract(root: Path = ROOT) -> dict[str, Any]:
     return read_json(root / CONTRACT_PATH)
 
 
-def validate_contract(contract: dict[str, Any], impact: dict[str, Any] | None = None) -> None:
-    if contract.get("schemaVersion") != SCHEMA_VERSION:
-        raise PromotionError(f"quality promotion schemaVersion must be {SCHEMA_VERSION}")
+def model_applicability(contract: dict[str, Any], root: Path) -> dict[str, dict[str, bool]]:
+    """Validate eligibility against the source contract; no operator-authored waiver."""
+    binding = contract.get("modelApplicabilitySource")
+    if not isinstance(binding, dict) or set(binding) != {"path", "sha256"}:
+        raise PromotionError("model applicability source binding is missing")
+    if binding["path"] != MODEL_CONTRACT_PATH.as_posix():
+        raise PromotionError("model applicability must use the production model contract")
+    path = root / MODEL_CONTRACT_PATH
+    if not path.is_file() or binding["sha256"] != file_digest(path):
+        raise PromotionError("model applicability source digest differs")
+    models = read_json(path).get("models")
+    if not isinstance(models, list) or len(models) != 3 or {
+        model.get("mode") for model in models if isinstance(model, dict)
+    } != {"custom", "design", "clone"}:
+        raise PromotionError("model applicability requires all three production modes")
+    result: dict[str, dict[str, bool]] = {}
+    for kind in ("speed", "quality"):
+        eligible: dict[str, list[bool]] = {"ios": [], "macos": []}
+        for model in models:
+            variants = model.get("variants")
+            if not isinstance(variants, list) or any(not isinstance(v, dict) for v in variants):
+                raise PromotionError("model applicability variants are malformed")
+            selected = [v for v in variants if v.get("kind") == kind]
+            if len(selected) != 1:
+                raise PromotionError(f"model applicability requires one {kind} variant per mode")
+            variant = selected[0]
+            platforms = variant.get("platforms")
+            if (not isinstance(platforms, list) or not platforms
+                    or any(not isinstance(p, str) or p not in {"iOS", "macOS"} for p in platforms)
+                    or len(set(platforms)) != len(platforms)
+                    or type(variant.get("iosDownloadEligible")) is not bool
+                    or variant["iosDownloadEligible"] != ("iOS" in platforms)):
+                raise PromotionError("model applicability platform eligibility disagrees")
+            eligible["ios"].append("iOS" in platforms)
+            eligible["macos"].append("macOS" in platforms)
+        if any(any(values) != all(values) for values in eligible.values()):
+            raise PromotionError("partial mode applicability requires an explicit coverage migration")
+        result[f"{kind}-generation"] = {p: all(values) for p, values in eligible.items()}
+    return result
+
+
+def validate_contract(
+    contract: dict[str, Any], impact: dict[str, Any] | None = None, *, root: Path = ROOT
+) -> None:
+    version = contract.get("schemaVersion")
+    if type(version) is not int or version not in {2, CONTRACT_SCHEMA_VERSION}:
+        raise PromotionError("quality promotion contract schemaVersion must be 2 or 3")
+    applicability = model_applicability(contract, root) if version == 3 else {}
+    if version == 2 and "modelApplicabilitySource" in contract:
+        raise PromotionError("historical contract cannot add applicability waivers")
     if contract.get("publicPromotionPolicy") != "source-bound-quality-evidence":
         raise PromotionError("public promotion policy must remain source-bound-quality-evidence")
     age = contract.get("maxEvidenceAgeSeconds")
@@ -135,22 +184,43 @@ def validate_contract(contract: dict[str, Any], impact: dict[str, Any] | None = 
     capabilities = contract.get("capabilities")
     if not isinstance(capabilities, dict) or not capabilities:
         raise PromotionError("quality promotion capabilities are missing")
+    if set(applicability) - capabilities.keys():
+        raise PromotionError("model generation capabilities cannot be omitted")
     for capability, definition in capabilities.items():
         if not isinstance(capability, str) or re.fullmatch(r"[a-z][a-z0-9-]+", capability) is None:
             raise PromotionError(f"invalid promotion capability id: {capability!r}")
-        if not isinstance(definition, dict) or set(definition) != {
-            "evidenceByPlatform", "unsupportedDimensions"
-        }:
+        keys = {"evidenceByPlatform", "unsupportedDimensions"}
+        if capability in applicability:
+            keys.add("platformApplicability")
+        if not isinstance(definition, dict) or set(definition) != keys:
             raise PromotionError(f"{capability} capability definition is malformed")
+        if capability in applicability:
+            declared = definition["platformApplicability"]
+            if (not isinstance(declared, dict) or set(declared) != {"macos", "ios"}
+                    or any(type(value) is not bool for value in declared.values())
+                    or declared != applicability[capability]):
+                raise PromotionError(f"{capability} platform applicability disagrees with source")
         by_platform = definition["evidenceByPlatform"]
         if not isinstance(by_platform, dict) or set(by_platform) != {"macos", "ios"}:
             raise PromotionError(f"{capability} must map evidence for macos and ios")
         for platform, identities in by_platform.items():
-            if not isinstance(identities, list) or not identities or len(identities) != len(set(identities)):
+            applies = applicability.get(capability, {}).get(platform, True)
+            if (not isinstance(identities, list)
+                    or any(not isinstance(identity, str) for identity in identities)
+                    or bool(identities) != applies or len(identities) != len(set(identities))):
                 raise PromotionError(f"{capability}.{platform} evidence is invalid")
             for identity in identities:
                 if identity not in definitions or definitions[identity].get("platform") != platform:
                     raise PromotionError(f"{capability}.{platform} references invalid evidence {identity}")
+            if capability in applicability and applies:
+                kind = capability.removesuffix("-generation")
+                if not any(
+                    set(definitions[i].get("requiredTakeCoverage", {}).get("variants", [])) == {kind}
+                    and set(definitions[i].get("requiredTakeCoverage", {}).get("modes", []))
+                    == {"custom", "design", "clone"}
+                    for i in identities
+                ):
+                    raise PromotionError(f"{capability}.{platform} lacks source-applicable tier/mode coverage")
         unsupported = definition["unsupportedDimensions"]
         if (
             not isinstance(unsupported, list)
@@ -286,6 +356,15 @@ def capability_coverage(
             "requiredEvidence": sorted(definition["evidenceByPlatform"][platform]),
             "unsupportedDimensions": dimensions,
         }
+        if "platformApplicability" in definition:
+            applies = definition["platformApplicability"][platform]
+            result[capability]["platformApplicability"] = {
+                "status": "applicable" if applies else "unsupported",
+                "reason": "catalog-eligible" if applies else "no-catalog-eligible-variant",
+                "sourceSHA256": contract["modelApplicabilitySource"]["sha256"],
+            }
+            if not applies:
+                unsupported.add(f"{capability}:platform-{platform}")
     return result, sorted(unsupported)
 
 
@@ -420,7 +499,7 @@ def create(args: argparse.Namespace) -> dict[str, Any]:
     root = args.root.resolve()
     contract = load_contract(root)
     impact_contract = evidence_impact.load_contract(root)
-    validate_contract(contract, impact_contract)
+    validate_contract(contract, impact_contract, root=root)
     release_evidence, commit = release_identity(args.release_evidence.resolve(), args.platform, args.tag, root)
     base_commit, paths = changed_paths(root, args.base, commit)
     impact_result = evidence_impact.classify(impact_contract, paths)
@@ -497,7 +576,7 @@ def validate_manifest(args: argparse.Namespace) -> dict[str, Any]:
     root = args.root.resolve()
     contract = load_contract(root)
     impact_contract = evidence_impact.load_contract(root)
-    validate_contract(contract, impact_contract)
+    validate_contract(contract, impact_contract, root=root)
     manifest = read_json(args.manifest.resolve())
     expected_top_level = {
         "schemaVersion", "platform", "tag", "sourceCommit", "baseCommit", "createdAt",
@@ -582,7 +661,7 @@ def capture(args: argparse.Namespace) -> dict[str, Any]:
     root = args.root.resolve()
     contract = load_contract(root)
     impact_contract = evidence_impact.load_contract(root)
-    validate_contract(contract, impact_contract)
+    validate_contract(contract, impact_contract, root=root)
     definition = contract["evidence"].get(args.evidence_id)
     if not isinstance(definition, dict) or definition.get("type") != "managed-command":
         raise PromotionError("capture requires a managed-command evidence id")
@@ -658,7 +737,7 @@ def main() -> int:
     try:
         if args.operation == "validate-contract":
             contract = load_contract(args.root.resolve())
-            validate_contract(contract, evidence_impact.load_contract(args.root.resolve()))
+            validate_contract(contract, evidence_impact.load_contract(args.root.resolve()), root=args.root.resolve())
             print(f"Quality promotion contract: PASS ({digest_value(contract)})")
             return 0
         if args.operation == "capture":

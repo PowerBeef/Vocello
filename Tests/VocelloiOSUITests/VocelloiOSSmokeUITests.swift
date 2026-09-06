@@ -350,33 +350,43 @@ final class VocelloiOSSmokeUITests: VocelloiOSUITestCase {
         assertVisibleModelReadiness()
         prepare(mode: .custom)
 
-        // Pronounceable nonce (hex nonces read as spelled letters and perturb
-        // the QC pause budget — macOS acceptance lesson).
-        let nonce = String((0..<8).map { _ in "abcdefghijklmnopqrstuvwxyz".randomElement()! })
+        // Natural, deterministic speech. Ownership comes from a before/after
+        // census of persisted IDs, never from a random token spoken by the model.
+        let searchTitle = "An evening by the harbor."
         let paragraph = "The evening ferry crossed the quiet harbor while gulls circled the "
             + "breakwater and the lighthouse began its slow rotation over the bay. Along the "
             + "promenade the vendors folded their awnings, stacked crates of oranges, and "
             + "compared notes about the tide. Farther up the hill the windows brightened one "
             + "by one, and the smell of bread and woodsmoke drifted through narrow streets "
             + "that remembered a century of similar evenings. "
-        var script = "Project \(nonce). "
+        var script = searchTitle + " "
         while script.count < 2_000 {
             script += paragraph
         }
 
+        guard let beforeTitleIDs = historyRowCensus(expectedScript: searchTitle),
+              let beforeJoinedIDs = historyRowCensus(expectedScript: script) else { return }
+        select(tab: .studio)
         replaceScript(with: script)
-        _ = generateAndWaitForCompletedPlayer(timeout: 900)
+        let generationID = generateAndWaitForCompletedPlayer(timeout: 900)
+        guard !generationID.isEmpty else { return }
         VocelloUIScreenshot.attach(app, named: "ios-longform-complete")
 
-        // Search flattens: the nonce lands in the first segment and the joined
-        // transcript — exactly two flat rows.
-        replaceHistorySearch(with: nonce)
-        XCTAssertTrue(
-            VocelloUIWait.condition("first segment + joined output to appear in History search", timeout: 30) {
-                self.historyRows().count == 2
-            },
-            "Search must surface exactly the first segment and the joined output"
-        )
+        guard let afterJoinedIDs = historyRowCensus(expectedScript: script),
+              let afterTitleIDs = historyRowCensus(expectedScript: searchTitle) else { return }
+        let addedJoined = Set(afterJoinedIDs).subtracting(beforeJoinedIDs)
+        let addedTitle = Set(afterTitleIDs).subtracting(beforeTitleIDs)
+        guard Set(beforeJoinedIDs).isSubset(of: Set(afterJoinedIDs)),
+              Set(beforeTitleIDs).isSubset(of: Set(afterTitleIDs)),
+              addedJoined.count == 1, addedTitle.count == 2,
+              let joinedID = addedJoined.first, addedTitle.contains(joinedID),
+              let firstSegmentID = addedTitle.subtracting(addedJoined).first else {
+            XCTFail("Long-form must add its joined output and first segment without changing prior History")
+            return
+        }
+        replaceHistorySearch(with: script)
+        dismissHistorySearchKeyboardIfNeeded()
+        guard verifyHistoryTranscript(rowID: joinedID, expectedScript: script) else { return }
 
         // Without search, the project groups: one joined row plus a per-segment
         // disclosure that expands to the project's segment rows. Clear the
@@ -386,6 +396,8 @@ final class VocelloiOSSmokeUITests: VocelloiOSUITestCase {
         let searchField = app.textFields["historySearchField"].firstMatch
         XCTAssertTrue(VocelloUIWait.exists(searchField, timeout: 30))
         XCTAssertTrue(VocelloUITextEntry.replace(in: searchField, with: "", timeout: 20))
+        dismissHistorySearchKeyboardIfNeeded()
+        guard revealHistoryRow(joinedID) != nil else { return }
         let segmentsToggle = app.descendants(matching: .any)
             .matching(NSPredicate(format: "identifier BEGINSWITH %@", "history_longFormSegmentsToggle_"))
             .firstMatch
@@ -393,23 +405,15 @@ final class VocelloiOSSmokeUITests: VocelloiOSUITestCase {
             VocelloUIWait.exists(segmentsToggle, timeout: 30),
             "The grouped project row must expose its per-segment disclosure"
         )
-        // Count nonce-bearing rows, not total rows: the lazy list drops older
-        // rows out of the instantiated window as segment rows appear, so a
-        // total-count delta is not stable. The nonce rows (joined + first
-        // segment) sit at the top of the newest project and are always
-        // instantiated: collapsed shows one, expanded shows both.
-        let nonceRows = app.descendants(matching: .any).matching(
-            NSPredicate(
-                format: "identifier BEGINSWITH %@ AND label CONTAINS %@",
-                "historyRowTap_", nonce
-            )
-        )
+        // Observe the exact newly persisted row, not text matches or total lazy-list count.
+        let firstSegmentRow = element("historyRowTap_\(firstSegmentID)")
+        XCTAssertFalse(firstSegmentRow.exists, "New project's segments must initially be collapsed")
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: segmentsToggle, timeout: 20))
         XCTAssertTrue(
             VocelloUIWait.condition("per-segment map to expand", timeout: 20) {
-                nonceRows.count == 2
+                firstSegmentRow.exists
             },
-            "Expanding the newest project must reveal the nonce-bearing first segment beside the joined row"
+            "Expanding the newest project must reveal its exact first segment"
         )
         VocelloUIScreenshot.attach(app, named: "ios-longform-history-project")
 
@@ -479,15 +483,15 @@ final class VocelloiOSSmokeUITests: VocelloiOSUITestCase {
             "The replaced project must remain regenerable in-session"
         )
         XCTAssertTrue(VocelloUIWait.enabled(segmentsChip, timeout: 60))
-        // No data loss: the nonce still surfaces both the joined output and a
-        // first-segment row in History search.
-        replaceHistorySearch(with: nonce)
-        XCTAssertTrue(
-            VocelloUIWait.condition("nonce rows to survive the replacement", timeout: 30) {
-                self.historyRows().count >= 2
-            },
-            "Replacement must keep the joined output and segment history searchable"
-        )
+        // RF-04 retains the old accepted joined output when publishing a replacement.
+        guard let regeneratedJoinedIDs = historyRowCensus(expectedScript: script) else { return }
+        let replacementIDs = Set(regeneratedJoinedIDs).subtracting(afterJoinedIDs)
+        guard Set(afterJoinedIDs).isSubset(of: Set(regeneratedJoinedIDs)),
+              replacementIDs.count == 1, let replacementID = replacementIDs.first,
+              verifyHistoryTranscript(rowID: replacementID, expectedScript: script) else {
+            XCTFail("Replacement must preserve prior joined History and add one transcript-verified output")
+            return
+        }
         VocelloUIScreenshot.attach(app, named: "ios-longform-regenerated")
     }
 }

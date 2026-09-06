@@ -1,5 +1,9 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
+  "modelApplicabilitySource": {
+    "path": "Sources/Resources/qwenvoice_contract.json",
+    "sha256": "ac5c76af58bb43bc928a2adc47b3f8aa178497c5bf1b6b50fe2c11dc0c0627e3"
+  },
   "owner": "release-qa",
   "publicPromotionPolicy": "source-bound-quality-evidence",
   "maxEvidenceAgeSeconds": 604800,
@@ -201,6 +205,7 @@
   },
   "capabilities": {
     "speed-generation": {
+      "platformApplicability": {"macos": true, "ios": true},
       "evidenceByPlatform": {
         "macos": ["macos-ui-benchmark"],
         "ios": ["ios-ui-benchmark"]
@@ -208,9 +213,10 @@
       "unsupportedDimensions": []
     },
     "quality-generation": {
+      "platformApplicability": {"macos": true, "ios": false},
       "evidenceByPlatform": {
         "macos": ["macos-quality-engine-benchmark"],
-        "ios": ["ios-quality-engine-benchmark"]
+        "ios": []
       },
       "unsupportedDimensions": ["multilingual-quality", "delivery-quality"]
     },

@@ -15,7 +15,8 @@ reviewed `86696036`; the initial implementation baseline is clean `main` at `2f3
 Its readiness score is advisory, not a release gate. Source and the roadmap remain authoritative.
 
 `config/roadmap.json` designates **`release-first-3-0-2026-09` as `primaryPlan`**. Its
-`RF-01` through `RF-12` milestones are the execution roadmap from now on, in the order below.
+`RF-01` through `RF-12` milestones remain the execution roadmap. The September 6 iOS-first
+amendment below supersedes their original numeric scheduling order, not their closure gates.
 Both `roadmap.py status` and the generated `docs/ROADMAP.md` present it first. Older plans retain
 technical defect ownership, evidence and deferred backlog; their active status does not independently
 schedule another workstream. RF milestone completion never closes a referenced defect implicitly:
@@ -24,7 +25,8 @@ for example RF-03 source proof does not close F-15's packaged-candidate acceptan
 ## Decisions and order
 
 Keep and repair long-form and segment regeneration. Complete the 201-take iOS campaign.
-Qualify macOS and a separately downloadable, signed CLI without waiting for iOS-only gates.
+Prioritize iOS; park Mac/CLI-only packaging and qualification until the iOS critical path clears.
+Shared-code regression tests remain required. This changes scheduling, not previous failure results.
 The maintainer-selected next release is **3.0.0**, marking the new phase of Vocello across
 iOS, macOS, and the downloadable CLI. This supersedes the original 2.5.0 planning default.
 Reconcile the App Store Connect version and select an unused build number through the existing
@@ -40,20 +42,42 @@ Candidate verification is distinct from implementation completion and from expli
 or submission authorization. No release, account mutation, or legal conclusion follows from a
 source checkpoint.
 
-1. **RF-01:** Reconcile retained evidence and map findings below.
-2. **RF-02:** Start bounded read-only account/signing inspection and the qualified-decision packet.
-3. **RF-03:** Fix macOS Design request preservation (F-15).
-4. **RF-04:** Repair shared long-form durability and platform integration (F-16).
-5. **RF-05:** Expose History enqueue failures without losing playable output (F-06).
-6. **RF-06:** Localize remaining natural-text Custom and French Design failures (ICA-15, VLR-07).
-7. **RF-07:** Repair only observation durability, focus, terminal bookkeeping, and bounded shards needed
-   to finish the existing campaign (ICA-18, AV-09).
-8. **RF-08:** Package and verify the optimized downloadable CLI (F-17).
-9. **RF-09:** Complete deterministic checks, collision validation, exact-SHA CI, and candidate freeze.
-10. **RF-10:** Qualify desktop/CLI packages and applicable promotion lanes (F-05, F-17).
-11. **RF-11:** Complete the frozen iPhone campaign with every attempt represented (ICA-04/ICA-05).
-12. **RF-12:** Finish distribution-candidate acceptance, account/rights decisions, and submission preparation
-    (ASR-02, ASR-04 through ASR-12).
+## September 6 accelerated iOS queue
+
+Baseline: clean `793439ad`. RF-03/04/05/07 stay implementation-complete; do not reimplement
+their accepted repairs. `config/roadmap.json` remains the only status ledger. The following maps
+the approved ten-step execution sequence onto existing owners; it is not a second defect register.
+
+| Order / class | Owner and next action | Required evidence / exit |
+| --- | --- | --- |
+| 1 — scheduling | RF-01: classify the existing queue and preserve historical outcomes | Roadmap, documentation and instruction validators agree; original gates retained |
+| 2 — external dependency | RF-02 / ASR-02/04/08/10/11: use the consolidated rights/account packet | Qualified decisions or an explicit owner/service blocker; separate authorization for edits, candidate operations and uploads |
+| 3 — correction before freeze | RF-06 / ICA-15 / VLR-07 / F-16: long-form cap first, severe gaps second, cadence/recognition third | Exact retained inputs, first divergent boundary, verified correction or explicit release blocker |
+| 4 — verification correction before freeze | RF-09 / RF-12: source-validated platform applicability and preinstalled-candidate route | iOS Speed requirements retained, macOS Quality retained, historical compatibility; no target replacement or diagnostics dependence |
+| 5 — freeze | RF-09: coherent deterministic checkpoint, exact-SHA CI/Security, fresh collision check, authorized tag/archive/IPA | Frozen candidate with signing, entitlements, notices, privacy, architecture and UUID proof; no internal diagnostics |
+| 6 — implemented, candidate verification | RF-11 / F-01/06/16/18/23 / ICI-4 / VLR-07: targeted correction acceptance | Long-form/regeneration, all modes, enrollment, player, History, export and preservation pass before expansion |
+| 7 — implemented, campaign verification | RF-11 / ICA-04/05 / AV-09 / ASR-12: all 201 takes and applicable remaining lanes | Five-take pilot then up to 20 per invocation, mode boundaries respected; all outcomes and restoration accounted for, no unresolved required failures |
+| 8 — processed candidate verification | RF-12 / ASR-06/07/10/12: separately authorized TestFlight, then black-box upgrade/fresh-install acceptance | Approved identity unchanged; no debug app substitution. Fresh install only after usable encrypted recovery and immediate separate approval; otherwise blocked |
+| 9 — external and candidate materials | RF-12 / ASR-05/09/11: genuine screenshots, approved metadata/declarations, fresh regional host proofs | Authentic accepted-size layouts, reviewer journey, NA/Europe/East Asia proofs inside the 24-hour freshness window |
+| 10 — submission decision | RF-12: issue READY TO SUBMIT or the remaining owner/action blockers | All required gates passed; actual App Review submission still separately authorized |
+| Deferred — non-iOS qualification / research | RF-08/RF-10; broad evaluator, prompt and prosody studies | Preserve existing evidence and gates; no Mac/CLI-only job or semantic research milestone on the iOS critical path |
+
+Before each RF-06 experiment, register hypothesis, exact inputs, discriminating observation and
+production decision in the existing untracked run bundle. The first pass is limited to two targeted
+experiments per finding. Recover the failed long-form text/seed once; do not substitute approximations.
+Replace the acceptance fixture's random spoken marker with deterministic natural text and existing
+History/metadata ownership. That fixture correction does not resolve the original product failure.
+Do not repeat excluded decoder permutations, trim silence, raise the token cap arbitrarily, change
+seeds/prompts, weaken QC or introduce hidden retries. If no actionable defect is localized, record a
+decision checkpoint and continue independent host work without calling the audio finding fixed.
+
+During RF-11 reserve at least 20 minutes before each phone deadline for collection/restoration.
+Derive ETA from the first shard. Resume only at an independent next row after terminal cleanup and
+identity validation; no failed-row retry. Stop for crash, unsafe device conditions, uncertain ownership
+or data-loss risk. Source changes start a new campaign identity; previous results remain historical.
+End device work with the existing French-compatible three-minute Auto-Lock readback and verified lock.
+Candidate marketing overlays must retain genuine captures/aspect ratio and never claim native Pro Max
+testing. No uninstall, legal clearance, account mutation or upload is authorized by a roadmap update.
 
 Use focused verification after each coherent change and one complete checkpoint before freeze.
 While a campaign is frozen, keep resumable progress in its pinned, untracked run artifacts; do not

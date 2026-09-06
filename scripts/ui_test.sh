@@ -40,6 +40,7 @@ Usage:
   scripts/ui_test.sh macos perf
   scripts/ui_test.sh ios localization
   scripts/ui_test.sh ios smoke
+  scripts/ui_test.sh ios smoke --preinstalled-candidate VERIFIED_RELEASE_DIRECTORY [--retain-result]
   scripts/ui_test.sh ios benchmark [--modes custom,design,clone] [--lengths short,medium,long] [--warm 3] [--label RUN_ID]
   scripts/ui_test.sh ios perf [--label RUN_ID]
   scripts/ui_test.sh ios delivery-cohort --text SCRIPT [--takes 20] [--label RUN_ID]
@@ -69,6 +70,9 @@ visible Files-import flow; stage the reference WAV and .txt sidecar in the app's
 the lane begins in Studio Clone, imports, auto-transcribes, saves, generates, previews, and deletes
 that throwaway voice through visible production UI.
 No lane retries automatically. A failed run keeps its log, xcresult, screenshots, and diagnostics.
+`--preinstalled-candidate` is a separate, black-box navigation proof, not instrumented smoke.
+It requires the exact clean release source and an already installed, matching non-development app.
+Only the standalone test runner is built/installed. Distribution acceptance remains separately authorized.
 `screen-protection` inspects the real iOS Auto-Lock screen (English/French Settings).
 Only explicit `--scenario enable` selects and verifies 3 minutes; no other setting is changed.
 It never runs as part of another lane. Run it after all device work, before leaving the phone idle.
@@ -114,8 +118,12 @@ control_resume_take_start=0
 control_take_limit=5
 control_take_limit_explicit=0
 retain_result=0
+candidate_evidence=""
+candidate_collection_needed=0
+candidate_collection_attempted=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --preinstalled-candidate) candidate_evidence="${2:?--preinstalled-candidate requires a directory}"; shift 2 ;;
     --scenario) scenario_argument="${2:?--scenario requires a value}"; shift 2 ;;
     --scenario=*) scenario_argument="${1#*=}"; shift ;;
     --resume) control_resume="${2:?--resume requires a value}"; shift 2 ;;
@@ -149,6 +157,10 @@ while [[ $# -gt 0 ]]; do
 done
 validate_benchmark_label "$label"
 validate_benchmark_label "$control_resume"
+if [[ -n "$candidate_evidence" ]]; then
+  [[ "$platform" == "ios" && "$lane" == "smoke" && -d "$candidate_evidence" ]] \
+    || die "--preinstalled-candidate requires ios smoke and verified release evidence"
+fi
 
 if [[ "$lane" == "model-download" ]]; then
   model_scenario="${scenario_argument:-acceptance}"
@@ -275,14 +287,17 @@ if [[ "$platform" == "macos" ]]; then
     "$QVOICE_XCODE_SOURCE_PACKAGES" ui-macos VocelloMacUI Release \
     'platform=macOS,arch=arm64'
 else
+  ios_scheme=VocelloiOSUI
+  [[ -z "$candidate_evidence" ]] || ios_scheme=VocelloiOSCandidateUI
   ensure_spm_resolved "$QVOICE_SCRATCH_PACKAGE_RESOLUTION" \
-    "$QVOICE_XCODE_SOURCE_PACKAGES" ui-ios VocelloiOSUI Release \
+    "$QVOICE_XCODE_SOURCE_PACKAGES" ui-ios "$ios_scheme" Release \
     'generic/platform=iOS'
 fi
 
 timestamp="$(date -u +%Y%m%d-%H%M%S)"
 nonce="$(uuidgen | tr '[:upper:]' '[:lower:]' | cut -c1-8)"
 run_id="${platform}-xcui-${lane}-${timestamp}-${nonce}"
+[[ -z "$candidate_evidence" ]] || run_id="ios-xcui-candidate-smoke-${timestamp}-${nonce}"
 audit_source_id=""
 if [[ "$lane" == "control-audit" ]]; then
   audit_source_id="$(python3 "$ROOT_DIR/scripts/tree_fingerprint.py" --root "$ROOT_DIR")" \
@@ -294,6 +309,7 @@ result="$out/result.xcresult"
 mkdir -p "$out"
 step_ledger="$out/required-steps.json"
 step_workflow="ui-$platform-$lane"
+[[ -z "$candidate_evidence" ]] || step_workflow="ui-ios-candidate-smoke"
 if [[ "$lane" == "control-audit" && ( "$control_scenario" == "generation" || "$control_scenario" == "all" ) ]]; then
   step_workflow="ui-ios-control-audit-generation"
 fi
@@ -307,7 +323,7 @@ write_run_metadata() {
   python3 - "$out/run.json" "$platform" "$lane" "$run_id" "$modes" "$lengths" \
     "$warm" "${label:-$run_id}" "$started_at" "$finished_at" "$status" "$exit_code" \
     "$audit_source_id" "$control_scenario" "$control_resume" "$control_resume_run_ids" \
-    "$control_resume_take_start" "$control_take_limit" <<'PY'
+    "$control_resume_take_start" "$control_take_limit" "$candidate_evidence" <<'PY'
 import json, os, pathlib, sys, tempfile
 
 path = pathlib.Path(sys.argv[1])
@@ -330,6 +346,15 @@ if sys.argv[15]:
     payload["resumedFrom"] = sys.argv[15]
 if sys.argv[16]:
     payload["resumeRunIDs"] = sys.argv[16].split(",")
+if sys.argv[19]:
+    payload["evidenceClass"] = "preinstalled-candidate-black-box"
+    payload["lane"] = "candidate-smoke"
+    payload["modes"] = []
+    payload["lengths"] = []
+    payload["warm"] = 0
+    identity = path.parent / "candidate-identity.json"
+    if identity.is_file():
+        payload["candidateIdentity"] = json.loads(identity.read_text())
 path.parent.mkdir(parents=True, exist_ok=True)
 descriptor, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
 try:
@@ -575,6 +600,9 @@ cleanup_ui_run() {
   trap - EXIT
   set +e
   [[ "$platform" != "macos" ]] || cleanup_macos_run
+  if (( candidate_collection_needed == 1 && candidate_collection_attempted == 0 )); then
+    collect_candidate_forensics || status=1
+  fi
   if (( run_finalized == 0 )); then
     (( status != 0 )) || status=1
     required_steps_finalize "$step_ledger" >"$out/required-steps-finalization.log" 2>&1 || true
@@ -1119,7 +1147,95 @@ preserve_ios_ui_dsym() {
     > "$(dirname "$destination")/build-version.txt" 2>/dev/null || true
 }
 
-if [[ "$platform" == "macos" ]]; then
+# Candidate-only helpers. No appDataContainer, debug knobs, app installation,
+# benchmark publication, or development-app cache provenance belongs here.
+candidate_inventory() {
+  local phase="$1"
+  xcrun devicectl device info apps --device "$device" --json-output "$out/apps-$phase.json" \
+    --timeout 60 --quiet >"$out/apps-$phase.log" 2>&1 || return 1
+  python3 "$ROOT_DIR/scripts/ios_candidate_acceptance.py" installed \
+    --apps "$out/apps-$phase.json" --identity "$out/candidate-identity.json" \
+    --output "$out/candidate-$phase.json"
+}
+
+candidate_attachments() {
+  [[ -d "$result" ]] || return 1
+  xcrun xcresulttool export attachments --path "$result" \
+    --output-path "$out/attachments" >"$out/attachments.log" 2>&1
+}
+
+candidate_crash_delta() {
+  python3 "$ROOT_DIR/scripts/ios_candidate_acceptance.py" snapshot-crashes \
+    --device "$device" --output "$out/system-crashes-after" || return 1
+  python3 "$ROOT_DIR/scripts/ios_candidate_acceptance.py" crash-delta \
+    --before "$out/system-crashes-before" --after "$out/system-crashes-after" \
+    --output "$out/system-crash-delta.json"
+}
+
+collect_candidate_forensics() {
+  candidate_collection_attempted=1
+  local failed=0
+  required_step_run "$step_ledger" candidate-after candidate_inventory after || failed=1
+  required_step_run "$step_ledger" candidate-crash-delta candidate_crash_delta || failed=1
+  required_step_run "$step_ledger" candidate-attachments candidate_attachments || failed=1
+  write_test_summary || failed=1
+  required_step_run "$step_ledger" candidate-result \
+    python3 "$ROOT_DIR/scripts/ios_candidate_acceptance.py" validate-results \
+      --summary "$out/test-results.json" --attachments "$out/attachments" \
+      --identity "$out/candidate-identity.json" --output "$out/candidate-result.json" || failed=1
+  return "$failed"
+}
+
+run_preinstalled_candidate() {
+  required_step_run "$step_ledger" candidate-evidence \
+    python3 "$ROOT_DIR/scripts/ios_candidate_acceptance.py" identity \
+      --evidence "$candidate_evidence" --output "$out/candidate-identity.json" || return 1
+  write_run_metadata running
+  local probe team runner xctestrun
+  probe="$(ios_probe)" || return 1
+  device="$(python3 -c 'import json,sys; p=json.load(sys.stdin); assert p.get("reachable") is True and (p.get("lock") or {}).get("deviceLocked") is False; print(p["identifier"])' <<<"$probe")" || return 1
+  team="$(derive_team)" || return 1
+  [[ -n "$team" ]] || return 1
+  required_step_run "$step_ledger" candidate-before candidate_inventory before || return 1
+  required_step_run "$step_ledger" candidate-crash-baseline \
+    python3 "$ROOT_DIR/scripts/ios_candidate_acceptance.py" snapshot-crashes \
+      --device "$device" --output "$out/system-crashes-before" || return 1
+  candidate_collection_needed=1
+  required_step_run "$step_ledger" candidate-runner-build xcb_run build-for-testing \
+    -project "$PROJECT" -scheme VocelloiOSCandidateUI -configuration Release \
+    -destination 'generic/platform=iOS' -derivedDataPath "$IOS_DERIVED" \
+    -clonedSourcePackagesDirPath "$QVOICE_XCODE_SOURCE_PACKAGES" \
+    -disableAutomaticPackageResolution -onlyUsePackageVersionsFromResolvedFile \
+    DEVELOPMENT_TEAM="$team" CODE_SIGN_STYLE=Automatic \
+    >"$out/candidate-runner-build.log" 2>&1 || return 1
+  runner="$IOS_DERIVED/Build/Products/Release-iphoneos/VocelloiOSCandidateUITests-Runner.app"
+  xctestrun="$(python3 - "$IOS_DERIVED/Build/Products" <<'PY'
+import pathlib, sys
+paths = list(pathlib.Path(sys.argv[1]).glob('VocelloiOSCandidateUI_*.xctestrun'))
+if len(paths) != 1:
+    raise SystemExit('candidate xctestrun is missing or ambiguous')
+print(paths[0])
+PY
+)" || return 1
+  required_step_run "$step_ledger" candidate-runner-configuration \
+    python3 "$ROOT_DIR/scripts/ios_candidate_acceptance.py" prepare-runner \
+      --xctestrun "$xctestrun" --runner "$runner" --identity "$out/candidate-identity.json" \
+      --output "$out/candidate.xctestrun" || return 1
+  codesign --verify --deep --strict "$runner" >"$out/candidate-runner-signature.log" 2>&1 || return 1
+  required_step_run "$step_ledger" candidate-runner-install \
+    xcrun devicectl device install app --device "$device" "$runner" \
+      --timeout 120 --quiet >"$out/candidate-runner-install.log" 2>&1 || return 1
+  local test_status=0 collection_status=0
+  required_step_run "$step_ledger" xcuitest run_xcodebuild xcb_run test-without-building \
+    -xctestrun "$out/candidate.xctestrun" -destination "id=$device" \
+    -resultBundlePath "$result" -parallel-testing-enabled NO || test_status=$?
+  collect_candidate_forensics || collection_status=$?
+  (( test_status == 0 && collection_status == 0 ))
+}
+
+if [[ -n "$candidate_evidence" ]]; then
+  run_preinstalled_candidate || die "preinstalled candidate proof failed; retained evidence: $out"
+elif [[ "$platform" == "macos" ]]; then
   terminate_macos_app
   if [[ "$lane" == "localization" ]]; then
     only_test="VocelloMacUITests/VocelloMacSmokeUITests/test01_NavigationAndReadiness"

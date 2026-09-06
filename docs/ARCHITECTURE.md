@@ -53,7 +53,7 @@ stable macOS release is **Vocello 2.4.0** and iOS build 23 (v2.4.0) is live as a
 ## 1. Module & target dependency graph
 
 The Xcode project is generated from [`project.yml`](../project.yml) (XcodeGen
-2.46.0). There are 13 targets split into **cross-platform frameworks**,
+2.46.0). There are 14 targets split into **cross-platform frameworks**,
 **macOS-only frameworks + XPC service**, and **apps/CLI/tests**.
 
 ```mermaid
@@ -124,6 +124,7 @@ graph.)
 | `VocelloEngineIntegrationTests` | bundle.unit-test | macOS | `VocelloEngineIntegrationTests` | `com.qwenvoice.engine-integration.tests` | Injectable XPC client/transport lifecycle and correlation contracts; never launches frontend UI. |
 | `VocelloMacUITests` | bundle.ui-testing | macOS | `VocelloMacUITests` | `com.qwenvoice.app.uitests` | Explicit native-app smoke and benchmark XCUITest lanes. |
 | `VocelloiOSUITests` | bundle.ui-testing | iOS | `VocelloiOSUITests` | `com.patricedery.vocello.uitests` | Explicit paired-physical-iPhone smoke/benchmark lanes plus the isolated opt-in model-delivery lifecycle proof; never Simulator. |
+| `VocelloiOSCandidateUITests` | bundle.ui-testing | iOS | `VocelloiOSCandidateUITests` | `com.patricedery.vocello.candidateuitests` | Standalone black-box runner; no target-app dependency, no diagnostics, and no replacement of the preinstalled distribution app. |
 
 ### Testing lanes (see [`docs/reference/testing-runbook.md`](reference/testing-runbook.md))
 
@@ -139,9 +140,9 @@ graph.)
 Release packaging is deterministic and does not consume UI results. Frontend evidence remains
 platform-specific and is created only when explicitly requested.
 
-**Six shared schemes**: the four XcodeGen schemes, `QwenVoice` (macOS app + deterministic unit/integration tests), `VocelloiOS`
+**Seven shared schemes**: the five XcodeGen schemes, `QwenVoice` (macOS app + deterministic unit/integration tests), `VocelloiOS`
 (iOS app), `VocelloMacUI` (explicit macOS XCUITest), and `VocelloiOSUI` (explicit physical-device
-iOS XCUITest), plus the separately rendered `VocelloCLI` and `VocelloiOSLogic` (standalone iOS
+iOS XCUITest), and `VocelloiOSCandidateUI` (standalone preinstalled-candidate runner), plus the separately rendered `VocelloCLI` and `VocelloiOSLogic` (standalone iOS
 policy XCTest) schemes. XcodeGen cannot directly render those tool and app-host-free test
 schemes (verified unchanged through 2.46.0), so checked-in templates bind to their generated target IDs. The UI schemes are isolated from ordinary test actions; ordinary CI executes the shared
 policy assertions through `VocelloCoreTests`, compiles `VocelloiOSLogic` for the generic device SDK,

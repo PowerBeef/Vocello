@@ -42,8 +42,9 @@ username, hostname, or absolute path. “Device identity” means the checked-in
 profile only.
 
 Every platform requires its canonical 29-take Speed `ui-generation` matrix. Capability-sensitive
-changes add the smallest platform-specific set declared by the contract: Quality requires a
-Quality-tier engine record across Custom, Design, and Clone; multilingual changes require every
+changes add the smallest platform-specific set declared by the contract: applicable Quality
+requires a Quality-tier engine record across Custom, Design, and Clone on macOS; the production
+model contract does not expose Quality on iOS. Multilingual changes require every
 declared language cell; delivery changes require delivery cells carrying the governed prosody
 metric; and model-catalog changes require the managed lifecycle receipt. Memory paths add
 `memory-qualification`, and UI paths add `ui-perf`. `python3 scripts/evidence_impact.py
@@ -53,6 +54,15 @@ The manifest records `capabilityCoverage` and `unsupportedDimensions`. Unsupport
 such as multilingual Quality/Clone cohorts and independently held-out delivery calibration are
 never silently implied by a successful Speed record. The research and device-evidence roadmap
 items remain the authority for removing those labels.
+
+Contract schema v3 digest-binds platform applicability to
+`Sources/Resources/qwenvoice_contract.json`, validating every model's platform and iOS download
+eligibility. iOS Quality is explicitly `unsupported` in coverage, not passed or silently omitted.
+All iOS Speed/mode, language, delivery, lifecycle, memory and UI requirements still apply when
+selected by impact. macOS Quality cannot be substituted with a Speed record. Eligibility drift,
+partial-mode support, absent applicability or unsupported waivers fail closed and require review.
+Manifest schema v2 is unchanged. Historical contract-v2 manifests retain their original nonempty
+lane requirements and exact contract digest; they are not reinterpreted as current-source evidence.
 
 ## Capture after the candidate is frozen
 

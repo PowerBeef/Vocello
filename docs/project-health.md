@@ -4,11 +4,11 @@
 > execute models, devices, UI tests, signing, or network checks.
 
 - Current source identity and dirty state: local JSON report only (kept out of the tracked snapshot to avoid self-referential drift)
-- Swift tests: 750 cases in 99 files
-- Python tests: 1547 cases in 121 files
-- Required-step assurance: 112 steps across 23 workflows, all covered by forced-failure fixtures
+- Swift tests: 751 cases in 100 files
+- Python tests: 1568 cases in 122 files
+- Required-step assurance: 124 steps across 24 workflows, all covered by forced-failure fixtures
 - Unsafe-concurrency annotations: 48 (48 registered with owner and invariant; contract complete)
-- Evidence routing: 928/928 critical paths explicit; 0 use repository-other fallback
+- Evidence routing: 931/931 critical paths explicit; 0 use repository-other fallback
 
 ## Hardware evidence by domain selector
 
@@ -30,13 +30,13 @@
 | event-delivery | backend | 3 | 2 / 10 | macos-ui-generation: stale, ios-ui-generation: stale |
 | memory-policy | backend-platform | 6 | 8 / 65 | macos-memory-qualification: stale, ios-memory-qualification: stale |
 | model-delivery | backend-platform | 17 | 9 / 83 | external promotion: macos-model-download-lifecycle, ios-model-download-lifecycle |
-| ui-performance | platform | 79 | 18 / 59 | macos-ui-performance: stale, ios-ui-performance: stale |
+| ui-performance | platform | 79 | 19 / 60 | macos-ui-performance: stale, ios-ui-performance: stale |
 | xpc-transport | macos | 3 | 4 / 19 | macos-ui-generation: fresh |
 | benchmark-validation | release-qa | 6 | 4 / 126 | macos-ui-generation: stale, ios-ui-generation: stale |
 | orchestration-assurance | release-qa | 3 | 1 / 16 | not hardware-gated |
-| release-supply-chain | release-qa | 12 | 5 / 82 | not hardware-gated |
+| release-supply-chain | release-qa | 12 | 5 / 89 | not hardware-gated |
 | persistence-privacy | platform-release-qa | 4 | 2 / 8 | not hardware-gated |
-| runtime-hardening | backend-release-qa | 13 | 4 / 56 | not hardware-gated |
+| runtime-hardening | backend-release-qa | 13 | 4 / 63 | not hardware-gated |
 
 ## Interpretation
 

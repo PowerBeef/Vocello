@@ -1494,102 +1494,6 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
         return components[0] * 60 + components[1]
     }
 
-    /// Read-only census of the filtered production list, including lazy rows.
-    /// The search term narrows results but NEVER grants mutation authority.
-    private func historyRowCensus(expectedScript: String) -> [String]? {
-        select(tab: .history)
-        let search = app.textFields["historySearchField"].firstMatch
-        guard VocelloUIWait.exists(search, timeout: 20) else { return nil }
-        if (search.value as? String) != expectedScript {
-            replaceHistorySearch(with: expectedScript)
-        }
-        dismissHistorySearchKeyboardIfNeeded()
-        // History debounces search. Poll for a stable visible result, rather
-        // than sleeping or treating the editor's value as completed filtering.
-        var lastSignature = ""
-        var stableSince = ProcessInfo.processInfo.systemUptime
-        guard VocelloUIWait.condition("History search results to settle", timeout: 15, evaluate: {
-            let signature = self.historyViewportSignature()
-            if signature != lastSignature {
-                lastSignature = signature
-                stableSince = ProcessInfo.processInfo.systemUptime
-            }
-            return ProcessInfo.processInfo.systemUptime - stableSince >= 0.75
-        }) else { return nil }
-
-        let scroll = app.scrollViews.firstMatch
-        guard VocelloUIWait.exists(scroll, timeout: 10) else { return nil }
-        // Establish the leading edge first, even after a previous census left
-        // the lazy list at its end. Exhaustion is an observed viewport condition.
-        var reachedTop = false
-        for _ in 0..<64 {
-            let before = historyViewportSignature()
-            scroll.swipeDown()
-            if historyViewportSignature() == before { reachedTop = true; break }
-        }
-        guard reachedTop else {
-            XCTFail("History census could not establish the top within its safety bound")
-            return nil
-        }
-        var identifiers = Set<String>()
-        for _ in 0..<64 {
-            let visible = historyRows().allElementsBoundByIndex
-            let rowPrefix = "historyRow_"
-            let ids = visible.map { String($0.identifier.dropFirst(rowPrefix.count)) }
-            guard Set(ids).count == ids.count,
-                  ids.allSatisfy({ $0.range(of: #"^generation-[1-9][0-9]*$"#, options: .regularExpression) != nil }) else {
-                XCTFail("History census contains duplicate or non-persisted row identities")
-                return nil
-            }
-            identifiers.formUnion(ids)
-            let before = historyViewportSignature()
-            guard ids.isEmpty || !before.isEmpty else {
-                XCTFail("History rows exist but no row action is visible; census cannot prove exhaustion")
-                return nil
-            }
-            scroll.swipeUp()
-            if historyViewportSignature() == before { return identifiers.sorted() }
-        }
-        XCTFail("History census exceeded its bound; no History mutation is authorized")
-        return nil
-    }
-
-    private func historyViewportSignature() -> String {
-        app.descendants(matching: .any).matching(
-            NSPredicate(format: "identifier BEGINSWITH %@", "historyRowTap_")
-        ).allElementsBoundByIndex.filter { $0.isHittable }.map {
-            "\($0.identifier):\(Int($0.frame.minY)):\(Int($0.frame.height))"
-        }.joined(separator: "|")
-    }
-
-    private func revealHistoryRow(_ rowID: String) -> XCUIElement? {
-        let row = element("historyRowTap_\(rowID)")
-        let scroll = app.scrollViews.firstMatch
-        for _ in 0..<64 {
-            if row.exists && row.isHittable { return row }
-            let before = historyViewportSignature()
-            scroll.swipeDown()
-            if historyViewportSignature() == before { break }
-        }
-        XCTFail("The exact observed History row is not reachable")
-        return nil
-    }
-
-    /// Verify the genuine full-player transcript before any menu mutation.
-    private func verifyHistoryTranscript(rowID: String, expectedScript: String) -> Bool {
-        guard let rowAction = revealHistoryRow(rowID),
-              VocelloUIPrimaryAction.perform(on: rowAction, timeout: 20) else { return false }
-        let transcript = element("iosPlayer_transcript")
-        guard VocelloUIWait.exists(transcript, timeout: 20) else { return false }
-        let matches = (transcript.value as? String) == expectedScript
-        guard VocelloUIPrimaryAction.perform(on: element("iosPlayer_close"), timeout: 20),
-              VocelloUIWait.disappears(transcript, timeout: 20) else { return false }
-        guard matches else {
-            XCTFail("Observed History row full transcript differs from the frozen plan")
-            return false
-        }
-        return true
-    }
 
     private func deleteRunOwnedHistoryRow(rowID: String, expectedScript: String) -> Bool {
         guard let before = historyRowCensus(expectedScript: expectedScript),
@@ -1611,17 +1515,6 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
         return true
     }
 
-    private func dismissHistorySearchKeyboardIfNeeded() {
-        guard app.keyboards.firstMatch.exists else { return }
-        let searchField = app.textFields["historySearchField"].firstMatch
-        XCTAssertTrue(searchField.exists)
-        searchField.typeText("\n")
-        XCTAssertTrue(
-            VocelloUIWait.condition("History search keyboard to dismiss", timeout: 15) {
-                !self.app.keyboards.firstMatch.exists
-            }
-        )
-    }
 
     private func visiblePinnedSeed() -> UInt64? {
         let chip = element("studioChip_seedPin")

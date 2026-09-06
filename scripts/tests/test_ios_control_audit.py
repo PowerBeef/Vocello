@@ -438,17 +438,18 @@ class IOSControlAuditContractTests(unittest.TestCase):
 
     def test_history_full_transcript_guard_precedes_every_mutation(self) -> None:
         source = audit.UI_TEST_PATH.read_text()
-        helper = source.split("private func verifyHistoryTranscript", 1)[1].split("private func deleteRunOwnedHistoryRow", 1)[0]
+        shared = (audit.UI_TEST_PATH.parent / "VocelloiOSUITestCase.swift").read_text()
+        helper = shared.split("func verifyHistoryTranscript", 1)[1].split("func dismissHistorySearchKeyboardIfNeeded", 1)[0]
         self.assertIn('(transcript.value as? String) == expectedScript', helper)
         self.assertIn("guard matches else", helper)
         self.assertIn('element("iosPlayer_transcript")', helper)
         self.assertIn('element("iosPlayer_close")', helper)
         self.assertNotIn("historyRowMenu_", helper)
-        for name, end in (("deleteRunOwnedHistoryRow", "dismissHistorySearchKeyboardIfNeeded"),
+        for name, end in (("deleteRunOwnedHistoryRow", "visiblePinnedSeed"),
                           ("pinSeedFromRunOwnedHistoryRow", "decodeSeedCarriers")):
             mutation = source.split(f"private func {name}", 1)[1].split(f"private func {end}", 1)[0]
             self.assertLess(mutation.index("verifyHistoryTranscript"), mutation.index('element("historyRowMenu_'))
-        cleanup = source.split("private func deleteRunOwnedHistoryRow", 1)[1].split("private func dismissHistorySearchKeyboardIfNeeded", 1)[0]
+        cleanup = source.split("private func deleteRunOwnedHistoryRow", 1)[1].split("private func visiblePinnedSeed", 1)[0]
         self.assertIn("Set(before).subtracting([rowID])", cleanup)
 
     def test_corpus_matches_every_selectable_language(self) -> None:

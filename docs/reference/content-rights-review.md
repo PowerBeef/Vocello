@@ -1,7 +1,7 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-09-05
+reviewed: 2026-09-06
 summary: Decision-ready evidence and qualified-review gates for downloadable Qwen model artifacts, built-in voice previews, marketing audio, product artwork, and the App Store Connect third-party-content declaration.
 sourceOfTruth:
   - config/third-party-attribution-policy.json
@@ -15,6 +15,13 @@ sourceOfTruth:
 This is a decision packet, not legal advice or an independent status authority. Source assets,
 machine-readable contracts, and `config/roadmap.json` remain authoritative. A source-proven fact does
 not become a qualified legal conclusion merely because it is recorded here.
+
+Apple's [upload requirements](https://developer.apple.com/news/upcoming-requirements/) were rechecked
+September 6: iOS uploads require Xcode 26 or later and the iOS 26 SDK or later. The installed iOS
+26.5 SDK clears that minimum; signed-candidate verification is still separate. Apple's
+[privacy definition](https://developer.apple.com/app-store/app-privacy-details/) still requires
+consideration of third-party partner collection. No disclosure decision is inferred from local
+inference alone.
 
 ## Account declaration
 
@@ -115,6 +122,22 @@ Hugging Face by the model-download flow; that fact alone does not decide metadat
 Keep any vendor inquiry or private legal correspondence untracked and send it only on separate
 authorization. One consolidated private review can resolve these rows; a missing decision remains
 an external dependency, not an inferred approval. Publication/submission stays separately gated.
+
+### September 6 owner checkpoint and timing
+
+Use the six decision rows above as one maintainer checkpoint, not repeated account polling.
+The release maintainer must identify the qualified privacy/IP reviewer and provide their recorded
+decisions; no reviewer is assumed to have been engaged. The account holder supplies pricing,
+territories, review contact and applicable agreement/regional decisions. The signing owner supplies
+the approved profile/private-key match and authorizes candidate operations separately. Record only
+sanitized decision, date, scope and evidence digest in the repository; private correspondence stays
+untracked. Missing responses keep ASR-02/04/08/10/11 blocked, not implicitly approved.
+
+ASR-09 also needs named execution providers in North America, Europe and East Asia. Arrange those
+operators now, but run the existing full-artifact host proofs only near submission: their freshness
+window is **24 hours**. Local probes cannot stand in for the other regions. Do not purchase hosts,
+send vendor/legal inquiries, edit account fields or accept agreements without separate authority.
+Repeat the build-number collision check immediately before archive, not continuously while waiting.
 
 ## Fail-closed release choices
 

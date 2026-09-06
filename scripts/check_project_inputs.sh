@@ -5,6 +5,20 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 PBXPROJ="$PROJECT_DIR/QwenVoice.xcodeproj/project.pbxproj"
+LOCAL_MODE=0
+SURFACES_ONLY=0
+case "${1:-}" in
+    "") ;;
+    --surfaces-only) SURFACES_ONLY=1 ;;
+    --local)
+        if [[ -n "${CI:-}${GITHUB_ACTIONS:-}" ]]; then
+            echo "error: --local is not allowed in CI/release verification" >&2
+            exit 1
+        fi
+        LOCAL_MODE=1
+        ;;
+    *) echo "usage: scripts/check_project_inputs.sh [--local|--surfaces-only]" >&2; exit 2 ;;
+esac
 
 if [ ! -f "$PBXPROJ" ]; then
     echo "error: missing project file at $PBXPROJ" >&2
@@ -256,7 +270,6 @@ REQUIRED_SURFACES=(
     "Tests/VocelloiOSLogicTests"
     "scripts/check_ios_model_management.py"
     "scripts/tests/test_check_ios_model_management.py"
-    ".xcodebuildmcp/config.yaml"
     "AGENTS.md"
     ".agents/rules"
     "website/AGENTS.md"
@@ -270,6 +283,11 @@ for required_surface in "${REQUIRED_SURFACES[@]}"; do
         exit 1
     fi
 done
+
+if [[ "$SURFACES_ONLY" == 1 ]]; then
+    echo "==> Required surfaces are present."
+    exit 0
+fi
 
 # Validate the machine-readable generated-output contract before any producer,
 # cleanup, or higher-level workflow check can rely on its paths.
@@ -345,36 +363,7 @@ for removed_pattern in "${PROHIBITED_REFERENCE_PATTERNS[@]}"; do
     rm -f /tmp/qwenvoice_removed_reference_grep
 done
 
-XCODE_MCP_CONFIG="$PROJECT_DIR/.xcodebuildmcp/config.yaml"
-if grep -niE 'simulator|ui-automation|ios-sim|^[[:space:]]*(deviceId|device_id|udid):' "$XCODE_MCP_CONFIG" >/tmp/qwenvoice_xcode_mcp_forbidden; then
-    echo "error: .xcodebuildmcp/config.yaml contains a prohibited destination, workflow, or committed device identifier:" >&2
-    cat /tmp/qwenvoice_xcode_mcp_forbidden >&2
-    rm -f /tmp/qwenvoice_xcode_mcp_forbidden
-    exit 1
-fi
-rm -f /tmp/qwenvoice_xcode_mcp_forbidden
-
-actual_workflows="$(sed -n '/^enabledWorkflows:/,/^activeSessionDefaultsProfile:/p' "$XCODE_MCP_CONFIG" \
-    | sed -n 's/^[[:space:]]*-[[:space:]]*\([^#[:space:]]*\).*/\1/p' | sort | tr '\n' ' ')"
-expected_workflows="debugging device macos project-discovery "
-if [ "$actual_workflows" != "$expected_workflows" ]; then
-    echo "error: unexpected XcodeBuildMCP workflows: $actual_workflows" >&2
-    echo "expected: $expected_workflows" >&2
-    exit 1
-fi
-
-for profile in macos ios-device; do
-    grep -qE "^[[:space:]]{2}${profile}:$" "$XCODE_MCP_CONFIG" \
-        || { echo "error: missing XcodeBuildMCP profile: $profile" >&2; exit 1; }
-done
-
-for derived_data_path in \
-    "build/scratch/derived-data/xcodebuildmcp/macos" \
-    "build/scratch/derived-data/xcodebuildmcp/ios-device"
-do
-    grep -qF "$derived_data_path" "$XCODE_MCP_CONFIG" \
-        || { echo "error: missing managed XcodeBuildMCP derivedDataPath: $derived_data_path" >&2; exit 1; }
-done
+# User-scoped optional assists are checked only by scripts/dev.sh assists.
 
 GENERATION_PREWARM_PATH="$PROJECT_DIR/Sources/Views/Generate"
 if [ -d "$GENERATION_PREWARM_PATH" ]; then
@@ -529,6 +518,10 @@ python3 "$SCRIPT_DIR/check_surface_coverage.py"
 "$SCRIPT_DIR/check_backend_resource_contract.sh" --project
 "$SCRIPT_DIR/check_qwen3_backend_only.sh"
 python3 "$SCRIPT_DIR/validate_backend_risk_spine.py" --root "$PROJECT_DIR"
-"$SCRIPT_DIR/check_test_workflows.sh"
+if [[ "$LOCAL_MODE" == 1 ]]; then
+    "$SCRIPT_DIR/check_test_workflows.sh" --project-inputs --local
+else
+    "$SCRIPT_DIR/check_test_workflows.sh" --project-inputs
+fi
 
 echo "==> Project inputs are clean."

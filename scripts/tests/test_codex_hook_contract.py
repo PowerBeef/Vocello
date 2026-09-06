@@ -68,7 +68,7 @@ class CodexHookContractTests(unittest.TestCase):
             shutil.copy2(TREE_FINGERPRINT, fingerprint)
             make_executable(fingerprint)
 
-            gate = root / "scripts" / "check_project_inputs.sh"
+            gate = root / "scripts" / "dev.sh"
             gate.write_text("#!/usr/bin/env bash\nexit 1\n", encoding="utf-8")
             make_executable(gate)
 
@@ -117,7 +117,7 @@ class CodexHookContractTests(unittest.TestCase):
             shutil.copy2(HOOK_SCRIPT, hook)
             make_executable(hook)
 
-            gate = root / "scripts" / "check_project_inputs.sh"
+            gate = root / "scripts" / "dev.sh"
             gate.write_text(
                 "#!/usr/bin/env bash\ntouch gate-ran\nexit 0\n",
                 encoding="utf-8",

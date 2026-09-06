@@ -51,8 +51,9 @@ gates the build actually runs, the set of governed output paths — and reports 
 
 ## What runs, and in which class
 
-`./scripts/check_project_inputs.sh` is the deterministic gate. It runs on every commit through the
-T1 hook and on every push through CI. None of it needs a model, a device, or XCUITest.
+`./scripts/check_project_inputs.sh` is the complete deterministic gate used by CI/release. The T1
+hook runs the path-aware local checkpoint; see [development-workflow.md](development-workflow.md).
+None of these deterministic checks needs a model, a device, or XCUITest.
 
 | Check | Class | Guards |
 | --- | --- | --- |
@@ -139,18 +140,20 @@ confidence becomes misplaced.
    it targets — a fabricated commit sha, a nested orphan directory, a stale tier count taken from
    git history — and confirming a red build. A check that has only ever passed has not been tested.
 3. **Decide severity from precision**, per the calibration rule above.
-4. **Register it everywhere it must appear.** A gate typically spans four places: the script, its
-   self-test, `scripts/check_project_inputs.sh`, and `scripts/check_test_workflows.sh`. Contracts
+4. **Register it once at its execution boundary.** A gate spans its script, its self-test and
+   `scripts/check_project_inputs.sh`; `scripts/check_test_workflows.sh` delegates required-surface
+   inventory to that parent instead of maintaining a duplicate list. Contracts
    with an `env` field span the manifest, `scripts/lib/build_paths.sh`, and the test's
    `REQUIRED_EXPORTS`. Landing a partial set leaves the tree green locally while CI fails from a
    clean checkout — that exact split broke `main` on 2026-08-02.
 5. **Name it in `AGENTS.md` or a domain rule**, or `check_surface_coverage.py` will fail —
    deliberately, since a gate no guidance mentions is invisible to anyone reading the docs.
 
-The local checkpoint cache follows the same rule. `tree_fingerprint.py` binds HEAD, final tracked
-content, and every non-ignored untracked path/byte. Staging identical bytes is not a new tree;
-editing them is. A completed `scripts/dev.sh checkpoint` can therefore satisfy the commit hook
-without recreating the old stale-PASS hole.
+The local checkpoint cache follows the same rule. `tree_fingerprint.py` retains unchanged full-tree
+semantics for release consumers, with a separate versioned local marker binding tools/environment
+as well as HEAD, tracked content and non-ignored paths/bytes. Staging identical bytes is not a new
+tree; editing them is. A local checkpoint reclassifies after refresh and rejects mid-check edits.
+It can satisfy the commit hook but never stand in for CI, candidate or promotion evidence.
 
 The root Swift dependency watch follows this pattern: `swift_dependency_updates.py` validates exact
 pin agreement without network access in the deterministic gate, while its scheduled workflow uses

@@ -35,12 +35,17 @@ machine-readable contract invalidates documentation, update the documentation in
    Stop if returning to `main` risks existing work; preserve unrelated changes.
 2. Verify `docs/development-progress.md`; follow `config/roadmap.json`'s `primaryPlan`.
    Other plans retain defect/evidence authority, not competing work queues.
-3. Read the applicable file under `.agents/rules/` and the authoritative subsystem reference.
+3. Read the applicable domain rule, then only the subsystem references needed for this change.
 4. Inspect the exact code, tests, and contracts before deciding on an implementation.
 5. Read every selected skill completely and verify optional tools are callable.
 6. Make the smallest coherent change. Preserve module boundaries and stable accessibility IDs.
-7. Land source, tests, evidence, contracts and narrative together; check documentation currency
-   before another workstream.
+7. Update affected instructions/contracts when behavior changes. Refresh derived documents and
+   update roadmap/narrative once per coherent checkpoint, not after each edit or diagnostic.
+
+Codex is the development environment; agent/model selection is not a quality gate. Proceed
+autonomously with bounded, reversible implementation and relevant verification within the requested
+scope. Do not simulate separate team-role approvals. Ask only for missing authority, consequential
+product choices, external dependencies or unsafe ambiguity; preserve explicit release/device consent.
 
 Clarify ambiguous scope. Ordinary checkpoints need deterministic checks, never models or a phone.
 
@@ -131,12 +136,14 @@ Discover assists only when needed.
 ## Codex and Xcode workflow
 
 Review and trust `.codex/hooks.json` with `/hooks`. Its Bash hook runs
-`scripts/hooks/precommit_gate.sh`; commits require `main` and the quick gate. Exit 2 blocks.
+`scripts/hooks/precommit_gate.sh`; commits require `main` and the local checkpoint. Exit 2 blocks.
 `QVOICE_SKIP_COMMIT_GATE=1` bypasses validation once, never the `main` requirement or full CI.
 
 With XcodeBuildMCP, read `axiom-xcode-mcp`, call `session_show_defaults`, use profile `macos`
 for `QwenVoice` or `ios-device` for `VocelloiOS`, and resolve physical-device IDs only at runtime.
 Never use its Simulator, preview, or UI routes; repository scripts remain authoritative.
+`scripts/dev.sh assists` is the opt-in configuration check. Optional configurations and installed
+tools are not required by ordinary verification.
 
 ## Verification tiers
 
@@ -148,8 +155,10 @@ Serialize native Xcode commands: the shared SwiftPM lock spans XCTest. Paralleli
 work instead; never bypass the lock or clear caches to evade contention.
 
 - **T0:** fast generation, adjacent Python tests, and changed XCTest classes.
-- **T1:** derived refresh, the full project-input gate, and path-required native evidence. The
-  commit hook reuses an exact-content PASS but invalidates it after any edit.
+- **T1:** derived refresh, relevant documentation or project-input contracts, affected Python tests
+  and platform-required native checks. Unknown/tooling-authority changes broaden verification.
+  `scripts/dev.sh checkpoint --full` requests the full deterministic checkpoint. The commit hook
+  reuses only the same content/toolchain PASS; edits during checking invalidate it.
 - **T2:** full deterministic GitHub CI for every push/PR; path-aware jobs may skip while the
   aggregate required context remains authoritative.
 - **T3:** explicit release evidence, signing, notarization, archive, and artifact verification.

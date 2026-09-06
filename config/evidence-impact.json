@@ -355,7 +355,12 @@
         "ios-device-sdk-compile"
       ],
       "qualityEvidence": [],
-      "promotionRequiredEvidence": []
+      "promotionRequiredEvidence": [],
+      "exclude": [
+        "Packages/VocelloQwen3Core/README.md",
+        "Packages/VocelloQwen3Core/PERFORMANCE.md",
+        "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/README.md"
+      ]
     },
     {
       "id": "repository-validation-surface",
@@ -412,6 +417,11 @@
         "studio-modes",
         "multilingual-output",
         "delivery-evaluation"
+      ],
+      "exclude": [
+        "Packages/VocelloQwen3Core/README.md",
+        "Packages/VocelloQwen3Core/PERFORMANCE.md",
+        "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/README.md"
       ]
     },
     {
@@ -499,7 +509,13 @@
         "website-build"
       ],
       "qualityEvidence": [],
-      "promotionRequiredEvidence": []
+      "promotionRequiredEvidence": [],
+      "exclude": [
+        "website/AGENTS.md",
+        "website/PRODUCT.md",
+        "website/DESIGN.md",
+        "website/README.md"
+      ]
     },
     {
       "id": "documentation-and-governance",
@@ -511,7 +527,14 @@
         "README.md",
         "config/documentation-contract.json",
         "config/evidence-impact.json",
-        "docs/**"
+        "docs/**",
+        "Packages/VocelloQwen3Core/README.md",
+        "Packages/VocelloQwen3Core/PERFORMANCE.md",
+        "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/README.md",
+        "website/AGENTS.md",
+        "website/PRODUCT.md",
+        "website/DESIGN.md",
+        "website/README.md"
       ],
       "mergeRequiredEvidence": [
         "documentation-contract"
@@ -533,5 +556,49 @@
     ],
     "qualityEvidence": [],
     "promotionRequiredEvidence": []
+  },
+  "localVerification": {
+    "version": 1,
+    "documentationOnlyPatterns": [
+      "*.md",
+      "docs/*.html",
+      "docs/charts/*.svg",
+      "docs/INDEX.json",
+      "config/roadmap.json",
+      "config/derived-doc-facts.json"
+    ],
+    "fullTestPatterns": [
+      "scripts/development_workflow.py",
+      "scripts/python_test_contract.py",
+      "scripts/evidence_impact.py",
+      "scripts/tree_fingerprint.py",
+      "scripts/check_project_inputs.sh",
+      "scripts/check_test_workflows.sh",
+      "scripts/hooks/**",
+      "scripts/lib/**",
+      "config/evidence-impact.json",
+      "config/orchestration-contract.json",
+      "config/toolchain.json",
+      "config/build-output-policy.json",
+      "config/documentation-contract.json",
+      ".github/**",
+      ".codex/**",
+      "project.yml",
+      "Package.resolved",
+      "QwenVoice.xcodeproj/**"
+    ],
+    "macosOnlyPatterns": [
+      "Sources/Views/**",
+      "Sources/ViewModels/**",
+      "Sources/Models/**",
+      "Sources/Services/**",
+      "Sources/App/**",
+      "Sources/VocelloCLI/**",
+      "Sources/QwenVoiceNative/**",
+      "Sources/QwenVoiceEngineService/**",
+      "Sources/QwenVoiceEngineSupport/**",
+      "Tests/VocelloMacUITests/**",
+      "Tests/VocelloEngineIntegrationTests/**"
+    ]
   }
 }

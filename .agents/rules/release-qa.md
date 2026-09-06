@@ -66,12 +66,14 @@ sourceOfTruth:
 
 ## Required pre-read
 
-Before changing scripts or CI, read:
+Read for the task at hand; unrelated runbooks are not prerequisites:
 1. The script you are modifying (header comments encode intent and env vars).
 2. `.github/workflows/release.yml` and `.github/workflows/promote-release.yml` if touching release CI.
-3. `docs/reference/macos-release-qa.md` for the full macOS release QA checklist.
-4. `docs/reference/benchmarking-procedure.md` for the operator runbook (when to bench, platform lanes, preflight).
-5. `docs/reference/telemetry-and-benchmarking.md` for benchmark/telemetry schema and knobs.
+3. `docs/reference/development-workflow.md` for local verification changes, and
+   `docs/reference/repository-self-verification.md` before adding or weakening a check.
+4. `docs/reference/macos-release-qa.md` only for macOS packaging/release work.
+5. `docs/reference/benchmarking-procedure.md` only for benchmark execution;
+   `docs/reference/telemetry-and-benchmarking.md` for schema/field changes.
 
 ## Tools and skills
 
@@ -140,8 +142,9 @@ Before changing scripts or CI, read:
   `--keep-trace` only when the raw Instruments document must be reopened.
 - **Documentation and public facts:** this role owns lifecycle/index validation and public release,
   platform, support, and canonical-hardware references. Model implementation facts remain backend-owned.
-- **Schema review:** telemetry or benchmark schema-version changes require backend, the affected
-  platform owner, and release/QA review before publication contracts change.
+- **Schema review:** for telemetry/benchmark changes, inspect the backend producer, affected
+  platform consumer and release validator together. This is a technical cross-boundary review,
+  not a requirement to obtain simulated approvals from separate agents or roles.
 - **Root Swift dependency watch:** `scripts/swift_dependency_updates.py` and
   `config/swift-dependency-update-policy.json` keep project, owned-runtime, lock, compatibility,
   and evidence surfaces coordinated. The scheduled workflow is read-only; release availability or
@@ -208,9 +211,12 @@ Exemptions require a reason in `config/surface-coverage-exemptions.json`. Read
   (verified unchanged through 2.46.0).
 - **Developer ID signing + notarization.** macOS release uses Developer ID Application cert,
   hardened runtime, and `notarytool` stapling. CI uses App Store Connect API key auth.
-- **Gate quick mode is local-only.** `QVOICE_GATES=quick` may skip the script self-test suite
-  only while `scripts/` and `config/` have no pending changes; CI and release lanes never set it,
-  so every push and package still runs the full suite. Do not widen the skip's scope.
+- **Local verification is selective; CI/release are complete.** `scripts/dev.sh checkpoint`
+  chooses documentation checks or `check_project_inputs.sh --local`, with affected Python tests
+  and source-relevant native evidence. Unknown dependencies, deletions and routing-authority
+  changes select full discovery. The default project gate and `checkpoint --full` retain the
+  complete suite; CI refuses local selection. Legacy `QVOICE_GATES=quick` remains compatible only
+  for a local unchanged scripts/config tree. Local PASS markers never authorize promotion.
 - **CI topology.** `ci.yml`: a cheap `changes` router classifies pushed paths; the two heavy
   macos-26 jobs run only for native-surface changes (Sources/Tests/Packages/config/scripts/
   benchmarks/project files/.github), the website job for `website/` changes, and the `CI required`

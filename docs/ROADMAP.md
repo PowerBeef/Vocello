@@ -23,7 +23,7 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 | `voice-identity-language-reliability-2026-08` | active | backend-and-platform | 9/10 (90%) |
 | `compliance-2026-08` | complete | release-qa | 2/2 (100%) |
 | `convergence-metal4-stage4-2026-08` | complete | backend-and-platform | 7/7 (100%) |
-| `development-workflow-performance-2026-08` | complete | release-qa | 5/5 (100%) |
+| `development-workflow-performance-2026-08` | complete | release-qa | 6/6 (100%) |
 | `doc-governance-2026-08` | complete | release-qa | 9/9 (100%) |
 | `ios-clone-import-2026-08` | complete | ios | 4/4 (100%) |
 | `ios-settings-2026-08` | complete | ios | 3/3 (100%) |
@@ -440,6 +440,7 @@ Narrative authority: [`docs/reference/development-workflow.md`](reference/develo
 | `DWF-03` | done | Preserve valid Xcode and package caches | `file:scripts/build_foundation_targets.sh`, `file:scripts/lib/build_cache.sh`, `file:project.yml`, `file:scripts/tests/test_build_routing_contract.py` |
 | `DWF-04` | done | Make checkpoint reuse content-complete and fail-closed | `file:scripts/tree_fingerprint.py`, `file:scripts/tests/test_tree_fingerprint.py`, `file:scripts/hooks/precommit_gate.sh` |
 | `DWF-05` | done | Validate and adopt the new development workflow | `doc:docs/reference/development-workflow.md`, `doc:docs/development-progress.md` |
+| `DWF-06` | done | Streamline Codex local gates without weakening CI or release evidence | `file:scripts/development_workflow.py`, `file:scripts/tests/test_development_workflow.py`, `file:scripts/tests/test_evidence_impact.py`, `doc:docs/reference/development-workflow.md`, `doc:docs/development-progress.md#codex-workflow-streamlining` |
 
 ## Documentation governance and staleness control
 

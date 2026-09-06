@@ -339,6 +339,8 @@ class BuildRoutingContractTests(unittest.TestCase):
                 self.assertIn(token, window, f"{relative} resolver lacks {token}")
 
     def test_mcp_profiles_have_managed_scratch_derived_data(self) -> None:
+        if not (ROOT / ".xcodebuildmcp/config.yaml").exists():
+            self.skipTest("optional Xcode assist is not configured")
         text = self.text(".xcodebuildmcp/config.yaml")
         self.assertEqual(text.count("derivedDataPath:"), 2)
         self.assertIn("build/scratch/derived-data/xcodebuildmcp/macos", text)

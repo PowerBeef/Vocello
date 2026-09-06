@@ -27,7 +27,8 @@ python3 scripts/evidence_impact.py classify --base origin/main
 
 The output separates four sets:
 
-- `mergeRequiredEvidence`: deterministic proof required for ordinary development publication.
+- `mergeRequiredEvidence`: complete deterministic proof for CI/merge qualification, distinct from
+  selective local feedback before a commit/push.
 - `releaseRequiredEvidence`: deterministic proof required when the changed surface is packaged.
 - `qualityEvidence`: model-, UI-, or device-dependent acceptance appropriate to the product risk.
 - `promotionRequiredEvidence`: the source-bound subset required only when a verified candidate is
@@ -39,6 +40,13 @@ in an ordinary merge or release-required set. Those checks may fail-close public
 commit, push, pull request, merge, signing/notarization run, candidate package, draft upload, or
 internal TestFlight upload. Unknown paths use the deterministic `repository-other` fallback instead
 of silently receiving no evidence classification.
+
+The versioned `localVerification` block schedules local checkpoints only; it cannot alter
+release/promotion manifests or the full-tree source identity. See
+[development-workflow.md](development-workflow.md). Path classes accept an optional `exclude`
+array of reviewed exact Markdown paths (no broad glob or code/resource exclusion). Contracts
+without this v1 extension retain their original behavior; any routing change changes the digest.
+Runtime code, model data, notices and unreviewed package documentation keep their broader checks.
 
 The model-delivery class illustrates the boundary: catalog reproducibility, deterministic tests,
 and device-SDK compilation are publication proof; isolated Mac and physical-iPhone downloads are

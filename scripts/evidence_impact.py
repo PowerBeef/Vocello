@@ -93,6 +93,11 @@ def validate_contract(contract: dict[str, Any]) -> list[str]:
         includes = item.get("include")
         if not isinstance(includes, list) or not includes or any(not isinstance(value, str) or not value for value in includes):
             errors.append(f"path class {identity} has invalid include patterns")
+        excludes = item.get("exclude", [])
+        if not isinstance(excludes, list) or any(not isinstance(value, str) or not value for value in excludes):
+            errors.append(f"path class {identity} has invalid exclude patterns")
+        elif any(not value.endswith(".md") or any(c in value for c in "*?[]") for value in excludes):
+            errors.append(f"path class {identity}: exclusions must be reviewed exact prose paths")
         errors.extend(_validate_references(item, identity, evidence))
         errors.extend(_validate_capabilities(item, identity))
 
@@ -102,6 +107,16 @@ def validate_contract(contract: dict[str, Any]) -> list[str]:
     else:
         errors.extend(_validate_references(fallback, str(fallback["id"]), evidence))
         errors.extend(_validate_capabilities(fallback, str(fallback["id"])))
+
+    local = contract.get("localVerification")
+    if local is not None:  # Historical contracts retain their original schema.
+        if not isinstance(local, dict) or local.get("version") != 1:
+            errors.append("localVerification must use version 1")
+        else:
+            for key in ("documentationOnlyPatterns", "fullTestPatterns", "macosOnlyPatterns"):
+                values = local.get(key)
+                if not isinstance(values, list) or not values or any(not isinstance(v, str) or not v for v in values):
+                    errors.append(f"localVerification.{key} must be a non-empty string array")
 
     # Ordinary merge/release evidence is deliberately deterministic. Device,
     # UI, and model-dependent checks may block an explicit public promotion,
@@ -161,6 +176,14 @@ def _matches(path: str, pattern: str) -> bool:
     )
 
 
+def _class_matches(path: str, item: dict[str, Any]) -> bool:
+    # Optional v1 extension: old contracts without exclusions retain exactly
+    # their original semantics. The digest binds any new routing decision.
+    return any(_matches(path, pattern) for pattern in item["include"]) and not any(
+        _matches(path, pattern) for pattern in item.get("exclude", [])
+    )
+
+
 def critical_fallback_paths(contract: dict[str, Any], paths: list[str]) -> list[str]:
     classes = contract.get("pathClasses") or []
     critical_patterns = contract.get("criticalPathPatterns") or []
@@ -172,7 +195,7 @@ def critical_fallback_paths(contract: dict[str, Any], paths: list[str]) -> list[
         path = path.lstrip("/")
         if not any(_matches(path, pattern) for pattern in critical_patterns):
             continue
-        if not any(any(_matches(path, pattern) for pattern in item["include"]) for item in classes):
+        if not any(_class_matches(path, item) for item in classes):
             fallback_paths.append(path)
     return fallback_paths
 
@@ -208,7 +231,7 @@ def classify(contract: dict[str, Any], paths: list[str]) -> dict[str, Any]:
         while path.startswith("./"):
             path = path[2:]
         path = path.lstrip("/")
-        matches = [item for item in classes if any(_matches(path, pattern) for pattern in item["include"])]
+        matches = [item for item in classes if _class_matches(path, item)]
         if not matches:
             matches = [fallback]
         for item in matches:

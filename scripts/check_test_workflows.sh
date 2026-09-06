@@ -5,6 +5,19 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
+PARENT_VALIDATED=0
+LOCAL_TESTS=0
+for option in "$@"; do
+  case "$option" in
+    --project-inputs) PARENT_VALIDATED=1 ;;
+    --local) LOCAL_TESTS=1 ;;
+    *) echo "usage: scripts/check_test_workflows.sh [--project-inputs] [--local]" >&2; exit 2 ;;
+  esac
+done
+if [[ "$LOCAL_TESTS" == 1 && -n "${CI:-}${GITHUB_ACTIONS:-}" ]]; then
+  echo "error: local test selection is prohibited in CI" >&2
+  exit 1
+fi
 
 fail() { printf '\033[0;31m[test-workflow]\033[0m %s\n' "$*" >&2; exit 1; }
 command -v rg >/dev/null 2>&1 || fail "ripgrep is required"
@@ -24,97 +37,15 @@ rg -q 'cmd_tsan()' scripts/macos_test.sh \
 rg -q 'scripts/macos_test.sh tsan' .github/workflows/tsan.yml \
   || fail "scheduled TSan workflow no longer invokes the repository subset"
 
-for required_policy_surface in \
-  config/build-output-policy.json \
-  config/codex-session-storage-policy.json \
-  config/ios-storage-protection-policy.json \
-  config/app-store-connect-readiness-policy.json \
-  config/model-host-availability-policy.json \
-  config/ios-release-analyzer-warning-policy.json \
-  config/documentation-contract.json \
-  config/public-product-facts.json \
-  config/orchestration-contract.json \
-  config/project-health-contract.json \
-  config/quality-promotion-contract.json \
-  config/tsan-policy.json \
-  docs/project-health.md \
-  scripts/build_output_policy.py \
-  scripts/dev.sh \
-  scripts/development_workflow.py \
-  scripts/tree_fingerprint.py \
-  scripts/codex_session_storage.py \
-  scripts/ios_storage_protection_policy.py \
-  scripts/app_store_build_preflight.py \
-  scripts/app_store_connect_readiness.py \
-  scripts/model_host_availability.py \
-  scripts/ios_release_analyzer_warnings.py \
-  scripts/install_pinned_asc.sh \
-  scripts/cli_version_contract.py \
-  scripts/saved_voice_lifecycle_contract.py \
-  scripts/documentation_contract.py \
-  scripts/model_catalog_contract.py \
-  scripts/evidence_impact.py \
-  scripts/quality_promotion.py \
-  scripts/vendor_runtime_contract.py \
-  scripts/supply_chain_contract.py \
-  scripts/swift_dependency_snapshot.py \
-  scripts/swift_dependency_updates.py \
-  scripts/entitlement_contract.py \
-  scripts/release_evidence.py \
-  scripts/release_sbom.py \
-  scripts/required_step_ledger.py \
-  scripts/project_health.py \
-  scripts/build_cleanup.py \
-  scripts/clean_build_caches.sh \
-  scripts/lib/build_paths.sh \
-  scripts/lib/build_cache.sh \
-  scripts/lib/required_steps.sh \
-  scripts/lib/profile_trace_retention.py \
-  scripts/lib/build_artifact_retention.py \
-  scripts/lib/storage_preflight.py \
-  scripts/lib/ios_platform_preflight.py \
-  scripts/python_test_contract.py \
-  scripts/tests/test_build_output_policy.py \
-  scripts/tests/test_codex_session_storage.py \
-  scripts/tests/test_ios_storage_protection_policy.py \
-  scripts/tests/test_app_store_build_preflight.py \
-  scripts/tests/test_app_store_connect_readiness.py \
-  scripts/tests/test_model_host_availability.py \
-  scripts/tests/test_ios_release_analyzer_warnings.py \
-  scripts/tests/test_codex_hook_contract.py \
-  scripts/tests/test_cli_version_contract.py \
-  scripts/tests/test_saved_voice_lifecycle_contract.py \
-  scripts/tests/test_documentation_contract.py \
-  scripts/tests/test_model_catalog_contract.py \
-  scripts/tests/test_evidence_impact.py \
-  scripts/tests/test_quality_promotion.py \
-  scripts/tests/test_vendor_runtime_contract.py \
-  scripts/tests/test_supply_chain_contract.py \
-  scripts/tests/test_swift_dependency_snapshot.py \
-  scripts/tests/test_swift_dependency_updates.py \
-  scripts/tests/test_entitlement_contract.py \
-  scripts/tests/test_release_evidence.py \
-  scripts/tests/test_required_step_ledger.py \
-  scripts/tests/test_project_health.py \
-  scripts/tests/test_refresh_derived_artifacts.py \
-  scripts/tests/test_build_routing_contract.py \
-  scripts/tests/test_development_workflow.py \
-  scripts/tests/test_tree_fingerprint.py \
-  scripts/tests/test_clean_build_caches.py \
-  scripts/tests/test_profile_trace_retention.py \
-  scripts/tests/test_storage_preflight.py \
-  scripts/tests/test_ios_platform_preflight.py \
-  scripts/tests/test_python_test_contract.py; do
-  [[ -f "$required_policy_surface" ]] \
-    || fail "required build-output policy surface is missing: $required_policy_surface"
-done
+# One required-surface inventory, also available to this standalone check.
+[[ "$PARENT_VALIDATED" == 1 ]] || scripts/check_project_inputs.sh --surfaces-only
 
 # The manifest owns every generated path. Load its validated exports before
 # checking individual producer scripts, then enforce tracked-reference and
 # compatibility-link consistency through the policy helper itself.
 # shellcheck source=lib/build_paths.sh
 . "$ROOT_DIR/scripts/lib/build_paths.sh"
-python3 scripts/build_output_policy.py validate \
+[[ "$PARENT_VALIDATED" == 1 ]] || python3 scripts/build_output_policy.py validate \
   || fail "build-output policy validation failed"
 
 for required in \
@@ -206,9 +137,9 @@ out="$(rg -n --pcre2 "$release_ui_gate_pattern" AGENTS.md README.md .agents .cod
 
 # Pinned research may retain obsolete procedures only when every directly
 # openable report identifies itself before the historical body begins.
-python3 scripts/documentation_contract.py \
+[[ "$PARENT_VALIDATED" == 1 ]] || python3 scripts/documentation_contract.py \
   || fail "active documentation contract failed"
-python3 scripts/vendor_runtime_contract.py validate \
+[[ "$PARENT_VALIDATED" == 1 ]] || python3 scripts/vendor_runtime_contract.py validate \
   || fail "owned Qwen3 runtime contract failed"
 
 # Current guidance uses the typed playback-scheduled and heartbeat metrics. Keep
@@ -535,154 +466,15 @@ out="$(rg -n -i 'platform=iOS Simulator|build_run_sim|test_sim|launch_sim' \
   --glob '!scripts/check_test_workflows.sh' 2>/dev/null || true)"
 [[ -z "$out" ]] || fail "active Simulator workflow returned:\n$out"
 
-# Validate relative Markdown links in active guidance so deleted harness documents
-# cannot remain referenced. Immutable release notes, dated baselines, the legacy
-# ledger, and pinned research bodies remain historical evidence rather than live
-# operator instructions.
-python3 - <<'PY'
-from pathlib import Path
-import re
+# Documentation links, paths, HTML and commands are owned by
+# documentation_contract.py (run once above or by the parent gate).
 
-files = [Path("AGENTS.md"), Path("README.md"), Path("benchmarks/README.md"), Path("website/AGENTS.md")]
-files.extend(Path(".agents/rules").rglob("*.md"))
-files.extend(
-    path
-    for path in Path("docs").rglob("*.md")
-    if "releases" not in path.parts
-    and path != Path("docs/reference/backend-optimization-research-report.md")
-)
+# Private-path redaction is included in documentation_contract.py, including
+# the lightweight local documentation route.
 
-errors = []
-pattern = re.compile(r'\[[^\]]*\]\(([^)]+)\)')
-for source in files:
-    text = source.read_text(encoding='utf-8')
-    for target in pattern.findall(text):
-        target = target.strip().strip('<>')
-        if not target or target.startswith(('#', 'http://', 'https://', 'mailto:', 'plugin://')):
-            continue
-        path_part = target.split('#', 1)[0]
-        if not path_part:
-            continue
-        resolved = (source.parent / path_part).resolve()
-        if not resolved.exists():
-            errors.append(f'{source}: missing link target {target}')
-if errors:
-    raise SystemExit('\n'.join(errors))
-PY
-
-# Validate local HTML links in the active project map as well as Markdown links.
-python3 - <<'PY'
-from pathlib import Path
-import re
-
-errors = []
-for source in Path("docs").rglob("*.html"):
-    text = source.read_text(encoding="utf-8")
-    for target in re.findall(r'(?:href|src)=["\']([^"\']+)["\']', text):
-        if not target or target.startswith(("#", "http://", "https://", "data:", "mailto:")):
-            continue
-        path_part = target.split("#", 1)[0].split("?", 1)[0]
-        if path_part and not (source.parent / path_part).resolve().exists():
-            errors.append(f"{source}: missing HTML target {target}")
-if errors:
-    raise SystemExit("\n".join(errors))
-PY
-
-# Literal documented script commands must resolve to real dispatch forms. This
-# deliberately checks active guidance, while immutable release notes stay history.
-python3 - <<'PY'
-from pathlib import Path
-import re
-
-roots = [
-    Path("AGENTS.md"),
-    Path("README.md"),
-    Path(".agents/rules"),
-    Path("docs/reference"),
-    Path("benchmarks/README.md"),
-    Path("docs/project-map.html"),
-]
-files = []
-for root in roots:
-    candidates = [root] if root.is_file() else root.rglob("*.md")
-    files.extend(
-        path
-        for path in candidates
-        if path != Path("docs/reference/backend-optimization-research-report.md")
-    )
-allowed = {
-    "ios_device.sh": {"doctor", "build", "install", "launch", "console", "pull", "bench", "lang-bench", "delivery-reliability", "voice-reliability", "voice-reliability-export", "clone-conditioning", "speech-assets", "enroll-clone-fixture", "crashes", "debug", "logs", "profile", "memory", "memory-field-report", "preflight", "device-state", "gate", "help"},
-    "macos_test.sh": {"preflight", "core-test", "tsan", "lang-bench", "test", "telemetry-overhead", "crashes", "debug", "logs", "profile", "memory", "gate", "release-readiness", "models", "help"},
-    "ui_test.sh": {"macos", "ios"},
-}
-errors = []
-command = re.compile(r"(?:\./)?scripts/(ios_device\.sh|macos_test\.sh|ui_test\.sh)\s+([a-z][a-z0-9-]*)")
-baseline = re.compile(r"--compare-baseline(?:=|\s+)([^\s`\\]+)")
-for path in files:
-    text = path.read_text(encoding="utf-8")
-    for script, subcommand in command.findall(text):
-        if subcommand not in allowed[script]:
-            errors.append(f"{path}: unsupported {script} command: {subcommand}")
-    for argument in baseline.findall(text):
-        if argument.startswith(("$", "<")):
-            continue
-        if Path(argument.strip('"\'')).suffix.lower() != ".json":
-            errors.append(f"{path}: --compare-baseline requires a JSON baseline, not {argument}")
-if errors:
-    raise SystemExit("\n".join(errors))
-PY
-
-# Catch stale inline source/test/script paths in active guidance. Vendored MLX
-# sources may be documented relative to their package root.
-python3 - <<'PY'
-from pathlib import Path
-import glob
-import re
-
-roots = [
-    Path("AGENTS.md"),
-    Path("README.md"),
-    Path(".agents/rules"),
-    Path("docs/reference"),
-    Path("benchmarks/README.md"),
-    Path("docs/project-map.html"),
-]
-files = []
-for root in roots:
-    candidates = [root] if root.is_file() else root.rglob("*.md")
-    files.extend(
-        path
-        for path in candidates
-        if path != Path("docs/reference/backend-optimization-research-report.md")
-    )
-prefixes = ("Sources/", "Tests/", "scripts/", "config/", ".github/", "Packages/")
-errors = []
-for source in files:
-    text = source.read_text(encoding="utf-8")
-    for value in re.findall(r"`([^`\n]+)`", text):
-        candidate = value.strip().split()[0].rstrip(".,;:")
-        candidate = re.sub(r":\d+(?:-\d+)?$", "", candidate)
-        if not candidate.startswith(prefixes) or not Path(candidate).suffix:
-            continue
-        if any(marker in candidate for marker in ("<", ">", "{", "}", "$")):
-            continue
-        matches = glob.glob(candidate) if "*" in candidate else ([candidate] if Path(candidate).exists() else [])
-        if not matches and candidate.startswith("Sources/"):
-            runtime = Path("Packages/VocelloQwen3Core") / candidate
-            matches = [str(runtime)] if runtime.exists() else []
-        if not matches:
-            errors.append(f"{source}: stale inline path {candidate}")
-if errors:
-    raise SystemExit("\n".join(errors))
-PY
-
-# Tracked artifacts must not capture a developer's absolute home path. The
-# explicit /Users/example privacy-test fixture is intentionally synthetic.
-out="$(git grep -nE '/Users/[A-Za-z0-9._-]+/' -- ':!scripts/check_test_workflows.sh' 2>/dev/null \
-  | rg -v '/Users/example/' || true)"
-[[ -z "$out" ]] || fail "tracked developer home path returned; use a relative or redacted path:\n$out"
-
-python3 scripts/validate_backend_risk_spine.py
+if [[ "$PARENT_VALIDATED" != 1 ]]; then
+  python3 scripts/validate_backend_risk_spine.py
+fi
 
 # Script self-tests validate the gate/tooling scripts themselves (~75 s).
 # QVOICE_GATES=quick may skip them ONLY while nothing under scripts/ or
@@ -691,7 +483,9 @@ python3 scripts/validate_backend_risk_spine.py
 # lanes never set this and therefore always run the full suite.
 python3 scripts/python_test_contract.py validate \
   || fail "Python test inventory/discovery contract failed"
-if [[ "${QVOICE_GATES:-}" == "quick" ]] \
+if [[ "$LOCAL_TESTS" == 1 ]]; then
+  python3 scripts/development_workflow.py python-tests
+elif [[ "${QVOICE_GATES:-}" == "quick" && -z "${CI:-}${GITHUB_ACTIONS:-}" ]] \
     && [[ -z "$(git status --porcelain -- scripts config 2>/dev/null)" ]]; then
   echo "==> quick gate mode: scripts/config unchanged — skipping script self-tests" >&2
 else

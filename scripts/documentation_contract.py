@@ -181,6 +181,34 @@ def validate_script_references(root: Path, paths: list[Path]) -> list[str]:
     return errors
 
 
+def validate_html_links(root: Path) -> list[str]:
+    errors: list[str] = []
+    for source in (root / "docs").rglob("*.html"):
+        for target in re.findall(r'''(?:href|src)=["']([^"']+)["']''', source.read_text(encoding="utf-8")):
+            if not target or target.startswith(("#", "http://", "https://", "data:", "mailto:")):
+                continue
+            path = urllib.parse.unquote(target.split("#", 1)[0].split("?", 1)[0])
+            if path and not (source.parent / path).exists():
+                errors.append(f"{source.relative_to(root)}: missing HTML target {target}")
+    return errors
+
+
+def validate_private_paths(root: Path) -> list[str]:
+    # The former workflow-shell privacy guard also applies to docs-only commits.
+    # Synthetic validator fixtures need not be Git repositories.
+    if not (root / ".git").exists():
+        return []
+    result = subprocess.run(
+        ["git", "grep", "-nE", "/Users/[A-Za-z0-9._-]+/", "--", ":!scripts/check_test_workflows.sh"],
+        cwd=root, capture_output=True, text=True, check=False,
+    )
+    if result.returncode not in (0, 1):
+        return ["cannot validate tracked private-path redaction"]
+    return ["tracked developer home path returned; use a relative or redacted path"] if any(
+        "/Users/example/" not in line for line in result.stdout.splitlines()
+    ) else []
+
+
 def validate_repository_paths(root: Path, paths: list[Path]) -> list[str]:
     prefixes = ("Sources/", "Tests/", "scripts/", "config/", ".github/", ".agents/", ".codex/", "docs/", "benchmarks/", "website/", "Packages/")
     generated_roots: set[str] = set()
@@ -585,10 +613,14 @@ def validate_documented_subcommands(root: Path, paths: list[Path]) -> list[str]:
     # `sourceOfTruth: scripts/ui_test.sh` entry with the closing `---` fence.
     command = re.compile(r"(?:^|\s)(?:\./)?(?P<script>scripts/[A-Za-z0-9_-]+\.sh)[^\S\n]+(?P<sub>[A-Za-z0-9_-]+)")
     for source in paths:
-        for match in command.finditer(source.read_text(encoding="utf-8")):
+        text = source.read_text(encoding="utf-8")
+        for match in command.finditer(text):
             script, subcommand = match.group("script"), match.group("sub")
             if script in help_text and subcommand not in help_text[script]:
                 errors.append(f"{source.relative_to(root)}: undocumented or retired subcommand {script} {subcommand}")
+        for argument in re.findall(r"--compare-baseline(?:=|\s+)([^\s`\\]+)", text):
+            if not argument.startswith(("$", "<")) and Path(argument.strip("\"'")).suffix.lower() != ".json":
+                errors.append(f"{source.relative_to(root)}: --compare-baseline requires a JSON baseline")
     return errors
 
 
@@ -659,6 +691,8 @@ def validate(root: Path) -> list[str]:
     paths = active_markdown_paths(root)
     errors: list[str] = []
     errors.extend(validate_relative_links(root, paths))
+    errors.extend(validate_html_links(root))
+    errors.extend(validate_private_paths(root))
     errors.extend(validate_script_references(root, paths))
     errors.extend(validate_repository_paths(root, paths))
     errors.extend(validate_build_references(root, paths))

@@ -3,8 +3,8 @@
 #
 # Fired for every Bash tool call; exits instantly unless the command contains
 # `git commit`. For commits it first requires the symbolic branch to be exactly
-# `main`, then runs the quick project-inputs gate
-# (QVOICE_GATES=quick ./scripts/check_project_inputs.sh). Either violation blocks
+# `main`, then runs the path-aware local checkpoint through scripts/dev.sh.
+# Either violation blocks
 # the commit. A fingerprint of the current tree state is cached under
 # build/scratch/gate-fingerprint (scratch-class output) so repeat commits on
 # an already-validated tree are a no-op.
@@ -52,16 +52,17 @@ log="$marker_dir/last-run.log"
 # Content-complete tree fingerprint: final tracked worktree bytes and every
 # non-ignored untracked path/byte are bound. Re-editing an already-dirty file
 # cannot reuse a stale PASS marker, while staging the exact same bytes can.
-fingerprint="$(python3 scripts/tree_fingerprint.py --root "$ROOT_DIR")"
+fingerprint="$(python3 scripts/tree_fingerprint.py --root "$ROOT_DIR" --checkpoint)"
 
 if [[ -f "$marker" && "$(cat "$marker" 2>/dev/null)" == "$fingerprint" ]]; then
   exit 0
 fi
 
 mkdir -p "$marker_dir"
-echo "commit gate: running QVOICE_GATES=quick ./scripts/check_project_inputs.sh …" >&2
-if QVOICE_GATES=quick ./scripts/check_project_inputs.sh >"$log" 2>&1; then
-  printf '%s\n' "$fingerprint" >"$marker"
+echo "commit gate: running scripts/dev.sh checkpoint …" >&2
+if scripts/dev.sh checkpoint >"$log" 2>&1; then
+  # The checkpoint owns its post-refresh marker and rejects mid-check edits.
+  # Never overwrite it with the pre-refresh fingerprint captured above.
   echo "commit gate: PASS" >&2
   exit 0
 fi

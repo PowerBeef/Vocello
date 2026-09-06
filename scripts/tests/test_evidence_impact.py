@@ -20,6 +20,31 @@ SPEC.loader.exec_module(IMPACT)
 
 
 class EvidenceImpactTests(unittest.TestCase):
+    def test_reviewed_readme_is_prose_but_models_notices_and_unknown_docs_stay_broad(self):
+        self.contract = IMPACT.load_contract(REPO_ROOT)
+        for path in ("Packages/VocelloQwen3Core/README.md", "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/README.md"):
+            result = IMPACT.classify(self.contract, [path])
+            self.assertEqual(result["classes"], ["documentation-and-governance"])
+            self.assertEqual(result["promotionRequiredEvidence"], [])
+        for path in ("Packages/VocelloQwen3Core/NOTICES.md", "Packages/VocelloQwen3Core/Sources/new.swift", "Packages/VocelloQwen3Core/new-guide.md"):
+            result = IMPACT.classify(self.contract, [path])
+            self.assertIn("engine-runtime", result["classes"])
+            self.assertTrue(result["promotionRequiredEvidence"])
+
+    def test_historical_contract_without_exclusions_retains_original_routing(self):
+        old = copy.deepcopy(IMPACT.load_contract(REPO_ROOT))
+        for item in old["pathClasses"]:
+            item.pop("exclude", None)
+        old.pop("localVerification", None)
+        self.assertEqual(IMPACT.validate_contract(old), [])
+        self.assertIn("engine-runtime", IMPACT.classify(old, ["Packages/VocelloQwen3Core/README.md"])["classes"])
+
+    def test_broad_or_nonprose_exclusion_fails_closed(self):
+        for pattern in ("Sources/**", "Sources/Resources/catalog.json", "**/*.md"):
+            broken = copy.deepcopy(IMPACT.load_contract(REPO_ROOT))
+            broken["pathClasses"][0]["exclude"] = [pattern]
+            self.assertTrue(IMPACT.validate_contract(broken))
+
     def setUp(self) -> None:
         self.contract = IMPACT.load_contract(REPO_ROOT)
 

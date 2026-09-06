@@ -4,6 +4,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import sys
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -70,6 +71,28 @@ class DocumentationContractTests(unittest.TestCase):
         self.write("scripts/missing_tool.sh", "#!/bin/sh\n")
         self.assertEqual(DOCUMENTATION.validate_relative_links(self.root, [source]), [])
         self.assertEqual(DOCUMENTATION.validate_script_references(self.root, [source]), [])
+
+    def test_html_link_guard_replaces_inline_shell_check(self):
+        self.write("docs/map.html", '<a href="missing.html?q=1#part">x</a>')
+        self.assertTrue(DOCUMENTATION.validate_html_links(self.root))
+        self.write("docs/missing.html", "<p>ok</p>")
+        self.assertEqual(DOCUMENTATION.validate_html_links(self.root), [])
+
+    def test_baseline_guard_replaces_inline_shell_check(self):
+        source = self.write("README.md", "`--compare-baseline wrong.csv`\n")
+        self.assertTrue(DOCUMENTATION.validate_documented_subcommands(self.root, [source]))
+        source.write_text("`--compare-baseline valid.json`\n")
+        self.assertEqual(DOCUMENTATION.validate_documented_subcommands(self.root, [source]), [])
+
+    def test_docs_only_privacy_guard_rejects_private_paths_without_echoing_them(self):
+        subprocess.run(["git", "init", "-q", self.root], check=True)
+        source = self.write("README.md", "/Users/" + "synthetic-person/private.txt")
+        subprocess.run(["git", "-C", self.root, "add", "README.md"], check=True)
+        errors = DOCUMENTATION.validate_private_paths(self.root)
+        self.assertTrue(errors)
+        self.assertNotIn("synthetic-person", " ".join(errors))
+        source.write_text("/Users/example/synthetic.txt")
+        self.assertEqual(DOCUMENTATION.validate_private_paths(self.root), [])
 
     def test_frontmatter_owns_lifecycle_across_overlapping_groups(self) -> None:
         def group(identifier, status, paths):

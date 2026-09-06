@@ -169,7 +169,7 @@
         "doc:docs/reference/release-first-execution-2026-09.md#preserved-september-4-device-boundary"
       ],
       "updated": "2026-09-06",
-      "notes": "September 6 documentation cleanup: one current checkpoint and current release queue, pinned verbatim narrative/runbook archives, reconciled per-file lifecycle catalogs, concise instruction routing, corrected stale facts and explicit frozen-campaign pause rules. No status, acceptance gate, historical failure, or product behavior was changed. Verification and resume context: docs/development-progress.md#documentation-cleanup-checkpoint. September 6: iOS-first queue adopted; active release-first reference maps each remaining blocker to owner, next action and evidence. No parallel status authority. Historical checkpoint: VRA-001 through VRA-022 are mapped. F-15/F-16/F-17 own the new independent gaps; F-06 is reopened. A bounded scan of the retained 1710-attachment manifest and Staging found no canonical recoverable observation stream. ICA-04/ICA-05/ICA-18 keep the original failed/unverified attempts, not a fabricated PASS or safe-resume cursor. This closes reconciliation only, not any acceptance campaign. The September 4 HTML audit of 616fdfe2 was separately grounded at 75ecb740: all 12 V26 findings have dispositions in docs/reference/engineering-audit-grounding-2026-09-04.md. F-01 is reopened; F-18 through F-22 capture independent output/lifecycle/CLI/shared-store issues; F-16, F-06, VLR-07 and ASR items retain overlapping authority. Concurrency schedules remain risks until tested. This is review completion, not remediation or new candidate evidence."
+      "notes": "September 6 Codex workflow streamlining is owned by DWF-06 in the existing development-workflow plan. Local checks are selective, complete CI/release proof remains separate, and no release blocker was closed. September 6 documentation cleanup: one current checkpoint and current release queue, pinned verbatim narrative/runbook archives, reconciled per-file lifecycle catalogs, concise instruction routing, corrected stale facts and explicit frozen-campaign pause rules. No status, acceptance gate, historical failure, or product behavior was changed. Verification and resume context: docs/development-progress.md#documentation-cleanup-checkpoint. September 6: iOS-first queue adopted; active release-first reference maps each remaining blocker to owner, next action and evidence. No parallel status authority. Historical checkpoint: VRA-001 through VRA-022 are mapped. F-15/F-16/F-17 own the new independent gaps; F-06 is reopened. A bounded scan of the retained 1710-attachment manifest and Staging found no canonical recoverable observation stream. ICA-04/ICA-05/ICA-18 keep the original failed/unverified attempts, not a fabricated PASS or safe-resume cursor. This closes reconciliation only, not any acceptance campaign. The September 4 HTML audit of 616fdfe2 was separately grounded at 75ecb740: all 12 V26 findings have dispositions in docs/reference/engineering-audit-grounding-2026-09-04.md. F-01 is reopened; F-18 through F-22 capture independent output/lifecycle/CLI/shared-store issues; F-16, F-06, VLR-07 and ASR items retain overlapping authority. Concurrency schedules remain risks until tested. This is review completion, not remediation or new candidate evidence."
     },
     {
       "id": "RF-02",
@@ -3385,6 +3385,28 @@
       "evidence": [
         "doc:docs/development-progress.md#september-5-physical-device-checkpoint"
       ]
+    },
+    {
+      "id": "DWF-06",
+      "plan": "development-workflow-performance-2026-08",
+      "title": "Streamline Codex local gates without weakening CI or release evidence",
+      "status": "done",
+      "gate": "The existing router distinguishes reviewed prose, tooling, platform source and shared/build authority; focused negative fixtures prove fallback, dependency selection, privacy, historical compatibility and stale-PASS rejection. Required surfaces and documentation checks have one owner; optional assists do not gate development. Full CI/release, 201-take acceptance, QC, preservation and source identity remain intact.",
+      "evidence": [
+        "file:scripts/development_workflow.py",
+        "file:scripts/tests/test_development_workflow.py",
+        "file:scripts/tests/test_evidence_impact.py",
+        "doc:docs/reference/development-workflow.md",
+        "doc:docs/development-progress.md#codex-workflow-streamlining"
+      ],
+      "sourceOfTruth": [
+        "config/evidence-impact.json",
+        "scripts/development_workflow.py",
+        "scripts/check_project_inputs.sh",
+        "scripts/check_test_workflows.sh"
+      ],
+      "updated": "2026-09-06",
+      "notes": "Implementation and focused routing/negative fixtures completed. The coherent full deterministic checkpoint remains required before publication of this patch; its result is retained in the existing local gate artifact. This is workflow implementation, not product/candidate acceptance. Release-first remains primary; the phone and product investigations remain paused."
     }
   ]
 }

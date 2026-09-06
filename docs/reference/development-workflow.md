@@ -14,8 +14,8 @@ sourceOfTruth:
 # Development workflow
 
 Vocello separates rapid feedback from publication evidence. The edit loop answers whether the
-changed unit is coherent; the checkpoint answers whether the complete current tree is safe to
-commit. CI remains the independent T2 authority. Model, phone, UI, benchmark, signing, and release
+changed unit is coherent; the local checkpoint checks the current tree in proportion to the change.
+CI remains the independent complete T2 authority. Model, phone, UI, benchmark, signing, and release
 lanes remain explicit and are never silently inferred.
 
 ## Daily route
@@ -23,13 +23,17 @@ lanes remain explicit and are never silently inferred.
 ```sh
 scripts/dev.sh plan        # read-only: show changes, classifications, and selected commands
 scripts/dev.sh focused     # fast regeneration plus adjacent Python/changed XCTest checks
-scripts/dev.sh checkpoint  # refresh, full tree gate, and path-required native evidence
+scripts/dev.sh checkpoint  # refresh, relevant contracts/tests and platform checks
+scripts/dev.sh checkpoint --full  # complete deterministic checkpoint
 ```
 
 Run `focused` repeatedly while editing. Run one `checkpoint` after a coherent change is ready. The
 checkpoint records a privacy-safe exact-tree PASS marker, so staging the same bytes and committing
 does not run the project gate again. Any subsequent edit, added untracked file, or HEAD change
-invalidates the marker.
+invalidates the marker. Local markers also bind resolved tool executables, Python/OS/Xcode identity
+and relevant toolchain environment. Equivalent shell PATH ordering reuses a marker only when PATH
+membership and all fingerprinted tool resolutions remain unchanged. They are not release evidence. The checker refuses edits during
+verification instead of attaching PASS to the later untested content.
 
 Finalize intended tracked-file membership **before** derived refresh: project-health inventories
 use Git-tracked files. Adding a new file to the index afterward can stale that generated summary
@@ -40,11 +44,36 @@ the existing pinned untracked run bundles; follow [device pause/resume](ios-devi
 At a deliberate source checkpoint, update the roadmap and narrative together and acknowledge the
 new full-tree evidence identity.
 
-`scripts/development_workflow.py` obtains merge-required native lanes from
-`scripts/evidence_impact.py`; it does not maintain a parallel classifier. It always refreshes and
-validates derived artifacts and runs the quick project-input gate. That gate still executes the
-complete Python self-test inventory whenever `scripts/` or `config/` changed. The workflow then
-runs the deterministic macOS and incremental generic-iOS lanes required by the classified paths.
+`scripts/evidence_impact.py` remains the classifier. The optional, versioned `localVerification`
+section of its existing contract controls local scheduling; release/promotion requirements stay
+separate. Exact reviewed prose exclusions prevent a package README from being treated as engine
+code. New/unreviewed resource documentation and license/NOTICE files remain conservative.
+
+| Change | Local checkpoint |
+| --- | --- |
+| Classified prose, generated docs or roadmap state | Derived refresh/validation, links, lifecycle/digests, facts, roadmap evidence and surface coverage |
+| Python/configuration tooling | All static project contracts plus reverse-dependency-selected Python tests |
+| macOS-only source | Static contracts, applicable Python fixtures, macOS deterministic tests and app build |
+| iOS source/policy | Static contracts, host-executed policy tests and generic iOS compile |
+| Shared runtime/resources or build/verification authority | Both platforms; routing/build-authority edits require full Python discovery |
+| Unknown/deleted tooling input or unknown dependencies | Full Python discovery; unknown repository classes also broaden native checks |
+
+Python selection walks literal import/helper/config references transitively; it deliberately
+over-selects on shared basenames. A changed input without a known test consumer falls back to full
+discovery. Selection is local feedback, not a proof of complete dependency coverage; CI/release
+retain discovery of every test. Dynamic or unusual dependencies warrant `checkpoint --full`.
+Native applicability also consults iOS/shared source membership in `project.yml`; a path list cannot
+silently omit a newly shared source. Unknown project syntax broadens to both platforms.
+
+`scripts/dev.sh plan --json --paths docs/development-progress.md` previews representative changes
+without executing anything or recording PASS. Executable checkpoints always derive their actual
+changed paths from Git and reclassify after derived refresh. `scripts/dev.sh assists` checks optional
+Xcode configuration only; it neither requires installation nor contacts devices/accounts.
+
+`check_project_inputs.sh` without arguments remains the full gate. `--local` selects local Python
+feedback and is rejected in CI. `check_test_workflows.sh` delegates to the one required-surface
+inventory and does not repeat its parent's validators. Documentation link/path/command checks
+live in `documentation_contract.py`, with negative fixtures, rather than duplicate inline scripts.
 
 The helper never schedules XCUITest, a model download, generated audio, a benchmark, signing,
 notarization, App Store work, or a release. Run those canonical scripts only when the task
@@ -72,6 +101,13 @@ only when a verified invalidation or storage threshold requires it.
 
 ## Measured 2026-08-27 baseline
 
+September 6 workflow validation measured the representative documentation checkpoint at **24.3 s**
+on the development Mac: refresh 6.7 s, derived validation 3.2 s, documentation 1.0 s, metadata 6.1 s,
+roadmap 7.3 s and surface coverage under 0.1 s. Every command passed and the source remained
+unchanged. No native build, model or phone was used. This is a route measurement, not full-patch
+acceptance or a permanent timing gate. An analyzer-edit example selected 45 of 122 Python modules
+through reverse dependencies; unknown/routing changes still select all modules.
+
 These are observations on the base M2/8 GB development Mac, not permanent thresholds:
 
 | Operation | Before / cold | Steady state after overhaul |
@@ -86,15 +122,15 @@ The regression signal is whether a no-source-change incremental run reuses it.
 
 ## Quality controls retained or strengthened
 
-- The project gate, discovered Python inventory, native deterministic tests, generic device-SDK
-  compile, and T2 CI are unchanged authorities.
+- The complete project gate, discovered Python inventory, native tests and generic device-SDK
+  compile remain CI/release authorities. Local selection cannot replace candidate evidence.
 - The commit marker hashes HEAD, final tracked content, and every non-ignored untracked path and
   byte. It ignores only index placement, so staging identical content is free while a re-edit cannot
   reuse stale evidence.
 - `project.yml` remains the only project authority. Fast regeneration cannot record a stamp until
   XcodeGen and both generated schemes succeed.
-- Focused test selection is an optimization, never coverage authority. Checkpoint and CI still run
-  the full required inventory.
+- Local test selection is an optimization, never coverage authority. CI/release still run the full
+  required inventory. Legacy quick-gate behavior remains local-only; new work uses `dev.sh`.
 - Full logs and `.xcresult` bundles remain governed artifacts; concise output discards no evidence.
 
 When a focused lane exposes an environment failure, use the applicable build/test triage guidance.

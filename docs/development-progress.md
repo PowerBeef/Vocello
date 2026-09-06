@@ -21,7 +21,7 @@ Mac/CLI-only qualification and broad evaluator/prompt research remain off that c
 
 | Work | Existing owner | Next boundary |
 | --- | --- | --- |
-| Documentation cleanup | RF-01 | Coherent deterministic checkpoint; no product acceptance is inferred |
+| Documentation/workflow cleanup | RF-01 / DWF-06 | Local workflow implemented; coherent deterministic checkpoint, no product acceptance inferred |
 | Privacy/IP/account/signing decisions | RF-02 | Use the existing consolidated decision packet; no repeated account polling |
 | Unresolved long-form/French/Chinese audio | RF-06 | Bounded, predeclared causal work; device comparison waits for the phone |
 | Static-analysis legacy tensor transfer warning | RF-09 / ASR-10 | Correct the isolated adapter contract, then native tests and Release Analyze before freeze |
@@ -102,6 +102,31 @@ Next action: correct the legacy adapter's tensor-transfer contract without weake
 changing the shipping PCM boundary, then pass native regressions and Release Analyze before freeze.
 The normal deterministic checkpoint PASS does **not** replace this failed candidate-warning gate.
 
+
+## Codex workflow streamlining
+
+DWF-06 extends the existing development-workflow plan; the release-first queue remains primary.
+Known prose and roadmap edits use documentation/fact/evidence checks. Tooling uses all static
+contracts plus transitive local Python selection, with full discovery for unknown/deleted inputs or
+verification-authority changes. Native applicability follows the actual source surface, with
+`project.yml` protecting shared/iOS membership. Full CI and release checks remain independent.
+
+Removed duplicate inline documentation validators and the duplicate 80-file inventory; HTML-link,
+baseline-argument and private-path protections now have one tested owner in the documentation
+validator. Four parent/child validators execute once. Optional Xcode assist configuration has an
+explicit opt-in command. Instructions now require task-relevant reading and cross-boundary review,
+not simulated role approvals or repeated narrative updates after every edit.
+
+Local PASS reuse is versioned separately from release fingerprints and binds tools/environment as
+well as source bytes. Refresh is followed by reclassification; concurrent edits prevent PASS.
+Focused fixtures cover real routing, transitive consumers, mixed/unknown changes, preserved v1
+semantics, missing optional tools, corruption/privacy failures and cache invalidation. Coherent
+full verification is performed before publishing the patch, using the existing gate artifacts.
+The representative documentation-route commands passed in 24.3 seconds with unchanged source;
+this timing is not a substitute for full-patch verification. Final review also covered inherited
+quick-mode refusal for `checkpoint --full` and mixed package-prose/tooling routing.
+No device, model, account, release or paused product investigation was started. The 201-take gate,
+all audio/privacy/preservation rules and outstanding release blockers remain unchanged.
 
 ## Documentation cleanup checkpoint
 

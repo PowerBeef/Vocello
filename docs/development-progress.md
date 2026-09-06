@@ -120,8 +120,11 @@ not simulated role approvals or repeated narrative updates after every edit.
 Local PASS reuse is versioned separately from release fingerprints and binds tools/environment as
 well as source bytes. Refresh is followed by reclassification; concurrent edits prevent PASS.
 Focused fixtures cover real routing, transitive consumers, mixed/unknown changes, preserved v1
-semantics, missing optional tools, corruption/privacy failures and cache invalidation. Coherent
-full verification is performed before publishing the patch, using the existing gate artifacts.
+semantics, missing optional tools, corruption/privacy failures and cache invalidation. The initial
+full checkpoint passed; the final hook-hosted recheck for 7887bfda ended before its last build
+completed and is not accepted as a completed checkpoint. The follow-up makes the hook receipt-only:
+missing/stale/unreadable receipts block immediately, and full checks run directly outside the hook.
+The retained interrupted logs remain distinct from completed direct-run evidence.
 The representative documentation-route commands passed in 24.3 seconds with unchanged source;
 this timing is not a substitute for full-patch verification. Final review also covered inherited
 quick-mode refusal for `checkpoint --full` and mixed package-prose/tooling routing.

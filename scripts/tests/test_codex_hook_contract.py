@@ -9,6 +9,7 @@ from pathlib import Path
 import shutil
 import stat
 import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -54,7 +55,7 @@ class CodexHookContractTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertNotIn("Running Vocello commit gate", result.stderr)
 
-    def test_failed_commit_gate_blocks_with_exit_code_two(self) -> None:
+    def test_receipt_check_blocks_missing_stale_corrupt_or_unreadable_identity_without_running_checks(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             hook_dir = root / "scripts" / "hooks"
@@ -69,10 +70,11 @@ class CodexHookContractTests(unittest.TestCase):
             make_executable(fingerprint)
 
             gate = root / "scripts" / "dev.sh"
-            gate.write_text("#!/usr/bin/env bash\nexit 1\n", encoding="utf-8")
+            gate.write_text("#!/usr/bin/env bash\ntouch gate-ran\nexit 1\n", encoding="utf-8")
             make_executable(gate)
 
             subprocess.run(["git", "init", "-q", "-b", "main"], cwd=root, check=True)
+            (root / ".gitignore").write_text("build/\n", encoding="utf-8")
             (root / "fixture.txt").write_text("fixture\n", encoding="utf-8")
             subprocess.run(["git", "add", "."], cwd=root, check=True)
             subprocess.run(
@@ -104,8 +106,35 @@ class CodexHookContractTests(unittest.TestCase):
             )
 
             self.assertEqual(result.returncode, 2, result.stderr)
-            self.assertIn("commit gate: running", result.stderr)
-            self.assertIn("commit gate FAILED", result.stderr)
+            self.assertIn("receipt is missing or stale", result.stderr)
+            self.assertIn("Run scripts/dev.sh checkpoint outside the hook", result.stderr)
+            self.assertFalse((root / "gate-ran").exists())
+
+            marker = root / "build/scratch/gate-fingerprint/last-pass"
+            marker.parent.mkdir(parents=True)
+            exact = subprocess.check_output(
+                [sys.executable, str(fingerprint), "--root", str(root), "--checkpoint"], text=True, env=env
+            ).strip()
+            for receipt, expected in (("corrupt", 2), ("", 2), (exact, 0)):
+                with self.subTest(receipt="exact" if receipt == exact else "invalid"):
+                    marker.write_text(receipt + "\n", encoding="utf-8")
+                    result = subprocess.run([str(hook)], cwd=root, env=env,
+                                            input=json.dumps({"tool_input": {"command": "git commit -m test"}}),
+                                            text=True, capture_output=True, timeout=10)
+                    self.assertEqual(result.returncode, expected, result.stderr)
+                    self.assertFalse((root / "gate-ran").exists())
+            (root / "fixture.txt").write_text("changed after checkpoint\n", encoding="utf-8")
+            result = subprocess.run([str(hook)], cwd=root, env=env,
+                                    input=json.dumps({"tool_input": {"command": "git commit -m test"}}),
+                                    text=True, capture_output=True, timeout=10)
+            self.assertEqual(result.returncode, 2, result.stderr)
+            fingerprint.write_text("raise SystemExit(1)\n", encoding="utf-8")
+            result = subprocess.run([str(hook)], cwd=root, env=env,
+                                    input=json.dumps({"tool_input": {"command": "git commit -m test"}}),
+                                    text=True, capture_output=True, timeout=10)
+            self.assertEqual(result.returncode, 2, result.stderr)
+            self.assertIn("unable to verify", result.stderr)
+            self.assertFalse((root / "gate-ran").exists())
 
     def test_non_main_branch_blocks_commit_even_when_validation_is_skipped(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

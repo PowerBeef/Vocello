@@ -33,7 +33,9 @@ does not run the project gate again. Any subsequent edit, added untracked file, 
 invalidates the marker. Local markers also bind resolved tool executables, Python/OS/Xcode identity
 and relevant toolchain environment. Equivalent shell PATH ordering reuses a marker only when PATH
 membership and all fingerprinted tool resolutions remain unchanged. They are not release evidence. The checker refuses edits during
-verification instead of attaching PASS to the later untested content.
+verification instead of attaching PASS to the later untested content. The commit hook only checks
+the receipt and blocks if it is absent, stale or unreadable. It never starts another build. Run the
+checkpoint directly so long checks remain observable and are not limited by the host hook timeout.
 
 Finalize intended tracked-file membership **before** derived refresh: project-health inventories
 use Git-tracked files. Adding a new file to the index afterward can stale that generated summary

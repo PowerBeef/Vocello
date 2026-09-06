@@ -52,7 +52,8 @@ gates the build actually runs, the set of governed output paths — and reports 
 ## What runs, and in which class
 
 `./scripts/check_project_inputs.sh` is the complete deterministic gate used by CI/release. The T1
-hook runs the path-aware local checkpoint; see [development-workflow.md](development-workflow.md).
+hook requires the path-aware local checkpoint's exact-tree receipt; it blocks rather than launching
+long checks itself. See [development-workflow.md](development-workflow.md).
 None of these deterministic checks needs a model, a device, or XCUITest.
 
 | Check | Class | Guards |

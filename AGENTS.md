@@ -136,7 +136,9 @@ Discover assists only when needed.
 ## Codex and Xcode workflow
 
 Review and trust `.codex/hooks.json` with `/hooks`. Its Bash hook runs
-`scripts/hooks/precommit_gate.sh`; commits require `main` and the local checkpoint. Exit 2 blocks.
+`scripts/hooks/precommit_gate.sh`; commits require `main` and a completed, matching local checkpoint.
+The hook only checks that receipt; missing/stale receipts block with exit 2. Run long checks through
+`scripts/dev.sh checkpoint`, never inside the hook or its host timeout.
 `QVOICE_SKIP_COMMIT_GATE=1` bypasses validation once, never the `main` requirement or full CI.
 
 With XcodeBuildMCP, read `axiom-xcode-mcp`, call `session_show_defaults`, use profile `macos`

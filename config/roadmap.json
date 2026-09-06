@@ -3406,7 +3406,7 @@
         "scripts/check_test_workflows.sh"
       ],
       "updated": "2026-09-06",
-      "notes": "Implementation and focused routing/negative fixtures completed. The coherent full deterministic checkpoint remains required before publication of this patch; its result is retained in the existing local gate artifact. This is workflow implementation, not product/candidate acceptance. Release-first remains primary; the phone and product investigations remain paused."
+      "notes": "Implementation and focused routing/negative fixtures completed. Commit-hook validation is receipt-only: absent, stale or unreadable receipts block without starting another checkpoint; long checks run directly outside the host hook timeout. The interrupted 7887bfda hook recheck is not a completed PASS. A direct coherent full deterministic checkpoint remains required for the follow-up; results stay in the existing gate artifacts. This is workflow implementation, not product/candidate acceptance. Release-first remains primary; the phone and product investigations remain paused."
     }
   ]
 }

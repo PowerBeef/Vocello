@@ -224,7 +224,7 @@ Exemptions require a reason in `config/surface-coverage-exemptions.json`. Read
   lightweight `docs-contracts` job runs unconditionally on every push/PR (documentation,
   doc-metadata, surface-coverage, and roadmap validators), so a docs-only push can never green
   `CI required` without the contract suite — the T1 commit-gate hook
-  (`scripts/hooks/precommit_gate.sh`, owned here) provides the same coverage locally but is
+  (`scripts/hooks/precommit_gate.sh`, owned here) requires the local checkpoint receipt but is
   Codex-session tooling, not a universal git hook. Both heavy macOS jobs cache SwiftPM checkouts.
 - **Security timing is path-relevant and release-bound.** `security.yml` routes native and website
   changes on pushes and pull requests, runs CodeQL for either relevant surface and npm advisory

@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
-# Codex PreToolUse hook: the automatic T1 commit gate.
+# Codex PreToolUse hook: the fast T1 receipt check.
 #
 # Fired for every Bash tool call; exits instantly unless the command contains
 # `git commit`. For commits it first requires the symbolic branch to be exactly
-# `main`, then runs the path-aware local checkpoint through scripts/dev.sh.
-# Either violation blocks
-# the commit. A fingerprint of the current tree state is cached under
+# `main`, then requires a completed path-aware local checkpoint receipt.
+# Either violation blocks the commit. Run the checkpoint outside this hook:
+# builds can exceed the host hook timeout, which is not a validation result.
+# A fingerprint of the current tree state is cached under
 # build/scratch/gate-fingerprint (scratch-class output) so repeat commits on
 # an already-validated tree are a no-op.
 #
@@ -47,27 +48,20 @@ fi
 
 marker_dir="build/scratch/gate-fingerprint"
 marker="$marker_dir/last-pass"
-log="$marker_dir/last-run.log"
 
 # Content-complete tree fingerprint: final tracked worktree bytes and every
 # non-ignored untracked path/byte are bound. Re-editing an already-dirty file
 # cannot reuse a stale PASS marker, while staging the exact same bytes can.
-fingerprint="$(python3 scripts/tree_fingerprint.py --root "$ROOT_DIR" --checkpoint)"
+if ! fingerprint="$(python3 scripts/tree_fingerprint.py --root "$ROOT_DIR" --checkpoint 2>/dev/null)"; then
+  echo "commit gate: BLOCKED — unable to verify the checkpoint identity." >&2
+  echo "Run scripts/dev.sh checkpoint and resolve its errors before committing." >&2
+  exit 2
+fi
 
 if [[ -f "$marker" && "$(cat "$marker" 2>/dev/null)" == "$fingerprint" ]]; then
   exit 0
 fi
 
-mkdir -p "$marker_dir"
-echo "commit gate: running scripts/dev.sh checkpoint …" >&2
-if scripts/dev.sh checkpoint >"$log" 2>&1; then
-  # The checkpoint owns its post-refresh marker and rejects mid-check edits.
-  # Never overwrite it with the pre-refresh fingerprint captured above.
-  echo "commit gate: PASS" >&2
-  exit 0
-fi
-
-echo "commit gate FAILED — last lines of $log:" >&2
-tail -20 "$log" >&2 || true
-echo "Fix the failure (or QVOICE_SKIP_COMMIT_GATE=1 to bypass once); the full CI suite still runs on push." >&2
+echo "commit gate: BLOCKED — completed checkpoint receipt is missing or stale." >&2
+echo "Run scripts/dev.sh checkpoint outside the hook, inspect its result, then commit the validated tree." >&2
 exit 2

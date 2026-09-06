@@ -76,6 +76,13 @@ RSS peaks are 33,636,352 / 33,718,272 bytes. They are probe-implementation evide
 qualification or continuous host-pressure proof. The deterministic fixture, not these two
 naturally clean exits, exercises the precisely scheduled teardown race.
 
+Final `scripts/dev.sh checkpoint` passes outside the managed sandbox: derived refresh/validation,
+project-input gates and all **1,547 Python tests**, generic iOS app/logic SDK builds, and macOS
+native run `mac-test-20260906-134817` (**582 core, 19 transport, 109 runtime**; no failures, two
+optional runtime fixtures skipped). Native logs/verdict remain under the governed test-artifact
+root. Implementation checkpoint: `32c8daa6`. This is deterministic implementation verification,
+not a new device campaign, heavy-model qualification or candidate promotion.
+
 Ignored bundle: `build/artifacts/diagnostics/macos/rf06-evaluator-corrections-20260906/`.
 The initial operator comparison wrapper used an incorrect audio-digest key after its two
 successful probes; that failure/script remains retained. Comparison was completed separately

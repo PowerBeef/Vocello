@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import fcntl
+import copy
+import json
 import os
 import signal
 import subprocess
@@ -11,13 +13,15 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from delivery_resource_supervisor import (  # noqa: E402
     HostSnapshot,
     ResourceSupervisorError,
+    parse_macos_footprint_report,
+    macos_footprint_sampler,
     run_supervised,
 )
 
@@ -234,6 +238,121 @@ class DeliveryResourceSupervisorTests(unittest.TestCase):
         self.assertNotIn("private probe details", str(result.report))
         with self.assertRaises(ProcessLookupError):
             os.kill(child_ids[0], 0)
+
+    def _probe_exit_race(self, error, *, exits=True, sampled=True, exit_code=0):
+        """Kernel probe loses the child before Popen has observed its exit."""
+        child = Mock(pid=123456)
+        status = {"code": None}
+        child.poll.side_effect = lambda: status["code"]
+
+        def wait(timeout):
+            if not exits and status["code"] is None:
+                raise subprocess.TimeoutExpired("fixture", timeout)
+            status["code"] = exit_code if status["code"] is None else status["code"]
+            return status["code"]
+
+        def stop(_pid, _sig):
+            status["code"] = -signal.SIGTERM
+
+        child.wait.side_effect = wait
+        samples = ([1024] if sampled else []) + [error]
+        with patch("delivery_resource_supervisor.subprocess.Popen", return_value=child), \
+             patch("delivery_resource_supervisor.os.killpg", side_effect=stop) as kill, \
+             patch("delivery_resource_supervisor.time.sleep"):
+            result = run_supervised(
+                ["fixture"], lock_root=self.root, snapshotter=self._snapshot,
+                rss_sampler=lambda _: 1024,
+                physical_footprint_sampler=Mock(side_effect=samples),
+            )
+        return result.report, kill.call_count
+
+    def test_typed_probe_exit_is_confirmed_before_signalling(self) -> None:
+        report, signals = self._probe_exit_race(ProcessLookupError("private kernel report"))
+        self.assertEqual(signals, 0)
+        self.assertTrue(report["qualified"])
+        self.assertEqual(report["physicalFootprintSampleCount"], 1)
+        self.assertEqual(report["terminalProbeCount"], 1)
+        self.assertNotIn("private kernel report", str(report))
+
+    def test_probe_lookup_error_does_not_excuse_a_live_child(self) -> None:
+        report, signals = self._probe_exit_race(ProcessLookupError(), exits=False)
+        self.assertGreater(signals, 0)
+        self.assertFalse(report["qualified"])
+        self.assertIn("resource-probe-failed", report["qualificationFailures"])
+
+    def test_confirmed_exit_without_a_sample_cannot_qualify(self) -> None:
+        report, signals = self._probe_exit_race(ProcessLookupError(), sampled=False)
+        self.assertEqual(signals, 0)
+        self.assertFalse(report["qualified"])
+        self.assertIn("physical-footprint-unavailable", report["qualificationFailures"])
+
+    def test_confirmed_nonzero_exit_cannot_qualify(self) -> None:
+        report, signals = self._probe_exit_race(ProcessLookupError(), exit_code=1)
+        self.assertEqual(signals, 0)
+        self.assertIn("nonzero-exit", report["qualificationFailures"])
+
+    def test_permission_and_unknown_probe_errors_remain_failures(self) -> None:
+        for error in (PermissionError("private path"), RuntimeError("private path")):
+            with self.subTest(error=type(error).__name__):
+                report, _ = self._probe_exit_race(error)
+                self.assertFalse(report["qualified"])
+                self.assertIn("resource-probe-failed", report["qualificationFailures"])
+                self.assertNotIn("private path", str(report))
+
+    def test_footprint_parser_requires_exact_pid_byte_measurement(self) -> None:
+        payload = {"unit": "byte", "bytes per unit": 1, "errors": [], "warnings": [],
+                   "processes": [{"pid": 42, "footprint": 1024}]}
+        self.assertEqual(parse_macos_footprint_report(payload, 42), 1024)
+        mutations = [
+            {"unit": "MiB"}, {"bytes per unit": True}, {"bytes per unit": 1024},
+            {"processes": [{"pid": 43, "footprint": 1024}]},
+            {"processes": [{"pid": 42, "footprint": 1024}] * 2},
+            {"errors": ["permission denied: private path"]},
+            {"warnings": "malformed"},
+        ] + [{"processes": [{"pid": 42, "footprint": value}]}
+             for value in (None, True, -1, 0, 1.5, "1024")]
+        for mutation in mutations:
+            with self.subTest(mutation=mutation), self.assertRaises(ResourceSupervisorError):
+                parse_macos_footprint_report(payload | mutation, 42)
+
+    def test_footprint_parser_types_only_allowlisted_kernel_teardown(self) -> None:
+        payload = {
+            "unit": "byte", "bytes per unit": 1,
+            "errors": ["mach_vm_region_recurse - (os/kern) invalid argument"],
+            "warnings": ["Unable to retrieve ledger entry info - No such process",
+                         "vm.get_owned_vmobjects - No such process"],
+            "processes": [{"pid": 42, "footprint": None}],
+        }
+        with self.assertRaises(ProcessLookupError):
+            parse_macos_footprint_report(payload, 42)
+        for field, value in (("errors", "permission denied"), ("warnings", "unexplained warning")):
+            invalid = copy.deepcopy(payload)
+            invalid[field].append(value)
+            with self.assertRaises(ResourceSupervisorError):
+                parse_macos_footprint_report(invalid, 42)
+        with self.assertRaises(ResourceSupervisorError):
+            parse_macos_footprint_report(payload, 43)
+
+    def test_footprint_sampler_retains_reports_and_refuses_stderr_or_directory_reuse(self):
+        raw = self.root / "samples"
+        sample = macos_footprint_sampler(raw)
+        with self.assertRaises(FileExistsError):
+            macos_footprint_sampler(raw)
+        def run(command, **kwargs):
+            self.assertEqual(command[:3], ["/usr/bin/footprint", "-p", "42"])
+            Path(command[-1]).write_text(json.dumps({
+                "unit": "byte", "bytes per unit": 1, "errors": [], "warnings": [],
+                "processes": [{"pid": 42, "footprint": 1024}],
+            }))
+            return subprocess.CompletedProcess(command, 0, b"", b"")
+        with patch("delivery_resource_supervisor.subprocess.run", side_effect=run):
+            self.assertEqual(sample(42), 1024)
+        self.assertTrue((raw / "footprint-0000.json").is_file())
+        with patch("delivery_resource_supervisor.subprocess.run", return_value=
+                   subprocess.CompletedProcess([], 1, b"", b"permission denied: private path")), \
+             self.assertRaises(ResourceSupervisorError):
+            sample(42)
+        self.assertEqual((raw / "footprint-0001.stderr.log").read_bytes(), b"permission denied: private path")
 
     def test_pressure_swap_and_recovery_fail_closed(self) -> None:
         snapshots = iter((

@@ -363,6 +363,7 @@
         "scripts/qualify_delivery_compact_models.py",
         "scripts/prepare_delivery_listener_anchors.py",
         "scripts/delivery_resource_supervisor.py",
+        "scripts/check_language_output.py",
         "scripts/run_local_delivery_cascade.py",
         "scripts/delivery_promotion_decision.py",
         "scripts/audio_cadence_qc.py",

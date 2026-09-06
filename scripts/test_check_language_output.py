@@ -2,16 +2,21 @@
 """Offline fixture tests for scripts/check_language_output.py (no device)."""
 
 import json
+import hashlib
 import os
 from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__)))
 from language_bench_evidence import build_plan, write_json_atomic
-from check_language_output import recomputed_accuracy, validate_structured_verification
+from check_language_output import (
+    CHINESE_SCRIPT_CONVERTER, ChineseScriptDiagnosticError, chinese_script_diagnostic,
+    _pinned_chinese_script_transform, recomputed_accuracy, validate_structured_verification,
+)
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 CHECK = os.path.join(ROOT, "scripts", "check_language_output.py")
@@ -467,6 +472,138 @@ class CheckLanguageOutputTests(unittest.TestCase):
         # must retain the audible dakuten distinction.
         self.assertEqual(word["errorRate"], 0.0)
         self.assertEqual(character["errorRate"], 0.2)
+
+
+class ChineseScriptDiagnosticTests(unittest.TestCase):
+    # Deliberately small deterministic fixture, NOT a replacement normalization
+    # table. Real conversion is optional, digest-pinned and checked separately.
+    @staticmethod
+    def transform(texts, _root):
+        table = str.maketrans({"車": "车", "開": "开", "國": "国", "語": "语", "後": "后"})
+        return tuple(text.translate(table) for text in texts)
+
+    def diagnose(self, reference, hypothesis, language="chinese"):
+        with patch("check_language_output._pinned_chinese_script_transform", side_effect=self.transform):
+            return chinese_script_diagnostic(reference, hypothesis, language,
+                                             audio_sha256="a" * 64, icu_root=Path("unused"))
+
+    def test_script_equivalence_is_supplemental_and_raw_metric_is_unchanged(self):
+        result = self.diagnose("中国车开", "中國車開")
+        self.assertEqual(result["rawCharacterMetrics"], recomputed_accuracy("中国车开", "中國車開", "chinese")[1])
+        self.assertEqual(result["rawCharacterMetrics"]["errorRate"], .75)
+        self.assertEqual(result["scriptCanonicalCharacterMetrics"]["errorRate"], 0)
+        self.assertFalse(result["promotionAuthority"])
+        self.assertFalse(result["homophoneNormalization"])
+        self.assertNotIn("pass", result)
+        self.assertNotIn("中国车开", json.dumps(result, ensure_ascii=False))
+        self.assertEqual(result["sourceAudioSHA256"], "a" * 64)
+        self.assertEqual(result["algorithmVersion"], "chinese-script-diagnostic-v1")
+
+    def test_real_errors_and_homophones_remain_after_script_conversion(self):
+        for reference, hypothesis, counts in (
+            ("车站", "車山", (1, 0, 0)),
+            ("车站", "車", (0, 0, 1)),
+            ("车站", "車站山", (0, 1, 0)),
+            ("身后坐", "深厚做", (3, 0, 0)),
+        ):
+            with self.subTest(hypothesis=hypothesis):
+                result = self.diagnose(reference, hypothesis)["scriptCanonicalCharacterMetrics"]
+                self.assertEqual(tuple(result[key] for key in ("substitutions", "insertions", "deletions")), counts)
+
+    def test_both_script_directions_and_punctuation_are_consistent(self):
+        first = self.diagnose("中国，车开。", "中國車開")
+        second = self.diagnose("中國車開", "中国，车开。")
+        self.assertEqual(first["scriptCanonicalCharacterMetrics"]["errorRate"], 0)
+        self.assertEqual(second["scriptCanonicalCharacterMetrics"]["errorRate"], 0)
+
+    def test_locale_and_bad_inputs_fail_without_launching_converter(self):
+        with patch("check_language_output._pinned_chinese_script_transform") as convert:
+            for language, reference, audio in (("japanese", "国", "a" * 64),
+                                                ("chinese", "", "a" * 64),
+                                                ("chinese", "国", "invalid")):
+                with self.subTest(language=language), self.assertRaises(ChineseScriptDiagnosticError):
+                    chinese_script_diagnostic(reference, "國", language, audio_sha256=audio, icu_root=Path("private"))
+            convert.assert_not_called()
+
+    def test_supplement_cannot_override_governed_failure(self):
+        value = verification("chinese", script="中国车开", transcript_override="中國車開")
+        value["scriptDiagnostic"] = self.diagnose("中国车开", "中國車開")
+        failures = validate_structured_verification(value, "chinese", "中国车开", "fixture")
+        self.assertTrue(failures)
+        self.assertEqual(value["characterErrorRate"], .75)
+
+    def test_tool_missing_or_drift_fails_before_launch(self):
+        with tempfile.TemporaryDirectory() as temp, patch("check_language_output.subprocess.run") as run:
+            root = Path(temp)
+            with self.assertRaisesRegex(ChineseScriptDiagnosticError, "converter-unavailable"):
+                _pinned_chinese_script_transform(("国", "國"), root)
+            (root / "bin").mkdir()
+            (root / "bin/uconv").write_text("drift")
+            with self.assertRaisesRegex(ChineseScriptDiagnosticError, "converter-digest-mismatch"):
+                _pinned_chinese_script_transform(("国", "國"), root)
+            run.assert_not_called()
+
+    def test_pinned_converter_rechecks_files_and_scrubs_environment(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            pins = dict(CHINESE_SCRIPT_CONVERTER, files={})
+            for relative in CHINESE_SCRIPT_CONVERTER["files"]:
+                target = root / relative
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(b"fixture")
+                pins["files"][relative] = hashlib.sha256(b"fixture").hexdigest()
+            calls = []
+            def run(command, **kwargs):
+                calls.append((command, kwargs))
+                if "--version" in command:
+                    output = pins["version"] + "\n"
+                else:
+                    output = self.transform((kwargs["input"], ""), root)[0]
+                return subprocess.CompletedProcess(command, 0, output, "")
+            with patch("check_language_output.CHINESE_SCRIPT_CONVERTER", pins), \
+                 patch("check_language_output.subprocess.run", side_effect=run):
+                self.assertEqual(_pinned_chinese_script_transform(("国", "國"), root), ("国", "国"))
+                self.assertEqual(len(calls), 3)
+                self.assertEqual(set(calls[0][1]["env"]), {"PATH", "LANG"})
+                def drift(command, **kwargs):
+                    result = run(command, **kwargs)
+                    (root / "lib/libicudata.78.dylib").write_bytes(b"changed")
+                    return result
+                with patch("check_language_output.subprocess.run", side_effect=drift), \
+                     self.assertRaisesRegex(ChineseScriptDiagnosticError, "converter-digest-mismatch"):
+                    _pinned_chinese_script_transform(("国", "國"), root)
+
+    def test_cli_refuses_existing_evidence_and_redacts_paths(self):
+        with tempfile.TemporaryDirectory() as temp:
+            output = Path(temp) / "existing.json"
+            output.write_text("original")
+            result = subprocess.run([
+                sys.executable, CHECK, "chinese-script-diagnostic", "--reference-file", temp,
+                "--transcript-file", temp, "--audio-file", temp, "--icu-root", temp,
+                "--output", str(output)], capture_output=True, text=True)
+            self.assertEqual(result.returncode, 1)
+            self.assertEqual(output.read_text(), "original")
+            self.assertNotIn(temp, result.stderr)
+
+    def test_converter_version_timeout_and_stderr_fail_closed(self):
+        def pinned(path):
+            for relative, digest in CHINESE_SCRIPT_CONVERTER["files"].items():
+                if str(path).endswith(relative):
+                    return digest
+            self.fail("unexpected converter file")
+        valid_version = subprocess.CompletedProcess([], 0, CHINESE_SCRIPT_CONVERTER["version"], "")
+        cases = (
+            ([subprocess.CompletedProcess([], 0, "unreviewed version", "")], "version-mismatch"),
+            ([valid_version, subprocess.CompletedProcess([], 0, "国", "private text")], "output-invalid"),
+            ([valid_version, subprocess.CompletedProcess([], 1, "", "private path")], "output-invalid"),
+            ([subprocess.TimeoutExpired("private path", 5)], "unavailable"),
+        )
+        for responses, reason in cases:
+            with self.subTest(reason=reason), \
+                 patch("check_language_output._sha256_file", side_effect=pinned), \
+                 patch("check_language_output.subprocess.run", side_effect=responses), \
+                 self.assertRaisesRegex(ChineseScriptDiagnosticError, reason):
+                _pinned_chinese_script_transform(("国", "國"), Path("unused"))
 
 
 if __name__ == "__main__":

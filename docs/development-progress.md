@@ -47,6 +47,67 @@ machine-readable status record and wins over any older prose.
 | 13 — Benchmark/history v3 | Live 2026-07-29: the first schema-v3 records are committed (three clean `phase0-cli-control-*` engine records plus one exploratory run that also exposed and fixed the summarizer's v3 pin). `benchmarks/schema-v3.json` adds the typed quality identity to generation takes (pass/warning only, five fast gates required, machine-code issues); v1/v2 records stay valid immutable history; the publisher stamps v3 only when every take carries the identity. The UI benchmark checkers folded the same identity 2026-08-01: ui-generation records now publish v3 (first: the focused `v3-fold-proof` record `macos-xcui-benchmark-20260801-003208-403989cf`); the canonical iOS matrix published its first v3 record 2026-08-01 (`ios-xcui-benchmark-20260801-132415-abbec96b`). |
 | 14 — Organization and retirement | Closed 2026-07-23 (14a + 14b): compatibility SPI retired, actor-owned loading/metadata/priming/clone artifacts, clone conditioning epoch-bound end to end. |
 
+## September 6 evaluator corrections and product priority
+
+**The two bounded evaluator corrections are implemented; RF-06/VLR-07 remain in-flight.** No
+phone, TTS or neural evaluator ran, and no production request, model, seed, sampling, token-cap
+or QC policy changed. The 201-take campaign remains stopped. AGENTS.md's existing release-first,
+serial-work, retained-evidence and no-speculative-fix instructions remain applicable.
+
+- **Resource capture:** the retained final `footprint-0071.json` has a null exact-PID footprint
+  and allowlisted kernel `No such process` diagnostics. The regression reproduced premature
+  signalling in the previous supervisor. `owned-process-probe-v2` now distinguishes this typed
+  probe observation, waits at most 250 ms for the owned child, and accepts terminal absence only
+  with confirmed exit and valid prior samples. Permission errors, unknown errors, live missing
+  samples and unconfirmed exit still fail closed. The historical ASR probe/signal failure stays
+  unqualified; this does not retrospectively prove its signal denial was harmless.
+- **Chinese diagnostics:** `check_language_output.py chinese-script-diagnostic` uses pinned
+  ICU 78.3 binary/library/data and configuration identity to supplement, never replace, strict
+  CER. Three retained transcripts and the real CLI path reproduce raw **25/59 (42.3729%)** and
+  supplementary **3/59 (5.08475%)**. The three residual differences remain errors in that score;
+  there is no homophone normalization, phonetic proof or quality PASS. No tool/model installation
+  is required by CI. The four original audio/codec artifacts were rehashed and remain unchanged.
+
+Focused verification passes **52 tests**, including historical language-gate fixtures and
+negative resource/parser/normalization cases. Two final-source serial lightweight probes each
+retain ten valid footprint samples, exit zero, zero swap growth, no before/after pressure
+warning and qualified post-exit recovery. Footprint peaks are 23,675,312 / 23,757,232 bytes;
+RSS peaks are 33,636,352 / 33,718,272 bytes. They are probe-implementation evidence, not heavy-model
+qualification or continuous host-pressure proof. The deterministic fixture, not these two
+naturally clean exits, exercises the precisely scheduled teardown race.
+
+Ignored bundle: `build/artifacts/diagnostics/macos/rf06-evaluator-corrections-20260906/`.
+The initial operator comparison wrapper used an incorrect audio-digest key after its two
+successful probes; that failure/script remains retained. Comparison was completed separately
+without repeating those probes or recognition. Later final-source probes have distinct records.
+Bindings: `summary.json` SHA-256 `58d5dce00cfaa31aa493339e68e65afbf23d2ff7198f49bdf16d480f31fca7aa`;
+`final-probes/probe-1/resources.json`
+`9d15b261d2ddd88a8ead63cc0141c19ecfe8f2c4bb4401e49865d36c8d688c78`;
+`final-probes/probe-2/resources.json`
+`120a3940f01f7649ece793d96f80c35c8584ab0b1c2149e6be5a4fc5f174c43b`;
+`remaining-review.json` `5ecf5c61ddb436b219588ede5d4e11cbb3f4ef1c23e281e665dc112cbc9da887`.
+
+### Next product work, in order
+
+1. **Long-form non-EOS termination:** retained telemetry again confirms the first 859-character
+   Aiden/English/Consistent segment reaches 2,048 codes and 293 decoded/published chunks, then
+   `generation.incomplete`. The adapter correctly rejects `.maximumTokens` before final
+   acceptance; its typed-error regression already exists. The planner's coarse token/pace
+   estimate is not a proof that every take finishes. Recover the exact script bytes against
+   the recorded digest, preserve the original UInt64 seed, and use existing gated codec capture
+   for a bounded comparison. Original WAV/codes are unavailable and serious thermals/test text
+   remain confounders. Do not raise the cap, shorten text or change planning based on this alone.
+2. **Severe gaps:** keep the French traces' independently reproduced ~12-second interior gap
+   separate from the Chinese 86.392-second trailing silence/EOS case. Existing decoded evidence
+   excludes several incremental/UI/writer and fp16-rounding hypotheses, not every shared
+   learned-codec/generated-code cause. Preserve mandatory rejection; no more undirected decoder
+   variants. A new targeted experiment needs a specific remaining hypothesis and exact inputs.
+3. **Advisory Chinese pause and French ASR disagreement:** preserve the 834 ms extra-pause
+   warning and raw scores. Independent locale-locked full-WAV recognition and governed
+   pause/prosody evidence remain missing; script conversion alone cannot close either issue.
+
+No new campaign, device acceptance or production remediation is implied by these tooling passes.
+
 ## September 6 Chinese intelligibility and pause alignment
 
 **The bounded host-only RF-06 analysis is complete, not a quality PASS.** The original 18.8 s

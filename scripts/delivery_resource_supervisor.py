@@ -11,6 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import fcntl
 import hashlib
+import json
 import math
 import os
 from pathlib import Path
@@ -30,10 +31,73 @@ SAMPLE_INTERVAL_SECONDS = 0.05
 DEFAULT_RECOVERY_TIMEOUT_SECONDS = 15.0
 RECOVERY_SAMPLE_INTERVAL_SECONDS = 0.5
 SHUTDOWN_WAIT_SECONDS = 2.0
+PROBE_EXIT_WAIT_SECONDS = 0.25
+PROBE_ALGORITHM_VERSION = "owned-process-probe-v2"
 
 
 class ResourceSupervisorError(RuntimeError):
     """A process could not run inside the serial resource contract."""
+
+
+def parse_macos_footprint_report(payload: Any, process_id: int) -> int:
+    """Exact-PID byte measurement; only known kernel teardown is typed as exit.
+
+    A ProcessLookupError is a probe observation, NOT proof of child exit. The
+    supervisor must still reap its owned Popen child before accepting shutdown.
+    Do not expose kernel diagnostics, process names or paths in compact reports.
+    """
+    invalid = ResourceSupervisorError("invalid physical-footprint report")
+    if (type(process_id) is not int or process_id <= 0 or not isinstance(payload, dict)
+            or payload.get("unit") != "byte" or type(payload.get("bytes per unit")) is not int
+            or payload["bytes per unit"] != 1):
+        raise invalid
+    rows = payload.get("processes")
+    if (not isinstance(rows, list) or len(rows) != 1 or not isinstance(rows[0], dict)
+            or type(rows[0].get("pid")) is not int or rows[0]["pid"] != process_id):
+        raise invalid
+    errors, warnings = payload.get("errors"), payload.get("warnings")
+    if (not isinstance(errors, list) or not isinstance(warnings, list)
+            or any(not isinstance(item, str) for item in errors + warnings)):
+        raise invalid
+    value = rows[0].get("footprint")
+    if type(value) is int and value > 0 and not errors and not warnings:
+        return value
+    teardown_warnings = {
+        "Unable to retrieve ledger entry info - No such process",
+        "vm.get_owned_vmobjects - No such process",
+    }
+    if ("footprint" in rows[0] and value is None and warnings
+            and set(warnings) <= teardown_warnings
+            and set(errors) <= {"mach_vm_region_recurse - (os/kern) invalid argument"}):
+        raise ProcessLookupError("physical-footprint target disappeared")
+    raise invalid
+
+
+def macos_footprint_sampler(raw_root: Path) -> Callable[[int], int]:
+    """Retain every raw probe in a new operator-owned, untracked directory."""
+    raw_root.mkdir(parents=True, exist_ok=False)
+    index = 0
+
+    def sample(process_id: int) -> int:
+        nonlocal index
+        target = raw_root / f"footprint-{index:04d}.json"
+        index += 1
+        result = subprocess.run(
+            ["/usr/bin/footprint", "-p", str(process_id), "--noCategories",
+             "-f", "bytes", "-j", str(target)],
+            capture_output=True, check=False, timeout=5,
+        )
+        if result.stderr:
+            target.with_suffix(".stderr.log").write_bytes(result.stderr)
+            raise ResourceSupervisorError("physical-footprint command diagnostics")
+        # Even a failed tool can retain a typed kernel teardown report. Parse
+        # that first; a valid measurement additionally needs successful exit.
+        value = parse_macos_footprint_report(json.loads(target.read_text()), process_id)
+        if result.returncode != 0:
+            raise ResourceSupervisorError("physical-footprint command failed")
+        return value
+
+    return sample
 
 
 @dataclass(frozen=True)
@@ -167,6 +231,8 @@ def run_supervised(
         footprint_samples = 0
         resource_limit_terminated = False
         resource_probe_failed = False
+        probe_failures: list[dict[str, str]] = []
+        terminal_probe_count = 0
         with tempfile.TemporaryFile() as stdout_file, tempfile.TemporaryFile() as stderr_file:
             process = subprocess.Popen(
                 list(command), stdout=stdout_file, stderr=stderr_file,
@@ -178,19 +244,41 @@ def run_supervised(
             )
             try:
                 while process.poll() is None:
+                    probe_stage = "rss"
                     try:
                         peak_rss = max(peak_rss, rss_sampler(process.pid))
                         if physical_footprint_sampler is not None:
+                            probe_stage = "physical-footprint"
                             footprint = physical_footprint_sampler(process.pid)
                             if type(footprint) is not int or footprint <= 0:
                                 # A process may exit between the liveness check and
-                                # the probe; missing live measurements fail closed.
-                                resource_probe_failed = process.poll() is None
+                                # the probe. Only absence, never malformed values,
+                                # can be explained by independently observed exit.
+                                resource_probe_failed = footprint is not None or process.poll() is None
+                                if resource_probe_failed:
+                                    probe_failures.append({"stage": probe_stage, "reason": "missing-live-measurement"})
                             else:
                                 footprint_samples += 1
                                 peak_footprint = max(peak_footprint, footprint)
+                    except ProcessLookupError:
+                        # The kernel may lose the task before waitpid observes
+                        # exit. Only this typed observation permits a bounded
+                        # reap before shutdown, never a retry of the workload.
+                        try:
+                            process.wait(timeout=PROBE_EXIT_WAIT_SECONDS)
+                            terminal_probe_count += 1
+                        except subprocess.TimeoutExpired:
+                            resource_probe_failed = True
+                            probe_failures.append({"stage": probe_stage, "reason": "target-exit-unconfirmed"})
+                        except OSError:
+                            resource_probe_failed = True
+                            probe_failures.append({"stage": probe_stage, "reason": "target-exit-observation-failed"})
+                    except PermissionError:
+                        resource_probe_failed = True
+                        probe_failures.append({"stage": probe_stage, "reason": "permission-denied"})
                     except Exception:
                         resource_probe_failed = True
+                        probe_failures.append({"stage": probe_stage, "reason": "probe-exception"})
                     resource_limit_terminated = (
                         peak_rss > maximum_rss_bytes
                         or peak_footprint > maximum_physical_footprint_bytes
@@ -259,6 +347,7 @@ def run_supervised(
             failures.append("post-exit-memory-recovery-unqualified")
         report = {
             "schemaVersion": SCHEMA_VERSION,
+            "probeAlgorithmVersion": PROBE_ALGORITHM_VERSION,
             "kind": "delivery-analyzer-resource-envelope",
             "provisionalPolicy": True,
             "promotionAuthority": False,
@@ -269,6 +358,8 @@ def run_supervised(
             "processExitConfirmed": exit_confirmed,
             "outputCaptureComplete": exit_confirmed,
             "shutdownFailures": shutdown_failures,
+            "probeFailures": probe_failures,
+            "terminalProbeCount": terminal_probe_count,
             "wallSeconds": wall_seconds,
             "peakRSSBytes": peak_rss,
             "maximumAllowedRSSBytes": maximum_rss_bytes,

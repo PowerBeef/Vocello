@@ -18,6 +18,7 @@ sourceOfTruth:
   - scripts/qualify_delivery_compact_models.py
   - scripts/prepare_delivery_listener_anchors.py
   - scripts/delivery_resource_supervisor.py
+  - scripts/check_language_output.py
   - scripts/run_local_delivery_cascade.py
   - scripts/delivery_promotion_decision.py
   - scripts/audio_cadence_qc.py
@@ -426,6 +427,37 @@ envelopes; a denied signal or incomplete exit remains unqualified even when usef
 results exist. Never infer OS termination cause, model qualification or a memory leak from it.
 No production generation
 memory threshold, historical evidence, or model qualification is changed by this diagnostic fix.
+
+Use `macos_footprint_sampler(new_untracked_directory)` for new physical-footprint probes. It
+retains raw reports, validates the exact PID and byte units, and rejects unexplained diagnostics.
+`owned-process-probe-v2` records sanitized `probeFailures` and `terminalProbeCount` alongside
+historical schema-1 fields. Only a typed target-disappeared observation permits a bounded 250 ms
+wait for the owned child before signalling. Confirmed exit requires earlier valid measurements;
+it does not excuse nonzero exit, permission denial, malformed data, or unavailable live samples.
+An unconfirmed exit still triggers bounded shutdown and fails qualification. Never retrofit this
+classification into an old failed envelope or infer that all old signal denials were harmless.
+
+### Optional Chinese script diagnostic
+
+The existing language checker provides an opt-in `chinese-script-diagnostic-v1` comparison:
+
+```sh
+python3 scripts/check_language_output.py chinese-script-diagnostic \
+  --reference-file <untracked-reference.txt> --transcript-file <untracked-transcript.txt> \
+  --audio-file <retained.wav> --icu-root <installed-icu-root> \
+  --output <new-untracked-diagnostic.json>
+```
+
+This runs no ASR or TTS. It preserves raw `normalized-edit-rate-v1` CER and separately compares
+both texts after ICU Traditional-to-Simplified conversion. ICU 78.3 binary/library/data digests,
+version, transform and configuration digest are pinned in `scripts/check_language_output.py`;
+missing or upgraded tools fail closed without installing anything. ICU is not a CI/release
+prerequisite. The JSON binds audio and original/converted text digests and lengths, not text or
+local paths. Existing output cannot be overwritten. No homophone normalization, quality PASS,
+threshold change or link into the governed language verdict exists. Many-to-one conversion is
+not phonetic/semantic proof, independent recognition, or permission to clear cadence warnings.
+
+### Listener workflow
 
 The versioned listener workflow remains under `delivery_calibration_session.py`:
 

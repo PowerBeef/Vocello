@@ -47,6 +47,90 @@ machine-readable status record and wins over any older prose.
 | 13 — Benchmark/history v3 | Live 2026-07-29: the first schema-v3 records are committed (three clean `phase0-cli-control-*` engine records plus one exploratory run that also exposed and fixed the summarizer's v3 pin). `benchmarks/schema-v3.json` adds the typed quality identity to generation takes (pass/warning only, five fast gates required, machine-code issues); v1/v2 records stay valid immutable history; the publisher stamps v3 only when every take carries the identity. The UI benchmark checkers folded the same identity 2026-08-01: ui-generation records now publish v3 (first: the focused `v3-fold-proof` record `macos-xcui-benchmark-20260801-003208-403989cf`); the canonical iOS matrix published its first v3 record 2026-08-01 (`ios-xcui-benchmark-20260801-132415-abbec96b`). |
 | 14 — Organization and retirement | Closed 2026-07-23 (14a + 14b): compatibility SPI retired, actor-owned loading/metadata/priming/clone artifacts, clone conditioning epoch-bound end to end. |
 
+## September 6 phase 4 Chinese cadence diagnostic
+
+**The authorized step 4 is complete as a diagnostic, not a quality PASS or audio-defect fix.**
+One original-seed take ran on clean `4fbbcd79`; full-tree identity remained
+`43037f38ec627592128f7638784f55fcf290f94cda8fab4513fca8a6e7f43ba5` throughout generation and
+the final screen-protection lane. RF-06/VLR-07 remain in-flight, RF-07 stays complete, and the
+201-take campaign has not restarted. No production source, prompt, model, sampling, seed or QC
+policy changed. This checkpoint supersedes the September 5 phone-approval wait below.
+
+The single run `ios-startup-reliability-20260906-161145-f0893eb1` used the prepared plan
+`ec705ce969d3bffe2eb29e46d48cdfa3cde0a8a0d8dd007859895718b8fcddc3`: Aiden, Angry normal,
+Chinese output, Consistent variation, streaming, cold start, UInt64 seed `11842053760559927849`.
+All expected receipt fields match, including the canonical English instruction for this
+non-Chinese-native speaker. The exact 64-character script is digest-bound; text stays untracked.
+There is one represented attempt, retry attempt zero, EOS termination and no token-cap hit.
+First codes arrived at 999 ms, first decoded audio at 1,411 ms and first publication at 1,417 ms.
+
+| Same-code evidence | Published output | Incremental replay | Full-mode replay |
+| --- | --- | --- | --- |
+| Duration | 18.80 s | 18.80 s | 18.80 s |
+| Fast-QC v6 | WARN | WARN | WARN |
+| Cadence pauses / expected budget | 5 / 4 | 5 / 4 | 5 / 4 |
+| Longest interior silence | 834 ms | 836 ms | 836 ms |
+| Longest silence starts | 16,702 ms | 16,702 ms | 16,702 ms |
+
+The warning is `cadence:excess1(5/4)`; no pause reaches the existing 1,200 ms suspicious-pause
+threshold. Pre-write near-silent chunks 17, 22 and 30 are diagnostic chunk flags, not three failed
+takes or whole-output hard rejections. The diagnostic result's `pass` means execution finished
+without a whole-output hard rejection; **the WARN remains authoritative and is not promotion
+quality**. Both replay schedules reproduce the pause from the retained 235 code frames. This
+excludes an exclusively UI, final-writer or incremental-schedule cause; their shared decoder and
+weights do not distinguish generated-code pathology from a common decoder cause. The historical
+warning WAV is missing, so matching duration/pause metrics are not byte-identical historical
+audio. A cold diagnostics-enabled `-Onone` process also does not recreate the prior optimized
+UI session's predecessor state. No new ASR, semantic-delivery or memory-promotion claim is made.
+
+The host validated generation/digest/size/PCM/duration/terminal identity for all four retained
+audio/codec artifacts, including the newly captured published warning WAV. The runner acknowledged
+device-side evidence removal; a subsequent process inventory found no Vocello or test-runner
+process before final screen protection. Model availability remained installed, thermal state
+nominal and sampled pressure healthy; no allocation retry or crash-log delta was observed.
+This is not a byte-for-byte audit of every user file or full memory qualification.
+
+**Retained evidence (ignored, never published):**
+
+- Run root: `build/artifacts/diagnostics/ios/startup-reliability/ios-startup-reliability-20260906-161145-f0893eb1/`.
+  Its generation `57133ADB-F3A5-499D-B795-2AF87E6720B7` owns the published WAV, codec trace,
+  incremental/full replay WAVs, request receipts, complete QC, telemetry, source/build identity,
+  system crash delta and collection/cleanup acknowledgment.
+- Supplemental review: `build/artifacts/diagnostics/ios/startup-reliability/rf06-phase4-20260906/review.json`,
+  SHA-256 `b8d180e8968b464113e44857f5c05c009093816fe1d9c30e65ee4d4b5e021587`.
+- Published WAV SHA-256 `8976164446328859b26ec0aa5154a97b48b351c50dc5b6d96530fa90913ee055`;
+  codec SHA-256 `bbe7ff2eb6bf8333b4b0f3ae991136a538890873041885f7ce6ca8b6a46429d6`.
+  The review lists each replay's exact hash and relative artifact reference.
+
+**XCUI accounting and screen protection:** initial inspect
+`ios-xcui-screen-protection-20260906-160510-ae3c3640` failed before any test-case body launched.
+The existing host classifier records `infrastructure_bootstrap_failure`: automation-mode timeout,
+zero launched test cases, one xcresult runner failure. It remains pinned with its failed result,
+ledger and classifier output. After the user's renewed unlock authorization, the separate inspect
+`ios-xcui-screen-protection-20260906-161039-bfe7e1e7` passed; this is not an automatic retry or a
+conversion of the first failure. Final enable
+`ios-xcui-screen-protection-20260906-161528-120086de` passed its complete runner/required-step
+ledger. French Settings' nested text and retained screenshot confirm **3 minutes**; the parent
+cell's raw accessibility value is empty. The screenshot also shows Always-On Display off.
+The test returned Home at 16:19:03 UTC. At 16:22 UTC, an independent read-only CoreDevice
+probe returned `passcodeRequired: true`, confirming current lock after the timer; no device UI
+followed protection. The private readback is retained as `lock-state-final-02.json` in the
+supplemental review directory. The earlier readback is retained separately, not overwritten.
+
+**Resume:** review these retained codes and pause locations on the host before considering more
+phone generation. Any next decoder comparison must use the same trace, bounded serial resources,
+and exact weights; separate common decoder behavior from generated-code behavior before a source
+fix. French recognizer disagreement, earlier distinct French/Chinese long-gap findings, and
+long-form termination remain separate RF-06 work. Do not retry this take, substitute another seed,
+relax cadence QC, resume the full campaign or relabel historical failures as PASS. Any additional
+device session requires renewed authorization after final screen protection. Existing AGENTS.md
+and testing procedures already express these boundaries; no new procedure or harness is needed.
+
+This documentation-only checkpoint uses the path-aware deterministic checkpoint: derived
+refresh/validation, `git diff --check` and the quick project-input gate. No additional native
+build, synthesis or UI rerun is needed for the narrative/roadmap changes; the device evidence
+remains bound to the clean pre-documentation source above.
+
 ## September 5 host follow-up completed — phone approval pending
 
 The requested steps 1–3 are complete as **diagnostic work, not audio-defect closure**.

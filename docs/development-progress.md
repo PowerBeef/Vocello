@@ -47,6 +47,69 @@ machine-readable status record and wins over any older prose.
 | 13 — Benchmark/history v3 | Live 2026-07-29: the first schema-v3 records are committed (three clean `phase0-cli-control-*` engine records plus one exploratory run that also exposed and fixed the summarizer's v3 pin). `benchmarks/schema-v3.json` adds the typed quality identity to generation takes (pass/warning only, five fast gates required, machine-code issues); v1/v2 records stay valid immutable history; the publisher stamps v3 only when every take carries the identity. The UI benchmark checkers folded the same identity 2026-08-01: ui-generation records now publish v3 (first: the focused `v3-fold-proof` record `macos-xcui-benchmark-20260801-003208-403989cf`); the canonical iOS matrix published its first v3 record 2026-08-01 (`ios-xcui-benchmark-20260801-132415-abbec96b`). |
 | 14 — Organization and retirement | Closed 2026-07-23 (14a + 14b): compatibility SPI retired, actor-owned loading/metadata/priming/clone artifacts, clone conditioning epoch-bound end to end. |
 
+## September 6 Chinese intelligibility and pause alignment
+
+**The bounded host-only RF-06 analysis is complete, not a quality PASS.** The original 18.8 s
+published iPhone WAV was analyzed without another TTS take, phone access or production change.
+Clean `cdf99fa7` and full-tree fingerprint
+`8f708fd96894ef07b4e7ea60b6b6939ef1f8d9df44799d4733e2d6062a602726` were unchanged throughout.
+All four original audio/codec artifacts remain hash-identical. RF-06/VLR-07 remain in-flight;
+RF-07 remains complete and the 201-take campaign remains stopped.
+
+Three predeclared offline passes used cached `mlx-community/whisper-small-mlx` revision
+`45f3915923c7a79a5a5b5a7d909d39aeb0e5630e`, with verified weights/configuration, runtime binary
+and preprocessing digests. Each processed the complete WAV, locale-locked to Chinese, without
+the expected text, an initial prompt or previous-text conditioning. The normalized transcripts
+agree 3/3; these are same-model replicates, not three independent recognizers. Language was
+forced, not detected. Word timestamps span 0–18.74 s but do not prove interior phonetic coverage.
+
+| Text comparison | Result | Interpretation |
+| --- | --- | --- |
+| Existing strict CER | 25/59 = 42.3729% | Preserved unchanged; no insertions or deletions. |
+| Traditional/Simplified diagnostic | 22 of 25 substitutions explained | Pinned ICU 78.3 transformation, not a scoring-policy change. |
+| Remaining diagnostic differences | 3/59 = 5.08475% | All three character pairs have matching isolated ICU dictionary readings; not confirmed spoken-word errors or acoustic phoneme proof. |
+
+The supplementary [ICU transformations](https://unicode-org.github.io/icu/userguide/transforms/general/)
+are version/binary/data-bound in the ignored evidence. Orthographic conversion and isolated
+readings cannot establish correct contextual meaning or natural delivery. The first analysis
+assertion incorrectly assumed every substitution was a script variant; its failure is retained
+separately, and the corrected diagnostic preserves all three residual differences. No inference
+was repeated to improve a score, and neither diagnostic score replaces the governed strict CER.
+
+Across all three timestamp streams, four measured pauses align approximately with the four
+source punctuation boundaries (after normalized characters 15, 27, 34 and 43). The fifth and
+longest pause, **834 ms starting at 16.702 s**, aligns after character 54 inside the final
+unpunctuated clause. ASR timestamps absorb silence and are not sample-accurate phoneme boundaries.
+This localizes the extra-pause concern; it does not prove that the pause is unnatural or authorize
+clearing `cadence:excess1(5/4)`. The prior independent decoder evidence remains unchanged.
+
+**Resource qualification remains failed:** the fresh lightweight preflight qualified, but the
+ASR envelope recorded `resource-probe-failed` and `process-group-signal-denied`. Child exit zero,
+confirmed process exit, complete capture, zero swap growth and successful post-exit memory
+recovery do not override these failures. Sampled footprint peaked at 1.747 GiB, RSS at 0.824 GiB;
+the three passes took 1.914/1.024/1.013 s inside a 6.254 s supervised run. No pressure warning
+appeared in before/after snapshots; this is not continuous pressure proof. No further heavy
+analyzer was launched. The cause of the probe/shutdown failure is not established by exit timing.
+
+Ignored bundle: `build/artifacts/diagnostics/macos/rf06-chinese-intelligibility-20260906/` contains
+source/preflight/provenance, all three recognition outputs, exact-PID samples and diagnostics.
+SHA-256 bindings: `comparison.json`
+`51a1fd21a1bf1da652ff16d08c555e16c8e37dcfc2458f7a7c2e65fa929e21ec`;
+`orthography.json` `1f1f76e3272927046306a532e16c5387c43f09f0606f32667945e9ce823b0534`;
+`pronunciation.json` `fb0bca045739dde007208412a7c2ad3a166a5b9c26e6321685ba703644735d5b`;
+`whisper/resources.json` `79590e56746af570c4db7c8964ae1da29b5d980fdd1d8e6663d64614ceeceb6c`.
+These artifacts bind the original take and unchanged WAV; raw transcripts/audio remain untracked.
+
+**Next:** preserve the warning and stop repeating decoder variants. Before another heavy run,
+establish reliable resource-probe/shutdown capture with a lightweight check. Remaining Chinese
+quality evidence needs independent locale-locked full-WAV recognition (Apple Speech has not run
+on this WAV) and governed pause/prosody controls. Any Chinese orthography-scoring change needs
+an explicit versioned normalization decision and regression fixtures, not score substitution.
+French recognizer disagreement, distinct long gaps and long-form termination remain separate
+RF-06 blockers. No new campaign or device work is authorized by this host checkpoint. Existing
+AGENTS.md/procedures remain accurate; verify this documentation change through the path-aware
+deterministic checkpoint, without a native rebuild or repeat generation.
+
 ## September 6 independent Chinese decoder comparison
 
 **The next bounded RF-06 investigation is complete; there is no evidence for a Vocello-specific

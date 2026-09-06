@@ -2388,7 +2388,8 @@
       "status": "in-flight",
       "gate": "Prosody calibration must freeze on a source-bound labeled training corpus and pass predeclared confusion/noise targets on an untouched holdout spanning speakers, scripts, lengths, languages, and defect severities before becoming promotion authority. Required closure evidence: corpus manifests and digests, annotation protocol, frozen profile, holdout report with uncertainty, analyzer noise-floor/repeatability evidence, and negative threshold-leakage fixtures.",
       "evidence": [
-        "doc:docs/reference/autonomous-validation-audit-2026-08-21.md"
+        "doc:docs/reference/autonomous-validation-audit-2026-08-21.md",
+        "doc:docs/reference/audio-qc-engineering.md"
       ],
       "sourceOfTruth": [
         "scripts/prosody_calibration.py",
@@ -2399,8 +2400,8 @@
         "scripts/tests/test_prosody_calibration.py",
         "scripts/tests/test_prosody_holdout_validation.py"
       ],
-      "updated": "2026-09-01",
-      "notes": "The 2026-08-22 DP-26 screen materially hardened exploratory delivery analysis, and the 2026-09-01 holdout implementation now freezes a calibration/holdout contract with source-bound audio plus split metadata, speaker/script/translation-group isolation, three-language and three-length coverage, severity coverage, analyzer/profile identity, 95% Wilson uncertainty, fail-closed threshold leakage, and privacy-safe atomic reports. The project gate and focused negative fixtures validate that infrastructure. AV-07 remains open because no independently labelled real 60-clip calibration plus 30-good/30-bad-or-larger untouched holdout has been supplied; current thresholds therefore remain explicitly unvalidated for promotion authority."
+      "updated": "2026-09-06",
+      "notes": "The 2026-08-22 DP-26 screen materially hardened exploratory delivery analysis, and the 2026-09-01 holdout implementation freezes source-bound audio/split metadata, speaker/script/translation isolation, multilingual/length/severity coverage, analyzer/profile identity, Wilson uncertainty and leakage checks. The separately requested September 6 QC audit repaired non-finite metric acceptance, truncated PCM and cache metadata acceptance, duration-sized derivative buffering, missing imported-analyzer cache identity, repeated neutral analysis and premature neural launches. Eight legacy derivative digests remain exact. Four serial synthetic M2/8 GB resource probes qualified with no swap growth; the one-hour derivative's process RSS fell from 316.98 MB to 43.22 MB. This is infrastructure/resource evidence, not perceptual qualification. Next with DP-28: explicitly version anti-aliased resampling and requalify adapters; compare corrected harmonicity/pitch with independent references before profile calibration; migrate the two legacy full-frame callers without rewriting historical reports. Three noiseless tone probes exposed pitch-dependent HNR proxy bias, so v3 is not a calibrated physical measure. No thresholds, prompts, models or sampling changed. AV-07 remains open because the independent real 60-clip calibration and 30-good/30-bad-or-larger untouched holdout remain unavailable; RF-06 product failures and the primary iOS release queue are unchanged."
     },
     {
       "id": "AV-08",

@@ -11,6 +11,7 @@ import stat
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -253,6 +254,23 @@ class DeliveryExperimentRunnerTests(unittest.TestCase):
         self.assertIn("derivedFeatures", report["rows"][0])
         self.assertEqual(report["rows"][0]["deliveryVerdict"]["deliveryID"], "neutral.strong")
         self.assertTrue((run_dir / "acoustic-layer.json").is_file())
+
+    def test_analysis_reuses_identical_audio_and_rejects_changed_bytes(self) -> None:
+        plan = self._single_row_plan()
+        run_dir = self.root / "analysis-cache"
+        state = run_execution_plan(plan=plan, binary=self.binary, data_dir=None, run_dir=run_dir)
+        import delivery_experiment_runner as runner
+        # The fake generator produces byte-identical instructed/reference WAVs.
+        with mock.patch.object(runner, "analyze", wraps=runner.analyze) as global_analysis, \
+             mock.patch.object(runner, "analyze_temporal", wraps=runner.analyze_temporal) as temporal:
+            result = analyze_execution(plan, run_dir)
+        self.assertEqual(global_analysis.call_count, 1)
+        self.assertEqual(temporal.call_count, 1)
+        self.assertTrue(all(value == 0 for value in result["rows"][0]["features"].values()))
+        audio = run_dir / next(iter(state["takes"].values()))["audio"]
+        audio.write_bytes(audio.read_bytes()[:-10])
+        with self.assertRaises(RunnerError):
+            analyze_execution(plan, run_dir)
 
     def test_generate_json_source_exposes_exact_receipt_fields(self) -> None:
         source = (REPO / "Sources/VocelloCLI/GenerateCommand.swift").read_text(encoding="utf-8")

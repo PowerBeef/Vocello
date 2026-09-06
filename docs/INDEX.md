@@ -53,6 +53,7 @@ Review when: target or scheme changes; runtime topology; telemetry schema; test 
 - **active** · [`docs/development-progress.md`](../docs/development-progress.md)
 - **active** · [`docs/project-map.html`](../docs/project-map.html)
 - **active** · [`docs/qwen_tone.md`](../docs/qwen_tone.md)
+- **active** · [`docs/reference/audio-qc-engineering.md`](../docs/reference/audio-qc-engineering.md)
 - **active** · [`docs/reference/benchmarking-procedure.md`](../docs/reference/benchmarking-procedure.md)
 - **active** · [`docs/reference/cli.md`](../docs/reference/cli.md)
 - **active** · [`docs/reference/codex-session-storage.md`](../docs/reference/codex-session-storage.md)

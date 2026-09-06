@@ -501,8 +501,10 @@ once.
 deterministic foundation for Fast, Standard, and Canonical gate composition. They are not the
 shipping quality authority yet: persisted Fast QC plus the existing specialized ASR, prosody,
 delivery, and benchmark validators remain authoritative until one end-to-end report/scheduler is
-cut over. The Python prosody analyzer is independently shipping algorithm v2, which uses two
-bounded passes rather than a duration-sized PCM/frame matrix.
+cut over. The Python prosody analyzer is independently shipping algorithm v3, which uses two
+bounded passes rather than a duration-sized PCM/frame matrix. Its phonation/spectral outputs are
+acoustic proxies, not calibrated emotion or clinical measures. See the
+[Audio QC engineering review](reference/audio-qc-engineering.md) for cache/resource and accuracy boundaries.
 
 ### 4.11 Spoken-text and long-form planning status
 

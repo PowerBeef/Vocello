@@ -93,7 +93,7 @@ Narrative authority: [`docs/reference/autonomous-validation-audit-2026-08-21.md`
 | `AV-04` | done | P2 — make baseline coverage changes fail closed | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md`, `file:config/benchmark-baseline-migrations.json`, `file:scripts/tests/test_compare_baseline.py` |
 | `AV-05` | done | P2 — bind engine performance evidence to shipping optimization | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md`, `file:scripts/build.sh`, `file:scripts/publish_benchmark_history.py`, `file:benchmarks/runs/engine-generation/mac-gate-bench-20260901-223657-866ddfb3.json` |
 | `AV-06` | done | P2 — establish stable powered benchmark trends | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md`, `file:benchmarks/runs/engine-generation/mac-gate-bench-20260902-013854-f39c1c91.json`, `file:benchmarks/runs/engine-generation/mac-gate-bench-20260902-015022-591814fe.json` |
-| `AV-07` | in-flight | P2 — independently validate prosody thresholds | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md` |
+| `AV-07` | in-flight | P2 — independently validate prosody thresholds | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md`, `doc:docs/reference/audio-qc-engineering.md` |
 | `AV-08` | in-flight | P2 — qualify multilingual output beyond a single cohort | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md` |
 | `AV-09` | in-flight | P2 — make stateful physical-device lanes independently repeatable | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md`, `doc:docs/development-progress.md#september-6-phase-4-chinese-cadence-diagnostic` |
 | `AV-10` | done | P3 — add deterministic real-browser website smoke | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md` |

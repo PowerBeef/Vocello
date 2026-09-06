@@ -15,9 +15,9 @@ level percentiles come from deterministic fixed-width histograms, so values
 near a bin boundary may differ slightly from v1; ``analyzerAlgorithmVersion``
 makes that methodological change explicit.  No ML model or raw audio is kept.
 
-v3 adds the *valence* half of delivery.  v1/v2 measured only arousal-bearing
+v3 adds phonation and spectral proxies, not measured emotional valence. v1/v2 measured arousal-bearing
 dimensions (pitch height/variation, rate, pauses, energy dynamics), which cannot
-separate emotions that share arousal but oppose in valence -- happy versus angry
+establish emotions that share arousal but oppose in valence -- happy versus angry
 being the canonical pair -- and cannot describe phonation at all, so ``whisper``
 had no breathiness measure and ``fearful`` had no tremor measure.  v3 adds:
 
@@ -462,6 +462,11 @@ def _pcm_blocks(
     memory: ManagedMemoryEstimate,
 ) -> Iterator[np.ndarray]:
     with wave.open(path, "rb") as reader:
+        observed = 0
+        if (reader.getframerate(), reader.getnframes(), reader.getnchannels(), reader.getsampwidth()) != (
+            metadata.sample_rate, metadata.frame_count, metadata.channel_count, metadata.sample_width
+        ):
+            raise ValueError("WAV metadata changed before analysis")
         while True:
             raw = reader.readframes(READ_BLOCK_FRAMES)
             if not raw:
@@ -476,7 +481,10 @@ def _pcm_blocks(
             # ``pcm`` is a zero-copy view over ``raw``; count their shared
             # backing bytes once, plus the owned mono Float64 conversion.
             memory.observe(mono, raw_bytes=len(raw))
+            observed += len(mono)
             yield mono
+        if observed != metadata.frame_count:
+            raise ValueError("WAV declared frame count differs from readable PCM")
 
 
 def _analysis_frames(
@@ -548,13 +556,16 @@ def _rms_db(frame: np.ndarray) -> tuple[float, float]:
 
 
 def hnr_db(autocorrelation_peak: float) -> float:
-    """Harmonics-to-noise ratio in dB from a normalized autocorrelation peak.
+    """Harmonicity proxy in dB from this analyzer's windowed correlation peak.
 
     Boersma (1993): with ``r`` the normalized autocorrelation at the pitch lag,
     the harmonic share of the frame's energy is ``r`` and the noise share is
     ``1 - r``, so ``HNR = 10*log10(r / (1 - r))``.  The peak is already computed
     by ``f0_autocorr`` for pitch, so this costs nothing beyond the arithmetic.
-    Clamped to keep the logarithm finite at the degenerate ends.
+    Clamped to keep the logarithm finite at the degenerate ends. Unlike Praat's
+    estimator, our input has no autocorrelation window-bias correction. These
+    values are pitch-dependent proxies, not calibrated physical HNR. Preserve
+    v3 arithmetic for frozen profiles; corrected estimation needs a new version.
     """
     ratio = min(max(float(autocorrelation_peak), 1e-6), 1.0 - 1e-6)
     return 10.0 * math.log10(ratio / (1.0 - ratio))

@@ -37,6 +37,11 @@ sourceOfTruth:
 ---
 # The audio delivery analysis harness
 
+For the current source-grounded layer map, M2 memory measurements and compatibility-preserving
+cleanup/accuracy work, see [Audio QC engineering](audio-qc-engineering.md). Product Fast QC,
+speech verification and experimental emotion scoring have different authority; do not merge
+their completion statuses into an unconditional audio-quality PASS.
+
 > The consolidated operator's reference for measuring delivery/emotion quality. Deterministic
 > analysis rejects broken or regressed candidates autonomously; blinded listening is the
 > semantic authority for promoting delivery meaning because acoustic proxies do not establish
@@ -377,6 +382,11 @@ python3 scripts/run_local_delivery_cascade.py \
   --run-dir build/artifacts/macos/delivery-experiment/calibration/run \
   --out build/artifacts/macos/delivery-experiment/cascade-report.json
 ```
+
+The experiment analyzer reuses up to 128 blind global/temporal summary pairs by verified WAV digest
+within one invocation, avoiding repeated neutral-control passes without retaining PCM. Input hashes
+are checked even on hits. The cascade skips later deterministic layers after an earlier rejection
+and completes deterministic checks for both paired files before starting a neural scorer.
 
 The cascade derives its input from the runner's retained plan, execution state, acoustic layer,
 source identities and exact WAV digests after the generator has exited, then reuses neutral

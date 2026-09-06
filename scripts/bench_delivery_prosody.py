@@ -7,13 +7,11 @@ also contains files from older ``--keep`` runs. The resulting sidecar is written
 before the telemetry summary so the current summary and history record include
 the same prosody evidence.
 
-Each sidecar row also carries prompt provenance (2026-08-04 delivery-control
-audit, hardening item 2): the run seed, the exact instruction string the bench
-sent (``instructEcho``), and the engine's own ``promptChars``/``promptDigest``
-notes for the take and its paired neutral. The instructed prompt must be
-strictly longer than the neutral prompt — the end-to-end proof that the
-instruction reached the engine — and the analysis fails closed when that or
-any provenance field cannot be established.
+Each sidecar row carries instruction provenance: the run seed, exact bench
+instruction echo, and engine ``instructChars``/``instructDigest`` receipt. The
+receipt must match the instruction, and the neutral reference must have none.
+Script/prompt length is not evidence that a delivery instruction reached the
+engine. Missing or inconsistent receipt identity fails closed.
 
 Usage:
     scripts/bench_delivery_prosody.py <diagnostics_dir> \

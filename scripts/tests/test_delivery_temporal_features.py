@@ -64,6 +64,13 @@ def _all_numbers(value):
 
 
 class DeliveryTemporalFeatureTests(unittest.TestCase):
+    def test_truncated_wav_cannot_produce_complete_temporal_features(self) -> None:
+        path = self.root / "truncated.wav"
+        _write(path, _tone(1, lambda _x: 160))
+        path.write_bytes(path.read_bytes()[:-100])
+        with self.assertRaisesRegex(ValueError, "frame count"):
+            analyze_temporal(str(path))
+
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
         self.root = Path(self.temporary.name)

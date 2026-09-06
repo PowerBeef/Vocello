@@ -11,6 +11,7 @@ published automatically.
 from __future__ import annotations
 
 import argparse
+from collections import OrderedDict
 import fcntl
 import hashlib
 import json
@@ -539,6 +540,34 @@ def analyze_execution(plan: dict[str, Any], run_dir: Path) -> dict[str, Any]:
     rows_by_id = {row["takeID"]: row for row in plan["rows"]}
     profile = builtin_profile()
     rows: list[dict[str, Any]] = []
+    # Small, invocation-local measurement cache. Labels never enter extraction;
+    # shared neutral controls pay for the four streaming passes once, not once
+    # per preset. Retain summaries only, never PCM or duration-sized frames.
+    measurements: OrderedDict[str, tuple[dict[str, Any], dict[str, Any]]] = OrderedDict()
+
+    def measure(result: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
+        relative = result.get("audio")
+        expected = result.get("audioSHA256")
+        if (not isinstance(relative, str) or Path(relative).is_absolute()
+                or ".." in Path(relative).parts or not isinstance(expected, str)):
+            raise RunnerError("analysis audio identity is incomplete")
+        path = run_dir / relative
+        if not path.is_file() or file_sha256(path) != expected:
+            raise RunnerError("analysis audio is missing or changed")
+        if expected in measurements:
+            measurements.move_to_end(expected)
+            return measurements[expected]
+        global_report = analyze(str(path))
+        if "error" in global_report:
+            raise RunnerError("deterministic prosody analysis failed")
+        temporal_report = analyze_temporal(str(path))
+        if file_sha256(path) != expected:
+            raise RunnerError("analysis audio changed during extraction")
+        measurements[expected] = (global_report, temporal_report)
+        if len(measurements) > 128:
+            measurements.popitem(last=False)
+        return global_report, temporal_report
+
     for take_id, result in sorted(state["takes"].items()):
         if result.get("status") != "complete":
             continue
@@ -546,14 +575,11 @@ def analyze_execution(plan: dict[str, Any], run_dir: Path) -> dict[str, Any]:
         reference = state["references"].get(result.get("referenceKey"), {})
         if row is None or reference.get("status") != "complete":
             raise RunnerError(f"{take_id}: missing plan row or complete reference")
-        instructed_analysis = analyze(str(run_dir / result["audio"]))
-        reference_analysis = analyze(str(run_dir / reference["audio"]))
-        if "error" in instructed_analysis or "error" in reference_analysis:
-            raise RunnerError(f"{take_id}: deterministic prosody analysis failed")
         try:
+            instructed_analysis, instructed_temporal = measure(result)
+            reference_analysis, reference_temporal = measure(reference)
             temporal_features = paired_temporal_delta(
-                analyze_temporal(str(run_dir / result["audio"])),
-                analyze_temporal(str(run_dir / reference["audio"])),
+                instructed_temporal, reference_temporal,
             )
         except (OSError, ValueError) as error:
             raise RunnerError(f"{take_id}: deterministic temporal analysis failed") from error

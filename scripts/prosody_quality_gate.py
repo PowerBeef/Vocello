@@ -13,7 +13,7 @@ Usage:
   scripts/prosody_quality_gate.py <wav> [<wav> ...] [--json] [--profile path.json]
   python3 -c "from prosody_quality_gate import evaluate; print(evaluate('clip.wav'))"
 """
-import sys, json, argparse, os
+import sys, json, argparse, os, math
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from analyze_prosody import ANALYZER_ALGORITHM_VERSION, analyze
 from prosody_profile import builtin_profile, load_profile, threshold
@@ -54,7 +54,17 @@ def evaluate_metrics(pros, prof=None):
         "pauses_pause_speech_ratio", "energy_envelope_roughness",
         "rate_local_rate_cv", "pauses_max_pause_seconds",
     )
-    if any(key not in pros for key in required):
+    optional = (
+        "f0_std_semitones", "f0_range_semitones", "boundaries_max_sample_jump",
+        "analysisEstimatedPeakWorkingSetBytes",
+    )
+    def finite_measurement(key):
+        value = pros.get(key)
+        return (isinstance(value, (int, float)) and not isinstance(value, bool)
+                and math.isfinite(value))
+
+    if (any(not finite_measurement(key) for key in required)
+            or any(not finite_measurement(key) for key in optional if key in pros)):
         return {
             "clip": pros.get("clip", ""),
             "analyzerAlgorithmVersion": pros.get(
@@ -62,7 +72,7 @@ def evaluate_metrics(pros, prof=None):
             ),
             "passed": False,
             "flags": ["metrics_incomplete"],
-            "reason": "gate inputs missing from analyzed metrics",
+            "reason": "gate inputs missing, non-numeric or non-finite",
             "metrics": {},
         }
 

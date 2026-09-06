@@ -16,7 +16,7 @@ import math
 import os
 from pathlib import Path
 import tempfile
-from typing import Any, Callable
+from typing import Any, Callable, Iterator
 import wave
 
 import numpy as np
@@ -183,16 +183,19 @@ def _mono_pcm16(raw: bytes, channels: int) -> np.ndarray:
     return interleaved.reshape(-1, channels).astype(np.float64).mean(axis=1)
 
 
-def _canonical_pcm(path: Path) -> tuple[bytes, int]:
-    """Return canonical PCM using bounded block arrays and rational positions."""
-    chunks: list[bytes] = []
-    # The list contains encoded output chunks, not frame matrices. Cache creation
-    # writes once atomically; each numerical working array remains block-bounded.
+def _canonical_pcm_blocks(path: Path) -> Iterator[bytes]:
+    """Stream legacy-v1 PCM without retaining duration-sized encoded output.
+
+    Keep interpolation and the historical omitted endpoint byte-identical. This
+    is NOT an anti-aliased resampler: changing that requires a new preprocessing
+    version and requalification of the neural adapters, not a cache refactor.
+    """
     with wave.open(str(path), "rb") as reader:
         if reader.getsampwidth() != 2:
             raise AnalysisCacheError("canonicalization requires 16-bit PCM WAV")
         source_rate = reader.getframerate()
         channels = reader.getnchannels()
+        expected_frames = reader.getnframes()
         if source_rate <= 0 or channels <= 0:
             raise AnalysisCacheError("WAV sample rate and channels must be positive")
         previous = np.empty(0, dtype=np.float64)
@@ -225,14 +228,61 @@ def _canonical_pcm(path: Path) -> tuple[bytes, int]:
                     fraction = local - lower
                     values = combined[lower] * (1.0 - fraction) + combined[lower + 1] * fraction
                     encoded = np.clip(np.rint(values), -32768, 32767).astype("<i2")
-                    chunks.append(encoded.tobytes())
+                    yield encoded.tobytes()
                     output_index = int(indices[-1]) + 1
             previous = combined[-1:].copy()
             global_start += len(block)
-    if not chunks:
+    if global_start != expected_frames:
+        raise AnalysisCacheError("WAV declared frame count differs from readable PCM")
+    if output_index == 0:
         raise AnalysisCacheError("WAV has no canonicalizable audio samples")
-    result = b"".join(chunks)
-    return result, len(result) // 2
+
+
+def _write_canonical_pcm(path: Path, destination: Path, original_digest: str) -> tuple[str, int]:
+    """Hash/write one bounded stream; publish only after complete source validation."""
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary = tempfile.mkstemp(prefix=f".{destination.name}-", dir=destination.parent)
+    hasher = hashlib.sha256()
+    byte_count = 0
+    try:
+        with os.fdopen(descriptor, "wb") as output:
+            for block in _canonical_pcm_blocks(path):
+                output.write(block)
+                hasher.update(block)
+                byte_count += len(block)
+            output.flush()
+            os.fsync(output.fileno())
+        if file_sha256(path) != original_digest:
+            raise AnalysisCacheError("source WAV changed during canonicalization")
+        os.replace(temporary, destination)
+        _fsync_directory(destination.parent)
+    finally:
+        try:
+            os.unlink(temporary)
+        except FileNotFoundError:
+            pass
+    return hasher.hexdigest(), byte_count // 2
+
+
+def _validate_audio_metadata(body: dict[str, Any], original_digest: str) -> int:
+    expected = {
+        "schemaVersion": SCHEMA_VERSION, "kind": "canonical-delivery-analysis-audio",
+        "originalWAVSHA256": original_digest, "sampleRateHz": CANONICAL_SAMPLE_RATE,
+        "channels": CANONICAL_CHANNELS, "format": CANONICAL_FORMAT,
+        "resamplerVersion": RESAMPLER_VERSION,
+    }
+    if any(type(body.get(key)) is not type(value) or body[key] != value
+           for key, value in expected.items()):
+        raise AnalysisCacheError("canonical audio preprocessing or identity mismatch")
+    count = body.get("sampleCount")
+    if type(count) is not int or count <= 0 or type(body.get("byteCount")) is not int:
+        raise AnalysisCacheError("canonical audio sample count is invalid")
+    duration = body.get("durationSeconds")
+    if (body["byteCount"] != count * 2 or type(duration) not in (int, float)
+            or not math.isfinite(duration) or duration != count / CANONICAL_SAMPLE_RATE):
+        raise AnalysisCacheError("canonical audio sample count or duration mismatch")
+    _validate_sha256(body.get("canonicalDerivativeSHA256"), "canonical derivative")
+    return count
 
 
 class DeliveryAnalysisCache:
@@ -255,6 +305,7 @@ class DeliveryAnalysisCache:
                 raise AnalysisCacheError("canonical audio record digest mismatch")
             if body.get("originalWAVSHA256") != original_digest:
                 raise AnalysisCacheError("canonical audio original identity mismatch")
+            sample_count = _validate_audio_metadata(body, original_digest)
             if not pcm_path.is_file():
                 raise AnalysisCacheError("canonical derivative is missing")
             derivative_digest = file_sha256(pcm_path)
@@ -263,12 +314,10 @@ class DeliveryAnalysisCache:
             if pcm_path.stat().st_size != body.get("byteCount"):
                 raise AnalysisCacheError("canonical derivative byte count mismatch")
             return CanonicalAudio(
-                original_digest, derivative_digest, int(body["sampleCount"]),
+                original_digest, derivative_digest, sample_count,
                 float(body["durationSeconds"]), pcm_path,
             )
-        pcm, sample_count = _canonical_pcm(wav_path)
-        derivative_digest = hashlib.sha256(pcm).hexdigest()
-        atomic_bytes(pcm_path, pcm)
+        derivative_digest, sample_count = _write_canonical_pcm(wav_path, pcm_path, original_digest)
         body = {
             "schemaVersion": SCHEMA_VERSION,
             "kind": "canonical-delivery-analysis-audio",
@@ -279,7 +328,7 @@ class DeliveryAnalysisCache:
             "format": CANONICAL_FORMAT,
             "resamplerVersion": RESAMPLER_VERSION,
             "sampleCount": sample_count,
-            "byteCount": len(pcm),
+            "byteCount": sample_count * 2,
             "durationSeconds": sample_count / CANONICAL_SAMPLE_RATE,
         }
         atomic_json(metadata_path, {**body, "recordDigest": digest(body)})
@@ -304,6 +353,11 @@ class DeliveryAnalysisCache:
         body.pop("recordDigest", None)
         if stored != digest(body):
             raise AnalysisCacheError("analysis cache record digest mismatch")
+        if (type(body.get("schemaVersion")) is not int
+                or body["schemaVersion"] != SCHEMA_VERSION
+                or body.get("kind") != "delivery-analysis-layer"
+                or body.get("promotionAuthority") is not False):
+            raise AnalysisCacheError("analysis cache record schema mismatch")
         if body.get("identity") != identity.report():
             raise AnalysisCacheError("analysis cache identity mismatch")
         payload = body.get("payload")

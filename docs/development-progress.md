@@ -19,6 +19,11 @@ The iPhone is unavailable. Do not start device work. No acceptance campaign is c
 The approved priority is iOS 3.0, retaining all modes, long-form and all 201 campaign takes.
 Mac/CLI-only qualification and broad evaluator/prompt research remain off that critical path.
 
+The separately requested Audio QC review and first compatibility-preserving cleanup are recorded
+in [Audio QC engineering](reference/audio-qc-engineering.md). No product-QC threshold, model,
+prompt, seed, or release acceptance changed. AV-07/DP-28 retain the remaining versioned resampler,
+harmonicity and calibration work; RF-06 remains a separate unresolved product-audio blocker.
+
 | Work | Existing owner | Next boundary |
 | --- | --- | --- |
 | Documentation/workflow cleanup | RF-01 / DWF-06 | Local workflow implemented; coherent deterministic checkpoint, no product acceptance inferred |
@@ -102,6 +107,28 @@ Next action: correct the legacy adapter's tensor-transfer contract without weake
 changing the shipping PCM boundary, then pass native regressions and Release Analyze before freeze.
 The normal deterministic checkpoint PASS does **not** replace this failed candidate-warning gate.
 
+
+## Audio QC review and first cleanup — September 6
+
+Source review reproduced non-finite prosody inputs passing, cache preprocessing/count drift being
+accepted, and truncated audio being treated as complete. Corrected those fail-closed boundaries,
+streamed canonical writes instead of collecting the full output, bound imported analyzer/runtime
+identity into cache keys, reused digest-verified neutral summaries, and prevented neural launches
+until both sides pass deterministic screening. Existing valid derivative bytes and score algorithms
+remain unchanged; eight pre-refactor byte digests now have regression coverage.
+The final focused run passed 57 Python tests in 7.79 seconds, including cache-schema drift,
+shared-control reuse, malformed numeric values, truncation, bounded memory and early-stop fixtures.
+
+Four serial synthetic cache probes qualified on the M2/8 GB host: for 60-minute audio, traced peak
+fell from 231.75 MB to 4.82 MB and process RSS high water from 316.98 MB to 43.22 MB. No swap growth,
+before/after pressure warning or unrecovered process was recorded. This is not neural or perceptual
+qualification. Raw evidence remains under `build/artifacts/diagnostics/audio-qc-review-20260906`.
+
+The audit also measured linear-resampler aliasing and pitch-dependent HNR-proxy bias. Their
+correction requires explicit preprocessing/analyzer versions and affected-model/profile
+requalification; it is not silently included in a memory refactor. Legacy full-frame analysis and
+four-pass global/temporal fusion have a bounded migration plan. AV-07/AV-08/DP-28 stay open.
+No phone, new weights, generation, personal audio, account or candidate operation was involved.
 
 ## Codex workflow streamlining
 

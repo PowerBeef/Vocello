@@ -11,6 +11,7 @@ import struct
 import sys
 import tempfile
 import unittest
+from unittest import mock
 import wave
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -18,6 +19,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from delivery_analysis_cache import DeliveryAnalysisCache, digest  # noqa: E402
 from run_local_delivery_cascade import (  # noqa: E402
     CascadeError,
+    GLOBAL_ANALYZER,
+    TEMPORAL_ANALYZER,
+    _identity,
     build_cascade_manifest,
     run_cascade,
 )
@@ -101,6 +105,10 @@ class LocalDeliveryCascadeTests(unittest.TestCase):
             row["alwaysLayers"]["audioQC"]["instructed"]["status"] == "complete"
             for row in first["rows"]
         ))
+        self.assertTrue(all(
+            row["alwaysLayers"]["audioQC"]["instructed"]["scope"] == "canonical-pcm-integrity-only"
+            for row in first["rows"]
+        ))
         second = run_cascade(
             manifest=self.manifest, cache=self.cache, lock_root=self.root / "lock",
         )
@@ -136,6 +144,41 @@ class LocalDeliveryCascadeTests(unittest.TestCase):
             result["rows"][0]["alwaysLayers"]["audioQC"]["instructed"]["errorCode"],
             "all-zero-pcm",
         )
+
+    def test_neither_side_launches_a_model_when_a_pair_is_rejected(self) -> None:
+        for bad_role in ("instructed", "neutral"):
+            with self.subTest(bad_role=bad_role):
+                manifest = json.loads(json.dumps(self.manifest))
+                manifest["rows"] = manifest["rows"][:1]
+                # A very short, valid WAV: integrity can finish but frame-based
+                # analysis cannot. Both controls must qualify BEFORE any model.
+                short = self.root / f"short-{bad_role}.wav"
+                with wave.open(str(short), "wb") as output:
+                    output.setparams((1, 2, 16000, 0, "NONE", "not compressed"))
+                    output.writeframes(b"\x01\x00" * 100)
+                manifest["rows"][0][f"{bad_role}WAV"] = str(short)
+                manifest["rows"][0][f"{bad_role}SHA256"] = self._sha(short)
+                with mock.patch("run_local_delivery_cascade.run_compact_adapter") as adapter:
+                    result = run_cascade(
+                        manifest=self._seal(manifest), cache=self.cache,
+                        lock_root=self.root / "lock", compact_config={"adapterID": "unneeded"},
+                    )
+                adapter.assert_not_called()
+                self.assertEqual(result["rows"][0]["route"], "rejected")
+                self.assertFalse(result["rows"][0]["finalistLayers"]["required"])
+                self.assertFalse(result["promotionAuthority"])
+
+    def test_temporal_cache_binds_its_imported_global_analyzer(self) -> None:
+        canonical = self.cache.canonicalize(self.one)
+        first = _identity(canonical, layer="temporal-contour", version="1", source=TEMPORAL_ANALYZER)
+        self.cache.store(first, {"score": 1.0})
+        from delivery_analysis_cache import file_sha256
+        with mock.patch("run_local_delivery_cascade.file_sha256", side_effect=lambda path: (
+            "a" * 64 if path == GLOBAL_ANALYZER else file_sha256(path)
+        )):
+            changed = _identity(canonical, layer="temporal-contour", version="1", source=TEMPORAL_ANALYZER)
+        self.assertNotEqual(first.key, changed.key)
+        self.assertIsNone(self.cache.load(changed))
 
     def test_operator_manifest_is_derived_from_one_sealed_runner_identity(self) -> None:
         run_dir = self.root / "run"

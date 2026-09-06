@@ -14,6 +14,7 @@ import hashlib
 import json
 import math
 import os
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -65,7 +66,11 @@ def _identity(canonical, *, layer: str, version: str, source: Path) -> LayerIden
         binary_sha256=file_sha256(source), model_id="none",
         model_revision="not-applicable", weights_sha256=NO_MODEL_DIGEST,
         preprocessing_config_digest=digest({
-            "sampleRate": "source-native", "requestedLabelVisible": False,
+            "sampleRate": canonical.report()["sampleRateHz"] if layer == "pcm-integrity-qc" else "source-native",
+            "requestedLabelVisible": False,
+            "cacheSourceSHA256": file_sha256(REPO / "scripts/delivery_analysis_cache.py"),
+            "sharedAnalyzerSHA256": file_sha256(GLOBAL_ANALYZER),
+            "pythonVersion": sys.version, "numpyVersion": np.__version__,
         }),
     )
 
@@ -91,6 +96,7 @@ def _pcm_integrity_layer(canonical) -> dict[str, Any]:
         return {"status": "rejected", "errorCode": "all-zero-pcm"}
     return {
         "status": "complete",
+        "scope": "canonical-pcm-integrity-only",
         "sampleCount": sample_count,
         "durationSeconds": canonical.duration_seconds,
         "peakAbsolutePCM16": peak,
@@ -102,7 +108,7 @@ def _pcm_integrity_layer(canonical) -> dict[str, Any]:
 def _global_layer(path: Path) -> dict[str, Any]:
     report = analyze(str(path))
     if "error" in report:
-        return {"status": "rejected", "errorCode": str(report["error"]).split(":", 1)[0]}
+        return {"status": "rejected", "errorCode": "prosody-analysis-unavailable"}
     report = dict(report)
     report.pop("clip", None)
     return {"status": "complete", "features": report}
@@ -338,28 +344,23 @@ def run_cascade(
                 qc_identity, lambda canonical=canonical: _pcm_integrity_layer(canonical)
             )
             cache_hits += hit; cache_misses += not hit
-            global_identity = _identity(canonical, layer="global-acoustics", version="3", source=GLOBAL_ANALYZER)
-            global_report, hit = cache.get_or_compute(global_identity, lambda path=path: _global_layer(path))
-            cache_hits += hit; cache_misses += not hit
-            temporal_identity = _identity(canonical, layer="temporal-contour", version="1", source=TEMPORAL_ANALYZER)
-            temporal_report, hit = cache.get_or_compute(temporal_identity, lambda path=path: _temporal_layer(path))
-            cache_hits += hit; cache_misses += not hit
-            compact_report = None
-            compact_hit = None
-            if compact_config is not None:
-                compact_report, compact_hit = run_compact_adapter(
-                    wav_path=path, config=compact_config, cache=cache,
-                    lock_root=lock_root,
-                    supervisor_options=compact_supervisor_options,
-                )
-                cache_hits += bool(compact_hit); cache_misses += not bool(compact_hit)
+            global_report = {"status": "skipped", "errorCode": "pcm-integrity-rejected"}
+            temporal_report = {"status": "skipped", "errorCode": "earlier-deterministic-layer-rejected"}
+            if qc_report.get("status") == "complete":
+                global_identity = _identity(canonical, layer="global-acoustics", version="3", source=GLOBAL_ANALYZER)
+                global_report, hit = cache.get_or_compute(global_identity, lambda path=path: _global_layer(path))
+                cache_hits += hit; cache_misses += not hit
+            if global_report.get("status") == "complete":
+                temporal_identity = _identity(canonical, layer="temporal-contour", version="1", source=TEMPORAL_ANALYZER)
+                temporal_report, hit = cache.get_or_compute(temporal_identity, lambda path=path: _temporal_layer(path))
+                cache_hits += hit; cache_misses += not hit
             per_audio[role] = {
                 "canonical": canonical.report(),
                 "qc": qc_report,
                 "global": global_report,
                 "temporal": temporal_report,
-                "compact": compact_report,
-                "compactCacheHit": compact_hit,
+                "compact": None,
+                "compactCacheHit": None,
             }
         reasons: list[str] = []
         route = "accepted-for-continued-screening"
@@ -369,6 +370,17 @@ def run_cascade(
         ):
             route = "rejected"
             reasons.append("deterministic-audio-qc-or-global-analysis-failed")
+        # Qualify BOTH sides before launching any neural process. A rejected
+        # neutral control invalidates the pair just as a rejected take does.
+        if route != "rejected" and compact_config is not None:
+            for role, field in (("instructed", "instructedWAV"), ("neutral", "neutralWAV")):
+                compact_report, compact_hit = run_compact_adapter(
+                    wav_path=Path(row[field]), config=compact_config, cache=cache,
+                    lock_root=lock_root, supervisor_options=compact_supervisor_options,
+                )
+                per_audio[role]["compact"] = compact_report
+                per_audio[role]["compactCacheHit"] = compact_hit
+                cache_hits += bool(compact_hit); cache_misses += not bool(compact_hit)
         global_delta = _numeric_delta(
             per_audio["instructed"]["global"].get("features", {}),
             per_audio["neutral"]["global"].get("features", {}),
@@ -382,7 +394,7 @@ def run_cascade(
             else {"schemaVersion": 1, "kind": "temporal-delta-unavailable"}
         )
         compact_delta = None
-        if compact_config is not None:
+        if route != "rejected" and compact_config is not None:
             compact_delta = _compact_delta(
                 compact_config,
                 per_audio["instructed"]["compact"],

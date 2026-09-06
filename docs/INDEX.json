@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "generated": "python3 scripts/doc_metadata.py rebuild-index",
   "note": "Machine-readable documentation map. Query this instead of globbing docs/.",
-  "annotatedDocuments": 114,
+  "annotatedDocuments": 115,
   "unannotatedDocuments": 0,
   "documents": [
     {
@@ -294,6 +294,26 @@
       "summary": "App-facing quick guide to tone and emotion control; the sourced qwen3-tts-prompting-guide wins on any disagreement.",
       "sourceOfTruth": [
         "Sources/QwenVoiceCore/EmotionPreset.swift"
+      ]
+    },
+    {
+      "path": "docs/reference/audio-qc-engineering.md",
+      "status": "active",
+      "owner": "backend-mlx",
+      "summary": "Source-grounded Audio QC architecture, corrected infrastructure defects, M2 resource measurements, accuracy limitations and compatibility-preserving next steps.",
+      "sourceOfTruth": [
+        "Sources/QwenVoiceCore/GenerationOutputAdapter.swift",
+        "Sources/QwenVoiceCore/GenerationQualityComposition.swift",
+        "Sources/SharedSupport/Services/VoiceClipTranscriber.swift",
+        "scripts/analyze_prosody.py",
+        "scripts/delivery_analysis_cache.py",
+        "scripts/delivery_experiment_runner.py",
+        "scripts/run_local_delivery_cascade.py",
+        "scripts/prosody_quality_gate.py",
+        "scripts/check_language_output.py",
+        "config/audio-cadence-qc-contract.json",
+        "config/prosody-holdout-policy.json",
+        "config/roadmap.json"
       ]
     },
     {

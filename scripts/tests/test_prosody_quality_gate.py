@@ -12,7 +12,7 @@ import unittest
 import wave
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from prosody_quality_gate import evaluate
+from prosody_quality_gate import evaluate, evaluate_metrics
 from prosody_profile import builtin_profile, save_profile
 
 
@@ -40,6 +40,26 @@ def write_sine(path, freq, duration, amplitude=0.5, pause_ranges=None):
 
 
 class ProsodyQualityGateTests(unittest.TestCase):
+    def test_invalid_measurements_cannot_pass_or_emit_nonfinite_json(self):
+        valid = {
+            "f0_std_hz": 30.0, "f0_turning_points_per_sec": 3.0,
+            "rate_syllable_rate_hz": 4.0, "pauses_pause_speech_ratio": 0.1,
+            "energy_envelope_roughness": 0.3, "rate_local_rate_cv": 0.3,
+            "pauses_max_pause_seconds": 0.4,
+        }
+        self.assertTrue(evaluate_metrics(valid)["passed"])
+        for key in valid:
+            for invalid in (float("nan"), float("inf"), -float("inf"), True, None, "3"):
+                with self.subTest(key=key, invalid=invalid):
+                    report = evaluate_metrics({**valid, key: invalid})
+                    self.assertFalse(report["passed"])
+                    self.assertEqual(report["flags"], ["metrics_incomplete"])
+                    json.dumps(report, allow_nan=False)
+        for key in ("f0_std_semitones", "boundaries_max_sample_jump"):
+            report = evaluate_metrics({**valid, key: float("nan")})
+            self.assertFalse(report["passed"])
+            json.dumps(report, allow_nan=False)
+
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.dir = self.tmp.name

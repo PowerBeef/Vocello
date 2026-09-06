@@ -32,8 +32,13 @@ the contract needs a same-named WAV in this directory.
 
 ## Generation recipe
 
-For each speaker, generate one sample via the macOS Vocello.app (Debug
-build) in **Built-in Voice** mode (internal mode id `custom`):
+These samples are already bundled. Replacing them is an explicit asset-generation/rights task,
+not part of ordinary documentation or app builds. Use the repository XCUITest/macOS generation
+route in **Built-in Voice** mode (internal mode id `custom`) with the approved catalog and recorded
+seed/model identity. The project has only a Release configuration; internal diagnostics are a
+separate compile capability and runtime gate, not a Debug configuration.
+
+Privacy-safe example scripts for an explicitly approved replacement:
 
 | Speaker | Mode | Delivery | Prompt |
 |---|---|---|---|
@@ -42,13 +47,14 @@ build) in **Built-in Voice** mode (internal mode id `custom`):
 | ono_anna | Custom | Neutral | `こんにちは、これは私の声のプレビューサンプルです。` |
 | sohee | Custom | Neutral | `안녕하세요, 이것은 제 목소리 미리보기 샘플입니다。` |
 
-After each generation, find the WAV in
-`~/Library/Application Support/QwenVoice-Debug/outputs/` (Debug builds)
-or via the inline player's Save / right-click context menu, then rename
-and copy:
+Export the accepted WAV through the visible player or use the exact output recorded by the
+authorized generator. Diagnostic outputs may use the isolated QwenVoice-Debug support root;
+that directory name does not imply an Xcode Debug configuration. Validate PCM/QC and obtain the
+required provenance/rights decision under `docs/reference/content-rights-review.md` before replacing
+a bundled asset. Stage only the intended speaker file:
 
 ```bash
-cp ~/.../outputs/{generated}.wav \
+cp <verified-export.wav> \
    Sources/Resources/voice-previews/aiden.wav
 ```
 
@@ -56,5 +62,5 @@ XcodeGen's `buildPhase: resources` rule in `project.yml` for the
 `VocelloiOS` target's `voice-previews` path picks the WAVs up
 automatically on the next `scripts/regenerate_project.sh`.
 
-When the WAVs land, the voice picker's per-row play button will Just Work.
-Until then, taps no-op (the player logs a Debug warning).
+Verify bundled resource membership and the real picker preview after any approved replacement.
+Presence in the bundle is not a qualified content-rights decision.

@@ -10,6 +10,7 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(REPO_ROOT / "scripts"))
 HELPER = REPO_ROOT / "scripts/documentation_contract.py"
 SPEC = importlib.util.spec_from_file_location("documentation_contract", HELPER)
 assert SPEC and SPEC.loader
@@ -69,6 +70,35 @@ class DocumentationContractTests(unittest.TestCase):
         self.write("scripts/missing_tool.sh", "#!/bin/sh\n")
         self.assertEqual(DOCUMENTATION.validate_relative_links(self.root, [source]), [])
         self.assertEqual(DOCUMENTATION.validate_script_references(self.root, [source]), [])
+
+    def test_frontmatter_owns_lifecycle_across_overlapping_groups(self) -> None:
+        def group(identifier, status, paths):
+            return {"id": identifier, "title": identifier, "status": status, "paths": paths,
+                    "owner": "release-qa", "audience": "maintainers", "authority": "source", "reviewTriggers": []}
+        self.write("config/documentation-contract.json", json.dumps({"indexPath": "docs/INDEX.md", "groups": [
+            group("guides", "active", ["docs/reference/*.md", "docs/decisions/*.md"]),
+            group("history", "historical", ["docs/reference/old.md", "docs/releases/*.md"]),
+            group("generated", "generated", ["docs/INDEX.md"]),
+        ]}))
+        adr = self.write("docs/decisions/old.md", "---\nstatus: historical\n---\n# Past\n")
+        old = self.write("docs/reference/old.md", "---\nstatus: superseded\n---\n# Old\n")
+        release = self.write("docs/releases/v3.0.0.md", "---\nstatus: active\n---\n# Candidate\n[missing](missing.md)\n")
+        legacy = self.write("docs/releases/v1.0.0.md", "# Released\n")
+        current = self.write("docs/reference/current.md", "# Public compatibility\n")
+        generated = self.write("docs/INDEX.md", "# Generated\n")
+        self.assertEqual(set(DOCUMENTATION.active_markdown_paths(self.root)), {release, current})
+        self.assertEqual(set(DOCUMENTATION.historical_markdown_paths(self.root)), {adr, old, legacy})
+        self.assertTrue(DOCUMENTATION.validate_relative_links(self.root, DOCUMENTATION.active_markdown_paths(self.root)))
+        rendered = DOCUMENTATION.render_index(self.root)
+        self.assertIn("**active** · [`docs/releases/v3.0.0.md`]", rendered)
+        self.assertIn("**historical** · [`docs/decisions/old.md`]", rendered)
+        self.assertIn("**superseded** · [`docs/reference/old.md`]", rendered)
+        self.assertEqual(rendered.count("[`docs/reference/old.md`]"), 1)
+        self.assertNotIn(generated, DOCUMENTATION.active_markdown_paths(self.root))
+        for invalid in ("---\nstatus: unknown\n---\n", "---\nstatus: active\n"):
+            current.write_text(invalid)
+            with self.assertRaises(ValueError):
+                DOCUMENTATION.active_markdown_paths(self.root)
 
     def test_stale_inline_repository_path_is_rejected(self) -> None:
         source = self.write("README.md", "Use `config/missing-contract.json`.\n")
@@ -199,6 +229,26 @@ class DocumentationContractTests(unittest.TestCase):
         project = "targets:\n  One:\n    type: app\n  Two:\n    type: framework\nschemes:\n  Main:\n    build:\n"
         self.assertEqual(DOCUMENTATION._top_level_names(project, "targets"), ["One", "Two"])
         self.assertEqual(DOCUMENTATION._top_level_names(project, "schemes"), ["Main"])
+
+    def test_project_map_target_count_follows_project_inventory(self) -> None:
+        path = self.write("docs/project-map.html", "<span data-project-target-count>2</span>")
+        self.assertEqual(DOCUMENTATION.validate_project_map_inventory(self.root, ["One", "Two"]), [])
+        self.assertTrue(DOCUMENTATION.validate_project_map_inventory(self.root, ["One", "Two", "Three"]))
+        path.write_text("<span data-project-target-count>2</span>" * 2)
+        self.assertTrue(DOCUMENTATION.validate_project_map_inventory(self.root, ["One", "Two"]))
+        path.write_text("Thirteen targets")
+        self.assertTrue(DOCUMENTATION.validate_project_map_inventory(self.root, ["One", "Two"]))
+
+    def test_website_guidance_rejects_stale_or_candidate_cta(self) -> None:
+        public = {"stableMacRelease": {"version": "2.4.0"}, "candidateRelease": {"version": "3.0.0"}}
+        good = "Primary CTA follows stableMacRelease in ../config/public-product-facts.json."
+        path = self.write("website/PRODUCT.md", good)
+        self.assertEqual(DOCUMENTATION.validate_public_guidance(self.root, public), [])
+        for version in ("2.3.0", "3.0.0"):
+            path.write_text(good + "\nThe primary CTA is Vocello " + version + " (stable).")
+            self.assertTrue(DOCUMENTATION.validate_public_guidance(self.root, public))
+        path.write_text("Use the latest release.")
+        self.assertTrue(DOCUMENTATION.validate_public_guidance(self.root, public))
 
     def test_clean_canonical_status_is_derived_from_history(self) -> None:
         self.write(

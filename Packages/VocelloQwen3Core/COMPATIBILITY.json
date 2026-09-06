@@ -59,7 +59,7 @@
       "MLXAudioCodecs",
       "MLXAudioTTS"
     ],
-    "policy": "Vocello product generation consumes the owned engine actor, classified session, and product finalization contracts. QwenVoiceCore imports the named legacy SPI only for the remaining load/prewarm and schema-3 conditioning bridge. The MLXAudio package, products, targets, modules, and public APIs remain available as implementation compatibility surfaces."
+    "policy": "Vocello product generation, loading, prewarm, and schema-3 conditioning consume actor-owned public contracts; the named legacy SPI is retired with no consumers. The MLXAudio package, products, targets, modules, and public APIs remain available as implementation compatibility surfaces, not product generation authority."
   },
   "modelContract": "../../Sources/Resources/qwenvoice_contract.json",
   "validation": [

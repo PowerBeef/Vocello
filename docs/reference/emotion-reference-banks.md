@@ -16,7 +16,7 @@ sourceOfTruth:
 > VoiceDesign references never audibly carried their emotion, so their clones
 > read as neutral. The lossy hop is instruct→reference; curation closes it.
 > Decision record: [`delivery-control-audit-2026-08.md`](delivery-control-audit-2026-08.md)
-> (F8/R3) and `docs/development-progress.md` findings 13–15.
+> (F8/R3) and the preserved `docs/development-history-2026-09-06.md` findings 13–15.
 
 ## What a bank is
 

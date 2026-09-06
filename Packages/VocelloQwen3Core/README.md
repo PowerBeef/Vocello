@@ -52,8 +52,9 @@ prepared state, coalesced progress, model terminal, bounded PCM-free diagnostics
 product finalization remain independent. Custom, Design, and Clone now use that classified session
 through QwenVoiceCore's `GenerationOutputAdapter`; direct compatibility streams are not product
 generation authority. The old combined facade event session remains a package-internal
-characterization surface only. The named `VocelloQwen3LegacyCompatibility` SPI is now limited to
-the transitional prepared-model load/prewarm bridge and validated schema-3 clone-prompt adoption.
+characterization surface only. `VocelloQwen3LegacyCompatibility` was retired; loading, metadata,
+prewarm and schema-3 clone-prompt persistence/adoption now use actor-owned public surfaces.
+The empty retired-SPI inventories in `COMPATIBILITY.json` are enforced fail-closed.
 
 The actor closes its inert-reservation and critical-relief lifecycle explicitly.
 Reserved, generating, and aborting states prevent open-after-abort and make duplicate aborts join

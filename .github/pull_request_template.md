@@ -6,7 +6,7 @@ Describe the user-visible or maintainer-visible outcome.
 
 - [ ] Relevant deterministic repository checks pass.
 - [ ] Generated project or indexes were regenerated and checked when their inputs changed.
-- [ ] Model-, device-, and UI-dependent QA is listed separately and is not treated as a publishing prerequisite.
+- [ ] Model-, device-, and UI-dependent QA is listed separately, not required for an ordinary commit/push or candidate build. Public promotion still requires its applicable source-bound acceptance gates.
 
 ## Documentation impact
 

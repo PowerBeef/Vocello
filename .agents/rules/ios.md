@@ -34,7 +34,7 @@ sourceOfTruth:
 **Consults:**
 - `docs/ARCHITECTURE.md` §6 (iOS request lifecycle)
 - `docs/reference/{ios-app-guide,ios-device-testing,ios-engine-optimization,ios-appstore-submission,ios-increased-memory-entitlement-request}.md`
-- Root `AGENTS.md` (Hard rules) + [`docs/project-map.html`](../../docs/project-map.html)
+- Root `AGENTS.md` (Hard invariants) + [`docs/project-map.html`](../../docs/project-map.html)
 
 ## Required pre-read
 
@@ -89,44 +89,27 @@ Before changing iOS UI or behavior, read:
   and platform-pressure evidence. Typed field semantics remain backend-owned and schema/publication
   changes require release/QA review.
 
-## Build / test commands
+## Execution procedure
 
-```sh
-# Ordinary development (app + policy-test bundle compile only; no device/UI prerequisite)
-./scripts/build_foundation_targets.sh ios
+Additional enforced evidence contracts: `config/ios-control-audit-contract-20260904.json`
+is historical v2/v3 plan compatibility, never current-source acceptance;
+`config/model-management-diagnostics-schema-v1.json` owns model lifecycle correlation;
+`config/voice-identity-language-reliability.json` owns private Clone/French diagnostics;
+`config/language-bench-corpus.json`, `config/language-bench-matrix.json`, and
+`config/language-bench-diagnostic-cohort.json` freeze language fixtures and cells.
 
-# Explicit frontend acceptance only. Never use Simulator.
-scripts/ios_device.sh preflight
-# XCUITest verifies all Speed tiers visibly in Settings before generation.
-scripts/ui_test.sh ios smoke
-scripts/ui_test.sh ios benchmark
-# Frame-health lane (ios-ui-2026-08): in-app CADisplayLink probe pinned to the
-# app's 60 Hz cap + marked scenario windows, validated by
-# scripts/check_ios_ui_perf.py — fail-closed on missing scenarios, <90% probe
-# coverage, non-canonical hardware, and a median block cadence outside
-# 55–65 Hz on the quiet ios-idle-baseline sentinel (Low Power Mode off and
-# nominal thermals are run preconditions; interactive scenarios record
-# out-of-band cadence as a warn-only uiperf.cadence code instead, since block
-# cadence there conflates re-pacing with the stalls being measured).
-# Warn-only ceilings live in config/ui-perf-thresholds-ios.json (IUI-6,
-# derived from the three counted sessions; breaches mark passedWithWarnings,
-# never fail the lane), and on the canonical iPhone profile a PASS publishes
-# a platform-ios ui-perf registry record — the macOS UI-7 twin.
-scripts/ui_test.sh ios perf
-# Opt-in iOS-only diagnostic lanes (never ordinary acceptance):
-scripts/ui_test.sh ios delivery-cohort   # delivery-consistency cohort (--text/--takes/--label)
-scripts/ui_test.sh ios model-download    # isolated background-delivery lifecycle proof
-scripts/ui_test.sh ios enroll-clone-fixture  # benchmark clone voice through the visible Files-import flow
-scripts/ui_test.sh ios saved-voice-lifecycle # opt-in F-01 import/preview/handoff/delete acceptance
-scripts/ui_test.sh ios startup-parity --script-file SCRIPT.txt # exact visible request-to-engine receipt proof
-scripts/ui_test.sh ios control-audit --scenario inventory|stateful|external|accessibility|generation|all --retain-result
-scripts/ios_device.sh gate            # deterministic physical-device/runtime proof
-```
+The [development workflow](../../docs/reference/development-workflow.md) owns no-phone checks.
+[iOS device testing](../../docs/reference/ios-device-testing.md) owns preflight, candidate
+navigation, smoke, control audit, model download, startup/saved-voice, benchmark and performance
+procedures. The perf protocol is enforced by `scripts/check_ios_ui_perf.py` and
+`config/ui-perf-thresholds-ios.json`; warnings remain warnings, never clean promotion evidence.
+Do not reproduce that guide's commands or dated run progress here.
 
-For a multi-run campaign, pass `--retain-result` before each member starts. Before the device
-leaves, stop after a completed scenario, record exact run IDs, findings, blocked/skipped rows, and
-the next valid command in `config/roadmap.json` plus `docs/development-progress.md`, then verify the
-untracked pins with a cleanup dry-run. Remove pins only after the evidence set is explicitly closed.
+For a multi-run campaign, pass `--retain-result` before each member starts. Follow the single
+pause/resume procedure in `docs/reference/ios-device-testing.md`: during a frozen campaign,
+retain run IDs, findings, blocked/skipped rows and the validated next command in untracked
+checkpoints only. Update the roadmap/narrative at a deliberate source checkpoint, acknowledging
+the changed evidence identity. Verify pins with a cleanup dry-run; retire them only after closure.
 The runner verdict, not the raw XCTest count, owns lane qualification: post-test diagnostics,
 crash-delta collection, artifact validation, and cleanup required by that lane must all finish. If
 collection is cancelled after XCTest passes, retain the partial proof but keep the lane failed and
@@ -142,7 +125,7 @@ about product generation and never permission to delete or mutate that row.
   physical-device SDK compile (app plus standalone policy-test bundle) is the sole no-phone iOS
   development lane. It still requires the selected Xcode's matching iOS Platform Support/runtime
   component; `scripts/lib/ios_platform_preflight.py check` verifies that external toolchain state
-  without running a Simulator. The same Foundation-level policy sources and 24 assertions execute
+  without running a Simulator. The same Foundation-level policy assertions execute
   in ordinary macOS `VocelloCoreTests`; Xcode 26 cannot execute the duplicate app-host-free,
   tool-hosted XCTest bundle on a physical-device destination, so that iOS target is compile-only.
   Runtime proof still uses the existing headless diagnostics and XCUITest lanes.

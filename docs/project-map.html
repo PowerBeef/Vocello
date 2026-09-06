@@ -1407,7 +1407,7 @@ table.matrix .note {
     <p class="section-label">03 · Modules</p>
     <h2 class="section-title">Target dependency graph</h2>
     <p class="section-lede">
-      Thirteen Swift targets from <code>project.yml</code>; the graph shows the ten build-graph participants — the three UI/logic test bundles ride the targets they test. Click a node for details.
+      <span data-project-target-count>14</span> Swift targets from <code>project.yml</code>; the graph shows ten build-graph participants. The four UI/logic test bundles are omitted; <code>VocelloiOSCandidateUITests</code> is standalone and never builds the production app. Click a node for details.
       Hover highlights connected edges. Layering rule:
       <code>BackendCore</code> ← <code>Core</code> ← apps / XPC / CLI.
     </p>
@@ -1421,7 +1421,7 @@ table.matrix .note {
           <span><i style="background:rgba(191,170,219,0.35);border:1px solid var(--lavender-300)"></i> SPM / packages</span>
           <span><i style="background:rgba(140,143,155,0.3);border:1px solid var(--charcoal-200)"></i> Tests</span>
         </div>
-        <svg id="moduleGraph" viewBox="0 0 860 620" role="img" aria-labelledby="moduleGraphTitle moduleGraphDesc"><title id="moduleGraphTitle">Vocello build dependency graph</title><desc id="moduleGraphDesc">Ten of the thirteen Xcode targets and their direct package dependencies. Select a node for exact dependencies and key paths.</desc></svg>
+        <svg id="moduleGraph" viewBox="0 0 860 620" role="img" aria-labelledby="moduleGraphTitle moduleGraphDesc"><title id="moduleGraphTitle">Vocello build dependency graph</title><desc id="moduleGraphDesc">Ten Xcode graph participants and their direct package dependencies; UI and logic test bundles are omitted. Select a node for exact dependencies and key paths.</desc></svg>
       </div>
       <aside class="detail-panel" id="detailPanel" aria-live="polite">
         <div class="empty">Select a module to inspect its type, platform, dependencies, and key files.</div>

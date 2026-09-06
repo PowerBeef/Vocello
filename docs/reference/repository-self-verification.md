@@ -58,7 +58,7 @@ T1 hook and on every push through CI. None of it needs a model, a device, or XCU
 | --- | --- | --- |
 | `build_output_policy.py validate` | omission + integrity | Every directory under `build/` is governed at any depth; heavy-lane free-space floors |
 | `localization_contract.py validate` | omission + contradiction | String Catalog settings/context/plurals, typed dynamic presentation use, pseudo-localization coverage, and content-addressed rejection of new direct UI literals |
-| `documentation_contract.py` | contradiction | Doc lifecycle groups, link and anchor resolution, public-fact consistency |
+| `documentation_contract.py` | contradiction | Frontmatter-resolved lifecycle inventory, link/anchor resolution and public-fact consistency; groups are taxonomy/legacy defaults, not a second status |
 | `doc_metadata.py validate` | contradiction + drift + integrity | Per-file status, pinned bodies, derived-fact contradictions in docs, `AGENTS.md`, and `README.md` |
 | `check_surface_coverage.py` | omission | Every enforced gate and contract is named in guidance; the optional-assists section survives |
 | `roadmap.py validate` | evidence + contradiction | Plans and items; every evidence reference resolved against the repository; an optional primary execution plan must exist and remain active |
@@ -159,7 +159,7 @@ authorizes a pin change.
 
 ## Related
 
-- [`../../AGENTS.md`](../../AGENTS.md) — hard rules and the full list of what the gate runs
+- [`../../AGENTS.md`](../../AGENTS.md) — hard invariants and domain routing; the release/QA rule owns the enforced-surface catalog
 - [`macos-release-qa.md`](macos-release-qa.md) — the release-evidence chain, a separate and stricter system
 - [`../../.agents/rules/derived-artifacts.md`](../../.agents/rules/derived-artifacts.md) — generated-inventory freshness
 - [`privacy-storage.md`](privacy-storage.md) — the build-output ownership table

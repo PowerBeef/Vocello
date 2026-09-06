@@ -192,6 +192,24 @@ class IndexTests(unittest.TestCase):
             if document["status"] in ("historical", "superseded"):
                 self.assertIn("contentDigest", document)
 
+    def test_indexes_share_per_file_lifecycle_and_cover_archived_guidance(self):
+        import pathlib
+        from documentation_contract import documentation_inventory
+        root = pathlib.Path(__file__).resolve().parents[2]
+        metadata = {entry["path"]: entry["status"] for entry in render_index(root)["documents"]}
+        grouped = documentation_inventory(root)
+        for path, record in grouped.items():
+            relative = path.relative_to(root).as_posix()
+            if relative in metadata:
+                self.assertEqual(record["status"], metadata[relative], relative)
+        for relative in ("docs/development-history-2026-09-06.md",
+                         "docs/reference/ios-device-testing-history-2026-09-06.md",
+                         "docs/reference/testing-runbook-history-2026-09-06.md",
+                         "docs/reference/release-first-execution-history-2026-09-06.md",
+                         "design_references/Vocello Design System/SKILL.md"):
+            self.assertEqual(metadata[relative], "historical")
+        self.assertEqual(metadata["docs/releases/v3.0.0.md"], "active")
+
 
 if __name__ == "__main__":
     unittest.main()

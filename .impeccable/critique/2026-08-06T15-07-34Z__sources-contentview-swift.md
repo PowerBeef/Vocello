@@ -7,7 +7,15 @@ p0_count: 0
 p1_count: 3
 timestamp: 2026-08-06T15-07-34Z
 slug: sources-contentview-swift
+status: historical
+owner: backend-and-platform
+summary: Preserved legacy design prototype or critique; not current product guidance or acceptance.
+contentDigest: sha256:d5491c4fc8348171505f8895e7ff717973e60ff4d83212fc6e99e443271aa6d8
 ---
+> **Historical reference only.** This retained prototype/review is not the current app, release
+> procedure, acceptance evidence, or asset-licensing authority. Follow root AGENTS.md, the
+> current platform guide and source; do not apply its older layout or font-distribution advice.
+
 Method: dual-agent (A: design review · B: detector/evidence)
 
 # Vocello macOS UI — Design Critique (2026-08-06)

@@ -67,7 +67,8 @@ Details and test references live in `PERFORMANCE.md`, `CLONE_ARTIFACT_FORMAT.md`
 
 ## Selective upstream intake
 
-Use a separate branch and an explicit upstream checkout:
+Keep Vocello development on local `main`. An explicit external upstream checkout may be used
+read-only for comparison; it is not a development branch or an alternate source authority:
 
 1. Review the desired upstream commit against the recorded import baseline.
 2. Never rebuild the immutable import inventory merely to record a newer review point.

@@ -31,6 +31,15 @@ checkpoint records a privacy-safe exact-tree PASS marker, so staging the same by
 does not run the project gate again. Any subsequent edit, added untracked file, or HEAD change
 invalidates the marker.
 
+Finalize intended tracked-file membership **before** derived refresh: project-health inventories
+use Git-tracked files. Adding a new file to the index afterward can stale that generated summary
+even if the content fingerprint is unchanged. Do not change index membership during a gate.
+
+During frozen acceptance, do not run an editing/checkpoint cycle between shards. Keep progress in
+the existing pinned untracked run bundles; follow [device pause/resume](ios-device-testing.md#pause-and-resume).
+At a deliberate source checkpoint, update the roadmap and narrative together and acknowledge the
+new full-tree evidence identity.
+
 `scripts/development_workflow.py` obtains merge-required native lanes from
 `scripts/evidence_impact.py`; it does not maintain a parallel classifier. It always refreshes and
 validates derived artifacts and runs the quick project-input gate. That gate still executes the

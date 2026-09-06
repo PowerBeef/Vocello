@@ -68,8 +68,9 @@ Existing copy is not evidence. Verify every product claim against the parent rep
 | Performance statements | compatible clean records under `../benchmarks/runs/` and generated `../benchmarks/HISTORY.md` |
 | Architecture, privacy, distribution | `../AGENTS.md`, `../docs/ARCHITECTURE.md`, and machine-readable contracts |
 
-Voice Cloning has no controllable delivery. Do not imply emotion or intensity controls on that
-engine path. Keep public language aligned with `../config/public-product-facts.json`; do not infer
+Voice Cloning has no instruction channel. Its delivery banks select verified reference clips,
+not engine emotion/intensity instructions. Keep public language aligned with
+`../config/public-product-facts.json`; do not infer
 availability from an old page or release note.
 
 ## Brand and copy rules

@@ -62,7 +62,7 @@ sourceOfTruth:
 **Consults:**
 - `docs/reference/{macos-release-qa,telemetry-and-benchmarking,cli,macos-testing,ios-device-testing}.md`
 - `docs/ARCHITECTURE.md` §12 (telemetry)
-- Root `AGENTS.md` (Workflows, Commands) + [`docs/project-map.html`](../../docs/project-map.html)
+- Root `AGENTS.md` (Verification tiers) + [`docs/project-map.html`](../../docs/project-map.html)
 
 ## Required pre-read
 
@@ -91,7 +91,7 @@ Before changing scripts or CI, read:
   telemetry after their instructions are read. Start from script output and generated artifacts.
   Triage failing UI lanes with `axiom-testing` and focused repository commands, and symbolicate
   crashes with `xcsym` through `axiom-tools` before manual log digging; computer use stays assistive
-  (exploratory QA/diagnosis per `docs/reference/interactive-ui-qa.md`), never a driver or gate.
+  (development-environment diagnosis per `docs/reference/interactive-ui-qa.md`), never an app driver or gate.
 - XCUITest is the sole autonomous app UI driver. It runs against the native macOS app or a paired
   physical iPhone and provides smoke and benchmark lanes; iOS adds pulled on-device
   telemetry proof.
@@ -153,108 +153,44 @@ Before changing scripts or CI, read:
   exact test subset, recorded clean runs, and maintainer-reviewed transition to blocking. Do not
   weaken ordinary deterministic or MLX runtime coverage to make the sanitizer subset pass.
 
-## Build / test commands
+## Procedure routing
 
-```sh
-# Preferred local loop: narrow repeatable checks, then one complete checkpoint.
-scripts/dev.sh plan
-scripts/dev.sh focused
-scripts/dev.sh checkpoint
+Use [development-workflow.md](../../docs/reference/development-workflow.md) for the
+`scripts/dev.sh plan` → `focused` → `checkpoint` loop and index/refresh ordering.
+[testing-runbook.md](../../docs/reference/testing-runbook.md) selects the platform or research
+procedure; it never authorizes UI/model work implicitly. Consult
+[benchmarking-procedure.md](../../docs/reference/benchmarking-procedure.md) only for benchmark
+operation, and [telemetry-and-benchmarking.md](../../docs/reference/telemetry-and-benchmarking.md)
+only for schema/field interpretation. Release steps live in
+[macos-release-qa.md](../../docs/reference/macos-release-qa.md) and
+[ios-appstore-submission.md](../../docs/reference/ios-appstore-submission.md).
+Do not duplicate their command catalogs here.
 
-# Ordinary development / CI (no model, device, or UI prerequisite)
-./scripts/check_project_inputs.sh
-QVOICE_GATES=quick ./scripts/check_project_inputs.sh   # local fast loop: self-tests skipped only while scripts/ + config/ are untouched
-scripts/macos_test.sh test
-./scripts/build.sh build
-./scripts/build_foundation_targets.sh ios
+## Deterministic gate map
 
-# Explicit scheduled-lane characterization; not an ordinary commit/release prerequisite.
-scripts/macos_test.sh tsan
+`./scripts/check_project_inputs.sh` is the T1/T2 repository gate. Its enforced surfaces include:
 
-# Deterministic/runtime macOS gate (models are needed only for the optional bounded bench)
-scripts/macos_test.sh models ensure   # explicit repair/bootstrap only; normal readiness is visible in Settings
-scripts/macos_test.sh gate
-QWENVOICE_GATE_BENCH=1 scripts/macos_test.sh gate   # optional: bounded custom/speed/medium bench + audioQC
+| Check | Contract |
+| --- | --- |
+| `build_output_policy.py` | output ownership and storage floors |
+| `cli_version_contract.py`, `cli_package.py` | CLI identity, resources and packaged smoke |
+| `saved_voice_lifecycle_contract.py` | transactional review, deletion, XPC, cache, and iOS accessibility surfaces |
+| `documentation_contract.py`, `doc_metadata.py`, `check_surface_coverage.py` | links, lifecycle, facts, pinned bodies, and guidance completeness |
+| `roadmap.py`, `project_health.py`, `evidence_impact.py` | work authority, health, and change-to-evidence mapping |
+| `check_delivery_instructions.py` | delivery-copy parity and conflicts |
+| `model_catalog_contract.py`, `vendor_runtime_contract.py` | production artifacts, owned-runtime inventory, and facade baseline |
+| `runtime_security_contract.py`, `validate_backend_risk_spine.py` | debug/concurrency registries and backend risks |
+| `scripts/support_contact_contract.py`, `config/support-contact.json` | public support identity |
+| `scripts/attribution_manifest.py`, `config/third-party-attribution-policy.json` | bundled license/NOTICE coverage |
+| `check_convergence_promotion_gate.py` | convergence promotion preconditions |
+| `check_qwen3_backend_only.sh`, `check_backend_resource_contract.sh` | MLX-only and native resource wiring |
+| `check_test_workflows.sh` | one UI stack, retired-harness exclusion, and script self-tests |
+| `python_test_contract.py` | discovery-complete Python inventory, runner compatibility, and zero-test rejection |
+| `benchmark_history.py`, `supply_chain_contract.py`, `required_step_ledger.py`, `codex_session_storage.py`, `check_release_notes.py` | history, supply chain, release steps, task storage, and release-note contracts |
 
-# Explicit XCUITest evidence; never a packaging prerequisite.
-scripts/ui_test.sh macos smoke
-scripts/ui_test.sh macos benchmark
-scripts/macos_test.sh telemetry-overhead
-python3 scripts/check_macos_xpc_bench.py ~/Library/Application\ Support/QwenVoice-Debug/diagnostics \
-  --run-id macos-xcui-benchmark-YYYYMMDD-HHMMSS
+Exemptions require a reason in `config/surface-coverage-exemptions.json`. Read
+`docs/reference/repository-self-verification.md` before adding or weakening a gate.
 
-# Language-path verification (optional pre-release; Phases 1–3)
-scripts/macos_test.sh core-test
-python3 scripts/test_check_language_hints.py
-python3 scripts/test_check_language_output.py
-scripts/macos_test.sh lang-bench --subset quick              # Phase 2 hint gate (CLI)
-scripts/ios_device.sh lang-bench --subset quick --label release-QA   # Phases 2–3 on device
-# Full 19-cell iOS matrix: scripts/ios_device.sh lang-bench --subset full --label lang-full-v1
-# Fixed 15-take autonomous diagnosis, never history: scripts/ios_device.sh lang-bench --diagnostic-cohort
-# Phase 3 output (DE/ES/ZH/JA): language-bench.md § Phase 3 prerequisites — Speech Wi‑Fi assets
-# Current acceptance state and resume commands: docs/development-progress.md
-
-scripts/ui_test.sh ios smoke
-scripts/ui_test.sh ios benchmark
-scripts/ios_device.sh gate
-
-# Model fixture helpers
-scripts/macos_test.sh models check|ensure|install
-# XCUITest reviews iOS model readiness visibly in Settings.
-
-# Release packaging
-./scripts/build.sh release
-python3 scripts/supply_chain_contract.py
-python3 scripts/release_source_authority.py --help
-python3 scripts/release_evidence.py validate --output-dir build/dist/macos
-
-# Benchmark driver (PASS publishes a registry record automatically when run in this checkout)
-QWENVOICE_DEBUG=1 ./build/vocello bench --modes clone --variants speed \
-  --lengths short,medium,long --warm 3 --voice <prepared-voice> \
-  --label "release-QA"
-
-# Derived catalogs (inventories / indexes CI fail-closes on)
-python3 scripts/refresh_derived_artifacts.py refresh
-python3 scripts/refresh_derived_artifacts.py validate
-
-# Registry validation / reproducibility
-python3 scripts/benchmark_history.py validate --all
-python3 scripts/benchmark_history.py rebuild-index --check
-python3 scripts/model_catalog_contract.py rebuild --check
-python3 scripts/model_catalog_contract.py validate
-
-# Optional regression compare (see macos-release-qa.md step 3)
-python3 scripts/summarize_generation_telemetry.py \
-  ~/Library/Application\ Support/QwenVoice-Debug/diagnostics \
-  --run-id <run-id> --evidence-manifest <run-artifact-dir>/benchmark-evidence.json \
-  --compare-baseline benchmarks/baselines/mac-gate-bench.json \
-  --label "release-QA"
-
-# Crash/profile (PASS-only; failed traces or generations never publish benchmark history)
-scripts/macos_test.sh crashes
-scripts/macos_test.sh profile [--kind cpu|memory] [--keep-trace] [spec]
-scripts/macos_test.sh memory [--label ID]
-scripts/ios_device.sh crashes
-scripts/ios_device.sh profile [--kind cpu|memory] [--keep-trace] [spec]
-scripts/ios_device.sh memory --voice-id SAVED_VOICE_ID [--label ID]
-# Reads already-pulled delayed MetricKit aggregates; it does not contact the phone or publish history.
-scripts/ios_device.sh memory-field-report [pulled-diagnostics]
-python3 scripts/build_output_policy.py status [--json]
-python3 scripts/build_output_policy.py validate
-python3 scripts/codex_session_storage.py validate
-python3 scripts/codex_session_storage.py status   # optional local aggregate; never CI/release input
-scripts/clean_build_caches.sh --routine --dry-run
-scripts/clean_build_caches.sh --routine
-scripts/clean_build_caches.sh --prune-ui-results --dry-run
-scripts/clean_build_caches.sh --cache macos --dry-run
-scripts/clean_build_caches.sh --compact-profile-failure <run-id> --dry-run
-```
-
-The router optimizes `scripts/evidence_impact.py`; it is not another evidence authority. Focused
-work may use fast regeneration, selected XCTest classes, and the governed incremental iOS cache.
-Checkpoint and CI retain full deterministic coverage. See
-[`development-workflow.md`](../../docs/reference/development-workflow.md). Never add inferred
-UI/model, benchmark, signing, or release work.
 
 ## Invariants (do not regress)
 
@@ -292,7 +228,7 @@ UI/model, benchmark, signing, or release work.
   release authority. Candidate and promotion workflows compensate by requiring a GitHub-verified
   annotated tag, containment in `origin/main`, and successful latest `CI required` plus
   `Security required` runs on the exact tagged commit.
-- **Ordinary CI is deterministic-only.** GitHub CI executes the 19 platform-neutral iOS policy
+- **Ordinary CI is deterministic-only.** GitHub CI executes the platform-neutral iOS policy
   assertions inside macOS `VocelloCoreTests`, compiles the `VocelloiOS` app and duplicate standalone
   `VocelloiOSLogicTests` bundle with `generic/platform=iOS`, and never executes XCUITest. Xcode 26
   cannot execute the app-host-free tool-hosted policy bundle on a physical-device destination, so
@@ -325,8 +261,8 @@ UI/model, benchmark, signing, or release work.
   was explicit. A failed lane retains at most the newest raw trace per platform/profile kind and
   requires an exact run ID before manual compaction. Inventory distinguishes automatic, blocked,
   and explicit reclamation; never reinterpret all of `build/artifacts/` as disposable.
-- **Build outputs have one owner.** macOS and physical-device iOS keep exactly two persistent Xcode
-  caches, package resolution uses the shared locked checkout, and release/MCP/compile-safety work is
+- **Build outputs have one owner.** The policy registers macOS, macOS TSan, and physical-device iOS
+  persistent Xcode caches; package resolution uses the shared locked checkout, and release/MCP/compile-safety work is
   scratch. Release files live only under `build/dist/` and routine cleanup never removes them.
   Heavy lanes use the manifest-owned free-space preflight before work starts. Prefer one selective
   `--cache` target over `--aggressive`; successful ordinary builds remain non-destructive.

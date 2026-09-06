@@ -161,20 +161,20 @@
     {
       "id": "RF-01",
       "plan": "release-first-3-0-2026-09",
-      "title": "Step 1 — reconcile the audit and preserve the exact testing checkpoint",
+      "title": "reconcile the audit and preserve the exact testing checkpoint",
       "status": "done",
       "gate": "Map every audit finding to its existing defect authority or one independent product defect; preserve seven correlated passes, one product failure, and five additional unverified engine attempts. Inspect retained attachments once without inventing observations. Register the ordered primary programme and pass roadmap/documentation validation.",
       "evidence": [
         "doc:docs/reference/release-first-execution-2026-09.md#audit-finding-disposition",
         "doc:docs/reference/release-first-execution-2026-09.md#preserved-september-4-device-boundary"
       ],
-      "updated": "2026-09-04",
-      "notes": "September 6: iOS-first queue adopted; active release-first reference maps each remaining blocker to owner, next action and evidence. No parallel status authority. Historical checkpoint: VRA-001 through VRA-022 are mapped. F-15/F-16/F-17 own the new independent gaps; F-06 is reopened. A bounded scan of the retained 1710-attachment manifest and Staging found no canonical recoverable observation stream. ICA-04/ICA-05/ICA-18 keep the original failed/unverified attempts, not a fabricated PASS or safe-resume cursor. This closes reconciliation only, not any acceptance campaign. The September 4 HTML audit of 616fdfe2 was separately grounded at 75ecb740: all 12 V26 findings have dispositions in docs/reference/engineering-audit-grounding-2026-09-04.md. F-01 is reopened; F-18 through F-22 capture independent output/lifecycle/CLI/shared-store issues; F-16, F-06, VLR-07 and ASR items retain overlapping authority. Concurrency schedules remain risks until tested. This is review completion, not remediation or new candidate evidence."
+      "updated": "2026-09-06",
+      "notes": "September 6 documentation cleanup: one current checkpoint and current release queue, pinned verbatim narrative/runbook archives, reconciled per-file lifecycle catalogs, concise instruction routing, corrected stale facts and explicit frozen-campaign pause rules. No status, acceptance gate, historical failure, or product behavior was changed. Verification and resume context: docs/development-progress.md#documentation-cleanup-checkpoint. September 6: iOS-first queue adopted; active release-first reference maps each remaining blocker to owner, next action and evidence. No parallel status authority. Historical checkpoint: VRA-001 through VRA-022 are mapped. F-15/F-16/F-17 own the new independent gaps; F-06 is reopened. A bounded scan of the retained 1710-attachment manifest and Staging found no canonical recoverable observation stream. ICA-04/ICA-05/ICA-18 keep the original failed/unverified attempts, not a fabricated PASS or safe-resume cursor. This closes reconciliation only, not any acceptance campaign. The September 4 HTML audit of 616fdfe2 was separately grounded at 75ecb740: all 12 V26 findings have dispositions in docs/reference/engineering-audit-grounding-2026-09-04.md. F-01 is reopened; F-18 through F-22 capture independent output/lifecycle/CLI/shared-store issues; F-16, F-06, VLR-07 and ASR items retain overlapping authority. Concurrency schedules remain risks until tested. This is review completion, not remediation or new candidate evidence."
     },
     {
       "id": "RF-02",
       "plan": "release-first-3-0-2026-09",
-      "title": "Step 2 — complete Apple prerequisites and the consolidated qualified-decision packet",
+      "title": "complete Apple prerequisites and the consolidated qualified-decision packet",
       "status": "in-flight",
       "blockedBy": [
         "RF-01"
@@ -191,7 +191,7 @@
     {
       "id": "RF-03",
       "plan": "release-first-3-0-2026-09",
-      "title": "Step 3 — implement and behavior-test macOS Design request preservation",
+      "title": "implement and behavior-test macOS Design request preservation",
       "status": "done",
       "blockedBy": [
         "RF-01"
@@ -213,7 +213,7 @@
     {
       "id": "RF-04",
       "plan": "release-first-3-0-2026-09",
-      "title": "Step 4 — repair long-form durability on both platforms",
+      "title": "repair long-form durability on both platforms",
       "status": "done",
       "blockedBy": [
         "RF-03"
@@ -235,7 +235,7 @@
     {
       "id": "RF-05",
       "plan": "release-first-3-0-2026-09",
-      "title": "Step 5 — expose recoverable History-save outcomes",
+      "title": "expose recoverable History-save outcomes",
       "status": "done",
       "blockedBy": [
         "RF-04"
@@ -259,7 +259,7 @@
     {
       "id": "RF-06",
       "plan": "release-first-3-0-2026-09",
-      "title": "Step 6 — localize the remaining natural-text audio failures",
+      "title": "localize the remaining natural-text audio failures",
       "status": "in-flight",
       "blockedBy": [
         "RF-05"
@@ -291,7 +291,7 @@
     {
       "id": "RF-07",
       "plan": "release-first-3-0-2026-09",
-      "title": "Step 7 — finish only the acceptance-blocking harness repairs",
+      "title": "finish only the acceptance-blocking harness repairs",
       "status": "done",
       "gate": "Under ICA-18/AV-09, extend the existing runner with incremental durable observations, early generation identity capture, explicit serialization failure, visible History-focus polling, observed-versus-expected selections, genuine playback/scrub evidence, terminal ledgers on every exit, and default five-take shards through existing start/limit controls. Interrupted/lost-focus/missing-observation/collection/stale-resume/duplicate fixtures pass; collection and cleanup plus one small physical pilot pass before the full campaign. No parallel harness, automatic retry, or fabricated observation.",
       "sourceOfTruth": [
@@ -309,7 +309,7 @@
     {
       "id": "RF-08",
       "plan": "release-first-3-0-2026-09",
-      "title": "Step 8 — package the downloadable optimized CLI",
+      "title": "package the downloadable optimized CLI",
       "status": "parked",
       "unparkWhen": "The iOS submission critical path is clear or the maintainer separately prioritizes desktop/CLI qualification.",
       "gate": "Implement F-17 in the existing release workflow: separate optimized arm64 CLI DMG, complete libraries/resources/notices/instructions, checkout-independent discovery, signatures, notarization/stapling, checksums and source/version supply-chain identity. Copied-package tests cover paths with spaces, version/JSON, all three modes, a real two-item batch, cancellation, failure exits and resource loading. The F-21 batch-admission regression must use production-built requests against the real engine policy; keep index/total outside ordinary requests. No Homebrew route, privileged installer, shell-profile edits, or second release system.",
@@ -327,7 +327,7 @@
     {
       "id": "RF-09",
       "plan": "release-first-3-0-2026-09",
-      "title": "Step 9 — verify the coherent tree and freeze the 3.0.0 candidate",
+      "title": "verify the coherent tree and freeze the 3.0.0 candidate",
       "status": "in-flight",
       "gate": "Run derived refresh/validation, full project-input gate, macOS deterministic tests/app build, generic physical-iOS SDK compile, website check and affected release/privacy/attribution/supply-chain fixtures. Set shared version 3.0.0 through project.yml, reconcile the pending iOS version and collision-check an unused build number under ASR-08. Commit main and require exact-SHA CI/security, verified annotated-tag authority and command-bound candidate evidence; compute required promotion lanes before expensive QA. No unrelated source/docs edits during the frozen campaign or full-tree identity bypass. The September 4 pre-freeze source amendment must first qualify F-18/F-01 preservation, F-19 terminal ownership, F-22 shared-store exclusion, F-20/F-21 CLI lifecycle/accounting, F-16 recovery/retention, and VLR-07 live-duration/edge semantics. This means their bounded source corrections/tests, not their later device or signed-candidate closure gates; do not introduce a dependency cycle or replace RF-10 through RF-12.",
       "sourceOfTruth": [
@@ -342,7 +342,7 @@
     {
       "id": "RF-10",
       "plan": "release-first-3-0-2026-09",
-      "title": "Step 10 — independently qualify macOS and downloadable CLI",
+      "title": "independently qualify macOS and downloadable CLI",
       "status": "parked",
       "unparkWhen": "The iOS submission critical path is clear or the maintainer separately prioritizes desktop/CLI qualification.",
       "blockedBy": [
@@ -361,7 +361,7 @@
     {
       "id": "RF-11",
       "plan": "release-first-3-0-2026-09",
-      "title": "Step 11 — account for the full frozen-source 201-take iOS campaign",
+      "title": "account for the full frozen-source 201-take iOS campaign",
       "status": "planned",
       "blockedBy": [
         "RF-07",
@@ -379,7 +379,7 @@
     {
       "id": "RF-12",
       "plan": "release-first-3-0-2026-09",
-      "title": "Step 12 — verify the distribution iOS candidate and finish submission preparation",
+      "title": "verify the distribution iOS candidate and finish submission preparation",
       "status": "planned",
       "blockedBy": [
         "RF-11"

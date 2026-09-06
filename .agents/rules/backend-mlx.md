@@ -61,7 +61,7 @@ sourceOfTruth:
 **Consults:**
 - `docs/ARCHITECTURE.md` §4 (engine core), §11 (model management), §12 (telemetry)
 - `docs/reference/{mlx-guide,qwen3-tts-guide,mimi-codec-guide,metal-guide,swift-performance-guide,ios-engine-optimization,telemetry-and-benchmarking}.md`
-- Root `AGENTS.md` (Hard rules) + [`docs/ARCHITECTURE.md`](../../docs/ARCHITECTURE.md) (engine invariants)
+- Root `AGENTS.md` (Hard invariants) + [`docs/ARCHITECTURE.md`](../../docs/ARCHITECTURE.md) (engine invariants)
 - Delivery/emotion quality measurement: [`docs/reference/delivery-harness.md`](../../docs/reference/delivery-harness.md)
   (tools, `bench --delivery` protocol, multilingual experiment compiler/runner, layered evaluator,
   instruction-receipt provenance, statistics semantics, blinded-listener authority,
@@ -154,8 +154,10 @@ an ordinary build/release prerequisite.
 - **Cancellation ownership.** `MLXTTSEngine` conforms to `ActiveGenerationCancellable` on every
   platform. `ActiveGenerationCoordinator` owns one active generation, records the typed reason
   (`user`, `memoryPressure`, `superseded`, or `shutdown`), and awaits task termination before trim,
-  unload, or ownership release. Cancellation emits `.cancelled`, not `.failed`, and no late result
-  may reach persistence. The generate catch must still restore `loadState` on every terminal path.
+  unload, or ownership release. Typed engine cancellation emits `.cancelled`, not `.failed`, and
+  cannot publish a late result. Cancelling UI presentation after accepted publication is different:
+  preserve the successful output's History ownership without stale player takeover. The generate
+  catch must still restore `loadState` on every terminal path.
 - **Per-tier memory.** `NativeMemoryPolicyResolver` sets policy per device class. There is
   **no hard `Memory.memoryLimit` in production** and **no Quality→Speed OOM fallback**. MLX
   allocator limits are host-boundary process state; request-varying Qwen clear cadence and KV
@@ -169,8 +171,8 @@ an ordinary build/release prerequisite.
   `VocelloQwen3Engine`, its classified session, and QwenVoiceCore's `GenerationOutputAdapter` as
   the shipping generation path for Custom, Design, and Clone. Phase 4 `overallPromotion` passed
   2026-07-20 with clean Phase 0 controls and canonical matrices. The contract JSON's
-  `phaseStatus` block is the sole per-phase status authority (human summary: the phase table in
-  `docs/development-progress.md`); do not restate open/closed phase state here. Prepared-model
+  `phaseStatus` block is the sole per-phase status authority (older phase narrative is preserved in
+  `docs/development-history-2026-09-06.md`); do not restate open/closed phase state here. Prepared-model
   loading, post-load metadata/facts, preparation diagnostics, priming, and schema-3 clone-artifact
   persistence/adoption are actor-owned public surfaces; the legacy compatibility SPI is retired
   and its symbols are internal to the package. Do not add a public mutation surface back to the

@@ -57,29 +57,28 @@ processed-candidate proof and submission approval differ. Keep external dependen
 
 | Invariant | Required behavior |
 | --- | --- |
-| **Development work is `main`-only** | Develop and commit only on local `main`; never create or use another development branch. If returning to `main` risks existing work, stop and ask. PR refs and detached CI checkouts are execution contexts, not agent development branches. |
-| **iOS runtime and UI use a physical device** | Never select Simulator. XCUITest is the only autonomous native UI driver. `scripts/build_foundation_targets.sh ios` is a generic physical-device SDK compile and needs no phone; `scripts/lib/ios_platform_preflight.py check` verifies host platform support without downloading or starting a Simulator. |
-| **XCUITest owns app UI** | Native macOS and iOS UI evidence comes only from `scripts/ui_test.sh` and the checked-in XCUITest targets. Computer-use, browser, coordinate, vision, simulator, and MCP UI automation never drive Vocello or substitute for XCUITest evidence. Computer-use may assist with the development environment only. |
-| **No hidden test UI** | Tests observe genuine visible controls. Shippable targets contain no preview routes, invisible state markers, seeded UI state, or onboarding bypasses. Test-only behavior stays in test targets. |
-| **`project.yml` owns the project** | Never hand-edit `QwenVoice.xcodeproj/project.pbxproj`. After manifest changes run `./scripts/regenerate_project.sh` and the project gate. iOS resources use `sources:` with `buildPhase: resources`. |
-| **Release-only configuration** | There is no generic Debug configuration or `DEBUG` symbol. Production-affecting environment overrides must be registered in `config/runtime-debug-knobs.json` and require both the repository-owned `VOCELLO_INTERNAL_DIAGNOSTICS` build capability and `QWENVOICE_DEBUG=1`; distributed builds omit the capability. |
-| **Concurrency exceptions are registered** | Every owned `@unchecked Sendable`, `nonisolated(unsafe)`, or equivalent escape requires a justification in `config/concurrency-safety.json`. Prefer actors, `Mutex`, immutable adapters, and value types. Run `python3 scripts/runtime_security_contract.py`. |
-| **MLX isolation and pins** | `MLXArray` is non-`Sendable`; keep arrays and lazy graphs inside one isolation domain, call `eval` deliberately, use request-local randomness, await low-level generation tasks after early stream exit, and coordinate active/reservation memory through wired-memory tickets. Move `mlx-swift` and `mlx-swift-lm` pins in lockstep. No Core ML backend. |
-| **Engine authority is singular** | Preserve actor-owned lifecycle mutation, typed cancellation, prewarm-slot serialization, request-local sampling and memory policy, frame-bounded suspending audio delivery, non-eviction of audio-bearing events, and classified-session/product-finalization authority. `config/runtime-refactor-contract.json` is the sole phase-status authority. |
-| **Roadmap state has one home** | `config/roadmap.json` owns plans and items and generates `docs/ROADMAP.md`; the runtime-refactor contract owns convergence phase status; `docs/development-progress.md` is narrative and cites both. Do not create another status ledger. |
-| **Privacy and clone language fail closed** | Never track PII, paths, prompts, transcripts, secrets, or raw diagnostics. Shared enrollment review keeps reference language from selecting Clone output. |
-| **Generated output has one policy** | `config/build-output-policy.json` owns native output under `build/`, cache placement, retention, and free-space floors. Persistent caches are `build/cache/xcode/{macos,macos-tsan,ios-device}`. Never add ad hoc DerivedData or `.build` paths, bypass a preflight, or delete an entire cache when selective cleanup suffices. `website/dist` remains Vite-owned. |
-| **Scripts are final authority** | Skills, plugins, MCP servers, Xcode integrations, browsers, GitHub, and Hugging Face tools are assists only. They are not CI, packaging, commit, or release prerequisites and never override repository scripts or contracts. |
-| **Ordinary publication is deterministic-only** | Commits, pushes, PRs, ordinary merges, CI, signing, notarization, candidate packaging, draft artifacts, and internal TestFlight uploads require deterministic checks only. Frontend/model lanes run only for explicit QA or public promotion work. |
-| **Release source is signed and exact-SHA green** | Direct `main` development grants no release authority. Candidates and promotion require a GitHub-verified annotated tag whose commit is in `origin/main` and has successful latest `CI required` plus `Security required` exact-SHA checks. `scripts/release_source_authority.py` fails closed otherwise. |
-| **Public promotion is source-bound** | Making a macOS draft public or submitting an iOS candidate for external TestFlight/App Review requires `quality-promotion.json` validated by `scripts/quality_promotion.py` against the exact tag, release-evidence bytes, path-classified lanes, and privacy-safe hardware profiles. Device/model availability may delay public promotion but never candidate production. |
-| **Release evidence is command-bound** | Release candidates require schema-v2 `release-evidence.json` and hashed `release-verification.json` produced by the contract-defined managed subprocess against a clean full-tree identity within the freshness window. Apple archive, entitlement, signing, and UUID continuity are checked against `config/apple-platform-capability-matrix.json`. Self-authored, substituted, partial, stale, or cross-source PASS files cannot authorize publication. |
-| **Benchmark history is PASS-only** | Publish only privacy-safe, qualified PASS records under `benchmarks/runs/` and regenerate `benchmarks/HISTORY.md`. Raw audio, telemetry, screenshots, traces, and `.xcresult` bundles stay untracked. Publishing must never stage, commit, or push automatically. |
-| **Profile traces are ephemeral** | Exact-PID traces are hashed, validated, summarized, and published before raw trace removal. Keep a trace only for an explicit Instruments session. Routine cleanup must not touch current apps, canonical caches, dSYMs, models, source, or tracked history. |
-| **Memory evidence is qualified** | `config/memory-qualification-policy.json` owns thresholds. Publishable generation evidence requires telemetry schema v8 and benchmark manifest v2, run-scoped sidecars, lifecycle boundaries, zero capture failures, at least 95% sampler coverage, and no critical-pressure or forced-unload event. Do not add independent app and engine peaks. |
-| **Audio QA is autonomous** | Ordinary promotion uses PCM QC, fixed seeds, locale-locked full-WAV ASR consensus, and applicable prosody/delivery gates. Partial-utterance consensus is a harness gap, never product-failure or PASS evidence. Listening never waives a deterministic failure. Semantic prompt-improvement claims also need the blinded holdout in `config/delivery-experiment-contract.json`; that research is not an ordinary release prerequisite. `passedWithWarnings` is not promotion quality until a deterministic rule or implementation fix clears it. |
-| **Documentation is governed** | Markdown under `docs/` and `.agents/rules/` carries metadata validated by `python3 scripts/doc_metadata.py validate`. Historical/superseded bodies are digest-pinned. Active facts come from `config/derived-doc-facts.json`. Delivery copy is checked by `scripts/check_delivery_instructions.py` against `config/delivery-instruction-contract.json`. Every enforced surface must be named in this file or a domain rule. |
-| **Derived catalogs stay fresh** | Run `python3 scripts/refresh_derived_artifacts.py refresh` then `validate` when registered inputs change. This includes owned-runtime inventories/baselines, `docs/project-health.md`, `docs/INDEX.md`, `docs/INDEX.json`, `docs/ROADMAP.md`, derived facts, README charts, and the production model catalog. Narrative progress remains a deliberate manual update. |
+| **Main only** | Develop and commit on local `main`; never create/use another development branch, including experiments. Preserve dirty work; stop if returning to main risks it. Detached CI/PR execution is not agent development. |
+| **Physical iPhone only** | No Simulator build, launch or runtime/UI tests. `scripts/build_foundation_targets.sh ios` is a no-phone generic device-SDK compile; `scripts/lib/ios_platform_preflight.py check` only verifies host support. |
+| **One UI driver** | `scripts/ui_test.sh` and checked-in XCUITest own native macOS/iOS UI. Computer-use, browser, coordinate, vision, Mirroring and MCP UI routes never drive Vocello, even for diagnosis. Environment assistance only. |
+| **Genuine controls** | No hidden markers, preview routes, seeded UI state or onboarding bypasses in shippable targets. Test-only behavior stays in test targets; preserve accessibility IDs. |
+| **Generated project** | Edit `project.yml`, never `QwenVoice.xcodeproj/project.pbxproj`; run `scripts/regenerate_project.sh` and the project gate. iOS resources use `sources:` with `buildPhase: resources`. |
+| **Release-only configuration** | No generic Debug configuration or `DEBUG` symbol. Production overrides require registration in `config/runtime-debug-knobs.json`, `VOCELLO_INTERNAL_DIAGNOSTICS` and `QWENVOICE_DEBUG=1`; distribution omits the capability. |
+| **Concurrency and MLX** | Register owned unsafe concurrency in `config/concurrency-safety.json`; prefer actors/Mutex/immutable values. Keep non-Sendable MLX arrays/lazy graphs isolated, evaluate deliberately, use request-local randomness, await low-level tasks after early stream exit, and own wired-memory reservations. Move MLX pins in lockstep; no Core ML. |
+| **One lifecycle authority** | Actor-owned lifecycle, typed cancellation, serialized prewarm, request-local memory/sampling, frame-bounded suspending audio, no audio-event eviction and classified-session finalization remain intact. `config/runtime-refactor-contract.json` owns phase status. |
+| **One work authority** | `config/roadmap.json` owns status and generates `docs/ROADMAP.md`; the current checkpoint is narrative, not another ledger. |
+| **Privacy and language** | Never track PII, private paths, prompts, transcripts, credentials or raw diagnostics. Shared enrollment keeps reference language separate from Clone output; explicit target language wins. |
+| **Owned output** | `config/build-output-policy.json` owns `build/`, free-space floors and retention. Reuse `build/cache/xcode/{macos,macos-tsan,ios-device}`; no ad hoc DerivedData/.build roots, bypassed preflights or whole-cache deletion when selective cleanup suffices. Vite owns `website/dist`. |
+| **Scripts outrank assists** | Skills, plugins, devices, models, MCP and external connectors never override scripts or become ordinary CI/commit/packaging prerequisites. |
+| **Deterministic publication checkpoints** | Commits, pushes, PRs, ordinary merges/CI and candidate signing/notarization/packaging/draft/internal TestFlight require deterministic checks only. UI/model lanes need explicit QA/public-promotion scope. None grants release authorization. |
+| **Exact-source releases** | Candidates/promotion require a GitHub-verified annotated tag in `origin/main` and successful latest exact-SHA `CI required` + `Security required`; `scripts/release_source_authority.py` fails closed. |
+| **Command-bound candidate evidence** | Schema-v2 `release-evidence.json` and hashed `release-verification.json` come from managed commands on a clean, fresh full-tree identity. Verify Apple signing/entitlements/UUIDs against `config/apple-platform-capability-matrix.json`; reject fabricated, partial, stale or cross-source PASS. |
+| **Separate public promotion** | Public Mac release or external TestFlight/App Review requires exact-tag `quality-promotion.json`, release bytes, applicable lanes and privacy-safe hardware profiles validated by `scripts/quality_promotion.py`. Device availability may delay promotion, never candidate production. |
+| **Evidence retention** | Only qualified privacy-safe PASS enters `benchmarks/runs/`; regenerate `benchmarks/HISTORY.md`. Raw WAV/telemetry/screenshots/traces/xcresult stay untracked. Publishing evidence never stages/commits/pushes automatically. |
+| **Ephemeral profiles** | Hash, validate and publish exact-PID summaries before deleting raw traces; retain raw only for explicit Instruments work. Never clean current apps, canonical caches, dSYMs, models, source or tracked history as scratch. |
+| **Qualified memory** | `config/memory-qualification-policy.json` owns thresholds. New evidence requires telemetry v8/manifest v2, run sidecars/boundaries, zero capture failures, ≥95% coverage and no critical-pressure/forced-unload event. Never add unrelated app/engine peaks. |
+| **Autonomous audio QA** | Require fixed seeds, PCM QC, locale-locked full-WAV ASR and applicable prosody/delivery gates. Partial-utterance consensus is a harness gap, not PASS/product failure; listening never waives deterministic failure. Warnings need a governed correction before clean promotion. Semantic prompt claims additionally require the blinded holdout in `config/delivery-experiment-contract.json`, not ordinary release research. |
+| **Governed documentation** | `scripts/doc_metadata.py validate` checks metadata and pinned historical/superseded bodies. Active facts derive from `config/derived-doc-facts.json`; delivery copy from `config/delivery-instruction-contract.json`. Every enforced surface stays named here or in a domain rule. |
+| **Fresh derived artifacts** | Run `scripts/refresh_derived_artifacts.py refresh` then `validate` for changed registered inputs. Catalogs, inventories/baselines, health, indexes, roadmap, facts and README charts are generated; narrative updates are deliberate. |
 
 Details for runtime, lifecycle, and event-channel invariants live in `docs/ARCHITECTURE.md`,
 `config/runtime-refactor-contract.json`, `config/backend-risk-spine.json`, and the backend rule.
@@ -99,28 +98,10 @@ Details for runtime, lifecycle, and event-channel invariants live in `docs/ARCHI
 
 ### Deterministic gate map
 
-`./scripts/check_project_inputs.sh` is the T1/T2 repository gate. Its enforced surfaces include:
-
-| Check | Contract |
-| --- | --- |
-| `build_output_policy.py` | output ownership and storage floors |
-| `cli_version_contract.py`, `cli_package.py` | CLI identity, resources and packaged smoke |
-| `saved_voice_lifecycle_contract.py` | transactional review, deletion, XPC, cache, and iOS accessibility surfaces |
-| `documentation_contract.py`, `doc_metadata.py`, `check_surface_coverage.py` | links, lifecycle, facts, pinned bodies, and guidance completeness |
-| `roadmap.py`, `project_health.py`, `evidence_impact.py` | work authority, health, and change-to-evidence mapping |
-| `check_delivery_instructions.py` | delivery-copy parity and conflicts |
-| `model_catalog_contract.py`, `vendor_runtime_contract.py` | production artifacts, owned-runtime inventory, and facade baseline |
-| `runtime_security_contract.py`, `validate_backend_risk_spine.py` | debug/concurrency registries and backend risks |
-| `scripts/support_contact_contract.py`, `config/support-contact.json` | public support identity |
-| `scripts/attribution_manifest.py`, `config/third-party-attribution-policy.json` | bundled license/NOTICE coverage |
-| `check_convergence_promotion_gate.py` | convergence promotion preconditions |
-| `check_qwen3_backend_only.sh`, `check_backend_resource_contract.sh` | MLX-only and native resource wiring |
-| `check_test_workflows.sh` | one UI stack, retired-harness exclusion, and script self-tests |
-| `python_test_contract.py` | discovery-complete Python inventory, runner compatibility, and zero-test rejection |
-| `benchmark_history.py`, `supply_chain_contract.py`, `required_step_ledger.py`, `codex_session_storage.py`, `check_release_notes.py` | history, supply chain, release steps, task storage, and release-note contracts |
-
-Exemptions require a reason in `config/surface-coverage-exemptions.json`. Read
-`docs/reference/repository-self-verification.md` before adding or weakening a gate.
+`./scripts/check_project_inputs.sh` owns T1/T2. The complete enforced-surface catalog is in
+[the release/QA rule](.agents/rules/release-qa.md#deterministic-gate-map).
+Read [repository self-verification](docs/reference/repository-self-verification.md) before adding
+or weakening a gate. Exemptions need reasons in `config/surface-coverage-exemptions.json`.
 
 <!-- BEGIN OPTIONAL ASSISTS -->
 
@@ -178,64 +159,17 @@ authorizes a release. The main-only invariant also applies to experiments and ML
 
 ### Explicit frontend acceptance
 
-Only run these lanes when the user requests frontend/device acceptance:
+Only explicit QA authorizes `scripts/ui_test.sh` or model/device lanes. Follow
+[the testing router](docs/reference/testing-runbook.md), then the relevant platform procedure.
+iOS preflight requires a valid Apple Development identity/private key and an unlocked physical
+device. Preserve all user data; runner PASS requires diagnostics, crash checks and restoration,
+not just XCTest success. Zero observations cannot authorize resume; changed source needs new IDs.
+`scripts/ios_candidate_acceptance.py` guards the separate preinstalled-candidate route.
 
-```sh
-scripts/ui_test.sh macos smoke|benchmark|perf
-scripts/macos_test.sh gate
-
-scripts/ios_device.sh preflight
-scripts/ui_test.sh ios smoke|benchmark|perf
-scripts/ui_test.sh ios saved-voice-lifecycle
-scripts/ui_test.sh ios control-audit --scenario inventory|stateful|external|accessibility|generation|all
-scripts/ios_device.sh gate
-# Private Clone/French diagnosis; never CI/release:
-scripts/ios_device.sh voice-reliability --plan <untracked-plan.json> --private-map <untracked-map.json> [--resume]
-```
-
-Device `preflight` requires a valid Apple Development identity/private key; team-only, expired,
-and distribution-only states fail. Model/clone lanes are opt-in. For timed sessions, reserve
-collection/cleanup time and stop before the deadline. Pin runs and record completed/failed/untested
-boundaries. Runner PASS requires diagnostics/cleanup. Interrupted runs stay failed; zero-observation
-runs cannot resume. Source changes need new IDs. Identity, reachability, and safe-resume procedures:
-`docs/reference/ios-device-testing.md`.
-Candidate guards: `scripts/ios_candidate_acceptance.py`.
-
-When authorized, finish with `scripts/ui_test.sh ios screen-protection --scenario enable --retain-result`.
-Verify English/French Settings' three-minute readback, return Home, then independently verify lock
-after the timer; `unlockedSinceBoot` is historical. No device UI follows final protection. This is
-cleanup, not product acceptance; details live in the device-testing guide.
-
-## Key paths
-
-| Path | Purpose |
-| --- | --- |
-| `Sources/QwenVoiceBackendCore/`, `Sources/QwenVoiceCore/` | backend vocabulary, engine, downloads, generation, telemetry |
-| `Packages/VocelloQwen3Core/` | owned Qwen3-TTS/Mimi runtime and stable facade |
-| `Sources/QwenVoiceNative/`, `Sources/QwenVoiceEngineService/`, `Sources/QwenVoiceEngineSupport/` | macOS XPC stack |
-| `Sources/iOS/`, `Sources/iOSSupport/`, `Sources/SharedSupport/` | iOS app and shared player/persistence/transcription |
-| `Tests/VocelloCoreTests/`, `Tests/VocelloEngineIntegrationTests/` | deterministic core and XPC tests |
-| `Tests/UIAutomationSupport/`, `Tests/VocelloMacUITests/`, `Tests/VocelloiOSUITests/` | checked-in XCUITest stack |
-| `Tests/VocelloiOSLogicTests/` | Host-executed platform-neutral policy assertions, also compiled in a standalone generic device-SDK bundle |
-| `config/runtime-debug-knobs.json`, `config/concurrency-safety.json` | debug and concurrency exception registries |
-| `config/support-contact.json`, `config/third-party-attribution-policy.json`, `docs/reference/content-rights-review.md` | support, offline attribution, and qualified-rights gates |
-| `config/{ios-storage-protection-policy,app-store-connect-readiness-policy,model-host-availability-policy}.json` | Storage, account, collision, host contracts |
-| `config/model-management-diagnostics-schema-v1.json`, `scripts/check_ios_model_management.py` | correlated physical-iPhone model-delivery and progress diagnosis contract |
-| `config/ios-startup-reliability-{plan-schema-v1,result-schema-v1,result-schema-v2,sentinel}.json`, `scripts/ios_startup_reliability.py` | bounded physical-iPhone Built-in Voice startup plans, backward-compatible retained results, codec replay, memory/crash forensics, and exact request parity |
-| `config/runtime-refactor-contract.json`, `config/roadmap.json` | convergence and work-state authorities |
-| `config/language-bench-*.json` | language corpus and matrices |
-| `config/ios-control-audit-contract-20260904.json` | digest-pinned v2/v3 historical control-plan compatibility; never current-source acceptance |
-| `benchmarks/`, `scripts/benchmark_history.py` | privacy-safe PASS registry and generated history |
-| `scripts/ui_test.sh`, `scripts/macos_test.sh`, `scripts/ios_device.sh` | native test and diagnostic entry points |
-| `docs/reference/model-delivery.md` | download/restoration/retry diagnostics and live-proof rules |
-| `config/delivery-experiment-contract.json`, `config/delivery-evaluator-v2-contract.json`, `config/delivery-evaluation-corpus.json`, `config/delivery-evaluator-v2-candidates.json` | pre-registered prompt arms, compact local evaluator, sampling, multilingual scripts, pinned candidate models, holdouts, and semantic-promotion limits |
-| `config/audio-cadence-qc-contract.json`, `scripts/audio_cadence_qc.py` | Fast-QC v6 cadence, calibration, and threshold-review authority |
-| `config/voice-identity-language-reliability.json`, `scripts/voice_identity_language_reliability.py` | Private Clone/French matrices with privacy-safe terminal QC/replay |
-| `docs/reference/delivery-harness.md` | delivery/emotion protocol, provenance, layered evaluation, statistics, and results |
-| `website/` | marketing site governed by `website/AGENTS.md` |
-
-Full lanes: `docs/reference/macos-testing.md`, `docs/reference/ios-device-testing.md`,
-`docs/reference/benchmarking-procedure.md`, and `.agents/rules/release-qa.md`.
+For timed sessions reserve collection time. Frozen campaigns use untracked checkpoints, never
+tracked doc edits between shards. The [device procedure](docs/reference/ios-device-testing.md#pause-and-resume)
+owns retention, resume validation and the separately authorized English/French three-minute
+Auto-Lock readback plus independent lock verification. No device UI follows final protection.
 
 ## Security and release summary
 

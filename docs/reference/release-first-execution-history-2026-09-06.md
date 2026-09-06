@@ -1,0 +1,403 @@
+---
+status: historical
+owner: release-qa
+reviewed: 2026-09-06
+summary: Preserved pre-cleanup release-first programme checkpoints; current scheduling lives at the original plan path.
+contentDigest: sha256:174266f5b40e01c476b19fdc54f33a02407d2c3a3fbb6d3a1ca164f1234c6c86
+---
+> **Historical snapshot, archived 2026-09-06.** Preserved programme checkpoints, not current scheduling.
+> Use [the active release-first plan](release-first-execution-2026-09.md) and config/roadmap.json.
+
+# Release-first execution
+
+The maintainer adopted this programme on 2026-09-04. The external September 3 audit
+reviewed `86696036`; the initial implementation baseline is clean `main` at `2f392484`.
+Its readiness score is advisory, not a release gate. Source and the roadmap remain authoritative.
+
+`config/roadmap.json` designates **`release-first-3-0-2026-09` as `primaryPlan`**. Its
+`RF-01` through `RF-12` milestones remain the execution roadmap. The September 6 iOS-first
+amendment below supersedes their original numeric scheduling order, not their closure gates.
+Both `roadmap.py status` and the generated `docs/ROADMAP.md` present it first. Older plans retain
+technical defect ownership, evidence and deferred backlog; their active status does not independently
+schedule another workstream. RF milestone completion never closes a referenced defect implicitly:
+for example RF-03 source proof does not close F-15's packaged-candidate acceptance.
+
+## Decisions and order
+
+Keep and repair long-form and segment regeneration. Complete the 201-take iOS campaign.
+Prioritize iOS; park Mac/CLI-only packaging and qualification until the iOS critical path clears.
+Shared-code regression tests remain required. This changes scheduling, not previous failure results.
+The maintainer-selected next release is **3.0.0**, marking the new phase of Vocello across
+iOS, macOS, and the downloadable CLI. This supersedes the original 2.5.0 planning default.
+Reconcile the App Store Connect version and select an unused build number through the existing
+collision preflight before freezing. The September 4 source-preparation checkpoint sets
+`project.yml` to 3.0.0/build 24 and regenerates the project. A complete read-only account preflight
+found zero matching builds. This is not a reservation; repeat it immediately before archive.
+The live App Store version still requires separately authorized reconciliation.
+`candidateRelease` in the public-facts contract is version/tag-matched, explicitly unpublished,
+and strictly newer than `stableMacRelease`; public links and stable-version fact scans do not
+advertise the candidate. Remove the candidate declaration when an authorized publication moves
+the stable release forward. Build numbers remain solely owned by `project.yml`.
+Candidate verification is distinct from implementation completion and from explicit publication
+or submission authorization. No release, account mutation, or legal conclusion follows from a
+source checkpoint.
+
+## September 6 accelerated iOS queue
+
+Baseline: clean `793439ad`. RF-03/04/05/07 stay implementation-complete; do not reimplement
+their accepted repairs. `config/roadmap.json` remains the only status ledger. The following maps
+the approved ten-step execution sequence onto existing owners; it is not a second defect register.
+
+| Order / class | Owner and next action | Required evidence / exit |
+| --- | --- | --- |
+| 1 — scheduling | RF-01: classify the existing queue and preserve historical outcomes | Roadmap, documentation and instruction validators agree; original gates retained |
+| 2 — external dependency | RF-02 / ASR-02/04/08/10/11: use the consolidated rights/account packet | Qualified decisions or an explicit owner/service blocker; separate authorization for edits, candidate operations and uploads |
+| 3 — correction before freeze | RF-06 / ICA-15 / VLR-07 / F-16: long-form cap first, severe gaps second, cadence/recognition third | Exact retained inputs, first divergent boundary, verified correction or explicit release blocker |
+| 4 — verification correction before freeze | RF-09 / RF-12: source-validated platform applicability and preinstalled-candidate route | iOS Speed requirements retained, macOS Quality retained, historical compatibility; no target replacement or diagnostics dependence |
+| 5 — freeze | RF-09: coherent deterministic checkpoint, exact-SHA CI/Security, fresh collision check, authorized tag/archive/IPA | Frozen candidate with signing, entitlements, notices, privacy, architecture and UUID proof; no internal diagnostics |
+| 6 — implemented, candidate verification | RF-11 / F-01/06/16/18/23 / ICI-4 / VLR-07: targeted correction acceptance | Long-form/regeneration, all modes, enrollment, player, History, export and preservation pass before expansion |
+| 7 — implemented, campaign verification | RF-11 / ICA-04/05 / AV-09 / ASR-12: all 201 takes and applicable remaining lanes | Five-take pilot then up to 20 per invocation, mode boundaries respected; all outcomes and restoration accounted for, no unresolved required failures |
+| 8 — processed candidate verification | RF-12 / ASR-06/07/10/12: separately authorized TestFlight, then black-box upgrade/fresh-install acceptance | Approved identity unchanged; no debug app substitution. Fresh install only after usable encrypted recovery and immediate separate approval; otherwise blocked |
+| 9 — external and candidate materials | RF-12 / ASR-05/09/11: genuine screenshots, approved metadata/declarations, fresh regional host proofs | Authentic accepted-size layouts, reviewer journey, NA/Europe/East Asia proofs inside the 24-hour freshness window |
+| 10 — submission decision | RF-12: issue READY TO SUBMIT or the remaining owner/action blockers | All required gates passed; actual App Review submission still separately authorized |
+| Deferred — non-iOS qualification / research | RF-08/RF-10; broad evaluator, prompt and prosody studies | Preserve existing evidence and gates; no Mac/CLI-only job or semantic research milestone on the iOS critical path |
+
+Before each RF-06 experiment, register hypothesis, exact inputs, discriminating observation and
+production decision in the existing untracked run bundle. The first pass is limited to two targeted
+experiments per finding. Recover the failed long-form text/seed once; do not substitute approximations.
+Replace the acceptance fixture's random spoken marker with deterministic natural text and existing
+History/metadata ownership. That fixture correction does not resolve the original product failure.
+Do not repeat excluded decoder permutations, trim silence, raise the token cap arbitrarily, change
+seeds/prompts, weaken QC or introduce hidden retries. If no actionable defect is localized, record a
+decision checkpoint and continue independent host work without calling the audio finding fixed.
+
+During RF-11 reserve at least 20 minutes before each phone deadline for collection/restoration.
+Derive ETA from the first shard. Resume only at an independent next row after terminal cleanup and
+identity validation; no failed-row retry. Stop for crash, unsafe device conditions, uncertain ownership
+or data-loss risk. Source changes start a new campaign identity; previous results remain historical.
+End device work with the existing French-compatible three-minute Auto-Lock readback and verified lock.
+Candidate marketing overlays must retain genuine captures/aspect ratio and never claim native Pro Max
+testing. No uninstall, legal clearance, account mutation or upload is authorized by a roadmap update.
+
+Use focused verification after each coherent change and one complete checkpoint before freeze.
+While a campaign is frozen, keep resumable progress in its pinned, untracked run artifacts; do not
+edit unrelated source or documentation and then bypass the full-tree identity check. Incorporate
+results in the roadmap at the next source checkpoint. A changed product needs fresh applicable
+acceptance; old results remain historical evidence, not replacement candidate proof.
+
+## September 5 device checkpoint and next boundary
+
+The [correlation/capture correction](../development-progress.md#september-5-correlation-and-capture-correction--verified)
+now passes a fresh two-take physical pilot with all required collection, correlation and restoration
+steps. RF-07/ICA-18's bounded harness gates are complete; RF-09's candidate freeze still precedes
+RF-11. Six genuine screenshots and two engine-digest-bound WAVs are retained, including the output
+whose test-owned History row was deleted. Both new takes pass Fast QC, but use a different seed
+from the earlier warning; no audio-quality finding is silently closed. Full-campaign warm coverage
+remains pending and 199 pilot-plan takes are unscheduled. Screen protection is verified and the
+phone is locked. Do not reuse this development pilot as full acceptance for a later changed tree.
+
+The [later two-take pilot](../development-progress.md#september-5-later-physical-pilot--resume-checkpoint)
+on `1ba75045` completed both UI/player/History journeys and restoration, but the runner failed
+missing warm coverage (both authoritative receipts were cold). English passed QC; Chinese had
+an excess-cadence warning. Keep that warning distinct from both a hard rejection and promotion
+PASS. The host's optional correlation step and absent generation screenshots are addressed by
+the verified correlation-v2/capture correction under RF-07/AV-09; no failed result was rewritten
+or resumed. RF-11's full campaign remains gated by RF-09. The historical final French Settings
+readback confirms three-minute Auto-Lock; the independent
+13:59 UTC CoreDevice observation confirms the phone is locked. No further device UI work followed.
+
+The later [phone-independent codec checkpoint](../development-progress.md#september-5-phone-independent-codec-checkpoint)
+reproduces the 12.817-second French gap on the Mac using the exact retained iPhone codes and
+catalog-verified model bytes. Historical `full` replay means the production non-streaming
+25-frame chunk schedule, not an independent decoder. This excludes an iPhone-only origin for
+that gap but leaves common decoder versus sampled codes unresolved. Its resource envelope fails
+on host swap growth, so the second distinct trace and further heavy qualification were not run.
+Retain the diagnostic result without treating it as audio or memory PASS; no production change
+or phone interaction occurred.
+
+The [active checkpoint](../development-progress.md#september-5-physical-device-checkpoint)
+records the exact runs, fixes and limitations. Two new 14/14 Clone/French Design closures,
+inventory, bounded stateful/external checks, corrected four-size layout review and nine performance
+scenarios completed. They are not the full 201-take campaign or signed-candidate proof.
+
+Before another long campaign:
+
+1. Finish RF-09's coherent host verification/commit. F-23 corrects explicit Play after stream
+   finalization; ICA-19 closes the directly observed largest-size tab-title truncation.
+2. RF-06 keeps three distinct audio cases: the retained numeric-marker regression, reproducible
+   marker-free French/Chinese EOS failures, and the new long-form first-segment token-cap failure.
+   Both decoder replay paths reproduce the French gap; common decoder/platform numerics versus
+   sampled codes are still unresolved. The long-form failure occurred at serious thermal load,
+   with healthy memory. No speculative prompt/token-cap/seed/model/QC changes are justified.
+3. RF-07's original failed pilot and smoke results stay failed. Scope the next physical pilot to
+   the remaining long-player/request boundary. Failure diagnostics now collect before aggregate
+   exit; separately recovered smoke telemetry cannot retrospectively turn the runner green.
+4. Only after a complete pilot and candidate freeze schedule RF-11's full matrix. Preserve every
+   source/seed-bound attempt; the three new two-take pilots are not a merged campaign or retries.
+
+French Settings Auto-Lock was restored to three minutes and verified separately from product
+acceptance; no further device UI runs follow final screen protection. Unrelated user data and
+retained test-owned forensic residue must not be deleted on inference. RF-10 desktop/CLI package
+qualification can proceed independently; account/rights/signing decisions remain explicit.
+
+## September 4 current-source amendment
+
+The [engineering audit grounding](engineering-audit-grounding-2026-09-04.md) reviews the new
+HTML report against `75ecb740`, not merely its `616fdfe2` baseline. All 12 findings have an
+evidence-qualified disposition. The primary programme and 3.0.0 target are unchanged.
+
+Before RF-09 freezes the next candidate, complete this bounded source amendment in order:
+
+1. Protect existing output bytes (**F-18**) and repair secondary Saved Voice rollback failure
+   (**reopened F-01**).
+2. Prove or refute stale macOS terminal ownership (**F-19**) and cross-process Saved Voice
+   interference (**F-22**) with controlled tests; implement only the narrow evidenced correction.
+3. Finish graceful CLI interruption (**F-20**) and truthful partial-batch reporting (**F-21**)
+   under existing F-17/RF-08 packaging work.
+4. Complete corrupt-journal recovery and retained-artifact ownership checks under **F-16/F-06**,
+   and strict live-duration/accurate edge-coverage semantics under **VLR-07/RF-06**.
+5. Run focused verification per patch, then one coherent RF-09 checkpoint and exact-SHA CI/Security.
+
+These are source prerequisites, not circular dependencies on those items' later candidate/device
+closure. RF-03/04/05 still record their earlier implementation milestones; they do not close new
+failure schedules. RF-10 through RF-12 retain packaged acceptance, the full 201-take iPhone
+campaign, and qualified external decisions. Existing successes and failures remain immutable.
+No additional harness, prompt study, or engine rewrite is part of this amendment.
+
+The amendment's source work and deterministic verification are now complete; see the
+[current checkpoint](../development-progress.md#resume-here-2026-09-04) for the exact native,
+Python, build and website results, including retained red-to-green reproductions. This does not
+close the referenced corrected-candidate gates. RF-09 still requires exact-SHA CI/Security and
+authorized tag/account preparation before freeze; RF-10 owns signed-package proof, RF-06/RF-07
+own the next focused iPhone session, and RF-02 retains qualified owner/privacy/rights decisions.
+
+Reviewer free-space guidance and the stale dependency table were corrected during review;
+App Store Connect metadata and product behavior were not changed. AGENTS.md already expresses
+the required authority, ownership and verification boundaries; run-specific progress belongs here
+and in the roadmap, not in its durable instructions.
+
+## Audit finding disposition
+
+| External finding | Grounded disposition and authority |
+| --- | --- |
+| VRA-001 | Confirmed incomplete macOS Design draft capture: F-15. |
+| VRA-002 | Premature replacement History publication: F-16. |
+| VRA-003 | Silent manifest serialization/write failure: F-16. |
+| VRA-004 | Rejected segment/joined artifact cleanup gaps: F-16. |
+| VRA-005 | iOS resumed progress counts reused segments twice: F-16. |
+| VRA-006 | Segment versus project terminal ownership must be explicit: F-16; preserve F-08. |
+| VRA-007 | Unchanged segment QC/provenance must survive regeneration: F-16. |
+| VRA-008 | Outbox enqueue failure has no durable entry to recover: reopen F-06. |
+| VRA-009 | Sampled-output failures remain; natural-text custom-008 is separate: ICA-15. |
+| VRA-010 | Marker-removal experiment completed; schema-v3 metadata ownership implemented: ICA-18. Retain original numeric failures. |
+| VRA-011 | Full-tree churn is real; freeze source rather than redesign evidence authority this release: ICA-04/ICA-18. |
+| VRA-012 | Add behavioral tests at changed boundaries; no mass source-contract rewrite: F-15/F-16/F-06. |
+| VRA-013 | Shared iOS policy assertions already execute on macOS; duplicate iOS bundle is compile-only: F-03 remains closed. |
+| VRA-014 | Third-party processing/disclosure requires qualified review: ASR-02. |
+| VRA-015 | Attribution implementation exists; qualified asset rights remain: ASR-04. |
+| VRA-016 | Distribution identity/profile/archive must be freshly verified: ASR-10. |
+| VRA-017 | Current qualified regional host evidence required: ASR-09. |
+| VRA-018 | Exact candidate, screenshots, and reviewer journey: ASR-05/ASR-12. |
+| VRA-019 | Broad engine decomposition deferred unless causally necessary; no reopening F-09. |
+| VRA-020 | Generation continuation is session-scoped; durability repair does not add relaunch continuation: F-16. |
+| VRA-021 | Milestones distinguish source completion, candidate verification, and release authorization; roadmap remains singular. |
+| VRA-022 | Pin failures and apply existing bounded retention; no new storage-management framework. |
+
+Additional grounded gap: the source-built CLI has no downloadable release package (F-17).
+Retained VLR French accuracy findings must distinguish production Neutral from experimental
+no-delivery/Calm arms before deciding remediation (VLR-07); do not repeat completed Clone studies.
+
+## Preserved September 4 device boundary
+
+`ios-xcui-control-audit-20260904-065457-e2ec8911` has seven correlated passes and
+`custom-008` PRODUCT_FAIL: marker-free French CustomVoice with a 12.362-second interior gap.
+The successor `ios-xcui-control-audit-20260904-151935-164b4ee3` failed History keyboard focus
+after 1115.371 seconds. Five additional engine attempts exist (three Fast-QC passes, two warnings),
+but no accepted current-run control-observation attachment. They are not UI acceptance and must
+not be silently replayed. The composer preserves seven inherited passes, one inherited product
+failure, and 193 unvalidated generation cells plus three aggregate controls.
+
+The retained attachment manifest contains 1710 attachments and no canonical observations; a
+bounded read-only inspection of exported attachment names and retained Staging found no recoverable
+structured observation stream. Preserve the original result and ledger. Screenshots or engine
+records alone cannot manufacture missing ownership/cleanup receipts. A new-source campaign may
+explicitly revalidate cells, but must not overwrite these original failed/unverified attempts.
+
+No phone work is active at this checkpoint. The previous run did not prove final app termination,
+restoration, or screen lock; verify those before the next unattended run. Do not assume ownership
+of existing History rows from text alone.
+
+## RF-06 retained-evidence review and bounded follow-up (September 4)
+
+No original result was rewritten. The review and three bounded Mac reproductions narrow the next
+device diagnostic rather than claiming the remaining release finding is resolved.
+
+- **Marker-free Custom:** `custom-008` in `065457-e2ec8911` has a correct French model-facing
+  receipt, the recorded seed, zero allocation retries, and voluntary EOS. Persisted QC locates
+  12.362 seconds of interior silence starting at 6.074 seconds. Pre-write chunk reports 11–32
+  cover 6.16–18.48 seconds with RMS between −77.16 and −69.26 dBFS. These reports are computed
+  from decoded samples before the final writer (`GenerationOutputAdapter.swift`), so the defect
+  is already observable upstream of file assembly/History/playback. The retained bundle has the
+  rejected-WAV digest but no matching WAV or codec trace. The exact current-source request then
+  passed three fresh Mac processes without a retry: streaming produced 199 codec frames and a
+  15.92-second clip twice with identical QC, while non-streaming produced 325 frames and a
+  26.00-second clip. The retained iPhone row produced 1,347 frames and 107.76 seconds of audio.
+  This rules out the tracked script, instruction/language routing, and final WAV writer as a shared
+  deterministic cause, and establishes stable same-path Mac sampling. It does not distinguish an
+  iPhone-specific sampled continuation from code-to-audio decoding because the device codec trace
+  is missing. Next: the exact existing row/seed on the physical phone with scoped codec/rejected-
+  audio collection, then incremental/full replay. Do not infer an RNG, decoder, prompt, token-cap,
+  or QC fix from telemetry alone.
+- **French Design:** the September 2 corrected characterization has 28 rows per arm. Shipped
+  Neutral has 26 passing output verifications and two accuracy rejects; no-delivery has 23 passes,
+  four verification rejects and one mandatory QC rejection; Calm has 19 passes, eight verification
+  rejects and one mandatory QC rejection. These are this run's counts, not the earlier cohort's.
+  Keep the original terminal results and prompt copy.
+- **Verifier completeness was the first divergence for one shipped Design row:** the shipped Neutral long row,
+  seed `32060824` (`t96-60c01edf`), is a 16-second WAV. All three `fr-CA` recognition passes cover
+  only 8.16–15.84 seconds; the score counts 20 deletions out of 39 reference words. The first
+  eight seconds are not blank: one-second RMS windows range from −37.7 to −15.9 dBFS. An offline,
+  locally cached Whisper Small analysis of the immutable WAV then transcribed the complete file.
+  Its hypothesis has three edits over 39 normalized words (WER 0.077),
+  below the unchanged 0.15 threshold; the first half has high speech probability. This establishes
+  that Apple Speech consistently discarded the first utterance in this row. It is verifier evidence
+  failure, not proof of a French synthesis defect, and the independent analyzer remains diagnostic
+  rather than promotion authority.
+- **Narrow source correction:** current live verification now binds the Speech timing ranges to the
+  immutable WAV duration. Every consensus pass must cover both source edges within the bounded
+  one-second/15%-of-duration allowance, capped at 2.5 seconds. A partial but internally consistent
+  utterance produces `speech_recognition_incomplete_temporal_coverage`, no WER/CER score, and a
+  harness-owned inconclusive VLR result. Historical records remain decodable and unchanged. The
+  focused Swift and Python tests cover the retained 8.16–15.84/16-second shape and complete-edge
+  control. This is fail-closed classification, not a retroactive PASS or a replacement ASR result.
+- **Complete retained Design screen:** the same offline, cached, serial full-file analysis was
+  applied to all 14 rows whose successful audio had not cleared the original verifier. Every WAV
+  is shorter than the analyzer's 30-second context, so no artificial split boundary was needed.
+  Twelve fall at or below WER 0.15: both shipped Neutral rows, all four no-delivery rows, and six
+  of eight Calm rows. The only two remaining diagnostic misses are short Calm controls at WER
+  0.167. Of the 12 original numeric accuracy rejects, four have incomplete Apple Speech edge
+  coverage; the other eight cover the WAV but still contain evaluator disagreement. The two
+  shipped Neutral rows are 2/2 under the diagnostic analyzer, but the short row remains an Apple
+  Speech 0.167 failure versus diagnostic WER 0.083 and is not promoted by the independent result.
+  This preserves the distinction between proven temporal truncation, unresolved evaluator
+  disagreement, and actual experimental-arm defects.
+- **Exact current-source Mac confirmation:** the retained short and long shipped-Neutral French
+  requests were regenerated in fresh CLI processes with their exact scripts, briefs, delivery,
+  and seeds `32060828` and `32060824`. Both passed mandatory Fast-QC, emitted matching request
+  receipts, and scored diagnostic full-file WER 0.000. This is useful same-source Mac evidence;
+  it is not physical-iPhone or Apple Speech closure.
+
+Evidence stays in the original ignored UI/VLR run bundles. Engine JSONL SHA-256 for the Custom
+row's bundle: `09d6a537b4da25a5434a30c79a47943acb7fec6a82b4030936a9270d57aa5b3a`.
+The current VLR composer correctly refuses to qualify historical input against the changed full
+tree; that guard was not bypassed. The observations above are diagnostic, not newly qualified
+candidate evidence. RF-06 remains open for the iPhone codec/replay boundary, the shipped Neutral
+short-row Apple/Whisper disagreement, and fixed-source physical-device confirmation of the
+coverage classifier; independent RF-07/RF-08 engineering may continue.
+
+The coherent source checkpoint passed the full project-input gate (121 Python modules and 1,468
+declared tests), generic physical-iOS SDK app and logic-test builds, and all deterministic macOS
+core, transport, and owned-runtime suites (`mac-test-20260904-145600`). No phone, model download,
+or release action was used by that checkpoint.
+
+## RF-08 source checkpoint (September 4)
+
+The existing release workflow now produces and verifies the separate CLI DMG through the same
+managed build/artifact steps, with backward-compatible app-only historical verification. The
+payload includes the executable, MLX/dependency resource bundles, two source-bound catalogs,
+project license, complete governed attribution JSON, rendered notices and usage instructions.
+Both DMGs enter checksums, attestation, draft upload and exact remote-asset validation together.
+
+The optimized development CLI built successfully and its 32-file copied payload passed real
+model-free discovery outside the checkout, including a path containing spaces. The first test
+demonstrated that Xcode's tool product omitted the catalog JSON; release staging now copies the
+authoritative source bytes explicitly and refuses a mismatching built catalog. Ad-hoc resource
+signatures legitimately have empty CMS placeholders; a narrow fixture covers these without
+permitting empty shaders/data. No Swift resource-lookup change was necessary.
+
+Local report: `cli-packaging-local-20260904.json` in ignored macOS release artifacts; executable
+SHA-256 `8ba1c5a3ef95e5098e26251b320eb17966f0a113a3e026f4bcc8456fc8fa7217`.
+It declares development/internal-diagnostics scope, not candidate acceptance. The later all-mode
+and cancellation proof below uses that same 2.4.0/build 23 development artifact. Developer ID/
+notarized DMG qualification and RF-10 promotion remain open; current source is 3.0.0/build 24.
+
+The real ad-hoc DMG route then passed independently: a 11,969,269-byte image with SHA-256
+`ad109cb15c610d8964fc3429daac46fab9622ca2e9816b9fd2fc95b88816ca69` attached read-only,
+copied its `Vocello CLI` folder to a path with spaces, repeated all nine model-free checks, and
+detached cleanly. The ignored proof bundle is `rf08-cli-dmg-roundtrip-20260904`. Ad-hoc signing
+and no-generation scope are explicit; this is not Developer ID, notarization or RF-10 evidence.
+
+The package verifier now also has an opt-in, privacy-safe real-generation qualifier. It revalidates
+the copied payload before using an isolated runtime and an already-installed model store, runs all
+three Speed modes serially, requires exact request/result identities and strict QC PASS, observes
+live cancellation before sending SIGINT, and checks stable failure exits. The existing ad-hoc
+2.4.0/build 23 DMG passed: Built-in English (3.28 s), French Voice Design (7.68 s), and English
+Clone (4.08 s) each produced a valid QC-PASS WAV with the exact expected model; live cancellation
+exited 130, unknown command exited 2, and invalid mode exited 1. The ignored report is
+`rf08-cli-dmg-roundtrip-20260904/cli-generation-qualification.json`. It records no source text,
+transcript, path, or audio and explicitly grants no publication authority. Because the artifact is
+an older ad-hoc development package at source `089328d3`, this proves the qualification mechanism
+and package self-containment only; RF-10 must repeat it on the signed/notarized 3.0.0 candidate.
+
+The resumed qualifier additionally removes an assumed Clone transcript: use audio-only conditioning
+or provide the actual reviewed reference transcript. The historical Clone take therefore proves
+execution/QC only, not reference fidelity. Current qualification retains WAVs, atomic partial rows,
+the active stage, and sanitized failure types on failure/interruption. It refuses report reuse,
+terminates/awaits process groups on timeout, and handles newline-free progress output. Its 25 focused
+fixtures pass; requested seed/streaming fields are not claimed as observed engine receipts.
+
+## RF-09 host verification and safe next step (September 4)
+
+The full project-input gate passed all 1,481 Python tests. macOS core, XPC transport and owned-runtime
+tests passed (`mac-test-20260904-160540`); macOS app and 3.0.0 CLI builds, generic iOS app/logic
+compiles, and the complete website check (including both rendered browser layouts) passed.
+Ignored logs in `rf09-host-checkpoint-20260904` preserve the initial failed gate attempts as well
+as the successful run. Version separation, attribution regeneration and the guidance byte budget
+were corrected, not waived. Advisory currency warnings remain distinct from required failures.
+
+The existing classifier against `v2.4.0` requires eight promotion lanes for each platform:
+engine, Quality-engine, delivery, language, model lifecycle, retained memory, UI benchmark and UI
+performance. `quality_promotion.py` filters them by platform; desktop qualification is independent
+of the phone. Recompute from the exact committed candidate before expensive execution. These are
+promotion requirements, not commit/candidate-build prerequisites, and unsupported dimensions must
+remain explicit in the contract's capability coverage.
+
+Phone-independent source work is ready for a coherent commit. Exact-SHA CI/Security, the authorized
+verified tag and signed candidate remain separate; do not call source preparation a frozen release.
+No iPhone or Simulator ran. RF-06 and RF-07's focused physical proof precede RF-11's fresh campaign;
+the seven earlier correlated passes, one product failure and five unverified attempts are preserved.
+
+## External decisions and final gates
+
+The [candidate-notes route](release-3-0-candidate-notes.md) now points to the single governed
+[unpublished v3.0.0 body](../releases/v3.0.0.md), including delivery migration, complete-folder CLI
+installation, known limitations and What to Test. Preparing that file does not freeze or publish
+a candidate. Reconcile exact candidate evidence at the authorized freeze; pin its body only after
+publication, and never change historical release notes.
+
+RF-02's September 4 read-only checkpoint now proves a valid Keychain profile, usable local Apple
+Development, Apple Distribution, and Developer ID identities, one active matching App Store profile,
+and registered App Group plus Increased Memory Limit capabilities for the exact iOS bundle. It also
+confirms the existing third-party-content declaration. This supersedes the September 1 observation
+that no matching App Store profile was available. It does not prove the profile payload's
+entitlements or produce an archive/IPA; those remain ASR-10/RF-12 gates.
+
+The account inventory remains incomplete: pricing/availability has no readable initialized record;
+the old 2.4.0/build 23 identity is already used; accessibility declarations are empty; and App
+Privacy publication, agreements/tax/banking, DSA trader status, and regional compliance require
+owner/web or qualified review. The iOS plist already declares non-exempt encryption false and the
+API reports no separate encryption-declaration resource, but the processed 3.0.0 candidate must still
+confirm export-compliance behavior. No account value changed during this inspection. RF-09 now
+selects source 3.0.0/build 24 with a passing read-only collision check; the live version still needs
+an authorized edit and archive-time collision revalidation.
+
+Use the existing [content-rights review](content-rights-review.md),
+[App Store submission procedure](ios-appstore-submission.md), and
+[quality-promotion contract](quality-promotion.md). Qualified privacy/rights judgment, signing
+assets, owner-only account fields, internal TestFlight upload authorization, and final publication
+authorization cannot be replaced by automated tests. Fresh-install proof must not erase the
+maintainer's current app without separately authorized, verified recovery.
+
+Defer evaluator research, prompt-population studies, broad runtime refactoring, hosting migration,
+and general evidence redesign. Preserve existing model pins, QC rules, fixed seeds, and one-take
+behavior. An accounted-for failed campaign is not a passing campaign.

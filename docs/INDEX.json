@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "generated": "python3 scripts/doc_metadata.py rebuild-index",
   "note": "Machine-readable documentation map. Query this instead of globbing docs/.",
-  "annotatedDocuments": 105,
+  "annotatedDocuments": 114,
   "unannotatedDocuments": 0,
   "documents": [
     {
@@ -91,6 +91,44 @@
         "config/support-contact.json",
         "config/third-party-attribution-policy.json"
       ]
+    },
+    {
+      "path": ".impeccable/critique/2026-08-06T15-07-34Z__sources-contentview-swift.md",
+      "status": "historical",
+      "owner": "backend-and-platform",
+      "summary": "Preserved legacy design prototype or critique; not current product guidance or acceptance.",
+      "contentDigest": "sha256:d5491c4fc8348171505f8895e7ff717973e60ff4d83212fc6e99e443271aa6d8"
+    },
+    {
+      "path": "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/README.md",
+      "status": "active",
+      "owner": "backend-mlx",
+      "summary": "Owned Qwen3 implementation API routing; compatibility examples are not production catalog or facade instructions.",
+      "sourceOfTruth": [
+        "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
+        "Packages/VocelloQwen3Core/COMPATIBILITY.json"
+      ]
+    },
+    {
+      "path": "design_references/Vocello Design System/README.md",
+      "status": "historical",
+      "owner": "backend-and-platform",
+      "summary": "Preserved legacy design prototype or critique; not current product guidance or acceptance.",
+      "contentDigest": "sha256:4d47b6c759ac98773555f7f6b87fbb44bdd4f3b189c402a59bb3bd17be0ef9ce"
+    },
+    {
+      "path": "design_references/Vocello Design System/SKILL.md",
+      "status": "historical",
+      "owner": "backend-and-platform",
+      "summary": "Preserved legacy design prototype or critique; not current product guidance or acceptance.",
+      "contentDigest": "sha256:cd6d1918014f2a8411eeb784478e1d8826e4424713de19fe1f3b9b4d74223b50"
+    },
+    {
+      "path": "design_references/Vocello Design System/ui_kits/mac-app/README.md",
+      "status": "historical",
+      "owner": "backend-and-platform",
+      "summary": "Preserved legacy design prototype or critique; not current product guidance or acceptance.",
+      "contentDigest": "sha256:1f9881ff67959f16828853aa6dde02aad26a6bb41ce83a80a63cc9b3e0d85c27"
     },
     {
       "path": "docs/ARCHITECTURE.md",
@@ -233,10 +271,17 @@
       ]
     },
     {
+      "path": "docs/development-history-2026-09-06.md",
+      "status": "historical",
+      "owner": "backend-and-platform",
+      "summary": "Preserved pre-cleanup docs/development-progress.md; historical instructions only, current work uses the original path.",
+      "contentDigest": "sha256:659bd6a1a77b03cf6681e4bcab5a0a874ee6a964a8f10ac20a4973f1e0fb471f"
+    },
+    {
       "path": "docs/development-progress.md",
       "status": "active",
       "owner": "backend-and-platform",
-      "summary": "The active narrative checkpoint \u2014 current resume block, per-arc history, and the phase table; cites config/roadmap.json and the runtime contract as the status authorities it never overrides.",
+      "summary": "Current release-first resume checkpoint; dated evidence lives in the pinned development history, and config/roadmap.json owns status.",
       "sourceOfTruth": [
         "config/roadmap.json",
         "config/runtime-refactor-contract.json"
@@ -454,7 +499,7 @@
       "path": "docs/reference/interactive-ui-qa.md",
       "status": "active",
       "owner": "release-qa",
-      "summary": "Assistive computer-use policy for exploratory UI QA and lane-failure diagnosis \u2014 never a driver, gate, or replacement for the XCUITest lanes.",
+      "summary": "Development-environment assistance only; Vocello reproduction and UI evidence use the repository XCUITest lanes.",
       "sourceOfTruth": [
         "scripts/ui_test.sh"
       ]
@@ -534,6 +579,13 @@
         "scripts/check_ios_model_management.py",
         "scripts/ui_test.sh"
       ]
+    },
+    {
+      "path": "docs/reference/ios-device-testing-history-2026-09-06.md",
+      "status": "historical",
+      "owner": "ios",
+      "summary": "Preserved pre-cleanup docs/reference/ios-device-testing.md; historical instructions only, current work uses the original path.",
+      "contentDigest": "sha256:e972d67551cc83562aa44f872509aca9a5474a5104e0ff17b7d6196d792a223c"
     },
     {
       "path": "docs/reference/ios-device-testing.md",
@@ -861,13 +913,20 @@
       "path": "docs/reference/release-first-execution-2026-09.md",
       "status": "active",
       "owner": "release-qa",
-      "summary": "Finite release-first execution order for iOS, macOS, and the downloadable CLI; maps the September audit to existing defect authorities.",
+      "summary": "Finite release-first execution order for iOS, macOS, and the downloadable CLI; current scheduling and durable gates only; dated programme checkpoints are archived.",
       "sourceOfTruth": [
         "config/roadmap.json",
         "config/quality-promotion-contract.json",
         "config/release-evidence-contract.json",
         "project.yml"
       ]
+    },
+    {
+      "path": "docs/reference/release-first-execution-history-2026-09-06.md",
+      "status": "historical",
+      "owner": "release-qa",
+      "summary": "Preserved pre-cleanup release-first programme checkpoints; current scheduling lives at the original plan path.",
+      "contentDigest": "sha256:174266f5b40e01c476b19fdc54f33a02407d2c3a3fbb6d3a1ca164f1234c6c86"
     },
     {
       "path": "docs/reference/repository-self-verification.md",
@@ -921,17 +980,23 @@
       ]
     },
     {
+      "path": "docs/reference/testing-runbook-history-2026-09-06.md",
+      "status": "historical",
+      "owner": "release-qa",
+      "summary": "Preserved pre-cleanup docs/reference/testing-runbook.md; historical instructions only, current work uses the original path.",
+      "contentDigest": "sha256:316ba3fed7dffae2b58e5008810f293615964d75fb1a8c411ee6713daae12b50"
+    },
+    {
       "path": "docs/reference/testing-runbook.md",
       "status": "active",
       "owner": "release-qa",
-      "summary": "The cross-platform testing runbook \u2014 deterministic lanes as the routine contract, explicit XCUITest acceptance, model readiness, and the authority order for test guidance.",
+      "summary": "Testing entry point and evidence boundaries; platform guides own execution, the development workflow owns the edit loop, and delivery research stays opt-in.",
       "sourceOfTruth": [
         "scripts/check_project_inputs.sh",
         "scripts/macos_test.sh",
         "scripts/ios_device.sh",
         "scripts/ui_test.sh",
-        "scripts/delivery_evaluator.py",
-        "scripts/delivery_promotion_decision.py"
+        "config/orchestration-contract.json"
       ]
     },
     {

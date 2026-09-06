@@ -776,7 +776,7 @@ the engine. The chain:
 `notes.promptChars` cannot prove any of this — it counts only the script text, which
 never includes the instruction. The original guard compared prompt lengths and could
 never pass live; it was replaced with the receipt on 2026-08-04
-([`development-progress.md`](../development-progress.md) finding 21). The lesson is
+([preserved development history](../development-history-2026-09-06.md) finding 21). The lesson is
 codified in §7: exercise every new fail-closed check live in the arc that lands it.
 
 ## 5. Statistics the separability scorer reports

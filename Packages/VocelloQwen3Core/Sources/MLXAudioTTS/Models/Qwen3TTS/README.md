@@ -1,154 +1,58 @@
-# Qwen3-TTS
+---
+status: active
+owner: backend-mlx
+reviewed: 2026-09-06
+summary: Owned Qwen3 implementation API routing; compatibility examples are not production catalog or facade instructions.
+sourceOfTruth:
+  - Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift
+  - Packages/VocelloQwen3Core/COMPATIBILITY.json
+---
+# Qwen3-TTS implementation reference
 
-Alibaba's multilingual Qwen3-TTS family with Base, CustomVoice, and VoiceDesign checkpoints.
+This directory implements the runtime behind [the owned facade](../../../../README.md).
+Vocello product code uses `VocelloQwen3Engine`, classified sessions and materialized PCM, not
+direct imports of `MLXAudioTTS` or the generic compatibility stream. Follow
+[COMPATIBILITY.json](../../../../COMPATIBILITY.json) for supported boundaries and
+[RUNTIME_CAPABILITIES.json](../../../../RUNTIME_CAPABILITIES.json) for capabilities.
 
-## Swift Example
+## Explicit mode routing
 
-```swift
-import Foundation
-import MLXAudioCore
-import MLXAudioTTS
+The implementation's named methods keep conditioning channels separate:
 
-let model = try await TTS.loadModel(
-    modelRepo: "mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit"
-)
+| Mode | Quality-first entry point | Conditioning |
+| --- | --- | --- |
+| CustomVoice | `generateCustomVoice` / `generateCustomVoiceQualityFirst` | Separate `speaker` and optional `instruct` |
+| VoiceDesign | `generateVoiceDesign` / `generateVoiceDesignQualityFirst` | `voiceDescription` |
+| Base Clone | `generateVoiceClone` / `generateVoiceCloneQualityFirst` | Prepared `voiceClonePrompt`; no delivery instruction |
 
-let audio = try await model.generate(
-    text: "Hello from Qwen3-TTS.",
-    voice: nil,
-    refAudio: nil,
-    refText: nil,
-    language: "English"
-)
+Each takes the target text/language plus caller-owned generation parameters, request sampling
+policy and request memory policy. Do not invent defaults or share mutable random state.
+The corresponding explicit streaming methods remain implementation/compatibility surfaces;
+product generation follows the facade's isolation, single-consumer and cancellation contracts.
 
-try AudioUtils.writeWavFile(
-    samples: audio.asArray(Float.self),
-    sampleRate: Double(model.sampleRate),
-    fileURL: URL(fileURLWithPath: "/tmp/qwen3-tts.wav")
-)
-```
+The generic `generate(text:voice:refAudio:refText:language:...)` forwards `voice` as an
+instruction. It does **not** parse a combined speaker-and-emotion string. In particular,
+`voice: "Vivian, very happy"` is not a CustomVoice speaker selector. Base cloning has no
+built-in speaker roster, and model families must not be inferred from this compatibility API.
 
-## Voice Cloning
+## Models, scripts and reference audio
 
-Clone a voice with reference audio and its transcript:
+Approved artifact identities, model variants and native speaker languages come from the root
+`Sources/Resources/qwenvoice_contract.json` and complete production model catalog. Example Hub
+repository names are not permission to bypass those immutable delivery plans. The production
+catalog, not this directory, determines supported variants and instruction capability.
 
-```swift
-import Foundation
-import MLXAudioCore
-import MLXAudioTTS
+Keep a reviewed reference transcript aligned with its audio. Reference language is conditioning
+metadata; it must not select the target output language. Transcript-backed and audio-only
+conditioning remain distinct recorded modes.
 
-let model = try await TTS.loadModel(
-    modelRepo: "mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit"
-)
+## Streaming and sequential work
 
-let (_, refAudio) = try loadAudioArray(
-    from: URL(fileURLWithPath: "sample_audio.wav"),
-    sampleRate: model.sampleRate
-)
+Streaming interval affects publication cadence, not permission to alter request-local sampling,
+drop audio or raise token limits. Product PCM must be materialized in its owning isolation domain
+before transport. Reaching a token cap without EOS is incomplete output, not successful truncation.
+Do not copy legacy examples that retain a whole unbounded chunk list or send MLX arrays across tasks.
 
-let cloned = try await model.generate(
-    text: "Hello from Qwen3-TTS.",
-    voice: nil,
-    refAudio: refAudio,
-    refText: "This is what my voice sounds like.",
-    language: "English"
-)
-```
-
-For best results, keep `refText` closely aligned with the spoken content in the reference clip.
-
-## CustomVoice (Emotion Control)
-
-CustomVoice checkpoints support named speakers and style prompting. In the current Swift API, pass that conditioning through `voice`:
-
-```swift
-let model = try await TTS.loadModel(
-    modelRepo: "mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-bf16"
-)
-
-let audio = try await model.generate(
-    text: "I'm so excited to meet you!",
-    voice: "Vivian, very happy and excited.",
-    refAudio: nil,
-    refText: nil,
-    language: "English"
-)
-```
-
-## VoiceDesign (Create Any Voice)
-
-VoiceDesign checkpoints let you describe the target voice in natural language. In Swift, pass that description with `voice`:
-
-```swift
-let model = try await TTS.loadModel(
-    modelRepo: "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16"
-)
-
-let audio = try await model.generate(
-    text: "Big brother, you're back!",
-    voice: "A cheerful young female voice with high pitch and energetic tone.",
-    refAudio: nil,
-    refText: nil,
-    language: "English"
-)
-```
-
-## Streaming
-
-`generateStream(...)` yields tokens, timing info, and streamed audio chunks for lower-latency playback:
-
-```swift
-let model = try await TTS.loadModel(
-    modelRepo: "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16"
-)
-
-var audioChunks = [[Float]]()
-
-for try await event in model.generateStream(
-    text: "Hello, how are you today?",
-    voice: "A calm, friendly narrator",
-    refAudio: nil,
-    refText: nil,
-    language: "English",
-    generationParameters: GenerateParameters(
-        maxTokens: 4096,
-        temperature: 0.9,
-        topP: 1.0,
-        repetitionPenalty: 1.1
-    ),
-    streamingInterval: 0.32
-) {
-    switch event {
-    case .token(let token):
-        print("Generated token: \(token)")
-    case .info(let info):
-        print("Tokens/s: \(info.tokensPerSecond)")
-    case .audio(let chunk):
-        audioChunks.append(chunk.asArray(Float.self))
-    }
-}
-```
-
-`streamingInterval` controls how frequently chunks are emitted in seconds. Smaller values reduce latency but increase overhead.
-
-## Batch Generation
-
-The Python reference exposes batched multi-sequence generation. The current Swift port does not yet have a public batch-generation API, so issue multiple `generate(...)` or `generateStream(...)` calls at the application layer when you need concurrency.
-
-## Available Models
-
-| Model | Swift entry point | Description |
-|-------|-------------------|-------------|
-| `mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit` | `generate()` | Fast, predefined voices |
-| `mlx-community/Qwen3-TTS-12Hz-1.7B-Base-bf16` | `generate()` | Higher quality |
-| `mlx-community/Qwen3-TTS-12Hz-0.6B-CustomVoice-bf16` | `generate()` with `voice` prompt | Voices + emotion control |
-| `mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-bf16` | `generate()` with `voice` prompt | Better emotion control |
-| `mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16` | `generate()` with `voice` description | Create any voice |
-
-## Speakers (Base / CustomVoice)
-
-Common preset speakers for Base and CustomVoice checkpoints include:
-
-**Chinese:** `Vivian`, `Serena`, `Uncle_Fu`, `Dylan`, `Eric`
-
-**English:** `Ryan`, `Aiden`
+Use the existing product batch/long-form runners for sequential work; do not turn compatibility
+method calls into concurrent generation. Accepted-output ownership, per-item identity, QC and
+cancellation remain the caller's governed transaction, not a new batch API in this README.

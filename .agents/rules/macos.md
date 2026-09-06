@@ -36,7 +36,7 @@ sourceOfTruth:
 **Consults:**
 - `docs/ARCHITECTURE.md` §3 (runtime architecture), §5 (macOS request lifecycle), §8 (macOS app surfaces)
 - `docs/reference/{macos-app-guide,macos-testing,macos-release-qa,macos-permissions,privacy-storage}.md`
-- Root `AGENTS.md` (Hard rules) + [`docs/project-map.html`](../../docs/project-map.html)
+- Root `AGENTS.md` (Hard invariants) + [`docs/project-map.html`](../../docs/project-map.html)
 
 ## Required pre-read
 
@@ -66,11 +66,9 @@ Before changing macOS app or XPC code, read:
 - Optional SwiftUI/AppKit or performance skills may assist after their instructions are read;
   shell scripts remain the source of truth for gates. Triage UI-lane failures and flake patterns
   with `axiom-testing`, symbolicate crashes with `xcsym` through `axiom-tools`, and drive fast
-  inner-loop builds/test runs
-  through the shared XcodeBuildMCP route (`macos` profile, `test_macos` on the `VocelloMacUI`
-  scheme, LLDB tools for hangs) — its UI-automation tools stay banned for Vocello, and
-  `scripts/ui_test.sh` remains the sole acceptance lane. Computer use stays assistive:
-  exploratory QA and failure diagnosis per
+  inner-loop non-UI builds/debugging through the shared XcodeBuildMCP `macos` profile.
+  All app UI reproduction and acceptance run through `scripts/ui_test.sh`, never an MCP
+  test/automation route. Computer use is development-environment-only per
   [`docs/reference/interactive-ui-qa.md`](../../docs/reference/interactive-ui-qa.md).
 - Generated output must use `config/build-output-policy.json`. Do not add a macOS DerivedData,
   package, evidence, symbol, or distribution root outside the manifest; route policy changes
@@ -85,27 +83,13 @@ Before changing macOS app or XPC code, read:
 - macOS owns app/XPC capture, uptime alignment, transport, and platform-pressure evidence. Typed
   field semantics remain backend-owned and schema/publication changes require release/QA review.
 
-## Build / test commands
+## Execution procedure
 
-```sh
-# Fast local loop
-./scripts/build.sh build
-./scripts/build.sh run
-
-# Deterministic macOS tests do not require a model-readiness bootstrap.
-scripts/macos_test.sh test
-
-# Explicit macOS fixture repair/bootstrap only after visible Settings readiness fails.
-# This symlinks QwenVoice-Debug/models → the canonical store; restart the UI lane afterward.
-scripts/macos_test.sh models ensure
-
-# Explicit frontend acceptance only:
-scripts/ui_test.sh macos smoke
-scripts/ui_test.sh macos benchmark
-scripts/macos_test.sh gate            # deterministic macOS platform gate
-
-# XPC lifecycle / crash isolation is included in the deterministic test and gate lanes.
-```
+The [development workflow](../../docs/reference/development-workflow.md) owns routine focused
+checks and coherent checkpoints. [macOS testing](../../docs/reference/macos-testing.md) owns
+fixture preparation, XPC diagnostics, native XCUITest and artifact collection. No UI/model lane
+is inferred from an ordinary edit. Consult the relevant procedure rather than keeping a second
+command catalog in this rule.
 
 ## Invariants (do not regress)
 
@@ -141,7 +125,9 @@ scripts/macos_test.sh gate            # deterministic macOS platform gate
 - **Mac cancellation UI coverage exists.** The smoke suite's cancellation journey clicks the
   visible mid-generation Cancel and asserts a clean reset: Generate re-enabled, no backend
   error/crash badge, and zero History rows for the cancelled take. Do not regress the engine
-  semantics it protects (user cancel is `.cancelled`, never an error, never persisted).
+  semantics it protects: a typed engine cancellation before publication creates no accepted
+  output. If publication wins a presentation-cancellation race, retain the successful output's
+  History persistence without letting its stale completion take over a newer player/attempt.
 - **Saved-voice review is shared and typed.** macOS and iOS use
   `ReferenceTranscriptionReviewState` for awaiting-audio, automatic, manual, unavailable, and
   explicitly confirmed audio-only states. Save remains blocked while recognition is unresolved;

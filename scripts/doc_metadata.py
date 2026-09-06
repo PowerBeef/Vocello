@@ -57,8 +57,9 @@ import sys
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 FACTS_PATH = "config/derived-doc-facts.json"
 INDEX_PATH = "docs/INDEX.json"
-DOC_ROOTS = ("docs", ".agents/rules")
-ROOT_SCAN_FILES = ("AGENTS.md", "README.md")
+DOC_ROOTS = ("docs", ".agents/rules", "design_references/Vocello Design System", ".impeccable/critique")
+EXTRA_DOC_FILES = ("Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/README.md",)
+ROOT_SCAN_FILES = ("AGENTS.md", "README.md", "website/AGENTS.md", "website/PRODUCT.md")
 STATUSES = ("active", "historical", "superseded")
 PINNED = ("historical", "superseded")
 OWNERS = ("backend-mlx", "release-qa", "ios", "macos", "backend-and-platform")
@@ -124,6 +125,10 @@ def iter_docs(root: pathlib.Path):
         for path in sorted(base.rglob("*.md")):
             if path.relative_to(root).as_posix() in GENERATED_DOCS:
                 continue
+            yield path
+    for relative in EXTRA_DOC_FILES:
+        path = root / relative
+        if path.is_file():
             yield path
 
 
@@ -476,12 +481,12 @@ def validate(root: pathlib.Path, strict: bool = False) -> dict:
                     f"{finding['fact']} -- {finding['detail']} (matched {finding['matched']!r})"
                 )
 
-    # The two root documents are fact-scanned but never annotated. AGENTS.md is
+    # Public entry documents are fact-scanned but never annotated. AGENTS.md is
     # the file that mandates fact-checking and was, until 2026-08-02, the one
     # document exempt from it: a wrong preset count there passed every gate. They
     # are scan-only rather than annotated because AGENTS.md describes the whole
     # repository, so a sourceOfTruth binding would be either uselessly broad or
-    # arbitrarily narrow. Contradictions here FAIL -- these are the two documents
+    # arbitrarily narrow. Contradictions here FAIL -- these are the documents
     # most read and most copied from.
     for relative in ROOT_SCAN_FILES:
         target = root / relative

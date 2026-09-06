@@ -64,14 +64,15 @@ resolved once per process:
 | Source | Effect |
 |---|---|
 | `QWENVOICE_DEBUG=1` (env) | On in any process that inherits it (e.g. `./scripts/build.sh run`). |
-| 7‑tap the version label in Settings (persisted `UserDefaults` flag) | On in the app process; relayed to the engine process over the `initialize` IPC handshake (`telemetryEnabled`). |
+| App-to-engine `initialize` handshake | Relays the app's resolved environment mode to the macOS engine; `TelemetryGate.applyHandshakeMode(_:)` latches a non-off mode. There is no persisted Settings tap-toggle. |
 | `QWENVOICE_NATIVE_TELEMETRY_MODE=lightweight\|verbose` (aliases: `light`, `full`, `deep`) | Forces sampling/persistence on regardless of the gate. |
 
 The engine runs **out of process on macOS** (XPC service) and **in process on iOS**
 (the ExtensionKit extension was removed; see `AGENTS.md` / commit `aed617c`). The
-different bundle id means the app's `UserDefaults` flag still can't reach the macOS
-engine via environment — it is carried on the handshake, where the host calls
-`TelemetryGate.applyHandshakeMode(_:)`.
+separate process does not automatically inherit the app's resolved mode; the initialize handshake
+carries it. Telemetry opt-in is distinct from production-affecting overrides, which additionally
+require the registered internal-diagnostics build capability and debug gate. Do not claim that
+all telemetry code is compiled out of distributed binaries.
 
 ### Sampling modes (`NativeTelemetryMode`, in `SemanticTypes.swift`)
 

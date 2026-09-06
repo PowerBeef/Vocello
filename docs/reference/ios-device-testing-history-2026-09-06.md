@@ -1,18 +1,13 @@
 ---
-status: active
+status: historical
 owner: ios
-summary: iOS physical-device testing — deterministic compile lanes, explicit on-device acceptance (smoke/benchmark/perf with the frame-health protocol), headless diagnostics, and burn-in safety.
-sourceOfTruth:
-  - scripts/ios_device.sh
-  - scripts/ui_test.sh
-  - scripts/ios_candidate_acceptance.py
-  - scripts/ios_control_audit.py
-  - config/ios-control-audit.json
-  - scripts/check_ios_ui_perf.py
-  - scripts/check_ios_model_management.py
-  - scripts/voice_identity_language_reliability.py
-  - config/voice-identity-language-reliability.json
+reviewed: 2026-09-06
+summary: Preserved pre-cleanup docs/reference/ios-device-testing.md; historical instructions only, current work uses the original path.
+contentDigest: sha256:e972d67551cc83562aa44f872509aca9a5474a5104e0ff17b7d6196d792a223c
 ---
+> **Historical snapshot, archived 2026-09-06.** Preserved pre-cleanup text, not current instructions.
+> For current work use [ios-device-testing.md](ios-device-testing.md). Old run commands do not authorize resume.
+
 # iOS physical-device testing
 
 Vocello's iOS runtime and UI acceptance run on a paired physical iPhone. Simulator build, launch,
@@ -25,7 +20,7 @@ and UI automation are unsupported. XCUITest is the sole autonomous iOS app UI dr
 ./scripts/build_foundation_targets.sh ios
 ```
 
-The ordinary macOS deterministic lane executes the Foundation-level iOS policy assertions in
+The ordinary macOS deterministic lane executes the 19 Foundation-level iOS policy assertions in
 `VocelloCoreTests`. The generic physical-device SDK compile then builds both the app and a duplicate,
 standalone `VocelloiOSLogicTests` policy bundle without executing that iOS bundle. Neither route
 requires a connected phone, and together they are sufficient for routine commits, pushes, pull
@@ -153,7 +148,9 @@ throughout XCTest, not just build/package resolution. Concurrent native commands
 waiting for that lock. Run read-only analysis or Python fixtures alongside a device lane instead;
 do not bypass the lock or clear a cache to resolve legitimate contention.
 
-Index membership and derived-refresh ordering follow [development-workflow.md](development-workflow.md).
+Stage newly created owned source/test files before the final derived refresh: project-health
+counts Git-tracked files. Refresh and stage the resulting summary before the exact-content commit
+gate, so adding a new file does not invalidate a previously checked inventory.
 
 ```sh
 scripts/ui_test.sh ios smoke
@@ -221,32 +218,17 @@ cleanup proof stay untracked below the run artifact directory. The composer vali
 source identity and assigns only the terminal vocabulary in
 `config/ios-control-audit.json`. A required row without an observation becomes
 `SKIPPED_AFTER_FAILURE`; permission or destructive work that cannot be restored becomes
-`BLOCKED_PRESERVATION_POLICY`. Neither is a passing result. The campaign contract is `config/ios-control-audit.json`; the
-[current checkpoint](../development-progress.md) routes to the primary roadmap.
-The [August report](ios-on-device-control-audit-2026-08-28.md) is historical evidence only.
-Do not repeat completed phases merely for a green aggregate or reuse a token after source changes.
-`--retain-result` pins the bundle before Xcode starts, including legacy-shaped metadata.
-
-## Pause and resume
-
-1. Set the phone deadline before starting; reserve at least 20 minutes for collection/restoration.
-   The release-first campaign starts with five takes, then may use up to 20 per invocation only
-   after correlation and preservation succeed, splitting at mode boundaries and deadlines.
-2. Stop between terminal, fully collected shards. If interruption is necessary, stop only the
-   exact owned process and preserve the failed/partial run; never convert it to PASS.
-3. Verify diagnostics, crash delta, observations, artifact digests, cleanup/restoration, and
-   test-owned app termination. Run `scripts/clean_build_caches.sh --prune-ui-results --dry-run`
-   and confirm required runs are `explicitly-pinned`. Retire pins only after explicit closure.
-4. **Frozen source:** record run IDs, source/build/device/plan identities, outcomes, remaining
-   rows and the validated next command in the existing untracked run checkpoints. Do not edit
-   the roadmap, this guide, AGENTS, or any tracked file between shards.
-5. **Deliberate source checkpoint:** incorporate collected results into `config/roadmap.json`
-   and the current narrative. A changed full-tree identity requires new acceptance identity;
-   previous results remain history, never merged current-source PASS.
-6. Before resume, use the runner's schema/identity/artifact validation. Never guess a cursor,
-   retry a failed cell, replace a seed, or infer restoration from a green XCTest counter.
-7. If authorized, finish with the screen-protection procedure and independent lock readback.
-   No further device UI follows final protection.
+`BLOCKED_PRESERVATION_POLICY`. Neither is a passing result. The complete multi-lane campaign
+contract and current post-performance pause checkpoint are recorded in
+[`ios-on-device-control-audit-2026-08-28.md`](ios-on-device-control-audit-2026-08-28.md). That
+report lists the authoritative passing runs, source/device findings, blocked coverage, and exact
+safe-resume boundary. Do not repeat completed phases merely to obtain a green aggregate, and do not
+use an old resume token after a source fix changes the frozen identity. `--retain-result` writes an
+untracked pin before Xcode starts, so every required multi-run member survives normal latest-pass
+pruning even if its metadata is legacy-shaped. Before releasing the phone, record exact run IDs,
+terminal outcomes, remaining rows, and the next valid command in the roadmap and development
+checkpoint; then confirm each pin reports `explicitly-pinned` in a cleanup dry-run. Remove pins only
+when the evidence set is explicitly retired.
 
 The RF-07 runner defaults generation/all to **five takes per invocation**; `--take-limit 1..201`
 sets an explicit bounded shard and `--resume` selects its source-bound start. The immutable plan
@@ -270,9 +252,13 @@ History text entry waits for the real field and keyboard before one replacement,
 value. No automatic test/generation retry is added. These source repairs require a physical pilot.
 Runner PASS is written only after required-step finalization; failure exits also finalize the ledger.
 
-Historical pilot failures, including missing warm/capture evidence, remain in the
-[preserved device history](ios-device-testing-history-2026-09-06.md). Never infer a PASS from an
-optional ledger subtotal when mandatory correlation or artifact evidence fails.
+The [later September 5 pilot checkpoint](../development-progress.md#september-5-later-physical-pilot--resume-checkpoint)
+records an exception in the historical runner: device correlation fails on missing warm
+coverage while its required-step entry is optional and the UI-only summary says the shard passed.
+Use `run.json` plus the correlation and all underlying observations, never the ledger subtotal alone.
+That failed run cannot resume. Its generation evidence labels have no corresponding PNGs; do not
+claim screenshot acceptance from the structured player observations. RF-07/AV-09 own the bounded
+correction; the warm cohort and promotion treatment of cadence warnings remain required.
 
 New generation/all runs declare `controlEvidenceVersion: 2`. Their dedicated
 `ui-ios-control-audit-generation` required-step workflow makes device correlation mandatory.
@@ -357,9 +343,213 @@ After a test has launched, a separate classifier may report `infrastructure_exte
 only when the retained log proves a SpringBoard notification banner and
 `NotificationShortLookView`, the `.xcresult` proves exactly one identified wait timeout, and no
 product, harness, crash, generation, or QC failure coexists. It never turns the run into PASS and
-never authorizes an automatic retry. See the
-[historical infrastructure findings](ios-control-audit-remediation-2026-08-29.md); their dated
-runs do not qualify new source or guarantee Xcode bootstrap reliability.
+never authorizes an automatic retry. Retained pre-test run
+`ios-xcui-control-audit-20260829-152245-bbe90762` was replayed on 2026-09-02 as exactly one
+run-level `INFRASTRUCTURE_FAIL` plus 42 `SKIPPED_AFTER_FAILURE` rows, with zero product/harness rows;
+the 2026-08-29 Messenger-interrupted run is the distinct post-launch proof. Fresh no-retry smoke
+`ios-xcui-smoke-20260903-184747-dc032d1b` subsequently launched all three tests and passed its full
+ledger, closing ICA-09's remaining bootstrap observation. This does not guarantee that Xcode
+bootstrap cannot fail again or reclassify any original failure.
+See [`ios-control-audit-remediation-2026-08-29.md`](ios-control-audit-remediation-2026-08-29.md).
+
+### Control-audit continuation — 2026-09-03
+
+Preflight passed on the paired iPhone. Saved-voice run
+`ios-xcui-saved-voice-lifecycle-20260903-162036-6f4e3996` and generation run
+`ios-xcui-control-audit-20260903-162348-77a58a4e` each stopped before any test case launched with
+the Xcode automation-mode bootstrap timeout. Preserve both bundles independently: they are
+infrastructure evidence, contain no product observation, and never authorize an automatic retry or
+a merged PASS.
+
+After the maintainer manually unlocked the phone, distinct saved-voice run
+`ios-xcui-saved-voice-lifecycle-20260903-162649-37ad8335` launched normally. It used the real Voices
+search field to reveal `ICI Direct Clone Import`, proved the semantic row/menu was hittable, and
+completed its visible delete confirmation. The run then stopped when the cleared search field left
+the software keyboard covering the root tab dock, preventing `rootTab_settings` from becoming
+hittable. This is a harness cleanup failure after the original row-menu boundary, not a product
+voice-lifecycle failure.
+
+Any XCUITest journey leaving an active search surface for the floating root dock must dismiss the
+keyboard semantically and condition-poll for keyboard absence before selecting a tab. The shared
+helper now submits the genuine search field and enforces that condition. Fresh no-retry run
+`ios-xcui-saved-voice-lifecycle-20260903-164233-e71568b3` subsequently passed the complete import,
+automatic transcription, enrollment, Clone selection/generation, preview, deletion, draft cleanup,
+and runner-diagnostics journey. ICA-13 is closed.
+
+Fresh generation run `ios-xcui-control-audit-20260903-164806-affcc06a` completed two visible Custom
+takes, then stopped at the identity guard because a long exact script cannot equal the History
+row's intentional 60-character preview. No History mutation followed the mismatch, no terminal
+observation stream was retained, and the run cannot resume after the source correction. The guard
+now opens each narrowed row's genuine read-only player and requires its full accessible transcript
+to equal the frozen plan before cleanup, pinning, restoration, or deletion.
+
+Corrected-source generation `ios-xcui-control-audit-20260903-172247-b8fc963e` then emitted four
+`PASS` observations and one independently diagnosed `PRODUCT_FAIL` at `custom-005`, leaving 199
+composed rows skipped. Full-transcript ownership passed through the long scripts, closing ICA-14;
+the Eric/Calm Strong/Italian sampled-output failure belongs to ICA-15. Two separate four-cell
+diagnostics (`174346` and `180139`) preserve its warm/cold and streaming/non-streaming failures,
+codec replay, exact seed, healthy memory, and absence from History. Do not silently retry that row.
+
+Final smoke `ios-xcui-smoke-20260903-184747-dc032d1b` passed all three tests and its entire runner
+ledger. Crash delta and scoped diagnostics completed at 19:02:42/19:02:44 UTC, before the phone
+deadline; teardown terminated Vocello. The host-only retention phase also passed. The earlier
+`181935` run remains failed/unqualified after its whole-mirror collection was stopped. ICA-16 is
+closed by the fresh run, not by relabelling the older test-only success. All named bundles remain
+explicitly pinned; do not repeat accepted smoke or saved-voice phases solely to obtain green counts.
+
+The probe prepared at that pause is retained in the ignored directory below. It was executed on
+September 4; these commands are historical reproduction instructions, not an outstanding run:
+
+```sh
+scripts/ios_device.sh preflight
+scripts/ios_device.sh delivery-reliability \
+  --plan build/artifacts/diagnostics/ios/startup-reliability/ica15-marker-ablation-pending/plan.json \
+  --script-file build/artifacts/diagnostics/ios/startup-reliability/ica15-marker-ablation-pending/script.txt
+```
+
+This independent two-take diagnostic removes the spoken numeric History marker while holding
+the failing speaker, preset, language, variation, and seed fixed. The host revalidates exact script
+bytes before launch. The initial two takes and a separate reverse-order confirmation all pass
+on-device QC, with identical per-mode cold/warm codec traces. The initial host runner remains
+failed because of ICA-17's now-corrected optional cadence-quantile mismatch; its retained bytes
+validate after correction. Run `ios-startup-reliability-20260904-054340-c307ab41` independently
+passes the entire runner, crash collection, and cleanup. See the active remediation report for
+exact observations. These probes cannot replace the failed original-text row or qualify a
+production change by themselves.
+The current-build marker control `ios-startup-reliability-20260904-054601-0770b988` reproduces both
+historical codec digests and QC rejections; its complete runner reports `diagnosed_failure` and
+cleans up successfully. All six new takes remain represented. Next separate ordinary audit History
+identity from spoken text, keeping the exact numeric failures as independent stress cases; do not
+strip digits from product input or silently replace a failed matrix row.
+After localization and any qualifying remediation, freeze the final committed source and use
+`scripts/ui_test.sh ios control-audit --scenario generation --retain-result` from row 1 on a new
+schema-v3 plan. No September 2/3 shard may resume across this checkpoint's source change.
+ICA-04/ICA-05 retain generation, final restoration/reporting, and preservation-blocked coverage;
+ICA-06 still needs its exact-seed confirmation. VLR-07 retains its separate accuracy/ASR closure.
+
+Diagnostic plan preparation must preserve UInt64 seeds exactly. Do not round-trip them through
+JavaScript Number or another floating-point JSON parser. Compare with the retained exact integer
+using integer-preserving tooling before launch, then verify receipt parity. Optional Swift Codable
+fields may be absent when nil: cadence median/p90 remain optional in result-v2 validation, while
+all required fields, numeric types, and unknown-key rejection remain enforced. A corrected validator
+may recheck retained immutable evidence but never rewrite the original runner outcome.
+
+### Control-audit one-hour continuation — 2026-09-02
+
+The next one-hour device window ran on source identity
+`ee2e7d4e245bd8d95b47fa0cc0064783fd9d4be7edc5ef8211728d017d45996e`. Preflight passed and
+inventory run `ios-xcui-control-audit-20260902-180938-42d76c39` completed with 41 `PASS`, one
+explicit `NOT_APPLICABLE`, zero failures, and zero skipped rows. It supersedes the earlier
+zero-observation inventory attempt for active coverage purposes without rewriting that historical
+bundle.
+
+Two short journeys then exposed harness/reachability gaps. Saved-voice run
+`ios-xcui-saved-voice-lifecycle-20260902-181739-713b7367` found the run-owned imported voice but
+could not activate `voicesRowMenu_ICI Direct Clone Import`: its accessibility frame produced no
+valid activation or suggested hit point. Generation run
+`ios-xcui-control-audit-20260902-181849-9ea76d5a` stopped at its intended History-integrity guard
+because reserved token `28400003` matched a non-audit History row. No generation observation was
+written, all 204 composed rows remain `SKIPPED_AFTER_FAILURE`, and no row-level resume state exists.
+Neither failure is product-generation evidence, and neither authorizes an automatic retry. The
+phone-independent remediation now reveals the exact run-owned voice through the genuine Voices
+search field and requires the row/menu to be enabled, hittable, finite, and at least 44 by 44 points
+before activation. It also replaces fixed sequential tokens for new plans with schema-v2
+source-bound tokens and requires the exact full script/row identifier before every History action.
+Focused fixtures and generic iOS compilation pass; physical closure remains outstanding.
+
+Smoke run `ios-xcui-smoke-20260902-182906-25dc08ce` passed all three XCTest cases, including the
+primary cancellation/memory-recovery/Custom-History journey, the Settings accessibility layout
+walk, and the long-form project journey. The one-hour deadline arrived during the later diagnostics
+pull. That pull was cancelled, so the overall runner remains failed and the XCTest-only result is
+not a qualified smoke PASS. At the deadline, all test processes were stopped and the four run
+bundles remained explicitly pinned.
+
+Committing this checkpoint changes the full-tree identity. The next phone window must not resume
+`181849`. Generate a fresh schema-v2 plan after the final commit, then use new run IDs:
+
+```sh
+scripts/ios_device.sh preflight
+scripts/ui_test.sh ios saved-voice-lifecycle --retain-result
+scripts/ui_test.sh ios control-audit --scenario generation --retain-result
+scripts/ui_test.sh ios smoke --retain-result
+```
+
+The generation campaign starts at row 1. Preserve the historical silent-gap findings, do not merge
+source identities, and complete cleanup/restoration only from the final source-bound shard.
+
+### Earlier control-audit pause boundary — 2026-09-02
+
+The latest generation shard, `ios-xcui-control-audit-20260902-153340-9092ff5d`, was stopped at the
+maintainer's request while the test was capturing initial Studio state. It emitted zero control
+observations and began no generation row. The retained summary consequently carries all 204
+composed controls/takes as `SKIPPED_AFTER_FAILURE`; that is an honest incomplete-run result, not a
+product, harness, or infrastructure classification. The `.xcresult`, log, plan, summary, crash
+delta, attachment manifest, exact rerun command, and explicit retention pin remain in the untracked
+run bundle. Xcode and XCUITest were confirmed stopped after collection.
+
+There is no row-level resume state to consume from that empty shard. Moreover, recording this
+checkpoint changes the full-tree source identity. At the next device window, run preflight and
+start a new frozen generation campaign from row 1:
+
+```sh
+scripts/ios_device.sh preflight
+scripts/ui_test.sh ios control-audit --scenario generation --retain-result
+```
+
+Do not pass `--resume` with the `153340` run ID and do not merge its empty summary with earlier
+source identities. The September 2 shards remain forensic inputs: `141800` passed three rows and
+then rejected the German Calm/strong row for a 2.085-second interior gap; `151248` passed one row
+and rejected the Chinese Angry/normal row for a 25.446-second interior gap. Both rejections were
+product-output audio-QC safety outcomes with no History publication, automatic retry, or seed
+substitution; one observation per cell is not a repeatability claim. Runs between them drove three
+harness corrections; the phone-call-affected
+mode-setup run remains non-product evidence. `config/roadmap.json` is the current status authority.
+
+The earlier September 2 phases remain independently useful but do not form a single-source final
+campaign. Stateful `121158` completed with explicit prerequisite/preservation limitations,
+external `121608` completed with the permission-preservation block, and accessibility `121855`
+passed. Isolated model diagnose `122641`, queue `123230`, and acceptance `123603` passed with no
+finding. Inventory `120801` stopped with zero observations after the voice picker did not dismiss;
+saved-voice lifecycle `122245` reached its preview action but never observed the player sheet. Those
+two incomplete journeys require ownership diagnosis and fresh evidence. The cleanup dry run reports
+every named bundle as `explicitly-pinned`; no raw evidence needs to be moved or rewritten.
+
+The model-delivery runner always exports the `.xcresult`, attachments, diagnostics journal,
+delivery summaries, ledger copy, sanitized storage inventories, crash delta, and host diagnosis even
+when XCTest fails. Determinate bar observations include raw and total bytes, expected and
+accessibility fractions, visible copy, status, phase, action set, frames, and screenshot names.
+The SwiftUI progress rail disables inherited animation so a captured frame represents the same
+exact durable-byte fraction exposed through accessibility. An unchanged integer accessibility
+percentage is not a freeze unless exact progress advances by at least one percentage point; tiny
+byte changes below the rounded display resolution remain valid. Rendered-width error, monotonicity,
+leading-edge anchoring, geometry, and 3:1 contrast checks remain fail-closed.
+The 95% visual checkpoint is an honest late-transfer band: the first exact incomplete sample from
+90% through under 100% is used because durable catalog-byte progress can jump directly from 94% to
+complete. Crossed milestones share one immutable UI sample and screenshot, preventing Ready or
+finalization from removing controls while the evidence is being serialized. A completed diagnostic
+that isolates a defect is retained and labelled `diagnosedFailure`; only a clean diagnosis counts
+toward MD-3 closure. After the August 29 animation correction, consecutive diagnoses
+`ios-xcui-model-download-20260829-181500-8b1428c9` and
+`ios-xcui-model-download-20260829-182031-207e8a83` plus acceptance
+`ios-xcui-model-download-20260829-182534-91d70526` re-closed the gate. The acceptance run installed,
+adopted after relaunch, reused shared components, and visibly removed all three models with no
+finding; its 15 visual samples stayed within 1.06 percentage points and above 8.80:1 contrast. This
+procedure remains the fail-closed regression protocol.
+`scripts/check_ios_model_management.py` identifies the first inconsistent layer and emits a timeline,
+machine-readable diagnosis/summary, visual measurements, and a milestone contact sheet. A failed
+isolated root remains available to the next `diagnose` or `recover` run; ordinary app data and
+canonical model state are never used as the test root.
+
+The smoke runner pulls only `Library/Caches/Vocello/diagnostics/<run-id>` through the shared
+60-second bounded collector; it never copies the complete historical mirror. Copy failure remains
+fatal even when XCTest passed, and a separate later inspection cannot rewrite that failed run.
+The unchanged acceptance checker fails unless the one-shot event sequence is
+`debug_force_critical_once` → `critical_memory_action` → typed `memory_pressure` cancellation →
+`fullUnload`, followed by a successful generation from the same relaunched app process.
+
+Benchmark accepts `--modes`, `--lengths`, `--warm`, and `--label`. Filters are explicit diagnostic
+runs; invoking the command without filters is the canonical 29-take matrix on the tracked iPhone 17
+Pro `iPhone18,1` profile. Dirty-source successes are exploratory even on that hardware.
 
 ### UI-performance lane (`ios perf`)
 
@@ -511,6 +701,162 @@ parity, and Expressive sentinels. It remains below the 128-take runner bound. Th
 ledger prevents `--resume` from retrying either a terminal failure or a prior launch that exited
 without a sentinel. A new run ID is required to repeat evidence.
 
+### Retained pause boundary — 2026-08-31
+
+Characterization run `vlr-device-20260831-characterization-04` is intentionally incomplete and
+immutable. It is bound to plan digest
+`c1c0593ee49ee39dedff156dfb47a97282edbc08f431927631373c7b0c5eecfb` and retained terminal
+sentinels for takes 1–114: 98 PASS, three product QC failures, and 13 locale-verification failures.
+Take 115 is a ledgered, sentinel-less interruption; takes 116–122 were not launched. Its untracked
+artifact root contains `device-plan.json`, `launch-ledger.jsonl`,
+`voice-reliability-partial-summary.json`, and `pause-checkpoint.json`, plus per-take evidence.
+
+Do not use `--resume` for that run after the 2026-08-31 tracked checkpoint: committing changes the
+full-tree source identity, and cross-source resume correctly fails closed. Do not delete, overwrite,
+or rename the retained artifact root, and do not convert its missing rows into PASS. At the next
+phone window, create a new plan and private map with a new run ID against the then-current source and
+run the complete characterization. The old 114 terminal rows remain valid historical
+characterization; they cannot be merged with the new run to satisfy a complete-run gate.
+
+### Corrected-source resume boundary — 2026-09-01
+
+Run `vlr-device-20260901-characterization-01` is a separate complete 122-row characterization
+bound to plan digest `3926f6c1383d24f9268aa056017f49400d3b16f0c4383815aac59fe096c75d53`
+and source identity `ed3b9febae572683d295c9d5aebecaaa18838f2d66e230fe2d4e139e3c17c656`.
+It retained 103 PASS rows, three mandatory product-QC failures, and 16 successful-generation
+locale-verification failures. Keep that run and the August 31 partial run immutable and distinct.
+
+Replay subsequently disproved the first VLR-08 hypothesis: incremental and full decoding reproduce
+the delayed onset, so the allocator-cache workaround was reverted. The corrected source instead
+uses a bounded Clone-only leading-edge gate that preserves 80 ms of pre-roll and never edits an
+interior pause. VLR-09 Fast-QC v6 adds bounded terminal-silence evidence and rejects an egregious
+open tail without changing interior-pause thresholds. The completed Mac/CLI matrix and targeted
+three-cohort proof are pinned in the VLR Mac report. The phone has not run this corrected source, so
+neither fix has physical-device acceptance.
+
+At the next phone window, first run `scripts/ios_device.sh preflight`. Generate new closure and
+characterization plans/private maps from the exact committed tree; do not resume either historical
+run. VLR-07 requires two distinct clean 14-row closure runs and one complete characterization. A failure
+remains terminal and gets no automatic retry, seed substitution, or cross-run merge.
+
+### Storage-policy startup interruption — 2026-09-02
+
+Preflight passed with the paired phone unlocked, but the first attempted corrected-source private
+export never wrote its terminal sentinel and launched zero generation rows. The visible app failed
+during initialization because recursive storage-policy metadata could not be saved on the
+read-only `speech_tokenizer/model.safetensors` hard link. Preserve the failed export attempt and
+its empty source-bound plan as infrastructure/product-startup evidence; it is not a VLR closure
+run and must not be resumed, relabelled, or counted.
+
+The source correction preserves shared-component immutability by temporarily adding only owner
+write access while applying data-protection/backup metadata, then restoring the exact prior mode
+on both success and failure. After its deterministic checkpoint and commit, generate entirely new
+run IDs, plans, and private maps for both 14-row closure passes and the 122-row characterization.
+
+F-01/ICI-4 saved-voice and direct Clone-import acceptance is separately opt-in:
+
+```sh
+scripts/ui_test.sh ios saved-voice-lifecycle
+```
+
+Before running it, stage `ICI Direct Clone Import.wav` **without** a matching `.txt` sidecar in the
+app's Documents directory. The XCUITest uses only visible production controls: Studio Clone opens
+`referenceClip_importAudioFile`, Files selects the staged WAV, the enrollment sheet exposes
+`saveVoice_transcriptionStatus`, on-device recognition supplies a nonempty editable transcript,
+and Save resolves any genuine soft warning. The test then proves the exact voice is selected in
+`studioChip_reference`, completes one Clone take, previews the durable Saved Voice, confirms the
+exact named deletion, verifies the row disappears, and verifies the matching Studio draft is
+cleared. When the run-owned row is outside the lazy viewport, the test uses the genuine Voices
+search field to reveal its exact name, then requires the row and menu to be enabled, hittable,
+finite, and at least 44 by 44 points before activation. The separate `enroll-clone-fixture` lane
+retains sidecar-prefilled coverage. Neither lane runs in smoke, benchmark, CI, or release.
+
+Built-in Voice startup reliability is a separate compile-gated diagnostic, not an ordinary
+benchmark or release lane. The headless route consumes a schema-v1 ordered plan plus an exact
+untracked UTF-8 script; retained results contain only its SHA-256 and character count:
+
+```sh
+scripts/ios_device.sh delivery-reliability \
+  --plan <plan.json> \
+  --script-file <untracked-exact-script.txt>
+
+scripts/ui_test.sh ios startup-parity \
+  --script-file <untracked-exact-script.txt>
+```
+
+The app records a privacy-safe request receipt and one-shot startup boundaries, represents every
+planned take, preserves allocation attempts zero/one with the same request and seed, and writes the
+terminal sentinel last. Result schema v2 retains complete final and chunk QC, and, only for the
+gated diagnostic request, a bounded generation-scoped rejected WAV plus codec trace. The same
+loaded Mimi decoder replays that trace both incrementally at the captured production chunk ranges
+and as one full decode; both replay WAVs receive ordinary persisted-WAV QC. No path, script, codec
+ID, or raw error enters retained JSON.
+
+Current startup result-v2 producers additionally set `publishedAudioCaptureRequired: true` and
+copy every published pass/warning WAV to the same bounded run-scoped `outputs/<generation>.wav`
+mirror used by control-audit, before removing diagnostic scratch output. The host must authenticate
+its generation, SHA-256, byte count, complete mono PCM16 payload, duration and pre-sentinel write
+ordering before cleanup. Capture failure is a failed collection, not an engine failure or a
+qualified PASS. Older v1/v2 records without the field retain historical decoding; they do not
+retroactively prove that published audio was captured. Failed/rejected audio and codec replay keep
+their existing separate identities. This is diagnostic-only and does not create History entries.
+
+The diagnostic writer and iOS pullable mirror share one validated capture run ID from the
+registered device and benchmark keys. UI-only runs use their device run ID without needing
+benchmark metadata. Missing, unsafe, anonymous, or conflicting identities refuse artifact capture;
+they never fall back to a shared `not-bench` directory. Older misplaced artifacts remain failed
+collection evidence and must not be relabelled or deleted as though successfully collected.
+
+Post-generation rejection evidence must use the terminal model-diagnostic snapshot, not the
+pre-loop timing snapshot. It therefore retains the final target-token and effective-token-budget
+counters, bounded hot-loop timings, allowlisted EOS/token-cap flags, chunk/channel state, and the
+model-versus-product terminal timeline alongside Fast-QC. Result schema v2 accepts the complete
+Fast-QC v6 trailing-silence and cadence block while keeping earlier v2 result bytes valid. A host
+validator that predates a producer's registered optional QC fields is a harness failure; update and
+revalidate the retained bytes rather than relabelling the take.
+
+When one codec trace reproduces the same defect through incremental and full Mimi decoding, that
+excludes incremental scheduling, UI publication, and the final writer as necessary causes. It
+does **not** distinguish invalid sampled codes from a defect shared by both decoder paths or
+platform numerics. Voluntary EOS excludes a token-cap termination, not a common decoder defect.
+Keep the cause qualified until independent code/decoder evidence distinguishes those branches.
+Keep the ordinary fail-closed publication decision and explicit
+user-controlled retry. Do not trim around interior silence, retry invisibly, mutate the seed,
+weaken QC, or infer that a lower token budget is safe from one failing sample. Any continuation
+budget candidate needs a pre-registered representative matrix showing that it prevents the
+pathology without truncating valid speech or converting good rows into incomplete-output failures.
+
+Full-unload preparation records memory before unload, after owned references release and MLX cache
+clearing, immediately before a request, and after reload. A request starts only after three stable
+one-second samples prove no active generation/operation/reservation/model, a cleared MLX cache, at
+least 768 MiB process headroom, and footprint below the existing 4.5 GiB guard. The host polls the
+exact PID returned by CoreDevice and immediately enters forensic collection if it exits before
+terminal evidence; a process-query failure remains unknown rather than being treated as an exit.
+Partial evidence is composed into explicit `process_terminated` and
+`not_started_after_process_exit` rows, while CoreDevice `systemCrashLogs` are retained untracked and
+reduced to an allowlisted termination summary.
+
+The XCUITest route selects Vivian, Calm Strong, and English through genuine visible controls and
+correlates the completed generation UUID with the engine receipt. An automation-session bootstrap
+timeout is classified as infrastructure only when the `.xcresult` proves zero launched test cases
+and the log contains no app assertion, generation, crash, or QC outcome. It is never retried
+automatically; a manual rerun has a new run ID and separate evidence. Both routes are
+physical-iPhone-only, publish nothing, and are documented in
+[`ios-built-in-startup-reliability.md`](ios-built-in-startup-reliability.md).
+
+Successful startup-reliability evidence is removed through a second narrowly gated launch. That
+cleanup executes before native-engine initialization, writes a pullable acknowledgement only after
+removing the run-scoped app/App-Group evidence, and never converts a generation result. If cleanup
+fails, the already-collected run remains valid but the command fails and retains the artifact for
+forensics; do not automatically rerun the generation.
+
+**Bench spec syntax:** the `ios_device.sh bench` positional argument is the full
+`mode:variant:text` spec; a bare argument is treated as *text* (wrapped as
+`custom:speed:<arg>`), so `bench custom` generates the literal word "custom" — a
+six-character prompt that mandatory Fast QC rejects at generation startup. Always pass
+the full spec; a startup failure with healthy memory and a tiny `promptCharacters` in
+the sentinel is this mistake.
+
 ## Deterministic evidence retained
 
 The benchmark result is joined with exact device/app identity, current-run engine and app telemetry,
@@ -634,12 +980,3 @@ and never an archive, upload, or Git-publishing prerequisite.
 
 See also [`testing-runbook.md`](testing-runbook.md) and
 [`benchmarking-procedure.md`](benchmarking-procedure.md).
-
-## Historical checkpoint references
-
-Dated run logs were preserved verbatim in [the historical snapshot](ios-device-testing-history-2026-09-06.md).
-They are evidence, not the next commands to execute.
-
-### Control-audit one-hour continuation — 2026-09-02
-
-Historical only: [preserved checkpoint](ios-device-testing-history-2026-09-06.md#control-audit-one-hour-continuation--2026-09-02).

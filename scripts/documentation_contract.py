@@ -12,6 +12,8 @@ import sys
 import urllib.parse
 from pathlib import Path
 
+from doc_metadata import PINNED, STATUSES, split_frontmatter
+
 
 CONTRACT_PATH = Path("config/documentation-contract.json")
 PUBLIC_FACTS_PATH = Path("config/public-product-facts.json")
@@ -64,6 +66,28 @@ def documentation_groups(root: Path) -> list[dict]:
     return contract["groups"]
 
 
+def documentation_inventory(root: Path) -> dict[Path, dict]:
+    """One lifecycle per file; groups provide taxonomy and legacy defaults only."""
+    memberships: dict[Path, list[dict]] = {}
+    for group in documentation_groups(root):
+        for path in _expand_group(root, group["paths"]):
+            memberships.setdefault(path, []).append(group)
+    inventory = {}
+    for path, groups in memberships.items():
+        metadata, _ = split_frontmatter(path.read_text(encoding="utf-8"))
+        defaults = {group["status"] for group in groups}
+        if metadata is not None:
+            status = metadata.get("status")
+            if status not in STATUSES or "generated" in defaults:
+                raise ValueError(f"{path.relative_to(root)}: invalid authored lifecycle {status!r}")
+        else:
+            # Preserve unannotated public/release and generated-document compatibility.
+            status = next(value for value in ("generated", "historical", "active") if value in defaults)
+        group = next((group for group in groups if group["status"] == status), groups[0])
+        inventory[path] = {"status": status, "group": group["id"]}
+    return inventory
+
+
 def active_markdown_paths(root: Path) -> list[Path]:
     if not (root / CONTRACT_PATH).is_file():
         # Small fixture fallback. Production inventory is always manifest-owned.
@@ -81,16 +105,8 @@ def active_markdown_paths(root: Path) -> list[Path]:
             and path.name != "backend-optimization-research-report.md"
             and "releases" not in path.parts
         )
-    paths: set[Path] = set()
-    historical: set[Path] = set()
-    for group in documentation_groups(root):
-        if group["status"] == "historical":
-            historical.update(_expand_group(root, group["paths"]))
-    for group in documentation_groups(root):
-        if group["status"] != "active":
-            continue
-        paths.update(_expand_group(root, group["paths"]))
-    return sorted(paths - historical)
+    return sorted(path for path, record in documentation_inventory(root).items()
+                  if record["status"] == "active")
 
 
 def historical_markdown_paths(root: Path) -> list[Path]:
@@ -100,11 +116,8 @@ def historical_markdown_paths(root: Path) -> list[Path]:
         if backend.is_file():
             paths.append(backend)
         return sorted(paths)
-    paths: set[Path] = set()
-    for group in documentation_groups(root):
-        if group["status"] == "historical":
-            paths.update(_expand_group(root, group["paths"]))
-    return sorted(paths)
+    return sorted(path for path, record in documentation_inventory(root).items()
+                  if record["status"] in PINNED)
 
 
 def markdown_slug(value: str) -> str:
@@ -412,6 +425,8 @@ def validate_facts(root: Path) -> list[str]:
     models = load_json(root / "Sources/Resources/qwenvoice_contract.json")
     project = (root / "project.yml").read_text(encoding="utf-8")
     targets = _top_level_names(project, "targets")
+    errors.extend(validate_project_map_inventory(root, targets))
+    errors.extend(validate_public_guidance(root, public))
     schemes = _top_level_names(project, "schemes")
     cli_template = root / "config/xcode-schemes/VocelloCLI.xcscheme.template"
     ios_logic_template = root / "config/xcode-schemes/VocelloiOSLogic.xcscheme.template"
@@ -476,6 +491,30 @@ def validate_facts(root: Path) -> list[str]:
         errors.append("docs/development-progress.md: tracked history has a clean canonical macOS baseline but the checkpoint does not")
     if not benchmark_baseline_status(root, "ios") and "clean canonical iPhone schema-v2 baseline remains pending" not in progress:
         errors.append("docs/development-progress.md: iPhone clean canonical status must remain pending")
+    return errors
+
+
+def validate_project_map_inventory(root: Path, targets: list[str]) -> list[str]:
+    path = root / "docs/project-map.html"
+    if not path.is_file():
+        return []
+    declared = re.findall(r"<span data-project-target-count>(\d+)</span>", path.read_text(encoding="utf-8"))
+    if declared != [str(len(targets))]:
+        return ["docs/project-map.html: declared target count must match project.yml"]
+    return []
+
+
+def validate_public_guidance(root: Path, public: dict) -> list[str]:
+    path = root / "website/PRODUCT.md"
+    if not path.is_file():
+        return []
+    text = path.read_text(encoding="utf-8")
+    errors = []
+    if "stableMacRelease" not in text or "config/public-product-facts.json" not in text:
+        errors.append("website/PRODUCT.md: CTA guidance must reference stableMacRelease, not a hand-maintained version")
+    for version in re.findall(r"(?i)primary CTA[^\n]*?Vocello\s+(\d+\.\d+\.\d+)", text):
+        if version != public["stableMacRelease"]["version"]:
+            errors.append("website/PRODUCT.md: primary CTA contradicts the public stable release")
     return errors
 
 
@@ -575,22 +614,22 @@ def render_index(root: Path) -> str:
         "",
         "Code, machine-readable contracts, and repository scripts remain higher authority than prose.",
         "",
+        "Start with [the current checkpoint](development-progress.md) and [the primary roadmap](ROADMAP.md).",
+        "Per-file frontmatter owns lifecycle; groups describe audience/ownership, not current status.",
+        "Unannotated public documents retain the group's default lifecycle. Historical instructions are not resume commands.",
+        "",
     ]
     groups = documentation_groups(root)
-    historical = set().union(*(
-        _expand_group(root, group["paths"]) for group in groups if group["status"] == "historical"
-    ))
+    inventory = documentation_inventory(root)
     for group in groups:
-        lines.extend([f"## {group['title']}", "", f"Status: **{group['status']}** · Owner: **{group['owner']}** · Audience: {group['audience']}.", "", f"Authority: {group['authority']}.", "", "Review when: " + "; ".join(group["reviewTriggers"]) + ".", ""])
-        group_paths = _expand_group(root, group["paths"])
-        if group["status"] == "active":
-            group_paths -= historical
+        lines.extend([f"## {group['title']}", "", f"Owner: **{group['owner']}** · Audience: {group['audience']}.", "", f"Authority: {group['authority']}.", "", "Review when: " + "; ".join(group["reviewTriggers"]) + ".", ""])
+        group_paths = {path for path, record in inventory.items() if record["group"] == group["id"]}
         for path in sorted(group_paths):
             if path == root / load_json(root / CONTRACT_PATH)["indexPath"]:
                 continue
             relative = path.relative_to(root)
             link = Path("..") / relative
-            lines.append(f"- [`{relative.as_posix()}`]({link.as_posix()})")
+            lines.append(f"- **{inventory[path]['status']}** · [`{relative.as_posix()}`]({link.as_posix()})")
         lines.append("")
     return "\n".join(lines).rstrip() + "\n"
 

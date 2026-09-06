@@ -41,40 +41,40 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 | Item | Status | Title | Evidence |
 | --- | --- | --- | --- |
-| `RF-01` | done | Step 1 — reconcile the audit and preserve the exact testing checkpoint | `doc:docs/reference/release-first-execution-2026-09.md#audit-finding-disposition`, `doc:docs/reference/release-first-execution-2026-09.md#preserved-september-4-device-boundary` |
-| `RF-02` | in-flight | Step 2 — complete Apple prerequisites and the consolidated qualified-decision packet | — |
-| `RF-03` | done | Step 3 — implement and behavior-test macOS Design request preservation | `file:Sources/ViewModels/VoiceDesignCoordinator.swift`, `file:Tests/VocelloCoreTests/VoiceDesignCoordinatorTests.swift`, `doc:docs/development-progress.md#resume-here-2026-09-04` |
-| `RF-04` | done | Step 4 — repair long-form durability on both platforms | `file:Tests/VocelloCoreTests/LongFormHistoryAcceptanceTests.swift`, `doc:docs/development-progress.md#resume-here-2026-09-04` |
-| `RF-05` | done | Step 5 — expose recoverable History-save outcomes | `file:Tests/VocelloCoreTests/GenerationHistoryEnqueueStateTests.swift`, `file:Tests/VocelloCoreTests/GenerationHistoryOutboxTests.swift`, `doc:docs/development-progress.md#resume-here-2026-09-04` |
-| `RF-06` | in-flight | Step 6 — localize the remaining natural-text audio failures | `doc:docs/reference/release-first-execution-2026-09.md#rf-06-retained-evidence-review-and-bounded-follow-up-september-4`, `doc:docs/development-progress.md#september-5-phone-independent-codec-checkpoint`, `doc:docs/development-progress.md#september-5-host-follow-up-completed--phone-approval-pending`, `doc:docs/development-progress.md#september-6-phase-4-chinese-cadence-diagnostic`, `doc:docs/development-progress.md#september-6-independent-chinese-decoder-comparison`, `doc:docs/development-progress.md#september-6-chinese-intelligibility-and-pause-alignment`, `doc:docs/development-progress.md#september-6-evaluator-corrections-and-product-priority` |
-| `RF-07` | done | Step 7 — finish only the acceptance-blocking harness repairs | `doc:docs/development-progress.md#september-5-correlation-and-capture-correction--verified`, `file:Tests/VocelloiOSLogicTests/IOSAuditOutputCaptureTests.swift` |
-| `RF-08` | parked | Step 8 — package the downloadable optimized CLI | — |
-| `RF-09` | in-flight | Step 9 — verify the coherent tree and freeze the 3.0.0 candidate | — |
-| `RF-10` | parked | Step 10 — independently qualify macOS and downloadable CLI | — |
-| `RF-11` | planned | Step 11 — account for the full frozen-source 201-take iOS campaign | — |
-| `RF-12` | planned | Step 12 — verify the distribution iOS candidate and finish submission preparation | — |
+| `RF-01` | done | reconcile the audit and preserve the exact testing checkpoint | `doc:docs/reference/release-first-execution-2026-09.md#audit-finding-disposition`, `doc:docs/reference/release-first-execution-2026-09.md#preserved-september-4-device-boundary` |
+| `RF-02` | in-flight | complete Apple prerequisites and the consolidated qualified-decision packet | — |
+| `RF-03` | done | implement and behavior-test macOS Design request preservation | `file:Sources/ViewModels/VoiceDesignCoordinator.swift`, `file:Tests/VocelloCoreTests/VoiceDesignCoordinatorTests.swift`, `doc:docs/development-progress.md#resume-here-2026-09-04` |
+| `RF-04` | done | repair long-form durability on both platforms | `file:Tests/VocelloCoreTests/LongFormHistoryAcceptanceTests.swift`, `doc:docs/development-progress.md#resume-here-2026-09-04` |
+| `RF-05` | done | expose recoverable History-save outcomes | `file:Tests/VocelloCoreTests/GenerationHistoryEnqueueStateTests.swift`, `file:Tests/VocelloCoreTests/GenerationHistoryOutboxTests.swift`, `doc:docs/development-progress.md#resume-here-2026-09-04` |
+| `RF-06` | in-flight | localize the remaining natural-text audio failures | `doc:docs/reference/release-first-execution-2026-09.md#rf-06-retained-evidence-review-and-bounded-follow-up-september-4`, `doc:docs/development-progress.md#september-5-phone-independent-codec-checkpoint`, `doc:docs/development-progress.md#september-5-host-follow-up-completed--phone-approval-pending`, `doc:docs/development-progress.md#september-6-phase-4-chinese-cadence-diagnostic`, `doc:docs/development-progress.md#september-6-independent-chinese-decoder-comparison`, `doc:docs/development-progress.md#september-6-chinese-intelligibility-and-pause-alignment`, `doc:docs/development-progress.md#september-6-evaluator-corrections-and-product-priority` |
+| `RF-07` | done | finish only the acceptance-blocking harness repairs | `doc:docs/development-progress.md#september-5-correlation-and-capture-correction--verified`, `file:Tests/VocelloiOSLogicTests/IOSAuditOutputCaptureTests.swift` |
+| `RF-08` | parked | package the downloadable optimized CLI | — |
+| `RF-09` | in-flight | verify the coherent tree and freeze the 3.0.0 candidate | — |
+| `RF-10` | parked | independently qualify macOS and downloadable CLI | — |
+| `RF-11` | planned | account for the full frozen-source 201-take iOS campaign | — |
+| `RF-12` | planned | verify the distribution iOS candidate and finish submission preparation | — |
 
 ### Open items in detail
 
-- **`RF-02`** (in-flight) — Step 2 — complete Apple prerequisites and the consolidated qualified-decision packet.
+- **`RF-02`** (in-flight) — complete Apple prerequisites and the consolidated qualified-decision packet.
   gate: Under ASR-02/ASR-04/ASR-08/ASR-10/ASR-11, complete bounded read-only account, distribution-key/profile/entitlement, agreement, version, and collision checks. Reuse support and bundled attribution; consolidate provider metadata/retention, model distribution, previews, marketing audio/artwork, privacy, content rights, age rating, export, and regional decisions. Every field has evidence or a named external dependency; qualified legal/privacy decisions are recorded before closure. Authentication failures remain failures.
 
-- **`RF-06`** (in-flight) — Step 6 — localize the remaining natural-text audio failures.
+- **`RF-06`** (in-flight) — localize the remaining natural-text audio failures.
   gate: Under ICA-15/VLR-07, review retained WAV/code/receipt/ASR evidence before new generation; separate the completed numeric-marker regression, marker-free French Custom failure, and French Design production versus experimental results. Locate the first divergent request/language/code/decoder/assembly/QC boundary, add a targeted fixture, and run only qualifying fixed-seed confirmations. Keep QC, seeds, prompts, token caps and model pins unchanged absent causal proof. Any unresolved sampled-output pathology remains an explicit release blocker/decision, never harness PASS.
 
-- **`RF-08`** (parked) — Step 8 — package the downloadable optimized CLI.
+- **`RF-08`** (parked) — package the downloadable optimized CLI.
   gate: Implement F-17 in the existing release workflow: separate optimized arm64 CLI DMG, complete libraries/resources/notices/instructions, checkout-independent discovery, signatures, notarization/stapling, checksums and source/version supply-chain identity. Copied-package tests cover paths with spaces, version/JSON, all three modes, a real two-item batch, cancellation, failure exits and resource loading. The F-21 batch-admission regression must use production-built requests against the real engine policy; keep index/total outside ordinary requests. No Homebrew route, privileged installer, shell-profile edits, or second release system.
 
-- **`RF-09`** (in-flight) — Step 9 — verify the coherent tree and freeze the 3.0.0 candidate.
+- **`RF-09`** (in-flight) — verify the coherent tree and freeze the 3.0.0 candidate.
   gate: Run derived refresh/validation, full project-input gate, macOS deterministic tests/app build, generic physical-iOS SDK compile, website check and affected release/privacy/attribution/supply-chain fixtures. Set shared version 3.0.0 through project.yml, reconcile the pending iOS version and collision-check an unused build number under ASR-08. Commit main and require exact-SHA CI/security, verified annotated-tag authority and command-bound candidate evidence; compute required promotion lanes before expensive QA. No unrelated source/docs edits during the frozen campaign or full-tree identity bypass. The September 4 pre-freeze source amendment must first qualify F-18/F-01 preservation, F-19 terminal ownership, F-22 shared-store exclusion, F-20/F-21 CLI lifecycle/accounting, F-16 recovery/retention, and VLR-07 live-duration/edge semantics. This means their bounded source corrections/tests, not their later device or signed-candidate closure gates; do not introduce a dependency cycle or replace RF-10 through RF-12.
 
-- **`RF-10`** (parked) — Step 10 — independently qualify macOS and downloadable CLI.
+- **`RF-10`** (parked) — independently qualify macOS and downloadable CLI.
   gate: Close F-05 with actual signed/notarized packaged-app startup/XPC evidence, verify Built-in, French Design pinned seed, Clone/enrollment, History recovery, long-form/regeneration, and applicable canonical benchmark/promotion lanes. Qualify F-17's copied CLI independently. Product defects, distribution rights, artifact verification and applicable promotion evidence must be clear before publication; an explicit maintainer publication authorization is still required. iOS-only blockers do not prevent desktop/CLI qualification or separately authorized publication. Copied CLI qualification also verifies one real two-item batch with ordered legacy-success JSON and retained WAVs, signal-driven owned cleanup, complete partial-batch accounting, pre-existing-output preservation and app/CLI Saved Voice coexistence under F-18 through F-22; do not substitute host cleanup or source-only fixtures for artifact behavior.
 
-- **`RF-11`** (planned) — Step 11 — account for the full frozen-source 201-take iOS campaign.
+- **`RF-11`** (planned) — account for the full frozen-source 201-take iOS campaign.
   gate: Complete ICA-04/ICA-05's full 201-take plan in bounded mode-grouped shards with frozen seeds/corpus, all original failures/attempts retained, terminal state and preservation before each next cell, and correlated UI/receipt/QC/History/playback/cleanup after every shard. Complete applicable outstanding controls/accessibility/model/perf acceptance, reserve collection before device deadlines and verify unattended screen protection/termination/cleanup. Accounted-for is not PASS; no difficult, failed or missing row may be dropped or substituted.
 
-- **`RF-12`** (planned) — Step 12 — verify the distribution iOS candidate and finish submission preparation.
+- **`RF-12`** (planned) — verify the distribution iOS candidate and finish submission preparation.
   gate: Under ASR-05 through ASR-12, verify archive/IPA entitlements/privacy/notices/architecture/UUID identity and absence of internal diagnostics. Separately authorize any internal TestFlight upload, then black-box test the processed candidate through the same XCUITest stack without replacing it with a diagnostics build. Preserve personal data during upgrade; fresh install needs another phone or explicit verified backup/reinstallation authorization. Verify reviewer-critical downloads/modes/import/transcription/permissions/offline/recovery/long-form/export, storage/screenshots, manual-only gaps, fresh regional hosting and all qualified account/privacy/rights decisions. No unexplained required failure; App Review submission requires separate explicit authorization and approval is not guaranteed.
 
 ## Autonomous validation audit remediation

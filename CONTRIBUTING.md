@@ -19,14 +19,15 @@ Models, a physical iPhone, and UI automation are not required for ordinary sourc
 Repository scripts are the authoritative interface:
 
 ```sh
+scripts/dev.sh plan                  # discover path-required checks
+scripts/dev.sh focused               # repeat during the edit loop
 ./scripts/regenerate_project.sh        # required after project.yml changes
-./scripts/check_project_inputs.sh
-scripts/macos_test.sh test
-./scripts/build.sh build
-./scripts/build_foundation_targets.sh ios
+scripts/dev.sh checkpoint            # one coherent deterministic checkpoint
 ```
 
-The final four deterministic commands are sufficient for ordinary pull requests. Run only the checks relevant to the files you changed, then state exactly what you ran in the pull request.
+The router selects the required derived, Python, native and website checks without scheduling
+model generation, UI acceptance or release operations. Use the [development workflow](docs/reference/development-workflow.md)
+for direct commands and cache policy. State exactly what ran and any deferred acceptance in the pull request.
 Pull requests need the single green `CI required` check; jobs skipped by
 path routing (for example docs-only changes) count as passing.
 
@@ -52,6 +53,7 @@ See [`docs/reference/testing-runbook.md`](docs/reference/testing-runbook.md) for
 
 - Code and machine-readable contracts take precedence over prose.
 - Update relevant documentation in the same change when behavior, public facts, commands, platform support, models, or test contracts change.
+- Keep dated run details in preserved evidence/checkpoints, not general instructions. During a frozen acceptance campaign, record progress untracked; a deliberate source/documentation checkpoint creates a new acceptance identity.
 - Keep dependencies pinned. MLX dependency changes require the backend review and benchmark process in [`.agents/rules/backend-mlx.md`](.agents/rules/backend-mlx.md).
 - Keep external Actions pinned to the full SHA in [`config/toolchain.json`](config/toolchain.json).
   Dependabot proposals must update that manifest and the adjacent workflow version comment together.

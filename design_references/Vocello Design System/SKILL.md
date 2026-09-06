@@ -1,8 +1,16 @@
 ---
 name: vocello-design
-description: Use this skill to generate well-branded interfaces and assets for Vocello (a local-first, Apple-native macOS voice-generation app — formerly QwenVoice). Contains essential design guidelines, colors, type, fonts, assets, and a Mac-app UI kit for prototyping voice-studio interfaces, marketing surfaces, and slides.
-user-invocable: true
+description: Historical Vocello 2.0 prototype reference only; not a current production or user-scoped Codex skill.
+user-invocable: false
+status: historical
+owner: backend-and-platform
+summary: Preserved legacy design prototype or critique; not current product guidance or acceptance.
+contentDigest: sha256:cd6d1918014f2a8411eeb784478e1d8826e4424713de19fe1f3b9b4d74223b50
 ---
+> **Historical reference only.** This retained prototype/review is not the current app, release
+> procedure, acceptance evidence, or asset-licensing authority. Follow root AGENTS.md, the
+> current platform guide and source; do not apply its older layout or font-distribution advice.
+
 
 Read `README.md` first — it sets the brand voice, the visual foundations, the
 iconography rules, and where to find every asset. Browse `colors_and_type.css`

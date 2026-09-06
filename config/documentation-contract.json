@@ -26,6 +26,7 @@
         "AGENTS.md",
         "README.md",
         "CONTRIBUTING.md",
+        ".github/pull_request_template.md",
         "PRODUCT.md",
         "SECURITY.md",
         ".agents/rules/*.md",
@@ -37,7 +38,7 @@
     },
     {
       "id": "architecture",
-      "title": "Architecture and active references",
+      "title": "Architecture and references",
       "status": "active",
       "owner": "backend-and-platform",
       "authority": "derived from source, project.yml, scripts, and machine-readable contracts",
@@ -95,7 +96,8 @@
         "Packages/VocelloQwen3Core/ORIGINS.md",
         "Packages/VocelloQwen3Core/NOTICES.md",
         "Packages/VocelloQwen3Core/PERFORMANCE.md",
-        "Packages/VocelloQwen3Core/CLONE_ARTIFACT_FORMAT.md"
+        "Packages/VocelloQwen3Core/CLONE_ARTIFACT_FORMAT.md",
+        "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/README.md"
       ]
     },
     {
@@ -110,6 +112,7 @@
       ],
       "paths": [
         "docs/INDEX.md",
+        "docs/ROADMAP.md",
         "docs/project-health.md",
         "benchmarks/HISTORY.md"
       ]
@@ -130,11 +133,24 @@
       ]
     },
     {
+      "id": "legacy-design",
+      "title": "Legacy design prototypes and critiques",
+      "status": "historical",
+      "owner": "backend-and-platform",
+      "authority": "pinned historical reference, never current product instructions, acceptance, or rights clearance",
+      "audience": "design provenance review",
+      "reviewTriggers": ["historical link or metadata repair only"],
+      "paths": [
+        "design_references/Vocello Design System/**/*.md",
+        ".impeccable/critique/*.md"
+      ]
+    },
+    {
       "id": "historical",
-      "title": "Historical evidence",
+      "title": "Release notes and historical evidence",
       "status": "historical",
       "owner": "archive",
-      "authority": "pinned historical snapshot only",
+      "authority": "per-file lifecycle; active candidate release notes remain current, historical bodies remain pinned snapshots",
       "audience": "research and provenance review",
       "reviewTriggers": [
         "link repair or archive classification only"
@@ -143,6 +159,8 @@
         "benchmarks/LEGACY_HISTORY.md",
         "benchmarks/baseline-*.md",
         "docs/releases/*.md",
+        "docs/development-history-*.md",
+        "docs/reference/*-history-2026-09-06.md",
         "docs/audits/archive/**/*.md",
         "docs/reference/backend-optimization-research-report.md",
         "docs/reference/delivery-control-audit-2026-08.md",

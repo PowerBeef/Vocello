@@ -4,198 +4,222 @@
 
 Code, machine-readable contracts, and repository scripts remain higher authority than prose.
 
+Start with [the current checkpoint](development-progress.md) and [the primary roadmap](ROADMAP.md).
+Per-file frontmatter owns lifecycle; groups describe audience/ownership, not current status.
+Unannotated public documents retain the group's default lifecycle. Historical instructions are not resume commands.
+
 ## Onboarding and product
 
-Status: **active** · Owner: **release-qa** · Audience: contributors and users.
+Owner: **release-qa** · Audience: contributors and users.
 
 Authority: repository guidance.
 
 Review when: release facts; workflow changes; platform support.
 
-- [`.agents/rules/backend-mlx.md`](../.agents/rules/backend-mlx.md)
-- [`.agents/rules/derived-artifacts.md`](../.agents/rules/derived-artifacts.md)
-- [`.agents/rules/ios.md`](../.agents/rules/ios.md)
-- [`.agents/rules/macos.md`](../.agents/rules/macos.md)
-- [`.agents/rules/release-qa.md`](../.agents/rules/release-qa.md)
-- [`AGENTS.md`](../AGENTS.md)
-- [`CONTRIBUTING.md`](../CONTRIBUTING.md)
-- [`PRODUCT.md`](../PRODUCT.md)
-- [`README.md`](../README.md)
-- [`SECURITY.md`](../SECURITY.md)
-- [`website/AGENTS.md`](../website/AGENTS.md)
-- [`website/DESIGN.md`](../website/DESIGN.md)
-- [`website/PRODUCT.md`](../website/PRODUCT.md)
-- [`website/README.md`](../website/README.md)
+- **active** · [`.agents/rules/backend-mlx.md`](../.agents/rules/backend-mlx.md)
+- **active** · [`.agents/rules/derived-artifacts.md`](../.agents/rules/derived-artifacts.md)
+- **active** · [`.agents/rules/ios.md`](../.agents/rules/ios.md)
+- **active** · [`.agents/rules/macos.md`](../.agents/rules/macos.md)
+- **active** · [`.agents/rules/release-qa.md`](../.agents/rules/release-qa.md)
+- **active** · [`.github/pull_request_template.md`](../.github/pull_request_template.md)
+- **active** · [`AGENTS.md`](../AGENTS.md)
+- **active** · [`CONTRIBUTING.md`](../CONTRIBUTING.md)
+- **active** · [`PRODUCT.md`](../PRODUCT.md)
+- **active** · [`README.md`](../README.md)
+- **active** · [`SECURITY.md`](../SECURITY.md)
+- **active** · [`website/AGENTS.md`](../website/AGENTS.md)
+- **active** · [`website/DESIGN.md`](../website/DESIGN.md)
+- **active** · [`website/PRODUCT.md`](../website/PRODUCT.md)
+- **active** · [`website/README.md`](../website/README.md)
 
-## Architecture and active references
+## Architecture and references
 
-Status: **active** · Owner: **backend-and-platform** · Audience: maintainers.
+Owner: **backend-and-platform** · Audience: maintainers.
 
 Authority: derived from source, project.yml, scripts, and machine-readable contracts.
 
 Review when: target or scheme changes; runtime topology; telemetry schema; test workflow.
 
-- [`Sources/Resources/voice-previews/README.md`](../Sources/Resources/voice-previews/README.md)
-- [`docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md)
-- [`docs/decisions/ios-6gb-floor-feasibility.md`](../docs/decisions/ios-6gb-floor-feasibility.md)
-- [`docs/decisions/long-form-acoustic-carryover-experiment.md`](../docs/decisions/long-form-acoustic-carryover-experiment.md)
-- [`docs/decisions/long-form-context-planning-v2.md`](../docs/decisions/long-form-context-planning-v2.md)
-- [`docs/decisions/model-delivery-background-assets.md`](../docs/decisions/model-delivery-background-assets.md)
-- [`docs/decisions/owned-qwen3-runtime-monorepo.md`](../docs/decisions/owned-qwen3-runtime-monorepo.md)
-- [`docs/decisions/product-identity-compatibility.md`](../docs/decisions/product-identity-compatibility.md)
-- [`docs/decisions/runtime-hardening-and-trust-boundary.md`](../docs/decisions/runtime-hardening-and-trust-boundary.md)
-- [`docs/decisions/runtime-streaming-quality-convergence.md`](../docs/decisions/runtime-streaming-quality-convergence.md)
-- [`docs/development-progress.md`](../docs/development-progress.md)
-- [`docs/project-map.html`](../docs/project-map.html)
-- [`docs/qwen_tone.md`](../docs/qwen_tone.md)
-- [`docs/reference/benchmarking-procedure.md`](../docs/reference/benchmarking-procedure.md)
-- [`docs/reference/cli.md`](../docs/reference/cli.md)
-- [`docs/reference/codex-session-storage.md`](../docs/reference/codex-session-storage.md)
-- [`docs/reference/content-rights-review.md`](../docs/reference/content-rights-review.md)
-- [`docs/reference/delivery-harness.md`](../docs/reference/delivery-harness.md)
-- [`docs/reference/development-workflow.md`](../docs/reference/development-workflow.md)
-- [`docs/reference/emotion-reference-banks.md`](../docs/reference/emotion-reference-banks.md)
-- [`docs/reference/engineering-audit-grounding-2026-09-04.md`](../docs/reference/engineering-audit-grounding-2026-09-04.md)
-- [`docs/reference/eu-ai-act-article50-assessment.md`](../docs/reference/eu-ai-act-article50-assessment.md)
-- [`docs/reference/evidence-impact.md`](../docs/reference/evidence-impact.md)
-- [`docs/reference/interactive-ui-qa.md`](../docs/reference/interactive-ui-qa.md)
-- [`docs/reference/ios-app-guide.md`](../docs/reference/ios-app-guide.md)
-- [`docs/reference/ios-appstore-submission.md`](../docs/reference/ios-appstore-submission.md)
-- [`docs/reference/ios-built-in-startup-reliability.md`](../docs/reference/ios-built-in-startup-reliability.md)
-- [`docs/reference/ios-control-audit-remediation-2026-08-29.md`](../docs/reference/ios-control-audit-remediation-2026-08-29.md)
-- [`docs/reference/ios-device-testing.md`](../docs/reference/ios-device-testing.md)
-- [`docs/reference/ios-engine-optimization.md`](../docs/reference/ios-engine-optimization.md)
-- [`docs/reference/ios-increased-memory-entitlement-request.md`](../docs/reference/ios-increased-memory-entitlement-request.md)
-- [`docs/reference/ios-ui-reference.md`](../docs/reference/ios-ui-reference.md)
-- [`docs/reference/ios-ui-refresh-2026-08.md`](../docs/reference/ios-ui-refresh-2026-08.md)
-- [`docs/reference/language-bench.md`](../docs/reference/language-bench.md)
-- [`docs/reference/localization.md`](../docs/reference/localization.md)
-- [`docs/reference/long-form-generation.md`](../docs/reference/long-form-generation.md)
-- [`docs/reference/macos-app-guide.md`](../docs/reference/macos-app-guide.md)
-- [`docs/reference/macos-permissions.md`](../docs/reference/macos-permissions.md)
-- [`docs/reference/macos-release-qa.md`](../docs/reference/macos-release-qa.md)
-- [`docs/reference/macos-testing.md`](../docs/reference/macos-testing.md)
-- [`docs/reference/macos-ui-refresh-2026-08.md`](../docs/reference/macos-ui-refresh-2026-08.md)
-- [`docs/reference/metal-guide.md`](../docs/reference/metal-guide.md)
-- [`docs/reference/mimi-codec-guide.md`](../docs/reference/mimi-codec-guide.md)
-- [`docs/reference/mlx-audio-swift-patching.md`](../docs/reference/mlx-audio-swift-patching.md)
-- [`docs/reference/mlx-guide.md`](../docs/reference/mlx-guide.md)
-- [`docs/reference/model-delivery.md`](../docs/reference/model-delivery.md)
-- [`docs/reference/privacy-storage.md`](../docs/reference/privacy-storage.md)
-- [`docs/reference/prosody-qa-research.md`](../docs/reference/prosody-qa-research.md)
-- [`docs/reference/quality-promotion.md`](../docs/reference/quality-promotion.md)
-- [`docs/reference/qwen3-tts-guide.md`](../docs/reference/qwen3-tts-guide.md)
-- [`docs/reference/qwen3-tts-prompting-guide.md`](../docs/reference/qwen3-tts-prompting-guide.md)
-- [`docs/reference/release-3-0-candidate-notes.md`](../docs/reference/release-3-0-candidate-notes.md)
-- [`docs/reference/release-first-execution-2026-09.md`](../docs/reference/release-first-execution-2026-09.md)
-- [`docs/reference/repository-self-verification.md`](../docs/reference/repository-self-verification.md)
-- [`docs/reference/roadmap-2026-08.md`](../docs/reference/roadmap-2026-08.md)
-- [`docs/reference/swift-performance-guide.md`](../docs/reference/swift-performance-guide.md)
-- [`docs/reference/telemetry-and-benchmarking.md`](../docs/reference/telemetry-and-benchmarking.md)
-- [`docs/reference/testing-runbook.md`](../docs/reference/testing-runbook.md)
+- **active** · [`Sources/Resources/voice-previews/README.md`](../Sources/Resources/voice-previews/README.md)
+- **active** · [`docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md)
+- **active** · [`docs/decisions/ios-6gb-floor-feasibility.md`](../docs/decisions/ios-6gb-floor-feasibility.md)
+- **historical** · [`docs/decisions/long-form-acoustic-carryover-experiment.md`](../docs/decisions/long-form-acoustic-carryover-experiment.md)
+- **historical** · [`docs/decisions/long-form-context-planning-v2.md`](../docs/decisions/long-form-context-planning-v2.md)
+- **historical** · [`docs/decisions/model-delivery-background-assets.md`](../docs/decisions/model-delivery-background-assets.md)
+- **historical** · [`docs/decisions/owned-qwen3-runtime-monorepo.md`](../docs/decisions/owned-qwen3-runtime-monorepo.md)
+- **active** · [`docs/decisions/product-identity-compatibility.md`](../docs/decisions/product-identity-compatibility.md)
+- **active** · [`docs/decisions/runtime-hardening-and-trust-boundary.md`](../docs/decisions/runtime-hardening-and-trust-boundary.md)
+- **active** · [`docs/decisions/runtime-streaming-quality-convergence.md`](../docs/decisions/runtime-streaming-quality-convergence.md)
+- **active** · [`docs/development-progress.md`](../docs/development-progress.md)
+- **active** · [`docs/project-map.html`](../docs/project-map.html)
+- **active** · [`docs/qwen_tone.md`](../docs/qwen_tone.md)
+- **active** · [`docs/reference/benchmarking-procedure.md`](../docs/reference/benchmarking-procedure.md)
+- **active** · [`docs/reference/cli.md`](../docs/reference/cli.md)
+- **active** · [`docs/reference/codex-session-storage.md`](../docs/reference/codex-session-storage.md)
+- **active** · [`docs/reference/content-rights-review.md`](../docs/reference/content-rights-review.md)
+- **active** · [`docs/reference/delivery-harness.md`](../docs/reference/delivery-harness.md)
+- **superseded** · [`docs/reference/delivery-remediation-plan-2026-08.md`](../docs/reference/delivery-remediation-plan-2026-08.md)
+- **active** · [`docs/reference/development-workflow.md`](../docs/reference/development-workflow.md)
+- **active** · [`docs/reference/emotion-reference-banks.md`](../docs/reference/emotion-reference-banks.md)
+- **active** · [`docs/reference/engineering-audit-grounding-2026-09-04.md`](../docs/reference/engineering-audit-grounding-2026-09-04.md)
+- **active** · [`docs/reference/eu-ai-act-article50-assessment.md`](../docs/reference/eu-ai-act-article50-assessment.md)
+- **active** · [`docs/reference/evidence-impact.md`](../docs/reference/evidence-impact.md)
+- **active** · [`docs/reference/interactive-ui-qa.md`](../docs/reference/interactive-ui-qa.md)
+- **active** · [`docs/reference/ios-app-guide.md`](../docs/reference/ios-app-guide.md)
+- **active** · [`docs/reference/ios-appstore-submission.md`](../docs/reference/ios-appstore-submission.md)
+- **active** · [`docs/reference/ios-built-in-startup-reliability.md`](../docs/reference/ios-built-in-startup-reliability.md)
+- **active** · [`docs/reference/ios-control-audit-remediation-2026-08-29.md`](../docs/reference/ios-control-audit-remediation-2026-08-29.md)
+- **active** · [`docs/reference/ios-device-testing.md`](../docs/reference/ios-device-testing.md)
+- **active** · [`docs/reference/ios-engine-optimization.md`](../docs/reference/ios-engine-optimization.md)
+- **active** · [`docs/reference/ios-increased-memory-entitlement-request.md`](../docs/reference/ios-increased-memory-entitlement-request.md)
+- **active** · [`docs/reference/ios-ui-reference.md`](../docs/reference/ios-ui-reference.md)
+- **active** · [`docs/reference/ios-ui-refresh-2026-08.md`](../docs/reference/ios-ui-refresh-2026-08.md)
+- **active** · [`docs/reference/language-bench.md`](../docs/reference/language-bench.md)
+- **active** · [`docs/reference/localization.md`](../docs/reference/localization.md)
+- **active** · [`docs/reference/long-form-generation.md`](../docs/reference/long-form-generation.md)
+- **active** · [`docs/reference/macos-app-guide.md`](../docs/reference/macos-app-guide.md)
+- **active** · [`docs/reference/macos-permissions.md`](../docs/reference/macos-permissions.md)
+- **active** · [`docs/reference/macos-release-qa.md`](../docs/reference/macos-release-qa.md)
+- **active** · [`docs/reference/macos-testing.md`](../docs/reference/macos-testing.md)
+- **active** · [`docs/reference/macos-ui-refresh-2026-08.md`](../docs/reference/macos-ui-refresh-2026-08.md)
+- **active** · [`docs/reference/metal-guide.md`](../docs/reference/metal-guide.md)
+- **active** · [`docs/reference/mimi-codec-guide.md`](../docs/reference/mimi-codec-guide.md)
+- **active** · [`docs/reference/mlx-audio-swift-patching.md`](../docs/reference/mlx-audio-swift-patching.md)
+- **active** · [`docs/reference/mlx-guide.md`](../docs/reference/mlx-guide.md)
+- **active** · [`docs/reference/model-delivery.md`](../docs/reference/model-delivery.md)
+- **active** · [`docs/reference/privacy-storage.md`](../docs/reference/privacy-storage.md)
+- **active** · [`docs/reference/prosody-qa-research.md`](../docs/reference/prosody-qa-research.md)
+- **active** · [`docs/reference/quality-promotion.md`](../docs/reference/quality-promotion.md)
+- **active** · [`docs/reference/qwen3-tts-guide.md`](../docs/reference/qwen3-tts-guide.md)
+- **active** · [`docs/reference/qwen3-tts-prompting-guide.md`](../docs/reference/qwen3-tts-prompting-guide.md)
+- **active** · [`docs/reference/release-3-0-candidate-notes.md`](../docs/reference/release-3-0-candidate-notes.md)
+- **active** · [`docs/reference/release-first-execution-2026-09.md`](../docs/reference/release-first-execution-2026-09.md)
+- **active** · [`docs/reference/repository-self-verification.md`](../docs/reference/repository-self-verification.md)
+- **superseded** · [`docs/reference/roadmap-2026-08.md`](../docs/reference/roadmap-2026-08.md)
+- **active** · [`docs/reference/swift-performance-guide.md`](../docs/reference/swift-performance-guide.md)
+- **active** · [`docs/reference/telemetry-and-benchmarking.md`](../docs/reference/telemetry-and-benchmarking.md)
+- **active** · [`docs/reference/testing-runbook.md`](../docs/reference/testing-runbook.md)
 
 ## Benchmark governance
 
-Status: **active** · Owner: **release-qa** · Audience: performance and release maintainers.
+Owner: **release-qa** · Audience: performance and release maintainers.
 
 Authority: benchmark schemas, validators, and tracked PASS records.
 
 Review when: benchmark schema; telemetry schema; hardware profiles; publication rules.
 
-- [`benchmarks/OPTIMIZATION.md`](../benchmarks/OPTIMIZATION.md)
-- [`benchmarks/README.md`](../benchmarks/README.md)
+- **active** · [`benchmarks/OPTIMIZATION.md`](../benchmarks/OPTIMIZATION.md)
+- **active** · [`benchmarks/README.md`](../benchmarks/README.md)
 
 ## Owned Qwen3 runtime
 
-Status: **active** · Owner: **backend-mlx** · Audience: backend maintainers.
+Owner: **backend-mlx** · Audience: backend maintainers.
 
 Authority: owned runtime lineage, compatibility, ownership, and capability contracts.
 
 Review when: owned runtime source changes; dependency pins; upstream review; performance semantics.
 
-- [`Packages/VocelloQwen3Core/CLONE_ARTIFACT_FORMAT.md`](../Packages/VocelloQwen3Core/CLONE_ARTIFACT_FORMAT.md)
-- [`Packages/VocelloQwen3Core/NOTICES.md`](../Packages/VocelloQwen3Core/NOTICES.md)
-- [`Packages/VocelloQwen3Core/ORIGINS.md`](../Packages/VocelloQwen3Core/ORIGINS.md)
-- [`Packages/VocelloQwen3Core/PERFORMANCE.md`](../Packages/VocelloQwen3Core/PERFORMANCE.md)
-- [`Packages/VocelloQwen3Core/README.md`](../Packages/VocelloQwen3Core/README.md)
-- [`Packages/VocelloQwen3Core/UPSTREAM.md`](../Packages/VocelloQwen3Core/UPSTREAM.md)
+- **active** · [`Packages/VocelloQwen3Core/CLONE_ARTIFACT_FORMAT.md`](../Packages/VocelloQwen3Core/CLONE_ARTIFACT_FORMAT.md)
+- **active** · [`Packages/VocelloQwen3Core/NOTICES.md`](../Packages/VocelloQwen3Core/NOTICES.md)
+- **active** · [`Packages/VocelloQwen3Core/ORIGINS.md`](../Packages/VocelloQwen3Core/ORIGINS.md)
+- **active** · [`Packages/VocelloQwen3Core/PERFORMANCE.md`](../Packages/VocelloQwen3Core/PERFORMANCE.md)
+- **active** · [`Packages/VocelloQwen3Core/README.md`](../Packages/VocelloQwen3Core/README.md)
+- **active** · [`Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/README.md`](../Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/README.md)
+- **active** · [`Packages/VocelloQwen3Core/UPSTREAM.md`](../Packages/VocelloQwen3Core/UPSTREAM.md)
 
 ## Generated indexes
 
-Status: **generated** · Owner: **release-qa** · Audience: maintainers.
+Owner: **release-qa** · Audience: maintainers.
 
 Authority: generators.
 
 Review when: source manifest or benchmark record changes.
 
-- [`benchmarks/HISTORY.md`](../benchmarks/HISTORY.md)
-- [`docs/project-health.md`](../docs/project-health.md)
+- **generated** · [`benchmarks/HISTORY.md`](../benchmarks/HISTORY.md)
+- **generated** · [`docs/ROADMAP.md`](../docs/ROADMAP.md)
+- **generated** · [`docs/project-health.md`](../docs/project-health.md)
 
 ## Imported research corpus (point-in-time)
 
-Status: **historical** · Owner: **backend-mlx** · Audience: maintainers.
+Owner: **backend-mlx** · Audience: maintainers.
 
 Authority: external research snapshots counter-verified 2026-07-22; superseded figures carry inline editor's notes; contract JSON remains status authority.
 
 Review when: runtime refactor phase changes; canonical benchmark supersession.
 
-- [`docs/research/README.md`](../docs/research/README.md)
-- [`docs/research/audio-quality-review-system-2026-07-16.md`](../docs/research/audio-quality-review-system-2026-07-16.md)
-- [`docs/research/exhaustive-project-review-2026-07-16.md`](../docs/research/exhaustive-project-review-2026-07-16.md)
-- [`docs/research/launch-bound-optimization-report-2026-07-24.md`](../docs/research/launch-bound-optimization-report-2026-07-24.md)
-- [`docs/research/performance-deep-dive-2026-07-17.md`](../docs/research/performance-deep-dive-2026-07-17.md)
-- [`docs/research/qwen3tts-leverage-assessment-2026-07-16.md`](../docs/research/qwen3tts-leverage-assessment-2026-07-16.md)
-- [`docs/research/refactor-blueprint-2026-07-17.md`](../docs/research/refactor-blueprint-2026-07-17.md)
+- **historical** · [`docs/research/README.md`](../docs/research/README.md)
+- **historical** · [`docs/research/audio-quality-review-system-2026-07-16.md`](../docs/research/audio-quality-review-system-2026-07-16.md)
+- **historical** · [`docs/research/exhaustive-project-review-2026-07-16.md`](../docs/research/exhaustive-project-review-2026-07-16.md)
+- **historical** · [`docs/research/launch-bound-optimization-report-2026-07-24.md`](../docs/research/launch-bound-optimization-report-2026-07-24.md)
+- **historical** · [`docs/research/performance-deep-dive-2026-07-17.md`](../docs/research/performance-deep-dive-2026-07-17.md)
+- **historical** · [`docs/research/qwen3tts-leverage-assessment-2026-07-16.md`](../docs/research/qwen3tts-leverage-assessment-2026-07-16.md)
+- **historical** · [`docs/research/refactor-blueprint-2026-07-17.md`](../docs/research/refactor-blueprint-2026-07-17.md)
 
-## Historical evidence
+## Legacy design prototypes and critiques
 
-Status: **historical** · Owner: **archive** · Audience: research and provenance review.
+Owner: **backend-and-platform** · Audience: design provenance review.
 
-Authority: pinned historical snapshot only.
+Authority: pinned historical reference, never current product instructions, acceptance, or rights clearance.
+
+Review when: historical link or metadata repair only.
+
+- **historical** · [`.impeccable/critique/2026-08-06T15-07-34Z__sources-contentview-swift.md`](../.impeccable/critique/2026-08-06T15-07-34Z__sources-contentview-swift.md)
+- **historical** · [`design_references/Vocello Design System/README.md`](../design_references/Vocello Design System/README.md)
+- **historical** · [`design_references/Vocello Design System/SKILL.md`](../design_references/Vocello Design System/SKILL.md)
+- **historical** · [`design_references/Vocello Design System/ui_kits/mac-app/README.md`](../design_references/Vocello Design System/ui_kits/mac-app/README.md)
+
+## Release notes and historical evidence
+
+Owner: **archive** · Audience: research and provenance review.
+
+Authority: per-file lifecycle; active candidate release notes remain current, historical bodies remain pinned snapshots.
 
 Review when: link repair or archive classification only.
 
-- [`benchmarks/LEGACY_HISTORY.md`](../benchmarks/LEGACY_HISTORY.md)
-- [`benchmarks/baseline-2026-05-30-06166f0.md`](../benchmarks/baseline-2026-05-30-06166f0.md)
-- [`benchmarks/baseline-2026-05-30-670d5c8-length-sweep.md`](../benchmarks/baseline-2026-05-30-670d5c8-length-sweep.md)
-- [`benchmarks/baseline-2026-05-31-641a541.md`](../benchmarks/baseline-2026-05-31-641a541.md)
-- [`benchmarks/baseline-2026-06-16-45720dd-streaming-default.md`](../benchmarks/baseline-2026-06-16-45720dd-streaming-default.md)
-- [`benchmarks/baseline-2026-06-16-p4-native-8gb.md`](../benchmarks/baseline-2026-06-16-p4-native-8gb.md)
-- [`benchmarks/baseline-2026-07-02-rescue-p2-speed.md`](../benchmarks/baseline-2026-07-02-rescue-p2-speed.md)
-- [`docs/audits/archive/2026-07-10/01_Evidence_Method_and_Corrections.md`](../docs/audits/archive/2026-07-10/01_Evidence_Method_and_Corrections.md)
-- [`docs/audits/archive/2026-07-10/02_Exhaustive_Current_State_Delta_Catalogue.md`](../docs/audits/archive/2026-07-10/02_Exhaustive_Current_State_Delta_Catalogue.md)
-- [`docs/audits/archive/2026-07-10/03_Performance_Memory_Streaming_Optimizations.md`](../docs/audits/archive/2026-07-10/03_Performance_Memory_Streaming_Optimizations.md)
-- [`docs/audits/archive/2026-07-10/04_Correctness_Risk_and_Findings.md`](../docs/audits/archive/2026-07-10/04_Correctness_Risk_and_Findings.md)
-- [`docs/audits/archive/2026-07-10/05_Upstream_Sync_and_Ownership_Strategy.md`](../docs/audits/archive/2026-07-10/05_Upstream_Sync_and_Ownership_Strategy.md)
-- [`docs/audits/archive/2026-07-10/06_Verification_Test_and_Benchmark_Matrix.md`](../docs/audits/archive/2026-07-10/06_Verification_Test_and_Benchmark_Matrix.md)
-- [`docs/audits/archive/2026-07-10/README.md`](../docs/audits/archive/2026-07-10/README.md)
-- [`docs/audits/archive/2026-07-10/SOURCE_MAP.md`](../docs/audits/archive/2026-07-10/SOURCE_MAP.md)
-- [`docs/audits/archive/2026-07-14/RESOLUTION.md`](../docs/audits/archive/2026-07-14/RESOLUTION.md)
-- [`docs/reference/autonomous-validation-audit-2026-08-21.md`](../docs/reference/autonomous-validation-audit-2026-08-21.md)
-- [`docs/reference/backend-optimization-research-report.md`](../docs/reference/backend-optimization-research-report.md)
-- [`docs/reference/codex-handover-review-2026-08-19.md`](../docs/reference/codex-handover-review-2026-08-19.md)
-- [`docs/reference/codex-storage-ballooning-incident.md`](../docs/reference/codex-storage-ballooning-incident.md)
-- [`docs/reference/delivery-control-audit-2026-08.md`](../docs/reference/delivery-control-audit-2026-08.md)
-- [`docs/reference/delivery-fidelity-report-2026-08-01.md`](../docs/reference/delivery-fidelity-report-2026-08-01.md)
-- [`docs/reference/delivery-remediation-plan-2026-08.md`](../docs/reference/delivery-remediation-plan-2026-08.md)
-- [`docs/reference/ios-app-store-readiness-audit-2026-08-26.md`](../docs/reference/ios-app-store-readiness-audit-2026-08-26.md)
-- [`docs/reference/ios-on-device-control-audit-2026-08-28.md`](../docs/reference/ios-on-device-control-audit-2026-08-28.md)
-- [`docs/reference/metal4-tensor-feasibility-2026-07-31.md`](../docs/reference/metal4-tensor-feasibility-2026-07-31.md)
-- [`docs/reference/optimization-report-review-2026-07-25.md`](../docs/reference/optimization-report-review-2026-07-25.md)
-- [`docs/reference/qwen3-apple-silicon-roadmap-review.md`](../docs/reference/qwen3-apple-silicon-roadmap-review.md)
-- [`docs/reference/qwen3-tts-emotion-tone-research-2026-08-22.md`](../docs/reference/qwen3-tts-emotion-tone-research-2026-08-22.md)
-- [`docs/reference/runtime-refactor-status-report.md`](../docs/reference/runtime-refactor-status-report.md)
-- [`docs/reference/voice-identity-language-reliability-ios-2026-09-02.md`](../docs/reference/voice-identity-language-reliability-ios-2026-09-02.md)
-- [`docs/reference/voice-identity-language-reliability-macos-2026-09-01.md`](../docs/reference/voice-identity-language-reliability-macos-2026-09-01.md)
-- [`docs/releases/v1.2.1.md`](../docs/releases/v1.2.1.md)
-- [`docs/releases/v1.2.2.md`](../docs/releases/v1.2.2.md)
-- [`docs/releases/v1.2.3.md`](../docs/releases/v1.2.3.md)
-- [`docs/releases/v2.0.0-beta.1.md`](../docs/releases/v2.0.0-beta.1.md)
-- [`docs/releases/v2.0.0.md`](../docs/releases/v2.0.0.md)
-- [`docs/releases/v2.1.0.md`](../docs/releases/v2.1.0.md)
-- [`docs/releases/v2.2.0.md`](../docs/releases/v2.2.0.md)
-- [`docs/releases/v2.2.1.md`](../docs/releases/v2.2.1.md)
-- [`docs/releases/v2.2.2.md`](../docs/releases/v2.2.2.md)
-- [`docs/releases/v2.3.0.md`](../docs/releases/v2.3.0.md)
-- [`docs/releases/v2.4.0.md`](../docs/releases/v2.4.0.md)
-- [`docs/releases/v3.0.0.md`](../docs/releases/v3.0.0.md)
+- **historical** · [`benchmarks/LEGACY_HISTORY.md`](../benchmarks/LEGACY_HISTORY.md)
+- **historical** · [`benchmarks/baseline-2026-05-30-06166f0.md`](../benchmarks/baseline-2026-05-30-06166f0.md)
+- **historical** · [`benchmarks/baseline-2026-05-30-670d5c8-length-sweep.md`](../benchmarks/baseline-2026-05-30-670d5c8-length-sweep.md)
+- **historical** · [`benchmarks/baseline-2026-05-31-641a541.md`](../benchmarks/baseline-2026-05-31-641a541.md)
+- **historical** · [`benchmarks/baseline-2026-06-16-45720dd-streaming-default.md`](../benchmarks/baseline-2026-06-16-45720dd-streaming-default.md)
+- **historical** · [`benchmarks/baseline-2026-06-16-p4-native-8gb.md`](../benchmarks/baseline-2026-06-16-p4-native-8gb.md)
+- **historical** · [`benchmarks/baseline-2026-07-02-rescue-p2-speed.md`](../benchmarks/baseline-2026-07-02-rescue-p2-speed.md)
+- **historical** · [`docs/audits/archive/2026-07-10/01_Evidence_Method_and_Corrections.md`](../docs/audits/archive/2026-07-10/01_Evidence_Method_and_Corrections.md)
+- **historical** · [`docs/audits/archive/2026-07-10/02_Exhaustive_Current_State_Delta_Catalogue.md`](../docs/audits/archive/2026-07-10/02_Exhaustive_Current_State_Delta_Catalogue.md)
+- **historical** · [`docs/audits/archive/2026-07-10/03_Performance_Memory_Streaming_Optimizations.md`](../docs/audits/archive/2026-07-10/03_Performance_Memory_Streaming_Optimizations.md)
+- **historical** · [`docs/audits/archive/2026-07-10/04_Correctness_Risk_and_Findings.md`](../docs/audits/archive/2026-07-10/04_Correctness_Risk_and_Findings.md)
+- **historical** · [`docs/audits/archive/2026-07-10/05_Upstream_Sync_and_Ownership_Strategy.md`](../docs/audits/archive/2026-07-10/05_Upstream_Sync_and_Ownership_Strategy.md)
+- **historical** · [`docs/audits/archive/2026-07-10/06_Verification_Test_and_Benchmark_Matrix.md`](../docs/audits/archive/2026-07-10/06_Verification_Test_and_Benchmark_Matrix.md)
+- **historical** · [`docs/audits/archive/2026-07-10/README.md`](../docs/audits/archive/2026-07-10/README.md)
+- **historical** · [`docs/audits/archive/2026-07-10/SOURCE_MAP.md`](../docs/audits/archive/2026-07-10/SOURCE_MAP.md)
+- **historical** · [`docs/audits/archive/2026-07-14/RESOLUTION.md`](../docs/audits/archive/2026-07-14/RESOLUTION.md)
+- **historical** · [`docs/development-history-2026-09-06.md`](../docs/development-history-2026-09-06.md)
+- **historical** · [`docs/reference/autonomous-validation-audit-2026-08-21.md`](../docs/reference/autonomous-validation-audit-2026-08-21.md)
+- **historical** · [`docs/reference/backend-optimization-research-report.md`](../docs/reference/backend-optimization-research-report.md)
+- **historical** · [`docs/reference/codex-handover-review-2026-08-19.md`](../docs/reference/codex-handover-review-2026-08-19.md)
+- **historical** · [`docs/reference/codex-storage-ballooning-incident.md`](../docs/reference/codex-storage-ballooning-incident.md)
+- **historical** · [`docs/reference/delivery-control-audit-2026-08.md`](../docs/reference/delivery-control-audit-2026-08.md)
+- **historical** · [`docs/reference/delivery-fidelity-report-2026-08-01.md`](../docs/reference/delivery-fidelity-report-2026-08-01.md)
+- **historical** · [`docs/reference/ios-app-store-readiness-audit-2026-08-26.md`](../docs/reference/ios-app-store-readiness-audit-2026-08-26.md)
+- **historical** · [`docs/reference/ios-device-testing-history-2026-09-06.md`](../docs/reference/ios-device-testing-history-2026-09-06.md)
+- **historical** · [`docs/reference/ios-on-device-control-audit-2026-08-28.md`](../docs/reference/ios-on-device-control-audit-2026-08-28.md)
+- **historical** · [`docs/reference/metal4-tensor-feasibility-2026-07-31.md`](../docs/reference/metal4-tensor-feasibility-2026-07-31.md)
+- **historical** · [`docs/reference/optimization-report-review-2026-07-25.md`](../docs/reference/optimization-report-review-2026-07-25.md)
+- **historical** · [`docs/reference/qwen3-apple-silicon-roadmap-review.md`](../docs/reference/qwen3-apple-silicon-roadmap-review.md)
+- **historical** · [`docs/reference/qwen3-tts-emotion-tone-research-2026-08-22.md`](../docs/reference/qwen3-tts-emotion-tone-research-2026-08-22.md)
+- **historical** · [`docs/reference/release-first-execution-history-2026-09-06.md`](../docs/reference/release-first-execution-history-2026-09-06.md)
+- **historical** · [`docs/reference/runtime-refactor-status-report.md`](../docs/reference/runtime-refactor-status-report.md)
+- **historical** · [`docs/reference/testing-runbook-history-2026-09-06.md`](../docs/reference/testing-runbook-history-2026-09-06.md)
+- **historical** · [`docs/reference/voice-identity-language-reliability-ios-2026-09-02.md`](../docs/reference/voice-identity-language-reliability-ios-2026-09-02.md)
+- **historical** · [`docs/reference/voice-identity-language-reliability-macos-2026-09-01.md`](../docs/reference/voice-identity-language-reliability-macos-2026-09-01.md)
+- **historical** · [`docs/releases/v1.2.1.md`](../docs/releases/v1.2.1.md)
+- **historical** · [`docs/releases/v1.2.2.md`](../docs/releases/v1.2.2.md)
+- **historical** · [`docs/releases/v1.2.3.md`](../docs/releases/v1.2.3.md)
+- **historical** · [`docs/releases/v2.0.0-beta.1.md`](../docs/releases/v2.0.0-beta.1.md)
+- **historical** · [`docs/releases/v2.0.0.md`](../docs/releases/v2.0.0.md)
+- **historical** · [`docs/releases/v2.1.0.md`](../docs/releases/v2.1.0.md)
+- **historical** · [`docs/releases/v2.2.0.md`](../docs/releases/v2.2.0.md)
+- **historical** · [`docs/releases/v2.2.1.md`](../docs/releases/v2.2.1.md)
+- **historical** · [`docs/releases/v2.2.2.md`](../docs/releases/v2.2.2.md)
+- **historical** · [`docs/releases/v2.3.0.md`](../docs/releases/v2.3.0.md)
+- **historical** · [`docs/releases/v2.4.0.md`](../docs/releases/v2.4.0.md)
+- **active** · [`docs/releases/v3.0.0.md`](../docs/releases/v3.0.0.md)

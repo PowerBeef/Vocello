@@ -47,6 +47,73 @@ machine-readable status record and wins over any older prose.
 | 13 — Benchmark/history v3 | Live 2026-07-29: the first schema-v3 records are committed (three clean `phase0-cli-control-*` engine records plus one exploratory run that also exposed and fixed the summarizer's v3 pin). `benchmarks/schema-v3.json` adds the typed quality identity to generation takes (pass/warning only, five fast gates required, machine-code issues); v1/v2 records stay valid immutable history; the publisher stamps v3 only when every take carries the identity. The UI benchmark checkers folded the same identity 2026-08-01: ui-generation records now publish v3 (first: the focused `v3-fold-proof` record `macos-xcui-benchmark-20260801-003208-403989cf`); the canonical iOS matrix published its first v3 record 2026-08-01 (`ios-xcui-benchmark-20260801-132415-abbec96b`). |
 | 14 — Organization and retirement | Closed 2026-07-23 (14a + 14b): compatibility SPI retired, actor-owned loading/metadata/priming/clone artifacts, clone conditioning epoch-bound end to end. |
 
+## September 6 independent Chinese decoder comparison
+
+**The next bounded RF-06 investigation is complete; there is no evidence for a Vocello-specific
+decoder repair for this take. The cadence warning and release-quality gate remain open.**
+The phone was not contacted, no new speech was generated and no production code, prompt, model,
+sampling, seed or QC policy changed. Clean `dfc0d03d` and full-tree fingerprint
+`4ce915f53c5707ceaa8ee34051f07eabe219787f5592a168fbce7cafe8565537` match before and after.
+
+One serial CPU process decoded the complete retained 235-frame Chinese trace through the
+[official Qwen decoder at pinned revision 022e286](https://github.com/QwenLM/Qwen3-TTS/blob/022e286b98fbec7e1e916cb940cdf532cd9f488e/qwen_tts/core/tokenizer_12hz/modeling_qwen3_tts_tokenizer_v2.py).
+Cached implementation/configuration source hashes, runtime binary/package versions, tokenizer
+config and exact current fp16 weight digest were verified before execution. Arithmetic was
+PyTorch CPU float32; this changes implementation/platform, not weight identity. The upstream
+`chunked_decode` used 25-frame blocks and 25-frame left context (at most 50 frames per decoder
+call). It was not an unbounded single full-sequence forward, another TTS take or a new harness.
+
+| Bounded per-sample measurement | Published iPhone WAV | iPhone decoder replays | Independent CPU float / WAV |
+| --- | --- | --- | --- |
+| Samples / duration | 451,200 / 18.8 s | 451,200 / 18.8 s | 451,200 / 18.8 s |
+| Interior pauses at least 350 ms | 5 | 5 | 5 |
+| Longest pause | 834 ms | 836 ms | 836 ms |
+| Longest pause starts | 16,702 ms | 16,702 ms | 16,702 ms |
+| Interior pauses at least 1,200 ms | 0 | 0 | 0 |
+
+The diagnostic uses the existing absolute-amplitude floor 0.001 and 100 ms interior-run
+recording floor, reading at most 24,000 frames at once. It reproduces the original published
+pause durations exactly before comparing the new output. Raw float32 and PCM16 are measured
+separately; conversion is not mistaken for decoding. Smaller pause edges vary, so neither
+waveform identity nor exact cross-platform sample equality is claimed. All four original
+audio/codec files remain hash-identical. This measurement is **not** a new production AudioQC
+report, ASR check or semantic-delivery verdict.
+
+**Causal boundary:** the pause survives the independently implemented official decoder before
+PCM conversion. A Swift-only decoder, incremental-only schedule, iPhone-only numeric effect,
+UI or final-file writer is not required to produce it. The shared learned codec/weights and
+generated code sequence remain common inputs; this does not prove that a five-pause delivery is
+linguistically correct or identify a training/sampling defect. Preserve the existing warning;
+do not change decoding, thresholds, seeds or prompts to clear it. The missing historical WAV
+also remains missing rather than being replaced by this new evidence.
+
+**Resource result:** decoder work completed in 12.09 s; the supervised child exited zero in
+13.11 s, with complete stdout/stderr capture and no shutdown/probe error. Sampled physical
+footprint peaked at 2.030 GiB (146 measurements), RSS at 1.924 GiB, below the stricter 3 GiB
+diagnostic footprint ceiling. Before/after pressure flags were clear and swap fell 64 MiB.
+However, host free memory changed from 68% to 59% and missed the existing recovery bound after
+15.02 s. The resource wrapper therefore exited **1 / unqualified**; no further heavy analyzer
+was launched. Process exit is confirmed, but this is neither memory qualification nor evidence
+of a retained-model leak. Host-wide free memory is not process-owned allocation.
+
+Ignored evidence: `build/artifacts/diagnostics/macos/rf06-chinese-codec-20260906/` contains the
+source snapshot, scripts, result, raw float/WAV, resource samples, stdout/stderr and comparison.
+`comparison.json` SHA-256: `21d14f1149b5bbbfdb520acf439475a9e14f33534d13a73a557aa9130f76bce4`;
+`resources.json`: `6dd451e28131a7d6d3140e9678f220bdd0ab99504a6ea98afeff76aa58f9622a`;
+`result.json`: `0643af72f1bb95bc085499319155b668c56236622ad79040c11c6ebde8075d94`.
+The comparison and decoder result bind the exact trace, source, weights and output hashes;
+the resource envelope records the supervised execution. Raw evidence stays untracked.
+
+**Next:** stop repeating decoder variants for this Chinese warning. Its remaining quality question
+needs exact-WAV, locale-locked full-file intelligibility and pause-to-text alignment after a fresh
+qualified host-resource preflight; do not silently substitute a lower ASR score or change the
+pause budget. Existing French recognizer disagreement, distinct long-gap traces and long-form
+termination remain separate RF-06 work. The 201-take campaign remains stopped. No additional
+phone approval is needed for retained-file work, but device work still needs renewed authorization.
+AGENTS.md and the existing testing procedures remain accurate. This documentation-only checkpoint
+uses derived refresh/validation and the path-aware quick project-input gate; no native rebuild or
+repeat generation is warranted by narrative changes.
+
 ## September 6 phase 4 Chinese cadence diagnostic
 
 **The authorized step 4 is complete as a diagnostic, not a quality PASS or audio-defect fix.**

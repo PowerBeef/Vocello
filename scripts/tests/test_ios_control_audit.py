@@ -36,6 +36,30 @@ class IOSControlAuditContractTests(unittest.TestCase):
         self.assertGreaterEqual(report["interactiveOccurrenceCount"], 70)
         self.assertGreaterEqual(report["expandedControlCount"], 50)
 
+    def test_history_query_replacement_clears_before_typing_without_caret_assumptions(self) -> None:
+        # Source-contract guard only: the physical smoke journey owns behavior
+        # proof. Never replace its exact query echo with a prefix/length check.
+        source = (ROOT / "Tests/VocelloiOSUITests/VocelloiOSUITestCase.swift").read_text()
+        helper = source.split("func replaceHistorySearch(with query: String)", 1)[1].split(
+            "func revealSavedVoice", 1
+        )[0]
+        clear = helper.index('app.buttons["historySearchField"]')
+        empty = helper.index('"History search to clear"')
+        type_query = helper.index("searchField.typeText(query)")
+        self.assertLess(clear, empty)
+        self.assertLess(empty, type_query)
+        self.assertIn("if clear.exists", helper)
+        self.assertIn("&& !clear.exists", helper)
+        self.assertNotIn("guard let current = searchField.value", helper)
+        production = (ROOT / "Sources/iOS/IOSDesignSystemPrimitives.swift").read_text()
+        search = production.split("struct IOSSearchField", 1)[1].split("// MARK: - Primary CTA", 1)[0]
+        self.assertIn("if !text.isEmpty", search)
+        self.assertIn('text = ""', search)
+        self.assertIn('.accessibilityLabel("Clear search")', search)
+        self.assertIn("(searchField.value as? String) == query", helper)
+        self.assertNotIn("XCUIKeyboardKey.delete", helper)
+        self.assertNotIn("historyClearMenu", helper)
+
     def test_inventory_returns_to_studio_before_mode_controls(self) -> None:
         source = (
             ROOT

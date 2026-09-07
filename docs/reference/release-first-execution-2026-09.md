@@ -87,6 +87,14 @@ acceptance; old results remain historical evidence, not replacement candidate pr
 
 ## External decisions and final gates
 
+September 7 scheduling amendment: retain the English long-form generated-code failure as an open
+known limitation and defer further causal research. Preserve its original evidence and uncertainty;
+independent-decoder reproduction is not proof of the original generating trigger. Verify explicit
+rejection, recovery and accepted-output preservation, then use the already-required frozen 201-take
+campaign to assess incidence rather than adding a research matrix. RF-09 still precedes that full
+campaign. This does not waive QC, close the separate French/Chinese findings, or authorize shipping
+with an unresolved required failure. A release-risk exception requires a separate recorded decision.
+
 Use the existing [consolidated content-rights packet](content-rights-review.md),
 [App Store submission procedure](ios-appstore-submission.md), and
 [quality-promotion contract](quality-promotion.md). Account snapshots are dated evidence, not

@@ -2,10 +2,11 @@ import Foundation
 import MLX
 @testable import MLXAudioTTS
 import MLXLMCommon
+import MLXNN
 import XCTest
 
 /// Stage 1 P3: the compiled per-pass code-predictor plan must reproduce the
-/// eager module path exactly — same logits for every pass, across repeated
+/// eager module path within the declared fp32 tolerance, across repeated
 /// frames (the eager path trims its cache to zero per frame; the compiled
 /// plan overwrites baked buffer slices).
 final class Qwen3CodePredictorCompiledTests: XCTestCase {
@@ -54,7 +55,6 @@ final class Qwen3CodePredictorCompiledTests: XCTestCase {
             let (passLogits, _, _) = predictor(
                 input, cache: cache, generationStep: pass, stepConstants: constants
             )
-            eval(passLogits)
             logits.append(passLogits)
         }
         return logits
@@ -79,14 +79,13 @@ final class Qwen3CodePredictorCompiledTests: XCTestCase {
                     pass: pass, codeHidden: nil, code0Embed: nil, token: followTokens[pass - 1]
                 )
             }
-            eval(passLogits)
             logits.append(passLogits)
         }
         return logits
     }
 
     private func assertFramesMatch(talkerHidden: Int, cpHidden: Int) throws {
-        let config = try makeConfig(numCodeGroups: 4, hidden: cpHidden)
+        let config = try makeConfig(numCodeGroups: 16, hidden: cpHidden)
         let predictor = Qwen3TTSCodePredictor(config: config, talkerHiddenSize: talkerHidden)
         eval(predictor)
         let passCount = config.numCodeGroups - 1
@@ -95,9 +94,9 @@ final class Qwen3CodePredictorCompiledTests: XCTestCase {
         let constants = CodePredictorStepConstants()
         let plan = CodePredictorCompiledPlan(predictor: predictor, dtype: .float32)
 
-        // Two frames with distinct inputs: frame 2 proves the per-frame
+        // Three frames with distinct inputs: later frames check per-frame
         // replay (eager trim-to-zero vs compiled slice overwrite) agrees.
-        for frame in 0 ..< 2 {
+        for frame in 0 ..< 3 {
             let key = MLXRandom.key(UInt64(20_260_726 + frame))
             let keys = MLXRandom.split(key: key, into: 2)
             let codeHidden = MLXRandom.normal([1, 1, talkerHidden], key: keys[0])
@@ -115,14 +114,15 @@ final class Qwen3CodePredictorCompiledTests: XCTestCase {
                 followTokens: followTokens, passCount: passCount
             )
 
+            // One materialization boundary per complete frame, not per pass.
+            // Forced codes isolate predictor arithmetic from categorical draws.
+            eval(eager + compiled)
+
             for pass in 0 ..< passCount {
                 XCTAssertEqual(eager[pass].shape, compiled[pass].shape, "frame \(frame) pass \(pass)")
                 // MLX compile fuses elementwise/reduction chains, which
-                // reorders fp32 rounding by ~1e-7 relative vs the eager
-                // kernels. That sits below bf16 resolution, so the shipping
-                // bf16 model remains byte-identical end-to-end (enforced by
-                // the fixed-seed WAV identity gate); this fp32 fixture allows
-                // exactly that fusion-level tolerance and nothing more.
+                // reorders fp32 rounding. This fixture does not establish
+                // low-precision shipping-code or end-to-end audio identity.
                 let eagerValues = eager[pass].asArray(Float.self)
                 let compiledValues = compiled[pass].asArray(Float.self)
                 for (index, (e, c)) in zip(eagerValues, compiledValues).enumerated() {
@@ -141,5 +141,38 @@ final class Qwen3CodePredictorCompiledTests: XCTestCase {
 
     func testCompiledPlanMatchesEagerPathWithProjection() throws {
         try assertFramesMatch(talkerHidden: 24, cpHidden: 16)
+    }
+
+    func testLowPrecisionAllPassesOverwritePriorFrameState() throws {
+        // Bit identity is asserted only between fresh and reused *compiled*
+        // plans. Eager/compiled production-dtype differences are measured by the
+        // opt-in real-weight probe, not waived by an invented fp16 tolerance.
+        for dtype: DType in [.float16, .bfloat16] {
+            for talkerHidden in [16, 24] {
+                let config = try makeConfig(numCodeGroups: 16, hidden: 16)
+                let predictor = Qwen3TTSCodePredictor(config: config, talkerHiddenSize: talkerHidden)
+                predictor.update(parameters: predictor.parameters().mapValues { $0.asType(dtype) })
+                eval(predictor)
+                let reused = CodePredictorCompiledPlan(predictor: predictor, dtype: dtype)
+                for frame in 0..<3 {
+                    let hidden = MLXRandom.normal([1, 1, talkerHidden], key: MLXRandom.key(UInt64(100 + frame))).asType(dtype)
+                    let first = hidden * 0.5
+                    let tokens = (0..<14).map { MLXArray([Int32(($0 + frame * 7) % 32)]).reshaped(1, 1) }
+                    let a = runCompiledFrame(plan: reused, codeHidden: hidden, code0Embed: first,
+                        followTokens: tokens, passCount: 15)
+                    let fresh = CodePredictorCompiledPlan(predictor: predictor, dtype: dtype)
+                    let b = runCompiledFrame(plan: fresh, codeHidden: hidden, code0Embed: first,
+                        followTokens: tokens, passCount: 15)
+                    eval(a + b)
+                    for pass in 0..<15 {
+                        let values = a[pass].asType(.float32).asArray(Float.self)
+                        XCTAssertEqual(a[pass].dtype, dtype)
+                        XCTAssertTrue(values.allSatisfy(\.isFinite))
+                        XCTAssertEqual(values, b[pass].asType(.float32).asArray(Float.self),
+                            "\(dtype) projection \(talkerHidden != 16) frame \(frame) pass \(pass)")
+                    }
+                }
+            }
+        }
     }
 }

@@ -15,6 +15,112 @@ This is a narrative, not a second work ledger. Product source, contracts and scr
 
 ## Resume now
 
+September 7 **release-forward decision:** the maintainer has deferred further English long-form
+causal research. RF-06 remains a **known limitation, open and not fixed**. Its original failed
+audio/code trace, exact seed/receipts, independent-decoder reproduction and inconclusive generating
+cause remain retained below. No cap, seed, model, prompt, retry or QC policy changes follow.
+The remaining French/Chinese findings are separate; none is cleared by this scheduling decision.
+
+Next: resolve the retained joined-History transcript comparison and finish segment-regeneration
+acceptance without repeating the original failed audio. Visible cancellation/pressure recovery passed;
+exact QC-error recovery and complete accepted-output preservation remain partially verified.
+Use the required 201-take campaign for incidence/workflow impact, not another research matrix.
+RF-09's legacy tensor-transfer Analyze warning and exact-source candidate freeze still precede
+the full campaign. Development recovery tests do not substitute for that candidate gate.
+Finish independent submission-material preparation through the existing RF-02 packet. Unresolved
+required failures still block clean promotion; accepting a shipping risk requires a separate
+documented decision, not relabeling the failure or declaring this issue resolved.
+
+### September 7 physical recovery checkpoint
+
+All runs used the canonical physical-iPhone smoke lane and retain their own source fingerprints,
+logs, result bundles, diagnostics and terminal required-step ledgers. They are separate attempts,
+not an automatically retried or combined PASS:
+
+| Run suffix (all September 7) | Outcome |
+| --- | --- |
+| `201825-9356e2d1` | Automation bootstrap failure; zero real test cases launched. |
+| `202239-b4e9b670` | After explicit user unlock: recovery and four layouts passed; long-form stopped before Generate because caret-dependent search clearing left old text. |
+| `204407-d88669f8` | First helper correction wrongly required a readable value for an empty field: two harness failures, layout PASS. Retained, not erased by the next correction. |
+| `205513-1be7eb7e` | Corrected search: recovery PASS (249.395 s), four layouts PASS (287.741 s); long-form completed audio but failed the joined-History transcript comparison (424.580 s). Segment regeneration not reached. |
+
+The final helper uses the genuine search-only Clear button and waits for its conditional
+disappearance before typing once. Exact query equality remains required. Its 82 focused Python
+checks pass, and the final physical run proves short and 2,131-character query replacement.
+The final frozen run fingerprint is
+`92b6295239e856925675caf217bca4a788cd5b787437e44f892a8718f5db3af3`;
+these subsequent documentation edits are a new checkpoint, not identical campaign source.
+
+The three long-form segments reached EOS, with durations **52.24 / 50.72 / 25.04 seconds**,
+persisted-WAV QC PASS and cadence `withinFastGate`. The joined player appeared and before/after
+History censuses preserved prior matching IDs. This is not full-WAV ASR/prosody qualification or
+a fixed-seed confirmation of the original RF-06 failure. The original evidence remains unchanged.
+The later full-player comparison did not retain its observed value. Source inspection identifies
+a plausible fixture mismatch: a trailing space in raw input versus planner-normalized joined
+History. Do not declare that explanation proven, weaken equality, or infer lost user text.
+Next, bind the actual retained row and expected normalized joined transcript, then finish the
+regeneration/previous-output checks. Do not regenerate merely to recover a missing observation.
+
+The final runner remains **FAIL**, with only `xcuitest` failed and no missing required step.
+Recovery diagnostics pass; their intentionally forced critical-memory/full-unload event is not
+clean memory-promotion evidence. Before/after collected crash hashes match. A successful read-only
+process query after collection found no Vocello or test-runner process. Personal models/voices were
+not deliberately removed; this smoke lane does not establish byte-for-byte restoration of all
+personal state. No screen settings changed, as requested for this session.
+
+No full-campaign cell ran: the prepared 201-row snapshot (91 Built-in, 80 Design, 30 Clone) is
+preparation only and must be regenerated after RF-09 freeze. RF-02's existing consolidated packet,
+support/attribution contracts and release notes were reviewed; qualified decisions, account changes,
+candidate authorization and signed/processed-candidate evidence remain outstanding. No account
+mutation, upload, release or submission occurred.
+
+### Completed sampler investigation
+
+September 7 **production sampler / predictor follow-up** completed the two bounded Mac experiments
+recommended after the external review. No phone was used. Diagnostic allocator setup now consumes
+a digest-bound export from the actual host `NativeMemoryPolicyResolver` before model load and
+restores prior limits after model ownership ends. This is a diagnostic correction, not an audio fix.
+
+- **Experiment A:** the same original request/seed through the production producer, once without
+  and once with internal sampling observation. All **600 × 16 codes match** between these two arms.
+  The new Mac trace first differs from the original iPhone trace at zero-based **frame 1, codebook 8**
+  (predictor pass 7), well before the old silence. No Talker processed row contains NaN; EOS has
+  nonzero probability after its two-frame minimum. The longest new first-codebook run is four
+  frames, not the original sustained collapse. Both captures deliberately stop at 600 frames;
+  neither is EOS, complete synthesis, PCM acceptance or proof the original issue is fixed.
+- **Experiment B:** teacher-force the new history at frames 0–2 through all 15 predictor passes
+  using shipping quantized weights/bfloat16 activations. All **45 complete logit comparisons are
+  exactly equal** eager versus compiled and versus the captured production values. No predictor
+  arithmetic/cache correction is supported at this early boundary. This remains a shared-weights,
+  same-platform comparison, not independent Talker or original-device numerical parity.
+- **Resources:** all three processes exited and stayed below 5 GiB (about 2.94 GiB sampled peak
+  physical footprint). Observed and predictor arms pass their supervised resource envelopes.
+  Baseline remains **unqualified** for a probe failure and +117,702,656 bytes host swap growth;
+  retain that failure, not a claimed all-runs memory PASS. Inspected original/model files and
+  full-tree source stayed unchanged during each run. Mac cache policy is 256 MiB, not the original
+  phone's 128 MiB; platform/setup differences remain explicit.
+- **Capture correction:** first-frame raw statistics accidentally flattened the whole prompt.
+  Retained raw arrays allow a separately digest-bound last-position correction without replacing
+  or regenerating either capture. New diagnostic records declare schema 2, raw shape and last
+  position; a negative fixture covers this error and incomplete-frame classification.
+
+The private `sampler-transition-20260907/` bundle under RF-06 recovery retains inputs, actual consumed
+keys, full checkpoint logits, original outputs, resource failures and `analysis.json`. Nothing raw
+is published. Production-sampler arithmetic/scratch/observer tests, deterministic overlapping async
+request scopes (including exact keys), and all-pass fp32/fp16/bfloat16 predictor cache tests passed:
+18 focused tests, one explicit model-dependent skip, zero failures. The earlier coherent native run
+also passed. The final tree uses `scripts/dev.sh checkpoint`; its exact-source receipt, not these
+diagnostic results, owns deterministic verification. No candidate acceptance is claimed.
+
+**Investigation checkpoint (research now deferred):** RF-06 stays open. Stop after these two experiments; no sampling, cap, EOS,
+prompt, model, decoder or QC policy change is justified. Missing original device distributions/keys
+cannot be reconstructed. The next useful comparison needs matched conditioning/weight representation
+and an independent Talker or bounded device-side early-decision capture; a new Mac take alone cannot
+explain the old phone decision. French interior gaps, French recognition disagreement and Chinese
+trailing silence/cadence remain separate blockers, not cleared by these English diagnostics.
+
+### Earlier Talker replay
+
 September 7 **Talker replay follow-up** inspected 600 original code frames without resampling,
 decoding audio or using the phone. All inspected last-step logits were finite. At seven fixed
 checkpoints, recomputing the identical complete history from a fresh cache also ranked the recorded
@@ -38,7 +144,7 @@ swap growth; no resource PASS. Both runs preserved 12 original evidence files an
 model files, plus unchanged full-tree identity during execution. Private evidence is retained under
 `talker-replay-20260907/` and `talker-replay-20260907-corrected-prefix/` in the RF-06 recovery bundle.
 
-**Next:** inspect the earlier real generation/sampling transition, with bounded raw/post-filter
+**Then-planned follow-up (completed above):** inspect the earlier real generation/sampling transition, with bounded raw/post-filter
 first-codebook and EOS evidence and request-local randomness identity against a matched control.
 Original device probabilities/keys are missing. Do not change sampling or repeat decoder studies
 on this conditional replay. RF-06 remains open; no new TTS or phone campaign was run.
@@ -340,7 +446,7 @@ criteria. This adopts a policy, not a completed repository-wide test audit or ch
 | --- | --- | --- |
 | Documentation/workflow cleanup | RF-01 / DWF-06 | Local workflow implemented; coherent deterministic checkpoint, no product acceptance inferred |
 | Privacy/IP/account/signing decisions | RF-02 | Use the existing consolidated decision packet; no repeated account polling |
-| Unresolved long-form/French/Chinese audio | RF-06 | Bounded, predeclared causal work; device comparison waits for the phone |
+| Unresolved long-form/French/Chinese audio | RF-06 | English causal research deferred; verify recovery and measure incidence in required acceptance; retain separate French/Chinese findings |
 | Static-analysis legacy tensor transfer warning | RF-09 / ASR-10 | Correct the isolated adapter contract, then native tests and Release Analyze before freeze |
 | Targeted device acceptance, then 201 takes | RF-11 | Start only after release-blocking product decisions and exact-source freeze |
 | Processed candidate and submission material | RF-12 | Separate candidate/upload authority, qualified decisions and actual candidate proof |

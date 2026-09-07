@@ -3575,7 +3575,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
             let sampleFirstCodebookStartedAt = ContinuousClock.now
             let sampleFirstCodebookSignpost =
                 Qwen3Signposts.signposter.beginInterval("Sample First Codebook")
-            let nextToken = sampleToken(
+            let nextToken = Self.sampleToken(
                 logits,
                 temperature: temperature,
                 topP: topP,
@@ -3584,7 +3584,8 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                 eosTokenId: allowsEOS ? eosTokenId : nil,
                 minP: minP,
                 scratch: samplerScratch,
-                allowsEOS: allowsEOS
+                allowsEOS: allowsEOS,
+                observe: samplerObserver
             )
             Qwen3Signposts.signposter.endInterval(
                 "Sample First Codebook",
@@ -3645,13 +3646,14 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                 // Subtalker (code-predictor) sampling is explicitly request
                 // owned. It defaults to the talker stage, but may vary without
                 // inheriting the talker's repetition penalty.
-                let nextCode = sampleToken(
+                let nextCode = Self.sampleToken(
                     codeLogits,
                     temperature: subtalkerSampling.temperature,
                     topP: subtalkerSampling.topP,
                     topK: subtalkerSampling.topK,
                     minP: subtalkerSampling.minP,
-                    scratch: codePredictorScratch
+                    scratch: codePredictorScratch,
+                    observe: samplerObserver
                 )
                 Qwen3Signposts.signposter.endInterval(
                     "Sample Predicted Codebook",
@@ -4645,7 +4647,12 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
 
     // MARK: - Token sampling
 
-    private final class Qwen3SamplerScratch {
+    /// Internal diagnostic seam. Product hosts cannot set this. The observer
+    /// must retain at most one frame and materialize only after its normal eval
+    /// boundary; observed/unobserved code parity is a separate required check.
+    var samplerObserver: ((MLXArray, MLXArray, MLXArray?, MLXArray) -> Void)?
+
+    final class Qwen3SamplerScratch {
         let vocabSize: Int
         let negInfScalar: MLXArray
         let arangeIndices: MLXArray
@@ -4760,7 +4767,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         }
     }
 
-    private func sampleToken(
+    static func sampleToken(
         _ logits: MLXArray,
         temperature: Float = 0.9,
         topP: Float = 1.0,
@@ -4771,7 +4778,8 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         eosTokenId: Int? = nil,
         minP: Float = 0.0,
         scratch: Qwen3SamplerScratch? = nil,
-        allowsEOS: Bool = true
+        allowsEOS: Bool = true,
+        observe: ((MLXArray, MLXArray, MLXArray?, MLXArray) -> Void)? = nil
     ) -> MLXArray {
         var logitsSlice = logits[0..., (-1)..., 0...].squeezed(axis: 1) // [batch, vocab_size]
 
@@ -4816,7 +4824,9 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
 
         // Greedy if temperature 0
         if temperature <= 0 {
-            return argMax(logitsSlice, axis: -1, keepDims: true)
+            let token = argMax(logitsSlice, axis: -1, keepDims: true)
+            observe?(logits, logitsSlice, nil, token)
+            return token
         }
 
         // Sampling-order fix (ported from upstream mlx-audio a730a68, #735):
@@ -4935,7 +4945,16 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         }
 
         // Logits are already temperature-scaled above — sample at T = 1.0.
-        let token = categorical(filteredLogits)
+        // Internal test observation resolves exactly the key categorical would
+        // consume, once. The ordinary path and lazy evaluation remain unchanged.
+        let token: MLXArray
+        if let observe {
+            let key = resolve(key: MLXArray?.none)
+            token = categorical(filteredLogits, key: key)
+            observe(logits, filteredLogits, key, token)
+        } else {
+            token = categorical(filteredLogits)
+        }
         return token.reshaped(1, 1)
     }
 

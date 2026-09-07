@@ -514,16 +514,24 @@ class VocelloiOSUITestCase: XCTestCase {
         // an `.any.firstMatch` lookup.
         let searchField = app.textFields["historySearchField"].firstMatch
         XCTAssertTrue(VocelloUIWait.exists(searchField, timeout: 30))
-        // Do not send keystrokes during the tab/keyboard transition. Dismiss a
-        // Activate this actual text field, then wait for the system keyboard
-        // before one (non-retried) replacement.
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: searchField, timeout: 20))
         XCTAssertTrue(VocelloUIWait.condition("History keyboard ready", timeout: 15) {
             searchField.isHittable && self.app.keyboards.firstMatch.exists
         })
-        if let current = searchField.value as? String, current != searchField.placeholderValue {
-            searchField.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: current.count))
+        // A tap can put the caret in the middle of the existing query. Counting
+        // backspaces from there leaves a suffix, especially before a long query.
+        // Use the production search-only Clear button (not History's delete menu)
+        // and prove empty state before one non-retried replacement.
+        let clear = app.buttons["historySearchField"].firstMatch
+        if clear.exists {
+            XCTAssertTrue(VocelloUIPrimaryAction.perform(on: clear, timeout: 20))
         }
+        // IOSSearchField exposes Clear exactly when its bound text is nonempty.
+        // An empty native field can report nil, an empty string or a placeholder;
+        // the actual production button's disappearance is the empty-state proof.
+        XCTAssertTrue(VocelloUIWait.condition("History search to clear", timeout: 15) {
+            searchField.isHittable && self.app.keyboards.firstMatch.exists && !clear.exists
+        })
         searchField.typeText(query)
         XCTAssertTrue(
             VocelloUIWait.condition("History search to match the requested token", timeout: 15) {

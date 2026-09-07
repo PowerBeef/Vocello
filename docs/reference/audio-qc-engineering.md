@@ -412,6 +412,58 @@ agree. The corrected run is separate, not a regenerated audio take. It exited 0 
 evidence files and 34 canonical model files were unchanged. Evidence/limitations are in the RF-06
 `talker-replay-20260907-corrected-prefix/` bundle; work status remains solely in the roadmap.
 
+### Bounded production sampler and predictor diagnosis
+
+The same opt-in test now requires `allocatorPolicyPath` and `allocatorPolicySHA256`. Export the
+actual Mac host policy with `DiagnosticMemoryPolicyExportTests`, setting its test-only
+`VOCELLO_TEST_MEMORY_POLICY_OUTPUT` to a new private output; bind that file's SHA in the private
+input. It invokes `NativeMemoryPolicyResolver`, not a duplicated tier table. Older retained inputs
+need this explicit addition before re-execution; their outputs remain historical evidence, never
+silently requalified. The diagnostic verifies/applies limits before load and restores the previous
+settings after releasing model ownership, including cancellation and observer-error paths. Keep the
+existing external supervisor's 5 GiB ceiling, pressure/probe/swap/recovery checks and serial process
+exit requirement; allocator configuration alone is not resource qualification.
+
+Optional `productionCapture` runs the actual CustomVoice producer with the exact receipt's seed,
+talker/subtalker settings, repetition penalty, streaming interval and unchanged 2,048-code cap.
+`frameLimit` remains at most 600; at most 16 `inspectFrames` retain full logit vectors. Run an
+unobserved control and observed arm as separately identified attempts, verify every emitted code
+and input/source identity before using the observations. The internal observer resolves the exact
+single key consumed by categorical, without an additional RNG advance. It retains at most one
+frame's tensor handles and reads them only after the producer's normal materialization boundary.
+Per-frame records are atomic and private; the explicit `diagnostic_frame_bound_not_eos` terminal
+is neither a cap failure nor successful finished audio. No observer is configured by product hosts.
+
+Optional `predictorFrames` (at most four) compares all 15 eager/compiled residual passes under
+identical teacher-forced codes and hidden inputs, with one evaluation boundary per selected frame.
+Do not independently sample arms and interpret later divergent audio as a numeric regression.
+Production-dtype comparisons do not inherit fp32 toy tolerances. Ordinary tests exercise sampler
+suppression/penalty/filter order/EOS, scratch parity, observer key/sequence identity, truly overlapping
+async scopes and all-pass cache reuse across projection and dtype variants without model weights.
+
+**September 7 decision checkpoint:** two experiments completed. Observer on/off codes match at all
+600 frames, but first differ from the original phone at frame 1/codebook 8. The new first-codebook
+sequence repeats at most four consecutive frames within this bound. All 45 shipping-weight
+bfloat16 predictor logit comparisons at frames 0–2 match exactly eager/compiled/captured production.
+This does not reproduce the original decision, validate cross-platform seed identity or clear RF-06.
+No generator correction follows. Original keys/logits are unavailable; an independent matched Talker
+or early device-decision comparison is the remaining discriminating boundary, not another decoder
+study. Stop here for a decision rather than expanding the campaign automatically.
+
+Raw schema-absent first-frame capture statistics initially included the whole 56-position prompt;
+predictor pass-zero raw arrays also include both input positions. Preserve those originals. The
+separate `analysis.json` binds the original arrays and extracts the final vocabulary row (first-frame
+selected raw probability .99999901, not the invalid flattened probability). Diagnostic schema 2
+now records `rawShape`, `rawPosition: last` and only that last raw row; a synthetic mismatched-position
+fixture rejects the former interpretation. Processed distributions and all code comparisons were
+unaffected. Never combine old flattened arrays with new last-position arrays without this explicit
+interpretation. Evidence lives in RF-06 `sampler-transition-20260907/`, untracked.
+
+All three processes exited below 5 GiB (~2.94 GiB sampled peak). Baseline remains resource-unqualified
+for probe failure/swap growth; observed and predictor envelopes qualify. Preserved originals and
+model files/source are verified separately. Mac 256 MiB cache versus original iPhone 128 MiB,
+different platform/build setup and a deliberate 600-frame stop preclude product/release acceptance.
+
 ### Earlier analyzer corrections
 
 | Finding | Evidence before repair | Correction / regression boundary |

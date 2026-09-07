@@ -464,7 +464,9 @@ class IOSControlAuditContractTests(unittest.TestCase):
         source = audit.UI_TEST_PATH.read_text()
         shared = (audit.UI_TEST_PATH.parent / "VocelloiOSUITestCase.swift").read_text()
         helper = shared.split("func verifyHistoryTranscript", 1)[1].split("func dismissHistorySearchKeyboardIfNeeded", 1)[0]
-        self.assertIn('(transcript.value as? String) == expectedScript', helper)
+        self.assertIn('let observed = transcript.value as? String', helper)
+        self.assertIn('let matches = observed == expectedScript', helper)
+        self.assertLess(helper.index('add(attachment)'), helper.index('element("iosPlayer_close")'))
         self.assertIn("guard matches else", helper)
         self.assertIn('element("iosPlayer_transcript")', helper)
         self.assertIn('element("iosPlayer_close")', helper)

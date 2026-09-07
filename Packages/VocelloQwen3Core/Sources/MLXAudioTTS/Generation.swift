@@ -208,7 +208,7 @@ public struct AudioGenerationCompletion: Sendable {
 
 /// Materialized, task-safe events emitted by the suspending Qwen3 producer.
 ///
-/// Unlike `AudioGeneration`, this boundary never contains `MLXArray`. The
+/// Like the compatibility `AudioGeneration` stream, this boundary contains no MLX arrays. The
 /// Qwen token/decode task evaluates and copies each waveform to `[Float]`
 /// before awaiting the sink, keeping lazy MLX graphs inside their owning task.
 public enum Qwen3MaterializedGenerationEvent: Sendable {
@@ -552,7 +552,7 @@ public extension SpeechGenerationModel {
         )
         return proxyAudioStream(stream, extract: {
             guard case .audio(let samples) = $0 else { return nil }
-            return samples.asArray(Float.self)
+            return samples
         })
     }
 

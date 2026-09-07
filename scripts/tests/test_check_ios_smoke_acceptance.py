@@ -66,16 +66,67 @@ def write_jsonl(path: Path, rows: list[dict]) -> None:
 
 
 class IOSSmokeAcceptanceTests(unittest.TestCase):
+    def test_read_only_history_observation_is_bound_and_not_audio_acceptance(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            item = {"suggestedHumanReadableName": "history-transcript-observation_0_AAAA.json",
+                    "exportedFileName": "value.json"}
+            row = {"schemaVersion": 1, "runID": RUN_ID, "rowID": "generation-7",
+                   "observedTranscript": "A retained fixture."}
+            def check(items, observed):
+                (root / "manifest.json").write_text(json.dumps([{"attachments": items}]))
+                (root / "value.json").write_text(json.dumps(observed))
+                return subprocess.run([sys.executable, str(CHECKER), str(root),
+                    "--run-id", RUN_ID, "--history-row-id", "generation-7"],
+                    capture_output=True, text=True)
+            result = check([item], row)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            report = json.loads(result.stdout)
+            self.assertEqual(report["status"], "observed")
+            self.assertNotIn(row["observedTranscript"], result.stdout)
+            for changes in ({"runID": "another-run"}, {"rowID": "generation-8"},
+                            {"observedTranscript": None}, {"observedTranscript": ""}):
+                self.assertNotEqual(check([item], row | changes).returncode, 0)
+            self.assertNotEqual(check([], row).returncode, 0)
+            self.assertNotEqual(check([item, item], row).returncode, 0)
+            self.assertNotEqual(check([item | {"exportedFileName": "../value.json"}], row).returncode, 0)
+            for malformed in ([], None, "private fixture", row | {"schemaVersion": True},
+                              row | {"observedTranscript": "\ud800"}):
+                result = check([item], malformed)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertNotIn("Traceback", result.stderr)
+                self.assertNotIn("private fixture", result.stderr)
+            self.assertNotEqual(check([item], row | {"observedTranscript": "x" * (256 * 1024)}).returncode, 0)
+
+    def test_history_observation_cli_rejects_unsafe_or_ambiguous_routes(self) -> None:
+        for args in (
+            ["macos", "smoke", "--scenario", "history-transcript", "--history-row-id", "generation-7"],
+            ["ios", "smoke", "--scenario", "history-transcript"],
+            ["ios", "smoke", "--history-row-id", "generation-7"],
+            ["ios", "smoke", "--scenario", "history-transcript", "--history-row-id", "../private"],
+        ):
+            result = subprocess.run(["bash", str(ROOT / "scripts/ui_test.sh"), *args],
+                                    capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertNotIn("xcodebuild completed", result.stderr)
+
     def test_long_form_fixture_uses_natural_text_and_persisted_ownership(self) -> None:
         source = (ROOT / "Tests/VocelloiOSUITests/VocelloiOSSmokeUITests.swift").read_text()
         journey = source.split("func testZLongFormProjectJourney()", 1)[1]
         self.assertNotIn("randomElement", journey)
         self.assertNotIn("nonce", journey)
         self.assertIn('let searchTitle = "An evening by the harbor."', journey)
+        self.assertLess(journey.index("script = script.trimmingCharacters(in: .whitespacesAndNewlines)"),
+                        journey.index("beforeTitleIDs = historyRowCensus"))
         self.assertLess(journey.index("beforeTitleIDs = historyRowCensus"), journey.index("generateAndWaitForCompletedPlayer"))
         self.assertIn("Set(afterJoinedIDs).isSubset(of: Set(regeneratedJoinedIDs))", journey)
         self.assertIn("verifyHistoryTranscript(rowID: replacementID, expectedScript: script)", journey)
+        self.assertIn('replaceHistorySearch(with: "")', journey)
+        self.assertNotIn('VocelloUITextEntry.replace(in: searchField, with: ""', journey)
         support = (ROOT / "Tests/VocelloiOSUITests/VocelloiOSUITestCase.swift").read_text()
+        search = support.split("func replaceHistorySearch(with query: String)", 1)[1].split("func revealSavedVoiceControls", 1)[0]
+        self.assertLess(search.index('"History search to clear"'), search.index("guard !query.isEmpty else { return }"))
+        self.assertLess(search.index("guard !query.isEmpty else { return }"), search.index("searchField.typeText(query)"))
         self.assertIn("func historyRowCensus(expectedScript:", support)
         self.assertIn("History census exceeded its bound", support)
 

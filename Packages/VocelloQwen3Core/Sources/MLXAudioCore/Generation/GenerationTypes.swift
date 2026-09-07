@@ -6,7 +6,7 @@
 //
 
 import Foundation
-@preconcurrency import MLX
+import MLX
 
 // MARK: - Generation Info
 
@@ -268,7 +268,13 @@ public enum AudioGeneration: Sendable {
     /// Generation statistics
     case info(AudioGenerationInfo)
     /// Final generated audio
-    case audio(MLXArray)
+    case audio([Float])
+
+    /// Evaluate and copy on the producer before publishing across a task boundary.
+    /// The event retains only PCM values, never the tensor or its lazy graph.
+    public static func audio(materializing waveform: MLXArray) -> Self {
+        .audio(waveform.asArray(Float.self))
+    }
     /// Per-chunk sub-stage timing breakdown. Always emitted
     /// immediately before the corresponding `.audio(...)` chunk so
     /// consumers can stash it and bind to the next audio event.

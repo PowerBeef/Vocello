@@ -59,6 +59,29 @@ the existing headless diagnostics and genuine XCUITest lanes; no Simulator subst
 
 ## Device preparation
 
+### Inspect a retained long-form transcript without regenerating
+
+For the deterministic harbor smoke fixture, first resolve the exact test-owned History ID from
+the retained run, then use the existing smoke runner's focused observation scenario:
+
+```sh
+scripts/ui_test.sh ios smoke --scenario history-transcript --history-row-id generation-N --retain-result
+```
+
+This opens that row through genuine History controls, attaches its complete transcript before
+closing the player, clears the test search, returns to Studio and terminates the test session.
+It neither generates audio nor deletes/pins History. The private attachment remains untracked;
+`history-transcript-summary.json` contains only identities, digests and length. The collector rejects
+missing, duplicate, malformed or cross-run attachments. Its result is **observed**, not full smoke,
+audio-quality, restoration or candidate acceptance. The separate required-step workflow preserves
+source identity, XCUITest status and crash collection without requiring a fabricated pressure event.
+It is unavailable in preinstalled-candidate mode. Normal smoke remains unchanged.
+
+The long-form acceptance fixture removes its final separator space before entry so exact joined
+History comparisons use canonical input. Do not normalize the observed player value or ignore
+missing words/punctuation. On mismatch, the shared verifier retains the actual value before dismissal;
+keep the original failure and compare it with planner behavior before regenerating any output.
+
 ### Already installed distribution candidate
 
 After separately authorized signing/upload and installation, use:

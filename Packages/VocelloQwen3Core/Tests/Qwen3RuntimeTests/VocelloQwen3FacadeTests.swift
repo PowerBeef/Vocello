@@ -7,6 +7,31 @@ import MLXAudioTTS
 import XCTest
 
 final class VocelloQwen3FacadeTests: XCTestCase {
+    func testCompatibilityAudioMaterializesBeforeTaskTransferAndSampleProxy() async throws {
+        // Exercise the same constructor as all four compatibility producers with
+        // a lazy waveform. Only the resulting PCM event crosses into the proxy task.
+        let event = AudioGeneration.audio(materializing: MLXArray([Float(1), 2, 3]) * 0.5)
+        let transferred = await Task.detached { event }.value
+        guard case .audio(let samples) = transferred else {
+            return XCTFail("Expected materialized PCM")
+        }
+        XCTAssertEqual(samples, [0.5, 1, 1.5])
+        let stream = AsyncThrowingStream<AudioGeneration, Error> { continuation in
+            continuation.yield(.token(7))
+            continuation.yield(transferred)
+            continuation.yield(.audio([]))
+            continuation.finish()
+        }
+        let model = FacadeCompatibilityModel(streamOverride: stream)
+        var chunks: [[Float]] = []
+        for try await chunk in model.generateSamplesStream(
+            text: "Fixture.", voice: nil, refAudio: nil, refText: nil, language: "en"
+        ) {
+            chunks.append(chunk)
+        }
+        XCTAssertEqual(chunks, [[0.5, 1, 1.5], []])
+    }
+
     func testActorRequestCarriesExactCurrentChunkSchedulesAndLegacyDecodeDefaults() throws {
         let cases: [(VocelloQwen3SynthesisInput, Int, Int)] = [
             (.customVoice(speakerID: "fixture", deliveryInstruction: nil), 7, 7),
@@ -376,8 +401,8 @@ final class VocelloQwen3FacadeTests: XCTestCase {
     func testEngineDirectProducerBackpressuresUntilMandatoryConsumerDrains() async throws {
         let generationID = UUID()
         let stream = AsyncThrowingStream<AudioGeneration, Error> { continuation in
-            continuation.yield(.audio(MLXArray([Float(0.1), Float(0.2)])))
-            continuation.yield(.audio(MLXArray([Float(0.3), Float(0.4)])))
+            continuation.yield(.audio([0.1, 0.2]))
+            continuation.yield(.audio([0.3, 0.4]))
             continuation.finish()
         }
         let engine = VocelloQwen3Engine(
@@ -1725,7 +1750,7 @@ final class VocelloQwen3FacadeTests: XCTestCase {
 
     func testProductOutputAdapterAbortsAndReleasesLeaseAfterSinkFailure() async throws {
         let stream = AsyncThrowingStream<AudioGeneration, Error> { continuation in
-            continuation.yield(.audio(MLXArray([Float(0.1), Float(0.2)])))
+            continuation.yield(.audio([0.1, 0.2]))
             continuation.finish()
         }
         let engine = VocelloQwen3Engine(
@@ -2450,7 +2475,7 @@ private final class FacadeCompatibilityModel: SpeechGenerationModel, Qwen3Optimi
                         audioDecoderMS: 3
                     )))
                 }
-                continuation.yield(.audio(MLXArray([Float(0.1)])))
+                continuation.yield(.audio([0.1]))
             }
             continuation.finish()
         }
@@ -2472,7 +2497,7 @@ private final class FacadeCompatibilityModel: SpeechGenerationModel, Qwen3Optimi
             case .info(let info):
                 try await sink(.info(info))
             case .audio(let audio):
-                try await sink(.audio(audio.asArray(Float.self)))
+                try await sink(.audio(audio))
             case .chunkTimings(let timings):
                 try await sink(.chunkTimings(timings))
             }

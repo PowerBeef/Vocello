@@ -56,6 +56,12 @@ characterization surface only. `VocelloQwen3LegacyCompatibility` was retired; lo
 prewarm and schema-3 clone-prompt persistence/adoption now use actor-owned public surfaces.
 The empty retired-SPI inventories in `COMPATIBILITY.json` are enforced fail-closed.
 
+The implementation-only `AudioGeneration.audio` compatibility event also carries `[Float]`,
+not `MLXArray`. Its four Qwen producers call `audio(materializing:)` while still owning the
+waveform; sample-stream consumers do not evaluate tensors in their proxy tasks. There are no
+product consumers of the former tensor payload and no persisted event format to migrate.
+The actor-owned shipping facade and sampling/chunk schedules are unchanged.
+
 The actor closes its inert-reservation and critical-relief lifecycle explicitly.
 Reserved, generating, and aborting states prevent open-after-abort and make duplicate aborts join
 one finalization. Typed cache-trim or full-unload relief carries the generation lease through the

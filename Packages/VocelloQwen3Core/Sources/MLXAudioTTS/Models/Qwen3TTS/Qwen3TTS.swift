@@ -2385,7 +2385,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                         },
                         onAudioChunk: { chunk in
                             guard !Task.isCancelled else { return }
-                            continuation.yield(.audio(chunk))
+                            continuation.yield(.audio(materializing: chunk))
                         },
                         onAudioChunkTimings: enableChunkTimings ? { timings in
                             guard !Task.isCancelled else { return }
@@ -2656,7 +2656,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                         },
                         onAudioChunk: {
                             guard !Task.isCancelled else { return }
-                            continuation.yield(.audio($0))
+                            continuation.yield(.audio(materializing: $0))
                         },
                         onAudioChunkTimings: enableChunkTimings ? {
                             guard !Task.isCancelled else { return }
@@ -2718,7 +2718,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                         },
                         onAudioChunk: {
                             guard !Task.isCancelled else { return }
-                            continuation.yield(.audio($0))
+                            continuation.yield(.audio(materializing: $0))
                         },
                         onAudioChunkTimings: enableChunkTimings ? {
                             guard !Task.isCancelled else { return }
@@ -2782,7 +2782,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                         },
                         onAudioChunk: {
                             guard !Task.isCancelled else { return }
-                            continuation.yield(.audio($0))
+                            continuation.yield(.audio(materializing: $0))
                         },
                         onAudioChunkTimings: enableChunkTimings ? {
                             guard !Task.isCancelled else { return }

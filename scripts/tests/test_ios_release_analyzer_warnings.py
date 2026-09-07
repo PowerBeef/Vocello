@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import importlib.util
+import json
 import unittest
 from pathlib import Path
 
@@ -21,6 +22,21 @@ class IOSReleaseAnalyzerWarningPolicyTests(unittest.TestCase):
 
     def test_checked_in_policy_is_valid(self) -> None:
         self.assertEqual(module.validate_policy(self.policy), [])
+
+    def test_shipped_icon_sets_have_no_unassigned_image_files(self) -> None:
+        for catalog in (ROOT / "Sources/Assets.xcassets").glob("*.appiconset"):
+            with self.subTest(catalog=catalog.name):
+                contents = json.loads((catalog / "Contents.json").read_text())
+                assigned = {image["filename"] for image in contents["images"] if "filename" in image}
+                present = {path.name for path in catalog.iterdir() if path.suffix.lower() == ".png"}
+                self.assertEqual(present, assigned)
+
+    def test_unassigned_icon_warning_is_not_accepted(self) -> None:
+        result = module.analyze_log(
+            '/opt/work/QwenVoice/Sources/Assets.xcassets:./AppIcon.appiconset/(null)[2d][AppIcon-1024.png]: '
+            'warning: The app icon set "AppIcon" has an unassigned child.\n', self.policy
+        )
+        self.assertEqual(result["status"], "FAIL")
 
     def test_registered_warning_passes_without_leaking_absolute_path(self) -> None:
         log = (

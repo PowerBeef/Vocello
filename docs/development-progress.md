@@ -21,15 +21,66 @@ audio/code trace, exact seed/receipts, independent-decoder reproduction and inco
 cause remain retained below. No cap, seed, model, prompt, retry or QC policy changes follow.
 The remaining French/Chinese findings are separate; none is cleared by this scheduling decision.
 
-Next: resolve the retained joined-History transcript comparison and finish segment-regeneration
-acceptance without repeating the original failed audio. Visible cancellation/pressure recovery passed;
-exact QC-error recovery and complete accepted-output preservation remain partially verified.
+The retained joined-History mismatch is resolved as fixture-only trailing whitespace, and the
+corrected physical long-form/regeneration journey passed its UI/History assertions. Two generated
+segments carry QC/cadence warnings; this is not clean audio acceptance. The latest recovery case
+was interrupted by a notification before the forced-memory generation, so that run remains FAIL.
+Exact QC-error recovery and complete accepted-output preservation remain partially verified.
 Use the required 201-take campaign for incidence/workflow impact, not another research matrix.
-RF-09's legacy tensor-transfer Analyze warning and exact-source candidate freeze still precede
-the full campaign. Development recovery tests do not substitute for that candidate gate.
+RF-09's unexpected tensor-transfer Analyze warning is corrected; exact-source candidate freeze
+still precedes the full campaign. Development recovery tests do not substitute for that candidate gate.
 Finish independent submission-material preparation through the existing RF-02 packet. Unresolved
 required failures still block clean promotion; accepting a shipping risk requires a separate
 documented decision, not relabeling the failure or declaring this issue resolved.
+
+### September 7 transcript and Analyze corrections
+
+- Read-only XCUITest `214509-5facda49` opened the exact retained test-owned History row without
+  synthesis. Its 2,130-character value matches the earlier 2,131-character fixture **exactly after
+  removing its final ASCII space** (SHA-256
+  `305f0baad162d0c60a148237419c772638f1c4854fe77b94ebc22d8e8068f000`). No words were lost.
+  The new focused observation route uses the existing smoke runner and leaves raw text untracked;
+  its verdict is observed, not full smoke or audio acceptance. The original failed run is retained.
+- The fixture now trims its final separator before entry; observed History values still require
+  exact equality. The existing Clear-button helper also handles empty searches without relying on
+  caret placement or placeholder values. Mismatches retain the actual value before player dismissal.
+  Twenty planner tests pass, including joined-word/punctuation preservation versus trailing whitespace.
+- Compatibility `AudioGeneration.audio` now owns materialized `[Float]`; all four Qwen producers
+  materialize before yielding, and the sample proxy no longer evaluates transferred MLX tensors.
+  The native production-constructor/proxy/task-transfer regression passes. Shipping actor-owned
+  synthesis, sampling, model pins and QC are unchanged; no Sendable suppression was added.
+- Release Analyze recompiled the changed boundary successfully: its enum warning disappeared.
+  It exposed an unassigned PNG identical to the assigned 1024px icon. The redundant catalog copy
+  was moved to untracked evidence; the assigned icon is unchanged and Git retains its history.
+  Asset-inventory/negative-warning tests pass. The subsequent incremental Analyze and warning
+  gate pass with zero emitted warnings; this is not a claim that all 19 reviewed compatibility/tool
+  warnings disappeared from a fresh full rebuild. Exact signed-artifact verification stays pending.
+
+Physical smoke `220711-845f7f36` retained a matching pre/post source fingerprint
+`b2dfcb64b2fad0c39d80533fb57918cb304ee9b85ca376e1f4c92f2dcb5246ad`:
+
+| Case | Result and boundary |
+| --- | --- |
+| Recovery | FAIL, 181.231 s. Visible cancellation completed. SpringBoard recorded a notification banner interrupting the editor tap; typing then failed without keyboard focus. Forced-memory generation and post-pressure reuse were not reached. This is an interruption-affected test, not bootstrap or audio-engine failure. |
+| Four layouts | PASS, 294.167 s: default, AX-L, AX-XXXL and pseudo-AX-XXXL. |
+| Long-form/regeneration | UI PASS, 595.369 s: joined completion, exact transcript, grouped segments, one explicit regeneration, exact replacement transcript and retained prior joined History IDs. This does not prove every old audio byte or failure-path restoration. |
+
+Collected engine evidence represents one cancelled request and four EOS outputs. Initial segments
+are **53.76 / 55.84 / 27.84 s**; the explicit replacement is **60.96 s**. First/third segments have
+persisted-WAV QC PASS. The second and replacement retain **1,628 / 1,878 ms dropout warnings**
+and `unusual` cadence (`single_suspicious_pause`); both were published under the unchanged warning
+policy. No hard QC rejection occurred, but these warnings block a clean audio-promotion claim.
+Record them under RF-06; no retry, seed substitution, new causal conclusion or broad research follows.
+
+The overall runner and terminal ledger remain **FAIL** (`xcuitest`, `smoke-diagnostics` failed;
+no missing required steps). Diagnostics correctly reject the absent forced-pressure event instead
+of fabricating it. Crash hashes match; a post-collection process query found no Vocello/test-runner
+process. Raw results/diagnostics are pinned and untracked. No screen settings changed. No 201-take
+cell, candidate tag/archive/upload or submission ran. AGENTS.md's durable procedures remain accurate.
+
+The exact-tree `scripts/dev.sh checkpoint` receipt owns the final deterministic verdict. Next:
+separately authorized uninterrupted recovery acceptance and RF-09 candidate freeze. Keep earlier recovery evidence historical and current
+warnings explicit; do not turn the aggregate failed run into PASS.
 
 ### September 7 physical recovery checkpoint
 
@@ -55,11 +106,9 @@ The three long-form segments reached EOS, with durations **52.24 / 50.72 / 25.04
 persisted-WAV QC PASS and cadence `withinFastGate`. The joined player appeared and before/after
 History censuses preserved prior matching IDs. This is not full-WAV ASR/prosody qualification or
 a fixed-seed confirmation of the original RF-06 failure. The original evidence remains unchanged.
-The later full-player comparison did not retain its observed value. Source inspection identifies
-a plausible fixture mismatch: a trailing space in raw input versus planner-normalized joined
-History. Do not declare that explanation proven, weaken equality, or infer lost user text.
-Next, bind the actual retained row and expected normalized joined transcript, then finish the
-regeneration/previous-output checks. Do not regenerate merely to recover a missing observation.
+At that checkpoint the full-player comparison did not retain its observed value, and trailing
+fixture whitespace was only a hypothesis. The later read-only observation above proves that
+explanation without regenerating the retained output; the original run still remains failed.
 
 The final runner remains **FAIL**, with only `xcuitest` failed and no missing required step.
 Recovery diagnostics pass; their intentionally forced critical-memory/full-unload event is not

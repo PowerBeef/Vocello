@@ -378,6 +378,17 @@
         "result-retention"
       ]
     },
+    "ui-ios-history-transcript": {
+      "producer": "scripts/ui_test.sh",
+      "requiredSteps": [
+        "source-provenance",
+        "crash-baseline",
+        "xcuitest",
+        "crash-delta",
+        "smoke-diagnostics"
+      ],
+      "optionalSteps": ["result-retention"]
+    },
     "ui-ios-candidate-smoke": {
       "producer": "scripts/ui_test.sh",
       "requiredSteps": [

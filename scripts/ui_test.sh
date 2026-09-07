@@ -40,6 +40,7 @@ Usage:
   scripts/ui_test.sh macos perf
   scripts/ui_test.sh ios localization
   scripts/ui_test.sh ios smoke
+  scripts/ui_test.sh ios smoke --scenario history-transcript --history-row-id generation-N [--retain-result]
   scripts/ui_test.sh ios smoke --preinstalled-candidate VERIFIED_RELEASE_DIRECTORY [--retain-result]
   scripts/ui_test.sh ios benchmark [--modes custom,design,clone] [--lengths short,medium,long] [--warm 3] [--label RUN_ID]
   scripts/ui_test.sh ios perf [--label RUN_ID]
@@ -70,6 +71,8 @@ visible Files-import flow; stage the reference WAV and .txt sidecar in the app's
 the lane begins in Studio Clone, imports, auto-transcribes, saves, generates, previews, and deletes
 that throwaway voice through visible production UI.
 No lane retries automatically. A failed run keeps its log, xcresult, screenshots, and diagnostics.
+`smoke --scenario history-transcript` only observes one retained harbor-fixture History row.
+It generates no audio and exports its raw transcript untracked; success is an observation, not full smoke acceptance.
 `--preinstalled-candidate` is a separate, black-box navigation proof, not instrumented smoke.
 It requires the exact clean release source and an already installed, matching non-development app.
 Only the standalone test runner is built/installed. Distribution acceptance remains separately authorized.
@@ -111,6 +114,7 @@ engine_profile=""
 model_scenario="acceptance"
 model_iterations=3
 scenario_argument=""
+history_row_id=""
 control_scenario="all"
 control_resume=""
 control_resume_run_ids=""
@@ -126,6 +130,7 @@ while [[ $# -gt 0 ]]; do
     --preinstalled-candidate) candidate_evidence="${2:?--preinstalled-candidate requires a directory}"; shift 2 ;;
     --scenario) scenario_argument="${2:?--scenario requires a value}"; shift 2 ;;
     --scenario=*) scenario_argument="${1#*=}"; shift ;;
+    --history-row-id) history_row_id="${2:?--history-row-id requires a value}"; shift 2 ;;
     --resume) control_resume="${2:?--resume requires a value}"; shift 2 ;;
     --resume=*) control_resume="${1#*=}"; shift ;;
     --iterations) model_iterations="${2:?--iterations requires a value}"; shift 2 ;;
@@ -170,8 +175,16 @@ elif [[ "$lane" == "screen-protection" ]]; then
   scenario_argument="${scenario_argument:-inspect}"
   [[ "$scenario_argument" == "inspect" || "$scenario_argument" == "enable" ]] \
     || die "screen-protection --scenario must be inspect or enable"
+elif [[ "$platform" == "ios" && "$lane" == "smoke" && -n "$scenario_argument" ]]; then
+  [[ "$scenario_argument" == "history-transcript" && -z "$candidate_evidence" ]] \
+    || die "development iOS smoke --scenario accepts only history-transcript"
+  [[ "$history_row_id" =~ ^generation-[0-9]+$ ]] \
+    || die "history-transcript requires an exact --history-row-id generation-N"
 elif [[ -n "$scenario_argument" ]]; then
-  die "--scenario is accepted only by model-download, control-audit, and screen-protection"
+  die "--scenario requires model-download, control-audit, screen-protection, or development ios smoke"
+fi
+if [[ -n "$history_row_id" && "$scenario_argument" != "history-transcript" ]]; then
+  die "--history-row-id requires ios smoke --scenario history-transcript"
 fi
 if [[ -n "$control_resume" && "$lane" != "control-audit" ]]; then
   die "--resume is accepted only by control-audit"
@@ -297,6 +310,7 @@ fi
 timestamp="$(date -u +%Y%m%d-%H%M%S)"
 nonce="$(uuidgen | tr '[:upper:]' '[:lower:]' | cut -c1-8)"
 run_id="${platform}-xcui-${lane}-${timestamp}-${nonce}"
+[[ "$scenario_argument" != "history-transcript" ]] || run_id="ios-xcui-history-transcript-${timestamp}-${nonce}"
 [[ -z "$candidate_evidence" ]] || run_id="ios-xcui-candidate-smoke-${timestamp}-${nonce}"
 audit_source_id=""
 if [[ "$lane" == "control-audit" ]]; then
@@ -309,6 +323,7 @@ result="$out/result.xcresult"
 mkdir -p "$out"
 step_ledger="$out/required-steps.json"
 step_workflow="ui-$platform-$lane"
+[[ "$scenario_argument" != "history-transcript" ]] || step_workflow="ui-ios-history-transcript"
 [[ -z "$candidate_evidence" ]] || step_workflow="ui-ios-candidate-smoke"
 if [[ "$lane" == "control-audit" && ( "$control_scenario" == "generation" || "$control_scenario" == "all" ) ]]; then
   step_workflow="ui-ios-control-audit-generation"
@@ -323,7 +338,7 @@ write_run_metadata() {
   python3 - "$out/run.json" "$platform" "$lane" "$run_id" "$modes" "$lengths" \
     "$warm" "${label:-$run_id}" "$started_at" "$finished_at" "$status" "$exit_code" \
     "$audit_source_id" "$control_scenario" "$control_resume" "$control_resume_run_ids" \
-    "$control_resume_take_start" "$control_take_limit" "$candidate_evidence" <<'PY'
+    "$control_resume_take_start" "$control_take_limit" "$candidate_evidence" "$scenario_argument" <<'PY'
 import json, os, pathlib, sys, tempfile
 
 path = pathlib.Path(sys.argv[1])
@@ -355,6 +370,12 @@ if sys.argv[19]:
     identity = path.parent / "candidate-identity.json"
     if identity.is_file():
         payload["candidateIdentity"] = json.loads(identity.read_text())
+if sys.argv[20] == "history-transcript":
+    payload["scenario"] = "history-transcript"
+    payload["evidenceClass"] = "read-only-history-observation"
+    payload["modes"] = []
+    payload["lengths"] = []
+    payload["warm"] = 0
 path.parent.mkdir(parents=True, exist_ok=True)
 descriptor, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
 try:
@@ -1099,6 +1120,12 @@ PY
 }
 
 validate_ios_smoke() {
+  if [[ "$scenario_argument" == "history-transcript" ]]; then
+    python3 "$ROOT_DIR/scripts/check_ios_smoke_acceptance.py" "$out/attachments" \
+      --run-id "$run_id" --history-row-id "$history_row_id" \
+      | tee "$out/history-transcript-summary.json"
+    return $?
+  fi
   local diagnostics="$out/diagnostics"
   pull_ios_run_diagnostics "$device" "$run_id" "$diagnostics" \
     "$out/smoke-diagnostics-pull.log" || return 1
@@ -1368,6 +1395,10 @@ else
     only_test="VocelloiOSUITests/VocelloiOSSmokeUITests/testSettingsAccessibilityLayoutWalk"
   elif [[ "$lane" == "smoke" ]]; then
     only_test="VocelloiOSUITests/VocelloiOSSmokeUITests"
+    if [[ "$scenario_argument" == "history-transcript" ]]; then
+      only_test="VocelloiOSUITests/VocelloiOSHistoryObservationUITests/testRetainedHistoryTranscript"
+      export TEST_RUNNER_QVOICE_IOS_HISTORY_OBSERVATION_ROW_ID="$history_row_id"
+    fi
     export TEST_RUNNER_QVOICE_IOS_SMOKE_RUN_ID="$run_id"
   elif [[ "$lane" == "benchmark" ]]; then
     only_test="VocelloiOSUITests/VocelloiOSBenchmarkUITests/testOrderedConfigurableMatrix"

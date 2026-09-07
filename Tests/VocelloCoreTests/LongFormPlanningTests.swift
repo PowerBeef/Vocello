@@ -4,6 +4,18 @@ import QwenVoiceBackendCore
 import XCTest
 
 final class LongFormPlanningTests: XCTestCase {
+    func testJoinedSpokenSegmentsPreserveWordsButNotTrailingFixtureWhitespace() throws {
+        let expected = "The evening ferry crossed the harbor. Windows brightened along the bay."
+        let original = expected + " "
+        let plan = try makePlan(original, tokenLimit: 15)
+        let joined = plan.segments.map(\.spokenTextForGeneration).joined(separator: " ")
+        XCTAssertGreaterThan(plan.segments.count, 1)
+        XCTAssertEqual(joined, expected)
+        XCTAssertNotEqual(joined, original)
+        XCTAssertNotEqual(joined, expected.replacingOccurrences(of: "ferry", with: "boat"))
+        XCTAssertNotEqual(joined, String(expected.dropLast()))
+    }
+
     func testBoundaryPrecedenceUsesParagraphBeforeLowerPriorityBoundaries() throws {
         let plan = try makePlan(
             "First paragraph.\n\nSecond sentence; clause, tail words.",

@@ -532,6 +532,9 @@ class VocelloiOSUITestCase: XCTestCase {
         XCTAssertTrue(VocelloUIWait.condition("History search to clear", timeout: 15) {
             searchField.isHittable && self.app.keyboards.firstMatch.exists && !clear.exists
         })
+        // Empty queries are proven by the conditional Clear control, not a
+        // native accessibility value that may instead contain a placeholder.
+        guard !query.isEmpty else { return }
         searchField.typeText(query)
         XCTAssertTrue(
             VocelloUIWait.condition("History search to match the requested token", timeout: 15) {
@@ -786,7 +789,16 @@ class VocelloiOSUITestCase: XCTestCase {
               VocelloUIPrimaryAction.perform(on: rowAction, timeout: 20) else { return false }
         let transcript = element("iosPlayer_transcript")
         guard VocelloUIWait.exists(transcript, timeout: 20) else { return false }
-        let matches = (transcript.value as? String) == expectedScript
+        let observed = transcript.value as? String
+        let matches = observed == expectedScript
+        if !matches {
+            // Capture before dismissing: failure teardown cannot recover a value
+            // that has already left the accessibility tree. Attachments stay private.
+            let attachment = XCTAttachment(string: observed ?? "<missing String value>")
+            attachment.name = "history-transcript-mismatch-\(rowID).txt"
+            attachment.lifetime = .keepAlways
+            add(attachment)
+        }
         guard VocelloUIPrimaryAction.perform(on: element("iosPlayer_close"), timeout: 20),
               VocelloUIWait.disappears(transcript, timeout: 20) else { return false }
         guard matches else {

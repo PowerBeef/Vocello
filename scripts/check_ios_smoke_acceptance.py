@@ -264,15 +264,66 @@ def validate(root: Path, run_id: str) -> dict[str, Any]:
     }
 
 
+def validate_history_observation(root: Path, run_id: str, row_id: str) -> dict[str, Any]:
+    """Collect one private XCUI value; do not turn observation into audio acceptance."""
+    if not SAFE_RUN_ID.fullmatch(run_id) or not re.fullmatch(r"generation-[0-9]+", row_id):
+        raise IOSSmokeAcceptanceError("invalid observation identity")
+    try:
+        manifest_path = root / "manifest.json"
+        if root.is_symlink() or manifest_path.is_symlink() or manifest_path.stat().st_size > 8 * 1024 * 1024:
+            raise IOSSmokeAcceptanceError("invalid attachment manifest file")
+        manifest = json.loads(manifest_path.read_text())
+        if not isinstance(manifest, list) or any(
+            not isinstance(test, dict) or not isinstance(test.get("attachments", []), list)
+            or any(not isinstance(item, dict) for item in test.get("attachments", []))
+            for test in manifest
+        ):
+            raise IOSSmokeAcceptanceError("invalid attachment manifest")
+        pattern = re.compile(r"history-transcript-observation(?:_[0-9]+_[0-9A-Fa-f-]+)?(?:\.json)?")
+        matches = [
+            attachment for test in manifest for attachment in test.get("attachments", [])
+            if pattern.fullmatch(str(attachment.get("suggestedHumanReadableName", "")))
+        ]
+        if len(matches) != 1:
+            raise IOSSmokeAcceptanceError("expected exactly one History observation attachment")
+        name = matches[0]["exportedFileName"]
+        if Path(name).name != name:
+            raise IOSSmokeAcceptanceError("invalid attachment name")
+        path = root / name
+        if path.is_symlink() or not path.is_file() or path.stat().st_size > 256 * 1024:
+            raise IOSSmokeAcceptanceError("invalid observation attachment")
+        data = path.read_bytes()
+        row = json.loads(data)
+        if not isinstance(row, dict) or type(row.get("schemaVersion")) is not int or row.get("schemaVersion") != 1 or row.get("runID") != run_id or row.get("rowID") != row_id:
+            raise IOSSmokeAcceptanceError("History observation identity mismatch")
+        transcript = row.get("observedTranscript")
+        if not isinstance(transcript, str) or not transcript:
+            raise IOSSmokeAcceptanceError("missing History transcript value")
+        transcript_bytes = transcript.encode("utf-8")
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        raise IOSSmokeAcceptanceError("History observation could not be validated") from error
+    return {
+        "schemaVersion": 1, "status": "observed", "runID": run_id, "rowID": row_id,
+        "evidenceClass": "read-only-history-observation",
+        "transcriptSHA256": hashlib.sha256(transcript_bytes).hexdigest(),
+        "transcriptCharacterCount": len(transcript),
+        "attachmentSHA256": hashlib.sha256(data).hexdigest(),
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="validate run-scoped physical-iPhone smoke memory-pressure evidence"
     )
     parser.add_argument("diagnostics_root", type=Path)
     parser.add_argument("--run-id", required=True)
+    parser.add_argument("--history-row-id")
     args = parser.parse_args(argv)
     try:
-        result = validate(args.diagnostics_root, args.run_id)
+        result = (
+            validate_history_observation(args.diagnostics_root, args.run_id, args.history_row_id)
+            if args.history_row_id else validate(args.diagnostics_root, args.run_id)
+        )
     except IOSSmokeAcceptanceError as error:
         print(f"iOS smoke acceptance FAIL: {error}", file=sys.stderr)
         return 1

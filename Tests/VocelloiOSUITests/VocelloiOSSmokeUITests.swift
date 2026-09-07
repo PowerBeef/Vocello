@@ -1,5 +1,43 @@
 import XCTest
 
+/// Inspect a previously observed row without generation, pinning, deletion, or
+/// seed adoption. A successful observation is not a speech-quality verdict.
+@MainActor
+final class VocelloiOSHistoryObservationUITests: VocelloiOSUITestCase {
+    override func tearDown() {
+        endSession()
+        super.tearDown()
+    }
+
+    func testRetainedHistoryTranscript() throws {
+        let environment = ProcessInfo.processInfo.environment
+        let rowID = try XCTUnwrap(environment["QVOICE_IOS_HISTORY_OBSERVATION_ROW_ID"])
+        let runID = try XCTUnwrap(environment["QVOICE_IOS_SMOKE_RUN_ID"])
+        XCTAssertNotNil(rowID.range(of: "^generation-[0-9]+$", options: .regularExpression))
+        beginSession()
+        replaceHistorySearch(with: "An evening by the harbor.")
+        dismissHistorySearchKeyboardIfNeeded()
+        let row = try XCTUnwrap(revealHistoryRow(rowID))
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: row, timeout: 20))
+        let transcript = element("iosPlayer_transcript")
+        XCTAssertTrue(VocelloUIWait.exists(transcript, timeout: 20))
+        let observed = try XCTUnwrap(transcript.value as? String)
+        let data = try JSONSerialization.data(withJSONObject: [
+            "schemaVersion": 1, "runID": runID, "rowID": rowID,
+            "observedTranscript": observed,
+        ], options: [.sortedKeys])
+        let attachment = XCTAttachment(data: data, uniformTypeIdentifier: "public.json")
+        attachment.name = "history-transcript-observation"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: element("iosPlayer_close"), timeout: 20))
+        XCTAssertTrue(VocelloUIWait.disappears(transcript, timeout: 20))
+        replaceHistorySearch(with: "")
+        dismissHistorySearchKeyboardIfNeeded()
+        select(tab: .studio)
+    }
+}
+
 /// Explicit operator cleanup, isolated from every Vocello acceptance journey.
 /// No product launch environment or hidden app UI participates in this action.
 @MainActor
@@ -363,6 +401,9 @@ final class VocelloiOSSmokeUITests: VocelloiOSUITestCase {
         while script.count < 2_000 {
             script += paragraph
         }
+        // The planner drops trailing whitespace. Use canonical fixture input so
+        // exact History equality tests content preservation, not a trailing space.
+        script = script.trimmingCharacters(in: .whitespacesAndNewlines)
 
         guard let beforeTitleIDs = historyRowCensus(expectedScript: searchTitle),
               let beforeJoinedIDs = historyRowCensus(expectedScript: script) else { return }
@@ -389,13 +430,10 @@ final class VocelloiOSSmokeUITests: VocelloiOSUITestCase {
         guard verifyHistoryTranscript(rowID: joinedID, expectedScript: script) else { return }
 
         // Without search, the project groups: one joined row plus a per-segment
-        // disclosure that expands to the project's segment rows. Clear the
-        // field directly and wait on the grouped outcome — an empty
-        // UITextField reports its placeholder as `value`, so the helper's
-        // value-echo assertion cannot confirm an empty query.
+        // disclosure that expands to the project's segment rows. Clear via the
+        // genuine conditional button; an empty native field may expose a placeholder.
+        replaceHistorySearch(with: "")
         let searchField = app.textFields["historySearchField"].firstMatch
-        XCTAssertTrue(VocelloUIWait.exists(searchField, timeout: 30))
-        XCTAssertTrue(VocelloUITextEntry.replace(in: searchField, with: "", timeout: 20))
         dismissHistorySearchKeyboardIfNeeded()
         guard revealHistoryRow(joinedID) != nil else { return }
         let segmentsToggle = app.descendants(matching: .any)

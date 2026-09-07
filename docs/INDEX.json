@@ -306,6 +306,8 @@
         "Sources/QwenVoiceCore/GenerationQualityComposition.swift",
         "Sources/SharedSupport/Services/VoiceClipTranscriber.swift",
         "scripts/analyze_prosody.py",
+        "scripts/audio_phonation.py",
+        "scripts/audio_resampling.py",
         "scripts/delivery_analysis_cache.py",
         "scripts/delivery_experiment_runner.py",
         "scripts/run_local_delivery_cascade.py",

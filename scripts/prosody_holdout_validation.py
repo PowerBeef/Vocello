@@ -69,7 +69,8 @@ def _safe_token(value: Any, field: str) -> str:
 
 def _clip_digest(entry: dict[str, Any]) -> str:
     try:
-        return hashlib.sha256(Path(entry["path"]).read_bytes()).hexdigest()
+        with Path(entry["path"]).open("rb") as audio:
+            return hashlib.file_digest(audio, "sha256").hexdigest()
     except OSError as error:
         raise HoldoutError("a manifest clip cannot be read") from error
 
@@ -140,10 +141,7 @@ def _metrics(
         result = analyzer(row["path"])
         if "error" in result:
             raise HoldoutError("holdout analysis failed")
-        record = {
-            metric: float(result.get(metric, 0.0))
-            for metric, _direction in prosody_calibration.THRESHOLD_MAP.values()
-        }
+        record = prosody_calibration.validated_metrics(result)
         (good if row["label"] == "good" else bad).append(record)
     return good, bad
 
@@ -212,9 +210,58 @@ def _atomic_json(path: Path, payload: dict[str, Any]) -> None:
     os.replace(temporary, path)
 
 
+def prepare_calibration(inventory: list[dict[str, Any]], policy: dict[str, Any]) -> dict[str, Any]:
+    """Prepare blind, byte-bound labelling inventory; never open or infer labels.
+
+Input is private/local. Output has anonymous group tokens and audio digests only.
+Splits must be declared by the operator before fitting; this is not a selector.
+An empty inventory emits the existing protocol and honest data dependencies.
+"""
+    rows = []
+    seen = set()
+    groups = {split: {field: set() for field in policy['groupIsolation']}
+              for split in ('calibration', 'holdout')}
+    for item in inventory:
+        if item.get('split') not in groups:
+            raise HoldoutError('preparation requires an explicit calibration/holdout split')
+        if any(key in item for key in ('label', 'requestedLabel', 'preset', 'targetDelivery')):
+            raise HoldoutError('blind preparation must not receive requested or scored labels')
+        audio_digest = _clip_digest(item)
+        if audio_digest in seen:
+            raise HoldoutError('preparation reuses audio bytes')
+        seen.add(audio_digest)
+        row = {'audioSHA256': audio_digest, 'split': item['split'], 'label': None}
+        for field in METADATA_FIELDS:
+            if field == 'defectSeverity':
+                continue  # Independent annotation, never a requested-label feature.
+            row[field] = _safe_token(item.get(field), field)
+        for field in policy['groupIsolation']:
+            groups[item['split']][field].add(row[field])
+        rows.append(row)
+    for field in policy['groupIsolation']:
+        if groups['calibration'][field] & groups['holdout'][field]:
+            raise HoldoutError(f'preparation leaks {field}')
+    counts = {split: sum(row['split'] == split for row in rows) for split in groups}
+    minimum = {'calibration': policy['minimumCalibrationClips'],
+               'holdout': policy['minimumHoldoutGoodClips']+policy['minimumHoldoutBadClips']}
+    return {
+        'schemaVersion': 1, 'kind': 'prosody-calibration-preparation',
+        'status': 'NEEDS_INDEPENDENT_LABELS', 'promotionAuthority': False,
+        'policy': policy, 'policySHA256': hashlib.sha256(json.dumps(policy, sort_keys=True).encode()).hexdigest(),
+        'sourceSHA256': hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+        'counts': counts, 'additionalAudioMinimum': {s: max(0, minimum[s]-counts[s]) for s in groups},
+        'items': rows,
+        'requiredAnnotations': ['good-or-bad', 'defectSeverity', 'independent-reviewer-provenance'],
+        'nextActions': ['complete-group-and-language-coverage', 'independently-label-calibration-and-holdout',
+                        'fit-only-calibration', 'freeze-profile-before-opening-holdout',
+                        'evaluate-once-with-existing-prosody-holdout-validator'],
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("validate-contract", "evaluate"))
+    parser.add_argument("command", choices=("validate-contract", "prepare", "evaluate"))
+    parser.add_argument("--inventory", type=Path, help="private JSON object with predeclared unlabelled items")
     parser.add_argument("--root", type=Path, default=ROOT)
     parser.add_argument("--calibration-labels", type=Path)
     parser.add_argument("--holdout-labels", type=Path)
@@ -225,6 +272,16 @@ def main() -> int:
         if arguments.command == "validate-contract":
             policy = validate_policy(arguments.root.resolve())
             print(f"Prosody holdout contract: PASS ({policy['minimumHoldoutGoodClips']} good + {policy['minimumHoldoutBadClips']} bad)")
+            return 0
+        if arguments.command == "prepare":
+            if arguments.output is None:
+                raise HoldoutError('prepare requires --output')
+            items = _load_object(arguments.inventory).get('items') if arguments.inventory else []
+            if not isinstance(items, list) or any(not isinstance(row, dict) for row in items):
+                raise HoldoutError('inventory items must be an array of objects')
+            result = prepare_calibration(items, validate_policy(arguments.root.resolve()))
+            _atomic_json(arguments.output.resolve(), result)
+            print(json.dumps({'status': result['status'], 'counts': result['counts']}))
             return 0
         if not all((arguments.calibration_labels, arguments.holdout_labels, arguments.profile, arguments.output)):
             raise HoldoutError("evaluate requires calibration, holdout, profile, and output paths")

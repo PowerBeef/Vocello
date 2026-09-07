@@ -396,6 +396,14 @@ corruption or drift fails closed and a cache hit launches no model. Reports cont
 measurements, never local paths or audio. Always-on acoustics can reject a broken row, but absent a
 qualified compact adapter and calibrated tiny head the honest result is `abstained`.
 
+Historical/default canonicalization stays `linear-rational-v1`. The explicit
+`--resampler polyphase-kaiser5-v2` option adds anti-aliased bounded FIR preprocessing;
+new compact configs bind its version and implementation digests, and mismatches refuse launch.
+The optional `analyze_prosody.py --experimental-phonation` block does not alter v3 measurements
+or profiles. Legacy delivery callers now label their bounded projection as delivery analysis v2.
+See [Audio QC engineering](audio-qc-engineering.md#follow-up-resource-evidence-and-remaining-boundaries)
+for numerical/resource evidence, compatibility rules and independent-calibration prerequisites.
+
 External candidates are governed separately by
 [`config/delivery-evaluator-v2-candidates.json`](../../config/delivery-evaluator-v2-candidates.json).
 The tracked contract pins the exact SenseVoiceSmall Q8 model revision, GGUF and runtime archive/

@@ -12,7 +12,7 @@ import subprocess
 import sys
 from typing import Any
 
-from delivery_analysis_cache import DeliveryAnalysisCache, atomic_json, digest, file_sha256
+from delivery_analysis_cache import DeliveryAnalysisCache, atomic_json, digest, file_sha256, configured_resampler
 from delivery_compact_model_adapter import run_compact_adapter
 
 
@@ -115,7 +115,7 @@ def qualify(
     audio_digests = [file_sha256(path) for path in audio_paths]
     if len(set(audio_digests)) != 2:
         raise QualificationError("qualification audio probes must be byte-distinct")
-    cache = DeliveryAnalysisCache(output_root / "analysis-cache")
+    cache = DeliveryAnalysisCache(output_root / "analysis-cache", resampler_version=configured_resampler(config))
     runs = []
     for index, (audio, audio_sha) in enumerate(zip(audio_paths, audio_digests), start=1):
         payload, cache_hit = run_compact_adapter(

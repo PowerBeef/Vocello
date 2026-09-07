@@ -27,6 +27,10 @@ from delivery_analysis_cache import (
     NO_MODEL_DIGEST,
     digest,
     file_sha256,
+    configured_resampler,
+    canonicalization_identity,
+    RESAMPLER_VERSION,
+    FIR_VERSION,
 )
 from delivery_compact_model_adapter import run_compact_adapter
 from delivery_evaluator import atomic_json
@@ -68,6 +72,7 @@ def _identity(canonical, *, layer: str, version: str, source: Path) -> LayerIden
         preprocessing_config_digest=digest({
             "sampleRate": canonical.report()["sampleRateHz"] if layer == "pcm-integrity-qc" else "source-native",
             "requestedLabelVisible": False,
+            "canonicalizationIdentity": canonicalization_identity(canonical.resampler_version),
             "cacheSourceSHA256": file_sha256(REPO / "scripts/delivery_analysis_cache.py"),
             "sharedAnalyzerSHA256": file_sha256(GLOBAL_ANALYZER),
             "pythonVersion": sys.version, "numpyVersion": np.__version__,
@@ -493,13 +498,18 @@ def main() -> int:
     parser.add_argument("--lock-root", type=Path, default=DEFAULT_CACHE_ROOT)
     parser.add_argument("--compact-adapter-config", type=Path)
     parser.add_argument("--evaluator-model", type=Path)
+    parser.add_argument("--resampler", choices=(RESAMPLER_VERSION, FIR_VERSION))
     parser.add_argument("--out", required=True, type=Path)
     args = parser.parse_args()
     try:
+        compact = _read(args.compact_adapter_config) if args.compact_adapter_config else None
+        resampler = args.resampler or (configured_resampler(compact) if compact else RESAMPLER_VERSION)
+        if compact and resampler != configured_resampler(compact):
+            raise CascadeError("selected resampler differs from compact model configuration")
         result = run_cascade(
             manifest=build_cascade_manifest(plan_path=args.plan, run_dir=args.run_dir),
-            cache=DeliveryAnalysisCache(args.cache_root), lock_root=args.lock_root,
-            compact_config=_read(args.compact_adapter_config) if args.compact_adapter_config else None,
+            cache=DeliveryAnalysisCache(args.cache_root, resampler_version=resampler), lock_root=args.lock_root,
+            compact_config=compact,
             evaluator_model=_read(args.evaluator_model) if args.evaluator_model else None,
         )
         atomic_json(args.out, result)

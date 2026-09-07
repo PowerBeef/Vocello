@@ -8,6 +8,8 @@ sourceOfTruth:
   - Sources/QwenVoiceCore/GenerationQualityComposition.swift
   - Sources/SharedSupport/Services/VoiceClipTranscriber.swift
   - scripts/analyze_prosody.py
+  - scripts/audio_phonation.py
+  - scripts/audio_resampling.py
   - scripts/delivery_analysis_cache.py
   - scripts/delivery_experiment_runner.py
   - scripts/run_local_delivery_cascade.py
@@ -111,10 +113,22 @@ Proper downsampling includes a low-pass stage. SciPy documents the FIR/polyphase
 boundary behavior. Use that as a tested reference for a bounded implementation, not independent
 per-block resampling with reset filters. [SciPy resample_poly](https://docs.scipy.org/doc/scipy/reference/generated/scipy.signal.resample_poly.html)
 
-This patch intentionally preserves v1 derivative bytes and pinned model preprocessing. A v2
-resampler must use a new namespace/config digest, preserve old evidence, match a whole-file
-reference at block seams, specify endpoint/padding/rounding rules, and requalify affected compact
-models. Do not silently interpret a formerly qualified model as qualified on different audio.
+The default still preserves v1 derivative bytes and historical model configurations. The explicit
+`polyphase-kaiser5-v2` option now uses a bounded, delay-compensated rational FIR: Kaiser beta 5,
+10 zero crossings, zero extension, Float64 mono mixing/filtering, nearest-even PCM16 quantization,
+and `ceil(inputFrames * 16000 / sourceRate)` output frames. Unlike v1, equal-rate input includes
+its final sample. New derivatives occupy a separate versioned cache namespace. Prepared model
+configs bind the selected resampler and both implementation digests; mismatched configs/cache
+versions fail before model launch. The v2 derivative metadata also binds the implementation and
+rejects drift instead of silently reusing old bytes. Missing config identity means historical v1,
+never inferred v2.
+
+The frozen SciPy **1.18.0** reference fixture needs no SciPy installation in CI. Impulses/edges,
+tones, chirps, stereo, odd lengths, single frames, block seams, source truncation, interrupted
+publication and corruption have deterministic coverage. An additional installed-reference check
+at 8/16/22.05/24/44.1/48/96/192 kHz matched Float64 output within `2.7e-15`.
+The 24→16 kHz 10 kHz alias probe is suppressed below 0.003 RMS while the 1 kHz passband remains
+within 0.003 RMS of its expected value. This qualifies preprocessing mathematics, not emotion.
 
 ### Harmonicity and emotion claims need recalibration
 
@@ -136,6 +150,15 @@ Five-region maxima are coarse regional contours, not sample-accurate peak locali
 rate is an envelope-peak proxy, not phoneme/syllable alignment. Neither these features nor a
 categorical SER label proves emotion meaning or speaker fidelity.
 
+`analyze_prosody.py --experimental-phonation` now appends a separate
+`experimentalPhonation` block (`window-corrected-ac-v1`). It shares the bounded PCM/frame reader,
+uses 100 ms Hann windows / 10 ms hops, FFT autocorrelation divided by window autocorrelation,
+local-peak interpolation and an explicit 0.01 octave cost. Periodicity-derived HNR is capped at
+60 dB; unvoiced/short input abstains with null values. Synthetic 80–395 Hz, phase, harmonic-mixture,
+10/20/30 dB SNR, noise, local-contour and tremor fixtures pass. Existing v3 output is identical
+with the optional block removed. No existing profile consumes the new block. This is not Praat
+equivalence, a clinical HNR measurement, a calibrated pitch tracker, or an emotion verdict.
+
 ### Language and naturalness remain separate
 
 Three Apple Speech passes test repeatability of one recognizer. Edge timestamps reject one-utterance
@@ -151,11 +174,13 @@ pitch/cadence and transcript accuracy. [SpeechBERTScore evaluation](https://www.
 
 ### Legacy and orchestration debt
 
-`analyze_delivery.py` still materializes a full index/frame matrix and `frames ** 2`, with
-duration-times-window memory growth. Its callers are the legacy `delivery_adherence.py` and
-`longform_carryover_probe.py`, not the current bench/cascade. Do not use it for long recordings.
-Replacing it with a view alone does not make downstream arithmetic bounded; NumPy documents the
-cost of sliding-window work. [NumPy sliding windows](https://numpy.org/doc/stable/reference/generated/numpy.lib.stride_tricks.sliding_window_view.html)
+`analyze_delivery.py` is now a small **deliveryAnalysisVersion 2** projection of the existing
+bounded v3 engine. Both `delivery_adherence.py` and `longform_carryover_probe.py` record that version.
+The adherence caller reuses one extraction for both projections instead of analyzing each WAV twice.
+Legacy keys remain, including raw-voiced RMS/count measured during the shared anchor pass.
+Histogram percentiles and the shared cadence definition are explicitly versioned changes, not
+byte-equivalent old scores. Original v1 reports and baseline source remain historical; the resource
+bundle retains before/after reports from `917856c3`. No full frame matrix remains in either caller.
 
 Global and temporal extraction still perform four total passes for a unique WAV. This is bounded
 and compatible; fuse them only after exact-output fixtures establish an unchanged numerical path.
@@ -163,22 +188,79 @@ The main runner and cascade have separate caches; do not reuse their result file
 field names match. Cache entries are measurements, not cross-run evidence or completed Fast QC.
 The cascade's `audioQC` block now explicitly identifies canonical PCM integrity only.
 
-## Efficient next implementation order
+## Follow-up resource evidence and remaining boundaries
 
-1. **Completed:** repair invalid-input rejection, stream canonical writes, validate identity,
-   reuse neutral summaries and stop before unnecessary neural work. Preserve production Fast QC.
-2. **AV-07 / DP-28:** version anti-aliased preprocessing; test impulses, tones, chirps, stereo,
-   odd lengths and block seams against a pinned reference; prove constant working memory.
-   Requalify the existing adapters twice serially before adoption. No new weights needed.
-3. **AV-07:** add corrected harmonicity/pitch candidates in an explicit analyzer version;
-   characterize frequency, SNR, voicing and noise. Calibrate only on the calibration partition;
-   compare on the untouched labelled holdout. Until then retain advisory v3 interpretation.
-4. **AV-07 / DP-28:** move the two legacy callers through an explicit compatibility adapter
-   to the bounded analyzer, with frozen old reports retained. Share/fuse measurement passes only
-   when profiling justifies it; preserve source dependency closure and neutral/control identity.
-5. **AV-08 / RF-06:** use independent full-WAV ASR only for ambiguous production findings;
-   keep failure, evaluator-unavailable and disagreement separate. No repeated identical recognizer
-   runs beyond the existing contract, no fresh large model campaign for this refactor.
+All new raw evidence stays in `build/artifacts/diagnostics/audio-qc-v2-20260906/`.
+Nine serial synthetic probes qualified under the existing supervisor with a temporary 1 GiB
+probe ceiling, zero swap growth, clean exits, recovered memory and no before/after pressure warning.
+An initial **probe failure**, caused by naming its script `profile.py` and shadowing Python's
+stdlib module, is retained in `resource-profile.json` and `profile-initial-failure/`. It preceded
+measurement and is not a product failure. Corrected results are `resource-profile-v2.json`.
+
+| Probe | Duration | Traced peak | Process RSS high water | Conversion/analysis time |
+| --- | ---: | ---: | ---: | ---: |
+| Legacy full-matrix adapter | 20 / 120 s | 34.53 / 207.41 MB | 74.58 / 252.79 MB | 0.40 / 2.32 s |
+| Bounded compatibility adapter | 20 / 120 s | 0.86 / 0.86 MB | 38.49 / 38.34 MB | 1.30 / 7.71 s |
+| Anti-aliased v2 derivative | 10 / 60 min | 3.29 / 3.29 MB | 42.91 / 43.88 MB | 1.98 / 11.81 s |
+| Corrected phonation candidate | 20 / 120 s | 0.89 / 0.89 MB | 38.19 / 38.29 MB | 0.35 / 2.06 s |
+
+Decimal MB; traced memory excludes interpreter/runtime baseline. Timing includes profiler overhead,
+not repeated benchmark uncertainty. The compatibility adapter is slower because it computes shared
+two-pass v3 features; its improvement is bounded memory and one implementation, not TTS speed.
+The 20-second global+temporal profile took 2.85 seconds under instrumentation; raw autocorrelation
+consumed 1.12 seconds across 7,988 calls. Four passes remain. Fusion is deliberately deferred:
+neutral reuse already avoids repeated whole-file work, and changing the established numerical path
+for this small absolute saving would add acceptance work without resolving a release blocker.
+
+Each already-installed, contract-pinned compact model passed **two cache-cold serial probes** on
+public English/Chinese preview audio with finalized v2 preprocessing. Separate final reports are
+`sensevoice-qualified/qualification.json` and `distilhubert-qualified/qualification.json`; earlier development
+probes are retained, not merged. Resource envelopes include RSS, clean exit, pressure snapshots,
+swap deltas and post-exit recovery. This is CPU/RSS short-clip bake-off qualification, not continuous
+pressure sampling, physical-footprint qualification, long-form neural memory bounds, calibrated
+human agreement, or adoption. No new weights, package versions or production assets were acquired.
+
+### Independent recognition: one additional observation, no waiver
+
+The predeclared `chinese-plan.json` binds the original 18.8-second iPhone WAV and permits one
+independent SenseVoice run, with expected text read only after extraction. It detects `zh` and
+returns **1 substitution / 59 characters (1.695%), no insertions/deletions** under the unchanged
+strict scoring. Resource RSS peaked at 329.12 MB, runtime was 1.16 seconds, with a qualified
+envelope. `chinese-comparison.json` binds the private output, input and plan by digest.
+
+This is independent of the earlier Whisper model, but the pinned binary has **no locale-lock
+option** and emits no time-aligned interior coverage. Complete WAV input is not proof of complete
+correct speech. Preserve the prior 25/59 strict Whisper result, the 834 ms interior pause, cadence
+warning and all original failures. The new result supports a recognizer/orthography disagreement;
+it does not authorize script conversion, a quality PASS, or RF-06 closure. No TTS take was repeated.
+The 14 retained French Design comparisons already include independent Apple/Whisper evidence.
+SenseVoice does not support French and DistilHuBERT does not transcribe; running either as a French
+judge would be invalid. French disagreement remains open; no extra recognizer was downloaded.
+
+### Calibration preparation is ready; independent labels are not
+
+`prosody_holdout_validation.py prepare --output <untracked.json>` now emits the existing frozen
+protocol and missing-data counts. Optional `--inventory` accepts predeclared, unlabelled split/group
+metadata and local audio; output strips paths, rejects audio/group overlap and requested/scored
+labels, and binds bytes. It never selects a holdout, invents labels or fits a profile. Calibration
+and holdout now reject missing/non-numeric/non-finite metrics instead of filling in zero, and
+corpus hashing is streamed. Existing Wilson, leakage and threshold-binding checks still apply.
+
+The prepared `calibration-preparation.json` correctly reports **60 calibration clips plus at least
+30 good / 30 bad holdout clips still needed**, with independent annotations and existing coverage
+requirements. Reused research previews are not an untouched holdout. Existing listener-session v2
+supplies blinded review; no second listening harness was added. AV-07 and DP-28 stay open until
+independent data and qualification exist. Numerical fixtures cannot provide those labels.
+
+Operator commands (existing defaults remain v1):
+
+```sh
+python3 scripts/delivery_analysis_cache.py --resampler polyphase-kaiser5-v2 canonicalize <wav>
+python3 scripts/analyze_prosody.py <wav> --experimental-phonation --json
+python3 scripts/prepare_delivery_compact_model_config.py sensevoice-small-q8 \
+  --resampler polyphase-kaiser5-v2 --output <untracked-config.json>
+python3 scripts/prosody_holdout_validation.py prepare --output <untracked-preparation.json>
+```
 
 A clean end state has one native product-QC authority, one bounded blind acoustic engine, one
 versioned derivative cache, the existing serial neural supervisor, and explicit per-dimension

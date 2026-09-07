@@ -28,7 +28,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from analyze_delivery import analyze  # noqa: E402
+from analyze_delivery import analyze, DELIVERY_ANALYSIS_VERSION  # noqa: E402
 
 SEGMENT_A = (
     "The lighthouse keeper wrote the same entry every evening, wind steady, "
@@ -198,6 +198,8 @@ def main() -> int:
     )
 
     report = {
+        "deliveryAnalysisVersion": DELIVERY_ANALYSIS_VERSION,
+        "analyzerAlgorithmVersion": 3,
         "probe": "longform-acoustic-carryover-v1",
         "generatedAtUTC": datetime.now(timezone.utc).isoformat(),
         "preRegistration": "docs/decisions/long-form-acoustic-carryover-experiment.md",

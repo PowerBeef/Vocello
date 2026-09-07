@@ -30,6 +30,25 @@ def write_sine(path, freq, duration, amplitude=0.5):
 
 
 class AnalyzeDeliveryTests(unittest.TestCase):
+    def test_v2_projection_is_shared_bounded_and_explicit(self):
+        from analyze_prosody import analyze as shared
+        path = os.path.join(self.dir, 'projection.wav')
+        write_sine(path, 150, 1.0)
+        report = analyze(path)
+        full = shared(path, delivery_projection=True)
+        self.assertEqual(report['deliveryAnalysisVersion'], 2)
+        self.assertEqual(report['analyzerAlgorithmVersion'], 3)
+        self.assertTrue(report['analysisWorkingSetDurationBounded'])
+        self.assertEqual(report['rms_voiced_db'], full['deliveryProjection']['rms_voiced_db'])
+        self.assertEqual(report['syllable_rate_hz'], full['rate_syllable_rate_hz'])
+        from delivery_adherence import analyze_features
+        from unittest.mock import patch
+        with patch('delivery_adherence.analyze_prosody', return_value=full) as extract:
+            projection, retained = analyze_features(path)
+        extract.assert_called_once_with(path, delivery_projection=True)
+        self.assertEqual(projection, report)
+        self.assertIs(retained, full)
+
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.dir = self.tmp.name

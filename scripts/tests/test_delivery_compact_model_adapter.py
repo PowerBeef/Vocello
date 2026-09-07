@@ -28,6 +28,27 @@ import delivery_compact_model_adapter  # noqa: E402
 
 
 class DeliveryCompactModelAdapterTests(unittest.TestCase):
+    def test_preprocessing_mismatch_refuses_model_launch(self):
+        from delivery_analysis_cache import FIR_VERSION, canonicalization_identity
+        from unittest.mock import Mock
+        cache = DeliveryAnalysisCache(self.root / 'v2', resampler_version=FIR_VERSION)
+        supervisor = Mock(side_effect=AssertionError('must not launch'))
+        with self.assertRaisesRegex(ValueError, 'resampler'):
+            run_compact_adapter(wav_path=self.audio, config=self.config, cache=cache,
+                                lock_root=self.root, supervisor=supervisor)
+        supervisor.assert_not_called()
+        self.config['preprocessingConfig']['canonicalizationIdentity'] = canonicalization_identity(FIR_VERSION)
+        self.config['preprocessingConfigDigest'] = digest(self.config['preprocessingConfig'])
+        # Explicit v2 succeeds and the second call is a true no-model cache hit.
+        payload, hit = run_compact_adapter(wav_path=self.audio, config=self.config, cache=cache,
+                                          lock_root=self.root, supervisor=self._supervisor)
+        self.assertFalse(hit)
+        again, hit = run_compact_adapter(wav_path=self.audio, config=self.config, cache=cache,
+                                        lock_root=self.root, supervisor=supervisor)
+        self.assertTrue(hit)
+        self.assertEqual(payload, again)
+        supervisor.assert_not_called()
+
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
         self.root = Path(self.temporary.name)

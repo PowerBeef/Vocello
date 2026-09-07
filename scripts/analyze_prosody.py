@@ -492,8 +492,9 @@ def _analysis_frames(
     metadata: WavMetadata,
     memory: ManagedMemoryEstimate,
     block_observer: Callable[[np.ndarray, int], None] | None = None,
+    *, frame_ms: float = FRAME_MS,
 ) -> Iterator[tuple[int, np.ndarray]]:
-    frame_samples = int(metadata.sample_rate * FRAME_MS / 1000.0)
+    frame_samples = int(metadata.sample_rate * frame_ms / 1000.0)
     hop_samples = int(metadata.sample_rate * HOP_MS / 1000.0)
     if frame_samples <= 0 or hop_samples <= 0:
         raise ValueError("sample rate is too low for the analysis frame contract")
@@ -782,6 +783,7 @@ def _signal_and_anchor_pass(
     memory.own_histogram(f0_histogram)
     analysis_frame_count = 0
     voiced_frame_count = 0
+    voiced_rms_moments = RunningMoments()
     maximum_rms = 0.0
     sample_count = 0
     clipping_count = 0
@@ -838,16 +840,18 @@ def _signal_and_anchor_pass(
         block_observer=observe_signal_block,
     ):
         analysis_frame_count += 1
-        rms, _ = _rms_db(frame)
+        rms, rms_db = _rms_db(frame)
         maximum_rms = max(maximum_rms, rms)
         f0, autocorrelation_peak = f0_autocorr(frame, metadata.sample_rate)
         if autocorrelation_peak >= VOICING_AC and f0 > 0:
             voiced_frame_count += 1
+            voiced_rms_moments.add(rms_db)
             f0_histogram.add(f0)
 
     result = {
         "analysis_frame_count": analysis_frame_count,
         "voiced_frame_count": voiced_frame_count,
+        "voiced_rms_mean_db": voiced_rms_moments.mean if voiced_frame_count else 0.0,
         "maximum_rms": maximum_rms,
         "anchor_median_hz": f0_histogram.quantile(0.5),
         "sample_count": sample_count,
@@ -1014,7 +1018,7 @@ def _empty_pitch() -> dict[str, float]:
     }
 
 
-def _analyze(path: str, boundary_seconds: Iterable[float]) -> dict[str, object]:
+def _analyze(path: str, boundary_seconds: Iterable[float], *, delivery_projection: bool = False) -> dict[str, object]:
     metadata = _metadata(path)
     duration = metadata.duration_seconds
     frame_samples = int(metadata.sample_rate * FRAME_MS / 1000.0)
@@ -1203,13 +1207,23 @@ def _analyze(path: str, boundary_seconds: Iterable[float]) -> dict[str, object]:
     flat["rate_cv"] = flat["rate_local_rate_cv"]
     flat["pause_ratio"] = flat["pauses_pause_speech_ratio"]
     flat["energy_roughness"] = flat["energy_envelope_roughness"]
+    if delivery_projection:
+        flat["deliveryProjection"] = {
+            "rms_voiced_db": round(float(anchor["voiced_rms_mean_db"]), 1),
+            "n_voiced_frames": int(anchor["voiced_frame_count"]),
+        }
     return flat
 
 
-def analyze(path: str, boundary_seconds: Iterable[float] = ()) -> dict[str, object]:
+def analyze(path: str, boundary_seconds: Iterable[float] = (), *,
+            delivery_projection: bool = False, experimental_phonation: bool = False) -> dict[str, object]:
     """Analyze one WAV without raising file/format/analysis errors to callers."""
     try:
-        return _analyze(path, boundary_seconds)
+        result = _analyze(path, boundary_seconds, delivery_projection=delivery_projection)
+        if experimental_phonation and "error" not in result:
+            from audio_phonation import analyze_phonation
+            result["experimentalPhonation"] = analyze_phonation(path)
+        return result
     except Exception as error:
         return {
             "clip": os.path.basename(path),
@@ -1232,6 +1246,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Bounded reference-free prosody analyzer.")
     parser.add_argument("clips", nargs="*", help="PCM16 WAV file(s) to analyze")
     parser.add_argument("--json", action="store_true", help="emit JSON")
+    parser.add_argument("--experimental-phonation", action="store_true",
+                        help="append uncalibrated window-corrected measurements; never changes v3 gates")
     parser.add_argument(
         "--boundary-seconds",
         type=_parse_boundary_seconds,
@@ -1242,7 +1258,8 @@ def main() -> None:
     if not arguments.clips:
         parser.print_help()
         return
-    output = [analyze(path, boundary_seconds=arguments.boundary_seconds) for path in arguments.clips]
+    output = [analyze(path, boundary_seconds=arguments.boundary_seconds,
+                      experimental_phonation=arguments.experimental_phonation) for path in arguments.clips]
     print(json.dumps(output, indent=2))
 
 

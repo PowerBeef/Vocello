@@ -24,6 +24,7 @@ from delivery_analysis_cache import (
     LayerIdentity,
     digest,
     file_sha256,
+    configured_resampler,
 )
 from delivery_resource_supervisor import SupervisedResult, run_supervised
 import delivery_resource_supervisor
@@ -76,6 +77,7 @@ def validate_adapter_config(config: dict[str, Any]) -> dict[str, Any]:
         config.get("preprocessingConfigDigest"), "preprocessingConfigDigest"
     ):
         raise CompactAdapterError("compact adapter preprocessing configuration drifted")
+    configured_resampler(config)
     command = config.get("commandTemplate")
     if not isinstance(command, list) or not command or any(not isinstance(item, str) for item in command):
         raise CompactAdapterError("compact adapter commandTemplate must be a string array")
@@ -188,6 +190,8 @@ def run_compact_adapter(
     return_unqualified: bool = False,
 ) -> tuple[dict[str, Any], bool]:
     config = validate_adapter_config(config)
+    if cache.resampler_version != configured_resampler(config):
+        raise CompactAdapterError("cache resampler differs from pinned model preprocessing")
     canonical = cache.canonicalize(wav_path)
     identity = LayerIdentity(
         original_wav_sha256=canonical.original_wav_sha256,

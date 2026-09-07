@@ -19,10 +19,12 @@ The iPhone is unavailable. Do not start device work. No acceptance campaign is c
 The approved priority is iOS 3.0, retaining all modes, long-form and all 201 campaign takes.
 Mac/CLI-only qualification and broad evaluator/prompt research remain off that critical path.
 
-The separately requested Audio QC review and first compatibility-preserving cleanup are recorded
-in [Audio QC engineering](reference/audio-qc-engineering.md). No product-QC threshold, model,
-prompt, seed, or release acceptance changed. AV-07/DP-28 retain the remaining versioned resampler,
-harmonicity and calibration work; RF-06 remains a separate unresolved product-audio blocker.
+The separately requested Audio QC review and autonomous follow-up are recorded in
+[Audio QC engineering](reference/audio-qc-engineering.md). Versioned anti-alias preprocessing,
+experimental corrected phonation, bounded legacy projection, model resource requalification and
+blind calibration preparation are implemented. No product-QC threshold, model, prompt, seed or
+release acceptance changed. AV-07/DP-28 retain independent calibration/adoption requirements;
+RF-06 remains a separate unresolved product-audio blocker.
 
 | Work | Existing owner | Next boundary |
 | --- | --- | --- |
@@ -128,6 +130,42 @@ The audit also measured linear-resampler aliasing and pitch-dependent HNR-proxy 
 correction requires explicit preprocessing/analyzer versions and affected-model/profile
 requalification; it is not silently included in a memory refactor. Legacy full-frame analysis and
 four-pass global/temporal fusion have a bounded migration plan. AV-07/AV-08/DP-28 stay open.
+
+## Autonomous Audio QC follow-up — September 6
+
+Implemented optional `polyphase-kaiser5-v2` bounded FIR preprocessing with frozen SciPy 1.18.0
+reference fixtures and cache/config source binding. Historical/default v1 bytes remain unchanged.
+The opt-in `window-corrected-ac-v1` phonation block passes synthetic frequency/SNR/noise tests but
+has no calibrated threshold or semantic authority. Both legacy callers now use a versioned bounded
+projection, and adherence reuses its global extraction. Missing/invalid calibration or holdout
+metrics fail closed. Existing preparation tooling emits a blind, byte-bound protocol with explicit
+missing-data counts; it neither invents labels nor opens a holdout.
+
+Nine serial synthetic resource probes qualified: one-hour v2 resampling used 3.29 MB traced memory;
+120-second legacy analysis fell from 207.41 MB to 0.86 MB, while processing time rose from 2.32 to
+7.71 seconds. The shared v3 computation is more expensive than the narrow old analyzer; no TTS
+speedup is claimed. Global/temporal fusion stays deferred after profiling (2.85 s for 20 s audio
+under instrumentation). An initial stdlib-shadowing probe failure is retained separately.
+
+The installed, pinned SenseVoice and DistilHuBERT models each passed two final-source serial CPU
+probes with v2 preprocessing, zero swap growth, no before/after pressure warning, confirmed exits
+and memory recovery. This is short-clip resource qualification only; both remain unadopted.
+The single predeclared independent Chinese comparison returned 1/59 strict character differences
+and detected Chinese. Because that binary cannot locale-lock or prove interior coverage, original
+Whisper scores, the 834 ms pause and cadence warning remain unchanged. French Apple/Whisper
+disagreement remains open; no invalid French compact-model test or new download was substituted.
+
+Ignored evidence is under `build/artifacts/diagnostics/audio-qc-v2-20260906/`; numerical methods,
+report references, resource caveats and repeatable commands are in the engineering reference.
+Independent calibration labels and untouched human confirmation remain external dependencies,
+not incomplete autonomous coding tasks. No phone, native app UI, generator, production asset,
+threshold, prompt, account, release operation or personal data was changed.
+
+Final focused verification passed 79 tests in 7.40 seconds, including v2 derivative-source drift.
+Final two-run model report digests are `58b095ae...653eeb2` (SenseVoice) and
+`5063b8cf...42ab2` (DistilHuBERT), in the `*-qualified` evidence folders. Earlier development
+qualification sets are retained separately, not merged. AGENTS.md remains applicable without
+another rule or gate; the existing source-binding, serial-workload and promotion boundaries apply.
 No phone, new weights, generation, personal audio, account or candidate operation was involved.
 
 ## Codex workflow streamlining

@@ -27,6 +27,41 @@ def policy() -> dict[str, object]:
 
 
 class ProsodyHoldoutValidationTests(unittest.TestCase):
+    def test_empty_preparation_reports_missing_data_not_pass(self):
+        result = module.prepare_calibration([], module.validate_policy())
+        self.assertEqual(result['additionalAudioMinimum'], {'calibration': 60, 'holdout': 60})
+        self.assertEqual(result['status'], 'NEEDS_INDEPENDENT_LABELS')
+        self.assertFalse(result['promotionAuthority'])
+
+    def test_blind_preparation_identity_and_leakage(self):
+        with tempfile.TemporaryDirectory() as directory:
+            cal, hold = self._manifests(Path(directory))
+            items = [{**{k: v for k, v in row.items() if k not in ('label', 'defectSeverity')}, 'split': split}
+                     for split, rows in (('calibration', cal), ('holdout', hold)) for row in rows]
+            result = module.prepare_calibration(items, policy())
+            self.assertNotIn(directory, json.dumps(result))
+            self.assertTrue(all(row['label'] is None for row in result['items']))
+            items[0]['requestedLabel'] = 'happy'
+            with self.assertRaisesRegex(ValueError, 'labels'):
+                module.prepare_calibration(items, policy())
+            del items[0]['requestedLabel']
+            items[-1]['speakerGroup'] = items[0]['speakerGroup']
+            with self.assertRaisesRegex(ValueError, 'leaks speakerGroup'):
+                module.prepare_calibration(items, policy())
+
+    def test_calibration_and_holdout_reject_invalid_measurements(self):
+        from unittest.mock import patch
+        baseline = {metric: 1.0 for metric, _ in module.prosody_calibration.THRESHOLD_MAP.values()}
+        key = next(iter(baseline))
+        for value in (None, True, '1.0', float('nan'), float('inf')):
+            bad = {**baseline, key: value}
+            with self.assertRaises(ValueError):
+                module._metrics([{'path': 'fixture', 'label': 'good'}], lambda _: bad)
+            with patch.object(module.prosody_calibration, 'analyze', return_value=bad):
+                good, _, errors = module.prosody_calibration.analyze_corpus([{'path': 'fixture', 'label': 'good'}])
+                self.assertEqual(len(errors), 1)
+                self.assertTrue(all(not values for values in good.values()))
+
     def _row(self, root: Path, name: str, label: str, prefix: str, index: int) -> dict[str, object]:
         path = root / f"{name}.wav"
         path.write_bytes(name.encode())

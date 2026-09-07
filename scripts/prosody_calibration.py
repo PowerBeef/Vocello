@@ -97,10 +97,26 @@ def analyze_corpus(entries):
         if "error" in pros:
             errors.append((path, pros["error"]))
             continue
+        try:
+            record = validated_metrics(pros)
+        except ValueError:
+            errors.append((path, "metrics_incomplete"))
+            continue
         bucket = good if entry["label"] == "good" else bad
-        for metric, _ in THRESHOLD_MAP.values():
-            bucket[metric].append(pros.get(metric, 0.0))
+        for metric, value in record.items():
+            bucket[metric].append(value)
     return good, bad, errors
+
+
+def validated_metrics(result):
+    """Calibration and holdout must not invent zero for a missing measurement."""
+    record = {}
+    for metric, _ in THRESHOLD_MAP.values():
+        value = result.get(metric)
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+            raise ValueError("calibration metrics incomplete or non-finite")
+        record[metric] = float(value)
+    return record
 
 
 def corpus_digest(entries):
@@ -127,7 +143,8 @@ def corpus_digest(entries):
             ).encode("utf-8")
         )
         digest.update(b"\0")
-        digest.update(hashlib.sha256(clip.read_bytes()).digest())
+        with clip.open("rb") as audio:
+            digest.update(hashlib.file_digest(audio, "sha256").digest())
     return digest.hexdigest()
 
 

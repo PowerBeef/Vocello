@@ -27,7 +27,7 @@ Usage:
 """
 import sys, os, json, argparse, subprocess, tempfile, shutil, statistics
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from analyze_delivery import analyze
+from analyze_delivery import project_report, DELIVERY_ANALYSIS_VERSION
 from analyze_prosody import analyze as analyze_prosody
 from prosody_profile import builtin_profile, load_profile, delivery_weight
 
@@ -35,6 +35,14 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEFAULT_TEXT = ("The morning train slipped quietly out of the station, carrying a handful "
                 "of sleepy travelers toward the coast.")
 DEFAULT_PRESETS = ["happy.normal", "surprised.normal", "angry.normal"]
+
+
+def analyze_features(path):
+    """One bounded extraction supplies both legacy and current projections."""
+    full = analyze_prosody(path, delivery_projection=True)
+    if "error" in full:
+        raise ValueError("delivery acoustic extraction failed")
+    return project_report(full), full
 
 
 def _weight(profile, section, key):
@@ -130,8 +138,7 @@ def main():
             for s in seeds:
                 npath = os.path.join(workdir, f"neutral_{variant}_s{s}.wav")
                 if generate(args.vocello, variant, args.speaker, args.text, s, npath, data_dir=args.data_dir):
-                    neutral_feat[s] = analyze(npath)
-                    neutral_pros[s] = analyze_prosody(npath)
+                    neutral_feat[s], neutral_pros[s] = analyze_features(npath)
                 else:
                     print(f"WARN: neutral gen failed {variant}/s{s}", file=sys.stderr)
             for pid in presets:
@@ -143,11 +150,12 @@ def main():
                     if not generate(args.vocello, variant, args.speaker, args.text, s, ipath, instr, data_dir=args.data_dir):
                         print(f"WARN: gen failed {pid}/{variant}/s{s}", file=sys.stderr)
                         continue
-                    inst = analyze(ipath)
+                    inst, p_inst = analyze_features(ipath)
                     neu = neutral_feat[s]
-                    p_inst = analyze_prosody(ipath)
                     p_neu = neutral_pros[s]
                     records.append({
+                        "deliveryAnalysisVersion": DELIVERY_ANALYSIS_VERSION,
+                        "analyzerAlgorithmVersion": p_inst["analyzerAlgorithmVersion"],
                         "preset": pid, "variant": variant, "seed": s,
                         "dF0": round(inst["f0_median_hz"] - neu["f0_median_hz"], 1),
                         "dRange": round(inst["f0_range_hz"] - neu["f0_range_hz"], 1),
@@ -173,6 +181,8 @@ def main():
         ar = [r["arousal"] for r in rs]
         pe = [r["prosodyEffect"] for r in rs]
         summary.append({
+            "deliveryAnalysisVersion": DELIVERY_ANALYSIS_VERSION,
+            "analyzerAlgorithmVersion": 3,
             "preset": preset, "variant": variant, "n": len(rs),
             "dF0": med([r["dF0"] for r in rs]),
             "dRange": med([r["dRange"] for r in rs]),

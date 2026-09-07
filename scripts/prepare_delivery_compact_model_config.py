@@ -10,7 +10,9 @@ import subprocess
 import sys
 from typing import Any
 
-from delivery_analysis_cache import atomic_json, digest, file_sha256
+from delivery_analysis_cache import (
+    atomic_json, digest, file_sha256, canonicalization_identity, RESAMPLER_VERSION, FIR_VERSION,
+)
 
 
 REPO = Path(__file__).resolve().parents[1]
@@ -126,7 +128,8 @@ def _runtime_versions(python: Path) -> dict[str, str]:
     return value
 
 
-def prepare(adapter_id: str, *, contract_path: Path, model_root: Path) -> dict[str, Any]:
+def prepare(adapter_id: str, *, contract_path: Path, model_root: Path,
+            resampler_version: str = RESAMPLER_VERSION) -> dict[str, Any]:
     contract = validate_candidate_contract(_read(contract_path))
     candidates = contract.get("candidates")
     if not isinstance(candidates, dict):  # validate_candidate_contract owns this invariant
@@ -184,6 +187,7 @@ def prepare(adapter_id: str, *, contract_path: Path, model_root: Path) -> dict[s
         raise PreparationError("unsupported candidate")
     dependency_digest = digest(dependencies)
     preprocessing = dict(candidate["preprocessingConfig"])
+    preprocessing["canonicalizationIdentity"] = canonicalization_identity(resampler_version)
     layer_digest = file_sha256(ADAPTER_LAYER_SOURCE)
     supervisor_digest = file_sha256(SUPERVISOR_SOURCE)
     preprocessing["executionIdentity"] = {
@@ -231,6 +235,7 @@ def main() -> int:
     parser.add_argument("--model-root", type=Path, default=DEFAULT_MODEL_ROOT)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--validate-only", action="store_true")
+    parser.add_argument("--resampler", choices=(RESAMPLER_VERSION, FIR_VERSION), default=RESAMPLER_VERSION)
     args = parser.parse_args()
     try:
         if args.validate_only:
@@ -244,7 +249,8 @@ def main() -> int:
             return 0
         if args.adapter is None or args.output is None:
             raise PreparationError("adapter and --output are required for preparation")
-        value = prepare(args.adapter, contract_path=args.contract, model_root=args.model_root)
+        value = prepare(args.adapter, contract_path=args.contract, model_root=args.model_root,
+                        resampler_version=args.resampler)
         atomic_json(args.output, value)
         print(json.dumps({
             "adapterID": args.adapter,

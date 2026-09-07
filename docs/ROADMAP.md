@@ -41,7 +41,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 | Item | Status | Title | Evidence |
 | --- | --- | --- | --- |
-| `RF-01` | done | reconcile the audit and preserve the exact testing checkpoint | `doc:docs/reference/release-first-execution-2026-09.md#audit-finding-disposition`, `doc:docs/reference/release-first-execution-2026-09.md#preserved-september-4-device-boundary` |
+| `RF-01` | done | reconcile the audit and preserve the exact testing checkpoint | `doc:docs/reference/release-first-execution-2026-09.md#audit-finding-disposition`, `doc:docs/reference/release-first-execution-2026-09.md#preserved-september-4-device-boundary`, `doc:docs/development-progress.md#project-wide-test-and-harness-evolution--september-6` |
 | `RF-02` | in-flight | complete Apple prerequisites and the consolidated qualified-decision packet | — |
 | `RF-03` | done | implement and behavior-test macOS Design request preservation | `file:Sources/ViewModels/VoiceDesignCoordinator.swift`, `file:Tests/VocelloCoreTests/VoiceDesignCoordinatorTests.swift`, `doc:docs/development-progress.md#resume-here-2026-09-04` |
 | `RF-04` | done | repair long-form durability on both platforms | `file:Tests/VocelloCoreTests/LongFormHistoryAcceptanceTests.swift`, `doc:docs/development-progress.md#resume-here-2026-09-04` |
@@ -440,7 +440,7 @@ Narrative authority: [`docs/reference/development-workflow.md`](reference/develo
 | `DWF-03` | done | Preserve valid Xcode and package caches | `file:scripts/build_foundation_targets.sh`, `file:scripts/lib/build_cache.sh`, `file:project.yml`, `file:scripts/tests/test_build_routing_contract.py` |
 | `DWF-04` | done | Make checkpoint reuse content-complete and fail-closed | `file:scripts/tree_fingerprint.py`, `file:scripts/tests/test_tree_fingerprint.py`, `file:scripts/hooks/precommit_gate.sh` |
 | `DWF-05` | done | Validate and adopt the new development workflow | `doc:docs/reference/development-workflow.md`, `doc:docs/development-progress.md` |
-| `DWF-06` | done | Streamline Codex local gates without weakening CI or release evidence | `file:scripts/development_workflow.py`, `file:scripts/tests/test_development_workflow.py`, `file:scripts/tests/test_evidence_impact.py`, `doc:docs/reference/development-workflow.md`, `doc:docs/development-progress.md#codex-workflow-streamlining` |
+| `DWF-06` | done | Streamline Codex local gates without weakening CI or release evidence | `file:scripts/development_workflow.py`, `file:scripts/tests/test_development_workflow.py`, `file:scripts/tests/test_evidence_impact.py`, `doc:docs/reference/development-workflow.md`, `doc:docs/development-progress.md#codex-workflow-streamlining`, `doc:docs/reference/repository-self-verification.md#replace-and-retire-tests-and-harnesses`, `doc:docs/development-progress.md#project-wide-test-and-harness-evolution--september-6` |
 
 ## Documentation governance and staleness control
 

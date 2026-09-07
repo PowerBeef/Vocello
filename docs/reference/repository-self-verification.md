@@ -1,8 +1,8 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-08-29
-summary: How the repository checks itself — the five classes of failure the gates detect, which class each check belongs to, what none of them can see, and how to add a new one.
+reviewed: 2026-09-06
+summary: Verification boundaries and evidence-led replacement of tests, harnesses and gates; prove detection, measure cost, retain necessary compatibility and retire redundant execution paths.
 sourceOfTruth:
   - scripts/check_project_inputs.sh
   - scripts/check_surface_coverage.py
@@ -24,10 +24,76 @@ were the same class of failure, and no check in the repository could see that cl
 Architecture and gate tiers live in [`../ARCHITECTURE.md`](../ARCHITECTURE.md) and the root
 [`AGENTS.md`](../../AGENTS.md). This file is about the verification system itself.
 
-Currency review (2026-08-27): the project-input gate now also executes localization, entitlement,
-support-contact, and deterministic attribution-manifest contracts. Python inventory is
-discovery-complete (107 modules / 1,281 declared tests at this checkpoint), rejects zero-test
-modules, and keeps required surfaces synchronized with the curated runner.
+The project-input gate also executes localization, entitlement, support-contact and deterministic
+attribution-manifest contracts. `scripts/python_test_contract.py` discovers Python tests, rejects
+zero-test modules and checks runner coverage; use its output and the generated project health for
+current counts. Inventory completeness establishes discovery, not behavioral correctness.
+
+## Replace and retire tests and harnesses
+
+This procedure applies to **all** tests, fixtures, evaluators, benchmarks, runners and release
+validators, not only Audio QC. Existing sources/contracts remain the execution authority until a
+coherent correction lands; that hierarchy does not establish scientific or behavioral validity.
+An inherited implementation is not a gold standard. A replacement earns no exemption from the
+same scrutiny because it is newer or written with a more capable agent.
+
+Use the existing owning roadmap item and checkpoint, not a new review registry or gate:
+
+1. **State the claim and risk.** Identify the user-visible behavior or invariant the check protects,
+   its real callers and the specific defect, false verdict, duplicate work or measured cost that
+   motivates change. A version suffix or old test framework alone is not a defect. Prefer
+   release-blocking and touched paths over a repository-wide rewrite before shipping.
+2. **Establish an independent expectation.** Use an external specification, mathematical reference,
+   observable product behavior, independently labeled data or a controlled failure schedule as
+   appropriate. Do not derive both expected and actual values from the same helper. Include known
+   good, known bad and boundary cases; demonstrate that the check detects the relevant defect.
+   Snapshots and historical equality are compatibility evidence, not correctness by themselves.
+3. **Exercise the connection.** Test real request builders, adapters and consumers together where
+   an integration claim crosses them. Mocks isolate failure handling; a mock-only pass cannot
+   qualify the production boundary or packaged product. Classify missing/invalid observations as
+   evidence gaps, not clean passes or unsupported product failures.
+4. **Choose a finite disposition.** Keep a justified check; repair a demonstrated flaw; consolidate
+   duplicate responsibility; or retire a redundant/obsolete check. Before replacement, state its
+   acceptance cases, supported consumers, compatibility need, cost budget and retirement trigger.
+   Distinguish measurement validity from the calibration needed for any resulting product verdict.
+   Unsubstantiated thresholds are findings to resolve, not values to preserve merely to stay green.
+5. **Qualify and switch.** Compare against the independent expectation, not blind agreement with
+   the predecessor. Measure representative runtime, peak memory, flakiness and false verdicts in
+   proportion to risk. On the 8 GB Mac keep heavy work serial. A bounded comparison may use both
+   paths temporarily; record the exit condition instead of accumulating permanent challenger lanes.
+6. **Retire execution, preserve meaning.** Once criteria pass, make the replacement the normal route
+   for all supported callers and remove obsolete writers, runners, flags and duplicate assertions.
+   Retain a reader/migration fixture only for identified persisted data, public clients or retained
+   evidence; an old executable path additionally needs a concrete reproduction requirement and a
+   named review/removal milestone. Preserve original artifacts and append corrected interpretations
+   with provenance when a previous evaluator was wrong. Never rewrite an old failure into a pass.
+
+For a replacement, record **claim → evidence → replacement → remaining consumers → retirement
+condition** briefly in the existing item. A named ongoing archival requirement may justify a small
+reader; it does not justify keeping the old generator/scorer as a competing default. Do not call a
+migration complete while normal callers still depend on the obsolete path. No new project-wide
+inventory, automatic mutation campaign or recurring approval ritual is required.
+
+| Surface | Evidence required for a meaningful change |
+| --- | --- |
+| Unit, integration, persistence and CLI tests | Intended behavior plus failure cases; real producer/consumer compatibility, cancellation/ownership and durable bytes where applicable |
+| Native UI and system-handoff harnesses | Genuine visible state and independently captured outcomes; failed/missing observations and cleanup remain explicit; XCUITest is still the sole app UI driver |
+| Audio/language/delivery evaluators | Numerical references and adversarial audio for measurements; representative independent calibration for decisions; semantic claims retain the separate blinded-holdout boundary |
+| Performance, memory and benchmark tools | Correct process/lifecycle attribution, representative inputs, observer overhead and measured variance; historical numbers are comparisons, not universal limits |
+| Build, CI, security, packaging and release validators | Positive and deliberate-negative fixtures at the actual execution boundary; justified applicability, identity, privacy and provenance checks |
+
+Version a persisted/public wire format, cache identity or changed measurement meaning when needed
+to prevent silent reinterpretation. Ordinary internal refactors should replace the implementation
+in place. Do not rename frameworks or create V2/V3 pipelines just to signal modernization.
+Fewer tests or gates can be better when unique risk coverage is preserved and verified; counts,
+coverage percentages and inherited health scores are not substitutes for defect detection.
+
+This policy does not silently relax user-data protection, privacy, source binding, fixed inputs,
+no-retry rules or the maintainer's 201-take prerequisite. A flawed gate can be corrected with a
+scoped source/contract/test migration, including evidence that valid cases pass and invalid ones
+remain rejected. Until then its unresolved claim blocks a clean verdict; neither a waiver nor a
+known-wrong baseline is a substitute for a demonstrated correction. Review changes at coherent
+checkpoints, never by changing a frozen campaign or reinterpreting its original result files.
 
 ## The five classes
 

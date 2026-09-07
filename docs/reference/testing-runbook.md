@@ -16,6 +16,12 @@ Start with the [current checkpoint](../development-progress.md) and primary road
 run command. Source, project settings, contracts, and repository scripts outrank this guide.
 This page routes work; it does not duplicate platform procedures or establish another gate.
 
+All routes follow the [replacement and retirement procedure](repository-self-verification.md#replace-and-retire-tests-and-harnesses).
+Preserve tested user protections and evidence, not legacy implementation details or unsupported
+scores. A passing inherited suite does not prove correctness; a newer suite is not exempt from
+independent validation. Replace or consolidate demonstrated weaknesses within their existing owner,
+then retire obsolete execution paths. This is a working policy, not a claim of a completed suite-wide audit.
+
 ## Choose the route
 
 | Task | Authoritative procedure | Boundary |

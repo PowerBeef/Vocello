@@ -26,6 +26,11 @@ blind calibration preparation are implemented. No product-QC threshold, model, p
 release acceptance changed. AV-07/DP-28 retain independent calibration/adoption requirements;
 RF-06 remains a separate unresolved product-audio blocker.
 
+The evidence-led replacement/retirement policy now applies to every testing surface, not just
+Audio QC. DWF-06 records the guidance update; [the procedure](reference/repository-self-verification.md#replace-and-retire-tests-and-harnesses)
+requires an independent expectation, real integration boundaries and finite compatibility/retirement
+criteria. This adopts a policy, not a completed repository-wide test audit or changed quality gate.
+
 | Work | Existing owner | Next boundary |
 | --- | --- | --- |
 | Documentation/workflow cleanup | RF-01 / DWF-06 | Local workflow implemented; coherent deterministic checkpoint, no product acceptance inferred |
@@ -164,9 +169,25 @@ threshold, prompt, account, release operation or personal data was changed.
 Final focused verification passed 79 tests in 7.40 seconds, including v2 derivative-source drift.
 Final two-run model report digests are `58b095ae...653eeb2` (SenseVoice) and
 `5063b8cf...42ab2` (DistilHuBERT), in the `*-qualified` evidence folders. Earlier development
-qualification sets are retained separately, not merged. AGENTS.md remains applicable without
-another rule or gate; the existing source-binding, serial-workload and promotion boundaries apply.
+qualification sets are retained separately, not merged. That implementation added no new gate;
+the existing source-binding, serial-workload and promotion boundaries apply.
 No phone, new weights, generation, personal audio, account or candidate operation was involved.
+
+## Project-wide test and harness evolution — September 6
+
+Extended the requested forward-looking approach to unit/integration/CLI tests, native UI runners,
+audio evaluators, performance tools and build/CI/release validators. AGENTS.md and the existing
+testing router point to one replacement/retirement procedure in repository self-verification.
+Neither legacy output, snapshots nor newer tooling is treated as correctness authority. Changes
+must protect independently established behavior, exercise real connections, demonstrate defect
+detection and consider measured cost. Compatibility requires identified consumers and a retirement
+condition; historical interpretation can be corrected without rewriting original evidence.
+
+DWF-06 owns this guidance checkpoint and RF-01 cross-references it. No new framework, gate,
+mandatory audit campaign, status ledger or product change was introduced. No test implementation
+was retired in this guidance-only change. Existing failures and calibration gaps remain open;
+the phone, release campaign and publication operations remain untouched. Concrete migrations
+belong to existing subsystem items, with release-blocking work first.
 
 ## Codex workflow streamlining
 

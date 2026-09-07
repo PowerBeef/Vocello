@@ -58,6 +58,18 @@ No broad harness work. Serialize heavy work; verify focused changes then the tre
 Freeze source/docs during campaigns; checkpoint runs untracked. Implementation, instrumented QA,
 processed-candidate proof and submission approval differ. Keep external dependencies explicit.
 
+### Evidence-led test and harness evolution
+
+Apply this across unit/integration/UI tests, audio evaluators, performance tools and CI/release
+validators. Existing code/contracts govern execution, not unquestionable correctness; neither age,
+version, model reputation nor a green suite makes an implementation a gold standard. Validate the
+intended behavior independently, including real producer/consumer boundaries and known bad inputs.
+Prefer one current implementation; retain compatibility only for identified consumers or evidence
+with an explicit retirement condition. Version persisted/public contracts or changed measurement
+meaning, not routine refactors. Preserve user data and original evidence, not known bugs or
+unsupported verdicts. Use the [replacement and retirement procedure](docs/reference/repository-self-verification.md#replace-and-retire-tests-and-harnesses)
+within existing roadmap items; no blanket rewrite, parallel harness or silent gate waiver.
+
 ## Hard invariants
 
 | Invariant | Required behavior |

@@ -166,7 +166,8 @@
       "gate": "Map every audit finding to its existing defect authority or one independent product defect; preserve seven correlated passes, one product failure, and five additional unverified engine attempts. Inspect retained attachments once without inventing observations. Register the ordered primary programme and pass roadmap/documentation validation.",
       "evidence": [
         "doc:docs/reference/release-first-execution-2026-09.md#audit-finding-disposition",
-        "doc:docs/reference/release-first-execution-2026-09.md#preserved-september-4-device-boundary"
+        "doc:docs/reference/release-first-execution-2026-09.md#preserved-september-4-device-boundary",
+        "doc:docs/development-progress.md#project-wide-test-and-harness-evolution--september-6"
       ],
       "updated": "2026-09-06",
       "notes": "September 6 Codex workflow streamlining is owned by DWF-06 in the existing development-workflow plan. Local checks are selective, complete CI/release proof remains separate, and no release blocker was closed. September 6 documentation cleanup: one current checkpoint and current release queue, pinned verbatim narrative/runbook archives, reconciled per-file lifecycle catalogs, concise instruction routing, corrected stale facts and explicit frozen-campaign pause rules. No status, acceptance gate, historical failure, or product behavior was changed. Verification and resume context: docs/development-progress.md#documentation-cleanup-checkpoint. September 6: iOS-first queue adopted; active release-first reference maps each remaining blocker to owner, next action and evidence. No parallel status authority. Historical checkpoint: VRA-001 through VRA-022 are mapped. F-15/F-16/F-17 own the new independent gaps; F-06 is reopened. A bounded scan of the retained 1710-attachment manifest and Staging found no canonical recoverable observation stream. ICA-04/ICA-05/ICA-18 keep the original failed/unverified attempts, not a fabricated PASS or safe-resume cursor. This closes reconciliation only, not any acceptance campaign. The September 4 HTML audit of 616fdfe2 was separately grounded at 75ecb740: all 12 V26 findings have dispositions in docs/reference/engineering-audit-grounding-2026-09-04.md. F-01 is reopened; F-18 through F-22 capture independent output/lifecycle/CLI/shared-store issues; F-16, F-06, VLR-07 and ASR items retain overlapping authority. Concurrency schedules remain risks until tested. This is review completion, not remediation or new candidate evidence."
@@ -3398,7 +3399,9 @@
         "file:scripts/tests/test_development_workflow.py",
         "file:scripts/tests/test_evidence_impact.py",
         "doc:docs/reference/development-workflow.md",
-        "doc:docs/development-progress.md#codex-workflow-streamlining"
+        "doc:docs/development-progress.md#codex-workflow-streamlining",
+        "doc:docs/reference/repository-self-verification.md#replace-and-retire-tests-and-harnesses",
+        "doc:docs/development-progress.md#project-wide-test-and-harness-evolution--september-6"
       ],
       "sourceOfTruth": [
         "config/evidence-impact.json",
@@ -3407,7 +3410,7 @@
         "scripts/check_test_workflows.sh"
       ],
       "updated": "2026-09-06",
-      "notes": "Implementation and focused routing/negative fixtures completed. Commit-hook validation is receipt-only: absent, stale or unreadable receipts block without starting another checkpoint; long checks run directly outside the host hook timeout. The interrupted 7887bfda hook recheck is not a completed PASS. A direct coherent full deterministic checkpoint remains required for the follow-up; results stay in the existing gate artifacts. This is workflow implementation, not product/candidate acceptance. Release-first remains primary; the phone and product investigations remain paused."
+      "notes": "September 6 project-wide policy extension: AGENTS.md and the testing router now direct all tests/harnesses to the existing self-verification reference's replacement/retirement procedure. Each scoped migration states its claim, independent evidence, replacement, remaining consumers and retirement condition. Known-wrong baselines have no automatic authority; temporary comparisons must end in one current route or an explicit unresolved decision. Preserve necessary readers and original evidence, not redundant execution paths. This records guidance adoption only, not a completed suite-wide audit or relaxation of the 201-take, data-preservation, QC or release requirements. Concrete corrections remain with existing subsystem owners; no new audit programme or blocker was created. Earlier workflow checkpoint: implementation and focused routing/negative fixtures completed. Commit-hook validation is receipt-only: absent, stale or unreadable receipts block without starting another checkpoint; long checks run directly outside the host hook timeout. The interrupted 7887bfda hook recheck is not a completed PASS. A direct coherent full deterministic checkpoint remains required for the follow-up; results stay in the existing gate artifacts. This is workflow implementation, not product/candidate acceptance. Release-first remains primary; the phone and product investigations remain paused."
     }
   ]
 }

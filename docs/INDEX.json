@@ -315,6 +315,8 @@
         "scripts/check_language_output.py",
         "config/audio-cadence-qc-contract.json",
         "config/prosody-holdout-policy.json",
+        "scripts/prosody_corpus_inventory.py",
+        "scripts/prosody_holdout_validation.py",
         "config/roadmap.json"
       ]
     },

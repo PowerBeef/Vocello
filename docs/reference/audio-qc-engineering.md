@@ -17,6 +17,8 @@ sourceOfTruth:
   - scripts/check_language_output.py
   - config/audio-cadence-qc-contract.json
   - config/prosody-holdout-policy.json
+  - scripts/prosody_corpus_inventory.py
+  - scripts/prosody_holdout_validation.py
   - config/roadmap.json
 ---
 # Audio QC: engineering review and consolidation
@@ -335,20 +337,104 @@ The 14 retained French Design comparisons already include independent Apple/Whis
 SenseVoice does not support French and DistilHuBERT does not transcribe; running either as a French
 judge would be invalid. French disagreement remains open; no extra recognizer was downloaded.
 
-### Calibration preparation is ready; independent labels are not
+### Speech/defect calibration: prepare independently, then measure
 
-`prosody_holdout_validation.py prepare --output <untracked.json>` now emits the existing frozen
-protocol and missing-data counts. Optional `--inventory` accepts predeclared, unlabelled split/group
-metadata and local audio; output strips paths, rejects audio/group overlap and requested/scored
-labels, and binds bytes. It never selects a holdout, invents labels or fits a profile. Calibration
-and holdout now reject missing/non-numeric/non-finite metrics instead of filling in zero, and
-corpus hashing is streamed. Existing Wilson, leakage and threshold-binding checks still apply.
+The existing `prosody_holdout_validation.py` route now offers **inventory → prepare → evaluate**;
+`prosody_corpus_inventory.py` is its standard-library, read-only inventory helper, not another
+evaluator. None of these preparation steps runs a model, generates speech or assigns quality labels.
+Signal correctness, speech usability, and semantic emotion/fidelity are separate claims.
 
-The prepared `calibration-preparation.json` correctly reports **60 calibration clips plus at least
-30 good / 30 bad holdout clips still needed**, with independent annotations and existing coverage
-requirements. Reused research previews are not an untouched holdout. Existing listener-session v2
-supplies blinded review; no second listening harness was added. AV-07 and DP-28 stay open until
-independent data and qualification exist. Numerical fixtures cannot provide those labels.
+**Sampling correction.** The current minimum is **60 calibration + 60 good / 60 bad holdout
+recordings**. At the previous 30-good floor, even zero errors gives a 95% Wilson false-positive
+upper bound of 0.113513, which cannot meet the unchanged 0.10 limit. At 60 it is 0.060172. Policy
+validation now rejects floors incapable of meeting either confusion bound even with perfect
+results. These are starting floors, not a power guarantee or permission to collect until PASS.
+Freeze the sampling/analysis plan before fitting; if underpowered, report inconclusive and
+predeclare a new independent study instead of repeatedly opening or topping up the same holdout.
+
+**Actual retained inventory, September 6.** Explicit diagnostics/macOS roots yielded 2,918 WAVs:
+2,915 readable PCM files, 1,967 unique containers, **1,145 unique format-bound PCM streams**, and
+three unavailable metadata cases. The walk visited 27,900 entries and explicitly skipped 139
+symlinks. File/PCM hashes reveal copies and differently tagged containers; they do not establish
+independent speakers, scripts, seeds, source families, real speech, or human quality labels.
+All discovered material is development-only. It has no inferred labels or promotion authority.
+The untracked bundle is `build/artifacts/diagnostics/audio-qc-calibration-preparation-20260906/`:
+`inventory.json` is sanitized; `private-map.json` is private and must never be published;
+`preparation-final.json` reports the still-missing qualified 60/120 corpus and unanswered annotation
+template; the initial `preparation.json` is preserved. Inventory digest:
+`e80b59e11e0de0684667a5ea56f21166d6fcebe2d39aa2da44cbaecf85208eff`.
+
+**Corpus preparation order.**
+
+1. Reconcile source metadata from exact receipts/manifests, never file names or prior QC verdicts.
+   Include good speech and real retained defects; stratify language, speaker, script/translation
+   family, duration, phonation and defect severity. Include quiet/whispered but usable speech and
+   natural punctuation pauses as negative controls. Synthetic corruptions are useful measurement
+   fixtures, not independent perceptual ground truth.
+2. Declare `sourceGroup` for the original recording family: copies, crops, replay outputs and
+   altered derivatives stay together. Calibration and holdout must also separate speaker, script
+   and translated-equivalent groups. Select one predeclared primary observation per holdout source
+   family. Different hashes do not prove independent sampling. Wilson bounds here describe the
+   sampled clip cohort; they do not prove per-language or unseen-speaker generalization. Record
+   group-level results and declare insufficient coverage rather than imply that broader claim.
+3. Predeclare the untouched pool with genuinely unexamined recordings/groups and attest exposure
+   as `untouched`. Previously listened-to/analyzed previews or known failures may inform development,
+   never confirmation. Prepare accepts explicit `calibration`/`holdout` splits and rejects examined
+   holdout rows, duplicate PCM, source/group overlap and any extra requested/scored label fields.
+   Freeze primary selections independently of detector scores. Do not run feature extraction on
+   the confirmation pool before freezing the profile.
+4. Collect the independent annotations below. Uncertain/disputed rows remain in the accounting;
+   resolve them independently before binary export, or leave qualification blocked. Do not drop
+   them or choose replacements because they disagree with the detector.
+5. Fit on calibration only, bind the exact feature/preprocessing source and profile, then run the
+   frozen holdout once. Inspect false alarms, misses and uncertain strata. AV-07 remains open until
+   representative independent evidence qualifies the actual feature consumer. Retire the old
+   proxy only after that switch is justified; old output equality is not an acceptance target.
+
+**Annotation protocol** is `annotationProtocol` in `config/prosody-holdout-policy.json`:
+
+- At least three independently responding reviewers per clip, with at least one fluent in its
+  language. Use anonymous reviewer digests, retain every response and record language fluency.
+- Hide source names, requested presets, prior QC, split membership, metrics and expected defects.
+  Randomize presentation per reviewer. The original PCM amplitude and time origin must remain
+  intact: no gain normalization, silence trimming, denoising or time stretching for defect review.
+- Record `acceptable`, `objectionable` or `uncertain`, finite confidence 0–1, and each audible
+  defect's type, start/end in original-WAV seconds, and mild/moderate/severe severity. The rubric
+  separates audibility from impact; none means no identified defect, not correct emotion.
+  Keep optional free-text notes private and separate from machine reports. Do not show desired
+  speech text before a free intelligibility/language judgment; a separate alignment review may
+  use a verified transcript and must be identified as such.
+- Retain approximately 10–15% exact presentation repeats for reviewer consistency checks, but
+  never count those repeats as independent corpus rows. Listen before discussing other votes.
+  The validator binds responses to WAV bytes, requires distinct reviewer IDs and fluent coverage,
+  validates finite interval/confidence fields, and checks severity against observations. Any
+  disagreement/uncertainty requires a separate fluent adjudicator bound to the original response
+  set. Reviewer independence/fluency are operator attestations, not cryptographically proven facts.
+- Private labeled JSONL rows add `annotations` to the existing calibration input. Each response
+  uses the emitted template (`protocolID`, `source`, `audioSHA256`, `reviewerID`, `fluentLanguages`,
+  `decision`, `confidence`, `defects`). A needed `adjudication` uses the same fields plus
+  `responseSetSHA256` (SHA-256 of `json.dumps(annotations, sort_keys=True).encode()`). It must come
+  from another reviewer; original votes remain unchanged. Final `label` maps acceptable→good and
+  objectionable→bad. `defectSeverity` is the maximum resolved interval severity, or none.
+
+The existing delivery listening session remains the **dimensional/emotion** tool: it requires
+completed generations and asks VAD/2AFC questions. It does **not** collect defect intervals or accept
+failed generations as a defect study, and is not silently repurposed as one. The new template is
+an annotation data contract, not a claim that a graphical/interactive defect-listening session has
+been built or completed. No independent reviewers or labels were fabricated.
+
+**Compatibility.** Existing JSONL/profile readers and historical result files remain readable.
+New qualification deliberately requires source-family/exposure provenance and bound independent
+annotations; old anonymous good/bad strings alone no longer authorize a current PASS. Supply real
+provenance or keep those files historical—never backfill invented source IDs or reviewer votes.
+New reports include the policy and annotation-evidence digests. Production QC and DP-31 semantic
+prompt-promotion rules are unchanged; this is not a new general release prerequisite.
+
+Verification: 32 prosody tests pass, including actual CLI inventory/overwrite refusal, duplicate
+container-versus-PCM identity, truncated input, symlink/traversal bounds, original-byte preservation,
+duration-bounded read memory (one versus 600 seconds), impossible sample floors, split/source reuse,
+per-listener/adjudication drift, and refusal before analyzer launch when annotations are missing.
+This proves preparation/validation behavior, not that the unlabelled corpus is calibrated.
 
 Operator commands (corrected FIR is the default; old configs require explicit historical replay):
 
@@ -358,6 +444,10 @@ python3 scripts/analyze_prosody.py <wav> --experimental-phonation --json
 python3 scripts/prepare_delivery_compact_model_config.py sensevoice-small-q8 \
   --output <new-untracked-config.json>
 python3 scripts/prosody_holdout_validation.py prepare --output <untracked-preparation.json>
+# Explicit roots only; both outputs must be new and untracked.
+python3 scripts/prosody_holdout_validation.py inventory \
+  --audio-root build/artifacts/diagnostics --audio-root build/artifacts/macos \
+  --output <untracked-inventory.json> --private-map <private-path-map.json>
 ```
 
 Regenerate local configs after source changes; do not overwrite the retained evidence's configs.

@@ -39,6 +39,23 @@ before/after processes qualified below 119 MB sampled RSS; the initial invalid P
 and red regressions remain recorded, not overwritten. Detailed methods, digests, limitations and
 the next AV-07 calibration boundary are in the Audio QC reference; no phone work occurred.
 
+Speech/defect preparation now corrects the underpowered old minimum: zero false alarms in 30 good
+clips cannot meet the 95% upper-bound gate; the predeclared starting design is 60 calibration plus
+60-good/60-bad holdout recordings. The existing validator now rejects impossible sample floors,
+duplicate PCM/source families, examined holdout material and missing/mismatched independent
+annotations. A bounded read-only inventory found 2,918 WAVs, 2,915 readable files and 1,145 unique
+PCM streams, with three unavailable cases retained. These are **not** 1,145 qualified independent
+speech observations: groups, languages, exposure and human labels remain unverified. Everything
+discovered stays development-only. The anonymous inventory, separate private path map, unanswered
+annotation template and remaining-data counts are retained in
+`build/artifacts/diagnostics/audio-qc-calibration-preparation-20260906/`.
+Next: reconcile exact source metadata, predeclare an unexamined confirmation pool, obtain three
+independent reviewers with fluent coverage, fit calibration only and qualify once. No profile,
+production threshold, phone or neural model was used/changed. AV-07 remains open; the full protocol
+and the emotion-listener tool's distinct scope are in the Audio QC reference.
+The complete focused prosody suite passes 32 tests, including existing profile/calibration consumers;
+no app/phone acceptance or completed speech-defect listening session is implied.
+
 The evidence-led replacement/retirement policy now applies to every testing surface, not just
 Audio QC. DWF-06 records the guidance update; [the procedure](reference/repository-self-verification.md#replace-and-retire-tests-and-harnesses)
 requires an independent expectation, real integration boundaries and finite compatibility/retirement

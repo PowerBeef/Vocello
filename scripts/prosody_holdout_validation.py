@@ -9,6 +9,7 @@ import json
 import math
 import os
 import re
+import subprocess
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
@@ -16,6 +17,7 @@ from typing import Any, Callable
 
 import prosody_calibration
 from prosody_profile import load_profile
+from prosody_corpus_inventory import audio_identity, inventory_audio
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -46,18 +48,30 @@ def validate_policy(root: Path = ROOT) -> dict[str, Any]:
         "minimumCalibrationClips", "minimumHoldoutGoodClips", "minimumHoldoutBadClips",
         "minimumHoldoutSpeakerGroups", "minimumHoldoutScriptGroups", "minimumHoldoutLanguages",
     ):
-        if not isinstance(policy.get(key), int) or policy[key] < 2:
+        if type(policy.get(key)) is not int or policy[key] < 2:
             raise HoldoutError(f"{key} must be an integer of at least two")
-    if not 0 < policy.get("maximumFalsePositiveRateUpperBound", 0) < 1:
-        raise HoldoutError("maximum false-positive bound is invalid")
-    if not 0 < policy.get("minimumTruePositiveRateLowerBound", 0) < 1:
-        raise HoldoutError("minimum true-positive bound is invalid")
+    for key in ("maximumFalsePositiveRateUpperBound", "minimumTruePositiveRateLowerBound"):
+        value = policy.get(key)
+        if type(value) not in (int, float) or not math.isfinite(value) or not 0 < value < 1:
+            raise HoldoutError(f"{key} is invalid")
     for key in ("requiredLengthClasses", "requiredDefectSeverities", "groupIsolation"):
         value = policy.get(key)
         if not isinstance(value, list) or not value or any(not isinstance(item, str) for item in value):
             raise HoldoutError(f"{key} must be a non-empty string array")
     if set(policy["groupIsolation"]) != {"speakerGroup", "scriptGroup", "translationGroup"}:
         raise HoldoutError("holdout isolation must cover speaker, script, and translation groups")
+    good, bad = policy["minimumHoldoutGoodClips"], policy["minimumHoldoutBadClips"]
+    if _wilson(0, good)["upper"] > policy["maximumFalsePositiveRateUpperBound"]:
+        raise HoldoutError("good-clip floor cannot satisfy the false-positive bound even with zero errors")
+    if _wilson(bad, bad)["lower"] < policy["minimumTruePositiveRateLowerBound"]:
+        raise HoldoutError("bad-clip floor cannot satisfy the true-positive bound even with perfect detection")
+    if policy.get("samplingUnit") != "independent-source-recording":
+        raise HoldoutError("sampling unit must identify independent source recordings")
+    annotation = policy.get("annotationProtocol", {})
+    if annotation.get("id") != "speech-defects-1" or annotation.get("minimumIndependentReviewers") != 3:
+        raise HoldoutError("independent speech/defect annotation protocol is required")
+    if annotation.get('minimumFluentReviewersPerClip') != 1 or annotation.get('decisions') != ['acceptable', 'objectionable', 'uncertain']:
+        raise HoldoutError('annotation fluency and uncertainty contract is invalid')
     return policy
 
 
@@ -88,13 +102,28 @@ def validate_manifests(
         raise HoldoutError("holdout lacks the frozen good/bad sample floors")
     for split_name, entries in (("calibration", calibration), ("holdout", holdout)):
         for row in entries:
+            if row.get('exposure') not in ('previously-examined', 'untouched'):
+                raise HoldoutError('source exposure history is required')
+            if split_name == 'holdout' and row['exposure'] != 'untouched':
+                raise HoldoutError('previously examined audio cannot qualify an untouched holdout')
+            _safe_token(row.get("sourceGroup"), f"{split_name}.sourceGroup")
             for field in METADATA_FIELDS:
                 _safe_token(row.get(field), f"{split_name}.{field}")
     calibration_audio = {_clip_digest(row) for row in calibration}
     holdout_audio = {_clip_digest(row) for row in holdout}
     if calibration_audio & holdout_audio:
         raise HoldoutError("calibration and holdout reuse audio bytes")
-    for field in policy["groupIsolation"]:
+    if len(calibration_audio) != len(calibration) or len(holdout_audio) != len(holdout):
+        raise HoldoutError("duplicate audio cannot count as independent observations")
+    # Container metadata is not a new observation. Variants/replays of one
+    # recording must also share sourceGroup, even when their PCM differs.
+    pcm = [[audio_identity(Path(row["path"]))["pcmSHA256"] for row in rows]
+           for rows in (calibration, holdout)]
+    if len(set(pcm[0] + pcm[1])) != len(calibration) + len(holdout):
+        raise HoldoutError("duplicate PCM cannot count as independent observations")
+    if len({row["sourceGroup"] for row in holdout}) != len(holdout):
+        raise HoldoutError("holdout requires one primary observation per independent sourceGroup")
+    for field in (*policy["groupIsolation"], "sourceGroup"):
         if {row[field] for row in calibration} & {row[field] for row in holdout}:
             raise HoldoutError(f"calibration and holdout leak {field}")
     speaker_count = len({row["speakerGroup"] for row in holdout})
@@ -117,12 +146,85 @@ def validate_manifests(
         "holdoutSpeakerGroupCount": speaker_count,
         "holdoutScriptGroupCount": script_count,
         "holdoutLanguages": languages,
+        "holdoutSourceGroupCount": len({row["sourceGroup"] for row in holdout}),
+        "samplingUnit": policy["samplingUnit"],
     }
 
 
+def validate_annotations(row: dict[str, Any], policy: dict[str, Any]) -> str:
+    """Validate independent observations, not an analyzer's self-assigned labels.
+
+    Pseudonyms and human/fluency declarations require operator attestation; this
+    validates binding/structure, not that a program can authenticate a human.
+    Disagreement needs a separate, blind adjudicator, preserving original votes.
+    """
+    protocol = policy['annotationProtocol']
+    responses = row.get('annotations')
+    if not isinstance(responses, list) or len(responses) < protocol['minimumIndependentReviewers']:
+        raise HoldoutError('independent per-listener annotations are missing')
+    identity = audio_identity(Path(row['path']))
+    reviewers = set()
+
+    def checked(response):
+        if not isinstance(response, dict):
+            raise HoldoutError('annotation must be an object')
+        reviewer = response.get('reviewerID')
+        if not isinstance(reviewer, str) or not re.fullmatch(r'[0-9a-f]{64}', reviewer) or reviewer in reviewers:
+            raise HoldoutError('annotations require distinct anonymous reviewer digests')
+        reviewers.add(reviewer)
+        if response.get('audioSHA256') != identity['audioSHA256']:
+            raise HoldoutError('annotation audio binding does not match')
+        if response.get('protocolID') != protocol['id'] or response.get('source') != 'independent-human':
+            raise HoldoutError('annotation must declare the independent human protocol')
+        confidence = response.get('confidence')
+        if type(confidence) not in (int, float) or not math.isfinite(confidence) or not 0 <= confidence <= 1:
+            raise HoldoutError('annotation confidence must be finite and bounded')
+        decision = response.get('decision')
+        if decision not in protocol['decisions']:
+            raise HoldoutError('annotation decision is invalid')
+        languages = response.get('fluentLanguages')
+        if not isinstance(languages, list) or any(not isinstance(item, str) for item in languages):
+            raise HoldoutError('annotation fluent languages are required')
+        defects = response.get('defects')
+        if not isinstance(defects, list) or (decision == 'objectionable' and not defects):
+            raise HoldoutError('objectionable annotations require defect intervals')
+        for defect in defects:
+            if not isinstance(defect, dict) or defect.get('type') not in protocol['defectTypes']:
+                raise HoldoutError('annotation defect type is invalid')
+            if defect.get('severity') not in ('mild', 'moderate', 'severe'):
+                raise HoldoutError('annotation defect severity is invalid')
+            start, end = defect.get('startSeconds'), defect.get('endSeconds')
+            if any(type(value) not in (int, float) or not math.isfinite(value) for value in (start, end)) or not 0 <= start < end <= identity['durationSeconds']:
+                raise HoldoutError('annotation interval is outside the original WAV')
+        return decision, row['language'] in languages
+
+    votes = [checked(response) for response in responses]
+    if not any(fluent for _, fluent in votes):
+        raise HoldoutError('annotations lack fluent-language coverage')
+    expected = {'good': 'acceptable', 'bad': 'objectionable'}.get(row['label'])
+    if expected is None:
+        raise HoldoutError('a binary label must be independently resolved')
+    resolved_responses = responses
+    if any(decision != expected for decision, _ in votes):
+        adjudication = row.get('adjudication')
+        response_digest = hashlib.sha256(json.dumps(responses, sort_keys=True).encode()).hexdigest()
+        if not isinstance(adjudication, dict) or adjudication.get('responseSetSHA256') != response_digest:
+            raise HoldoutError('disagreement or uncertainty needs retained independent adjudication')
+        decision, fluent = checked(adjudication)
+        if decision != expected or not fluent:
+            raise HoldoutError('adjudication must independently resolve the label with language fluency')
+        resolved_responses = [adjudication]
+    severity_order = ['none', 'mild', 'moderate', 'severe']
+    severity = max((severity_order.index(defect['severity'])
+                    for response in resolved_responses for defect in response['defects']), default=0)
+    if row.get('defectSeverity') != severity_order[severity]:
+        raise HoldoutError('declared defect severity disagrees with independent annotations')
+    return hashlib.sha256(json.dumps({'annotations': responses, 'adjudication': row.get('adjudication')}, sort_keys=True).encode()).hexdigest()
+
+
 def _wilson(successes: int, total: int) -> dict[str, float]:
-    if total <= 0:
-        raise HoldoutError("confidence interval requires observations")
+    if type(total) is not int or type(successes) is not int or total <= 0 or not 0 <= successes <= total:
+        raise HoldoutError("confidence interval requires valid integer observation counts")
     z = 1.959963984540054
     proportion = successes / total
     denominator = 1 + z * z / total
@@ -170,6 +272,8 @@ def evaluate(
     calibration = prosody_calibration.load_labels(calibration_path)
     holdout = prosody_calibration.load_labels(holdout_path)
     coverage = validate_manifests(calibration, holdout, policy)
+    # Check independent labels before launching any acoustic analyzer.
+    annotation_digests = [validate_annotations(row, policy) for row in calibration + holdout]
     profile = load_profile(profile_path)
     calibration_digest = validate_profile_binding(profile, calibration)
     good, bad = _metrics(holdout, analyzer)
@@ -191,6 +295,10 @@ def evaluate(
         "calibrationCorpusDigest": calibration_digest,
         "holdoutCorpusDigest": prosody_calibration.corpus_digest(holdout),
         "profileDigest": hashlib.sha256(profile_path.read_bytes()).hexdigest(),
+        "policySHA256": hashlib.sha256(json.dumps(policy, sort_keys=True).encode()).hexdigest(),
+        "annotationEvidenceSHA256": hashlib.sha256(json.dumps(annotation_digests).encode()).hexdigest(),
+        "validationSourceSHA256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+        "inventorySourceSHA256": hashlib.sha256(Path(__file__).with_name('prosody_corpus_inventory.py').read_bytes()).hexdigest(),
         "coverage": coverage,
         "falsePositiveRate95CI": fpr,
         "truePositiveRate95CI": tpr,
@@ -201,13 +309,29 @@ def evaluate(
 
 def _atomic_json(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    encoded = json.dumps(payload, indent=2, sort_keys=True).encode() + b"\n"
-    with tempfile.NamedTemporaryFile(dir=path.parent, prefix=f".{path.name}.", delete=False) as handle:
-        temporary = Path(handle.name)
-        handle.write(encoded)
-        handle.flush()
-        os.fsync(handle.fileno())
-    os.replace(temporary, path)
+    encoded = json.dumps(payload, indent=2, sort_keys=True, allow_nan=False).encode() + b"\n"
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(dir=path.parent, prefix=f".{path.name}.", delete=False) as handle:
+            temporary = Path(handle.name)
+            handle.write(encoded)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+
+
+def _new_private_output(path: Path) -> Path:
+    path = path.resolve()
+    if path.exists():
+        raise HoldoutError("preparation output already exists; preserve the earlier artifact")
+    if path.is_relative_to(ROOT):
+        ignored = subprocess.run(["git", "check-ignore", "-q", "--", str(path)], cwd=ROOT, check=False)
+        if ignored.returncode != 0:
+            raise HoldoutError("calibration artifacts inside the repository must be git-ignored")
+    return path
 
 
 def prepare_calibration(inventory: list[dict[str, Any]], policy: dict[str, Any]) -> dict[str, Any]:
@@ -219,26 +343,41 @@ An empty inventory emits the existing protocol and honest data dependencies.
 """
     rows = []
     seen = set()
-    groups = {split: {field: set() for field in policy['groupIsolation']}
+    source_groups = set()
+    groups = {split: {field: set() for field in (*policy['groupIsolation'], 'sourceGroup')}
               for split in ('calibration', 'holdout')}
     for item in inventory:
         if item.get('split') not in groups:
             raise HoldoutError('preparation requires an explicit calibration/holdout split')
-        if any(key in item for key in ('label', 'requestedLabel', 'preset', 'targetDelivery')):
+        allowed = {'path', 'split', 'sourceGroup', 'exposure', *METADATA_FIELDS} - {'defectSeverity'}
+        if set(item) - allowed:
             raise HoldoutError('blind preparation must not receive requested or scored labels')
+        if item.get('exposure') not in ('previously-examined', 'untouched'):
+            raise HoldoutError('preparation requires explicitly attested exposure history')
+        if item['split'] == 'holdout' and item['exposure'] != 'untouched':
+            raise HoldoutError('previously examined recordings cannot enter an untouched holdout')
+        source_group = _safe_token(item.get('sourceGroup'), 'sourceGroup')
+        if item['split'] == 'holdout' and source_group in source_groups:
+            raise HoldoutError('holdout requires one primary observation per sourceGroup')
+        if item['split'] == 'holdout':
+            source_groups.add(source_group)
         audio_digest = _clip_digest(item)
-        if audio_digest in seen:
-            raise HoldoutError('preparation reuses audio bytes')
-        seen.add(audio_digest)
-        row = {'audioSHA256': audio_digest, 'split': item['split'], 'label': None}
+        identity = audio_identity(Path(item['path']))
+        if identity['audioSHA256'] != audio_digest:
+            raise HoldoutError('audio changed during preparation')
+        if identity['pcmSHA256'] in seen:
+            raise HoldoutError('preparation reuses audio bytes or PCM')
+        seen.add(identity['pcmSHA256'])
+        row = {**identity, 'split': item['split'], 'label': None,
+               'sourceGroup': source_group, 'exposure': item['exposure']}
         for field in METADATA_FIELDS:
             if field == 'defectSeverity':
                 continue  # Independent annotation, never a requested-label feature.
             row[field] = _safe_token(item.get(field), field)
-        for field in policy['groupIsolation']:
+        for field in groups[item['split']]:
             groups[item['split']][field].add(row[field])
         rows.append(row)
-    for field in policy['groupIsolation']:
+    for field in groups['calibration']:
         if groups['calibration'][field] & groups['holdout'][field]:
             raise HoldoutError(f'preparation leaks {field}')
     counts = {split: sum(row['split'] == split for row in rows) for split in groups}
@@ -249,9 +388,22 @@ An empty inventory emits the existing protocol and honest data dependencies.
         'status': 'NEEDS_INDEPENDENT_LABELS', 'promotionAuthority': False,
         'policy': policy, 'policySHA256': hashlib.sha256(json.dumps(policy, sort_keys=True).encode()).hexdigest(),
         'sourceSHA256': hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+        'inventorySourceSHA256': hashlib.sha256(Path(__file__).with_name('prosody_corpus_inventory.py').read_bytes()).hexdigest(),
         'counts': counts, 'additionalAudioMinimum': {s: max(0, minimum[s]-counts[s]) for s in groups},
         'items': rows,
-        'requiredAnnotations': ['good-or-bad', 'defectSeverity', 'independent-reviewer-provenance'],
+        'requiredAnnotations': ['decision', 'defect-intervals', 'severity', 'confidence', 'independent-reviewer-provenance'],
+        'annotationTemplate': {
+            'protocolID': policy['annotationProtocol']['id'], 'source': 'independent-human',
+            'audioSHA256': None, 'reviewerID': None, 'fluentLanguages': [],
+            'decision': None, 'confidence': None,
+            'defects': [{'type': None, 'startSeconds': None, 'endSeconds': None, 'severity': None}],
+            'status': 'UNANSWERED',
+        },
+        'samplingFeasibility': {
+            'zeroErrorsAtGoodFloor95Upper': _wilson(0, policy['minimumHoldoutGoodClips'])['upper'],
+            'perfectDetectionAtBadFloor95Lower': _wilson(policy['minimumHoldoutBadClips'], policy['minimumHoldoutBadClips'])['lower'],
+            'countsAreStartingFloorsNotPowerGuarantees': True,
+        },
         'nextActions': ['complete-group-and-language-coverage', 'independently-label-calibration-and-holdout',
                         'fit-only-calibration', 'freeze-profile-before-opening-holdout',
                         'evaluate-once-with-existing-prosody-holdout-validator'],
@@ -260,7 +412,10 @@ An empty inventory emits the existing protocol and honest data dependencies.
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("validate-contract", "prepare", "evaluate"))
+    parser.add_argument("command", choices=("validate-contract", "inventory", "prepare", "evaluate"))
+    parser.add_argument("--audio-root", type=Path, action="append", help="explicit retained-audio directory; never a holdout selector")
+    parser.add_argument("--private-map", type=Path, help="new untracked local path map, separate from the sanitized inventory")
+    parser.add_argument("--max-files", type=int, default=5000)
     parser.add_argument("--inventory", type=Path, help="private JSON object with predeclared unlabelled items")
     parser.add_argument("--root", type=Path, default=ROOT)
     parser.add_argument("--calibration-labels", type=Path)
@@ -269,6 +424,17 @@ def main() -> int:
     parser.add_argument("--output", type=Path)
     arguments = parser.parse_args()
     try:
+        if arguments.command == "inventory":
+            if not arguments.audio_root or arguments.output is None or arguments.private_map is None:
+                raise HoldoutError('inventory requires audio roots, output and private map')
+            output, private_map = map(_new_private_output, (arguments.output, arguments.private_map))
+            if output == private_map:
+                raise HoldoutError('public and private outputs must be separate')
+            result, paths = inventory_audio(arguments.audio_root, max_files=arguments.max_files)
+            _atomic_json(private_map, paths)
+            _atomic_json(output, result)
+            print(json.dumps({'status': result['status'], 'counts': result['counts']}))
+            return 0 if result['status'] == 'INVENTORIED' else 2
         if arguments.command == "validate-contract":
             policy = validate_policy(arguments.root.resolve())
             print(f"Prosody holdout contract: PASS ({policy['minimumHoldoutGoodClips']} good + {policy['minimumHoldoutBadClips']} bad)")
@@ -280,7 +446,7 @@ def main() -> int:
             if not isinstance(items, list) or any(not isinstance(row, dict) for row in items):
                 raise HoldoutError('inventory items must be an array of objects')
             result = prepare_calibration(items, validate_policy(arguments.root.resolve()))
-            _atomic_json(arguments.output.resolve(), result)
+            _atomic_json(_new_private_output(arguments.output), result)
             print(json.dumps({'status': result['status'], 'counts': result['counts']}))
             return 0
         if not all((arguments.calibration_labels, arguments.holdout_labels, arguments.profile, arguments.output)):

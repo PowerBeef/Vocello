@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "confidenceLevel": 0.95,
   "minimumCalibrationClips": 60,
-  "minimumHoldoutGoodClips": 30,
-  "minimumHoldoutBadClips": 30,
+  "minimumHoldoutGoodClips": 60,
+  "minimumHoldoutBadClips": 60,
   "minimumHoldoutSpeakerGroups": 3,
   "minimumHoldoutScriptGroups": 3,
   "minimumHoldoutLanguages": 3,
@@ -11,5 +11,25 @@
   "requiredDefectSeverities": ["none", "mild", "moderate", "severe"],
   "maximumFalsePositiveRateUpperBound": 0.1,
   "minimumTruePositiveRateLowerBound": 0.7,
-  "groupIsolation": ["speakerGroup", "scriptGroup", "translationGroup"]
+  "groupIsolation": ["speakerGroup", "scriptGroup", "translationGroup"],
+  "samplingUnit": "independent-source-recording",
+  "annotationProtocol": {
+    "id": "speech-defects-1",
+    "minimumIndependentReviewers": 3,
+    "minimumFluentReviewersPerClip": 1,
+    "decisions": ["acceptable", "objectionable", "uncertain"],
+    "defectTypes": ["interior-gap", "trailing-silence", "clipping-distortion", "truncation", "repetition", "word-spacing", "pitch-instability", "intelligibility", "wrong-language", "other"],
+    "severities": {
+      "none": "No audible defect identified; this is not a claim that the requested emotion was achieved.",
+      "mild": "Noticeable irregularity that does not materially impair use or comprehension.",
+      "moderate": "Clearly distracting defect that materially reduces usability or comprehension.",
+      "severe": "Output is unusable, substantially incomplete, or seriously unintelligible."
+    },
+    "confidenceRange": [0, 1],
+    "intervalUnit": "seconds-from-original-wav-start",
+    "playback": "original-PCM-no-gain-normalization-no-trimming",
+    "blindFields": ["requestedPreset", "expectedDefect", "priorQC", "sourceName", "split", "metrics"],
+    "disagreement": "retain-all-responses-and-adjudicate-independently-before-binary-label-export",
+    "authority": "independent-human-observation-not-analyzer-output"
+  }
 }

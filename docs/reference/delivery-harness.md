@@ -95,7 +95,7 @@ the script self-test suite via `scripts/check_test_workflows.sh`.
 | `scripts/analyze_delivery.py` | Reference-free delivery acoustic analyzer (F0 median/range, syllable rate, duration, voicing) consumed by `delivery_adherence.py` and the bench sidecar | `test_analyze_delivery.py` |
 | `scripts/analyze_prosody.py` | Bounded reference-free prosody analyzer (pitch/cadence/pause/energy + `voice_*` HNR/jitter/CPP + spectral balance) | `test_analyze_prosody.py` |
 | `scripts/prosody_profile.py` | Versioned prosody profile: thresholds, delivery weights, per-preset expectations | via gate/separability tests |
-| `scripts/prosody_holdout_validation.py` | Source-bound untouched threshold holdout with audio/group leakage rejection, multilingual/length/severity coverage, and 95% Wilson confusion bounds | `test_prosody_holdout_validation.py` |
+| `scripts/prosody_holdout_validation.py`, `scripts/prosody_corpus_inventory.py` | Retained-audio inventory, blind defect preparation, independent annotation/source-family binding and untouched threshold holdout; multilingual/length/severity coverage and feasible 95% Wilson confusion bounds | `test_prosody_holdout_validation.py`, `test_prosody_corpus_inventory.py` |
 | `scripts/prosody_quality_gate.py` | Reference-free per-take prosody gate (monotone / rushed / flat / pause issues) | `test_prosody_quality_gate.py` |
 | `scripts/check_delivery_instructions.py` | Deterministic text-level contract gate on shipped delivery copy (T1/CI) → [`config/delivery-instruction-contract.json`](../../config/delivery-instruction-contract.json) | `test_check_delivery_instructions.py` |
 
@@ -331,6 +331,12 @@ regressions, ties and a two-sided exact sign-test probability overall and per pr
 a one-cell aggregate lead from being presented as a stable improvement.
 
 ### 2.2 Blinded dimensional calibration
+
+This is semantic VAD/emotion calibration, not speech-defect annotation. Failed audio, defect
+intervals and acceptable/objectionable decisions use the existing prosody preparation contract
+described in [Audio QC engineering](audio-qc-engineering.md#speechdefect-calibration-prepare-independently-then-measure).
+Its current starting design is 60 calibration plus 60-good/60-bad untouched source recordings;
+independent labels are still required. Neither detector verdicts nor requested presets are labels.
 
 The evaluator cannot learn valence, arousal or dominance from requested preset names. Build a
 calibration-only packet from completed, analyzed calibration rows, collect ratings independently,

@@ -29,6 +29,16 @@ blind calibration preparation are implemented. No product-QC threshold, model, p
 release acceptance changed. AV-07/DP-28 retain independent calibration/adoption requirements;
 RF-06 remains a separate unresolved product-audio blocker.
 
+The next Audio QC measurement step is now complete: analytic signals plus all nine public voice
+previews were compared with pinned local Praat/Parselmouth. A reproduced lag-rounding defect
+discarded valid 70 Hz pitches and aliased 400 Hz to 200 Hz; interpolation-before-filtering repairs
+it, with source-bound optional reports and bounded-memory regressions. Eight focused tests pass.
+Across 3,095 preview frames, 62 large pitch disagreements and 2.28–5.06 dB per-preview median HNR
+disagreement remain after repair. This is not calibrated semantic/quality evidence. Four serial
+before/after processes qualified below 119 MB sampled RSS; the initial invalid Praat-window setup
+and red regressions remain recorded, not overwritten. Detailed methods, digests, limitations and
+the next AV-07 calibration boundary are in the Audio QC reference; no phone work occurred.
+
 The evidence-led replacement/retirement policy now applies to every testing surface, not just
 Audio QC. DWF-06 records the guidance update; [the procedure](reference/repository-self-verification.md#replace-and-retire-tests-and-harnesses)
 requires an independent expectation, real integration boundaries and finite compatibility/retirement

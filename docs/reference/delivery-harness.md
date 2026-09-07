@@ -402,7 +402,11 @@ refuse execution. Historical `linear-rational-v1` replay requires explicit `--re
 providing an old config never silently chooses it or upgrades its pins. Preserve the old config,
 cache and reports, and prepare a separate current config. Cascade and qualification reports expose
 the actual canonicalization identity. This corrects preprocessing, not a perceptual quality claim.
-The optional `analyze_prosody.py --experimental-phonation` block does not alter v3 measurements
+The optional `analyze_prosody.py --experimental-phonation` block binds its estimator/frame-reader
+source digests and NumPy version. Its repaired boundary interpolation is analytically tested;
+independent public-preview comparison still finds pitch/voicing/HNR disagreements, not calibrated
+equivalence (methods and evidence: [Audio QC engineering](audio-qc-engineering.md#independent-measurement-comparison--september-6)).
+It does not alter v3 measurements
 or profiles. Legacy delivery callers now label their bounded projection as delivery analysis v2.
 See [Audio QC engineering](audio-qc-engineering.md#follow-up-resource-evidence-and-remaining-boundaries)
 for numerical/resource evidence, compatibility rules and independent-calibration prerequisites.

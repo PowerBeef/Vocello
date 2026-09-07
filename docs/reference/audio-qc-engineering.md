@@ -175,6 +175,72 @@ local-peak interpolation and an explicit 0.01 octave cost. Periodicity-derived H
 with the optional block removed. No existing profile consumes the new block. This is not Praat
 equivalence, a clinical HNR measurement, a calibrated pitch tracker, or an emotion verdict.
 
+#### Independent measurement comparison — September 6
+
+Two bounded experiments compared the candidate with analytic signal truth and the independently
+installed **Parselmouth 0.4.7 / Praat 6.1.38** implementation: known-frequency/noise frames, then
+all nine checked-in public voice previews. This is raw autocorrelation, **not** modern Praat
+filtered-autocorrelation intonation tracking. The isolated GPL-3.0-or-later reference tool is local
+only: no source copied, app dependency, bundled tool, model download or CI prerequisite.
+[Parselmouth documentation](https://parselmouth.readthedocs.io/en/stable/),
+[raw autocorrelation](https://praat.org/manual/Sound__To_Pitch__raw_autocorrelation____.html).
+
+The original harmonicity setup failed before producing measurements: 4.5 periods at the 70 Hz
+floor required a longer input than each 100 ms frame. That failed process and original probe are
+retained. The corrected comparison explicitly uses three periods, rather than silently accepting
+a fallback. Consequently its HNR differences are descriptive, **not** equivalence against Praat's
+recommended 4.5-period speech setting. Both tools receive identical frames, but their effective
+windowing and voicing definitions differ. Each preview is analyzed frame-by-frame; this does not
+qualify whole-utterance pitch tracking, and overlapping frames are not independent observations.
+
+**Proven defect and correction:** integer-lag filtering discarded valid 70 Hz peaks and selected
+200 Hz for an analytic 400 Hz input at 44.1 kHz. Interpolation could also escape the declared
+range. The new regressions produced 41 failing assertions before repair. Candidate peaks now
+include both integer neighbours, are interpolated before range filtering, and preserve the existing
+ranking among valid peaks. Estimates within 0.001 Hz of an endpoint snap to the inclusive
+70–400 Hz range; that numerical tolerance is not a physiological range extension. Analytic
+boundaries and adjacent frequencies pass across 8/16/22.05/24/44.1/48/96/192 kHz and three phases.
+Praat itself sometimes aliases an exact boundary tone, illustrating why agreement alone is not
+ground truth. The optional report now binds the estimator, shared frame reader and NumPy identity;
+the algorithm family/schema remain unchanged, but old source results are not silently upgraded.
+
+| Public-preview comparison | Before repair | After repair |
+| --- | ---: | ---: |
+| Complete overlapping frames | 3,095 | 3,095 |
+| Frames both tools call voiced | 2,301 | 2,300 |
+| Absolute pitch disagreement above 600 cents, among jointly voiced frames | 67 | 62 |
+| Voiced/unvoiced disagreements | 299 | 298 |
+| Per-preview median absolute pitch disagreement | 8.33–31.19 cents | 8.33–31.19 cents |
+| Per-preview median absolute HNR disagreement | 2.28–5.06 dB | 2.28–5.06 dB |
+
+This is not a validated speech-improvement claim. A bounded autocorrelation search can report an
+in-range subharmonic of an out-of-range tone; both tools did so for 450/600 Hz examples. The
+candidate's fixed energy floor also abstains on the deliberately tiny unit-amplitude inputs.
+Neither behavior establishes reliable out-of-domain detection. The old Hann-biased proxy is not a
+gold standard, and the replacement is not ready to inherit its profile thresholds.
+
+Evidence remains untracked in
+`build/artifacts/diagnostics/audio-phonation-reference-20260906/`: predeclared `plan.json`,
+original setup/probe, `baseline-synthetic-resources.json` (failed setup), `regression-before.log`,
+and `comparison-*` / `corrected-*` reports and resource envelopes. The pinned arm64 wheel SHA-256
+is `998138bf2acb15ae329caa217d523965b897417a1a2df130a2ecf41b664bfbf1`;
+the imported reference binary is `c9d907cd7365906e853e5d89fa5203efce40da6733cf7ba3ba20e6c35c538da8`.
+Corrected synthetic report digest:
+`75b22e3c216b6850610f21919e7412a56d2d28fc1ea465cf86e59b24685bb5f6`;
+corrected speech report digest:
+`a3a04a23d34716b1389c40426bd79a0653a700a859113e3e319a273a72d89687`.
+Four successful before/after processes ran serially below a 1 GiB ceiling. Maximum sampled RSS
+was **118.31 MB**, corrected speech elapsed **4.42 s**; clean exits, post-exit recovery, zero
+swap growth and no before/after pressure warning were observed. These snapshots do not prove
+continuous absence of pressure. The deterministic 12/24-second fixture fills the streaming read
+buffer and verifies an unchanged managed-memory estimate and bounded traced allocation; it is
+not a host-footprint benchmark.
+
+**Decision:** keep the numerical repair, retain the experimental block without promotion authority,
+and stop this comparison here. AV-07 next requires independent real-speech/defect annotations and
+source-bound calibration before changing any feature consumer or retiring the biased proxy. No
+new framework, model, production QC threshold, prompt, seed, or release gate was introduced.
+
 ### Language and naturalness remain separate
 
 Three Apple Speech passes test repeatability of one recognizer. Edge timestamps reject one-utterance

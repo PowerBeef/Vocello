@@ -37,7 +37,7 @@ User-requested QC engineering does not close any of those acceptance gates.
 | Spoken content | `VoiceClipTranscriber.swift`, `check_language_output.py` | Three locale-locked recognitions of the exact WAV, edge evidence, WER/CER, language checks. Repeatability is not three independent ASR systems. |
 | Acoustic measurement | `analyze_prosody.py` v3, `delivery_temporal_features.py` v1 | Two bounded passes each: global features and five-region contours. Measures signal properties, not listener-recognized emotion. |
 | Acoustic decisions | `prosody_quality_gate.py`, `delivery_quality_gate.py`, frozen profile | Warn-first heuristics; incomplete measurement must not become PASS. AV-07's independent calibration is still missing. |
-| Local research | experiment runner, analysis cache, compact adapter, resource supervisor, cascade, evaluator | Source-bound serial screening; absent calibrated heads abstain. Requested follow-up layers are **requests**, not executed ASR/UTMOS evidence. No semantic promotion authority. |
+| Local research | experiment runner, analysis cache, compact adapter, resource supervisor, cascade, evaluator | Source-bound serial screening; native QC and independent ASR evidence compose separately from optional heads. Missing/contradictory evidence abstains. Requested follow-up layers are **requests**, not executed ASR/UTMOS evidence. No listener-proven semantic claim. |
 | Release composition | typed quality producer/composer, specialized benchmark and promotion validators | Required missing/warning/failure evidence remains blocking. An experimental cascade completing is not release PASS. |
 
 The existing production safety core is already shared and file-bounded. A second Python
@@ -337,7 +337,12 @@ The 14 retained French Design comparisons already include independent Apple/Whis
 SenseVoice does not support French and DistilHuBERT does not transcribe; running either as a French
 judge would be invalid. French disagreement remains open; no extra recognizer was downloaded.
 
-### Speech/defect calibration: prepare independently, then measure
+### Speech/defect calibration: independent references, no required listening
+
+**Current maintainer decision (September 6): human listening is optional throughout automated
+review, calibration and candidate comparison.** Earlier listener-packet results below remain
+historical evidence, not unfinished tasks that require a person. Removing the prerequisite does
+not turn an unlabelled inventory into truth, change production QC thresholds or resolve RF-06.
 
 The existing `prosody_holdout_validation.py` route now offers **inventory → prepare → evaluate**;
 `prosody_corpus_inventory.py` is its standard-library, read-only inventory helper, not another
@@ -383,15 +388,18 @@ template; the initial `preparation.json` is preserved. Inventory digest:
    holdout rows, duplicate PCM, source/group overlap and any extra requested/scored label fields.
    Freeze primary selections independently of detector scores. Do not run feature extraction on
    the confirmation pool before freezing the profile.
-4. Collect the independent annotations below. Uncertain/disputed rows remain in the accounting;
-   resolve them independently before binary export, or leave qualification blocked. Do not drop
-   them or choose replacements because they disagree with the detector.
+4. Bind independent reference evidence: an exact byte-verified controlled PCM transformation or
+   a locally available, digest-pinned external annotation catalog. No new listening responses are
+   required. Unknown/disputed rows stay in the accounting; do not substitute the detector's own
+   verdict as its training label. Existing human annotations may optionally be reused unchanged.
 5. Fit on calibration only, bind the exact feature/preprocessing source and profile, then run the
    frozen holdout once. Inspect false alarms, misses and uncertain strata. AV-07 remains open until
    representative independent evidence qualifies the actual feature consumer. Retire the old
    proxy only after that switch is justified; old output equality is not an acceptance target.
 
-**Annotation protocol** is `annotationProtocol` in `config/prosody-holdout-policy.json`:
+**Optional historical annotation protocol** is `annotationProtocol` in
+`config/prosody-holdout-policy.json`. These requirements apply only when choosing to import
+listener evidence, not to the automatic reference route:
 
 - At least three independently responding reviewers per clip, with at least one fluent in its
   language. Use anonymous reviewer digests, retain every response and record language fluency.
@@ -417,24 +425,90 @@ template; the initial `preparation.json` is preserved. Inventory digest:
   from another reviewer; original votes remain unchanged. Final `label` maps acceptable→good and
   objectionable→bad. `defectSeverity` is the maximum resolved interval severity, or none.
 
-The existing delivery listening session remains the **dimensional/emotion** tool: it requires
+The optional existing delivery listening session remains a **dimensional/emotion** tool: it requires
 completed generations and asks VAD/2AFC questions. It does **not** collect defect intervals or accept
 failed generations as a defect study, and is not silently repurposed as one. The new template is
 an annotation data contract, not a claim that a graphical/interactive defect-listening session has
 been built or completed. No independent reviewers or labels were fabricated.
 
 **Compatibility.** Existing JSONL/profile readers and historical result files remain readable.
-New qualification deliberately requires source-family/exposure provenance and bound independent
-annotations; old anonymous good/bad strings alone no longer authorize a current PASS. Supply real
-provenance or keep those files historical—never backfill invented source IDs or reviewer votes.
-New reports include the policy and annotation-evidence digests. Production QC and DP-31 semantic
-prompt-promotion rules are unchanged; this is not a new general release prerequisite.
+New qualification requires source-family/exposure provenance and bound independent reference
+evidence; old anonymous good/bad strings alone cannot authorize a current PASS. Supply real
+provenance or keep those files historical—never invent source IDs or reviewer votes. New reports
+include policy, evidence digests and qualification scopes. Controlled fixtures can qualify signal
+detection only (`promotionAuthority: false`); an external dataset qualifies only its documented
+label definition/cohort, not all speech or emotion. Product QC thresholds remain unchanged.
 
 Verification: 32 prosody tests pass, including actual CLI inventory/overwrite refusal, duplicate
 container-versus-PCM identity, truncated input, symlink/traversal bounds, original-byte preservation,
 duration-bounded read memory (one versus 600 seconds), impossible sample floors, split/source reuse,
 per-listener/adjudication drift, and refusal before analyzer launch when annotations are missing.
 This proves preparation/validation behavior, not that the unlabelled corpus is calibrated.
+
+### Current automated review and measured-claim decisions
+
+The existing `run_local_delivery_cascade.py` route uses `automated-evidence-1`. No parallel
+generator, evaluator service, cloud processing or evaluator bundled into the app was added.
+
+- The experiment runner now retains the CLI's **native `audioQC` receipt** alongside the actual
+  WAV digest. The cascade consumes it instead of reproducing Swift Fast-QC thresholds in Python.
+  Native failure wins over all other scores. Warning, absent/current-version mismatch, invalid
+  duration or contradictory receipt stays inconclusive. Historical runs without receipts remain
+  usable for acoustic analysis, but cannot receive a retrospectively invented safety PASS.
+- Original/canonical integrity, cached global and temporal analysis continue. The existing
+  prosody gate consumes the already extracted features; its warnings remain advisory/unresolved,
+  never calibrated emotion labels. No extra audio frame matrix or model residency is introduced.
+- `--review-evidence` optionally supplies **executed**, run-bound recognition receipts. It must
+  cover exactly the plan's generation IDs. Each role binds the original WAV and script digest,
+  full processed duration, locked and detected language, transcript, and runtime/model/config
+  digests. WER/CER is recomputed with the existing language checker and unchanged 0.15 threshold;
+  supplied scores are ignored. These processing receipts are evidence from trusted producers,
+  not cryptographic proof that a recognizer actually listened to every word.
+- At least two distinct supported ASR families must agree. Three Whisper/Apple repetitions are
+  repeatability, not independent consensus. Wrong-language/partial/missing/drifted receipts or
+  disagreement are inconclusive; unanimous valid content rejection is a measured failure.
+  SenseVoice cannot judge French; DistilHuBERT cannot transcribe. No new recognizer was acquired.
+- Optional compact features and fitted heads do not create a mandatory listener dependency.
+  Missing heads report semantic delivery **unmeasured**. Their uncertainty never requests a human
+  as the only continuation; bounded automatic evidence collection or a recorded inconclusive
+  decision replaces manual-listening routing. Requested ASR/UTMOS layers are not automatically
+  launched by this composer. Neural execution stays serial under the existing supervisor after
+  TTS exits; cache hits do not launch models; UTMOS is finalist-only.
+- `delivery_promotion_decision.py` schema 2 requires a frozen named metric/protocol, complete
+  untouched holdout, independent-reference qualification, independent judge families, consistent
+  reverse-order judgments, paired improvement/2AFC, distributed gains and unchanged quality/runtime
+  guardrails. It can qualify **measured automatic improvement**, never listener-proven emotion.
+  Schema 1 preserves the optional historical listening interpretation. Neither authorizes release,
+  edits production copy, or waives the iOS acceptance campaign.
+
+Reference input formats (private JSONL, existing calibration/holdout commands):
+
+- `referenceEvidence.kind: controlled-pcm`: `audioSHA256`, `referenceWAV`, `referenceSHA256`,
+  `operation: unchanged|mute-interval`; mute additionally declares integer `startFrame/endFrame`.
+  The validator streams both PCM16 files, verifies equal formats/counts, exact unchanged bytes
+  outside the interval and zero samples inside it, and rechecks identities. An unchanged control
+  means **no injected defect**, not generally acceptable speech. Severity is a declared fixture
+  stratum, not a measured perceptual severity. Derivatives must retain their source family.
+- `referenceEvidence.kind: published-label`: `audioSHA256`, `annotationFile`,
+  `annotationFileSHA256`. The bounded local catalog has `kind: external-reference-labels`,
+  HTTPS `source`, immutable `revision`, `license`, `labelDefinition`,
+  `derivedFromVocelloEvaluator: false`, and exactly one matching row with `audioSHA256`, `label`
+  and `defectSeverity`. Its digest must also be in the policy's `approvedExternalCatalogSHA256`;
+  the current list is empty, so an arbitrary local file cannot qualify itself. Verify actual source/licensing before acquisition; these declarations
+  are provenance to audit, not legal clearance or self-label permission. No downloads occur.
+- Cadence schema-2 rows replace `humanLabel/listenerCount/labelAgreement` with `referenceLabel`
+  and `referenceInput` (the bound private row above). Emitted reports exclude private inputs.
+  Optional schema-1 listener cohorts keep their original validation and meaning.
+
+ASR evidence format: `{policyID: automated-evidence-1, executionPlanDigest, rows: {generationID:
+{instructed: [...], neutral: [...]}}}`. Each recognition contains `modelFamily`
+(`apple-speech|whisper|sensevoice`), `audioSHA256`, `inputTextSHA256`, `status: complete`,
+`outputLanguage`, `detectedLanguage`, `fullFileProcessed: true`, `processedDurationSeconds`,
+private `transcript` and `provenance` (`runtimeSHA256`, `modelIdentitySHA256`, `configSHA256`).
+Optional missing inputs never become empty-success votes. Reports contain metrics/digests only.
+The current bounded comparison accepts at most 4,096 characters per text; longer evidence is
+explicitly unqualified rather than silently truncated. This route does not replace existing
+release-safe language verification or reinterpret past product failures.
 
 Operator commands (corrected FIR is the default; old configs require explicit historical replay):
 
@@ -458,5 +532,6 @@ adopt a model, change production Fast QC, or close RF-06's product-audio finding
 
 A clean end state has one native product-QC authority, one bounded blind acoustic engine, one
 versioned derivative cache, the existing serial neural supervisor, and explicit per-dimension
-decisions. Human calibration remains necessary for semantic promotion—not for ordinary code checks.
+decisions. Listening is optional. Frozen independent-reference qualification supports named measured
+improvements, not listener-proven semantic claims; unmeasured dimensions remain explicit.
 No new aggregate score, hidden retry, model/prompt/seed change, QC relaxation, or parallel harness.

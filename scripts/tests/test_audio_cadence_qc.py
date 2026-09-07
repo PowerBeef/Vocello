@@ -3,10 +3,15 @@
 
 from __future__ import annotations
 
+import copy
 import hashlib
+import json
+import tempfile
+import wave
 from pathlib import Path
 import sys
 import unittest
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -90,6 +95,54 @@ def complete_fixture() -> dict:
 
 
 class AudioCadenceQCTests(unittest.TestCase):
+    def test_reference_cohort_runs_without_listener_counts_and_stays_private(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            fixture = complete_fixture()
+            fixture['schemaVersion'] = 2
+            annotations = []
+            for index, row in enumerate(fixture['rows']):
+                path = root / f'{index}.wav'
+                with wave.open(str(path), 'wb') as wav:
+                    wav.setparams((1, 2, 8000, 0, 'NONE', 'not compressed'))
+                    wav.writeframes((index + 1).to_bytes(2, 'little') * 80_000)
+                audio_digest = hashlib.sha256(path.read_bytes()).hexdigest()
+                label = row.pop('humanLabel')
+                row.pop('listenerCount'); row.pop('labelAgreement')
+                row['referenceLabel'] = label
+                row['audioDigest'] = audio_digest
+                binary_label = 'good' if label == 'acceptable' else 'bad'
+                severity = {'acceptable': 'none', 'unusual': 'moderate', 'severe': 'severe'}[label]
+                row['referenceInput'] = {'path': str(path), 'label': binary_label, 'defectSeverity': severity,
+                                         'referenceEvidence': {'kind': 'published-label', 'audioSHA256': audio_digest,
+                                                               'annotationFile': str(root / 'labels.json')}}
+                annotations.append({'audioSHA256': audio_digest, 'label': binary_label, 'defectSeverity': severity})
+            corpus = {'kind': 'external-reference-labels', 'source': 'https://example.invalid/test-only',
+                      'revision': 'fixture', 'license': 'CC0', 'labelDefinition': 'fixture-only',
+                      'derivedFromVocelloEvaluator': False, 'rows': annotations}
+            raw = json.dumps(corpus).encode()
+            (root / 'labels.json').write_bytes(raw)
+            for row in fixture['rows']:
+                row['referenceInput']['referenceEvidence']['annotationFileSHA256'] = hashlib.sha256(raw).hexdigest()
+            from prosody_holdout_validation import validate_policy
+            pinned = validate_policy()
+            pinned['approvedExternalCatalogSHA256'] = [hashlib.sha256(raw).hexdigest()]
+            with patch('prosody_holdout_validation.validate_policy', return_value=pinned):
+                report = evaluate(fixture)
+            self.assertTrue(report['readyForThresholdReview'])
+            self.assertFalse(report['humanListeningRequired'])
+            self.assertNotIn(directory, json.dumps(report))
+            self.assertNotIn('humanLabels', json.dumps(report))
+            severity_mismatch = copy.deepcopy(fixture)
+            severe = next(row for row in severity_mismatch['rows'] if row['referenceLabel'] == 'severe')
+            severe['referenceInput']['defectSeverity'] = 'moderate'
+            with patch('prosody_holdout_validation.validate_policy', return_value=pinned):
+                with self.assertRaisesRegex(ValueError, 'does not bind'):
+                    evaluate(severity_mismatch)
+            fixture['rows'][0]['referenceInput']['label'] = 'bad'
+            with self.assertRaisesRegex(ValueError, 'does not bind'):
+                evaluate(fixture)
+
     def test_contract_preserves_visible_warning_and_explicit_retry(self) -> None:
         contract = load_contract()
         self.assertEqual(contract["policy"]["unusual"], "publish-with-visible-review-notice")

@@ -43,9 +43,9 @@ speech verification and experimental emotion scoring have different authority; d
 their completion statuses into an unconditional audio-quality PASS.
 
 > The consolidated operator's reference for measuring delivery/emotion quality. Deterministic
-> analysis rejects broken or regressed candidates autonomously; blinded listening is the
-> semantic authority for promoting delivery meaning because acoustic proxies do not establish
-> what a listener hears. Ordinary commits and releases remain deterministic-only.
+> review requires no human listening. Frozen automated comparisons qualify named measured claims,
+> not listener-proven emotion or naturalness. Missing or contradictory evidence stays inconclusive.
+> Listening tools are optional; their historical evidence retains its original meaning.
 > The program's item-by-item status and pre-registered results live in
 > [`config/roadmap.json`](../../config/roadmap.json) (`delivery-prompting-2026-08` plan);
 > the adversarial audit that shaped this harness is pinned at
@@ -76,8 +76,8 @@ the script self-test suite via `scripts/check_test_workflows.sh`.
 | `scripts/qualify_delivery_compact_models.py` | Runs exactly two cache-cold probes, retains sanitized resource evidence, and refuses holdout bake-off on any unqualified run | `test_qualify_delivery_compact_models.py` |
 | `scripts/prepare_delivery_listener_anchors.py` | Builds label-blind naturalness/attention anchors by pairing a real clip with a deterministic dropout control; audio and manifest remain untracked | `test_prepare_delivery_listener_anchors.py` |
 | `scripts/delivery_resource_supervisor.py` | Single-process lock, enforced RSS/optional physical-footprint ceilings, pressure/swap/timeout capture, and post-exit memory-recovery qualification for heavy local analyzers | `test_delivery_resource_supervisor.py` |
-| `scripts/run_local_delivery_cascade.py` | Existing-harness post-generation composer for always-on, ambiguous-only, finalist-only, abstention, rejection, and manual-listening routes | `test_run_local_delivery_cascade.py` |
-| `scripts/delivery_promotion_decision.py` | Fail-closed decision over blinded listener evidence, paired statistics, multiplicity correction, acoustic guardrails, and runtime invariants | `test_delivery_promotion_decision.py` |
+| `scripts/run_local_delivery_cascade.py` | Existing-harness composer: byte-bound native QC, independent full-file ASR receipts, cached acoustics, optional heads, rejection and explicit inconclusive routes; no mandatory listening | `test_run_local_delivery_cascade.py` |
+| `scripts/delivery_promotion_decision.py` | Automatic measured-claim decision (schema 2); schema 1 is the optional historical listener reader. Paired statistics, independent judges, multiplicity correction and runtime/quality guardrails | `test_delivery_promotion_decision.py` |
 | `scripts/audio_cadence_qc.py` | Validates the Fast-QC cadence policy and audits untracked, privacy-safe, independently labelled calibration/development/confirmation cohorts before a threshold review | `test_audio_cadence_qc.py` |
 | `scripts/voice_identity_language_reliability.py` | Source-bound, serial Clone fidelity/enrollment-transcription/tokenizer and French Voice Design diagnosis; personal references stay in a private content-addressed bundle, rows never retry, and sanitized analysis has no semantic-promotion authority | `test_voice_identity_language_reliability.py` |
 | `scripts/delivery_separability.py` | Cross-preset separability: ridge-LDA over paired signed features, seed-grouped CV, UAR, computed chance floor, permutation null, Wilson intervals, per-cell BH-FDR, `--presets` subset probes | `test_delivery_separability.py` |
@@ -205,7 +205,7 @@ ordinary terminal padding and all existing interior-pause thresholds remain unch
 No prompt, tokenizer, model pin, sampling default, seed, retry policy, or QC threshold changed. The
 current fp16 artifact remains selected because it broadly passed and the immutable archived-fp32
 artifact was unavailable rather than substituted. Any Design delivery-copy candidate remains under
-DP-31/DP-32 blinded-listening authority. The immutable run identities and next-run procedure live
+DP-31/DP-32 measured-claim authority (listening is now optional). The immutable run identities and next-run procedure live
 in the iOS device-testing guide.
 
 ## 2. Measurement protocol — `vocello bench --delivery`
@@ -330,11 +330,11 @@ the manifest. When `--baseline` is supplied, the summary also reports paired imp
 regressions, ties and a two-sided exact sign-test probability overall and per preset. This prevents
 a one-cell aggregate lead from being presented as a stable improvement.
 
-### 2.2 Blinded dimensional calibration
+### 2.2 Optional blinded dimensional calibration
 
 This is semantic VAD/emotion calibration, not speech-defect annotation. Failed audio, defect
 intervals and acceptable/objectionable decisions use the existing prosody preparation contract
-described in [Audio QC engineering](audio-qc-engineering.md#speechdefect-calibration-prepare-independently-then-measure).
+described in [Audio QC engineering](audio-qc-engineering.md#speechdefect-calibration-independent-references-no-required-listening).
 Its current starting design is 60 calibration plus 60-good/60-bad untouched source recordings;
 independent labels are still required. Neither detector verdicts nor requested presets are labels.
 
@@ -488,7 +488,7 @@ local paths. Existing output cannot be overwritten. No homophone normalization, 
 threshold change or link into the governed language verdict exists. Many-to-one conversion is
 not phonetic/semantic proof, independent recognition, or permission to clear cadence warnings.
 
-### Listener workflow
+### Optional listener workflow — not an operational requirement
 
 The versioned listener workflow remains under `delivery_calibration_session.py`:
 
@@ -541,11 +541,12 @@ post-hoc selection. `compare-v2-holdout` verifies the sealed score digest and ex
 Ridge-v1 remains the adopted baseline. V2 adds per-preset regularized logistic heads, elastic-net
 and PLS VAD challengers, fold-local reduction across speaker/translation/seed/language blocks,
 blocked split-conformal intervals, robust Mahalanobis/nearest-neighbor OOD, and typed contradiction
-or abstention reasons. No challenger is adopted until it improves an untouched qualified human
-holdout without regressing any VAD dimension, preset, speaker or script group, with gains present
+or abstention reasons. This optional listener-trained model keeps its original calibration meaning;
+it does not block the normal cascade. No challenger is adopted until it improves an untouched qualified
+reference holdout without regressing any measured dimension, preset, speaker or script group, with gains present
 across both speaker and script groupings. SenseVoiceSmall Q8 and DistilHuBERT remain unadopted
 adapter candidates until license/training provenance, immutable digests, two clean serial M2/8 GB
-runs, post-exit memory release, and human-holdout gain all pass. UTMOS remains finalist-only and
+runs, post-exit memory release, and independent-reference holdout gain all pass. UTMOS remains finalist-only and
 legacy SER remains a bake-off comparator.
 
 ### 2.4 Cadence validity is separate from delivery adherence
@@ -567,7 +568,9 @@ spacing, or have ordinary pauses while missing the requested emotion.
 
 [`config/audio-cadence-qc-contract.json`](../../config/audio-cadence-qc-contract.json) keeps the
 current boundary authoritative until an independently labelled cohort qualifies. Operator-local
-datasets contain digests and measurements only, require three listeners per row, block compound
+schema-2 datasets use pinned external reference labels or byte-verified controlled transformations,
+not required listener counts. Private reference inputs stay untracked; output contains digests and
+measurements only. Optional schema-1 listener datasets retain their old validation. Both block compound
 speaker/script/seed/language identities across calibration, development, and untouched
 confirmation, and cover every preset, at least six speakers, English/Chinese/Japanese/Korean,
 three script lengths, six script groups, and eight seeds in each split. Run:
@@ -579,7 +582,7 @@ python3 scripts/audio_cadence_qc.py evaluate \
   --output build/artifacts/macos/delivery-cadence/review-readiness.json
 ```
 
-The untouched confirmation must have zero severe false rejection among human-acceptable takes,
+The untouched confirmation must have zero severe false rejection among reference-acceptable takes,
 at least 90% severe recall, and at most 25% warning notices among acceptable takes. The report can
 authorize an explicit source review only; it cannot edit thresholds or claim semantic delivery
 quality.
@@ -591,10 +594,10 @@ balanced source-bound cohort completed 64 instructed rows plus eight shared neut
 all eight presets, eight speakers, six scripts/three translation groups and three languages. A
 prior cohort is retained but excluded because one fixed-seed cell reproducibly failed Fast QC with
 a 4.613-second dropout. The accepted run's 64-row acoustic/temporal analysis and both compact
-cascades passed; the cascades abstain pending human calibration. Its source-bound listener packet
+cascades completed; their historical results abstained pending human calibration. Its source-bound listener packet
 contains 64 dimensional trials, 56 non-neutral 2AFC trials and three multilingual anchors. The
-remaining gate is three independent qualified listeners with English/Chinese/Japanese fluency
-coverage, followed by calibration-only preselection and a separately generated untouched holdout.
+then-required gate was three independent qualified listeners. That requirement was removed on
+September 6; current independent-reference calibration and untouched measured-claim gates replace it.
 No production delivery copy or `EmotionPreset` changed.
 
 ### 2.4 Development-screen findings (2026-08-22)
@@ -622,8 +625,8 @@ open the confirmation split.
 
 Those exploratory screens left production instructions and the default Expressive sampler
 unchanged. The next automatic screen may expand the Happy-only acoustic arm to the pre-registered
-8-20 seed range, but semantic promotion still requires the blinded calibration and untouched
-listening gates below.
+8-20 seed range. Current promotion follows the frozen automatic measured-claim protocol;
+historical listener results below are preserved, not required new work.
 
 ### 2.5 Maintainer-directed production-copy checkpoint (2026-08-25)
 
@@ -861,11 +864,11 @@ It does not cover Quality, multiple scripts or lengths, other languages, indepen
 annotated defects, or listener-recognized emotion. Separability can therefore show that
 presets make different acoustic regions without proving that they sound like the named
 delivery. The layered evaluator and its fail-closed schemas are now present, but AV-07 remains
-open until a frozen blinded-label corpus calibrates its dimensional model on grouped
-speaker/script folds and an untouched multi-speaker/script/language holdout validates it. The SER
+open until independent reference evidence calibrates the actual decision consumer on grouped
+folds and an untouched multi-speaker/script/language holdout validates its named claims. The SER
 layer records its full posterior, entropy and top-two margin: calm-to-neutral is a hypothesis, not
-a truth label, and whisper abstains from categorical emotion. Automatic scores can reject a
-candidate or identify a regression, but cannot alone authorize a delivery-copy promotion.
+a truth label, and whisper abstains from categorical emotion. Automatic comparisons can qualify a
+named measured improvement under the current experiment contract; they do not prove what listeners hear.
 
 AV-07's source boundary is now executable rather than prose-only. A calibration run stamps the
 digest of every labelled WAV plus every non-path split field into the frozen profile. Then
@@ -931,11 +934,11 @@ ready; AV-07 remains open until an independently labelled real corpus produces a
   `records_from_sidecar(rows)` output into one records JSON; score with
   `delivery_separability.py --records … --label-mode preset --null-iters 1000
   --designation confirmatory --json`, plus `--presets …` for registered subset probes.
-- **Blinded semantic confirmation** (operator-local; required only for a delivery-meaning
-  promotion): `delivery_listening_session.py build --out DIR` from bench archives → `run`
+- **Optional blinded semantic research**: `delivery_listening_session.py build --out DIR` from bench archives → `run`
   (afplay, resumable, keys sealed) → `score`; combine at least three pseudonymous listeners with
   `score-cohort`, then evaluate the untouched result with `delivery_promotion_decision.py`.
-  Automatic analysis may reject before this step, but it cannot waive it. Setup and posture:
+  This is no longer a required step. Current automatic decisions use schema 2; schema 1 retains
+  historical listener semantics. Setup and posture:
   [`testing-runbook.md`](testing-runbook.md).
 - **Reference bank**: [`emotion-reference-banks.md`](emotion-reference-banks.md) —
   generation strictly before scorers on the 8 GB canonical machine; SER + identity +

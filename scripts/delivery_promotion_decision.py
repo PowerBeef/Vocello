@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Fail-closed promotion decision for a delivery prompt candidate family.
 
-Automatic layers may reject a candidate.  This decision additionally requires
-paired, blinded listener evidence and enforces the pre-registered regression,
+Current decisions use frozen automatic measurements, never required listening.
+Historical schema-v1 listener evidence remains readable with its original meaning.
+Both modes enforce the pre-registered regression,
 intelligibility, identity, naturalness, memory, seed, and receipt limits.  It
 never generates audio or publishes evidence.
 """
@@ -58,8 +59,21 @@ def _balanced_improvement(rows: list[dict[str, Any]], group: str) -> dict[str, A
 
 
 def decide(payload: dict[str, Any]) -> dict[str, Any]:
-    if not isinstance(payload, dict) or payload.get("schemaVersion") != SCHEMA_VERSION:
-        raise DecisionError(f"schemaVersion must be {SCHEMA_VERSION}")
+    if not isinstance(payload, dict) or payload.get("schemaVersion") not in (1, 2):
+        raise DecisionError("schemaVersion must be 1 (historical listening) or 2 (automated)")
+    automated = payload['schemaVersion'] == 2
+    if automated:
+        authority = payload.get('automatedAuthority', {})
+        for field in ('protocolSHA256', 'holdoutManifestSHA256', 'evaluationSourceSHA256'):
+            value = authority.get(field)
+            if not isinstance(value, str) or len(value) != 64 or any(c not in '0123456789abcdef' for c in value):
+                raise DecisionError('automated review needs frozen protocol, source and holdout identities')
+        for field in ('holdoutOpenedOnce', 'metricFrozenBeforeHoldout', 'blindExtraction',
+                      'completePlannedCoverage', 'independentReferenceQualification'):
+            if authority.get(field) is not True:
+                raise DecisionError(f'automated authority missing {field}')
+        if not isinstance(authority.get('metricID'), str) or not authority['metricID'].strip():
+            raise DecisionError('automated metric must be named; it is not listener identification')
     rows = payload.get("pairedIdentification")
     if not isinstance(rows, list) or len(rows) < 2:
         raise DecisionError("pairedIdentification requires at least two rows")
@@ -76,8 +90,28 @@ def decide(payload: dict[str, Any]) -> dict[str, Any]:
         for field in ("speakerID", "scriptID"):
             if not isinstance(row.get(field), str) or not row[field]:
                 raise DecisionError(f"{identity}: {field} is required")
-        if row.get("candidateCorrect") not in (0, 1) or row.get("baselineCorrect") not in (0, 1):
+        if any(type(row.get(field)) is not int or row[field] not in (0, 1)
+               for field in ('candidateCorrect', 'baselineCorrect')):
             raise DecisionError(f"{identity}: correctness must be binary")
+        if automated:
+            votes = row.get('independentJudges')
+            if not isinstance(votes, list) or len(votes) < 2:
+                raise DecisionError('automated comparisons require independent judges')
+            families = set()
+            for vote in votes:
+                if not isinstance(vote, dict) or not isinstance(vote.get('family'), str) or not vote['family']:
+                    raise DecisionError('automated judge family is missing')
+                families.add(vote['family'])
+                for field in ('modelSHA256', 'evidenceSHA256'):
+                    value = vote.get(field)
+                    if not isinstance(value, str) or len(value) != 64 or any(c not in '0123456789abcdef' for c in value):
+                        raise DecisionError('automated judge provenance is missing')
+                if (vote.get('orderReversalConsistent') is not True
+                        or any(type(vote.get(field)) is not int or vote[field] != row[field]
+                               for field in ('candidateCorrect', 'baselineCorrect'))):
+                    raise DecisionError('automated judge disagreement or order bias is inconclusive')
+            if len(families) < 2:
+                raise DecisionError('repeated judges are not independent families')
 
     bootstrap = paired_bootstrap_delta(
         [row["candidateCorrect"] for row in rows],
@@ -114,6 +148,18 @@ def decide(payload: dict[str, Any]) -> dict[str, Any]:
     two_afc = payload.get("instructedVersusNeutral2AFC")
     if not isinstance(two_afc, list):
         raise DecisionError("instructedVersusNeutral2AFC must be an array")
+    if automated:
+        # Each planned pair is one observation; duplicates or invented trials
+        # must not inflate exact-binomial significance.
+        if (len(two_afc) != len(rows) or any(not isinstance(row, dict) for row in two_afc)
+                or {row.get('pairID') for row in two_afc} != identities):
+            raise DecisionError('automated 2AFC must cover exactly the same unique planned pairs')
+        expected_presets = {row['pairID']: row['preset'] for row in rows}
+        for row in two_afc:
+            if (type(row.get('correct')) is not bool
+                    or row.get('preset') != expected_presets[row['pairID']]
+                    or row.get('orderReversalConsistent') is not True):
+                raise DecisionError('automated 2AFC evidence is invalid or order-biased')
     two_afc_rows = []
     p_values = []
     for preset in PRESETS:
@@ -149,10 +195,12 @@ def decide(payload: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(invariants, dict) or any(invariants.get(name) not in (True, False) for name in required_invariants):
         raise DecisionError(f"runtimeInvariants requires booleans {required_invariants}")
 
-    listener_authority = payload.get("listenerAuthority")
-    if not isinstance(listener_authority, dict):
+    listener_authority = payload.get("listenerAuthority", {})
+    if automated:
+        listener_authority = {}  # Optional user feedback cannot change this decision.
+    if not automated and not isinstance(listener_authority, dict):
         raise DecisionError("listenerAuthority is required")
-    authority_passed = (
+    authority_passed = automated or (
         listener_authority.get("independentListenerCount", 0) >= 3
         and listener_authority.get("allOutputLanguagesFluentlyCovered") is True
         and listener_authority.get("holdoutOpenedOnce") is True
@@ -160,7 +208,7 @@ def decide(payload: dict[str, Any]) -> dict[str, Any]:
 
     failures = []
     if bootstrap["lower"] <= 0:
-        failures.append("listener-identification-bootstrap-lower-not-positive")
+        failures.append("automatic-metric-bootstrap-lower-not-positive" if automated else "listener-identification-bootstrap-lower-not-positive")
     if not speaker_balance["distributed"]:
         failures.append("improvement-not-distributed-across-speakers")
     if not script_balance["distributed"]:
@@ -178,15 +226,20 @@ def decide(payload: dict[str, Any]) -> dict[str, Any]:
     if not authority_passed:
         failures.append("listener-authority-incomplete")
     return {
-        "schemaVersion": SCHEMA_VERSION, "kind": "delivery-candidate-promotion-decision",
+        "schemaVersion": payload['schemaVersion'], "kind": "delivery-candidate-promotion-decision",
         "candidateFamily": payload.get("candidateFamily"),
         "verdict": "qualifies" if not failures else "does-not-qualify",
-        "failures": failures, "listenerIdentificationImprovement": bootstrap,
+        "failures": failures,
+        ("automatedMetricImprovement" if automated else "listenerIdentificationImprovement"): bootstrap,
         "speakerBalance": speaker_balance, "scriptBalance": script_balance,
         "presetRegressionTests": preset_rows, "twoAFC": two_afc_rows,
         "automaticGuardrails": metric_results,
         "runtimeInvariants": {name: invariants[name] for name in required_invariants},
-        "listenerAuthority": {**listener_authority, "passed": authority_passed},
+        ("automatedAuthority" if automated else "listenerAuthority"):
+            {**(authority if automated else listener_authority), "passed": authority_passed},
+        "humanListeningRequired": not automated,
+        "claimScope": "measured-automatic-metric-improvement" if automated else "historical-listener-evidence",
+        "publicationAuthorized": False,
     }
 
 

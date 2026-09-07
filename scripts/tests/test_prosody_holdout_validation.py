@@ -42,10 +42,68 @@ def annotations(row):
 
 
 class ProsodyHoldoutValidationTests(unittest.TestCase):
+    def test_published_reference_labels_need_no_new_listener_and_reject_drift(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            row = self._row(root, 'reference', 'good', 'cal', 0)
+            catalog = {'kind': 'external-reference-labels', 'source': 'https://example.invalid/fixture',
+                       'revision': 'fixture-only', 'license': 'CC0', 'labelDefinition': 'fixture rubric',
+                       'derivedFromVocelloEvaluator': False,
+                       'rows': [{'audioSHA256': module._clip_digest(row), 'label': 'good', 'defectSeverity': 'none'}]}
+            path = root / 'labels.json'
+            path.write_text(json.dumps(catalog))
+            row['referenceEvidence'] = {'kind': 'published-label', 'audioSHA256': module._clip_digest(row),
+                                        'annotationFile': str(path),
+                                        'annotationFileSHA256': hashlib.sha256(path.read_bytes()).hexdigest()}
+            pinned = policy()
+            with self.assertRaisesRegex(ValueError, 'not independently approved'):
+                module.validate_label_evidence(row, pinned)
+            pinned['approvedExternalCatalogSHA256'] = [row['referenceEvidence']['annotationFileSHA256']]
+            result = module.validate_label_evidence(row, pinned)
+            self.assertEqual(result['scope'], 'external-dataset-label-definition-only')
+            self.assertNotIn(directory, json.dumps(result))
+            row['label'] = 'bad'
+            with self.assertRaisesRegex(ValueError, 'does not match'):
+                module.validate_label_evidence(row, pinned)
+            row['label'] = 'good'
+            path.write_text(json.dumps({**catalog, 'derivedFromVocelloEvaluator': True}))
+            with self.assertRaisesRegex(ValueError, 'changed'):
+                module.validate_label_evidence(row, pinned)
+            row['referenceEvidence']['annotationFileSHA256'] = hashlib.sha256(path.read_bytes()).hexdigest()
+            pinned['approvedExternalCatalogSHA256'] = [row['referenceEvidence']['annotationFileSHA256']]
+            with self.assertRaisesRegex(ValueError, 'provenance'):
+                module.validate_label_evidence(row, pinned)
+
+    def test_controlled_signal_truth_is_byte_verified_not_perceptual_truth(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = self._row(root, 'source', 'good', 'cal', 0)
+            row = self._row(root, 'muted', 'bad', 'hold', 1)
+            with wave.open(source['path'], 'rb') as wav:
+                params, pcm = wav.getparams(), bytearray(wav.readframes(wav.getnframes()))
+            # The first nonzero source bytes, away from frame zero.
+            pcm[2:6] = bytes(4)
+            with wave.open(row['path'], 'wb') as wav:
+                wav.setparams(params)
+                wav.writeframes(pcm)
+            row['referenceEvidence'] = {'kind': 'controlled-pcm', 'audioSHA256': module._clip_digest(row),
+                'referenceWAV': source['path'], 'referenceSHA256': module._clip_digest(source),
+                'operation': 'mute-interval', 'startFrame': 1, 'endFrame': 3}
+            result = module.validate_label_evidence(row, policy())
+            self.assertEqual(result['scope'], 'controlled-signal-defect-detection-only')
+            self.assertNotIn(directory, json.dumps(result))
+            row['referenceEvidence']['endFrame'] = 2
+            with self.assertRaisesRegex(ValueError, 'differs outside'):
+                module.validate_label_evidence(row, policy())
+            row['referenceEvidence']['operation'] = 'detector-self-label'
+            with self.assertRaisesRegex(ValueError, 'unregistered'):
+                module.validate_label_evidence(row, policy())
+
     def test_empty_preparation_reports_missing_data_not_pass(self):
         result = module.prepare_calibration([], module.validate_policy())
         self.assertEqual(result['additionalAudioMinimum'], {'calibration': 60, 'holdout': 120})
-        self.assertEqual(result['status'], 'NEEDS_INDEPENDENT_LABELS')
+        self.assertEqual(result['status'], 'NEEDS_REFERENCE_EVIDENCE')
+        self.assertFalse(result['humanListeningRequired'])
         self.assertFalse(result['promotionAuthority'])
 
     def test_blind_preparation_identity_and_leakage(self):

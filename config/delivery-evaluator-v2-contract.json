@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "status": "active-experimental",
-  "boundary": "Operator-local post-release research. This contract cannot alter product delivery instructions, cannot become an ordinary CI or release prerequisite, and cannot authorize semantic promotion without qualified blinded human evidence.",
+  "boundary": "Operator-local research. Automated review requires no human listening; qualified results support only their named measured claims. This contract cannot alter product instructions or become an ordinary CI prerequisite. Optional listener-labelled models retain their original provenance, not a required operational stage.",
   "hostClass": {
     "canonical": "Mac mini M2 8GB",
     "executionPolicy": "strictly-sequential-subprocesses",
@@ -42,6 +42,7 @@
     "pairedDeltaBlock": "temporalDeltaV1"
   },
   "humanCalibration": {
+    "requiredForAutomatedReview": false,
     "schemaVersion": 2,
     "minimumIndependentListeners": 3,
     "minimumValidListenersPerRatedRow": 3,
@@ -60,7 +61,7 @@
     "allowUncertain": true,
     "retainListenerLevelRows": true,
     "requestedLabelMayEnterDimensionalBlock": false,
-    "humanSemanticAuthorityRequired": true
+    "humanSemanticAuthorityRequired": false
   },
   "evaluator": {
     "baseline": "ridge-v1",
@@ -112,7 +113,7 @@
     "requiredBeforeAdoption": [
       "two-clean-eight-gigabyte-runs",
       "clean-post-exit-memory-release",
-      "untouched-human-holdout-improvement"
+      "untouched-independent-reference-holdout-improvement"
     ]
   },
   "cascade": {
@@ -120,9 +121,10 @@
       "audio-qc",
       "global-acoustics",
       "temporal-acoustics",
-      "cached-compact-representation",
-      "tiny-local-heads"
+      "byte-bound-native-fast-qc",
+      "independent-full-file-asr-evidence"
     ],
+    "optionalQualifiedLayers": ["cached-compact-representation", "tiny-local-heads"],
     "ambiguousOnly": [
       "coarse-ser-asr",
       "extra-identity",
@@ -132,13 +134,15 @@
       "utmos",
       "complete-multilingual-asr-cer",
       "optional-semantic-reviewer",
-      "human-holdout"
+      "automated-untouched-holdout"
     ]
   },
   "promotion": {
     "automaticLayersMayReject": true,
     "automaticLayersMayAbstain": true,
-    "automaticLayersMayRouteToManualListening": true,
+    "automaticLayersMayRouteToManualListening": false,
+    "humanListeningRequired": false,
+    "automaticLayersMayQualifyMeasuredClaims": true,
     "automaticLayersMayPromoteSemanticDelivery": false,
     "confirmationSelectorsForbidden": true,
     "requestedLabelsForbiddenFromBlindFeatureExtraction": true,

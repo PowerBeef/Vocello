@@ -386,6 +386,9 @@ def _invoke_generate(
         "finishReason": payload.get("finishReason"),
         "instructionDigest": instruction["sha256"],
         "scriptDigest": row["script"]["sha256"],
+        # Preserve the native, published-byte QC. Canonical PCM integrity is
+        # not a substitute for the engine's limiter/cadence/final-WAV checks.
+        "audioQC": payload.get("audioQC"),
     }
 
 

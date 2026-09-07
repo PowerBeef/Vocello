@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate and audit human-calibrated Fast-QC cadence evidence.
+"""Validate independent-reference Fast-QC cadence evidence.
 
 The shipping amplitude-only gate remains source-owned. This tool never derives
 or edits a production threshold. It verifies that an untracked, privacy-safe
@@ -148,7 +148,11 @@ def load_contract(root: Path = REPO_ROOT) -> dict[str, Any]:
     if not {"audioPath", "path", "scriptText", "prompt", "transcript", "rawError"} <= forbidden:
         raise CadenceContractError("identity must prohibit paths, text, prompts, and raw errors")
     authority = contract.get("thresholdChangeAuthority")
-    if not isinstance(authority, dict) or not all(authority.values()):
+    if authority != {
+        'requiresUntouchedConfirmation': True, 'requiresIndependentHumanLabels': False,
+        'requiresIndependentReferenceEvidence': True, 'automaticMetricsMayScreenOnly': True,
+        'sourceChangeRequiresExplicitReview': True, 'currentBoundaryRemainsUntilQualified': True,
+    }:
         raise CadenceContractError("threshold-change authority must remain fully fail closed")
     return contract
 
@@ -221,8 +225,9 @@ def _validate_cadence(cadence: Any, context: str) -> dict[str, Any]:
 
 def evaluate(payload: dict[str, Any], root: Path = REPO_ROOT) -> dict[str, Any]:
     contract = load_contract(root)
-    if not isinstance(payload, dict) or payload.get("schemaVersion") != SCHEMA_VERSION:
-        raise CadenceContractError(f"dataset schemaVersion must be {SCHEMA_VERSION}")
+    if not isinstance(payload, dict) or payload.get("schemaVersion") not in (1, 2):
+        raise CadenceContractError('dataset schemaVersion must be 1 (optional listening) or 2 (reference evidence)')
+    automated = payload['schemaVersion'] == 2
     _require_exact_keys(payload, {"schemaVersion", "runID", "rows"}, "dataset")
     run_id = _nonempty_string(payload["runID"], "runID")
     rows = payload["rows"]
@@ -238,6 +243,9 @@ def evaluate(payload: dict[str, Any], root: Path = REPO_ROOT) -> dict[str, Any]:
         "speakerID", "presetID", "outputLanguage", "scriptLength", "scriptGroupID",
         "seed", "split", "humanLabel", "listenerCount", "labelAgreement", "cadence",
     }
+    if automated:
+        allowed_row_keys = (allowed_row_keys - {'humanLabel', 'listenerCount', 'labelAgreement'}) | {'referenceLabel', 'referenceInput'}
+    reference_scopes: set[str] = set()
     seen_rows: set[str] = set()
     seen_generations: set[str] = set()
     seen_audio: set[str] = set()
@@ -250,6 +258,19 @@ def evaluate(payload: dict[str, Any], root: Path = REPO_ROOT) -> dict[str, Any]:
         if forbidden & set(row):
             raise CadenceContractError(f"{context} contains privacy-forbidden fields")
         _require_exact_keys(row, allowed_row_keys, context)
+        if automated:
+            from prosody_holdout_validation import validate_label_evidence, validate_policy
+            reference = row['referenceInput']
+            if (not isinstance(reference, dict) or not isinstance(reference.get('referenceEvidence'), dict)
+                    or reference['referenceEvidence'].get('audioSHA256') != row['audioDigest']
+                    or reference.get('label') != ('good' if row['referenceLabel'] == 'acceptable' else 'bad')
+                    or reference.get('defectSeverity') not in {
+                        'acceptable': ('none',), 'unusual': ('mild', 'moderate'), 'severe': ('severe',),
+                    }.get(row['referenceLabel'], ())):
+                raise CadenceContractError('cadence reference does not bind the row and label')
+            reference_scopes.add(validate_label_evidence(reference, validate_policy(root))['scope'])
+            row = {key: value for key, value in row.items() if key not in ('referenceLabel', 'referenceInput')}
+            row['humanLabel'] = payload['rows'][index]['referenceLabel']  # Internal compatibility aggregation only.
         if row["runID"] != run_id:
             raise CadenceContractError(f"{context}: cross-run identity")
         row_id = _nonempty_string(row["rowID"], f"{context}.rowID")
@@ -273,12 +294,12 @@ def evaluate(payload: dict[str, Any], root: Path = REPO_ROOT) -> dict[str, Any]:
             raise CadenceContractError(f"{context}.seed must be a nonnegative integer")
         if row["humanLabel"] not in labels:
             raise CadenceContractError(f"{context}: unknown humanLabel")
-        if not isinstance(row["listenerCount"], int) or row["listenerCount"] < contract["minimumCoverage"]["listenersPerRow"]:
+        if not automated and (not isinstance(row["listenerCount"], int) or row["listenerCount"] < contract["minimumCoverage"]["listenersPerRow"]):
             raise CadenceContractError(f"{context}: insufficient independent listeners")
-        agreement = row["labelAgreement"]
-        if not isinstance(agreement, (int, float)) or not math.isfinite(agreement):
+        agreement = row.get('labelAgreement')
+        if not automated and (not isinstance(agreement, (int, float)) or not math.isfinite(agreement)):
             raise CadenceContractError(f"{context}: labelAgreement must be finite")
-        if not contract["minimumCoverage"]["minimumLabelAgreement"] <= agreement <= 1.0:
+        if not automated and not contract["minimumCoverage"]["minimumLabelAgreement"] <= agreement <= 1.0:
             raise CadenceContractError(f"{context}: insufficient label agreement")
         cadence = _validate_cadence(row["cadence"], context)
         blocked = "|".join(str(row[field]) for field in contract["identity"]["blockedSplitKey"])
@@ -351,8 +372,11 @@ def evaluate(payload: dict[str, Any], root: Path = REPO_ROOT) -> dict[str, Any]:
     dataset_digest = hashlib.sha256(
         json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
     ).hexdigest()
+    if automated:
+        for value in coverage.values():
+            value['referenceLabels'] = value.pop('humanLabels')
     return {
-        "schemaVersion": SCHEMA_VERSION,
+        "schemaVersion": payload['schemaVersion'],
         "runID": run_id,
         "datasetDigest": dataset_digest,
         "rowCount": len(validated),
@@ -364,8 +388,10 @@ def evaluate(payload: dict[str, Any], root: Path = REPO_ROOT) -> dict[str, Any]:
             "severeRecall": severe_recall,
         },
         "failures": sorted(set(failures)),
-        "readyForThresholdReview": not failures,
-        "authority": "human-calibrated-cadence-screening-only",
+        "readyForThresholdReview": not failures and 'controlled-signal-defect-detection-only' not in reference_scopes,
+        "authority": "independent-reference-cadence-screening-only" if automated else "historical-human-calibrated-cadence-screening-only",
+        "humanListeningRequired": not automated,
+        "referenceScopes": sorted(reference_scopes),
         "semanticDeliveryAuthority": False,
     }
 

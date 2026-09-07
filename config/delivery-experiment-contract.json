@@ -194,14 +194,15 @@
     {"id": "consistent-matched", "talker": "consistent", "subtalker": "matched"}
   ],
   "promotionGuardrails": {
-    "listenerMacroImprovementLower95Above": 0.0,
+    "automatedMacroImprovementLower95Above": 0.0,
     "holmAlpha": 0.05,
     "maximumAbsoluteWEROrCERRegression": 0.01,
     "maximumMedianSpeakerSimilarityRegression": 0.02,
     "maximumMedianRelativeUTMOSRegression": 0.1,
     "maximumNewHardAudioQCFailures": 0,
-    "minimumIndependentListeners": 3,
-    "minimumFluentListenersPerLanguage": 1
+    "minimumIndependentJudgeFamilies": 2,
+    "humanListeningRequired": false,
+    "claimScope": "measured-automatic-metric-improvement"
   },
   "externalModelPolicy": {
     "required": [

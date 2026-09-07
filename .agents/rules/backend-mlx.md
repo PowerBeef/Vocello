@@ -64,7 +64,7 @@ sourceOfTruth:
 - Root `AGENTS.md` (Hard invariants) + [`docs/ARCHITECTURE.md`](../../docs/ARCHITECTURE.md) (engine invariants)
 - Delivery/emotion quality measurement: [`docs/reference/delivery-harness.md`](../../docs/reference/delivery-harness.md)
   (tools, `bench --delivery` protocol, multilingual experiment compiler/runner, layered evaluator,
-  instruction-receipt provenance, statistics semantics, blinded-listener authority,
+  instruction-receipt provenance, statistics semantics, automated measured-claim authority,
   pre-registration discipline, and the DP results ledger)
 
 ## Required pre-read
@@ -83,7 +83,7 @@ Before changing anything in this layer, read:
 - Delivery research is operator-local and source-bound: `scripts/delivery_experiment.py` validates
   and compiles the contract, `scripts/delivery_experiment_runner.py` runs it serially,
   `scripts/delivery_calibration_session.py` builds and merges metadata-blinded independent-listener
-  calibration sessions,
+  optional calibration sessions (never an automated-review prerequisite),
   `scripts/delivery_evaluator.py` composes post-generation layers, and
   `scripts/prepare_delivery_compact_model_config.py` plus
   `scripts/qualify_delivery_compact_models.py` verify exact local candidate assets and canonical-host
@@ -91,7 +91,8 @@ Before changing anything in this layer, read:
   attention anchors,
   `scripts/run_local_delivery_cascade.py` runs the content-addressed v2 acoustic/adapter cascade
   only after the generator has exited,
-  `scripts/delivery_promotion_decision.py` fails closed over automatic and blinded evidence, and
+  `scripts/delivery_promotion_decision.py` qualifies named automatic metrics on a frozen holdout;
+  its historical listener-evidence reader retains the original meaning, and
   `scripts/audio_cadence_qc.py` validates independently labelled cadence evidence before any
   Fast-QC warning or rejection boundary can be reconsidered, and
   `scripts/prosody_holdout_validation.py` keeps threshold fitting isolated from its untouched
@@ -136,10 +137,11 @@ A successful in-repository benchmark publishes a compact, allowlisted record aut
 not append to `benchmarks/HISTORY.md`; it is generated from `benchmarks/runs/`. Raw JSONL, audio,
 screenshots, result bundles, listener responses, and traces remain in the untracked artifact
 directory. Dirty-source runs are exploratory. Deterministic quality gates remain the ordinary
-release authority. A change claiming improved semantic delivery additionally requires the local,
-blinded, multi-listener holdout defined by `config/delivery-experiment-contract.json`; that
-research evidence can authorize delivery copy, but never waive a deterministic failure or become
-an ordinary build/release prerequisite.
+release authority. Human listening is optional. Candidate comparisons follow the frozen automatic
+holdout in `config/delivery-experiment-contract.json`, with independent judges, reversed-order
+agreement and unchanged quality/runtime guardrails. Report measured metric improvements, never
+listener-proven semantic gains. Synthetic defects establish signal detection, not general speech
+usability. Neither research nor optional listening waives a deterministic failure or authorizes publication.
 
 ## Invariants (do not regress)
 

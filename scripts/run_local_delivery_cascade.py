@@ -3,8 +3,8 @@
 
 Always-on deterministic layers are cached by audio bytes and source identity.
 Compact neural features are optional until a candidate is fully pinned. Rows
-are explicitly accepted for more screening, rejected, abstained, or routed to
-manual listening; no automatic result has semantic promotion authority.
+are explicitly accepted for more screening, rejected, or inconclusive. Listening
+is optional. Measured screening is not listener-proven semantic improvement.
 """
 
 from __future__ import annotations
@@ -35,9 +35,12 @@ from delivery_compact_model_adapter import run_compact_adapter
 from delivery_evaluator import atomic_json
 from delivery_evaluator_v2 import evaluate_v2
 from delivery_temporal_features import analyze_temporal, paired_temporal_delta
+from check_language_output import recomputed_accuracy, MAX_ACCURACY_ERROR_RATE
+from prosody_quality_gate import evaluate_metrics
 
 
 SCHEMA_VERSION = 1
+REVIEW_POLICY = "automated-evidence-1"
 REPO = Path(__file__).resolve().parents[1]
 GLOBAL_ANALYZER = REPO / "scripts/analyze_prosody.py"
 TEMPORAL_ANALYZER = REPO / "scripts/delivery_temporal_features.py"
@@ -49,6 +52,116 @@ DEFAULT_CACHE_ROOT = Path(os.environ.get(
 
 class CascadeError(ValueError):
     """The cascade input is incomplete, cross-run, or unsafe."""
+
+
+def review_automated_audio(row: dict[str, Any], role: str, duration: float) -> dict[str, Any]:
+    """Compose byte-bound native QC and independent full-file recognitions.
+
+    This consumes retained evidence; it never launches a model or treats an
+    absent scorer as PASS. Transcripts are private inputs, never report fields.
+    Repetitions of one ASR family are one witness, not independent votes.
+    """
+    all_evidence = row.get("reviewEvidence") or {}
+    evidence = all_evidence.get(role, {}) if isinstance(all_evidence, dict) else {}
+    if not isinstance(evidence, dict):
+        evidence = {}
+    expected = row[f"{role}SHA256"]
+    reasons: list[str] = []
+    qc = evidence.get("audioQC")
+    safety = "inconclusive"
+    if evidence.get("audioSHA256") != expected:
+        reasons.append("missing-or-mismatched-native-qc-audio-binding")
+    elif not isinstance(qc, dict) or qc.get("algorithmVersion") != 6:
+        reasons.append("current-native-fast-qc-unavailable")
+    else:
+        verdicts = [qc.get(key) for key in ("verdict", "instabilityVerdict", "writtenOutputVerdict")]
+        reported_duration = qc.get("durationSeconds")
+        valid = (all(value in ("pass", "warn", "fail") for value in verdicts)
+                 and type(reported_duration) in (int, float) and math.isfinite(reported_duration)
+                 and abs(reported_duration - duration) <= max(0.001, duration * 0.001)
+                 and all(type(qc.get(key)) is int and qc[key] >= 0 for key in
+                         ("nonFiniteSamples", "clippedSamples", "hotSamples", "clickEvents",
+                          "longestSilenceMS", "trailingSilenceMS"))
+                 and isinstance(qc.get("flags"), list)
+                 and (qc.get('cadence') is None or isinstance(qc['cadence'], dict)))
+        if not valid:
+            reasons.append("invalid-native-qc-receipt")
+        elif "fail" in verdicts:
+            safety = "fail"
+            reasons.append("native-fast-qc-failed")
+        elif "warn" in verdicts or qc["flags"]:
+            reasons.append("native-fast-qc-warning-unresolved")
+        elif qc["nonFiniteSamples"] or (qc.get("cadence") or {}).get("classification") == "severe":
+            reasons.append("native-fast-qc-receipt-contradiction")
+        else:
+            safety = "pass"
+    recognitions = evidence.get("recognitions", [])
+    metrics = []
+    families: dict[str, list[bool]] = {}
+    language = row["outputLanguage"].lower()
+    script = row.get("referenceText")
+    if not isinstance(recognitions, list):
+        recognitions = []
+        reasons.append("invalid-recognition-evidence")
+    for recognition in recognitions:
+        if not isinstance(recognition, dict):
+            reasons.append("invalid-recognition-evidence")
+            continue
+        family = recognition.get("modelFamily")
+        provenance = recognition.get("provenance", {})
+        duration_read = recognition.get("processedDurationSeconds")
+        valid = (
+            isinstance(family, str) and family in ("apple-speech", "whisper", "sensevoice")
+            and recognition.get("audioSHA256") == expected
+            and recognition.get("inputTextSHA256") == row.get("scriptSHA256")
+            and recognition.get("status") == "complete"
+            and recognition.get("outputLanguage") == language
+            and recognition.get("fullFileProcessed") is True
+            and type(duration_read) in (int, float) and math.isfinite(duration_read)
+            and abs(duration_read - duration) <= max(0.001, duration * 0.001)
+            and isinstance(provenance, dict)
+            and set(provenance) == {'runtimeSHA256', 'modelIdentitySHA256', 'configSHA256'}
+            and all(isinstance(provenance.get(key), str) and len(provenance[key]) == 64
+                    and all(char in "0123456789abcdef" for char in provenance[key])
+                    for key in ("runtimeSHA256", "modelIdentitySHA256", "configSHA256"))
+            and isinstance(script, str) and 0 < len(script.strip()) <= 4096
+            and hashlib.sha256(script.encode()).hexdigest() == row.get("scriptSHA256")
+            and isinstance(recognition.get("transcript"), str) and 0 < len(recognition["transcript"].strip()) <= 4096
+        )
+        # SenseVoice's language set cannot be enlarged by an input attestation.
+        if family == "sensevoice" and language not in ("english", "chinese", "japanese", "korean", "cantonese"):
+            valid = False
+        if not valid:
+            reasons.append("unqualified-recognition-evidence")
+            continue
+        words, characters = recomputed_accuracy(script, recognition["transcript"], language)
+        use_cer = language in ("chinese", "japanese", "korean", "cantonese")
+        score = (characters if use_cer else words)["errorRate"]
+        passed = score <= MAX_ACCURACY_ERROR_RATE and recognition.get("detectedLanguage") == language
+        families.setdefault(family, []).append(passed)
+        metrics.append({"modelFamily": family, "metric": "CER" if use_cer else "WER",
+                        "errorRate": score, "passed": passed, "provenance": provenance})
+    language_status = "inconclusive"
+    if len(families) < 2:
+        reasons.append("independent-full-file-asr-missing")
+    elif not all(len(set(votes)) == 1 for votes in families.values()):
+        reasons.append("asr-repeatability-disagreement")
+    elif all(all(votes) for votes in families.values()):
+        language_status = "pass"
+    elif all(not any(votes) for votes in families.values()):
+        language_status = "fail"
+        reasons.append("independent-asr-content-failure")
+    else:
+        reasons.append("independent-asr-disagreement")
+    if any(reason in reasons for reason in ("unqualified-recognition-evidence", "invalid-recognition-evidence")):
+        language_status = "inconclusive"
+    status = ("fail" if "fail" in (safety, language_status) else
+              "pass" if (safety, language_status) == ("pass", "pass") else "inconclusive")
+    return {"policyID": REVIEW_POLICY, "status": status, "safety": safety,
+            "spokenContent": language_status, "recognitions": metrics,
+            "independentASRFamilies": len(families), "reasons": sorted(set(reasons)),
+            "humanListeningRequired": False, "perceptualQuality": "not-established",
+            "audioSHA256": expected}
 
 
 def _read(path: Path) -> dict[str, Any]:
@@ -204,7 +317,7 @@ def _flatten_numeric(value: Any, prefix: str, output: dict[str, float]) -> None:
         output[prefix] = float(value)
 
 
-def build_cascade_manifest(*, plan_path: Path, run_dir: Path) -> dict[str, Any]:
+def build_cascade_manifest(*, plan_path: Path, run_dir: Path, review_evidence: dict[str, Any] | None = None) -> dict[str, Any]:
     plan = _read(plan_path)
     retained_plan = _read(run_dir / "execution-plan.json")
     state = _read(run_dir / "execution-state.json")
@@ -228,6 +341,15 @@ def build_cascade_manifest(*, plan_path: Path, run_dir: Path) -> dict[str, Any]:
     }
     if set(acoustic_rows) != set(plan_rows):
         raise CascadeError("cascade requires exact acoustic-row coverage")
+    if any(acoustic_rows[key].get('generationID') != take.get('generationID') for key, take in takes.items()):
+        raise CascadeError('cascade acoustic generation identities differ')
+    if review_evidence is not None and (
+        review_evidence.get("policyID") != REVIEW_POLICY
+        or review_evidence.get("executionPlanDigest") != execution_digest
+        or not isinstance(review_evidence.get("rows"), dict)
+        or set(review_evidence["rows"]) != {take["generationID"] for take in takes.values()}
+    ):
+        raise CascadeError("automated review evidence must cover the exact run and generations")
     rows = []
     for take_id, row in sorted(plan_rows.items()):
         take = takes[take_id]
@@ -255,6 +377,15 @@ def build_cascade_manifest(*, plan_path: Path, run_dir: Path) -> dict[str, Any]:
             "neutralWAV": str(neutral),
             "instructedSHA256": take["audioSHA256"],
             "neutralSHA256": reference["audioSHA256"],
+            "referenceText": row["script"].get("text"),
+            "scriptSHA256": row["script"].get("sha256"),
+            "reviewEvidence": {
+                role: {
+                    "audioSHA256": result["audioSHA256"], "audioQC": result.get("audioQC"),
+                    "recognitions": (review_evidence or {}).get("rows", {}).get(
+                        take["generationID"], {}).get(role, []),
+                } for role, result in (("instructed", take), ("neutral", reference))
+            },
         })
     identity = plan.get("executionIdentity")
     required_identity = (
@@ -274,6 +405,7 @@ def build_cascade_manifest(*, plan_path: Path, run_dir: Path) -> dict[str, Any]:
             "retainedPlanSHA256": file_sha256(run_dir / "execution-plan.json"),
             "executionStateSHA256": file_sha256(run_dir / "execution-state.json"),
             "acousticLayerSHA256": file_sha256(run_dir / "acoustic-layer.json"),
+            "reviewEvidenceSHA256": digest(review_evidence),
             **{field: identity[field] for field in required_identity},
         },
         "rows": rows,
@@ -294,9 +426,12 @@ def _validate_manifest(payload: dict[str, Any]) -> list[dict[str, Any]]:
     if not isinstance(execution_digest, str) or len(execution_digest) != 64:
         raise CascadeError("cascade execution plan identity is invalid")
     source_digests = payload.get("sourceDigests")
-    if not isinstance(source_digests, dict) or any(
+    if (not isinstance(source_digests, dict) or not {
+        'retainedPlanSHA256', 'executionStateSHA256', 'acousticLayerSHA256',
+        'binarySHA256', 'runnerSHA256', 'analyzerSHA256', 'temporalAnalyzerSHA256',
+    } <= set(source_digests) or any(
         not isinstance(value, str) or len(value) != 64 for value in source_digests.values()
-    ):
+    )):
         raise CascadeError("cascade source digests are incomplete")
     if payload.get("generationProcessExited") is not True:
         raise CascadeError("TTS/MLX process must exit before the evaluator cascade starts")
@@ -375,6 +510,17 @@ def run_cascade(
         ):
             route = "rejected"
             reasons.append("deterministic-audio-qc-or-global-analysis-failed")
+        automated = {role: review_automated_audio(row, role, per_audio[role]["canonical"]["durationSeconds"])
+                     for role in ("instructed", "neutral")}
+        if any(value["status"] == "fail" for value in automated.values()):
+            route = "rejected"
+            reasons.append("byte-bound-native-qc-or-independent-content-failed")
+        # Advisory features are not trained perceptual truth. Report them without
+        # duplicating extraction or weakening native QC to match a proxy.
+        prosody = {role: evaluate_metrics(per_audio[role]["global"].get("features", {}))
+                   for role in ("instructed", "neutral")}
+        for report in prosody.values():
+            report.pop("clip", None)
         # Qualify BOTH sides before launching any neural process. A rejected
         # neutral control invalidates the pair just as a rejected take does.
         if route != "rejected" and compact_config is not None:
@@ -433,23 +579,21 @@ def run_cascade(
                 }],
             }
             evaluation = evaluate_v2(evaluation_payload, evaluator_model)["rows"][0]
-        if route != "rejected" and compact_config is None:
+        if route != "rejected" and (any(value["status"] != "pass" for value in automated.values())
+                                    or any(not value["passed"] for value in prosody.values())):
             route = "abstained"
-            reasons.append("compact-representation-not-qualified-or-configured")
-        if route != "rejected" and evaluator_model is None:
-            route = "abstained"
-            reasons.append("tiny-local-heads-not-calibrated")
+            reasons.append("automated-quality-evidence-incomplete-or-prosody-warning")
         if evaluation is not None and evaluation.get("abstained"):
-            route = "routed-to-manual-listening"
+            route = "abstained"
             reasons.extend(evaluation.get("abstainReasons", []))
         if evaluation is not None and not evaluation.get("abstained"):
             probability = evaluation.get("pairwise", {}).get("targetAlignedProbability")
             if isinstance(probability, (int, float)) and 0.4 <= probability <= 0.6:
-                route = "routed-to-manual-listening"
+                route = "abstained"
                 reasons.append("pairwise-target-adherence-ambiguous")
         if not reasons:
             reasons.append("all-always-on-layers-complete-and-noncontradictory")
-        ambiguous = route in {"abstained", "routed-to-manual-listening"}
+        ambiguous = route == "abstained"
         finalist = (
             evaluation is not None and not evaluation.get("abstained")
             and float(evaluation.get("pairwise", {}).get("targetAlignedProbability", 0.0)) >= 0.7
@@ -458,6 +602,10 @@ def run_cascade(
             "generationID": row["generationID"],
             "route": route, "reasons": sorted(set(reasons)),
             "promotionAuthority": False,
+            "automatedReview": automated,
+            "advisoryProsody": prosody,
+            "semanticDelivery": "unmeasured" if evaluation is None else "model-estimate",
+            "humanListeningRequired": False,
             "alwaysLayers": {
                 "audioQC": {
                     role: per_audio[role]["qc"] for role in ("instructed", "neutral")
@@ -473,18 +621,24 @@ def run_cascade(
             },
             "finalistLayers": {
                 "required": finalist,
-                "requested": ["utmos", "complete-multilingual-asr-cer", "human-holdout"] if finalist else [],
+                "requested": ["utmos", "complete-multilingual-asr-cer", "automated-untouched-holdout"] if finalist else [],
             },
         })
     report = {
         "schemaVersion": SCHEMA_VERSION,
         "kind": "local-delivery-cascade",
+        "reviewPolicyID": REVIEW_POLICY,
+        "humanListeningRequired": False,
         "promotionAuthority": False,
         "inputManifestDigest": manifest["manifestDigest"],
         "composerSHA256": file_sha256(CASCADE_SOURCE),
+        "reviewDependencies": {name: file_sha256(REPO / 'scripts' / name) for name in
+                               ('check_language_output.py', 'prosody_quality_gate.py', 'prosody_profile.py')},
         "canonicalizationIdentity": canonicalization_identity(cache.resampler_version),
         "cache": {"hits": cache_hits, "misses": cache_misses},
         "rowCount": len(output_rows),
+        "reviewCounts": {route: sum(row['route'] == route for row in output_rows) for route in
+                         ('accepted-for-continued-screening', 'rejected', 'abstained')},
         "rows": output_rows,
     }
     report["reportDigest"] = digest(report)
@@ -499,6 +653,7 @@ def main() -> int:
     parser.add_argument("--lock-root", type=Path, default=DEFAULT_CACHE_ROOT)
     parser.add_argument("--compact-adapter-config", type=Path)
     parser.add_argument("--evaluator-model", type=Path)
+    parser.add_argument("--review-evidence", type=Path, help="untracked, run-bound full-file ASR receipts; never listener responses")
     parser.add_argument("--resampler", choices=SUPPORTED_RESAMPLERS)
     parser.add_argument("--out", required=True, type=Path)
     args = parser.parse_args()
@@ -506,13 +661,16 @@ def main() -> int:
         compact = _read(args.compact_adapter_config) if args.compact_adapter_config else None
         resampler = select_resampler(args.resampler, compact)
         result = run_cascade(
-            manifest=build_cascade_manifest(plan_path=args.plan, run_dir=args.run_dir),
+            manifest=build_cascade_manifest(plan_path=args.plan, run_dir=args.run_dir,
+                                           review_evidence=_read(args.review_evidence) if args.review_evidence else None),
             cache=DeliveryAnalysisCache(args.cache_root, resampler_version=resampler), lock_root=args.lock_root,
             compact_config=compact,
             evaluator_model=_read(args.evaluator_model) if args.evaluator_model else None,
         )
         atomic_json(args.out, result)
-        print(json.dumps({"status": "PASS", "rows": result["rowCount"], "output": str(args.out)}, indent=2))
+        print(json.dumps({"status": "COMPLETED", "rows": result["rowCount"],
+                          "reviewCounts": result.get('reviewCounts'),
+                          "promotionAuthority": False, "output": str(args.out)}, indent=2))
         return 0
     except (CascadeError, ValueError, OSError) as error:
         print(f"Local delivery cascade: FAIL\n{error}", file=__import__("sys").stderr)

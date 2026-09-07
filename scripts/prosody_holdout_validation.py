@@ -11,6 +11,7 @@ import os
 import re
 import subprocess
 import tempfile
+import wave
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
@@ -67,6 +68,17 @@ def validate_policy(root: Path = ROOT) -> dict[str, Any]:
         raise HoldoutError("bad-clip floor cannot satisfy the true-positive bound even with perfect detection")
     if policy.get("samplingUnit") != "independent-source-recording":
         raise HoldoutError("sampling unit must identify independent source recordings")
+    if policy.get('reviewAuthority') != {
+        'humanListeningRequired': False, 'default': 'independent-reference-evidence',
+        'acceptedSources': ['controlled-pcm', 'published-label', 'optional-human-annotation'],
+        'detectorSelfLabelsAllowed': False, 'controlledFixturesQualifyPerceptualQuality': False,
+    }:
+        raise HoldoutError('automated independent-reference policy is invalid')
+    catalogs = policy.get('approvedExternalCatalogSHA256')
+    if (not isinstance(catalogs, list)
+            or any(not isinstance(item, str) or not re.fullmatch(r'[0-9a-f]{64}', item) for item in catalogs)
+            or len(set(catalogs)) != len(catalogs)):
+        raise HoldoutError('approved external catalog pins are invalid')
     annotation = policy.get("annotationProtocol", {})
     if annotation.get("id") != "speech-defects-1" or annotation.get("minimumIndependentReviewers") != 3:
         raise HoldoutError("independent speech/defect annotation protocol is required")
@@ -123,6 +135,12 @@ def validate_manifests(
         raise HoldoutError("duplicate PCM cannot count as independent observations")
     if len({row["sourceGroup"] for row in holdout}) != len(holdout):
         raise HoldoutError("holdout requires one primary observation per independent sourceGroup")
+    origins = [
+        [(row.get('referenceEvidence') or {}).get('referenceSHA256', _clip_digest(row))
+         for row in entries] for entries in (calibration, holdout)
+    ]
+    if set(origins[0]) & set(origins[1]) or len(set(origins[1])) != len(holdout):
+        raise HoldoutError('controlled derivatives cannot disguise source reuse across holdout observations')
     for field in (*policy["groupIsolation"], "sourceGroup"):
         if {row[field] for row in calibration} & {row[field] for row in holdout}:
             raise HoldoutError(f"calibration and holdout leak {field}")
@@ -222,6 +240,96 @@ def validate_annotations(row: dict[str, Any], policy: dict[str, Any]) -> str:
     return hashlib.sha256(json.dumps({'annotations': responses, 'adjudication': row.get('adjudication')}, sort_keys=True).encode()).hexdigest()
 
 
+def validate_label_evidence(row: dict[str, Any], policy: dict[str, Any]) -> dict[str, str]:
+    """Reference truth is independent of the detector being fitted.
+
+    Existing listener records remain optional, strictly validated inputs. Machine
+    fixtures establish an exact signal transformation, never general usability.
+    Published labels require an immutable local annotation file; no network runs.
+    """
+    evidence = row.get('referenceEvidence')
+    if evidence is None:
+        return {'scope': 'listener-labelled-cohort', 'sha256': validate_annotations(row, policy)}
+    if not isinstance(evidence, dict):
+        raise HoldoutError('reference evidence must be an object')
+    audio = audio_identity(Path(row['path']))
+    if evidence.get('audioSHA256') != audio['audioSHA256']:
+        raise HoldoutError('reference evidence audio binding mismatch')
+    kind = evidence.get('kind')
+    if kind == 'published-label':
+        # The registry is private. Only its content digest and declared scope
+        # leave this function; URLs, local paths and labels are not copied out.
+        try:
+            annotation_path = Path(evidence['annotationFile'])
+            if annotation_path.stat().st_size > 16 * 1024**2:
+                raise HoldoutError('published annotations exceed the bounded input size')
+            raw = annotation_path.read_bytes()
+        except (OSError, KeyError, TypeError) as error:
+            raise HoldoutError('published reference annotations unavailable') from error
+        if hashlib.sha256(raw).hexdigest() != evidence.get('annotationFileSHA256'):
+            raise HoldoutError('published reference annotations changed')
+        if evidence['annotationFileSHA256'] not in policy['approvedExternalCatalogSHA256']:
+            raise HoldoutError('external reference catalog is not independently approved and pinned')
+        corpus = json.loads(raw)
+        if (not isinstance(corpus, dict) or corpus.get('kind') != 'external-reference-labels'
+                or not isinstance(corpus.get('source'), str) or not corpus['source'].startswith('https://')
+                or not all(isinstance(corpus.get(key), str) and corpus[key].strip()
+                           for key in ('revision', 'license', 'labelDefinition'))
+                or corpus.get('derivedFromVocelloEvaluator') is not False):
+            raise HoldoutError('independent published label provenance is incomplete')
+        matches = [entry for entry in corpus.get('rows', []) if isinstance(entry, dict)
+                   and entry.get('audioSHA256') == audio['audioSHA256']]
+        if (len(matches) != 1 or matches[0].get('label') != row['label']
+                or matches[0].get('defectSeverity') != row['defectSeverity']):
+            raise HoldoutError('published reference label does not match the frozen row')
+        scope = 'external-dataset-label-definition-only'
+    elif kind == 'controlled-pcm':
+        try:
+            reference = Path(evidence['referenceWAV'])
+            original = audio_identity(reference)
+        except (OSError, ValueError, KeyError, TypeError) as error:
+            raise HoldoutError('controlled reference audio unavailable') from error
+        if original['audioSHA256'] != evidence.get('referenceSHA256'):
+            raise HoldoutError('controlled reference digest mismatch')
+        operation = evidence.get('operation')
+        start, end = evidence.get('startFrame'), evidence.get('endFrame')
+        if operation not in ('unchanged', 'mute-interval'):
+            raise HoldoutError('unregistered controlled transformation')
+        with wave.open(str(reference), 'rb') as source, wave.open(row['path'], 'rb') as target:
+            if source.getparams() != target.getparams() or source.getsampwidth() != 2:
+                raise HoldoutError('controlled PCM requires identical PCM16 formats and frame counts')
+            frames, channels = source.getnframes(), source.getnchannels()
+            if operation == 'mute-interval':
+                if (type(start) is not int or type(end) is not int or not 0 < start < end < frames
+                        or row['label'] != 'bad' or row['defectSeverity'] == 'none'):
+                    raise HoldoutError('controlled interval or label invalid')
+            elif row['label'] != 'good' or row['defectSeverity'] != 'none':
+                raise HoldoutError('unchanged control must have no injected defect')
+            changed = False
+            for offset in range(0, frames, 8192):
+                expected = bytearray(source.readframes(min(8192, frames - offset)))
+                observed = target.readframes(min(8192, frames - offset))
+                if len(expected) != min(8192, frames - offset) * channels * 2 or len(observed) != len(expected):
+                    raise HoldoutError('controlled PCM is truncated')
+                if operation == 'mute-interval':
+                    left, right = max(start, offset), min(end, offset + len(expected) // (channels * 2))
+                    if left < right:
+                        a, b = (left - offset) * channels * 2, (right - offset) * channels * 2
+                        changed |= any(expected[a:b])
+                        expected[a:b] = bytes(b - a)
+                if observed != expected:
+                    raise HoldoutError('controlled PCM differs outside the declared transformation')
+            if operation == 'mute-interval' and not changed:
+                raise HoldoutError('controlled defect did not change any samples')
+        if (audio_identity(reference)['audioSHA256'] != original['audioSHA256']
+                or audio_identity(Path(row['path']))['audioSHA256'] != audio['audioSHA256']):
+            raise HoldoutError('controlled audio changed during verification')
+        scope = 'controlled-signal-defect-detection-only'
+    else:
+        raise HoldoutError('independent reference evidence kind is unsupported')
+    return {'scope': scope, 'sha256': hashlib.sha256(json.dumps(evidence, sort_keys=True).encode()).hexdigest()}
+
+
 def _wilson(successes: int, total: int) -> dict[str, float]:
     if type(total) is not int or type(successes) is not int or total <= 0 or not 0 <= successes <= total:
         raise HoldoutError("confidence interval requires valid integer observation counts")
@@ -273,7 +381,7 @@ def evaluate(
     holdout = prosody_calibration.load_labels(holdout_path)
     coverage = validate_manifests(calibration, holdout, policy)
     # Check independent labels before launching any acoustic analyzer.
-    annotation_digests = [validate_annotations(row, policy) for row in calibration + holdout]
+    label_evidence = [validate_label_evidence(row, policy) for row in calibration + holdout]
     profile = load_profile(profile_path)
     calibration_digest = validate_profile_binding(profile, calibration)
     good, bad = _metrics(holdout, analyzer)
@@ -296,14 +404,16 @@ def evaluate(
         "holdoutCorpusDigest": prosody_calibration.corpus_digest(holdout),
         "profileDigest": hashlib.sha256(profile_path.read_bytes()).hexdigest(),
         "policySHA256": hashlib.sha256(json.dumps(policy, sort_keys=True).encode()).hexdigest(),
-        "annotationEvidenceSHA256": hashlib.sha256(json.dumps(annotation_digests).encode()).hexdigest(),
+        "annotationEvidenceSHA256": hashlib.sha256(json.dumps(label_evidence, sort_keys=True).encode()).hexdigest(),
+        "reviewAuthority": policy['reviewAuthority'],
+        "qualificationScopes": sorted({entry['scope'] for entry in label_evidence}),
         "validationSourceSHA256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
         "inventorySourceSHA256": hashlib.sha256(Path(__file__).with_name('prosody_corpus_inventory.py').read_bytes()).hexdigest(),
         "coverage": coverage,
         "falsePositiveRate95CI": fpr,
         "truePositiveRate95CI": tpr,
         "qualificationFailures": failures,
-        "promotionAuthority": not failures,
+        "promotionAuthority": not failures and all(entry['scope'] != 'controlled-signal-defect-detection-only' for entry in label_evidence),
     }
 
 
@@ -385,13 +495,15 @@ An empty inventory emits the existing protocol and honest data dependencies.
                'holdout': policy['minimumHoldoutGoodClips']+policy['minimumHoldoutBadClips']}
     return {
         'schemaVersion': 1, 'kind': 'prosody-calibration-preparation',
-        'status': 'NEEDS_INDEPENDENT_LABELS', 'promotionAuthority': False,
+        'status': 'NEEDS_REFERENCE_EVIDENCE', 'promotionAuthority': False,
+        'humanListeningRequired': False,
         'policy': policy, 'policySHA256': hashlib.sha256(json.dumps(policy, sort_keys=True).encode()).hexdigest(),
         'sourceSHA256': hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
         'inventorySourceSHA256': hashlib.sha256(Path(__file__).with_name('prosody_corpus_inventory.py').read_bytes()).hexdigest(),
         'counts': counts, 'additionalAudioMinimum': {s: max(0, minimum[s]-counts[s]) for s in groups},
         'items': rows,
-        'requiredAnnotations': ['decision', 'defect-intervals', 'severity', 'confidence', 'independent-reviewer-provenance'],
+        'referenceEvidenceOptions': policy['reviewAuthority']['acceptedSources'],
+        'requiredAnnotations': [],
         'annotationTemplate': {
             'protocolID': policy['annotationProtocol']['id'], 'source': 'independent-human',
             'audioSHA256': None, 'reviewerID': None, 'fluentLanguages': [],
@@ -404,7 +516,7 @@ An empty inventory emits the existing protocol and honest data dependencies.
             'perfectDetectionAtBadFloor95Lower': _wilson(policy['minimumHoldoutBadClips'], policy['minimumHoldoutBadClips'])['lower'],
             'countsAreStartingFloorsNotPowerGuarantees': True,
         },
-        'nextActions': ['complete-group-and-language-coverage', 'independently-label-calibration-and-holdout',
+        'nextActions': ['complete-group-and-language-coverage', 'bind-independent-reference-evidence',
                         'fit-only-calibration', 'freeze-profile-before-opening-holdout',
                         'evaluate-once-with-existing-prosody-holdout-validator'],
     }

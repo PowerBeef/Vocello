@@ -13,6 +13,14 @@
   "minimumTruePositiveRateLowerBound": 0.7,
   "groupIsolation": ["speakerGroup", "scriptGroup", "translationGroup"],
   "samplingUnit": "independent-source-recording",
+  "approvedExternalCatalogSHA256": [],
+  "reviewAuthority": {
+    "humanListeningRequired": false,
+    "default": "independent-reference-evidence",
+    "acceptedSources": ["controlled-pcm", "published-label", "optional-human-annotation"],
+    "detectorSelfLabelsAllowed": false,
+    "controlledFixturesQualifyPerceptualQuality": false
+  },
   "annotationProtocol": {
     "id": "speech-defects-1",
     "minimumIndependentReviewers": 3,

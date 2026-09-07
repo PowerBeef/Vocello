@@ -66,6 +66,10 @@ print(json.dumps({
     "generationID": hashlib.sha256(out.name.encode()).hexdigest()[:32],
     "audioPath": str(out), "durationSeconds": 1.0, "wallSeconds": 0.1,
     "finishReason": "eos",
+    "audioQC": {"algorithmVersion": 6, "verdict": "pass", "durationSeconds": 1.0,
+                "writtenOutputVerdict": "pass", "instabilityVerdict": "pass", "flags": [],
+                "nonFiniteSamples": 0, "clippedSamples": 0, "hotSamples": 0, "clickEvents": 0,
+                "longestSilenceMS": 0, "trailingSilenceMS": 0},
     "deliveryInstructionChars": len(instruction),
     "deliveryInstructionDigest": hashlib.sha256(instruction.encode()).hexdigest(),
 }))
@@ -205,6 +209,12 @@ class DeliveryExperimentRunnerTests(unittest.TestCase):
         take = next(iter(second["takes"].values()))
         self.assertEqual(take["status"], "complete")
         self.assertFalse(Path(take["audio"]).is_absolute())
+        self.assertEqual(take["audioQC"]["algorithmVersion"], 6)
+        reference = second["references"][take["referenceKey"]]
+        self.assertEqual(reference["audioQC"], take["audioQC"])
+        # The producer's receipt must survive both process decoding and resume,
+        # rather than being reconstructed from an evaluator's expected verdict.
+        self.assertEqual(take["audioQC"], next(iter(first["takes"].values()))["audioQC"])
 
     def test_retry_retains_the_failed_attempt(self) -> None:
         plan = self._single_row_plan()
@@ -245,7 +255,7 @@ class DeliveryExperimentRunnerTests(unittest.TestCase):
     def test_paired_analyzer_emits_evaluator_compatible_rows(self) -> None:
         plan = self._single_row_plan()
         run_dir = self.root / "run"
-        run_execution_plan(plan=plan, binary=self.binary, data_dir=None, run_dir=run_dir)
+        state = run_execution_plan(plan=plan, binary=self.binary, data_dir=None, run_dir=run_dir)
         report = analyze_execution(plan, run_dir)
         self.assertEqual(report["kind"], "paired-acoustic-delta")
         self.assertEqual(len(report["rows"]), 1)
@@ -254,6 +264,13 @@ class DeliveryExperimentRunnerTests(unittest.TestCase):
         self.assertIn("derivedFeatures", report["rows"][0])
         self.assertEqual(report["rows"][0]["deliveryVerdict"]["deliveryID"], "neutral.strong")
         self.assertTrue((run_dir / "acoustic-layer.json").is_file())
+        from run_local_delivery_cascade import build_cascade_manifest
+        manifest = build_cascade_manifest(plan_path=run_dir / 'execution-plan.json', run_dir=run_dir)
+        take = next(iter(state['takes'].values()))
+        for role in ('instructed', 'neutral'):
+            receipt = manifest['rows'][0]['reviewEvidence'][role]
+            self.assertEqual(receipt['audioQC'], take['audioQC'])
+            self.assertEqual(receipt['audioSHA256'], manifest['rows'][0][f'{role}SHA256'])
 
     def test_analysis_reuses_identical_audio_and_rejects_changed_bytes(self) -> None:
         plan = self._single_row_plan()

@@ -25,8 +25,9 @@ default for new cache/cascade/compact-model qualification; historical linear rep
 selection and never silently follows an old config. Source-bound integration tests cover actual
 model-input PCM, cache reuse, config mismatch and legacy compatibility. The
 experimental corrected phonation, bounded legacy projection, model resource requalification and
-blind calibration preparation are implemented. No product-QC threshold, model, prompt, seed or
-release acceptance changed. AV-07/DP-28 retain independent calibration/adoption requirements;
+blind calibration preparation are implemented. Human listening is now optional by explicit
+maintainer decision. No product-QC threshold, model, prompt, seed or iOS acceptance changed.
+AV-07/DP-28 retain independent-reference calibration/adoption requirements;
 RF-06 remains a separate unresolved product-audio blocker.
 
 The next Audio QC measurement step is now complete: analytic signals plus all nine public voice
@@ -43,18 +44,46 @@ Speech/defect preparation now corrects the underpowered old minimum: zero false 
 clips cannot meet the 95% upper-bound gate; the predeclared starting design is 60 calibration plus
 60-good/60-bad holdout recordings. The existing validator now rejects impossible sample floors,
 duplicate PCM/source families, examined holdout material and missing/mismatched independent
-annotations. A bounded read-only inventory found 2,918 WAVs, 2,915 readable files and 1,145 unique
+reference evidence. A bounded read-only inventory found 2,918 WAVs, 2,915 readable files and 1,145 unique
 PCM streams, with three unavailable cases retained. These are **not** 1,145 qualified independent
-speech observations: groups, languages, exposure and human labels remain unverified. Everything
+speech observations: groups, languages, exposure and reference labels remain unverified. Everything
 discovered stays development-only. The anonymous inventory, separate private path map, unanswered
 annotation template and remaining-data counts are retained in
 `build/artifacts/diagnostics/audio-qc-calibration-preparation-20260906/`.
-Next: reconcile exact source metadata, predeclare an unexamined confirmation pool, obtain three
-independent reviewers with fluent coverage, fit calibration only and qualify once. No profile,
-production threshold, phone or neural model was used/changed. AV-07 remains open; the full protocol
-and the emotion-listener tool's distinct scope are in the Audio QC reference.
+Next: reconcile exact source metadata, predeclare an unexamined confirmation pool and bind
+independent reference evidence, fit calibration only and qualify once. New listeners are not needed.
+The validator can verify controlled PCM changes and pinned external label catalogs. None is
+currently approved as general speech-quality calibration; synthetic detection is not perceptual
+truth. No profile, production threshold, phone or neural model was used/changed. AV-07 remains open.
 The complete focused prosody suite passes 32 tests, including existing profile/calibration consumers;
 no app/phone acceptance or completed speech-defect listening session is implied.
+
+### Automated-review correction — September 6
+
+The existing cascade now consumes native Fast-QC receipts preserved by the experiment runner,
+uses recomputed WER/CER from independent full-file ASR evidence, and retains cached global/temporal
+features. Hard failures dominate; missing, partial, wrong-language, repeated-family, warning and
+contradictory evidence cannot become PASS. Optional compact heads no longer force a listener
+dependency: unmeasured semantic delivery is explicit, with no mandatory manual-listening route.
+The named policy is `automated-evidence-1`; ASR/UTMOS execution requests are not executed results.
+
+Current candidate decisions use schema 2: frozen automatic metrics, independent/reverse-order
+judges, complete untouched paired coverage and unchanged statistical/quality/runtime guardrails.
+They qualify measured improvements only. Historical listener/annotation readers remain optional,
+strict and unchanged in meaning. AV-07, DP-28, DP-31 and DP-32 have updated closure gates; none is
+marked complete merely because the human prerequisite was removed. Production prompts, thresholds,
+release approval and the 201-take campaign remain unchanged. No cloud or model acquisition occurred.
+
+A read-only replay of 32 retained completed takes produced 32 abstentions, zero screening accepts
+and zero measured rejections: the older run did not retain native-QC/independent-ASR receipts.
+The new review is retained at
+`build/artifacts/diagnostics/audio-review-automated-20260906/retained-screen-review.json`;
+it is not new generation, current-source acceptance or a semantic calibration pass. Regression
+fixtures exercise native failure precedence, exact audio/text/source bindings, recognizer
+independence, full-file coverage, warning/disagreement abstention, reference-label provenance,
+severity consistency and unchanged CLI-to-cascade native receipts.
+Focused verification passes all 80 tests across the eight affected Python modules, plus the
+whitespace/diff check. No native/app source changed, so no new device or native-build result is claimed.
 
 The evidence-led replacement/retirement policy now applies to every testing surface, not just
 Audio QC. DWF-06 records the guidance update; [the procedure](reference/repository-self-verification.md#replace-and-retire-tests-and-harnesses)

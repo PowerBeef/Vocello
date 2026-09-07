@@ -56,8 +56,9 @@ def validate_v2_contract(payload: dict[str, Any]) -> dict[str, Any]:
         raise EvaluatorError("delivery evaluator v2 human calibration policy is missing")
     if human.get("requestedLabelMayEnterDimensionalBlock") is not False:
         raise EvaluatorError("requested labels cannot enter blind dimensional features")
-    if human.get("humanSemanticAuthorityRequired") is not True:
-        raise EvaluatorError("human semantic authority cannot be removed")
+    if (human.get("humanSemanticAuthorityRequired") is not False
+            or human.get("requiredForAutomatedReview") is not False):
+        raise EvaluatorError("listener calibration must remain optional for automated review")
     if human.get("minimumIntraRaterRepeatAgreement") != 0.75:
         raise EvaluatorError("listener repeat-agreement floor drifted")
     if human.get("minimumAnchorAccuracy") != 0.8:
@@ -87,6 +88,10 @@ def validate_v2_contract(payload: dict[str, Any]) -> dict[str, Any]:
         raise EvaluatorError("delivery evaluator v2 promotion policy is missing")
     if promotion.get("automaticLayersMayPromoteSemanticDelivery") is not False:
         raise EvaluatorError("automatic layers cannot gain semantic promotion authority")
+    if (promotion.get('humanListeningRequired') is not False
+            or promotion.get('automaticLayersMayRouteToManualListening') is not False
+            or promotion.get('automaticLayersMayQualifyMeasuredClaims') is not True):
+        raise EvaluatorError('automated review must preserve measured scope without mandatory listening')
     if promotion.get("requestedLabelsForbiddenFromBlindFeatureExtraction") is not True:
         raise EvaluatorError("blind feature extraction cannot consume requested labels")
     if promotion.get("productionEmotionPresetChangesInThisWork") is not False:

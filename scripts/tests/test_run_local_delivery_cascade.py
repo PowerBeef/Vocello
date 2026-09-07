@@ -26,10 +26,85 @@ from run_local_delivery_cascade import (  # noqa: E402
     _identity,
     build_cascade_manifest,
     run_cascade,
+    review_automated_audio,
 )
 
 
 class LocalDeliveryCascadeTests(unittest.TestCase):
+    def review_row(self):
+        text = 'The quiet garden is open today.'
+        row = self._row('review', self.one, 17)
+        row.update(referenceText=text, scriptSHA256=hashlib.sha256(text.encode()).hexdigest())
+        qc = {'algorithmVersion': 6, 'verdict': 'pass', 'instabilityVerdict': 'pass',
+              'writtenOutputVerdict': 'pass', 'durationSeconds': 2.0, 'flags': [],
+              **{key: 0 for key in ('nonFiniteSamples', 'clippedSamples', 'hotSamples',
+                                   'clickEvents', 'longestSilenceMS', 'trailingSilenceMS')}}
+        recognitions = [{'modelFamily': family, 'audioSHA256': row['instructedSHA256'],
+                         'inputTextSHA256': row['scriptSHA256'], 'status': 'complete',
+                         'outputLanguage': 'english', 'detectedLanguage': 'english',
+                         'fullFileProcessed': True, 'processedDurationSeconds': 2.0,
+                         'transcript': text,
+                         'provenance': {key: digest(f'{family}-{key}') for key in
+                                        ('runtimeSHA256', 'modelIdentitySHA256', 'configSHA256')}}
+                        for family in ('whisper', 'sensevoice')]
+        row['reviewEvidence'] = {'instructed': {'audioSHA256': row['instructedSHA256'],
+                                               'audioQC': qc, 'recognitions': recognitions}}
+        return row
+
+    def test_automated_review_needs_no_listener_and_recomputes_content(self):
+        row = self.review_row()
+        report = review_automated_audio(row, 'instructed', 2.0)
+        self.assertEqual(report['status'], 'pass')
+        self.assertFalse(report['humanListeningRequired'])
+        self.assertEqual(report['perceptualQuality'], 'not-established')
+        self.assertNotIn(row['referenceText'], json.dumps(report))
+        self.assertNotIn(str(self.root), json.dumps(report))
+        for recognition in row['reviewEvidence']['instructed']['recognitions']:
+            recognition['transcript'] = 'Wrong words completely replace the content.'
+            recognition['errorRate'] = 0.0  # A supplied perfect score must be ignored.
+        report = review_automated_audio(row, 'instructed', 2.0)
+        self.assertEqual(report['status'], 'fail')
+        self.assertTrue(all(r['errorRate'] > .15 for r in report['recognitions']))
+
+    def test_native_failure_wins_over_perfect_asr_and_no_models_launch(self):
+        row = self.review_row()
+        row['reviewEvidence']['instructed']['audioQC']['writtenOutputVerdict'] = 'fail'
+        self.assertEqual(review_automated_audio(row, 'instructed', 2.0)['status'], 'fail')
+        manifest = self._seal({**self.manifest, 'rows': [row]})
+        with mock.patch('run_local_delivery_cascade.run_compact_adapter') as adapter:
+            result = run_cascade(manifest=manifest, cache=self.cache, lock_root=self.root,
+                                 compact_config={'preprocessingConfig': {
+                                     'canonicalizationIdentity': canonicalization_identity(RESAMPLER_VERSION)}})
+        adapter.assert_not_called()
+        self.assertEqual(result['rows'][0]['route'], 'rejected')
+
+    def test_missing_partial_drifted_unsupported_or_disagreeing_asr_is_inconclusive(self):
+        import copy
+        original = self.review_row()
+        changes = [
+            ('audioSHA256', '0' * 64), ('inputTextSHA256', '0' * 64),
+            ('fullFileProcessed', False), ('processedDurationSeconds', 1.0),
+            ('processedDurationSeconds', float('nan')), ('outputLanguage', 'french'),
+            ('provenance', {}), ('transcript', 'Wrong words.'),
+        ]
+        for field, value in changes:
+            with self.subTest(field=field):
+                row = copy.deepcopy(original)
+                row['reviewEvidence']['instructed']['recognitions'][0][field] = value
+                self.assertEqual(review_automated_audio(row, 'instructed', 2.0)['status'], 'inconclusive')
+        row = copy.deepcopy(original)
+        row['reviewEvidence']['instructed']['recognitions'][1]['modelFamily'] = 'whisper'
+        self.assertEqual(review_automated_audio(row, 'instructed', 2.0)['independentASRFamilies'], 1)
+        self.assertEqual(review_automated_audio(row, 'instructed', 2.0)['status'], 'inconclusive')
+        row = copy.deepcopy(original)
+        row['outputLanguage'] = 'French'
+        for r in row['reviewEvidence']['instructed']['recognitions']:
+            r['outputLanguage'] = r['detectedLanguage'] = 'french'
+        self.assertEqual(review_automated_audio(row, 'instructed', 2.0)['status'], 'inconclusive')
+        row = copy.deepcopy(original)
+        row['reviewEvidence']['instructed']['audioQC']['verdict'] = 'warn'
+        self.assertEqual(review_automated_audio(row, 'instructed', 2.0)['status'], 'inconclusive')
+
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
         self.root = Path(self.temporary.name)
@@ -99,6 +174,9 @@ class LocalDeliveryCascadeTests(unittest.TestCase):
             digest({key: value for key, value in first.items() if key != "reportDigest"}),
         )
         self.assertTrue(all(row["route"] == "abstained" for row in first["rows"]))
+        self.assertFalse(first['humanListeningRequired'])
+        self.assertTrue(all(row['semanticDelivery'] == 'unmeasured' for row in first['rows']))
+        self.assertNotIn('manual-listening', json.dumps(first))
         self.assertGreater(first["cache"]["hits"], 0)
         self.assertTrue(all(
             row["alwaysLayers"]["temporalAcoustics"]["kind"] == "instructed-minus-neutral-temporal-delta"

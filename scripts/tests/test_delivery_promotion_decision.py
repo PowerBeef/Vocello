@@ -10,6 +10,8 @@ import unittest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from delivery_promotion_decision import DecisionError, PRESETS, decide  # noqa: E402
+import copy
+import hashlib
 
 
 def passing_fixture() -> dict:
@@ -48,6 +50,59 @@ def passing_fixture() -> dict:
 
 
 class DeliveryPromotionDecisionTests(unittest.TestCase):
+    def automated_fixture(self):
+        payload = passing_fixture()
+        payload['schemaVersion'] = 2
+        del payload['listenerAuthority']
+        payload['automatedAuthority'] = {
+            **{key: 'a' * 64 for key in ('protocolSHA256', 'holdoutManifestSHA256', 'evaluationSourceSHA256')},
+            **{key: True for key in ('holdoutOpenedOnce', 'metricFrozenBeforeHoldout', 'blindExtraction',
+                                    'completePlannedCoverage', 'independentReferenceQualification')},
+            'metricID': 'fixture-acoustic-target-identification',
+        }
+        for row in payload['pairedIdentification']:
+            row['independentJudges'] = [
+                {'family': family, 'modelSHA256': hashlib.sha256(family.encode()).hexdigest(),
+                 'evidenceSHA256': hashlib.sha256(f'{family}-{row["pairID"]}'.encode()).hexdigest(),
+                 'orderReversalConsistent': True,
+                 **{key: row[key] for key in ('candidateCorrect', 'baselineCorrect')}}
+                for family in ('fixture-one', 'fixture-two')]
+        for row, paired in zip(payload['instructedVersusNeutral2AFC'], payload['pairedIdentification']):
+            row.update(pairID=paired['pairID'], orderReversalConsistent=True)
+        return payload
+
+    def test_automated_qualification_is_scoped_without_listener_authority(self):
+        result = decide(self.automated_fixture())
+        self.assertEqual(result['verdict'], 'qualifies')
+        self.assertFalse(result['humanListeningRequired'])
+        self.assertFalse(result['publicationAuthorized'])
+        self.assertEqual(result['claimScope'], 'measured-automatic-metric-improvement')
+        self.assertNotIn('listenerIdentificationImprovement', result)
+
+    def test_automated_review_rejects_missing_drifted_biased_or_dependent_evidence(self):
+        original = self.automated_fixture()
+        for key in original['automatedAuthority']:
+            payload = copy.deepcopy(original)
+            del payload['automatedAuthority'][key]
+            with self.assertRaises(DecisionError):
+                decide(payload)
+        for field, value in (('modelSHA256', 'missing'), ('evidenceSHA256', None),
+                             ('orderReversalConsistent', False), ('candidateCorrect', False),
+                             ('family', 'fixture-one')):
+            payload = copy.deepcopy(original)
+            payload['pairedIdentification'][0]['independentJudges'][1][field] = value
+            with self.assertRaises(DecisionError):
+                decide(payload)
+        for key, value in (('newHardAudioQCFailures', 1), ('werCERAbsoluteDelta', .011),
+                           ('medianSpeakerSimilarityDelta', -.021), ('relativeUTMOSDelta', -.101)):
+            payload = copy.deepcopy(original)
+            payload['automaticGuardrails'][key] = value
+            self.assertEqual(decide(payload)['verdict'], 'does-not-qualify')
+        payload = copy.deepcopy(original)
+        payload['instructedVersusNeutral2AFC'][1] = payload['instructedVersusNeutral2AFC'][0]
+        with self.assertRaisesRegex(DecisionError, 'unique planned pairs'):
+            decide(payload)
+
     def test_complete_candidate_qualifies(self) -> None:
         report = decide(passing_fixture())
         self.assertEqual(report["verdict"], "qualifies")

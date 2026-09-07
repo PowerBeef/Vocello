@@ -139,14 +139,15 @@ def validate_contract(contract: dict[str, Any]) -> dict[str, Any]:
 
     guardrails = contract.get("promotionGuardrails")
     expected_guardrails = {
-        "listenerMacroImprovementLower95Above": 0.0,
+        "automatedMacroImprovementLower95Above": 0.0,
         "holmAlpha": 0.05,
         "maximumAbsoluteWEROrCERRegression": 0.01,
         "maximumMedianSpeakerSimilarityRegression": 0.02,
         "maximumMedianRelativeUTMOSRegression": 0.1,
         "maximumNewHardAudioQCFailures": 0,
-        "minimumIndependentListeners": 3,
-        "minimumFluentListenersPerLanguage": 1,
+        "minimumIndependentJudgeFamilies": 2,
+        "humanListeningRequired": False,
+        "claimScope": "measured-automatic-metric-improvement",
     }
     if guardrails != expected_guardrails:
         raise ExperimentError("promotion guardrails drifted from the pre-registered contract")

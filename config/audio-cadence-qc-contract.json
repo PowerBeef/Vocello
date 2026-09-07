@@ -75,7 +75,8 @@
   },
   "thresholdChangeAuthority": {
     "requiresUntouchedConfirmation": true,
-    "requiresIndependentHumanLabels": true,
+    "requiresIndependentHumanLabels": false,
+    "requiresIndependentReferenceEvidence": true,
     "automaticMetricsMayScreenOnly": true,
     "sourceChangeRequiresExplicitReview": true,
     "currentBoundaryRemainsUntilQualified": true

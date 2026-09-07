@@ -34,7 +34,7 @@ then retire obsolete execution paths. This is a working policy, not a claim of a
 | Model download lifecycle | [Model delivery](model-delivery.md) | Explicit isolated root; preserve canonical data and failed evidence |
 | Benchmark operation / publication | [Benchmarking procedure](benchmarking-procedure.md) | Exact-source qualified PASS only; no automatic Git changes |
 | Telemetry fields / schema / knobs | [Telemetry reference](telemetry-and-benchmarking.md) | Interpretation, not another operator runbook |
-| Delivery / emotion research | [Delivery harness](delivery-harness.md) | Serial local analyzers after TTS exits; human holdout for semantic promotion only |
+| Delivery / emotion research | [Delivery harness](delivery-harness.md) | Serial local analyzers after TTS exits; frozen independent-reference automated holdouts, measured claims only; listening optional |
 | Release / submission programme | [Release-first plan](release-first-execution-2026-09.md) | Implementation, candidate verification, publication approval are separate |
 | Gate changes / deliberate-failure fixtures | [Repository self-verification](repository-self-verification.md) | Prove rejection as well as success; preserve deterministic coverage |
 

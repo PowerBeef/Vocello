@@ -53,7 +53,7 @@ class PrepareDeliveryCompactModelConfigTests(unittest.TestCase):
         with self.assertRaisesRegex(PreparationError, "dependency pins"):
             validate_candidate_contract(runtime_drift)
         gate_drift = copy.deepcopy(self.contract)
-        gate_drift["adoptionRequirements"].remove("untouched-human-holdout-gain")
+        gate_drift["adoptionRequirements"].remove("untouched-independent-reference-holdout-gain")
         with self.assertRaisesRegex(PreparationError, "adoption requirements"):
             validate_candidate_contract(gate_drift)
 
@@ -122,7 +122,10 @@ class PrepareDeliveryCompactModelConfigTests(unittest.TestCase):
             manifest = {
                 "schemaVersion": 1, "kind": "source-bound-delivery-cascade-input",
                 "generationProcessExited": True, "executionPlanDigest": "1" * 64,
-                "sourceDigests": {"fixtureSHA256": "2" * 64},
+                "sourceDigests": {key: "2" * 64 for key in (
+                    "retainedPlanSHA256", "executionStateSHA256", "acousticLayerSHA256",
+                    "binarySHA256", "runnerSHA256", "analyzerSHA256", "temporalAnalyzerSHA256",
+                )},
                 "rows": [{
                     "generationID": "fixture-one", "speakerID": "aiden", "scriptID": "fixture",
                     "scriptTranslationGroup": "fixture", "seed": 1, "outputLanguage": "English",

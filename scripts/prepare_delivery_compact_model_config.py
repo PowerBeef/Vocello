@@ -86,7 +86,7 @@ def validate_candidate_contract(contract: dict[str, Any]) -> dict[str, Any]:
         raise PreparationError("DistilHuBERT runtime dependency pins are incomplete")
     required_gates = {
         "two-clean-eight-gib-host-runs", "serial-process-isolation",
-        "post-exit-memory-recovery", "untouched-human-holdout-gain",
+        "post-exit-memory-recovery", "untouched-independent-reference-holdout-gain",
         "no-vad-dimension-regression", "no-preset-regression",
     }
     if set(contract.get("adoptionRequirements", [])) != required_gates:

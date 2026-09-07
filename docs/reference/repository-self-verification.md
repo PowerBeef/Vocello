@@ -78,7 +78,7 @@ inventory, automatic mutation campaign or recurring approval ritual is required.
 | --- | --- |
 | Unit, integration, persistence and CLI tests | Intended behavior plus failure cases; real producer/consumer compatibility, cancellation/ownership and durable bytes where applicable |
 | Native UI and system-handoff harnesses | Genuine visible state and independently captured outcomes; failed/missing observations and cleanup remain explicit; XCUITest is still the sole app UI driver |
-| Audio/language/delivery evaluators | Numerical references and adversarial audio for measurements; representative independent calibration for decisions; semantic claims retain the separate blinded-holdout boundary |
+| Audio/language/delivery evaluators | Numerical references and adversarial audio for measurements; representative independent reference calibration for decisions; frozen automated holdouts for named metric claims. Listening is optional, and machine scores are not listener-proven semantic quality. |
 | Performance, memory and benchmark tools | Correct process/lifecycle attribution, representative inputs, observer overhead and measured variance; historical numbers are comparisons, not universal limits |
 | Build, CI, security, packaging and release validators | Positive and deliberate-negative fixtures at the actual execution boundary; justified applicability, identity, privacy and provenance checks |
 

@@ -116,6 +116,108 @@ final class Qwen3DecoderPartitionTests: XCTestCase {
         )
     }
 
+    func testReplayCachePolicyPreservesBothPartitionsAndBoundsObservations() throws {
+        MLXRandom.seed(0xC0DEC0DE)
+        let decoder = Qwen3TTSSpeechTokenizerDecoder(config: try tinyConfig())
+        let codes = fixtureCodes(tokenCount: 300)
+        for size in [7, Qwen3TTSModel.qualityFirstDecoderChunkFrames] {
+            let partitions = repeatedPartitions(total: 300, size: size)
+            let baseline = decode(decoder, codes: codes, partitions: partitions, timing: false)
+            let ranges = stride(from: 0, to: 300, by: size).map {
+                Qwen3CodecFrameRange(start: $0, endExclusive: min(300, $0 + size))
+            }
+            for clear in [false, true] {
+                var observations: [CodecReplayMemoryObservation] = []
+                let replay = try Qwen3TTSModel.replayDecoderArm(
+                    decoder, codes: codes.transposed(0, 2, 1), ranges: ranges,
+                    arm: size == 7 ? .incremental : .full,
+                    memoryPolicy: Qwen3RequestMemoryPolicy(
+                        clearCacheOnStreamChunkEmit: clear, tokenMemoryClearCadence: 50,
+                        talkerKVGeneratedWindow: nil
+                    ), observe: { observations.append($0) }
+                )
+                assertWaveform(replay, matches: baseline, label: "replay \(size), cache clear \(clear)")
+                XCTAssertEqual(observations.first?.stage, .started)
+                XCTAssertEqual(observations.last?.stage, .finished)
+                XCTAssertEqual(observations.last?.completedFrames, 300)
+                XCTAssertLessThanOrEqual(observations.count, 36)
+                let cleared = observations.filter { $0.stage == .afterCachePolicy }
+                if clear { XCTAssertTrue(cleared.allSatisfy { $0.cacheBytes == 0 }) }
+                for row in observations {
+                    XCTAssertGreaterThanOrEqual(row.activeBytes, 0)
+                    XCTAssertGreaterThanOrEqual(row.cacheBytes, 0)
+                    XCTAssertGreaterThanOrEqual(row.peakBytes, row.activeBytes)
+                }
+            }
+        }
+    }
+
+    func testReplayObservationScheduleIsBoundedAtMaximumTraceLength() throws {
+        for count in [1, 16, 17, 293, 8192] {
+            let indices = (0..<count).filter { CodecReplayMemoryObservation.shouldSample(index: $0, count: count) }
+            XCTAssertEqual(indices.first, 0)
+            XCTAssertEqual(indices.last, count - 1)
+            XCTAssertLessThanOrEqual(indices.count, 17)
+        }
+        let data = try JSONEncoder().encode(CodecReplayMemoryObservation.capture(
+            arm: .incremental, stage: .started, completedFrames: 0
+        ))
+        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertEqual(Set(object.keys), Set([
+            "event", "arm", "stage", "completedFrames", "timestampUnixMS",
+            "activeBytes", "cacheBytes", "peakBytes", "cacheLimitBytes"
+        ]))
+    }
+
+    func testReplayObservationFailureResetsDecoderAndFailsClosed() throws {
+        enum Failure: Error { case capture }
+        MLXRandom.seed(0xC0DEC0DE)
+        let decoder = Qwen3TTSSpeechTokenizerDecoder(config: try tinyConfig())
+        let codes = fixtureCodes(tokenCount: 14)
+        let baseline = decode(decoder, codes: codes, partitions: [7, 7], timing: false)
+        XCTAssertThrowsError(try Qwen3TTSModel.replayDecoderArm(
+            decoder, codes: codes.transposed(0, 2, 1),
+            ranges: [.init(start: 0, endExclusive: 7), .init(start: 7, endExclusive: 14)],
+            arm: .incremental, memoryPolicy: .compatibilityDefault,
+            observe: { if $0.stage == .materialized { throw Failure.capture } }
+        )) { XCTAssertTrue($0 is Failure) }
+        // Do not manually reset: failure cleanup must make the decoder fresh.
+        let afterFailure = decoder.streamingStep(codes)[0, 0].asArray(Float.self)
+        assertWaveform(afterFailure, matches: baseline, label: "capture failure cleanup")
+        decoder.resetStreamingState()
+    }
+
+    func testReplayCancellationStopsAtChunkBoundaryAndResetsDecoder() async throws {
+        let config = try tinyConfig()
+        let result = try await Task {
+            MLXRandom.seed(0xC0DEC0DE)
+            let decoder = Qwen3TTSSpeechTokenizerDecoder(config: config)
+            let codes = MLXArray(Array(repeating: Int32(1), count: 28)).reshaped(1, 14, 2)
+            let baseline = decoder.streamingStep(codes.transposed(0, 2, 1))[0, 0].asArray(Float.self)
+            var materialized: [Int] = []
+            var cancelled = false
+            do {
+                _ = try Qwen3TTSModel.replayDecoderArm(
+                    decoder, codes: codes,
+                    ranges: [.init(start: 0, endExclusive: 7), .init(start: 7, endExclusive: 14)],
+                    arm: .incremental, memoryPolicy: .compatibilityDefault,
+                    observe: {
+                        if $0.stage == .materialized {
+                            materialized.append($0.completedFrames)
+                            withUnsafeCurrentTask { $0?.cancel() }
+                        }
+                    }
+                )
+            } catch is CancellationError { cancelled = true }
+            let afterCancel = decoder.streamingStep(codes.transposed(0, 2, 1))[0, 0].asArray(Float.self)
+            decoder.resetStreamingState()
+            return (cancelled, materialized, baseline, afterCancel)
+        }.value
+        XCTAssertTrue(result.0)
+        XCTAssertEqual(result.1, [7])
+        assertWaveform(result.3, matches: result.2, label: "cancellation cleanup")
+    }
+
     private func tinyConfig() throws -> Qwen3TTSTokenizerDecoderConfig {
         let json = """
         {

@@ -31,6 +31,24 @@ from run_local_delivery_cascade import (  # noqa: E402
 
 
 class LocalDeliveryCascadeTests(unittest.TestCase):
+    def test_reference_default_cache_and_optional_failure_never_change_route(self):
+        import delivery_acoustic_reference as reference
+        # Fixture compatibility is explicit; current optional reference freshness
+        # must not become an analyzer-upgrade/release prerequisite.
+        with mock.patch.object(reference, 'availability', return_value=None):
+            first = run_cascade(manifest=self.manifest, cache=self.cache, lock_root=self.root)
+        self.assertEqual(first['acousticReferenceBase']['status'], 'available')
+        self.assertTrue(all('acousticReference' in r for r in first['rows']))
+        with mock.patch.object(reference, 'availability', return_value=None), mock.patch.object(reference, 'analyze', side_effect=AssertionError('cache hit must not extract')):
+            second = run_cascade(manifest=self.manifest, cache=self.cache, lock_root=self.root)
+        self.assertEqual(second['cache']['misses'], 0)
+        with mock.patch.object(reference, 'load_base', side_effect=ValueError('drift')):
+            missing = run_cascade(manifest=self.manifest, cache=self.cache, lock_root=self.root)
+        self.assertEqual(missing['acousticReferenceBase']['status'], 'unavailable')
+        self.assertEqual([r['route'] for r in first['rows']], [r['route'] for r in missing['rows']])
+        self.assertTrue(all(r['acousticReference']['status'] == 'unavailable' for r in missing['rows']))
+        self.assertNotIn(str(self.root), json.dumps(first))
+
     def review_row(self):
         text = 'The quiet garden is open today.'
         row = self._row('review', self.one, 17)

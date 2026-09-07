@@ -1,7 +1,10 @@
 import hashlib
 import importlib.util
+import contextlib
+import io
 import json
 import os
+import re
 import sys
 import tempfile
 import unittest
@@ -17,6 +20,20 @@ SPEC.loader.exec_module(MODULE)
 
 
 class IOSStartupReliabilityTests(unittest.TestCase):
+    def test_codec_replay_routes_host_memory_policy_before_model_load(self):
+        runtime = (ROOT / "Sources/QwenVoiceCore/NativeEngineRuntime.swift").read_text()
+        replay = runtime.split("func replayStartupReliabilityCodecTrace(", 1)[1].split(
+            "private func recordCodecReplayLoadMemory", 1
+        )[0]
+        self.assertLess(replay.index("NativeMemoryPolicyResolver.apply(policy)"), replay.index("try await loadModel("))
+        self.assertIn("memory: NativeMemoryPolicyResolver.memoryConfiguration(for: policy)", replay)
+        self.assertIn('recordCodecReplayLoadMemory(stage: "before_load")', replay)
+        self.assertIn('recordCodecReplayLoadMemory(stage: "after_load")', replay)
+        wrapper = (ROOT / "Sources/QwenVoiceCore/UnsafeSpeechGenerationModel.swift").read_text()
+        self.assertIn("memory: memory", wrapper.split("func replayCodecTrace(", 1)[1].split("var supportsDedicated", 1)[0])
+        loaded = (ROOT / "Packages/VocelloQwen3Core/Sources/VocelloQwen3Core/LoadedModel.swift").read_text()
+        self.assertIn("memoryPolicy: try requestMemoryPolicy(memory)", loaded.split("func replayCodecTrace(", 1)[1].split("private func parameters", 1)[0])
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.root = Path(self.temp.name)
@@ -137,7 +154,26 @@ class IOSStartupReliabilityTests(unittest.TestCase):
         path.write_text(json.dumps(bad))
         with self.assertRaises(MODULE.ContractError): MODULE.load_plan(path)
 
-    def test_result_validation_requires_parity_order_and_terminal_last(self):
+    def test_every_adapter_failure_forwards_the_owned_diagnostic_notes(self):
+        # Compile-time-required notes plus this wiring regression protect the
+        # actual call sites, not only the codec persistence helper in isolation.
+        source = (ROOT / "Sources/QwenVoiceCore/GenerationOutputAdapter.swift").read_text()
+        calls = source.split("await writeFailureTelemetry(")[1:]
+        self.assertEqual(len(calls), 6)
+        for call in calls:
+            prefix = call.split("timingsMS:", 1)[0].split("throw error", 1)[0]
+            self.assertIn("additionalNotes: diagnosticEvidenceNotes", prefix)
+        declaration = source.split("private func writeFailureTelemetry(", 1)[1].split(") async", 1)[0]
+        self.assertNotIn("additionalNotes: [String: String] =", declaration)
+
+    def test_post_generation_failure_vocabulary_is_v2_only(self):
+        v1 = json.loads((ROOT / "config/ios-startup-reliability-result-schema-v1.json").read_text())
+        v2 = json.loads((ROOT / "config/ios-startup-reliability-result-schema-v2.json").read_text())
+        self.assertNotIn('"post_generation_failure"', json.dumps(v1))
+        self.assertIn("post_generation_failure", v2["$defs"]["take"]["properties"]["classification"]["enum"])
+        self.assertNotIn("post_generation_failure", MODULE.CLASSIFICATIONS)
+
+    def result_fixture(self):
         artifacts = self.root / "artifacts"; artifacts.mkdir()
         sessions = ["a" * 64, "b" * 64]
         takes = []
@@ -179,12 +215,87 @@ class IOSStartupReliabilityTests(unittest.TestCase):
         }
         result_path = artifacts / "startup-reliability-result.json"
         result_path.write_text(json.dumps(result))
+        return result, artifacts, result_path
+
+    def test_result_validation_requires_parity_order_and_terminal_last(self):
+        result, artifacts, result_path = self.result_fixture()
         summary = MODULE.validate_result(self.plan_path, artifacts, "run-1")
         self.assertEqual(summary["result"], "pass")
         result["takes"][1]["requestReceipt"]["seed"] = 9
         result_path.write_text(json.dumps(result))
         with self.assertRaisesRegex(MODULE.ContractError, "match"):
             MODULE.validate_result(self.plan_path, artifacts, "run-1")
+
+    def test_result_language_parity_distinguishes_selection_and_resolution(self):
+        original, artifacts, result_path = self.result_fixture()
+        cases = [
+            # Receipt v1 has only the historical language field.
+            (1, "english", None, "english", True),
+            (1, "auto", None, "auto", True),
+            (1, "auto", None, "english", False),
+            (2, "auto", "auto", "english", True),
+            (2, "auto", "auto", "french", True),
+            (2, "auto", "auto", "auto", True),
+            (2, "english", "english", "english", True),
+            (2, "french", "french", "french", True),
+            (2, "french", "french", "english", False),
+            (2, "auto", "english", "english", False),
+            (2, "english", "auto", "english", False),
+            (2, "auto", None, "english", False),
+            (2, "auto", "auto", None, False),
+        ]
+        for version, planned, stored, resolved, accepted in cases:
+            with self.subTest(version=version, planned=planned, stored=stored, resolved=resolved):
+                result = json.loads(json.dumps(original))
+                plan = json.loads(json.dumps(self.plan))
+                for row, take in zip(plan["takes"], result["takes"]):
+                    row["language"] = planned
+                    receipt = take["requestReceipt"]
+                    receipt.update(schemaVersion=version, language=resolved)
+                    if version == 2:
+                        receipt.update(
+                            storedLanguageSelection=stored, finalModelLanguage=resolved,
+                            languageTokenMode="nothink" if resolved == "auto" else "think",
+                            conditioningMode="custom_voice", modelFacingInstructionLanguage="english",
+                            normalizedTargetTextDigest=plan["scriptSHA256"],
+                            normalizedTargetTextCharacters=plan["scriptCharacters"],
+                            referenceTranscriptCharacters=0,
+                        )
+                    take["attempts"][0]["requestReceipt"] = dict(receipt)
+                self.plan_path.write_text(json.dumps(plan))
+                result_path.write_text(json.dumps(result))
+                if accepted:
+                    self.assertEqual(MODULE.validate_result(self.plan_path, artifacts, "run-1")["result"], "pass")
+                else:
+                    with self.assertRaises(MODULE.ContractError):
+                        MODULE.validate_result(self.plan_path, artifacts, "run-1")
+
+    def test_read_only_validation_preserves_files_and_failed_outcome(self):
+        result, artifacts, result_path = self.result_fixture()
+        for take in result["takes"]:
+            take.update(status="failed", classification="timeout", failureCode="generation.timeout")
+            take["attempts"][0]["finishReason"] = "timeout"
+        result["status"] = "diagnosed_failure"
+        result_path.write_text(json.dumps(result))
+        summary_path = artifacts / "startup-reliability-summary.json"
+        summary_path.write_text('{"originalRunner":"failed"}')
+        before = {p.name: (p.read_bytes(), p.stat().st_mtime_ns) for p in artifacts.iterdir()}
+        summary = MODULE.validate_result(self.plan_path, artifacts, "run-1", write_summary=False)
+        self.assertEqual(summary["result"], "diagnosed_failure")
+        self.assertEqual(summary["failedTakeCount"], 2)
+        self.assertEqual(before, {p.name: (p.read_bytes(), p.stat().st_mtime_ns) for p in artifacts.iterdir()})
+        output = io.StringIO()
+        command = ["validate-result", "--plan", str(self.plan_path), "--artifact-dir", str(artifacts),
+                   "--run-id", "run-1", "--read-only"]
+        with contextlib.redirect_stdout(output):
+            self.assertEqual(MODULE.main(command), 0)
+        self.assertEqual(json.loads(output.getvalue()), summary)
+        self.assertEqual(before, {p.name: (p.read_bytes(), p.stat().st_mtime_ns) for p in artifacts.iterdir()})
+        result["takes"][0]["requestReceipt"]["seed"] += 1
+        result_path.write_text(json.dumps(result))
+        with contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(MODULE.main(command), 2)
+        self.assertEqual(summary_path.read_bytes(), before[summary_path.name][0])
 
     def test_retry_must_be_contiguous_and_identity_preserving(self):
         artifacts = self.root / "retry"; artifacts.mkdir()
@@ -228,6 +339,20 @@ class IOSStartupReliabilityTests(unittest.TestCase):
         result_path = artifacts / "startup-reliability-result.json"
         result_path.write_text(json.dumps(result))
         MODULE.validate_result(plan_path, artifacts, "run-1")
+        for item in (receipt, retried):
+            item.update(
+                schemaVersion=2, storedLanguageSelection="english", finalModelLanguage="english",
+                languageTokenMode="think", conditioningMode="custom_voice",
+                modelFacingInstructionLanguage="english", normalizedTargetTextDigest=self.plan["scriptSHA256"],
+                normalizedTargetTextCharacters=len(self.script), referenceTranscriptCharacters=0,
+            )
+        result_path.write_text(json.dumps(result))
+        MODULE.validate_result(plan_path, artifacts, "run-1")
+        receipt["storedLanguageSelection"] = "auto"
+        result_path.write_text(json.dumps(result))
+        with self.assertRaisesRegex(MODULE.ContractError, "changed request"):
+            MODULE.validate_result(plan_path, artifacts, "run-1")
+        receipt["storedLanguageSelection"] = "english"
         take["attempts"][0]["requestReceipt"]["seed"] += 1
         result_path.write_text(json.dumps(result))
         with self.assertRaisesRegex(MODULE.ContractError, "changed request"):
@@ -534,6 +659,38 @@ class IOSStartupReliabilityTests(unittest.TestCase):
         qc["cadence"]["unexpected"] = None
         with self.assertRaises(MODULE.ContractError):
             MODULE.validate_audio_qc(qc, "take.audioQC")
+
+    def test_pause_record_bound_matches_native_producer_and_schema(self):
+        source = (ROOT / "Sources/QwenVoiceCore/GenerationOutputAdapter.swift").read_text()
+        native_limit = int(re.search(r"static let interiorRunRecordCap = (\d+)", source)[1])
+        schema = json.loads((ROOT / "config/ios-startup-reliability-result-schema-v2.json").read_text())
+        self.assertEqual(native_limit, 256)
+        self.assertEqual(schema["$defs"]["audioCadenceQC"]["properties"]["recordedInteriorPausesMS"]["maxItems"], native_limit)
+        for count in (64, 65, 256, 257):
+            with self.subTest(count=count):
+                qc = {
+                    "algorithmVersion": 6, "instabilityVerdict": "pass",
+                    "writtenOutputVerdict": "fail", "verdict": "fail", "flags": ["dropout:16680ms"],
+                    "peak": 0.4, "clippedSamples": 0, "hotSamples": 0,
+                    "nonFiniteSamples": 0, "clickEvents": 0, "longestSilenceMS": 16680,
+                    "durationSeconds": 163.84,
+                    "cadence": {
+                        "classification": "severe", "reasons": ["egregious_interior_silence"],
+                        "expectedPauseCount": 10, "cadencePauseThresholdMS": 600,
+                        "suspiciousPauseThresholdMS": 1500, "observedCadencePauseCount": 1,
+                        "excessCadencePauseCount": 0, "suspiciousPauseCount": 1,
+                        "recordedInteriorPausesMS": [100] * (count - 1) + [16680],
+                        "totalInteriorSilenceMS": (count - 1) * 100 + 16680,
+                        "totalCadenceSilenceMS": 16680, "cadenceSilenceRatio": 16680 / 163840,
+                    },
+                }
+                if count <= native_limit:
+                    MODULE.validate_audio_qc(qc, "take.audioQC")
+                    self.assertEqual(qc["verdict"], "fail")
+                    self.assertEqual(len(qc["cadence"]["recordedInteriorPausesMS"]), count)
+                else:
+                    with self.assertRaises(MODULE.ContractError):
+                        MODULE.validate_audio_qc(qc, "take.audioQC")
 
     def test_v2_failed_codec_replay_is_typed_and_carries_no_partial_success(self):
         codec = {

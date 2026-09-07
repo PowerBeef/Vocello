@@ -962,7 +962,11 @@ def classify_output_verification_failure(
             "harness",
             ["output-recognition-evidence-unavailable"],
         )
-    if recognition.get("evidenceConsistency") is not True:
+    # The live verifier emits a skipReason before scoring. Its placeholder
+    # languagePass=False must never be mistaken for a measured language defect,
+    # even if the underlying recognition happened to be consistent.
+    if (reason is not None or recognition.get("evidenceConsistency") is not True
+            or recognition.get("consensusStatus") != "consistent"):
         safe_reason = reason if _safe_diagnostic_identifier(reason) else "unavailable"
         return (
             f"output-verification-inconclusive:{safe_reason}",

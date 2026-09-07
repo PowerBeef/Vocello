@@ -226,6 +226,11 @@ def validate_receipt(value: Any, field: str) -> None:
         }
         if not v2_required.issubset(value):
             raise ContractError(f"{field} omits request-receipt schema v2 fields")
+        for key in ("storedLanguageSelection", "finalModelLanguage"):
+            if not isinstance(value[key], str) or value[key] not in LANGUAGES:
+                raise ContractError(f"{field}.{key} is invalid")
+        if value["storedLanguageSelection"] != "auto" and value["finalModelLanguage"] != value["storedLanguageSelection"]:
+            raise ContractError(f"{field}.finalModelLanguage changed an explicit selection")
         if value.get("instructionDigest") is not None and "modelFacingInstructionLanguage" not in value:
             raise ContractError(f"{field} omits model-facing instruction language")
     validate_uuid(value["generationID"], f"{field}.generationID")
@@ -472,7 +477,9 @@ def validate_audio_qc(value: Any, field: str) -> None:
             if type(cadence[key]) is not int or cadence[key] < 0:
                 raise ContractError(f"{field}.cadence.{key} is invalid")
         pauses = cadence["recordedInteriorPausesMS"]
-        if not isinstance(pauses, list) or len(pauses) > 64 or any(
+        # Match the bounded native limiter and audio_cadence_qc consumer. These
+        # are all recorded interior runs, not only cadence-threshold pauses.
+        if not isinstance(pauses, list) or len(pauses) > 256 or any(
             type(pause) is not int or pause < 0 for pause in pauses
         ):
             raise ContractError(f"{field}.cadence.recordedInteriorPausesMS is invalid")
@@ -649,7 +656,9 @@ def validate_codec_replay(value: Any, field: str, artifacts: list[dict[str, Any]
         validate_audio_qc(value.get(key), f"{field}.{key}")
 
 
-def validate_result(plan_path: Path, artifact_dir: Path, run_id: str) -> dict[str, Any]:
+def validate_result(
+    plan_path: Path, artifact_dir: Path, run_id: str, *, write_summary: bool = True
+) -> dict[str, Any]:
     plan = load_plan(plan_path)
     result_path = next(iter(artifact_dir.rglob("startup-reliability-result.json")), None)
     if result_path is None:
@@ -694,8 +703,16 @@ def validate_result(plan_path: Path, artifact_dir: Path, run_id: str) -> dict[st
         if not isinstance(observed, dict) or not required_take.issubset(observed) or set(observed) - allowed_take:
             raise ContractError(f"take does not match result schema v{result_version}")
         validate_uuid(observed["generationID"], "take.generationID")
-        if observed["status"] not in {"pass", "failed"} or observed["preparation"] not in PREPARATIONS or observed["classification"] not in CLASSIFICATIONS:
+        classifications = CLASSIFICATIONS | ({"post_generation_failure"} if result_version == 2 else set())
+        if observed["status"] not in {"pass", "failed"} or observed["preparation"] not in PREPARATIONS or observed["classification"] not in classifications:
             raise ContractError("take has invalid terminal vocabulary")
+        if observed["classification"] == "post_generation_failure":
+            qc = observed.get("audioQC")
+            if observed["status"] != "failed" or not observed.get("failureCode") or not any(
+                row.get("boundary") == "first_decoded_audio_frame"
+                for row in observed.get("startupTimeline", []) if isinstance(row, dict)
+            ) or (isinstance(qc, dict) and qc.get("verdict") == "fail"):
+                raise ContractError("post-audio generation failure lacks its boundary or has failed QC")
         if observed["preparation"] != planned["preparation"]:
             raise ContractError("take preparation drifted")
         if observed.get("output") is not None:
@@ -772,7 +789,10 @@ def validate_result(plan_path: Path, artifact_dir: Path, run_id: str) -> dict[st
                 raise ContractError("passing take lacks its complete AudioQCReport")
         required_matches = {
             "speakerID": planned["speakerID"], "deliveryID": planned["deliveryID"],
-            "language": planned["language"], "seed": planned["seed"],
+            # v2 separates the requested selection from the model-facing
+            # resolution. v1 retains its historical single-field comparison.
+            ("storedLanguageSelection" if receipt["schemaVersion"] == 2 else "language"): planned["language"],
+            "seed": planned["seed"],
             "variation": planned["variation"], "streaming": planned["streaming"],
         }
         if any(receipt.get(key) != value for key, value in required_matches.items()):
@@ -803,6 +823,8 @@ def validate_result(plan_path: Path, artifact_dir: Path, run_id: str) -> dict[st
             "sessionIdentityDigest", "prewarmIdentityDigest", "modelID", "speakerID", "deliveryID",
             "instructionDigest", "instructionCharacters", "language", "seed", "seedSource", "variation",
             "streaming", "predecessorIdentityDigest", "operationGeneration",
+            "storedLanguageSelection", "detectedTargetLanguage", "referenceTranscriptLanguage",
+            "finalModelLanguage", "languageTokenMode",
         }
         baseline_attempt = attempt_receipts[0]
         for attempt_receipt in attempt_receipts[1:]:
@@ -864,7 +886,8 @@ def validate_result(plan_path: Path, artifact_dir: Path, run_id: str) -> dict[st
         "failedTakeCount": failed_count,
         "scriptSHA256": plan["scriptSHA256"],
     }
-    atomic_json(artifact_dir / "startup-reliability-summary.json", summary)
+    if write_summary:
+        atomic_json(artifact_dir / "startup-reliability-summary.json", summary)
     return summary
 
 
@@ -1261,6 +1284,7 @@ def main(argv: list[str] | None = None) -> int:
     validate_parser.add_argument("--plan", required=True, type=Path)
     validate_parser.add_argument("--artifact-dir", required=True, type=Path)
     validate_parser.add_argument("--run-id", required=True)
+    validate_parser.add_argument("--read-only", action="store_true", help="Print validation summary without changing retained artifacts")
     ui_parser = sub.add_parser("validate-ui-parity")
     ui_parser.add_argument("--xcodebuild-log", required=True, type=Path)
     ui_parser.add_argument("--diagnostics", required=True, type=Path)
@@ -1290,7 +1314,9 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "prepare":
             prepare(args.plan, args.script_file, args.run_id, args.sanitized_output, args.launch_output)
         elif args.command == "validate-result":
-            validate_result(args.plan, args.artifact_dir, args.run_id)
+            summary = validate_result(args.plan, args.artifact_dir, args.run_id, write_summary=not args.read_only)
+            if args.read_only:
+                print(json.dumps(summary, sort_keys=True))
         elif args.command == "validate-ui-parity":
             validate_ui_parity(args.xcodebuild_log, args.diagnostics, args.run_id, args.output)
         elif args.command == "compose-process-exit":

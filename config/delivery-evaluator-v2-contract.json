@@ -124,7 +124,10 @@
       "byte-bound-native-fast-qc",
       "independent-full-file-asr-evidence"
     ],
-    "optionalQualifiedLayers": ["cached-compact-representation", "tiny-local-heads"],
+    "optionalQualifiedLayers": [
+      "cached-compact-representation",
+      "tiny-local-heads"
+    ],
     "ambiguousOnly": [
       "coarse-ser-asr",
       "extra-identity",
@@ -147,5 +150,12 @@
     "confirmationSelectorsForbidden": true,
     "requestedLabelsForbiddenFromBlindFeatureExtraction": true,
     "productionEmotionPresetChangesInThisWork": false
+  },
+  "acousticReferenceBase": {
+    "manifest": "config/delivery-acoustic-reference-base.json",
+    "sha256": "a3b0499e6987b0a71e3bf0860e279388ea03b73adb8b0ad6261b03647928bfed",
+    "defaultComparison": "advisory",
+    "requiredForRelease": false,
+    "missingOrDrifted": "report-unavailable-without-changing-quality-route"
   }
 }

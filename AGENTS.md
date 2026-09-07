@@ -70,6 +70,12 @@ meaning, not routine refactors. Preserve user data and original evidence, not kn
 unsupported verdicts. Use the [replacement and retirement procedure](docs/reference/repository-self-verification.md#replace-and-retire-tests-and-harnesses)
 within existing roadmap items; no blanket rewrite, parallel harness or silent gate waiver.
 
+The delivery cascade's default `config/delivery-acoustic-reference-base.json` panel is pinned by
+`config/delivery-evaluator-v2-contract.json` and consumed by `scripts/delivery_acoustic_reference.py`.
+It is descriptive context, not good/bad speech labels or a release gate; preserve warnings and missing
+coverage. The existing [Audio QC procedure](docs/reference/audio-qc-engineering.md#default-acoustic-reference-base)
+owns reference comparison and update instructions.
+
 ## Hard invariants
 
 | Invariant | Required behavior |

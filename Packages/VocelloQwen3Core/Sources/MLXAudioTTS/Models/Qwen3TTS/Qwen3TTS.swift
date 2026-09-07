@@ -27,6 +27,41 @@ private func qwen3TTSLog(_ message: String) {
     FileHandle.standardError.write(Data((message + "\n").utf8))
 }
 
+/// Bounded, audio/path-free records emitted only by explicit codec replay.
+/// MLX counters are allocator measurements, not physical footprint or RSS.
+struct CodecReplayMemoryObservation: Encodable {
+    enum Arm: String, Codable { case incremental, full }
+    enum Stage: String, Codable { case started, materialized, afterCachePolicy, finished }
+    let event = "codec_replay_memory"
+    let arm: Arm
+    let stage: Stage
+    let completedFrames: Int
+    let timestampUnixMS: Int64
+    let activeBytes: Int
+    let cacheBytes: Int
+    let peakBytes: Int
+    let cacheLimitBytes: Int
+
+    static func shouldSample(index: Int, count: Int) -> Bool {
+        // At most 17 sampled chunks, independent of trace duration/partition.
+        index % max(1, (count + 15) / 16) == 0 || index == count - 1
+    }
+
+    static func capture(arm: Arm, stage: Stage, completedFrames: Int) -> Self {
+        let snapshot = Memory.snapshot()
+        return Self(arm: arm, stage: stage, completedFrames: completedFrames,
+                    timestampUnixMS: Int64(Date().timeIntervalSince1970 * 1_000),
+                    activeBytes: snapshot.activeMemory, cacheBytes: snapshot.cacheMemory,
+                    peakBytes: snapshot.peakMemory, cacheLimitBytes: Memory.cacheLimit)
+    }
+
+    func writeToStandardError() throws {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        try FileHandle.standardError.write(contentsOf: encoder.encode(self) + Data([0x0A]))
+    }
+}
+
 /// TEL-001: estimate K+V talker cache bytes for the effective sequence length.
 private func estimatedKVCacheFootprintMB(layers: Int, heads: Int, seq: Int, headDim: Int, dtypeBytes: Int) -> Double {
     let bytes = 2 * layers * heads * seq * headDim * dtypeBytes
@@ -354,7 +389,7 @@ private enum Qwen3StreamingGenerationMode: String, Sendable {
     }
 }
 
-fileprivate enum Qwen3TextConditioningMode: String, Sendable {
+enum Qwen3TextConditioningMode: String, Sendable {
     case streamingTrailingText = "streaming_trailing_text"
     case fullTextNonStreaming = "full_text_non_streaming"
 }
@@ -1671,7 +1706,9 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         )
     }
 
-    private func prepareCustomVoiceInputs(
+    // Internal so opt-in runtime diagnostics inspect the production conditioning
+    // path without duplicating prompt assembly. Not part of the public facade.
+    func prepareCustomVoiceInputs(
         text: String,
         language: String,
         speaker: String,
@@ -2943,7 +2980,8 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
 
     public func replayCodecTrace(
         frames: [[Int32]],
-        incrementalRanges: [Qwen3CodecFrameRange]
+        incrementalRanges: [Qwen3CodecFrameRange],
+        memoryPolicy: Qwen3RequestMemoryPolicy = .compatibilityDefault
     ) throws -> Qwen3CodecReplayResult {
         guard let speechTokenizer else {
             throw AudioGenerationError.modelNotInitialized("Speech tokenizer not loaded")
@@ -2972,28 +3010,75 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         let flatCodes = frames.flatMap { $0 }
         let codes = MLXArray(flatCodes).reshaped([1, frames.count, groupCount])
 
-        speechTokenizer.decoder.resetStreamingState()
-        var incrementalChunks: [[Float]] = []
-        incrementalChunks.reserveCapacity(incrementalRanges.count)
-        defer { speechTokenizer.decoder.resetStreamingState() }
-        for range in incrementalRanges {
-            let decoderCodes = codes[0..., range.start ..< range.endExclusive, 0...]
-                .transposed(0, 2, 1)
-            let decoded = speechTokenizer.decoder.streamingStep(decoderCodes)[0, 0]
-            eval(decoded)
-            incrementalChunks.append(decoded.asArray(Float.self))
+        let incrementalAudio = try Self.replayDecoderArm(
+            speechTokenizer.decoder, codes: codes, ranges: incrementalRanges,
+            arm: .incremental, memoryPolicy: memoryPolicy
+        )
+        let fullRanges = stride(from: 0, to: frames.count, by: Self.qualityFirstDecoderChunkFrames).map {
+            Qwen3CodecFrameRange(start: $0, endExclusive: min(frames.count, $0 + Self.qualityFirstDecoderChunkFrames))
         }
-        speechTokenizer.decoder.resetStreamingState()
-        let full = decodeChunk(codes)
-        eval(full)
-        let fullAudio = full.asArray(Float.self)
-        speechTokenizer.decoder.resetStreamingState()
+        var fullAudio = try Self.replayDecoderArm(
+            speechTokenizer.decoder, codes: codes, ranges: fullRanges,
+            arm: .full, memoryPolicy: memoryPolicy
+        )
+        // Preserve decodeChunk's existing valid-length semantics exactly.
+        let validLen = frames.filter { $0[0] > 0 }.count * speechTokenizer.decodeUpsampleRate
+        if validLen > 0, validLen < fullAudio.count {
+            fullAudio.removeSubrange(validLen...)
+        }
 
         return Qwen3CodecReplayResult(
-            incrementalAudio: incrementalChunks.flatMap { $0 },
+            incrementalAudio: incrementalAudio,
             fullAudio: fullAudio,
             sampleRate: sampleRate
         )
+    }
+
+    /// Diagnostic replay keeps only CPU samples after each materialization;
+    /// neither arm retains a list of GPU outputs. Decoder context and the
+    /// original/25-frame partitions remain intact until the arm terminates.
+    static func replayDecoderArm(
+        _ decoder: Qwen3TTSSpeechTokenizerDecoder,
+        codes: MLXArray,
+        ranges: [Qwen3CodecFrameRange],
+        arm: CodecReplayMemoryObservation.Arm,
+        memoryPolicy: Qwen3RequestMemoryPolicy,
+        observe: (CodecReplayMemoryObservation) throws -> Void = { try $0.writeToStandardError() }
+    ) throws -> [Float] {
+        decoder.resetStreamingState()
+        defer {
+            decoder.resetStreamingState()
+            if memoryPolicy.clearCacheOnStreamChunkEmit { Memory.clearCache() }
+        }
+        try Task.checkCancellation()
+        try observe(.capture(arm: arm, stage: .started, completedFrames: 0))
+        var samples: [Float] = []
+        for (index, range) in ranges.enumerated() {
+            try Task.checkCancellation()
+            // Release temporary arrays before clearing recyclable allocations.
+            // The decoder's live KV/convolution state is deliberately retained.
+            let chunk: [Float] = autoreleasepool {
+                let input = codes[0..., range.start ..< range.endExclusive, 0...].transposed(0, 2, 1)
+                let decoded = decoder.streamingStep(input)[0, 0]
+                eval(decoded)
+                return decoded.asArray(Float.self)
+            }
+            samples.append(contentsOf: chunk)
+            let sampled = CodecReplayMemoryObservation.shouldSample(index: index, count: ranges.count)
+            if sampled {
+                try observe(.capture(arm: arm, stage: .materialized, completedFrames: range.endExclusive))
+            }
+            if memoryPolicy.clearCacheOnStreamChunkEmit { Memory.clearCache() }
+            if sampled {
+                try observe(.capture(arm: arm, stage: .afterCachePolicy, completedFrames: range.endExclusive))
+            }
+            try Task.checkCancellation()
+        }
+        decoder.resetStreamingState()
+        if memoryPolicy.clearCacheOnStreamChunkEmit { Memory.clearCache() }
+        try observe(.capture(arm: arm, stage: .finished, completedFrames: ranges.last?.endExclusive ?? 0))
+        try Task.checkCancellation()
+        return samples
     }
 
     // MARK: - VoiceDesign generation

@@ -172,13 +172,15 @@ final class UnsafeSpeechGenerationModel: Sendable {
 
     func replayCodecTrace(
         frames: [[Int32]],
-        incrementalRanges: [StartupReliabilityCodecFrameRange]
+        incrementalRanges: [StartupReliabilityCodecFrameRange],
+        memory: VocelloQwen3MemoryConfiguration
     ) async throws -> StartupReliabilityCodecReplayResult {
         let replay = try await engine.replayCodecTrace(
             frames: frames,
             incrementalRanges: incrementalRanges.map {
                 VocelloQwen3CodecFrameRange(start: $0.start, endExclusive: $0.endExclusive)
-            }
+            },
+            memory: memory
         )
         return StartupReliabilityCodecReplayResult(
             incrementalAudio: replay.incrementalAudio,

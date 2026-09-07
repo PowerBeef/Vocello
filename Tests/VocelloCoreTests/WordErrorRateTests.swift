@@ -693,7 +693,7 @@ final class WordErrorRateTests: XCTestCase {
         let gate = passing.languageASRGateResult(evidenceDigest: digest)
         XCTAssertEqual(gate.gate, .languageASR)
         XCTAssertEqual(gate.outcome, .pass)
-        XCTAssertEqual(gate.algorithmVersion, passing.schemaVersion)
+        XCTAssertEqual(gate.algorithmVersion, 4)
         XCTAssertEqual(gate.evidenceDigest, digest)
         XCTAssertEqual(
             gate.measurements.first { $0.key == .consensusPassCount }?.value,
@@ -704,13 +704,13 @@ final class WordErrorRateTests: XCTestCase {
             0
         )
 
-        // Ran-but-did-not-verify is a plain fail.
+        // Inconsistent recognition is unavailable evidence, not a measured speech defect.
         var failing = passing
         failing.pass = false
         failing.skipReason = "speech_recognition_inconsistent"
         failing.recognition.consensusStatus = .inconsistent
         let failingGate = failing.languageASRGateResult()
-        XCTAssertEqual(failingGate.outcome, .fail)
+        XCTAssertEqual(failingGate.outcome, .unavailable)
         XCTAssertEqual(
             failingGate.measurements.first { $0.key == .consensusPassCount }?.value,
             0
@@ -723,5 +723,40 @@ final class WordErrorRateTests: XCTestCase {
         unavailable.skipReason = "speech_recognition_unauthorized"
         unavailable.recognition.consensusStatus = .failed
         XCTAssertEqual(unavailable.languageASRGateResult().outcome, .unavailable)
+    }
+
+    func testUnavailableASREvidenceStaysBlockingWithoutClaimingMeasuredFailure() throws {
+        let script = "Hello world"
+        let recognition = evidence(authorization: .authorized, consensus: .consistent,
+            repetitions: (1 ... 3).map { pass(index: $0, transcript: script) }, transcript: script)
+        let original = GenerationOutputVerifier.evaluate(recognition: recognition,
+            expectedScript: script, expectedLanguage: .english)
+        let policy = QualityReviewPolicy(depth: .standard, requiresLanguageASR: true)
+        for reason in [
+            "speech_recognition_inconsistent", "speech_recognition_incomplete",
+            "speech_recognition_incomplete_temporal_coverage", "speech_recognition_evidence_invalid",
+            "speech_recognition_timed_out", "speech_recognition_error", "transcription_failed",
+            "accuracy_threshold_invalid", "source_audio_duration_invalid", "future_unknown_reason",
+        ] {
+            var result = original
+            result.pass = false
+            result.skipReason = reason
+            let gate = result.languageASRGateResult()
+            XCTAssertEqual(gate.outcome, .unavailable, reason)
+            let gates = QualityGateRegistry.requiredGates(for: policy).map { id in
+                id == .languageASR ? gate : GenerationQualityGateResult(
+                    gate: id, outcome: .pass, algorithmVersion: 1)
+            }
+            let verdict = try QualityGateRegistry.evaluate(GenerationQualityReport(
+                generationID: UUID(), policy: policy, results: gates))
+            XCTAssertEqual(verdict.outcome, .fail, reason)
+            XCTAssertEqual(verdict.issues, ["quality_gate_unavailable.language_asr"], reason)
+        }
+        // Actual full-consensus text errors still fail; no threshold or transcript is changed.
+        let measured = GenerationOutputVerifier.evaluate(recognition: recognition,
+            expectedScript: "The train arrived late at the station", expectedLanguage: .english)
+        XCTAssertNil(measured.skipReason)
+        XCTAssertEqual(measured.accuracyPass, false)
+        XCTAssertEqual(measured.languageASRGateResult().outcome, .fail)
     }
 }

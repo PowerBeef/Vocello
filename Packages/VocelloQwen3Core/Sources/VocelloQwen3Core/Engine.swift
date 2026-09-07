@@ -740,7 +740,8 @@ public actor VocelloQwen3Engine {
     /// owns the loaded model and mutable Mimi decoder state.
     public func replayCodecTrace(
         frames: [[Int32]],
-        incrementalRanges: [VocelloQwen3CodecFrameRange]
+        incrementalRanges: [VocelloQwen3CodecFrameRange],
+        memory: VocelloQwen3MemoryConfiguration = .compatibilityDefault
     ) throws -> VocelloQwen3CodecReplayResult {
         guard let model = loadedModel else {
             throw VocelloQwen3EngineError.noLoadedModel
@@ -750,7 +751,8 @@ public actor VocelloQwen3Engine {
             try Task.checkCancellation()
             let result = try model.replayCodecTrace(
                 frames: frames,
-                incrementalRanges: incrementalRanges
+                incrementalRanges: incrementalRanges,
+                memory: memory
             )
             try revalidate(lease)
             try Task.checkCancellation()

@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-mlx
-reviewed: 2026-09-06
+reviewed: 2026-09-07
 summary: Source-grounded Audio QC architecture, corrected default preprocessing, M2 resource measurements, accuracy limitations and explicit historical replay boundaries.
 sourceOfTruth:
   - Sources/QwenVoiceCore/GenerationOutputAdapter.swift
@@ -30,6 +30,169 @@ User-requested QC engineering does not close any of those acceptance gates.
 
 ## What exists and what each result means
 
+### Default acoustic reference base
+
+`config/delivery-acoustic-reference-base.json` freezes the 45-clip September 7 panel as the
+**default descriptive reference** for `run_local_delivery_cascade.py`. The existing evaluator
+contract pins its exact SHA-256. This is a numerical reference database, not a new generator,
+classifier, calibration service, app dependency or release prerequisite.
+
+The manifest retains source revisions, attribution/license URLs and source-file hashes; original
+and canonical audio hashes; published label provenance; speaker/script/source groups; exact neutral
+pairing; original native QC and advisory/source warnings; analyzer/preprocessing identities; and
+original evidence-report hashes. Audio, transcripts and raw diagnostic reports stay untracked.
+The CREMA-derived database carries its ODbL/DbCL notice; no recording is bundled in Vocello.
+All rows are development-exposed. Emotion/style labels are **not good/bad speech labels** and are
+not registered as speech-defect holdout truth.
+
+Three uses remain separate:
+
+1. **Paired English:** 24 same-speaker/same-text contrasts, six per Angry/Fearful/Happy/Sad.
+   Generated instructed/neutral pairs are compared with same-language reference deltas.
+2. **Unpaired German:** Angry/Surprised/Whisper style context only. No neutral or cross-language
+   pairing is manufactured. Recording-level differences particularly limit these absolute values.
+3. **QC disagreement specimens:** every source, advisory and native warning/failure is retained.
+   Native QC stays on originals; archived reference results never override generated-output QC.
+
+The cascade retains its original-rate global/temporal layers and native receipt review. Its
+additional `acousticReference` block uses cached FIR **16 kHz mono PCM** matching the frozen
+reference, without gain normalization or trimming. The bounded blind extractor receives no
+requested preset/text; labels select the cohort only afterward. Neutral cache hits launch neither
+extraction nor models. Temporal contours remain separate, not bandwidth-matched reference bounds.
+
+Each feature reports observed minimum/median/maximum and within/above/below that small sample's
+range—not an emotion percentage, confidence interval, quality verdict or universal target.
+The complete cohort is always primary. `excludingFlaggedSensitivity` excludes pairs when **either
+member** has any source/native/advisory warning, lists excluded IDs, and reports zero remaining
+samples as unavailable. Only one Angry pair remains in this strict sensitivity view; it is not
+a clean replacement cohort. Missing coverage, absent neutral, analyzer/preprocessing drift,
+corrupt registration and unavailable measurements are explicit. None changes quality routing.
+
+Run the existing cascade normally; tracked numerical features require no reference download.
+To additionally verify all 45 retained originals, add:
+
+```sh
+--reference-audio-dir build/artifacts/diagnostics/licensed-audio-reference-20260907/audio
+```
+
+This optional audit emits no paths. Missing/changed originals disable reference comparison for
+that run without substituting a reference error for product QC. To update the base, explicitly
+review a newly frozen cohort/analysis and its warnings, retain previous evidence, and update the
+manifest/contract digest together. Never re-pin changed analyzer code without reanalysis or
+silently rebase historical results. No human/cloud review or new release gate is required.
+
+**Integrated verification, September 7:** all 45 original hashes match. The actual cascade processed
+all 64 retained August 23 takes: ten descriptive contexts (eight English emotion/neutral contrasts
+and two unpaired Neutral contexts), 54 missing-coverage rows, zero unavailable reference blocks.
+All 64 overall quality decisions remain inconclusive because archived evidence does not satisfy
+current quality requirements. The first extraction took 85.74 s but its sandboxed RSS/swap capture
+was unavailable; that resource report remains unqualified. A separate outside-sandbox cache replay
+completed in 0.42 s, 45.22 MB sampled peak RSS, 512 hits/zero misses, zero swap growth, no before/after
+pressure warning and clean exit/recovery. No generation/neural model ran. Reports are retained in
+`build/artifacts/diagnostics/acoustic-reference-adoption-20260907/`; cached report SHA-256
+`b217066bfdff06e7a7f7e7646e05e08630138a992c09813bdd289918fcbb4bfe`.
+This is diagnostic integration/cache proof, not new product or current-prompt acceptance.
+
+### Licensed acoustic reference pilot — September 7
+
+Completed the maintainer-requested bounded reference comparison on source `a359c514` without
+new generation, a neural judge, a listener session or product changes. This is descriptive
+development evidence, not threshold calibration, an untouched holdout or release acceptance.
+
+- **CREMA-D:** 30 English recordings, six actors, three distinct sentences, with one complete
+  five-emotion sentence per actor. Selected in deterministic actor/sentence order using the
+  published **audio-only VoiceVote** matching the intended Angry/Fearful/Happy/Sad/Neutral label;
+  ties and mismatches did not qualify. This is a selected clear-label cohort, not representative
+  accuracy evidence or proof of defect-free audio. No acoustic score selected the clips.
+  Revision `1658cd342dff90010aa843eaeebd53610a08b1dc`; database ODbL-1.0, contents DbCL-1.0.
+  Attribution: Cheyney Computer Science / CREMA-D contributors. Preserve the source notices and
+  applicable attribution/database share-alike terms when reusing or distributing derivatives.
+  [Source and license](https://github.com/CheyneyComputerScience/CREMA-D),
+  [ODbL](https://opendatacommons.org/licenses/odbl/1-0/),
+  [DbCL](https://opendatacommons.org/licenses/dbcl/1-0/).
+- **Thorsten-Voice:** 15 German recordings, one speaker, five identical texts across Angry,
+  Surprised and Whisper. Revision `2b61b98fa8f99abd1ce1587b4bf413d6ebc217d5` declares CC0-1.0.
+  Attribution: Thorsten Müller and dataset contributors. Actual emotional files contain **no
+  Neutral rows**, despite that style appearing in the card; no other-session neutral was substituted.
+  Every selected row carries `end might be cut off early`. The card also declares denoising,
+  -24 dB normalization and edge trimming: these are not clean-speech, recording-level or edge-silence
+  standards. The older Zenodo package declares CC BY 4.0; its terms were not silently replaced by
+  the current HF card. Only the pinned HF release was acquired.
+  [Pinned dataset card](https://huggingface.co/datasets/Thorsten-Voice/TV-44kHz-Full/blob/2b61b98fa8f99abd1ce1587b4bf413d6ebc217d5/README.md).
+
+Metadata discovery reduced the proposed sample before audio examination: only three CREMA actors
+supported two fully matched sentences under the selection rule; six actors with one sentence each
+were retained instead. Thorsten's missing neutral reduced its panel to three styles. All 45 selected
+originals remain unchanged, including flagged examples. Calm, French and native East Asian emotional
+references remain uncovered; sleepy/amused labels were not renamed to fill gaps.
+
+**Execution:** label-blind global, five-region temporal and optional corrected-phonation extraction
+on original WAVs; the existing FIR cache additionally supplies 16 kHz mono PCM for bandwidth-matched
+comparisons. No new gain normalization, trimming or denoising. A small untracked Swift caller invokes
+the existing cached framework's `PersistedWAVAudioQCAnalyzer` v6 on original WAVs, with source-text
+punctuation budgets. Its binary/framework hashes are retained; this is not a fresh candidate build
+or pre-limiter generation telemetry. No native threshold was reimplemented in Python.
+
+| Native PCM QC | Count | Advisory prosody QC | Count |
+| --- | ---: | --- | ---: |
+| Pass | 39 | No flags | 40 |
+| Warn | 3 | Rushed | 5 |
+| Fail | 3 | Other flags | 0 |
+
+All six native non-passes are CREMA click flags. The three failures contain 716–1,327 raw adjacent
+sample jumps above 0.42 full scale and 72–269 samples at a PCM16 endpoint. Native `clippedSamples=0`
+does not prove a recording was never clipped before quantization. These are signal observations,
+not confirmed audible clicks or a measured false-positive rate. The five advisory rushed flags
+occur on three Sad and two Neutral clips. Emotion votes do not adjudicate these quality warnings.
+All 15 cut-off-warning German clips pass native QC, illustrating that signal PASS cannot establish
+linguistic completeness. No ASR/content-consensus pass was inferred or produced by this pilot.
+
+Twenty-four same-speaker/same-text English contrasts produced these descriptive medians:
+
+| Label | Pitch shift from Neutral (semitones) | Duration / Neutral duration |
+| --- | ---: | ---: |
+| Angry | +5.08 | 1.265 |
+| Fearful | +4.32 | 1.072 |
+| Happy | +1.73 | 1.075 |
+| Sad | +1.33 | 1.271 |
+
+Six contrasts per label; the sample is small, selected and script-imbalanced. All Sad clips were
+longer, but all had higher **estimated** median pitch. Do not encode universal lower-pitch Sad or
+faster Angry rules. Whisper receives 0.378–0.498 apparent voiced fraction from the original-rate
+legacy tracker; periodicity/F0 estimates cannot by themselves prove voiced speech or whisper fidelity.
+HNR/CPP, spectral features and syllable-rate proxies retain the limitations documented below.
+
+All 16 English rows (Aiden/Ryan, eight presets) from the retained August 23 balanced-v4 cohort were
+also reanalyzed with original audio hashes verified and original neutral pairing preserved. They
+are **historical prompts/settings, not current production acceptance**. Bandwidth-matched examples:
+Angry pitch shift +10.96/+7.98 semitones; Happy +3.55/-2.71; Sad duration ratio 0.943/1.242.
+This illustrates speaker-dependent acoustic response, not an emotion accuracy score or a prompt
+promotion decision. Eighteen distinct retained TTS WAVs plus 45 references share the same 16 kHz
+comparison preprocessing; original-rate and canonical reports remain separate.
+
+**Resources/verification:** original reference extraction 23.33 s / 47.17 MB sampled peak RSS;
+native QC 1.04 s / 24.18 MB; historical TTS analysis 7.77 s / 40.08 MB; common-bandwidth comparison
+8.81 s / 42.81 MB. Processes ran serially, exited cleanly, recovered memory, showed zero swap growth
+and no before/after pressure warning. These are sampled RSS/snapshots, not continuous host-pressure
+or GPU-footprint proof. The 46 existing focused global/temporal/phonation/prosody/cache tests pass.
+Original-byte, upstream LFS shard, count/duration, label/plan and self-delta checks pass. Initial
+metadata/wrapper/link setup failures and the invalid container-equality assumption are recorded as
+operator setup failures, not audio failures. HF strict-extra verification rejected its own local
+cache metadata; verifying the three requested source files succeeds and both LFS hashes match.
+
+Evidence: `build/artifacts/diagnostics/licensed-audio-reference-20260907/` contains frozen `plan.json`,
+source licenses/cards, `provenance.json`, 45 WAVs (8.2 MiB disk usage), original/canonical features,
+paired deltas, native QC, retained-TTS comparisons, resource envelopes and integrity verification.
+Original summary SHA-256: `f95266e09f56733dc854da460059122938ca9f1ea9756c4662d1b9a8bfc64880`.
+The one-shot operator scripts remain with the untracked bundle; no parallel production harness,
+new CI dependency or downloaded model was added. The 748 MB HF emotional shards are retained for
+reproducibility; other HF subsets/video were not downloaded. All examined rows are development-only.
+
+**Decision:** use the panel as acoustic reference points and QC disagreement examples, not as
+automatic accept/reject limits or good/bad calibration labels. No external annotation catalog was
+approved for general speech quality, no holdout was consumed, and AV-07/DP-28 remain open. Production
+QC, prompts, models, seeds, personal data and the release queue are unchanged.
+
 | Layer | Implementation | Meaning and authority |
 | --- | --- | --- |
 | Product safety | `GenerationOutputAdapter.swift`, `PersistedWAVAudioQCAnalyzer`, limiter and atomic writer | Fast-QC v6 examines final marked PCM and retains pre-write instability. Hard failures prevent publication; ordinary cadence warnings remain visible. |
@@ -57,6 +220,199 @@ on the published-byte boundary; reuse its receipts in higher-level reports.
 - Independent listener-labelled multilingual accuracy is a **known coverage gap**, not established by synthetic tones.
 
 ## Confirmed defects and this implementation
+
+### Retained audio-failure follow-up — September 7
+
+The shared verifier-to-quality-registry adapter incorrectly mapped incomplete/inconsistent ASR,
+recognition errors and invalid timing evidence to a measured `.fail`. The VLR host classifier also
+mistook the verifier's placeholder `languagePass=false` for a product rejection when a `skipReason`
+was present alongside consistent recognition. Native negative fixtures reproduced 22 assertions;
+six Python subcases independently reproduced incorrect product ownership.
+
+Current composition marks these cases `.unavailable` / harness-inconclusive, including unknown
+skip reasons. Valid scored language/accuracy rejection remains `.fail`; both outcomes still block
+required acceptance. Only the persisted **gate composition** identifier advances to 4. Verifier v3
+records, edit metrics, PCM/cadence thresholds and retained reports are unchanged. Recomposition is
+new evidence, never an overwrite of historical results.
+Focused verification passes 55 native verifier/quality-registry tests and 40 Python VLR/language
+tests, including measured-failure preservation, unavailable-gate blocking and private-error redaction.
+
+Authenticated reinspection of the 14 retained French WAV/sentinel pairs preserved all 30 checked
+files: eight measured single-family rejections and six inconclusive cases (four incomplete edges,
+two inconsistent/incomplete recognitions). No new recognizer or generator ran and no row became
+PASS. The cross-family disagreements still prevent speech-defect closure. Evidence is retained in
+`build/artifacts/diagnostics/macos/rf06-classification-remediation-20260907/`.
+
+RF-06 remains open: the separately authorized September 7 cold iPhone comparison reproduced the
+2,048-code/no-EOS stop with the original text/instruction/seed and nominal thermals throughout.
+Memory pressure was healthy; no allocation retry or system crash delta occurred. The original
+hot-device condition and long-form UI are therefore not necessary for the reproduced symptom.
+The collected binary has 2,048 frames, 16 groups each and zero reported drops, but its producer
+digest was lost from failure telemetry and the terminal validator rejects the omitted optional
+`audioQC` key. Keep the run failed and the orphan trace unqualified for authenticated replay;
+repair the narrow producer/consumer evidence path before further generation, never fabricate QC
+or rewrite the historical result. Source-bound registration/assessment live in the existing
+`rf06-longform-recovery-20260906/iphone-followup-20260907/` bundle; device run is
+`ios-startup-reliability-20260907-145015-63ba20fb`. The process was stopped and device artifacts
+retained because guarded cleanup follows successful validation. The severe French generated-code gap and distinct Chinese trailing silence are not
+repaired by this classification fix. The 834 ms Chinese pause remains a cadence warning. Do not
+repeat excluded decoder variants or infer Chinese/French acceptance from the English/German
+reference panel. No speculative generator, planner, prompt, token-cap or threshold change is made.
+
+### Token-limit diagnostic records and replay
+
+The September 7 repair keeps result schema v2: `audioQC` is explicitly `null` when final
+QC never ran, while absent QC still cannot qualify a passing take or a QC rejection.
+The device runner's existing wire records now live in `IOSStartupReliabilityRecord`, shared
+with host tests; no second producer or device harness was added. All adapter failure calls
+must forward their owned diagnostic notes. Codec artifact parsing uses the existing shared
+`GenerationTerminalDiagnosticEvidence` parser, and failures after decoded audio use its
+`post_generation_failure` classification rather than pretending final QC rejected them.
+That classification is accepted by result v2 only; historical v1/v2 meanings remain readable.
+
+A complete captured token-limit trace can now enter the existing diagnostic replay path without
+a final QC report. Portable CLI replay retains all original take/trace/model checks:
+
+```sh
+QWENVOICE_DEBUG=1 ./build/vocello bench \
+  --codec-replay <original-take.json> --take-sha256 <original-take-sha256> \
+  --codec-trace <original-codec-trace.bin> --script-file <untracked-model-facing-text.txt> \
+  --output-dir <new-untracked-directory>
+```
+
+For a no-QC take, `generation.incomplete` and a receipt-matching model-facing text digest/length
+are required. Script input is bounded at 64 KiB, remains local, and supplies only the existing
+analyzer's pause expectation. QC-bearing historical inputs can still use their recorded cadence
+expectation without a script; contradictory script/QC expectations are rejected. Replay computes
+new reports for replayed PCM, never invents a report for the failed original. "Full" retains its
+existing meaning: the production non-streaming 25-frame schedule, not an independent decoder.
+
+The original September 7 binary remains an orphan with no producer-recorded digest in the
+collected bundle. A hash computed afterward does not replace that missing receipt. Its original
+take, result and audio/code bytes stay unchanged and unqualified; this repair does not recover
+authenticated replay eligibility for that historical take or fix the long-form cutoff. Native
+producer-to-Python validation and negative fixtures qualify the record correction without a phone;
+new physical capture/replay remains a separate, explicitly scheduled diagnostic step.
+
+The later authorized September 7 capture (`ios-startup-reliability-20260907-154111-6a16585e`)
+verified explicit-null QC, codec metadata retention and post-generation classification on the
+physical iPhone. Its producer-bound trace matches the earlier orphan's bytes; both replay schedules
+complete but fail QC with a 16.680-second gap starting at 33.483 seconds. The aggregate runner still
+failed: native pause capture permits 256 entries, whereas the host/schema permitted only 64; the
+replay reports contain 159/158. The corrected host/schema now accept the producer's bounded list,
+with 64/65/256/257 boundary fixtures. No list is truncated and no QC threshold changes.
+The same revalidation exposed a second host defect: receipt v2's resolved `language` was compared
+with the plan's requested `auto`. Compare `storedLanguageSelection` with the plan instead, require
+explicit selections to agree with the final language, and retain v1's historical comparison.
+Both language identities remain stable across allocation retry.
+
+Use the existing validator's read-only route for retained bundles:
+
+```sh
+python3 scripts/ios_startup_reliability.py validate-result \
+  --plan <original-plan.json> --artifact-dir <collected-artifacts> \
+  --run-id <original-run-id> --read-only
+```
+
+It prints the summary without writing into the source bundle. Successful validation establishes
+record integrity, not successful synthesis: the September 7 run validates as `diagnosed_failure`,
+with one represented failed take. All 27 original files retain bytes and modification times;
+the original runner failure and withheld device cleanup remain recorded.
+
+The separately authorized same-code Mac replay used `BenchCodecReplay` and the existing serial
+resource supervisor, with exact take/trace/tokenizer binding and isolated app data. It exceeded the
+provisional 5 GiB physical-footprint ceiling after 33.60 seconds (5,390,092,808 bytes; swap growth
+2,118,186,434 bytes) and was terminated before either WAV was completed. Exit and post-exit free-memory
+recovery are confirmed; resource qualification fails. The external resource report records the
+termination even though the interrupted CLI report remains `started`. Do not treat it as a clean
+exit, a completed cross-platform comparison or a product Jetsam event. Retain the failed attempt;
+inspect replay allocation ownership before any newly authorized bounded-memory follow-up. Evidence
+is `host-contract-replay-20260907/` under the existing RF-06 long-form recovery bundle. The phone
+was untouched. None of these harness corrections fixes the 2,048-code cutoff or silent continuation.
+
+The subsequent source review identified a cold replay policy bypass: CLI bootstrap initializes the
+engine but does not apply generation's host cache policy. Replay now applies
+`NativeMemoryPolicyResolver` before loading and carries its immutable chunk-clear setting into both
+decoder arms. Temporary GPU output arrays are released after CPU materialization, with cache clears
+at policy-owned boundaries; live decoder context remains intact. The original recorded ranges and
+the full arm's 25-frame schedule/valid-length semantics are unchanged. Each arm resets on success,
+cancellation, or observation failure. No attention-mask, model, precision or production decoder
+change is included.
+
+Explicit replay emits privacy-safe, timestamped JSON `codec_replay_memory` lines to retained stderr:
+before/after load, arm start/finish, and before/after cache policy at at most 17 chunks per arm
+(at most 74 records including load boundaries). Fields are arm/stage, completed-frame count,
+MLX active/cache/peak bytes and cache-limit bytes; no audio, codec IDs, prompts or paths. Capture
+failure aborts replay rather than silently omitting evidence. These allocator counters supplement,
+not replace, the exact-PID physical-footprint supervisor. A killed process can still leave the CLI
+report `started`; the external resource report remains terminal authority. Preserve the original
+failed attempt and use a new run identity for any authorized same-code memory confirmation with
+the unchanged 5 GiB ceiling. Deterministic parity tests do not establish real-model memory fit.
+
+The subsequently authorized `memory-policy-confirmation-20260907` completed both arms in 57.35s,
+peak footprint 3,970,451,736 bytes (3.70 GiB), with 455 exact-PID samples, clean exit, no probe failure,
+clean pre/post host pressure and decreasing swap. Seventy bounded allocator records confirm the
+256 MiB limit before loading and zero cached bytes after all observed policy clears. This resolves
+the ceiling breach for this one trace, not general memory qualification: the supervisor retains
+`post-exit-memory-recovery-unqualified` because host free memory fell from 69% to 62% after its
+original 15.22-second recovery window (five-point tolerance). The exited process was independently
+absent; the host-wide deficit's allocation owner is not established. A later snapshot is annotation,
+never a rewritten PASS or permission to relax the gate.
+
+Both authenticated Mac WAVs are 163.84s and fail with the same 16.680s gap at 33.483s as the original
+iPhone replays. Mac-arm differences are at most one PCM16 quantization step; Mac/iPhone bytes are
+not identical. The comparison excludes an iPhone-only/output-mode-only cause, not shared decoding
+versus sampled codes. All original evidence and in-run source identity are preserved. RF-06 remains
+open; do not rerun this excluded platform hypothesis or waive QC. The untracked assessment in that
+existing recovery bundle records exact hashes, waveform differences and the separate resource failure.
+
+The subsequent `gap-localization-20260907` investigation used the pinned official Qwen CPU decoder
+on the same 2,048-frame trace, not another generated take. Its bounded 25-frame/25-left-context
+schedule reproduced an 18.475s raw-float gap at 33.488s. Three fixed 50-frame direct-forward windows
+then compared current fp16 with archived fp32 tokenizer weights: the four-second interior-gap
+window was entirely below 0.001 with both, while preceding speech remained audible-level. The
+trace contains no dropped/all-zero frames or adjacent identical complete frames; first-codebook
+diversity collapses and later repeats last 610 and 570 frames. These observations localize the
+immediate defect to the generated sequence and exclude a required Swift-only, publication,
+long-lived decoder-state or fp16-rounding cause for these windows. They do not prove whether the
+generator's collapse originates in model behavior or generation implementation/numerics; no
+per-step logits/EOS probabilities were retained. Do not raise caps or alter the decoder from this.
+
+All outputs are diagnostic, not promotion evidence. Sampled footprints stayed below 5 GiB, but all
+three processes failed host free-memory recovery; the fp32 window run also retained a resource
+probe/process-group-signal failure despite complete output and exit code 0. Source/weight/trace/output
+digests, unchanged originals, failed resource envelopes, one-second bounded signal measurements and
+synthetic measurement checks remain untracked in that existing recovery bundle. The next causal
+comparison belongs at generation-side conditioning/logit/EOS/sampling, not another decoder replay.
+
+**September 7 Talker follow-up:** opt-in `Qwen3TalkerReplayDiagnosticTests` teacher-forces at most
+600 retained frames through the production CustomVoice conditioning and Talker, without sampling
+or decoder forward. Private input must bind model/config/tokenizer files, text, instruction, trace
+and expected token lengths; ordinary deterministic tests skip the model-dependent method without
+`VOCELLO_TEST_TALKER_REPLAY_INPUT`. This key is read only by the test target, not a product override.
+Use the existing external resource supervisor; never run it as a normal CI/model prerequisite.
+At most eight fixed checkpoints recompute the same full history using a fresh cache. Observations
+are bounded, atomic, digest-bound and untracked; no raw text or code IDs enter report JSON.
+The lower runtime exposes conditioning internally for this purpose, not through its public facade.
+
+The corrected run inspected 600 finite last-step logit vectors and retained 59 observations.
+At all seven fresh-prefix checkpoints the recorded first code remains top-ranked in both methods.
+Inside the gap at frame 475, raw selected probability is .94394/.94686 and raw EOS is
+2.63e-7/2.22e-7 (cached/fresh). This supports a model continuation strongly conditioned on the
+already-bad history, not gross incremental-cache corruption at those checkpoints. Absolute logit
+differences up to .375 remain; there is no byte-equivalence or new numeric tolerance claim.
+Raw probabilities precede the sampler filters; the original device probabilities and random keys
+remain absent. The earlier transition into the bad history is unresolved. No source fix is justified.
+
+Retain the preceding failed diagnostic preflight: it inferred a 55-position prefix instead of 56.
+The first forward consumes the whole prefix, so subtract **forward count minus one** from final KV
+offset; account for an EOS forward separately. Both historical traces and independent tokenization
+agree. The corrected run is separate, not a regenerated audio take. It exited 0 in 27.74s at sampled
+2.93 GiB footprint but remains resource-unqualified (probe failure and swap growth). All 12 original
+evidence files and 34 canonical model files were unchanged. Evidence/limitations are in the RF-06
+`talker-replay-20260907-corrected-prefix/` bundle; work status remains solely in the roadmap.
+
+### Earlier analyzer corrections
 
 | Finding | Evidence before repair | Correction / regression boundary |
 | --- | --- | --- |

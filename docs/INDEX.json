@@ -434,6 +434,8 @@
         "scripts/delivery_resource_supervisor.py",
         "scripts/check_language_output.py",
         "scripts/run_local_delivery_cascade.py",
+        "scripts/delivery_acoustic_reference.py",
+        "config/delivery-acoustic-reference-base.json",
         "scripts/delivery_promotion_decision.py",
         "scripts/audio_cadence_qc.py",
         "scripts/prosody_holdout_validation.py",

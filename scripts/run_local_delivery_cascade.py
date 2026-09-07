@@ -37,6 +37,7 @@ from delivery_evaluator_v2 import evaluate_v2
 from delivery_temporal_features import analyze_temporal, paired_temporal_delta
 from check_language_output import recomputed_accuracy, MAX_ACCURACY_ERROR_RATE
 from prosody_quality_gate import evaluate_metrics
+import delivery_acoustic_reference as acoustic_reference
 
 
 SCHEMA_VERSION = 1
@@ -466,12 +467,28 @@ def run_cascade(
     compact_config: dict[str, Any] | None = None,
     evaluator_model: dict[str, Any] | None = None,
     compact_supervisor_options: dict[str, Any] | None = None,
+    reference_audio_dir: Path | None = None,
 ) -> dict[str, Any]:
     select_resampler(cache.resampler_version, compact_config)
     rows = _validate_manifest(manifest)
     output_rows = []
     cache_hits = 0
     cache_misses = 0
+    reference_base = None
+    reference_status = {"status": "unavailable", "promotionAuthority": False}
+    try:
+        reference_base = acoustic_reference.load_base()
+        problem = acoustic_reference.availability(reference_base, cache.resampler_version)
+        reference_status.update(baseID=reference_base['id'], manifestSHA256=reference_base['_manifestSHA256'])
+        if reference_audio_dir is not None:
+            audit = acoustic_reference.verify_originals(reference_base, reference_audio_dir)
+            reference_status['originalAudioAudit'] = audit
+            if not audit['allMatched']:
+                problem = 'reference-original-audio-missing-or-mismatched'
+        reference_status.update(status='available' if problem is None else 'unavailable', reason=problem)
+    except (ValueError, OSError, KeyError, TypeError):
+        # An optional reference cannot manufacture a PASS or block native QC.
+        reference_status['reason'] = 'reference-base-missing-invalid-or-drifted'
     for row in rows:
         per_audio: dict[str, dict[str, Any]] = {}
         for role, field in (("instructed", "instructedWAV"), ("neutral", "neutralWAV")):
@@ -501,7 +518,15 @@ def run_cascade(
                 "temporal": temporal_report,
                 "compact": None,
                 "compactCacheHit": None,
+                "referenceFeatures": None,
             }
+            if reference_status['status'] == 'available' and global_report.get('status') == 'complete':
+                try:
+                    features, hit = acoustic_reference.extract_canonical(canonical, cache, reference_base)
+                    per_audio[role]['referenceFeatures'] = features
+                    cache_hits += hit; cache_misses += not hit
+                except (ValueError, OSError, KeyError):
+                    pass  # Explicit unavailable comparison below; never change quality routing.
         reasons: list[str] = []
         route = "accepted-for-continued-screening"
         if any(
@@ -598,6 +623,19 @@ def run_cascade(
             evaluation is not None and not evaluation.get("abstained")
             and float(evaluation.get("pairwise", {}).get("targetAlignedProbability", 0.0)) >= 0.7
         )
+        reference_comparison = {**reference_status, 'status': 'unavailable'}
+        if reference_status['status'] == 'available':
+            if all(per_audio[role]['referenceFeatures'] is not None for role in ('instructed', 'neutral')):
+                reference_comparison = acoustic_reference.compare(
+                    reference_base, preset=row['preset'], language=row['outputLanguage'],
+                    instructed=per_audio['instructed']['referenceFeatures'],
+                    neutral=per_audio['neutral']['referenceFeatures'])
+                reference_comparison['inputAudio'] = {role: per_audio[role]['canonical']
+                                                      for role in ('instructed', 'neutral')}
+                reference_comparison['featureRuntime'] = {'pythonVersion': sys.version,
+                                                          'numpyVersion': np.__version__}
+            else:
+                reference_comparison['reason'] = 'canonical-reference-features-unavailable'
         output_rows.append({
             "generationID": row["generationID"],
             "route": route, "reasons": sorted(set(reasons)),
@@ -606,6 +644,7 @@ def run_cascade(
             "advisoryProsody": prosody,
             "semanticDelivery": "unmeasured" if evaluation is None else "model-estimate",
             "humanListeningRequired": False,
+            "acousticReference": reference_comparison,
             "alwaysLayers": {
                 "audioQC": {
                     role: per_audio[role]["qc"] for role in ("instructed", "neutral")
@@ -635,6 +674,8 @@ def run_cascade(
         "reviewDependencies": {name: file_sha256(REPO / 'scripts' / name) for name in
                                ('check_language_output.py', 'prosody_quality_gate.py', 'prosody_profile.py')},
         "canonicalizationIdentity": canonicalization_identity(cache.resampler_version),
+        "acousticReferenceBase": reference_status,
+        "acousticReferenceComparatorSHA256": file_sha256(Path(acoustic_reference.__file__)),
         "cache": {"hits": cache_hits, "misses": cache_misses},
         "rowCount": len(output_rows),
         "reviewCounts": {route: sum(row['route'] == route for row in output_rows) for route in
@@ -655,6 +696,8 @@ def main() -> int:
     parser.add_argument("--evaluator-model", type=Path)
     parser.add_argument("--review-evidence", type=Path, help="untracked, run-bound full-file ASR receipts; never listener responses")
     parser.add_argument("--resampler", choices=SUPPORTED_RESAMPLERS)
+    parser.add_argument("--reference-audio-dir", type=Path,
+                        help="optional original-reference hash audit; no download or model launch")
     parser.add_argument("--out", required=True, type=Path)
     args = parser.parse_args()
     try:
@@ -666,6 +709,7 @@ def main() -> int:
             cache=DeliveryAnalysisCache(args.cache_root, resampler_version=resampler), lock_root=args.lock_root,
             compact_config=compact,
             evaluator_model=_read(args.evaluator_model) if args.evaluator_model else None,
+            reference_audio_dir=args.reference_audio_dir,
         )
         atomic_json(args.out, result)
         print(json.dumps({"status": "COMPLETED", "rows": result["rowCount"],

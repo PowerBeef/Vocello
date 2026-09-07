@@ -17,6 +17,21 @@ SPEC.loader.exec_module(VLR)
 
 
 class VoiceIdentityLanguageReliabilityTests(unittest.TestCase):
+    def testVerifierFailureReasonCannotBecomeProductLanguageFailure(self):
+        for reason in ("speech_recognition_evidence_invalid", "source_audio_duration_invalid",
+                       "accuracy_threshold_invalid", "speech_recognition_error", "future_reason",
+                       "/private/audio.wav: raw error"):
+            with self.subTest(reason=reason):
+                failure, owner, gaps = VLR.classify_output_verification_failure({
+                    "pass": False, "skipReason": reason, "languagePass": False,
+                    "accuracyPass": None,
+                    "recognition": {"consensusStatus": "consistent", "evidenceConsistency": True},
+                })
+                self.assertEqual(owner, "harness")
+                self.assertTrue(failure.startswith("output-verification-inconclusive:"))
+                self.assertTrue(gaps)
+                self.assertNotIn("/private", failure)
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.root = Path(self.temp.name)

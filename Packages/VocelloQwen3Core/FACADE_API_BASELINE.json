@@ -220,7 +220,7 @@
     "Sources/VocelloQwen3Core/Engine.swift::public func adoptCloneArtifact( from directory: URL, expectedMetadata: VocelloQwen3CloneArtifactMetadata, conditioningDigest: String ) throws -> VocelloQwen3CloneHandle",
     "Sources/VocelloQwen3Core/Engine.swift::public func prewarm( request: VocelloQwen3SynthesisRequest, cloneHandle: VocelloQwen3CloneHandle? = nil, customDepth: String? = nil ) async throws",
     "Sources/VocelloQwen3Core/Engine.swift::public func prime( request: VocelloQwen3SynthesisRequest, cloneHandle: VocelloQwen3CloneHandle? = nil ) async throws -> VocelloQwen3PrimeResult",
-    "Sources/VocelloQwen3Core/Engine.swift::public func replayCodecTrace( frames: [[Int32]], incrementalRanges: [VocelloQwen3CodecFrameRange] ) throws -> VocelloQwen3CodecReplayResult",
+    "Sources/VocelloQwen3Core/Engine.swift::public func replayCodecTrace( frames: [[Int32]], incrementalRanges: [VocelloQwen3CodecFrameRange], memory: VocelloQwen3MemoryConfiguration = .compatibilityDefault ) throws -> VocelloQwen3CodecReplayResult",
     "Sources/VocelloQwen3Core/Engine.swift::public func reserveGeneration( request: VocelloQwen3SynthesisRequest, cloneHandle: VocelloQwen3CloneHandle? = nil, audioCapacityFrames: Int, diagnosticCapacity: Int = 128 ) async throws -> VocelloQwen3GenerationReservation",
     "Sources/VocelloQwen3Core/Engine.swift::public func open(_ reservationID: UUID) async throws",
     "Sources/VocelloQwen3Core/Engine.swift::public func abortReservation( _ reservationID: UUID, reason: VocelloQwen3CancellationReason = .shutdown ) async throws",
@@ -418,7 +418,7 @@
     },
     {
       "path": "Sources/VocelloQwen3Core/Engine.swift",
-      "sha256": "422613df579372f7a69a00722e4f5afba69c7888d50ff285d5dab3d530e62f84"
+      "sha256": "163f3a01836f7db3f0071de98d0876dc6b063d5ef44f48142506dc8ee86b2324"
     },
     {
       "path": "Sources/VocelloQwen3Core/GenerationSession.swift",
@@ -426,7 +426,7 @@
     },
     {
       "path": "Sources/VocelloQwen3Core/LoadedModel.swift",
-      "sha256": "509cf34cced2ee7685691d1888f2e616faa2444eca0124166266e1287ecb427b"
+      "sha256": "0db4febfa33fb8998aebfcbd78cf83e011afc4b89716a69aa7acd947b76f3f00"
     },
     {
       "path": "Sources/VocelloQwen3Core/ProductOutputAdapter.swift",

@@ -424,7 +424,8 @@ final class VocelloQwen3LoadedModel: @unchecked Sendable {
 
     func replayCodecTrace(
         frames: [[Int32]],
-        incrementalRanges: [VocelloQwen3CodecFrameRange]
+        incrementalRanges: [VocelloQwen3CodecFrameRange],
+        memory: VocelloQwen3MemoryConfiguration
     ) throws -> VocelloQwen3CodecReplayResult {
         guard let replay = box.replay else {
             throw VocelloQwen3ContractError.incompatibleLoadedModel
@@ -433,7 +434,8 @@ final class VocelloQwen3LoadedModel: @unchecked Sendable {
             frames: frames,
             incrementalRanges: incrementalRanges.map {
                 Qwen3CodecFrameRange(start: $0.start, endExclusive: $0.endExclusive)
-            }
+            },
+            memoryPolicy: try requestMemoryPolicy(memory)
         )
         return VocelloQwen3CodecReplayResult(
             incrementalAudio: result.incrementalAudio,

@@ -1431,7 +1431,7 @@ struct StreamingExecutionContext: Sendable {
                 withIntermediateDirectories: true
             )
         } catch {
-            await writeFailureTelemetry(error: error, usedStreaming: request.shouldStream, counters: [:])
+            await writeFailureTelemetry(error: error, usedStreaming: request.shouldStream, counters: [:], additionalNotes: diagnosticEvidenceNotes)
             throw error
         }
 
@@ -1472,7 +1472,7 @@ struct StreamingExecutionContext: Sendable {
                 ? try PCM16ChunkFileWriter(sampleRate: sampleRate)
                 : nil
         } catch {
-            await writeFailureTelemetry(error: error, usedStreaming: request.shouldStream, counters: [:])
+            await writeFailureTelemetry(error: error, usedStreaming: request.shouldStream, counters: [:], additionalNotes: diagnosticEvidenceNotes)
             throw error
         }
         let scratchBuffer = self.scratchBuffer(sampleRate: sampleRate)
@@ -1485,7 +1485,7 @@ struct StreamingExecutionContext: Sendable {
                 signpostCorrelation: signpostCorrelation
             )
         } catch {
-            await writeFailureTelemetry(error: error, usedStreaming: request.shouldStream, counters: [:])
+            await writeFailureTelemetry(error: error, usedStreaming: request.shouldStream, counters: [:], additionalNotes: diagnosticEvidenceNotes)
             throw error
         }
         defer {
@@ -1740,6 +1740,7 @@ struct StreamingExecutionContext: Sendable {
                 error: error,
                 usedStreaming: request.shouldStream,
                 counters: ["chunkCount": chunkIndex],
+                additionalNotes: diagnosticEvidenceNotes,
                 timingsMS: Self.finalizedGenerationTimings(
                     base: timingOverridesMS,
                     modelDiagnostics: finalizedDiagnostics,
@@ -1787,6 +1788,7 @@ struct StreamingExecutionContext: Sendable {
                 error: terminalError,
                 usedStreaming: request.shouldStream,
                 counters: ["chunkCount": chunkIndex],
+                additionalNotes: diagnosticEvidenceNotes,
                 timingsMS: Self.finalizedGenerationTimings(
                     base: timingOverridesMS,
                     modelDiagnostics: finalizedDiagnostics,
@@ -2169,7 +2171,7 @@ struct StreamingExecutionContext: Sendable {
         usedStreaming: Bool,
         counters: [String: Int],
         audioQC: AudioQCReport? = nil,
-        additionalNotes: [String: String] = [:],
+        additionalNotes: [String: String],
         timingsMS: [String: Int]? = nil,
         diagnosticBooleanFlags: [String: Bool]? = nil,
         diagnosticStringFlags: [String: String]? = nil,

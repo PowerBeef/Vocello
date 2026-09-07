@@ -379,7 +379,8 @@ enum IOSStartupReliabilityRunner {
                     runID: runID,
                     script: script,
                     records: records,
-                    engine: engine
+                    engine: engine,
+                    failureCode: metadata.code
                 )
             } else {
                 codecReplay = nil
@@ -563,9 +564,12 @@ enum IOSStartupReliabilityRunner {
         runID: String,
         script: String,
         records: [GenerationTelemetryRecord],
-        engine: TTSEngineStore
+        engine: TTSEngineStore,
+        failureCode: String? = nil
     ) async -> CodecReplayComparison? {
-        guard requiresCodecReplay(terminalTelemetryRecord(in: records)?.audioQC),
+        guard StartupReliabilityDiagnosticEvidence.requiresCodecReplay(
+                  terminalTelemetryRecord(in: records)?.audioQC, failureCode: failureCode
+              ),
               let traceEvidence = diagnosticArtifacts(in: records).first(where: {
                   $0.kind == .codecTrace
               }),
@@ -633,13 +637,7 @@ enum IOSStartupReliabilityRunner {
     /// even when they do not form one continuous hard-fail dropout, so the
     /// diagnostics lane must retain/replay them instead of calling them clean.
     private static func requiresCodecReplay(_ report: AudioQCReport?) -> Bool {
-        guard let report else { return false }
-        if report.verdict != .pass
-            || report.instabilityVerdict != .pass
-            || report.writtenOutputVerdict != .pass {
-            return true
-        }
-        return report.chunkQC?.contains(where: { $0.verdict == .fail }) == true
+        StartupReliabilityDiagnosticEvidence.requiresCodecReplay(report)
     }
 
     private static func classifyFailure(
@@ -647,15 +645,13 @@ enum IOSStartupReliabilityRunner {
         records: [GenerationTelemetryRecord],
         output: OutputDigest?
     ) -> String {
-        if metadata.classification == .cancelled { return "cancelled" }
-        if metadata.classification == .memory { return "memory_failure" }
-        if metadata.code.contains("timeout") { return "timeout" }
         let stages = records.flatMap(\.stageMarks).map(\.stage)
-        if output != nil || stages.contains(GenerationStartupBoundary.firstDecodedAudioFrame.telemetryStage) {
-            return "post_generation_qc"
-        }
-        if stages.contains(where: { $0.hasPrefix("startup.") }) { return "pre_audio_startup" }
-        return "unmaterialized_unknown"
+        return StartupReliabilityDiagnosticEvidence.failureClassification(
+            metadata: metadata,
+            hasDecodedAudio: output != nil || stages.contains(GenerationStartupBoundary.firstDecodedAudioFrame.telemetryStage),
+            hasStartupBoundary: stages.contains(where: { $0.hasPrefix("startup.") }),
+            audioQC: terminalTelemetryRecord(in: records)?.audioQC
+        )
     }
 
     private static func memoryEvidence(
@@ -693,50 +689,11 @@ enum IOSStartupReliabilityRunner {
     private static func diagnosticArtifacts(
         in records: [GenerationTelemetryRecord]
     ) -> [StartupReliabilityArtifactEvidence] {
-        guard let notes = terminalTelemetryRecord(in: records)?.notes else { return [] }
-        var result: [StartupReliabilityArtifactEvidence] = []
-        if let sha256 = notes["codecTraceSHA256"],
-           let byteCount = notes["codecTraceByteCount"].flatMap(Int.init),
-           let frameCount = notes["codecTraceFrameCount"].flatMap(Int.init),
-           let minimum = notes["codecTraceCodeGroupsMinimum"].flatMap(Int.init),
-           let maximum = notes["codecTraceCodeGroupsMaximum"].flatMap(Int.init),
-           let complete = notes["codecTraceComplete"].flatMap(Bool.init),
-           let ranges = parseCodecRanges(notes["codecTraceChunkRanges"]) {
-            result.append(StartupReliabilityArtifactEvidence(
-                kind: .codecTrace,
-                sha256: sha256,
-                byteCount: byteCount,
-                codecFrameCount: frameCount,
-                codeGroupRange: .init(minimum: minimum, maximum: maximum),
-                codecChunkRanges: ranges,
-                complete: complete
-            ))
-        }
-        if let sha256 = notes["rejectedAudioSHA256"],
-           let byteCount = notes["rejectedAudioByteCount"].flatMap(Int.init),
-           let duration = notes["rejectedAudioDurationSeconds"].flatMap(Double.init) {
-            result.append(StartupReliabilityArtifactEvidence(
-                kind: .rejectedAudio,
-                sha256: sha256,
-                byteCount: byteCount,
-                durationSeconds: duration
-            ))
-        }
-        return result.sorted { $0.kind.rawValue < $1.kind.rawValue }
-    }
-
-    private static func parseCodecRanges(
-        _ raw: String?
-    ) -> [StartupReliabilityCodecFrameRange]? {
-        guard let raw, !raw.isEmpty else { return nil }
-        let ranges = raw.split(separator: ",").compactMap { component -> StartupReliabilityCodecFrameRange? in
-            let values = component.split(separator: ":", omittingEmptySubsequences: false)
-            guard values.count == 2, let start = Int(values[0]), let end = Int(values[1]) else {
-                return nil
-            }
-            return StartupReliabilityCodecFrameRange(start: start, endExclusive: end)
-        }
-        return ranges.count == raw.split(separator: ",").count ? ranges : nil
+        guard let terminal = terminalTelemetryRecord(in: records) else { return [] }
+        return GenerationTerminalDiagnosticEvidence(
+            requestReceipt: terminal.requestReceipt, audioQC: terminal.audioQC,
+            notes: terminal.notes, stageNames: terminal.stageMarks.map(\.stage)
+        ).diagnosticArtifacts
     }
 
     private static func telemetryRecords(generationID: UUID) -> [GenerationTelemetryRecord] {
@@ -933,23 +890,11 @@ enum IOSStartupReliabilityRunner {
         (error as? RunnerError)?.rawValue ?? fallback
     }
 
-    private struct BoundaryResult: Codable {
-        let boundary: String
-        let tMS: Int
-    }
+    private typealias BoundaryResult = IOSStartupReliabilityRecord.BoundaryResult
 
-    private struct AttemptResult: Codable {
-        let retryAttempt: Int
-        let finishReason: String
-        let requestReceipt: GenerationRequestReceipt
-        let startupTimeline: [BoundaryResult]
-    }
+    private typealias AttemptResult = IOSStartupReliabilityRecord.AttemptResult
 
-    private struct OutputDigest: Codable {
-        let sha256: String
-        let byteCount: Int
-        let durationSeconds: Double
-    }
+    private typealias OutputDigest = IOSStartupReliabilityRecord.OutputDigest
 
     private struct DeviceState: Codable {
         let lowPowerModeEnabled: Bool
@@ -963,55 +908,11 @@ enum IOSStartupReliabilityRunner {
         let evidence: [PreparationEvidence]
     }
 
-    private struct PreparationEvidence: Codable {
-        let stage: String
-        let sequence: Int
-        let capturedAtUptimeSeconds: Double
-        let mlxActiveMB: Double?
-        let mlxCacheMB: Double?
-        let mlxPeakMB: Double?
-        let metalAllocatedMB: Double?
-        let physicalFootprintMB: Double?
-        let availableHeadroomMB: Double?
-        let hasActiveGeneration: Bool
-        let memoryActionInFlight: Bool
-        let modelOperationInFlight: Bool
-        let generationReservationInFlight: Bool
-        let loadedModelID: String?
-        let engineLifecycle: String
-        let violations: [String]
-    }
+    private typealias PreparationEvidence = IOSStartupReliabilityRecord.PreparationEvidence
 
-    private struct TakeResult: Codable {
-        let takeIndex: Int
-        let takeID: String
-        let generationID: String
-        let status: String
-        let preparation: String
-        let prePreparationStoreWarmState: String
-        let preRequestStoreWarmState: String
-        let preparationEvidence: [PreparationEvidence]
-        let requestReceipt: GenerationRequestReceipt?
-        let attempts: [AttemptResult]
-        let startupTimeline: [BoundaryResult]
-        let failureCode: String?
-        let classification: String
-        let output: OutputDigest?
-        let audioQC: AudioQCReport?
-        let diagnosticArtifacts: [StartupReliabilityArtifactEvidence]
-        let codecReplay: CodecReplayComparison?
-    }
+    private typealias TakeResult = IOSStartupReliabilityRecord.TakeResult
 
-    private struct CodecReplayComparison: Codable {
-        let status: String
-        let failureCode: String?
-        let traceSHA256: String
-        let ranges: [StartupReliabilityCodecFrameRange]
-        let incrementalArtifact: StartupReliabilityArtifactEvidence?
-        let incrementalAudioQC: AudioQCReport?
-        let fullArtifact: StartupReliabilityArtifactEvidence?
-        let fullAudioQC: AudioQCReport?
-    }
+    private typealias CodecReplayComparison = IOSStartupReliabilityRecord.CodecReplayComparison
 
     private struct ResultRecord: Codable {
         var schemaVersion = 2

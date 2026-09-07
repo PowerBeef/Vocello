@@ -11,7 +11,8 @@ enum BenchCodecReplay {
         let generationID: UUID
         let requestReceipt: GenerationRequestReceipt
         let diagnosticArtifacts: [StartupReliabilityArtifactEvidence]
-        let audioQC: AudioQCReport
+        let audioQC: AudioQCReport?
+        let failureCode: String?
     }
 
     private struct ReplayOutput: Encodable {
@@ -34,6 +35,8 @@ enum BenchCodecReplay {
         // Historical "full" means the shipping non-streaming schedule, not an
         // independent decoder or a single full-sequence callAsFunction pass.
         let fullReplaySemantics = "production_nonstreaming_25_frame_schedule"
+        let expectedPauseCount: Int
+        let pauseExpectationSource: String
         let runID: String
         var status = "started"
         var failureCode: String?
@@ -60,6 +63,19 @@ enum BenchCodecReplay {
         guard digest(takeData) == expectedDigest else { throw CLIError("Source take digest mismatch.") }
         let take = try JSONDecoder().decode(Take.self, from: takeData)
         let receipt = take.requestReceipt
+        let script: String?
+        if let path = args.string("script-file") {
+            let url = URL(fileURLWithPath: path)
+            guard (try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? Int.max) <= 64 * 1_024 else {
+                throw CLIError("Replay script exceeds the bounded evidence size.")
+            }
+            script = try String(contentsOf: url, encoding: .utf8)
+        } else {
+            script = nil
+        }
+        let pauseCount = try StartupReliabilityDiagnosticEvidence.replayExpectedPauseCount(
+            report: take.audioQC, failureCode: take.failureCode, receipt: receipt, script: script
+        )
         guard receipt.schemaVersion == 2,
               receipt.generationID == take.generationID.uuidString,
               receipt.conditioningMode == "custom_voice",
@@ -67,9 +83,8 @@ enum BenchCodecReplay {
               let expectedTokenizer = receipt.speechTokenizerDigest,
               receipt.modelIntegrityManifestDigest != nil,
               take.diagnosticArtifacts.filter({ $0.kind == .codecTrace }).count == 1,
-              let evidence = take.diagnosticArtifacts.first(where: { $0.kind == .codecTrace }),
-              let pauseCount = take.audioQC.cadence?.expectedPauseCount, pauseCount >= 0 else {
-            throw CLIError("Replay requires a correlated CustomVoice v2 take and complete codec/QC identity.")
+              let evidence = take.diagnosticArtifacts.first(where: { $0.kind == .codecTrace }) else {
+            throw CLIError("Replay requires a correlated CustomVoice v2 take and complete codec identity.")
         }
         let trace = try StartupReliabilityDiagnosticEvidence.verifiedReplayTrace(
             data: Data(contentsOf: traceURL), evidence: evidence
@@ -122,7 +137,10 @@ enum BenchCodecReplay {
             catalogSHA256: try SamplingTakeEvidence.sha256FileDigest(at: catalogURL),
             tokenizerSHA256: expectedTokenizer,
             replayInstalledManifestSHA256: try SamplingTakeEvidence.sha256FileDigest(at: manifestURL),
-            replayInstalledRevision: installedManifest.revision, runID: runID
+            replayInstalledRevision: installedManifest.revision,
+            expectedPauseCount: pauseCount,
+            pauseExpectationSource: script == nil ? "recorded_audio_qc" : "receipt_bound_script",
+            runID: runID
         )
         let reportURL = output.appendingPathComponent("codec-replay-result.json")
         try write(report, to: reportURL)

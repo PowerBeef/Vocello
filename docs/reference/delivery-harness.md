@@ -20,6 +20,8 @@ sourceOfTruth:
   - scripts/delivery_resource_supervisor.py
   - scripts/check_language_output.py
   - scripts/run_local_delivery_cascade.py
+  - scripts/delivery_acoustic_reference.py
+  - config/delivery-acoustic-reference-base.json
   - scripts/delivery_promotion_decision.py
   - scripts/audio_cadence_qc.py
   - scripts/prosody_holdout_validation.py
@@ -77,6 +79,7 @@ the script self-test suite via `scripts/check_test_workflows.sh`.
 | `scripts/prepare_delivery_listener_anchors.py` | Builds label-blind naturalness/attention anchors by pairing a real clip with a deterministic dropout control; audio and manifest remain untracked | `test_prepare_delivery_listener_anchors.py` |
 | `scripts/delivery_resource_supervisor.py` | Single-process lock, enforced RSS/optional physical-footprint ceilings, pressure/swap/timeout capture, and post-exit memory-recovery qualification for heavy local analyzers | `test_delivery_resource_supervisor.py` |
 | `scripts/run_local_delivery_cascade.py` | Existing-harness composer: byte-bound native QC, independent full-file ASR receipts, cached acoustics, optional heads, rejection and explicit inconclusive routes; no mandatory listening | `test_run_local_delivery_cascade.py` |
+| `scripts/delivery_acoustic_reference.py` | Default digest-pinned numerical reference comparison in the cascade: same-language paired deltas, unpaired style context, warning retention and flagged-exclusion sensitivity; descriptive only, no downloads or quality authority | `test_delivery_acoustic_reference.py` |
 | `scripts/delivery_promotion_decision.py` | Automatic measured-claim decision (schema 2); schema 1 is the optional historical listener reader. Paired statistics, independent judges, multiplicity correction and runtime/quality guardrails | `test_delivery_promotion_decision.py` |
 | `scripts/audio_cadence_qc.py` | Validates the Fast-QC cadence policy and audits untracked, privacy-safe, independently labelled calibration/development/confirmation cohorts before a threshold review | `test_audio_cadence_qc.py` |
 | `scripts/voice_identity_language_reliability.py` | Source-bound, serial Clone fidelity/enrollment-transcription/tokenizer and French Voice Design diagnosis; personal references stay in a private content-addressed bundle, rows never retry, and sanitized analysis has no semantic-promotion authority | `test_voice_identity_language_reliability.py` |

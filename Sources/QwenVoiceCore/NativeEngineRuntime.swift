@@ -354,16 +354,37 @@ actor NativeEngineRuntime {
                 message: "Codec replay requires the gated startup-reliability trace request."
             )
         }
+        // The cold CLI replay does not pass through prepareGeneration. Apply
+        // the same host allocator policy before loading, not after the peak.
+        let policy = NativeMemoryPolicyResolver.policy(mode: request.mode, isBatch: false)
+        NativeMemoryPolicyResolver.apply(policy)
+        try Task.checkCancellation()
+        try recordCodecReplayLoadMemory(stage: "before_load")
         let loadResult = try await loadModel(
             id: request.modelID,
             capabilityProfile: NativeLoadCapabilityProfile(for: request),
             preserveActiveClonePrimeToken: false,
             signpostGenerationID: request.generationID
         )
+        try Task.checkCancellation()
+        try recordCodecReplayLoadMemory(stage: "after_load")
         return try await loadResult.model.replayCodecTrace(
             frames: frames,
-            incrementalRanges: incrementalRanges
+            incrementalRanges: incrementalRanges,
+            memory: NativeMemoryPolicyResolver.memoryConfiguration(for: policy)
         )
+    }
+
+    private func recordCodecReplayLoadMemory(stage: String) throws {
+        let snapshot = Memory.snapshot()
+        let data = try JSONSerialization.data(withJSONObject: [
+            "event": "codec_replay_memory", "stage": stage,
+            "timestampUnixMS": Int64(Date().timeIntervalSince1970 * 1_000),
+            "activeBytes": snapshot.activeMemory, "cacheBytes": snapshot.cacheMemory,
+            "peakBytes": snapshot.peakMemory, "cacheLimitBytes": Memory.cacheLimit
+        ], options: [.sortedKeys])
+        // Immediate, privacy-safe stderr survives supervisor termination.
+        try FileHandle.standardError.write(contentsOf: data + Data([0x0A]))
     }
 
     /// Stamp the raw kernel memory-pressure signal onto the active generation's

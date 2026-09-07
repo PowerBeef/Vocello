@@ -92,6 +92,53 @@ public struct StartupReliabilityArtifactEvidence: Hashable, Codable, Sendable {
 public enum StartupReliabilityDiagnosticEvidence {
     public static let maximumCodecFrames = 8_192
 
+    /// Replay diagnoses captured codes, including a model that stopped at its cap
+    /// before a final WAV/QC existed. It never turns an incomplete take into PASS.
+    public static func requiresCodecReplay(_ report: AudioQCReport?, failureCode: String? = nil) -> Bool {
+        if failureCode == "generation.incomplete" { return true }
+        guard let report else { return false }
+        return report.verdict != .pass || report.instabilityVerdict != .pass
+            || report.writtenOutputVerdict != .pass
+            || report.chunkQC?.contains(where: { $0.verdict == .fail }) == true
+    }
+
+    /// Old QC-bearing takes retain their recorded expectation. A no-QC token-limit
+    /// take requires exact model-facing text, checked against the original receipt;
+    /// no default pause count or invented QC can grant replay eligibility.
+    public static func replayExpectedPauseCount(
+        report: AudioQCReport?, failureCode: String?, receipt: GenerationRequestReceipt,
+        script: String?
+    ) throws -> Int {
+        if let count = report?.cadence?.expectedPauseCount, count >= 0, script == nil { return count }
+        guard receipt.schemaVersion == 2, let script else { throw EvidenceError.invalidIdentity }
+        let normalized = script.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalized.isEmpty, normalized.count == receipt.normalizedTargetTextCharacters,
+              sha256(Data(normalized.utf8)) == receipt.normalizedTargetTextDigest else {
+            throw EvidenceError.invalidIdentity
+        }
+        let count = PersistedWAVAudioQCAnalyzer.expectedPauseCount(in: normalized)
+        if let report {
+            guard report.cadence?.expectedPauseCount == count else { throw EvidenceError.invalidIdentity }
+        } else if failureCode != "generation.incomplete" {
+            throw EvidenceError.invalidIdentity
+        }
+        return count
+    }
+
+    public static func failureClassification(
+        metadata: GenerationFailureDiagnosticLogger.ErrorMetadata,
+        hasDecodedAudio: Bool, hasStartupBoundary: Bool, audioQC: AudioQCReport?
+    ) -> String {
+        if metadata.classification == .cancelled { return "cancelled" }
+        if metadata.classification == .memory { return "memory_failure" }
+        if metadata.code.contains("timeout") { return "timeout" }
+        let stages = hasDecodedAudio ? [GenerationStartupBoundary.firstDecodedAudioFrame.telemetryStage]
+            : (hasStartupBoundary ? [GenerationStartupBoundary.requestValidated.telemetryStage] : [])
+        return GenerationTerminalDiagnosticEvidence(
+            requestReceipt: nil, audioQC: audioQC, notes: [:], stageNames: stages
+        ).classification.rawValue
+    }
+
     /// The writer and pullable mirror must use one registered run identity.
     /// UI-only runs need no benchmark metadata. Conflicting or missing identities
     /// cannot fall back to a shared anonymous directory containing unrelated takes.

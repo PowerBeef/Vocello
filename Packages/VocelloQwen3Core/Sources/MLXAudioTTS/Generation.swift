@@ -265,7 +265,8 @@ public struct Qwen3CodecReplayResult: Sendable {
 public protocol Qwen3CodecTraceReplayModel: AnyObject {
     func replayCodecTrace(
         frames: [[Int32]],
-        incrementalRanges: [Qwen3CodecFrameRange]
+        incrementalRanges: [Qwen3CodecFrameRange],
+        memoryPolicy: Qwen3RequestMemoryPolicy
     ) throws -> Qwen3CodecReplayResult
 }
 

@@ -493,6 +493,7 @@ targets:
       - path: Sources/VocelloCLI/CLIBatchExecution.swift
       - path: Sources/Models/Generation.swift
       - path: Sources/iOSSupport/Models/PendingVoiceCloningHandoff.swift
+      - path: Sources/iOSSupport/Models/IOSStartupReliabilityRecord.swift
       - path: Sources/iOSSupport/Services/AppPaths.swift
       - path: Sources/iOSSupport/Services/IOSModelDeliverySupport.swift
       - path: Sources/iOSSupport/Services/IOSModelProgressPresentation.swift
@@ -530,6 +531,7 @@ targets:
     sources:
       - path: Tests/VocelloiOSLogicTests
       - path: Sources/iOSSupport/Models/PendingVoiceCloningHandoff.swift
+      - path: Sources/iOSSupport/Models/IOSStartupReliabilityRecord.swift
       - path: Sources/iOSSupport/Services/AppPaths.swift
       - path: Sources/iOSSupport/Services/IOSModelDeliverySupport.swift
       - path: Sources/iOSSupport/Services/IOSModelProgressPresentation.swift

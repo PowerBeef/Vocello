@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-09-06
+reviewed: 2026-09-07
 summary: Current release-first resume checkpoint; dated evidence lives in the pinned development history, and config/roadmap.json owns status.
 sourceOfTruth:
   - config/roadmap.json
@@ -15,7 +15,253 @@ This is a narrative, not a second work ledger. Product source, contracts and scr
 
 ## Resume now
 
-The iPhone is unavailable. Do not start device work. No acceptance campaign is currently frozen.
+September 7 **Talker replay follow-up** inspected 600 original code frames without resampling,
+decoding audio or using the phone. All inspected last-step logits were finite. At seven fixed
+checkpoints, recomputing the identical complete history from a fresh cache also ranked the recorded
+first-codebook value first. Inside the gap (frame 475), its raw probability is 94.394% cached versus
+94.686% fresh; raw EOS probability is approximately 2.63e-7 versus 2.22e-7. The bad history already
+strongly favors the repetitive continuation; gross incremental-cache corruption is not supported
+at these checkpoints. This does **not** identify the earlier generation/sampling divergence that
+entered that state, or prove intrinsic official-model failure. Raw logits precede sampling filters.
+
+The opt-in `Qwen3TalkerReplayDiagnosticTests` uses production conditioning through internal access;
+no new public API, product behavior, model, prompt or QC change. Model execution skips without
+explicit private input. Parser/probability and adjacent sampler/compiled-predictor checks: nine
+deterministic passes, one explicit model-dependent skip. Full candidate verification is not claimed.
+
+The first diagnostic preflight failed before prediction: an inferred prefix length of 55 was wrong.
+The corrected expectation is **56**: initial prefix = final KV offset minus (forward count minus one).
+Independent tokenization and both original Mac/iPhone offsets agree. The failed preflight remains
+separate; the corrected run took 27.74s at 3,147,828,128 bytes sampled peak footprint (2.93 GiB),
+exit 0 and confirmed process exit. **Resource-unqualified:** probe failure and +390,133,186 bytes
+swap growth; no resource PASS. Both runs preserved 12 original evidence files and 34 canonical
+model files, plus unchanged full-tree identity during execution. Private evidence is retained under
+`talker-replay-20260907/` and `talker-replay-20260907-corrected-prefix/` in the RF-06 recovery bundle.
+
+**Next:** inspect the earlier real generation/sampling transition, with bounded raw/post-filter
+first-codebook and EOS evidence and request-local randomness identity against a matched control.
+Original device probabilities/keys are missing. Do not change sampling or repeat decoder studies
+on this conditional replay. RF-06 remains open; no new TTS or phone campaign was run.
+
+### Earlier independent decoder localization
+
+September 7 long-form gap localization is complete at the **generated-code boundary**, not a
+production correction or full generator root cause. Two predeclared retained-code experiments used
+the cached, pinned official Qwen CPU decoder; no new synthesis or phone work occurred.
+
+- Complete trace, exact current weights: raw float reproduces an 18.475s gap at 33.488s versus the
+  iPhone's 16.680s at 33.483s. Independent implementation/overlapping blocks reproduce the gross
+  failure; exact durations and waveforms differ.
+- Fixed direct-forward windows: frames 475–525 are entirely below the existing 0.001 floor with
+  both current fp16 and archived fp32 weights (-73.66/-73.65 dBFS). The preceding speech window
+  remains approximately -31.86 dBFS in both. Resetting context or removing fp16 rounding does not
+  recover speech. Later repetition is also near-silent in both arms.
+- The trace has no dropped/all-zero frames or adjacent duplicated complete frames, but its first
+  codebook later repeats for 610 frames (48.8s) and for the final 570 frames (45.6s). Other groups
+  continue varying. The gap/collapse precedes the token cap; raising the cap is not a supported fix.
+
+**Then-planned follow-up (partially completed above):** inspect generation-side conditioning, finite logits, EOS probability and sampling around
+the first collapse with exact request/seed identity and a matched control. Retained evidence lacks
+those probability/state observations, so intrinsic model behavior versus a generation implementation
+defect remains unresolved. Do not repeat platform/decoder/precision permutations, change prompts,
+revert tokenizer weights, trim silence or waive QC from this finding. RF-06 remains in flight.
+
+The three serial decoder processes took 67.11/8.10/8.70s; sampled footprint peaks were
+2,207,762,664 / 1,934,149,672 / 1,695,057,768 bytes. All produced complete outputs and exit code 0,
+with process exit confirmed, no pre/post pressure warning and no swap growth. **None is resource
+qualified:** all failed host free-memory recovery; the fp32 window run additionally retained a
+footprint-probe error and denied process-group signal (`cleanExit=false`, despite return code 0).
+Its sampled peak is not a qualified whole-run maximum. Do not replace these failures with PASS.
+All 12 inspected original device-evidence files and in-run full-tree identity remained unchanged. Evidence, hashes, synthetic
+measurement checks and limitations are in `gap-localization-20260907/` under the existing RF-06
+long-form recovery bundle. Production source and all previous attempts are untouched.
+
+### Earlier corrected-memory confirmation
+
+September 7 authorized corrected-memory confirmation is complete, **not an aggregate PASS**.
+One same-code Mac replay completed both arms in 57.35 seconds at 3,970,451,736 bytes peak physical
+footprint (3.70 GiB), below the unchanged 5 GiB ceiling. Exit was clean and independently confirmed;
+455 footprint samples had no probe failure, pressure stayed clean before/after, and swap decreased
+by 357,365,187 bytes. All 70 bounded allocator records validate the before-load 256 MiB policy and
+zero cached bytes at every sampled post-clear boundary.
+
+Resource qualification nevertheless fails `post-exit-memory-recovery-unqualified`: host free memory
+was 69% before and 62% after 30 recovery snapshots/15.22 seconds, outside the existing five-point
+tolerance. A later 63% reading is annotation only, not replacement evidence. This host-wide deficit
+does not identify an allocation owner or prove a leak in the exited CLI. No threshold or observation
+window changed, and no automatic second run was launched.
+
+Both 163.84-second replay WAVs fail QC with the same 16.680-second gap at 33.483 seconds as the
+original iPhone arms. All output hashes, source receipt, trace/tokenizer identity and partitions
+authenticate. The Mac arms differ at only 1,320 PCM16 samples, by at most one quantization step;
+Mac/iPhone waveforms are not byte-identical but the severe gap matches. This excludes an iPhone-only
+or output-mode-only explanation, **not** the common decoder. Generated-code versus shared-decoder
+causation remains the next audio decision; do not repeat the excluded platform-only comparison.
+
+Evidence: `memory-policy-confirmation-20260907/` under the existing RF-06 long-form recovery bundle
+(preregistration, resource/allocator records, WAVs, assessment and preservation proof). All 27 original
+iPhone files and 291 prior Mac evidence files preserve bytes/mtimes; source stayed frozen during
+the run. The phone was untouched. RF-06 remains in flight for unresolved audio and full memory
+qualification; the 5 GiB replay-ceiling failure did not recur in this confirmation.
+
+### Earlier implementation checkpoint
+
+September 7 replay-memory correction is implemented and deterministically verified.
+Cold replay applies the existing host allocator policy before model load (256 MiB cache on the
+8 GB Mac), and passes that same policy through the facade to both replay arms. Each materialized
+chunk becomes CPU samples before policy-owned cache clearing; decoder context and original/25-frame
+partitions are preserved. Cancellation and observation failures reset decoder state. Bounded,
+timestamped `codec_replay_memory` stderr records expose load boundaries and both arms' MLX
+active/cache/peak counters; they are not physical-footprint measurements. The supervisor ceiling
+stays 5 GiB. No new replay or phone run is part of this implementation checkpoint; a separately
+identified supervised same-code confirmation is still needed before claiming memory qualification.
+
+Verification passed: 32 focused host tests; the quick project-input gate (1,556 Python tests);
+587 core, 19 transport and 113 runtime tests (two optional AudioSeal fixture skips, no failures);
+CLI build/version validation; generic iOS app/logic compilation. The four new runtime tests cover
+cache-on/off waveform parity at original-style and 25-frame partitions, bounded observations,
+capture-failure cleanup, and mid-replay cancellation/reset. Artifacts: `mac-test-20260907-125419`
+and `replay-memory-{cli,ios}-build.log` under the governed macOS test artifacts. Derived runtime
+inventory/API baseline, roadmap and documentation were refreshed. No commit or push was requested.
+
+September 7 host-contract follow-up is implemented: pause-list validation/schema now match the
+native 256-entry bound; receipt v2 compares the plan with `storedLanguageSelection` while preserving
+the resolved language and rejecting explicit-language drift. Legacy receipt v1 keeps its original
+comparison. `validate-result --read-only` revalidated the complete retained iPhone bundle as
+`diagnosed_failure` (1/1 represented, one failed), without rewriting its original runner failure.
+All 27 original run files retain their bytes and modification times. The 63 focused host/cadence/
+resource tests and refreshed CLI build passed; the new negative fixtures reproduced both defects
+before repair. No native synthesis, decoding or audio-QC threshold changed in this follow-up.
+
+The authorized single same-code Mac replay **did not complete**. The existing CLI verified the
+source take/trace and pinned model files, loaded the model, then exceeded the supervisor's provisional
+5 GiB physical-footprint ceiling: 5,390,092,808 bytes, with 2,118,186,434 bytes of swap growth, after
+33.60 seconds. The supervisor terminated the owned process; exit is confirmed, post-exit free-memory
+recovery passed, and resource qualification failed. Neither replay WAV was completed. Its retained
+CLI report remains `started`; the external supervisor report owns the terminated outcome. This is
+not evidence for either cross-platform audio branch, not a Jetsam diagnosis and not an automatic
+retry. The full-tree fingerprint was unchanged during execution. No phone was used or unlocked.
+
+Evidence is in the existing long-form recovery bundle's `host-contract-replay-20260907/` (read-only
+revalidation, preregistration, resource report, 278 exact-PID footprint samples and preservation
+proof). Allocation review found the cold replay's host-policy bypass and missing chunk cache clears;
+the diagnostic-only correction is described above. Do not raise the ceiling or launch another
+attempt automatically. RF-06
+remains open for the cutoff/severe continuation and the unresolved French/Chinese findings.
+
+September 7 corrected-source physical diagnostic is complete, **not an aggregate PASS**.
+Run `ios-startup-reliability-20260907-154111-6a16585e` represented its sole planned cold take,
+without retry: original input/seed/instruction/tokenizer receipts match, thermals stayed nominal,
+memory pressure stayed healthy, and no system crash report appeared. Generation again stopped at
+2,048 codes without EOS. Both original diagnostic-record defects are verified fixed on-device:
+the take contains `audioQC: null`, and codec metadata survives into telemetry and the result.
+The `post_generation_failure` classification is correct. All three collected artifact hashes
+validate; the new producer-bound trace matches the earlier orphan's bytes. Historical records
+remain unchanged and are not retroactively promoted.
+
+Incremental and production non-streaming replay completed, each producing 163.84 seconds of audio
+with the same severe 16.680-second interior gap starting at 33.483 seconds. These are replay QC
+failures, not a final QC report for the incomplete original; common decoding versus generated-code
+causation is still unresolved. Host validation then failed because `recordedInteriorPausesMS`
+allows only 64 entries while the native producer is bounded at 256; replay records contain 159
+and 158 entries. That host defect and the subsequently exposed Auto-language comparison are now
+corrected and read-only revalidation is recorded above. Preserve the failed runner outcome;
+structural validity does not clear the cutoff or severe silence. RF-06 remains open.
+
+The exact diagnostic process was independently confirmed absent. Device evidence remains retained
+because the failed-validation guard withheld artifact cleanup; personal data was not targeted.
+The source fingerprint stayed unchanged throughout the diagnostic and screen-protection runs.
+Registration, assessment and logs are under the existing long-form recovery bundle's
+`record-fix-acceptance-20260907/`. French-compatible screen-protection inspection and three-minute
+enable lanes passed; CoreDevice independently confirmed current `passcodeRequired: true` afterward.
+No device UI followed final protection. No broader campaign
+or automatic follow-on generation was started.
+
+September 7 diagnostic-record remediation is implemented and deterministically verified.
+The startup result encoder emits explicit null for absent final QC, adapter failures preserve codec
+metadata, and the runner reuses shared artifact/classification interpretation. Token-limit failures
+are distinguished from QC rejections. The existing device/CLI replay paths now support complete
+captured token-limit traces without fabricated QC; portable replay requires receipt-bound text when
+no recorded cadence expectation exists. The original failed run below is unchanged and still lacks
+producer-authenticated codec identity. No phone, synthesis, prompt, cap, model or QC threshold change
+is part of this repair. RF-06 stays open; see the
+[record/replay procedure](reference/audio-qc-engineering.md#token-limit-diagnostic-records-and-replay).
+
+Verification: 28 focused Python tests and 38 focused native tests passed, including the actual
+Swift record encoder consumed by the Python host validator. The coherent-tree `scripts/dev.sh
+checkpoint` passed: 1,552 Python tests, 587 core tests, 19 transport tests, and 109 runtime tests
+(two optional AudioSeal fixture tests skipped; no failures), generic iOS app/logic compilation,
+and the macOS app build. The separate CLI build and binary-version contract also passed.
+Native artifacts: `mac-test-20260907-112538`; CLI log: `diagnostic-record-cli-build.log` under the
+governed macOS test artifacts. Original take/result/codec hashes were rechecked unchanged.
+The separately authorized corrected-source capture/replay is now recorded above. Do not
+retry the historical row or claim product acceptance from these deterministic tests.
+
+September 7 physical-phone RF-06 follow-up: exactly one separately authorized cold take reproduced
+the original long-form cutoff at 2,048 code frames without EOS. Original text/instruction/seed,
+English routing and tokenizer receipts match; thermal state stayed nominal, memory pressure was
+healthy, retry attempt was zero and the system crash delta was empty. Thus the original serious
+thermal state and long-form UI are not necessary conditions for this symptom. This is not a fix.
+Run `ios-startup-reliability-20260907-145015-63ba20fb` retains a 2,048-frame/16-group codec binary
+with zero reported drops, but the runner failed schema validation: absent final QC is omitted by
+Swift while the host requires the key. The streaming failure path also loses the already-persisted
+codec metadata from telemetry, leaving the take's artifact list empty; authenticated replay remains
+blocked. Do not invent QC, rewrite this failure as PASS, or silently regenerate it.
+The exact diagnostic process was terminated. Guarded device-evidence cleanup did not run after
+validation failure; retain that evidence. No broader campaign or further generation was started.
+Source fingerprints before/after match. The original September 6 experiment/resource stop remains
+unchanged; the new registration and assessment are under the existing long-form recovery bundle's
+`iphone-followup-20260907/`. The evidence-path corrections and regression fixtures are now
+verified above; the historical binary still lacks producer binding. RF-06 remains open.
+
+September 7 RF-06 follow-up: corrected an evidence-classification defect in the shared native
+language-quality adapter and VLR host composer. Incomplete/inconsistent/invalid recognition is now
+unavailable evidence, not a measured speech rejection; required acceptance still fails closed.
+Native tests reproduced 22 failing assertions before repair; Python reproduced six incorrect-owner
+subcases. Verifier records and edit metrics stay v3/unchanged; only new gate composition identifies
+the corrected interpretation as algorithm 4. Original evidence is never rewritten.
+The 14 retained French clips were rechecked without new recognition/generation: eight measured
+rejections, six inconclusive, zero promoted; all 30 inspected original files retain their hashes.
+See [the bounded follow-up](reference/audio-qc-engineering.md#retained-audio-failure-follow-up--september-7).
+At that checkpoint the phone was unavailable. RF-06 was still blocked on the matched original-seed
+iPhone long-form comparison and unresolved severe French/Chinese output plus cadence/recognition evidence. No
+production audio change, expanded decoder study, campaign resume or release authorization occurred.
+Focused verification passes: 55 native verifier/quality-registry tests and 40 Python VLR/language
+tests. The before-fix native failure and after-fix PASS logs are retained with the reinspection.
+
+September 7 follow-up: the 45-clip numerical panel is now the cascade's default, digest-pinned
+descriptive reference base. Same-language English neutral deltas, unpaired German context and QC
+disagreement specimens remain separate; full-cohort and explicitly flagged-exclusion sensitivity
+views preserve every warning. No audio/model download is needed to consume the tracked features.
+All 45 local original hashes reverified. The actual existing cascade processed all 64 historical
+August 23 takes: ten matched reference contexts, 54 explicit missing-coverage rows, and **64 unchanged
+inconclusive quality outcomes**, not acceptance passes. A separate cache-hit replay took 0.42 s,
+45.22 MB sampled RSS, 512 hits/zero misses, zero swap growth and clean exit/recovery. The first
+85.74 s extraction run remains retained with unqualified RSS/swap capture inside the sandbox.
+Evidence is `build/artifacts/diagnostics/acoustic-reference-adoption-20260907/`; procedures and
+limitations are in [the default-reference section](reference/audio-qc-engineering.md#default-acoustic-reference-base).
+Production QC/prompt/model/seed behavior, speech-defect holdout approval and release requirements
+are unchanged. AV-07 remains open for actual quality calibration; no new work authority was added.
+The 22 focused reference/cascade tests pass, including integrity, warning retention, missing coverage,
+source drift, genuine 24→16 kHz extraction, cache reuse and unchanged quality routes. The initial
+checkpoint caught a missing AGENTS surface registration; the exact manifest/helper pointers were added.
+
+September 7: the separately authorized licensed acoustic-reference pilot is complete. Thirty
+English CREMA-D clips (six actors, audio-only votes) and 15 German Thorsten clips were analyzed
+through existing local global/temporal/phonation, native PCM QC and common-bandwidth comparison.
+Native results: 39 pass, three warn, three fail; five separate advisory rushed flags. Every original
+and failure is retained. Thorsten's actual emotional subset has no Neutral rows and all selected
+clips have source cut-off warnings, so it cannot establish clean paired Whisper/Surprised bounds.
+Sixteen retained English Vocello takes were compared without new generation; they remain historical,
+not current-prompt acceptance. Four serial analysis processes stayed below 48 MB sampled RSS with
+clean exit/recovery and zero swap growth. Forty-six focused tests pass. Methods, license pins,
+acoustic findings, limitations and the untracked bundle are in
+[Audio QC engineering](reference/audio-qc-engineering.md#licensed-acoustic-reference-pilot--september-7).
+No new profile, threshold, model, cloud judge, listener requirement or phone work was introduced.
+This provides development reference points, not AV-07 quality calibration or RF-06 closure.
+
+The September 7 phone diagnostics above are finished; no further device campaign is scheduled.
+No acceptance campaign is currently frozen.
 The approved priority is iOS 3.0, retaining all modes, long-form and all 201 campaign takes.
 Mac/CLI-only qualification and broad evaluator/prompt research remain off that critical path.
 

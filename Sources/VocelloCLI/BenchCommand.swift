@@ -1617,6 +1617,8 @@ enum BenchCommand {
                          --output-dir <new-directory>: internal diagnostics only;
                          replay collected CustomVoice Speed codes without synthesis
                          or publication. Requires QWENVOICE_DEBUG=1 and exact model identity.
+                         For a token-limit take without final QC, also provide
+                         --script-file <file> matching the original model-facing text receipt.
           --quiet|--verbose   suppress / expand stderr progress notes
         """)
     }

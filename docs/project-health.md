@@ -4,11 +4,11 @@
 > execute models, devices, UI tests, signing, or network checks.
 
 - Current source identity and dirty state: local JSON report only (kept out of the tracked snapshot to avoid self-referential drift)
-- Swift tests: 751 cases in 100 files
-- Python tests: 1660 cases in 125 files
+- Swift tests: 763 cases in 101 files
+- Python tests: 1677 cases in 126 files
 - Required-step assurance: 124 steps across 24 workflows, all covered by forced-failure fixtures
 - Unsafe-concurrency annotations: 48 (48 registered with owner and invariant; contract complete)
-- Evidence routing: 938/938 critical paths explicit; 0 use repository-other fallback
+- Evidence routing: 943/943 critical paths explicit; 0 use repository-other fallback
 
 ## Hardware evidence by domain selector
 
@@ -26,7 +26,7 @@
 | Domain | Owner | Production files | Direct test files / cases | Hardware evidence |
 | --- | --- | ---: | ---: | --- |
 | generation-terminal | backend | 4 | 2 / 16 | macos-ui-generation: fresh, ios-ui-generation: stale |
-| clone-conditioning | backend | 33 | 2 / 32 | macos-ui-generation: fresh, ios-ui-generation: stale |
+| clone-conditioning | backend | 33 | 2 / 32 | macos-ui-generation: stale, ios-ui-generation: stale |
 | event-delivery | backend | 3 | 2 / 10 | macos-ui-generation: stale, ios-ui-generation: stale |
 | memory-policy | backend-platform | 6 | 8 / 65 | macos-memory-qualification: stale, ios-memory-qualification: stale |
 | model-delivery | backend-platform | 17 | 9 / 83 | external promotion: macos-model-download-lifecycle, ios-model-download-lifecycle |

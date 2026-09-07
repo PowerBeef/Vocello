@@ -12,7 +12,10 @@ import subprocess
 import sys
 from typing import Any
 
-from delivery_analysis_cache import DeliveryAnalysisCache, atomic_json, digest, file_sha256, configured_resampler
+from delivery_analysis_cache import (
+    DeliveryAnalysisCache, atomic_json, digest, file_sha256, select_resampler,
+    SUPPORTED_RESAMPLERS, canonicalization_identity,
+)
 from delivery_compact_model_adapter import run_compact_adapter
 
 
@@ -100,6 +103,7 @@ def _summary(payload: dict[str, Any]) -> dict[str, Any]:
 def qualify(
     *, config_path: Path, audio_paths: list[Path], output_root: Path,
     hardware_attestation: dict[str, Any] | None = None,
+    resampler_version: str | None = None,
 ) -> dict[str, Any]:
     hardware = hardware_attestation or canonical_hardware_attestation()
     if (
@@ -110,12 +114,13 @@ def qualify(
     ):
         raise QualificationError("hardware attestation is incomplete")
     config = _read(config_path)
+    resampler = select_resampler(resampler_version, config)
     if len(audio_paths) != 2:
         raise QualificationError("qualification requires exactly two audio probes")
     audio_digests = [file_sha256(path) for path in audio_paths]
     if len(set(audio_digests)) != 2:
         raise QualificationError("qualification audio probes must be byte-distinct")
-    cache = DeliveryAnalysisCache(output_root / "analysis-cache", resampler_version=configured_resampler(config))
+    cache = DeliveryAnalysisCache(output_root / "analysis-cache", resampler_version=resampler)
     runs = []
     for index, (audio, audio_sha) in enumerate(zip(audio_paths, audio_digests), start=1):
         payload, cache_hit = run_compact_adapter(
@@ -154,6 +159,7 @@ def qualify(
             )
         },
         "configSHA256": file_sha256(config_path),
+        "canonicalizationIdentity": canonicalization_identity(resampler),
         "runs": runs,
         "serialRunCount": len(runs),
         "qualificationFailures": qualification_failures,
@@ -169,11 +175,13 @@ def main() -> int:
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--audio", type=Path, action="append", required=True)
     parser.add_argument("--output-root", type=Path, required=True)
+    parser.add_argument("--resampler", choices=SUPPORTED_RESAMPLERS)
     args = parser.parse_args()
     try:
         report = qualify(
             config_path=args.config, audio_paths=args.audio,
             output_root=args.output_root,
+            resampler_version=args.resampler,
         )
         atomic_json(args.output_root / "qualification.json", report)
         print(json.dumps({

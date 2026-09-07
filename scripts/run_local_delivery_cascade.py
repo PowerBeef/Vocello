@@ -27,10 +27,9 @@ from delivery_analysis_cache import (
     NO_MODEL_DIGEST,
     digest,
     file_sha256,
-    configured_resampler,
+    select_resampler,
     canonicalization_identity,
-    RESAMPLER_VERSION,
-    FIR_VERSION,
+    SUPPORTED_RESAMPLERS,
 )
 from delivery_compact_model_adapter import run_compact_adapter
 from delivery_evaluator import atomic_json
@@ -333,6 +332,7 @@ def run_cascade(
     evaluator_model: dict[str, Any] | None = None,
     compact_supervisor_options: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    select_resampler(cache.resampler_version, compact_config)
     rows = _validate_manifest(manifest)
     output_rows = []
     cache_hits = 0
@@ -482,6 +482,7 @@ def run_cascade(
         "promotionAuthority": False,
         "inputManifestDigest": manifest["manifestDigest"],
         "composerSHA256": file_sha256(CASCADE_SOURCE),
+        "canonicalizationIdentity": canonicalization_identity(cache.resampler_version),
         "cache": {"hits": cache_hits, "misses": cache_misses},
         "rowCount": len(output_rows),
         "rows": output_rows,
@@ -498,14 +499,12 @@ def main() -> int:
     parser.add_argument("--lock-root", type=Path, default=DEFAULT_CACHE_ROOT)
     parser.add_argument("--compact-adapter-config", type=Path)
     parser.add_argument("--evaluator-model", type=Path)
-    parser.add_argument("--resampler", choices=(RESAMPLER_VERSION, FIR_VERSION))
+    parser.add_argument("--resampler", choices=SUPPORTED_RESAMPLERS)
     parser.add_argument("--out", required=True, type=Path)
     args = parser.parse_args()
     try:
         compact = _read(args.compact_adapter_config) if args.compact_adapter_config else None
-        resampler = args.resampler or (configured_resampler(compact) if compact else RESAMPLER_VERSION)
-        if compact and resampler != configured_resampler(compact):
-            raise CascadeError("selected resampler differs from compact model configuration")
+        resampler = select_resampler(args.resampler, compact)
         result = run_cascade(
             manifest=build_cascade_manifest(plan_path=args.plan, run_dir=args.run_dir),
             cache=DeliveryAnalysisCache(args.cache_root, resampler_version=resampler), lock_root=args.lock_root,

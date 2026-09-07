@@ -12,7 +12,10 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from audio_resampling import RationalFIR, RESAMPLER_VERSION, INPUT_BLOCK_FRAMES
-from delivery_analysis_cache import DeliveryAnalysisCache, AnalysisCacheError, configured_resampler, canonicalization_identity
+from delivery_analysis_cache import (
+    DeliveryAnalysisCache, AnalysisCacheError, configured_resampler, canonicalization_identity,
+    LEGACY_RESAMPLER_VERSION, select_resampler,
+)
 
 
 def resample(x, rate, block=997):
@@ -21,6 +24,27 @@ def resample(x, rate, block=997):
 
 
 class ResamplingTests(unittest.TestCase):
+    def test_default_cache_preserves_endpoint_and_rejects_alias_energy(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            cache = DeliveryAnalysisCache(root / 'cache')
+            self.assertEqual(cache.resampler_version, RESAMPLER_VERSION)
+            path = root / 'input.wav'
+            with wave.open(str(path), 'wb') as wav:
+                wav.setparams((1, 2, 16000, 0, 'NONE', 'not compressed'))
+                wav.writeframes(np.array([100, 200, 300], dtype='<i2').tobytes())
+            canonical = cache.canonicalize(path)
+            self.assertEqual(canonical.sample_count, 3)
+            np.testing.assert_array_equal(
+                np.frombuffer(canonical.derivative_path.read_bytes(), dtype='<i2'), [100, 200, 300])
+            samples = np.rint(10000 * np.sin(2*np.pi*10000*np.arange(24000)/24000)).astype('<i2')
+            with wave.open(str(path), 'wb') as wav:
+                wav.setparams((1, 2, 24000, 0, 'NONE', 'not compressed'))
+                wav.writeframes(samples.tobytes())
+            canonical = cache.canonicalize(path)
+            actual = np.frombuffer(canonical.derivative_path.read_bytes(), dtype='<i2')[100:-100].astype(float)
+            self.assertLess(float(np.sqrt(np.mean(actual**2))), 30)
+
     def test_frozen_scipy_reference_and_block_invariance(self):
         fixture = json.loads(Path(__file__).with_name('fixtures').joinpath('audio_resampling_v2.json').read_text())
         x = np.array(fixture['input'])
@@ -77,7 +101,8 @@ class ResamplingTests(unittest.TestCase):
             with wave.open(str(path), 'wb') as wav:
                 wav.setnchannels(2); wav.setsampwidth(2); wav.setframerate(24000)
                 wav.writeframes(np.tile(np.array([1000, 3000], dtype='<i2'), 1001).tobytes())
-            old = DeliveryAnalysisCache(root/'cache').canonicalize(path)
+            legacy_cache = DeliveryAnalysisCache(root/'cache', resampler_version=LEGACY_RESAMPLER_VERSION)
+            old = legacy_cache.canonicalize(path)
             cache = DeliveryAnalysisCache(root/'cache', resampler_version=RESAMPLER_VERSION)
             new = cache.canonicalize(path)
             self.assertNotEqual(old.derivative_path, new.derivative_path)
@@ -89,7 +114,21 @@ class ResamplingTests(unittest.TestCase):
             new.derivative_path.write_bytes(b'corrupt')
             with self.assertRaises(AnalysisCacheError):
                 cache.canonicalize(path)
-            self.assertEqual(old, DeliveryAnalysisCache(root/'cache').canonicalize(path))
+            self.assertEqual(old, legacy_cache.canonicalize(path))
+
+    def test_legacy_requires_explicit_selection_and_identity_is_not_inferred(self):
+        legacy = {'preprocessingConfig': {}}
+        self.assertEqual(configured_resampler(legacy), LEGACY_RESAMPLER_VERSION)
+        self.assertEqual(select_resampler(), RESAMPLER_VERSION)
+        with self.assertRaisesRegex(AnalysisCacheError, 'resampler'):
+            select_resampler(config=legacy)
+        self.assertEqual(select_resampler(LEGACY_RESAMPLER_VERSION, legacy), LEGACY_RESAMPLER_VERSION)
+        for identity in (None, {}, {'resamplerVersion': 'unknown'}):
+            with self.subTest(identity=identity), self.assertRaises(AnalysisCacheError):
+                configured_resampler({'preprocessingConfig': {'canonicalizationIdentity': identity}})
+        for version in ('unknown', '', False):
+            with self.assertRaises(AnalysisCacheError):
+                select_resampler(version)
 
     def test_model_preprocessing_identity_drift(self):
         identity = canonicalization_identity(RESAMPLER_VERSION)

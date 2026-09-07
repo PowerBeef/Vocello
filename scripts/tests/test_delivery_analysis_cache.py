@@ -175,6 +175,8 @@ class DeliveryAnalysisCacheTests(unittest.TestCase):
                     self.cache.get_or_compute(identity, lambda: self.fail("must not recompute corruption"))
 
     def test_streamed_derivatives_preserve_legacy_bytes_across_blocks(self) -> None:
+        from delivery_analysis_cache import LEGACY_RESAMPLER_VERSION
+        legacy_cache = DeliveryAnalysisCache(self.root / "legacy", resampler_version=LEGACY_RESAMPLER_VERSION)
         expected = {
             (16000, 1): (70006, "03ef64d5ead49477b80bd77f6e8d6dbff533d7544da1b8b3ddd895114473e08b"),
             (16000, 2): (70006, "2484878667528f9ed259c5a6077b86c4f1bb8375cfbfc9972c3e794a25cd5f43"),
@@ -191,7 +193,7 @@ class DeliveryAnalysisCacheTests(unittest.TestCase):
                 with wave.open(str(self.wav), "wb") as output:
                     output.setparams((channels, 2, rate, 0, "NONE", "not compressed"))
                     output.writeframes(samples.tobytes())
-                result = self.cache.canonicalize(self.wav)
+                result = legacy_cache.canonicalize(self.wav)
                 self.assertEqual((result.sample_count, result.canonical_derivative_sha256), (count, sha))
 
     def test_canonical_write_interruption_and_source_change_do_not_publish(self) -> None:

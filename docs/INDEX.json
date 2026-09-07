@@ -300,7 +300,7 @@
       "path": "docs/reference/audio-qc-engineering.md",
       "status": "active",
       "owner": "backend-mlx",
-      "summary": "Source-grounded Audio QC architecture, corrected infrastructure defects, M2 resource measurements, accuracy limitations and compatibility-preserving next steps.",
+      "summary": "Source-grounded Audio QC architecture, corrected default preprocessing, M2 resource measurements, accuracy limitations and explicit historical replay boundaries.",
       "sourceOfTruth": [
         "Sources/QwenVoiceCore/GenerationOutputAdapter.swift",
         "Sources/QwenVoiceCore/GenerationQualityComposition.swift",

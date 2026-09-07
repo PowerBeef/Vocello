@@ -396,9 +396,12 @@ corruption or drift fails closed and a cache hit launches no model. Reports cont
 measurements, never local paths or audio. Always-on acoustics can reject a broken row, but absent a
 qualified compact adapter and calibrated tiny head the honest result is `abstained`.
 
-Historical/default canonicalization stays `linear-rational-v1`. The explicit
-`--resampler polyphase-kaiser5-v2` option adds anti-aliased bounded FIR preprocessing;
-new compact configs bind its version and implementation digests, and mismatches refuse launch.
+New analysis defaults to anti-aliased bounded `polyphase-kaiser5-v2` FIR preprocessing.
+Prepared compact configs bind its version and implementation digests; stale or mismatched configs
+refuse execution. Historical `linear-rational-v1` replay requires explicit `--resampler` selection;
+providing an old config never silently chooses it or upgrades its pins. Preserve the old config,
+cache and reports, and prepare a separate current config. Cascade and qualification reports expose
+the actual canonicalization identity. This corrects preprocessing, not a perceptual quality claim.
 The optional `analyze_prosody.py --experimental-phonation` block does not alter v3 measurements
 or profiles. Legacy delivery callers now label their bounded projection as delivery analysis v2.
 See [Audio QC engineering](audio-qc-engineering.md#follow-up-resource-evidence-and-remaining-boundaries)

@@ -2,7 +2,7 @@
 status: active
 owner: backend-mlx
 reviewed: 2026-09-06
-summary: Source-grounded Audio QC architecture, corrected infrastructure defects, M2 resource measurements, accuracy limitations and compatibility-preserving next steps.
+summary: Source-grounded Audio QC architecture, corrected default preprocessing, M2 resource measurements, accuracy limitations and explicit historical replay boundaries.
 sourceOfTruth:
   - Sources/QwenVoiceCore/GenerationOutputAdapter.swift
   - Sources/QwenVoiceCore/GenerationQualityComposition.swift
@@ -101,7 +101,7 @@ after each probe. No personal audio or model was read, generated, downloaded or 
 
 ## Accuracy findings: not solved by structural cleanup
 
-### Resampling requires an explicit versioned migration
+### Corrected resampling is now the default
 
 `linear-rational-v1` does not low-pass before reducing 24 kHz to 16 kHz. A synthetic 10 kHz
 tone became a dominant **6 kHz alias**, with 5,164.7 PCM RMS; the installed SciPy polyphase
@@ -113,15 +113,25 @@ Proper downsampling includes a low-pass stage. SciPy documents the FIR/polyphase
 boundary behavior. Use that as a tested reference for a bounded implementation, not independent
 per-block resampling with reset filters. [SciPy resample_poly](https://docs.scipy.org/doc/scipy/reference/generated/scipy.signal.resample_poly.html)
 
-The default still preserves v1 derivative bytes and historical model configurations. The explicit
-`polyphase-kaiser5-v2` option now uses a bounded, delay-compensated rational FIR: Kaiser beta 5,
+New cache, cascade, prepared-config and qualification runs default to `polyphase-kaiser5-v2`,
+a bounded, delay-compensated rational FIR: Kaiser beta 5,
 10 zero crossings, zero extension, Float64 mono mixing/filtering, nearest-even PCM16 quantization,
 and `ceil(inputFrames * 16000 / sourceRate)` output frames. Unlike v1, equal-rate input includes
 its final sample. New derivatives occupy a separate versioned cache namespace. Prepared model
 configs bind the selected resampler and both implementation digests; mismatched configs/cache
 versions fail before model launch. The v2 derivative metadata also binds the implementation and
-rejects drift instead of silently reusing old bytes. Missing config identity means historical v1,
-never inferred v2.
+rejects drift instead of silently reusing old bytes. Missing config identity decodes as historical
+v1; null/malformed identities are rejected. An old config never silently selects the execution
+method or gets upgraded. Either prepare a new source-bound config for current analysis or explicitly
+select `--resampler linear-rational-v1` to replay historical measurements. Config/cache mismatch
+fails before extraction or model launch. Existing cache namespaces and original reports are preserved.
+
+The linear implementation is retained solely for explicit legacy config/cache consumers, not as a
+quality reference or normal analysis path. Retire its execution path once active retained-config
+consumers have migrated and remaining historical replay is served by the archived source; reading
+original reports does not require keeping the old algorithm in current execution. No arbitrary date
+or automatic cache deletion is implied. New calibration must bind the current preprocessing identity;
+old model/score qualification is not silently transferred to it.
 
 The frozen SciPy **1.18.0** reference fixture needs no SciPy installation in CI. Impulses/edges,
 tones, chirps, stereo, odd lengths, single frames, block seams, source truncation, interrupted
@@ -129,6 +139,12 @@ publication and corruption have deterministic coverage. An additional installed-
 at 8/16/22.05/24/44.1/48/96/192 kHz matched Float64 output within `2.7e-15`.
 The 24→16 kHz 10 kHz alias probe is suppressed below 0.003 RMS while the 1 kHz passband remains
 within 0.003 RMS of its expected value. This qualifies preprocessing mathematics, not emotion.
+The default-selection and silent-legacy-selection regressions both failed before this migration.
+The integration fixture now passes a production-prepared config through the real cache, compact
+adapter and cascade, inspecting the exact model-input WAV and its final sample. Only the external
+model process is a fixture; cache reuse must perform no launch. Explicit legacy digests, invalid
+identity, truncated PCM, source drift and interrupted writes remain covered. Invalid FIR input now
+returns the cache's typed error and leaves no accepted derivative or metadata.
 
 ### Harmonicity and emotion claims need recalibration
 
@@ -220,6 +236,22 @@ swap deltas and post-exit recovery. This is CPU/RSS short-clip bake-off qualific
 pressure sampling, physical-footprint qualification, long-form neural memory bounds, calibrated
 human agreement, or adoption. No new weights, package versions or production assets were acquired.
 
+After making FIR the default, the same two public preview inputs were requalified through the
+normal no-`--resampler` preparation/qualification commands, with newly source-bound configs. The
+four new cache-cold processes ran serially; their reports explicitly name the actual preprocessing.
+Evidence stays separate in `build/artifacts/diagnostics/audio-qc-current-default-20260906/`:
+
+| Installed analyzer | Two sampled peak RSS values | Two process wall times | Report digest |
+| --- | --- | --- | --- |
+| SenseVoiceSmall Q8 | 277.68 / 272.96 MB | 0.269 / 0.192 s | `a58b480543c6f38b7210a1dc433a1285890e7f467485adca13cff90103d7d5df` |
+| DistilHuBERT | 572.87 / 562.99 MB | 2.834 / 2.172 s | `2138f39fad780c50182ae3c4e08decec74eced05c1b588b70d16f974fe4eecfc` |
+
+Reports are `sensevoice/qualification.json` and `distilhubert/qualification.json`. All four
+envelopes passed with confirmed clean exit and post-exit recovery; SenseVoice swap delta was zero,
+DistilHuBERT's was negative, and before/after pressure warnings were false. Existing swap was
+nonzero. These short, warm-host observations are not a speed benchmark, continuous pressure
+monitor or neural long-form memory bound. No new model/download/generation or promotion occurred.
+
 ### Independent recognition: one additional observation, no waiver
 
 The predeclared `chinese-plan.json` binds the original 18.8-second iPhone WAV and permits one
@@ -252,15 +284,21 @@ requirements. Reused research previews are not an untouched holdout. Existing li
 supplies blinded review; no second listening harness was added. AV-07 and DP-28 stay open until
 independent data and qualification exist. Numerical fixtures cannot provide those labels.
 
-Operator commands (existing defaults remain v1):
+Operator commands (corrected FIR is the default; old configs require explicit historical replay):
 
 ```sh
-python3 scripts/delivery_analysis_cache.py --resampler polyphase-kaiser5-v2 canonicalize <wav>
+python3 scripts/delivery_analysis_cache.py canonicalize <wav>
 python3 scripts/analyze_prosody.py <wav> --experimental-phonation --json
 python3 scripts/prepare_delivery_compact_model_config.py sensevoice-small-q8 \
-  --resampler polyphase-kaiser5-v2 --output <untracked-config.json>
+  --output <new-untracked-config.json>
 python3 scripts/prosody_holdout_validation.py prepare --output <untracked-preparation.json>
 ```
+
+Regenerate local configs after source changes; do not overwrite the retained evidence's configs.
+Cascade and qualification reports include their actual canonicalization method and source digests.
+The optional corrected phonation block still needs independent real-speech calibration before any
+profile consumes it. Making FIR current does not repair the old HNR proxy, calibrate emotion heads,
+adopt a model, change production Fast QC, or close RF-06's product-audio findings.
 
 A clean end state has one native product-QC authority, one bounded blind acoustic engine, one
 versioned derivative cache, the existing serial neural supervisor, and explicit per-dimension

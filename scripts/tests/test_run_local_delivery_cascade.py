@@ -16,7 +16,9 @@ import wave
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from delivery_analysis_cache import DeliveryAnalysisCache, digest  # noqa: E402
+from delivery_analysis_cache import (  # noqa: E402
+    DeliveryAnalysisCache, digest, canonicalization_identity, RESAMPLER_VERSION, LEGACY_RESAMPLER_VERSION,
+)
 from run_local_delivery_cascade import (  # noqa: E402
     CascadeError,
     GLOBAL_ANALYZER,
@@ -90,6 +92,7 @@ class LocalDeliveryCascadeTests(unittest.TestCase):
             manifest=self.manifest, cache=self.cache, lock_root=self.root / "lock",
         )
         self.assertEqual(first["rowCount"], 2)
+        self.assertEqual(first["canonicalizationIdentity"], canonicalization_identity(RESAMPLER_VERSION))
         self.assertEqual(len(first["composerSHA256"]), 64)
         self.assertEqual(
             first["reportDigest"],
@@ -161,7 +164,11 @@ class LocalDeliveryCascadeTests(unittest.TestCase):
                 with mock.patch("run_local_delivery_cascade.run_compact_adapter") as adapter:
                     result = run_cascade(
                         manifest=self._seal(manifest), cache=self.cache,
-                        lock_root=self.root / "lock", compact_config={"adapterID": "unneeded"},
+                        lock_root=self.root / "lock", compact_config={
+                            "adapterID": "unneeded", "preprocessingConfig": {
+                                "canonicalizationIdentity": canonicalization_identity(RESAMPLER_VERSION),
+                            },
+                        },
                     )
                 adapter.assert_not_called()
                 self.assertEqual(result["rows"][0]["route"], "rejected")
@@ -179,6 +186,33 @@ class LocalDeliveryCascadeTests(unittest.TestCase):
             changed = _identity(canonical, layer="temporal-contour", version="1", source=TEMPORAL_ANALYZER)
         self.assertNotEqual(first.key, changed.key)
         self.assertIsNone(self.cache.load(changed))
+
+    def test_mismatched_config_is_rejected_before_any_analysis(self) -> None:
+        with mock.patch.object(self.cache, "canonicalize") as canonicalize:
+            with self.assertRaisesRegex(ValueError, "resampler"):
+                run_cascade(manifest=self.manifest, cache=self.cache,
+                            lock_root=self.root, compact_config={"preprocessingConfig": {}})
+            canonicalize.assert_not_called()
+
+    def test_cli_never_silently_selects_legacy_and_explicit_replay_is_retained(self) -> None:
+        import run_local_delivery_cascade as cascade
+        config_path = self.root / "legacy.json"
+        config_path.write_text(json.dumps({"preprocessingConfig": {}}))
+        base = ["cascade", "--plan", str(self.root / "plan.json"), "--run-dir", str(self.root),
+                "--out", str(self.root / "out.json"), "--compact-adapter-config", str(config_path)]
+        with mock.patch.object(sys, "argv", base), mock.patch.object(
+            cascade, "build_cascade_manifest", return_value=self.manifest,
+        ) as manifest, mock.patch.object(cascade, "run_cascade", return_value={"rowCount": 2}) as run:
+            self.assertEqual(cascade.main(), 1)
+            manifest.assert_not_called()
+            run.assert_not_called()
+            with mock.patch.object(sys, "argv", base + ["--resampler", LEGACY_RESAMPLER_VERSION]):
+                self.assertEqual(cascade.main(), 0)
+            self.assertEqual(run.call_args.kwargs["cache"].resampler_version, LEGACY_RESAMPLER_VERSION)
+            run.reset_mock()
+            with mock.patch.object(sys, "argv", base[:-2]):
+                self.assertEqual(cascade.main(), 0)
+            self.assertEqual(run.call_args.kwargs["cache"].resampler_version, RESAMPLER_VERSION)
 
     def test_operator_manifest_is_derived_from_one_sealed_runner_identity(self) -> None:
         run_dir = self.root / "run"

@@ -11,7 +11,8 @@ import sys
 from typing import Any
 
 from delivery_analysis_cache import (
-    atomic_json, digest, file_sha256, canonicalization_identity, RESAMPLER_VERSION, FIR_VERSION,
+    atomic_json, digest, file_sha256, canonicalization_identity, RESAMPLER_VERSION,
+    SUPPORTED_RESAMPLERS, select_resampler, AnalysisCacheError,
 )
 
 
@@ -130,6 +131,10 @@ def _runtime_versions(python: Path) -> dict[str, str]:
 
 def prepare(adapter_id: str, *, contract_path: Path, model_root: Path,
             resampler_version: str = RESAMPLER_VERSION) -> dict[str, Any]:
+    try:
+        resampler_version = select_resampler(resampler_version)
+    except AnalysisCacheError as error:
+        raise PreparationError(str(error)) from None
     contract = validate_candidate_contract(_read(contract_path))
     candidates = contract.get("candidates")
     if not isinstance(candidates, dict):  # validate_candidate_contract owns this invariant
@@ -235,7 +240,7 @@ def main() -> int:
     parser.add_argument("--model-root", type=Path, default=DEFAULT_MODEL_ROOT)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--validate-only", action="store_true")
-    parser.add_argument("--resampler", choices=(RESAMPLER_VERSION, FIR_VERSION), default=RESAMPLER_VERSION)
+    parser.add_argument("--resampler", choices=SUPPORTED_RESAMPLERS, default=RESAMPLER_VERSION)
     args = parser.parse_args()
     try:
         if args.validate_only:

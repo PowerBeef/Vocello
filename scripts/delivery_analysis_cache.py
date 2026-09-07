@@ -27,7 +27,9 @@ SCHEMA_VERSION = 1
 CANONICAL_SAMPLE_RATE = 16_000
 CANONICAL_CHANNELS = 1
 CANONICAL_FORMAT = "pcm-s16le"
-RESAMPLER_VERSION = "linear-rational-v1"
+LEGACY_RESAMPLER_VERSION = "linear-rational-v1"
+RESAMPLER_VERSION = FIR_VERSION
+SUPPORTED_RESAMPLERS = (RESAMPLER_VERSION, LEGACY_RESAMPLER_VERSION)
 READ_FRAMES = 65_536
 NO_MODEL_DIGEST = hashlib.sha256(b"vocello:no-external-model").hexdigest()
 REPO = Path(__file__).resolve().parents[1]
@@ -59,7 +61,7 @@ def file_sha256(path: Path) -> str:
 
 
 def canonicalization_identity(version: str) -> dict[str, str]:
-    if version not in (RESAMPLER_VERSION, FIR_VERSION):
+    if version not in SUPPORTED_RESAMPLERS:
         raise AnalysisCacheError("unsupported resampler version")
     return {
         "resamplerVersion": version,
@@ -73,12 +75,29 @@ def configured_resampler(config: dict[str, Any]) -> str:
     preprocessing = config.get("preprocessingConfig", {})
     if not isinstance(preprocessing, dict):
         raise AnalysisCacheError("canonicalization preprocessing must be an object")
-    identity = preprocessing.get("canonicalizationIdentity")
-    if identity is None:
-        return RESAMPLER_VERSION
+    if "canonicalizationIdentity" not in preprocessing:
+        return LEGACY_RESAMPLER_VERSION
+    identity = preprocessing["canonicalizationIdentity"]
     if not isinstance(identity, dict) or identity != canonicalization_identity(identity.get("resamplerVersion")):
         raise AnalysisCacheError("canonicalization identity drifted")
     return identity["resamplerVersion"]
+
+
+def select_resampler(requested: str | None = None, config: dict[str, Any] | None = None) -> str:
+    """New analysis uses FIR; historical replay requires explicit selection.
+
+    Never infer the execution method from a retained config or upgrade its pins.
+    Missing identity still decodes as legacy, but cannot select legacy by default.
+    """
+    selected = RESAMPLER_VERSION if requested is None else requested
+    if selected not in SUPPORTED_RESAMPLERS:
+        raise AnalysisCacheError("unsupported resampler version")
+    if config is not None and selected != configured_resampler(config):
+        raise AnalysisCacheError(
+            "selected resampler differs from compact model configuration; prepare a new "
+            "config for current analysis, or explicitly select the pinned resampler for replay"
+        )
+    return selected
 
 
 def _fsync_directory(path: Path) -> None:
@@ -138,7 +157,7 @@ class CanonicalAudio:
     sample_count: int
     duration_seconds: float
     derivative_path: Path
-    resampler_version: str = RESAMPLER_VERSION
+    resampler_version: str
 
     def report(self) -> dict[str, Any]:
         return {
@@ -264,19 +283,25 @@ def _canonical_pcm_blocks(path: Path) -> Iterator[bytes]:
 
 
 def _fir_pcm_blocks(path: Path) -> Iterator[bytes]:
-    with wave.open(str(path), "rb") as reader:
-        if reader.getsampwidth() != 2 or not 1 <= reader.getnchannels() <= 8:
-            raise AnalysisCacheError("v2 canonicalization requires PCM16 WAV with 1...8 channels")
-        resampler = RationalFIR(reader.getframerate())
-        source = (_mono_pcm16(raw, reader.getnchannels())
-                  for raw in iter(lambda: reader.readframes(INPUT_BLOCK_FRAMES), b""))
-        for block in resampler.blocks(source, reader.getnframes()):
-            yield np.clip(np.rint(block), -32768, 32767).astype("<i2").tobytes()
+    try:
+        with wave.open(str(path), "rb") as reader:
+            if reader.getsampwidth() != 2 or not 1 <= reader.getnchannels() <= 8:
+                raise AnalysisCacheError("canonicalization requires PCM16 WAV with 1...8 channels")
+            resampler = RationalFIR(reader.getframerate())
+            source = (_mono_pcm16(raw, reader.getnchannels())
+                      for raw in iter(lambda: reader.readframes(INPUT_BLOCK_FRAMES), b""))
+            for block in resampler.blocks(source, reader.getnframes()):
+                yield np.clip(np.rint(block), -32768, 32767).astype("<i2").tobytes()
+    except AnalysisCacheError:
+        raise
+    except (ValueError, wave.Error, EOFError):
+        raise AnalysisCacheError("canonicalization rejected invalid or incomplete PCM WAV") from None
 
 
 def _write_canonical_pcm(path: Path, destination: Path, original_digest: str,
                          resampler_version: str = RESAMPLER_VERSION) -> tuple[str, int]:
     """Hash/write one bounded stream; publish only after complete source validation."""
+    select_resampler(resampler_version)
     destination.parent.mkdir(parents=True, exist_ok=True)
     descriptor, temporary = tempfile.mkstemp(prefix=f".{destination.name}-", dir=destination.parent)
     hasher = hashlib.sha256()
@@ -310,7 +335,7 @@ def _validate_audio_metadata(body: dict[str, Any], original_digest: str,
         "channels": CANONICAL_CHANNELS, "format": CANONICAL_FORMAT,
         "resamplerVersion": resampler_version,
     }
-    if resampler_version != RESAMPLER_VERSION:
+    if resampler_version != LEGACY_RESAMPLER_VERSION:
         expected["canonicalizationIdentity"] = canonicalization_identity(resampler_version)
     if any(type(body.get(key)) is not type(value) or body[key] != value
            for key, value in expected.items()):
@@ -328,17 +353,15 @@ def _validate_audio_metadata(body: dict[str, Any], original_digest: str,
 
 class DeliveryAnalysisCache:
     def __init__(self, root: Path, *, resampler_version: str = RESAMPLER_VERSION) -> None:
-        if resampler_version not in (RESAMPLER_VERSION, FIR_VERSION):
-            raise AnalysisCacheError("unsupported canonical resampler version")
         self.root = root
-        self.resampler_version = resampler_version
+        self.resampler_version = select_resampler(resampler_version)
 
     def canonicalize(self, wav_path: Path) -> CanonicalAudio:
         if not wav_path.is_file():
             raise AnalysisCacheError("source WAV does not exist")
         original_digest = file_sha256(wav_path)
         audio_dir = self.root / "audio" / original_digest[:2]
-        if self.resampler_version != RESAMPLER_VERSION:
+        if self.resampler_version != LEGACY_RESAMPLER_VERSION:
             audio_dir = self.root / "audio" / self.resampler_version / original_digest[:2]
         pcm_path = audio_dir / f"{original_digest}.pcm"
         metadata_path = audio_dir / f"{original_digest}.json"
@@ -378,7 +401,7 @@ class DeliveryAnalysisCache:
             "byteCount": sample_count * 2,
             "durationSeconds": sample_count / CANONICAL_SAMPLE_RATE,
         }
-        if self.resampler_version != RESAMPLER_VERSION:
+        if self.resampler_version != LEGACY_RESAMPLER_VERSION:
             body["canonicalizationIdentity"] = canonicalization_identity(self.resampler_version)
         atomic_json(metadata_path, {**body, "recordDigest": digest(body)})
         return CanonicalAudio(
@@ -472,7 +495,7 @@ def _assert_report_safe(value: Any, trail: str = "report") -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=DEFAULT_CACHE_ROOT)
-    parser.add_argument("--resampler", choices=(RESAMPLER_VERSION, FIR_VERSION), default=RESAMPLER_VERSION)
+    parser.add_argument("--resampler", choices=SUPPORTED_RESAMPLERS, default=RESAMPLER_VERSION)
     commands = parser.add_subparsers(dest="command", required=True)
     canonical = commands.add_parser("canonicalize")
     canonical.add_argument("wav", type=Path)

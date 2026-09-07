@@ -20,7 +20,10 @@ The approved priority is iOS 3.0, retaining all modes, long-form and all 201 cam
 Mac/CLI-only qualification and broad evaluator/prompt research remain off that critical path.
 
 The separately requested Audio QC review and autonomous follow-up are recorded in
-[Audio QC engineering](reference/audio-qc-engineering.md). Versioned anti-alias preprocessing,
+[Audio QC engineering](reference/audio-qc-engineering.md). Anti-alias preprocessing is now the
+default for new cache/cascade/compact-model qualification; historical linear replay requires explicit
+selection and never silently follows an old config. Source-bound integration tests cover actual
+model-input PCM, cache reuse, config mismatch and legacy compatibility. The
 experimental corrected phonation, bounded legacy projection, model resource requalification and
 blind calibration preparation are implemented. No product-QC threshold, model, prompt, seed or
 release acceptance changed. AV-07/DP-28 retain independent calibration/adoption requirements;
@@ -188,6 +191,34 @@ mandatory audit campaign, status ledger or product change was introduced. No tes
 was retired in this guidance-only change. Existing failures and calibration gaps remain open;
 the phone, release campaign and publication operations remain untouched. Concrete migrations
 belong to existing subsystem items, with release-blocking work first.
+
+## Audio QC current-path migration — September 6
+
+Completed the resampler migration rather than leaving the corrected implementation optional:
+new cache, cascade, config preparation and compact qualification use anti-aliased FIR by default.
+Historical linear processing is an explicit replay path; old configs cannot silently select it,
+change their pins or masquerade as new preprocessing. Existing derivative namespaces and eight
+legacy digest fixtures remain intact. Malformed/truncated FIR inputs now return a typed cache
+failure without accepted metadata. Cascade and qualification reports expose actual method/source
+identity. No product-QC threshold or generation behavior changed.
+
+Two regressions reproduced before the fix. All 47 focused tests pass in 4.17 seconds, including
+the production config → cache → WAV writer → compact adapter → cascade connection. The fixture
+inspects actual model-input bytes and requires zero launches for cached neutral reuse. Only the
+external process is substituted in that deterministic test; separate subprocess tests remain.
+
+Two new cache-cold CPU probes per installed compact model passed via default commands, serially
+on the M2/8 GB host. Highest sampled RSS: SenseVoice 277.68 MB, DistilHuBERT 572.87 MB. Every
+process exited cleanly and recovered memory; no swap growth or before/after pressure warning.
+New source-bound reports/configs are retained separately under
+`build/artifacts/diagnostics/audio-qc-current-default-20260906/`; exact digests and limitations are
+in the engineering reference. Earlier reports are historical, never overwritten or merged.
+
+DP-28 records this current-path implementation; it is not model adoption. AV-07 still owns the
+next independent phonation/profile calibration boundary. Original HNR proxies are not gold
+standards; the corrected candidate requires real-speech comparison and an explicitly migrated
+consumer before its measurements can drive decisions. RF-06, the phone wait and release gates
+remain unchanged. No new schema generation, framework or gate was added for this wiring change.
 
 ## Codex workflow streamlining
 

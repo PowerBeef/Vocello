@@ -15,7 +15,9 @@ import wave
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from delivery_analysis_cache import DeliveryAnalysisCache, digest, file_sha256  # noqa: E402
+from delivery_analysis_cache import (  # noqa: E402
+    DeliveryAnalysisCache, digest, file_sha256, canonicalization_identity, RESAMPLER_VERSION,
+)
 from delivery_compact_model_adapter import (  # noqa: E402
     CompactAdapterError,
     run_compact_adapter,
@@ -32,6 +34,8 @@ class DeliveryCompactModelAdapterTests(unittest.TestCase):
         from delivery_analysis_cache import FIR_VERSION, canonicalization_identity
         from unittest.mock import Mock
         cache = DeliveryAnalysisCache(self.root / 'v2', resampler_version=FIR_VERSION)
+        self.config['preprocessingConfig'].pop('canonicalizationIdentity')
+        self.config['preprocessingConfigDigest'] = digest(self.config['preprocessingConfig'])
         supervisor = Mock(side_effect=AssertionError('must not launch'))
         with self.assertRaisesRegex(ValueError, 'resampler'):
             run_compact_adapter(wav_path=self.audio, config=self.config, cache=cache,
@@ -58,7 +62,10 @@ class DeliveryCompactModelAdapterTests(unittest.TestCase):
             output.writeframes(struct.pack("<h", 100) * 3200)
         self.weights = self.root / "sensevoice-q8.gguf"
         self.weights.write_bytes(b"fixture weights")
-        preprocessing = {"sampleRateHz": 16000, "channels": 1, "normalization": "none"}
+        preprocessing = {
+            "sampleRateHz": 16000, "channels": 1, "normalization": "none",
+            "canonicalizationIdentity": canonicalization_identity(RESAMPLER_VERSION),
+        }
         code = (
             "import json,sys,time; time.sleep(.1); "
             "print(json.dumps({'transcript':'hello','languageTag':'en',"

@@ -7,14 +7,27 @@ import copy
 import json
 from pathlib import Path
 import sys
+import tempfile
 import unittest
+from unittest.mock import patch, Mock
+import wave
+
+import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from prepare_delivery_compact_model_config import (  # noqa: E402
     PreparationError,
     validate_candidate_contract,
+    prepare,
 )
+from delivery_analysis_cache import (  # noqa: E402
+    AnalysisCacheError, DeliveryAnalysisCache, canonicalization_identity, configured_resampler,
+    digest, file_sha256, RESAMPLER_VERSION, LEGACY_RESAMPLER_VERSION,
+)
+from delivery_compact_model_adapter import run_compact_adapter, validate_adapter_config  # noqa: E402
+from delivery_resource_supervisor import SupervisedResult  # noqa: E402
+from run_local_delivery_cascade import run_cascade  # noqa: E402
 
 
 class PrepareDeliveryCompactModelConfigTests(unittest.TestCase):
@@ -43,6 +56,114 @@ class PrepareDeliveryCompactModelConfigTests(unittest.TestCase):
         gate_drift["adoptionRequirements"].remove("untouched-human-holdout-gain")
         with self.assertRaisesRegex(PreparationError, "adoption requirements"):
             validate_candidate_contract(gate_drift)
+
+    def test_prepared_config_cache_adapter_and_cascade_agree_on_actual_model_input(self) -> None:
+        # Only the external model process is a fixture. Exercise the real config
+        # producer, validators, canonical writer, compact adapter and composer.
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            contract = copy.deepcopy(self.contract)
+            candidate = contract["candidates"]["sensevoice-small-q8"]
+            files = (
+                ("sensevoice-q8/" + candidate["weightsFile"], b"fixture q8 weights", candidate, "weightsSHA256"),
+                ("runtime-v0.1.9/" + candidate["runtime"]["archiveFile"], b"fixture archive",
+                 candidate["runtime"], "archiveSHA256"),
+                ("runtime-v0.1.9/extracted/" + candidate["runtime"]["binaryFile"], b"fixture binary",
+                 candidate["runtime"], "binarySHA256"),
+            )
+            for name, content, target, field in files:
+                path = root / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(content)
+                target[field] = file_sha256(path)
+            contract_path = root / "contract.json"
+            contract_path.write_text(json.dumps(contract))
+            config = prepare("sensevoice-small-q8", contract_path=contract_path, model_root=root)
+            self.assertEqual(configured_resampler(config), RESAMPLER_VERSION)
+            self.assertIs(validate_adapter_config(config), config)
+            self.assertEqual(config["preprocessingConfigDigest"], digest(config["preprocessingConfig"]))
+
+            audio = root / "tone.wav"
+            samples = np.rint(8000 * np.sin(2*np.pi*150*np.arange(48001)/24000)).astype('<i2')
+            with wave.open(str(audio), "wb") as wav:
+                wav.setparams((1, 2, 24000, 0, "NONE", "not compressed"))
+                wav.writeframes(samples.tobytes())
+            cache = DeliveryAnalysisCache(root / "cache")
+            derivative = cache.canonicalize(audio)
+            launches = []
+
+            def model_process(command, **_kwargs):
+                # Read the exact WAV passed across the process boundary, not a
+                # recomputed expectation assembled from config fields.
+                wav_path = Path(command[command.index("-a") + 1])
+                with wave.open(str(wav_path), "rb") as reader:
+                    self.assertEqual((reader.getframerate(), reader.getnchannels(), reader.getsampwidth()),
+                                     (16000, 1, 2))
+                    self.assertEqual(reader.getnframes(), 32001)
+                    self.assertEqual(reader.readframes(reader.getnframes()), derivative.derivative_path.read_bytes())
+                self.assertEqual(command[-3:], ["--backend", "cpu", "--keep-tags"])
+                launches.append(wav_path)
+                return SupervisedResult(
+                    report={"qualified": True, "qualificationFailures": []},
+                    stdout=b"<|en|><|NEUTRAL|><|Speech|><|withitn|>fixture", stderr=b"",
+                )
+
+            payload, hit = run_compact_adapter(
+                wav_path=audio, config=config, cache=cache, lock_root=root, supervisor=model_process,
+            )
+            self.assertFalse(hit)
+            self.assertFalse(launches[0].exists())
+            never_launch = Mock(side_effect=AssertionError("cached representation launched a model"))
+            retained, hit = run_compact_adapter(
+                wav_path=audio, config=config, cache=cache, lock_root=root, supervisor=never_launch,
+            )
+            self.assertTrue(hit)
+            self.assertEqual(retained, payload)
+            manifest = {
+                "schemaVersion": 1, "kind": "source-bound-delivery-cascade-input",
+                "generationProcessExited": True, "executionPlanDigest": "1" * 64,
+                "sourceDigests": {"fixtureSHA256": "2" * 64},
+                "rows": [{
+                    "generationID": "fixture-one", "speakerID": "aiden", "scriptID": "fixture",
+                    "scriptTranslationGroup": "fixture", "seed": 1, "outputLanguage": "English",
+                    "preset": "neutral", "instructedWAV": str(audio), "neutralWAV": str(audio),
+                    "instructedSHA256": file_sha256(audio), "neutralSHA256": file_sha256(audio),
+                }],
+            }
+            manifest["manifestDigest"] = digest(manifest)
+            # Bind the real adapter with a no-launch guard. Identical paired
+            # audio must reuse the representation even across candidate arms.
+            def cached_adapter(**kwargs):
+                return run_compact_adapter(**kwargs, supervisor=never_launch)
+
+            with patch("run_local_delivery_cascade.run_compact_adapter", side_effect=cached_adapter):
+                report = run_cascade(manifest=manifest, cache=cache, lock_root=root, compact_config=config)
+            never_launch.assert_not_called()
+            self.assertEqual(len(launches), 1)
+            self.assertEqual(report["canonicalizationIdentity"], canonicalization_identity(RESAMPLER_VERSION))
+            self.assertEqual(report["rows"][0]["route"], "abstained")  # no calibrated heads
+            self.assertNotIn(str(root), json.dumps(report))
+
+            legacy = prepare("sensevoice-small-q8", contract_path=contract_path, model_root=root,
+                             resampler_version=LEGACY_RESAMPLER_VERSION)
+            self.assertEqual(configured_resampler(legacy), LEGACY_RESAMPLER_VERSION)
+            self.assertNotEqual(legacy["preprocessingConfigDigest"], config["preprocessingConfigDigest"])
+            with self.assertRaisesRegex(ValueError, "resampler"):
+                run_compact_adapter(wav_path=audio, config=legacy, cache=cache,
+                                    lock_root=root, supervisor=never_launch)
+            drifted = copy.deepcopy(config)
+            drifted["preprocessingConfig"]["canonicalizationIdentity"]["cacheSourceSHA256"] = "0" * 64
+            drifted["preprocessingConfigDigest"] = digest(drifted["preprocessingConfig"])
+            with self.assertRaises(AnalysisCacheError):
+                run_compact_adapter(wav_path=audio, config=drifted, cache=cache,
+                                    lock_root=root, supervisor=never_launch)
+
+    def test_invalid_resampler_fails_before_asset_inspection(self) -> None:
+        with patch("prepare_delivery_compact_model_config._verified") as verify:
+            with self.assertRaisesRegex(PreparationError, "resampler"):
+                prepare("sensevoice-small-q8", contract_path=Path("absent"),
+                        model_root=Path("absent"), resampler_version="unknown")
+            verify.assert_not_called()
 
 
 if __name__ == "__main__":

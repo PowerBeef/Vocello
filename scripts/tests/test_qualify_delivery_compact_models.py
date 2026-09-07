@@ -14,7 +14,9 @@ import wave
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from delivery_analysis_cache import file_sha256  # noqa: E402
+from delivery_analysis_cache import (  # noqa: E402
+    file_sha256, canonicalization_identity, RESAMPLER_VERSION, LEGACY_RESAMPLER_VERSION,
+)
 from qualify_delivery_compact_models import (  # noqa: E402
     QualificationError,
     canonical_hardware_attestation,
@@ -40,6 +42,7 @@ class QualifyDeliveryCompactModelsTests(unittest.TestCase):
             "preprocessingConfigDigest": "6" * 64,
             "adapterLayerSHA256": "7" * 64,
             "resourceSupervisorSHA256": "8" * 64,
+            "preprocessingConfig": {"canonicalizationIdentity": canonicalization_identity(RESAMPLER_VERSION)},
         }), encoding="utf-8")
         self.audio = [self._wav(f"{index}.wav", index + 1) for index in range(2)]
 
@@ -79,6 +82,27 @@ class QualifyDeliveryCompactModelsTests(unittest.TestCase):
         self.assertNotIn("private fixture transcript", serialized)
         self.assertNotIn(str(self.root), serialized)
         self.assertEqual(report["serialRunCount"], 2)
+        self.assertEqual(report["canonicalizationIdentity"], canonicalization_identity(RESAMPLER_VERSION))
+
+    def test_legacy_config_cannot_silently_select_historical_preprocessing(self) -> None:
+        config = json.loads(self.config.read_text())
+        config.pop("preprocessingConfig")
+        self.config.write_text(json.dumps(config))
+        with patch("qualify_delivery_compact_models.run_compact_adapter") as adapter:
+            adapter.side_effect = [(self._payload(), False), (self._payload(), False)]
+            with self.assertRaisesRegex(ValueError, "resampler"):
+                qualify(
+                    config_path=self.config, audio_paths=self.audio,
+                    output_root=self.root / "output", hardware_attestation=self.HARDWARE,
+                )
+            adapter.assert_not_called()
+            report = qualify(
+                config_path=self.config, audio_paths=self.audio,
+                output_root=self.root / "replay", hardware_attestation=self.HARDWARE,
+                resampler_version=LEGACY_RESAMPLER_VERSION,
+            )
+            self.assertEqual(report["canonicalizationIdentity"]["resamplerVersion"], LEGACY_RESAMPLER_VERSION)
+            self.assertEqual(adapter.call_count, 2)
 
     def test_cache_hit_and_duplicate_audio_fail_closed(self) -> None:
         with self.assertRaisesRegex(QualificationError, "byte-distinct"):

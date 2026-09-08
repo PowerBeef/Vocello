@@ -721,7 +721,7 @@ final class IOSLongFormProjectRunner {
             let saved = try await DatabaseService.shared.acceptLongFormProject(candidate)
             candidateJoinedURL = nil
             NotificationCenter.default.post(name: .generationSaved, object: nil)
-            IOSSavedOutputsDestination.exportIfConfigured(internalAudioPath: joined.outputURL.path)
+            IOSSavedOutputsDestination.exportIfConfigured(internalAudioPath: joined.outputURL.path, generationMode: saved.mode)
             publish(active: nil, message: "Done")
             return .completed(
                 segments: segments,
@@ -919,7 +919,7 @@ final class IOSLongFormProjectRunner {
             let saved = try await DatabaseService.shared.acceptLongFormProject(candidate)
             candidateAudioURLs.removeAll()
             NotificationCenter.default.post(name: .generationSaved, object: nil)
-            IOSSavedOutputsDestination.exportIfConfigured(internalAudioPath: joined.outputURL.path)
+            IOSSavedOutputsDestination.exportIfConfigured(internalAudioPath: joined.outputURL.path, generationMode: saved.mode)
             publish(active: nil, message: "Done")
             return (
                 .completed(

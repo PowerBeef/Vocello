@@ -112,6 +112,7 @@ struct QVoiceiOSApp: App {
                 }
             }
             .preferredColorScheme(.dark)
+            .task { await IOSExportCommerce.shared.refresh() }
         }
         .onChange(of: scenePhase) { _, newValue in
             handleScenePhaseChange(newValue)
@@ -151,6 +152,7 @@ struct QVoiceiOSApp: App {
     private func handleScenePhaseChange(_ scenePhase: ScenePhase) {
         switch scenePhase {
         case .active:
+            Task { await IOSExportCommerce.shared.refresh() }
             setPlaybackSessionActive(true)
             if let engine = deps.engine {
                 Task {

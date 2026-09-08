@@ -5,6 +5,9 @@ import SwiftUI
 struct GenerationHistoryEnqueueWarning: View {
     private let state = GenerationHistoryRecovery.unqueued
     @State private var isRetrying = false
+    #if os(iOS)
+    @State private var exportGate = IOSExportGate()
+    #endif
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
@@ -37,12 +40,26 @@ struct GenerationHistoryEnqueueWarning: View {
                     .disabled(isRetrying)
                     .frame(minHeight: 44)
                     .accessibilityIdentifier("historyUnqueued_retry")
+                    #if os(iOS)
+                    Button {
+                        let urls = state.availableAudioURLs
+                        // Only actual enqueue failures enter this recovery surface.
+                        // Never trap retained user audio behind a purchase on storage failure.
+                        exportGate.share(urls: urls, provenance: urls.map { _ in .recoveryRecord })
+                    } label: {
+                        Label(VocelloPresentationText.exportAudio, systemImage: "square.and.arrow.up")
+                    }
+                    .disabled(state.availableAudioURLs.isEmpty)
+                    .frame(minHeight: 44)
+                    .accessibilityIdentifier("historyUnqueued_export")
+                    #else
                     ShareLink(items: state.availableAudioURLs) {
                         Label(VocelloPresentationText.exportAudio, systemImage: "square.and.arrow.up")
                     }
                     .disabled(state.availableAudioURLs.isEmpty)
                     .frame(minHeight: 44)
                     .accessibilityIdentifier("historyUnqueued_export")
+                    #endif
                 }
                 .buttonStyle(.bordered)
             }
@@ -51,6 +68,9 @@ struct GenerationHistoryEnqueueWarning: View {
             .background(.regularMaterial)
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("historyUnqueued_banner")
+            #if os(iOS)
+            .iosExportPresentation(exportGate)
+            #endif
         }
     }
 }

@@ -29,15 +29,37 @@ Exact hard-QC-error recovery and complete byte-level accepted-output preservatio
 Use the required 201-take campaign for incidence/workflow impact, not another research matrix.
 RF-09's unexpected tensor-transfer Analyze warning is corrected; exact-source candidate freeze
 still precedes the full campaign. Development recovery tests do not substitute for that candidate gate.
-The newly specified iOS one-time Design/Clone export unlock is planned under RF-13, before RF-09
-freeze. No StoreKit implementation exists yet. Finish that product change and its focused purchase/
-export checks before creating the final candidate or starting its 201-take campaign. Generation,
+The iOS one-time Design/Clone export unlock now has source implementation under RF-13, before RF-09
+freeze. Finish physical StoreKit/sandbox purchase/export acceptance and RF-02's live product choices
+before creating the final candidate or starting its 201-take campaign. Generation,
 listening and internal History remain free in all modes; Built-in output export remains free.
 Finish independent submission-material preparation through the existing RF-02 packet. Unresolved
 required failures still block clean promotion; accepting a shipping risk requires a separate
 documented decision, not relabeling the failure or declaring this issue resolved.
 
-### September 7 passing smoke and monetization scheduling
+### September 7 phone-independent export purchase implementation
+
+RF-13 now has one StoreKit adapter, one observable purchase-state owner and one outward export
+boundary. Studio/full-player/History/segment sharing and automatic folder copies use the finished
+output's mode. New Design-derived Saved Voices retain their origin in additive enrollment metadata.
+Original and legacy unclassified references remain freely recoverable; actual storage-failure
+recovery does not demand payment. No voices, clips, preferences, models or phone state were changed.
+Generation/playback/internal History and Built-in exports remain free; macOS/CLI are unrestricted.
+
+The proposed ID is `com.patricedery.vocello.design-clone-export`. The unactivated, non-bundled
+StoreKit fixture's TEST name/price are not a live offer or a maintainer-approved price. RF-02 still
+owns final ID/name/price/Family Sharing, live setup and account/privacy decisions. No ASC call,
+purchase, account edit, signing operation or device test was performed for this patch.
+
+Deterministic purchase/provenance tests and route-wiring fixtures are implemented; generic iOS app
+and logic-target builds pass. The coherent checkpoint must be current before publication.
+The stateful control audit now inspects/dismisses purchase options but records transaction actions
+as blocked until separately authorized StoreKit/sandbox acceptance. RF-13 remains in flight, not
+purchase-qualified. Its physical export/purchase tests precede RF-09 freeze and the 201-take run;
+RF-12 additionally requires processed-candidate proof. Earlier audio findings and device evidence
+remain unchanged and are not acceptance for this new source.
+
+### September 7 passing smoke and monetization scheduling (historical)
 
 Clean `3272d17e5e008ab5c1a09304a18917efb9d68659` passed the explicitly authorized smoke
 `ios-xcui-smoke-20260907-225523-62a57c2f`, with matching full-tree fingerprints
@@ -79,8 +101,8 @@ Price, final product identifier, purchase display name and Family Sharing choice
 This checkpoint records the scope, not purchase implementation or authorization to create products,
 change prices or accept agreements. The maintainer explicitly confirmed iOS-only monetization and
 App Store submission; macOS remains distributed through GitHub Releases with unrestricted exports,
-and the CLI gains no paywall. Shared export code must preserve that platform boundary. The next source patch
-should implement the export boundary, then freeze once; existing audio limitations stay open.
+and the CLI gains no paywall. Shared export code must preserve that platform boundary. The subsequent
+implementation checkpoint above supersedes this planning-only state; existing audio limitations stay open.
 
 ### September 7 transcript and Analyze corrections
 

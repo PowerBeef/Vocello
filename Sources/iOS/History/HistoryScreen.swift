@@ -176,6 +176,7 @@ private struct IOSHistoryLibrarySection: View {
     @State private var databaseUnavailable = false
     @State private var recoverySnapshot: GenerationHistoryRecoverySnapshot = .empty
     @State private var recoveryAudioURLs: [URL] = []
+    @State private var recoveryExportGate = IOSExportGate()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -328,7 +329,12 @@ private struct IOSHistoryLibrarySection: View {
                     .iosAdaptiveUtilityButtonStyle(tint: Theme.Brand.library)
                     .accessibilityIdentifier("historyRecovery_retry")
                 if !recoveryAudioURLs.isEmpty {
-                    ShareLink(items: recoveryAudioURLs) {
+                    Button {
+                        // Actual failed-storage recovery must not become a payment demand.
+                        // This list is owned by the outbox/recovery coordinator, not a picker.
+                        recoveryExportGate.share(urls: recoveryAudioURLs,
+                            provenance: recoveryAudioURLs.map { _ in .recoveryRecord })
+                    } label: {
                         Label(VocelloPresentationText.exportRecoveryFiles, systemImage: "square.and.arrow.up")
                     }
                     .iosAdaptiveUtilityButtonStyle(tint: Theme.Brand.library)
@@ -340,6 +346,7 @@ private struct IOSHistoryLibrarySection: View {
         .background(Theme.Surface.panel, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("historyRecovery_banner")
+        .iosExportPresentation(recoveryExportGate)
     }
 
     private var recoveryMessage: String {
@@ -605,6 +612,7 @@ private struct IOSHistoryItemCard: View {
     var onPinSeed: (() -> Void)? = nil
 
     @State private var isConfirmingDelete = false
+    @State private var exportGate = IOSExportGate()
     @Environment(\.presentIOSPlayerSheet) private var presentPlayerSheet
 
     private var modeText: String {
@@ -719,9 +727,13 @@ private struct IOSHistoryItemCard: View {
                     Label("Play", systemImage: "play.fill")
                 }
                 if audioAvailable {
-                    ShareLink(item: URL(fileURLWithPath: item.audioPath)) {
+                    Button {
+                        exportGate.share(urls: [URL(fileURLWithPath: item.audioPath)],
+                            provenance: [IOSExportProvenance(generationMode: item.mode)])
+                    } label: {
                         Label("Save audio", systemImage: "square.and.arrow.down")
                     }
+                    .accessibilityIdentifier("historyRowExport_\(item.historyAccessibilityID)")
                 }
                 if let onPinSeed, let seedValue = item.samplingSeed {
                     Button {
@@ -781,6 +793,7 @@ private struct IOSHistoryItemCard: View {
         } message: {
             Text("This permanently removes the generated audio and its history entry.")
         }
+        .iosExportPresentation(exportGate)
     }
 
     private func openPlayerSheet() {

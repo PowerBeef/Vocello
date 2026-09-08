@@ -1,0 +1,24 @@
+{
+  "identifier" : "VocelloExportsLocalFixture",
+  "nonRenewingSubscriptions" : [],
+  "products" : [
+    {
+      "displayPrice" : "0.99",
+      "familyShareable" : false,
+      "internalID" : "10000001",
+      "localizations" : [
+        {
+          "description" : "Local test fixture only. Unlock Voice Design and Voice Clone exports.",
+          "displayName" : "Design & Clone Export — TEST",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.patricedery.vocello.design-clone-export",
+      "referenceName" : "Proposed export unlock — not a live product or approved price",
+      "type" : "NonConsumable"
+    }
+  ],
+  "settings" : { "_storefront" : "USA", "_locale" : "en_US" },
+  "subscriptionGroups" : [],
+  "version" : { "major" : 3, "minor" : 0 }
+}

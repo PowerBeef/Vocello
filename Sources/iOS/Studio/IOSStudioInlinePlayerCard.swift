@@ -79,6 +79,7 @@ struct IOSStudioPlayerCard: View {
     @State private var controller = IOSInlinePlaybackController()
     @State private var pulse = false
     @State private var showDismissConfirm = false
+    @State private var exportGate = IOSExportGate()
     @EnvironmentObject private var audioPlayer: AudioPlayerViewModel
     @Environment(\.iosReduceMotionEnabled) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -146,6 +147,7 @@ struct IOSStudioPlayerCard: View {
         .shadow(color: Color.black.opacity(0.22), radius: 5, x: 0, y: 2)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(phase.accessibilityIdentifier)
+        .iosExportPresentation(exportGate)
         .transition(cardTransition)
         // Tab-scoped activation (IUI-5 P4 follow-up): the stable-identity tab
         // container keeps a visited Studio mounted, so tab switches no longer
@@ -397,7 +399,9 @@ struct IOSStudioPlayerCard: View {
                     label: "Save",
                     accessibilityIdentifier: "studio_inlinePlayer_save"
                 ) {
-                    if let onSave { onSave() } else { shareWAV() }
+                    if let onSave, case .complete(let item) = phase {
+                        exportGate.perform(provenance: [IOSExportProvenance(generationMode: item.mode.rawValue)]) { onSave() }
+                    } else { shareWAV() }
                 }
                 iconButton(
                     symbol: "arrow.down.to.line",
@@ -430,12 +434,7 @@ struct IOSStudioPlayerCard: View {
 
     private func shareWAV() {
         guard case .complete(let item) = phase else { return }
-        let activity = UIActivityViewController(activityItems: [item.audioURL], applicationActivities: nil)
-        UIApplication.shared.connectedScenes
-            .compactMap { ($0 as? UIWindowScene)?.keyWindow }
-            .first?
-            .rootViewController?
-            .present(activity, animated: true)
+        exportGate.share(urls: [item.audioURL], provenance: [IOSExportProvenance(generationMode: item.mode.rawValue)])
     }
 }
 

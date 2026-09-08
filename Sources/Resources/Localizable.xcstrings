@@ -1,6 +1,258 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "vocello.export.privacy" : {
+      "comment": "Opens the published Vocello Privacy Policy page.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Privacy Policy"
+          }
+        }
+      }
+    },
+    "vocello.export.support" : {
+      "comment": "Opens the published Vocello Help & Support page.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Help & Support"
+          }
+        }
+      }
+    },
+    "vocello.export.unlock_title" : {
+      "comment": "iOS one-time export unlock. Live price comes from StoreKit.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Design & Clone Export"
+          }
+        }
+      }
+    },
+    "vocello.export.unlock_detail" : {
+      "comment": "iOS one-time export unlock. Live price comes from StoreKit.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Generate, listen, and keep every take in History for free. Built-in exports are free. A one-time purchase unlocks sharing and saving Voice Design and Voice Clone audio outside Vocello on iOS."
+          }
+        }
+      }
+    },
+    "vocello.export.unlocked" : {
+      "comment": "iOS one-time export unlock. Live price comes from StoreKit.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Export unlocked"
+          }
+        }
+      }
+    },
+    "vocello.export.retry_export" : {
+      "comment": "iOS one-time export unlock. Live price comes from StoreKit.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close this sheet and choose Share or Download again to export your selected clip."
+          }
+        }
+      }
+    },
+    "vocello.export.unavailable" : {
+      "comment": "iOS one-time export unlock. Live price comes from StoreKit.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The purchase is currently unavailable. Your audio stays in Vocello. You can try again or restore an existing purchase."
+          }
+        }
+      }
+    },
+    "vocello.export.reload" : {
+      "comment": "iOS one-time export unlock. Live price comes from StoreKit.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Try Again"
+          }
+        }
+      }
+    },
+    "vocello.export.checking" : {
+      "comment": "iOS one-time export unlock. Live price comes from StoreKit.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Checking purchase…"
+          }
+        }
+      }
+    },
+    "vocello.export.restore" : {
+      "comment": "iOS one-time export unlock. Live price comes from StoreKit.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restore Purchases"
+          }
+        }
+      }
+    },
+    "vocello.export.close" : {
+      "comment": "iOS one-time export unlock. Live price comes from StoreKit.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Done"
+          }
+        }
+      }
+    },
+    "vocello.export.view_options" : {
+      "comment": "iOS one-time export unlock. Live price comes from StoreKit.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "View options"
+          }
+        }
+      }
+    },
+    "vocello.export.options_hint" : {
+      "comment": "iOS one-time export unlock. Live price comes from StoreKit.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opens export purchase options and Restore Purchases"
+          }
+        }
+      }
+    },
+    "vocello.export.folder_detail" : {
+      "comment": "iOS one-time export unlock. Live price comes from StoreKit.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "All clips stay in History. An optional Files folder also receives new Built-in clips; Design and Clone copies require the export unlock. If purchase access is still being checked, export those clips manually from History afterward."
+          }
+        }
+      }
+    },
+    "vocello.export.pending" : {
+      "comment": "iOS one-time export unlock. Live price comes from StoreKit.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Purchase pending approval. You can continue generating and listening."
+          }
+        }
+      }
+    },
+    "vocello.export.cancelled" : {
+      "comment": "iOS one-time export unlock. Live price comes from StoreKit.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Purchase cancelled. No export access was changed."
+          }
+        }
+      }
+    },
+    "vocello.export.failed" : {
+      "comment": "iOS one-time export unlock. Live price comes from StoreKit.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The App Store operation could not complete. Try again. Your clips remain in History."
+          }
+        }
+      }
+    },
+    "vocello.export.unverified" : {
+      "comment": "iOS one-time export unlock. Live price comes from StoreKit.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The purchase could not be verified. Try Restore Purchases or contact support."
+          }
+        }
+      }
+    },
+    "vocello.export.restored" : {
+      "comment": "iOS one-time export unlock. Live price comes from StoreKit.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your export purchase has been restored."
+          }
+        }
+      }
+    },
+    "vocello.export.not_owned" : {
+      "comment": "iOS one-time export unlock. Live price comes from StoreKit.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No export purchase was found for this Apple Account."
+          }
+        }
+      }
+    },
+    "vocello.export.buy" : {
+      "comment": "iOS one-time export unlock. Live price comes from StoreKit.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unlock exports — %@"
+          }
+        }
+      }
+    },
     "vocello.history.export_recovery_files" : {
       "comment" : "User-directed export of retained audio and private recovery journals; not an upload or repair.",
       "extractionState" : "manual",

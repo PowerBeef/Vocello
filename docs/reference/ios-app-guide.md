@@ -1,7 +1,7 @@
 ---
 status: active
 owner: ios
-reviewed: 2026-09-04
+reviewed: 2026-09-07
 summary: Consolidated iPhone app map — every screen, element, and option from the user view, and how XCUITest drives each via stable identifiers on the paired physical device.
 sourceOfTruth:
   - Sources/iOS
@@ -12,6 +12,39 @@ sourceOfTruth:
   - Tests/VocelloiOSUITests/VocelloiOSUITestCase.swift
 ---
 # Vocello for iPhone — app guide + test-driving reference
+
+## iOS export purchase
+
+Generation, listening, internal History and voice enrollment remain free. One iOS non-consumable
+unlocks outward Design/Clone audio export. Built-in exports remain free; macOS and CLI are unchanged.
+The live product/price and physical purchase acceptance remain pending under RF-13/RF-02/RF-12.
+
+- Studio Save/Download, expanded-player Share, History/segment export and optional Files folder
+  copying use the **finished output's mode**, never the current Studio selection. Unknown generated
+  modes require unlock. Internal storage and playback never consult the entitlement.
+- Settings → **Design & Clone Export** (`iosSettings_exportPurchaseRow`) opens purchase options.
+  `exportPurchase_buy` displays the StoreKit-localized one-time price; `exportPurchase_reload` handles
+  product unavailability; `exportPurchase_restore` explicitly syncs. Pending, cancellation and
+  verification failures have visible status. `exportPurchase_close` dismisses without export.
+  Close and request export again after purchase: it never silently shares a previously selected clip.
+- Automatic folder copying never starts a purchase or changes the folder. Without verified access,
+  including startup checking, paid-mode clips remain in History for manual export afterward. The
+  folder explanation states this behavior.
+- New Design-generated Saved Voices retain `generatedSourceMode` in existing enrollment metadata
+  through candidate commit and reference playback. Imported/recorded originals remain recoverable
+  for free. Legacy Saved Voices lack origin metadata and stay exportable without retrospective
+  inference, rewriting or deletion. Existing History entries already record their generation mode.
+- Actual failed-storage recovery audio/journals remain freely exportable. Only the existing enqueue/
+  outbox recovery surfaces provide this exception; ordinary History/player/folder exports do not.
+  This preserves the rule against making data recovery a payment demand.
+- Refund/revocation removes paid export access, **never clips, voices, drafts, History or playback**.
+  Access uses verified StoreKit entitlements and its offline cache, not a local paid flag. No app
+  server, cloud inference, login, diagnostics bypass or receipt logging was introduced.
+
+The existing stateful control audit owns options-sheet reachability/dismissal and explicitly blocks
+purchase actions pending an approved StoreKit/sandbox session. It never buys or invokes Restore.
+The [submission procedure](ios-appstore-submission.md#1-privacy--compliance-app-store-connect) owns
+focused physical purchase acceptance and the still-unapproved fixture/product choices.
 
 A consolidated map of the Vocello iOS app: what every screen/element/option does (user
 view) and how XCUITest drives it (stable identifier → action → expected). Use this to understand the

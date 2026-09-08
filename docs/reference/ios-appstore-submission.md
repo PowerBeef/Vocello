@@ -81,12 +81,28 @@ download it automatically.
 
 ## 1. Privacy + compliance (App Store Connect)
 
-**Planned monetization, not yet implemented (RF-13):** the iOS app remains free to generate and
-listen in all three modes, with free Built-in output export. One non-consumable purchase will unlock
-Design and Clone output export. Implement and verify this before candidate freeze; the current
-source has no StoreKit entitlement owner. Do not represent the planned purchase as available yet.
+**Implemented source, purchase acceptance pending (RF-13):** the iOS app remains free to generate
+and listen in all three modes, with free Built-in output export. The StoreKit entitlement owner and
+output-provenance export boundary are implemented. The live product is **not configured or
+qualified**; do not represent it as available. Finish focused purchase acceptance before freeze.
 Monetization and App Store submission apply only to iOS. The macOS app remains distributed through
 GitHub Releases with unrestricted exports; neither macOS nor CLI gains an entitlement requirement.
+
+The proposed identifier is `com.patricedery.vocello.design-clone-export`. The local-only
+`Tests/Fixtures/VocelloExports.storekit` uses a TEST product and arbitrary fixture price, not an
+approved live offer. It is not bundled in the app or activated in shipping schemes. RF-02 must
+confirm identifier/name/price/Family Sharing before live setup. Settings → Design & Clone Export
+provides the StoreKit-localized price, Restore, status, privacy/support links and dismissal.
+See the [app guide](ios-app-guide.md#ios-export-purchase) for routes and compatibility.
+
+Phone-independent checks: `scripts/macos_test.sh core-test --only IOSExportPurchaseTests` executes
+production state/policy with deterministic StoreKit-boundary fixtures; `python3 -m unittest
+scripts.tests.test_ios_export_contract` checks route wiring, fixture isolation and platform separation.
+These **do not execute an Apple transaction**. Generic iOS compilation checks the real adapter/UI.
+The existing stateful control audit inspects/dismisses purchase options but blocks transaction actions.
+A separately authorized physical StoreKit/sandbox session must qualify purchase/restore/pending/
+cancel/refund and all paid/free export paths, followed by processed-candidate checks. Do not fake
+entitlements for the 201-take campaign; prepare the approved test purchase before freezing it.
 
 - [ ] Resolve the product identifier, display name, price and Family Sharing choice under RF-02;
       create/configure the live non-consumable only after separate account-mutation authorization.

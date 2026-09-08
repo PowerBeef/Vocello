@@ -111,6 +111,14 @@ GitHub Releases distribution with unrestricted exports, and the CLI gains no pay
 a Mac App Store route or propagate iOS entitlement checks into macOS/CLI export paths. No account edit, purchase or candidate
 operation is authorized by this amendment alone.
 
+September 7 implementation checkpoint: the source now includes the iOS-only StoreKit owner,
+output-provenance export gate, restore/options sheet, legacy-reference preservation and free actual
+storage-failure recovery. The test product is provisional and not active in shipping schemes.
+Deterministic checks and generic compilation are distinct from the still-required physical purchase
+and processed-candidate acceptance. Use [the app guide](ios-app-guide.md#ios-export-purchase) and
+[submission procedure](ios-appstore-submission.md#1-privacy--compliance-app-store-connect); RF-13
+stays in flight until its focused acceptance gate passes. Do not create a second purchase harness.
+
 September 7 scheduling amendment: retain the English long-form generated-code failure as an open
 known limitation and defer further causal research. Preserve its original evidence and uncertainty;
 independent-decoder reproduction is not proof of the original generating trigger. Verify explicit

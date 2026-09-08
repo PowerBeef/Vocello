@@ -18,6 +18,7 @@ struct IOSPlayerSheet: View {
     var onDismiss: () -> Void
 
     @StateObject private var controller = IOSPlayerSheetController()
+    @State private var exportGate = IOSExportGate()
     @Environment(\.iosReduceMotionEnabled) private var reduceMotion
     @Environment(\.iosReduceTransparencyEnabled) private var reduceTransparency
 
@@ -64,6 +65,7 @@ struct IOSPlayerSheet: View {
             }
         }
         .preferredColorScheme(.dark)
+        .iosExportPresentation(exportGate)
         .task {
             await controller.load(item: item)
         }
@@ -266,7 +268,7 @@ struct IOSPlayerSheet: View {
                 playerSideButton(
                     title: "Save",
                     symbol: "bookmark",
-                    action: onSave
+                    action: { exportGate.perform(provenance: [item.exportProvenance]) { onSave() } }
                 )
                 .accessibilityIdentifier("iosPlayer_save")
             } else {
@@ -319,7 +321,7 @@ struct IOSPlayerSheet: View {
             playerSideButton(
                 title: "Share",
                 symbol: "square.and.arrow.up",
-                action: { controller.shareCurrent() }
+                action: { exportGate.share(urls: [item.audioURL], provenance: [item.exportProvenance]) }
             )
             .accessibilityIdentifier("iosPlayer_download")
         }
@@ -360,6 +362,7 @@ struct IOSPlayerSheetItem: Equatable, Identifiable {
     let avatarSeed: String
     let avatarInitials: String
     let waveformSeed: Int
+    var exportProvenance: IOSExportProvenance = .unknown
 
     var id: URL { audioURL }
 
@@ -397,7 +400,8 @@ struct IOSPlayerSheetItem: Equatable, Identifiable {
             subtitle: history.formattedDate,
             avatarSeed: voiceName,
             avatarInitials: voiceName,
-            waveformSeed: history.id.map { Int(truncatingIfNeeded: $0) } ?? IOSStableVisualHash.int(history.audioPath)
+            waveformSeed: history.id.map { Int(truncatingIfNeeded: $0) } ?? IOSStableVisualHash.int(history.audioPath),
+            exportProvenance: IOSExportProvenance(generationMode: history.mode)
         )
     }
 
@@ -417,7 +421,10 @@ struct IOSPlayerSheetItem: Equatable, Identifiable {
             subtitle: "Saved voice",
             avatarSeed: voice.id,
             avatarInitials: voice.name,
-            waveformSeed: IOSStableVisualHash.int(voice.wavPath)
+            waveformSeed: IOSStableVisualHash.int(voice.wavPath),
+            exportProvenance: voice.enrollmentMetadata?.generatedSourceMode.map {
+                IOSExportProvenance(generationMode: $0)
+            } ?? .originalReference
         )
     }
 
@@ -447,7 +454,8 @@ struct IOSPlayerSheetItem: Equatable, Identifiable {
             subtitle: "Voice preview",
             avatarSeed: speaker.id,
             avatarInitials: speaker.displayName,
-            waveformSeed: IOSStableVisualHash.int(speaker.id)
+            waveformSeed: IOSStableVisualHash.int(speaker.id),
+            exportProvenance: .builtIn
         )
     }
 }
@@ -878,16 +886,6 @@ final class IOSPlayerSheetController: NSObject, ObservableObject {
         let target = duration * max(0, min(1, fraction))
         player.currentTime = target
         currentTime = target
-    }
-
-    func shareCurrent() {
-        guard let url = loadedItem?.audioURL else { return }
-        let activity = UIActivityViewController(activityItems: [url], applicationActivities: nil)
-        UIApplication.shared.connectedScenes
-            .compactMap { ($0 as? UIWindowScene)?.keyWindow }
-            .first?
-            .rootViewController?
-            .present(activity, animated: true)
     }
 
     func formatted(time: TimeInterval) -> String {

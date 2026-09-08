@@ -73,7 +73,11 @@ public enum IOSSavedOutputsDestination {
 
     /// Copy a just-generated clip into the chosen folder. No-op when the destination is "On My
     /// iPhone". Best-effort + off the main actor — a failure here never propagates to the caller.
-    public static func exportIfConfigured(internalAudioPath: String) {
+    @MainActor
+    public static func exportIfConfigured(internalAudioPath: String, generationMode: String) {
+        // Never start a purchase, change the folder, or fail generation here.
+        // Unknown/checking access keeps paid output in internal History.
+        guard IOSExportCommerce.shared.permits([IOSExportProvenance(generationMode: generationMode)]) else { return }
         guard let folder = resolveFolderURL() else { return }
         let source = URL(fileURLWithPath: internalAudioPath)
         Task.detached(priority: .utility) {

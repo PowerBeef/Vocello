@@ -290,7 +290,37 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
         VocelloUIScreenshot.attach(app, named: "ios-control-audit-inventory")
     }
 
+    private func auditExportPurchasePresentation() {
+        select(tab: .settings)
+        let row = element("iosSettings_exportPurchaseRow")
+        guard revealSettingsElement(row, swipingUp: true),
+              VocelloUIPrimaryAction.perform(on: row, timeout: 20) else {
+            XCTFail("Export purchase settings row was not reachable")
+            recorder.record(scenario: "stateful", controlID: "export-purchase-settings",
+                classification: "HARNESS_FAIL", expected: "Purchase options open through Settings",
+                actual: "Settings row was not reachable")
+            return
+        }
+        let restore = element("exportPurchase_restore")
+        let close = element("exportPurchase_close")
+        let observed = VocelloUIWait.exists(restore, timeout: 20)
+            && VocelloUIWait.exists(close, timeout: 20)
+        XCTAssertTrue(observed)
+        VocelloUIScreenshot.attach(app, named: "ios-export-purchase-options")
+        let closed = VocelloUIPrimaryAction.perform(on: close, timeout: 20)
+        XCTAssertTrue(closed)
+        recorder.record(scenario: "stateful", controlID: "export-purchase-settings",
+            classification: observed && closed ? "PASS" : "HARNESS_FAIL",
+            expected: "Visible purchase disclosure, Restore action, and non-mutating dismissal",
+            actual: "Observed purchase options and returned without starting an App Store operation")
+        recorder.record(scenario: "stateful", controlID: "export-purchase-actions",
+            classification: "BLOCKED_PREREQUISITE",
+            expected: "Approved StoreKit/sandbox purchase, restore, pending, cancellation, refund and export proof",
+            actual: "General control audit never buys, restores or changes account state; focused purchase acceptance remains separate")
+    }
+
     private func runStatefulAudit() {
+        auditExportPurchasePresentation()
         beginAuditSession()
         defer { endSession() }
 

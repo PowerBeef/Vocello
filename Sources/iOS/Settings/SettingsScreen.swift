@@ -19,6 +19,7 @@ struct SettingsScreen: View {
 
     @State private var isSavedOutputsDialogPresented = false
     @State private var isFolderPickerPresented = false
+    @State private var isExportPurchasePresented = false
 
     private var readyModelCount: Int {
         TTSModel.all.reduce(into: 0) { total, model in
@@ -51,6 +52,7 @@ struct SettingsScreen: View {
                 VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
                     audioSection
                     modelsAndFilesSection
+                    exportPurchaseSection
                     accessibilitySection
                     privacySection
                     aboutSection
@@ -61,6 +63,7 @@ struct SettingsScreen: View {
             }
         }
         .toolbar(.hidden, for: .navigationBar)
+        .sheet(isPresented: $isExportPurchasePresented) { IOSExportPurchaseSheet() }
         .task(id: isTabActive) {
             guard isTabActive else { return }
             await modelManager.refresh()
@@ -73,7 +76,7 @@ struct SettingsScreen: View {
             Button("Keep in app (History)") { IOSSavedOutputsDestination.clearFolder() }
             Button("Choose a Folder…") { isFolderPickerPresented = true }
         } message: {
-            Text("Generated clips are always kept on this iPhone for History. Optionally also copy each new clip to a folder you choose — Files or iCloud Drive.")
+            Text(VocelloPresentationText.exportFolderDetail)
         }
         .fileImporter(
             isPresented: $isFolderPickerPresented,
@@ -97,6 +100,21 @@ struct SettingsScreen: View {
 
             IOSSettingsDivider()
             IOSSettingsPickerRow(selection: $generationVariation)
+        }
+    }
+
+    private var exportPurchaseSection: some View {
+        IOSSettingsSection(title: VocelloPresentationText.exportUnlockTitle) {
+            IOSSettingsValueRow(
+                symbol: "square.and.arrow.up",
+                title: VocelloPresentationText.exportUnlockTitle,
+                subtitle: VocelloPresentationText.exportUnlockDetail,
+                accessibilityIdentifier: "iosSettings_exportPurchaseRow",
+                value: IOSExportCommerce.shared.access == .unlocked
+                    ? VocelloPresentationText.exportUnlocked : VocelloPresentationText.exportViewOptions,
+                accessibilityHint: VocelloPresentationText.exportOptionsHint,
+                action: { isExportPurchasePresented = true }
+            )
         }
     }
 

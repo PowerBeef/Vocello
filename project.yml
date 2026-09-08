@@ -505,6 +505,8 @@ targets:
       - path: Sources/iOSSupport/Services/IOSSingleTakeGenerationExecutor.swift
       - path: Sources/iOSSupport/Services/IOSStorageProtectionPolicy.swift
       - path: Sources/iOSSupport/Services/IOSDeviceEligibilityPolicy.swift
+      - path: Sources/iOSSupport/Services/IOSExportAccessPolicy.swift
+      - path: Sources/iOSSupport/Services/IOSExportPurchaseState.swift
     dependencies:
       - target: QwenVoiceCore
       - target: QwenVoiceNative
@@ -543,6 +545,8 @@ targets:
       - path: Sources/iOSSupport/Services/IOSSingleTakeGenerationExecutor.swift
       - path: Sources/iOSSupport/Services/IOSStorageProtectionPolicy.swift
       - path: Sources/iOSSupport/Services/IOSDeviceEligibilityPolicy.swift
+      - path: Sources/iOSSupport/Services/IOSExportAccessPolicy.swift
+      - path: Sources/iOSSupport/Services/IOSExportPurchaseState.swift
       - path: Sources/SharedSupport/Services/VocelloPresentationText.swift
     dependencies:
       - target: QwenVoiceCore

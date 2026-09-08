@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-09-04
+reviewed: 2026-09-07
 summary: Local-first privacy and on-disk storage layout on both platforms — app transfers, operating-system backups, and deletion semantics.
 sourceOfTruth:
   - Sources/SharedSupport
@@ -130,7 +130,15 @@ Maintained iPhone subtrees:
 - `downloads/ios_model_delivery_state.json` is the atomic schema-v2 delivery ledger. It stores only privacy-safe identifiers, relative paths, receipts, retry counts, byte progress, and terminal state.
 - `downloads/staging/` is the only iPhone delivery staging tree; it holds durable delegate files plus per-model verified files, partials, and resume data.
 - `diagnostics/model-downloads/` stores allowlisted local transfer/failure summaries, capped at 60 records and 5 MB. It excludes raw URLs, absolute paths, device identity, and user data.
-- `outputs/` stores generated audio. The user can optionally also copy each new clip to an external Files/iCloud folder via Settings → "Saved outputs" (a user-granted security-scoped bookmark; no new entitlement). The internal copy here is always kept and is what History plays from.
+- `outputs/` stores generated audio. Settings → "Saved outputs" optionally copies new Built-in clips
+  to a user-granted Files/iCloud folder; Design/Clone copies require the iOS export purchase.
+  The internal App Group copy always remains available to History. Checking/unowned access skips
+  the paid-mode external copy, not internal persistence; export manually after verification.
+  Outputs do not move into Files-visible Documents. Existing document sharing and personal files
+  are unchanged. StoreKit handles billing; verified access is held in app memory, without an app
+  server, receipt logging or preference unlock. Apple's billing/privacy disclosures remain RF-02
+  account-review work. Storage-failure and original-reference recovery remain free. New generated
+  Saved Voices retain source mode in enrollment metadata; legacy references are not reclassified.
 - `voices/` stores committed saved-voice reference assets. Each row can delete only its own audio, transcript, and prepared prompt artifacts after an explicit confirmation; other voice-bank members remain intact.
 - `voice-candidates/` privately stages review candidates for at most 24 hours. They are invisible to the saved-voice catalog until Keep/Save commits them; Cancel, Discard, and outside dismissal remove them. `voice-transactions/` is the bounded recovery journal for commit/replacement/delete operations.
 - `cache/imported_references/` stores app-owned materializations of WAV, MP3, AIFF, or M4A files

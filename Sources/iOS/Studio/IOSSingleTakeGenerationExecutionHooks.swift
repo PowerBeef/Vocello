@@ -70,7 +70,9 @@ final class IOSStudioSingleTakeGenerationHooks: IOSSingleTakeGenerationExecution
             ),
             caller: plan.persistenceCaller
         )
-        IOSSavedOutputsDestination.exportIfConfigured(internalAudioPath: result.audioPath)
+        IOSSavedOutputsDestination.exportIfConfigured(
+            internalAudioPath: result.audioPath, generationMode: plan.request.mode.rawValue
+        )
     }
 
     func generationCancelled(

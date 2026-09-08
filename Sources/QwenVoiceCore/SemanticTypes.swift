@@ -725,12 +725,16 @@ public struct PreparedVoiceEnrollmentMetadata: Hashable, Codable, Sendable {
     public let transcriptSource: PreparedVoiceTranscriptSource
     public let automaticTranscriptionOutcome: String?
     public let transcriptionEvidenceDigest: String?
+    /// Additive provenance for a generated clip enrolled as a reusable voice.
+    /// Nil preserves pre-monetization and personal-reference records unchanged.
+    public let generatedSourceMode: String?
 
     public init(
         referenceLanguage: Qwen3SupportedLanguage?,
         transcriptSource: PreparedVoiceTranscriptSource,
         automaticTranscriptionOutcome: String? = nil,
         transcriptionEvidenceDigest: String? = nil,
+        generatedSourceMode: String? = nil,
         schemaVersion: Int = Self.currentSchemaVersion
     ) {
         self.schemaVersion = schemaVersion
@@ -738,6 +742,7 @@ public struct PreparedVoiceEnrollmentMetadata: Hashable, Codable, Sendable {
         self.transcriptSource = transcriptSource
         self.automaticTranscriptionOutcome = automaticTranscriptionOutcome
         self.transcriptionEvidenceDigest = transcriptionEvidenceDigest
+        self.generatedSourceMode = generatedSourceMode
     }
 }
 

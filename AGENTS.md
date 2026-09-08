@@ -22,6 +22,11 @@ Monetization and App Store submission are **iOS-only**. macOS remains distribute
 Releases, with no purchase/export restrictions; the CLI likewise gains no paywall. Shared code
 must not make macOS/CLI generation or export depend on an iOS StoreKit entitlement.
 
+iOS export eligibility uses output provenance, never the current Studio mode. Keep one StoreKit
+owner and one outward-export boundary; no paid preference flag or diagnostics unlock. Generation,
+internal History/playback, personal-reference recovery and actual failed-storage recovery stay free.
+Local StoreKit fixtures never enter shipping app resources or authorize live purchases/account edits.
+
 Source-of-truth order:
 
 `Sources/` → `project.yml` → machine-readable `config/` contracts → `scripts/` →

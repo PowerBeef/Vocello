@@ -703,7 +703,11 @@ struct IOSVoiceDesignView: View {
                                         name: saveSheetSuggestedName,
                                         audioPath: saveSheetAudioPath,
                                         transcript: saveSheetTranscript.isEmpty ? nil : saveSheetTranscript,
-                                        replacingVoiceID: nil
+                                        replacingVoiceID: nil,
+                                        enrollmentMetadata: PreparedVoiceEnrollmentMetadata(
+                                            referenceLanguage: nil, transcriptSource: .manual,
+                                            generatedSourceMode: "design"
+                                        )
                                     )
                                     if candidate.qualityWarnings.isEmpty {
                                         do {

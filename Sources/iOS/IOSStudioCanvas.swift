@@ -562,7 +562,8 @@ struct IOSStudioInlinePlayerItem: Equatable {
             subtitle: "Just now",
             avatarSeed: voiceName,
             avatarInitials: voiceName,
-            waveformSeed: waveformSeed
+            waveformSeed: waveformSeed,
+            exportProvenance: IOSExportProvenance(generationMode: mode.rawValue)
         )
     }
 }

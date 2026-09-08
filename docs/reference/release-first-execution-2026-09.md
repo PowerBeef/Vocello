@@ -119,6 +119,13 @@ and processed-candidate acceptance. Use [the app guide](ios-app-guide.md#ios-exp
 [submission procedure](ios-appstore-submission.md#1-privacy--compliance-app-store-connect); RF-13
 stays in flight until its focused acceptance gate passes. Do not create a second purchase harness.
 
+September 8 account checkpoint: the maintainer approved and authorized the non-consumable
+`com.patricedery.vocello.design_clone_export`, reference name Design & Clone Export, USD 19.99 base
+in USA, automatic regional pricing, and Family Sharing off. Creation and pricing readback succeeded;
+localized metadata, availability and physical/processed purchase acceptance remain pending. The
+product is MISSING_METADATA and was not submitted. The earlier invalid hyphenated identifier was
+rejected without creation; source and TEST fixture now match the approved identifier.
+
 September 7 scheduling amendment: retain the English long-form generated-code failure as an open
 known limitation and defer further causal research. Preserve its original evidence and uncertainty;
 independent-decoder reproduction is not proof of the original generating trigger. Verify explicit

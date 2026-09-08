@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-09-07
+reviewed: 2026-09-08
 summary: Current release-first resume checkpoint; dated evidence lives in the pinned development history, and config/roadmap.json owns status.
 sourceOfTruth:
   - config/roadmap.json
@@ -30,14 +30,31 @@ Use the required 201-take campaign for incidence/workflow impact, not another re
 RF-09's unexpected tensor-transfer Analyze warning is corrected; exact-source candidate freeze
 still precedes the full campaign. Development recovery tests do not substitute for that candidate gate.
 The iOS one-time Design/Clone export unlock now has source implementation under RF-13, before RF-09
-freeze. Finish physical StoreKit/sandbox purchase/export acceptance and RF-02's live product choices
+freeze. Finish physical StoreKit/sandbox purchase/export acceptance and RF-02's remaining metadata/account work
 before creating the final candidate or starting its 201-take campaign. Generation,
 listening and internal History remain free in all modes; Built-in output export remains free.
 Finish independent submission-material preparation through the existing RF-02 packet. Unresolved
 required failures still block clean promotion; accepting a shipping risk requires a separate
 documented decision, not relabeling the failure or declaring this issue resolved.
 
-### September 7 phone-independent export purchase implementation
+### September 8 approved purchase and regional pricing setup
+
+With explicit maintainer authorization, created the non-consumable **Design & Clone Export** using
+`com.patricedery.vocello.design_clone_export`. Apple rejected the earlier hyphenated identifier;
+the empty inventory was verified before the corrected, separately approved creation. Source and
+the non-shipping TEST fixture now use the valid identifier, with a format regression assertion.
+
+Readback confirmed the USA/USD base, one manual **19.99** base price and Apple-managed automatic
+price schedules for 174 other territories (178 schedule records, including dated transitions).
+No regional override, app download price, availability, agreement, submission or phone state was
+changed. Family Sharing was not enabled; its field is omitted by the API readback and remains a
+UI verification detail. Raw account receipts remain private/untracked. Product state is
+**MISSING_METADATA**, not reviewed or purchase-qualified. RF-02 retains localized metadata,
+availability, agreements and qualified decisions; RF-13/RF-12 retain physical/processed purchase proof.
+The TEST fixture price remains deliberately separate from the live offer; production shows StoreKit's
+localized price, never a hard-coded currency conversion.
+
+### September 7 phone-independent export purchase implementation (historical)
 
 RF-13 now has one StoreKit adapter, one observable purchase-state owner and one outward export
 boundary. Studio/full-player/History/segment sharing and automatic folder copies use the finished

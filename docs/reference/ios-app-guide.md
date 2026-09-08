@@ -17,7 +17,9 @@ sourceOfTruth:
 
 Generation, listening, internal History and voice enrollment remain free. One iOS non-consumable
 unlocks outward Design/Clone audio export. Built-in exports remain free; macOS and CLI are unchanged.
-The live product/price and physical purchase acceptance remain pending under RF-13/RF-02/RF-12.
+The approved product and USD 19.99 US-base/automatic-regional price schedule exist in App Store
+Connect. Product metadata/availability and physical purchase acceptance remain pending under
+RF-13/RF-02/RF-12; this is not an available or reviewed purchase.
 
 - Studio Save/Download, expanded-player Share, History/segment export and optional Files folder
   copying use the **finished output's mode**, never the current Studio selection. Unknown generated
@@ -44,7 +46,7 @@ The live product/price and physical purchase acceptance remain pending under RF-
 The existing stateful control audit owns options-sheet reachability/dismissal and explicitly blocks
 purchase actions pending an approved StoreKit/sandbox session. It never buys or invokes Restore.
 The [submission procedure](ios-appstore-submission.md#1-privacy--compliance-app-store-connect) owns
-focused physical purchase acceptance and the still-unapproved fixture/product choices.
+focused physical purchase acceptance and the remaining product metadata/account work.
 
 A consolidated map of the Vocello iOS app: what every screen/element/option does (user
 view) and how XCUITest drives it (stable identifier → action → expected). Use this to understand the

@@ -28,9 +28,9 @@ enum IOSExportProvenance: Equatable, Sendable {
 }
 
 enum IOSExportAccessPolicy {
-    /// Proposed identifier; RF-02 must approve it before creating the live IAP.
+    /// Approved App Store Connect non-consumable identifier (RF-02).
     /// No runtime override, cached paid flag, or diagnostics entitlement bypass.
-    static let productID = "com.patricedery.vocello.design-clone-export"
+    static let productID = "com.patricedery.vocello.design_clone_export"
 
     static func permits(_ items: [IOSExportProvenance], unlocked: Bool) -> Bool {
         !items.isEmpty && (unlocked || items.allSatisfy { !$0.requiresUnlock })

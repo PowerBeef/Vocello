@@ -83,15 +83,21 @@ download it automatically.
 
 **Implemented source, purchase acceptance pending (RF-13):** the iOS app remains free to generate
 and listen in all three modes, with free Built-in output export. The StoreKit entitlement owner and
-output-provenance export boundary are implemented. The live product is **not configured or
-qualified**; do not represent it as available. Finish focused purchase acceptance before freeze.
+output-provenance export boundary are implemented. The product and price schedule were created on
+September 8 with explicit authorization; it remains **MISSING_METADATA, not purchase-qualified or
+submitted**. Finish metadata and focused purchase acceptance before freeze.
 Monetization and App Store submission apply only to iOS. The macOS app remains distributed through
 GitHub Releases with unrestricted exports; neither macOS nor CLI gains an entitlement requirement.
 
-The proposed identifier is `com.patricedery.vocello.design-clone-export`. The local-only
+The approved identifier is `com.patricedery.vocello.design_clone_export`, reference name
+**Design & Clone Export**. The approved US base price is **USD 19.99**, with Apple-managed regional
+pricing and no manual regional overrides. Readback confirmed USA/USD, one manual base price and
+automatic schedules for 174 other territories. Family Sharing was not enabled during creation;
+the API readback omits that flag. Localized product metadata, availability and review remain pending.
+The rejected earlier hyphenated identifier created no product. The local-only
 `Tests/Fixtures/VocelloExports.storekit` uses a TEST product and arbitrary fixture price, not an
-approved live offer. It is not bundled in the app or activated in shipping schemes. RF-02 must
-confirm identifier/name/price/Family Sharing before live setup. Settings → Design & Clone Export
+approved live offer. It is not bundled in the app or activated in shipping schemes. RF-02 owns the
+remaining account and product metadata work. Settings → Design & Clone Export
 provides the StoreKit-localized price, Restore, status, privacy/support links and dismissal.
 See the [app guide](ios-app-guide.md#ios-export-purchase) for routes and compatibility.
 
@@ -104,8 +110,10 @@ A separately authorized physical StoreKit/sandbox session must qualify purchase/
 cancel/refund and all paid/free export paths, followed by processed-candidate checks. Do not fake
 entitlements for the 201-take campaign; prepare the approved test purchase before freezing it.
 
-- [ ] Resolve the product identifier, display name, price and Family Sharing choice under RF-02;
-      create/configure the live non-consumable only after separate account-mutation authorization.
+- [x] Approve product identifier/reference name, USD 19.99 and automatic regional pricing; create
+      the non-consumable and price schedule under explicit authorization, leaving Family Sharing off.
+- [ ] Complete localized product details and territory availability; verify Family Sharing in
+      App Store Connect if the API continues omitting the field. No submission is authorized.
 - [ ] Verify purchase/cancellation/pending/failure, restore, relaunch/offline owned access and
       refund/revocation, including every output export surface and Built-in free-export controls.
       Internal History/playback and original imported references must remain accessible.

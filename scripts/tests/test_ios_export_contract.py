@@ -20,6 +20,8 @@ class IOSExportContractTests(unittest.TestCase):
         self.assertEqual(len(config["products"]), 1)
         product = config["products"][0]
         self.assertEqual(product["type"], "NonConsumable")
+        # Apple rejects hyphens even though they are valid in bundle IDs.
+        self.assertRegex(product["productID"], r"\A[A-Za-z0-9_.]+\Z")
         policy = self.read("Sources/iOSSupport/Services/IOSExportAccessPolicy.swift")
         self.assertIn('static let productID = "' + product["productID"] + '"', policy)
         self.assertIn("TEST", product["localizations"][0]["displayName"])

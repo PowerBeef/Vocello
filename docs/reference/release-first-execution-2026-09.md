@@ -15,7 +15,7 @@ reviewed `86696036`; the initial implementation baseline is clean `main` at `2f3
 Its readiness score is advisory, not a release gate. Source and the roadmap remain authoritative.
 
 `config/roadmap.json` designates **`release-first-3-0-2026-09` as `primaryPlan`**. Its
-`RF-01` through `RF-12` milestones remain the execution roadmap. The September 6 iOS-first
+`RF-01` through `RF-13` milestones remain the execution roadmap. The September 6 iOS-first
 amendment below supersedes their original numeric scheduling order, not their closure gates.
 Both `roadmap.py status` and the generated `docs/ROADMAP.md` present it first. Older plans retain
 technical defect ownership, evidence and deferred backlog; their active status does not independently
@@ -54,6 +54,7 @@ the approved ten-step execution sequence onto existing owners; it is not a secon
 | 2 — external dependency | RF-02 / ASR-02/04/08/10/11: use the consolidated rights/account packet | Qualified decisions or an explicit owner/service blocker; separate authorization for edits, candidate operations and uploads |
 | 3 — correction before freeze | RF-06 / ICA-15 / VLR-07 / F-16: long-form cap first, severe gaps second, cadence/recognition third | Exact retained inputs, first divergent boundary, verified correction or explicit release blocker |
 | 4 — verification correction before freeze | RF-09 / RF-12: source-validated platform applicability and preinstalled-candidate route | iOS Speed requirements retained, macOS Quality retained, historical compatibility; no target replacement or diagnostics dependence |
+| 4a — monetization before freeze | RF-13: one-time iOS Design/Clone export unlock | Verified StoreKit entitlement and all outward export paths; generation/listening/internal History free in every mode, Built-in export free; focused purchase, restore, offline and refund tests |
 | 5 — freeze | RF-09: coherent deterministic checkpoint, exact-SHA CI/Security, fresh collision check, authorized tag/archive/IPA | Frozen candidate with signing, entitlements, notices, privacy, architecture and UUID proof; no internal diagnostics |
 | 6 — implemented, candidate verification | RF-11 / F-01/06/16/18/23 / ICI-4 / VLR-07: targeted correction acceptance | Long-form/regeneration, all modes, enrollment, player, History, export and preservation pass before expansion |
 | 7 — implemented, campaign verification | RF-11 / ICA-04/05 / AV-09 / ASR-12: all 201 takes and applicable remaining lanes | Five-take pilot then up to 20 per invocation, mode boundaries respected; all outcomes and restoration accounted for, no unresolved required failures |
@@ -86,6 +87,27 @@ results in the roadmap at the next source checkpoint. A changed product needs fr
 acceptance; old results remain historical evidence, not replacement candidate proof.
 
 ## External decisions and final gates
+
+September 7 monetization amendment: implement the maintainer's one-time iOS export purchase before
+RF-09's final source freeze and RF-11's 201-take campaign. RF-13 is the new product owner, not a new
+plan or harness. Use one StoreKit non-consumable entitlement for Design and Clone output export;
+do not charge for generation, playback, internal History or Built-in output export. Preserve original
+imported references and personal data. Inventory every outward path (Studio/full player/History,
+sharing, Files/save destination, long-form/segments, recovery and automation) and bind eligibility
+to the output's recorded generation provenance, not the currently selected Studio mode. Review
+document sharing and generated storage before claiming there is no export bypass. Do not turn data
+recovery into a payment demand or migrate/delete user files without a safe, explicitly scoped policy.
+
+First define the test product configuration and export policy, then implement one verified StoreKit
+owner and common export authorization boundary, followed by focused deterministic and physical
+purchase acceptance. Pending/cancelled/failed/unverified transactions cannot unlock paid export;
+restore, relaunch, offline owned access and refund/revocation behavior require tests. Sandbox and
+processed-candidate checks supplement local tests; never buy with a real account automatically or
+introduce a diagnostics-only entitlement bypass to green the campaign. RF-02 owns the separate
+price/product/account decisions and RF-12 the first-IAP submission materials and processed-candidate
+purchase proof. Local configuration is not a live product. Price, identifier, name and Family Sharing
+remain explicit choices; no macOS/CLI paywall is inferred. No account edit, purchase or candidate
+operation is authorized by this amendment alone.
 
 September 7 scheduling amendment: retain the English long-form generated-code failure as an open
 known limitation and defer further causal research. Preserve its original evidence and uncertainty;

@@ -21,17 +21,64 @@ audio/code trace, exact seed/receipts, independent-decoder reproduction and inco
 cause remain retained below. No cap, seed, model, prompt, retry or QC policy changes follow.
 The remaining French/Chinese findings are separate; none is cleared by this scheduling decision.
 
-The retained joined-History mismatch is resolved as fixture-only trailing whitespace, and the
-corrected physical long-form/regeneration journey passed its UI/History assertions. Two generated
-segments carry QC/cadence warnings; this is not clean audio acceptance. The latest recovery case
-was interrupted by a notification before the forced-memory generation, so that run remains FAIL.
-Exact QC-error recovery and complete accepted-output preservation remain partially verified.
+The retained joined-History mismatch is resolved as fixture-only trailing whitespace. The separately
+authorized clean-source smoke `225523-62a57c2f` now passes recovery, all four layouts and long-form
+regeneration. The prior notification-interrupted run remains FAIL with its two whole-output warnings;
+the later PASS does not erase those attempts or establish the cause of their audio defects.
+Exact hard-QC-error recovery and complete byte-level accepted-output preservation remain partially verified.
 Use the required 201-take campaign for incidence/workflow impact, not another research matrix.
 RF-09's unexpected tensor-transfer Analyze warning is corrected; exact-source candidate freeze
 still precedes the full campaign. Development recovery tests do not substitute for that candidate gate.
+The newly specified iOS one-time Design/Clone export unlock is planned under RF-13, before RF-09
+freeze. No StoreKit implementation exists yet. Finish that product change and its focused purchase/
+export checks before creating the final candidate or starting its 201-take campaign. Generation,
+listening and internal History remain free in all modes; Built-in output export remains free.
 Finish independent submission-material preparation through the existing RF-02 packet. Unresolved
 required failures still block clean promotion; accepting a shipping risk requires a separate
 documented decision, not relabeling the failure or declaring this issue resolved.
+
+### September 7 passing smoke and monetization scheduling
+
+Clean `3272d17e5e008ab5c1a09304a18917efb9d68659` passed the explicitly authorized smoke
+`ios-xcui-smoke-20260907-225523-62a57c2f`, with matching full-tree fingerprints
+`9183d03b65c16b41030977a98d53fe2777fcd45e6f0fa0aa2f2f36d3e5df0dc9`.
+The complete runner and required-step ledger pass with no failed or missing steps. Raw results,
+audio and observations remain in the pinned untracked run bundle; this documentation checkpoint
+changes tree identity and does not relabel that evidence as a new candidate run.
+
+- Recovery PASS, 249.407 s: user cancellation, ordered forced-memory cancellation/unload,
+  subsequent completed generation and one completed History entry; cancelled requests absent.
+- Four layouts PASS, 288.442 s: default, AX-L, AX-XXXL and pseudo-AX-XXXL.
+- Long-form/regeneration UI PASS, 622.986 s: grouped segments, exact initial/replacement
+  transcripts and retention of the prior joined History IDs. Not every old audio byte or
+  injected failure-path recovery was tested by this journey.
+- Seven engine attempts: two cancellations and five EOS/published outputs. Durations are
+  4.96 s for recovery, 55.84 / 50.00 / 27.44 s for initial segments, and 54.00 s for replacement.
+  All five whole-WAV/written-output QC verdicts pass with cadence `withinFastGate`.
+  Thirteen chunk warnings remain (seven `low_level`, six `cadence:excess1(1/0)`); this is not
+  independent ASR, semantic promotion or a claim of warning-free audio.
+- Crash snapshots match; independent post-collection process inspection found no Vocello or
+  test-runner process. Focus preparation was user-confirmed, not independently read back.
+  No agent screen/notification mutation, automatic retry or 201-take cell occurred.
+
+GitHub [CI](https://github.com/PowerBeef/Vocello/actions/runs/34167970141) and
+[Security](https://github.com/PowerBeef/Vocello/actions/runs/34167970151) both completed successfully
+for `3272d17e`. This is exact-commit evidence, not CI for subsequent edits. Read-only candidate
+preparation confirms source 3.0.0/build 24, available iOS platform support and one valid local
+identity each for Development, Distribution and Developer ID. The platform query required the
+normal outside-sandbox route; the initial sandbox runtime-service error is not a product defect.
+The quality-promotion contract validates. Profile payload/emitted entitlements, unused build number,
+signed archive/IPA and processed candidate remain unverified. No API-key access or account mutation
+was needed; defer the fresh collision/account check until actual archive preparation rather than
+pretending build 24 is reserved. No candidate tag, signing or upload occurred.
+
+The maintainer's intended iOS business model is one non-consumable purchase unlocking export of
+Voice Design and Voice Clone output, with all other functionality free. RF-13 now owns implementation
+and focused verification; RF-02 owns product/account setup and RF-12 processed purchase acceptance.
+Price, final product identifier, purchase display name and Family Sharing choice remain to be set.
+This checkpoint records the scope, not purchase implementation or authorization to create products,
+change prices or accept agreements. macOS/CLI monetization is not implied. The next source patch
+should implement the export boundary, then freeze once; existing audio limitations stay open.
 
 ### September 7 transcript and Analyze corrections
 
@@ -78,9 +125,9 @@ of fabricating it. Crash hashes match; a post-collection process query found no 
 process. Raw results/diagnostics are pinned and untracked. No screen settings changed. No 201-take
 cell, candidate tag/archive/upload or submission ran. AGENTS.md's durable procedures remain accurate.
 
-The exact-tree `scripts/dev.sh checkpoint` receipt owns the final deterministic verdict. Next:
-separately authorized uninterrupted recovery acceptance and RF-09 candidate freeze. Keep earlier recovery evidence historical and current
-warnings explicit; do not turn the aggregate failed run into PASS.
+The exact-tree `scripts/dev.sh checkpoint` receipt owns the deterministic verdict for that patch.
+The later separately authorized uninterrupted recovery run is recorded above. Keep this aggregate
+failed run and its warnings historical; the new PASS does not change its verdict.
 
 ### September 7 physical recovery checkpoint
 

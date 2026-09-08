@@ -1,7 +1,7 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-09-04
+reviewed: 2026-09-07
 summary: Operator checklist for shipping Vocello for iPhone to TestFlight / the App Store — account prerequisites, App Store Connect privacy and compliance rows, App Review notes, and the credential-bound archive/upload steps.
 sourceOfTruth:
   - project.yml
@@ -80,6 +80,26 @@ download it automatically.
       newer. Deterministic source and archive/IPA verification reject future drift (ASR-01).
 
 ## 1. Privacy + compliance (App Store Connect)
+
+**Planned monetization, not yet implemented (RF-13):** the iOS app remains free to generate and
+listen in all three modes, with free Built-in output export. One non-consumable purchase will unlock
+Design and Clone output export. Implement and verify this before candidate freeze; the current
+source has no StoreKit entitlement owner. Do not represent the planned purchase as available yet.
+
+- [ ] Resolve the product identifier, display name, price and Family Sharing choice under RF-02;
+      create/configure the live non-consumable only after separate account-mutation authorization.
+- [ ] Verify purchase/cancellation/pending/failure, restore, relaunch/offline owned access and
+      refund/revocation, including every output export surface and Built-in free-export controls.
+      Internal History/playback and original imported references must remain accessible.
+- [ ] Verify required paid-app agreements, tax and banking readiness for IAP, even though the app
+      download itself is free. These owner/account decisions are not completed by source tests.
+- [ ] Prepare localized product details and an IAP review screenshot; attach the first IAP to the
+      app version for review. Explain the free/paid boundary and restore path in reviewer notes
+      after implementation, and verify purchases in the separately authorized processed candidate.
+
+Apple references: [purchase types](https://developer.apple.com/help/app-store-connect/reference/in-app-purchases-and-subscriptions/in-app-purchase-types),
+[IAP configuration](https://developer.apple.com/help/app-store-connect/configure-in-app-purchase-settings/overview-for-configuring-in-app-purchases),
+[review rules](https://developer.apple.com/app-store/review/guidelines/#in-app-purchase).
 
 Current account checkpoint (2026-09-04): authentication and exact app resolution succeeded in a
 bounded read-only inventory. The exact `en-US` Support URL and `USES_THIRD_PARTY_CONTENT`

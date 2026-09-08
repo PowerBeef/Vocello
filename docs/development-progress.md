@@ -77,7 +77,9 @@ Voice Design and Voice Clone output, with all other functionality free. RF-13 no
 and focused verification; RF-02 owns product/account setup and RF-12 processed purchase acceptance.
 Price, final product identifier, purchase display name and Family Sharing choice remain to be set.
 This checkpoint records the scope, not purchase implementation or authorization to create products,
-change prices or accept agreements. macOS/CLI monetization is not implied. The next source patch
+change prices or accept agreements. The maintainer explicitly confirmed iOS-only monetization and
+App Store submission; macOS remains distributed through GitHub Releases with unrestricted exports,
+and the CLI gains no paywall. Shared export code must preserve that platform boundary. The next source patch
 should implement the export boundary, then freeze once; existing audio limitations stay open.
 
 ### September 7 transcript and Analyze corrections

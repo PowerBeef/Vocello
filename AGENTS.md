@@ -18,6 +18,10 @@ approved assets download from Hugging Face through the production catalog.
 Check version, hardware and counts against `project.yml`, `config/public-product-facts.json` and benchmarks.
 `candidateRelease` tracks unpublished source; public links use `stableMacRelease`. Release only on explicit request.
 
+Monetization and App Store submission are **iOS-only**. macOS remains distributed through GitHub
+Releases, with no purchase/export restrictions; the CLI likewise gains no paywall. Shared code
+must not make macOS/CLI generation or export depend on an iOS StoreKit entitlement.
+
 Source-of-truth order:
 
 `Sources/` → `project.yml` → machine-readable `config/` contracts → `scripts/` →

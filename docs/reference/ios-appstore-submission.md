@@ -85,6 +85,8 @@ download it automatically.
 listen in all three modes, with free Built-in output export. One non-consumable purchase will unlock
 Design and Clone output export. Implement and verify this before candidate freeze; the current
 source has no StoreKit entitlement owner. Do not represent the planned purchase as available yet.
+Monetization and App Store submission apply only to iOS. The macOS app remains distributed through
+GitHub Releases with unrestricted exports; neither macOS nor CLI gains an entitlement requirement.
 
 - [ ] Resolve the product identifier, display name, price and Family Sharing choice under RF-02;
       create/configure the live non-consumable only after separate account-mutation authorization.

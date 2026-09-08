@@ -106,7 +106,9 @@ processed-candidate checks supplement local tests; never buy with a real account
 introduce a diagnostics-only entitlement bypass to green the campaign. RF-02 owns the separate
 price/product/account decisions and RF-12 the first-IAP submission materials and processed-candidate
 purchase proof. Local configuration is not a live product. Price, identifier, name and Family Sharing
-remain explicit choices; no macOS/CLI paywall is inferred. No account edit, purchase or candidate
+remain explicit choices. Monetization and App Store submission are iOS-only: macOS remains a
+GitHub Releases distribution with unrestricted exports, and the CLI gains no paywall. Do not add
+a Mac App Store route or propagate iOS entitlement checks into macOS/CLI export paths. No account edit, purchase or candidate
 operation is authorized by this amendment alone.
 
 September 7 scheduling amendment: retain the English long-form generated-code failure as an open

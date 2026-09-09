@@ -43,6 +43,24 @@ final class VocelloiOSCandidateAcceptanceUITests: XCTestCase {
             XCTAssertEqual(XCTWaiter.wait(for: [selected], timeout: 10), .completed)
             VocelloUIScreenshot.attach(app, named: "candidate-\(tab)")
         }
+        for _ in 0..<3 {
+            let ids = ["iosAttributionDetailBackButton", "iosSettings_voiceModelsBackButton", "iosSettings_openSourceBackButton"]
+                + ["audio", "modelsFiles", "privacyPermissions", "accessibility", "about"].map { "iosSettings_\($0)BackButton" }
+            guard let back = ids.map({ VocelloUIWait.element(app, id: $0) }).first(where: { $0.exists }) else { break }
+            for _ in 0..<12 {
+                if back.isHittable { break }
+                app.swipeDown()
+            }
+            XCTAssertTrue(VocelloUIPrimaryAction.perform(on: back, timeout: 20))
+            XCTAssertTrue(VocelloUIWait.disappears(back, timeout: 20))
+        }
+        let about = VocelloUIWait.element(app, id: "iosSettings_aboutRow")
+        for _ in 0..<12 {
+            if about.exists && about.isHittable { break }
+            app.swipeUp()
+        }
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: about, timeout: 20))
+        XCTAssertTrue(VocelloUIWait.exists(VocelloUIWait.element(app, id: "screen_settings_about"), timeout: 20))
         let version = VocelloUIWait.element(app, id: "iosSettings_versionLabel")
         let scroll = app.scrollViews.firstMatch
         for _ in 0..<12 {

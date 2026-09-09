@@ -247,8 +247,31 @@ jobs:
           CERT_BASE64: ${{ secrets.APPLE_DEV_ID_APP_P12_BASE64 }}
           CERT_PASSWORD: ${{ secrets.APPLE_DEV_ID_APP_P12_PASSWORD }}
         run: |
+          set +x
           set -euo pipefail
+          umask 077
           KEYCHAIN_PATH="$RUNNER_TEMP/vocello-signing.keychain-db"
+          # Refuse pre-existing files; cleanup owns only this setup attempt.
+          for path in "$KEYCHAIN_PATH" "$RUNNER_TEMP/cert.p12"; do
+            [ ! -e "$path" ] && [ ! -L "$path" ] || { echo "::error::signing scratch already exists"; exit 1; }
+          done
+          cleanup_setup() {
+            result=$?
+            trap - EXIT
+            set +e
+            cleanup_result=0
+            rm -f "$RUNNER_TEMP/cert.p12" || cleanup_result=1
+            if [ "$result" -ne 0 ] && [ -f "$KEYCHAIN_PATH" ]; then
+              security delete-keychain "$KEYCHAIN_PATH" >/dev/null 2>&1 || cleanup_result=1
+            fi
+            [ "$result" -ne 0 ] || result=$cleanup_result
+            exit "$result"
+          }
+          trap cleanup_setup EXIT
+          trap 'exit 130' INT
+          trap 'exit 143' TERM
+          # Register before creation so the always() step also covers partial setup.
+          echo "QWENVOICE_CODESIGN_KEYCHAIN=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
           # Ephemeral keychain password — only used during this job;
           # never logged, never persisted, never echoed.
           KEYCHAIN_PASSWORD="$(openssl rand -base64 24)"
@@ -282,7 +305,6 @@ jobs:
 
           # Export to subsequent steps without surfacing the value in
           # the workflow UI's "env" panel.
-          echo "QWENVOICE_CODESIGN_KEYCHAIN=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
           echo "QWENVOICE_SIGNING_IDENTITY=$IDENTITY"        >> "$GITHUB_ENV"
 
       - name: Write App Store Connect API key file
@@ -292,14 +314,28 @@ jobs:
         env:
           NOTARY_KEY_P8: ${{ secrets.APPLE_NOTARY_PRIVATE_KEY_P8 }}
         run: |
+          set +x
           set -euo pipefail
+          umask 077
+          [[ "$APPLE_API_KEY_ID" =~ ^[A-Za-z0-9]+$ ]] || { echo "::error::invalid API key identifier"; exit 1; }
           KEY_PATH="$RUNNER_TEMP/AuthKey_${APPLE_API_KEY_ID}.p8"
+          [ ! -e "$KEY_PATH" ] && [ ! -L "$KEY_PATH" ] || { echo "::error::API key scratch already exists"; exit 1; }
+          cleanup_setup() {
+            result=$?
+            trap - EXIT
+            set +e
+            if [ "$result" -ne 0 ]; then rm -f "$KEY_PATH"; fi
+            exit "$result"
+          }
+          trap cleanup_setup EXIT
+          trap 'exit 130' INT
+          trap 'exit 143' TERM
+          echo "APPLE_API_KEY_PATH=$KEY_PATH" >> "$GITHUB_ENV"
           printf '%s' "$NOTARY_KEY_P8" > "$KEY_PATH"
           chmod 600 "$KEY_PATH"
           # Sanity-check: a valid PKCS#8 EC key begins with this header.
           head -1 "$KEY_PATH" | grep -q "BEGIN PRIVATE KEY" \
             || { echo "::error::APPLE_NOTARY_PRIVATE_KEY_P8 does not look like a PKCS#8 private key (first line is not 'BEGIN PRIVATE KEY')" >&2; exit 1; }
-          echo "APPLE_API_KEY_PATH=$KEY_PATH" >> "$GITHUB_ENV"
 
       - name: Cache SwiftPM dependencies
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -513,12 +549,16 @@ jobs:
         # (The runner is ephemeral, but matches macOS-CI best practice.)
         if: always()
         run: |
+          set +x
+          set +e
+          cleanup_result=0
           if [ -n "${QWENVOICE_CODESIGN_KEYCHAIN:-}" ] && [ -f "$QWENVOICE_CODESIGN_KEYCHAIN" ]; then
-            security delete-keychain "$QWENVOICE_CODESIGN_KEYCHAIN" || true
+            security delete-keychain "$QWENVOICE_CODESIGN_KEYCHAIN" || cleanup_result=1
           fi
           if [ -n "${APPLE_API_KEY_PATH:-}" ] && [ -f "$APPLE_API_KEY_PATH" ]; then
-            rm -f "$APPLE_API_KEY_PATH"
+            rm -f "$APPLE_API_KEY_PATH" || cleanup_result=1
           fi
+          exit "$cleanup_result"
 
   compile-ios:
     # iOS compile-safety check. Runs in parallel with the macOS package
@@ -721,8 +761,37 @@ jobs:
           ASC_API_KEY_P8: ${{ secrets.ASC_API_KEY_P8 }}
           ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
         run: |
+          set +x
           set -euo pipefail
+          umask 077
+          [[ "$ASC_API_KEY_ID" =~ ^[A-Za-z0-9]+$ ]] || { echo "::error::invalid API key identifier"; exit 1; }
           KEYCHAIN="$RUNNER_TEMP/vocello-signing.keychain-db"
+          KEY_COPY_PATH="$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_API_KEY_ID}.p8"
+          PROFILE_PATH=""
+          for path in "$KEYCHAIN" "$RUNNER_TEMP/dist.p12" "$RUNNER_TEMP/profile.mobileprovision" "$RUNNER_TEMP/asc" "$KEY_COPY_PATH"; do
+            [ ! -e "$path" ] && [ ! -L "$path" ] || { echo "::error::signing scratch already exists"; exit 1; }
+          done
+          cleanup_setup() {
+            result=$?
+            trap - EXIT
+            set +e
+            cleanup_result=0
+            rm -f "$RUNNER_TEMP/dist.p12" "$RUNNER_TEMP/profile.mobileprovision" || cleanup_result=1
+            if [ "$result" -ne 0 ]; then
+              if [ -f "$KEYCHAIN" ]; then security delete-keychain "$KEYCHAIN" >/dev/null 2>&1 || cleanup_result=1; fi
+              if [ -n "$PROFILE_PATH" ]; then rm -f "$PROFILE_PATH" || cleanup_result=1; fi
+              rm -f "$RUNNER_TEMP/asc/AuthKey_${ASC_API_KEY_ID}.p8" "$KEY_COPY_PATH" || cleanup_result=1
+              rmdir "$RUNNER_TEMP/asc" 2>/dev/null || true
+            fi
+            [ "$result" -ne 0 ] || result=$cleanup_result
+            exit "$result"
+          }
+          trap cleanup_setup EXIT
+          trap 'exit 130' INT
+          trap 'exit 143' TERM
+          echo "IOS_KEYCHAIN_PATH=$KEYCHAIN" >> "$GITHUB_ENV"
+          echo "IOS_API_KEY_PATH=$RUNNER_TEMP/asc/AuthKey_${ASC_API_KEY_ID}.p8" >> "$GITHUB_ENV"
+          echo "IOS_API_KEY_COPY_PATH=$KEY_COPY_PATH" >> "$GITHUB_ENV"
           KEYCHAIN_PW="$(uuidgen)"
           security create-keychain -p "$KEYCHAIN_PW" "$KEYCHAIN"
           security set-keychain-settings -lut 3600 "$KEYCHAIN"
@@ -737,9 +806,12 @@ jobs:
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
           echo "$IOS_PROVISION_PROFILE" | base64 --decode > "$RUNNER_TEMP/profile.mobileprovision"
           UUID=$(/usr/libexec/PlistBuddy -c "Print :UUID" /dev/stdin <<< "$(security cms -D -i "$RUNNER_TEMP/profile.mobileprovision")")
-          cp "$RUNNER_TEMP/profile.mobileprovision" ~/Library/MobileDevice/Provisioning\ Profiles/"$UUID".mobileprovision
-          echo "IOS_KEYCHAIN_PATH=$KEYCHAIN" >> "$GITHUB_ENV"
-          echo "IOS_PROFILE_PATH=$HOME/Library/MobileDevice/Provisioning Profiles/$UUID.mobileprovision" >> "$GITHUB_ENV"
+          [[ "$UUID" =~ ^[A-Fa-f0-9-]+$ ]] || { echo "::error::invalid provisioning UUID"; exit 1; }
+          candidate_profile="$HOME/Library/MobileDevice/Provisioning Profiles/$UUID.mobileprovision"
+          [ ! -e "$candidate_profile" ] && [ ! -L "$candidate_profile" ] || { echo "::error::provisioning profile already exists"; exit 1; }
+          PROFILE_PATH="$candidate_profile"
+          echo "IOS_PROFILE_PATH=$PROFILE_PATH" >> "$GITHUB_ENV"
+          cp "$RUNNER_TEMP/profile.mobileprovision" "$PROFILE_PATH"
 
           # The contract-bound archive command passes PROVISIONING_PROFILE_SPECIFIER
           # as a global xcodebuild override, and Xcode applies global overrides to every
@@ -951,11 +1023,18 @@ jobs:
       - name: Cleanup iOS signing material
         if: always()
         run: |
+          set +x
+          set +e
+          cleanup_result=0
           if [ -n "${IOS_KEYCHAIN_PATH:-}" ] && [ -f "$IOS_KEYCHAIN_PATH" ]; then
-            security delete-keychain "$IOS_KEYCHAIN_PATH" || true
+            security delete-keychain "$IOS_KEYCHAIN_PATH" || cleanup_result=1
           fi
-          [ -z "${IOS_PROFILE_PATH:-}" ] || rm -f "$IOS_PROFILE_PATH"
-          rm -rf "$RUNNER_TEMP/asc" "$RUNNER_TEMP/dist.p12" "$RUNNER_TEMP/profile.mobileprovision"
-          rm -f "$HOME/.appstoreconnect/private_keys/AuthKey_${{ secrets.ASC_API_KEY_ID }}.p8"
+          if [ -n "${IOS_PROFILE_PATH:-}" ]; then rm -f "$IOS_PROFILE_PATH" || cleanup_result=1; fi
+          if [ -n "${IOS_API_KEY_PATH:-}" ]; then
+            rm -f "$IOS_API_KEY_PATH" "$RUNNER_TEMP/dist.p12" "$RUNNER_TEMP/profile.mobileprovision" || cleanup_result=1
+            rmdir "$RUNNER_TEMP/asc" 2>/dev/null || true
+          fi
+          if [ -n "${IOS_API_KEY_COPY_PATH:-}" ]; then rm -f "$IOS_API_KEY_COPY_PATH" || cleanup_result=1; fi
           export PATH="$HOME/.qwenvoice-pinned-tools/bin:$PATH"
           asc auth logout --name vocello-release-preflight --confirm >/dev/null 2>&1 || true
+          exit "$cleanup_result"

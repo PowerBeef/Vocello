@@ -134,9 +134,24 @@ class IOSControlAuditContractTests(unittest.TestCase):
         helper = source.split("func revealSettingsElement", 1)[1].split(
             "func assertRequiredCloneVoice", 1
         )[0]
-        self.assertIn("settingsElementIsClearOfDock", helper)
-        self.assertIn('element("rootTab_settings")', helper)
-        self.assertIn("target.frame.maxY <= dockAnchor.frame.minY", helper)
+        self.assertIn("VocelloUISettingsReveal.perform(target, in: app, swipingUp: swipingUp)", helper)
+        shared = (ROOT / "Tests/UIAutomationSupport/VocelloUIAutomationSupport.swift").read_text()
+        reveal = shared.split("enum VocelloUISettingsReveal", 1)[1].split("#endif", 1)[0]
+        self.assertIn('VocelloUIWait.element(app, id: "rootTabDock")', reveal)
+        self.assertIn("VocelloUIRevealRequirement.viewport(", reveal)
+        self.assertIn("dock: dock.frame", reveal)
+        self.assertIn("target.isHittable", reveal)
+        self.assertIn("requirement: VocelloUIRevealRequirement = .fullVisibility", reveal)
+        self.assertIn("requirement.satisfied(by: frame, visible: visible)", reveal)
+        self.assertIn("search.next(target: required, visible: visible)", reveal)
+        dock = (ROOT / "Sources/iOS/App/TabDock.swift").read_text()
+        self.assertIn('.accessibilityElement(children: .contain)', dock)
+        self.assertIn('.accessibilityIdentifier("rootTabDock")', dock)
+        smoke = (ROOT / "Tests/VocelloiOSUITests/VocelloiOSSmokeUITests.swift").read_text()
+        assertion = smoke.split("private func assertAboveTabDock", 1)[1].split("/// Long-form", 1)[0]
+        self.assertIn("requirement: .fullVisibility", assertion)
+        self.assertIn("VocelloUIRevealRequirement.fullVisibility.satisfied", assertion)
+        self.assertNotIn("settingsTab.frame", assertion)
 
     def test_script_restoration_treats_empty_text_as_empty_not_as_a_placeholder(self) -> None:
         source = (

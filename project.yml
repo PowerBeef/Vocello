@@ -472,6 +472,7 @@ targets:
     platform: macOS
     sources:
       - path: Tests/VocelloCoreTests
+      - path: Tests/UIAutomationSupport/VocelloUIInteractionPolicy.swift
       - path: Tests/VocelloiOSLogicTests
       - path: Sources/SharedSupport/Services/AudioPlaybackResumePolicy.swift
       - path: Sources/SharedSupport/Services/LanguageSelectionPresentation.swift
@@ -484,6 +485,7 @@ targets:
       - path: Sources/SharedSupport/Database/LongFormHistoryAcceptance.swift
       - path: Sources/SharedSupport/Database/GenerationHistoryEnqueueState.swift
       - path: Sources/SharedSupport/Services/VocelloPresentationText.swift
+      - path: Sources/iOS/Commerce/IOSCommercePresentationText.swift
       - path: Sources/Services/MacStudioGenerationRequestFactory.swift
       - path: Sources/Models/VoiceDesignDraft.swift
       - path: Sources/Models/ScriptTextState.swift
@@ -613,6 +615,8 @@ targets:
     platform: iOS
     sources:
       - path: Tests/UIAutomationSupport
+      - path: Tests/Fixtures/VocelloExports.storekit
+        buildPhase: resources
       - path: Tests/VocelloiOSUITests
         excludes:
           - VocelloiOSCandidateAcceptanceUITests.swift

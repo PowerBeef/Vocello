@@ -58,6 +58,9 @@ struct TabDock: View {
             )
             .ignoresSafeArea(edges: .bottom)
         )
+        // Expose the genuine whole dock without merging its individually actionable tabs.
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("rootTabDock")
     }
 
     @ViewBuilder

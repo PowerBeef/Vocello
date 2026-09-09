@@ -25,26 +25,30 @@ enum IOSSettingsFormatters {
     }
 }
 
-/// A compact Settings group using the same eyebrow-and-panel language as Voices and History.
+/// Flat Settings groups; optional headings remain available to existing model/license sections.
 /// The tab dock remains the only glass surface on this screen.
 struct IOSSettingsSection<Content: View>: View {
-    let title: String
+    let title: String?
+    let accent: Color?
     let accessibilityIdentifier: String?
     let content: Content
 
     init(
-        title: String,
+        title: String? = nil,
+        accent: Color? = nil,
         accessibilityIdentifier: String? = nil,
         @ViewBuilder content: () -> Content
     ) {
         self.title = title
+        self.accent = accent
         self.accessibilityIdentifier = accessibilityIdentifier
         self.content = content()
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(title.uppercased())
+            if let title {
+                Text(title.uppercased())
                 .iosScaledFont(size: 11, weight: .semibold, relativeTo: .caption2)
                 .tracking(0.88)
                 .foregroundStyle(Theme.Text.secondary)
@@ -52,15 +56,16 @@ struct IOSSettingsSection<Content: View>: View {
                 .accessibilityIdentifier(accessibilityIdentifier ?? "")
                 .padding(.horizontal, 4)
                 .padding(.bottom, 6)
+            }
 
             VStack(alignment: .leading, spacing: 0) {
                 content
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.white.opacity(0.04))
+            .background(accent?.opacity(0.07) ?? Color.white.opacity(0.04))
             .overlay {
                 RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous)
-                    .stroke(Theme.Surface.panelStroke, lineWidth: 0.5)
+                    .stroke(accent?.opacity(0.25) ?? Theme.Surface.panelStroke, lineWidth: 0.5)
             }
             .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous))
         }
@@ -72,7 +77,7 @@ struct IOSSettingsDivider: View {
         Rectangle()
             .fill(Theme.Surface.hairline)
             .frame(height: 0.5)
-            .padding(.leading, 62)
+            .padding(.leading, 50)
     }
 }
 
@@ -81,18 +86,14 @@ private struct IOSSettingsIcon: View {
     var tint: Color = Theme.Brand.silver
 
     var body: some View {
-        RoundedRectangle(cornerRadius: 10, style: .continuous)
-            .fill(tint.opacity(0.10))
-            .overlay {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .stroke(tint.opacity(0.18), lineWidth: 0.5)
-            }
-            .overlay {
-                Image(systemName: symbol)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(tint)
-            }
-            .frame(width: 36, height: 36)
+        Image(systemName: symbol)
+            // Decorative artwork fits its slot; neighboring text still scales freely.
+            .resizable()
+            .scaledToFit()
+            .fontWeight(.medium)
+            .foregroundStyle(tint)
+            .frame(width: 20, height: 20)
+            .frame(width: 28, height: 28)
             .accessibilityHidden(true)
     }
 }
@@ -115,7 +116,7 @@ private struct IOSSettingsLabel: View {
 
                 if let subtitle, !subtitle.isEmpty {
                     Text(subtitle)
-                        .font(.caption)
+                        .font(.footnote)
                         .foregroundStyle(Theme.Text.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -129,16 +130,18 @@ private struct IOSSettingsLabel: View {
 /// Vocello's compact switch chrome around a semantic SwiftUI `Toggle`.
 /// The visible track is 44x26 while the returned control retains a 44-point hit region.
 private struct IOSSettingsCompactToggleStyle: ToggleStyle {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let tint: Color
 
     func makeBody(configuration: Configuration) -> some View {
-        Button {
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+            : AnyLayout(HStackLayout(spacing: 12))
+        return Button {
             configuration.isOn.toggle()
         } label: {
-            HStack(spacing: 12) {
+            layout {
                 configuration.label
-
-                Spacer(minLength: 8)
 
                 Capsule(style: .continuous)
                     .fill(configuration.isOn ? tint.opacity(0.88) : Color.white.opacity(0.10))
@@ -190,8 +193,6 @@ struct IOSSettingsToggleRow: View {
 }
 
 struct IOSSettingsValueRow: View {
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-
     let symbol: String
     let title: String
     let subtitle: String?
@@ -202,11 +203,8 @@ struct IOSSettingsValueRow: View {
 
     var body: some View {
         Group {
-            if let action {
-                Button(action: action) { content }.buttonStyle(.plain)
-            } else {
-                content
-            }
+            if let action { Button(action: action) { content }.buttonStyle(.plain) }
+            else { content }
         }
         .accessibilityIdentifier(accessibilityIdentifier)
         .accessibilityLabel(title)
@@ -215,96 +213,47 @@ struct IOSSettingsValueRow: View {
     }
 
     private var content: some View {
-        Group {
-            if dynamicTypeSize.isAccessibilitySize {
-                VStack(alignment: .leading, spacing: 8) {
-                    IOSSettingsLabel(symbol: symbol, title: title, subtitle: subtitle)
-                    trailingValue
-                        .padding(.leading, 46)
-                }
-            } else {
-                HStack(alignment: .center, spacing: 10) {
-                    IOSSettingsLabel(symbol: symbol, title: title, subtitle: subtitle)
-                    trailingValue
-                        .frame(maxWidth: 152, alignment: .trailing)
-                }
-            }
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
-        .contentShape(Rectangle())
-    }
-
-    private var valueText: some View {
-        Text(value)
-            .font(.caption)
-            .foregroundStyle(Theme.Text.secondary)
-            .multilineTextAlignment(dynamicTypeSize.isAccessibilitySize ? .leading : .trailing)
-            .fixedSize(horizontal: false, vertical: true)
-    }
-
-    private var trailingValue: some View {
-        HStack(spacing: 8) {
-            valueText
-                .frame(maxWidth: .infinity, alignment: dynamicTypeSize.isAccessibilitySize ? .leading : .trailing)
-
-            if action != nil {
-                Image(systemName: "chevron.right")
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(Theme.Text.tertiary)
-                    .accessibilityHidden(true)
-            }
-        }
+        IOSSettingsNavigationRow(symbol: symbol, title: title, subtitle: subtitle,
+                                 value: value, showsChevron: action != nil)
     }
 }
 
 struct IOSSettingsNavigationRow: View {
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-
     let symbol: String
     let title: String
     let subtitle: String?
     let value: String
+    var tint: Color = Theme.Brand.silver
+    var showsChevron = true
 
     var body: some View {
-        Group {
-            if dynamicTypeSize.isAccessibilitySize {
-                VStack(alignment: .leading, spacing: 8) {
-                    IOSSettingsLabel(symbol: symbol, title: title, subtitle: subtitle)
-                    HStack(spacing: 8) {
-                        Text(value).frame(maxWidth: .infinity, alignment: .leading)
-                        chevron
-                    }
-                    .padding(.leading, 46)
-                }
-            } else {
-                HStack(spacing: 10) {
-                    IOSSettingsLabel(symbol: symbol, title: title, subtitle: subtitle)
+        HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 6) {
+                IOSSettingsLabel(symbol: symbol, title: title, subtitle: subtitle, tint: tint)
+                if !value.isEmpty {
                     Text(value)
-                        .font(.caption)
-                        .multilineTextAlignment(.trailing)
-                    chevron
+                        .font(.footnote)
+                        .foregroundStyle(Theme.Text.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.leading, 38)
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            if showsChevron {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Theme.Text.tertiary)
+                    .accessibilityHidden(true)
+            }
         }
-        .foregroundStyle(Theme.Text.secondary)
         .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.vertical, 12)
         .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
         .contentShape(Rectangle())
-    }
-
-    private var chevron: some View {
-        Image(systemName: "chevron.right")
-            .font(.footnote.weight(.semibold))
-            .foregroundStyle(Theme.Text.tertiary)
-            .accessibilityHidden(true)
     }
 }
 
 struct IOSSettingsPickerRow: View {
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Binding var selection: String
 
     private var currentDisplayName: String {
@@ -312,18 +261,9 @@ struct IOSSettingsPickerRow: View {
     }
 
     var body: some View {
-        Group {
-            if dynamicTypeSize.isAccessibilitySize {
-                VStack(alignment: .leading, spacing: 8) {
-                    label
-                    picker.frame(maxWidth: .infinity, alignment: .leading).padding(.leading, 46)
-                }
-            } else {
-                HStack(spacing: 10) {
-                    label
-                    picker
-                }
-            }
+        VStack(alignment: .leading, spacing: 8) {
+            label
+            picker.frame(maxWidth: .infinity, alignment: .leading).padding(.leading, 38)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
@@ -333,13 +273,13 @@ struct IOSSettingsPickerRow: View {
     private var label: some View {
         IOSSettingsLabel(
             symbol: "dial.medium",
-            title: "Take variation",
-            subtitle: "Choose how much finished takes vary."
+            title: IOSSettingsText.variation,
+            subtitle: IOSSettingsText.variationDetail
         )
     }
 
     private var picker: some View {
-        Picker("Take variation", selection: $selection) {
+        Picker(IOSSettingsText.variation, selection: $selection) {
             ForEach(Qwen3SamplingVariation.allCases, id: \.self) { variation in
                 Text(variation.displayName)
                     .accessibilityIdentifier("iosSettings_variationOption_\(variation.rawValue)")
@@ -348,49 +288,25 @@ struct IOSSettingsPickerRow: View {
         }
         .pickerStyle(.menu)
         .labelsHidden()
-        .font(.caption.weight(.semibold))
+        .font(.subheadline.weight(.semibold))
         .tint(Theme.Text.secondary)
-        .frame(minWidth: 44, minHeight: 44, alignment: dynamicTypeSize.isAccessibilitySize ? .leading : .trailing)
+        .frame(minWidth: 44, minHeight: 44, alignment: .leading)
         .contentShape(Rectangle())
         .accessibilityIdentifier("iosSettings_variationRow")
-        .accessibilityLabel("Take variation")
+        .accessibilityLabel(IOSSettingsText.variation)
         .accessibilityValue(currentDisplayName)
-        .accessibilityHint("Choose Expressive, Balanced, or Consistent")
+        .accessibilityHint(IOSSettingsText.variationHint)
     }
 }
 
 struct IOSSettingsVersionRow: View {
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-
     var body: some View {
-        Group {
-            if dynamicTypeSize.isAccessibilitySize {
-                VStack(alignment: .leading, spacing: 8) {
-                    IOSSettingsLabel(symbol: "info.circle", title: "Version", subtitle: nil)
-                    versionText.padding(.leading, 46)
-                }
-            } else {
-                HStack(spacing: 10) {
-                    IOSSettingsLabel(symbol: "info.circle", title: "Version", subtitle: nil)
-                    versionText
-                        .frame(maxWidth: 152, alignment: .trailing)
-                }
-            }
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
-        .accessibilityElement(children: .combine)
-        .accessibilityIdentifier("iosSettings_versionLabel")
-        .accessibilityLabel("Version \(IOSSettingsSupportInfo.version), build \(IOSSettingsSupportInfo.build)")
-    }
-
-    private var versionText: some View {
-        Text("\(IOSSettingsSupportInfo.version) (\(IOSSettingsSupportInfo.build))")
-            .font(.caption.monospacedDigit())
-            .foregroundStyle(Theme.Text.secondary)
-            .multilineTextAlignment(dynamicTypeSize.isAccessibilitySize ? .leading : .trailing)
-            .fixedSize(horizontal: false, vertical: true)
+        IOSSettingsNavigationRow(symbol: "info.circle", title: IOSSettingsText.version, subtitle: nil,
+            value: "\(IOSSettingsSupportInfo.version) (\(IOSSettingsSupportInfo.build))", showsChevron: false)
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("iosSettings_versionLabel")
+            .accessibilityLabel(IOSSettingsText.version)
+            .accessibilityValue("\(IOSSettingsSupportInfo.version) (\(IOSSettingsSupportInfo.build))")
     }
 }
 

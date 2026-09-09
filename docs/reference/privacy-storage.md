@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-09-07
+reviewed: 2026-09-09
 summary: Local-first privacy and on-disk storage layout on both platforms — app transfers, operating-system backups, and deletion semantics.
 sourceOfTruth:
   - Sources/SharedSupport
@@ -130,7 +130,7 @@ Maintained iPhone subtrees:
 - `downloads/ios_model_delivery_state.json` is the atomic schema-v2 delivery ledger. It stores only privacy-safe identifiers, relative paths, receipts, retry counts, byte progress, and terminal state.
 - `downloads/staging/` is the only iPhone delivery staging tree; it holds durable delegate files plus per-model verified files, partials, and resume data.
 - `diagnostics/model-downloads/` stores allowlisted local transfer/failure summaries, capped at 60 records and 5 MB. It excludes raw URLs, absolute paths, device identity, and user data.
-- `outputs/` stores generated audio. Settings → "Saved outputs" optionally copies new Built-in clips
+- `outputs/` stores generated audio. Settings → Models & Files → "Saved outputs" optionally copies new Built-in clips
   to a user-granted Files/iCloud folder; Design/Clone copies require the iOS export purchase.
   The internal App Group copy always remains available to History. Checking/unowned access skips
   the paid-mode external copy, not internal persistence; export manually after verification.

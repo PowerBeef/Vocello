@@ -75,3 +75,22 @@ benchmarks/**/*.dSYM/
 samples-*.jsonl
 **/diagnostics/
 .pytest_cache/
+
+# Local credentials and signing material (never app resources).
+*.p8
+*.p12
+*.pfx
+*.key
+*.pem
+*.keychain
+*.keychain-db
+*.mobileprovision
+*.provisionprofile
+.env
+.env.*
+!.env.example
+!.env.sample
+.asc/
+.appstoreconnect/
+id_rsa
+id_ed25519

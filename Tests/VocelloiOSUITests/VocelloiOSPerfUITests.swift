@@ -190,8 +190,8 @@ final class VocelloiOSPerfUITests: VocelloiOSUITestCase {
 
     func test05SettingsScroll() {
         beginScenario("ios-settings-scroll")
-        select(tab: .settings)
-        XCTAssertTrue(VocelloUIWait.exists(element("iosSettings_autoPlayToggle"), timeout: 20))
+        openSettingsRoot()
+        XCTAssertTrue(VocelloUIWait.exists(element("iosSettings_audioRow"), timeout: 20))
         measuredWindow("ios-settings-scroll", actionCount: 8) {
             for sweepIndex in 0..<8 {
                 sweep(up: sweepIndex.isMultiple(of: 2))

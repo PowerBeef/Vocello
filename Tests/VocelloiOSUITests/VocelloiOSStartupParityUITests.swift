@@ -57,6 +57,7 @@ final class VocelloiOSStartupParityUITests: VocelloiOSUITestCase {
 
     private func selectBalancedVariationThroughVisibleSettings() -> String {
         select(tab: .settings)
+        openSettingsPage(for: "iosSettings_variationRow")
         let picker = element("iosSettings_variationRow")
         XCTAssertTrue(VocelloUIWait.exists(picker, timeout: 20))
         let original = (picker.value as? String) ?? "Expressive"
@@ -83,6 +84,7 @@ final class VocelloiOSStartupParityUITests: VocelloiOSUITestCase {
     }
 
     private func chooseVariation(rawValue: String, displayName: String) {
+        openSettingsPage(for: "iosSettings_variationRow")
         let picker = element("iosSettings_variationRow")
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: picker, timeout: 20))
         let identifiedOption = element("iosSettings_variationOption_\(rawValue)")

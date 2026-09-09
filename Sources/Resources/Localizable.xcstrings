@@ -1,6 +1,852 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "vocello.settings.refinement.audio": {
+      "comment": "Settings refinement: preserve consent, free functionality and product meaning. No placeholder prices.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Audio"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Audio"
+          }
+        }
+      }
+    },
+    "vocello.settings.refinement.audioSummary": {
+      "comment": "Settings refinement: preserve consent, free functionality and product meaning. No placeholder prices.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Playback and take variation"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lecture et variation des prises"
+          }
+        }
+      }
+    },
+    "vocello.settings.refinement.modelsFiles": {
+      "comment": "Settings refinement: preserve consent, free functionality and product meaning. No placeholder prices.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Models & Files"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modèles et fichiers"
+          }
+        }
+      }
+    },
+    "vocello.settings.refinement.modelsFilesSummary": {
+      "comment": "Settings refinement: preserve consent, free functionality and product meaning. No placeholder prices.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Voice models and saved outputs"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modèles vocaux et fichiers enregistrés"
+          }
+        }
+      }
+    },
+    "vocello.settings.refinement.privacyPermissions": {
+      "comment": "Settings refinement: preserve consent, free functionality and product meaning. No placeholder prices.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Privacy & Permissions"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Confidentialité et autorisations"
+          }
+        }
+      }
+    },
+    "vocello.settings.refinement.privacyPermissionsSummary": {
+      "comment": "Settings refinement: preserve consent, free functionality and product meaning. No placeholder prices.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Voice consent and permissions"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Consentement vocal et autorisations"
+          }
+        }
+      }
+    },
+    "vocello.settings.refinement.accessibility": {
+      "comment": "Settings refinement: preserve consent, free functionality and product meaning. No placeholder prices.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Accessibility"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Accessibilité"
+          }
+        }
+      }
+    },
+    "vocello.settings.refinement.accessibilitySummary": {
+      "comment": "Settings refinement: preserve consent, free functionality and product meaning. No placeholder prices.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Motion and transparency"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mouvement et transparence"
+          }
+        }
+      }
+    },
+    "vocello.settings.refinement.about": {
+      "comment": "Settings refinement: preserve consent, free functionality and product meaning. No placeholder prices.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "About"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "À propos"
+          }
+        }
+      }
+    },
+    "vocello.settings.refinement.aboutSummary": {
+      "comment": "Settings refinement: preserve consent, free functionality and product meaning. No placeholder prices.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Support and app information"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Assistance et informations sur l’app"
+          }
+        }
+      }
+    },
+    "vocello.settings.refinement.back": {
+      "comment": "Settings refinement: preserve consent, free functionality and product meaning. No placeholder prices.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Back to Settings"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Retour aux réglages"
+          }
+        }
+      }
+    },
+    "vocello.settings.refinement.backModelsFiles": {
+      "comment": "Settings refinement: preserve consent, free functionality and product meaning. No placeholder prices.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Back to Models & Files"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Retour aux modèles et fichiers"
+          }
+        }
+      }
+    },
+    "vocello.settings.refinement.backAbout": {
+      "comment": "Settings refinement: preserve consent, free functionality and product meaning. No placeholder prices.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Back to About"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Retour à À propos"
+          }
+        }
+      }
+    },
+    "vocello.settings.refinement.historyOnly": {
+      "comment": "Settings refinement: preserve consent, free functionality and product meaning. No placeholder prices.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "History only"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Historique uniquement"
+          }
+        }
+      }
+    },
+    "vocello.settings.refinement.autoPlay": {
+      "comment": "Settings refinement: preserve consent, free functionality and product meaning. No placeholder prices.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Play generated audio"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lire l’audio généré"
+          }
+        }
+      }
+    },
+    "vocello.settings.refinement.autoPlayDetail": {
+      "comment": "Settings refinement: preserve consent, free functionality and product meaning. No placeholder prices.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatically play each finished take."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lire automatiquement chaque prise terminée."
+          }
+        }
+      }
+    },
+    "vocello.settings.refinement.voiceModels": {
+      "comment": "Settings refinement: preserve consent, free functionality and product meaning. No placeholder prices.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Voice Models"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modèles vocaux"
+          }
+        }
+      }
+    },
+    "vocello.settings.refinement.voiceModelsDetail": {
+      "comment": "Settings refinement: preserve consent, free functionality and product meaning. No placeholder prices.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "One private model per Studio mode."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Un modèle privé par mode du Studio."
+          }
+        }
+      }
+    },
+    "vocello.settings.refinement.voiceModelsHint": {
+      "comment": "Settings refinement: preserve consent, free functionality and product meaning. No placeholder prices.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opens Voice Models"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ouvre les modèles vocaux"
+          }
+        }
+      }
+    },
+    "vocello.settings.refinement.savedOutputs": {
+      "comment": "Settings refinement: preserve consent, free functionality and product meaning. No placeholder prices.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saved outputs"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fichiers enregistrés"
+          }
+        }
+      }
+    },
+    "vocello.settings.refinement.savedOutputsDetail": {
+      "comment": "Settings refinement: preserve consent, free functionality and product meaning. No placeholder prices.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "History or a folder in Files."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Historique ou dossier dans Fichiers."
+          }
+        }
+      }
+    },
+    "vocello.settings.refinement.savedOutputsHint": {
+      "comment": "Settings refinement: preserve consent, free functionality and product meaning. No placeholder prices.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opens saved output options"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ouvre les options d’enregistrement"
+          }
+        }
+      }
+    },
+    "vocello.settings.refinement.keepInHistory": {
+      "comment": "Settings refinement: preserve consent, free functionality and product meaning. No placeholder prices.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keep in History"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Conserver dans l’historique"
+          }
+        }
+      }
+    },
+    "vocello.settings.refinement.chooseFolder": {
+      "comment": "Settings refinement: preserve consent, free functionality and product meaning. No placeholder prices.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose Files folder…"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choisir un dossier dans Fichiers…"
+          }
+        }
+      }
+    },
+    "vocello.settings.refinement.reduceMotion": {
+      "comment": "Settings refinement: preserve consent, free functionality and product meaning. No placeholder prices.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reduce Motion"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Réduire les animations"
+          }
+        }
+      }
+    },
+    "vocello.settings.refinement.reduceMotionDetail": {
+      "comment": "Settings refinement: preserve consent, free functionality and product meaning. No placeholder prices.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use simpler transitions and movement."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Utiliser des transitions et des mouvements plus simples."
+          }
+        }
+      }
+    },
+    "vocello.settings.refinement.reduceTransparency": {
+      "comment": "Settings refinement: preserve consent, free functionality and product meaning. No placeholder prices.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reduce Transparency"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Réduire la transparence"
+          }
+        }
+      }
+    },
+    "vocello.settings.refinement.reduceTransparencyDetail": {
+      "comment": "Settings refinement: preserve consent, free functionality and product meaning. No placeholder prices.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use more opaque navigation surfaces."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Utiliser des surfaces de navigation plus opaques."
+          }
+        }
+      }
+    },
+    "vocello.settings.refinement.cloneConsent": {
+      "comment": "Settings refinement: preserve consent, free functionality and product meaning. No placeholder prices.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I own or have permission to clone the voices I use"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Je possède les voix que j’utilise ou j’ai l’autorisation de les cloner"
+          }
+        }
+      }
+    },
+    "vocello.settings.refinement.cloneConsentDetail": {
+      "comment": "Settings refinement: preserve consent, free functionality and product meaning. No placeholder prices.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Required for Voice Cloning."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Requis pour le clonage vocal."
+          }
+        }
+      }
+    },
+    "vocello.settings.refinement.cloneDisclosure": {
+      "comment": "Settings refinement: preserve consent, free functionality and product meaning. No placeholder prices.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "If you publish audio of a cloned real voice, disclose that it is AI-generated. EU law may require this."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Si vous publiez l’audio d’une voix réelle clonée, indiquez qu’il est généré par IA. Le droit de l’UE peut l’exiger."
+          }
+        }
+      }
+    },
+    "vocello.settings.refinement.cloneDisclosureHint": {
+      "comment": "Settings refinement: preserve consent, free functionality and product meaning. No placeholder prices.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI-generated audio disclosure. If you publish audio of a cloned real voice, disclose that it is AI-generated. EU law may require this."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mention de l’audio généré par IA. Si vous publiez l’audio d’une voix réelle clonée, indiquez qu’il est généré par IA. Le droit de l’UE peut l’exiger."
+          }
+        }
+      }
+    },
+    "vocello.settings.refinement.privacyHint": {
+      "comment": "Settings refinement: preserve consent, free functionality and product meaning. No placeholder prices.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opens the Vocello Privacy Policy"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ouvre la politique de confidentialité de Vocello"
+          }
+        }
+      }
+    },
+    "vocello.settings.refinement.permissions": {
+      "comment": "Settings refinement: preserve consent, free functionality and product meaning. No placeholder prices.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Permissions"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Autorisations"
+          }
+        }
+      }
+    },
+    "vocello.settings.refinement.permissionsDetail": {
+      "comment": "Settings refinement: preserve consent, free functionality and product meaning. No placeholder prices.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Microphone and speech recognition."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Microphone et reconnaissance vocale."
+          }
+        }
+      }
+    },
+    "vocello.settings.refinement.systemSettings": {
+      "comment": "Settings refinement: preserve consent, free functionality and product meaning. No placeholder prices.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iOS Settings"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Réglages iOS"
+          }
+        }
+      }
+    },
+    "vocello.settings.refinement.permissionsHint": {
+      "comment": "Settings refinement: preserve consent, free functionality and product meaning. No placeholder prices.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Leaves Vocello and opens iOS Settings"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quitte Vocello et ouvre les réglages iOS"
+          }
+        }
+      }
+    },
+    "vocello.settings.refinement.variation": {
+      "comment": "Settings refinement: preserve consent, free functionality and product meaning. No placeholder prices.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Take variation"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Variation des prises"
+          }
+        }
+      }
+    },
+    "vocello.settings.refinement.variationDetail": {
+      "comment": "Settings refinement: preserve consent, free functionality and product meaning. No placeholder prices.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose how much finished takes vary."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choisissez le degré de variation des prises terminées."
+          }
+        }
+      }
+    },
+    "vocello.settings.refinement.variationHint": {
+      "comment": "Settings refinement: preserve consent, free functionality and product meaning. No placeholder prices.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose Expressive, Balanced, or Consistent"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choisissez Expressive, Balanced ou Consistent"
+          }
+        }
+      }
+    },
+    "vocello.settings.refinement.version": {
+      "comment": "Settings refinement: preserve consent, free functionality and product meaning. No placeholder prices.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Version"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Version"
+          }
+        }
+      }
+    },
+    "vocello.settings.refinement.modelsReady": {
+      "comment": "Settings refinement: preserve consent, free functionality and product meaning. No placeholder prices.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%d of %d ready"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%d sur %d prêts"
+          }
+        }
+      }
+    },
+    "vocello.export.root_summary": {
+      "comment": "Settings refinement: preserve consent, free functionality and product meaning. No placeholder prices.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "One-time export unlock"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Déblocage des exports en un seul achat"
+          }
+        }
+      }
+    },
+    "vocello.export.benefit": {
+      "comment": "Settings refinement: preserve consent, free functionality and product meaning. No placeholder prices.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save and share audio created with Voice Design and Voice Clone."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enregistrez et partagez l’audio créé avec Voice Design et Voice Clone."
+          }
+        }
+      }
+    },
+    "vocello.export.free_detail": {
+      "comment": "Settings refinement: preserve consent, free functionality and product meaning. No placeholder prices.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Generation, listening, and History are free in every mode. Built-in voice exports are free too."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La génération, l’écoute et l’historique sont gratuits dans tous les modes. Les exports de voix intégrées sont gratuits aussi."
+          }
+        }
+      }
+    },
+    "vocello.export.one_time": {
+      "comment": "Settings refinement: preserve consent, free functionality and product meaning. No placeholder prices.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "One-time purchase. No subscription."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Achat unique. Aucun abonnement."
+          }
+        }
+      }
+    },
+    "vocello.export.thanks": {
+      "comment": "Settings refinement: preserve consent, free functionality and product meaning. No placeholder prices.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Thank you for supporting Vocello. Your purchase helps fund its continued development and future independent projects."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Merci de soutenir Vocello. Votre achat contribue à financer son développement et de futurs projets indépendants."
+          }
+        }
+      }
+    },
     "vocello.export.privacy" : {
       "comment": "Opens the published Vocello Privacy Policy page.",
       "extractionState": "manual",
@@ -9,6 +855,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Privacy Policy"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Politique de confidentialité"
           }
         }
       }
@@ -22,6 +874,12 @@
             "state": "translated",
             "value": "Help & Support"
           }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aide et assistance"
+          }
         }
       }
     },
@@ -33,6 +891,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Design & Clone Export"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exports Design et Clone"
           }
         }
       }
@@ -46,6 +910,12 @@
             "state": "translated",
             "value": "Generate, listen, and keep every take in History for free. Built-in exports are free. A one-time purchase unlocks sharing and saving Voice Design and Voice Clone audio outside Vocello on iOS."
           }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Générez, écoutez et conservez gratuitement chaque prise dans l’historique. Les exports de voix intégrées sont gratuits. Un achat unique débloque le partage et l’enregistrement de l’audio Voice Design et Voice Clone hors de Vocello sur iOS."
+          }
         }
       }
     },
@@ -57,6 +927,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Export unlocked"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exports débloqués"
           }
         }
       }
@@ -70,6 +946,30 @@
             "state": "translated",
             "value": "Close this sheet and choose Share or Download again to export your selected clip."
           }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fermez cette fenêtre, puis choisissez de nouveau Partager ou Télécharger pour exporter le clip sélectionné."
+          }
+        }
+      }
+    },
+    "vocello.export.owned_unavailable" : {
+      "comment": "Product information failed to load, but the verified export entitlement remains active. Do not imply exports are blocked.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Purchase information is currently unavailable. Your export unlock is still active; you can save and share audio in every mode."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les informations d’achat sont actuellement indisponibles. L’exportation reste déverrouillée : vous pouvez enregistrer et partager l’audio dans tous les modes."
+          }
         }
       }
     },
@@ -81,6 +981,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "The purchase is currently unavailable. Your audio stays in Vocello. You can try again or restore an existing purchase."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’achat est actuellement indisponible. Votre audio reste dans Vocello. Vous pouvez réessayer ou restaurer un achat existant."
           }
         }
       }
@@ -94,6 +1000,12 @@
             "state": "translated",
             "value": "Try Again"
           }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Réessayer"
+          }
         }
       }
     },
@@ -105,6 +1017,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Checking purchase…"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vérification de l’achat…"
           }
         }
       }
@@ -118,6 +1036,12 @@
             "state": "translated",
             "value": "Restore Purchases"
           }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restaurer les achats"
+          }
         }
       }
     },
@@ -129,6 +1053,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Done"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terminé"
           }
         }
       }
@@ -142,6 +1072,12 @@
             "state": "translated",
             "value": "View options"
           }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Voir les options"
+          }
         }
       }
     },
@@ -153,6 +1089,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Opens export purchase options and Restore Purchases"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ouvre les options d’achat des exports et de restauration des achats"
           }
         }
       }
@@ -166,6 +1108,12 @@
             "state": "translated",
             "value": "All clips stay in History. An optional Files folder also receives new Built-in clips; Design and Clone copies require the export unlock. If purchase access is still being checked, export those clips manually from History afterward."
           }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tous les clips restent dans l’historique. Un dossier facultatif dans Fichiers reçoit aussi les nouveaux clips de voix intégrées ; les copies Design et Clone nécessitent le déblocage des exports. Si l’accès à l’achat est encore en cours de vérification, exportez ensuite ces clips manuellement depuis l’historique."
+          }
         }
       }
     },
@@ -177,6 +1125,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Purchase pending approval. You can continue generating and listening."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Achat en attente d’approbation. Vous pouvez continuer à générer et à écouter."
           }
         }
       }
@@ -190,6 +1144,12 @@
             "state": "translated",
             "value": "Purchase cancelled. No export access was changed."
           }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Achat annulé. L’accès aux exports n’a pas changé."
+          }
         }
       }
     },
@@ -201,6 +1161,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "The App Store operation could not complete. Try again. Your clips remain in History."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’opération App Store n’a pas pu aboutir. Réessayez. Vos clips restent dans l’historique."
           }
         }
       }
@@ -214,6 +1180,12 @@
             "state": "translated",
             "value": "The purchase could not be verified. Try Restore Purchases or contact support."
           }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’achat n’a pas pu être vérifié. Essayez de restaurer les achats ou contactez l’assistance."
+          }
         }
       }
     },
@@ -225,6 +1197,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Your export purchase has been restored."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Votre achat des exports a été restauré."
           }
         }
       }
@@ -238,6 +1216,12 @@
             "state": "translated",
             "value": "No export purchase was found for this Apple Account."
           }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aucun achat des exports n’a été trouvé pour ce compte Apple."
+          }
         }
       }
     },
@@ -249,6 +1233,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Unlock exports — %@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Débloquer les exports — %@"
           }
         }
       }
@@ -384,59 +1374,147 @@
       }
     },
     "vocello.settings.help_support" : {
-      "comment" : "Settings row opening the public Vocello support page.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Help & Support" } }
+      "comment": "Settings row opening the public Vocello support page.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Help & Support"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aide et assistance"
+          }
+        }
       }
     },
     "vocello.settings.help_support.hint" : {
-      "comment" : "VoiceOver hint for the support-page link.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Opens the Vocello support page" } }
+      "comment": "VoiceOver hint for the support-page link.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opens the Vocello support page"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ouvre la page d’assistance de Vocello"
+          }
+        }
       }
     },
     "vocello.settings.help_support.subtitle" : {
-      "comment" : "Settings support-row description.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Troubleshooting and contact." } }
+      "comment": "Settings support-row description.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Troubleshooting and contact."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dépannage et contact."
+          }
+        }
       }
     },
     "vocello.settings.on_device" : {
-      "comment" : "Value indicating that license details are available inside the app.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "On Device" } }
+      "comment": "Value indicating that license details are available inside the app.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "On Device"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sur l’appareil"
+          }
+        }
       }
     },
     "vocello.settings.open_source_licenses" : {
-      "comment" : "Settings row opening bundled open-source license details.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Open Source & Licenses" } }
+      "comment": "Settings row opening bundled open-source license details.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Source & Licenses"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Code ouvert et licences"
+          }
+        }
       }
     },
     "vocello.settings.open_source_licenses.hint" : {
-      "comment" : "VoiceOver hint for the bundled license browser.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Shows software and model license details stored in Vocello" } }
+      "comment": "VoiceOver hint for the bundled license browser.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shows software and model license details stored in Vocello"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Affiche les détails des licences des logiciels et des modèles conservés dans Vocello"
+          }
+        }
       }
     },
     "vocello.settings.source_code" : {
-      "comment" : "Settings row opening the public source repository.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Source Code" } }
+      "comment": "Settings row opening the public source repository.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Source Code"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Code source"
+          }
+        }
       }
     },
     "vocello.settings.source_code.hint" : {
-      "comment" : "VoiceOver hint for the source-repository link.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Opens the Vocello source repository on GitHub" } }
+      "comment": "VoiceOver hint for the source-repository link.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opens the Vocello source repository on GitHub"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ouvre le dépôt de code source de Vocello sur GitHub"
+          }
+        }
       }
     },
     "vocello.settings.website" : {

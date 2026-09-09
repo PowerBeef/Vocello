@@ -161,7 +161,7 @@ struct OpenSourceLicensesScreen: View {
         HStack(spacing: 8) {
             Button { dismiss() } label: {
                 Image(systemName: "chevron.left")
-                    .font(.body.weight(.semibold))
+                    .font(.system(size: 17, weight: .semibold))
                     .foregroundStyle(Theme.Text.primary)
                     .frame(width: 44, height: 44)
                     .background(Theme.Surface.inline, in: Circle())
@@ -169,7 +169,7 @@ struct OpenSourceLicensesScreen: View {
                     .contentShape(Circle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(String(localized: "vocello.licenses.back_to_settings"))
+            .accessibilityLabel(IOSSettingsText.backAbout)
             .accessibilityIdentifier("iosSettings_openSourceBackButton")
 
             Text(String(localized: "vocello.settings.open_source_licenses"))
@@ -237,7 +237,7 @@ private struct IOSAttributionDetailScreen: View {
         HStack(spacing: 8) {
             Button { dismiss() } label: {
                 Image(systemName: "chevron.left")
-                    .font(.body.weight(.semibold))
+                    .font(.system(size: 17, weight: .semibold))
                     .foregroundStyle(Theme.Text.primary)
                     .frame(width: 44, height: 44)
                     .background(Theme.Surface.inline, in: Circle())

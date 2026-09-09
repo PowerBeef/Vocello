@@ -4,6 +4,37 @@ import Foundation
 import UIKit
 #endif
 
+#if os(iOS)
+@MainActor
+enum VocelloUISettingsReveal {
+    static func viewport(in app: XCUIApplication) -> CGRect? {
+        let dock = VocelloUIWait.element(app, id: "rootTabDock")
+        guard dock.exists else { return nil }
+        let statusBar = app.statusBars.firstMatch
+        return VocelloUIRevealRequirement.viewport(
+            window: app.windows.firstMatch.frame,
+            statusBar: statusBar.exists ? statusBar.frame : nil, dock: dock.frame)
+    }
+
+    static func perform(_ target: XCUIElement, in app: XCUIApplication, swipingUp: Bool,
+                        requirement: VocelloUIRevealRequirement = .fullVisibility) -> Bool {
+        var search = VocelloUIRevealSearch(preferred: swipingUp ? .up : .down)
+        while app.state == .runningForeground {
+            guard let visible = viewport(in: app) else { return false }
+            let frame = target.exists ? target.frame : nil
+            if let frame, target.isHittable, requirement.satisfied(by: frame, visible: visible) { return true }
+            let required = frame.map { requirement.requiredFrame($0, visible: visible) }
+            guard let swipe = search.next(target: required, visible: visible) else { return false }
+            switch swipe {
+            case .up: app.swipeUp()
+            case .down: app.swipeDown()
+            }
+        }
+        return false
+    }
+}
+#endif
+
 /// A per-test application session. Callers own the instance and must not share it
 /// across test methods.
 @MainActor

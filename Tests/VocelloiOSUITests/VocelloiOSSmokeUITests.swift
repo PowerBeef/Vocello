@@ -200,15 +200,24 @@ final class VocelloiOSSmokeUITests: VocelloiOSUITestCase {
 
             select(tab: .settings)
             let settings = element("screen_settings")
-            let autoplay = element("iosSettings_autoPlayToggle")
-            let variation = element("iosSettings_variationRow")
+            openSettingsRoot()
             XCTAssertTrue(VocelloUIWait.exists(settings, timeout: 20))
+            openSettingsPage(for: "iosSettings_autoPlayToggle")
+            let autoplay = element("iosSettings_autoPlayToggle")
+            XCTAssertTrue(VocelloUIWait.exists(autoplay, timeout: 20))
+            assertAboveTabDock(autoplay, named: "Play generated audio", category: category.name)
+            assertAccessibilityControl(autoplay, named: "Play generated audio", category: category.name)
+            VocelloUIScreenshot.attach(app, named: "ios-settings-\(category.name)-autoplay")
+            openSettingsPage(for: "iosSettings_variationRow")
+            let variation = element("iosSettings_variationRow")
+            XCTAssertTrue(VocelloUIWait.exists(element("screen_settings_audio"), timeout: 20))
             XCTAssertTrue(VocelloUIWait.exists(autoplay, timeout: 20))
             XCTAssertTrue(VocelloUIWait.exists(variation, timeout: 20))
-            assertAccessibilityControl(autoplay, named: "Play generated audio", category: category.name)
+            assertAboveTabDock(variation, named: "Take variation", category: category.name)
             assertAccessibilityControl(variation, named: "Take variation", category: category.name)
             VocelloUIScreenshot.attach(app, named: "ios-settings-\(category.name)-landing")
 
+            openSettingsPage(for: "iosSettings_versionLabel")
             let version = element("iosSettings_versionLabel")
             XCTAssertTrue(VocelloUIWait.exists(version, timeout: 20))
             XCTAssertTrue(revealSettingsElement(version, swipingUp: true))
@@ -349,19 +358,13 @@ final class VocelloiOSSmokeUITests: VocelloiOSUITestCase {
         named name: String,
         category: String
     ) {
-        let settingsTab = self.element(VocelloiOSTab.settings.identifier)
-        XCTAssertTrue(VocelloUIWait.exists(settingsTab, timeout: 20))
-        // XCUITest can report an element as hittable while the floating dock
-        // still overlaps its frame. Continue scrolling until the visual
-        // clearance contract itself is satisfied.
-        for _ in 0..<20 where element.exists && element.frame.maxY > settingsTab.frame.minY {
-            app.swipeUp()
+        XCTAssertTrue(VocelloUISettingsReveal.perform(element, in: app, swipingUp: true,
+                                                      requirement: .fullVisibility))
+        guard let visible = VocelloUISettingsReveal.viewport(in: app) else {
+            XCTFail("Missing whole-dock viewport at \(category)"); return
         }
-        XCTAssertLessThanOrEqual(
-            element.frame.maxY,
-            settingsTab.frame.minY,
-            "\(name) must scroll fully above the floating tab dock at \(category)"
-        )
+        XCTAssertTrue(VocelloUIRevealRequirement.fullVisibility.satisfied(by: element.frame, visible: visible),
+                      "\(name) must be fully visible above the whole tab dock at \(category)")
         XCTAssertGreaterThanOrEqual(element.frame.minX, app.frame.minX)
         XCTAssertLessThanOrEqual(element.frame.maxX, app.frame.maxX)
     }

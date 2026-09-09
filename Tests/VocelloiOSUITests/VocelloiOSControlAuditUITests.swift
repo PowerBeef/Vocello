@@ -288,10 +288,15 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
             actual: "Existing installation had no onboarding after visible launch normalization"
         )
         VocelloUIScreenshot.attach(app, named: "ios-control-audit-inventory")
+        assertSettingsLandingArchitecture()
+        recorder.record(scenario: "inventory", controlID: "settings-navigation",
+            expected: "All five Settings pages, original controls, nested destinations and Back remain reachable",
+            actual: "Hub and destination assertions completed through genuine controls")
     }
 
     private func auditExportPurchasePresentation() {
         select(tab: .settings)
+        openSettingsPage(for: "iosSettings_exportPurchaseRow")
         let row = element("iosSettings_exportPurchaseRow")
         guard revealSettingsElement(row, swipingUp: true),
               VocelloUIPrimaryAction.perform(on: row, timeout: 20) else {
@@ -406,6 +411,7 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
         defer { endSession() }
 
         select(tab: .settings)
+        openSettingsPage(for: "iosSettings_openSourceRow")
         let attribution = element("iosSettings_openSourceRow")
         XCTAssertTrue(VocelloUIWait.exists(attribution, timeout: 20))
         XCTAssertTrue(revealSettingsElement(attribution, swipingUp: true))
@@ -482,6 +488,7 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
             }
             select(tab: .settings)
             for identifier in ["iosSettings_autoPlayToggle", "iosSettings_variationRow"] {
+                openSettingsPage(for: identifier)
                 assertAccessibleTarget(element(identifier), category: name)
             }
             VocelloUIScreenshot.attach(app, named: "ios-control-audit-accessibility-\(name)")
@@ -809,6 +816,7 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
         }
         deleteAuditVoiceIfPresent()
         select(tab: .settings)
+        openSettingsPage(for: "voiceCloning_consentAcknowledgment")
         let consent = element("voiceCloning_consentAcknowledgment")
         XCTAssertTrue(VocelloUIWait.exists(consent, timeout: 20))
         XCTAssertTrue(revealSettingsElement(consent, swipingUp: true))
@@ -909,6 +917,7 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
     private func restoreCloneConsentIfNeeded() {
         guard cloneConsentWasEnabledBeforeAudit == false else { return }
         select(tab: .settings)
+        openSettingsPage(for: "voiceCloning_consentAcknowledgment")
         let consent = element("voiceCloning_consentAcknowledgment")
         XCTAssertTrue(VocelloUIWait.exists(consent, timeout: 20))
         XCTAssertTrue(revealSettingsElement(consent, swipingUp: true))
@@ -1192,6 +1201,7 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
 
     private func auditVariationOptions() {
         select(tab: .settings)
+        openSettingsPage(for: "iosSettings_variationRow")
         let picker = element("iosSettings_variationRow")
         XCTAssertTrue(VocelloUIWait.exists(picker, timeout: 20))
         let original = (picker.value as? String) ?? "Expressive"
@@ -1264,6 +1274,7 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
 
     private func selectVariation(_ id: String) {
         select(tab: .settings)
+        openSettingsPage(for: "iosSettings_variationRow")
         let picker = element("iosSettings_variationRow")
         XCTAssertTrue(VocelloUIWait.exists(picker, timeout: 20))
         XCTAssertTrue(revealSettingsElement(picker, swipingUp: false))
@@ -1276,6 +1287,7 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
 
     private func selectedVariationID() -> String {
         select(tab: .settings)
+        openSettingsPage(for: "iosSettings_variationRow")
         let picker = element("iosSettings_variationRow")
         XCTAssertTrue(VocelloUIWait.exists(picker, timeout: 20))
         let value = ((picker.value as? String) ?? picker.label).lowercased()
@@ -1295,7 +1307,7 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
     }
 
     private func mutateAndRestoreToggle(_ identifier: String) {
-        select(tab: .settings)
+        openSettingsPage(for: identifier)
         let toggle = element(identifier)
         XCTAssertTrue(VocelloUIWait.exists(toggle, timeout: 20))
         XCTAssertTrue(revealSettingsElement(toggle, swipingUp: true))
@@ -1331,7 +1343,7 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
     }
 
     private func verifyExternalHandoff(identifier: String, expectedApplication: String?) {
-        select(tab: .settings)
+        openSettingsPage(for: identifier)
         let control = element(identifier)
         XCTAssertTrue(VocelloUIWait.exists(control, timeout: 20))
         XCTAssertTrue(revealSettingsElement(control, swipingUp: true))
@@ -1349,7 +1361,7 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
         XCTAssertTrue(VocelloUIWait.condition("Vocello to return", timeout: 30) {
             self.app.state == .runningForeground
         })
-        XCTAssertTrue(VocelloUIWait.exists(element("screen_settings"), timeout: 20))
+        XCTAssertTrue(VocelloUIWait.exists(control, timeout: 20), "Return to the same Settings destination")
     }
 
     private func assertAccessibleTarget(_ target: XCUIElement, category: String) {

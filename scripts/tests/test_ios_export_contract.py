@@ -25,7 +25,12 @@ class IOSExportContractTests(unittest.TestCase):
         policy = self.read("Sources/iOSSupport/Services/IOSExportAccessPolicy.swift")
         self.assertIn('static let productID = "' + product["productID"] + '"', policy)
         self.assertIn("TEST", product["localizations"][0]["displayName"])
-        self.assertNotIn("VocelloExports.storekit", self.read("project.yml"))
+        import yaml
+        project = yaml.safe_load(self.read("project.yml"))
+        owners = [name for name, target in project["targets"].items()
+                  if any(isinstance(source, dict) and source.get("path") == "Tests/Fixtures/VocelloExports.storekit"
+                         for source in target.get("sources", []))]
+        self.assertEqual(owners, ["VocelloiOSUITests"])
         for scheme in (ROOT / "QwenVoice.xcodeproj/xcshareddata/xcschemes").glob("*.xcscheme"):
             self.assertNotIn("VocelloExports.storekit", scheme.read_text())
 
@@ -99,7 +104,63 @@ class IOSExportContractTests(unittest.TestCase):
         strings = json.loads(self.read("Sources/Resources/Localizable.xcstrings"))["strings"]
         for key in re.findall(r'String\(localized: "([^"]+)"', text):
             self.assertIn(key, strings)
-            self.assertIn("en", strings[key]["localizations"])
+            for locale in ["en", "fr"]:
+                self.assertIn(locale, strings[key]["localizations"])
+
+    def test_refined_sheet_preserves_price_states_and_one_purchase_owner(self):
+        sheet = self.read("Sources/iOS/Commerce/IOSExportGate.swift").split("struct IOSExportPurchaseSheet", 1)[1]
+        for expression in ["private let store = IOSExportCommerce.shared",
+                           "store.access == .unlocked", "else if let product = store.product",
+                           "exportBuy(product.displayPrice)", "await store.purchase()",
+                           "await store.restore()", "await store.refresh()", "await store.loadProduct()",
+                           "store.operation != .idle || store.access == .checking",
+                           "if let notice = store.notice", "exportPurchaseNotice(notice, access: store.access)",
+                           "exportRetryAfterPurchase", "exportProductUnavailable",
+                           ".frame(maxWidth: .infinity, minHeight: 44)"]:
+            self.assertIn(expression, sheet)
+        for name in ["exportBenefit", "exportFreeDetail", "exportOneTime", "exportThanks"]:
+            self.assertIn(name, sheet)
+        self.assertNotIn("19.99", sheet)
+        self.assertNotIn("exportViewOptions", self.read("Sources/iOS/Settings/SettingsScreen.swift"))
+        self.assertNotIn("displayPrice", self.read("Sources/iOS/Settings/SettingsScreen.swift"))
+
+    def test_refined_settings_copy_has_bilingual_context_and_preserved_consent(self):
+        source = self.read("Sources/iOS/Settings/SettingsScreen.swift")
+        strings = json.loads(self.read("Sources/Resources/Localizable.xcstrings"))["strings"]
+        for key in re.findall(r'String\(localized: "([^"]+)"', source):
+            if not key.startswith("vocello.settings.refinement."):
+                continue
+            self.assertTrue(strings[key]["comment"])
+            for locale in ["en", "fr"]:
+                self.assertTrue(strings[key]["localizations"][locale]["stringUnit"]["value"])
+        self.assertEqual(strings["vocello.settings.refinement.cloneConsent"]["localizations"]["en"]["stringUnit"]["value"],
+                         "I own or have permission to clone the voices I use")
+        self.assertEqual(strings["vocello.settings.refinement.cloneDisclosure"]["localizations"]["en"]["stringUnit"]["value"],
+                         "If you publish audio of a cloned real voice, disclose that it is AI-generated. EU law may require this.")
+        for declaration in ['@AppStorage("autoPlay") private var autoPlay = true',
+                            '@AppStorage("vocello.voiceCloningConsent.v1") private var cloneConsentAcknowledged = false',
+                            'IOSSavedOutputsDestination.setFolder(url)', 'IOSSavedOutputsDestination.clearFolder()']:
+            self.assertIn(declaration, source)
+
+    def test_settings_decoration_is_bounded_without_capping_text(self):
+        rows = self.read("Sources/iOS/IOSSettingsViews.swift")
+        icon = rows.split("private struct IOSSettingsIcon", 1)[1].split("private struct IOSSettingsLabel", 1)[0]
+        self.assertIn(".scaledToFit()", icon)
+        self.assertIn(".frame(width: 20, height: 20)", icon)
+        self.assertIn(".frame(width: 28, height: 28)", icon)
+        self.assertIn(".accessibilityHidden(true)", icon)
+        toggle = rows.split("private struct IOSSettingsCompactToggleStyle", 1)[1].split("struct IOSSettingsToggleRow", 1)[0]
+        self.assertIn("dynamicTypeSize.isAccessibilitySize", toggle)
+        self.assertIn("AnyLayout(VStackLayout", toggle)
+        self.assertIn("AnyLayout(HStackLayout", toggle)
+        self.assertIn("configuration.isOn.toggle()", toggle)
+        self.assertIn(".frame(minWidth: 44, minHeight: 44)", toggle)
+        self.assertNotIn(".dynamicTypeSize(", rows)
+        self.assertNotIn(".minimumScaleFactor(", rows)
+        for path in ["SettingsScreen.swift", "VoiceModelsScreen.swift", "OpenSourceLicensesScreen.swift"]:
+            source = self.read("Sources/iOS/Settings/" + path)
+            for after in source.split('Image(systemName: "chevron.left")')[1:]:
+                self.assertIn(".font(.system(size: 17, weight: .semibold))", after[:150])
 
 
 if __name__ == "__main__":

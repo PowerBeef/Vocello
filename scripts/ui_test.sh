@@ -50,6 +50,7 @@ Usage:
   scripts/ui_test.sh ios control-audit [--scenario inventory|stateful|external|accessibility|generation|all] [--take-limit 5] [--resume RUN_ID]
   scripts/ui_test.sh ios enroll-clone-fixture
   scripts/ui_test.sh ios saved-voice-lifecycle
+  scripts/ui_test.sh ios purchase [--scenario lifecycle|exports] --retain-result
   scripts/ui_test.sh ios screen-protection --scenario inspect|enable
 
 The iOS destination is the paired physical iPhone only. Simulator destinations are unsupported.
@@ -91,7 +92,8 @@ platform="$1"
 lane="$2"
 shift 2
 [[ "$platform" == "macos" || "$platform" == "ios" ]] || usage
-[[ "$lane" == "localization" || "$lane" == "smoke" || "$lane" == "benchmark" || "$lane" == "model-download" || "$lane" == "control-audit" || "$lane" == "delivery-cohort" || "$lane" == "startup-parity" || "$lane" == "perf" || "$lane" == "enroll-clone-fixture" || "$lane" == "saved-voice-lifecycle" || "$lane" == "screen-protection" ]] || usage
+[[ "$lane" == "localization" || "$lane" == "smoke" || "$lane" == "benchmark" || "$lane" == "model-download" || "$lane" == "control-audit" || "$lane" == "delivery-cohort" || "$lane" == "startup-parity" || "$lane" == "perf" || "$lane" == "enroll-clone-fixture" || "$lane" == "saved-voice-lifecycle" || "$lane" == "screen-protection" || "$lane" == "purchase" ]] || usage
+[[ "$lane" != "purchase" || "$platform" == "ios" ]] || usage
 [[ "$lane" != "model-download" || "$platform" == "ios" ]] || usage
 [[ "$lane" != "control-audit" || "$platform" == "ios" ]] || usage
 [[ "$lane" != "delivery-cohort" || "$platform" == "ios" ]] || usage
@@ -180,6 +182,10 @@ elif [[ "$platform" == "ios" && "$lane" == "smoke" && -n "$scenario_argument" ]]
     || die "development iOS smoke --scenario accepts only history-transcript"
   [[ "$history_row_id" =~ ^generation-[0-9]+$ ]] \
     || die "history-transcript requires an exact --history-row-id generation-N"
+elif [[ "$platform" == "ios" && "$lane" == "purchase" ]]; then
+  scenario_argument="${scenario_argument:-lifecycle}"
+  [[ "$scenario_argument" == "lifecycle" || "$scenario_argument" == "exports" ]] \
+    || die "purchase --scenario must be lifecycle or exports"
 elif [[ -n "$scenario_argument" ]]; then
   die "--scenario requires model-download, control-audit, screen-protection, or development ios smoke"
 fi
@@ -1430,6 +1436,12 @@ else
     export TEST_RUNNER_QVOICE_IOS_PERF_RUN_ID="$run_id"
   elif [[ "$lane" == "enroll-clone-fixture" ]]; then
     only_test="VocelloiOSUITests/VocelloiOSFixtureEnrollmentUITests/testEnrollBenchmarkCloneFixtureFromDocuments"
+  elif [[ "$lane" == "purchase" ]]; then
+    only_test="VocelloiOSUITests/VocelloiOSPurchaseUITests/testLocalPurchaseLifecycle"
+    export TEST_RUNNER_QVOICE_IOS_PURCHASE_RUN_ID="$run_id"
+    export TEST_RUNNER_QVOICE_IOS_PURCHASE_SCENARIO="$scenario_argument"
+    purchase_fixture_digest="$(shasum -a 256 "$ROOT_DIR/Tests/Fixtures/VocelloExports.storekit" | cut -d ' ' -f 1)"
+    export TEST_RUNNER_QVOICE_IOS_PURCHASE_FIXTURE_SHA256="$purchase_fixture_digest"
   elif [[ "$lane" == "saved-voice-lifecycle" ]]; then
     only_test="VocelloiOSUITests/VocelloiOSSavedVoiceLifecycleUITests/testImportPreviewHandoffAndDeleteSavedVoice"
   elif [[ "$lane" == "screen-protection" ]]; then
@@ -1472,7 +1484,7 @@ else
       -disableAutomaticPackageResolution \
       -onlyUsePackageVersionsFromResolvedFile \
       -resultBundlePath "$result" -collect-test-diagnostics never \
-      -only-testing:"$only_test" \
+      -only-testing:"$only_test" -parallel-testing-enabled NO \
       -allowProvisioningUpdates DEVELOPMENT_TEAM="$team" CODE_SIGN_STYLE=Automatic \
       ARCHS=arm64 ONLY_ACTIVE_ARCH=YES \
       QVOICE_INTERNAL_DIAGNOSTICS_SWIFT_FLAG=-DVOCELLO_INTERNAL_DIAGNOSTICS \
@@ -1488,11 +1500,14 @@ else
       --path "$result" --compact >"$out/xcresult-test-summary.json" \
       2>"$out/xcresult-summary.log" || true
   fi
-  if [[ ( "$lane" == "startup-parity" || "$lane" == "control-audit" ) \
+  if [[ ( "$lane" == "startup-parity" || "$lane" == "control-audit" || "$lane" == "purchase" ) \
       && "$xcuitest_status" -ne 0 ]]; then
     if [[ "$lane" == "startup-parity" ]]; then
       printf 'scripts/ui_test.sh ios startup-parity --script-file %q\n' \
         "$startup_parity_script_file" >"$out/exact-manual-rerun-command.txt"
+    elif [[ "$lane" == "purchase" ]]; then
+      printf 'scripts/ui_test.sh ios purchase --scenario %q --retain-result\n' "$scenario_argument" \
+        >"$out/exact-manual-rerun-command.txt"
     else
       printf 'scripts/ui_test.sh ios control-audit --scenario %q\n' \
         "$control_scenario" >"$out/exact-manual-rerun-command.txt"
@@ -1652,6 +1667,18 @@ PY
     fi
   fi
 
+  purchase_status=0
+  if [[ "$lane" == "purchase" ]]; then
+    if ! required_step_run "$step_ledger" purchase-validation \
+        python3 "$ROOT_DIR/scripts/ios_purchase_acceptance.py" \
+          --log "$out/xcodebuild.log" --run-id "$run_id" \
+          --fixture-sha256 "$purchase_fixture_digest" \
+          --scenario "$scenario_argument" --require-restoration \
+          --output "$out/local-purchase-summary.json"; then
+      purchase_status=1
+      warn "local StoreKit evidence incomplete; retained result is not purchase acceptance"
+    fi
+  fi
   crash_delta_status=0
   if ! required_step_run "$step_ledger" crash-delta check_ios_crash_delta; then
     crash_delta_status=1
@@ -1666,7 +1693,7 @@ PY
       warn "iOS smoke memory-pressure diagnostics gate failed"
     fi
   fi
-  if (( xcuitest_status != 0 || dsym_status != 0 || model_diagnostics_status != 0 || startup_parity_status != 0 || control_audit_status != 0 || crash_delta_status != 0 || smoke_diagnostics_status != 0 )); then
+  if (( xcuitest_status != 0 || dsym_status != 0 || model_diagnostics_status != 0 || startup_parity_status != 0 || control_audit_status != 0 || crash_delta_status != 0 || smoke_diagnostics_status != 0 || purchase_status != 0 )); then
     die "physical-iPhone $lane failed; complete available forensics are preserved in $out"
   fi
   write_build_provenance "$IOS_DERIVED/last-build.json" \

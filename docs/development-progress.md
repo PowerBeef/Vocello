@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-09-08
+reviewed: 2026-09-09
 summary: Current release-first resume checkpoint; dated evidence lives in the pinned development history, and config/roadmap.json owns status.
 sourceOfTruth:
   - config/roadmap.json
@@ -14,6 +14,171 @@ Start here, then follow `config/roadmap.json`'s `primaryPlan` and the
 This is a narrative, not a second work ledger. Product source, contracts and scripts win.
 
 ## Resume now
+
+### September 9 follow-up physical QA — local purchases PASS; Settings still incomplete
+
+The authorized two-hour session ended well before its deadline. Source and documentation stayed
+frozen through both independent runs; no automatic retry or production change occurred.
+
+- `ios-xcui-localization-20260909-170023-1a55e996` failed after 146.7 seconds. Default
+  Audio/About/Voice Models and AX-L Audio assertions completed; AX-L About navigation failed in
+  the shared reveal helper. Six named captures and the actual final hub screenshot remain retained.
+  The About row appears visible above the dock, but exact row/dock query frames were not retained:
+  a geometry-boundary explanation is a hypothesis, not a proven product defect. AX-L About/models,
+  AX-XXXL and pseudo-AX-XXXL remain unverified. Crash collection and source checks passed.
+- `ios-xcui-purchase-20260909-170541-2f432ab1` passed all 23 local StoreKit phases in
+  295.8 seconds. The corrected owned/product-unavailable guidance is visible and asserted;
+  owned/revoked History and full-player routes passed for all three modes. Complete runner ledger,
+  source, crash delta and schema-3 restoration passed. Test transactions were cleared, original
+  History filter/tab restored and Vocello terminated. No real charge, transfer or generation occurred.
+
+Visual inspection confirms clearer icon/Back sizing on Default screens and vertical switch reflow
+on AX-L Audio, plus consistent ordinary-size purchase messaging. It does not establish larger-size
+or comprehensive bilingual acceptance. The extended unavailable-product text scrolls; complete
+footer visibility was not independently exercised. Raw screenshots may contain personal History
+and remain untracked. Local fixture pricing is not the live product price. Actual offline,
+App Store sandbox and processed-candidate purchase acceptance remain separate open requirements.
+
+Next under ISU-4: retain the failure, capture actual row/dock geometry at the existing navigation
+boundary, correct demonstrated reachability and then run the incomplete layout configurations with
+fresh authorization. Preserve strict full-layout assertions. RF-13 retains the remaining purchase
+acceptance surfaces. Initial preflight's stale preserved dSYM was re-synced with the existing
+UUID-validating helper; no cache purge or product change was needed. This post-collection narrative
+changes full-tree identity and does not relabel either run as future candidate evidence.
+No AGENTS.md change is needed. Device work has stopped; the phone may be taken or locked.
+
+### September 9 focused Settings follow-up — implementation, not renewed device acceptance
+
+The bounded QA findings are corrected in source: decorative icons fit their slots, Back chevrons
+fit existing 44-point controls, and accessibility-size switches reflow vertically without capping
+text. Purchase notices now distinguish unavailable product information from an existing verified
+export unlock, with English/French copy; entitlement and export decisions are unchanged.
+
+The unchanged dock now exposes its real containing accessibility frame. Shared Settings reveal and
+layout assertions use that whole boundary with four-point clearance, not the lower Settings button.
+Only explicit oversized navigation may use a safely visible central 44-point band plus hittability;
+ordinary controls and layout checks retain full-frame visibility. Native geometry fixtures include
+the previously false-passing two-row dock, oversized navigation versus layout, boundary and invalid
+frames. The physical layout walk now checks and captures Auto-play clearance before variation;
+the purchase lane asserts owned/unavailable wording without rerunning any transaction here.
+
+Focused verification passed: 123 Python tests and nine native geometry/presentation tests, with
+zero failures. The complete `scripts/dev.sh checkpoint` then passed: 1,710 Python tests, 611 core,
+19 transport and 125 runtime tests (three optional fixture-dependent skips), project contracts,
+derived validation, macOS app build and generic iOS app/logic compilation. The updated iOS XCUITest
+bundle separately passed generic device-SDK `build-for-testing` without installation or execution.
+Native evidence remains under `mac-test-20260909-124931`; the compile log is retained in the governed
+foundation artifacts. Existing advisory documentation/roadmap freshness warnings remain; this is
+not a warning-free global audit. This final narrative update is documentation-only.
+No phone run, real transaction, account change or release operation is part of this patch.
+ISU-4 remains in flight pending fresh authorized visual/device acceptance;
+the failed/partial Settings runs and prior 23-phase local purchase PASS below retain their original
+source identities. No AGENTS.md change is needed for this scoped implementation.
+
+### September 9 repaired-source device QA — purchase PASS, Settings stress failure
+
+The maintainer paused `ios-xcui-localization-20260909-155529-2eeb7f10` after the Default
+captures, then explicitly resumed after enabling Do Not Disturb. That partial run remains failed
+and retained. No purchase test started before the pause; no original evidence was overwritten.
+
+New `ios-xcui-localization-20260909-160056-aecc5f90` completed Default, AX-L and AX-XXXL
+Audio/About/Voice Models assertions. Pseudo-AX-XXXL reached Audio and About, then failed revealing
+Models & Files at 417.4 seconds. Eleven named PNGs plus the actual last-observed hub screenshot
+remain untracked. The expanded row exceeds the visible viewport, while the helper requires its
+entire frame above the dock: the failure does not establish that a user cannot tap the visible row.
+Crash collection passed; no automatic retry followed.
+
+Visual review additionally found real large-text defects: decorative symbols overlap labels
+(already apparent at AX-L), the Back chevron outgrows its circle at AX-XXXL, and the Audio switch
+column leaves excessive text wrapping. Default-size surfaces are restrained and readable.
+The existing dock assertion and shared reveal use the Settings button's top, which is in the
+second dock row at accessibility sizes; the AX-XXXL About version value is visibly obscured by
+the dock despite completed assertions. Fix this verification false positive against the whole
+dock boundary while distinguishing genuinely oversized rows from unsafe taps. The shared purchase sheet is clear
+in its ordinary states, but owned access plus a product-loading failure shows conflicting guidance
+about whether audio can leave Vocello. ISU-4 owns these bounded presentation corrections;
+entitlement/export behavior must remain unchanged. Oversized-row actionability and actual layout
+clearance need separate assertions, not an unexplained weaker PASS rule.
+
+Independent `ios-xcui-purchase-20260909-160916-be0d2715` passed all 23 local StoreKit observations
+in 294.6 seconds. Schema 3 verified transaction deletion, the observed original History filter and
+tab restored, and app termination/Home. Runner source, crash, purchase-validation and retention
+steps all passed. Owned/revoked History and full-player export routes passed for Built-in, Design
+and Clone, with sharing cancelled and internal playback retained. No real charge, account edit,
+outward transfer, model installation, generation or personal-data deletion occurred.
+
+Both completed runs used HEAD `d7efc09f` plus the preserved uncommitted patch; the purchase source
+receipt records matching before/after fingerprint
+`114eb6d1c2551ddab240e0f44a1f0100f15ba7cf8fb5c4ba27aab392a7480e78`.
+This is local StoreKit on a development build, not actual offline, sandbox or processed-candidate
+acceptance. Tests have stopped. The documentation checkpoint after collection changes full-tree
+identity; retained results remain bound to their original receipt, not a future candidate.
+Remaining visual gaps include full English/French hub/category coverage, purchase accessibility
+sizes, measured contrast, VoiceOver and reduced effects. Two independent source/screenshot reviews
+inform the findings but do not substitute for those tests. No production fixes were made during QA.
+
+### September 9 Settings and purchase device tests — partial, stopped
+
+Separate device authorization followed the source-only handoff. The first localization run
+`ios-xcui-localization-20260909-145907-475352f1` failed automation bootstrap with no launched case.
+After explicit readiness, `ios-xcui-localization-20260909-150453-f2271f1e` ran for 258.8 seconds:
+Default and AX-L assertions completed; AX-XXXL Audio/About completed, then Models & Files navigation
+failed. The hub retained its bottom scroll position after Back, while `openSettingsPage` asked the
+shared helper to swipe only upward for a row above it. Source and the last observed screenshot
+confirm a harness reachability defect, not a product navigation verdict. Pseudo-AX-XXXL was not reached.
+The final failure image was listed but not materialized by attachment export; the preceding actual
+hub screenshot and original xcresult remain retained. Do not invent the missing image.
+
+Independent `ios-xcui-purchase-20260909-151016-dd80ec09` ran for 97.6 seconds and recorded 11 local
+StoreKit phases: environment, initial lock, restore-not-owned, cancellation, purchase, relaunch
+entitlement, restore, revocation, pending, approval, and owned product-unavailability. It then timed
+out selecting a History filter; the retained failure screenshot shows Messages foreground. The
+exact trigger is unknown. This is an interrupted launched test, not bootstrap failure or evidence
+of a purchase-policy defect. Export checks did not complete. Product-unavailability was simulated,
+not actual offline access. No real purchase or account mutation occurred.
+
+The local transaction cleanup and app termination checks passed; however, the background-app path
+skipped original-tab restoration, so the result's cleanup flag does not establish full UI restoration.
+Both runs remain FAIL and separate from historical passes. Private screenshots, observations, logs,
+and xcresults remain untracked; no automatic retry was made. Device testing is stopped.
+ISU-4's follow-up repair now uses one shared geometry-directed Settings reveal for layout and purchase
+tests, including retained scroll positions and a bounded fallback for missing frames. Fully visible,
+hittable controls and the four-point dock clearance remain required. RF-13 cleanup now records each
+restoration dimension, restores the observed original History filter rather than assuming All, and
+reports skipped-background restoration as incomplete without taking over another foreground app.
+Current schema 3 and the runner reject aggregate cleanup claims without observed restoration;
+historical schema 1/2 remains readable but cannot qualify new runs. This changes only test support
+and evidence validation, not Settings or purchase behavior. Native policy regressions and host
+collector fixtures cover direction, exhaustion, missing frames and false-success restoration.
+Verification: 56 focused Python tests passed; all five `UIInteractionPolicyTests` executed and passed
+on macOS. The actual `VocelloiOSUI` target passed generic physical-device-SDK `build-for-testing`
+with signing disabled, using the governed iOS cache and package lock; no phone test was launched.
+These results establish source/fixture correctness, not a physical navigation or purchase PASS.
+The first full checkpoint caught one older control-audit assertion bound to the moved private
+helper; it now verifies the shared call path and the same complete dock-clearance requirement.
+Fresh physical layout and export runs remain required. English/French,
+remaining layouts, VoiceOver/reduced-effects and live/processed purchase acceptance remain open.
+
+### September 9 Settings handoff — source refinement, physical acceptance pending
+
+ISU-4 reopens the existing Settings plan for the requested six-entry hub and shared purchase-sheet
+refinement. Five destinations retain the original bindings and navigation stack; Models and licenses
+now return through Models & Files and About. All original controls retain their identifiers, with
+explicit category/header/Back ownership added to the existing smoke/control-audit helpers. Folder
+selection, consent, generation, commerce ownership and output-provenance policy are unchanged.
+New Settings/purchase copy has English/French catalog coverage; Buy uses only StoreKit's price.
+
+The supplied brief and all seven reference images were reviewed; decorative mockup details and
+placeholder prices were not adopted. Earlier credential-hardening and local purchase-acceptance
+work in the checkout was preserved. Generic iOS app/logic compilation passed; `scripts/dev.sh focused`
+passed 123 tests plus project regeneration and whitespace validation. Settings/navigation,
+localization and purchase-state checks precede `scripts/dev.sh checkpoint`; its exact-tree receipt
+and full logs remain in the existing untracked development output, not physical acceptance evidence.
+At this source-only checkpoint no phone UI, transaction, account operation or release action was performed. Current-layout visual,
+VoiceOver, English/French, accessibility-size and reduced-effects acceptance remains separately
+authorized work under ISU-4/RF-13. September 8 purchase results below remain historical evidence,
+not a claim that this changed UI has passed physical acceptance.
+
 
 September 7 **release-forward decision:** the maintainer has deferred further English long-form
 causal research. RF-06 remains a **known limitation, open and not fixed**. Its original failed
@@ -36,6 +201,107 @@ listening and internal History remain free in all modes; Built-in output export 
 Finish independent submission-material preparation through the existing RF-02 packet. Unresolved
 required failures still block clean promotion; accepting a shipping risk requires a separate
 documented decision, not relabeling the failure or declaring this issue resolved.
+
+### September 8 physical export access — History/player PASS
+
+The authorized extended local StoreKit scenario is `scripts/ui_test.sh ios purchase --scenario
+exports --retain-result`. It reuses existing History clips without generation, editing, saving,
+deletion or outward transfer. One visible-provenance row per mode is reused for the owned/revoked
+comparison. Twelve checks cover History-menu and full-player sharing for Built-in, Design and Clone:
+owned sharing reaches the real system sheet; after revocation only Built-in remains free and the
+paid modes show the purchase sheet. Every share sheet is cancelled, and internal playback/pause
+remains available in both states. A simulated Apple product-loading network error additionally
+proves owned access survives relaunch without product availability. This is **not actual offline**
+or App Store sandbox evidence.
+
+Run `ios-xcui-purchase-20260908-182510-490db279` retained the product-unavailable PASS but failed
+before route checks because SwiftUI propagated the History container identifier to each filter.
+Run `ios-xcui-purchase-20260908-182939-20a4ccb2` then reached the real share sheet but failed on
+its French Close label; the modal also prevented tab restoration, so aggregate cleanup remained
+failed despite app termination/Home. Both are preserved as failed harness evidence. Queries now
+bind each filter's observed identifier plus unique English app label and the system share sheet's
+language-independent `header.closeButton`. Cleanup closes modals and verifies the original tab.
+No production UI, purchase, export, network setting or account behavior changed.
+
+Run `ios-xcui-purchase-20260908-183242-f3b9c6e4` **passed** all 23 ordered observations in 305.2 s,
+with full runner result validation, crash delta, retention and cleanup. The next session's empty
+transaction baseline independently confirmed no prior local transactions remained. Test-owned
+transactions were removed, History filter reset, original tab read back selected, Vocello stopped
+and Home restored. Raw screenshots/History content and all original results remain untracked.
+Schema 2 is selected explicitly by the exports scenario; schema 1 lifecycle results remain valid
+only for that earlier scope. Neither schema grants offline/live or complete export-surface authority.
+
+RF-13 remains open for real disconnected-device entitlement behavior; Studio inline Save/Download,
+automatic Files-folder copies, individual long-form segments, generated Saved Voice and original
+reference recovery, and failed-storage exports on test-owned fixtures. These require preserved
+draft/folder/reference setup rather than changing personal content or fabricating History. RF-02
+retains missing IAP metadata/availability/agreements and sandbox-account setup; RF-12 retains the
+separately authorized signed/uploaded processed candidate. No qualified archive/IPA evidence was
+found in the local release-output locations inspected. Do not replace those gates with this local PASS.
+
+### September 8 local physical purchase lane — lifecycle PASS
+
+Added the explicitly authorized `scripts/ui_test.sh ios purchase --retain-result` route to the
+existing XCUITest stack. Apple StoreKitTest and the TEST fixture live only in the UI-test target;
+no production unlock, live transaction, account change or shipping resource was added. The lane
+checks local environment/price and ordered purchase lifecycle observations, with test-owned
+transaction cleanup, app termination and strict result validation. It does not qualify sandbox,
+TestFlight, offline access or every paid/free export route.
+
+The focused Python checks passed (38 tests), and the iPhone app/test bundle compiled and signed.
+Physical run `ios-xcui-purchase-20260908-172652-033d58e4` failed while Xcode enabled automation mode,
+before any test case launched. The existing classifier confirmed `infrastructure_bootstrap_failure`
+with zero launched cases; the runner-level failed entry is not a purchase failure. Source receipt,
+failed xcresult, log, required-step ledger and clean crash delta remain retained and untracked.
+No transaction or purchase-sheet action executed in that first run. Two earlier host-only invocations refused the
+new lane's missing storage registration before build/device launch; registration and its regression
+test are now complete. No automatic retry occurred.
+
+After the maintainer manually unlocked XCUITest, run `ios-xcui-purchase-20260908-173201-30e6025b`
+proved local environment, initial lock, restore without ownership and simulated cancellation.
+The following positive purchase failed after clearing the injected cancellation. Retained screenshot
+and accessibility evidence show the safe failure message; cleanup passed. The isolated follow-up
+reads back the cleared error and resets Apple's session options between fault and success arms.
+No production StoreKit/state/export code was changed.
+
+Run `ios-xcui-purchase-20260908-173442-91a8ea73` then **passed** all ten ordered observations:
+local environment, initial lock, restore without ownership, cancellation, purchase, relaunch
+entitlement, restore, revocation, pending approval and approval delivery. The native XCUITest took
+58.7 seconds. The full runner passed result validation, crash delta, dSYM retention and the required
+step ledger. All test transactions were removed, the original tab was tapped, Vocello terminated
+and Home restored; the phone is no longer in use. The built application contains no StoreKit fixture.
+Every original failed run remains retained separately; this is **local StoreKit on physical hardware**,
+not an App Store sandbox charge, processed-candidate acceptance or proof of offline/all export routes.
+The bounded comparison implicates test-session fault isolation; it does not establish a production
+purchase defect. RF-13 remains in flight for remaining route/offline/sandbox coverage, with RF-12
+owning processed-candidate purchase proof. No real charge, account mutation or personal-data deletion.
+
+### September 8 credential hygiene hardening
+
+The scoped credential review found no exposed credentials among 1,526 tracked files and 12,504
+reachable historical blobs across 1,537 commits; common-signature matches were fixtures, environment
+references and ordinary text. GitHub reported secret scanning/push protection enabled and no alerts.
+This does not cover secrets concealed in images/encoded content, deleted remote history or every
+published artifact; no credential rotation was indicated by that review.
+
+The two identified prevention gaps are corrected: credential-file ignore patterns and owner-only
+creation/failure cleanup in the existing macOS/iOS release workflow. Setup refuses existing target
+files, records cleanup ownership before side effects and handles partial import/copy/cancellation;
+final cleanup attempts remaining paths even after a deletion failure. Existing supply-chain tests
+now execute the workflow blocks with dummy credentials and stubbed Apple tools, including deliberate
+permission/trap regressions. No real credentials, Keychain, account, signing, release or phone operation
+was used. Exact-tree checkpoint evidence owns the final verification; RF-02/RF-13 purchase and
+submission dependencies remain open. The earlier uncommitted open-source documentation is preserved.
+
+### September 8 open-source purchase decision
+
+The maintainer approved retaining MIT source and the official iOS-only StoreKit export unlock,
+accepting that self-built forks can change local checks. README and the iOS guide now explain the
+free/paid and official/self-built boundaries; SECURITY.md owns credential separation and the explicit
+local-client threat boundary. No license, product behavior, backend, obfuscation, account setting or
+phone state changed. Inspection of the existing adapter/state and export contract confirms the current
+architecture already fits this decision; this is not a repository-wide secret audit or purchase proof.
+RF-13 remains in flight for physical StoreKit/sandbox acceptance and RF-12 for processed-candidate proof.
 
 ### September 8 approved purchase and regional pricing setup
 

@@ -126,13 +126,47 @@ class VocelloiOSUITestCase: XCTestCase {
         XCTAssertTrue(VocelloUIWait.exists(element(modeVisibleControlIdentifier(mode)), timeout: 20))
     }
 
+    /// Follow genuine Settings navigation, including the tab's retained destination.
+    func openSettingsRoot() {
+        select(tab: .settings)
+        for _ in 0..<3 {
+            let backIDs = ["iosAttributionDetailBackButton", "iosSettings_voiceModelsBackButton", "iosSettings_openSourceBackButton"]
+                + ["audio", "modelsFiles", "privacyPermissions", "accessibility", "about"].map { "iosSettings_\($0)BackButton" }
+            guard let back = backIDs.map({ element($0) }).first(where: { $0.exists }) else { break }
+            XCTAssertTrue(revealSettingsElement(back, swipingUp: false))
+            XCTAssertTrue(VocelloUIPrimaryAction.perform(on: back, timeout: 20))
+            XCTAssertTrue(VocelloUIWait.disappears(back, timeout: 20))
+        }
+        XCTAssertTrue(VocelloUIWait.exists(element("screen_settings"), timeout: 20))
+    }
+
+    func openSettingsPage(for identifier: String) {
+        let category: String
+        switch identifier {
+        case "iosSettings_autoPlayToggle", "iosSettings_variationRow": category = "audio"
+        case "iosSettings_voiceModelsRow", "iosSettings_savedOutputsRow": category = "modelsFiles"
+        case "voiceCloning_consentAcknowledgment", "iosSettings_privacyPolicyRow", "iosSettings_openIOSSettingsRow": category = "privacyPermissions"
+        case "iosSettings_reduceMotionToggle", "iosSettings_reduceTransparencyToggle": category = "accessibility"
+        case "iosSettings_supportRow", "iosSettings_openSourceRow", "iosSettings_sourceCodeRow", "iosSettings_versionLabel": category = "about"
+        default: openSettingsRoot(); return
+        }
+        select(tab: .settings)
+        if element("screen_settings_\(category)").exists { return }
+        openSettingsRoot()
+        let row = element("iosSettings_\(category)Row")
+        XCTAssertTrue(VocelloUISettingsReveal.perform(row, in: app, swipingUp: true, requirement: .navigation))
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: row, timeout: 20))
+        XCTAssertTrue(VocelloUIWait.exists(element("screen_settings_\(category)"), timeout: 20))
+    }
+
     func openVoiceModels() {
         select(tab: .settings)
         if element("screen_voiceModels").exists { return }
 
+        openSettingsPage(for: "iosSettings_voiceModelsRow")
         let row = element("iosSettings_voiceModelsRow")
         XCTAssertTrue(VocelloUIWait.exists(row, timeout: 20))
-        XCTAssertTrue(revealSettingsElement(row, swipingUp: false))
+        XCTAssertTrue(VocelloUISettingsReveal.perform(row, in: app, swipingUp: false, requirement: .navigation))
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: row, timeout: 20))
         XCTAssertTrue(VocelloUIWait.exists(element("screen_voiceModels"), timeout: 20))
         XCTAssertTrue(VocelloUIWait.exists(element("iosSettings_voiceModelsBackButton"), timeout: 20))
@@ -142,25 +176,43 @@ class VocelloiOSUITestCase: XCTestCase {
         guard element("screen_voiceModels").exists else { return }
         let back = element("iosSettings_voiceModelsBackButton")
         XCTAssertTrue(VocelloUIWait.exists(back, timeout: 20))
+        XCTAssertTrue(revealSettingsElement(back, swipingUp: false))
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: back, timeout: 20))
-        XCTAssertTrue(VocelloUIWait.exists(element("screen_settings"), timeout: 20))
+        XCTAssertTrue(VocelloUIWait.exists(element("screen_settings_modelsFiles"), timeout: 20))
         XCTAssertTrue(VocelloUIWait.exists(element("iosSettings_voiceModelsRow"), timeout: 20))
     }
 
     func assertSettingsLandingArchitecture() {
-        select(tab: .settings)
+        openSettingsRoot()
         XCTAssertTrue(VocelloUIWait.exists(element("screen_settings"), timeout: 20))
+
+        for category in ["audio", "modelsFiles", "privacyPermissions", "accessibility", "about"] {
+            let row = element("iosSettings_\(category)Row")
+            XCTAssertTrue(revealSettingsElement(row, swipingUp: true))
+            XCTAssertTrue(VocelloUIPrimaryAction.perform(on: row, timeout: 20))
+            XCTAssertTrue(VocelloUIWait.exists(element("screen_settings_\(category)"), timeout: 20))
+            let back = element("iosSettings_\(category)BackButton")
+            XCTAssertTrue(VocelloUIWait.exists(back, timeout: 20))
+            XCTAssertGreaterThanOrEqual(back.frame.height, 44)
+            VocelloUIScreenshot.attach(app, named: "ios-settings-\(category)")
+            openSettingsRoot()
+        }
+        XCTAssertTrue(revealSettingsElement(element("iosSettings_exportPurchaseRow"), swipingUp: true))
 
         for identifier in [
             "iosSettings_autoPlayToggle",
             "iosSettings_variationRow",
             "iosSettings_voiceModelsRow",
             "iosSettings_savedOutputsRow",
+            "iosSettings_reduceMotionToggle",
+            "iosSettings_reduceTransparencyToggle",
         ] {
+            openSettingsPage(for: identifier)
             XCTAssertTrue(VocelloUIWait.exists(element(identifier), timeout: 20))
         }
         VocelloUIScreenshot.attach(app, named: "ios-settings-landing-audio-models")
 
+        openSettingsPage(for: "voiceCloning_consentAcknowledgment")
         let consent = element("voiceCloning_consentAcknowledgment")
         XCTAssertTrue(VocelloUIWait.exists(consent, timeout: 20))
         XCTAssertTrue(revealSettingsElement(consent, swipingUp: true))
@@ -172,10 +224,12 @@ class VocelloiOSUITestCase: XCTestCase {
             "iosSettings_sourceCodeRow",
             "iosSettings_versionLabel",
         ] {
+            openSettingsPage(for: identifier)
             XCTAssertTrue(VocelloUIWait.exists(element(identifier), timeout: 20))
         }
         VocelloUIScreenshot.attach(app, named: "ios-settings-landing-privacy-about")
 
+        openSettingsPage(for: "iosSettings_openSourceRow")
         let attributions = element("iosSettings_openSourceRow")
         XCTAssertTrue(revealSettingsElement(attributions, swipingUp: true))
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: attributions, timeout: 20))
@@ -184,8 +238,9 @@ class VocelloiOSUITestCase: XCTestCase {
         XCTAssertTrue(VocelloUIWait.exists(element("iosAttributionRow_vocello"), timeout: 20))
         VocelloUIScreenshot.attach(app, named: "ios-settings-open-source-licenses")
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: element("iosSettings_openSourceBackButton"), timeout: 20))
-        XCTAssertTrue(VocelloUIWait.exists(element("screen_settings"), timeout: 20))
+        XCTAssertTrue(VocelloUIWait.exists(element("screen_settings_about"), timeout: 20))
 
+        openSettingsPage(for: "iosSettings_autoPlayToggle")
         XCTAssertTrue(revealSettingsElement(element("iosSettings_autoPlayToggle"), swipingUp: false))
     }
 
@@ -220,6 +275,7 @@ class VocelloiOSUITestCase: XCTestCase {
     @discardableResult
     func ensureAutoplayEnabled() -> Bool {
         select(tab: .settings)
+        openSettingsPage(for: "iosSettings_autoPlayToggle")
         let toggle = element("iosSettings_autoPlayToggle")
         XCTAssertTrue(VocelloUIWait.exists(toggle, timeout: 20))
         XCTAssertTrue(revealSettingsElement(toggle, swipingUp: false))
@@ -254,6 +310,7 @@ class VocelloiOSUITestCase: XCTestCase {
     /// state without a hidden launch override.
     func ensureCloneConsentEnabled() {
         select(tab: .settings)
+        openSettingsPage(for: "voiceCloning_consentAcknowledgment")
         let consent = element("voiceCloning_consentAcknowledgment")
         XCTAssertTrue(VocelloUIWait.exists(consent, timeout: 20))
         XCTAssertTrue(revealSettingsElement(consent, swipingUp: true))
@@ -277,6 +334,7 @@ class VocelloiOSUITestCase: XCTestCase {
     private func restorePendingAutoplayPreference() {
         guard pendingAutoplayPreferenceRestore == false, session != nil else { return }
         select(tab: .settings)
+        openSettingsPage(for: "iosSettings_autoPlayToggle")
         let toggle = element("iosSettings_autoPlayToggle")
         XCTAssertTrue(VocelloUIWait.exists(toggle, timeout: 20))
         XCTAssertTrue(revealSettingsElement(toggle, swipingUp: false))
@@ -298,28 +356,7 @@ class VocelloiOSUITestCase: XCTestCase {
     }
 
     func revealSettingsElement(_ target: XCUIElement, swipingUp: Bool) -> Bool {
-        // Accessibility sizes make Settings substantially taller than the
-        // ordinary layout. Keep the bound finite while allowing the complete
-        // AX-XXXL surface to move above the floating tab dock.
-        for _ in 0..<20 {
-            if settingsElementIsClearOfDock(target) { return true }
-            if swipingUp {
-                app.swipeUp()
-            } else {
-                app.swipeDown()
-            }
-        }
-        return settingsElementIsClearOfDock(target)
-    }
-
-    private func settingsElementIsClearOfDock(_ target: XCUIElement) -> Bool {
-        guard target.exists, target.isHittable else { return false }
-        let dockAnchor = element("rootTab_settings")
-        guard dockAnchor.exists else { return true }
-        // XCTest can report a partially obscured row as hittable even when
-        // its synthesized center tap lands inside the floating dock. Require
-        // the complete target to clear the dock before acting on it.
-        return target.frame.maxY <= dockAnchor.frame.minY - 4
+        VocelloUISettingsReveal.perform(target, in: app, swipingUp: swipingUp)
     }
 
     @discardableResult

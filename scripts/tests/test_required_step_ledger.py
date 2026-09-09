@@ -32,13 +32,16 @@ class RequiredStepLedgerTests(unittest.TestCase):
         end = runner.index('  write_build_provenance "$IOS_DERIVED/last-build.json"', start)
         # Execute the production finalization stanza, not a reimplementation.
         # The collector can succeed after XCTest fails without changing that failure.
-        for lane, test_status, collector_status, expected in (
-            ("smoke", 65, 0, 27),
-            ("smoke", 0, 1, 27),
-            ("smoke", 65, 1, 27),
-            ("smoke", 0, 0, 0),
-            ("screen-protection", 0, 1, 0),
-            ("screen-protection", 65, 0, 27),
+        for lane, test_status, collector_status, purchase_status, expected in (
+            ("smoke", 65, 0, 0, 27),
+            ("smoke", 0, 1, 0, 27),
+            ("smoke", 65, 1, 0, 27),
+            ("smoke", 0, 0, 0, 0),
+            ("screen-protection", 0, 1, 0, 0),
+            ("screen-protection", 65, 0, 0, 27),
+            ("purchase", 0, 0, 1, 27),
+            ("purchase", 65, 0, 0, 27),
+            ("purchase", 0, 0, 0, 0),
         ):
             with self.subTest(lane=lane, test_status=test_status, collector_status=collector_status):
                 setup = f"""
@@ -46,6 +49,7 @@ set -euo pipefail
 lane={lane}
 xcuitest_status={test_status}
 collector_status={collector_status}
+purchase_status={purchase_status}
 dsym_status=0; model_diagnostics_status=0; startup_parity_status=0
 control_audit_status=0; step_ledger=fixture; out=fixture
 required_step_run() {{ shift 2; "$@"; }}

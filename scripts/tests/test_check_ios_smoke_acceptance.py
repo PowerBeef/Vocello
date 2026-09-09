@@ -422,27 +422,45 @@ class IOSSmokeAcceptanceTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
 
         section_markers = [
-            'IOSSettingsSection(title: "Audio",',
-            'IOSSettingsSection(title: "Models & Files")',
-            'IOSSettingsSection(title: "Accessibility")',
-            'IOSSettingsSection(title: "Privacy")',
-            'IOSSettingsSection(title: "About")',
+            'categoryLink(.audio)',
+            'NavigationLink { modelsAndFilesDestination }',
+            '                    exportPurchaseSection',
+            'categoryLink(.privacyPermissions)',
+            'categoryLink(.accessibility)',
+            'categoryLink(.about)',
         ]
         positions = [settings.index(marker) for marker in section_markers]
         self.assertEqual(positions, sorted(positions))
         self.assertNotIn("IOSStudioWorkspaceHeading", settings)
         self.assertNotIn(".navigationTitle", settings)
         self.assertIn(
-            'IOSSettingsSection(title: "Audio", accessibilityIdentifier: "screen_settings")',
+            '.accessibilityIdentifier("screen_settings")',
             settings,
         )
+        self.assertIn('IOSSettingsDetailPage(category: category, content: content)', settings)
+        self.assertIn('IOSSettingsDetailPage(category: .modelsFiles)', settings)
+        self.assertNotIn('NavigationStack', settings)
+        self.assertIn('var linkID: String { "iosSettings_\\(rawValue)Row" }', settings)
+        self.assertIn('var backID: String { "iosSettings_\\(rawValue)BackButton" }', settings)
+        self.assertIn('case audio, modelsFiles, privacyPermissions, accessibility, about', settings)
         self.assertIn('.accessibilityIdentifier("iosSettings_voiceModelsRow")', settings)
+        shared = (ROOT / "Tests/UIAutomationSupport/VocelloUIAutomationSupport.swift").read_text()
+        purchase = (ROOT / "Tests/VocelloiOSUITests/VocelloiOSPurchaseUITests.swift").read_text()
+        self.assertIn('VocelloUISettingsReveal.perform(target, in: app, swipingUp: swipingUp)', test_case)
+        self.assertIn('VocelloUISettingsReveal.perform(row, in: app, swipingUp: true)', purchase)
+        self.assertIn('VocelloUISettingsReveal.perform(back, in: app, swipingUp: false)', purchase)
+        self.assertIn('id: "rootTabDock"', shared)
+        self.assertIn('target.isHittable', shared)
+        self.assertIn('requirement.satisfied(by: frame, visible: visible)', shared)
+        self.assertIn('requirement: VocelloUIRevealRequirement = .fullVisibility', shared)
+        self.assertIn('search.next(target: required, visible: visible)', shared)
         self.assertIn(
             "IOSStudioShellMetrics.dockFadeHeight + Theme.Spacing.lg", settings
         )
 
         self.assertIn('.accessibilityIdentifier("screen_voiceModels")', models)
-        self.assertIn('Text("Voice Models")', models)
+        self.assertIn('Text(IOSSettingsText.voiceModels)', models)
+        self.assertIn('IOSSettingsText.backModelsFiles', models)
         self.assertIn(
             '.accessibilityIdentifier("iosSettings_voiceModelsBackButton")', models
         )
@@ -451,13 +469,13 @@ class IOSSmokeAcceptanceTests(unittest.TestCase):
 
         self.assertIn("Toggle(isOn: $isOn)", rows)
         self.assertIn("IOSSettingsCompactToggleStyle(tint: tint)", rows)
-        self.assertIn('Picker("Take variation", selection: $selection)', rows)
+        self.assertIn('Picker(IOSSettingsText.variation, selection: $selection)', rows)
         self.assertIn("Text(title.uppercased())", rows)
         self.assertIn(".font(.subheadline.weight(.semibold))", rows)
         self.assertNotIn(".toggleStyle(.switch)", rows)
         self.assertIn("var tint: Color = Theme.Brand.silver", rows)
         self.assertIn(".fill(Theme.Surface.hairline)", rows)
-        self.assertIn(".stroke(Theme.Surface.panelStroke", rows)
+        self.assertIn(".stroke(accent?.opacity(0.25) ?? Theme.Surface.panelStroke", rows)
         self.assertNotIn("IOSSettingsReferenceSwitch", rows)
         self.assertIn(
             "return VocelloPresentationText.status(.ready)",

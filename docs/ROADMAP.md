@@ -20,13 +20,13 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 | `ios-app-store-readiness-2026-08` | active | release-qa | 2/12 (17%) |
 | `ios-control-audit-2026-08` | active | ios | 15/19 (79%) |
 | `ios-generation-startup-reliability-2026-08` | active | backend-and-platform | 4/6 (67%) |
+| `ios-settings-2026-08` | active | ios | 3/4 (75%) |
 | `voice-identity-language-reliability-2026-08` | active | backend-and-platform | 9/10 (90%) |
 | `compliance-2026-08` | complete | release-qa | 2/2 (100%) |
 | `convergence-metal4-stage4-2026-08` | complete | backend-and-platform | 7/7 (100%) |
 | `development-workflow-performance-2026-08` | complete | release-qa | 6/6 (100%) |
 | `doc-governance-2026-08` | complete | release-qa | 9/9 (100%) |
 | `ios-clone-import-2026-08` | complete | ios | 4/4 (100%) |
-| `ios-settings-2026-08` | complete | ios | 3/3 (100%) |
 | `ios-ui-2026-08` | complete | ios | 6/6 (100%) |
 | `macos-ui-2026-08` | complete | macos | 7/7 (100%) |
 | `model-delivery-2026-08` | complete | release-qa | 3/3 (100%) |
@@ -372,6 +372,26 @@ Narrative authority: [`docs/reference/ios-built-in-startup-reliability.md`](refe
 - **`ISR-06`** (planned) — Complete exact-script and broader closure evidence.
   gate: Both the original script and tracked sentinel must pass 10/10 cold, 20/20 warm, all eight seeds, every focused predecessor, streaming/non-streaming, and matching UI/engine receipts; then complete the 9-speaker × 8-delivery grid at one seed plus a second seed for the affected speaker row and delivery column. Closure rejects unknown boundaries, silent seed changes, leaked retries, memory-policy violations, crashes, or unrepresented attempts and requires all deterministic gates green.
 
+## iOS Settings information architecture and visual alignment
+
+`ios-settings-2026-08` · **active** · ios · adopted 2026-08-20
+
+Reorganize the title-free Settings tab around user tasks, move model lifecycle management into a dedicated destination, and align the resulting controls with Vocello's compact custom iOS design language without weakening native semantics, Dynamic Type, VoiceOver, or physical-device acceptance.
+
+Narrative authority: [`docs/reference/ios-ui-reference.md`](reference/ios-ui-reference.md)
+
+| Item | Status | Title | Evidence |
+| --- | --- | --- | --- |
+| `ISU-1` | done | Rebuild Settings information architecture and model lifecycle destination | `file:Sources/iOS/Settings/SettingsScreen.swift`, `file:Sources/iOS/Settings/VoiceModelsScreen.swift`, `file:Tests/VocelloiOSUITests/VocelloiOSModelDownloadUITests.swift`, `file:scripts/tests/test_check_ios_smoke_acceptance.py`, `doc:docs/reference/ios-app-guide.md` |
+| `ISU-2` | done | Compact visual alignment and physical-device accessibility acceptance | `file:Sources/iOS/IOSSettingsViews.swift`, `file:Tests/VocelloiOSUITests/VocelloiOSSmokeUITests.swift`, `doc:docs/development-progress.md`, `doc:docs/reference/ios-ui-reference.md` |
+| `ISU-3` | done | Make model status and lifecycle actions immediately discoverable | `file:Sources/iOS/IOSSettingsViews.swift`, `file:Sources/iOS/Settings/VoiceModelsScreen.swift`, `file:Tests/VocelloiOSUITests/VocelloiOSModelDownloadUITests.swift`, `file:scripts/tests/test_check_ios_smoke_acceptance.py`, `doc:docs/reference/ios-app-guide.md`, `doc:docs/reference/ios-ui-reference.md` |
+| `ISU-4` | in-flight | Refine Settings hub and shared purchase sheet; qualify the new navigation | `file:scripts/tests/test_check_ios_smoke_acceptance.py`, `file:scripts/tests/test_ios_export_contract.py`, `doc:docs/reference/ios-app-guide.md`, `doc:docs/reference/ios-ui-reference.md` |
+
+### Open items in detail
+
+- **`ISU-4`** (in-flight) — Refine Settings hub and shared purchase sheet; qualify the new navigation.
+  gate: Six-entry title-free hub in three flat groups; five pushed detail pages retain every original setting, key, default, consent, model/folder route and tab dock. Shared purchase sheet uses live localized StoreKit price, full-width action, truthful states and explicit export retry without purchase-policy changes. Bilingual typed copy, source-bound navigation/control tests and deterministic checkpoint pass. Separate authorization precedes current-source physical English/French, Default/AX-L/AX-XXXL, VoiceOver/reduced-effects, navigation and local purchase acceptance; historical runs cannot substitute.
+
 ## Clone identity, enrollment transcription, and French Voice Design reliability
 
 `voice-identity-language-reliability-2026-08` · **active** · backend-and-platform · adopted 2026-08-30
@@ -480,20 +500,6 @@ Narrative authority: [`docs/reference/ios-app-guide.md`](reference/ios-app-guide
 | `ICI-2` | done | Device acceptance of the restored import route | `doc:docs/development-progress.md` |
 | `ICI-3` | done | Direct Clone import with permanent enrollment and transcript review | `file:Sources/iOSSupport/Services/IOSReferenceAudioImportPolicy.swift`, `file:Sources/SharedSupport/Services/ReferenceTranscriptionReviewState.swift`, `file:Sources/iOS/Voices/IOSRecordVoiceSheet.swift`, `file:Sources/iOS/App/RootView.swift`, `file:Tests/VocelloiOSLogicTests/IOSReferenceTranscriptionReviewStateTests.swift`, `doc:docs/reference/ios-app-guide.md` |
 | `ICI-4` | done | Physical-device direct-import, transcription, Clone-generation, and cleanup acceptance | `file:Tests/VocelloiOSUITests/VocelloiOSSavedVoiceLifecycleUITests.swift`, `file:scripts/ui_test.sh`, `doc:docs/reference/ios-device-testing.md` |
-
-## iOS Settings information architecture and visual alignment
-
-`ios-settings-2026-08` · **complete** · ios · adopted 2026-08-20
-
-Reorganize the title-free Settings tab around user tasks, move model lifecycle management into a dedicated destination, and align the resulting controls with Vocello's compact custom iOS design language without weakening native semantics, Dynamic Type, VoiceOver, or physical-device acceptance.
-
-Narrative authority: [`docs/reference/ios-ui-reference.md`](reference/ios-ui-reference.md)
-
-| Item | Status | Title | Evidence |
-| --- | --- | --- | --- |
-| `ISU-1` | done | Rebuild Settings information architecture and model lifecycle destination | `file:Sources/iOS/Settings/SettingsScreen.swift`, `file:Sources/iOS/Settings/VoiceModelsScreen.swift`, `file:Tests/VocelloiOSUITests/VocelloiOSModelDownloadUITests.swift`, `file:scripts/tests/test_check_ios_smoke_acceptance.py`, `doc:docs/reference/ios-app-guide.md` |
-| `ISU-2` | done | Compact visual alignment and physical-device accessibility acceptance | `file:Sources/iOS/IOSSettingsViews.swift`, `file:Tests/VocelloiOSUITests/VocelloiOSSmokeUITests.swift`, `doc:docs/development-progress.md`, `doc:docs/reference/ios-ui-reference.md` |
-| `ISU-3` | done | Make model status and lifecycle actions immediately discoverable | `file:Sources/iOS/IOSSettingsViews.swift`, `file:Sources/iOS/Settings/VoiceModelsScreen.swift`, `file:Tests/VocelloiOSUITests/VocelloiOSModelDownloadUITests.swift`, `file:scripts/tests/test_check_ios_smoke_acceptance.py`, `doc:docs/reference/ios-app-guide.md`, `doc:docs/reference/ios-ui-reference.md` |
 
 ## iOS UI performance harness, measured review, and fix waves
 

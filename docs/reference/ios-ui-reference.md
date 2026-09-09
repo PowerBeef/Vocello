@@ -1,7 +1,7 @@
 ---
 status: active
 owner: ios
-reviewed: 2026-08-29
+reviewed: 2026-09-09
 summary: Compact iOS screen and accessibility-identifier map for physical-device XCUITest — states, stable identifiers, and expectations per screen.
 sourceOfTruth:
   - Sources/iOS
@@ -113,25 +113,27 @@ successful read. Destructive History actions are outside the minimal smoke and b
 
 ## Settings
 
-iOS Settings is a title-free landing surface (`screen_settings`); the selected tab-dock item is the
-sole location indicator. Its order is Audio, Models & Files, Accessibility, Privacy, and About.
-Compact solid groups reuse the app canvas, eyebrow headings, headline/caption row hierarchy, tinted
-utility tiles, panel stroke, spacing grid, and shared dock clearance established by Voices and
-History. Neutral controls use the Settings silver accent; model and Clone semantics retain their
-mode colors. The Audio group owns a semantic `Toggle` with custom compact switch chrome and the Take
-variation menu picker. Models & Files summarizes model
-readiness as `N of 3 ready` through `iosSettings_voiceModelsRow` and keeps the Saved outputs value
-multi-line. Accessibility owns the app-level Reduce Motion and Reduce Transparency switches.
-Privacy owns clone consent, disclosure guidance, the Privacy Policy, Permissions (explicitly
-labeled as opening iOS Settings), and `iosSettings_supportRow`, which opens the contract-owned
-unauthenticated support page. About contains `iosSettings_openSourceRow`, Source Code, and the compact
-version/build row; there is no oversized logo footer. Open Source & Licenses pushes
+iOS Settings is a title-free six-entry hub (`screen_settings`) in three flat groups: Audio and
+Models & Files; the restrained gold Design & Clone Export entry; Privacy & Permissions,
+Accessibility, and About. Five detail pages use the existing tab navigation stack and compact
+44-point Back headers. Root links are `iosSettings_<category>Row`, headers are
+`screen_settings_<category>`, and Back is `iosSettings_<category>BackButton`, for categories
+`audio`, `modelsFiles`, `privacyPermissions`, `accessibility`, and `about`.
+The tab dock, preference keys/defaults, model operations and outward export policy are unchanged.
+Decorative symbols replace utility tiles; labels wrap and values sit below rather than compete
+with descriptions. Audio owns the original autoplay Toggle and Take variation menu. Models &
+Files owns actual model readiness and the existing saved-output folder workflow. Accessibility
+owns the two existing reduction preferences. Privacy & Permissions owns the exact consent,
+disclosure, policy and system-permission controls. About owns Help & Support, licenses, Source
+Code and a dynamic read-only version/build row; there is no branding footer.
+See the [app guide](ios-app-guide.md#settings-tab--sourcesiossettingssettingsscreenswift) for
+retained control IDs and purchase-sheet behavior. Open Source & Licenses pushes
 `screen_openSourceLicenses`, with stable component/model rows and a 44-point
-`iosSettings_openSourceBackButton`; attribution details expose their complete bundled license text
+`iosSettings_openSourceBackButton` returning to About; attribution details expose their complete bundled license text
 and governed source link without requiring network access.
 
 `iosSettings_voiceModelsRow` pushes `screen_voiceModels`, whose compact
-`iosSettings_voiceModelsBackButton` is the only Settings-specific contextual header. iOS has one
+`iosSettings_voiceModelsBackButton` returns to Models & Files. iOS has one
 Speed model for each generation mode. The destination combines `N of 3 ready` with managed model
 bytes in `iosSettings_storageRow`, then gives every model one non-color-dependent text-and-symbol
 status and only the lifecycle actions valid for its current state. At ordinary text sizes a sole
@@ -147,7 +149,7 @@ value. Normal smoke and benchmark lanes do not install or delete models; they vi
 Custom, Design, and Clone Speed are ready before generation.
 
 Settings also owns the persistent Clone consent row
-`voiceCloning_consentAcknowledgment` under Settings → Privacy. Smoke and benchmark enable it through that visible row when
+`voiceCloning_consentAcknowledgment` under Settings → Privacy & Permissions. Smoke and benchmark enable it through that visible row when
 needed so Clone acceptance starts from an explicit consent state; this preference intentionally
 remains enabled for later testing. The benchmark may temporarily enable Auto-play and restores its
 prior value. System permission enrollment is attended setup.

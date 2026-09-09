@@ -292,6 +292,11 @@
         "result-retention"
       ]
     },
+    "ui-ios-purchase": {
+      "producer": "scripts/ui_test.sh",
+      "requiredSteps": ["source-provenance", "crash-baseline", "xcuitest", "purchase-validation", "crash-delta"],
+      "optionalSteps": ["result-retention"]
+    },
     "ui-ios-screen-protection": {
       "producer": "scripts/ui_test.sh",
       "requiredSteps": [

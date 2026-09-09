@@ -36,6 +36,42 @@ on that exact commit. Candidate creation and later public promotion both re-eval
 and fail closed on lightweight or unsigned tags, missing checks, cross-commit evidence, or an
 incomplete check-run response.
 
+## Open-source purchase boundary
+
+The iOS export unlock protects access in the official app through verified StoreKit transactions;
+it does not attempt to prevent someone modifying and compiling MIT-licensed source. Product IDs,
+purchase code and isolated test fixtures are public configuration, not credentials. Apple signs
+transactions and StoreKit returns their verification result; the app grants access only for a verified,
+matching, non-revoked non-consumable. See [Apple's StoreKit documentation](https://developer.apple.com/storekit/).
+
+The runtime owner is `Sources/iOS/Commerce/IOSStoreKitClient.swift`, with entitlement decisions in
+`Sources/iOSSupport/Services/IOSExportPurchaseState.swift` and outward-export policy in
+`Sources/iOSSupport/Services/IOSExportAccessPolicy.swift`. No developer API key is needed by this
+purchase flow. Do not put App Store Connect private keys, signing private keys, passwords, tokens or
+private customer transaction records in tracked files, public logs or shipping resources. Keep release
+credentials in approved local Keychain/CI secret storage, separate from public StoreKit configuration.
+If a credential is exposed, revoke/rotate it; deleting the latest file alone does not remove exposure.
+
+Removing checks in a self-built fork is an accepted local-client limitation, not by itself a
+vulnerability in the official binary. Forged or unverified transactions granting official-app access,
+unintended export routes, credential exposure and release-signing compromise remain in scope.
+There is no anti-fork backend, obfuscation requirement or paid preference flag. macOS/CLI stay
+unrestricted. The isolated StoreKit fixture is test-only and must never authorize production access.
+Source checks do not replace physical StoreKit/sandbox and processed-candidate purchase acceptance.
+
+Credential-file exclusions in `.gitignore` cover private keys, signing containers/profiles, local
+`.env` files and `.asc`/`.appstoreconnect` directories. Only synthetic `.env.example`/`.env.sample`
+templates belong in Git. Ignore rules do not protect already-tracked files or forced additions;
+continue reviewing staged changes and using GitHub secret scanning/push protection.
+
+The release workflow sets `umask 077` before creating credential files, disables shell tracing,
+and registers cleanup paths before importing secrets. Setup traps remove partial material on failure
+or handled cancellation; unconditional final steps remove retained signing material after the job.
+Setup refuses pre-existing target files; final cleanup reports deletion failures without skipping other
+credential paths. Synthetic workflow tests exercise permissions before `chmod`, import/copy failures,
+termination and cleanup without using real credentials. A killed or lost runner still relies on the
+hosted runner's disposal; this is defense in depth, not guaranteed secure erasure.
+
 ## Report a vulnerability privately
 
 Do not open a public issue for a suspected vulnerability or include user data, credentials, model

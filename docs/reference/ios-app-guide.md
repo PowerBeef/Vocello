@@ -1,7 +1,7 @@
 ---
 status: active
 owner: ios
-reviewed: 2026-09-07
+reviewed: 2026-09-09
 summary: Consolidated iPhone app map — every screen, element, and option from the user view, and how XCUITest drives each via stable identifiers on the paired physical device.
 sourceOfTruth:
   - Sources/iOS
@@ -20,6 +20,14 @@ unlocks outward Design/Clone audio export. Built-in exports remain free; macOS a
 The approved product and USD 19.99 US-base/automatic-regional price schedule exist in App Store
 Connect. Product metadata/availability and physical purchase acceptance remain pending under
 RF-13/RF-02/RF-12; this is not an available or reviewed purchase.
+
+This is the official iOS app's export purchase, not a restriction on the MIT-licensed source.
+Self-built forks may change the checks; they do not acquire an official Apple entitlement by doing
+so. No licensing server or obfuscation is planned to prevent source modification. Keep public product
+configuration separate from private developer credentials as described in the
+[security boundary](../../SECURITY.md#open-source-purchase-boundary). Unmodified self-builds are not
+promised live purchase support under a different signing identity; use the isolated test fixture only
+through the governed test route, never a shipping unlock or production credential copied from the maintainer.
 
 - Studio Save/Download, expanded-player Share, History/segment export and optional Files folder
   copying use the **finished output's mode**, never the current Studio selection. Unknown generated
@@ -45,6 +53,11 @@ RF-13/RF-02/RF-12; this is not an available or reviewed purchase.
 
 The existing stateful control audit owns options-sheet reachability/dismissal and explicitly blocks
 purchase actions pending an approved StoreKit/sandbox session. It never buys or invokes Restore.
+The opt-in `scripts/ui_test.sh ios purchase --retain-result` lane uses Apple StoreKitTest and a
+fixture bundled **only in the UI-test target**. It attempts the local transaction lifecycle through
+the real purchase sheet, never live purchases. The fixture price and native Xcode environment must
+match before Buy; the test refuses preexisting local transactions and removes only its own afterward.
+This is separate from sandbox/TestFlight, offline and complete paid/free export-route acceptance.
 The [submission procedure](ios-appstore-submission.md#1-privacy--compliance-app-store-connect) owns
 focused physical purchase acceptance and the remaining product metadata/account work.
 
@@ -255,31 +268,49 @@ or delete the originals.
 
 ### Settings tab — `Sources/iOS/Settings/SettingsScreen.swift`
 
-The landing surface is deliberately title-free: the selected Settings item in the shared tab dock
-is its location indicator. Its compact grouped sections are ordered Audio, Models & Files,
-Accessibility, Privacy, and About. Eyebrow headings, dense headline/caption rows, tinted utility
-tiles, quiet panel fills, and dock clearance match the established Voices and History language;
-neutral controls use the Settings silver accent while mode-specific model and Clone semantics keep
-their mode colors. `iosSettings_autoPlayToggle` is a semantic SwiftUI `Toggle` with compact custom
-chrome; `iosSettings_variationRow` is a menu picker (Expressive/Balanced/Consistent). The landing
-page also owns `iosSettings_savedOutputsRow`, `iosSettings_reduceMotionToggle`,
-`iosSettings_reduceTransparencyToggle`, `voiceCloning_consentAcknowledgment`,
-`iosSettings_privacyPolicyRow`, `iosSettings_openIOSSettingsRow`, `iosSettings_supportRow`,
-`iosSettings_openSourceRow`, `iosSettings_sourceCodeRow`, and the compact read-only
-`iosSettings_versionLabel`. Support opens the contract-owned unauthenticated support page; Source Code
-remains a separate GitHub destination.
+The title-free hub (`screen_settings`) contains three flat groups: Audio and Models & Files;
+Design & Clone Export; Privacy & Permissions, Accessibility, and About. The shared tab dock is
+unchanged. Five `iosSettings_<category>Row` links push into the existing Settings navigation stack;
+categories are `audio`, `modelsFiles`, `privacyPermissions`, `accessibility`, and `about`.
+Each has `screen_settings_<category>` and a 44-point `iosSettings_<category>BackButton`.
+No nested navigation stack or additional preference is introduced.
+
+Audio retains `iosSettings_autoPlayToggle` (default on) and the unchanged
+`iosSettings_variationRow` menu. Models & Files owns `iosSettings_voiceModelsRow` and
+`iosSettings_savedOutputsRow`, including the existing History/folder picker and bookmark behavior.
+Accessibility owns `iosSettings_reduceMotionToggle` and `iosSettings_reduceTransparencyToggle`.
+Privacy & Permissions retains `voiceCloning_consentAcknowledgment`, its full legal disclosure,
+`iosSettings_privacyPolicyRow`, and `iosSettings_openIOSSettingsRow`. About owns
+`iosSettings_supportRow`, `iosSettings_openSourceRow`, `iosSettings_sourceCodeRow`, and the
+dynamic, non-interactive `iosSettings_versionLabel`. Support and Source Code retain their URLs.
+Rows use decorative symbols, wrapping labels and subordinate values; folder names and variation
+values sit below their labels. No forced Dynamic Type limit or fixed-width value column is used.
+Decorative symbols fit 20-point artwork inside 28-point slots; Back chevrons stay within their
+44-point controls. Text retains semantic scaling. At accessibility sizes, switch tracks reflow
+below their labels rather than reserving a narrow trailing column.
+
+The restrained gold `iosSettings_exportPurchaseRow` opens the same purchase sheet as all export
+entry points. Its summary reflects locked/checking/unlocked state and never displays a price.
+The sheet separates the benefit, free functionality, one-time/no-subscription reassurance,
+full-width live StoreKit-price action, Restore, policy/support links, and thank-you text. All
+purchase states, disabling rules and explicit post-purchase export retry remain unchanged.
+If product information cannot load while verified export access is already unlocked, the notice
+explicitly confirms that exports remain available. Product availability does not revoke access.
+New Settings/purchase presentation copy is typed and includes English/French catalog entries.
+Current-source physical visual, accessibility and purchase acceptance require separate authorization;
+historical Settings and local StoreKit passes are not proof for the refined layout.
 
 `iosSettings_openSourceRow` pushes `screen_openSourceLicenses`. The offline browser is generated from
 the exact application SwiftPM resolution, owned-runtime license/NOTICE/origin records, and the six
 production model revisions. Rows expose `iosAttributionRow_<componentID>` and
 `iosModelAttributionRow_<modelID>-<variantID>`; the 44-point
-`iosSettings_openSourceBackButton` returns to Settings. Each detail exposes complete license text,
+`iosSettings_openSourceBackButton` returns to About. Each detail exposes complete license text,
 applicable NOTICE/origin text, pinned identity, and the upstream source without requiring network access.
 The resource is fail-closed in deterministic and archive/IPA verification.
 
 `iosSettings_voiceModelsRow` pushes the dedicated `screen_voiceModels` destination. That screen
 keeps the system navigation bar hidden and provides the compact 44-point
-`iosSettings_voiceModelsBackButton`, the `iosSettings_storageRow` summary, and the three
+`iosSettings_voiceModelsBackButton` returning to Models & Files, the `iosSettings_storageRow` summary, and the three
 `iosModelRow_<modelID>` lifecycle rows (full state contract below). Both surfaces derive their
 bottom content clearance from the shared tab-dock fade metric and reflow values/actions vertically
 at accessibility Dynamic Type sizes. At ordinary text sizes each model keeps its icon, name,
@@ -472,6 +503,10 @@ Gotchas:
 5. Recording and destructive model lifecycle actions are outside smoke and benchmark. The isolated
    physical-device model-delivery proof is selected explicitly with
    `scripts/ui_test.sh ios model-download` and cleans up through visible Settings controls.
+6. Settings clearance uses the genuine `rootTabDock` container, not a single tab button (the dock
+   has two rows at accessibility sizes). Layout assertions require the entire element within the
+   unobscured viewport. Explicit oversized-navigation activation instead requires a visible central
+   44-point band and XCUI hittability; this is never accepted as full-row layout evidence.
 
 ---
 

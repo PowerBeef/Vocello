@@ -122,7 +122,7 @@ struct VoiceModelsScreen: View {
                 dismiss()
             } label: {
                 Image(systemName: "chevron.left")
-                    .font(.body.weight(.semibold))
+                            .font(.system(size: 17, weight: .semibold))
                     .foregroundStyle(Theme.Text.primary)
                     .frame(width: 44, height: 44)
                     .background(Theme.Surface.inline, in: Circle())
@@ -133,11 +133,10 @@ struct VoiceModelsScreen: View {
                     .contentShape(Circle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Back to Settings")
-            .accessibilityHint("Returns to the Settings tab")
+            .accessibilityLabel(IOSSettingsText.backModelsFiles)
             .accessibilityIdentifier("iosSettings_voiceModelsBackButton")
 
-            Text("Voice Models")
+            Text(IOSSettingsText.voiceModels)
                 .font(.headline)
                 .foregroundStyle(Theme.Text.primary)
                 .accessibilityAddTraits(.isHeader)

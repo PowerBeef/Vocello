@@ -2,6 +2,26 @@ import Foundation
 
 /// iOS-only purchase copy; live prices always come from StoreKit.
 extension VocelloPresentationText {
+    static var exportRootSummary: String {
+        String(localized: "vocello.export.root_summary", defaultValue: "One-time export unlock",
+               comment: "iOS export purchase presentation; never substitute a fixed price or imply generation is paid.")
+    }
+    static var exportBenefit: String {
+        String(localized: "vocello.export.benefit", defaultValue: "Save and share audio created with Voice Design and Voice Clone.",
+               comment: "iOS export purchase presentation; never substitute a fixed price or imply generation is paid.")
+    }
+    static var exportFreeDetail: String {
+        String(localized: "vocello.export.free_detail", defaultValue: "Generation, listening, and History are free in every mode. Built-in voice exports are free too.",
+               comment: "iOS export purchase presentation; never substitute a fixed price or imply generation is paid.")
+    }
+    static var exportOneTime: String {
+        String(localized: "vocello.export.one_time", defaultValue: "One-time purchase. No subscription.",
+               comment: "iOS export purchase presentation; never substitute a fixed price or imply generation is paid.")
+    }
+    static var exportThanks: String {
+        String(localized: "vocello.export.thanks", defaultValue: "Thank you for supporting Vocello. Your purchase helps fund its continued development and future independent projects.",
+               comment: "iOS export purchase presentation; never substitute a fixed price or imply generation is paid.")
+    }
     static var exportPrivacy: String {
         String(localized: "vocello.export.privacy", defaultValue: "Privacy Policy",
                comment: "Opens the published Vocello privacy policy.")
@@ -38,6 +58,11 @@ extension VocelloPresentationText {
     static var exportReloadProduct: String {
         String(localized: "vocello.export.reload", defaultValue: "Try Again",
                comment: "iOS non-consumable export purchase; generation and internal playback remain free.")
+    }
+
+    static var exportOwnedProductUnavailable: String {
+        String(localized: "vocello.export.owned_unavailable", defaultValue: "Purchase information is currently unavailable. Your export unlock is still active; you can save and share audio in every mode.",
+               comment: "Product information failed to load, but the existing verified export entitlement remains active. Do not imply exports are blocked.")
     }
 
     static var exportChecking: String {
@@ -105,12 +130,13 @@ extension VocelloPresentationText {
             defaultValue: "Unlock exports — %@", comment: "One-time purchase; substitution is the App Store localized price."), price)
     }
 
-    static func exportPurchaseNotice(_ notice: IOSExportPurchaseState.Notice) -> String {
+    static func exportPurchaseNotice(_ notice: IOSExportPurchaseState.Notice,
+                                     access: IOSExportPurchaseState.Access) -> String {
         switch notice {
         case .pending: exportNoticePending
         case .cancelled: exportNoticeCancelled
         case .failed: exportNoticeFailed
-        case .unavailable: exportProductUnavailable
+        case .unavailable: access == .unlocked ? exportOwnedProductUnavailable : exportProductUnavailable
         case .unverified: exportNoticeUnverified
         case .restored: exportNoticeRestored
         case .notOwned: exportNoticeNotOwned

@@ -105,6 +105,57 @@ Phone-independent checks: `scripts/macos_test.sh core-test --only IOSExportPurch
 production state/policy with deterministic StoreKit-boundary fixtures; `python3 -m unittest
 scripts.tests.test_ios_export_contract` checks route wiring, fixture isolation and platform separation.
 These **do not execute an Apple transaction**. Generic iOS compilation checks the real adapter/UI.
+For explicitly authorized **local** physical-device transaction testing, run:
+
+```sh
+scripts/ios_device.sh preflight
+scripts/ui_test.sh ios purchase --retain-result
+# Extend the same local session with read-only existing History/player export checks:
+scripts/ui_test.sh ios purchase --scenario exports --retain-result
+```
+
+The existing runner builds the UI-test target with `VocelloExports.storekit`; shipping targets and
+schemes never activate or bundle it. `SKTestSession` owns a serial local session: native Xcode
+transaction environment and the fixture's $0.99 price must be proven before visible Buy/Restore.
+The lane covers initial lock, restore without ownership, simulated cancellation, purchase, relaunch,
+restore, revocation, pending approval and approval delivery.
+The cancellation arm reads back cleared error injection and resets session options before the
+positive purchase: on the canonical phone, clearing the error alone left the next transaction failing.
+Keep the original failed evidence; do not replace this isolation with retries or a production bypass.
+Standard process-local Apple language
+arguments make assertions English without changing the phone's French settings. No live Apple
+Account, charge, account edits, app-data deletion or production entitlement override is authorized.
+Preexisting local test transactions block execution; test-owned transactions are deleted on normal
+failure/success and the app is terminated. Cleanup failure blocks acceptance. A runner crash can
+prevent teardown; retain evidence and resolve the local session before another attempt.
+`local-purchase-summary.json` requires every ordered phase, exact run/fixture identity and cleanup;
+the `.xcresult`, screenshots, source receipt and crash delta remain untracked. Zero-test bootstrap
+failures remain failed infrastructure runs, never retries or purchase passes.
+The optional `exports` scenario requires an existing accessible History clip in each mode. It
+selects one visible-provenance row per mode and reuses its exact identity for the revoked comparison;
+no row is created, edited, pinned or deleted. History-menu and full-player sharing are tested while
+owned and revoked, with free Built-in controls and internal playback/pause. System sharing is
+cancelled, never sent or saved. Apple's product-loading network-error injection tests relaunch with
+owned access but unavailable product metadata; it does not disconnect the device. The test restores
+the History filter and verifies the original tab after dismissing any modal, then stops the app.
+Current schema 3 records the scenario and separate transaction, tab, History-filter and app-stop
+restoration observations. The exports scenario still requires all 23 phases; lifecycle requires ten.
+The test snapshots the selected History filter before changing it and restores that filter, not an
+assumed All selection. Background interruption never triggers foreground takeover during cleanup:
+skipped or unobserved restoration fails qualification even if transactions were cleared and the app
+stopped. `--require-restoration` is mandatory in the current runner. Historical schemas 1/2 remain
+readable without that option but cannot establish current restoration proof. Cross-scenario
+qualification is rejected. The French system share sheet is queried by its stable
+`header.closeButton`, not the English app locale's Close label.
+
+Neither scenario qualifies actual offline behavior, every export surface, App Store sandbox,
+or the processed TestFlight candidate. Remaining physical surfaces are Studio Save/Download,
+automatic folder copies, individual long-form segments, generated Saved Voice/original reference
+recovery and genuine failed-storage exports, using test-owned fixtures with restoration. A local
+PASS cannot close those remaining RF-13/RF-12 gates. Sandbox needs a confirmed test account and
+available configured product; processed proof additionally needs the separately authorized
+command-bound archive/IPA and TestFlight upload, not a development build substituted in place.
+
 The existing stateful control audit inspects/dismisses purchase options but blocks transaction actions.
 A separately authorized physical StoreKit/sandbox session must qualify purchase/restore/pending/
 cancel/refund and all paid/free export paths, followed by processed-candidate checks. Do not fake

@@ -47,6 +47,22 @@ Scripts past 900 characters become **long-form projects**: planned segments stre
 
 Vocello is not a wrapper around a Python server: generation runs through a first-party Swift runtime on MLX, and the full engineering story lives in [Under the hood](#under-the-hood).
 
+## Open source and the iOS export unlock
+
+Vocello's source remains MIT-licensed. For the upcoming official iOS 3.0 release, **Design & Clone
+Export** is a one-time purchase with a **US base price of $19.99** and Apple-managed regional prices
+shown in your local currency. Generation, listening, internal History, voice enrollment and Built-in
+audio exports remain free. **macOS and CLI exports remain unrestricted.** The iOS product is configured,
+but metadata, purchase testing and App Store review are still pending; this is not an availability claim.
+
+The purchase supports the official iOS distribution, not an exclusive license to the source. People
+may build and modify the MIT-licensed code, including its export checks, subject to the license terms.
+A modified build is not the official App Store app and does not create an Apple purchase or entitlement.
+We accept this tradeoff instead of adding a licensing server, obfuscation or restrictions on forks.
+Third-party models and assets retain their applicable terms; the code license does not clear all
+content rights. See the [iOS purchase guide](docs/reference/ios-app-guide.md#ios-export-purchase)
+and [purchase security boundary](SECURITY.md#open-source-purchase-boundary).
+
 ## Voice workflows
 
 | Voice Design | Voice Cloning |

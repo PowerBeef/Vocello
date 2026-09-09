@@ -71,19 +71,32 @@ struct IOSExportPurchaseSheet: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
+            IOSScrollView {
                 VStack(alignment: .leading, spacing: 20) {
-                    Text(VocelloPresentationText.exportUnlockDetail)
+                    Text(VocelloPresentationText.exportBenefit)
+                        .font(.headline)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text(VocelloPresentationText.exportFreeDetail)
+                        .foregroundStyle(Theme.Text.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text(VocelloPresentationText.exportOneTime)
+                        .font(.subheadline)
                         .fixedSize(horizontal: false, vertical: true)
                     if store.access == .unlocked {
                         Label(VocelloPresentationText.exportUnlocked, systemImage: "checkmark.seal")
                             .accessibilityIdentifier("exportPurchase_unlocked")
                         Text(VocelloPresentationText.exportRetryAfterPurchase)
                     } else if let product = store.product {
-                        Button(VocelloPresentationText.exportBuy(product.displayPrice)) {
+                        Button {
                             Task { await store.purchase() }
+                        } label: {
+                            Text(VocelloPresentationText.exportBuy(product.displayPrice))
+                                .foregroundStyle(Theme.Text.onAccent)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .frame(maxWidth: .infinity, minHeight: 44)
                         }
                         .buttonStyle(.borderedProminent)
+                        .tint(Theme.Brand.gold)
                         .frame(minHeight: 44)
                         .disabled(store.operation != .idle || store.access == .checking)
                         .accessibilityIdentifier("exportPurchase_buy")
@@ -101,7 +114,7 @@ struct IOSExportPurchaseSheet: View {
                             .accessibilityIdentifier("exportPurchase_progress")
                     }
                     if let notice = store.notice {
-                        Text(VocelloPresentationText.exportPurchaseNotice(notice))
+                        Text(VocelloPresentationText.exportPurchaseNotice(notice, access: store.access))
                             .fixedSize(horizontal: false, vertical: true)
                             .accessibilityIdentifier("exportPurchase_status")
                     }
@@ -111,14 +124,21 @@ struct IOSExportPurchaseSheet: View {
                     .frame(minHeight: 44)
                     .disabled(store.operation != .idle)
                     .accessibilityIdentifier("exportPurchase_restore")
-                    Link(VocelloPresentationText.exportPrivacy,
+                    VStack(alignment: .leading, spacing: 0) {
+                        Link(VocelloPresentationText.exportPrivacy,
                          destination: URL(string: "https://vocello.vercel.app/privacy")!)
                         .frame(minHeight: 44)
                         .accessibilityIdentifier("exportPurchase_privacy")
-                    Link(VocelloPresentationText.exportSupport,
+                        Link(VocelloPresentationText.exportSupport,
                          destination: URL(string: "https://vocello.vercel.app/support/")!)
                         .frame(minHeight: 44)
                         .accessibilityIdentifier("exportPurchase_support")
+                    }
+                    .font(.subheadline)
+                    Text(VocelloPresentationText.exportThanks)
+                        .font(.footnote)
+                        .foregroundStyle(Theme.Text.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 .padding()
             }
@@ -127,6 +147,7 @@ struct IOSExportPurchaseSheet: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button(VocelloPresentationText.exportClose) { dismiss() }
+                        .frame(minWidth: 44, minHeight: 44)
                         .accessibilityIdentifier("exportPurchase_close")
                 }
             }

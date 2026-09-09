@@ -15,6 +15,20 @@ This is a narrative, not a second work ledger. Product source, contracts and scr
 
 ## Resume now
 
+### September 9 publication checkpoint
+
+Committed and pushed the complete Settings/purchase/credential-hygiene patch as `3247b566` on
+`main`. The resumed deterministic checkpoint passed: 122 focused plus 1,588 full-discovery Python
+tests, all native core/transport/runtime suites, generic iOS app/logic compilation and macOS app
+build. The interruption's missing completion receipt was not treated as PASS; a complete replacement
+checkpoint is retained untracked as `commit-checkpoint-20260909.log` in the macOS artifact root.
+GitHub exact-SHA CI/Security completion is not established by this local checkpoint or push.
+
+ISU-4 and RF-13 stay in flight. The next bounded task is the AX-L About reveal boundary and then
+the missing Settings layouts; actual offline, remaining export surfaces and processed-candidate
+purchase acceptance remain separate. The roadmap update follows publication; existing device
+evidence keeps its original source identity. No phone, account or release operation was performed.
+
 ### September 9 follow-up physical QA — local purchases PASS; Settings still incomplete
 
 The authorized two-hour session ended well before its deadline. Source and documentation stayed

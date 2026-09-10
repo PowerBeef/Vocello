@@ -709,6 +709,8 @@
         "Sources/iOS/InfoPlist.xcstrings",
         "Sources/iOS/IOSRootNavigationModels.swift",
         "Sources/SharedSupport/Services/VocelloPresentationText.swift",
+        "Sources/SharedSupport/Services/VocelloLocalization.swift",
+        "Sources/iOSSupport/Services/IOSAppLanguage.swift",
         "scripts/localization_contract.py",
         "config/localization-unlocalized-baseline.json",
         "Tests/VocelloMacUITests/VocelloMacSmokeUITests.swift",

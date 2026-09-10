@@ -269,12 +269,18 @@ or delete the originals.
 ### Settings tab — `Sources/iOS/Settings/SettingsScreen.swift`
 
 The compact Settings heading (`iosSettings_title`, localized as Réglages) introduces the hub
-(`screen_settings`) and its three flat groups: Audio and Models & Files;
+(`screen_settings`) and its three flat groups: Audio, App Language and Models & Files;
 Design & Clone Export; Privacy & Permissions, Accessibility, and About. The shared tab dock is
-unchanged. Five `iosSettings_<category>Row` links push into the existing Settings navigation stack;
-categories are `audio`, `modelsFiles`, `privacyPermissions`, `accessibility`, and `about`.
+unchanged. Six `iosSettings_<category>Row` links push into the existing Settings navigation stack;
+categories are `audio`, `appLanguage`, `modelsFiles`, `privacyPermissions`, `accessibility`, and `about`.
 Each has `screen_settings_<category>` and a 44-point `iosSettings_<category>BackButton`.
-No nested navigation stack or additional preference is introduced.
+No nested navigation stack is introduced. App Language adds a UI-only persisted preference,
+defaulting to System Default, then native-name choices from complete bundled translations
+(currently English and French). It does not select the language of generated speech. The
+observable app-lifetime owner updates typed display copy without replacing runtime dependencies;
+system dialogs may retain the OS language. English/French switching, relaunch and draft checks have
+partial physical evidence; full AX-XXXL/pseudo layout acceptance and the remaining eight translation
+batches are still pending under ASR-12/ISU-4.
 
 Audio retains `iosSettings_autoPlayToggle` (default on) and the unchanged
 `iosSettings_variationRow` menu. Models & Files owns `iosSettings_voiceModelsRow` and

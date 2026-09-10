@@ -428,16 +428,16 @@ struct IOSSaveVoiceSheet: View {
 
                     if let referenceLanguage {
                         fieldSection(
-                            label: VocelloPresentationText.referenceLanguageTitle,
+                            label: IOSAppLanguage.shared.presentation.referenceLanguageTitle,
                             caption: requiresReferenceLanguageConfirmation
-                                ? VocelloPresentationText.referenceLanguageConfirmation
-                                : VocelloPresentationText.referenceLanguageDetail
+                                ? IOSAppLanguage.shared.presentation.referenceLanguageConfirmation
+                                : IOSAppLanguage.shared.presentation.referenceLanguageDetail
                         ) {
                             Picker(
-                                VocelloPresentationText.referenceLanguageTitle,
+                                IOSAppLanguage.shared.presentation.referenceLanguageTitle,
                                 selection: referenceLanguage
                             ) {
-                                Text(VocelloPresentationText.referenceLanguagePlaceholder)
+                                Text(IOSAppLanguage.shared.presentation.referenceLanguagePlaceholder)
                                     .tag(Qwen3SupportedLanguage.auto)
                                 ForEach(Qwen3SupportedLanguage.selectableCases, id: \.self) { language in
                                     Text(IOSInterfaceText.languageName(language)).tag(language)
@@ -517,7 +517,7 @@ struct IOSSaveVoiceSheet: View {
                     dismissKeyboard()
                     onUseAudioOnly()
                 } label: {
-                    Label(VocelloPresentationText.useAudioOnly, systemImage: "waveform")
+                    Label(IOSAppLanguage.shared.presentation.useAudioOnly, systemImage: "waveform")
                         .font(.footnote.weight(.semibold))
                         .frame(minHeight: 44)
                         .padding(.horizontal, 14)
@@ -530,7 +530,7 @@ struct IOSSaveVoiceSheet: View {
                 .overlay {
                     Capsule().stroke(tint.opacity(0.35), lineWidth: 1)
                 }
-                .accessibilityHint(VocelloPresentationText.useAudioOnlyHint)
+                .accessibilityHint(IOSAppLanguage.shared.presentation.useAudioOnlyHint)
                 .accessibilityIdentifier("saveVoice_useAudioOnlyButton")
             }
         }
@@ -626,7 +626,7 @@ struct IOSSaveVoiceSheet: View {
     /// (10–20 s sweet spot, acceptable to ~30 s). The recorder caps at 20 s, so recorded clips
     /// read "Good length"; this mainly informs imported / generated clips.
     private func clipQualityHint(duration: TimeInterval) -> (label: String, tone: IOSStatusBadge.Tone) {
-        guard duration > 0 else { return (VocelloPresentationText.status(.ready), .muted) }
+        guard duration > 0 else { return (IOSAppLanguage.shared.presentation.status(.ready), .muted) }
         switch duration {
         case ..<10: return (IOSInterfaceText.shortClip, .warning)
         case 10...30: return (IOSInterfaceText.goodLength, .success)

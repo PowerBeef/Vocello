@@ -500,7 +500,10 @@ class IOSSmokeAcceptanceTests(unittest.TestCase):
         self.assertNotIn('NavigationStack', settings)
         self.assertIn('var linkID: String { "iosSettings_\\(rawValue)Row" }', settings)
         self.assertIn('var backID: String { "iosSettings_\\(rawValue)BackButton" }', settings)
-        self.assertIn('case audio, modelsFiles, privacyPermissions, accessibility, about', settings)
+        self.assertIn('case audio, appLanguage, modelsFiles, privacyPermissions, accessibility, about', settings)
+        self.assertIn('categoryLink(.appLanguage) { appLanguageSection }', settings)
+        self.assertIn('iosSettings_appLanguageOption_', settings)
+        self.assertIn('.accessibilityAddTraits(selected ? [.isSelected] : [])', settings)
         self.assertIn('.accessibilityIdentifier("iosSettings_voiceModelsRow")', settings)
         shared = (ROOT / "Tests/UIAutomationSupport/VocelloUIAutomationSupport.swift").read_text()
         purchase = (ROOT / "Tests/VocelloiOSUITests/VocelloiOSPurchaseUITests.swift").read_text()
@@ -514,7 +517,10 @@ class IOSSmokeAcceptanceTests(unittest.TestCase):
         self.assertIn('attachment.name = "settings-reveal-observations"', shared)
         self.assertIn('attachment.lifetime = .keepAlways', shared)
         self.assertIn('requirement: VocelloUIRevealRequirement = .fullVisibility', shared)
-        self.assertIn('search.next(target: required, visible: visible)', shared)
+        self.assertIn('search.nextScroll(target: required, visible: visible)', shared)
+        self.assertIn('VocelloUITouchScrollAnchor.index(', shared)
+        self.assertIn('anchor.swipeUp(velocity: .slow)', shared)
+        self.assertIn('anchor.swipeDown(velocity: .slow)', shared)
         self.assertIn(
             "max(IOSStudioShellMetrics.dockFadeHeight, dockHeight) + Theme.Spacing.lg", settings
         )
@@ -551,7 +557,7 @@ class IOSSmokeAcceptanceTests(unittest.TestCase):
         self.assertIn(".stroke(accent?.opacity(0.25) ?? Theme.Surface.panelStroke", rows)
         self.assertNotIn("IOSSettingsReferenceSwitch", rows)
         self.assertIn(
-            "return VocelloPresentationText.status(.ready)",
+            "return IOSAppLanguage.shared.presentation.status(.ready)",
             rows,
         )
         for state in [

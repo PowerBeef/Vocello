@@ -15,6 +15,7 @@ import QwenVoiceCore
 /// it ships inert unless a repository command supplies its purpose-specific environment.
 @main
 struct QVoiceiOSApp: App {
+    private let appLanguage = IOSAppLanguage.shared
     @StateObject private var deps: IOSAppDependenciesContainer
     @UIApplicationDelegateAdaptor private var appDelegate: IOSAppDelegate
     @StateObject private var audioPlayer = AudioPlayerViewModel()
@@ -112,6 +113,7 @@ struct QVoiceiOSApp: App {
                 }
             }
             .preferredColorScheme(.dark)
+            .environment(\.locale, appLanguage.interfaceLocale)
             .task { await IOSExportCommerce.shared.refresh() }
         }
         .onChange(of: scenePhase) { _, newValue in
@@ -152,6 +154,7 @@ struct QVoiceiOSApp: App {
     private func handleScenePhaseChange(_ scenePhase: ScenePhase) {
         switch scenePhase {
         case .active:
+            appLanguage.refreshSystemLanguage()
             Task { await IOSExportCommerce.shared.refresh() }
             setPlaybackSessionActive(true)
             if let engine = deps.engine {

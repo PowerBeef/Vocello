@@ -197,7 +197,7 @@ struct IOSStudioPlayerCard: View {
             .accessibilityIdentifier("studio_inlinePlayer_dismissConfirm")
             Button(IOSInterfaceText.cancel, role: .cancel) {}
         } message: {
-            Text(VocelloPresentationText.dismissPlayerDetail)
+            Text(IOSAppLanguage.shared.presentation.dismissPlayerDetail)
         }
     }
 

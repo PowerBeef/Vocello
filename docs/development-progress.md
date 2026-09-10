@@ -15,6 +15,84 @@ This is a narrative, not a second work ledger. Product source, contracts and scr
 
 ## Resume now
 
+### September 10 bounded Settings scrolling correction
+
+App-language run `ios-xcui-localization-20260910-165027-fa2f0c10` passed its English/French
+immediate-update, relaunch and draft-preservation assertions plus Default/French-Default/AX-L
+page checks, then failed before tapping App Language at AX-XXXL. The prior
+`ios-xcui-localization-20260910-164426-11ab77c8` remains a separate zero-case bootstrap failure.
+The measured 514-point row alternated above/below the 632-point viewport under full-window
+swipes. System Default was restored in completed configurations; the final configuration failed
+before mutation, and exact-PID readback confirmed app termination. Neither run is a passing lane.
+
+Physical run `ios-xcui-localization-20260910-175737-c71a0c95` rejected the initial delta transport:
+`scroll(byDeltaX:deltaY:)` requires pointer events unsupported by this iPhone. Default/French
+completed; AX-L failed revealing About, and AX-XXXL/pseudo were not reached. The original System
+Default selection was verified in teardown and the final app PID was independently absent.
+This is a harness failure, not a product-scroll verdict; SDK compilation did not qualify touch input.
+
+The helper now uses slow native touch swipes on small, fully visible static-text descendants of
+one uniquely identified containing scroll view. It never falls back to a dock-obscured row or
+full-window swipe. It remeasures each step, reduces the anchor size after reversals, records evidence
+before gestures and stops on stationary/impossible geometry or absent safe anchors. Full visibility,
+hittability and the separate oversized-navigation rule remain unchanged; no coordinate exception,
+production UI change, or automatic retry was added. Native regressions replay the retained
+geometry with several displacement gains. Focused verification is recorded in
+`build/artifacts/ios/bounded-scroll-native-corrected.log` and `bounded-scroll-python.log`; the coherent
+checkpoint is `bounded-scroll-checkpoint.log` (prior pointer implementation, not touch qualification).
+The current repair uses `touch-scroll-native.log` and `touch-scroll-python.log`: 14 native policy
+tests and 108 Python tests passed. Two subsequent containment source-contract tests passed in
+`touch-scroll-containment-python.log`. Use terminal outcomes only.
+
+Touch run `ios-xcui-localization-20260910-182012-6b1ea48d` completed Default/French and AX-L Audio/About,
+then failed revealing the Clone status. The containing-scroll query ambiguously matched the
+SwiftUI Label's identifier across element types. It now matches the resolved target's element type
+and exact frame, retaining single-container ownership and fail-closed behavior.
+Fresh run `ios-xcui-localization-20260910-183118-bfdbff01` completed Default, then encountered an
+explicit `NotificationShortLookView` banner during the French-Default App Language Back tap.
+The failure screenshot shows ChatGPT foreground; this is an external-interruption failure, not a
+proven Back-button defect. The lane remains failed with all required steps accounted for. System
+Default was observed before the interruption and remained selected in the retained app tree;
+teardown could not complete its navigation, but exact-PID readback independently proved termination.
+No automatic retry followed. Raw screenshots, original failures and session checkpoints remain
+untracked under the two run IDs. Resume with an uninterrupted, explicitly authorized phone session;
+the latest containment correction had not yet reached its physical acceptance point in that run.
+
+After the user enabled Do Not Disturb, separately authorized ten-minute run
+`ios-xcui-localization-20260910-184111-4c20b0d2` completed Default, French-Default and AX-L, including
+the previously failing Clone status/Voice Models reveal. System Default restoration completed
+before the AX-L app terminated. AX-XXXL had just launched when the exact owned Xcode process was
+interrupted for the phone deadline; pseudo was not reached. No assertion failure preceded the
+deadline stop. The runner retained available forensics and finalized its required-step ledger as
+failed/incomplete, with no missing steps; the Xcode interruption/shutdown stack is not an app-crash
+verdict. Exact-PID readback proved the final app absent and the phone was released before the
+deadline. This is useful partial physical evidence, not a passing localization lane. AX-XXXL/pseudo
+still require another authorized window; no automatic retry or further device work followed.
+Fresh authorized AX-XXXL/pseudo physical qualification remains open under ISU-4; prior successful
+assertions remain partial historical evidence. The eight additional translations are still pending.
+The publication checkpoint log for this coherent App Language/touch-scroll tree is
+`build/artifacts/ios/app-language-touch-publication-checkpoint.log`; its terminal result, not the
+earlier pointer-only checkpoint, governs commit readiness. No device or release lane is part of it.
+
+### September 10 app-language host continuation (partial implementation)
+
+Settings now includes App Language after Audio, with System Default and the complete bundled
+English/French choices. `IOSAppLanguage` owns a separate persisted UI preference; the existing
+typed helpers read its explicit compiled-catalog context. No application-root identity reset,
+engine/request change, StoreKit price reformatting or macOS selector is introduced. The new native
+tests exercise preference/fallback, actual compiled strings and plurals, Observation updates,
+regional formatting and opaque price/user-text preservation. The existing XCUI localization walk
+now covers genuine selection, relaunch and draft checks, and records/restores the original choice.
+No phone was contacted during this continuation.
+
+The approved ten-language plan is **not complete**. The catalog has 491 EN/FR entries; the eight
+additional locales remain absent rather than partially shipped. ASR-12 retains remaining indirect
+stored-error/status review and the translation batches, after ISU-4's unresolved AX-XXXL/pseudo
+navigation qualification. Physical language-switch/state/layout tests require separate approval;
+the earlier device runs below do not qualify this changed source. Host verification logs are
+`build/artifacts/ios/app-language-native-tests.log`, `app-language-compile.log` and
+`app-language-checkpoint.log`; only terminal PASS results may be used as verification evidence.
+
 ### September 10 physical localization and local StoreKit checkpoint
 
 The authorized device session is collected; no 201-take campaign or live transaction ran.

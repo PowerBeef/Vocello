@@ -99,4 +99,83 @@ final class UIInteractionPolicyTests: XCTestCase {
         state.appStopped = false
         XCTAssertFalse(state.complete)
     }
+
+    func testDesiredMovementBudgetConvergesForSyntheticDisplacementGains() throws {
+        let visible = CGRect(x: 0, y: 0, width: 402, height: 632)
+        // Both sides of the actual oscillation, with varied platform displacement.
+        for top in [343.333, -262.333] {
+            for gain in [0.5, 1.0, 2.0, 3.0] {
+                var row = CGRect(x: 16, y: top, width: 370, height: 514)
+                var search = VocelloUIRevealSearch(preferred: .up)
+                while !VocelloUIRevealRequirement.fullVisibility.satisfied(by: row, visible: visible) {
+                    let delta = try XCTUnwrap(search.nextScroll(target: row, visible: visible))
+                    XCTAssertLessThanOrEqual(abs(delta), 120)
+                    row = row.offsetBy(dx: 0, dy: delta * gain)
+                }
+                XCTAssertLessThan(search.attempts, 20)
+            }
+        }
+    }
+
+    func testTouchAnchorExcludesDockOffscreenAndOversizedRows() {
+        let frames = [
+            CGRect(x: 16, y: -18, width: 370, height: 127), // retained offscreen row
+            CGRect(x: 16, y: 491, width: 370, height: 242), // retained dock overlap
+            CGRect(x: 16, y: 100, width: 370, height: 514), // too large for bounded swipe
+            CGRect(x: 54, y: 300, width: 220, height: 50),
+            CGRect(x: 54, y: 400, width: 220, height: 90),
+        ]
+        XCTAssertEqual(VocelloUITouchScrollAnchor.index(frames: frames, visible: viewport, desiredDelta: -120), 4)
+        XCTAssertEqual(VocelloUITouchScrollAnchor.index(frames: frames, visible: viewport, desiredDelta: 30), 3)
+        XCTAssertNil(VocelloUITouchScrollAnchor.index(frames: Array(frames.prefix(3)), visible: viewport, desiredDelta: -120))
+    }
+
+    func testTouchAnchorFailsClosedAndDoesNotConfuseSpeedWithDistance() {
+        let small = CGRect(x: 20, y: 100, width: 100, height: 20)
+        XCTAssertEqual(VocelloUITouchScrollAnchor.index(frames: [.null, .zero, small, small],
+                                                       visible: viewport, desiredDelta: -4), 2)
+        XCTAssertNil(VocelloUITouchScrollAnchor.index(frames: [small], visible: .zero, desiredDelta: 30))
+        XCTAssertNil(VocelloUITouchScrollAnchor.index(frames: [small], visible: viewport, desiredDelta: .nan))
+        XCTAssertNil(VocelloUITouchScrollAnchor.index(frames: [small], visible: viewport, desiredDelta: 0))
+    }
+
+    func testBoundedScrollReversalReducesMovement() throws {
+        var search = VocelloUIRevealSearch(preferred: .up)
+        XCTAssertEqual(search.nextScroll(target: CGRect(x: 10, y: 800, width: 300, height: 514),
+                                         visible: viewport), -120)
+        XCTAssertEqual(search.nextScroll(target: CGRect(x: 10, y: -300, width: 300, height: 514),
+                                         visible: viewport), 60)
+        XCTAssertEqual(search.nextScroll(target: CGRect(x: 10, y: 800, width: 300, height: 514),
+                                         visible: viewport), -30)
+    }
+
+    func testBoundedScrollStopsOnUnchangedFramesAndImpossibleGeometry() {
+        var search = VocelloUIRevealSearch(preferred: .up)
+        let row = CGRect(x: 10, y: 800, width: 300, height: 514)
+        for _ in 0..<3 { XCTAssertNotNil(search.nextScroll(target: row, visible: viewport)) }
+        XCTAssertNil(search.nextScroll(target: row, visible: viewport))
+        for invalid in [CGRect(x: 0, y: 0, width: 300, height: 900),
+                        CGRect(x: -1, y: 0, width: 300, height: 100),
+                        CGRect(x: 0, y: 0, width: 500, height: 100)] {
+            var impossible = VocelloUIRevealSearch(preferred: .up)
+            XCTAssertNil(impossible.nextScroll(target: invalid, visible: viewport))
+        }
+        var satisfied = VocelloUIRevealSearch(preferred: .up)
+        XCTAssertNil(satisfied.nextScroll(target: CGRect(x: 10, y: 100, width: 300, height: 44),
+                                           visible: viewport))
+        XCTAssertNil(satisfied.nextScroll(target: row, visible: .zero))
+    }
+
+    func testBoundedScrollRetainsMissingFrameBudgetAndNavigationDistinction() throws {
+        var missing = VocelloUIRevealSearch(preferred: .up)
+        for _ in 0..<20 { XCTAssertNotNil(missing.nextScroll(target: nil, visible: viewport)) }
+        XCTAssertNil(missing.nextScroll(target: nil, visible: viewport))
+        let oversized = CGRect(x: 10, y: 500, width: 300, height: 900)
+        var full = VocelloUIRevealSearch(preferred: .up)
+        XCTAssertNil(full.nextScroll(target: oversized, visible: viewport))
+        var navigation = VocelloUIRevealSearch(preferred: .up)
+        let band = VocelloUIRevealRequirement.navigation.requiredFrame(oversized, visible: viewport)
+        XCTAssertLessThan(try XCTUnwrap(navigation.nextScroll(target: band, visible: viewport)), 0)
+        XCTAssertFalse(VocelloUIRevealRequirement.fullVisibility.satisfied(by: oversized, visible: viewport))
+    }
 }

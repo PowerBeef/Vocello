@@ -57,6 +57,8 @@ REQUIRED_PLURAL_KEYS = {
     "vocello.history.recovery_export_failure",
 }
 REQUIRED_LOCALES = ("en", "fr")
+# UI identifiers, deliberately separate from the model's spoken-language enum.
+SUPPORTED_UI_LOCALES = {"en", "fr", "es", "de", "it", "pt-BR", "zh-Hans", "ja", "ko", "ru"}
 FORMAT_ARGUMENT = re.compile(
     r"%(?:(?P<position>[1-9][0-9]*)\$)?(?P<type>@|lld|llu|ld|lu|d|u|f|g|s)"
 )
@@ -88,10 +90,13 @@ def _translation_units(payload: dict[str, Any], label: str) -> dict[str, str]:
     return result
 
 
-def _validate_translations(entry: dict[str, Any], key: str) -> None:
+def _validate_translations(entry: dict[str, Any], key: str, locales=REQUIRED_LOCALES) -> None:
     localizations = entry["localizations"]
+    unknown = set(localizations) - SUPPORTED_UI_LOCALES
+    if unknown:
+        raise ContractError(f"{key} has unsupported UI locales: {sorted(unknown)}")
     english = _translation_units(localizations["en"], f"{key} en")
-    for locale in REQUIRED_LOCALES:
+    for locale in set(locales) | set(localizations):
         payload = localizations.get(locale)
         if not isinstance(payload, dict):
             raise ContractError(f"{key} missing required localization {locale}")
@@ -114,7 +119,7 @@ def _validate_permission_catalog(root: Path) -> None:
     if set(catalog.get("strings", {})) != required:
         raise ContractError("permission catalog must contain exactly the two declared purpose strings")
     for key, entry in catalog["strings"].items():
-        _validate_translations(entry, key)
+        _validate_translations(entry, key, _bundled_catalog_locales(_read_json(root, CATALOG)))
         if entry["localizations"]["en"]["stringUnit"]["value"] != info[key]:
             raise ContractError(f"{key} must preserve the Info.plist purpose string")
     body = _target_body(_read_text(root, Path("project.yml")), "VocelloiOS")
@@ -185,6 +190,14 @@ def _english_payload(entry: dict[str, Any], key: str) -> dict[str, Any]:
     return localizations["en"]
 
 
+def _bundled_catalog_locales(catalog: dict[str, Any]) -> set[str]:
+    locales = set(REQUIRED_LOCALES)
+    for entry in catalog.get("strings", {}).values():
+        if isinstance(entry, dict):
+            locales.update(entry.get("localizations", {}))
+    return locales
+
+
 def _validate_catalog(root: Path) -> None:
     catalog = _read_json(root, CATALOG)
     if catalog.get("sourceLanguage") != "en" or catalog.get("version") != "1.0":
@@ -222,7 +235,7 @@ def _validate_catalog(root: Path) -> None:
             value = english.get("stringUnit", {}).get("value")
             if not isinstance(value, str) or not value.strip():
                 raise ContractError(f"catalog key {key} requires a non-empty English value")
-        _validate_translations(raw_entry, key)
+        _validate_translations(raw_entry, key, _bundled_catalog_locales(catalog))
 
 
 def _validate_typed_presentation(root: Path) -> None:
@@ -233,16 +246,16 @@ def _validate_typed_presentation(root: Path) -> None:
 
     expected_uses = {
         Path("Sources/iOS/IOSGenerationModeViews.swift"): (
-            "VocelloPresentationText.installModel",
-            "VocelloPresentationText.longFormPlanningFailed",
-            "VocelloPresentationText.cloningConsentRequired",
-            "VocelloPresentationText.referenceAudioRequired",
+            "IOSAppLanguage.shared.presentation.installModel",
+            "IOSAppLanguage.shared.presentation.longFormPlanningFailed",
+            "IOSAppLanguage.shared.presentation.cloningConsentRequired",
+            "IOSAppLanguage.shared.presentation.referenceAudioRequired",
         ),
         Path("Sources/iOS/Studio/StudioGenerationCoordinator.swift"): (
-            "VocelloPresentationText.cancellationCouldNotFinish",
+            "IOSAppLanguage.shared.presentation.cancellationCouldNotFinish",
         ),
         Path("Sources/iOS/IOSSettingsViews.swift"): (
-            "VocelloPresentationText.status(.ready)",
+            "IOSAppLanguage.shared.presentation.status(.ready)",
         ),
         Path("Sources/iOSSupport/Services/IOSModelProgressPresentation.swift"): (
             "VocelloPresentationText.status(.checkingDownloadedFiles)",

@@ -475,6 +475,8 @@ targets:
     type: bundle.unit-test
     platform: macOS
     sources:
+      - path: Sources/Resources/Localizable.xcstrings
+        buildPhase: resources
       - path: Tests/VocelloCoreTests
       - path: Tests/UIAutomationSupport/VocelloUIInteractionPolicy.swift
       - path: Tests/VocelloiOSLogicTests
@@ -489,6 +491,8 @@ targets:
       - path: Sources/SharedSupport/Database/LongFormHistoryAcceptance.swift
       - path: Sources/SharedSupport/Database/GenerationHistoryEnqueueState.swift
       - path: Sources/SharedSupport/Services/VocelloPresentationText.swift
+      - path: Sources/SharedSupport/Services/VocelloLocalization.swift
+      - path: Sources/iOSSupport/Services/IOSAppLanguage.swift
       - path: Sources/iOS/Commerce/IOSCommercePresentationText.swift
       - path: Sources/iOSSupport/Services/IOSSettingsModelNavigation.swift
       - path: Sources/Services/MacStudioGenerationRequestFactory.swift
@@ -538,6 +542,8 @@ targets:
     type: bundle.unit-test
     platform: iOS
     sources:
+      - path: Sources/Resources/Localizable.xcstrings
+        buildPhase: resources
       - path: Tests/VocelloiOSLogicTests
       - path: Sources/iOSSupport/Models/PendingVoiceCloningHandoff.swift
       - path: Sources/iOSSupport/Models/IOSStartupReliabilityRecord.swift
@@ -555,6 +561,9 @@ targets:
       - path: Sources/iOSSupport/Services/IOSExportAccessPolicy.swift
       - path: Sources/iOSSupport/Services/IOSExportPurchaseState.swift
       - path: Sources/SharedSupport/Services/VocelloPresentationText.swift
+      - path: Sources/SharedSupport/Services/VocelloLocalization.swift
+      - path: Sources/iOSSupport/Services/IOSAppLanguage.swift
+      - path: Sources/iOS/Commerce/IOSCommercePresentationText.swift
     dependencies:
       - target: QwenVoiceCore
     settings:

@@ -68,7 +68,7 @@ class ProductionInterfaceCatalogTests(unittest.TestCase):
         root = SCRIPTS.parent
         catalog = json.loads((root / localization_contract.CATALOG).read_text())["strings"]
         pattern = re.compile(
-            r'String\(localized:\s*"(?P<key>vocello\.(?:ui|presentation)\.[^"]+)",'
+            r'(?:String|localization\.string|IOSAppLanguage\.shared\.localized)\(localized:\s*"(?P<key>vocello\.(?:ui|presentation)\.[^"]+)",'
             r'\s*defaultValue:\s*(?P<value>"(?:[^"\\]|\\.)*")'
         )
         matched = set()
@@ -124,15 +124,15 @@ class LocalizationContractTests(unittest.TestCase):
         )
         expected_sources = {
             "Sources/iOS/IOSGenerationModeViews.swift": (
-                "VocelloPresentationText.installModel\n"
-                "VocelloPresentationText.longFormPlanningFailed\n"
-                "VocelloPresentationText.cloningConsentRequired\n"
-                "VocelloPresentationText.referenceAudioRequired\n"
+                "IOSAppLanguage.shared.presentation.installModel\n"
+                "IOSAppLanguage.shared.presentation.longFormPlanningFailed\n"
+                "IOSAppLanguage.shared.presentation.cloningConsentRequired\n"
+                "IOSAppLanguage.shared.presentation.referenceAudioRequired\n"
             ),
             "Sources/iOS/Studio/StudioGenerationCoordinator.swift": (
-                "VocelloPresentationText.cancellationCouldNotFinish\n"
+                "IOSAppLanguage.shared.presentation.cancellationCouldNotFinish\n"
             ),
-            "Sources/iOS/IOSSettingsViews.swift": "VocelloPresentationText.status(.ready)\n",
+            "Sources/iOS/IOSSettingsViews.swift": "IOSAppLanguage.shared.presentation.status(.ready)\n",
             "Sources/iOSSupport/Services/IOSModelProgressPresentation.swift": (
                 "VocelloPresentationText.status(.checkingDownloadedFiles)\n"
                 "VocelloPresentationText.status(.makingModelAvailableOffline)\n"
@@ -162,6 +162,28 @@ class LocalizationContractTests(unittest.TestCase):
 
     def test_valid_contract_passes(self) -> None:
         self.assertEqual(localization_contract.validate(self.root), 1)
+
+    def test_partial_new_locale_cannot_ship(self) -> None:
+        catalog = valid_catalog()
+        entry = next(iter(catalog["strings"].values()))
+        entry["localizations"]["de"] = copy.deepcopy(entry["localizations"]["en"])
+        (self.root / localization_contract.CATALOG).write_text(json.dumps(catalog))
+        with self.assertRaisesRegex(localization_contract.ContractError, "missing required localization de"):
+            localization_contract.validate(self.root)
+
+    def test_unknown_ui_locale_is_rejected(self) -> None:
+        entry = next(iter(valid_catalog()["strings"].values()))
+        entry["localizations"]["chinese"] = copy.deepcopy(entry["localizations"]["en"])
+        with self.assertRaisesRegex(localization_contract.ContractError, "unsupported UI locales"):
+            localization_contract._validate_translations(entry, "fixture")
+
+    def test_new_locale_requires_permission_translations_too(self) -> None:
+        catalog = valid_catalog()
+        for entry in catalog["strings"].values():
+            entry["localizations"]["de"] = copy.deepcopy(entry["localizations"]["en"])
+        (self.root / localization_contract.CATALOG).write_text(json.dumps(catalog))
+        with self.assertRaisesRegex(localization_contract.ContractError, "missing required localization de"):
+            localization_contract.validate(self.root)
 
     def test_french_translation_cannot_disappear_or_lose_its_reviewed_value(self) -> None:
         for payload in (None, {}, {"stringUnit": {"state": "new", "value": "Prêt"}},

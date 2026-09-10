@@ -128,7 +128,7 @@ final class StudioGenerationCoordinator {
         attempt: StudioGenerationAttemptToken
     ) -> Bool {
         guard attemptAuthority.failCancellation(attempt) else { return false }
-        errorMessage = VocelloPresentationText.cancellationCouldNotFinish(
+        errorMessage = IOSAppLanguage.shared.presentation.cancellationCouldNotFinish(
             details: error.localizedDescription
         )
         clearTerminalState()

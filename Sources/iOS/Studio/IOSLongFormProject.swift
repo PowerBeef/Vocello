@@ -319,7 +319,7 @@ final class IOSLongFormCoordinator {
             completedCount: priorSegments.count(where: \.isSaved),
             totalCount: priorSegments.count,
             activeSegmentIndex: index,
-            statusMessage: VocelloPresentationText.regeneratingSegment(index + 1, total: priorSegments.count)
+            statusMessage: IOSAppLanguage.shared.presentation.regeneratingSegment(index + 1, total: priorSegments.count)
         )
         runTask = Task { [weak self] in
             guard let self else { return }
@@ -409,7 +409,7 @@ final class IOSLongFormCoordinator {
             completedCount: segments.count(where: \.isSaved),
             totalCount: segments.count,
             activeSegmentIndex: nil,
-            statusMessage: VocelloPresentationText.preparingLongForm
+            statusMessage: IOSAppLanguage.shared.presentation.preparingLongForm
         )
         runTask = Task { [weak self] in
             guard let self else { return }
@@ -576,15 +576,15 @@ final class IOSLongFormProjectRunner {
                     onSegmentsUpdated(segments)
                     return .failed(
                         segments: segments,
-                        message: VocelloPresentationText.oldSegmentQC
+                        message: IOSAppLanguage.shared.presentation.oldSegmentQC
                     )
                 }
-                publish(active: index, message: VocelloPresentationText.reusingSegment(index + 1, total: total))
+                publish(active: index, message: IOSAppLanguage.shared.presentation.reusingSegment(index + 1, total: total))
                 continue
             }
 
             segments[index].status = .running
-            publish(active: index, message: VocelloPresentationText.generatingSegment(index + 1, total: total))
+            publish(active: index, message: IOSAppLanguage.shared.presentation.generatingSegment(index + 1, total: total))
 
             let generationID = UUID()
             let outputPath = LongFormHistoryAcceptance.uniqueAudioURL(basedOn: URL(fileURLWithPath: makeOutputPath(
@@ -649,7 +649,7 @@ final class IOSLongFormProjectRunner {
                     onSegmentsUpdated(segments)
                     return .failed(
                         segments: segments,
-                        message: VocelloPresentationText.segmentQC(index + 1, detail: report.failureSummary)
+                        message: IOSAppLanguage.shared.presentation.segmentQC(index + 1, detail: report.failureSummary)
                     )
                 }
 
@@ -664,7 +664,7 @@ final class IOSLongFormProjectRunner {
                 let persistence = await GenerationPersistence.persist(record, caller: "IOSLongFormSegment")
                 try persistence.requireSavedLongFormSegment()
                 segments[index].status = .saved(audioPath: result.audioPath)
-                publish(active: index, message: VocelloPresentationText.generatedSegmentPending(index + 1, total: total))
+                publish(active: index, message: IOSAppLanguage.shared.presentation.generatedSegmentPending(index + 1, total: total))
             } catch {
                 audioPlayer.abortLivePreviewIfNeeded()
                 let cancellationRequested = await cancellationState.wasRequested()
@@ -692,7 +692,7 @@ final class IOSLongFormProjectRunner {
         // join so the completed-project handoff never overlaps a draining
         // live tail.
         audioPlayer.abortLivePreviewIfNeeded()
-        publish(active: nil, message: VocelloPresentationText.joiningSegments(total))
+        publish(active: nil, message: IOSAppLanguage.shared.presentation.joiningSegments(total))
         var candidateJoinedURL: URL?
         defer { if let candidateJoinedURL { try? FileManager.default.removeItem(at: candidateJoinedURL) } }
         do {
@@ -705,7 +705,7 @@ final class IOSLongFormProjectRunner {
             guard joinedReport.passed else {
                 return .failed(
                     segments: segments,
-                    message: VocelloPresentationText.joinedQC(joinedReport.failureSummary)
+                    message: IOSAppLanguage.shared.presentation.joinedQC(joinedReport.failureSummary)
                 )
             }
             let joinedRecord = request.makeJoinedHistoryRecord(
@@ -722,7 +722,7 @@ final class IOSLongFormProjectRunner {
             candidateJoinedURL = nil
             NotificationCenter.default.post(name: .generationSaved, object: nil)
             IOSSavedOutputsDestination.exportIfConfigured(internalAudioPath: joined.outputURL.path, generationMode: saved.mode)
-            publish(active: nil, message: VocelloPresentationText.done)
+            publish(active: nil, message: IOSAppLanguage.shared.presentation.done)
             return .completed(
                 segments: segments,
                 joinedAudioPath: joined.outputURL.path,
@@ -734,7 +734,7 @@ final class IOSLongFormProjectRunner {
             if error is CancellationError { return .cancelled(segments: segments) }
             return .failed(
                 segments: segments,
-                message: VocelloPresentationText.assemblyFailed(error.localizedDescription)
+                message: IOSAppLanguage.shared.presentation.assemblyFailed(error.localizedDescription)
             )
         }
     }
@@ -765,7 +765,7 @@ final class IOSLongFormProjectRunner {
             return (
                 .failed(
                     segments: segments,
-                    message: VocelloPresentationText.segmentNotInProject
+                    message: IOSAppLanguage.shared.presentation.segmentNotInProject
                 ),
                 priorReplacements
             )
@@ -789,7 +789,7 @@ final class IOSLongFormProjectRunner {
         }
 
         segments[segmentIndex].status = .running
-        publish(active: segmentIndex, message: VocelloPresentationText.regeneratingSegment(segmentIndex + 1, total: total))
+        publish(active: segmentIndex, message: IOSAppLanguage.shared.presentation.regeneratingSegment(segmentIndex + 1, total: total))
 
         let generationID = UUID()
         let outputPath = LongFormHistoryAcceptance.uniqueAudioURL(basedOn: URL(fileURLWithPath: makeOutputPath(
@@ -856,7 +856,7 @@ final class IOSLongFormProjectRunner {
                 return (
                     .failed(
                         segments: segments,
-                        message: VocelloPresentationText.regeneratedQC(report.failureSummary)
+                        message: IOSAppLanguage.shared.presentation.regeneratedQC(report.failureSummary)
                     ),
                     priorReplacements
                 )
@@ -888,7 +888,7 @@ final class IOSLongFormProjectRunner {
             audioPlayer.abortLivePreviewIfNeeded()
             // Keep the accepted visible segments until the whole replacement
             // transaction succeeds; the candidate is local to this operation.
-            onProgress(IOSLongFormProgressSnapshot(totalCount: total, statusMessage: VocelloPresentationText.joiningSegments(total)))
+            onProgress(IOSLongFormProgressSnapshot(totalCount: total, statusMessage: IOSAppLanguage.shared.presentation.joiningSegments(total)))
             let qualityReports = segments.map(\.qualityReport)
             let joined = try await assemble(request: request, segments: segments)
             candidateAudioURLs.append(joined.outputURL)
@@ -901,7 +901,7 @@ final class IOSLongFormProjectRunner {
                 return (
                     .failed(
                         segments: priorSegments,
-                        message: VocelloPresentationText.regeneratedJoinedQC(joinedReport.failureSummary)
+                        message: IOSAppLanguage.shared.presentation.regeneratedJoinedQC(joinedReport.failureSummary)
                     ),
                     priorReplacements
                 )
@@ -920,7 +920,7 @@ final class IOSLongFormProjectRunner {
             candidateAudioURLs.removeAll()
             NotificationCenter.default.post(name: .generationSaved, object: nil)
             IOSSavedOutputsDestination.exportIfConfigured(internalAudioPath: joined.outputURL.path, generationMode: saved.mode)
-            publish(active: nil, message: VocelloPresentationText.done)
+            publish(active: nil, message: IOSAppLanguage.shared.presentation.done)
             return (
                 .completed(
                     segments: segments,
@@ -956,12 +956,12 @@ final class IOSLongFormProjectRunner {
     }
 
     private enum RunError: LocalizedError {
-        case missingSegmentAudio(index: Int)
+        case missingSegmentAudio(index: Int, text: VocelloPresentationText)
 
         var errorDescription: String? {
             switch self {
-            case .missingSegmentAudio(let index):
-                return VocelloPresentationText.segmentMissing(index + 1)
+            case .missingSegmentAudio(let index, let text):
+                return text.segmentMissing(index + 1)
             }
         }
     }
@@ -973,7 +973,7 @@ final class IOSLongFormProjectRunner {
         var sources: [LongFormAssemblySegmentSource] = []
         for (index, segment) in request.plan.segments.enumerated() {
             guard index < segments.count, let path = segments[index].audioPath else {
-                throw RunError.missingSegmentAudio(index: index)
+                throw RunError.missingSegmentAudio(index: index, text: IOSAppLanguage.shared.presentation)
             }
             sources.append(
                 LongFormAssemblySegmentSource(
@@ -986,7 +986,7 @@ final class IOSLongFormProjectRunner {
             )
         }
         guard let firstPath = segments.compactMap(\.audioPath).first else {
-            throw RunError.missingSegmentAudio(index: 0)
+            throw RunError.missingSegmentAudio(index: 0, text: IOSAppLanguage.shared.presentation)
         }
         let outputURL = URL(fileURLWithPath: firstPath)
             .deletingLastPathComponent()
@@ -1057,7 +1057,7 @@ final class IOSLongFormProjectRunner {
             assembly: assembly,
             replacements: replacements
         )
-        guard let firstAudioPath = segments.compactMap(\.audioPath).first else { throw RunError.missingSegmentAudio(index: 0) }
+        guard let firstAudioPath = segments.compactMap(\.audioPath).first else { throw RunError.missingSegmentAudio(index: 0, text: IOSAppLanguage.shared.presentation) }
         let directory = URL(fileURLWithPath: firstAudioPath).deletingLastPathComponent()
         let manifestURL = directory.appendingPathComponent(
             "long_form_manifest_\(request.projectDigestPrefix).json",

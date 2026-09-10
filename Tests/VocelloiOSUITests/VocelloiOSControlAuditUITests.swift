@@ -322,7 +322,7 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
         VocelloUIScreenshot.attach(app, named: "ios-control-audit-inventory")
         assertSettingsLandingArchitecture()
         recorder.record(scenario: "inventory", controlID: "settings-navigation",
-            expected: "All five Settings pages, original controls, nested destinations and Back remain reachable",
+            expected: "All six Settings pages, original controls, nested destinations and Back remain reachable",
             actual: "Hub and destination assertions completed through genuine controls")
     }
 
@@ -360,6 +360,13 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
         beginAuditSession()
         defer { endSession() }
         auditExportPurchasePresentation()
+
+        for language in ["en", "fr", "system"] {
+            selectInterfaceLanguageForTest(language)
+        }
+        recorder.record(scenario: "stateful", controlID: "app-language-options",
+            expected: "Every bundled language and System Default exposes the selected trait",
+            actual: "English, French and System Default selected through genuine controls; original preference restored by session cleanup")
 
         select(tab: .settings)
         let toggleIDs = [

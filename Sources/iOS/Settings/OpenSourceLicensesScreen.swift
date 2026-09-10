@@ -58,7 +58,7 @@ struct OpenSourceLicensesScreen: View {
             loadError = nil
         } catch {
             manifest = nil
-            loadError = String(localized: "vocello.licenses.unavailable")
+            loadError = IOSAppLanguage.shared.localized(localized: "vocello.licenses.unavailable")
         }
     }
 
@@ -67,14 +67,14 @@ struct OpenSourceLicensesScreen: View {
             VStack(alignment: .leading, spacing: Theme.Spacing.md) {
                 compactHeader
 
-                Text(String(localized: "vocello.licenses.introduction"))
+                Text(IOSAppLanguage.shared.localized(localized: "vocello.licenses.introduction"))
                     .font(.caption)
                     .foregroundStyle(Theme.Text.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.horizontal, 4)
 
                 if let manifest {
-                    IOSSettingsSection(title: String(localized: "vocello.licenses.software")) {
+                    IOSSettingsSection(title: IOSAppLanguage.shared.localized(localized: "vocello.licenses.software")) {
                         ForEach(Array(manifest.components.enumerated()), id: \.element.id) { index, component in
                             NavigationLink {
                                 IOSAttributionDetailScreen(
@@ -101,7 +101,7 @@ struct OpenSourceLicensesScreen: View {
                             .accessibilityIdentifier("iosAttributionRow_\(component.id)")
                             .accessibilityLabel(component.displayName)
                             .accessibilityValue("\(component.version), \(component.licenseID)")
-                            .accessibilityHint(String(localized: "vocello.licenses.detail_hint"))
+                            .accessibilityHint(IOSAppLanguage.shared.localized(localized: "vocello.licenses.detail_hint"))
 
                             if index < manifest.components.count - 1 {
                                 IOSSettingsDivider()
@@ -109,7 +109,7 @@ struct OpenSourceLicensesScreen: View {
                         }
                     }
 
-                    IOSSettingsSection(title: String(localized: "vocello.licenses.models")) {
+                    IOSSettingsSection(title: IOSAppLanguage.shared.localized(localized: "vocello.licenses.models")) {
                         ForEach(Array(manifest.modelArtifacts.enumerated()), id: \.element.id) { index, model in
                             NavigationLink {
                                 IOSAttributionDetailScreen(
@@ -134,7 +134,7 @@ struct OpenSourceLicensesScreen: View {
                             .accessibilityIdentifier("iosModelAttributionRow_\(model.id)")
                             .accessibilityLabel(model.displayName)
                             .accessibilityValue("\(model.variantID), \(model.licenseID)")
-                            .accessibilityHint(String(localized: "vocello.licenses.detail_hint"))
+                            .accessibilityHint(IOSAppLanguage.shared.localized(localized: "vocello.licenses.detail_hint"))
 
                             if index < manifest.modelArtifacts.count - 1 {
                                 IOSSettingsDivider()
@@ -173,7 +173,7 @@ struct OpenSourceLicensesScreen: View {
             .accessibilityLabel(IOSSettingsText.backAbout)
             .accessibilityIdentifier("iosSettings_openSourceBackButton")
 
-            Text(String(localized: "vocello.settings.open_source_licenses"))
+            Text(IOSAppLanguage.shared.localized(localized: "vocello.settings.open_source_licenses"))
                 .font(.headline)
                 .foregroundStyle(Theme.Text.primary)
                 .accessibilityAddTraits(.isHeader)
@@ -209,7 +209,7 @@ private struct IOSAttributionDetailScreen: View {
 
                 if let url = URL(string: sourceURL) {
                     Link(destination: url) {
-                        Label(String(localized: "vocello.licenses.view_source"), systemImage: "arrow.up.right.square")
+                        Label(IOSAppLanguage.shared.localized(localized: "vocello.licenses.view_source"), systemImage: "arrow.up.right.square")
                             .font(.subheadline.weight(.semibold))
                             .frame(minHeight: 44)
                     }
@@ -217,15 +217,15 @@ private struct IOSAttributionDetailScreen: View {
                 }
 
                 if let copyrightNotice, !copyrightNotice.isEmpty {
-                    detailSection(title: String(localized: "vocello.licenses.copyright"), body: copyrightNotice)
+                    detailSection(title: IOSAppLanguage.shared.localized(localized: "vocello.licenses.copyright"), body: copyrightNotice)
                 }
                 if let notice, !notice.isEmpty {
-                    detailSection(title: String(localized: "vocello.licenses.notices"), body: notice)
+                    detailSection(title: IOSAppLanguage.shared.localized(localized: "vocello.licenses.notices"), body: notice)
                 }
                 if let origins, !origins.isEmpty {
-                    detailSection(title: String(localized: "vocello.licenses.origins"), body: origins)
+                    detailSection(title: IOSAppLanguage.shared.localized(localized: "vocello.licenses.origins"), body: origins)
                 }
-                detailSection(title: "\(licenseID) \(String(localized: "vocello.licenses.license"))", body: licenseText)
+                detailSection(title: "\(licenseID) \(IOSAppLanguage.shared.localized(localized: "vocello.licenses.license"))", body: licenseText)
             }
             .padding(.horizontal, Theme.Spacing.lg)
             .padding(.top, Theme.Spacing.sm)
@@ -247,7 +247,7 @@ private struct IOSAttributionDetailScreen: View {
                     .contentShape(Circle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(String(localized: "vocello.licenses.back"))
+            .accessibilityLabel(IOSAppLanguage.shared.localized(localized: "vocello.licenses.back"))
             .accessibilityIdentifier("iosAttributionDetailBackButton")
 
             Text(title)

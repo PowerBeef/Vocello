@@ -3,169 +3,182 @@ import UIKit
 import QwenVoiceCore
 
 /// Typed Settings copy shared by the hub and its destinations.
-enum IOSSettingsText {
+@MainActor enum IOSSettingsText {
+    static var appLanguage: String {
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.appLanguage", defaultValue: "App Language",
+            comment: "Language of the interface, not generated speech.")
+    }
+    static var appLanguageDetail: String {
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.appLanguageDetail",
+            defaultValue: "Changes the app interface, not the language of generated speech.",
+            comment: "Explains the separate interface language preference.")
+    }
+    static var systemLanguage: String {
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.systemLanguage", defaultValue: "System Default",
+            comment: "Follow the operating system's preferred app language.")
+    }
     static var builtIn: String {
-        String(localized: "vocello.settings.polish.builtIn", defaultValue: "Built-in Voice",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.builtIn", defaultValue: "Built-in Voice",
                comment: "Settings and model management presentation; no change to stored identities.")
     }
     static var design: String {
-        String(localized: "vocello.settings.polish.design", defaultValue: "Voice Design",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.design", defaultValue: "Voice Design",
                comment: "Settings and model management presentation; no change to stored identities.")
     }
     static var clone: String {
-        String(localized: "vocello.settings.polish.clone", defaultValue: "Voice Cloning",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.clone", defaultValue: "Voice Cloning",
                comment: "Settings and model management presentation; no change to stored identities.")
     }
     static var overview: String {
-        String(localized: "vocello.settings.polish.overview", defaultValue: "Overview",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.overview", defaultValue: "Overview",
                comment: "Settings and model management presentation; no change to stored identities.")
     }
     static var studioModels: String {
-        String(localized: "vocello.settings.polish.studioModels", defaultValue: "Studio Models",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.studioModels", defaultValue: "Studio Models",
                comment: "Settings and model management presentation; no change to stored identities.")
     }
     static var modelsDetail: String {
-        String(localized: "vocello.settings.polish.modelsDetail", defaultValue: "One private, on-device model powers each Studio mode. Install only the modes you use.",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.modelsDetail", defaultValue: "One private, on-device model powers each Studio mode. Install only the modes you use.",
                comment: "Settings and model management presentation; no change to stored identities.")
     }
     static var noModelFiles: String {
-        String(localized: "vocello.settings.polish.noModelFiles", defaultValue: "No model files",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.noModelFiles", defaultValue: "No model files",
                comment: "Settings and model management presentation; no change to stored identities.")
     }
     static var install: String {
-        String(localized: "vocello.settings.polish.install", defaultValue: "Install",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.install", defaultValue: "Install",
                comment: "Settings and model management presentation; no change to stored identities.")
     }
     static var remove: String {
-        String(localized: "vocello.settings.polish.remove", defaultValue: "Remove",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.remove", defaultValue: "Remove",
                comment: "Settings and model management presentation; no change to stored identities.")
     }
     static var update: String {
-        String(localized: "vocello.settings.polish.update", defaultValue: "Update",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.update", defaultValue: "Update",
                comment: "Settings and model management presentation; no change to stored identities.")
     }
     static var repair: String {
-        String(localized: "vocello.settings.polish.repair", defaultValue: "Repair",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.repair", defaultValue: "Repair",
                comment: "Settings and model management presentation; no change to stored identities.")
     }
     static var retry: String {
-        String(localized: "vocello.settings.polish.retry", defaultValue: "Retry",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.retry", defaultValue: "Retry",
                comment: "Settings and model management presentation; no change to stored identities.")
     }
     static var cancel: String {
-        String(localized: "vocello.settings.polish.cancel", defaultValue: "Cancel",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.cancel", defaultValue: "Cancel",
                comment: "Settings and model management presentation; no change to stored identities.")
     }
     static var cancelDownload: String {
-        String(localized: "vocello.settings.polish.cancelDownload", defaultValue: "Cancel download",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.cancelDownload", defaultValue: "Cancel download",
                comment: "Settings and model management presentation; no change to stored identities.")
     }
     static var cancelDownloadTitle: String {
-        String(localized: "vocello.settings.polish.cancelDownloadTitle", defaultValue: "Cancel download?",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.cancelDownloadTitle", defaultValue: "Cancel download?",
                comment: "Settings and model management presentation; no change to stored identities.")
     }
     static var cancelDownloadConfirm: String {
-        String(localized: "vocello.settings.polish.cancelDownloadConfirm", defaultValue: "Cancel Download",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.cancelDownloadConfirm", defaultValue: "Cancel Download",
                comment: "Settings and model management presentation; no change to stored identities.")
     }
     static var keepDownload: String {
-        String(localized: "vocello.settings.polish.keepDownload", defaultValue: "Keep Download",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.keepDownload", defaultValue: "Keep Download",
                comment: "Settings and model management presentation; no change to stored identities.")
     }
     static var cancelDownloadDetail: String {
-        String(localized: "vocello.settings.polish.cancelDownloadDetail", defaultValue: "Canceling removes the downloaded data. You can download it again from scratch.",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.cancelDownloadDetail", defaultValue: "Canceling removes the downloaded data. You can download it again from scratch.",
                comment: "Settings and model management presentation; no change to stored identities.")
     }
     static var checking: String {
-        String(localized: "vocello.settings.polish.checking", defaultValue: "Checking…",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.checking", defaultValue: "Checking…",
                comment: "Settings and model management presentation; no change to stored identities.")
     }
     static var notInstalled: String {
-        String(localized: "vocello.settings.polish.notInstalled", defaultValue: "Not Installed",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.notInstalled", defaultValue: "Not Installed",
                comment: "Settings and model management presentation; no change to stored identities.")
     }
     static var updateAvailable: String {
-        String(localized: "vocello.settings.polish.updateAvailable", defaultValue: "Update Available",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.updateAvailable", defaultValue: "Update Available",
                comment: "Settings and model management presentation; no change to stored identities.")
     }
     static var repairNeeded: String {
-        String(localized: "vocello.settings.polish.repairNeeded", defaultValue: "Repair Needed",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.repairNeeded", defaultValue: "Repair Needed",
                comment: "Settings and model management presentation; no change to stored identities.")
     }
     static var retryNeeded: String {
-        String(localized: "vocello.settings.polish.retryNeeded", defaultValue: "Retry Needed",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.retryNeeded", defaultValue: "Retry Needed",
                comment: "Settings and model management presentation; no change to stored identities.")
     }
     static var queued: String {
-        String(localized: "vocello.settings.polish.queued", defaultValue: "Queued",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.queued", defaultValue: "Queued",
                comment: "Settings and model management presentation; no change to stored identities.")
     }
     static var waitingForNetwork: String {
-        String(localized: "vocello.settings.polish.waitingForNetwork", defaultValue: "Waiting for Network",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.waitingForNetwork", defaultValue: "Waiting for Network",
                comment: "Settings and model management presentation; no change to stored identities.")
     }
     static var finishing: String {
-        String(localized: "vocello.settings.polish.finishing", defaultValue: "Finishing",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.finishing", defaultValue: "Finishing",
                comment: "Settings and model management presentation; no change to stored identities.")
     }
     static var downloading: String {
-        String(localized: "vocello.settings.polish.downloading", defaultValue: "Downloading",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.downloading", defaultValue: "Downloading",
                comment: "Settings and model management presentation; no change to stored identities.")
     }
     static var retrying: String {
-        String(localized: "vocello.settings.polish.retrying", defaultValue: "Retrying",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.retrying", defaultValue: "Retrying",
                comment: "Settings and model management presentation; no change to stored identities.")
     }
     static var verifying: String {
-        String(localized: "vocello.settings.polish.verifying", defaultValue: "Verifying",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.verifying", defaultValue: "Verifying",
                comment: "Settings and model management presentation; no change to stored identities.")
     }
     static var installing: String {
-        String(localized: "vocello.settings.polish.installing", defaultValue: "Installing",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.installing", defaultValue: "Installing",
                comment: "Settings and model management presentation; no change to stored identities.")
     }
     static var cancelling: String {
-        String(localized: "vocello.settings.polish.cancelling", defaultValue: "Cancelling",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.cancelling", defaultValue: "Cancelling",
                comment: "Settings and model management presentation; no change to stored identities.")
     }
     static var removing: String {
-        String(localized: "vocello.settings.polish.removing", defaultValue: "Removing",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.removing", defaultValue: "Removing",
                comment: "Settings and model management presentation; no change to stored identities.")
     }
     static var severalGB: String {
-        String(localized: "vocello.settings.polish.severalGB", defaultValue: "several GB",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.severalGB", defaultValue: "several GB",
                comment: "Settings and model management presentation; no change to stored identities.")
     }
     static var onDeviceModel: String {
-        String(localized: "vocello.settings.polish.onDeviceModel", defaultValue: "On-device model",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.onDeviceModel", defaultValue: "On-device model",
                comment: "Settings and model management presentation; no change to stored identities.")
     }
     static var on: String {
-        String(localized: "vocello.settings.polish.on", defaultValue: "On",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.on", defaultValue: "On",
                comment: "Settings and model management presentation; no change to stored identities.")
     }
     static var off: String {
-        String(localized: "vocello.settings.polish.off", defaultValue: "Off",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.off", defaultValue: "Off",
                comment: "Settings and model management presentation; no change to stored identities.")
     }
     static func storageUsed(_ value: String) -> String {
-        String.localizedStringWithFormat(String(localized: "vocello.settings.polish.storageUsed",
+        String.localizedStringWithFormat(IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.storageUsed",
             defaultValue: "%@ used", comment: "Settings formatted presentation; preserve all substitutions."), value)
     }
     static func modelStatus(_ value: String) -> String {
-        String.localizedStringWithFormat(String(localized: "vocello.settings.polish.modelStatus",
+        String.localizedStringWithFormat(IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.modelStatus",
             defaultValue: "%@ model status", comment: "Settings formatted presentation; preserve all substitutions."), value)
     }
     static func modelAction(_ first: String, _ second: String) -> String {
-        String.localizedStringWithFormat(String(localized: "vocello.settings.polish.modelAction",
+        String.localizedStringWithFormat(IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.modelAction",
             defaultValue: "%1$@ %2$@ model", comment: "Settings formatted presentation; preserve all substitutions."), first, second)
     }
     static func modelProgress(_ value: String) -> String {
-        String.localizedStringWithFormat(String(localized: "vocello.settings.polish.modelProgress",
+        String.localizedStringWithFormat(IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.modelProgress",
             defaultValue: "%@ model download progress", comment: "Settings formatted presentation; preserve all substitutions."), value)
     }
     static func modelSetup(_ value: String) -> String {
-        String.localizedStringWithFormat(String(localized: "vocello.settings.polish.modelSetup",
+        String.localizedStringWithFormat(IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.modelSetup",
             defaultValue: "%@ model setup in progress", comment: "Settings formatted presentation; preserve all substitutions."), value)
     }
     static func modeName(_ mode: GenerationMode) -> String {
@@ -176,197 +189,198 @@ enum IOSSettingsText {
         }
     }
 
-    static var title: String { String(localized: "vocello.settings.polish.title", defaultValue: "Settings") }
-    static var modelsIntro: String { String(localized: "vocello.settings.polish.modelsIntro", defaultValue: "Manage your voice models and where finished audio is saved.") }
-    static var accessibilityIntro: String { String(localized: "vocello.settings.polish.accessibilityIntro", defaultValue: "Adapt Vocello’s interface to your accessibility preferences.") }
-    static var tagline: String { String(localized: "vocello.settings.polish.tagline", defaultValue: "Your voice, locally.") }
+    static var title: String { IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.title", defaultValue: "Settings") }
+    static var modelsIntro: String { IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.modelsIntro", defaultValue: "Manage your voice models and where finished audio is saved.") }
+    static var accessibilityIntro: String { IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.accessibilityIntro", defaultValue: "Adapt Vocello’s interface to your accessibility preferences.") }
+    static var tagline: String { IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.tagline", defaultValue: "Your voice, locally.") }
     static func versionIdentity(_ version: String, build: String) -> String {
-        String.localizedStringWithFormat(String(localized: "vocello.settings.polish.versionIdentity",
+        String.localizedStringWithFormat(IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.versionIdentity",
             defaultValue: "Version %1$@ (%2$@)", comment: "Installed app version and build; never hardcode release numbers."), version, build)
     }
 
     static func variationName(_ variation: Qwen3SamplingVariation) -> String {
         switch variation {
-        case .expressive: String(localized: "vocello.settings.polish.expressive", defaultValue: "Expressive")
-        case .balanced: String(localized: "vocello.settings.polish.balanced", defaultValue: "Balanced")
-        case .consistent: String(localized: "vocello.settings.polish.consistent", defaultValue: "Consistent")
+        case .expressive: IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.expressive", defaultValue: "Expressive")
+        case .balanced: IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.balanced", defaultValue: "Balanced")
+        case .consistent: IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.consistent", defaultValue: "Consistent")
         }
     }
     static var audio: String {
-        String(localized: "vocello.settings.refinement.audio", defaultValue: "Audio",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.audio", defaultValue: "Audio",
                comment: "Settings audio; preserve product and consent meaning.")
     }
     static var audioSummary: String {
-        String(localized: "vocello.settings.refinement.audioSummary", defaultValue: "Playback and take variation",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.audioSummary", defaultValue: "Playback and take variation",
                comment: "Settings audioSummary; preserve product and consent meaning.")
     }
     static var modelsFiles: String {
-        String(localized: "vocello.settings.refinement.modelsFiles", defaultValue: "Models & Files",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.modelsFiles", defaultValue: "Models & Files",
                comment: "Settings modelsFiles; preserve product and consent meaning.")
     }
     static var modelsFilesSummary: String {
-        String(localized: "vocello.settings.refinement.modelsFilesSummary", defaultValue: "Voice models and saved outputs",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.modelsFilesSummary", defaultValue: "Voice models and saved outputs",
                comment: "Settings modelsFilesSummary; preserve product and consent meaning.")
     }
     static var privacyPermissions: String {
-        String(localized: "vocello.settings.refinement.privacyPermissions", defaultValue: "Privacy & Permissions",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.privacyPermissions", defaultValue: "Privacy & Permissions",
                comment: "Settings privacyPermissions; preserve product and consent meaning.")
     }
     static var privacyPermissionsSummary: String {
-        String(localized: "vocello.settings.refinement.privacyPermissionsSummary", defaultValue: "Voice consent and permissions",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.privacyPermissionsSummary", defaultValue: "Voice consent and permissions",
                comment: "Settings privacyPermissionsSummary; preserve product and consent meaning.")
     }
     static var accessibility: String {
-        String(localized: "vocello.settings.refinement.accessibility", defaultValue: "Accessibility",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.accessibility", defaultValue: "Accessibility",
                comment: "Settings accessibility; preserve product and consent meaning.")
     }
     static var accessibilitySummary: String {
-        String(localized: "vocello.settings.refinement.accessibilitySummary", defaultValue: "Motion and transparency",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.accessibilitySummary", defaultValue: "Motion and transparency",
                comment: "Settings accessibilitySummary; preserve product and consent meaning.")
     }
     static var about: String {
-        String(localized: "vocello.settings.refinement.about", defaultValue: "About",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.about", defaultValue: "About",
                comment: "Settings about; preserve product and consent meaning.")
     }
     static var aboutSummary: String {
-        String(localized: "vocello.settings.refinement.aboutSummary", defaultValue: "Support and app information",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.aboutSummary", defaultValue: "Support and app information",
                comment: "Settings aboutSummary; preserve product and consent meaning.")
     }
     static var back: String {
-        String(localized: "vocello.settings.refinement.back", defaultValue: "Back to Settings",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.back", defaultValue: "Back to Settings",
                comment: "Settings back; preserve product and consent meaning.")
     }
     static var backModelsFiles: String {
-        String(localized: "vocello.settings.refinement.backModelsFiles", defaultValue: "Back to Models & Files",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.backModelsFiles", defaultValue: "Back to Models & Files",
                comment: "Settings backModelsFiles; preserve product and consent meaning.")
     }
     static var backAbout: String {
-        String(localized: "vocello.settings.refinement.backAbout", defaultValue: "Back to About",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.backAbout", defaultValue: "Back to About",
                comment: "Settings backAbout; preserve product and consent meaning.")
     }
     static var historyOnly: String {
-        String(localized: "vocello.settings.refinement.historyOnly", defaultValue: "History only",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.historyOnly", defaultValue: "History only",
                comment: "Settings historyOnly; preserve product and consent meaning.")
     }
     static var autoPlay: String {
-        String(localized: "vocello.settings.refinement.autoPlay", defaultValue: "Play generated audio",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.autoPlay", defaultValue: "Play generated audio",
                comment: "Settings autoPlay; preserve product and consent meaning.")
     }
     static var autoPlayDetail: String {
-        String(localized: "vocello.settings.refinement.autoPlayDetail", defaultValue: "Automatically play each finished take.",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.autoPlayDetail", defaultValue: "Automatically play each finished take.",
                comment: "Settings autoPlayDetail; preserve product and consent meaning.")
     }
     static var voiceModels: String {
-        String(localized: "vocello.settings.refinement.voiceModels", defaultValue: "Voice Models",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.voiceModels", defaultValue: "Voice Models",
                comment: "Settings voiceModels; preserve product and consent meaning.")
     }
     static var voiceModelsDetail: String {
-        String(localized: "vocello.settings.refinement.voiceModelsDetail", defaultValue: "One private model per Studio mode.",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.voiceModelsDetail", defaultValue: "One private model per Studio mode.",
                comment: "Settings voiceModelsDetail; preserve product and consent meaning.")
     }
     static var voiceModelsHint: String {
-        String(localized: "vocello.settings.refinement.voiceModelsHint", defaultValue: "Opens Voice Models",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.voiceModelsHint", defaultValue: "Opens Voice Models",
                comment: "Settings voiceModelsHint; preserve product and consent meaning.")
     }
     static var savedOutputs: String {
-        String(localized: "vocello.settings.refinement.savedOutputs", defaultValue: "Saved outputs",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.savedOutputs", defaultValue: "Saved outputs",
                comment: "Settings savedOutputs; preserve product and consent meaning.")
     }
     static var savedOutputsDetail: String {
-        String(localized: "vocello.settings.refinement.savedOutputsDetail", defaultValue: "History or a folder in Files.",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.savedOutputsDetail", defaultValue: "History or a folder in Files.",
                comment: "Settings savedOutputsDetail; preserve product and consent meaning.")
     }
     static var savedOutputsHint: String {
-        String(localized: "vocello.settings.refinement.savedOutputsHint", defaultValue: "Opens saved output options",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.savedOutputsHint", defaultValue: "Opens saved output options",
                comment: "Settings savedOutputsHint; preserve product and consent meaning.")
     }
     static var keepInHistory: String {
-        String(localized: "vocello.settings.refinement.keepInHistory", defaultValue: "Keep in History",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.keepInHistory", defaultValue: "Keep in History",
                comment: "Settings keepInHistory; preserve product and consent meaning.")
     }
     static var chooseFolder: String {
-        String(localized: "vocello.settings.refinement.chooseFolder", defaultValue: "Choose Files folder…",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.chooseFolder", defaultValue: "Choose Files folder…",
                comment: "Settings chooseFolder; preserve product and consent meaning.")
     }
     static var reduceMotion: String {
-        String(localized: "vocello.settings.refinement.reduceMotion", defaultValue: "Reduce Motion",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.reduceMotion", defaultValue: "Reduce Motion",
                comment: "Settings reduceMotion; preserve product and consent meaning.")
     }
     static var reduceMotionDetail: String {
-        String(localized: "vocello.settings.refinement.reduceMotionDetail", defaultValue: "Use simpler transitions and movement.",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.reduceMotionDetail", defaultValue: "Use simpler transitions and movement.",
                comment: "Settings reduceMotionDetail; preserve product and consent meaning.")
     }
     static var reduceTransparency: String {
-        String(localized: "vocello.settings.refinement.reduceTransparency", defaultValue: "Reduce Transparency",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.reduceTransparency", defaultValue: "Reduce Transparency",
                comment: "Settings reduceTransparency; preserve product and consent meaning.")
     }
     static var reduceTransparencyDetail: String {
-        String(localized: "vocello.settings.refinement.reduceTransparencyDetail", defaultValue: "Use more opaque navigation surfaces.",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.reduceTransparencyDetail", defaultValue: "Use more opaque navigation surfaces.",
                comment: "Settings reduceTransparencyDetail; preserve product and consent meaning.")
     }
     static var cloneConsent: String {
-        String(localized: "vocello.settings.refinement.cloneConsent", defaultValue: "I own or have permission to clone the voices I use",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.cloneConsent", defaultValue: "I own or have permission to clone the voices I use",
                comment: "Settings cloneConsent; preserve product and consent meaning.")
     }
     static var cloneConsentDetail: String {
-        String(localized: "vocello.settings.refinement.cloneConsentDetail", defaultValue: "Required for Voice Cloning.",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.cloneConsentDetail", defaultValue: "Required for Voice Cloning.",
                comment: "Settings cloneConsentDetail; preserve product and consent meaning.")
     }
     static var cloneDisclosure: String {
-        String(localized: "vocello.settings.refinement.cloneDisclosure", defaultValue: "If you publish audio of a cloned real voice, disclose that it is AI-generated. EU law may require this.",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.cloneDisclosure", defaultValue: "If you publish audio of a cloned real voice, disclose that it is AI-generated. EU law may require this.",
                comment: "Settings cloneDisclosure; preserve product and consent meaning.")
     }
     static var cloneDisclosureHint: String {
-        String(localized: "vocello.settings.refinement.cloneDisclosureHint", defaultValue: "AI-generated audio disclosure. If you publish audio of a cloned real voice, disclose that it is AI-generated. EU law may require this.",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.cloneDisclosureHint", defaultValue: "AI-generated audio disclosure. If you publish audio of a cloned real voice, disclose that it is AI-generated. EU law may require this.",
                comment: "Settings cloneDisclosureHint; preserve product and consent meaning.")
     }
     static var privacyHint: String {
-        String(localized: "vocello.settings.refinement.privacyHint", defaultValue: "Opens the Vocello Privacy Policy",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.privacyHint", defaultValue: "Opens the Vocello Privacy Policy",
                comment: "Settings privacyHint; preserve product and consent meaning.")
     }
     static var permissions: String {
-        String(localized: "vocello.settings.refinement.permissions", defaultValue: "Permissions",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.permissions", defaultValue: "Permissions",
                comment: "Settings permissions; preserve product and consent meaning.")
     }
     static var permissionsDetail: String {
-        String(localized: "vocello.settings.refinement.permissionsDetail", defaultValue: "Microphone and speech recognition.",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.permissionsDetail", defaultValue: "Microphone and speech recognition.",
                comment: "Settings permissionsDetail; preserve product and consent meaning.")
     }
     static var systemSettings: String {
-        String(localized: "vocello.settings.refinement.systemSettings", defaultValue: "iOS Settings",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.systemSettings", defaultValue: "iOS Settings",
                comment: "Settings systemSettings; preserve product and consent meaning.")
     }
     static var permissionsHint: String {
-        String(localized: "vocello.settings.refinement.permissionsHint", defaultValue: "Leaves Vocello and opens iOS Settings",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.permissionsHint", defaultValue: "Leaves Vocello and opens iOS Settings",
                comment: "Settings permissionsHint; preserve product and consent meaning.")
     }
     static var variation: String {
-        String(localized: "vocello.settings.refinement.variation", defaultValue: "Take variation",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.variation", defaultValue: "Take variation",
                comment: "Settings variation; preserve product and consent meaning.")
     }
     static var variationDetail: String {
-        String(localized: "vocello.settings.refinement.variationDetail", defaultValue: "Choose how much finished takes vary.",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.variationDetail", defaultValue: "Choose how much finished takes vary.",
                comment: "Settings variationDetail; preserve product and consent meaning.")
     }
     static var variationHint: String {
-        String(localized: "vocello.settings.refinement.variationHint", defaultValue: "Choose Expressive, Balanced, or Consistent",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.variationHint", defaultValue: "Choose Expressive, Balanced, or Consistent",
                comment: "Settings variationHint; preserve product and consent meaning.")
     }
     static var version: String {
-        String(localized: "vocello.settings.refinement.version", defaultValue: "Version",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.version", defaultValue: "Version",
                comment: "Settings version; preserve product and consent meaning.")
     }
     static func modelsReady(_ ready: Int, total: Int) -> String {
-        String.localizedStringWithFormat(String(localized: "vocello.settings.refinement.modelsReady",
+        String.localizedStringWithFormat(IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.modelsReady",
             defaultValue: "%d of %d ready", comment: "Installed model count out of total available models."), ready, total)
     }
 }
 
-enum IOSSettingsCategory: String, CaseIterable {
-    case audio, modelsFiles, privacyPermissions, accessibility, about
+@MainActor enum IOSSettingsCategory: String, CaseIterable {
+    case audio, appLanguage, modelsFiles, privacyPermissions, accessibility, about
     var title: String {
         switch self {
         case .audio: IOSSettingsText.audio
+        case .appLanguage: IOSSettingsText.appLanguage
         case .modelsFiles: IOSSettingsText.modelsFiles
         case .privacyPermissions: IOSSettingsText.privacyPermissions
         case .accessibility: IOSSettingsText.accessibility
@@ -376,6 +390,7 @@ enum IOSSettingsCategory: String, CaseIterable {
     var subtitle: String {
         switch self {
         case .audio: IOSSettingsText.audioSummary
+        case .appLanguage: IOSSettingsText.appLanguageDetail
         case .modelsFiles: IOSSettingsText.modelsFilesSummary
         case .privacyPermissions: IOSSettingsText.privacyPermissionsSummary
         case .accessibility: IOSSettingsText.accessibilitySummary
@@ -386,6 +401,7 @@ enum IOSSettingsCategory: String, CaseIterable {
     var symbol: String {
         switch self {
         case .audio: "waveform"
+        case .appLanguage: "globe"
         case .modelsFiles: "internaldrive"
         case .privacyPermissions: "hand.raised"
         case .accessibility: "accessibility"
@@ -499,6 +515,8 @@ struct SettingsScreen: View {
                     IOSSettingsSection {
                         categoryLink(.audio) { audioSection }
                         IOSSettingsDivider()
+                        categoryLink(.appLanguage) { appLanguageSection }
+                        IOSSettingsDivider()
                         NavigationLink(value: IOSSettingsModelNavigation.Destination.modelsAndFiles) {
                             categoryLabel(.modelsFiles)
                         }
@@ -553,7 +571,43 @@ struct SettingsScreen: View {
 
     private func categoryLabel(_ category: IOSSettingsCategory) -> some View {
         IOSSettingsNavigationRow(symbol: category.symbol, title: category.title,
-                                 subtitle: category.subtitle, value: "")
+                                 subtitle: category.subtitle,
+                                 value: category == .appLanguage ? selectedLanguageName : "")
+    }
+
+    private var selectedLanguageName: String {
+        IOSUILanguage(rawValue: IOSAppLanguage.shared.selection)?.nativeName ?? IOSSettingsText.systemLanguage
+    }
+
+    private var appLanguageSection: some View {
+        IOSSettingsSection {
+            appLanguageOption(IOSAppLanguage.system, name: IOSSettingsText.systemLanguage)
+            ForEach(IOSAppLanguage.shared.availableLanguages, id: \.rawValue) { language in
+                IOSSettingsDivider()
+                appLanguageOption(language.rawValue, name: language.nativeName)
+            }
+        }
+    }
+
+    private func appLanguageOption(_ identifier: String, name: String) -> some View {
+        let selected = IOSAppLanguage.shared.selection == identifier
+        return Button { IOSAppLanguage.shared.select(identifier) } label: {
+            HStack {
+                Text(verbatim: name)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: Theme.Spacing.sm)
+                if selected { Image(systemName: "checkmark").accessibilityHidden(true) }
+            }
+            .font(.body)
+            .foregroundStyle(Theme.Text.primary)
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            .contentShape(Rectangle())
+            .padding(Theme.Spacing.md)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(name)
+        .accessibilityAddTraits(selected ? [.isSelected] : [])
+        .accessibilityIdentifier("iosSettings_appLanguageOption_\(identifier)")
     }
 
     private var modelsAndFilesDestination: some View {
@@ -566,7 +620,7 @@ struct SettingsScreen: View {
             Button(IOSSettingsText.keepInHistory) { IOSSavedOutputsDestination.clearFolder() }
             Button(IOSSettingsText.chooseFolder) { isFolderPickerPresented = true }
         } message: {
-            Text(VocelloPresentationText.exportFolderDetail)
+            Text(IOSAppLanguage.shared.presentation.exportFolderDetail)
         }
         .fileImporter(
             isPresented: $isFolderPickerPresented,
@@ -598,7 +652,7 @@ struct SettingsScreen: View {
             Button { isExportPurchasePresented = true } label: {
                 IOSSettingsNavigationRow(
                 symbol: IOSExportCommerce.shared.access == .unlocked ? "checkmark.circle" : "square.and.arrow.up",
-                title: VocelloPresentationText.exportUnlockTitle,
+                title: IOSAppLanguage.shared.presentation.exportUnlockTitle,
                 subtitle: exportSummary,
                 value: "",
                 tint: Theme.Brand.gold
@@ -606,17 +660,17 @@ struct SettingsScreen: View {
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("iosSettings_exportPurchaseRow")
-            .accessibilityLabel(VocelloPresentationText.exportUnlockTitle)
+            .accessibilityLabel(IOSAppLanguage.shared.presentation.exportUnlockTitle)
             .accessibilityValue(exportSummary)
-            .accessibilityHint(VocelloPresentationText.exportOptionsHint)
+            .accessibilityHint(IOSAppLanguage.shared.presentation.exportOptionsHint)
         }
     }
 
     private var exportSummary: String {
         switch IOSExportCommerce.shared.access {
-        case .unlocked: VocelloPresentationText.exportUnlocked
-        case .checking: VocelloPresentationText.exportChecking
-        case .locked: VocelloPresentationText.exportRootSummary
+        case .unlocked: IOSAppLanguage.shared.presentation.exportUnlocked
+        case .checking: IOSAppLanguage.shared.presentation.exportChecking
+        case .locked: IOSAppLanguage.shared.presentation.exportRootSummary
         }
     }
 
@@ -695,7 +749,7 @@ struct SettingsScreen: View {
             IOSSettingsSection {
                 IOSSettingsValueRow(
                     symbol: "hand.raised.fill",
-                    title: VocelloPresentationText.exportPrivacy,
+                    title: IOSAppLanguage.shared.presentation.exportPrivacy,
                     subtitle: nil,
                     accessibilityIdentifier: "iosSettings_privacyPolicyRow",
                     value: "",
@@ -730,11 +784,11 @@ struct SettingsScreen: View {
             IOSSettingsSection {
                 IOSSettingsValueRow(
                     symbol: "questionmark.circle.fill",
-                    title: String(localized: "vocello.settings.help_support"),
-                    subtitle: String(localized: "vocello.settings.help_support.subtitle"),
+                    title: IOSAppLanguage.shared.localized(localized: "vocello.settings.help_support"),
+                    subtitle: IOSAppLanguage.shared.localized(localized: "vocello.settings.help_support.subtitle"),
                     accessibilityIdentifier: "iosSettings_supportRow",
                     value: "",
-                    accessibilityHint: String(localized: "vocello.settings.help_support.hint"),
+                    accessibilityHint: IOSAppLanguage.shared.localized(localized: "vocello.settings.help_support.hint"),
                     action: { open("https://vocello.vercel.app/support/") }
                 )
 
@@ -744,25 +798,25 @@ struct SettingsScreen: View {
                 } label: {
                     IOSSettingsNavigationRow(
                         symbol: "chevron.left.forwardslash.chevron.right",
-                        title: String(localized: "vocello.settings.open_source_licenses"),
+                        title: IOSAppLanguage.shared.localized(localized: "vocello.settings.open_source_licenses"),
                         subtitle: nil,
                         value: ""
                     )
                 }
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("iosSettings_openSourceRow")
-                .accessibilityLabel(String(localized: "vocello.settings.open_source_licenses"))
-                .accessibilityValue(String(localized: "vocello.settings.on_device"))
-                .accessibilityHint(String(localized: "vocello.settings.open_source_licenses.hint"))
+                .accessibilityLabel(IOSAppLanguage.shared.localized(localized: "vocello.settings.open_source_licenses"))
+                .accessibilityValue(IOSAppLanguage.shared.localized(localized: "vocello.settings.on_device"))
+                .accessibilityHint(IOSAppLanguage.shared.localized(localized: "vocello.settings.open_source_licenses.hint"))
 
                 IOSSettingsDivider()
                 IOSSettingsValueRow(
                     symbol: "chevron.left.forwardslash.chevron.right",
-                    title: String(localized: "vocello.settings.source_code"),
+                    title: IOSAppLanguage.shared.localized(localized: "vocello.settings.source_code"),
                     subtitle: nil,
                     accessibilityIdentifier: "iosSettings_sourceCodeRow",
                     value: "",
-                    accessibilityHint: String(localized: "vocello.settings.source_code.hint"),
+                    accessibilityHint: IOSAppLanguage.shared.localized(localized: "vocello.settings.source_code.hint"),
                     action: { open("https://github.com/PowerBeef/Vocello") }
                 )
 

@@ -366,7 +366,7 @@ struct IOSStudioCanvas<SetupChips: View>: View {
                     }
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(VocelloPresentationText.status(.generationFailed))
+                    Text(IOSAppLanguage.shared.presentation.status(.generationFailed))
                         .font(.footnote.weight(.semibold))
                         .foregroundStyle(Theme.Text.primary)
                     Text(errorMessage ?? IOSInterfaceText.tryAgain)
@@ -552,7 +552,7 @@ struct IOSStudioInlinePlayerItem: Equatable {
         lhs.audioURL == rhs.audioURL
     }
 
-    var playerSheetItem: IOSPlayerSheetItem {
+    @MainActor var playerSheetItem: IOSPlayerSheetItem {
         IOSPlayerSheetItem(
             audioURL: audioURL,
             transcript: transcript,
@@ -569,12 +569,10 @@ struct IOSStudioInlinePlayerItem: Equatable {
 }
 
 struct IOSStudioCadenceNotice: Equatable {
-    let title: String
-    let message: String
+    @MainActor var title: String { IOSInterfaceText.unusualPacing }
+    @MainActor var message: String { IOSInterfaceText.reviewTake }
 
     init?(audioQC: AudioQCReport?) {
         guard audioQC?.cadence?.classification == .unusual else { return nil }
-        title = IOSInterfaceText.unusualPacing
-        message = IOSInterfaceText.reviewTake
     }
 }

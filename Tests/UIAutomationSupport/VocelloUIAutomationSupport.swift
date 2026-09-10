@@ -57,10 +57,56 @@ enum VocelloUISettingsReveal {
                 succeeded = true
                 return true
             }
-            guard let swipe = search.next(target: required, visible: visible) else { return false }
-            switch swipe {
-            case .up: app.swipeUp()
-            case .down: app.swipeDown()
+            guard let delta = search.nextScroll(target: required, visible: visible) else {
+                observations.append("scroll stopped: no progress, impossible geometry, or exhausted budget")
+                return false
+            }
+            guard target.exists else {
+                observations.append("target absent; cannot prove containing scroll view")
+                return false
+            }
+            // Resolve the genuine containing scroll view, never the dock or an
+            // arbitrary first element. Its center must be within the safe viewport.
+            let containers = app.scrollViews.allElementsBoundByIndex.filter { container in
+                guard container.exists, container.isHittable,
+                      VocelloUIRevealRequirement.valid(container.frame),
+                      visible.contains(CGPoint(x: container.frame.midX, y: container.frame.midY)) else {
+                    return false
+                }
+                // SwiftUI Label can propagate the same identifier to its image and
+                // text. Bind containment to the already resolved element's type,
+                // not every descendant carrying the presentation identifier.
+                let matches = container.descendants(matching: target.elementType)
+                    .matching(identifier: target.identifier)
+                observations.append("containerMatches=\(matches.count); targetType=\(target.elementType.rawValue)")
+                return !target.identifier.isEmpty && matches.count == 1
+                    && matches.element.frame == frame
+            }
+            guard containers.count == 1, let container = containers.first else {
+                observations.append("scroll container missing, ambiguous, or dock-obscured")
+                return false
+            }
+            // Pointer scroll events compile for iOS but fail on touch-only iPhones.
+            // Text descendants are genuine visible content, not hidden test anchors.
+            // Their complete frames, not just centers/hittability, must clear the dock.
+            let anchors = container.staticTexts.allElementsBoundByIndex.filter {
+                $0.exists && $0.isHittable
+            }
+            guard let index = VocelloUITouchScrollAnchor.index(
+                frames: anchors.map(\.frame), visible: visible, desiredDelta: delta) else {
+                observations.append("no fully visible bounded touch anchor in owning scroll view")
+                return false
+            }
+            let anchor = anchors[index]
+            observations.append("desiredDeltaY=\(delta); touchAnchorFrame=\(anchor.frame); containerFrame=\(container.frame)")
+            // Persist before the event: an Objective-C XCTest exception can bypass Swift defer.
+            XCTContext.runActivity(named: "Settings bounded touch scroll") { activity in
+                let attachment = XCTAttachment(string: observations.joined(separator: "\n"))
+                attachment.name = "settings-touch-scroll-observations"
+                attachment.lifetime = .keepAlways
+                activity.add(attachment)
+                if delta < 0 { anchor.swipeUp(velocity: .slow) }
+                else { anchor.swipeDown(velocity: .slow) }
             }
         }
         return false

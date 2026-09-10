@@ -165,8 +165,10 @@ report that protection still requires operator action.
 ## Explicit XCUITest lanes
 
 Shared `VocelloiOSUITestCase` journeys select English using process-local launch arguments so
-exact model-status assertions do not depend on the phone's language. They do not write a saved
-language preference. The Settings `localization` walk explicitly overrides this for French-Default
+exact model-status assertions do not depend on the phone's language. They first observe the saved
+App Language choice through its genuine picker, temporarily select System Default, and restore
+the original choice during session cleanup. They never write global `AppleLanguages` preferences.
+The Settings `localization` walk explicitly overrides the process language for French-Default
 (including translated title and variation-value assertions), in addition to Default, AX-L,
 AX-XXXL and pseudo-AX-XXXL. Keep each layout's full-visibility assertions and retained captures;
 neither a default-language pass nor a compile substitutes for bilingual device acceptance.
@@ -236,6 +238,17 @@ restoration remains failure; never replace an unknown original value with a defa
 and simple saved-voice enrollment journeys still need equivalent preservation of Studio selections,
 draft and consent before use against personal state; do not infer that protection from the stateful
 lane. See the current checkpoint for this explicit acceptance limitation.
+
+Settings reveal uses the shared test-only `VocelloUISettingsReveal` helper. It preserves full
+visibility and whole-dock clearance while issuing slow native touch swipes on small static-text
+descendants of one genuine containing scroll view, not full-window swipes. Pointer-based
+`scroll(byDeltaX:deltaY:)` is not supported on the touch-only iPhone. Missing/ambiguous containers,
+an unsafe container center or no wholly visible small anchor fail closed. Each accessibility snapshot
+determines the desired movement and bounds the anchor size; velocity is not a distance guarantee.
+Direction reversal reduces the anchor bound, unchanged frames stop the search, and oversized full-visibility
+requirements remain failures. The separate navigation-only band is not layout acceptance. Retained
+pre-gesture and failure attachments include sampled frames and desired movement. Host geometry tests do not
+prove actual UIKit scrolling; new physical AX-XXXL/pseudo acceptance is required after changes.
 
 Every lane uses the paired physical-device destination. Tests use stable accessibility identifiers,
 condition-based waits, XCTest activities, screenshots, and failure attachments. Coordinate tables,

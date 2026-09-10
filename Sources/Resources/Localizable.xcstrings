@@ -1,6 +1,60 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "vocello.settings.appLanguage": {
+      "comment": "Language of the interface, not generated speech.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "App Language"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Langue de l’app"
+          }
+        }
+      }
+    },
+    "vocello.settings.appLanguageDetail": {
+      "comment": "Explains the separate interface language preference.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Changes the app interface, not the language of generated speech."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modifie l’interface de l’app, pas la langue de la parole générée."
+          }
+        }
+      }
+    },
+    "vocello.settings.systemLanguage": {
+      "comment": "Follow the operating system's preferred app language.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "System Default"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Réglage du système"
+          }
+        }
+      }
+    },
     "vocello.ui.seed": {
       "comment": "iOS interface guidance only; never substituted into model input.",
       "extractionState": "manual",

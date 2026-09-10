@@ -17,16 +17,18 @@ struct IOSModelProgressPresentation: Equatable, Sendable {
         bytesPerSecond: Int64? = nil,
         estimatedSecondsRemaining: Double? = nil,
         suffix: String? = nil,
+        text: VocelloPresentationText = .init(),
         formatBytes: (Int64) -> String
     ) -> Self {
         let durableBytes = max(durableBytes, 0)
         guard let catalogBytes, catalogBytes > 0 else {
-            var details = [VocelloPresentationText.downloadedBytes(formatBytes(durableBytes))]
+            var details = [text.downloadedBytes(formatBytes(durableBytes))]
             appendOptionalTransferDetails(
                 to: &details,
                 bytesPerSecond: bytesPerSecond,
                 estimatedSecondsRemaining: estimatedSecondsRemaining,
                 suffix: suffix,
+                text: text,
                 formatBytes: formatBytes
             )
             return Self(indicator: .indeterminate, detail: details.joined(separator: " · "))
@@ -36,26 +38,27 @@ struct IOSModelProgressPresentation: Equatable, Sendable {
         if visibleBytes >= catalogBytes {
             return Self(
                 indicator: .indeterminate,
-                detail: VocelloPresentationText.downloadFinishing
+                detail: text.downloadFinishing
             )
         }
 
         let fraction = min(max(Double(visibleBytes) / Double(catalogBytes), 0), 1)
         let percent = Int((fraction * 100).rounded(.down))
         var details = [
-            VocelloPresentationText.downloadTransfer(percent, completed: formatBytes(visibleBytes), total: formatBytes(catalogBytes))
+            text.downloadTransfer(percent, completed: formatBytes(visibleBytes), total: formatBytes(catalogBytes))
         ]
         appendOptionalTransferDetails(
             to: &details,
             bytesPerSecond: bytesPerSecond,
             estimatedSecondsRemaining: estimatedSecondsRemaining,
             suffix: suffix,
+            text: text,
             formatBytes: formatBytes
         )
         return Self(
             indicator: .determinate(
                 fraction: fraction,
-                accessibilityValue: VocelloPresentationText.downloadAccessibility(percent, completed: visibleBytes, total: catalogBytes)
+                accessibilityValue: text.downloadAccessibility(percent, completed: visibleBytes, total: catalogBytes)
             ),
             detail: details.joined(separator: " · ")
         )
@@ -71,12 +74,12 @@ struct IOSModelProgressPresentation: Equatable, Sendable {
         detail: VocelloPresentationText.status(.makingModelAvailableOffline) + "."
     )
 
-    static func retrying(retryCount: Int, reason: String?) -> Self {
+    static func retrying(retryCount: Int, reason: String?, text: VocelloPresentationText = .init()) -> Self {
         let detail: String
         if let reason, !reason.isEmpty {
-            detail = VocelloPresentationText.downloadRetryReason(max(1, retryCount), reason: reason)
+            detail = text.downloadRetryReason(max(1, retryCount), reason: reason)
         } else {
-            detail = VocelloPresentationText.downloadRetry(max(1, retryCount))
+            detail = text.downloadRetry(max(1, retryCount))
         }
         return Self(indicator: .indeterminate, detail: detail)
     }
@@ -106,6 +109,7 @@ struct IOSModelProgressPresentation: Equatable, Sendable {
         bytesPerSecond: Int64?,
         estimatedSecondsRemaining: Double?,
         suffix: String?,
+        text: VocelloPresentationText,
         formatBytes: (Int64) -> String
     ) {
         if let bytesPerSecond, bytesPerSecond > 0 {
@@ -114,7 +118,7 @@ struct IOSModelProgressPresentation: Equatable, Sendable {
         if let estimatedSecondsRemaining,
            estimatedSecondsRemaining.isFinite,
            estimatedSecondsRemaining > 0 {
-            details.append(VocelloPresentationText.downloadRemaining(max(1, Int(estimatedSecondsRemaining.rounded()))))
+            details.append(text.downloadRemaining(max(1, Int(estimatedSecondsRemaining.rounded()))))
         }
         if let suffix, !suffix.isEmpty {
             details.append(suffix)

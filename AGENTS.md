@@ -27,6 +27,11 @@ owner and one outward-export boundary; no paid preference flag or diagnostics un
 internal History/playback, personal-reference recovery and actual failed-storage recovery stay free.
 Local StoreKit fixtures never enter shipping app resources or authorize live purchases/account edits.
 
+iOS interface language belongs to `IOSAppLanguage`, independently of generated-speech and reference
+languages. Resolve app-owned copy through the existing catalog/context; never mutate `AppleLanguages`,
+swizzle bundles, recreate the application root, translate model-facing text or reformat StoreKit prices.
+Offer only complete bundled locales; catalog completeness does not replace physical layout acceptance.
+
 Source-of-truth order:
 
 `Sources/` → `project.yml` → machine-readable `config/` contracts → `scripts/` →

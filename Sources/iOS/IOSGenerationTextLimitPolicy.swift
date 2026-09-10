@@ -59,25 +59,25 @@ struct IOSGenerationTextLimitPolicy {
             "\(count)/\(displayLimit)"
         }
 
-        var helperMessage: String {
+        @MainActor var helperMessage: String {
             if isOverLimit {
                 return warningMessage
             }
             if routesToLongForm {
-                return VocelloPresentationText.longFormGuidance
+                return IOSAppLanguage.shared.presentation.longFormGuidance
             }
             if remainingCount == 0 {
-                return VocelloPresentationText.longFormLimit
+                return IOSAppLanguage.shared.presentation.longFormLimit
             }
-            return VocelloPresentationText.charactersRemaining(remainingCount)
+            return IOSAppLanguage.shared.presentation.charactersRemaining(remainingCount)
         }
 
-        var warningMessage: String {
-            VocelloPresentationText.shortenScript(IOSGenerationTextLimitPolicy.longFormScriptLimit)
+        @MainActor var warningMessage: String {
+            IOSAppLanguage.shared.presentation.shortenScript(IOSGenerationTextLimitPolicy.longFormScriptLimit)
         }
 
-        var readinessTitle: String {
-            VocelloPresentationText.shortenScriptTitle(IOSGenerationTextLimitPolicy.longFormScriptLimit)
+        @MainActor var readinessTitle: String {
+            IOSAppLanguage.shared.presentation.shortenScriptTitle(IOSGenerationTextLimitPolicy.longFormScriptLimit)
         }
     }
 

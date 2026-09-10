@@ -1187,8 +1187,8 @@ struct IOSReferenceClipSheet: View {
             )
             sourceRow(
                 symbol: "folder.fill",
-                title: VocelloPresentationText.importReferenceAudioTitle,
-                detail: VocelloPresentationText.importReferenceAudioDetail,
+                title: IOSAppLanguage.shared.presentation.importReferenceAudioTitle,
+                detail: IOSAppLanguage.shared.presentation.importReferenceAudioDetail,
                 accessibilityIdentifier: "referenceClip_importAudioFile",
                 action: onRequestImport
             )

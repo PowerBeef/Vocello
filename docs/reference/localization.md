@@ -9,6 +9,8 @@ sourceOfTruth:
   - Sources/iOS/InfoPlist.xcstrings
   - Sources/iOS/IOSRootNavigationModels.swift
   - Sources/SharedSupport/Services/VocelloPresentationText.swift
+  - Sources/SharedSupport/Services/VocelloLocalization.swift
+  - Sources/iOSSupport/Services/IOSAppLanguage.swift
   - scripts/localization_contract.py
   - config/localization-unlocalized-baseline.json
   - Tests/VocelloMacUITests/VocelloMacSmokeUITests.swift
@@ -35,6 +37,20 @@ contract. StoreKit remains the authority for the localized price; never format a
 Original license/NOTICE bodies remain unchanged; translate their surrounding browser controls only.
 
 ## Authorities
+
+- `IOSAppLanguage.shared` is the observable, app-lifetime iOS interface-language owner.
+  Settings → App Language stores `vocello.ios.interfaceLanguage`; absence or an unsupported value
+  means System Default. Choices are filtered against compiled bundle localizations: currently
+  English/French only. The ten-language identifier list is preparation, not shipped translations.
+  System Default uses OS language preferences and bundle matching, with English fallback.
+  No `AppleLanguages` preference mutation, bundle swizzling, or root identity reset is used.
+  The SwiftUI locale retains the current region; StoreKit prices remain opaque supplied strings.
+- `VocelloLocalization` resolves the selected compiled catalog bundle. `IOSInterfaceText` and
+  `IOSSettingsText` read the observable owner; iOS dynamic copy uses its `presentation` context.
+  Shared/macOS callers retain default-bundle text through the existing static interfaces.
+  Startup and unsupported-device presentation receive the same app-boundary locale.
+  Already stored error strings are not reverse-translated; completing indirect error/status
+  ownership remains part of the EN/FR review. Do not claim whole-app live switching from catalog tests.
 
 - `Sources/Resources/Localizable.xcstrings` owns interface translations. Manual entries require
   English and French content and non-empty translator context. Both languages retain complete
@@ -107,6 +123,17 @@ double-length and untranslated-string diagnostics. The `scripts/ui_test.sh ios l
 Settings layout walk adds a `Pseudo-AX-XXXL` arm combining the same diagnostics with the largest
 tested accessibility content-size category. Both use stable accessibility identifiers and genuine
 product controls; there is no hidden test UI. iOS acceptance remains physical-device XCUITest only.
+
+The existing iOS localization walk additionally selects English/French through
+`iosSettings_appLanguageOption_<locale>`, verifies immediate Settings copy, relaunch selection
+and unchanged Studio text, then returns to System Default. Test sessions record the original
+interface preference before selecting System Default for process-local language fixtures and restore
+it during cleanup; failed restoration is not a pass. New page IDs are
+`iosSettings_appLanguageRow`, `screen_settings_appLanguage` and `iosSettings_appLanguageBackButton`.
+Authorized September 10 runs exercised English/French selection, relaunch and draft preservation.
+The latest bounded run completed Default/French-Default/AX-L, but was interrupted for the phone
+deadline before AX-XXXL/pseudo acceptance. These are source-bound partial observations, not a
+passing whole-lane result; see the current development checkpoint for retained run identities.
 
 Broad translations may be accepted only after the relevant deterministic checks, macOS smoke, and
 physical-iPhone long-string/accessibility walk pass for the exact source change. Completed

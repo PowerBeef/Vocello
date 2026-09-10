@@ -265,7 +265,7 @@ extension IOSAppTab {
         }
     }
 
-    var title: String {
+    @MainActor var title: String {
         switch self {
         case .studio: return IOSInterfaceText.tabStudio
         case .voices: return IOSInterfaceText.tabVoices

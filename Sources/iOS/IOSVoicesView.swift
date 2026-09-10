@@ -254,8 +254,8 @@ struct IOSVoicesView: View {
                 .padding(.leading, 66)
 
             newVoiceActionRow(
-                title: VocelloPresentationText.importReferenceAudioTitle,
-                detail: VocelloPresentationText.importReferenceAudioDetail,
+                title: IOSAppLanguage.shared.presentation.importReferenceAudioTitle,
+                detail: IOSAppLanguage.shared.presentation.importReferenceAudioDetail,
                 symbol: "folder.fill",
                 accessibilityIdentifier: "voices_importAudioFile"
             ) {
@@ -608,7 +608,7 @@ private enum VoiceFilter: String, Identifiable, CaseIterable, Hashable {
 
     var id: String { rawValue }
 
-    var label: String {
+    @MainActor var label: String {
         switch self {
         case .all: return IOSInterfaceText.all
         case .builtIn: return IOSInterfaceText.modeBuiltIn

@@ -165,6 +165,9 @@ final class VocelloiOSScreenProtectionUITests: XCTestCase {
 @MainActor
 final class VocelloiOSSmokeUITests: VocelloiOSUITestCase {
     func testSettingsAccessibilityLayoutWalk() {
+        addTeardownBlock { @MainActor [self] in
+            if session != nil { endSession() }
+        }
         defer {
             if session != nil { endSession() }
         }
@@ -202,6 +205,25 @@ final class VocelloiOSSmokeUITests: VocelloiOSUITestCase {
 
         for category in categories {
             beginSession(additionalArguments: category.arguments)
+
+            if category.name == "Default" {
+                let editor = element("textInput_textEditor")
+                let originalDraft = editor.value as? String
+                for (locale, title) in [("fr", "Réglages"), ("en", "Settings")] {
+                    selectInterfaceLanguageForTest(locale)
+                    XCTAssertEqual(element("iosSettings_title").label, title)
+                    VocelloUIScreenshot.attach(app, named: "ios-app-language-\(locale)")
+                    // Relaunch the same app, not a new test session: the saved choice must survive.
+                    app.terminate()
+                    app.launch()
+                    XCTAssertTrue(VocelloUIWait.exists(element("rootTab_settings"), timeout: 30))
+                    openAppLanguageSettings()
+                    XCTAssertTrue(element("iosSettings_appLanguageOption_\(locale)").isSelected)
+                    select(tab: .studio)
+                    XCTAssertEqual(editor.value as? String, originalDraft)
+                }
+                selectInterfaceLanguageForTest("system")
+            }
 
             select(tab: .settings)
             let settings = element("screen_settings")

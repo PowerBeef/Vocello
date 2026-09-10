@@ -168,7 +168,7 @@ struct IOSPlayerSheet: View {
                 .foregroundStyle(Theme.Text.primary)
                 .lineLimit(1)
 
-            Text(VocelloPresentationText.playerSubtitle(item.subtitle ?? IOSInterfaceText.justNow, duration: controller.formatted(time: controller.duration)))
+            Text(IOSAppLanguage.shared.presentation.playerSubtitle(item.subtitle ?? IOSInterfaceText.justNow, duration: controller.formatted(time: controller.duration)))
                 .iosScaledFont(size: 13, relativeTo: .footnote)
                 .foregroundStyle(Theme.Text.secondary)
                 .monospacedDigit()
@@ -373,7 +373,7 @@ struct IOSPlayerSheetItem: Equatable, Identifiable {
     /// Helper: build a player-sheet item from a History `Generation` row.
     /// The sheet can still present transcript metadata if an older history
     /// row points at audio that has since disappeared from disk.
-    static func from(history: Generation) -> IOSPlayerSheetItem {
+    @MainActor static func from(history: Generation) -> IOSPlayerSheetItem {
         let modeTint: Color
         let modeLabel: String
         switch history.mode.lowercased() {
@@ -407,7 +407,7 @@ struct IOSPlayerSheetItem: Equatable, Identifiable {
 
     /// Helper: build a player-sheet item from a saved cloned voice.
     /// Returns `nil` when the prepared WAV is missing on disk.
-    static func from(savedVoice voice: Voice) -> IOSPlayerSheetItem? {
+    @MainActor static func from(savedVoice voice: Voice) -> IOSPlayerSheetItem? {
         guard FileManager.default.fileExists(atPath: voice.wavPath) else {
             return nil
         }
@@ -430,7 +430,7 @@ struct IOSPlayerSheetItem: Equatable, Identifiable {
 
     /// Helper: build a player-sheet item from a bundled built-in preview
     /// WAV. Missing preview assets intentionally produce no chrome.
-    static func fromBuiltInPreview(speaker: SpeakerDescriptor) -> IOSPlayerSheetItem? {
+    @MainActor static func fromBuiltInPreview(speaker: SpeakerDescriptor) -> IOSPlayerSheetItem? {
         guard let audioURL = Bundle.main.url(
             forResource: speaker.id,
             withExtension: "wav",

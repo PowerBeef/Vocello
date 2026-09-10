@@ -152,7 +152,7 @@ struct IOSCustomVoiceView: View {
 
     private var setupMessage: String? {
         if !isModelAvailable, let activeModel {
-            return VocelloPresentationText.installModel(named: activeModel.name)
+            return IOSAppLanguage.shared.presentation.installModel(named: activeModel.name)
         }
         return nil
     }
@@ -280,7 +280,7 @@ struct IOSCustomVoiceView: View {
                 studioCoordinator: coordinator
             )
         } catch {
-            coordinator.rejectStart(VocelloPresentationText.longFormPlanningFailed(
+            coordinator.rejectStart(IOSAppLanguage.shared.presentation.longFormPlanningFailed(
                 details: error.localizedDescription
             ))
         }
@@ -429,7 +429,7 @@ struct IOSCustomVoiceView: View {
         }
         guard let model = activeModel else { return }
         guard isModelAvailable else {
-            coordinator.rejectStart(VocelloPresentationText.installModel(named: model.name))
+            coordinator.rejectStart(IOSAppLanguage.shared.presentation.installModel(named: model.name))
             return
         }
         if scriptLimitState.routesToLongForm {
@@ -640,7 +640,7 @@ struct IOSVoiceDesignView: View {
 
     private var setupMessage: String? {
         if !isModelAvailable, let activeModel {
-            return VocelloPresentationText.installModel(named: activeModel.name)
+            return IOSAppLanguage.shared.presentation.installModel(named: activeModel.name)
         }
         return nil
     }
@@ -1015,7 +1015,7 @@ struct IOSVoiceDesignView: View {
                 studioCoordinator: coordinator
             )
         } catch {
-            coordinator.rejectStart(VocelloPresentationText.longFormPlanningFailed(
+            coordinator.rejectStart(IOSAppLanguage.shared.presentation.longFormPlanningFailed(
                 details: error.localizedDescription
             ))
         }
@@ -1143,7 +1143,7 @@ struct IOSVoiceDesignView: View {
         guard let model = activeModel else { return }
         guard canGenerate else {
             if !isModelAvailable {
-                coordinator.rejectStart(VocelloPresentationText.installModel(named: model.name))
+                coordinator.rejectStart(IOSAppLanguage.shared.presentation.installModel(named: model.name))
             } else if scriptLimitState.isOverLimit {
                 coordinator.rejectStart(scriptLimitState.warningMessage)
             }
@@ -1415,10 +1415,10 @@ struct IOSVoiceCloningView: View {
 
     private var setupMessage: String? {
         if !cloneConsentAcknowledged {
-            return VocelloPresentationText.cloningConsentRequired
+            return IOSAppLanguage.shared.presentation.cloningConsentRequired
         }
         if !isModelAvailable, let cloneModel {
-            return VocelloPresentationText.installModel(named: cloneModel.name)
+            return IOSAppLanguage.shared.presentation.installModel(named: cloneModel.name)
         }
         if draft.referenceAudioPath == nil {
             return IOSInterfaceText.chooseReferenceDetail
@@ -1614,7 +1614,7 @@ struct IOSVoiceCloningView: View {
                 studioCoordinator: coordinator
             )
         } catch {
-            coordinator.rejectStart(VocelloPresentationText.longFormPlanningFailed(
+            coordinator.rejectStart(IOSAppLanguage.shared.presentation.longFormPlanningFailed(
                 details: error.localizedDescription
             ))
         }
@@ -1846,7 +1846,7 @@ struct IOSVoiceCloningView: View {
     private func generate() {
         guard !scriptLimitState.trimmedIsEmpty, ttsEngine.isReady, !ttsEngine.hasActiveGeneration else { return }
         guard cloneConsentAcknowledged else {
-            coordinator.rejectStart(VocelloPresentationText.cloningConsentRequired)
+            coordinator.rejectStart(IOSAppLanguage.shared.presentation.cloningConsentRequired)
             return
         }
         guard !scriptLimitState.isOverLimit else {
@@ -1855,12 +1855,12 @@ struct IOSVoiceCloningView: View {
         }
         guard let model = cloneModel else { return }
         guard isModelAvailable else {
-            coordinator.rejectStart(VocelloPresentationText.installModel(named: model.name))
+            coordinator.rejectStart(IOSAppLanguage.shared.presentation.installModel(named: model.name))
             return
         }
         if scriptLimitState.routesToLongForm {
             guard let refPath = draft.referenceAudioPath else {
-                coordinator.rejectStart(VocelloPresentationText.referenceAudioRequired)
+                coordinator.rejectStart(IOSAppLanguage.shared.presentation.referenceAudioRequired)
                 return
             }
             startLongFormProject(model: model, refPath: refPath)
@@ -1894,7 +1894,7 @@ struct IOSVoiceCloningView: View {
                     throw NSError(
                         domain: "QVoice.AppGeneration",
                         code: 4,
-                        userInfo: [NSLocalizedDescriptionKey: VocelloPresentationText.referenceAudioRequired]
+                        userInfo: [NSLocalizedDescriptionKey: IOSAppLanguage.shared.presentation.referenceAudioRequired]
                     )
                 }
                 if ttsEngine.clonePreparationState.phase != .failed || ttsEngine.clonePreparationState.identityKey != clonePrimingRequestKey {

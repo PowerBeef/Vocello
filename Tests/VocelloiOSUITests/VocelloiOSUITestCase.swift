@@ -17,6 +17,7 @@ enum VocelloiOSTab: String, CaseIterable {
 class VocelloiOSUITestCase: XCTestCase {
     private(set) var session: VocelloUIApplicationSession!
     private var pendingAutoplayPreferenceRestore: Bool?
+    private var pendingInterfaceLanguageRestore: String?
 
     var app: XCUIApplication { session.app }
 
@@ -32,6 +33,10 @@ class VocelloiOSUITestCase: XCTestCase {
             additionalEnvironment: additionalEnvironment,
             additionalArguments: additionalArguments
         )
+        // A persisted in-app override wins over AppleLanguages. Use the genuine picker,
+        // recording its original choice before mutation, so existing locale fixtures remain honest.
+        selectInterfaceLanguageForTest("system")
+        select(tab: .studio)
     }
 
     func endSession() {
@@ -39,8 +44,53 @@ class VocelloiOSUITestCase: XCTestCase {
             session?.terminate()
             session = nil
             pendingAutoplayPreferenceRestore = nil
+            pendingInterfaceLanguageRestore = nil
         }
         restorePendingAutoplayPreference()
+        if let original = pendingInterfaceLanguageRestore, session != nil {
+            let previousTab = VocelloiOSTab.allCases.first { element($0.identifier).isSelected }
+            selectInterfaceLanguageForTest(original)
+            if let previousTab { select(tab: previousTab) }
+        }
+    }
+
+    func openAppLanguageSettings() {
+        openSettingsRoot()
+        let row = element("iosSettings_appLanguageRow")
+        XCTAssertTrue(revealSettingsElement(row, swipingUp: true))
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: row, timeout: 20))
+        XCTAssertTrue(VocelloUIWait.exists(element("screen_settings_appLanguage"), timeout: 20))
+    }
+
+    func selectInterfaceLanguageForTest(_ language: String) {
+        openAppLanguageSettings()
+        let identifiers = ["system", "en", "fr", "es", "de", "it", "pt-BR", "zh-Hans", "ja", "ko", "ru"]
+        let selected = identifiers.filter {
+            let option = element("iosSettings_appLanguageOption_\($0)")
+            return option.exists && option.isSelected
+        }
+        XCTAssertEqual(selected.count, 1, "Must observe exactly one original interface language before mutation")
+        guard let original = selected.first else { return }
+        if pendingInterfaceLanguageRestore == nil {
+            pendingInterfaceLanguageRestore = original
+            let attachment = XCTAttachment(string: "Original App Language: \(original)")
+            attachment.name = "interface-language-restoration-baseline"
+            attachment.lifetime = .keepAlways
+            add(attachment)
+        }
+        let option = element("iosSettings_appLanguageOption_\(language)")
+        XCTAssertTrue(VocelloUIWait.exists(option, timeout: 20))
+        if !option.isSelected {
+            XCTAssertTrue(revealSettingsElement(option, swipingUp: true))
+            XCTAssertTrue(VocelloUIPrimaryAction.perform(on: option, timeout: 20))
+        }
+        XCTAssertTrue(VocelloUIWait.condition("interface language selected", timeout: 10) {
+            option.exists && option.isSelected
+        })
+        let back = element("iosSettings_appLanguageBackButton")
+        XCTAssertTrue(revealSettingsElement(back, swipingUp: false))
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: back, timeout: 20))
+        XCTAssertTrue(VocelloUIWait.disappears(element("screen_settings_appLanguage"), timeout: 20))
     }
 
     /// Launches the production UI. First-run onboarding is completed through
@@ -137,7 +187,7 @@ class VocelloiOSUITestCase: XCTestCase {
         select(tab: .settings)
         for _ in 0..<3 {
             let backIDs = ["iosAttributionDetailBackButton", "iosSettings_voiceModelsBackButton", "iosSettings_openSourceBackButton"]
-                + ["audio", "modelsFiles", "privacyPermissions", "accessibility", "about"].map { "iosSettings_\($0)BackButton" }
+                + ["audio", "appLanguage", "modelsFiles", "privacyPermissions", "accessibility", "about"].map { "iosSettings_\($0)BackButton" }
             guard let back = backIDs.map({ element($0) }).first(where: { $0.exists }) else { break }
             XCTAssertTrue(revealSettingsElement(back, swipingUp: false))
             XCTAssertTrue(VocelloUIPrimaryAction.perform(on: back, timeout: 20))
@@ -192,7 +242,7 @@ class VocelloiOSUITestCase: XCTestCase {
         openSettingsRoot()
         XCTAssertTrue(VocelloUIWait.exists(element("screen_settings"), timeout: 20))
 
-        for category in ["audio", "modelsFiles", "privacyPermissions", "accessibility", "about"] {
+        for category in ["audio", "appLanguage", "modelsFiles", "privacyPermissions", "accessibility", "about"] {
             let row = element("iosSettings_\(category)Row")
             XCTAssertTrue(revealSettingsElement(row, swipingUp: true))
             XCTAssertTrue(VocelloUIPrimaryAction.perform(on: row, timeout: 20))

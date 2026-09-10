@@ -86,7 +86,7 @@ enum IOSHistoryModeFilter: String, CaseIterable, Identifiable, Hashable {
 
     var id: String { rawValue }
 
-    var title: String {
+    @MainActor var title: String {
         switch self {
         case .all: return IOSInterfaceText.all
         case .custom: return IOSInterfaceText.modeBuiltIn
@@ -130,7 +130,7 @@ private enum IOSHistoryBucket: Int, CaseIterable, Identifiable {
 
     var id: Int { rawValue }
 
-    var title: String {
+    @MainActor var title: String {
         switch self {
         case .today: return IOSInterfaceText.today
         case .yesterday: return IOSInterfaceText.yesterday
@@ -335,7 +335,7 @@ private struct IOSHistoryLibrarySection: View {
                         recoveryExportGate.share(urls: recoveryAudioURLs,
                             provenance: recoveryAudioURLs.map { _ in .recoveryRecord })
                     } label: {
-                        Label(VocelloPresentationText.exportRecoveryFiles, systemImage: "square.and.arrow.up")
+                        Label(IOSAppLanguage.shared.presentation.exportRecoveryFiles, systemImage: "square.and.arrow.up")
                     }
                     .iosAdaptiveUtilityButtonStyle(tint: Theme.Brand.library)
                     .accessibilityIdentifier("historyRecovery_export")
@@ -351,10 +351,10 @@ private struct IOSHistoryLibrarySection: View {
 
     private var recoveryMessage: String {
         if recoverySnapshot.longFormRecoveryPending {
-            return VocelloPresentationText.longFormRecoveryDetail
+            return IOSAppLanguage.shared.presentation.longFormRecoveryDetail
         }
         if recoverySnapshot.unqueuedCount > 0 {
-            return VocelloPresentationText.historyUnqueuedDetail
+            return IOSAppLanguage.shared.presentation.historyUnqueuedDetail
         }
         if recoverySnapshot.issueCount > 0 {
             return IOSInterfaceText.historyRecoveryProblem

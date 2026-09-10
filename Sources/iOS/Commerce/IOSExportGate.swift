@@ -73,24 +73,24 @@ struct IOSExportPurchaseSheet: View {
         NavigationStack {
             IOSScrollView {
                 VStack(alignment: .leading, spacing: 20) {
-                    Text(VocelloPresentationText.exportBenefit)
+                    Text(IOSAppLanguage.shared.presentation.exportBenefit)
                         .font(.headline)
                         .fixedSize(horizontal: false, vertical: true)
-                    Text(VocelloPresentationText.exportFreeDetail)
+                    Text(IOSAppLanguage.shared.presentation.exportFreeDetail)
                         .foregroundStyle(Theme.Text.secondary)
                         .fixedSize(horizontal: false, vertical: true)
-                    Text(VocelloPresentationText.exportOneTime)
+                    Text(IOSAppLanguage.shared.presentation.exportOneTime)
                         .font(.subheadline)
                         .fixedSize(horizontal: false, vertical: true)
                     if store.access == .unlocked {
-                        Label(VocelloPresentationText.exportUnlocked, systemImage: "checkmark.seal")
+                        Label(IOSAppLanguage.shared.presentation.exportUnlocked, systemImage: "checkmark.seal")
                             .accessibilityIdentifier("exportPurchase_unlocked")
-                        Text(VocelloPresentationText.exportRetryAfterPurchase)
+                        Text(IOSAppLanguage.shared.presentation.exportRetryAfterPurchase)
                     } else if let product = store.product {
                         Button {
                             Task { await store.purchase() }
                         } label: {
-                            Text(VocelloPresentationText.exportBuy(product.displayPrice))
+                            Text(IOSAppLanguage.shared.presentation.exportBuy(product.displayPrice))
                                 .foregroundStyle(Theme.Text.onAccent)
                                 .fixedSize(horizontal: false, vertical: true)
                                 .frame(maxWidth: .infinity, minHeight: 44)
@@ -101,8 +101,8 @@ struct IOSExportPurchaseSheet: View {
                         .disabled(store.operation != .idle || store.access == .checking)
                         .accessibilityIdentifier("exportPurchase_buy")
                     } else {
-                        Text(VocelloPresentationText.exportProductUnavailable)
-                        Button(VocelloPresentationText.exportReloadProduct) {
+                        Text(IOSAppLanguage.shared.presentation.exportProductUnavailable)
+                        Button(IOSAppLanguage.shared.presentation.exportReloadProduct) {
                             Task { await store.loadProduct() }
                         }
                         .frame(minHeight: 44)
@@ -110,43 +110,43 @@ struct IOSExportPurchaseSheet: View {
                         .accessibilityIdentifier("exportPurchase_reload")
                     }
                     if store.operation != .idle || store.access == .checking {
-                        ProgressView(VocelloPresentationText.exportChecking)
+                        ProgressView(IOSAppLanguage.shared.presentation.exportChecking)
                             .accessibilityIdentifier("exportPurchase_progress")
                     }
                     if let notice = store.notice {
-                        Text(VocelloPresentationText.exportPurchaseNotice(notice, access: store.access))
+                        Text(IOSAppLanguage.shared.presentation.exportPurchaseNotice(notice, access: store.access))
                             .fixedSize(horizontal: false, vertical: true)
                             .accessibilityIdentifier("exportPurchase_status")
                     }
-                    Button(VocelloPresentationText.exportRestore) {
+                    Button(IOSAppLanguage.shared.presentation.exportRestore) {
                         Task { await store.restore() }
                     }
                     .frame(minHeight: 44)
                     .disabled(store.operation != .idle)
                     .accessibilityIdentifier("exportPurchase_restore")
                     VStack(alignment: .leading, spacing: 0) {
-                        Link(VocelloPresentationText.exportPrivacy,
+                        Link(IOSAppLanguage.shared.presentation.exportPrivacy,
                          destination: URL(string: "https://vocello.vercel.app/privacy")!)
                         .frame(minHeight: 44)
                         .accessibilityIdentifier("exportPurchase_privacy")
-                        Link(VocelloPresentationText.exportSupport,
+                        Link(IOSAppLanguage.shared.presentation.exportSupport,
                          destination: URL(string: "https://vocello.vercel.app/support/")!)
                         .frame(minHeight: 44)
                         .accessibilityIdentifier("exportPurchase_support")
                     }
                     .font(.subheadline)
-                    Text(VocelloPresentationText.exportThanks)
+                    Text(IOSAppLanguage.shared.presentation.exportThanks)
                         .font(.footnote)
                         .foregroundStyle(Theme.Text.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .padding()
             }
-            .navigationTitle(VocelloPresentationText.exportUnlockTitle)
+            .navigationTitle(IOSAppLanguage.shared.presentation.exportUnlockTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(VocelloPresentationText.exportClose) { dismiss() }
+                    Button(IOSAppLanguage.shared.presentation.exportClose) { dismiss() }
                         .frame(minWidth: 44, minHeight: 44)
                         .accessibilityIdentifier("exportPurchase_close")
                 }

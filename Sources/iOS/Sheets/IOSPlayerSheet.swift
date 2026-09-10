@@ -127,7 +127,7 @@ struct IOSPlayerSheet: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Close")
+            .accessibilityLabel(IOSInterfaceText.close)
             .accessibilityIdentifier("iosPlayer_close")
 
             Spacer()
@@ -168,7 +168,7 @@ struct IOSPlayerSheet: View {
                 .foregroundStyle(Theme.Text.primary)
                 .lineLimit(1)
 
-            Text("\(item.subtitle ?? "Just now") · \(controller.formatted(time: controller.duration))")
+            Text(VocelloPresentationText.playerSubtitle(item.subtitle ?? IOSInterfaceText.justNow, duration: controller.formatted(time: controller.duration)))
                 .iosScaledFont(size: 13, relativeTo: .footnote)
                 .foregroundStyle(Theme.Text.secondary)
                 .monospacedDigit()
@@ -178,9 +178,9 @@ struct IOSPlayerSheet: View {
 
     private var playerEyebrowLabel: String {
         switch item.modeLabel.lowercased() {
-        case "custom": return "Built-in Voice"
-        case "design": return "Voice Design"
-        case "clone": return "Voice Cloning"
+        case "custom": return IOSSettingsText.builtIn
+        case "design": return IOSSettingsText.design
+        case "clone": return IOSSettingsText.clone
         default: return item.modeLabel
         }
     }
@@ -247,7 +247,7 @@ struct IOSPlayerSheet: View {
             // VoiceOver: read the transcript as one prose element (the karaoke
             // spans are visual-only highlighting, not separate semantics).
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel("Transcript")
+            .accessibilityLabel(IOSInterfaceText.transcript)
             .accessibilityValue(item.transcript)
             .accessibilityIdentifier("iosPlayer_transcript")
         }
@@ -266,7 +266,7 @@ struct IOSPlayerSheet: View {
             // (none does today); a clear placeholder keeps the row balanced.
             if let onSave {
                 playerSideButton(
-                    title: "Save",
+                    title: IOSInterfaceText.save,
                     symbol: "bookmark",
                     action: { exportGate.perform(provenance: [item.exportProvenance]) { onSave() } }
                 )
@@ -277,7 +277,7 @@ struct IOSPlayerSheet: View {
                 // Color.clear accepts any proposed height and would split
                 // spare space away from the transcript).
                 playerSideButton(
-                    title: "Share",
+                    title: IOSInterfaceText.share,
                     symbol: "square.and.arrow.up",
                     action: {}
                 )
@@ -289,7 +289,7 @@ struct IOSPlayerSheet: View {
                 controller.togglePlayback()
             } label: {
                 Image(systemName: controller.isPlaying ? "pause.fill" : "play.fill")
-                    .accessibilityLabel(controller.isPlaying ? "Pause" : "Play")
+                    .accessibilityLabel(controller.isPlaying ? IOSInterfaceText.pause : IOSInterfaceText.play)
                     .font(.system(size: 28, weight: .bold))
                     .foregroundStyle(Theme.Text.onAccent)
                     .frame(width: 72, height: 72)
@@ -319,7 +319,7 @@ struct IOSPlayerSheet: View {
             // says so ("Download" implied a direct file save). The stable
             // identifier keeps its historical name.
             playerSideButton(
-                title: "Share",
+                title: IOSInterfaceText.share,
                 symbol: "square.and.arrow.up",
                 action: { exportGate.share(urls: [item.audioURL], provenance: [item.exportProvenance]) }
             )
@@ -379,18 +379,18 @@ struct IOSPlayerSheetItem: Equatable, Identifiable {
         switch history.mode.lowercased() {
         case "custom":
             modeTint = Theme.Brand.modeCustom
-            modeLabel = "Built-in"
+            modeLabel = IOSInterfaceText.modeBuiltIn
         case "design":
             modeTint = Theme.Brand.modeDesign
-            modeLabel = "Design"
+            modeLabel = IOSInterfaceText.modeDesign
         case "clone":
             modeTint = Theme.Brand.modeClone
-            modeLabel = "Clone"
+            modeLabel = IOSInterfaceText.modeClone
         default:
             modeTint = Theme.Brand.library
             modeLabel = history.mode.capitalized
         }
-        let voiceName = history.voice ?? "Voice"
+        let voiceName = history.voice ?? IOSInterfaceText.voice
         return IOSPlayerSheetItem(
             audioURL: URL(fileURLWithPath: history.audioPath),
             transcript: history.text,
@@ -416,9 +416,9 @@ struct IOSPlayerSheetItem: Equatable, Identifiable {
             audioURL: URL(fileURLWithPath: voice.wavPath),
             transcript: transcript,
             voiceName: voice.name,
-            modeLabel: "Clone",
+            modeLabel: IOSInterfaceText.modeClone,
             modeTint: Theme.Brand.modeClone,
-            subtitle: "Saved voice",
+            subtitle: IOSInterfaceText.savedVoice,
             avatarSeed: voice.id,
             avatarInitials: voice.name,
             waveformSeed: IOSStableVisualHash.int(voice.wavPath),
@@ -449,9 +449,9 @@ struct IOSPlayerSheetItem: Equatable, Identifiable {
             audioURL: audioURL,
             transcript: "Hi, I'm \(speaker.displayName). \(descriptor).",
             voiceName: speaker.displayName,
-            modeLabel: "Built-in",
+            modeLabel: IOSInterfaceText.modeBuiltIn,
             modeTint: Theme.Brand.modeCustom,
-            subtitle: "Voice preview",
+            subtitle: IOSInterfaceText.voicePreview,
             avatarSeed: speaker.id,
             avatarInitials: speaker.displayName,
             waveformSeed: IOSStableVisualHash.int(speaker.id),
@@ -634,7 +634,7 @@ private struct IOSPlayerScrubSection: View {
                 // VoiceOver: a draggable thumb is unreachable; expose it as an
                 // adjustable element so swipe-up/down scrubs in 5% steps.
                 .accessibilityElement()
-                .accessibilityLabel("Playback position")
+                .accessibilityLabel(IOSInterfaceText.playbackPosition)
                 .accessibilityValue(controller.formatted(time: clock.currentTime))
                 .accessibilityIdentifier("iosPlayer_scrubber")
                 .accessibilityAdjustableAction { direction in

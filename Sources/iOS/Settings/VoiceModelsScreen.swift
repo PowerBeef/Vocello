@@ -4,6 +4,7 @@ import QwenVoiceCore
 /// Pushed Settings destination for the three on-device model lifecycles.
 /// The app-wide navigation bar stays hidden; this screen owns a compact 44-point Back control.
 struct VoiceModelsScreen: View {
+    @Environment(\.iosDockHeight) private var dockHeight
     @Environment(AppModel.self) private var appModel
     @EnvironmentObject private var modelManager: ModelManagerViewModel
     @EnvironmentObject private var modelInstaller: IOSModelInstallerViewModel
@@ -23,7 +24,7 @@ struct VoiceModelsScreen: View {
     }
 
     private var storageSummary: String {
-        managedModelBytes > 0 ? "\(IOSSettingsFormatters.fileSize(managedModelBytes)) used" : "No model files"
+        managedModelBytes > 0 ? IOSSettingsText.storageUsed(IOSSettingsFormatters.fileSize(managedModelBytes)) : IOSSettingsText.noModelFiles
     }
 
     private var readyModelCount: Int {
@@ -49,25 +50,25 @@ struct VoiceModelsScreen: View {
                 VStack(alignment: .leading, spacing: Theme.Spacing.md) {
                     compactHeader
 
-                    Text("One private, on-device model powers each Studio mode. Install only the modes you use.")
+                    Text(IOSSettingsText.modelsDetail)
                         .font(.caption)
                         .foregroundStyle(Theme.Text.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.horizontal, 4)
 
-                    IOSSettingsSection(title: "Overview") {
+                    IOSSettingsSection(title: IOSSettingsText.overview) {
                         IOSSettingsValueRow(
                             symbol: readyModelCount == TTSModel.all.count
                                 ? "checkmark.circle.fill"
                                 : "internaldrive",
-                            title: "\(readyModelCount) of \(TTSModel.all.count) ready",
+                            title: IOSSettingsText.modelsReady(readyModelCount, total: TTSModel.all.count),
                             subtitle: nil,
                             accessibilityIdentifier: "iosSettings_storageRow",
                             value: storageSummary
                         )
                     }
 
-                    IOSSettingsSection(title: "Studio Models") {
+                    IOSSettingsSection(title: IOSSettingsText.studioModels) {
                         ForEach(TTSModel.all) { model in
                             IOSModelRow(
                                 model: model,
@@ -86,7 +87,7 @@ struct VoiceModelsScreen: View {
                 }
                 .padding(.horizontal, Theme.Spacing.lg)
                 .padding(.top, Theme.Spacing.sm)
-                .padding(.bottom, IOSStudioShellMetrics.dockFadeHeight + Theme.Spacing.lg)
+                .padding(.bottom, max(IOSStudioShellMetrics.dockFadeHeight, dockHeight) + Theme.Spacing.lg)
             }
         }
         .toolbar(.hidden, for: .navigationBar)
@@ -94,7 +95,7 @@ struct VoiceModelsScreen: View {
             await modelManager.refresh()
         }
         .confirmationDialog(
-            "Cancel download?",
+            IOSSettingsText.cancelDownloadTitle,
             isPresented: Binding(
                 get: { modelPendingCancel != nil },
                 set: { if !$0 { modelPendingCancel = nil } }
@@ -102,17 +103,17 @@ struct VoiceModelsScreen: View {
             titleVisibility: .visible
         ) {
             if let model = modelPendingCancel {
-                Button("Cancel Download", role: .destructive) {
+                Button(IOSSettingsText.cancelDownloadConfirm, role: .destructive) {
                     modelInstaller.cancel(model)
                     modelPendingCancel = nil
                 }
                 .accessibilityIdentifier("iosModelCancelDownloadConfirmButton")
-                Button("Keep Download", role: .cancel) {
+                Button(IOSSettingsText.keepDownload, role: .cancel) {
                     modelPendingCancel = nil
                 }
             }
         } message: {
-            Text("Canceling removes the downloaded data. You can download it again from scratch.")
+            Text(IOSSettingsText.cancelDownloadDetail)
         }
     }
 
@@ -125,7 +126,7 @@ struct VoiceModelsScreen: View {
                             .font(.system(size: 17, weight: .semibold))
                     .foregroundStyle(Theme.Text.primary)
                     .frame(width: 44, height: 44)
-                    .background(Theme.Surface.inline, in: Circle())
+                    .background(Theme.Surface.panelMuted, in: Circle())
                     .overlay {
                         Circle()
                             .stroke(Theme.Surface.panelStroke, lineWidth: 0.5)

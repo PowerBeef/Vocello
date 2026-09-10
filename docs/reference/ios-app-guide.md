@@ -1,7 +1,7 @@
 ---
 status: active
 owner: ios
-reviewed: 2026-09-09
+reviewed: 2026-09-10
 summary: Consolidated iPhone app map — every screen, element, and option from the user view, and how XCUITest drives each via stable identifiers on the paired physical device.
 sourceOfTruth:
   - Sources/iOS
@@ -268,7 +268,8 @@ or delete the originals.
 
 ### Settings tab — `Sources/iOS/Settings/SettingsScreen.swift`
 
-The title-free hub (`screen_settings`) contains three flat groups: Audio and Models & Files;
+The compact Settings heading (`iosSettings_title`, localized as Réglages) introduces the hub
+(`screen_settings`) and its three flat groups: Audio and Models & Files;
 Design & Clone Export; Privacy & Permissions, Accessibility, and About. The shared tab dock is
 unchanged. Five `iosSettings_<category>Row` links push into the existing Settings navigation stack;
 categories are `audio`, `modelsFiles`, `privacyPermissions`, `accessibility`, and `about`.
@@ -283,10 +284,14 @@ Privacy & Permissions retains `voiceCloning_consentAcknowledgment`, its full leg
 `iosSettings_privacyPolicyRow`, and `iosSettings_openIOSSettingsRow`. About owns
 `iosSettings_supportRow`, `iosSettings_openSourceRow`, `iosSettings_sourceCodeRow`, and the
 dynamic, non-interactive `iosSettings_versionLabel`. Support and Source Code retain their URLs.
-Rows use decorative symbols, wrapping labels and subordinate values; folder names and variation
-values sit below their labels. No forced Dynamic Type limit or fixed-width value column is used.
+Rows use decorative symbols, wrapping labels and subordinate trailing values at ordinary sizes;
+values and the variation picker reflow below their labels at accessibility sizes. No forced
+Dynamic Type limit or fixed-width value column is used. Models & Files and Accessibility have
+short contextual introductions. About starts with a compact Vocello identity, local-voice tagline
+and the installed bundle's version/build, rather than a duplicate version row. The unchanged
+cloning disclosure sits outside its consent card, before the policy and permissions group.
 Decorative symbols fit 20-point artwork inside 28-point slots; Back chevrons stay within their
-44-point controls. Text retains semantic scaling. At accessibility sizes, switch tracks reflow
+44-point controls with a muted surface. Text retains semantic scaling. At accessibility sizes, switch tracks reflow
 below their labels rather than reserving a narrow trailing column.
 
 The restrained gold `iosSettings_exportPurchaseRow` opens the same purchase sheet as all export
@@ -297,6 +302,12 @@ purchase states, disabling rules and explicit post-purchase export retry remain 
 If product information cannot load while verified export access is already unlocked, the notice
 explicitly confirms that exports remain available. Product availability does not revoke access.
 New Settings/purchase presentation copy is typed and includes English/French catalog entries.
+Settings variation names and model names/actions/statuses are localized display values; saved
+variation raw values, model IDs, installation behavior and purchase policy remain unchanged.
+The existing Settings localization walk includes a French-Default pass alongside the four
+English layout configurations. Shared lifecycle tests explicitly select English in the app's
+process-local launch arguments; localization walks may override it, and the phone's persisted
+language is untouched. Compilation alone does not qualify that physical-device journey.
 Current-source physical visual, accessibility and purchase acceptance require separate authorization;
 historical Settings and local StoreKit passes are not proof for the refined layout.
 
@@ -312,7 +323,9 @@ The resource is fail-closed in deterministic and archive/IPA verification.
 keeps the system navigation bar hidden and provides the compact 44-point
 `iosSettings_voiceModelsBackButton` returning to Models & Files, the `iosSettings_storageRow` summary, and the three
 `iosModelRow_<modelID>` lifecycle rows (full state contract below). Both surfaces derive their
-bottom content clearance from the shared tab-dock fade metric and reflow values/actions vertically
+bottom content clearance from the greater of the shared fade metric and RootView's measured dock
+height, plus the existing spacing. The same environment value serves Settings detail and attribution
+scroll content. These surfaces reflow values/actions vertically
 at accessibility Dynamic Type sizes. At ordinary text sizes each model keeps its icon, name,
 metadata, textual status, and sole valid action in one compact summary row; two-action states and
 accessibility sizes reflow below the summary without reducing the 44-point control targets.
@@ -383,6 +396,14 @@ The composer's primary CTA reflects model readiness:
 
 - **Model missing → `textInput_installModelButton`** (Install CTA; `textInput_generateButton` absent).
 - **Model installed → `textInput_generateButton`** (Generate CTA).
+
+Tapping **Install [mode]** opens Settings → Models & Files → Voice Models and immediately
+requests that mode's model through the existing app-lifetime installer. There is no second Install
+tap. The selected descriptor is captured at the tap; Studio text, selections and references stay
+unchanged. Ordinary Settings navigation and Back do not start or replay downloads. Progress,
+queueing, cancellation, storage checks and errors remain owned by the normal model-delivery path;
+installation does not automatically start generation. The isolated model-download acceptance lane
+exercises this shortcut for Built-in, Design and Clone; no normal smoke lane downloads models.
 
 So "is this mode ready to generate?" is **test-readable from the Studio surface**: if
 `textInput_installModelButton` is present, the model isn't installed.
@@ -504,7 +525,8 @@ Gotchas:
    physical-device model-delivery proof is selected explicitly with
    `scripts/ui_test.sh ios model-download` and cleans up through visible Settings controls.
 6. Settings clearance uses the genuine `rootTabDock` container, not a single tab button (the dock
-   has two rows at accessibility sizes). Layout assertions require the entire element within the
+   has two rows at accessibility sizes). Production bottom padding follows the measured dock
+   height rather than a fixed Dynamic Type estimate. Layout assertions require the entire element within the
    unobscured viewport. Explicit oversized-navigation activation instead requires a visible central
    44-point band and XCUI hittability; this is never accepted as full-row layout evidence.
 

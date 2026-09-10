@@ -21,7 +21,7 @@ struct IOSModelProgressPresentation: Equatable, Sendable {
     ) -> Self {
         let durableBytes = max(durableBytes, 0)
         guard let catalogBytes, catalogBytes > 0 else {
-            var details = ["\(formatBytes(durableBytes)) downloaded"]
+            var details = [VocelloPresentationText.downloadedBytes(formatBytes(durableBytes))]
             appendOptionalTransferDetails(
                 to: &details,
                 bytesPerSecond: bytesPerSecond,
@@ -36,14 +36,14 @@ struct IOSModelProgressPresentation: Equatable, Sendable {
         if visibleBytes >= catalogBytes {
             return Self(
                 indicator: .indeterminate,
-                detail: "Download complete — finishing setup."
+                detail: VocelloPresentationText.downloadFinishing
             )
         }
 
         let fraction = min(max(Double(visibleBytes) / Double(catalogBytes), 0), 1)
         let percent = Int((fraction * 100).rounded(.down))
         var details = [
-            "\(percent)% · \(formatBytes(visibleBytes)) of \(formatBytes(catalogBytes))"
+            VocelloPresentationText.downloadTransfer(percent, completed: formatBytes(visibleBytes), total: formatBytes(catalogBytes))
         ]
         appendOptionalTransferDetails(
             to: &details,
@@ -55,7 +55,7 @@ struct IOSModelProgressPresentation: Equatable, Sendable {
         return Self(
             indicator: .determinate(
                 fraction: fraction,
-                accessibilityValue: "\(percent)% — \(visibleBytes) of \(catalogBytes) bytes"
+                accessibilityValue: VocelloPresentationText.downloadAccessibility(percent, completed: visibleBytes, total: catalogBytes)
             ),
             detail: details.joined(separator: " · ")
         )
@@ -72,11 +72,12 @@ struct IOSModelProgressPresentation: Equatable, Sendable {
     )
 
     static func retrying(retryCount: Int, reason: String?) -> Self {
-        var detail = "Preparing retry \(max(1, retryCount))"
+        let detail: String
         if let reason, !reason.isEmpty {
-            detail += ": \(reason)"
+            detail = VocelloPresentationText.downloadRetryReason(max(1, retryCount), reason: reason)
+        } else {
+            detail = VocelloPresentationText.downloadRetry(max(1, retryCount))
         }
-        detail += ". Verified files will be reused."
         return Self(indicator: .indeterminate, detail: detail)
     }
 
@@ -113,7 +114,7 @@ struct IOSModelProgressPresentation: Equatable, Sendable {
         if let estimatedSecondsRemaining,
            estimatedSecondsRemaining.isFinite,
            estimatedSecondsRemaining > 0 {
-            details.append("about \(max(1, Int(estimatedSecondsRemaining.rounded())))s remaining")
+            details.append(VocelloPresentationText.downloadRemaining(max(1, Int(estimatedSecondsRemaining.rounded()))))
         }
         if let suffix, !suffix.isEmpty {
             details.append(suffix)

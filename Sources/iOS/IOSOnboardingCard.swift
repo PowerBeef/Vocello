@@ -9,12 +9,12 @@ struct IOSFirstRunOnboardingCard: View {
                 Image(systemName: "sparkles")
                     .font(.callout.weight(.semibold))
                     .foregroundStyle(Theme.Brand.gold)
-                Text("Install your first voice")
+                Text(IOSInterfaceText.installFirstVoice)
                     .font(IOSTypeStyle.cardTitle.font)
                     .foregroundStyle(Theme.Text.primary)
             }
 
-            Text("Open Settings to download a Built-in Voice, Voice Design, or Voice Cloning model. Every package runs on-device.")
+            Text(IOSInterfaceText.firstVoiceDetail)
                 .font(IOSTypeStyle.body.font)
                 .foregroundStyle(Theme.Text.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -23,7 +23,7 @@ struct IOSFirstRunOnboardingCard: View {
                 IOSHaptics.selection()
                 selectedTab = .settings
             } label: {
-                Label("Open Settings", systemImage: "arrow.right.circle.fill")
+                Label(IOSInterfaceText.openSettings, systemImage: "arrow.right.circle.fill")
                     .font(.callout.weight(.semibold))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 10)

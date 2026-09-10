@@ -19,11 +19,44 @@ enum VocelloUISettingsReveal {
     static func perform(_ target: XCUIElement, in app: XCUIApplication, swipingUp: Bool,
                         requirement: VocelloUIRevealRequirement = .fullVisibility) -> Bool {
         var search = VocelloUIRevealSearch(preferred: swipingUp ? .up : .down)
+        var observations: [String] = []
+        var succeeded = false
+        defer {
+            if !succeeded {
+                // Test-target evidence only. No labels, values, user content, or app hooks.
+                // Keep each sampled predicate: a later screenshot cannot explain an earlier frame.
+                XCTContext.runActivity(named: "Settings reveal failure") { activity in
+                    let dock = VocelloUIWait.element(app, id: "rootTabDock")
+                    let statusBar = app.statusBars.firstMatch
+                    let finalFrames = [
+                        "requirement=\(requirement); appState=\(app.state.rawValue)",
+                        "finalWindow=\(app.windows.firstMatch.frame)",
+                        "finalDock=\(dock.exists ? String(describing: dock.frame) : "missing")",
+                        "finalStatusBar=\(statusBar.exists ? String(describing: statusBar.frame) : "missing")",
+                    ]
+                    let attachment = XCTAttachment(string: (finalFrames + observations).joined(separator: "\n"))
+                    attachment.name = "settings-reveal-observations"
+                    attachment.lifetime = .keepAlways
+                    activity.add(attachment)
+                }
+            }
+        }
         while app.state == .runningForeground {
-            guard let visible = viewport(in: app) else { return false }
+            guard let visible = viewport(in: app) else {
+                observations.append("viewport unavailable")
+                return false
+            }
             let frame = target.exists ? target.frame : nil
-            if let frame, target.isHittable, requirement.satisfied(by: frame, visible: visible) { return true }
+            let hittable = frame != nil && target.isHittable
             let required = frame.map { requirement.requiredFrame($0, visible: visible) }
+            let geometrySatisfied = frame.map { requirement.satisfied(by: $0, visible: visible) } ?? false
+            observations.append("attempt=\(search.attempts); frame=\(String(describing: frame)); "
+                + "required=\(String(describing: required)); viewport=\(visible); "
+                + "hittable=\(hittable); geometrySatisfied=\(geometrySatisfied)")
+            if hittable && geometrySatisfied {
+                succeeded = true
+                return true
+            }
             guard let swipe = search.next(target: required, visible: visible) else { return false }
             switch swipe {
             case .up: app.swipeUp()

@@ -376,7 +376,7 @@ Narrative authority: [`docs/reference/ios-built-in-startup-reliability.md`](refe
 
 `ios-settings-2026-08` · **active** · ios · adopted 2026-08-20
 
-Reorganize the title-free Settings tab around user tasks, move model lifecycle management into a dedicated destination, and align the resulting controls with Vocello's compact custom iOS design language without weakening native semantics, Dynamic Type, VoiceOver, or physical-device acceptance.
+Reorganize the Settings tab around user tasks, move model lifecycle management into a dedicated destination, and align the resulting controls with Vocello's compact custom iOS design language without weakening native semantics, Dynamic Type, VoiceOver, or physical-device acceptance.
 
 Narrative authority: [`docs/reference/ios-ui-reference.md`](reference/ios-ui-reference.md)
 
@@ -390,7 +390,7 @@ Narrative authority: [`docs/reference/ios-ui-reference.md`](reference/ios-ui-ref
 ### Open items in detail
 
 - **`ISU-4`** (in-flight) — Refine Settings hub and shared purchase sheet; qualify the new navigation.
-  gate: Six-entry title-free hub in three flat groups; five pushed detail pages retain every original setting, key, default, consent, model/folder route and tab dock. Shared purchase sheet uses live localized StoreKit price, full-width action, truthful states and explicit export retry without purchase-policy changes. Bilingual typed copy, source-bound navigation/control tests and deterministic checkpoint pass. Separate authorization precedes current-source physical English/French, Default/AX-L/AX-XXXL, VoiceOver/reduced-effects, navigation and local purchase acceptance; historical runs cannot substitute.
+  gate: Six-entry hub with compact localized title in three flat groups; five pushed detail pages retain every original setting, key, default, consent, model/folder route and tab dock. Shared purchase sheet uses live localized StoreKit price, full-width action, truthful states and explicit export retry without purchase-policy changes. Bilingual typed copy, source-bound navigation/control tests and deterministic checkpoint pass. Separate authorization precedes current-source physical English/French, Default/AX-L/AX-XXXL, VoiceOver/reduced-effects, navigation and local purchase acceptance; historical runs cannot substitute.
 
 ## Clone identity, enrollment transcription, and French Voice Design reliability
 

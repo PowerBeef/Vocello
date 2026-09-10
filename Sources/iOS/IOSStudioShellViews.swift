@@ -6,6 +6,19 @@ enum IOSStudioShellMetrics {
     static let dockFadeHeight: CGFloat = 118
 }
 
+/// Actual persistent chrome height, not a Dynamic Type estimate. Settings scroll
+/// content can extend under the shell; its last row must clear the whole dock.
+private struct IOSDockHeightKey: EnvironmentKey {
+    static let defaultValue: CGFloat = IOSStudioShellMetrics.dockFadeHeight
+}
+
+extension EnvironmentValues {
+    var iosDockHeight: CGFloat {
+        get { self[IOSDockHeightKey.self] }
+        set { self[IOSDockHeightKey.self] = newValue }
+    }
+}
+
 /// Thin per-screen body container.
 ///
 /// History: this used to host the full iOS chrome — `IOSStudioShellCanopy`

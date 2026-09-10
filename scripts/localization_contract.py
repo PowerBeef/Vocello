@@ -7,6 +7,7 @@ import argparse
 from collections import Counter
 import hashlib
 import json
+import plistlib
 from pathlib import Path
 import re
 import sys
@@ -55,6 +56,70 @@ REQUIRED_PLURAL_KEYS = {
     "vocello.models.ready_count",
     "vocello.history.recovery_export_failure",
 }
+REQUIRED_LOCALES = ("en", "fr")
+FORMAT_ARGUMENT = re.compile(
+    r"%(?:(?P<position>[1-9][0-9]*)\$)?(?P<type>@|lld|llu|ld|lu|d|u|f|g|s)"
+)
+
+
+def _format_arguments(value: str) -> Counter[tuple[int, str]]:
+    """Compare argument identity/type while allowing positional reordering."""
+    arguments: Counter[tuple[int, str]] = Counter()
+    for ordinal, match in enumerate(FORMAT_ARGUMENT.finditer(value.replace("%%", "")), 1):
+        arguments[(int(match.group("position") or ordinal), match.group("type"))] += 1
+    return arguments
+
+
+def _translation_units(payload: dict[str, Any], label: str) -> dict[str, str]:
+    variations = payload.get("variations", {})
+    if not isinstance(variations, dict):
+        raise ContractError(f"{label} has malformed variations")
+    plural = variations.get("plural")
+    variants = plural if isinstance(plural, dict) else {"value": payload}
+    if plural is not None and (not isinstance(plural, dict) or not {"one", "other"} <= plural.keys()):
+        raise ContractError(f"{label} requires plural one and other")
+    result = {}
+    for category, variant in variants.items():
+        unit = variant.get("stringUnit", {}) if isinstance(variant, dict) else {}
+        value = unit.get("value") if isinstance(unit, dict) else None
+        if not isinstance(value, str) or not value.strip() or unit.get("state") != "translated":
+            raise ContractError(f"{label} requires a non-empty translated {category}")
+        result[category] = value
+    return result
+
+
+def _validate_translations(entry: dict[str, Any], key: str) -> None:
+    localizations = entry["localizations"]
+    english = _translation_units(localizations["en"], f"{key} en")
+    for locale in REQUIRED_LOCALES:
+        payload = localizations.get(locale)
+        if not isinstance(payload, dict):
+            raise ContractError(f"{key} missing required localization {locale}")
+        translated = _translation_units(payload, f"{key} {locale}")
+        if ("value" in english) != ("value" in translated):
+            raise ContractError(f"{key} {locale} must preserve plural structure")
+        for category, value in translated.items():
+            original = english.get(category, english.get("other", ""))
+            if _format_arguments(original) != _format_arguments(value):
+                raise ContractError(f"{key} {locale} {category} format arguments differ from English")
+
+
+def _validate_permission_catalog(root: Path) -> None:
+    path = Path("Sources/iOS/InfoPlist.xcstrings")
+    catalog = _read_json(root, path)
+    info = plistlib.loads(_read_text(root, Path("Sources/iOS/Info.plist")).encode())
+    required = {"NSMicrophoneUsageDescription", "NSSpeechRecognitionUsageDescription"}
+    if catalog.get("sourceLanguage") != "en" or catalog.get("version") != "1.0":
+        raise ContractError("permission catalog must use English source and version 1.0")
+    if set(catalog.get("strings", {})) != required:
+        raise ContractError("permission catalog must contain exactly the two declared purpose strings")
+    for key, entry in catalog["strings"].items():
+        _validate_translations(entry, key)
+        if entry["localizations"]["en"]["stringUnit"]["value"] != info[key]:
+            raise ContractError(f"{key} must preserve the Info.plist purpose string")
+    body = _target_body(_read_text(root, Path("project.yml")), "VocelloiOS")
+    if "- path: Sources/iOS/InfoPlist.xcstrings\n        buildPhase: resources" not in body:
+        raise ContractError("VocelloiOS must explicitly bundle the permission catalog")
 
 
 class ContractError(ValueError):
@@ -157,6 +222,7 @@ def _validate_catalog(root: Path) -> None:
             value = english.get("stringUnit", {}).get("value")
             if not isinstance(value, str) or not value.strip():
                 raise ContractError(f"catalog key {key} requires a non-empty English value")
+        _validate_translations(raw_entry, key)
 
 
 def _validate_typed_presentation(root: Path) -> None:
@@ -302,6 +368,7 @@ def _validate_pseudo_localization(root: Path) -> None:
 def validate(root: Path) -> int:
     _validate_manifest(root)
     _validate_catalog(root)
+    _validate_permission_catalog(root)
     _validate_typed_presentation(root)
     _validate_pseudo_localization(root)
     return _validate_literal_baseline(root)

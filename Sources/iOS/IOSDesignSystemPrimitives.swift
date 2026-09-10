@@ -815,7 +815,7 @@ struct IOSBottomEdgeSheet<Content: View>: View {
                         }
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Close")
+                .accessibilityLabel(IOSInterfaceText.close)
                 .accessibilityIdentifier("bottomSheet_close")
             }
         }
@@ -949,7 +949,7 @@ struct IOSBottomSheet<Content: View>: View {
                                 .stroke(Color.white.opacity(0.10), lineWidth: 0.5)
                         }
                 }
-                .accessibilityLabel("Close")
+                .accessibilityLabel(IOSInterfaceText.close)
                 .accessibilityIdentifier("bottomSheet_close")
             }
         }
@@ -979,7 +979,7 @@ struct IOSSeedPinChip: View {
     var body: some View {
         if let seedValue = pinnedSeed {
             IOSStudioSetupChip(
-                eyebrow: "Seed",
+                eyebrow: IOSInterfaceText.seed,
                 value: String(seedValue),
                 abbreviation: "PN",
                 leadingSymbol: "pin.fill",
@@ -992,11 +992,11 @@ struct IOSSeedPinChip: View {
                 isPresented: $isConfirmingUnpin,
                 titleVisibility: .visible
             ) {
-                Button("Unpin — new seed each take") {
+                Button(IOSInterfaceText.unpinSeed) {
                     IOSHaptics.selection()
                     pinnedSeed = nil
                 }
-                Button("Keep pinned", role: .cancel) {}
+                Button(IOSInterfaceText.keepPinned, role: .cancel) {}
             }
         }
     }
@@ -1253,7 +1253,7 @@ struct IOSSearchField: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Clear search")
+                .accessibilityLabel(IOSInterfaceText.clearSearch)
             }
         }
         .padding(.horizontal, 14)

@@ -55,17 +55,17 @@ struct IOSRecordingOverlay: View {
             guard !didHandOffClip else { return }
             recorder.stopWithoutSaving()
         }
-        .alert("Microphone access denied", isPresented: $recorder.showsPermissionAlert) {
-            Button("Open Settings") {
+        .alert(IOSInterfaceText.microphoneDenied, isPresented: $recorder.showsPermissionAlert) {
+            Button(IOSInterfaceText.openSettings) {
                 if let url = URL(string: UIApplication.openSettingsURLString) {
                     UIApplication.shared.open(url)
                 }
             }
-            Button("Cancel", role: .cancel) {
+            Button(IOSInterfaceText.cancel, role: .cancel) {
                 onCancel()
             }
         } message: {
-            Text("Vocello needs the microphone to record reference clips. Enable it in Settings to continue.")
+            Text(IOSInterfaceText.microphoneDetail)
         }
     }
 
@@ -99,7 +99,7 @@ struct IOSRecordingOverlay: View {
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("iosRecord_close")
-            .accessibilityLabel("Close")
+            .accessibilityLabel(IOSInterfaceText.close)
         }
     }
 
@@ -134,7 +134,7 @@ struct IOSRecordingOverlay: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.5)
 
-                Text("Read 10-20 s of clean, natural speech. Quiet room. One voice.")
+                Text(IOSInterfaceText.recordGuidance)
                     .iosScaledFont(size: 14, weight: .medium, relativeTo: .footnote)
                     .foregroundStyle(Theme.Text.secondary)
                     .multilineTextAlignment(.center)
@@ -162,25 +162,25 @@ struct IOSRecordingOverlay: View {
     }
 
     private var phaseLabel: String {
-        if recorder.isRecording { return "Recording" }
-        if recorder.elapsed > 0 { return "Captured" }
-        return "Reference clip"
+        if recorder.isRecording { return IOSInterfaceText.recording }
+        if recorder.elapsed > 0 { return IOSInterfaceText.captured }
+        return IOSInterfaceText.referenceClip
     }
 
     private var statusLabel: String {
         if recorder.wasInterrupted && !recorder.isRecording && recorder.elapsed > 0 {
-            return "Recording was interrupted. The clip up to that point was kept."
+            return IOSInterfaceText.recordInterrupted
         }
         if !recorder.isRecording && recorder.elapsed == 0 {
-            return "Tap Record to begin."
+            return IOSInterfaceText.recordBegin
         }
         if recorder.elapsed < ReferenceClipRecorder.minDuration {
-            return "Keep recording. 10 second minimum."
+            return IOSInterfaceText.recordMinimum
         }
         if recorder.elapsed <= ReferenceClipRecorder.maxDuration {
-            return "Sounds good. Tap stop when ready."
+            return IOSInterfaceText.recordEnough
         }
-        return "Over 20 seconds. Stop now."
+        return IOSInterfaceText.recordMaximum
     }
 
     private var timeString: String {
@@ -194,7 +194,7 @@ struct IOSRecordingOverlay: View {
         HStack(spacing: 12) {
             if recorder.isRecording {
                 IOSPrimaryCTAButton(
-                    title: "Stop",
+                    title: IOSInterfaceText.stop,
                     symbol: "stop.fill",
                     tint: Theme.Brand.modeClone,
                     isEnabled: true,
@@ -206,7 +206,7 @@ struct IOSRecordingOverlay: View {
                 )
                 .accessibilityIdentifier("iosRecord_stop")
             } else if recorder.elapsed > 0 {
-                Button("Retake") {
+                Button(IOSInterfaceText.retake) {
                     recorder.reset()
                 }
                 .font(.subheadline.weight(.semibold))
@@ -222,7 +222,7 @@ struct IOSRecordingOverlay: View {
 
                 let canUse = recorder.elapsed >= ReferenceClipRecorder.minDuration
                 IOSPrimaryCTAButton(
-                    title: canUse ? "Use this clip" : "Need 10 s",
+                    title: canUse ? IOSInterfaceText.useClip : IOSInterfaceText.need10,
                     symbol: canUse ? "checkmark" : nil,
                     tint: Theme.Brand.modeClone,
                     isEnabled: canUse,
@@ -235,7 +235,7 @@ struct IOSRecordingOverlay: View {
                 .accessibilityIdentifier("iosRecord_use")
             } else {
                 IOSPrimaryCTAButton(
-                    title: "Record",
+                    title: IOSInterfaceText.record,
                     symbol: "mic.fill",
                     tint: Theme.Brand.modeClone,
                     isEnabled: !recorder.permissionDenied,

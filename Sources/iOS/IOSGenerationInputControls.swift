@@ -26,7 +26,7 @@ struct IOSDeliveryPicker: View {
     private var selectionLabel: String {
         switch delivery.mode {
         case .preset:
-            return delivery.selectedPresetLabel
+            return IOSInterfaceText.presetName(delivery.selectedPresetID, fallback: delivery.selectedPresetLabel)
         case .custom:
             return customSummaryText
         }
@@ -34,7 +34,7 @@ struct IOSDeliveryPicker: View {
 
     private var customSummaryText: String {
         let trimmed = delivery.customText.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? "Custom delivery…" : trimmed
+        return trimmed.isEmpty ? IOSInterfaceText.customDeliveryEmpty : trimmed
     }
 
     private var isCustomDeliveryEnabled: Bool {
@@ -70,7 +70,7 @@ struct IOSDeliveryPicker: View {
             ZStack(alignment: .topTrailing) {
                 IOSMultilineTextView(
                     text: $delivery.customText,
-                    placeholder: "Describe the delivery or emotion (optional)",
+                    placeholder: IOSInterfaceText.customPlaceholder,
                     tint: tint,
                     isFocused: Binding(
                         get: { isCustomEditorFocused && isCustomDeliveryEnabled },
@@ -84,7 +84,7 @@ struct IOSDeliveryPicker: View {
                 .opacity(isCustomDeliveryEnabled ? 1 : 0.48)
 
                 if !isCustomDeliveryEnabled {
-                    IOSStatusBadge(text: "Custom only", tone: .muted)
+                    IOSStatusBadge(text: IOSInterfaceText.customOnly, tone: .muted)
                         .padding(.top, 10)
                         .padding(.trailing, 10)
                         .allowsHitTesting(false)
@@ -93,8 +93,8 @@ struct IOSDeliveryPicker: View {
             }
             .accessibilityHint(
                 isCustomDeliveryEnabled
-                    ? "Custom delivery input"
-                    : "Select Custom delivery to edit this field"
+                    ? IOSInterfaceText.customInput
+                    : IOSInterfaceText.customInputDisabled
             )
         }
         .onChange(of: delivery.mode) { _, newMode in
@@ -389,8 +389,8 @@ struct IOSSaveVoiceSheet: View {
                         clipReviewCard(url: clipAudioURL)
                     }
 
-                    fieldSection(label: "Name") {
-                        TextField("Name this voice", text: $suggestedName)
+                    fieldSection(label: IOSInterfaceText.voiceName) {
+                        TextField(IOSInterfaceText.nameVoice, text: $suggestedName)
                             .focused($isNameFocused)
                             .foregroundStyle(Theme.Text.primary)
                             // Names are proper nouns; live autocorrection
@@ -406,15 +406,15 @@ struct IOSSaveVoiceSheet: View {
                     }
 
                     fieldSection(
-                        label: "What you said",
+                        label: IOSInterfaceText.whatYouSaid,
                         // Honest about what the transcript buys: it is the key
                         // to in-context prosody transfer, not a nicety
                         // (2026-08-04 delivery-control audit, F8).
-                        caption: "Auto-transcribed. With it, clones carry this clip's pacing and emotion; without it, identity only."
+                        caption: IOSInterfaceText.transcriptCaption
                     ) {
                         IOSMultilineTextView(
                             text: transcriptBinding,
-                            placeholder: "What you said in the recording",
+                            placeholder: IOSInterfaceText.transcriptPlaceholder,
                             tint: tint,
                             isFocused: $isTranscriptFocused,
                             accessibilityIdentifier: "saveVoice_transcriptEditor"
@@ -440,7 +440,7 @@ struct IOSSaveVoiceSheet: View {
                                 Text(VocelloPresentationText.referenceLanguagePlaceholder)
                                     .tag(Qwen3SupportedLanguage.auto)
                                 ForEach(Qwen3SupportedLanguage.selectableCases, id: \.self) { language in
-                                    Text(language.displayName).tag(language)
+                                    Text(IOSInterfaceText.languageName(language)).tag(language)
                                 }
                             }
                             .pickerStyle(.menu)
@@ -457,7 +457,7 @@ struct IOSSaveVoiceSheet: View {
                     }
 
                     IOSPrimaryCTAButton(
-                        title: "Save voice",
+                        title: IOSInterfaceText.saveVoice,
                         symbol: "checkmark",
                         tint: tint,
                         isEnabled: isSaveEnabled,
@@ -571,7 +571,7 @@ struct IOSSaveVoiceSheet: View {
                 .frame(width: 44, height: 44)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(clipPlayer.isPlaying ? "Pause" : "Play recording")
+            .accessibilityLabel(clipPlayer.isPlaying ? IOSInterfaceText.pause : IOSInterfaceText.playRecording)
 
             VStack(alignment: .leading, spacing: 8) {
                 IOSWaveformBars(
@@ -626,11 +626,11 @@ struct IOSSaveVoiceSheet: View {
     /// (10–20 s sweet spot, acceptable to ~30 s). The recorder caps at 20 s, so recorded clips
     /// read "Good length"; this mainly informs imported / generated clips.
     private func clipQualityHint(duration: TimeInterval) -> (label: String, tone: IOSStatusBadge.Tone) {
-        guard duration > 0 else { return ("Ready", .muted) }
+        guard duration > 0 else { return (VocelloPresentationText.status(.ready), .muted) }
         switch duration {
-        case ..<10: return ("A bit short", .warning)
-        case 10...30: return ("Good length", .success)
-        default: return ("A bit long", .warning)
+        case ..<10: return (IOSInterfaceText.shortClip, .warning)
+        case 10...30: return (IOSInterfaceText.goodLength, .success)
+        default: return (IOSInterfaceText.longClip, .warning)
         }
     }
 }

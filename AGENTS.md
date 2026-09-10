@@ -122,6 +122,7 @@ Details for runtime, lifecycle, and event-channel invariants live in `docs/ARCHI
 | MLX, engine, downloads, model catalog | `.agents/rules/backend-mlx.md`, `docs/reference/mlx-guide.md` | Owned runtime and backend contract scripts |
 | Delivery/emotion measurement | `.agents/rules/backend-mlx.md`, `docs/reference/delivery-harness.md` | Fixed protocol, provenance, statistics, and ledger |
 | iOS app or support code | `.agents/rules/ios.md`, `docs/reference/ios-app-guide.md` | Generic device SDK compile; physical-device XCUITest only when requested |
+| UI localization | `docs/reference/localization.md` and the platform rule | Typed String Catalog copy; UI locale stays separate from generated-speech language, model instructions and stored user content |
 | macOS app or XPC stack | `.agents/rules/macos.md`, `docs/reference/macos-app-guide.md` | macOS deterministic tests/build; native XCUITest only when requested |
 | Scripts, CI, packaging, benchmarks | `.agents/rules/release-qa.md` | Repository scripts and workflows |
 | Generated inventories | `.agents/rules/derived-artifacts.md` | `scripts/refresh_derived_artifacts.py` |
@@ -203,6 +204,10 @@ iOS preflight requires a valid Apple Development identity/private key and an unl
 device. Preserve all user data; runner PASS requires diagnostics, crash checks and restoration,
 not just XCTest success. Zero observations cannot authorize resume; changed source needs new IDs.
 `scripts/ios_candidate_acceptance.py` guards the separate preinstalled-candidate route.
+Before a stateful journey, verify that it records and restores observed original selections and
+drafts; hard-coded resets are not restoration. Catalog coverage and partial layout captures never
+substitute for complete locale/accessibility acceptance. Current gaps belong in the roadmap and
+checkpoint, not additional permanent gates here.
 
 For timed sessions reserve collection time. Frozen campaigns use untracked checkpoints, never
 tracked doc edits between shards. The [device procedure](docs/reference/ios-device-testing.md#pause-and-resume)

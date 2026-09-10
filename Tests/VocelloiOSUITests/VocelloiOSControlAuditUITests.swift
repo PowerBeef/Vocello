@@ -186,15 +186,47 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
     private var cloneConsentWasEnabledBeforeAudit: Bool?
     private var generationAuditVoiceName: String?
     private var playerEvidence: [String: String] = [:]
+    private var pendingSettingsToggleRestoration: [String: Bool] = [:]
+    private var pendingSettingsVariationRestoration: String?
 
-    override func tearDown() {
+    override func endSession() {
+        guard session != nil else { return }
+        // XCTest can bypass the test body's defer. tearDown calls this same
+        // owner, so an aborted setting exercise still restores observed values.
+        let failurePolicy = continueAfterFailure
+        continueAfterFailure = true
+        defer { continueAfterFailure = failurePolicy }
+        if !pendingSettingsToggleRestoration.isEmpty || pendingSettingsVariationRestoration != nil {
+            if app.state == .runningForeground {
+                for identifier in pendingSettingsToggleRestoration.keys.sorted() {
+                    guard let original = pendingSettingsToggleRestoration[identifier] else { continue }
+                    openSettingsPage(for: identifier)
+                    let toggle = element(identifier)
+                    restoreToggle(toggle, identifier: identifier, to: original)
+                    if VocelloUIToggle.state(of: toggle) == original {
+                        pendingSettingsToggleRestoration.removeValue(forKey: identifier)
+                    }
+                }
+                if let original = pendingSettingsVariationRestoration {
+                    restoreVariation(original)
+                    if selectedVariationID() == original { pendingSettingsVariationRestoration = nil }
+                }
+            }
+            XCTAssertTrue(pendingSettingsToggleRestoration.isEmpty && pendingSettingsVariationRestoration == nil,
+                          "Settings restoration incomplete; retain this run and do not resume blindly")
+        }
+        super.endSession()
+    }
+
+    override func tearDown() async throws {
         // XCTest's stop-on-failure exception can bypass Swift defer. Always
         // release the test-owned app session, including pending Auto-play
         // restoration. This does not certify other restoration after an abort;
         // the host still requires the explicit audit-restoration observation.
         continueAfterFailure = true
         endSession()
-        super.tearDown()
+        // XCTest awaits this MainActor-isolated async teardown before ending
+        // the test; no detached cleanup or assumed executor is involved.
     }
 
     private var directImportVoiceName: String {
@@ -325,9 +357,9 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
     }
 
     private func runStatefulAudit() {
-        auditExportPurchasePresentation()
         beginAuditSession()
         defer { endSession() }
+        auditExportPurchasePresentation()
 
         select(tab: .settings)
         let toggleIDs = [
@@ -1204,7 +1236,9 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
         openSettingsPage(for: "iosSettings_variationRow")
         let picker = element("iosSettings_variationRow")
         XCTAssertTrue(VocelloUIWait.exists(picker, timeout: 20))
-        let original = (picker.value as? String) ?? "Expressive"
+        let original = selectedVariationID()
+        guard original != "unknown" else { return }
+        pendingSettingsVariationRestoration = original
         for value in ["expressive", "balanced", "consistent"] {
             selectVariation(value)
             recorder.record(
@@ -1212,9 +1246,9 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
                 expected: "Variation becomes selected", actual: "Selected \(value) through Settings"
             )
         }
-        let originalValue = original.lowercased().contains("balanced") ? "balanced"
-            : original.lowercased().contains("consistent") ? "consistent" : "expressive"
-        selectVariation(originalValue)
+        restoreVariation(original)
+        XCTAssertEqual(selectedVariationID(), original)
+        pendingSettingsVariationRestoration = nil
         select(tab: .studio)
     }
 
@@ -1315,6 +1349,7 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
             XCTFail("Unknown toggle state for \(identifier); refusing mutation")
             return
         }
+        pendingSettingsToggleRestoration[identifier] = original
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: toggle, timeout: 20))
         let changed = VocelloUIWait.condition("\(identifier) changes", timeout: 15) {
             VocelloUIToggle.state(of: toggle) == !original
@@ -1327,6 +1362,7 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
         XCTAssertTrue(VocelloUIWait.condition("\(identifier) restores", timeout: 15) {
             VocelloUIToggle.state(of: toggle) == original
         })
+        pendingSettingsToggleRestoration.removeValue(forKey: identifier)
     }
 
     private func restoreToggle(_ toggle: XCUIElement, identifier: String, to original: Bool) {

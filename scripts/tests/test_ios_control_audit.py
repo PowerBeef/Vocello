@@ -55,7 +55,10 @@ class IOSControlAuditContractTests(unittest.TestCase):
         search = production.split("struct IOSSearchField", 1)[1].split("// MARK: - Primary CTA", 1)[0]
         self.assertIn("if !text.isEmpty", search)
         self.assertIn('text = ""', search)
-        self.assertIn('.accessibilityLabel("Clear search")', search)
+        self.assertIn('.accessibilityLabel(IOSInterfaceText.clearSearch)', search)
+        catalog = json.loads((ROOT / "Sources/Resources/Localizable.xcstrings").read_text())
+        self.assertEqual(catalog["strings"]["vocello.ui.clearSearch"]["localizations"]["en"]["stringUnit"]["value"], "Clear search")
+        self.assertEqual(catalog["strings"]["vocello.ui.clearSearch"]["localizations"]["fr"]["stringUnit"]["value"], "Effacer la recherche")
         self.assertIn("(searchField.value as? String) == query", helper)
         self.assertNotIn("XCUIKeyboardKey.delete", helper)
         self.assertNotIn("historyClearMenu", helper)
@@ -142,8 +145,13 @@ class IOSControlAuditContractTests(unittest.TestCase):
         self.assertIn("dock: dock.frame", reveal)
         self.assertIn("target.isHittable", reveal)
         self.assertIn("requirement: VocelloUIRevealRequirement = .fullVisibility", reveal)
-        self.assertIn("requirement.satisfied(by: frame, visible: visible)", reveal)
+        self.assertIn("frame.map { requirement.satisfied(by: $0, visible: visible) } ?? false", reveal)
+        self.assertIn("if hittable && geometrySatisfied {", reveal)
+        self.assertIn('attachment.name = "settings-reveal-observations"', reveal)
+        self.assertIn("if !succeeded {", reveal)
         self.assertIn("search.next(target: required, visible: visible)", reveal)
+        self.assertIn("case .up: app.swipeUp()", reveal)
+        self.assertIn("case .down: app.swipeDown()", reveal)
         dock = (ROOT / "Sources/iOS/App/TabDock.swift").read_text()
         self.assertIn('.accessibilityElement(children: .contain)', dock)
         self.assertIn('.accessibilityIdentifier("rootTabDock")', dock)
@@ -152,6 +160,27 @@ class IOSControlAuditContractTests(unittest.TestCase):
         self.assertIn("requirement: .fullVisibility", assertion)
         self.assertIn("VocelloUIRevealRequirement.fullVisibility.satisfied", assertion)
         self.assertNotIn("settingsTab.frame", assertion)
+
+    def test_stateful_audit_creates_and_owns_session_before_purchase_navigation(self) -> None:
+        source = (ROOT / "Tests/VocelloiOSUITests/VocelloiOSControlAuditUITests.swift").read_text()
+        body = source.split("private func runStatefulAudit()", 1)[1].split("private func runExternalAudit", 1)[0]
+        self.assertLess(body.index("beginAuditSession()"), body.index("auditExportPurchasePresentation()"))
+        self.assertLess(body.index("defer { endSession() }"), body.index("auditExportPurchasePresentation()"))
+
+    def test_stateful_preferences_retain_originals_until_verified_restoration(self) -> None:
+        source = (ROOT / "Tests/VocelloiOSUITests/VocelloiOSControlAuditUITests.swift").read_text()
+        cleanup = source.split("override func endSession()", 1)[1].split("override func tearDown", 1)[0]
+        self.assertIn("pendingSettingsToggleRestoration.keys.sorted()", cleanup)
+        self.assertIn("VocelloUIToggle.state(of: toggle) == original", cleanup)
+        self.assertIn("selectedVariationID() == original", cleanup)
+        self.assertIn("Settings restoration incomplete", cleanup)
+        toggle = source.split("private func mutateAndRestoreToggle", 1)[1].split("private func restoreToggle", 1)[0]
+        self.assertLess(toggle.index("pendingSettingsToggleRestoration[identifier] = original"),
+                        toggle.index("VocelloUIPrimaryAction.perform(on: toggle"))
+        variation = source.split("private func auditVariationOptions", 1)[1].split("private func auditCustomDeliveryEditor", 1)[0]
+        self.assertIn('guard original != "unknown" else { return }', variation)
+        self.assertIn("pendingSettingsVariationRestoration = original", variation)
+        self.assertNotIn('?? "Expressive"', variation)
 
     def test_script_restoration_treats_empty_text_as_empty_not_as_a_placeholder(self) -> None:
         source = (

@@ -275,13 +275,13 @@ struct IOSStudioCanvas<SetupChips: View>: View {
                 script = ""
                 isScriptFocused = false
             } label: {
-                Text("Clear")
+                Text(IOSInterfaceText.clearScript)
                     .font(.caption.weight(.semibold))
                     .frame(minWidth: 44, minHeight: 44)
             }
             .buttonStyle(.plain)
             .foregroundStyle(Theme.Text.secondary)
-            .accessibilityLabel("Clear script")
+            .accessibilityLabel(IOSInterfaceText.clearScript)
             .accessibilityIdentifier(IOSAccessibilityIdentifier.TextInput.clearButton)
         }
     }
@@ -342,7 +342,7 @@ struct IOSStudioCanvas<SetupChips: View>: View {
 
     private var installCTA: some View {
         IOSPrimaryCTAButton(
-            title: "Install \(modelDisplayName)",
+            title: IOSInterfaceText.installModel(modelDisplayName),
             symbol: "arrow.down.circle.fill",
             tint: tint,
             isEnabled: true,
@@ -366,10 +366,10 @@ struct IOSStudioCanvas<SetupChips: View>: View {
                     }
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Generation failed")
+                    Text(VocelloPresentationText.status(.generationFailed))
                         .font(.footnote.weight(.semibold))
                         .foregroundStyle(Theme.Text.primary)
-                    Text(errorMessage ?? "Try again.")
+                    Text(errorMessage ?? IOSInterfaceText.tryAgain)
                         .font(.caption2)
                         .foregroundStyle(Theme.Text.secondary)
                         .lineLimit(1)
@@ -400,7 +400,7 @@ struct IOSStudioCanvas<SetupChips: View>: View {
 
     private var generateCTA: some View {
         IOSPrimaryCTAButton(
-            title: "Generate",
+            title: IOSInterfaceText.generate,
             symbol: "sparkles",
             tint: tint,
             isEnabled: canGenerate,
@@ -424,7 +424,7 @@ struct IOSStudioCanvas<SetupChips: View>: View {
             .frame(height: 32)
 
             VStack(alignment: .trailing, spacing: 2) {
-                Text("Generating")
+                Text(IOSInterfaceText.generating)
                     .font(.footnote.weight(.semibold))
                     .foregroundStyle(Theme.Text.primary)
                 Text(generatingSubline)
@@ -444,7 +444,7 @@ struct IOSStudioCanvas<SetupChips: View>: View {
                     }
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Stop generating")
+            .accessibilityLabel(IOSInterfaceText.stopGenerating)
             .accessibilityIdentifier("textInput_cancelButton")
         }
         .padding(.horizontal, 16)
@@ -462,9 +462,9 @@ struct IOSStudioCanvas<SetupChips: View>: View {
 
     private var generatingSubline: String {
         switch mode {
-        case .custom: return "Rendering audio…"
-        case .design: return "Designing voice…"
-        case .clone: return "Cloning voice…"
+        case .custom: return IOSInterfaceText.renderingAudio
+        case .design: return IOSInterfaceText.designingVoice
+        case .clone: return IOSInterfaceText.cloningVoice
         }
     }
 }
@@ -559,7 +559,7 @@ struct IOSStudioInlinePlayerItem: Equatable {
             voiceName: voiceName,
             modeLabel: modeLabel,
             modeTint: Theme.Brand.modeColor(mode),
-            subtitle: "Just now",
+            subtitle: IOSInterfaceText.justNow,
             avatarSeed: voiceName,
             avatarInitials: voiceName,
             waveformSeed: waveformSeed,
@@ -574,7 +574,7 @@ struct IOSStudioCadenceNotice: Equatable {
 
     init?(audioQC: AudioQCReport?) {
         guard audioQC?.cadence?.classification == .unusual else { return nil }
-        title = "Unusual pacing detected"
-        message = "Review this take or generate it again."
+        title = IOSInterfaceText.unusualPacing
+        message = IOSInterfaceText.reviewTake
     }
 }

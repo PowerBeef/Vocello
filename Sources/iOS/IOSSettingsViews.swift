@@ -187,7 +187,7 @@ struct IOSSettingsToggleRow: View {
         .frame(minHeight: 52)
         .accessibilityIdentifier(accessibilityIdentifier)
         .accessibilityLabel(title)
-        .accessibilityValue(isOn ? "On" : "Off")
+        .accessibilityValue(isOn ? IOSSettingsText.on : IOSSettingsText.off)
         .accessibilityHint(subtitle ?? "")
     }
 }
@@ -219,6 +219,7 @@ struct IOSSettingsValueRow: View {
 }
 
 struct IOSSettingsNavigationRow: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let symbol: String
     let title: String
     let subtitle: String?
@@ -228,14 +229,18 @@ struct IOSSettingsNavigationRow: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            VStack(alignment: .leading, spacing: 6) {
+            let layout = dynamicTypeSize.isAccessibilitySize
+                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 6))
+                : AnyLayout(HStackLayout(alignment: .center, spacing: 12))
+            layout {
                 IOSSettingsLabel(symbol: symbol, title: title, subtitle: subtitle, tint: tint)
                 if !value.isEmpty {
                     Text(value)
                         .font(.footnote)
                         .foregroundStyle(Theme.Text.secondary)
+                        .multilineTextAlignment(dynamicTypeSize.isAccessibilitySize ? .leading : .trailing)
                         .fixedSize(horizontal: false, vertical: true)
-                        .padding(.leading, 38)
+                        .padding(.leading, dynamicTypeSize.isAccessibilitySize ? 38 : 0)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -254,16 +259,20 @@ struct IOSSettingsNavigationRow: View {
 }
 
 struct IOSSettingsPickerRow: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Binding var selection: String
 
     private var currentDisplayName: String {
-        (Qwen3SamplingVariation(rawValue: selection) ?? .expressive).displayName
+        IOSSettingsText.variationName(Qwen3SamplingVariation(rawValue: selection) ?? .expressive)
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+            : AnyLayout(HStackLayout(alignment: .center, spacing: 12))
+        layout {
             label
-            picker.frame(maxWidth: .infinity, alignment: .leading).padding(.leading, 38)
+            picker.padding(.leading, dynamicTypeSize.isAccessibilitySize ? 38 : 0)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
@@ -281,7 +290,7 @@ struct IOSSettingsPickerRow: View {
     private var picker: some View {
         Picker(IOSSettingsText.variation, selection: $selection) {
             ForEach(Qwen3SamplingVariation.allCases, id: \.self) { variation in
-                Text(variation.displayName)
+                Text(IOSSettingsText.variationName(variation))
                     .accessibilityIdentifier("iosSettings_variationOption_\(variation.rawValue)")
                     .tag(variation.rawValue)
             }
@@ -301,8 +310,10 @@ struct IOSSettingsPickerRow: View {
 
 struct IOSSettingsVersionRow: View {
     var body: some View {
-        IOSSettingsNavigationRow(symbol: "info.circle", title: IOSSettingsText.version, subtitle: nil,
-            value: "\(IOSSettingsSupportInfo.version) (\(IOSSettingsSupportInfo.build))", showsChevron: false)
+        Text(IOSSettingsText.versionIdentity(IOSSettingsSupportInfo.version, build: IOSSettingsSupportInfo.build))
+            .font(.footnote)
+            .foregroundStyle(Theme.Text.secondary)
+            .fixedSize(horizontal: false, vertical: true)
             .accessibilityElement(children: .combine)
             .accessibilityIdentifier("iosSettings_versionLabel")
             .accessibilityLabel(IOSSettingsText.version)
@@ -441,7 +452,7 @@ struct IOSModelRow: View {
             IOSSettingsIcon(symbol: modelIconName, tint: Theme.Brand.modeColor(model.mode))
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(model.mode.displayName)
+                Text(IOSSettingsText.modeName(model.mode))
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(Theme.Text.primary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -465,7 +476,7 @@ struct IOSModelRow: View {
             .font(.caption.weight(.semibold))
             .foregroundStyle(statusTint)
             .fixedSize(horizontal: false, vertical: true)
-            .accessibilityLabel("\(model.mode.displayName) model status")
+            .accessibilityLabel(IOSSettingsText.modelStatus(IOSSettingsText.modeName(model.mode)))
             .accessibilityValue(statusText)
             .accessibilityIdentifier("iosModelStatus_\(model.id)")
     }
@@ -489,7 +500,7 @@ struct IOSModelRow: View {
                 removalAction
             case .updateAvailable:
                 actionButton(
-                    "Update",
+                    IOSSettingsText.update,
                     symbol: "arrow.triangle.2.circlepath",
                     id: "iosModelUpdate_\(model.id)",
                     action: requestInstall
@@ -499,14 +510,14 @@ struct IOSModelRow: View {
                 EmptyView()
             case .notInstalled:
                 actionButton(
-                    "Install",
+                    IOSSettingsText.install,
                     symbol: "arrow.down.circle.fill",
                     id: "iosModelDownload_\(model.id)",
                     action: requestInstall
                 )
             case .incomplete:
                 actionButton(
-                    "Repair",
+                    IOSSettingsText.repair,
                     symbol: "wrench.and.screwdriver.fill",
                     id: "iosModelRepair_\(model.id)",
                     action: requestInstall
@@ -514,7 +525,7 @@ struct IOSModelRow: View {
                 removalAction
             case .error:
                 actionButton(
-                    "Retry",
+                    IOSSettingsText.retry,
                     symbol: "arrow.clockwise",
                     id: "iosModelRetry_\(model.id)",
                     action: requestInstall
@@ -524,18 +535,18 @@ struct IOSModelRow: View {
             removalAction
         case .available:
             actionButton(
-                "Install",
+                IOSSettingsText.install,
                 symbol: "arrow.down.circle.fill",
                 id: "iosModelDownload_\(model.id)",
                 action: requestInstall
             )
         case .queued, .waitingForConnectivity, .downloading, .retrying:
             actionButton(
-                "Cancel",
+                IOSSettingsText.cancel,
                 symbol: "xmark",
                 id: "iosModelCancel_\(model.id)",
                 prominence: .secondary,
-                accessibilityTitle: "Cancel download",
+                accessibilityTitle: IOSSettingsText.cancelDownload,
                 action: requestCancelOptions
             )
         case .verifying, .installing, .cancelling, .deleting:
@@ -544,7 +555,7 @@ struct IOSModelRow: View {
             if case .incomplete = status { removalAction }
         case .failed:
             actionButton(
-                "Retry",
+                IOSSettingsText.retry,
                 symbol: "arrow.clockwise",
                 id: "iosModelRetry_\(model.id)",
                 action: requestInstall
@@ -557,7 +568,7 @@ struct IOSModelRow: View {
     private var removalAction: some View {
         HStack(spacing: 0) {
             actionButton(
-                "Remove",
+                IOSSettingsText.remove,
                 symbol: "trash",
                 id: "iosModelDelete_\(model.id)",
                 prominence: .destructive,
@@ -584,7 +595,7 @@ struct IOSModelRow: View {
             tint: Theme.Brand.modeColor(model.mode),
             prominence: prominence
         ))
-        .accessibilityLabel("\(accessibilityTitle ?? title) \(model.mode.displayName) model")
+        .accessibilityLabel(IOSSettingsText.modelAction(accessibilityTitle ?? title, IOSSettingsText.modeName(model.mode)))
         .accessibilityIdentifier(id)
     }
 
@@ -640,7 +651,7 @@ struct IOSModelRow: View {
 
     private func requestDelete() {
         appModel.presentDeleteModelSheet(IOSDeleteModelSheetPresentation(
-            modelName: model.name,
+            modelName: IOSSettingsText.modeName(model.mode),
             sizeLabel: deleteSheetSizeLabel,
             onConfirm: { onDelete() }
         ))
@@ -651,7 +662,7 @@ struct IOSModelRow: View {
         case .installed(let sizeBytes), .updateAvailable(let sizeBytes, _), .incomplete(_, let sizeBytes):
             return IOSSettingsFormatters.fileSize(Int64(sizeBytes))
         default:
-            return model.estimatedDownloadBytes.map(IOSSettingsFormatters.fileSize) ?? "several GB"
+            return model.estimatedDownloadBytes.map(IOSSettingsFormatters.fileSize) ?? IOSSettingsText.severalGB
         }
     }
 
@@ -678,32 +689,32 @@ struct IOSModelRow: View {
         if let bytes = model.estimatedDownloadBytes {
             parts.append(IOSSettingsFormatters.fileSize(bytes))
         }
-        return parts.isEmpty ? "On-device model" : parts.joined(separator: " · ")
+        return parts.isEmpty ? IOSSettingsText.onDeviceModel : parts.joined(separator: " · ")
     }
 
     private var statusText: String {
         switch operationState {
         case .idle:
             switch status {
-            case .checking: return "Checking…"
-            case .notInstalled: return "Not Installed"
+            case .checking: return IOSSettingsText.checking
+            case .notInstalled: return IOSSettingsText.notInstalled
             case .installed: return VocelloPresentationText.status(.ready)
-            case .updateAvailable: return "Update Available"
-            case .incomplete: return "Repair Needed"
-            case .error: return "Retry Needed"
+            case .updateAvailable: return IOSSettingsText.updateAvailable
+            case .incomplete: return IOSSettingsText.repairNeeded
+            case .error: return IOSSettingsText.retryNeeded
             }
         case .installed: return VocelloPresentationText.status(.ready)
-        case .available: return "Not Installed"
-        case .queued: return "Queued"
-        case .waitingForConnectivity: return "Waiting for Network"
-        case .downloading: return transferIsComplete ? "Finishing" : "Downloading"
-        case .retrying: return transferIsComplete ? "Finishing" : "Retrying"
-        case .verifying: return "Verifying"
-        case .installing: return "Installing"
-        case .cancelling: return "Cancelling"
-        case .deleting: return "Removing"
-        case .unavailable: return "Repair Needed"
-        case .failed: return "Retry Needed"
+        case .available: return IOSSettingsText.notInstalled
+        case .queued: return IOSSettingsText.queued
+        case .waitingForConnectivity: return IOSSettingsText.waitingForNetwork
+        case .downloading: return transferIsComplete ? IOSSettingsText.finishing : IOSSettingsText.downloading
+        case .retrying: return transferIsComplete ? IOSSettingsText.finishing : IOSSettingsText.retrying
+        case .verifying: return IOSSettingsText.verifying
+        case .installing: return IOSSettingsText.installing
+        case .cancelling: return IOSSettingsText.cancelling
+        case .deleting: return IOSSettingsText.removing
+        case .unavailable: return IOSSettingsText.repairNeeded
+        case .failed: return IOSSettingsText.retryNeeded
         }
     }
 
@@ -811,14 +822,14 @@ struct IOSModelRow: View {
                 IOSModelTransferProgressBar(
                     fraction: fraction,
                     tint: Theme.Brand.modeColor(model.mode),
-                    accessibilityLabel: "\(model.mode.displayName) model download progress",
+                    accessibilityLabel: IOSSettingsText.modelProgress(IOSSettingsText.modeName(model.mode)),
                     accessibilityValue: accessibilityValue,
                     accessibilityIdentifier: "iosModelProgress_\(model.id)"
                 )
             case .indeterminate:
                 ProgressView()
                     .tint(Theme.Brand.modeColor(model.mode))
-                    .accessibilityLabel("\(model.mode.displayName) model setup in progress")
+                    .accessibilityLabel(IOSSettingsText.modelSetup(IOSSettingsText.modeName(model.mode)))
                     .accessibilityIdentifier("iosModelPhaseActivity_\(model.id)")
             }
             detailText(presentation.detail)

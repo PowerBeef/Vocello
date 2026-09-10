@@ -182,11 +182,11 @@ struct IOSStudioPlayerCard: View {
         }
         .onDisappear { controller.stop() }
         .confirmationDialog(
-            "Dismiss this clip?",
+            IOSInterfaceText.dismissClip,
             isPresented: $showDismissConfirm,
             titleVisibility: .visible
         ) {
-            Button("Dismiss", role: .destructive) {
+            Button(IOSInterfaceText.dismiss, role: .destructive) {
                 // Only clears the player. Storage acceptance is reported
                 // independently; failed enqueue still has an export warning.
                 // Stop the shared player too, so dismissing doesn't leave audio playing with
@@ -195,7 +195,7 @@ struct IOSStudioPlayerCard: View {
                 onDismiss()
             }
             .accessibilityIdentifier("studio_inlinePlayer_dismissConfirm")
-            Button("Cancel", role: .cancel) {}
+            Button(IOSInterfaceText.cancel, role: .cancel) {}
         } message: {
             Text(VocelloPresentationText.dismissPlayerDetail)
         }
@@ -255,7 +255,7 @@ struct IOSStudioPlayerCard: View {
             HStack(spacing: 8) {
                 Image(systemName: "waveform.badge.plus")
                     .font(.system(size: 14, weight: .semibold))
-                Text("Save as voice")
+                Text(IOSInterfaceText.saveAsVoice)
                     .font(.subheadline.weight(.semibold))
             }
             .foregroundStyle(tint)
@@ -311,7 +311,7 @@ struct IOSStudioPlayerCard: View {
             IOSHaptics.selection()
             onRetry?()
         } label: {
-            Text("Generate again")
+            Text(IOSInterfaceText.generateAgain)
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(Theme.Status.guarded)
                 .frame(minWidth: 44, minHeight: 44)
@@ -319,8 +319,8 @@ struct IOSStudioPlayerCard: View {
                 .background(Theme.Status.guarded.opacity(0.12), in: Capsule())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Generate this take again")
-        .accessibilityHint("Starts a new generation using the visible Studio settings")
+        .accessibilityLabel(IOSInterfaceText.generateAgainLabel)
+        .accessibilityHint(IOSInterfaceText.generateAgainHint)
         .accessibilityIdentifier("studio_inlinePlayer_cadenceRetry")
     }
 
@@ -351,7 +351,7 @@ struct IOSStudioPlayerCard: View {
                 }
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(controller.isPlaying ? "Pause" : "Play")
+        .accessibilityLabel(controller.isPlaying ? IOSInterfaceText.pause : IOSInterfaceText.play)
         .accessibilityIdentifier(phase.isLive ? "studio_livePreview_playPause" : "studio_inlinePlayer_playPause")
     }
 
@@ -363,14 +363,14 @@ struct IOSStudioPlayerCard: View {
                     .fill(tint)
                     .frame(width: 6, height: 6)
                     .opacity(reduceMotion ? 1.0 : (pulse ? 1.0 : 0.3))
-                Text("Streaming preview")
+                Text(IOSInterfaceText.streamingPreview)
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(Theme.Text.secondary)
                     .lineLimit(1)
             }
             .transition(.opacity)
         } else {
-            Text("Just now · \(phase.modeLabel)")
+            Text(IOSInterfaceText.justNowMode(phase.modeLabel))
                 .font(.system(size: 11))
                 .foregroundStyle(Theme.Text.secondary)
                 .lineLimit(1)
@@ -389,14 +389,14 @@ struct IOSStudioPlayerCard: View {
                     .background { Circle().fill(Theme.Surface.glassSurfaceMuted.opacity(0.7)) }
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Cancel generation")
+            .accessibilityLabel(IOSInterfaceText.cancelGeneration)
             .accessibilityIdentifier("studio_livePreview_cancel")
             .transition(.opacity)
         } else {
             HStack(spacing: 8) {
                 iconButton(
                     symbol: "bookmark",
-                    label: "Save",
+                    label: IOSInterfaceText.save,
                     accessibilityIdentifier: "studio_inlinePlayer_save"
                 ) {
                     if let onSave, case .complete(let item) = phase {
@@ -405,12 +405,12 @@ struct IOSStudioPlayerCard: View {
                 }
                 iconButton(
                     symbol: "arrow.down.to.line",
-                    label: "Download",
+                    label: IOSInterfaceText.download,
                     accessibilityIdentifier: "studio_inlinePlayer_download"
                 ) { shareWAV() }
                 iconButton(
                     symbol: "xmark",
-                    label: "Dismiss",
+                    label: IOSInterfaceText.dismiss,
                     accessibilityIdentifier: "studio_inlinePlayer_dismiss"
                 ) { showDismissConfirm = true }
             }
@@ -520,7 +520,7 @@ struct InlineWaveformProgressRow: View {
                 // switch/VoiceOver users — the sheet scrubber's adjustable
                 // pattern, 5% steps; disabled while streaming like the drag.
                 .accessibilityElement()
-                .accessibilityLabel("Playback position")
+                .accessibilityLabel(IOSInterfaceText.playbackPosition)
                 .accessibilityValue(controller.formatted(time: controller.currentTime))
                 .accessibilityIdentifier("studio_inlinePlayer_scrubber")
                 // Explicit activate: don't rely on SwiftUI synthesizing the

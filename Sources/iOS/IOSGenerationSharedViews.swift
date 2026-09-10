@@ -90,7 +90,7 @@ struct IOSStudioComposerCard<Accessory: View, Setup: View>: View {
     init(
         title: String? = nil,
         subtitle: String,
-        promptSectionTitle: String = "Prompt",
+        promptSectionTitle: String = IOSInterfaceText.promptLabel,
         setupSectionTitle: String,
         tint: Color,
         helper: String?,
@@ -406,7 +406,7 @@ private struct IOSGenerateMiniPlayerProgressRail: View {
         }
         .frame(height: railHeight)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(canSeek ? "Preview playback progress" : "Live preview progress")
+        .accessibilityLabel(canSeek ? IOSInterfaceText.previewProgress : IOSInterfaceText.liveProgress)
         .accessibilityValue("\(playbackProgress.formattedCurrentTime) of \(durationText)")
         .accessibilityIdentifier("generate_miniPlayer_seekRail")
         .accessibilityAdjustableAction { direction in
@@ -497,6 +497,6 @@ private struct IOSGenerateMiniPlayerProgressChrome: View {
                 Circle()
                     .stroke(Color.white.opacity(0.10), lineWidth: 0.5)
             }
-            .accessibilityLabel("Preparing preview")
+            .accessibilityLabel(IOSInterfaceText.preparingPreview)
     }
 }

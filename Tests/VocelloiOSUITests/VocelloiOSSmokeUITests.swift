@@ -174,6 +174,11 @@ final class VocelloiOSSmokeUITests: VocelloiOSUITestCase {
                 arguments: ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryL"]
             ),
             (
+                name: "French-Default",
+                arguments: ["-AppleLanguages", "(fr)", "-AppleLocale", "fr_FR",
+                            "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryL"]
+            ),
+            (
                 name: "AX-L",
                 arguments: [
                     "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityL",
@@ -202,6 +207,17 @@ final class VocelloiOSSmokeUITests: VocelloiOSUITestCase {
             let settings = element("screen_settings")
             openSettingsRoot()
             XCTAssertTrue(VocelloUIWait.exists(settings, timeout: 20))
+            XCTAssertTrue(VocelloUIWait.exists(element("iosSettings_title"), timeout: 20))
+            if category.name == "French-Default" {
+                XCTAssertEqual(element("iosSettings_title").label, "Réglages")
+                for (id, title) in [
+                    ("rootTab_studio", "Studio"), ("rootTab_voices", "Voix"),
+                    ("rootTab_history", "Historique"), ("rootTab_settings", "Réglages"),
+                ] {
+                    XCTAssertEqual(element(id).label, title,
+                                   "The genuine dock must display French without changing its identifiers")
+                }
+            }
             openSettingsPage(for: "iosSettings_autoPlayToggle")
             let autoplay = element("iosSettings_autoPlayToggle")
             XCTAssertTrue(VocelloUIWait.exists(autoplay, timeout: 20))
@@ -215,11 +231,16 @@ final class VocelloiOSSmokeUITests: VocelloiOSUITestCase {
             XCTAssertTrue(VocelloUIWait.exists(variation, timeout: 20))
             assertAboveTabDock(variation, named: "Take variation", category: category.name)
             assertAccessibilityControl(variation, named: "Take variation", category: category.name)
+            if category.name == "French-Default" {
+                XCTAssertTrue(["Expressif", "Équilibré", "Cohérent"].contains(variation.value as? String ?? ""),
+                              "Variation must expose its French display name without changing the saved value")
+            }
             VocelloUIScreenshot.attach(app, named: "ios-settings-\(category.name)-landing")
 
             openSettingsPage(for: "iosSettings_versionLabel")
             let version = element("iosSettings_versionLabel")
             XCTAssertTrue(VocelloUIWait.exists(version, timeout: 20))
+            XCTAssertFalse((version.value as? String ?? "").isEmpty, "About must expose the installed version and build")
             XCTAssertTrue(revealSettingsElement(version, swipingUp: true))
             assertAboveTabDock(version, named: "Version", category: category.name)
             VocelloUIScreenshot.attach(app, named: "ios-settings-\(category.name)-about")

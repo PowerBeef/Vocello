@@ -60,7 +60,13 @@ class VocelloiOSUITestCase: XCTestCase {
             environment[key] = value
         }
 
-        session.launch(environment: environment, arguments: additionalArguments)
+        // Existing lifecycle assertions use English status copy. Pin only this process's
+        // language instead of depending on the phone language; localization walks opt in
+        // to another language explicitly. NSArgumentDomain does not persist this choice.
+        let arguments = additionalArguments.contains("-AppleLanguages")
+            ? additionalArguments
+            : ["-AppleLanguages", "(en)", "-AppleLocale", "en_US"] + additionalArguments
+        session.launch(environment: environment, arguments: arguments)
         XCTAssertTrue(
             VocelloUIWait.condition("Vocello to enter the foreground", timeout: 30) {
                 self.app.state == .runningForeground

@@ -192,7 +192,7 @@ struct IOSUnsupportedDeviceView: View {
             Image(systemName: "iphone.slash")
                 .font(.system(size: 40, weight: .semibold))
                 .foregroundStyle(.orange)
-            Text("Unsupported Device")
+            Text(IOSInterfaceText.unsupportedDevice)
                 .font(.title2.weight(.semibold))
             Text(reason)
                 .multilineTextAlignment(.center)

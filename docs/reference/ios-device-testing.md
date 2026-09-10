@@ -164,6 +164,13 @@ report that protection still requires operator action.
 
 ## Explicit XCUITest lanes
 
+Shared `VocelloiOSUITestCase` journeys select English using process-local launch arguments so
+exact model-status assertions do not depend on the phone's language. They do not write a saved
+language preference. The Settings `localization` walk explicitly overrides this for French-Default
+(including translated title and variation-value assertions), in addition to Default, AX-L,
+AX-XXXL and pseudo-AX-XXXL. Keep each layout's full-visibility assertions and retained captures;
+neither a default-language pass nor a compile substitutes for bilingual device acceptance.
+
 Smoke diagnostics are collected before the aggregate failure exit, including when XCTest fails.
 A passing memory-pressure diagnostic subset cannot override a failed UI or long-form test.
 If an older runner omitted collection, preserve its failed ledger and put any recovered telemetry
@@ -222,6 +229,13 @@ The control-audit accessibility lane checks targets and `.textClipped` at Defaul
 AX-XXXL, and pseudo-AX-XXXL, then runs the complete system audit without a forced size. The system
 clipping audit can pass an ellipsized label whose accessibility name is complete. Inspect the
 retained screenshots as well; automatic PASS alone does not establish untruncated visual reflow.
+
+The stateful lane registers observed original toggle/variation values before mutation and awaits
+its session cleanup through XCTest teardown, including after assertion aborts. Failed or skipped
+restoration remains failure; never replace an unknown original value with a default. The inventory
+and simple saved-voice enrollment journeys still need equivalent preservation of Studio selections,
+draft and consent before use against personal state; do not infer that protection from the stateful
+lane. See the current checkpoint for this explicit acceptance limitation.
 
 Every lane uses the paired physical-device destination. Tests use stable accessibility identifiers,
 condition-based waits, XCTest activities, screenshots, and failure attachments. Coordinate tables,

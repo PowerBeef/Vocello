@@ -62,7 +62,20 @@ final class AppModel {
     /// The bottom-tab destination currently visible. Defaults to Studio.
     /// Persisted for state restoration (didSet fires only on post-init changes).
     var tab: IOSAppTab = .studio {
-        didSet { IOSAppDefaults.lastTabRawValue = tab.rawValue }
+        didSet {
+            IOSAppDefaults.lastTabRawValue = tab.rawValue
+            if tab != .settings { settingsModelNavigation.path = [] }
+        }
+    }
+
+    let settingsModelNavigation = IOSSettingsModelNavigation()
+
+    func requestModelInstallation(_ model: TTSModel, using installer: IOSModelInstallerViewModel) {
+        settingsModelNavigation.requestInstallation(
+            of: model,
+            selectSettings: { self.tab = .settings },
+            install: { installer.install($0) }
+        )
     }
 
     /// Which mode the unified Studio screen is currently editing.

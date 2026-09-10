@@ -706,6 +706,8 @@
       "sourceOfTruth": [
         "project.yml",
         "Sources/Resources/Localizable.xcstrings",
+        "Sources/iOS/InfoPlist.xcstrings",
+        "Sources/iOS/IOSRootNavigationModels.swift",
         "Sources/SharedSupport/Services/VocelloPresentationText.swift",
         "scripts/localization_contract.py",
         "config/localization-unlocalized-baseline.json",

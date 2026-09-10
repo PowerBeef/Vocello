@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-09-09
+reviewed: 2026-09-10
 summary: Current release-first resume checkpoint; dated evidence lives in the pinned development history, and config/roadmap.json owns status.
 sourceOfTruth:
   - config/roadmap.json
@@ -14,6 +14,212 @@ Start here, then follow `config/roadmap.json`'s `primaryPlan` and the
 This is a narrative, not a second work ledger. Product source, contracts and scripts win.
 
 ## Resume now
+
+### September 10 physical localization and local StoreKit checkpoint
+
+The authorized device session is collected; no 201-take campaign or live transaction ran.
+Each retained run owns its full-tree source identity; partial results below are not merged
+into an overall localization or processed-candidate PASS.
+
+- **Corrected product boundary:** measured AX-L frames proved the fixed Settings bottom padding
+  was shorter than the actual dock. RootView now supplies measured dock height to Settings,
+  Voice Models and attribution scroll content. Subsequent localization runs passed the previously
+  failing AX-L About and Models routes, preserving the original strict visibility assertions.
+- **Remaining harness boundary:** full-window swipes oscillate past a large row or start over the
+  enlarged dock. Two bounded element-swipe experiments failed and were reverted. Run
+  `ios-xcui-localization-20260910-143825-3a36824a` completed EN/FR Default and AX-L but failed
+  AX-XXXL About. The original failure, one notification interruption, one zero-test compile failure,
+  and both rejected experiments remain pinned. Do not repeat them or describe full accessibility
+  acceptance as complete.
+- **Settings stateful:** `ios-xcui-control-audit-20260910-144631-2fdbfc0e` completed in 281.5s:
+  eight PASS observations, four prerequisite blocks and two preservation-policy blocks. Four
+  toggles and all three variation options were exercised and restored; global History deletion
+  was cancelled. Session initialization now precedes purchase presentation, and awaited XCTest
+  teardown retains observed setting values for abort cleanup rather than assuming defaults.
+- **Accessibility:** `ios-xcui-control-audit-20260910-145307-323ae6b2` failed pseudo-AX-XXXL
+  navigation after Default/AX-L/AX-XXXL Audio captures and clipping checks. Terminal observations
+  were absent, so host collection/composition correctly failed too. These captures are partial
+  evidence, not an aggregate PASS or actual VoiceOver speech/rotor verification.
+- **Local StoreKit:** `ios-xcui-purchase-20260910-145728-79fd9b31` passed ten lifecycle phases
+  in 54.4s; `ios-xcui-purchase-20260910-150003-613fa5c8` passed all 23 lifecycle/export phases
+  in 295.6s. Built-in export stays free; Design/Clone History/full-player routes follow owned
+  versus revoked entitlement while internal playback stays available. Schema-3 restoration
+  verifies cleared test transactions, original tab/filter and app termination. No real charge,
+  external transfer, account edit, actual offline or processed-candidate proof is claimed.
+
+All completed runner crash-delta checks are clean. Visual inspection found coherent French
+Settings/model copy and default purchase presentation; larger scrolling surfaces are not fully
+qualified. Fixture prices are not the release USD 19.99 price. The post-device focused suite
+passed all 123 adjacent Python tests. The post-device deterministic checkpoint passed 1,720 Python
+tests, 615 core, 19 transport and 125 runtime tests (three optional fixture skips), generic iOS
+app/logic compilation and the macOS app build. Its retained log is
+`build/artifacts/ios/localization-device-checkpoint-20260910.log`, with native results in
+`mac-test-20260910-111719`. Publication verification after the documentation/index checkpoint uses
+`build/artifacts/ios/localization-publication-checkpoint-20260910.log`; neither checkpoint clears
+the physical navigation findings.
+
+Next, ISU-4 owns the bounded large-text reveal repair and missing layouts; ASR-12 owns remaining
+EN/FR indirect-error and candidate-wide acceptance before additional UI locales. RF-13 retains
+actual offline, other outward-export routes and sandbox/processed-candidate proof. Do not run the
+inventory or simple enrollment journey until they restore the observed Studio selections/draft
+and consent; their current hard-coded resets are unsafe for personal state. Built-in remains
+uninstalled, so normal smoke/generation/performance prerequisites are absent. Earlier isolated
+model-install acceptance remains historical; no canonical model installation was changed here.
+
+Final screen-protection run `ios-xcui-screen-protection-20260910-150637-33b6b221` passed the
+French three-minute Auto-Lock readback and complete runner ledger. The second independent
+CoreDevice readback confirmed current `passcodeRequired=true`, not merely historical unlocking.
+Private readbacks and the full session ledger remain untracked in
+`build/artifacts/ios/localization-device-session-20260910.json`. No device UI follows protection.
+The dated migration sections below describe earlier host-only continuations, not the current
+device session.
+
+### September 10 English/French localization — expanded interface migration
+
+The main catalog now has 488 manually owned English/French entries, plus the two iOS system
+permission entries. The expanded batch migrates recording/enrollment review and quality warnings,
+History filters/actions and recovery, player controls, delivery/reference sheets, language/preset
+display names, download transfer detail, long-form status and additional VoiceOver labels.
+Complete-message formatting preserves counts, byte totals and substituted user content; plural
+forms cover count-sensitive messages. This is presentation work, not a generation, sampling,
+quality-policy, saved-data or purchase-eligibility change.
+
+The maintainer chose Simplified Chinese (`zh-Hans`) and Brazilian Portuguese (`pt-BR`) for later
+batches. Shipping resources still contain only the maintained English/French UI, not ten locales.
+Canonical starter briefs remain model content; original license bodies, stored names/transcripts
+and diagnostic/system error details are not translated by blind substitution. Indirect shared
+error presentation and physical EN/FR review remain open under ASR-12; ISU-4 owns the retained
+Settings reveal failures. The later physical checkpoint above records the measured AX-L correction
+and the still-unqualified larger layouts; qualify those before expanding locales.
+
+The first expanded generic iOS app/logic compile passed. Fifteen focused localization tests pass,
+including production typed-key/default-to-catalog binding. The 120-test adjacent Python run found
+one old source assertion expecting a literal Clear search label; the correction checks its typed
+binding and exact English/French labels while preserving query, geometry and clearing assertions.
+The new native fixtures cover exact percent/64-bit counts, project-not-yet-saved wording and
+verbatim substituted content. The first native run caught the new fixture expecting ungrouped
+byte counts although Foundation correctly applies the host's numeric region; the expectation
+now uses independently formatted locale-aware counts without changing production behavior.
+The failed native run is retained as `mac-test-20260910-092713`. Final coherent-tree verification is recorded in the untracked
+`localization-expanded-*-20260910.log` artifacts; a compile is not device acceptance.
+No device, account, purchase or release operation ran in this continuation. The phone remains
+in its last verified protected state; request availability/unlock before the next physical run.
+
+### September 10 English/French localization — first migration batch
+
+The approved order is English/French completion, the existing large-text Settings defect,
+bounded additional-language batches, then separate App Store materials. ASR-12 owns candidate
+acceptance and ISU-4 retains the navigation defect; neither is closed by translation work.
+The missing 53 French translations in the existing main catalog are filled, and 38 typed
+onboarding/tab/Studio entries plus two system permission entries have English/French copy.
+Source-language wording, user data, generation prompts, enum/model identities, purchase state
+and StoreKit pricing remain unchanged. Existing Settings/install work is preserved.
+
+The localization contract now checks French presence, translated units, plural structure and
+format-argument parity; purpose-string English must match Info.plist and resource inclusion is
+explicit. The existing Settings reveal helper records bounded sampled frames/hittability only
+on failure, retaining the unchanged visibility predicates and swipe budget. The French walk
+asserts the genuine dock labels as well as the existing Settings checks.
+
+This is not complete app localization: secondary sheets, recording/quality warnings, History
+controls, transfer detail and other indirect/accessibility copy still require migration. The
+AX-L About failure needs a new authorized physical observation before a causal fix. No additional
+language is advertised, no App Store record changed, and the locked phone remains untouched.
+See [localization](reference/localization.md) for migration boundaries and remaining order.
+
+Focused verification: all 38 localization/Settings acceptance contract tests pass. The generic
+iOS app and logic targets compile, and the updated XCUITest bundle passes build-for-testing
+without launching on a device. The built English/French resources match all 440 expected string
+and permission values. Derived-artifact validation passes. These checks prove resource delivery
+and compilation, not rendered layout, translation quality across every screen or device acceptance.
+The first full Python checkpoint found two stale source assertions for the reveal predicate after
+its result was named for diagnostics. Updated assertions retain geometry plus hittability and
+verify the failure attachment; no visibility rule changed. The initial failure remains recorded,
+and a fresh deterministic checkpoint is required for the corrected test tree.
+
+### September 10 physical Settings and Studio-install acceptance
+
+The source stayed frozen through this authorized device session. The isolated all-mode install
+lane `ios-xcui-model-download-20260910-064334-5a13c126` passed in 395.0 seconds: each Studio
+Install CTA reached Voice Models and started its exact mode, all three models reached Ready,
+Built-in cancellation/restart/background adoption passed, isolated files were removed, and the
+canonical model-state comparison passed. Host diagnostics correlated 21 UI observations with
+1,148 delivery events; integrity, progress visualization, crash delta and the required-step ledger
+passed. This qualifies the installation shortcut, not generation or App Store candidate behavior.
+
+`ios-xcui-localization-20260910-063837-775e6e5a` failed at 230.2 seconds on the existing AX-L
+About navigation reveal assertion. English and French Default Audio/About/Voice Models checks,
+French title/variation assertions and AX-L Audio completed. Ten named captures are retained;
+reviewed French layouts wrap cleanly and show the new translated model copy. AX-L About/models,
+AX-XXXL and pseudo-AX-XXXL remain unverified. The failure screenshot shows About above the dock,
+but the exported partial accessibility snapshot does not establish its queried frame/hittability.
+Next capture those values at the existing helper's failure boundary and correct only the proven
+cause; do not weaken full-visibility assertions or automatically repeat the failed run.
+
+The first screen-protection inspection failed before any test launched
+(`ios-xcui-screen-protection-20260910-063514-6013d066`); its formal bootstrap classification is
+retained. After explicit XCUITest unlock, a separate inspection passed. Final protection run
+`ios-xcui-screen-protection-20260910-065150-43ca99c2` passed, selecting three-minute Auto-Lock
+and verifying the persisted French Settings value before returning Home. Independent CoreDevice
+readback confirmed the phone locked (`passcodeRequired: true`); no Vocello/test-runner process
+remained. The raw readbacks and final resume checkpoint are retained untracked. No further
+device UI follows that protection operation. No purchase transaction, account edit or release ran.
+The initial stale preserved dSYM was replaced by the canonical runner's matching build symbols;
+subsequent device preflight passed. ISU-4 stays in flight for the remaining layout/accessibility work.
+
+### September 10 Settings review polish — implementation checkpoint
+
+Applied the supplied review as a bounded continuation of ISU-4: compact localized Settings title,
+context on Models & Files and Accessibility, trailing values with accessibility-size reflow,
+compact About identity using the actual bundle version/build, and softer Back fills retaining
+44-point targets. The unchanged cloning disclosure now sits outside the consent card. English/
+French catalog entries cover Settings variation names and model names/actions/statuses; preference
+raw values, model IDs, consent, download ownership and purchase/export behavior remain unchanged.
+The existing localization walk retains all four layout configurations and adds French-Default
+title/variation assertions. Existing lifecycle assertions now explicitly select English through
+process-local launch arguments; this does not change the phone's saved language, and the French
+walk overrides it. The Studio install shortcut is preserved.
+
+The September 9 physical shortcut attempt `ios-xcui-model-download-20260909-184917-6c9a0b0a`
+failed at automation-mode bootstrap: zero test cases launched, no model transfer started. The
+failed xcresult/logs, formal bootstrap classification and safe-stop checkpoint remain untracked.
+No automatic retry occurred; the requested fresh attempt could not fit the remaining phone window.
+This is infrastructure failure, not product acceptance. ISU-4 remains in flight pending a freshly
+authorized shortcut run and Settings visual/layout acceptance on the updated source. No phone,
+transaction, account or release operation is part of this polish checkpoint.
+
+Focused verification: 33 Settings/localization Python tests pass; the iOS app and logic target
+compile with the generic physical-device SDK, and the actual app plus updated XCUITest bundle
+pass build-for-testing. A direct comparison of the compiled app's English and French string tables
+matches all 53 reviewed keys against the source catalog. Raw logs are retained under the governed
+foundation/iOS artifact roots with the `settings-polish` prefix. One test-build invocation was
+stopped after an incorrect cache variable selected Xcode's default location; the successful
+replacement uses the validated repository-owned cache. No existing cache was deleted. These
+results establish source/build coverage, not visual or interactive device acceptance. The local
+project-input gate passed, including 122 plus 1,590 Python tests (1,712 total); localization,
+control inventory and derived-artifact validation passed. No full native macOS suite, purchase
+transaction or device execution was rerun for this presentation-only continuation.
+
+### September 9 Studio install shortcut — source implementation
+
+The missing-model button now captures the current mode's model, opens Settings → Models & Files
+→ Voice Models and requests installation through the existing app-lifetime installer. It does not
+change Studio drafts or start generation; ordinary Settings navigation and Back never replay the
+request. All existing model-delivery checks, queueing, progress, cancellation and error UI remain.
+
+Native routing fixtures cover every mode and navigation without repeated installation. Source-bound
+tests cover the actual three CTA callbacks, root path and installer connection. The existing isolated
+model-download acceptance scenario now begins each of its three model installations from Studio;
+it retains cancellation, adoption, removal and canonical-state restoration checks. No physical run
+or real model download was authorized or claimed by that implementation-only checkpoint; the later
+authorized bootstrap failure is recorded above. Focused verification passed: 105
+Python navigation/control tests and two native routing tests. The actual iOS app and updated
+XCUITest bundle passed generic physical-device-SDK build-for-testing without installation or
+execution. Compile evidence is retained as `ios-studio-install-uitest-build.log` in the foundation
+artifact root; the coherent repository checkpoint is retained as
+`studio-install-checkpoint-20260909.log` in the macOS artifact root.
+ISU-4 remains in flight: this shortcut needs live acceptance, and the separate retained
+AX-L About reveal failure still needs diagnosis. No durable AGENTS.md procedure changes are needed.
 
 ### September 9 publication checkpoint
 

@@ -98,8 +98,8 @@ struct IOSCustomVoiceSetupCard: View {
     }
 
     private var speakerField: some View {
-        IOSInlineSetupField(title: "Voice") {
-            Picker("Speaker", selection: $selectedSpeaker) {
+        IOSInlineSetupField(title: IOSInterfaceText.voice) {
+            Picker(IOSInterfaceText.speakerLabel, selection: $selectedSpeaker) {
                 ForEach(TTSModel.allSpeakers, id: \.self) { speaker in
                     Text(TTSModel.speakerPickerLabel(for: speaker)).tag(speaker)
                 }
@@ -117,7 +117,7 @@ struct IOSCustomVoiceSetupCard: View {
     }
 
     private var deliveryField: some View {
-        IOSInlineSetupField(title: "Delivery") {
+        IOSInlineSetupField(title: IOSInterfaceText.delivery) {
             IOSDeliveryPicker(
                 delivery: $delivery,
                 tint: Theme.Brand.modeCustom,
@@ -154,9 +154,9 @@ struct IOSVoiceDesignSetupCard: View {
     }
 
     private var briefField: some View {
-        IOSInlineSetupField(title: "Description") {
+        IOSInlineSetupField(title: IOSInterfaceText.descriptionLabel) {
             ZStack(alignment: .trailing) {
-                TextField("Describe the voice you want", text: $voiceDescription)
+                TextField(IOSInterfaceText.describeWanted, text: $voiceDescription)
                     .focused($isBriefFocused)
                     .padding(.trailing, voiceDescription.isEmpty ? 0 : 34)
                     .iosFieldChrome(isFocused: isBriefFocused, tint: Theme.Brand.modeDesign)
@@ -175,7 +175,7 @@ struct IOSVoiceDesignSetupCard: View {
     }
 
     private var deliveryField: some View {
-        IOSInlineSetupField(title: "Delivery") {
+        IOSInlineSetupField(title: IOSInterfaceText.delivery) {
             IOSDeliveryPicker(
                 delivery: $delivery,
                 tint: Theme.Brand.modeDesign,

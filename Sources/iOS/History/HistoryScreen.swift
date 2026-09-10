@@ -88,10 +88,10 @@ enum IOSHistoryModeFilter: String, CaseIterable, Identifiable, Hashable {
 
     var title: String {
         switch self {
-        case .all: return "All"
-        case .custom: return "Built-in"
-        case .design: return "Design"
-        case .clone: return "Clone"
+        case .all: return IOSInterfaceText.all
+        case .custom: return IOSInterfaceText.modeBuiltIn
+        case .design: return IOSInterfaceText.modeDesign
+        case .clone: return IOSInterfaceText.modeClone
         }
     }
 
@@ -132,11 +132,11 @@ private enum IOSHistoryBucket: Int, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .today: return "Today"
-        case .yesterday: return "Yesterday"
-        case .previous7: return "Previous 7 Days"
-        case .previous30: return "Previous 30 Days"
-        case .earlier: return "Earlier"
+        case .today: return IOSInterfaceText.today
+        case .yesterday: return IOSInterfaceText.yesterday
+        case .previous7: return IOSInterfaceText.previous7
+        case .previous30: return IOSInterfaceText.previous30
+        case .earlier: return IOSInterfaceText.earlier
         }
     }
 
@@ -181,15 +181,15 @@ private struct IOSHistoryLibrarySection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 10) {
-                IOSSearchField(text: $searchQuery, placeholder: "Search transcript or voice")
+                IOSSearchField(text: $searchQuery, placeholder: IOSInterfaceText.historySearch)
                     .accessibilityIdentifier("historySearchField")
 
                 Menu {
-                    Button("Clear History (Keep Audio Files)…") {
+                    Button(IOSInterfaceText.clearKeepFiles) {
                         clearConfirmation = IOSHistoryClearConfirmation(deleteAudio: false)
                     }
                     .accessibilityIdentifier("historyClearKeepFiles")
-                    Button("Clear History and Delete Audio…", role: .destructive) {
+                    Button(IOSInterfaceText.clearDeleteFiles, role: .destructive) {
                         clearConfirmation = IOSHistoryClearConfirmation(deleteAudio: true)
                     }
                     .accessibilityIdentifier("historyClearDeleteFiles")
@@ -200,7 +200,7 @@ private struct IOSHistoryLibrarySection: View {
                         .frame(width: 34, height: 34)
                 }
                 .disabled(items.isEmpty || databaseUnavailable)
-                .accessibilityLabel("Clear history")
+                .accessibilityLabel(IOSInterfaceText.clearHistoryLower)
                 .accessibilityIdentifier("historyClearMenu")
             }
             .padding(.horizontal, 20)
@@ -219,16 +219,16 @@ private struct IOSHistoryLibrarySection: View {
                 LazyVStack(alignment: .leading, spacing: 0) {
                     if errorMessage != nil, items.isEmpty {
                         IOSEmptyStateCard(
-                            title: "Couldn't load history",
+                            title: IOSInterfaceText.historyLoadFailed,
                             // D4: there is no pull-to-refresh on this list —
                             // the visible Retry button below is the recovery.
-                            message: "Something went wrong reading your history. Tap Retry below.",
+                            message: IOSInterfaceText.historyLoadDetail,
                             symbolName: "exclamationmark.triangle",
                             tint: .orange
                         )
                         .padding(.horizontal, 20)
                         .padding(.top, 16)
-                        Button("Retry") {
+                        Button(IOSInterfaceText.retry) {
                             reload(reopenFailedStore: true)
                         }
                             .iosAdaptiveUtilityButtonStyle(tint: Theme.Brand.library)
@@ -236,8 +236,8 @@ private struct IOSHistoryLibrarySection: View {
                             .accessibilityIdentifier("historyRetryButton")
                     } else if items.isEmpty {
                         IOSEmptyStateCard(
-                            title: "No takes yet",
-                            message: "Generated audio shows up here once you create a voice or line.",
+                            title: IOSInterfaceText.noTakes,
+                            message: IOSInterfaceText.noTakesDetail,
                             symbolName: "clock.arrow.circlepath",
                             tint: Theme.Brand.library
                         )
@@ -245,8 +245,8 @@ private struct IOSHistoryLibrarySection: View {
                         .padding(.top, 16)
                     } else if filteredItemCount == 0 {
                         IOSEmptyStateCard(
-                            title: "No matches",
-                            message: "Nothing matches this filter or search. Try widening it.",
+                            title: IOSInterfaceText.noMatches,
+                            message: IOSInterfaceText.noMatchesDetail,
                             symbolName: "line.3.horizontal.decrease.circle",
                             tint: Theme.Brand.library
                         )
@@ -296,18 +296,18 @@ private struct IOSHistoryLibrarySection: View {
         .alert(item: $clearConfirmation) { confirmation in
             if confirmation.deleteAudio {
                 Alert(
-                    title: Text("Clear History and Delete Audio?"),
-                    message: Text("This permanently deletes all \(items.count) history entries and their audio files."),
-                    primaryButton: .destructive(Text("Delete Everything")) {
+                    title: Text(IOSInterfaceText.clearDeleteQuestion),
+                    message: Text(IOSInterfaceText.deleteAllHistory(items.count)),
+                    primaryButton: .destructive(Text(IOSInterfaceText.deleteEverything)) {
                         performClearAll(deleteAudio: true)
                     },
                     secondaryButton: .cancel()
                 )
             } else {
                 Alert(
-                    title: Text("Clear History?"),
-                    message: Text("This removes all \(items.count) history entries. The generated audio files stay on the device."),
-                    primaryButton: .destructive(Text("Clear History")) {
+                    title: Text(IOSInterfaceText.clearQuestion),
+                    message: Text(IOSInterfaceText.clearAllHistory(items.count)),
+                    primaryButton: .destructive(Text(IOSInterfaceText.clearHistory)) {
                         performClearAll(deleteAudio: false)
                     },
                     secondaryButton: .cancel()
@@ -318,14 +318,14 @@ private struct IOSHistoryLibrarySection: View {
 
     private var historyRecoveryBanner: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Label("Finished audio is waiting for History", systemImage: "arrow.clockwise.icloud")
+            Label(IOSInterfaceText.historyWaiting, systemImage: "arrow.clockwise.icloud")
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(Theme.Text.primary)
             Text(recoveryMessage)
                 .font(.caption)
                 .foregroundStyle(Theme.Text.secondary)
             HStack(spacing: 10) {
-                Button("Retry") { reload(reopenFailedStore: true) }
+                Button(IOSInterfaceText.retry) { reload(reopenFailedStore: true) }
                     .iosAdaptiveUtilityButtonStyle(tint: Theme.Brand.library)
                     .accessibilityIdentifier("historyRecovery_retry")
                 if !recoveryAudioURLs.isEmpty {
@@ -357,10 +357,10 @@ private struct IOSHistoryLibrarySection: View {
             return VocelloPresentationText.historyUnqueuedDetail
         }
         if recoverySnapshot.issueCount > 0 {
-            return "Vocello preserved the recovery record but could not verify or commit it. Retry before clearing History."
+            return IOSInterfaceText.historyRecoveryProblem
         }
         let count = recoverySnapshot.pendingCount
-        return "\(count) take\(count == 1 ? "" : "s") remain safely queued and available to retry or export."
+        return IOSInterfaceText.queuedTakes(count)
     }
 
     /// Clears the whole history; with `deleteAudio` false the WAVs stay on
@@ -546,7 +546,7 @@ private struct IOSHistoryLibrarySection: View {
             } label: {
                 HStack(spacing: 6) {
                     Image(systemName: "rectangle.stack")
-                    Text("\(segments.count) segments")
+                    Text(IOSInterfaceText.segmentCount(segments.count))
                     Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
                 }
                 .font(.footnote.weight(.medium))
@@ -618,11 +618,11 @@ private struct IOSHistoryItemCard: View {
     private var modeText: String {
         switch item.mode.lowercased() {
         case "custom":
-            return "Built-in"
+            return IOSInterfaceText.modeBuiltIn
         case "design":
-            return "Design"
+            return IOSInterfaceText.modeDesign
         case "clone":
-            return "Clone"
+            return IOSInterfaceText.modeClone
         default:
             return item.mode.capitalized
         }
@@ -724,14 +724,14 @@ private struct IOSHistoryItemCard: View {
                 Button {
                     openPlayerSheet()
                 } label: {
-                    Label("Play", systemImage: "play.fill")
+                    Label(IOSInterfaceText.play, systemImage: "play.fill")
                 }
                 if audioAvailable {
                     Button {
                         exportGate.share(urls: [URL(fileURLWithPath: item.audioPath)],
                             provenance: [IOSExportProvenance(generationMode: item.mode)])
                     } label: {
-                        Label("Save audio", systemImage: "square.and.arrow.down")
+                        Label(IOSInterfaceText.saveAudio, systemImage: "square.and.arrow.down")
                     }
                     .accessibilityIdentifier("historyRowExport_\(item.historyAccessibilityID)")
                 }
@@ -739,12 +739,12 @@ private struct IOSHistoryItemCard: View {
                     Button {
                         onPinSeed()
                     } label: {
-                        Label("Pin seed \(String(seedValue)) for new takes", systemImage: "pin")
+                        Label(IOSInterfaceText.pinSeed(String(seedValue)), systemImage: "pin")
                     }
                     .accessibilityIdentifier("historyRowPinSeed_\(item.historyAccessibilityID)")
                 }
                 Divider()
-                Button("Delete", role: .destructive) {
+                Button(IOSInterfaceText.deleteAction, role: .destructive) {
                     isConfirmingDelete = true
                 }
                 .disabled(!allowsDeletion)
@@ -765,7 +765,7 @@ private struct IOSHistoryItemCard: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("More actions")
+            .accessibilityLabel(IOSInterfaceText.moreActions)
             .accessibilityIdentifier("historyRowMenu_\(item.historyAccessibilityID)")
         }
         .padding(.horizontal, 20)
@@ -778,20 +778,20 @@ private struct IOSHistoryItemCard: View {
                 .padding(.trailing, 20)
         }
         .confirmationDialog(
-            "Delete this take?",
+            IOSInterfaceText.deleteTakeQuestion,
             isPresented: $isConfirmingDelete,
             titleVisibility: .visible
         ) {
-            Button("Delete", role: .destructive) {
+            Button(IOSInterfaceText.deleteAction, role: .destructive) {
                 guard allowsDeletion else { return }
                 IOSHaptics.warning()
                 onDelete()
             }
             .disabled(!allowsDeletion)
             .accessibilityIdentifier("historyRowDeleteConfirm_\(item.historyAccessibilityID)")
-            Button("Cancel", role: .cancel) {}
+            Button(IOSInterfaceText.cancel, role: .cancel) {}
         } message: {
-            Text("This permanently removes the generated audio and its history entry.")
+            Text(IOSInterfaceText.deleteAudioDetail)
         }
         .iosExportPresentation(exportGate)
     }

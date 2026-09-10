@@ -393,6 +393,10 @@ targets:
     # into the `resources:` block.
     sources:
       - path: Sources/iOS
+        excludes:
+          - InfoPlist.xcstrings
+      - path: Sources/iOS/InfoPlist.xcstrings
+        buildPhase: resources
       - path: Sources/iOSSupport
       - path: Sources/SharedSupport
       - path: Sources/Resources/qwenvoice_contract.json
@@ -486,6 +490,7 @@ targets:
       - path: Sources/SharedSupport/Database/GenerationHistoryEnqueueState.swift
       - path: Sources/SharedSupport/Services/VocelloPresentationText.swift
       - path: Sources/iOS/Commerce/IOSCommercePresentationText.swift
+      - path: Sources/iOSSupport/Services/IOSSettingsModelNavigation.swift
       - path: Sources/Services/MacStudioGenerationRequestFactory.swift
       - path: Sources/Models/VoiceDesignDraft.swift
       - path: Sources/Models/ScriptTextState.swift

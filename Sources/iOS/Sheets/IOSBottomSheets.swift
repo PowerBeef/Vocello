@@ -96,7 +96,7 @@ struct IOSDeliveryPickerSheet: View {
 
     var body: some View {
         IOSBottomSheetSurface(
-            title: isCustomToneEditorVisible ? "Custom tone" : "Delivery",
+            title: isCustomToneEditorVisible ? IOSInterfaceText.customTone : IOSInterfaceText.delivery,
             tint: tint,
             presentation: presentation,
             onDismiss: onDismiss,
@@ -128,7 +128,7 @@ struct IOSDeliveryPickerSheet: View {
                 Button {
                     closeSheet()
                 } label: {
-                    Text("Confirm")
+                    Text(IOSInterfaceText.confirm)
                         .font(.system(size: 17, weight: .semibold))
                         .foregroundStyle(Theme.Text.primary)
                         .padding(.horizontal, 18)
@@ -160,7 +160,7 @@ struct IOSDeliveryPickerSheet: View {
                 // The measured split (DP-12): distinct deliveries listeners
                 // actually identify, then directional hints framed honestly.
                 VStack(alignment: .leading, spacing: 10) {
-                    sectionHeader("Distinct deliveries")
+                    sectionHeader(IOSInterfaceText.distinctDeliveries)
                     LazyVGrid(columns: columns, spacing: 12) {
                         ForEach(EmotionPreset.all.filter { !$0.isDirectionalHint }) { preset in
                             cell(for: preset)
@@ -169,7 +169,7 @@ struct IOSDeliveryPickerSheet: View {
                 }
 
                 VStack(alignment: .leading, spacing: 10) {
-                    sectionHeader("Directional hints")
+                    sectionHeader(IOSInterfaceText.directionalHints)
                     LazyVGrid(columns: columns, spacing: 12) {
                         ForEach(EmotionPreset.all.filter(\.isDirectionalHint)) { preset in
                             cell(for: preset)
@@ -200,7 +200,7 @@ struct IOSDeliveryPickerSheet: View {
                         HStack(spacing: 8) {
                             Image(systemName: "slider.horizontal.3")
                                 .font(.system(size: 13, weight: .semibold))
-                            Text("Use a custom tone instead")
+                            Text(IOSInterfaceText.useCustomTone)
                                 .font(.subheadline.weight(.medium))
                         }
                         .foregroundStyle(tint)
@@ -259,17 +259,17 @@ struct IOSDeliveryPickerSheet: View {
     // MARK: - Custom tone guidance
 
     private let placeholderExamples: [String] = [
-        "e.g. A calm narrator, warm and measured",
-        "e.g. An energetic news anchor, bright and fast",
-        "e.g. Whispered, close-mic and breathy",
-        "e.g. Gentle, serious, and reassuring",
+        IOSInterfaceText.tonePlaceholderCalm,
+        IOSInterfaceText.tonePlaceholderNews,
+        IOSInterfaceText.tonePlaceholderWhisper,
+        IOSInterfaceText.tonePlaceholderGentle,
     ]
 
     @State private var placeholderExampleIndex = 0
 
 
     private var customToneGuidance: some View {
-        Text("Be specific: combine emotion, pace, pitch, and timbre.")
+        Text(IOSInterfaceText.toneGuidance)
             .iosScaledFont(size: 13, weight: .regular, relativeTo: .footnote)
             .foregroundStyle(Theme.Text.secondary)
             .fixedSize(horizontal: false, vertical: true)
@@ -280,7 +280,7 @@ struct IOSDeliveryPickerSheet: View {
             Image(systemName: "exclamationmark.triangle")
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(.orange)
-            Text(DeliveryInstructionAdvisor.advisoryMessage)
+            Text(IOSInterfaceText.timingAdvisory)
                 .iosScaledFont(size: 13, weight: .medium, relativeTo: .footnote)
                 .foregroundStyle(Theme.Text.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -325,15 +325,15 @@ struct IOSDeliveryPickerSheet: View {
     }
 
     private let customToneExamplesList: [String] = [
-        "A calm narrator, warm and measured.",
-        "An energetic news anchor, bright and fast.",
-        "A whispered, close-mic and breathy tone.",
-        "Gentle, serious, and reassuring.",
+        IOSInterfaceText.toneExampleCalm,
+        IOSInterfaceText.toneExampleNews,
+        IOSInterfaceText.toneExampleWhisper,
+        IOSInterfaceText.toneExampleGentle,
     ]
 
     private var customToneExamples: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Examples")
+            Text(IOSInterfaceText.examples)
                 .iosScaledFont(size: 13, weight: .semibold, relativeTo: .footnote)
                 .foregroundStyle(Theme.Text.secondary)
 
@@ -441,14 +441,14 @@ struct IOSDeliveryPickerSheet: View {
         // these move energy and pace hard, but the named emotion is not what
         // listeners reliably hear.
         switch preset.id {
-        case "neutral":  return "Default, even pacing"
-        case "happy":    return "Bright lift; can read as surprise"
-        case "sad":      return "Quiet, slower, somber"
-        case "angry":    return "Hard, driving push"
-        case "fearful":  return "Soft, unsteady; can read as sad"
-        case "surprised":return "Pitch jumps, quick catches"
-        case "whisper":  return "Soft, close-mic breath"
-        case "calm":     return "Slower, reassuring"
+        case "neutral":  return IOSInterfaceText.neutralHint
+        case "happy":    return IOSInterfaceText.happyHint
+        case "sad":      return IOSInterfaceText.sadHint
+        case "angry":    return IOSInterfaceText.angryHint
+        case "fearful":  return IOSInterfaceText.fearfulHint
+        case "surprised":return IOSInterfaceText.surprisedHint
+        case "whisper":  return IOSInterfaceText.whisperHint
+        case "calm":     return IOSInterfaceText.calmHint
         default:         return ""
         }
     }
@@ -483,7 +483,7 @@ struct IOSDeliveryPickerSheet: View {
                     Circle()
                         .fill(dot)
                         .frame(width: 8, height: 8)
-                    Text(preset.label)
+                    Text(IOSInterfaceText.presetName(preset.id, fallback: preset.label))
                         .iosScaledFont(size: 14, weight: .semibold, relativeTo: .footnote)
                         .foregroundStyle(Theme.Text.primary)
                     Spacer(minLength: 0)
@@ -532,7 +532,7 @@ struct IOSDeliveryPickerSheet: View {
             intensity = level        // write through to the draft
             IOSHaptics.selection()
         } label: {
-            Text(level.label)
+            Text(level == .normal ? IOSInterfaceText.normal : IOSInterfaceText.strong)
                 .font(.subheadline.weight(.medium))
                 .foregroundStyle(isSelected ? Theme.Text.primary : Theme.Text.secondary)
                 .frame(maxWidth: .infinity)
@@ -578,7 +578,7 @@ struct IOSQwenLanguagePickerSheet: View {
 
     var body: some View {
         IOSBottomSheetSurface(
-            title: "Language",
+            title: IOSInterfaceText.language,
             tint: tint,
             presentation: presentation,
             onDismiss: onDismiss,
@@ -586,7 +586,7 @@ struct IOSQwenLanguagePickerSheet: View {
                 Button {
                     closeSheet()
                 } label: {
-                    Text("Confirm")
+                    Text(IOSInterfaceText.confirm)
                         .font(.system(size: 17, weight: .semibold))
                         .foregroundStyle(Theme.Text.primary)
                         .padding(.horizontal, 18)
@@ -610,9 +610,9 @@ struct IOSQwenLanguagePickerSheet: View {
                     let recommendedLanguages = languages.filter(isRecommended)
                     let others = languages.filter { !isRecommended($0) }
                     if !recommendedLanguages.isEmpty {
-                        sectionHeader("Recommended")
+                        sectionHeader(IOSInterfaceText.recommended)
                         ForEach(recommendedLanguages, id: \.self) { languageButton($0) }
-                        sectionHeader("All languages")
+                        sectionHeader(IOSInterfaceText.allLanguages)
                     }
                     ForEach(others, id: \.self) { languageButton($0) }
                 }
@@ -709,19 +709,19 @@ struct IOSQwenLanguagePickerSheet: View {
 
     private func autoRowTitle(_ language: Qwen3SupportedLanguage) -> String {
         guard language == .auto, let recommended, recommended != .auto else {
-            return language.displayName
+            return IOSInterfaceText.languageName(language)
         }
-        return "\(recommended.displayName) (Auto)"
+        return IOSInterfaceText.languageAuto(IOSInterfaceText.languageName(recommended))
     }
 
     private func rowSubtitle(_ language: Qwen3SupportedLanguage) -> String {
         if language == .auto {
-            return "Infer from script or transcript."
+            return IOSInterfaceText.inferLanguage
         }
         if isRecommended(language) {
-            return "Detected from your text."
+            return IOSInterfaceText.detectedText
         }
-        return "Use Qwen3's \(language.displayName) path."
+        return IOSInterfaceText.languagePath(IOSInterfaceText.languageName(language))
     }
 
     private func closeSheet() {
@@ -793,7 +793,7 @@ struct IOSVoicePickerSheet: View {
 
     /// Filter chip row, including the leading "All" chip.
     private var availableFilters: [(id: String, label: String)] {
-        var out: [(id: String, label: String)] = [(IOSVoicePickerSheet.allFilterID, "All")]
+        var out: [(id: String, label: String)] = [(IOSVoicePickerSheet.allFilterID, IOSInterfaceText.all)]
         for tag in distinctLanguageTags {
             out.append((tag, IOSVoicePickerSheet.label(for: tag)))
         }
@@ -802,16 +802,16 @@ struct IOSVoicePickerSheet: View {
 
     private static func label(for tag: String) -> String {
         switch tag {
-        case "EN":    return "English"
-        case "EN-UK": return "British"
-        case "ZH":    return "Chinese"
-        case "JA":    return "Japanese"
-        case "KO":    return "Korean"
-        case "ES":    return "Spanish"
-        case "FR":    return "French"
-        case "DE":    return "German"
-        case "IT":    return "Italian"
-        case "PT":    return "Portuguese"
+        case "EN":    return IOSInterfaceText.english
+        case "EN-UK": return IOSInterfaceText.british
+        case "ZH":    return IOSInterfaceText.chinese
+        case "JA":    return IOSInterfaceText.japanese
+        case "KO":    return IOSInterfaceText.korean
+        case "ES":    return IOSInterfaceText.spanish
+        case "FR":    return IOSInterfaceText.french
+        case "DE":    return IOSInterfaceText.german
+        case "IT":    return IOSInterfaceText.italian
+        case "PT":    return IOSInterfaceText.portuguese
         default:      return tag    // unknown tag → render verbatim
         }
     }
@@ -833,7 +833,7 @@ struct IOSVoicePickerSheet: View {
 
     var body: some View {
         IOSBottomSheetSurface(
-            title: "Voice",
+            title: IOSInterfaceText.voice,
             tint: tint,
             presentation: presentation,
             onDismiss: onDismiss,
@@ -841,7 +841,7 @@ struct IOSVoicePickerSheet: View {
                 Button {
                     confirmSelection()
                 } label: {
-                    Text("Confirm")
+                    Text(IOSInterfaceText.confirm)
                         .font(.system(size: 17, weight: .semibold))
                         .foregroundStyle(Theme.Text.primary)
                         .padding(.horizontal, 18)
@@ -860,7 +860,7 @@ struct IOSVoicePickerSheet: View {
             }
         ) {
             VStack(alignment: .leading, spacing: 14) {
-                IOSSearchField(text: $search, placeholder: "Search voices")
+                IOSSearchField(text: $search, placeholder: IOSInterfaceText.searchVoices)
                     .padding(.horizontal, 20)
 
                 if availableFilters.count > 1 {
@@ -873,9 +873,9 @@ struct IOSVoicePickerSheet: View {
                         let recommended = filtered.filter(\.isRecommended)
                         let others = filtered.filter { !$0.isRecommended }
                         if !recommended.isEmpty {
-                            sectionHeader("Recommended")
+                            sectionHeader(IOSInterfaceText.recommended)
                             ForEach(recommended) { row(for: $0) }
-                            if !others.isEmpty { sectionHeader("All voices") }
+                            if !others.isEmpty { sectionHeader(IOSInterfaceText.allVoices) }
                         }
                         ForEach(others) { row(for: $0) }
                     }
@@ -999,7 +999,7 @@ struct IOSVoicePickerSheet: View {
                 )
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(isPreviewing ? "Stop preview" : "Preview voice")
+            .accessibilityLabel(isPreviewing ? IOSInterfaceText.stopPreview : IOSInterfaceText.previewVoice)
             .accessibilityIdentifier("voicePickerPreview_\(option.id)")
 
             // Always reserve the checkmark slot (invisible when unselected) so the play button +
@@ -1145,7 +1145,7 @@ struct IOSReferenceClipSheet: View {
 
     var body: some View {
         IOSBottomSheetSurface(
-            title: "Reference clip",
+            title: IOSInterfaceText.referenceClip,
             tint: Theme.Brand.modeClone,
             presentation: presentation,
             onDismiss: onDismiss
@@ -1158,13 +1158,13 @@ struct IOSReferenceClipSheet: View {
                         let recommended = savedVoices.filter(\.isRecommended)
                         let others = savedVoices.filter { !$0.isRecommended }
                         if recommended.isEmpty {
-                            savedVoicesHeader("Saved voices")
+                            savedVoicesHeader(IOSInterfaceText.savedVoices)
                             ForEach(others) { row(for: $0) }
                         } else {
-                            savedVoicesHeader("Recommended")
+                            savedVoicesHeader(IOSInterfaceText.recommended)
                             ForEach(recommended) { row(for: $0) }
                             if !others.isEmpty {
-                                savedVoicesHeader("All voices")
+                                savedVoicesHeader(IOSInterfaceText.allVoices)
                                 ForEach(others) { row(for: $0) }
                             }
                         }
@@ -1180,8 +1180,8 @@ struct IOSReferenceClipSheet: View {
         VStack(spacing: 8) {
             sourceRow(
                 symbol: "mic.fill",
-                title: "Record new clip",
-                detail: "Capture a 10-20 second sample on this iPhone.",
+                title: IOSInterfaceText.recordNewClip,
+                detail: IOSInterfaceText.captureSample,
                 accessibilityIdentifier: "referenceClip_recordNewClip",
                 action: onRequestRecord
             )
@@ -1321,14 +1321,14 @@ struct IOSBankDeliveryPickerSheet: View {
 
     var body: some View {
         IOSBottomSheetSurface(
-            title: "Delivery",
+            title: IOSInterfaceText.delivery,
             tint: Theme.Brand.modeClone,
             presentation: presentation,
             onDismiss: onDismiss
         ) {
             IOSScrollView(bottomFadeHeight: 0) {
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("\(personaName) is a voice bank: the same voice with curated emotion references. Each delivery clones its measured reference clip.")
+                    Text(IOSInterfaceText.voiceBankDetail(personaName))
                         .font(.caption)
                         .foregroundStyle(Theme.Text.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -1390,7 +1390,7 @@ struct IOSDeleteModelSheet: View {
 
     var body: some View {
         IOSBottomSheetSurface(
-            title: "Delete model?",
+            title: IOSInterfaceText.deleteModelQuestion,
             tint: destructiveRed,
             presentation: presentation,
             onDismiss: onCancel
@@ -1443,7 +1443,7 @@ struct IOSDeleteModelSheet: View {
                     .foregroundStyle(Theme.Text.primary)
                     .lineLimit(1)
 
-                Text("Frees \(sizeLabel). You can reinstall later from Settings.")
+                Text(IOSInterfaceText.freesStorage(sizeLabel))
                     .font(.system(size: 13, weight: .regular))
                     .foregroundStyle(Theme.Text.secondary)
                     .lineLimit(1)
@@ -1461,7 +1461,7 @@ struct IOSDeleteModelSheet: View {
             HStack(spacing: 8) {
                 Image(systemName: "trash")
                     .font(.system(size: 17, weight: .semibold))
-                Text("Delete model")
+                Text(IOSInterfaceText.deleteModel)
                     .font(.system(size: 17, weight: .semibold))
             }
             .foregroundStyle(.white)
@@ -1490,7 +1490,7 @@ struct IOSDeleteModelSheet: View {
         Button {
             onCancel()
         } label: {
-            Text("Cancel")
+            Text(IOSInterfaceText.cancel)
                 .font(.system(size: 17, weight: .semibold))
                 .foregroundStyle(Theme.Text.primary)
                 .frame(maxWidth: .infinity)

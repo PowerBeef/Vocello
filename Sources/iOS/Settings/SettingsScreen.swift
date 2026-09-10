@@ -4,6 +4,194 @@ import QwenVoiceCore
 
 /// Typed Settings copy shared by the hub and its destinations.
 enum IOSSettingsText {
+    static var builtIn: String {
+        String(localized: "vocello.settings.polish.builtIn", defaultValue: "Built-in Voice",
+               comment: "Settings and model management presentation; no change to stored identities.")
+    }
+    static var design: String {
+        String(localized: "vocello.settings.polish.design", defaultValue: "Voice Design",
+               comment: "Settings and model management presentation; no change to stored identities.")
+    }
+    static var clone: String {
+        String(localized: "vocello.settings.polish.clone", defaultValue: "Voice Cloning",
+               comment: "Settings and model management presentation; no change to stored identities.")
+    }
+    static var overview: String {
+        String(localized: "vocello.settings.polish.overview", defaultValue: "Overview",
+               comment: "Settings and model management presentation; no change to stored identities.")
+    }
+    static var studioModels: String {
+        String(localized: "vocello.settings.polish.studioModels", defaultValue: "Studio Models",
+               comment: "Settings and model management presentation; no change to stored identities.")
+    }
+    static var modelsDetail: String {
+        String(localized: "vocello.settings.polish.modelsDetail", defaultValue: "One private, on-device model powers each Studio mode. Install only the modes you use.",
+               comment: "Settings and model management presentation; no change to stored identities.")
+    }
+    static var noModelFiles: String {
+        String(localized: "vocello.settings.polish.noModelFiles", defaultValue: "No model files",
+               comment: "Settings and model management presentation; no change to stored identities.")
+    }
+    static var install: String {
+        String(localized: "vocello.settings.polish.install", defaultValue: "Install",
+               comment: "Settings and model management presentation; no change to stored identities.")
+    }
+    static var remove: String {
+        String(localized: "vocello.settings.polish.remove", defaultValue: "Remove",
+               comment: "Settings and model management presentation; no change to stored identities.")
+    }
+    static var update: String {
+        String(localized: "vocello.settings.polish.update", defaultValue: "Update",
+               comment: "Settings and model management presentation; no change to stored identities.")
+    }
+    static var repair: String {
+        String(localized: "vocello.settings.polish.repair", defaultValue: "Repair",
+               comment: "Settings and model management presentation; no change to stored identities.")
+    }
+    static var retry: String {
+        String(localized: "vocello.settings.polish.retry", defaultValue: "Retry",
+               comment: "Settings and model management presentation; no change to stored identities.")
+    }
+    static var cancel: String {
+        String(localized: "vocello.settings.polish.cancel", defaultValue: "Cancel",
+               comment: "Settings and model management presentation; no change to stored identities.")
+    }
+    static var cancelDownload: String {
+        String(localized: "vocello.settings.polish.cancelDownload", defaultValue: "Cancel download",
+               comment: "Settings and model management presentation; no change to stored identities.")
+    }
+    static var cancelDownloadTitle: String {
+        String(localized: "vocello.settings.polish.cancelDownloadTitle", defaultValue: "Cancel download?",
+               comment: "Settings and model management presentation; no change to stored identities.")
+    }
+    static var cancelDownloadConfirm: String {
+        String(localized: "vocello.settings.polish.cancelDownloadConfirm", defaultValue: "Cancel Download",
+               comment: "Settings and model management presentation; no change to stored identities.")
+    }
+    static var keepDownload: String {
+        String(localized: "vocello.settings.polish.keepDownload", defaultValue: "Keep Download",
+               comment: "Settings and model management presentation; no change to stored identities.")
+    }
+    static var cancelDownloadDetail: String {
+        String(localized: "vocello.settings.polish.cancelDownloadDetail", defaultValue: "Canceling removes the downloaded data. You can download it again from scratch.",
+               comment: "Settings and model management presentation; no change to stored identities.")
+    }
+    static var checking: String {
+        String(localized: "vocello.settings.polish.checking", defaultValue: "Checking…",
+               comment: "Settings and model management presentation; no change to stored identities.")
+    }
+    static var notInstalled: String {
+        String(localized: "vocello.settings.polish.notInstalled", defaultValue: "Not Installed",
+               comment: "Settings and model management presentation; no change to stored identities.")
+    }
+    static var updateAvailable: String {
+        String(localized: "vocello.settings.polish.updateAvailable", defaultValue: "Update Available",
+               comment: "Settings and model management presentation; no change to stored identities.")
+    }
+    static var repairNeeded: String {
+        String(localized: "vocello.settings.polish.repairNeeded", defaultValue: "Repair Needed",
+               comment: "Settings and model management presentation; no change to stored identities.")
+    }
+    static var retryNeeded: String {
+        String(localized: "vocello.settings.polish.retryNeeded", defaultValue: "Retry Needed",
+               comment: "Settings and model management presentation; no change to stored identities.")
+    }
+    static var queued: String {
+        String(localized: "vocello.settings.polish.queued", defaultValue: "Queued",
+               comment: "Settings and model management presentation; no change to stored identities.")
+    }
+    static var waitingForNetwork: String {
+        String(localized: "vocello.settings.polish.waitingForNetwork", defaultValue: "Waiting for Network",
+               comment: "Settings and model management presentation; no change to stored identities.")
+    }
+    static var finishing: String {
+        String(localized: "vocello.settings.polish.finishing", defaultValue: "Finishing",
+               comment: "Settings and model management presentation; no change to stored identities.")
+    }
+    static var downloading: String {
+        String(localized: "vocello.settings.polish.downloading", defaultValue: "Downloading",
+               comment: "Settings and model management presentation; no change to stored identities.")
+    }
+    static var retrying: String {
+        String(localized: "vocello.settings.polish.retrying", defaultValue: "Retrying",
+               comment: "Settings and model management presentation; no change to stored identities.")
+    }
+    static var verifying: String {
+        String(localized: "vocello.settings.polish.verifying", defaultValue: "Verifying",
+               comment: "Settings and model management presentation; no change to stored identities.")
+    }
+    static var installing: String {
+        String(localized: "vocello.settings.polish.installing", defaultValue: "Installing",
+               comment: "Settings and model management presentation; no change to stored identities.")
+    }
+    static var cancelling: String {
+        String(localized: "vocello.settings.polish.cancelling", defaultValue: "Cancelling",
+               comment: "Settings and model management presentation; no change to stored identities.")
+    }
+    static var removing: String {
+        String(localized: "vocello.settings.polish.removing", defaultValue: "Removing",
+               comment: "Settings and model management presentation; no change to stored identities.")
+    }
+    static var severalGB: String {
+        String(localized: "vocello.settings.polish.severalGB", defaultValue: "several GB",
+               comment: "Settings and model management presentation; no change to stored identities.")
+    }
+    static var onDeviceModel: String {
+        String(localized: "vocello.settings.polish.onDeviceModel", defaultValue: "On-device model",
+               comment: "Settings and model management presentation; no change to stored identities.")
+    }
+    static var on: String {
+        String(localized: "vocello.settings.polish.on", defaultValue: "On",
+               comment: "Settings and model management presentation; no change to stored identities.")
+    }
+    static var off: String {
+        String(localized: "vocello.settings.polish.off", defaultValue: "Off",
+               comment: "Settings and model management presentation; no change to stored identities.")
+    }
+    static func storageUsed(_ value: String) -> String {
+        String.localizedStringWithFormat(String(localized: "vocello.settings.polish.storageUsed",
+            defaultValue: "%@ used", comment: "Settings formatted presentation; preserve all substitutions."), value)
+    }
+    static func modelStatus(_ value: String) -> String {
+        String.localizedStringWithFormat(String(localized: "vocello.settings.polish.modelStatus",
+            defaultValue: "%@ model status", comment: "Settings formatted presentation; preserve all substitutions."), value)
+    }
+    static func modelAction(_ first: String, _ second: String) -> String {
+        String.localizedStringWithFormat(String(localized: "vocello.settings.polish.modelAction",
+            defaultValue: "%1$@ %2$@ model", comment: "Settings formatted presentation; preserve all substitutions."), first, second)
+    }
+    static func modelProgress(_ value: String) -> String {
+        String.localizedStringWithFormat(String(localized: "vocello.settings.polish.modelProgress",
+            defaultValue: "%@ model download progress", comment: "Settings formatted presentation; preserve all substitutions."), value)
+    }
+    static func modelSetup(_ value: String) -> String {
+        String.localizedStringWithFormat(String(localized: "vocello.settings.polish.modelSetup",
+            defaultValue: "%@ model setup in progress", comment: "Settings formatted presentation; preserve all substitutions."), value)
+    }
+    static func modeName(_ mode: GenerationMode) -> String {
+        switch mode {
+        case .custom: builtIn
+        case .design: design
+        case .clone: clone
+        }
+    }
+
+    static var title: String { String(localized: "vocello.settings.polish.title", defaultValue: "Settings") }
+    static var modelsIntro: String { String(localized: "vocello.settings.polish.modelsIntro", defaultValue: "Manage your voice models and where finished audio is saved.") }
+    static var accessibilityIntro: String { String(localized: "vocello.settings.polish.accessibilityIntro", defaultValue: "Adapt Vocello’s interface to your accessibility preferences.") }
+    static var tagline: String { String(localized: "vocello.settings.polish.tagline", defaultValue: "Your voice, locally.") }
+    static func versionIdentity(_ version: String, build: String) -> String {
+        String.localizedStringWithFormat(String(localized: "vocello.settings.polish.versionIdentity",
+            defaultValue: "Version %1$@ (%2$@)", comment: "Installed app version and build; never hardcode release numbers."), version, build)
+    }
+
+    static func variationName(_ variation: Qwen3SamplingVariation) -> String {
+        switch variation {
+        case .expressive: String(localized: "vocello.settings.polish.expressive", defaultValue: "Expressive")
+        case .balanced: String(localized: "vocello.settings.polish.balanced", defaultValue: "Balanced")
+        case .consistent: String(localized: "vocello.settings.polish.consistent", defaultValue: "Consistent")
+        }
+    }
     static var audio: String {
         String(localized: "vocello.settings.refinement.audio", defaultValue: "Audio",
                comment: "Settings audio; preserve product and consent meaning.")
@@ -211,6 +399,7 @@ enum IOSSettingsCategory: String, CaseIterable {
 
 /// Pushed into the Settings tab's existing stack; never creates another navigation shell.
 private struct IOSSettingsDetailPage<Content: View>: View {
+    @Environment(\.iosDockHeight) private var dockHeight
     @Environment(AppModel.self) private var appModel
     @Environment(\.dismiss) private var dismiss
     let category: IOSSettingsCategory
@@ -228,7 +417,7 @@ private struct IOSSettingsDetailPage<Content: View>: View {
                                 .font(.system(size: 17, weight: .semibold))
                                 .foregroundStyle(Theme.Text.primary)
                                 .frame(width: 44, height: 44)
-                                .background(Theme.Surface.inline, in: Circle())
+                                .background(Theme.Surface.panelMuted, in: Circle())
                                 .contentShape(Circle())
                         }
                         .buttonStyle(.plain)
@@ -246,7 +435,7 @@ private struct IOSSettingsDetailPage<Content: View>: View {
                 }
                 .padding(.horizontal, Theme.Spacing.lg)
                 .padding(.top, Theme.Spacing.md)
-                .padding(.bottom, IOSStudioShellMetrics.dockFadeHeight + Theme.Spacing.lg)
+                .padding(.bottom, max(IOSStudioShellMetrics.dockFadeHeight, dockHeight) + Theme.Spacing.lg)
             }
         }
         .toolbar(.hidden, for: .navigationBar)
@@ -254,9 +443,9 @@ private struct IOSSettingsDetailPage<Content: View>: View {
 }
 
 
-/// Title-free Settings landing page. The selected tab in the shared dock is the page indicator;
-/// only pushed Settings destinations provide their own compact contextual header.
+/// Compact Settings hub using the existing tab shell and grouped destinations.
 struct SettingsScreen: View {
+    @Environment(\.iosDockHeight) private var dockHeight
     @Environment(AppModel.self) private var appModel
     @EnvironmentObject private var modelManager: ModelManagerViewModel
     @Environment(\.openURL) private var openURL
@@ -302,10 +491,15 @@ struct SettingsScreen: View {
         ) {
             IOSScrollView {
                 VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
+                    Text(IOSSettingsText.title)
+                        .font(.headline)
+                        .foregroundStyle(Theme.Text.primary)
+                        .accessibilityAddTraits(.isHeader)
+                        .accessibilityIdentifier("iosSettings_title")
                     IOSSettingsSection {
                         categoryLink(.audio) { audioSection }
                         IOSSettingsDivider()
-                        NavigationLink { modelsAndFilesDestination } label: {
+                        NavigationLink(value: IOSSettingsModelNavigation.Destination.modelsAndFiles) {
                             categoryLabel(.modelsFiles)
                         }
                         .buttonStyle(.plain)
@@ -326,11 +520,17 @@ struct SettingsScreen: View {
                 .accessibilityIdentifier("screen_settings")
                 .padding(.horizontal, Theme.Spacing.lg)
                 .padding(.top, Theme.Spacing.md)
-                .padding(.bottom, IOSStudioShellMetrics.dockFadeHeight + Theme.Spacing.lg)
+                .padding(.bottom, max(IOSStudioShellMetrics.dockFadeHeight, dockHeight) + Theme.Spacing.lg)
             }
         }
         .toolbar(.hidden, for: .navigationBar)
         .sheet(isPresented: $isExportPurchasePresented) { IOSExportPurchaseSheet() }
+        .navigationDestination(for: IOSSettingsModelNavigation.Destination.self) { destination in
+            switch destination {
+            case .modelsAndFiles: modelsAndFilesDestination
+            case .voiceModels: VoiceModelsScreen()
+            }
+        }
         .task(id: isTabActive) {
             guard isTabActive else { return }
             await modelManager.refresh()
@@ -421,143 +621,160 @@ struct SettingsScreen: View {
     }
 
     private var modelsAndFilesSection: some View {
-        IOSSettingsSection {
-            NavigationLink {
-                VoiceModelsScreen()
-            } label: {
-                IOSSettingsNavigationRow(
-                    symbol: "internaldrive",
-                    title: IOSSettingsText.voiceModels,
-                    subtitle: IOSSettingsText.voiceModelsDetail,
-                    value: modelReadinessSummary
+        VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+            contextNote(IOSSettingsText.modelsIntro)
+            IOSSettingsSection {
+                NavigationLink(value: IOSSettingsModelNavigation.Destination.voiceModels) {
+                    IOSSettingsNavigationRow(
+                        symbol: "internaldrive",
+                        title: IOSSettingsText.voiceModels,
+                        subtitle: IOSSettingsText.voiceModelsDetail,
+                        value: modelReadinessSummary
+                    )
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("iosSettings_voiceModelsRow")
+                .accessibilityLabel(IOSSettingsText.voiceModels)
+                .accessibilityValue(modelReadinessSummary)
+                .accessibilityHint(IOSSettingsText.voiceModelsHint)
+
+                IOSSettingsDivider()
+                IOSSettingsValueRow(
+                    symbol: "bookmark",
+                    title: IOSSettingsText.savedOutputs,
+                    subtitle: IOSSettingsText.savedOutputsDetail,
+                    accessibilityIdentifier: "iosSettings_savedOutputsRow",
+                    value: savedOutputsSummary,
+                    accessibilityHint: IOSSettingsText.savedOutputsHint,
+                    action: { isSavedOutputsDialogPresented = true }
                 )
             }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("iosSettings_voiceModelsRow")
-            .accessibilityLabel(IOSSettingsText.voiceModels)
-            .accessibilityValue(modelReadinessSummary)
-            .accessibilityHint(IOSSettingsText.voiceModelsHint)
-
-            IOSSettingsDivider()
-            IOSSettingsValueRow(
-                symbol: "bookmark",
-                title: IOSSettingsText.savedOutputs,
-                subtitle: IOSSettingsText.savedOutputsDetail,
-                accessibilityIdentifier: "iosSettings_savedOutputsRow",
-                value: savedOutputsSummary,
-                accessibilityHint: IOSSettingsText.savedOutputsHint,
-                action: { isSavedOutputsDialogPresented = true }
-            )
         }
     }
 
     private var accessibilitySection: some View {
-        IOSSettingsSection {
-            IOSSettingsToggleRow(
-                symbol: "figure.walk.motion",
-                title: IOSSettingsText.reduceMotion,
-                subtitle: IOSSettingsText.reduceMotionDetail,
-                accessibilityIdentifier: "iosSettings_reduceMotionToggle",
-                isOn: $reduceMotionEnabled
-            )
+        VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+            contextNote(IOSSettingsText.accessibilityIntro)
+            IOSSettingsSection {
+                IOSSettingsToggleRow(
+                    symbol: "figure.walk.motion",
+                    title: IOSSettingsText.reduceMotion,
+                    subtitle: IOSSettingsText.reduceMotionDetail,
+                    accessibilityIdentifier: "iosSettings_reduceMotionToggle",
+                    isOn: $reduceMotionEnabled
+                )
 
-            IOSSettingsDivider()
-            IOSSettingsToggleRow(
-                symbol: "rectangle.fill.on.rectangle.fill",
-                title: IOSSettingsText.reduceTransparency,
-                subtitle: IOSSettingsText.reduceTransparencyDetail,
-                accessibilityIdentifier: "iosSettings_reduceTransparencyToggle",
-                isOn: $reduceTransparencyEnabled
-            )
+                IOSSettingsDivider()
+                IOSSettingsToggleRow(
+                    symbol: "rectangle.fill.on.rectangle.fill",
+                    title: IOSSettingsText.reduceTransparency,
+                    subtitle: IOSSettingsText.reduceTransparencyDetail,
+                    accessibilityIdentifier: "iosSettings_reduceTransparencyToggle",
+                    isOn: $reduceTransparencyEnabled
+                )
+            }
         }
     }
 
     private var privacySection: some View {
-        IOSSettingsSection {
-            IOSSettingsToggleRow(
-                symbol: "hand.raised.fill",
-                title: IOSSettingsText.cloneConsent,
-                subtitle: IOSSettingsText.cloneConsentDetail,
-                accessibilityIdentifier: "voiceCloning_consentAcknowledgment",
-                isOn: $cloneConsentAcknowledged,
-                tint: Theme.Brand.modeClone
-            )
+        VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+            IOSSettingsSection {
+                IOSSettingsToggleRow(
+                    symbol: "hand.raised.fill",
+                    title: IOSSettingsText.cloneConsent,
+                    subtitle: IOSSettingsText.cloneConsentDetail,
+                    accessibilityIdentifier: "voiceCloning_consentAcknowledgment",
+                    isOn: $cloneConsentAcknowledged,
+                    tint: Theme.Brand.modeClone
+                )
+            }
 
-            Text(IOSSettingsText.cloneDisclosure)
-                .font(.footnote)
-                .foregroundStyle(Theme.Text.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.horizontal, 14)
-                .padding(.bottom, 12)
+            contextNote(IOSSettingsText.cloneDisclosure)
                 .accessibilityLabel(IOSSettingsText.cloneDisclosureHint)
 
-            IOSSettingsDivider()
-            IOSSettingsValueRow(
-                symbol: "hand.raised.fill",
-                title: VocelloPresentationText.exportPrivacy,
-                subtitle: nil,
-                accessibilityIdentifier: "iosSettings_privacyPolicyRow",
-                value: "",
-                accessibilityHint: IOSSettingsText.privacyHint,
-                action: { open("https://vocello.vercel.app/privacy") }
-            )
+            IOSSettingsSection {
+                IOSSettingsValueRow(
+                    symbol: "hand.raised.fill",
+                    title: VocelloPresentationText.exportPrivacy,
+                    subtitle: nil,
+                    accessibilityIdentifier: "iosSettings_privacyPolicyRow",
+                    value: "",
+                    accessibilityHint: IOSSettingsText.privacyHint,
+                    action: { open("https://vocello.vercel.app/privacy") }
+                )
 
-            IOSSettingsDivider()
-            IOSSettingsValueRow(
-                symbol: "gearshape.fill",
-                title: IOSSettingsText.permissions,
-                subtitle: IOSSettingsText.permissionsDetail,
-                accessibilityIdentifier: "iosSettings_openIOSSettingsRow",
-                value: IOSSettingsText.systemSettings,
-                accessibilityHint: IOSSettingsText.permissionsHint,
-                action: { open(UIApplication.openSettingsURLString) }
-            )
+                IOSSettingsDivider()
+                IOSSettingsValueRow(
+                    symbol: "gearshape.fill",
+                    title: IOSSettingsText.permissions,
+                    subtitle: IOSSettingsText.permissionsDetail,
+                    accessibilityIdentifier: "iosSettings_openIOSSettingsRow",
+                    value: IOSSettingsText.systemSettings,
+                    accessibilityHint: IOSSettingsText.permissionsHint,
+                    action: { open(UIApplication.openSettingsURLString) }
+                )
+            }
         }
     }
 
     private var aboutSection: some View {
-        IOSSettingsSection {
-            IOSSettingsValueRow(
-                symbol: "questionmark.circle.fill",
-                title: String(localized: "vocello.settings.help_support"),
-                subtitle: String(localized: "vocello.settings.help_support.subtitle"),
-                accessibilityIdentifier: "iosSettings_supportRow",
-                value: "",
-                accessibilityHint: String(localized: "vocello.settings.help_support.hint"),
-                action: { open("https://vocello.vercel.app/support/") }
-            )
-
-            IOSSettingsDivider()
-            NavigationLink {
-                OpenSourceLicensesScreen()
-            } label: {
-                IOSSettingsNavigationRow(
-                    symbol: "chevron.left.forwardslash.chevron.right",
-                    title: String(localized: "vocello.settings.open_source_licenses"),
-                    subtitle: nil,
-                    value: ""
-                )
+        VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
+            VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+                Text(Theme.Branding.productName)
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(Theme.Text.primary)
+                    .accessibilityAddTraits(.isHeader)
+                contextNote(IOSSettingsText.tagline)
+                IOSSettingsVersionRow()
             }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("iosSettings_openSourceRow")
-            .accessibilityLabel(String(localized: "vocello.settings.open_source_licenses"))
-            .accessibilityValue(String(localized: "vocello.settings.on_device"))
-            .accessibilityHint(String(localized: "vocello.settings.open_source_licenses.hint"))
+            IOSSettingsSection {
+                IOSSettingsValueRow(
+                    symbol: "questionmark.circle.fill",
+                    title: String(localized: "vocello.settings.help_support"),
+                    subtitle: String(localized: "vocello.settings.help_support.subtitle"),
+                    accessibilityIdentifier: "iosSettings_supportRow",
+                    value: "",
+                    accessibilityHint: String(localized: "vocello.settings.help_support.hint"),
+                    action: { open("https://vocello.vercel.app/support/") }
+                )
 
-            IOSSettingsDivider()
-            IOSSettingsValueRow(
-                symbol: "chevron.left.forwardslash.chevron.right",
-                title: String(localized: "vocello.settings.source_code"),
-                subtitle: nil,
-                accessibilityIdentifier: "iosSettings_sourceCodeRow",
-                value: "",
-                accessibilityHint: String(localized: "vocello.settings.source_code.hint"),
-                action: { open("https://github.com/PowerBeef/Vocello") }
-            )
+                IOSSettingsDivider()
+                NavigationLink {
+                    OpenSourceLicensesScreen()
+                } label: {
+                    IOSSettingsNavigationRow(
+                        symbol: "chevron.left.forwardslash.chevron.right",
+                        title: String(localized: "vocello.settings.open_source_licenses"),
+                        subtitle: nil,
+                        value: ""
+                    )
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("iosSettings_openSourceRow")
+                .accessibilityLabel(String(localized: "vocello.settings.open_source_licenses"))
+                .accessibilityValue(String(localized: "vocello.settings.on_device"))
+                .accessibilityHint(String(localized: "vocello.settings.open_source_licenses.hint"))
 
-            IOSSettingsDivider()
-            IOSSettingsVersionRow()
+                IOSSettingsDivider()
+                IOSSettingsValueRow(
+                    symbol: "chevron.left.forwardslash.chevron.right",
+                    title: String(localized: "vocello.settings.source_code"),
+                    subtitle: nil,
+                    accessibilityIdentifier: "iosSettings_sourceCodeRow",
+                    value: "",
+                    accessibilityHint: String(localized: "vocello.settings.source_code.hint"),
+                    action: { open("https://github.com/PowerBeef/Vocello") }
+                )
+
+            }
         }
+    }
+
+    private func contextNote(_ text: String) -> some View {
+        Text(text)
+            .font(.footnote)
+            .foregroundStyle(Theme.Text.secondary)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     private func effectiveStatus(for model: TTSModel) -> ModelManagerViewModel.ModelStatus {

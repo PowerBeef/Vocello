@@ -26,8 +26,8 @@ struct IOSLongFormSegmentsMenuChip: View {
     var body: some View {
         if isVisible {
             IOSStudioSetupChip(
-                eyebrow: "Long-form",
-                value: "Regenerate segment",
+                eyebrow: IOSInterfaceText.longForm,
+                value: IOSInterfaceText.regenerateSegment,
                 abbreviation: "RS",
                 leadingSymbol: "square.stack.3d.up",
                 tint: tint,
@@ -36,12 +36,12 @@ struct IOSLongFormSegmentsMenuChip: View {
             )
             .disabled(appModel.longForm.isProcessing || ttsEngine.hasActiveGeneration)
             .confirmationDialog(
-                "Regenerate a segment",
+                IOSInterfaceText.regenerateSegmentTitle,
                 isPresented: $isChoosingSegment,
                 titleVisibility: .visible
             ) {
                 ForEach(appModel.longForm.segments) { segment in
-                    Button("Segment \(segment.index + 1): \(String(segment.line.prefix(28)))") {
+                    Button(IOSInterfaceText.segmentChoice(segment.index + 1, text: String(segment.line.prefix(28)))) {
                         appModel.longForm.regenerateSegment(
                             index: segment.index,
                             ttsEngine: ttsEngine,
@@ -51,7 +51,7 @@ struct IOSLongFormSegmentsMenuChip: View {
                     }
                     .accessibilityIdentifier("iosLongForm_regenerateSegment_\(segment.index)")
                 }
-                Button("Cancel", role: .cancel) {}
+                Button(IOSInterfaceText.cancel, role: .cancel) {}
             }
         }
     }

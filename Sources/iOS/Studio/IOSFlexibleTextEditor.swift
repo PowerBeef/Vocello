@@ -29,8 +29,8 @@ struct IOSFlexibleTextEditor: UIViewRepresentable {
     func makeUIView(context: Context) -> NoIntrinsicHeightTextView {
         let view = NoIntrinsicHeightTextView()
         view.accessibilityIdentifier = "textInput_textEditor"
-        view.accessibilityLabel = "Script"
-        view.accessibilityHint = "Enter or paste the text to generate."
+        view.accessibilityLabel = IOSInterfaceText.scriptLabel
+        view.accessibilityHint = IOSInterfaceText.scriptHint
         view.delegate = context.coordinator
         view.backgroundColor = .clear
         view.font = font
@@ -66,11 +66,11 @@ struct IOSFlexibleTextEditor: UIViewRepresentable {
         if view.accessibilityIdentifier != "textInput_textEditor" {
             view.accessibilityIdentifier = "textInput_textEditor"
         }
-        if view.accessibilityLabel != "Script" {
-            view.accessibilityLabel = "Script"
+        if view.accessibilityLabel != IOSInterfaceText.scriptLabel {
+            view.accessibilityLabel = IOSInterfaceText.scriptLabel
         }
-        if view.accessibilityHint != "Enter or paste the text to generate." {
-            view.accessibilityHint = "Enter or paste the text to generate."
+        if view.accessibilityHint != IOSInterfaceText.scriptHint {
+            view.accessibilityHint = IOSInterfaceText.scriptHint
         }
         if view.text != text {
             view.text = text

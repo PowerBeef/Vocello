@@ -47,7 +47,7 @@ struct QVoiceiOSApp: App {
                             .scaledToFit()
                             .frame(width: 64, height: 64)
                             .foregroundColor(.orange)
-                        Text("App Initialization Failed")
+                        Text(IOSInterfaceText.initializationFailed)
                             .font(.title2.bold())
                         Text(error.localizedDescription)
                             .multilineTextAlignment(.center)

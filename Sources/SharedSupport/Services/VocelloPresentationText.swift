@@ -2,11 +2,171 @@ import Foundation
 
 /// Typed presentation vocabulary for user-visible status and dynamic error text.
 ///
-/// English remains the only shipping localization for now. New presentation
+/// English is the source language; French catalog copy is maintained alongside it. New presentation
 /// strings enter through this vocabulary and `Localizable.xcstrings`, which
 /// gives translators stable semantic keys, context, substitutions, and plural
 /// rules before any broad translation work begins.
 enum VocelloPresentationText {
+    static func playerSubtitle(_ subtitle: String, duration: String) -> String {
+        String.localizedStringWithFormat(String(localized: "vocello.presentation.playerSubtitle",
+            defaultValue: "%1$@ · %2$@",
+            comment: "Complete user-facing playerSubtitle message. Preserve substitution identities."), subtitle, duration)
+    }
+
+    static func downloadedBytes(_ bytes: String) -> String {
+        String.localizedStringWithFormat(String(localized: "vocello.presentation.downloadedBytes",
+            defaultValue: "%1$@ downloaded",
+            comment: "Complete user-facing downloadedBytes message. Preserve substitution identities."), bytes)
+    }
+
+    static var downloadFinishing: String {
+        String(localized: "vocello.presentation.downloadFinishing", defaultValue: "Download complete — finishing setup.",
+               comment: "User-facing downloadFinishing message.")
+    }
+
+    static func downloadTransfer(_ percent: Int, completed: String, total: String) -> String {
+        String.localizedStringWithFormat(String(localized: "vocello.presentation.downloadTransfer",
+            defaultValue: "%1$lld%% · %2$@ of %3$@",
+            comment: "Complete user-facing downloadTransfer message. Preserve substitution identities."), percent, completed, total)
+    }
+
+    static func downloadAccessibility(_ percent: Int, completed: Int64, total: Int64) -> String {
+        String.localizedStringWithFormat(String(localized: "vocello.presentation.downloadAccessibility",
+            defaultValue: "%1$lld%% — %2$lld of %3$lld bytes",
+            comment: "Complete user-facing downloadAccessibility message. Preserve substitution identities."), percent, completed, total)
+    }
+
+    static func downloadRemaining(_ seconds: Int) -> String {
+        String.localizedStringWithFormat(String(localized: "vocello.presentation.downloadRemaining",
+            defaultValue: "about %1$llds remaining",
+            comment: "Complete user-facing downloadRemaining message. Preserve substitution identities."), seconds)
+    }
+
+    static func downloadRetry(_ count: Int) -> String {
+        String.localizedStringWithFormat(String(localized: "vocello.presentation.downloadRetry",
+            defaultValue: "Preparing retry %1$lld. Verified files will be reused.",
+            comment: "Complete user-facing downloadRetry message. Preserve substitution identities."), count)
+    }
+
+    static func downloadRetryReason(_ count: Int, reason: String) -> String {
+        String.localizedStringWithFormat(String(localized: "vocello.presentation.downloadRetryReason",
+            defaultValue: "Preparing retry %1$lld: %2$@. Verified files will be reused.",
+            comment: "Complete user-facing downloadRetryReason message. Preserve substitution identities."), count, reason)
+    }
+
+    static var longFormGuidance: String {
+        String(localized: "vocello.presentation.longFormGuidance", defaultValue: "Long-form script — Vocello plans segments, streams each one, and joins them into a single take.",
+               comment: "User-facing longFormGuidance message.")
+    }
+
+    static var longFormLimit: String {
+        String(localized: "vocello.presentation.longFormLimit", defaultValue: "At the single-take limit; keep typing for a long-form project.",
+               comment: "User-facing longFormLimit message.")
+    }
+
+    static func charactersRemaining(_ count: Int) -> String {
+        String.localizedStringWithFormat(String(localized: "vocello.presentation.charactersRemaining",
+            defaultValue: "%1$lld characters remaining for a single take.",
+            comment: "Complete user-facing charactersRemaining message. Preserve substitution identities."), count)
+    }
+
+    static func shortenScript(_ limit: Int) -> String {
+        String.localizedStringWithFormat(String(localized: "vocello.presentation.shortenScript",
+            defaultValue: "Shorten the script to %1$lld characters or less.",
+            comment: "Complete user-facing shortenScript message. Preserve substitution identities."), limit)
+    }
+
+    static func shortenScriptTitle(_ limit: Int) -> String {
+        String.localizedStringWithFormat(String(localized: "vocello.presentation.shortenScriptTitle",
+            defaultValue: "Shorten script to %1$lld chars",
+            comment: "Complete user-facing shortenScriptTitle message. Preserve substitution identities."), limit)
+    }
+
+    static var preparingLongForm: String {
+        String(localized: "vocello.presentation.preparingLongForm", defaultValue: "Preparing long-form project…",
+               comment: "User-facing preparingLongForm message.")
+    }
+
+    static func regeneratingSegment(_ number: Int, total: Int) -> String {
+        String.localizedStringWithFormat(String(localized: "vocello.presentation.regeneratingSegment",
+            defaultValue: "Regenerating segment %1$lld of %2$lld…",
+            comment: "Complete user-facing regeneratingSegment message. Preserve substitution identities."), number, total)
+    }
+
+    static func reusingSegment(_ number: Int, total: Int) -> String {
+        String.localizedStringWithFormat(String(localized: "vocello.presentation.reusingSegment",
+            defaultValue: "Reusing segment %1$lld of %2$lld…",
+            comment: "Complete user-facing reusingSegment message. Preserve substitution identities."), number, total)
+    }
+
+    static func generatingSegment(_ number: Int, total: Int) -> String {
+        String.localizedStringWithFormat(String(localized: "vocello.presentation.generatingSegment",
+            defaultValue: "Generating segment %1$lld of %2$lld…",
+            comment: "Complete user-facing generatingSegment message. Preserve substitution identities."), number, total)
+    }
+
+    static func generatedSegmentPending(_ number: Int, total: Int) -> String {
+        String.localizedStringWithFormat(String(localized: "vocello.presentation.generatedSegmentPending",
+            defaultValue: "Generated segment %1$lld of %2$lld; project not yet saved",
+            comment: "Complete user-facing generatedSegmentPending message. Preserve substitution identities."), number, total)
+    }
+
+    static func joiningSegments(_ count: Int) -> String {
+        String.localizedStringWithFormat(String(localized: "vocello.presentation.joiningSegments",
+            defaultValue: "Joining %1$lld segments…",
+            comment: "Complete user-facing joiningSegments message. Preserve substitution identities."), count)
+    }
+
+    static var done: String {
+        String(localized: "vocello.presentation.done", defaultValue: "Done",
+               comment: "User-facing done message.")
+    }
+
+    static var oldSegmentQC: String {
+        String(localized: "vocello.presentation.oldSegmentQC", defaultValue: "A previously generated segment no longer passes audio quality checks.",
+               comment: "User-facing oldSegmentQC message.")
+    }
+
+    static func segmentQC(_ number: Int, detail: String) -> String {
+        String.localizedStringWithFormat(String(localized: "vocello.presentation.segmentQC",
+            defaultValue: "Segment %1$lld failed audio quality checks. %2$@",
+            comment: "Complete user-facing segmentQC message. Preserve substitution identities."), number, detail)
+    }
+
+    static func joinedQC(_ detail: String) -> String {
+        String.localizedStringWithFormat(String(localized: "vocello.presentation.joinedQC",
+            defaultValue: "The joined long-form output failed audio quality checks: %1$@",
+            comment: "Complete user-facing joinedQC message. Preserve substitution identities."), detail)
+    }
+
+    static func assemblyFailed(_ detail: String) -> String {
+        String.localizedStringWithFormat(String(localized: "vocello.presentation.assemblyFailed",
+            defaultValue: "Long-form assembly failed: %1$@",
+            comment: "Complete user-facing assemblyFailed message. Preserve substitution identities."), detail)
+    }
+
+    static var segmentNotInProject: String {
+        String(localized: "vocello.presentation.segmentNotInProject", defaultValue: "The segment to regenerate is not part of this completed project.",
+               comment: "User-facing segmentNotInProject message.")
+    }
+
+    static func regeneratedQC(_ detail: String) -> String {
+        String.localizedStringWithFormat(String(localized: "vocello.presentation.regeneratedQC",
+            defaultValue: "The regenerated take failed audio quality checks; the previous take is unchanged. %1$@",
+            comment: "Complete user-facing regeneratedQC message. Preserve substitution identities."), detail)
+    }
+
+    static func regeneratedJoinedQC(_ detail: String) -> String {
+        String.localizedStringWithFormat(String(localized: "vocello.presentation.regeneratedJoinedQC",
+            defaultValue: "The joined long-form output failed audio quality checks after regeneration: %1$@",
+            comment: "Complete user-facing regeneratedJoinedQC message. Preserve substitution identities."), detail)
+    }
+
+    static func segmentMissing(_ number: Int) -> String {
+        String.localizedStringWithFormat(String(localized: "vocello.presentation.segmentMissing",
+            defaultValue: "Segment %1$lld has no generated audio to join.",
+            comment: "Complete user-facing segmentMissing message. Preserve substitution identities."), number)
+    }
     static var exportRecoveryFiles: String {
         String(localized: "vocello.history.export_recovery_files",
                defaultValue: "Export Recovery Files",

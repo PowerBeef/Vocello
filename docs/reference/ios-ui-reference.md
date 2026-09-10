@@ -1,7 +1,7 @@
 ---
 status: active
 owner: ios
-reviewed: 2026-09-09
+reviewed: 2026-09-10
 summary: Compact iOS screen and accessibility-identifier map for physical-device XCUITest — states, stable identifiers, and expectations per screen.
 sourceOfTruth:
   - Sources/iOS
@@ -113,24 +113,34 @@ successful read. Destructive History actions are outside the minimal smoke and b
 
 ## Settings
 
-iOS Settings is a title-free six-entry hub (`screen_settings`) in three flat groups: Audio and
+iOS Settings has a compact localized heading (`iosSettings_title`) above its six-entry hub
+(`screen_settings`) in three flat groups: Audio and
 Models & Files; the restrained gold Design & Clone Export entry; Privacy & Permissions,
 Accessibility, and About. Five detail pages use the existing tab navigation stack and compact
 44-point Back headers. Root links are `iosSettings_<category>Row`, headers are
 `screen_settings_<category>`, and Back is `iosSettings_<category>BackButton`, for categories
 `audio`, `modelsFiles`, `privacyPermissions`, `accessibility`, and `about`.
 The tab dock, preference keys/defaults, model operations and outward export policy are unchanged.
-Decorative symbols replace utility tiles; labels wrap and values sit below rather than compete
-with descriptions. Audio owns the original autoplay Toggle and Take variation menu. Models &
+Decorative symbols replace utility tiles; labels wrap and short values align to the trailing side,
+reflowing below labels at accessibility sizes. Audio owns the original autoplay Toggle and localized
+Take variation menu. Models &
 Files owns actual model readiness and the existing saved-output folder workflow. Accessibility
 owns the two existing reduction preferences. Privacy & Permissions owns the exact consent,
 disclosure, policy and system-permission controls. About owns Help & Support, licenses, Source
-Code and a dynamic read-only version/build row; there is no branding footer.
+Code and a compact identity block with the dynamic read-only version/build label; there is no
+branding footer. Models & Files and Accessibility use short contextual introductions, while the
+unchanged cloning disclosure sits between the consent card and the policy/permissions group.
+Back controls retain 44-point touch targets with a softer muted fill. French model presentation
+uses localized display names/actions/statuses without changing catalog or preference identities.
 See the [app guide](ios-app-guide.md#settings-tab--sourcesiossettingssettingsscreenswift) for
 retained control IDs and purchase-sheet behavior. Open Source & Licenses pushes
 `screen_openSourceLicenses`, with stable component/model rows and a 44-point
 `iosSettings_openSourceBackButton` returning to About; attribution details expose their complete bundled license text
 and governed source link without requiring network access.
+
+Studio's missing-model `textInput_installModelButton` opens the complete Settings → Models & Files
+→ Voice Models path and starts the selected mode's installation without another tap. Returning
+preserves the Studio draft; ordinary navigation and Back never initiate another installation.
 
 `iosSettings_voiceModelsRow` pushes `screen_voiceModels`, whose compact
 `iosSettings_voiceModelsBackButton` returns to Models & Files. iOS has one

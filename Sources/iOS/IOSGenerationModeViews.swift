@@ -33,6 +33,7 @@ private enum IOSStudioChipAbbreviation {
 }
 
 struct IOSCustomVoiceView: View {
+    @EnvironmentObject private var modelInstaller: IOSModelInstallerViewModel
     @EnvironmentObject private var ttsEngine: TTSEngineStore
     @EnvironmentObject private var audioPlayer: AudioPlayerViewModel
     @EnvironmentObject private var modelManager: ModelManagerViewModel
@@ -89,14 +90,14 @@ struct IOSCustomVoiceView: View {
     private var deliveryChipLabel: String {
         if draft.delivery.mode == .custom {
             let trimmed = draft.delivery.customText.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !trimmed.isEmpty else { return "Custom delivery" }
+            guard !trimmed.isEmpty else { return IOSInterfaceText.customDelivery }
             let maxLength = 30
             if trimmed.count > maxLength {
                 return String(trimmed.prefix(maxLength)) + "…"
             }
             return trimmed
         }
-        return draft.delivery.selectedPresetLabel
+        return IOSInterfaceText.presetName(draft.delivery.selectedPresetID, fallback: draft.delivery.selectedPresetLabel)
     }
 
     private var activeModel: TTSModel? {
@@ -190,15 +191,15 @@ struct IOSCustomVoiceView: View {
         IOSStudioCanvas(
             mode: .custom,
             script: promptTextBinding,
-            placeholder: "Type or paste your script.",
-            modeMetaLabel: "Built-in voice",
+            placeholder: IOSInterfaceText.scriptPlaceholder,
+            modeMetaLabel: IOSInterfaceText.builtInMeta,
             charLimit: scriptLimitState.displayLimit,
             tint: Theme.Brand.modeCustom,
             genState: studioGenState,
             errorMessage: coordinator.errorMessage,
             canGenerate: canGenerateInCurrentRuntime,
             modelInstalled: isModelAvailable,
-            modelDisplayName: activeModel?.name ?? "Voice model",
+            modelDisplayName: IOSSettingsText.builtIn,
             setupChips: { customModeChips },
             onGenerate: generate,
             onCancel: {
@@ -216,7 +217,10 @@ struct IOSCustomVoiceView: View {
                     )
                 }
             },
-            onInstallModel: { selectedTab = .settings },
+            onInstallModel: {
+                guard let model = activeModel else { return }
+                appModel.requestModelInstallation(model, using: modelInstaller)
+            },
             onPlayerDismiss: { coordinator.dismissInlinePlayer() },
             onPlayerExpand: expandInlinePlayer
         )
@@ -228,8 +232,8 @@ struct IOSCustomVoiceView: View {
     private var longFormResumeChip: some View {
         if appModel.longForm.canResume, appModel.longForm.lastMode == .custom {
             IOSStudioSetupChip(
-                eyebrow: "Long-form",
-                value: "Resume project",
+                eyebrow: IOSInterfaceText.longForm,
+                value: IOSInterfaceText.resumeProject,
                 abbreviation: "LF",
                 leadingSymbol: "arrow.clockwise",
                 tint: Theme.Brand.modeCustom,
@@ -251,7 +255,7 @@ struct IOSCustomVoiceView: View {
             let plan = try IOSLongFormCoordinator.plan(originalText: promptText)
             guard plan.segments.count <= IOSLongFormCoordinator.maxSegments else {
                 coordinator.rejectStart(
-                    "This script plans \(plan.segments.count) segments; the maximum is \(IOSLongFormCoordinator.maxSegments). Split the text and try again."
+                    IOSInterfaceText.tooManySegments(plan.segments.count, maximum: IOSLongFormCoordinator.maxSegments)
                 )
                 return
             }
@@ -294,7 +298,7 @@ struct IOSCustomVoiceView: View {
             studioCoordinator: coordinator
         )
         IOSStudioSetupChip(
-            eyebrow: "Voice",
+            eyebrow: IOSInterfaceText.voice,
             value: speakerDisplayName,
             abbreviation: IOSStudioChipAbbreviation.prefix2(speakerDisplayName),
             // Mirrors the macOS per-mode glyph (QwenVoiceCore GenerationMode.iconName =
@@ -305,7 +309,7 @@ struct IOSCustomVoiceView: View {
             action: presentVoicePicker
         )
         IOSStudioSetupChip(
-            eyebrow: "Delivery",
+            eyebrow: IOSInterfaceText.delivery,
             value: deliveryChipLabel,
             abbreviation: IOSStudioChipAbbreviation.prefix2(draft.delivery.selectedPresetLabel),
             leadingSymbol: "theatermasks.fill",
@@ -316,11 +320,11 @@ struct IOSCustomVoiceView: View {
         .disabled(!supportsDeliveryControl)
         .opacity(supportsDeliveryControl ? 1 : 0.45)
         IOSStudioSetupChip(
-            eyebrow: "Language",
-            value: LanguageSelectionPresentation.buttonLabel(
+            eyebrow: IOSInterfaceText.language,
+            value: IOSInterfaceText.languageName(LanguageSelectionPresentation.effective(
                 selected: draft.selectedLanguage,
                 detected: detectedPromptLanguage
-            ),
+            )),
             abbreviation: IOSStudioChipAbbreviation.language(
                 LanguageSelectionPresentation.effective(
                     selected: draft.selectedLanguage,
@@ -438,7 +442,7 @@ struct IOSCustomVoiceView: View {
         let generationID = UUID()
         guard let attempt = coordinator.start(live: IOSStudioLivePreviewItem(
             voiceName: speakerDisplayName,
-            modeLabel: "Built-in",
+            modeLabel: IOSInterfaceText.modeBuiltIn,
             mode: .custom,
             transcript: promptText,
             waveformSeed: seed,
@@ -485,7 +489,7 @@ struct IOSCustomVoiceView: View {
                         ? draft.resolvedDeliveryInstruction
                         : nil,
                     displayVoiceName: speakerDisplayName,
-                    modeLabel: "Built-in",
+                    modeLabel: IOSInterfaceText.modeBuiltIn,
                     waveformSeed: seed,
                     persistenceCaller: "IOSCustomVoiceView"
                 )
@@ -516,6 +520,7 @@ private struct IOSDesignedVoiceSaveResult: Equatable {
 }
 
 struct IOSVoiceDesignView: View {
+    @EnvironmentObject private var modelInstaller: IOSModelInstallerViewModel
     @EnvironmentObject private var ttsEngine: TTSEngineStore
     @EnvironmentObject private var audioPlayer: AudioPlayerViewModel
     @EnvironmentObject private var modelManager: ModelManagerViewModel
@@ -569,14 +574,14 @@ struct IOSVoiceDesignView: View {
     private var deliveryChipLabel: String {
         if draft.delivery.mode == .custom {
             let trimmed = draft.delivery.customText.trimmingCharacters(in: .whitespacesAndNewlines)
-            return trimmed.isEmpty ? "Custom delivery" : trimmed
+            return trimmed.isEmpty ? IOSInterfaceText.customDelivery : trimmed
         }
-        return draft.delivery.selectedPresetLabel
+        return IOSInterfaceText.presetName(draft.delivery.selectedPresetID, fallback: draft.delivery.selectedPresetLabel)
     }
 
     private var briefChipLabel: String {
         let trimmed = draft.voiceDescription.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? "Describe the voice" : trimmed
+        return trimmed.isEmpty ? IOSInterfaceText.describeVoice : trimmed
     }
 
     private var briefChipAbbreviation: String {
@@ -684,7 +689,7 @@ struct IOSVoiceDesignView: View {
             )) {
                 if let saveSheetAudioPath {
                     IOSSaveVoiceSheet(
-                        title: "Save Generated Voice",
+                        title: IOSInterfaceText.saveGeneratedVoice,
                         suggestedName: $saveSheetSuggestedName,
                         transcript: $saveSheetTranscript,
                         errorMessage: saveError,
@@ -750,16 +755,16 @@ struct IOSVoiceDesignView: View {
                 // so the user has to discard or cancel; soft-warn tier
                 // keeps all three buttons.
                 if !PreparedVoiceQualityWarning.isHardBlocking(candidate.qualityWarnings) {
-                    Button("Keep voice") {
+                    Button(IOSInterfaceText.keepVoice) {
                         commitDesignedVoiceCandidate(candidate)
                     }
                     .accessibilityIdentifier("voicesEnroll_keepDespiteWarning")
                 }
-                Button("Discard and re-record", role: .destructive) {
+                Button(IOSInterfaceText.discardRecord, role: .destructive) {
                     discardDesignedVoiceCandidate(candidate)
                 }
                 .accessibilityIdentifier("voicesEnroll_discardOnWarning")
-                Button("Cancel", role: .cancel) {
+                Button(IOSInterfaceText.cancel, role: .cancel) {
                     discardDesignedVoiceCandidate(candidate)
                 }
                 .accessibilityIdentifier("voicesEnroll_cancelOnWarning")
@@ -825,11 +830,11 @@ struct IOSVoiceDesignView: View {
     }
 
     private var designedVoiceReviewAlertTitle: String {
-        saveError == nil ? "Reference outside recommended range" : "Couldn't save voice"
+        saveError == nil ? IOSInterfaceText.referenceRange : IOSInterfaceText.saveVoiceFailed
     }
 
     private func designedVoiceReviewAlertMessage(for candidate: PreparedVoiceCandidate) -> String {
-        saveError ?? PreparedVoiceQualityWarning.summary(for: candidate.qualityWarnings)
+        saveError ?? IOSInterfaceText.qualitySummary(candidate.qualityWarnings)
     }
 
     /// Open the (existing) save-voice sheet for the just-generated designed clip, prefilled with a
@@ -876,11 +881,11 @@ struct IOSVoiceDesignView: View {
                 .foregroundStyle(Theme.Brand.modeDesign)
 
             VStack(alignment: .leading, spacing: 1) {
-                Text("Saved “\(result.voice.name)”")
+                Text(IOSInterfaceText.savedNamedVoice(result.voice.name))
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(Theme.Text.primary)
                     .lineLimit(1)
-                Text("Now in your voices.")
+                Text(IOSInterfaceText.nowInVoices)
                     .font(.caption)
                     .foregroundStyle(Theme.Text.secondary)
             }
@@ -891,7 +896,7 @@ struct IOSVoiceDesignView: View {
                 IOSHaptics.selection()
                 useDesignedVoiceInClone(result)
             } label: {
-                Text("Use in Clone")
+                Text(IOSInterfaceText.useClone)
                     .font(.footnote.weight(.semibold))
                     .foregroundStyle(Theme.Brand.modeClone)
                     .padding(.horizontal, 12)
@@ -922,15 +927,15 @@ struct IOSVoiceDesignView: View {
         IOSStudioCanvas(
             mode: .design,
             script: promptTextBinding,
-            placeholder: "Type the lines you want this designed voice to say.",
-            modeMetaLabel: "Designed voice",
+            placeholder: IOSInterfaceText.designPlaceholder,
+            modeMetaLabel: IOSInterfaceText.designedMeta,
             charLimit: scriptLimitState.displayLimit,
             tint: Theme.Brand.modeDesign,
             genState: studioGenState,
             errorMessage: coordinator.errorMessage,
             canGenerate: canGenerateInCurrentRuntime,
             modelInstalled: isModelAvailable,
-            modelDisplayName: activeModel?.name ?? "Voice Design model",
+            modelDisplayName: IOSSettingsText.design,
             setupChips: { designModeChips },
             onGenerate: generate,
             onCancel: {
@@ -948,7 +953,10 @@ struct IOSVoiceDesignView: View {
                     )
                 }
             },
-            onInstallModel: { selectedTab = .settings },
+            onInstallModel: {
+                guard let model = activeModel else { return }
+                appModel.requestModelInstallation(model, using: modelInstaller)
+            },
             onPlayerDismiss: { coordinator.dismissInlinePlayer() },
             onPlayerExpand: expandInlinePlayer,
             onSaveAsVoice: canSaveVoice ? { presentSaveDesignedVoice() } : nil
@@ -961,8 +969,8 @@ struct IOSVoiceDesignView: View {
     private var longFormResumeChip: some View {
         if appModel.longForm.canResume, appModel.longForm.lastMode == .design {
             IOSStudioSetupChip(
-                eyebrow: "Long-form",
-                value: "Resume project",
+                eyebrow: IOSInterfaceText.longForm,
+                value: IOSInterfaceText.resumeProject,
                 abbreviation: "LF",
                 leadingSymbol: "arrow.clockwise",
                 tint: Theme.Brand.modeDesign,
@@ -984,7 +992,7 @@ struct IOSVoiceDesignView: View {
             let plan = try IOSLongFormCoordinator.plan(originalText: promptText)
             guard plan.segments.count <= IOSLongFormCoordinator.maxSegments else {
                 coordinator.rejectStart(
-                    "This script plans \(plan.segments.count) segments; the maximum is \(IOSLongFormCoordinator.maxSegments). Split the text and try again."
+                    IOSInterfaceText.tooManySegments(plan.segments.count, maximum: IOSLongFormCoordinator.maxSegments)
                 )
                 return
             }
@@ -1025,7 +1033,7 @@ struct IOSVoiceDesignView: View {
             studioCoordinator: coordinator
         )
         IOSStudioSetupChip(
-            eyebrow: "Voice brief",
+            eyebrow: IOSInterfaceText.voiceBrief,
             value: briefChipLabel,
             abbreviation: briefChipAbbreviation,
             // Mirrors the macOS Voice Design glyph (GenerationMode.iconName = "text.bubble"),
@@ -1037,7 +1045,7 @@ struct IOSVoiceDesignView: View {
             action: presentBriefEditor
         )
         IOSStudioSetupChip(
-            eyebrow: "Delivery",
+            eyebrow: IOSInterfaceText.delivery,
             value: deliveryChipLabel,
             abbreviation: IOSStudioChipAbbreviation.prefix2(draft.delivery.selectedPresetLabel),
             leadingSymbol: "theatermasks.fill",
@@ -1046,11 +1054,11 @@ struct IOSVoiceDesignView: View {
             action: presentDesignDeliveryPicker
         )
         IOSStudioSetupChip(
-            eyebrow: "Language",
-            value: LanguageSelectionPresentation.buttonLabel(
+            eyebrow: IOSInterfaceText.language,
+            value: IOSInterfaceText.languageName(LanguageSelectionPresentation.effective(
                 selected: draft.selectedLanguage,
                 detected: detectedPromptLanguage
-            ),
+            )),
             abbreviation: IOSStudioChipAbbreviation.language(
                 LanguageSelectionPresentation.effective(
                     selected: draft.selectedLanguage,
@@ -1151,7 +1159,7 @@ struct IOSVoiceDesignView: View {
         let generationID = UUID()
         guard let attempt = coordinator.start(live: IOSStudioLivePreviewItem(
             voiceName: briefChipLabel,
-            modeLabel: "Design",
+            modeLabel: IOSInterfaceText.modeDesign,
             mode: .design,
             transcript: promptText,
             waveformSeed: seed,
@@ -1191,7 +1199,7 @@ struct IOSVoiceDesignView: View {
                     historyVoice: draft.voiceDescription,
                     historyEmotion: draft.resolvedDeliveryInstruction,
                     displayVoiceName: briefChipLabel,
-                    modeLabel: "Design",
+                    modeLabel: IOSInterfaceText.modeDesign,
                     waveformSeed: seed,
                     persistenceCaller: "IOSVoiceDesignView"
                 )
@@ -1217,6 +1225,7 @@ struct IOSVoiceDesignView: View {
 }
 
 struct IOSVoiceCloningView: View {
+    @EnvironmentObject private var modelInstaller: IOSModelInstallerViewModel
     @AppStorage("vocello.voiceCloningConsent.v1") private var cloneConsentAcknowledged = false
     @EnvironmentObject private var ttsEngine: TTSEngineStore
     @EnvironmentObject private var audioPlayer: AudioPlayerViewModel
@@ -1270,8 +1279,8 @@ struct IOSVoiceCloningView: View {
             }
             return voice.name
         }
-        if draft.referenceAudioPath != nil { return "Recorded clip" }
-        return "Choose reference"
+        if draft.referenceAudioPath != nil { return IOSInterfaceText.recordedClip }
+        return IOSInterfaceText.chooseReference
     }
 
     private var referenceChipAbbreviation: String {
@@ -1322,17 +1331,17 @@ struct IOSVoiceCloningView: View {
         guard let selectedID = draft.selectedSavedVoiceID,
               let presetID = persona.presetID(for: selectedID),
               let preset = EmotionPreset.preset(id: presetID) else {
-            return "Neutral"
+            return IOSInterfaceText.neutral
         }
-        return preset.label
+        return IOSInterfaceText.presetName(preset.id, fallback: preset.label)
     }
 
     private func bankDeliveryOptions(_ persona: VoiceBankCatalog.Persona) -> [IOSBankDeliveryOption] {
-        [IOSBankDeliveryOption(id: persona.baseVoiceID, label: "Neutral")]
+        [IOSBankDeliveryOption(id: persona.baseVoiceID, label: IOSInterfaceText.neutral)]
             + persona.orderedVariants.map { variant in
                 IOSBankDeliveryOption(
                     id: variant.voiceID,
-                    label: EmotionPreset.preset(id: variant.presetID)?.label ?? variant.presetID.capitalized
+                    label: IOSInterfaceText.presetName(variant.presetID, fallback: variant.presetID.capitalized)
                 )
             }
     }
@@ -1412,14 +1421,14 @@ struct IOSVoiceCloningView: View {
             return VocelloPresentationText.installModel(named: cloneModel.name)
         }
         if draft.referenceAudioPath == nil {
-            return "Choose a saved voice or record a reference clip on this iPhone."
+            return IOSInterfaceText.chooseReferenceDetail
         }
         if let cloneContextStatus {
             switch cloneContextStatus {
             case .waitingForHydration:
-                return "Loading the selected voice."
+                return IOSInterfaceText.loadingVoice
             case .preparing:
-                return "Preparing the reference audio."
+                return IOSInterfaceText.preparingReference
             case .primed:
                 return nil
             case .fallback(let message):
@@ -1433,18 +1442,18 @@ struct IOSVoiceCloningView: View {
     /// row. It gives users and XCUITest the same production signal without a
     /// hidden marker or making successful generation depend on proactive work.
     private var cloneModeMetaLabel: String {
-        guard draft.referenceAudioPath != nil else { return "Voice cloning" }
+        guard draft.referenceAudioPath != nil else { return IOSInterfaceText.cloneMeta }
         switch cloneContextStatus {
         case .waitingForHydration:
-            return "Voice cloning · Loading voice"
+            return IOSInterfaceText.cloneLoading
         case .preparing:
-            return "Voice cloning · Preparing reference"
+            return IOSInterfaceText.clonePreparing
         case .primed:
-            return "Voice cloning · Reference ready"
+            return IOSInterfaceText.cloneReady
         case .fallback:
-            return "Voice cloning · Prepares on generate"
+            return IOSInterfaceText.cloneOnGenerate
         case nil:
-            return "Voice cloning · Reference selected"
+            return IOSInterfaceText.cloneSelected
         }
     }
 
@@ -1518,7 +1527,7 @@ struct IOSVoiceCloningView: View {
             IOSStudioCanvas(
                 mode: .clone,
                 script: promptTextBinding,
-                placeholder: "Type the new text. The reference voice will speak it.",
+                placeholder: IOSInterfaceText.clonePlaceholder,
                 modeMetaLabel: cloneModeMetaLabel,
                 charLimit: scriptLimitState.displayLimit,
                 tint: Theme.Brand.modeClone,
@@ -1526,7 +1535,7 @@ struct IOSVoiceCloningView: View {
                 errorMessage: coordinator.errorMessage,
                 canGenerate: canGenerateInCurrentRuntime,
                 modelInstalled: isModelAvailable,
-                modelDisplayName: cloneModel?.name ?? "Voice Cloning model",
+                modelDisplayName: IOSSettingsText.clone,
                 setupChips: { cloneModeChips },
                 onGenerate: generate,
                 onCancel: {
@@ -1544,7 +1553,10 @@ struct IOSVoiceCloningView: View {
                         )
                     }
                 },
-                onInstallModel: { selectedTab = .settings },
+                onInstallModel: {
+                    guard let model = cloneModel else { return }
+                    appModel.requestModelInstallation(model, using: modelInstaller)
+                },
                 onPlayerDismiss: { coordinator.dismissInlinePlayer() },
                 onPlayerExpand: expandInlinePlayer
             )
@@ -1556,8 +1568,8 @@ struct IOSVoiceCloningView: View {
     private var longFormResumeChip: some View {
         if appModel.longForm.canResume, appModel.longForm.lastMode == .clone {
             IOSStudioSetupChip(
-                eyebrow: "Long-form",
-                value: "Resume project",
+                eyebrow: IOSInterfaceText.longForm,
+                value: IOSInterfaceText.resumeProject,
                 abbreviation: "LF",
                 leadingSymbol: "arrow.clockwise",
                 tint: Theme.Brand.modeClone,
@@ -1579,7 +1591,7 @@ struct IOSVoiceCloningView: View {
             let plan = try IOSLongFormCoordinator.plan(originalText: promptText)
             guard plan.segments.count <= IOSLongFormCoordinator.maxSegments else {
                 coordinator.rejectStart(
-                    "This script plans \(plan.segments.count) segments; the maximum is \(IOSLongFormCoordinator.maxSegments). Split the text and try again."
+                    IOSInterfaceText.tooManySegments(plan.segments.count, maximum: IOSLongFormCoordinator.maxSegments)
                 )
                 return
             }
@@ -1620,7 +1632,7 @@ struct IOSVoiceCloningView: View {
             studioCoordinator: coordinator
         )
         IOSStudioSetupChip(
-            eyebrow: draft.referenceAudioPath == nil ? "Reference" : "Voice",
+            eyebrow: draft.referenceAudioPath == nil ? IOSInterfaceText.reference : IOSInterfaceText.voice,
             value: referenceChipLabel,
             abbreviation: referenceChipAbbreviation,
             // MacOS Voice Cloning glyph is "waveform.badge.plus"; we use plain "waveform" here so
@@ -1634,7 +1646,7 @@ struct IOSVoiceCloningView: View {
         )
         if let persona = selectedBankPersona {
             IOSStudioSetupChip(
-                eyebrow: "Delivery",
+                eyebrow: IOSInterfaceText.delivery,
                 value: bankDeliveryLabel(persona),
                 abbreviation: IOSStudioChipAbbreviation.initials(bankDeliveryLabel(persona)),
                 leadingSymbol: "theatermasks",
@@ -1644,11 +1656,11 @@ struct IOSVoiceCloningView: View {
             )
         }
         IOSStudioSetupChip(
-            eyebrow: "Language",
-            value: LanguageSelectionPresentation.buttonLabel(
+            eyebrow: IOSInterfaceText.language,
+            value: IOSInterfaceText.languageName(LanguageSelectionPresentation.effective(
                 selected: draft.selectedLanguage,
                 detected: detectedPromptLanguage
-            ),
+            )),
             abbreviation: IOSStudioChipAbbreviation.language(
                 LanguageSelectionPresentation.effective(
                     selected: draft.selectedLanguage,
@@ -1740,10 +1752,10 @@ struct IOSVoiceCloningView: View {
             let subtitle: String
             if let persona = catalog.persona(containing: voice.id) {
                 let delivery = persona.presetID(for: voice.id)
-                    .flatMap { EmotionPreset.preset(id: $0)?.label } ?? "Neutral"
-                subtitle = "Voice bank · \(delivery)"
+                    .map { IOSInterfaceText.presetName($0) } ?? IOSInterfaceText.neutral
+                subtitle = IOSInterfaceText.voiceBank(delivery)
             } else {
-                subtitle = "Cloned reference"
+                subtitle = IOSInterfaceText.clonedReference
             }
             return IOSVoicePickerOption(
                 id: voice.id,
@@ -1859,7 +1871,7 @@ struct IOSVoiceCloningView: View {
         let generationID = UUID()
         guard let attempt = coordinator.start(live: IOSStudioLivePreviewItem(
             voiceName: referenceChipLabel,
-            modeLabel: "Clone",
+            modeLabel: IOSInterfaceText.modeClone,
             mode: .clone,
             transcript: promptText,
             waveformSeed: seed,
@@ -1923,7 +1935,7 @@ struct IOSVoiceCloningView: View {
                     historyVoice: voiceName,
                     historyEmotion: nil,
                     displayVoiceName: voiceName,
-                    modeLabel: "Clone",
+                    modeLabel: IOSInterfaceText.modeClone,
                     waveformSeed: seed,
                     persistenceCaller: "IOSVoiceCloningView"
                 )
@@ -1989,7 +2001,7 @@ struct IOSVoiceCloningView: View {
             transcriptLoadError = nil
         } catch {
             draft.applySavedVoice(voice, transcript: "")
-            transcriptLoadError = "Couldn't load the saved transcript for \"\(voice.name)\". Cloning can still use the audio."
+            transcriptLoadError = IOSInterfaceText.transcriptLoadFailed(voice.name)
         }
         hydratedSavedVoiceID = voice.id
         primeSelectedCloneVoiceProactively()

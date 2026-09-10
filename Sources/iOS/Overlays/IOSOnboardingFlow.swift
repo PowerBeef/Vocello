@@ -43,7 +43,7 @@ struct IOSOnboardingFlow: View {
             Spacer()
 
             if page < totalPages - 1 {
-                Button("Skip") {
+                Button(IOSInterfaceText.skip) {
                     complete()
                 }
                 .font(.subheadline.weight(.medium))
@@ -88,7 +88,7 @@ struct IOSOnboardingFlow: View {
         }
         .padding(.bottom, 24)
         .accessibilityElement()
-        .accessibilityLabel("Page \(page + 1) of \(totalPages)")
+        .accessibilityLabel(IOSInterfaceText.page(page + 1, of: totalPages))
     }
 
     // MARK: - CTA
@@ -105,9 +105,9 @@ struct IOSOnboardingFlow: View {
 
     private var ctaTitle: String {
         switch page {
-        case 0: return "Get started"
-        case 1: return "Continue"
-        default: return "Open Studio"
+        case 0: return IOSInterfaceText.getStarted
+        case 1: return IOSInterfaceText.continueAction
+        default: return IOSInterfaceText.openStudio
         }
     }
 
@@ -145,7 +145,7 @@ private struct IOSOnboardingWelcomePage: View {
                 .foregroundStyle(Theme.Text.primary)
                 .multilineTextAlignment(.center)
 
-            Text("Studio-quality voice generation. Runs entirely on this iPhone.")
+            Text(IOSInterfaceText.welcomeDetail)
                 .iosScaledFont(size: 17, relativeTo: .body)
                 .foregroundStyle(Theme.Text.secondary)
                 .multilineTextAlignment(.center)
@@ -156,17 +156,17 @@ private struct IOSOnboardingWelcomePage: View {
             VStack(alignment: .leading, spacing: 12) {
                 IOSOnboardingBenefitRow(
                     symbol: "lock.shield",
-                    title: "Nothing leaves your device",
+                    title: IOSInterfaceText.onDeviceBenefit,
                     detail: nil
                 )
                 IOSOnboardingBenefitRow(
                     symbol: "bolt.fill",
-                    title: "Generation in seconds",
+                    title: IOSInterfaceText.speedBenefit,
                     detail: nil
                 )
                 IOSOnboardingBenefitRow(
                     symbol: "waveform.path.ecg",
-                    title: "Clone, design, or pick a voice",
+                    title: IOSInterfaceText.modesBenefit,
                     detail: nil
                 )
             }
@@ -185,13 +185,13 @@ private struct IOSOnboardingInstallPage: View {
             IOSOnboardingIcon(symbol: "arrow.down.circle.fill", colors: [Theme.Brand.modeDesign, Theme.Brand.gold])
                 .padding(.bottom, 32)
 
-            Text("Install Built-in Voice")
+            Text(IOSInterfaceText.installBuiltIn)
                 .iosScaledFont(size: 36, weight: .bold, relativeTo: .largeTitle)
                 .tracking(-0.90)
                 .foregroundStyle(Theme.Text.primary)
                 .multilineTextAlignment(.center)
 
-            Text("Download the 4-bit Speed model to start generating. Voice Design and Voice Cloning each have their own model; install them later in Settings.")
+            Text(IOSInterfaceText.installDetail)
                 .iosScaledFont(size: 17, relativeTo: .body)
                 .foregroundStyle(Theme.Text.secondary)
                 .multilineTextAlignment(.center)
@@ -202,18 +202,18 @@ private struct IOSOnboardingInstallPage: View {
             VStack(alignment: .leading, spacing: 14) {
                 IOSOnboardingModelHint(
                     tint: Theme.Brand.modeCustom,
-                    name: "Built-in Voice",
-                    detail: "Built-in speakers and delivery presets."
+                    name: IOSSettingsText.builtIn,
+                    detail: IOSInterfaceText.builtInDetail
                 )
                 IOSOnboardingModelHint(
                     tint: Theme.Brand.modeDesign,
-                    name: "Voice Design",
-                    detail: "Describe a voice in natural language."
+                    name: IOSSettingsText.design,
+                    detail: IOSInterfaceText.designDetail
                 )
                 IOSOnboardingModelHint(
                     tint: Theme.Brand.modeClone,
-                    name: "Voice Cloning",
-                    detail: "Use a 10-20 s reference clip you own."
+                    name: IOSSettingsText.clone,
+                    detail: IOSInterfaceText.cloneDetail
                 )
             }
             .frame(width: 300, alignment: .leading)
@@ -231,7 +231,7 @@ private struct IOSOnboardingReadyPage: View {
             IOSOnboardingIcon(symbol: "checkmark.circle.fill", colors: [Theme.Brand.modeClone, Theme.Brand.modeDesign])
                 .padding(.bottom, 32)
 
-            Text("You're ready")
+            Text(IOSInterfaceText.onboardingReady)
                 .iosScaledFont(size: 36, weight: .bold, relativeTo: .largeTitle)
                 .tracking(-0.90)
                 .foregroundStyle(Theme.Text.primary)
@@ -240,7 +240,7 @@ private struct IOSOnboardingReadyPage: View {
             // Design pick D2: onboarding finishes before any model exists on
             // a fresh install — the closing copy names that first real step
             // instead of implying generation already works.
-            Text("Download a voice model in Settings, then type a script, pick a voice, generate. Your audio stays here.")
+            Text(IOSInterfaceText.onboardingReadyDetail)
                 .iosScaledFont(size: 17, relativeTo: .body)
                 .foregroundStyle(Theme.Text.secondary)
                 .multilineTextAlignment(.center)

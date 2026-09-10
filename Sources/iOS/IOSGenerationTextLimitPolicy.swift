@@ -64,20 +64,20 @@ struct IOSGenerationTextLimitPolicy {
                 return warningMessage
             }
             if routesToLongForm {
-                return "Long-form script — Vocello plans segments, streams each one, and joins them into a single take."
+                return VocelloPresentationText.longFormGuidance
             }
             if remainingCount == 0 {
-                return "At the single-take limit; keep typing for a long-form project."
+                return VocelloPresentationText.longFormLimit
             }
-            return "\(remainingCount) characters remaining for a single take."
+            return VocelloPresentationText.charactersRemaining(remainingCount)
         }
 
         var warningMessage: String {
-            "Shorten the script to \(IOSGenerationTextLimitPolicy.longFormScriptLimit) characters or less."
+            VocelloPresentationText.shortenScript(IOSGenerationTextLimitPolicy.longFormScriptLimit)
         }
 
         var readinessTitle: String {
-            "Shorten script to \(IOSGenerationTextLimitPolicy.longFormScriptLimit) chars"
+            VocelloPresentationText.shortenScriptTitle(IOSGenerationTextLimitPolicy.longFormScriptLimit)
         }
     }
 

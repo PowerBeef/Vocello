@@ -66,6 +66,43 @@ def write_jsonl(path: Path, rows: list[dict]) -> None:
 
 
 class IOSSmokeAcceptanceTests(unittest.TestCase):
+    def test_settings_polish_preserves_values_and_localizes_reviewed_surfaces(self) -> None:
+        settings = (ROOT / "Sources/iOS/Settings/SettingsScreen.swift").read_text()
+        rows = (ROOT / "Sources/iOS/IOSSettingsViews.swift").read_text()
+        catalog = json.loads((ROOT / "Sources/Resources/Localizable.xcstrings").read_text())["strings"]
+        expected = {
+            "title": "Réglages", "consistent": "Cohérent", "balanced": "Équilibré",
+            "expressive": "Expressif", "builtIn": "Voix intégrée", "design": "Création vocale",
+            "clone": "Clonage vocal", "install": "Installer", "remove": "Supprimer",
+            "notInstalled": "Non installé", "storageUsed": "%@ utilisés",
+        }
+        for key, value in expected.items():
+            self.assertEqual(catalog[f"vocello.settings.polish.{key}"]["localizations"]["fr"]["stringUnit"]["value"], value)
+        for key, entry in catalog.items():
+            if key.startswith("vocello.settings.polish."):
+                self.assertEqual(set(entry["localizations"]), {"en", "fr"}, key)
+                for locale in ("en", "fr"):
+                    self.assertTrue(entry["localizations"][locale]["stringUnit"]["value"], key)
+        self.assertIn('.tag(variation.rawValue)', rows)
+        self.assertIn('Text(IOSSettingsText.variationName(variation))', rows)
+        self.assertIn('Text(IOSSettingsText.modeName(model.mode))', rows)
+        self.assertIn('dynamicTypeSize.isAccessibilitySize', rows)
+        self.assertIn('AnyLayout(HStackLayout(alignment: .center, spacing: 12))', rows)
+        self.assertIn('AnyLayout(VStackLayout(alignment: .leading, spacing: 8))', rows)
+        self.assertIn('Text(IOSSettingsText.versionIdentity(IOSSettingsSupportInfo.version, build: IOSSettingsSupportInfo.build))', rows)
+        self.assertIn('contextNote(IOSSettingsText.modelsIntro)', settings)
+        self.assertIn('contextNote(IOSSettingsText.accessibilityIntro)', settings)
+        self.assertIn('contextNote(IOSSettingsText.cloneDisclosure)', settings)
+        self.assertIn('isOn: $cloneConsentAcknowledged', settings)
+        self.assertIn('.frame(width: 44, height: 44)', settings)
+        self.assertIn('.background(Theme.Surface.panelMuted, in: Circle())', settings)
+        base = (ROOT / "Tests/VocelloiOSUITests/VocelloiOSUITestCase.swift").read_text()
+        self.assertIn('additionalArguments.contains("-AppleLanguages")', base)
+        self.assertIn('["-AppleLanguages", "(en)", "-AppleLocale", "en_US"] + additionalArguments', base)
+        walk = (ROOT / "Tests/VocelloiOSUITests/VocelloiOSSmokeUITests.swift").read_text()
+        self.assertIn('name: "French-Default"', walk)
+        self.assertIn('XCTAssertEqual(element("iosSettings_title").label, "Réglages")', walk)
+
     def test_read_only_history_observation_is_bound_and_not_audio_acceptance(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -401,6 +438,27 @@ class IOSSmokeAcceptanceTests(unittest.TestCase):
         self.assertIn("ensureCloneConsentEnabled()", benchmark)
         self.assertIn("ensureCloneConsentEnabled()", smoke)
 
+    def test_studio_install_routes_selected_model_through_existing_installer(self) -> None:
+        modes = (ROOT / "Sources/iOS/IOSGenerationModeViews.swift").read_text()
+        app_model = (ROOT / "Sources/iOS/App/AppModel.swift").read_text()
+        root = (ROOT / "Sources/iOS/App/RootView.swift").read_text()
+        settings = (ROOT / "Sources/iOS/Settings/SettingsScreen.swift").read_text()
+        for name, descriptor in (
+            ("IOSCustomVoiceView", "activeModel"),
+            ("IOSVoiceDesignView", "activeModel"),
+            ("IOSVoiceCloningView", "cloneModel"),
+        ):
+            section = modes.split(f"struct {name}:", 1)[1].split("onInstallModel: {", 1)[1].split("},", 1)[0]
+            self.assertIn(f"guard let model = {descriptor}", section)
+            self.assertIn("appModel.requestModelInstallation(model, using: modelInstaller)", section)
+        self.assertIn("install: { installer.install($0) }", app_model)
+        self.assertIn("selectSettings: { self.tab = .settings }", app_model)
+        self.assertIn("@Bindable var modelNavigation = appModel.settingsModelNavigation", root)
+        self.assertIn("NavigationStack(path: $modelNavigation.path)", root)
+        self.assertIn("NavigationLink(value: IOSSettingsModelNavigation.Destination.voiceModels)", settings)
+        self.assertIn(".navigationDestination(for: IOSSettingsModelNavigation.Destination.self)", settings)
+        self.assertNotIn("installer.install(", settings)
+
     def test_settings_information_architecture_and_model_lifecycle_contract(self) -> None:
         settings = (
             ROOT / "Sources" / "iOS" / "Settings" / "SettingsScreen.swift"
@@ -423,7 +481,7 @@ class IOSSmokeAcceptanceTests(unittest.TestCase):
 
         section_markers = [
             'categoryLink(.audio)',
-            'NavigationLink { modelsAndFilesDestination }',
+            'NavigationLink(value: IOSSettingsModelNavigation.Destination.modelsAndFiles)',
             '                    exportPurchaseSection',
             'categoryLink(.privacyPermissions)',
             'categoryLink(.accessibility)',
@@ -451,12 +509,27 @@ class IOSSmokeAcceptanceTests(unittest.TestCase):
         self.assertIn('VocelloUISettingsReveal.perform(back, in: app, swipingUp: false)', purchase)
         self.assertIn('id: "rootTabDock"', shared)
         self.assertIn('target.isHittable', shared)
-        self.assertIn('requirement.satisfied(by: frame, visible: visible)', shared)
+        self.assertIn('frame.map { requirement.satisfied(by: $0, visible: visible) } ?? false', shared)
+        self.assertIn('if hittable && geometrySatisfied {', shared)
+        self.assertIn('attachment.name = "settings-reveal-observations"', shared)
+        self.assertIn('attachment.lifetime = .keepAlways', shared)
         self.assertIn('requirement: VocelloUIRevealRequirement = .fullVisibility', shared)
         self.assertIn('search.next(target: required, visible: visible)', shared)
         self.assertIn(
-            "IOSStudioShellMetrics.dockFadeHeight + Theme.Spacing.lg", settings
+            "max(IOSStudioShellMetrics.dockFadeHeight, dockHeight) + Theme.Spacing.lg", settings
         )
+        root = (ROOT / "Sources/iOS/App/RootView.swift").read_text()
+        self.assertIn('.onGeometryChange(for: CGFloat.self) { $0.size.height }', root)
+        self.assertIn('.environment(\\.iosDockHeight, dockHeight)', root)
+        for path, expected_count in [
+            ("SettingsScreen.swift", 2), ("VoiceModelsScreen.swift", 1),
+            ("OpenSourceLicensesScreen.swift", 2),
+        ]:
+            source = (ROOT / "Sources/iOS/Settings" / path).read_text()
+            self.assertEqual(source.count('@Environment(\\.iosDockHeight)'), expected_count)
+            self.assertEqual(source.count(
+                '.padding(.bottom, max(IOSStudioShellMetrics.dockFadeHeight, dockHeight) + Theme.Spacing.lg)'
+            ), expected_count)
 
         self.assertIn('.accessibilityIdentifier("screen_voiceModels")', models)
         self.assertIn('Text(IOSSettingsText.voiceModels)', models)
@@ -482,16 +555,16 @@ class IOSSmokeAcceptanceTests(unittest.TestCase):
             rows,
         )
         for state in [
-            'return "Not Installed"',
-            'return "Update Available"',
-            'return "Repair Needed"',
-            'return "Retry Needed"',
+            'return IOSSettingsText.notInstalled',
+            'return IOSSettingsText.updateAvailable',
+            'return IOSSettingsText.repairNeeded',
+            'return IOSSettingsText.retryNeeded',
         ]:
             self.assertIn(state, rows)
-        self.assertIn('? "Finishing" : "Downloading"', rows)
-        self.assertIn('"Cancel"', rows)
-        self.assertIn('accessibilityTitle: "Cancel download"', rows)
-        self.assertIn('"Remove"', rows)
+        self.assertIn('? IOSSettingsText.finishing : IOSSettingsText.downloading', rows)
+        self.assertIn('IOSSettingsText.cancel', rows)
+        self.assertIn('accessibilityTitle: IOSSettingsText.cancelDownload', rows)
+        self.assertIn('IOSSettingsText.remove', rows)
         self.assertIn('id: "iosModelDelete_\\(model.id)"', rows)
         self.assertIn('.accessibilityIdentifier("iosModelMenu_\\(model.id)")', rows)
         self.assertIn(".frame(minWidth: 44, minHeight: 44)", rows)
@@ -509,8 +582,8 @@ class IOSSmokeAcceptanceTests(unittest.TestCase):
         self.assertIn('accessibilityIdentifier("iosModelProgressDetail_\\(model.id)")', rows)
         self.assertNotIn('Image(systemName: "ellipsis.circle")', rows)
 
-        self.assertIn('IOSSettingsSection(title: "Overview")', models)
-        self.assertIn('title: "\\(readyModelCount) of \\(TTSModel.all.count) ready"', models)
+        self.assertIn('IOSSettingsSection(title: IOSSettingsText.overview)', models)
+        self.assertIn('title: IOSSettingsText.modelsReady(readyModelCount, total: TTSModel.all.count)', models)
 
         self.assertIn("func openVoiceModels()", test_case)
         self.assertIn("func leaveVoiceModels()", test_case)

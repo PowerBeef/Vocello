@@ -4,6 +4,9 @@
 from __future__ import annotations
 
 import json
+import copy
+import plistlib
+import re
 from pathlib import Path
 import sys
 import tempfile
@@ -31,6 +34,8 @@ targets:
     sources:
       - path: Sources/Resources/Localizable.xcstrings
         buildPhase: resources
+      - path: Sources/iOS/InfoPlist.xcstrings
+        buildPhase: resources
   VocelloCoreTests:
     type: bundle.unit-test
 """
@@ -53,9 +58,36 @@ def valid_catalog() -> dict[str, object]:
         strings[key] = {
             "comment": f"Translator context for {key}",
             "extractionState": "manual",
-            "localizations": {"en": english},
+            "localizations": {"en": english, "fr": copy.deepcopy(english)},
         }
     return {"sourceLanguage": "en", "strings": strings, "version": "1.0"}
+
+
+class ProductionInterfaceCatalogTests(unittest.TestCase):
+    def test_every_typed_interface_default_is_bound_to_catalog_english(self) -> None:
+        root = SCRIPTS.parent
+        catalog = json.loads((root / localization_contract.CATALOG).read_text())["strings"]
+        pattern = re.compile(
+            r'String\(localized:\s*"(?P<key>vocello\.(?:ui|presentation)\.[^"]+)",'
+            r'\s*defaultValue:\s*(?P<value>"(?:[^"\\]|\\.)*")'
+        )
+        matched = set()
+        for relative in (
+            "Sources/iOS/IOSRootNavigationModels.swift",
+            "Sources/SharedSupport/Services/VocelloPresentationText.swift",
+        ):
+            for match in pattern.finditer((root / relative).read_text()):
+                key = match["key"]
+                with self.subTest(key=key):
+                    self.assertNotIn(key, matched)
+                    matched.add(key)
+                    entry = catalog[key]["localizations"]["en"]
+                    unit = entry.get("stringUnit")
+                    if unit is None:
+                        unit = entry["variations"]["plural"]["other"]["stringUnit"]
+                    self.assertEqual(json.loads(match["value"]), unit["value"])
+        expected = {key for key in catalog if key.startswith(("vocello.ui.", "vocello.presentation."))}
+        self.assertEqual(matched, expected)
 
 
 class LocalizationContractTests(unittest.TestCase):
@@ -75,6 +107,14 @@ class LocalizationContractTests(unittest.TestCase):
         (self.root / localization_contract.CATALOG).write_text(
             json.dumps(valid_catalog()), encoding="utf-8"
         )
+        purposes = {"NSMicrophoneUsageDescription": "Record locally.",
+                    "NSSpeechRecognitionUsageDescription": "Transcribe locally."}
+        (self.root / "Sources/iOS/Info.plist").write_bytes(plistlib.dumps(purposes))
+        (self.root / "Sources/iOS/InfoPlist.xcstrings").write_text(json.dumps({
+            "sourceLanguage": "en", "version": "1.0",
+            "strings": {key: {"localizations": {
+                locale: {"stringUnit": {"state": "translated", "value": value}}
+                for locale in ("en", "fr")}} for key, value in purposes.items()}}))
         presentation = "\n".join(
             f'let key_{index} = String(localized: "{key}")'
             for index, key in enumerate(sorted(localization_contract.REQUIRED_KEYS))
@@ -122,6 +162,70 @@ class LocalizationContractTests(unittest.TestCase):
 
     def test_valid_contract_passes(self) -> None:
         self.assertEqual(localization_contract.validate(self.root), 1)
+
+    def test_french_translation_cannot_disappear_or_lose_its_reviewed_value(self) -> None:
+        for payload in (None, {}, {"stringUnit": {"state": "new", "value": "Prêt"}},
+                        {"stringUnit": {"state": "translated", "value": ""}},
+                        {"variations": []}):
+            with self.subTest(payload=payload):
+                catalog = valid_catalog()
+                catalog["strings"]["vocello.status.ready"]["localizations"]["fr"] = payload
+                (self.root / localization_contract.CATALOG).write_text(json.dumps(catalog))
+                with self.assertRaises(localization_contract.ContractError):
+                    localization_contract.validate(self.root)
+
+    def test_argument_order_can_change_but_types_positions_and_counts_cannot(self) -> None:
+        for french, accepted in (
+            ("%2$@ : %1$lld", True),
+            ("%1$lld : %2$@", True),
+            ("%1$@ : %2$lld", False),
+            ("%1$lld", False),
+            ("%1$lld %2$@ %2$@", False),
+            ("%3$lld %2$@", False),
+        ):
+            with self.subTest(french=french):
+                entry = {"localizations": {locale: {"stringUnit": {
+                    "state": "translated", "value": value}}
+                    for locale, value in (("en", "%lld %@"), ("fr", french))}}
+                if accepted:
+                    localization_contract._validate_translations(entry, "fixture")
+                else:
+                    with self.assertRaisesRegex(localization_contract.ContractError, "format arguments"):
+                        localization_contract._validate_translations(entry, "fixture")
+
+    def test_french_plural_requires_both_forms_and_matching_arguments(self) -> None:
+        for change in ("missing", "type", "flat"):
+            catalog = valid_catalog()
+            entry = catalog["strings"]["vocello.models.ready_count"]
+            if change == "missing":
+                del entry["localizations"]["fr"]["variations"]["plural"]["other"]
+            elif change == "type":
+                entry["localizations"]["fr"]["variations"]["plural"]["one"]["stringUnit"]["value"] = "%@ modèle"
+            else:
+                entry["localizations"]["fr"] = {"stringUnit": {"state": "translated", "value": "%lld modèles"}}
+            with self.subTest(change=change), self.assertRaises(localization_contract.ContractError):
+                localization_contract._validate_translations(entry, "fixture")
+
+    def test_permission_translation_preserves_source_and_is_bundled(self) -> None:
+        path = self.root / "Sources/iOS/InfoPlist.xcstrings"
+        catalog = json.loads(path.read_text())
+        catalog["strings"]["NSMicrophoneUsageDescription"]["localizations"]["en"]["stringUnit"]["value"] = "Different claim"
+        path.write_text(json.dumps(catalog))
+        with self.assertRaisesRegex(localization_contract.ContractError, "purpose string"):
+            localization_contract.validate(self.root)
+
+    def test_production_onboarding_and_dock_use_catalog_without_changing_identity(self) -> None:
+        root = localization_contract.REPO_ROOT
+        dock = (root / "Sources/iOS/App/TabDock.swift").read_text()
+        for name in ("Studio", "Voices", "History", "Settings"):
+            self.assertIn(f"IOSInterfaceText.tab{name}", dock)
+        flow = (root / "Sources/iOS/Overlays/IOSOnboardingFlow.swift").read_text()
+        self.assertIn("IOSInterfaceText.page(page + 1, of: totalPages)", flow)
+        self.assertIn('accessibilityIdentifier("onboarding_cta")', flow)
+        self.assertIn("IOSAppDefaults.hasCompletedOnboarding = true", flow)
+        source = (root / "Sources/iOS/IOSRootNavigationModels.swift").read_text()
+        self.assertIn("var id: String { rawValue }", source)
+        self.assertNotIn("GenerationRequest(", source)
 
     def test_missing_setting_catalog_or_resource_fails(self) -> None:
         cases = (
@@ -180,7 +284,8 @@ class LocalizationContractTests(unittest.TestCase):
 
     def test_additional_plural_keys_validate_categories_and_reject_malformed_payloads(self) -> None:
         for plural in (
-            {"one": {"stringUnit": {"value": "one"}}, "other": {"stringUnit": {"value": "many"}}},
+            {"one": {"stringUnit": {"state": "translated", "value": "one"}},
+             "other": {"stringUnit": {"state": "translated", "value": "many"}}},
             [], {"one": None}, {"one": {"stringUnit": []}},
             {"one": {"stringUnit": {"value": ""}}},
         ):
@@ -188,7 +293,8 @@ class LocalizationContractTests(unittest.TestCase):
                 catalog = valid_catalog()
                 catalog["strings"]["vocello.fixture.count"] = {
                     "comment": "Fixture count", "extractionState": "manual",
-                    "localizations": {"en": {"variations": {"plural": plural}}},
+                    "localizations": {locale: {"variations": {"plural": plural}}
+                                      for locale in ("en", "fr")},
                 }
                 (self.root / localization_contract.CATALOG).write_text(json.dumps(catalog), encoding="utf-8")
                 if isinstance(plural, dict) and "other" in plural:

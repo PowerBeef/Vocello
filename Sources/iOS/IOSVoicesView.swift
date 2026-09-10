@@ -60,11 +60,11 @@ struct IOSVoicesView: View {
 
     private func savedRowCaption(_ voice: Voice, bankCatalog: VoiceBankCatalog) -> String {
         guard let persona = bankCatalog.persona(containing: voice.id) else {
-            return "Cloned reference"
+            return IOSInterfaceText.clonedReference
         }
         let delivery = persona.presetID(for: voice.id)
-            .flatMap { EmotionPreset.preset(id: $0)?.label } ?? "Neutral"
-        return "Voice bank · \(delivery)"
+            .map { IOSInterfaceText.presetName($0) } ?? IOSInterfaceText.neutral
+        return IOSInterfaceText.voiceBank(delivery)
     }
 
     private var filteredBuiltIn: [SpeakerDescriptor] {
@@ -85,7 +85,7 @@ struct IOSVoicesView: View {
         ) {
             IOSScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    IOSSearchField(text: $search, placeholder: "Search voices")
+                    IOSSearchField(text: $search, placeholder: IOSInterfaceText.searchVoices)
                         .accessibilityIdentifier("voicesSearchField")
                         .padding(.horizontal, 20)
                         .padding(.bottom, 10)
@@ -103,7 +103,7 @@ struct IOSVoicesView: View {
                         // (IUI-5 P6) instead of one rebuild per row.
                         let bankCatalog = self.bankCatalog
 
-                        voicesSectionHeading("Your saved voices")
+                        voicesSectionHeading(IOSInterfaceText.yourVoices)
 
                         VStack(spacing: 0) {
                             LazyVStack(spacing: 0) {
@@ -116,7 +116,7 @@ struct IOSVoicesView: View {
                     }
 
                     if filter != .saved {
-                        voicesSectionHeading("Built-in speakers")
+                        voicesSectionHeading(IOSInterfaceText.builtInSpeakers)
 
                         LazyVStack(spacing: 0) {
                             ForEach(filteredBuiltIn, id: \.id) { speaker in
@@ -127,8 +127,8 @@ struct IOSVoicesView: View {
 
                     if filteredBuiltIn.isEmpty && filteredSaved.isEmpty {
                         IOSEmptyStateCard(
-                            title: "Nothing matches",
-                            message: "Try a different search term or switch the filter back to All.",
+                            title: IOSInterfaceText.nothingMatches,
+                            message: IOSInterfaceText.voiceSearchDetail,
                             symbolName: "magnifyingglass",
                             tint: Theme.Brand.library
                         )
@@ -158,7 +158,7 @@ struct IOSVoicesView: View {
             FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
         )
         .alert(
-            "Couldn't import audio",
+            IOSInterfaceText.importFailed,
             isPresented: Binding(
                 get: { importErrorMessage != nil },
                 set: { if !$0 { importErrorMessage = nil } }
@@ -166,18 +166,18 @@ struct IOSVoicesView: View {
         ) {
             Button("OK", role: .cancel) { importErrorMessage = nil }
         } message: {
-            Text(importErrorMessage ?? "Choose another audio file and try again.")
+            Text(importErrorMessage ?? IOSInterfaceText.importFailedDetail)
         }
         .alert(
-            "Delete saved voice?",
+            IOSInterfaceText.deleteVoiceQuestion,
             isPresented: Binding(
                 get: { voiceToDelete != nil },
                 set: { if !$0 { voiceToDelete = nil } }
             ),
             presenting: voiceToDelete
         ) { voice in
-            Button("Cancel", role: .cancel) { voiceToDelete = nil }
-            Button("Delete", role: .destructive) {
+            Button(IOSInterfaceText.cancel, role: .cancel) { voiceToDelete = nil }
+            Button(IOSInterfaceText.deleteAction, role: .destructive) {
                 deleteSavedVoice(voice)
             }
             .accessibilityIdentifier("voicesDeleteConfirm_\(voice.id)")
@@ -185,7 +185,7 @@ struct IOSVoicesView: View {
             Text(deleteConfirmationMessage(for: voice))
         }
         .alert(
-            "Delete failed",
+            IOSInterfaceText.deleteFailed,
             isPresented: Binding(
                 get: { deleteErrorMessage != nil },
                 set: { if !$0 { deleteErrorMessage = nil } }
@@ -193,7 +193,7 @@ struct IOSVoicesView: View {
         ) {
             Button("OK", role: .cancel) { deleteErrorMessage = nil }
         } message: {
-            Text(deleteErrorMessage ?? "The saved voice was not removed. Try again.")
+            Text(deleteErrorMessage ?? IOSInterfaceText.deleteFailedDetail)
         }
     }
 
@@ -232,7 +232,7 @@ struct IOSVoicesView: View {
 
     private var saveACallCard: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("Save a new voice")
+            Text(IOSInterfaceText.saveNewVoice)
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(Theme.Text.primary)
                 .padding(.horizontal, 14)
@@ -240,8 +240,8 @@ struct IOSVoicesView: View {
                 .padding(.bottom, 8)
 
             newVoiceActionRow(
-                title: "Record voice",
-                detail: "Capture a 10-20 second reference clip on this iPhone.",
+                title: IOSInterfaceText.recordVoice,
+                detail: IOSInterfaceText.captureDetail,
                 symbol: "mic.fill",
                 accessibilityIdentifier: "voices_saveNewVoice"
             ) {
@@ -460,7 +460,7 @@ struct IOSVoicesView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(isPlaying ? "Stop preview" : "Preview voice")
+        .accessibilityLabel(isPlaying ? IOSInterfaceText.stopPreview : IOSInterfaceText.previewVoice)
     }
 
     @ViewBuilder
@@ -469,13 +469,13 @@ struct IOSVoicesView: View {
             ProgressView()
                 .controlSize(.small)
                 .frame(width: 44, height: 44)
-                .accessibilityLabel("Deleting \(voice.name)")
+                .accessibilityLabel(IOSInterfaceText.deletingVoice(voice.name))
         } else {
             Menu {
                 Button(role: .destructive) {
                     voiceToDelete = voice
                 } label: {
-                    Label("Delete voice", systemImage: "trash")
+                    Label(IOSInterfaceText.deleteVoice, systemImage: "trash")
                 }
                 .disabled(ttsEngine.hasActiveGeneration)
                 .accessibilityIdentifier("voicesDelete_\(voice.id)")
@@ -490,30 +490,30 @@ struct IOSVoicesView: View {
                 .contentShape(Rectangle())
             }
             .accessibilityIdentifier("voicesRowMenu_\(voice.id)")
-            .accessibilityLabel("Actions for \(voice.name)")
+            .accessibilityLabel(IOSInterfaceText.actionsForVoice(voice.name))
             .accessibilityHint(
                 ttsEngine.hasActiveGeneration
-                    ? "Wait for generation to finish before deleting this voice."
-                    : "Opens actions for this saved voice."
+                    ? IOSInterfaceText.waitDelete
+                    : IOSInterfaceText.voiceActionsHint
             )
         }
     }
 
     private func deleteConfirmationMessage(for voice: Voice) -> String {
         guard let persona = bankCatalog.persona(containing: voice.id) else {
-            return "Delete \"\(voice.name)\" from this iPhone? This cannot be undone."
+            return IOSInterfaceText.deleteVoicePermanent(voice.name)
         }
         if persona.baseVoiceID == voice.id {
-            return "Delete \"\(voice.name)\"? Its voice-bank variants will remain as individual saved voices."
+            return IOSInterfaceText.deleteVoiceBase(voice.name)
         }
-        return "Delete \"\(voice.name)\"? The rest of this voice bank will remain available."
+        return IOSInterfaceText.deleteVoiceVariant(voice.name)
     }
 
     private func deleteSavedVoice(_ voice: Voice) {
         guard deletingVoiceID == nil else { return }
         guard !ttsEngine.hasActiveGeneration else {
             voiceToDelete = nil
-            deleteErrorMessage = "Wait for the current generation to finish before deleting this voice."
+            deleteErrorMessage = IOSInterfaceText.waitCurrentDelete
             return
         }
         voiceToDelete = nil
@@ -610,9 +610,9 @@ private enum VoiceFilter: String, Identifiable, CaseIterable, Hashable {
 
     var label: String {
         switch self {
-        case .all: return "All"
-        case .builtIn: return "Built-in"
-        case .saved: return "Saved"
+        case .all: return IOSInterfaceText.all
+        case .builtIn: return IOSInterfaceText.modeBuiltIn
+        case .saved: return IOSInterfaceText.saved
         }
     }
 }

@@ -46,6 +46,7 @@ private struct IOSAttributionManifest: Decodable {
 
 /// Offline software and model attribution browser generated from exact repository resolutions.
 struct OpenSourceLicensesScreen: View {
+    @Environment(\.iosDockHeight) private var dockHeight
     @Environment(\.dismiss) private var dismiss
 
     private let manifest: IOSAttributionManifest?
@@ -151,7 +152,7 @@ struct OpenSourceLicensesScreen: View {
             }
             .padding(.horizontal, Theme.Spacing.lg)
             .padding(.top, Theme.Spacing.sm)
-            .padding(.bottom, IOSStudioShellMetrics.dockFadeHeight + Theme.Spacing.lg)
+            .padding(.bottom, max(IOSStudioShellMetrics.dockFadeHeight, dockHeight) + Theme.Spacing.lg)
         }
         .background(Theme.Surface.canvas.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
@@ -164,7 +165,7 @@ struct OpenSourceLicensesScreen: View {
                     .font(.system(size: 17, weight: .semibold))
                     .foregroundStyle(Theme.Text.primary)
                     .frame(width: 44, height: 44)
-                    .background(Theme.Surface.inline, in: Circle())
+                    .background(Theme.Surface.panelMuted, in: Circle())
                     .overlay { Circle().stroke(Theme.Surface.panelStroke, lineWidth: 0.5) }
                     .contentShape(Circle())
             }
@@ -185,6 +186,7 @@ struct OpenSourceLicensesScreen: View {
 }
 
 private struct IOSAttributionDetailScreen: View {
+    @Environment(\.iosDockHeight) private var dockHeight
     @Environment(\.dismiss) private var dismiss
 
     let title: String
@@ -227,7 +229,7 @@ private struct IOSAttributionDetailScreen: View {
             }
             .padding(.horizontal, Theme.Spacing.lg)
             .padding(.top, Theme.Spacing.sm)
-            .padding(.bottom, IOSStudioShellMetrics.dockFadeHeight + Theme.Spacing.lg)
+            .padding(.bottom, max(IOSStudioShellMetrics.dockFadeHeight, dockHeight) + Theme.Spacing.lg)
         }
         .background(Theme.Surface.canvas.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
@@ -240,7 +242,7 @@ private struct IOSAttributionDetailScreen: View {
                     .font(.system(size: 17, weight: .semibold))
                     .foregroundStyle(Theme.Text.primary)
                     .frame(width: 44, height: 44)
-                    .background(Theme.Surface.inline, in: Circle())
+                    .background(Theme.Surface.panelMuted, in: Circle())
                     .overlay { Circle().stroke(Theme.Surface.panelStroke, lineWidth: 0.5) }
                     .contentShape(Circle())
             }

@@ -89,7 +89,7 @@ final class IOSModelInstallerViewModel: ObservableObject {
             return .idle
         case .notInstalled, .none:
             guard let descriptor = modelAssetStore?.descriptor(id: model.id)?.model else {
-                return .failed("Missing model descriptor.")
+                return .failed(IOSInterfaceText.missingDescriptor)
             }
             guard IOSNativeDeviceFeatureGate.allowsModelDownloads(for: descriptor) else {
                 return .unavailable("iPhone download support for this model is not enabled in this build.")
@@ -102,7 +102,7 @@ final class IOSModelInstallerViewModel: ObservableObject {
             if IOSNativeDeviceFeatureGate.allowsModelDownloads(for: descriptor) {
                 return .failed(message)
             }
-            return .unavailable("This model is not available on iPhone yet, and the local files are incomplete.")
+            return .unavailable(IOSInterfaceText.modelUnavailable)
         case .error(let message):
             guard let descriptor = modelAssetStore?.descriptor(id: model.id)?.model else {
                 return .failed(message)
@@ -120,7 +120,7 @@ final class IOSModelInstallerViewModel: ObservableObject {
             return
         }
         guard let coordinator else {
-            states[model.id] = .failed("Model delivery is unavailable in this runtime.")
+            states[model.id] = .failed(IOSInterfaceText.deliveryUnavailable)
             return
         }
 
@@ -158,7 +158,7 @@ final class IOSModelInstallerViewModel: ObservableObject {
             return
         }
         guard let coordinator else {
-            states[model.id] = .failed("Model delivery is unavailable in this runtime.")
+            states[model.id] = .failed(IOSInterfaceText.deliveryUnavailable)
             return
         }
 
@@ -279,7 +279,7 @@ final class IOSModelInstallerViewModel: ObservableObject {
         case .deleting:
             states[snapshot.modelID] = .deleting
         case .failed:
-            states[snapshot.modelID] = .failed(snapshot.message ?? "Model delivery failed.")
+            states[snapshot.modelID] = .failed(snapshot.message ?? IOSInterfaceText.deliveryFailed)
             Task {
                 await refreshModelInventory(modelID: snapshot.modelID, event: "failed-refresh")
             }

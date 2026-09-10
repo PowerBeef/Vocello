@@ -3,7 +3,7 @@ import Foundation
 
 /// Explicit, opt-in physical-device proof for background model delivery. This method is selected
 /// directly by `scripts/ui_test.sh ios model-download`; smoke, benchmarks, CI, and release never
-/// execute it. All actions use genuine visible Settings controls.
+/// execute it. All actions use genuine visible Studio and Settings controls.
 @MainActor
 final class VocelloiOSModelDownloadUITests: VocelloiOSUITestCase {
     private struct UIObservation: Codable {
@@ -93,10 +93,7 @@ final class VocelloiOSModelDownloadUITests: VocelloiOSUITestCase {
             expectedAction: "Download"
         )
 
-        let install = element("iosModelDownload_\(modelID)")
-        XCTAssertTrue(VocelloUIWait.exists(install, timeout: 60))
-        XCTAssertTrue(revealSettingsElement(install, swipingUp: true))
-        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: install, timeout: 20))
+        startDownloadFromStudio(modelID: modelID, mode: .custom)
 
         let progress = element("iosModelProgress_\(modelID)")
         guard waitForMeasurableTransfer(
@@ -122,7 +119,7 @@ final class VocelloiOSModelDownloadUITests: VocelloiOSUITestCase {
         )
         VocelloUIScreenshot.attach(app, named: "ios-model-download-cancelled")
 
-        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: install, timeout: 20))
+        startDownload(modelID: modelID)
         guard waitForMeasurableTransfer(
             modelID: modelID,
             description: "restarted model download to make measurable progress"
@@ -162,10 +159,9 @@ final class VocelloiOSModelDownloadUITests: VocelloiOSUITestCase {
         // must reuse the verified speech-tokenizer component; the pulled diagnostics
         // validator enforces the exact wire-byte accounting.
         for reusedModelID in ["pro_design", "pro_clone"] {
-            let download = element("iosModelDownload_\(reusedModelID)")
-            XCTAssertTrue(VocelloUIWait.exists(download, timeout: 60))
-            XCTAssertTrue(revealSettingsElement(download, swipingUp: true))
-            XCTAssertTrue(VocelloUIPrimaryAction.perform(on: download, timeout: 20))
+            startDownloadFromStudio(
+                modelID: reusedModelID, mode: reusedModelID == "pro_design" ? .design : .clone
+            )
             if let failure = waitForInstalledModel(
                 modelID: reusedModelID,
                 progress: element("iosModelProgress_\(reusedModelID)")
@@ -306,6 +302,22 @@ final class VocelloiOSModelDownloadUITests: VocelloiOSUITestCase {
         launchApp()
         openVoiceModels()
         assertCanonicalDeliveryMatches(canonicalSnapshot)
+    }
+
+    /// Only the isolated acceptance scenario uses Studio's explicit installation shortcut.
+    /// Other lifecycle arms retain direct Settings installation coverage.
+    private func startDownloadFromStudio(modelID: String, mode: VocelloUIBenchMatrix.Mode) {
+        select(mode: mode)
+        let install = element("textInput_installModelButton")
+        XCTAssertTrue(VocelloUIWait.exists(install, timeout: 60))
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: install, timeout: 20))
+        XCTAssertTrue(VocelloUIWait.exists(element("screen_voiceModels"), timeout: 30))
+        XCTAssertTrue(VocelloUIWait.condition("Studio-selected model to start without another Install tap", timeout: 120) {
+            self.element("iosModelProgress_\(modelID)").exists
+                || self.element("iosModelPhaseActivity_\(modelID)").exists
+                || self.element("iosModelCancel_\(modelID)").exists
+        })
+        VocelloUIScreenshot.attach(app, named: "ios-studio-install-\(modelID)")
     }
 
     private func startDownload(modelID: String) {

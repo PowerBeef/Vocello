@@ -112,7 +112,7 @@ struct IOSRecordVoiceSheet: View {
         }
         .sheet(isPresented: $isNamingPresented) {
             IOSSaveVoiceSheet(
-                title: importedReference == nil ? "Save this voice" : "Import voice",
+                title: importedReference == nil ? IOSInterfaceText.saveThisVoice : IOSInterfaceText.importVoice,
                 suggestedName: $suggestedName,
                 transcript: $transcript,
                 transcriptionReview: transcriptionReview,
@@ -146,16 +146,16 @@ struct IOSRecordVoiceSheet: View {
             presenting: pendingVoiceForReview
         ) { candidate in
             if !PreparedVoiceQualityWarning.isHardBlocking(candidate.qualityWarnings) {
-                Button("Keep voice") {
+                Button(IOSInterfaceText.keepVoice) {
                     commitPendingCandidate(candidate)
                 }
                 .accessibilityIdentifier("recordVoice_keepDespiteWarning")
             }
-            Button(importedReference == nil ? "Discard and re-record" : "Discard imported voice", role: .destructive) {
+            Button(importedReference == nil ? IOSInterfaceText.discardRecord : IOSInterfaceText.discardImport, role: .destructive) {
                 discardPendingCandidate(candidate, closesFlow: true)
             }
             .accessibilityIdentifier("recordVoice_discardOnWarning")
-            Button("Cancel", role: .cancel) {
+            Button(IOSInterfaceText.cancel, role: .cancel) {
                 discardPendingCandidate(candidate, closesFlow: false)
             }
                 .accessibilityIdentifier("recordVoice_cancelOnWarning")
@@ -270,7 +270,7 @@ struct IOSRecordVoiceSheet: View {
         if savedVoicesViewModel.voices.contains(where: {
             $0.name.caseInsensitiveCompare(name) == .orderedSame
         }) {
-            enrollError = "A saved voice named \(name) already exists. Choose another name."
+            enrollError = IOSInterfaceText.duplicateVoice(name)
             return
         }
         let trimmedTranscript = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -358,11 +358,11 @@ struct IOSRecordVoiceSheet: View {
     }
 
     private var reviewAlertTitle: String {
-        enrollError == nil ? "Reference outside recommended range" : "Couldn't save voice"
+        enrollError == nil ? IOSInterfaceText.referenceRange : IOSInterfaceText.saveVoiceFailed
     }
 
     private func reviewAlertMessage(for candidate: PreparedVoiceCandidate) -> String {
-        enrollError ?? PreparedVoiceQualityWarning.summary(for: candidate.qualityWarnings)
+        enrollError ?? IOSInterfaceText.qualitySummary(candidate.qualityWarnings)
     }
 
     private func cleanupCapturedFile() {

@@ -1,0 +1,22 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "NSMicrophoneUsageDescription": {
+      "comment": "System microphone permission for locally recording a cloning reference. Do not imply cloud recording.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {"stringUnit": {"state": "translated", "value": "Vocello records reference clips you use to clone voices on-device. Recordings stay on this iPhone."}},
+        "fr": {"stringUnit": {"state": "translated", "value": "Vocello enregistre les clips de référence utilisés pour cloner des voix sur l’appareil. Les enregistrements restent sur cet iPhone."}}
+      }
+    },
+    "NSSpeechRecognitionUsageDescription": {
+      "comment": "System Speech permission for on-device reference transcription. Do not imply remote transcription.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {"stringUnit": {"state": "translated", "value": "Vocello transcribes your reference recording on-device to improve clone quality. Audio never leaves your iPhone."}},
+        "fr": {"stringUnit": {"state": "translated", "value": "Vocello transcrit votre enregistrement de référence sur l’appareil pour améliorer la qualité du clonage. L’audio ne quitte jamais votre iPhone."}}
+      }
+    }
+  },
+  "version": "1.0"
+}

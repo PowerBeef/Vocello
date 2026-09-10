@@ -28,7 +28,7 @@ struct IOSVoiceDesignBriefSheet: View {
 
     var body: some View {
         IOSBottomSheetSurface(
-            title: "Voice brief",
+            title: IOSInterfaceText.voiceBrief,
             tint: tint,
             presentation: presentation,
             onDismiss: onDismiss,
@@ -37,7 +37,7 @@ struct IOSVoiceDesignBriefSheet: View {
                     isFocused = false
                     closeSheet()
                 } label: {
-                    Text("Confirm")
+                    Text(IOSInterfaceText.confirm)
                         .font(.system(size: 17, weight: .semibold))
                         .foregroundStyle(Theme.Text.primary)
                         .padding(.horizontal, 18)
@@ -58,7 +58,7 @@ struct IOSVoiceDesignBriefSheet: View {
             }
         ) {
             VStack(alignment: .leading, spacing: 0) {
-                Text("Describe the voice. Combine character, age, accent, and texture.")
+                Text(IOSInterfaceText.briefGuidance)
                     .iosScaledFont(size: 14, weight: .regular, relativeTo: .footnote)
                     .lineSpacing(1)
                     .foregroundStyle(Theme.Text.secondary)
@@ -74,7 +74,7 @@ struct IOSVoiceDesignBriefSheet: View {
                     )
 
                     if voiceDescription.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                        Text("A warm, deep narrator with a subtle British accent.")
+                        Text(IOSInterfaceText.briefPlaceholder)
                             .font(.system(size: 16, weight: .medium))
                             .foregroundStyle(Theme.Text.tertiary)
                             .padding(.horizontal, 16)
@@ -119,7 +119,7 @@ struct IOSVoiceDesignBriefSheet: View {
                 .padding(.top, 6)
                 .padding(.bottom, 18)
 
-                Text("Starting points".uppercased())
+                Text(IOSInterfaceText.startingPoints.uppercased())
                     .iosScaledFont(size: 11, weight: .semibold, relativeTo: .caption2)
                     .tracking(0.88)
                     .foregroundStyle(Theme.Text.secondary)

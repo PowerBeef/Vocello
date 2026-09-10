@@ -31,6 +31,7 @@ struct RootView: View {
     @AppStorage(IOSAppDefaults.reduceTransparencyEnabledKey) private var appReduceTransparency = false
     @State private var importedVoicePresentation: ImportedVoicePresentation?
     @State private var importErrorMessage: String?
+    @State private var dockHeight = IOSStudioShellMetrics.dockFadeHeight
 
     init(ttsEngine: TTSEngineStore) {
         self.ttsEngine = ttsEngine
@@ -76,6 +77,9 @@ struct RootView: View {
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             TabDock()
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
+                    dockHeight = height
+                }
         }
         // Pin all bottom chrome (dock + toast) AND the active screen so the
         // on-screen keyboard OVERLAYS them instead of riding the whole layout up.
@@ -173,7 +177,7 @@ struct RootView: View {
         }
         .onOpenURL(perform: openExternalAudio)
         .alert(
-            "Couldn't import audio",
+            IOSInterfaceText.importFailed,
             isPresented: Binding(
                 get: { importErrorMessage != nil },
                 set: { if !$0 { importErrorMessage = nil } }
@@ -181,7 +185,7 @@ struct RootView: View {
         ) {
             Button("OK", role: .cancel) { importErrorMessage = nil }
         } message: {
-            Text(importErrorMessage ?? "Choose another audio file and try again.")
+            Text(importErrorMessage ?? IOSInterfaceText.importFailedDetail)
         }
         // Outermost on purpose (IUI-5 X3): environment set here reaches the
         // tab screens AND every presentation attached above — sheets, covers,
@@ -189,6 +193,7 @@ struct RootView: View {
         // previously sat inside the chain, so all of that chrome read the
         // DEFAULT reduce-motion/transparency/performance-gate values.
         .environment(\.iosReduceMotionEnabled, effectiveReduceMotion)
+        .environment(\.iosDockHeight, dockHeight)
         .environment(\.iosReduceTransparencyEnabled, effectiveReduceTransparency)
         // Fixed-refresh (non-ProMotion) devices render glass with the shipped
         // solid-fill fallback while a generation is active; see
@@ -216,6 +221,7 @@ struct RootView: View {
     @ViewBuilder
     private var activeScreen: some View {
         @Bindable var appModel = appModel
+        @Bindable var modelNavigation = appModel.settingsModelNavigation
 
         switch appModel.tab {
         case .studio:
@@ -237,7 +243,7 @@ struct RootView: View {
             .toolbar(.hidden, for: .navigationBar)
 
         case .settings:
-            NavigationStack {
+            NavigationStack(path: $modelNavigation.path) {
                 SettingsScreen()
             }
             .toolbar(.hidden, for: .navigationBar)

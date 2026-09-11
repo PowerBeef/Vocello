@@ -52,7 +52,8 @@ the approved ten-step execution sequence onto existing owners; it is not a secon
 | --- | --- | --- |
 | 1 — scheduling | RF-01: classify the existing queue and preserve historical outcomes | Roadmap, documentation and instruction validators agree; original gates retained |
 | 2 — external dependency | RF-02 / ASR-02/04/08/10/11: use the consolidated rights/account packet | Qualified decisions or an explicit owner/service blocker; separate authorization for edits, candidate operations and uploads |
-| 3 — correction before freeze | RF-06 / ICA-15 / VLR-07 / F-16: long-form cap first, severe gaps second, cadence/recognition third | Exact retained inputs, first divergent boundary, verified correction or explicit release blocker |
+| 3 — correction before freeze | ICA-15 / VLR-07 / F-16: severe gaps and cadence/recognition findings; RF-06 is retained as a known limitation per the September 7 scheduling amendment (explicit rejection, recovery and accepted-output preservation verified; incidence measured by RF-11) | Exact retained inputs, first divergent boundary, verified correction or explicit release blocker; for RF-06 no new research matrix and no PASS relabeling |
+| 3a — accessibility qualification before freeze | ISU-4 / ISU-5: Settings and App Language reachability at AX-XXXL and pseudo-AX-XXXL on post-ISU-5 source | One authorized `scripts/ui_test.sh ios localization` walk in English/French; existing identifiers, strict visibility predicates, no automatic retry |
 | 4 — verification correction before freeze | RF-09 / RF-12: source-validated platform applicability and preinstalled-candidate route | iOS Speed requirements retained, macOS Quality retained, historical compatibility; no target replacement or diagnostics dependence |
 | 4a — monetization before freeze | RF-13: one-time iOS Design/Clone export unlock | Verified StoreKit entitlement and all outward export paths; generation/listening/internal History free in every mode, Built-in export free; focused purchase, restore, offline and refund tests |
 | 5 — freeze | RF-09: coherent deterministic checkpoint, exact-SHA CI/Security, fresh collision check, authorized tag/archive/IPA | Frozen candidate with signing, entitlements, notices, privacy, architecture and UUID proof; no internal diagnostics |
@@ -133,6 +134,17 @@ rejection, recovery and accepted-output preservation, then use the already-requi
 campaign to assess incidence rather than adding a research matrix. RF-09 still precedes that full
 campaign. This does not waive QC, close the separate French/Chinese findings, or authorize shipping
 with an unresolved required failure. A release-risk exception requires a separate recorded decision.
+
+September 11 reconciliation note: `config/roadmap.json` was compared item by item against the tree
+(`2f06f21a`). Items whose only open clause is packaged, frozen-source or device evidence owned by a
+parked or unfrozen owner are now `planned` with that owner in `blockedBy` (F-05/15/17/18/20/21/23,
+ICA-04/05, ISR-06, DP-32); F-19 and F-22 are done; ASR-04 is in flight; RF-06's title and gate now
+match the amendment above; two code defects found during the review are filed as F-25 (busy Saved
+Voice store is fatal to engine initialization) and F-26 (CLI playback children and signal edges).
+Step 5's CI dependency was not satisfiable between September 9 and September 11: `main` was red on a
+PyYAML import the runner cannot satisfy and then on a locale-dependent French plural test; both are
+fixed. A host cleanup on September 11 removed every retained run bundle under `build/artifacts`, so
+no earlier campaign phase can be resumed and the 201-take plan starts from take 1.
 
 Use the existing [consolidated content-rights packet](content-rights-review.md),
 [App Store submission procedure](ios-appstore-submission.md), and

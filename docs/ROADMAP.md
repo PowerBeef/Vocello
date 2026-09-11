@@ -16,7 +16,7 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 | `release-first-3-0-2026-09` | active | release-qa | 5/13 (38%) |
 | `autonomous-validation-remediation-2026-08` | active | release-qa | 9/12 (75%) |
 | `delivery-prompting-2026-08` | active | backend-mlx | 29/34 (85%) |
-| `engineering-review-remediation-2026-08` | active | backend-and-platform | 12/24 (50%) |
+| `engineering-review-remediation-2026-08` | active | backend-and-platform | 14/26 (54%) |
 | `ios-app-store-readiness-2026-08` | active | release-qa | 2/12 (17%) |
 | `ios-control-audit-2026-08` | active | ios | 15/19 (79%) |
 | `ios-generation-startup-reliability-2026-08` | active | backend-and-platform | 4/6 (67%) |
@@ -44,11 +44,11 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | --- | --- | --- | --- |
 | `RF-01` | done | reconcile the audit and preserve the exact testing checkpoint | `doc:docs/reference/release-first-execution-2026-09.md#audit-finding-disposition`, `doc:docs/reference/release-first-execution-2026-09.md#preserved-september-4-device-boundary`, `doc:docs/development-progress.md#project-wide-test-and-harness-evolution--september-6` |
 | `RF-02` | in-flight | complete Apple prerequisites and the consolidated qualified-decision packet | — |
-| `RF-03` | done | implement and behavior-test macOS Design request preservation | `file:Sources/ViewModels/VoiceDesignCoordinator.swift`, `file:Tests/VocelloCoreTests/VoiceDesignCoordinatorTests.swift`, `doc:docs/development-progress.md#resume-here-2026-09-04` |
-| `RF-04` | done | repair long-form durability on both platforms | `file:Tests/VocelloCoreTests/LongFormHistoryAcceptanceTests.swift`, `doc:docs/development-progress.md#resume-here-2026-09-04` |
-| `RF-05` | done | expose recoverable History-save outcomes | `file:Tests/VocelloCoreTests/GenerationHistoryEnqueueStateTests.swift`, `file:Tests/VocelloCoreTests/GenerationHistoryOutboxTests.swift`, `doc:docs/development-progress.md#resume-here-2026-09-04` |
-| `RF-06` | in-flight | localize the remaining natural-text audio failures | `doc:docs/reference/release-first-execution-2026-09.md#rf-06-retained-evidence-review-and-bounded-follow-up-september-4`, `doc:docs/development-progress.md#september-5-phone-independent-codec-checkpoint`, `doc:docs/development-progress.md#september-5-host-follow-up-completed--phone-approval-pending`, `doc:docs/development-progress.md#september-6-phase-4-chinese-cadence-diagnostic`, `doc:docs/development-progress.md#september-6-independent-chinese-decoder-comparison`, `doc:docs/development-progress.md#september-6-chinese-intelligibility-and-pause-alignment`, `doc:docs/development-progress.md#september-6-evaluator-corrections-and-product-priority`, `doc:docs/reference/audio-qc-engineering.md#retained-audio-failure-follow-up--september-7`, `doc:docs/reference/audio-qc-engineering.md#token-limit-diagnostic-records-and-replay`, `doc:docs/reference/audio-qc-engineering.md#bounded-production-sampler-and-predictor-diagnosis` |
-| `RF-07` | done | finish only the acceptance-blocking harness repairs | `doc:docs/development-progress.md#september-5-correlation-and-capture-correction--verified`, `file:Tests/VocelloiOSLogicTests/IOSAuditOutputCaptureTests.swift` |
+| `RF-03` | done | implement and behavior-test macOS Design request preservation | `file:Sources/ViewModels/VoiceDesignCoordinator.swift`, `file:Tests/VocelloCoreTests/VoiceDesignCoordinatorTests.swift`, `doc:docs/development-history-2026-09-06.md#resume-here-2026-09-04` |
+| `RF-04` | done | repair long-form durability on both platforms | `file:Tests/VocelloCoreTests/LongFormHistoryAcceptanceTests.swift`, `doc:docs/development-history-2026-09-06.md#resume-here-2026-09-04` |
+| `RF-05` | done | expose recoverable History-save outcomes | `file:Tests/VocelloCoreTests/GenerationHistoryEnqueueStateTests.swift`, `file:Tests/VocelloCoreTests/GenerationHistoryOutboxTests.swift`, `doc:docs/development-history-2026-09-06.md#resume-here-2026-09-04` |
+| `RF-06` | in-flight | characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred) | `doc:docs/reference/release-first-execution-2026-09.md#rf-06-retained-evidence-review-and-bounded-follow-up-september-4`, `doc:docs/development-history-2026-09-06.md#september-5-phone-independent-codec-checkpoint`, `doc:docs/development-history-2026-09-06.md#september-5-host-follow-up-completed--phone-approval-pending`, `doc:docs/development-history-2026-09-06.md#september-6-phase-4-chinese-cadence-diagnostic`, `doc:docs/development-history-2026-09-06.md#september-6-independent-chinese-decoder-comparison`, `doc:docs/development-history-2026-09-06.md#september-6-chinese-intelligibility-and-pause-alignment`, `doc:docs/development-history-2026-09-06.md#september-6-evaluator-corrections-and-product-priority`, `doc:docs/reference/audio-qc-engineering.md#retained-audio-failure-follow-up--september-7`, `doc:docs/reference/audio-qc-engineering.md#token-limit-diagnostic-records-and-replay`, `doc:docs/reference/audio-qc-engineering.md#bounded-production-sampler-and-predictor-diagnosis` |
+| `RF-07` | done | finish only the acceptance-blocking harness repairs | `doc:docs/development-history-2026-09-06.md#september-5-correlation-and-capture-correction--verified`, `file:Tests/VocelloiOSLogicTests/IOSAuditOutputCaptureTests.swift` |
 | `RF-08` | parked | package the downloadable optimized CLI | — |
 | `RF-09` | in-flight | verify the coherent tree and freeze the 3.0.0 candidate | — |
 | `RF-10` | parked | independently qualify macOS and downloadable CLI | — |
@@ -61,8 +61,8 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 - **`RF-02`** (in-flight) — complete Apple prerequisites and the consolidated qualified-decision packet.
   gate: Under ASR-02/ASR-04/ASR-08/ASR-10/ASR-11, complete bounded read-only account, distribution-key/profile/entitlement, agreement, version, and collision checks. Reuse support and bundled attribution; consolidate provider metadata/retention, model distribution, previews, marketing audio/artwork, privacy, content rights, age rating, export, and regional decisions. Every field has evidence or a named external dependency; qualified legal/privacy decisions are recorded before closure. Authentication failures remain failures.
 
-- **`RF-06`** (in-flight) — localize the remaining natural-text audio failures.
-  gate: Under ICA-15/VLR-07, review retained WAV/code/receipt/ASR evidence before new generation; separate the completed numeric-marker regression, marker-free French Custom failure, and French Design production versus experimental results. Locate the first divergent request/language/code/decoder/assembly/QC boundary, add a targeted fixture, and run only qualifying fixed-seed confirmations. Keep QC, seeds, prompts, token caps and model pins unchanged absent causal proof. Any unresolved sampled-output pathology remains an explicit release blocker/decision, never harness PASS.
+- **`RF-06`** (in-flight) — characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred).
+  gate: Per the September 7 scheduling amendment in docs/reference/release-first-execution-2026-09.md: keep the English long-form generated-code failure as an open known limitation with its original code/audio/seed/receipt evidence and uncertainty preserved; verify explicit rejection, recovery and accepted-output preservation on current source; measure incidence and workflow impact through RF-11's frozen 201-take campaign rather than a new research matrix. The separate French interior-gap and Chinese trailing-silence/cadence findings stay open under VLR-07/ICA-15. QC, seeds, prompts, token caps and model pins stay unchanged absent causal proof; no sampled-output pathology becomes harness PASS, and shipping with an unresolved required failure needs a separately recorded risk decision.
 
 - **`RF-08`** (parked) — package the downloadable optimized CLI.
   gate: Implement F-17 in the existing release workflow: separate optimized arm64 CLI DMG, complete libraries/resources/notices/instructions, checkout-independent discovery, signatures, notarization/stapling, checksums and source/version supply-chain identity. Copied-package tests cover paths with spaces, version/JSON, all three modes, a real two-item batch, cancellation, failure exits and resource loading. The F-21 batch-admission regression must use production-built requests against the real engine policy; keep index/total outside ordinary requests. No Homebrew route, privileged installer, shell-profile edits, or second release system.
@@ -100,7 +100,7 @@ Narrative authority: [`docs/reference/autonomous-validation-audit-2026-08-21.md`
 | `AV-06` | done | P2 — establish stable powered benchmark trends | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md`, `file:benchmarks/runs/engine-generation/mac-gate-bench-20260902-013854-f39c1c91.json`, `file:benchmarks/runs/engine-generation/mac-gate-bench-20260902-015022-591814fe.json` |
 | `AV-07` | in-flight | P2 — independently validate prosody thresholds | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md`, `doc:docs/reference/audio-qc-engineering.md` |
 | `AV-08` | in-flight | P2 — qualify multilingual output beyond a single cohort | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md` |
-| `AV-09` | in-flight | P2 — make stateful physical-device lanes independently repeatable | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md`, `doc:docs/development-progress.md#september-6-phase-4-chinese-cadence-diagnostic` |
+| `AV-09` | in-flight | P2 — make stateful physical-device lanes independently repeatable | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md`, `doc:docs/development-history-2026-09-06.md#september-6-phase-4-chinese-cadence-diagnostic` |
 | `AV-10` | done | P3 — add deterministic real-browser website smoke | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md` |
 | `AV-11` | done | P3 — make marking-equality resource hygiene enforceable | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md`, `file:scripts/check_marking_peak_equality.py`, `file:scripts/tests/test_check_marking_peak_equality.py` |
 | `AV-12` | done | TSan lane: run to completion with the two helper-process tests skipped under the sanitizer and their exclusion recorded | `file:.github/workflows/tsan.yml`, `file:Tests/VocelloCoreTests/CLIExecutionTests.swift`, `file:Tests/VocelloCoreTests/NativeHelperProcessSupport.swift`, `file:Tests/VocelloCoreTests/PreparedVoiceRepositoryTests.swift`, `file:config/tsan-policy.json` |
@@ -192,7 +192,7 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
 | `F-02` | done | Medium — make behavior-changing diagnostics an enforceable distribution boundary | `file:Sources/QwenVoiceCore/RuntimeDebugGate.swift`, `file:Tests/VocelloCoreTests/RuntimeDebugGateTests.swift`, `file:config/runtime-debug-knobs.json`, `file:scripts/runtime_security_contract.py`, `doc:docs/decisions/runtime-hardening-and-trust-boundary.md` |
 | `F-03` | done | Medium — execute deterministic iOS policy assertions in ordinary CI | `file:Tests/VocelloiOSLogicTests/VocelloiOSLogicTests.swift`, `file:project.yml`, `file:scripts/macos_test.sh`, `file:scripts/build_foundation_targets.sh`, `file:scripts/check_test_workflows.sh`, `file:.github/workflows/ci.yml` |
 | `F-04` | done | Medium — bind public promotion to exact-source canonical evidence | `commit:f6404ce`, `file:config/quality-promotion-contract.json`, `file:.github/workflows/promote-release.yml`, `doc:docs/reference/quality-promotion.md` |
-| `F-05` | in-flight | Medium — restore packaged macOS launch verification | — |
+| `F-05` | planned | Medium — restore packaged macOS launch verification | — |
 | `F-06` | in-flight | Medium — durably couple audio publication and History persistence | `file:Tests/VocelloCoreTests/GenerationHistoryOutboxTests.swift`, `file:Tests/VocelloCoreTests/HistoryDeletionEngineTests.swift`, `file:docs/reference/privacy-storage.md` |
 | `F-07` | done | Medium — close the main-branch administrator and security-timing gap | `file:scripts/tests/test_release_source_authority.py`, `file:scripts/tests/test_supply_chain_contract.py`, `file:docs/reference/macos-release-qa.md` |
 | `F-08` | done | Low — scope iOS Studio terminal state to a generation attempt | `file:Tests/VocelloiOSLogicTests/StudioGenerationAttemptAuthorityTests.swift`, `file:docs/reference/ios-app-guide.md` |
@@ -202,54 +202,56 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
 | `F-12` | done | Low — add a root Xcode Swift dependency update path | `file:scripts/tests/test_swift_dependency_updates.py`, `file:scripts/tests/test_supply_chain_contract.py`, `doc:docs/reference/mlx-guide.md` |
 | `F-13` | done | Advisory — continuously constrain the macOS entitlement posture | `file:scripts/tests/test_entitlement_contract.py`, `file:QwenVoice.xcodeproj/project.pbxproj`, `doc:docs/decisions/runtime-hardening-and-trust-boundary.md` |
 | `F-14` | done | Low — schedule Thread Sanitizer and enforce concurrency-debt quality | `file:scripts/tests/test_runtime_security_contract.py`, `file:scripts/macos_test.sh`, `doc:docs/reference/macos-testing.md` |
-| `F-15` | in-flight | P1 — preserve macOS Voice Design language, seed, and variation at launch | — |
-| `F-16` | in-flight | P1 — transactionally accept long-form projects and replacement segments | — |
-| `F-17` | in-flight | P1 release dependency — distribute an optimized standalone CLI package | — |
-| `F-18` | in-flight | P1 — preserve pre-existing generation destinations across failure and cancellation | `file:Tests/VocelloCoreTests/AtomicWAVGenerationOutputSinkTests.swift`, `file:Tests/VocelloCoreTests/GenerationTerminalCleanupTests.swift` |
-| `F-19` | in-flight | P1 — guard macOS attempt-scoped terminal and cancellation ownership | `file:Tests/VocelloCoreTests/GenerationLifecycleExecutorTests.swift`, `file:Tests/VocelloCoreTests/VoiceDesignCoordinatorTests.swift` |
-| `F-20` | in-flight | P2 — make CLI signal cancellation graceful and bounded | `file:Tests/VocelloCoreTests/CLIExecutionTests.swift`, `file:scripts/tests/test_cli_package.py` |
-| `F-21` | in-flight | P1 — restore CLI batch admission and preserve partial outcomes | `file:Tests/VocelloCoreTests/CLIExecutionTests.swift`, `file:Sources/VocelloCLI/BatchCommand.swift` |
-| `F-22` | in-flight | P1 risk — qualify shared Saved Voice transactions across app and CLI processes | `file:Tests/VocelloCoreTests/PreparedVoiceRepositoryTests.swift` |
-| `F-23` | in-flight | P2 — preserve explicit Play intent across live-to-file finalization | `file:Tests/VocelloCoreTests/AudioPlaybackResumePolicyTests.swift` |
+| `F-15` | planned | P1 — preserve macOS Voice Design language, seed, and variation at launch | — |
+| `F-16` | in-flight | P1 — transactionally accept long-form projects and replacement segments | `file:Tests/VocelloCoreTests/LongFormHistoryAcceptanceTests.swift`, `doc:docs/development-progress.md#september-7-passing-smoke-and-monetization-scheduling-historical` |
+| `F-17` | planned | P1 release dependency — distribute an optimized standalone CLI package | — |
+| `F-18` | planned | P1 — preserve pre-existing generation destinations across failure and cancellation | `file:Tests/VocelloCoreTests/AtomicWAVGenerationOutputSinkTests.swift`, `file:Tests/VocelloCoreTests/GenerationTerminalCleanupTests.swift` |
+| `F-19` | done | P1 — guard macOS attempt-scoped terminal and cancellation ownership | `file:Tests/VocelloCoreTests/GenerationLifecycleExecutorTests.swift`, `file:Tests/VocelloCoreTests/VoiceDesignCoordinatorTests.swift`, `file:Sources/ViewModels/GenerationLifecycleExecutor.swift` |
+| `F-20` | planned | P2 — make CLI signal cancellation graceful and bounded | `file:Tests/VocelloCoreTests/CLIExecutionTests.swift`, `file:scripts/tests/test_cli_package.py` |
+| `F-21` | planned | P1 — restore CLI batch admission and preserve partial outcomes | `file:Tests/VocelloCoreTests/CLIExecutionTests.swift`, `file:Sources/VocelloCLI/BatchCommand.swift` |
+| `F-22` | done | P1 risk — qualify shared Saved Voice transactions across app and CLI processes | `file:Tests/VocelloCoreTests/PreparedVoiceRepositoryTests.swift`, `file:Sources/QwenVoiceCore/PreparedVoiceRepository.swift` |
+| `F-23` | planned | P2 — preserve explicit Play intent across live-to-file finalization | `file:Tests/VocelloCoreTests/AudioPlaybackResumePolicyTests.swift` |
 | `F-24` | done | Concurrency registry accuracy and class-level MainActor isolation for the performance gate model | `file:config/concurrency-safety.json`, `file:Sources/ViewModels/GenerationPerformanceGateModel.swift` |
+| `F-25` | planned | P1 — a busy Saved Voice store must not be fatal to engine initialization | — |
+| `F-26` | planned | P2 — CLI: playback children, the pre-supervisor signal window and signal-coincident failure classification | — |
 
 ### Open items in detail
 
 - **`F-01`** (in-flight) — High — make saved-voice review transactional and add iOS deletion.
   gate: Interactive saved-voice review must stage an opaque, catalog-invisible candidate and publish only on explicit commit; Cancel, Discard, and outside dismissal must remove it. Replacement and delete must be recoverable across interruption. iOS must confirm individual deletion, stop a matching preview, clear engine and Studio state, preserve voice-bank siblings, and surface retryable failure. Deterministic repository, wire, source-surface, macOS test/build, and generic iOS device-SDK compilation must pass; physical-device UI acceptance remains explicit QA. Secondary-failure fixtures must inject backup-restore failure, post-publication cleanup failure and same-name replacement interruptions. Retain the last recoverable audio/transcript/metadata and journal until recovery succeeds, distinguish committed-but-needs-cleanup from rollback failure, and prove restart reconciliation is idempotent without relying only on target existence.
 
-- **`F-05`** (in-flight) — Medium — restore packaged macOS launch verification.
+- **`F-05`** (planned) — Medium — restore packaged macOS launch verification.
   gate: Run the existing packaged-app launch smoke on the declared macos-26 release runner. The release workflow and extracted-DMG verifier must require external startup evidence and reject a QWENVOICE_SKIP_LAUNCH_SMOKE bypass in CI. Close only after the next signed candidate records that hosted macos-26 proof.
 
 - **`F-06`** (in-flight) — Medium — durably couple audio publication and History persistence.
   gate: Preserve the implemented durable History outbox, startup/open reconciliation and database-first deletion. Close the remaining enqueue-failure gap with typed saved/queued-for-recovery/unable-to-queue outcomes, visible retry/export while successful audio remains playable, idempotent retry and long-form integration on both platform paths. Prove enqueue/database failures and recovery cannot duplicate History, delete referenced audio, or mislabel successful synthesis as an engine failure. Source tests and applicable corrected-candidate acceptance are required.
 
-- **`F-15`** (in-flight) — P1 — preserve macOS Voice Design language, seed, and variation at launch.
+- **`F-15`** (planned) — P1 — preserve macOS Voice Design language, seed, and variation at launch.
   gate: Capture the complete Design draft and variation before asynchronous startup. Behavioral request-path tests prove explicit French, Auto, pinned/default seed, and subsequent UI edits cannot change the prepared request. Focused tests and macOS build pass; candidate acceptance proves visible selection-to-engine parity.
 
 - **`F-16`** (in-flight) — P1 — transactionally accept long-form projects and replacement segments.
   gate: Both platforms stage and QC candidate segment/joined audio and a throwing manifest before accepted History mutation. Journaled atomic-file/database recovery is idempotent; normal failure preserves the accepted project and removes only unreferenced owned candidates. Fault tests cover serialization, writes, assembly, QC, database commits, cancellation and interruption; unchanged QC/seeds survive replacement, reused segments count once, and segment/project terminals are distinct. Existing manifests decode. Native long-form/regeneration acceptance passes on both platforms. Before RF-09 freeze, qualify recoveryRequired with an actual non-destructive recovery/export path and usable unrelated History where safe, cross-referencing F-06. Define accepted/candidate/recovery/session-resume/discardable ownership and test abandon/new-project/relaunch/replacement/delete/clear-all; retain anything referenced by accepted History, a journal, pending outbox, active playback or export. Intentional retention must be bounded and documented, not silently deleted.
 
-- **`F-17`** (in-flight) — P1 release dependency — distribute an optimized standalone CLI package.
+- **`F-17`** (planned) — P1 release dependency — distribute an optimized standalone CLI package.
   gate: The existing release workflow produces a separate arm64 CLI DMG containing all required runtime resources/libraries and notices, Developer ID signatures, notarization/stapling, checksums and source/version provenance. The copied package works outside the checkout and in paths with spaces; version/JSON discovery, all three modes, cancellation and error exits pass. No Homebrew route or privileged installer. Public promotion requires the existing exact-source gate and separate authorization.
 
-- **`F-18`** (in-flight) — P1 — preserve pre-existing generation destinations across failure and cancellation.
+- **`F-18`** (planned) — P1 — preserve pre-existing generation destinations across failure and cancellation.
   gate: Define publication ownership and the no-clobber or explicit atomic-replacement policy before touching an existing destination. Failed startup, QC rejection, cancellation, allocation retry and publication failure must preserve pre-existing bytes; clean only operation-owned staging/output. Native sentinel-hash fixtures cover successful replacement, reference/output aliasing and two writers targeting one path. Qualify corrected app and copied-CLI paths without hidden retry.
 
-- **`F-19`** (in-flight) — P1 — guard macOS attempt-scoped terminal and cancellation ownership.
-  gate: Test the real GenerationLifecycleExecutor, not its coordinator-test double. Hold attempt A in preparation/persistence, cancel it, start B, then release A's success/error/defer and delayed engine-cancel dispatch. Reproduce or refute whether A can clear B's task/generating/player/error state. If reproduced, apply the smallest attempt-owned mutation/cancellation fix and prove B survives every stale terminal path plus ordinary cancellation. Candidate acceptance remains separate.
-
-- **`F-20`** (in-flight) — P2 — make CLI signal cancellation graceful and bounded.
+- **`F-20`** (planned) — P2 — make CLI signal cancellation graceful and bounded.
   gate: Bridge SIGINT and SIGTERM to the existing owned generation cancellation lifecycle, await terminal cleanup, and preserve documented cancellation exit codes. Bound shutdown and explicitly distinguish a forced second-signal/timeout from graceful completion. Native isolated-process tests prove cleanup, accepted-output preservation and no live child/task; copied-package qualification repeats the affected paths. Host removal of partial output alone cannot satisfy this gate.
 
-- **`F-21`** (in-flight) — P1 — restore CLI batch admission and preserve partial outcomes.
+- **`F-21`** (planned) — P1 — restore CLI batch admission and preserve partial outcomes.
   gate: Build ordinary single-take requests with CLI-owned index/total bookkeeping, preserving per-item identities, text, mode, delivery and seeds. Test the production builder against the real engine support policy for every mode while retaining rejection of batch-only fields. Return stable row identities and completed/failed/cancelled/not-attempted states for every input, preserving successful WAVs and nonzero exits. Test later-row error, cancellation, empty input and legacy success compatibility. Qualify one actual two-item batch from the copied signed CLI under RF-10. Reject unsupported options explicitly; no hidden retry, seed substitution or new resume feature.
 
-- **`F-22`** (in-flight) — P1 risk — qualify shared Saved Voice transactions across app and CLI processes.
-  gate: Use two native processes on one disposable support root: pause candidate preparation, replacement or deletion in A while B initializes/reconciles/lists/mutates. Prove no live transaction is mistaken for an abandoned one and audio/transcript/metadata remain content-bound. If exclusion is missing, reuse a narrow process-wide operation lock or typed busy refusal; do not silently split production stores. Review model mutation entry points against the existing shared-component lock rather than asserting all storage is unlocked.
-
-- **`F-23`** (in-flight) — P2 — preserve explicit Play intent across live-to-file finalization.
+- **`F-23`** (planned) — P2 — preserve explicit Play intent across live-to-file finalization.
   gate: Explicit Play after finalization resumes heard currentTime (or restarts at end), independently of Auto-play and buffered duration. Deterministic fixtures pass; a source-bound long-clip UI pilot and applicable packaged macOS playback prove play/pause/scrub/History. Preserve failed pilots; unavailable controls never count as exercised.
+
+- **`F-25`** (planned) — P1 — a busy Saved Voice store must not be fatal to engine initialization.
+  gate: Engine initialization (Sources/QwenVoiceCore/MLXTTSEngine.swift:703 awaits reconcile() with no retry) treats PreparedVoiceRepository.storeBusy from the F-22 flock as a fatal, untyped failure: the typed error is flattened to generationFailed(text) at MLXTTSEngine.swift:1746-1751, no production caller handles .storeBusy (Sources/ViewModels/SavedVoicesViewModel.swift:76-81, Sources/iOS/IOSVoicesView.swift:540), and the messages in Sources/QwenVoiceCore/PreparedVoiceRepository.swift:15-35 are unlocalized English. The app and the CLI share one support root, so this is the app+CLI coexistence F-22 exists for. Closure: bounded retry or explicit typed surfacing of storeBusy at initialization and in the saved-voice view models, localized presentation through the typed presentation layer, a two-process test in which B initializes while A holds the lock and B recovers once the lock clears, and no change to the lock itself.
+
+- **`F-26`** (planned) — P2 — CLI: playback children, the pre-supervisor signal window and signal-coincident failure classification.
+  gate: Three bounded CLI gaps outside the F-20 fixtures: (1) afplay children outlive a signalled CLI because playback uses try? run() then waitUntilExit() with no termination on forced exit (Sources/VocelloCLI/GenerateCommand.swift:244-249, Sources/VocelloCLI/BatchCommand.swift:123-130); (2) the Dispatch signal sources are installed after the command task starts, leaving a window in which SIGINT/SIGTERM kill the process without owned cleanup (Sources/VocelloCLI/CLIProcessSupervisor.swift:16-19,57-60); (3) a genuine generation failure that coincides with a signal is reported as cancelled (Sources/VocelloCLI/CLIBatchExecution.swift:69-71). Closure: terminate owned playback children on cancellation and forced exit, install signal sources before the task starts or buffer early signals, classify failure-then-signal as failed with the cancellation noted, and cover each with deterministic fixtures; documented exit codes unchanged.
 
 ## iOS App Store readiness
 
@@ -264,7 +266,7 @@ Narrative authority: [`docs/reference/ios-app-store-readiness-audit-2026-08-26.m
 | `ASR-01` | done | Align App Store installation eligibility with the runtime hardware floor | `doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md` |
 | `ASR-02` | planned | Resolve Hugging Face processing and App Privacy disclosure | `doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md` |
 | `ASR-03` | done | Provide an accurate monitored support contact | `doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md`, `doc:docs/reference/ios-appstore-submission.md` |
-| `ASR-04` | planned | Bundle complete attributions and record content rights | `doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md`, `doc:docs/reference/content-rights-review.md` |
+| `ASR-04` | in-flight | Bundle complete attributions and record content rights | `doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md`, `doc:docs/reference/content-rights-review.md` |
 | `ASR-05` | in-flight | Refresh reviewer notes, metadata guidance, and App Store screenshots | `doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md` |
 | `ASR-06` | in-flight | Define and verify sensitive-file protection and backup policy | `doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md` |
 | `ASR-07` | in-flight | Complete final release logging, API, symbol, and analyzer hygiene | `doc:docs/reference/ios-app-store-readiness-audit-2026-08-26.md` |
@@ -279,7 +281,7 @@ Narrative authority: [`docs/reference/ios-app-store-readiness-audit-2026-08-26.m
 - **`ASR-02`** (planned) — Resolve Hugging Face processing and App Privacy disclosure.
   gate: Obtain a documented vendor-retention and qualified privacy/legal determination for every request field Hugging Face receives during model downloads; then make PrivacyInfo.xcprivacy, the website/in-app policy, App Store privacy answers, and reviewer notes mutually consistent. The current Data Not Collected assertion must not survive without evidence satisfying Apple's third-party-partner and retention definitions.
 
-- **`ASR-04`** (planned) — Bundle complete attributions and record content rights.
+- **`ASR-04`** (in-flight) — Bundle complete attributions and record content rights.
   gate: Generate a deterministic offline attribution/NOTICE manifest from the exact SwiftPM graph and owned runtime, bundle it, expose it through an accessible in-app screen, and bind every downloadable model revision to its license, model-card terms, NOTICE, and redistribution decision. Qualified records must also cover built-in speaker names/previews, generated marketing audio, icons/fonts, and the App Store content-rights declaration.
 
 - **`ASR-05`** (in-flight) — Refresh reviewer notes, metadata guidance, and App Store screenshots.
@@ -319,8 +321,8 @@ Narrative authority: [`docs/reference/ios-on-device-control-audit-2026-08-28.md`
 | `ICA-01` | done | Bind the complete production control inventory | `file:scripts/tests/test_ios_control_audit.py`, `doc:docs/reference/ios-on-device-control-audit-2026-08-28.md` |
 | `ICA-02` | done | Implement the resumable physical-device control harness | `file:scripts/tests/test_ios_control_audit.py`, `doc:docs/reference/ios-on-device-control-audit-2026-08-28.md` |
 | `ICA-03` | done | Freeze the pairwise generation and cleanup plan | `file:scripts/tests/test_ios_control_audit.py`, `doc:docs/reference/ios-on-device-control-audit-2026-08-28.md` |
-| `ICA-04` | in-flight | Execute the complete physical-device campaign | — |
-| `ICA-05` | in-flight | Publish the evidence-linked device findings checkpoint | — |
+| `ICA-04` | planned | Execute the complete physical-device campaign | — |
+| `ICA-05` | planned | Publish the evidence-linked device findings checkpoint | — |
 | `ICA-06` | in-flight | P1 — localize the long-Chinese non-EOS generation failure and terminal message | `doc:docs/reference/ios-on-device-control-audit-2026-08-28.md` |
 | `ICA-07` | done | P2 — restore the Voices root-tab 44-point target | `doc:docs/reference/ios-on-device-control-audit-2026-08-28.md` |
 | `ICA-08` | done | P2 — investigate UI cadence warnings and playback priority inversion | `benchmark:ios-xcui-perf-20260829-180027-45adde8a`, `doc:docs/reference/ios-on-device-control-audit-2026-08-28.md` |
@@ -333,15 +335,15 @@ Narrative authority: [`docs/reference/ios-on-device-control-audit-2026-08-28.md`
 | `ICA-15` | in-flight | P1 — bound deterministic CustomVoice over-continuation without truncating valid speech | `doc:docs/reference/ios-control-audit-remediation-2026-08-29.md`, `doc:docs/reference/ios-device-testing.md` |
 | `ICA-16` | done | P2 — bound smoke evidence collection to the exact run | `doc:docs/reference/ios-control-audit-remediation-2026-08-29.md`, `doc:docs/reference/ios-device-testing.md` |
 | `ICA-17` | done | P2 — accept omitted optional cadence quantiles in device evidence | `doc:docs/reference/ios-control-audit-remediation-2026-08-29.md`, `doc:docs/reference/ios-device-testing.md`, `file:scripts/tests/test_ios_startup_reliability.py` |
-| `ICA-18` | done | P2 — keep control-audit History ownership out of spoken scripts | `doc:docs/reference/ios-control-audit-remediation-2026-08-29.md`, `doc:docs/reference/ios-device-testing.md`, `file:scripts/tests/test_ios_control_audit.py`, `doc:docs/development-progress.md#september-5-correlation-and-capture-correction--verified`, `file:Tests/VocelloiOSLogicTests/IOSAuditOutputCaptureTests.swift` |
-| `ICA-19` | done | P2 — remove largest-size Settings tab truncation | `doc:docs/development-progress.md#september-5-physical-device-checkpoint` |
+| `ICA-18` | done | P2 — keep control-audit History ownership out of spoken scripts | `doc:docs/reference/ios-control-audit-remediation-2026-08-29.md`, `doc:docs/reference/ios-device-testing.md`, `file:scripts/tests/test_ios_control_audit.py`, `doc:docs/development-history-2026-09-06.md#september-5-correlation-and-capture-correction--verified`, `file:Tests/VocelloiOSLogicTests/IOSAuditOutputCaptureTests.swift` |
+| `ICA-19` | done | P2 — remove largest-size Settings tab truncation | `doc:docs/development-history-2026-09-06.md#september-5-physical-device-checkpoint` |
 
 ### Open items in detail
 
-- **`ICA-04`** (in-flight) — Execute the complete physical-device campaign.
+- **`ICA-04`** (planned) — Execute the complete physical-device campaign.
   gate: On the paired unlocked, charged, thermally nominal iPhone, complete inventory, stateful, external, accessibility, saved-voice, isolated model diagnose/queue/acceptance, generation, smoke, and perf phases against one frozen source identity. Every row must receive a terminal classification, every generated take must correlate visible request, receipt, QC, History and playback, and no failed row may be automatically retried or replaced.
 
-- **`ICA-05`** (in-flight) — Publish the evidence-linked device findings checkpoint.
+- **`ICA-05`** (planned) — Publish the evidence-linked device findings checkpoint.
   gate: After ICA-04, re-pin the historical audit report with every control and generation row represented, P0-P3 findings separated into product, harness, infrastructure, prerequisite, preservation-policy, not-applicable and post-failure categories, exact untracked artifact references, restoration proof, and objective remediation gates. No product fix may be folded into the audit without a separate request.
 
 - **`ICA-06`** (in-flight) — P1 — localize the long-Chinese non-EOS generation failure and terminal message.
@@ -415,7 +417,7 @@ Narrative authority: [`docs/reference/delivery-harness.md`](reference/delivery-h
 | `VLR-04` | done | Correct Clone target/reference language ownership | `file:Sources/QwenVoiceCore/GenerationSemantics.swift`, `file:Tests/VocelloCoreTests/GenerationSemanticsLanguageTests.swift`, `file:Sources/iOS/Voices/IOSRecordVoiceSheet.swift` |
 | `VLR-05` | done | Apply only the proven tokenizer or reference-quality remediation | `doc:docs/reference/voice-identity-language-reliability-macos-2026-09-01.md` |
 | `VLR-06` | done | Apply only the proven French Voice Design remediation | `doc:docs/reference/voice-identity-language-reliability-macos-2026-09-01.md` |
-| `VLR-07` | in-flight | Complete physical-device closure and publish the privacy-safe report | `doc:docs/reference/voice-identity-language-reliability-ios-2026-09-02.md`, `doc:docs/development-progress.md#september-5-host-follow-up-completed--phone-approval-pending`, `doc:docs/development-progress.md#september-6-phase-4-chinese-cadence-diagnostic`, `doc:docs/development-progress.md#september-6-independent-chinese-decoder-comparison`, `doc:docs/development-progress.md#september-6-chinese-intelligibility-and-pause-alignment` |
+| `VLR-07` | in-flight | Complete physical-device closure and publish the privacy-safe report | `doc:docs/reference/voice-identity-language-reliability-ios-2026-09-02.md`, `doc:docs/development-history-2026-09-06.md#september-5-host-follow-up-completed--phone-approval-pending`, `doc:docs/development-history-2026-09-06.md#september-6-phase-4-chinese-cadence-diagnostic`, `doc:docs/development-history-2026-09-06.md#september-6-independent-chinese-decoder-comparison`, `doc:docs/development-history-2026-09-06.md#september-6-chinese-intelligibility-and-pause-alignment` |
 | `VLR-08` | done | Repair the live Clone publication gap exposed by clean codec replay | `doc:docs/reference/voice-identity-language-reliability-ios-2026-09-02.md` |
 | `VLR-09` | done | Reject egregious terminal silence before publication | `file:Tests/VocelloCoreTests/GenerationTelemetrySchemaTests.swift`, `file:Tests/VocelloCoreTests/AtomicWAVPublicationTests.swift`, `doc:docs/reference/voice-identity-language-reliability-ios-2026-09-02.md` |
 | `VLR-10` | done | Close macOS enrollment metadata and request-boundary parity | `file:Tests/VocelloiOSLogicTests/IOSReferenceTranscriptionReviewStateTests.swift`, `file:Tests/VocelloCoreTests/VoiceClipEnrollmentEvidenceTests.swift`, `file:Tests/VocelloCoreTests/MacStudioGenerationRequestFactoryTests.swift`, `doc:docs/reference/macos-app-guide.md` |

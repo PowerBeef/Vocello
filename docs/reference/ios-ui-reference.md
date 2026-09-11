@@ -120,7 +120,9 @@ Accessibility, and About. Five detail pages use the existing tab navigation stac
 44-point Back headers. Root links are `iosSettings_<category>Row`, headers are
 `screen_settings_<category>`, and Back is `iosSettings_<category>BackButton`, for categories
 `audio`, `modelsFiles`, `privacyPermissions`, `accessibility`, and `about`.
-The tab dock, preference keys/defaults, model operations and outward export policy are unchanged.
+Preference keys/defaults, model operations and outward export policy are unchanged. The tab dock keeps
+its identifiers and layout but its Dynamic Type growth is capped at the first accessibility size
+(ISU-5) so Settings rows stay reachable at AX-XXXL; its icon is hidden from VoiceOver.
 Decorative symbols replace utility tiles; labels wrap and short values align to the trailing side,
 reflowing below labels at accessibility sizes. Audio owns the original autoplay Toggle and localized
 Take variation menu. Models &

@@ -98,13 +98,17 @@ acceptance and cross-references ISU-4 for the existing Settings navigation defec
 
 1. Complete English/French source migration, including indirect strings, errors, permissions,
    enrollment, player/History controls and VoiceOver descriptions. Keep identifiers and behavior.
-2. Complete the large-text reveal boundary using measured row/dock/window geometry and hittability.
-   The AX-L fixed-padding defect is corrected by measured dock clearance and has partial physical
-   confirmation. AX-XXXL/pseudo navigation remains unqualified: full-window gestures can overshoot
-   or start over the enlarged dock. Two element-swipe experiments failed and were reverted; use
-   the retained observations for the next bounded correction, not another unchanged run. Preserve
-   the helper's strict visibility predicates and bounded failure observations. A visible screenshot
-   is not proof of hittability, and clipping-audit success is not proof of every row's visibility.
+2. Qualify the large-text layouts on post-ISU-5 source. The AX-L fixed-padding defect is corrected
+   by measured dock clearance and has partial physical confirmation. The AX-XXXL/pseudo overshoot
+   had a product cause, not only a harness one: the persistent tab dock had no Dynamic Type ceiling
+   and grew upward into the region a Settings scroll gesture starts in. ISU-5 (2026-09-11) caps the
+   dock at the first accessibility size, restores the switch trait on the compact toggles, hides the
+   duplicated tab icon from VoiceOver and stacks the App Language rows at accessibility sizes. The
+   two earlier element-swipe experiments treated the symptom and stay reverted. What remains is one
+   separately authorized `scripts/ui_test.sh ios localization` walk covering English/French AX-XXXL
+   and pseudo-AX-XXXL; ISU-4 owns that run. Preserve the helper's strict visibility predicates and
+   bounded failure observations. A visible screenshot is not proof of hittability, and clipping-audit
+   success is not proof of every row's visibility.
 3. After the English/French and long-string walks qualify, expand in bounded batches:
    Spanish/German/Italian/Brazilian Portuguese, then Simplified Chinese/Japanese/Korean/Russian.
    The maintainer selected Brazilian Portuguese (`pt-BR`) and Simplified Chinese (`zh-Hans`)

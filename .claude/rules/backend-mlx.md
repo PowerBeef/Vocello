@@ -145,8 +145,9 @@ A successful in-repository benchmark publishes a compact, allowlisted record aut
 not append to `benchmarks/HISTORY.md`; it is generated from `benchmarks/runs/`. Raw JSONL, audio,
 screenshots, result bundles, listener responses, and traces remain in the untracked artifact
 directory. Dirty-source runs are exploratory. Deterministic quality gates remain the ordinary
-release authority. Human listening is optional. Candidate comparisons follow the frozen automatic
-holdout in `config/delivery-experiment-contract.json`, with independent judges, reversed-order
+release authority. Human listening is optional. Candidate comparisons follow a frozen automatic
+holdout supplied at run time and judged by `scripts/delivery_promotion_decision.py` under the
+guardrails in `config/delivery-experiment-contract.json`, with independent judges, reversed-order
 agreement and unchanged quality/runtime guardrails. Report measured metric improvements, never
 listener-proven semantic gains. Synthetic defects establish signal detection, not general speech
 usability. Neither research nor optional listening waives a deterministic failure or authorizes publication.

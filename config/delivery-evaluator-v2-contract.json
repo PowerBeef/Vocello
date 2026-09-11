@@ -29,7 +29,7 @@
       "sampleRateHz": 16000,
       "channels": 1,
       "format": "pcm-s16le",
-      "deterministicResampling": "linear-rational-v1"
+      "deterministicResampling": "polyphase-kaiser5-v2"
     },
     "atomicWrites": true,
     "failClosedOnDigestMismatch": true,

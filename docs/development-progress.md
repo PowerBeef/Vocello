@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-09-10
+reviewed: 2026-09-11
 summary: Current release-first resume checkpoint; dated evidence lives in the pinned development history, and config/roadmap.json owns status.
 sourceOfTruth:
   - config/roadmap.json
@@ -51,9 +51,10 @@ first; an `axiom:iap-auditor` pass over the iOS export unlock before RF-13; an
 critical path is unchanged: ISU-4 localization qualification and RF-13 remain next; the adoption track
 is closed.
 
-Later the same day the follow-up audits ran through Axiom and the first two CI runs after the push were
-repaired (a gitignored path quoted in prose, and a PyYAML import the runner cannot satisfy; main had been
-red since the previous day). The StoreKit audit found the export unlock clean against every invariant
+Later the same day the follow-up audits ran through Axiom and CI on `main` was repaired in two steps: the
+first push fixed a gitignored path quoted in prose and a PyYAML import the runner cannot satisfy (`main`
+had been red since the previous day); that run still failed on a French plural test that depended on the
+process locale, fixed in `2f06f21a` by binding formatted copy to the interface locale. The StoreKit audit found the export unlock clean against every invariant
 (one low note on generic error copy). The concurrency audit found no unregistered unsafe declaration and no
 confirmed race; the registry text for the engine service host now describes the per-method MainActor
 discipline the code really uses, the performance gate model is class-isolated (F-24), and the unchecked
@@ -66,6 +67,44 @@ ISU-4: the tab dock had no Dynamic Type ceiling and grew into the scroll-gesture
 is now capped at the first accessibility size, the compact toggles regain the switch role, the tab icon is
 hidden from VoiceOver and the App Language rows adapt their layout (ISU-5, source landed; the physical
 English/French AX-XXXL and pseudo-localization walks remain the explicit qualification step).
+
+### Roadmap reconciliation (September 11)
+
+`config/roadmap.json` was compared item by item against tree `2f06f21a` by three read-only audits.
+The ledger is structurally sound and every evidence and source path resolves, but about a third of the
+open items were inaccurate. What changed, all in the ledger and active docs, no product code:
+
+- Blocker topology was understated: eleven items were in flight although their only open clause is
+  packaged, frozen-source or device evidence owned by a parked or unfrozen owner. They are now
+  `planned` with the owner in `blockedBy` (F-05/15/18/20/21/23 behind RF-10, F-17 behind RF-08,
+  ICA-04 behind RF-09, ICA-05 behind ICA-04, ISR-06 behind ISR-04, DP-32 behind DP-31). RF-11 no
+  longer lists the done RF-07. Of the items still in flight, source work can move today on roughly a
+  dozen; the rest wait for RF-09's freeze or a device window.
+- F-19 (attempt-scoped terminal ownership) and F-22 (cross-process Saved Voice transactions) had fully
+  discharged gates and are done. ASR-04 was `planned` with shipped source and is in flight.
+- RF-06's title and gate now say what the September 7 amendment decided: known limitation, causal
+  research deferred, incidence measured by the frozen campaign.
+- Stale notes were corrected on F-16 (iOS long-form acceptance passed September 7), ISR-04 and VLR-07
+  (runner, schema and classifier changed after their last revalidation), ISU-4 (next action is the
+  post-ISU-5 physical walk), ICA-04 (five control families added after the frozen snapshot), AV-07
+  (empty approved external catalog digests block the licensed-reference pilot), AV-08 and DP-29 (the
+  September 2 language run is exploratory, partial and dirty-source with every cell
+  `passedWithWarnings`, no Korean), AV-09 (the controllable-clock clause is untouched). ICA-06 carries a
+  maintainer-visible re-scope proposal because seed-exact reproduction is unreachable through the UI.
+- Evidence anchors that resolved to "Historical only" redirect stubs now point at the pinned
+  `development-history-2026-09-06.md` sections. `config/delivery-evaluator-v2-contract.json` names the
+  live `polyphase-kaiser5-v2` resampler instead of the retired one. The CLAUDE.md holdout invariant now
+  says where the holdout really comes from.
+- Two code defects were filed, not fixed: F-25 (a busy Saved Voice store is fatal to engine
+  initialization, untyped and unlocalized; the exact app+CLI coexistence F-22 was for) and F-26 (CLI
+  `afplay` children outlive a signalled process, signal sources install after the task starts, and a
+  failure coinciding with a signal is reported as cancelled). ISU-5 carries a note on the stacked
+  App Language row layout to decide before the physical walk.
+- The September 11 host cleanup removed every retained run bundle and diagnostics directory under
+  `build/artifacts`. No run id cited in the ledger is inspectable locally and `scripts/ui_test.sh
+  --resume` has nothing to validate; the 201-take campaign restarts from take 1 on the frozen source.
+
+Critical path is unchanged: ISU-4's post-ISU-5 walk, RF-13, then RF-09's freeze.
 
 ### September 10 bounded Settings scrolling correction
 

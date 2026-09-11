@@ -479,6 +479,9 @@
         "scripts/development_workflow.py",
         "scripts/tree_fingerprint.py",
         "scripts/hooks/precommit_gate.sh",
+        "scripts/hooks/policy_guard.sh",
+        "scripts/hooks/generated_file_guard.sh",
+        ".claude/settings.json",
         "scripts/build_foundation_targets.sh",
         "scripts/regenerate_project.sh",
         "scripts/evidence_impact.py"

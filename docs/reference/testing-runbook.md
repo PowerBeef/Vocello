@@ -1,7 +1,7 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-09-06
+reviewed: 2026-09-11
 summary: Testing entry point and evidence boundaries; platform guides own execution, the development workflow owns the edit loop, and delivery research stays opt-in.
 sourceOfTruth:
   - scripts/check_project_inputs.sh
@@ -37,6 +37,26 @@ then retire obsolete execution paths. This is a working policy, not a claim of a
 | Delivery / emotion research | [Delivery harness](delivery-harness.md) | Serial local analyzers after TTS exits; frozen independent-reference automated holdouts, measured claims only; listening optional |
 | Release / submission programme | [Release-first plan](release-first-execution-2026-09.md) | Implementation, candidate verification, publication approval are separate |
 | Gate changes / deliberate-failure fixtures | [Repository self-verification](repository-self-verification.md) | Prove rejection as well as success; preserve deterministic coverage |
+
+## Claude Code routes
+
+Claude Code sessions reach the same procedures through repository-owned skills and subagents
+(`.claude/rules/claude-tooling.md`). They add no gate and change no evidence rule: a skill runs the
+named script, and a subagent only reads what the run produced.
+
+| Route | Skill (user-invoked unless noted) | Triage | Evidence owner |
+| --- | --- | --- | --- |
+| Routine edit / checkpoint | `/checkpoint` (Claude may invoke) | `gate-runner` subagent summarizes failures | [Development workflow](development-workflow.md) |
+| Derived docs, re-pins, roadmap | `/refresh-docs`, `/roadmap-checkpoint` (Claude may invoke) | `doc-governance-reviewer` | [Repository self-verification](repository-self-verification.md) |
+| macOS UI lanes | `/macos-ui-lane <lane>` | `xcresult-triage` | [macOS testing](macos-testing.md) |
+| iPhone XCUITest lanes | `/ios-lane <lane>` | `xcresult-triage`, then `axiom:test-failure-analyzer` for interruption patterns | [iOS testing](ios-device-testing.md) |
+| iPhone headless diagnostics | `/device-diagnostics <verb>` | `axiom:crash-analyzer` for `.ips` | [iOS testing](ios-device-testing.md) |
+| Release readiness (read-only) | `/release-evidence <tag>` | — | [Quality promotion](quality-promotion.md) |
+| Swift change review | `swift-review` subagent, `/code-review` | — | Domain rules under `.claude/rules/` |
+
+XcodeBuildMCP (`macos` and `ios-device` profiles) is an inner-loop assist for scratch builds and single
+XCTest classes; it never produces evidence and never drives the UI. Axiom's Simulator-only tools are not
+used. Physical-device and model lanes stay explicit and are never scheduled by a skill on its own.
 
 ## Model readiness
 

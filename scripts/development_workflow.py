@@ -344,6 +344,47 @@ def run_commands(commands: list[list[str]]) -> None:
     print(f"==> [dev] workflow completed in {time.monotonic() - started:.1f}s", flush=True)
 
 
+def receipt_state() -> str:
+    """fresh | stale | missing: does the commit-gate receipt match this tree and toolchain?"""
+    marker_root = os.environ.get("QVOICE_SCRATCH_GATE_FINGERPRINT") or str(ROOT / "build/scratch/gate-fingerprint")
+    marker = Path(marker_root) / "last-pass"
+    if not marker.is_file():
+        return "missing"
+    try:
+        from tree_fingerprint import checkpoint_fingerprint
+        current = checkpoint_fingerprint(ROOT)
+    except Exception:  # noqa: BLE001 - status is advisory
+        return "unverifiable"
+    return "fresh" if marker.read_text(encoding="utf-8").strip() == current else "stale"
+
+
+def print_status() -> None:
+    """One screen for a session start: branch, dirty paths, verification class, receipt, primary plan."""
+    branch = _git("symbolic-ref", "--quiet", "--short", "HEAD").decode().strip() or "detached HEAD"
+    paths = changed_paths()
+    try:
+        plan = workflow_plan(paths)
+        verification = plan["localVerification"]
+        lanes = ", ".join(plan["localNativeEvidence"]) or "none"
+    except (OSError, WorkflowError) as error:
+        verification, lanes = f"unavailable ({error})", "?"
+    print(f"branch: {branch}")
+    print(f"dirty: {len(paths)} path(s)")
+    print(f"verification: {verification}; native lanes: {lanes}")
+    print(f"receipt: {receipt_state()} (scripts/dev.sh checkpoint writes it)")
+    roadmap_path = ROOT / "config/roadmap.json"
+    if roadmap_path.is_file():
+        roadmap = json.loads(roadmap_path.read_text(encoding="utf-8"))
+        primary = roadmap.get("primaryPlan")
+        items = [item for item in roadmap.get("items", []) if item.get("plan") == primary]
+        done = sum(1 for item in items if item.get("status") == "done")
+        open_items = [item["id"] for item in items if item.get("status") in ("in-flight", "planned")]
+        print(f"primaryPlan: {primary} — {done}/{len(items)} done; open: {', '.join(open_items[:6])}"
+              + (" …" if len(open_items) > 6 else ""))
+    else:
+        print("primaryPlan: (config/roadmap.json missing)")
+
+
 def record_commit_gate_pass() -> None:
     marker_root = os.environ.get("QVOICE_SCRATCH_GATE_FINGERPRINT")
     if not marker_root:
@@ -376,11 +417,15 @@ def main(argv: list[str] | None = None) -> int:
     subparsers.add_parser("checkpoint").add_argument("--full", action="store_true")
     subparsers.add_parser("python-tests")
     subparsers.add_parser("assists")
+    subparsers.add_parser("status")
     args = parser.parse_args(argv)
 
     try:
         if args.command == "assists":
             validate_optional_assists(ROOT)
+            return 0
+        if args.command == "status":
+            print_status()
             return 0
         if args.command == "python-tests":
             if os.environ.get("CI") or os.environ.get("GITHUB_ACTIONS"):

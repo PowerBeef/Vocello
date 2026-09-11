@@ -7,6 +7,9 @@ sourceOfTruth:
   - scripts/development_workflow.py
   - scripts/tree_fingerprint.py
   - scripts/hooks/precommit_gate.sh
+  - scripts/hooks/policy_guard.sh
+  - scripts/hooks/generated_file_guard.sh
+  - .claude/settings.json
   - scripts/build_foundation_targets.sh
   - scripts/regenerate_project.sh
   - scripts/evidence_impact.py
@@ -33,9 +36,17 @@ does not run the project gate again. Any subsequent edit, added untracked file, 
 invalidates the marker. Local markers also bind resolved tool executables, Python/OS/Xcode identity
 and relevant toolchain environment. Equivalent shell PATH ordering reuses a marker only when PATH
 membership and all fingerprinted tool resolutions remain unchanged. They are not release evidence. The checker refuses edits during
-verification instead of attaching PASS to the later untested content. The commit hook only checks
-the receipt and blocks if it is absent, stale or unreadable. It never starts another build. Run the
-checkpoint directly so long checks remain observable and are not limited by the host hook timeout.
+verification instead of attaching PASS to the later untested content. The commit hook
+(`scripts/hooks/precommit_gate.sh`, wired as a Claude Code `PreToolUse` Bash hook in
+`.claude/settings.json`) only checks the receipt and blocks if it is absent, stale or unreadable. It
+never starts another build. Run the checkpoint directly so long checks remain observable and are not
+limited by the hook timeout. The receipt binds tree bytes plus resolved tool identities, not PATH
+membership, so the hook environment and the tool shell agree. `scripts/dev.sh status` prints the
+receipt state (fresh, stale, missing) with the branch, dirty paths and verification class; the
+`SessionStart` hook prints it at the start of every session. Two more `PreToolUse` guards
+(`scripts/hooks/policy_guard.sh`, `scripts/hooks/generated_file_guard.sh`) block Simulator destinations,
+whole-cache deletion, force pushes, new branches, direct `project.pbxproj` writes and hand edits of
+generated files; `scripts/claude_config_contract.py` validates the wiring.
 
 Finalize intended tracked-file membership **before** derived refresh: project-health inventories
 use Git-tracked files. Adding a new file to the index afterward can stale that generated summary

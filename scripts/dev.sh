@@ -10,11 +10,11 @@ cd "$ROOT_DIR"
 . "$ROOT_DIR/scripts/lib/build_paths.sh"
 
 case "${1:-plan}" in
-  plan|focused|checkpoint|assists)
+  plan|focused|checkpoint|assists|status)
     exec python3 "$ROOT_DIR/scripts/development_workflow.py" "${1:-plan}" "${@:2}"
     ;;
   *)
-    echo "usage: scripts/dev.sh plan [--json] [--paths PATH ...] | focused | checkpoint [--full] | assists" >&2
+    echo "usage: scripts/dev.sh plan [--json] [--paths PATH ...] | focused | checkpoint [--full] | assists | status" >&2
     exit 2
     ;;
 esac

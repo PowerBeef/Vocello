@@ -202,6 +202,12 @@ class GuidanceSizeTests(Harness):
         self.assertEqual(findings, [])
         self.assertIn("website/CLAUDE.md", sizes)
 
+    def test_root_guidance_alone_above_budget_fails(self):
+        root = self.build("documented_gate.py undocumented_gate.py kept.json")
+        (root / "CLAUDE.md").write_text("x" * (16 * 1024 + 1))
+        findings, _ = guidance_size_findings(root)
+        self.assertTrue(any("root guidance budget" in finding for finding in findings))
+
     def test_combined_root_and_nested_guidance_above_budget_fails(self):
         root = self.build("documented_gate.py undocumented_gate.py kept.json")
         (root / "website" / "CLAUDE.md").write_text("x" * (30 * 1024))

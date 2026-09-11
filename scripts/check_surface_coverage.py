@@ -38,7 +38,10 @@ EXEMPTIONS_PATH = "config/surface-coverage-exemptions.json"
 GUIDANCE = ("CLAUDE.md",)
 GUIDANCE_GLOBS = (".claude/rules/*.md",)
 NESTED_GUIDANCE = ("website/CLAUDE.md",)
-MAX_DISCOVERED_GUIDANCE_BYTES = 30 * 1024
+# Root guidance is read on every turn of every session; nested guidance joins it under
+# its directory. Claude Code's own recommendation is a root file under ~200 lines.
+MAX_ROOT_GUIDANCE_BYTES = 16 * 1024
+MAX_DISCOVERED_GUIDANCE_BYTES = 24 * 1024
 
 
 class CoverageError(RuntimeError):
@@ -202,6 +205,11 @@ def guidance_size_findings(root: pathlib.Path) -> tuple[list[str], dict[str, int
 
     sizes = {"CLAUDE.md": root_guidance.stat().st_size}
     findings: list[str] = []
+    if sizes["CLAUDE.md"] > MAX_ROOT_GUIDANCE_BYTES:
+        findings.append(
+            f"CLAUDE.md is {sizes['CLAUDE.md']} bytes, exceeding the {MAX_ROOT_GUIDANCE_BYTES}-byte "
+            "root guidance budget; move domain detail into a path-scoped .claude/rules/*.md"
+        )
     for relative in NESTED_GUIDANCE:
         nested = root / relative
         if not nested.is_file():

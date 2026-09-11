@@ -17,6 +17,7 @@ Authority: repository guidance.
 Review when: release facts; workflow changes; platform support.
 
 - **active** · [`.claude/rules/backend-mlx.md`](../.claude/rules/backend-mlx.md)
+- **active** · [`.claude/rules/claude-tooling.md`](../.claude/rules/claude-tooling.md)
 - **active** · [`.claude/rules/derived-artifacts.md`](../.claude/rules/derived-artifacts.md)
 - **active** · [`.claude/rules/ios.md`](../.claude/rules/ios.md)
 - **active** · [`.claude/rules/macos.md`](../.claude/rules/macos.md)

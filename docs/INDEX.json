@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "generated": "python3 scripts/doc_metadata.py rebuild-index",
   "note": "Machine-readable documentation map. Query this instead of globbing docs/.",
-  "annotatedDocuments": 115,
+  "annotatedDocuments": 116,
   "unannotatedDocuments": 0,
   "documents": [
     {
@@ -36,6 +36,18 @@
         "scripts/run_local_delivery_cascade.py",
         "scripts/delivery_promotion_decision.py",
         "scripts/audio_cadence_qc.py"
+      ]
+    },
+    {
+      "path": ".claude/rules/claude-tooling.md",
+      "status": "active",
+      "owner": "release-qa",
+      "summary": "Domain rule for the repository-owned Claude Code configuration \u2014 hooks, permissions, path-scoped rules, project skills, project subagents, MCP routing (XcodeBuildMCP, GitHub, Sosumi) and Axiom usage \u2014 and what the claude_config_contract.py gate enforces.",
+      "sourceOfTruth": [
+        ".claude/settings.json",
+        "scripts/claude_config_contract.py",
+        "scripts/hooks/precommit_gate.sh",
+        "scripts/development_workflow.py"
       ]
     },
     {

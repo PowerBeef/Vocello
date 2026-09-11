@@ -1,6 +1,7 @@
 ---
 status: active
 owner: release-qa
+reviewed: 2026-09-11
 summary: Domain rule for scripts, CI, packaging, signing, benchmarks, and release gates — build-output ownership, registry rules, release-evidence invariants, and the deterministic-only publishing posture.
 sourceOfTruth:
   - scripts/check_project_inputs.sh
@@ -172,6 +173,37 @@ only for schema/field interpretation. Release steps live in
 [macos-release-qa.md](../../docs/reference/macos-release-qa.md) and
 [ios-appstore-submission.md](../../docs/reference/ios-appstore-submission.md).
 Do not duplicate their command catalogs here.
+
+## Programme posture and harness evolution
+
+Moved here from the root guidance on 2026-09-11; the root file links to this section.
+
+### Release-first execution (programme posture)
+
+Follow [`docs/reference/release-first-execution-2026-09.md`](../../docs/reference/release-first-execution-2026-09.md)
+iOS-first: defer Mac/CLI-only qualification. Keep all modes, long-form and the 201-take gate.
+Use retained evidence; stop after two predeclared experiments per finding for a decision checkpoint.
+No broad harness work. Serialize heavy work; verify focused changes then the tree.
+Freeze source/docs during campaigns; checkpoint runs untracked. Implementation, instrumented QA,
+processed-candidate proof and submission approval differ. Keep external dependencies explicit.
+
+### Evidence-led test and harness evolution
+
+Apply this across unit/integration/UI tests, audio evaluators, performance tools and CI/release
+validators. Existing code/contracts govern execution, not unquestionable correctness; neither age,
+version, model reputation nor a green suite makes an implementation a gold standard. Validate the
+intended behavior independently, including real producer/consumer boundaries and known bad inputs.
+Prefer one current implementation; retain compatibility only for identified consumers or evidence
+with an explicit retirement condition. Version persisted/public contracts or changed measurement
+meaning, not routine refactors. Preserve user data and original evidence, not known bugs or
+unsupported verdicts. Use the [replacement and retirement procedure](../../docs/reference/repository-self-verification.md#replace-and-retire-tests-and-harnesses)
+within existing roadmap items; no blanket rewrite, parallel harness or silent gate waiver.
+
+The delivery cascade's default `config/delivery-acoustic-reference-base.json` panel is pinned by
+`config/delivery-evaluator-v2-contract.json` and consumed by `scripts/delivery_acoustic_reference.py`.
+It is descriptive context, not good/bad speech labels or a release gate; preserve warnings and missing
+coverage. The existing [Audio QC procedure](../../docs/reference/audio-qc-engineering.md#default-acoustic-reference-base)
+owns reference comparison and update instructions.
 
 ## Deterministic gate map
 

@@ -27,6 +27,11 @@ jobs:
         run: |
           set -euo pipefail
           sudo xcode-select -s /Applications/Xcode_26.6.app
+          # Same pinned numpy as ci.yml: supply_chain_contract.py --installed native
+          # verifies it, and the runner image does not ship it.
+          NUMPY_PIN="$(python3 -c "import json; print(json.load(open('config/toolchain.json'))['native']['numpy']['version'])")"
+          python3 -m pip install --quiet --break-system-packages "numpy==${NUMPY_PIN}" \
+            || python3 -m pip install --quiet "numpy==${NUMPY_PIN}"
           ./scripts/install_pinned_tools.sh
           export PATH="$HOME/.qwenvoice-pinned-tools/bin:$PATH"
           if ! xcrun metal --version >/dev/null 2>&1; then

@@ -11,6 +11,10 @@
   "excluded": {
     "Qwen3RuntimeTests": "MLX and Metal stay under their single-owner deterministic suite; the scheduled TSan lane targets the stable CPU core and injectable XPC transport subset."
   },
+  "skippedUnderSanitizer": {
+    "VocelloCoreTests.CLIExecutionTests/testRealSignalsReachNativeSupervisorAndAwaitCleanup": "Spawns a helper xctest child; any child of the instrumented parent aborts in VerifyInterceptorsWorking on Xcode 26.6 (inherited, re-injected and runtime-propagated insertion all tried 2026-09-11). Skips under the sanitizer via NativeHelperProcess; runs on every non-sanitized checkpoint.",
+    "VocelloCoreTests.PreparedVoiceRepositoryTests/testTwoNativeProcessesExcludePreparationReplacementAndDeletion": "Same helper-child limitation as the CLI signal test; the cross-process store lock stays covered by the ordinary lane."
+  },
   "characterization": {
     "deadline": "2026-09-30",
     "requiredConsecutivePassesForBlockingReview": 3,

@@ -225,108 +225,87 @@ import QwenVoiceCore
         return qualityIntro + "\n\n" + lines.map { "• \($0)" }.joined(separator: "\n") + "\n\n" + trailer
     }
     static func deleteAllHistory(_ count: Int) -> String {
-        String.localizedStringWithFormat(
-            IOSAppLanguage.shared.localized(localized: "vocello.ui.deleteAllHistory", defaultValue: "This permanently deletes all %1$lld history entries and their audio files.",
+        IOSAppLanguage.shared.format(IOSAppLanguage.shared.localized(localized: "vocello.ui.deleteAllHistory", defaultValue: "This permanently deletes all %1$lld history entries and their audio files.",
                    comment: "iOS complete message: deleteAllHistory. Substitutions retain original user content and numeric values."), count)
     }
     static func clearAllHistory(_ count: Int) -> String {
-        String.localizedStringWithFormat(
-            IOSAppLanguage.shared.localized(localized: "vocello.ui.clearAllHistory", defaultValue: "This removes all %1$lld history entries. The generated audio files stay on the device.",
+        IOSAppLanguage.shared.format(IOSAppLanguage.shared.localized(localized: "vocello.ui.clearAllHistory", defaultValue: "This removes all %1$lld history entries. The generated audio files stay on the device.",
                    comment: "iOS complete message: clearAllHistory. Substitutions retain original user content and numeric values."), count)
     }
     static func queuedTakes(_ count: Int) -> String {
-        String.localizedStringWithFormat(
-            IOSAppLanguage.shared.localized(localized: "vocello.ui.queuedTakes", defaultValue: "%1$lld takes remain safely queued and available to retry or export.",
+        IOSAppLanguage.shared.format(IOSAppLanguage.shared.localized(localized: "vocello.ui.queuedTakes", defaultValue: "%1$lld takes remain safely queued and available to retry or export.",
                    comment: "iOS complete message: queuedTakes. Substitutions retain original user content and numeric values."), count)
     }
     static func segmentCount(_ count: Int) -> String {
-        String.localizedStringWithFormat(
-            IOSAppLanguage.shared.localized(localized: "vocello.ui.segmentCount", defaultValue: "%1$lld segments",
+        IOSAppLanguage.shared.format(IOSAppLanguage.shared.localized(localized: "vocello.ui.segmentCount", defaultValue: "%1$lld segments",
                    comment: "iOS complete message: segmentCount. Substitutions retain original user content and numeric values."), count)
     }
     static func pinSeed(_ seed: String) -> String {
-        String.localizedStringWithFormat(
-            IOSAppLanguage.shared.localized(localized: "vocello.ui.pinSeed", defaultValue: "Pin seed %1$@ for new takes",
+        IOSAppLanguage.shared.format(IOSAppLanguage.shared.localized(localized: "vocello.ui.pinSeed", defaultValue: "Pin seed %1$@ for new takes",
                    comment: "iOS complete message: pinSeed. Substitutions retain original user content and numeric values."), seed)
     }
     static func voiceBank(_ delivery: String) -> String {
-        String.localizedStringWithFormat(
-            IOSAppLanguage.shared.localized(localized: "vocello.ui.voiceBank", defaultValue: "Voice bank · %1$@",
+        IOSAppLanguage.shared.format(IOSAppLanguage.shared.localized(localized: "vocello.ui.voiceBank", defaultValue: "Voice bank · %1$@",
                    comment: "iOS complete message: voiceBank. Substitutions retain original user content and numeric values."), delivery)
     }
     static func deletingVoice(_ name: String) -> String {
-        String.localizedStringWithFormat(
-            IOSAppLanguage.shared.localized(localized: "vocello.ui.deletingVoice", defaultValue: "Deleting %1$@",
+        IOSAppLanguage.shared.format(IOSAppLanguage.shared.localized(localized: "vocello.ui.deletingVoice", defaultValue: "Deleting %1$@",
                    comment: "iOS complete message: deletingVoice. Substitutions retain original user content and numeric values."), name)
     }
     static func actionsForVoice(_ name: String) -> String {
-        String.localizedStringWithFormat(
-            IOSAppLanguage.shared.localized(localized: "vocello.ui.actionsForVoice", defaultValue: "Actions for %1$@",
+        IOSAppLanguage.shared.format(IOSAppLanguage.shared.localized(localized: "vocello.ui.actionsForVoice", defaultValue: "Actions for %1$@",
                    comment: "iOS complete message: actionsForVoice. Substitutions retain original user content and numeric values."), name)
     }
     static func deleteVoicePermanent(_ name: String) -> String {
-        String.localizedStringWithFormat(
-            IOSAppLanguage.shared.localized(localized: "vocello.ui.deleteVoicePermanent", defaultValue: "Delete \"%1$@\" from this iPhone? This cannot be undone.",
+        IOSAppLanguage.shared.format(IOSAppLanguage.shared.localized(localized: "vocello.ui.deleteVoicePermanent", defaultValue: "Delete \"%1$@\" from this iPhone? This cannot be undone.",
                    comment: "iOS complete message: deleteVoicePermanent. Substitutions retain original user content and numeric values."), name)
     }
     static func deleteVoiceBase(_ name: String) -> String {
-        String.localizedStringWithFormat(
-            IOSAppLanguage.shared.localized(localized: "vocello.ui.deleteVoiceBase", defaultValue: "Delete \"%1$@\"? Its voice-bank variants will remain as individual saved voices.",
+        IOSAppLanguage.shared.format(IOSAppLanguage.shared.localized(localized: "vocello.ui.deleteVoiceBase", defaultValue: "Delete \"%1$@\"? Its voice-bank variants will remain as individual saved voices.",
                    comment: "iOS complete message: deleteVoiceBase. Substitutions retain original user content and numeric values."), name)
     }
     static func deleteVoiceVariant(_ name: String) -> String {
-        String.localizedStringWithFormat(
-            IOSAppLanguage.shared.localized(localized: "vocello.ui.deleteVoiceVariant", defaultValue: "Delete \"%1$@\"? The rest of this voice bank will remain available.",
+        IOSAppLanguage.shared.format(IOSAppLanguage.shared.localized(localized: "vocello.ui.deleteVoiceVariant", defaultValue: "Delete \"%1$@\"? The rest of this voice bank will remain available.",
                    comment: "iOS complete message: deleteVoiceVariant. Substitutions retain original user content and numeric values."), name)
     }
     static func duplicateVoice(_ name: String) -> String {
-        String.localizedStringWithFormat(
-            IOSAppLanguage.shared.localized(localized: "vocello.ui.duplicateVoice", defaultValue: "A saved voice named %1$@ already exists. Choose another name.",
+        IOSAppLanguage.shared.format(IOSAppLanguage.shared.localized(localized: "vocello.ui.duplicateVoice", defaultValue: "A saved voice named %1$@ already exists. Choose another name.",
                    comment: "iOS complete message: duplicateVoice. Substitutions retain original user content and numeric values."), name)
     }
     static func savedNamedVoice(_ name: String) -> String {
-        String.localizedStringWithFormat(
-            IOSAppLanguage.shared.localized(localized: "vocello.ui.savedNamedVoice", defaultValue: "Saved “%1$@”",
+        IOSAppLanguage.shared.format(IOSAppLanguage.shared.localized(localized: "vocello.ui.savedNamedVoice", defaultValue: "Saved “%1$@”",
                    comment: "iOS complete message: savedNamedVoice. Substitutions retain original user content and numeric values."), name)
     }
     static func tooManySegments(_ count: Int, maximum: Int) -> String {
-        String.localizedStringWithFormat(
-            IOSAppLanguage.shared.localized(localized: "vocello.ui.tooManySegments", defaultValue: "This script plans %1$lld segments; the maximum is %2$lld. Split the text and try again.",
+        IOSAppLanguage.shared.format(IOSAppLanguage.shared.localized(localized: "vocello.ui.tooManySegments", defaultValue: "This script plans %1$lld segments; the maximum is %2$lld. Split the text and try again.",
                    comment: "iOS complete message: tooManySegments. Substitutions retain original user content and numeric values."), count, maximum)
     }
     static func transcriptLoadFailed(_ name: String) -> String {
-        String.localizedStringWithFormat(
-            IOSAppLanguage.shared.localized(localized: "vocello.ui.transcriptLoadFailed", defaultValue: "Couldn’t load the saved transcript for \"%1$@\". Cloning can still use the audio.",
+        IOSAppLanguage.shared.format(IOSAppLanguage.shared.localized(localized: "vocello.ui.transcriptLoadFailed", defaultValue: "Couldn’t load the saved transcript for \"%1$@\". Cloning can still use the audio.",
                    comment: "iOS complete message: transcriptLoadFailed. Substitutions retain original user content and numeric values."), name)
     }
     static func justNowMode(_ mode: String) -> String {
-        String.localizedStringWithFormat(
-            IOSAppLanguage.shared.localized(localized: "vocello.ui.justNowMode", defaultValue: "Just now · %1$@",
+        IOSAppLanguage.shared.format(IOSAppLanguage.shared.localized(localized: "vocello.ui.justNowMode", defaultValue: "Just now · %1$@",
                    comment: "iOS complete message: justNowMode. Substitutions retain original user content and numeric values."), mode)
     }
     static func languageAuto(_ name: String) -> String {
-        String.localizedStringWithFormat(
-            IOSAppLanguage.shared.localized(localized: "vocello.ui.languageAuto", defaultValue: "%1$@ (Auto)",
+        IOSAppLanguage.shared.format(IOSAppLanguage.shared.localized(localized: "vocello.ui.languageAuto", defaultValue: "%1$@ (Auto)",
                    comment: "iOS complete message: languageAuto. Substitutions retain original user content and numeric values."), name)
     }
     static func languagePath(_ name: String) -> String {
-        String.localizedStringWithFormat(
-            IOSAppLanguage.shared.localized(localized: "vocello.ui.languagePath", defaultValue: "Use Qwen3’s %1$@ path.",
+        IOSAppLanguage.shared.format(IOSAppLanguage.shared.localized(localized: "vocello.ui.languagePath", defaultValue: "Use Qwen3’s %1$@ path.",
                    comment: "iOS complete message: languagePath. Substitutions retain original user content and numeric values."), name)
     }
     static func voiceBankDetail(_ name: String) -> String {
-        String.localizedStringWithFormat(
-            IOSAppLanguage.shared.localized(localized: "vocello.ui.voiceBankDetail", defaultValue: "%1$@ is a voice bank: the same voice with curated emotion references. Each delivery clones its measured reference clip.",
+        IOSAppLanguage.shared.format(IOSAppLanguage.shared.localized(localized: "vocello.ui.voiceBankDetail", defaultValue: "%1$@ is a voice bank: the same voice with curated emotion references. Each delivery clones its measured reference clip.",
                    comment: "iOS complete message: voiceBankDetail. Substitutions retain original user content and numeric values."), name)
     }
     static func freesStorage(_ size: String) -> String {
-        String.localizedStringWithFormat(
-            IOSAppLanguage.shared.localized(localized: "vocello.ui.freesStorage", defaultValue: "Frees %1$@. You can reinstall later from Settings.",
+        IOSAppLanguage.shared.format(IOSAppLanguage.shared.localized(localized: "vocello.ui.freesStorage", defaultValue: "Frees %1$@. You can reinstall later from Settings.",
                    comment: "iOS complete message: freesStorage. Substitutions retain original user content and numeric values."), size)
     }
     static func segmentChoice(_ number: Int, text: String) -> String {
-        String.localizedStringWithFormat(
-            IOSAppLanguage.shared.localized(localized: "vocello.ui.segmentChoice", defaultValue: "Segment %1$lld: %2$@",
+        IOSAppLanguage.shared.format(IOSAppLanguage.shared.localized(localized: "vocello.ui.segmentChoice", defaultValue: "Segment %1$lld: %2$@",
                    comment: "iOS complete message: segmentChoice. Substitutions retain original user content and numeric values."), number, text)
     }
     static var customDeliveryEmpty: String {
@@ -1183,14 +1162,12 @@ import QwenVoiceCore
     }
 
     static func page(_ current: Int, of total: Int) -> String {
-        String.localizedStringWithFormat(
-            IOSAppLanguage.shared.localized(localized: "vocello.ui.page", defaultValue: "Page %1$lld of %2$lld",
+        IOSAppLanguage.shared.format(IOSAppLanguage.shared.localized(localized: "vocello.ui.page", defaultValue: "Page %1$lld of %2$lld",
                    comment: "VoiceOver onboarding page position and total."), current, total)
     }
 
     static func installModel(_ name: String) -> String {
-        String.localizedStringWithFormat(
-            IOSAppLanguage.shared.localized(localized: "vocello.ui.installModel", defaultValue: "Install %1$@",
+        IOSAppLanguage.shared.format(IOSAppLanguage.shared.localized(localized: "vocello.ui.installModel", defaultValue: "Install %1$@",
                    comment: "Studio install button; substitution is the localized model display name."), name)
     }
 }

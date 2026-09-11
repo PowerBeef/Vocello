@@ -68,18 +68,16 @@ final class IOSAppLanguage {
         localization = VocelloLocalization(bundle: bundle, language: resolved)
     }
 
-    var interfaceLocale: Locale {
-        var components = Locale.Components(locale: .current)
-        let selected = Locale.Language.Components(identifier: resolvedLanguage)
-        // Region belongs to formatting preferences, not the interface-language choice.
-        components.languageComponents.languageCode = selected.languageCode
-        components.languageComponents.script = selected.script
-        return Locale(components: components)
-    }
+    var interfaceLocale: Locale { localization.locale }
     var presentation: VocelloPresentationText { VocelloPresentationText(localization: localization) }
 
     func localized(localized key: String, defaultValue: String? = nil, comment: StaticString? = nil) -> String {
         localization.string(localized: key, defaultValue: defaultValue, comment: comment)
+    }
+
+    /// Formatted copy bound to the interface locale (plural rules, number substitution).
+    func format(_ format: String, _ arguments: CVarArg...) -> String {
+        localization.format(format, arguments: arguments)
     }
 
     static func resolve(selection: String, available: [IOSUILanguage], preferred: [String]) -> String {

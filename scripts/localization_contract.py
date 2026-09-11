@@ -361,6 +361,26 @@ def _validate_literal_baseline(root: Path) -> int:
     return sum(record["count"] for record in current)
 
 
+def _validate_locale_bound_formatting(root: Path) -> None:
+    """Formatted copy must take its plural rules from the interface language.
+
+    `String.localizedStringWithFormat` resolves plural variants with the process locale, so
+    French copy rendered on an English-region device (or on CI) gets English plural rules
+    ("0 modèles prêts" for zero). `VocelloLocalization.format` and `IOSAppLanguage.format`
+    bind the context locale instead; a return of the process-locale API is a regression.
+    """
+    for scan_root in SCAN_ROOTS + (Path("Sources/iOSSupport"),):
+        base = root / scan_root
+        if not base.is_dir():
+            continue
+        for path in sorted(base.rglob("*.swift")):
+            if "localizedStringWithFormat" in path.read_text(encoding="utf-8"):
+                raise ContractError(
+                    f"{path.relative_to(root)} formats with the process locale; use "
+                    "VocelloLocalization.format or IOSAppLanguage.format so plural rules follow the interface language"
+                )
+
+
 def _validate_pseudo_localization(root: Path) -> None:
     text = _read_text(root, UI_TEST_SOURCE)
     required = (
@@ -383,6 +403,7 @@ def validate(root: Path) -> int:
     _validate_catalog(root)
     _validate_permission_catalog(root)
     _validate_typed_presentation(root)
+    _validate_locale_bound_formatting(root)
     _validate_pseudo_localization(root)
     return _validate_literal_baseline(root)
 

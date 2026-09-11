@@ -162,23 +162,23 @@ import QwenVoiceCore
                comment: "Settings and model management presentation; no change to stored identities.")
     }
     static func storageUsed(_ value: String) -> String {
-        String.localizedStringWithFormat(IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.storageUsed",
+        IOSAppLanguage.shared.format(IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.storageUsed",
             defaultValue: "%@ used", comment: "Settings formatted presentation; preserve all substitutions."), value)
     }
     static func modelStatus(_ value: String) -> String {
-        String.localizedStringWithFormat(IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.modelStatus",
+        IOSAppLanguage.shared.format(IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.modelStatus",
             defaultValue: "%@ model status", comment: "Settings formatted presentation; preserve all substitutions."), value)
     }
     static func modelAction(_ first: String, _ second: String) -> String {
-        String.localizedStringWithFormat(IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.modelAction",
+        IOSAppLanguage.shared.format(IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.modelAction",
             defaultValue: "%1$@ %2$@ model", comment: "Settings formatted presentation; preserve all substitutions."), first, second)
     }
     static func modelProgress(_ value: String) -> String {
-        String.localizedStringWithFormat(IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.modelProgress",
+        IOSAppLanguage.shared.format(IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.modelProgress",
             defaultValue: "%@ model download progress", comment: "Settings formatted presentation; preserve all substitutions."), value)
     }
     static func modelSetup(_ value: String) -> String {
-        String.localizedStringWithFormat(IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.modelSetup",
+        IOSAppLanguage.shared.format(IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.modelSetup",
             defaultValue: "%@ model setup in progress", comment: "Settings formatted presentation; preserve all substitutions."), value)
     }
     static func modeName(_ mode: GenerationMode) -> String {
@@ -194,7 +194,7 @@ import QwenVoiceCore
     static var accessibilityIntro: String { IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.accessibilityIntro", defaultValue: "Adapt Vocello’s interface to your accessibility preferences.") }
     static var tagline: String { IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.tagline", defaultValue: "Your voice, locally.") }
     static func versionIdentity(_ version: String, build: String) -> String {
-        String.localizedStringWithFormat(IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.versionIdentity",
+        IOSAppLanguage.shared.format(IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.versionIdentity",
             defaultValue: "Version %1$@ (%2$@)", comment: "Installed app version and build; never hardcode release numbers."), version, build)
     }
 
@@ -370,7 +370,7 @@ import QwenVoiceCore
                comment: "Settings version; preserve product and consent meaning.")
     }
     static func modelsReady(_ ready: Int, total: Int) -> String {
-        String.localizedStringWithFormat(IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.modelsReady",
+        IOSAppLanguage.shared.format(IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.modelsReady",
             defaultValue: "%d of %d ready", comment: "Installed model count out of total available models."), ready, total)
     }
 }

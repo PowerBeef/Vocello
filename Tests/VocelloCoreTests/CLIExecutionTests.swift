@@ -97,11 +97,12 @@ final class CLIExecutionTests: XCTestCase {
     }
 
     func testRealSignalsReachNativeSupervisorAndAwaitCleanup() async throws {
+        try NativeHelperProcess.skipUnderThreadSanitizer()
         for number in [SIGINT, SIGTERM] {
             let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
             try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
             defer { try? FileManager.default.removeItem(at: root) }
-            let child = try NativeHelperProcess.xctest(
+            let child = NativeHelperProcess.xctest(
                 running: "VocelloCoreTests.CLIExecutionTests/testNativeSignalWorker", in: Bundle(for: Self.self))
             var environment = ProcessInfo.processInfo.environment
             environment["VOCELLO_TEST_SIGNAL_ROOT"] = root.path

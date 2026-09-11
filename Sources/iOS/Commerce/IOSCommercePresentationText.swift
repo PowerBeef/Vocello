@@ -126,7 +126,7 @@ extension VocelloPresentationText {
     }
 
     func exportBuy(_ price: String) -> String {
-        String.localizedStringWithFormat(localization.string(localized: "vocello.export.buy",
+        localization.format(localization.string(localized: "vocello.export.buy",
             defaultValue: "Unlock exports — %@", comment: "One-time purchase; substitution is the App Store localized price."), price)
     }
 

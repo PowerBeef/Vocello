@@ -45,10 +45,11 @@ final class PreparedVoiceRepositoryTests: XCTestCase {
     }
 
     func testTwoNativeProcessesExcludePreparationReplacementAndDeletion() async throws {
+        try NativeHelperProcess.skipUnderThreadSanitizer()
         for phase in ["prepare", "replace", "delete"] {
             let shared = root.appendingPathComponent(phase)
             try FileManager.default.createDirectory(at: shared, withIntermediateDirectories: true)
-            let child = try NativeHelperProcess.xctest(
+            let child = NativeHelperProcess.xctest(
                 running: "VocelloCoreTests.PreparedVoiceRepositoryTests/testNativeStoreWorker", in: Bundle(for: Self.self))
             var environment = ProcessInfo.processInfo.environment
             environment["VOCELLO_TEST_STORE_ROOT"] = shared.path

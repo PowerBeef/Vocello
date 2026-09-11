@@ -163,6 +163,16 @@ class LocalizationContractTests(unittest.TestCase):
     def test_valid_contract_passes(self) -> None:
         self.assertEqual(localization_contract.validate(self.root), 1)
 
+    def test_process_locale_formatting_is_rejected(self) -> None:
+        bad = self.root / "Sources/iOS/Bad.swift"
+        bad.write_text(
+            'let text = String.localizedStringWithFormat("%lld items", 0)\n', encoding="utf-8")
+        with self.assertRaises(localization_contract.ContractError) as raised:
+            localization_contract.validate(self.root)
+        self.assertIn("process locale", str(raised.exception))
+        bad.unlink()
+        self.assertEqual(localization_contract.validate(self.root), 1)
+
     def test_partial_new_locale_cannot_ship(self) -> None:
         catalog = valid_catalog()
         entry = next(iter(catalog["strings"].values()))

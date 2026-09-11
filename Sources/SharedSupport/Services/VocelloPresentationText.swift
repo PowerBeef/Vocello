@@ -13,13 +13,13 @@ struct VocelloPresentationText: Sendable {
         self.localization = localization
     }
     func playerSubtitle(_ subtitle: String, duration: String) -> String {
-        String.localizedStringWithFormat(localization.string(localized: "vocello.presentation.playerSubtitle",
+        localization.format(localization.string(localized: "vocello.presentation.playerSubtitle",
             defaultValue: "%1$@ · %2$@",
             comment: "Complete user-facing playerSubtitle message. Preserve substitution identities."), subtitle, duration)
     }
 
     func downloadedBytes(_ bytes: String) -> String {
-        String.localizedStringWithFormat(localization.string(localized: "vocello.presentation.downloadedBytes",
+        localization.format(localization.string(localized: "vocello.presentation.downloadedBytes",
             defaultValue: "%1$@ downloaded",
             comment: "Complete user-facing downloadedBytes message. Preserve substitution identities."), bytes)
     }
@@ -30,31 +30,31 @@ struct VocelloPresentationText: Sendable {
     }
 
     func downloadTransfer(_ percent: Int, completed: String, total: String) -> String {
-        String.localizedStringWithFormat(localization.string(localized: "vocello.presentation.downloadTransfer",
+        localization.format(localization.string(localized: "vocello.presentation.downloadTransfer",
             defaultValue: "%1$lld%% · %2$@ of %3$@",
             comment: "Complete user-facing downloadTransfer message. Preserve substitution identities."), percent, completed, total)
     }
 
     func downloadAccessibility(_ percent: Int, completed: Int64, total: Int64) -> String {
-        String.localizedStringWithFormat(localization.string(localized: "vocello.presentation.downloadAccessibility",
+        localization.format(localization.string(localized: "vocello.presentation.downloadAccessibility",
             defaultValue: "%1$lld%% — %2$lld of %3$lld bytes",
             comment: "Complete user-facing downloadAccessibility message. Preserve substitution identities."), percent, completed, total)
     }
 
     func downloadRemaining(_ seconds: Int) -> String {
-        String.localizedStringWithFormat(localization.string(localized: "vocello.presentation.downloadRemaining",
+        localization.format(localization.string(localized: "vocello.presentation.downloadRemaining",
             defaultValue: "about %1$llds remaining",
             comment: "Complete user-facing downloadRemaining message. Preserve substitution identities."), seconds)
     }
 
     func downloadRetry(_ count: Int) -> String {
-        String.localizedStringWithFormat(localization.string(localized: "vocello.presentation.downloadRetry",
+        localization.format(localization.string(localized: "vocello.presentation.downloadRetry",
             defaultValue: "Preparing retry %1$lld. Verified files will be reused.",
             comment: "Complete user-facing downloadRetry message. Preserve substitution identities."), count)
     }
 
     func downloadRetryReason(_ count: Int, reason: String) -> String {
-        String.localizedStringWithFormat(localization.string(localized: "vocello.presentation.downloadRetryReason",
+        localization.format(localization.string(localized: "vocello.presentation.downloadRetryReason",
             defaultValue: "Preparing retry %1$lld: %2$@. Verified files will be reused.",
             comment: "Complete user-facing downloadRetryReason message. Preserve substitution identities."), count, reason)
     }
@@ -70,19 +70,19 @@ struct VocelloPresentationText: Sendable {
     }
 
     func charactersRemaining(_ count: Int) -> String {
-        String.localizedStringWithFormat(localization.string(localized: "vocello.presentation.charactersRemaining",
+        localization.format(localization.string(localized: "vocello.presentation.charactersRemaining",
             defaultValue: "%1$lld characters remaining for a single take.",
             comment: "Complete user-facing charactersRemaining message. Preserve substitution identities."), count)
     }
 
     func shortenScript(_ limit: Int) -> String {
-        String.localizedStringWithFormat(localization.string(localized: "vocello.presentation.shortenScript",
+        localization.format(localization.string(localized: "vocello.presentation.shortenScript",
             defaultValue: "Shorten the script to %1$lld characters or less.",
             comment: "Complete user-facing shortenScript message. Preserve substitution identities."), limit)
     }
 
     func shortenScriptTitle(_ limit: Int) -> String {
-        String.localizedStringWithFormat(localization.string(localized: "vocello.presentation.shortenScriptTitle",
+        localization.format(localization.string(localized: "vocello.presentation.shortenScriptTitle",
             defaultValue: "Shorten script to %1$lld chars",
             comment: "Complete user-facing shortenScriptTitle message. Preserve substitution identities."), limit)
     }
@@ -93,31 +93,31 @@ struct VocelloPresentationText: Sendable {
     }
 
     func regeneratingSegment(_ number: Int, total: Int) -> String {
-        String.localizedStringWithFormat(localization.string(localized: "vocello.presentation.regeneratingSegment",
+        localization.format(localization.string(localized: "vocello.presentation.regeneratingSegment",
             defaultValue: "Regenerating segment %1$lld of %2$lld…",
             comment: "Complete user-facing regeneratingSegment message. Preserve substitution identities."), number, total)
     }
 
     func reusingSegment(_ number: Int, total: Int) -> String {
-        String.localizedStringWithFormat(localization.string(localized: "vocello.presentation.reusingSegment",
+        localization.format(localization.string(localized: "vocello.presentation.reusingSegment",
             defaultValue: "Reusing segment %1$lld of %2$lld…",
             comment: "Complete user-facing reusingSegment message. Preserve substitution identities."), number, total)
     }
 
     func generatingSegment(_ number: Int, total: Int) -> String {
-        String.localizedStringWithFormat(localization.string(localized: "vocello.presentation.generatingSegment",
+        localization.format(localization.string(localized: "vocello.presentation.generatingSegment",
             defaultValue: "Generating segment %1$lld of %2$lld…",
             comment: "Complete user-facing generatingSegment message. Preserve substitution identities."), number, total)
     }
 
     func generatedSegmentPending(_ number: Int, total: Int) -> String {
-        String.localizedStringWithFormat(localization.string(localized: "vocello.presentation.generatedSegmentPending",
+        localization.format(localization.string(localized: "vocello.presentation.generatedSegmentPending",
             defaultValue: "Generated segment %1$lld of %2$lld; project not yet saved",
             comment: "Complete user-facing generatedSegmentPending message. Preserve substitution identities."), number, total)
     }
 
     func joiningSegments(_ count: Int) -> String {
-        String.localizedStringWithFormat(localization.string(localized: "vocello.presentation.joiningSegments",
+        localization.format(localization.string(localized: "vocello.presentation.joiningSegments",
             defaultValue: "Joining %1$lld segments…",
             comment: "Complete user-facing joiningSegments message. Preserve substitution identities."), count)
     }
@@ -133,19 +133,19 @@ struct VocelloPresentationText: Sendable {
     }
 
     func segmentQC(_ number: Int, detail: String) -> String {
-        String.localizedStringWithFormat(localization.string(localized: "vocello.presentation.segmentQC",
+        localization.format(localization.string(localized: "vocello.presentation.segmentQC",
             defaultValue: "Segment %1$lld failed audio quality checks. %2$@",
             comment: "Complete user-facing segmentQC message. Preserve substitution identities."), number, detail)
     }
 
     func joinedQC(_ detail: String) -> String {
-        String.localizedStringWithFormat(localization.string(localized: "vocello.presentation.joinedQC",
+        localization.format(localization.string(localized: "vocello.presentation.joinedQC",
             defaultValue: "The joined long-form output failed audio quality checks: %1$@",
             comment: "Complete user-facing joinedQC message. Preserve substitution identities."), detail)
     }
 
     func assemblyFailed(_ detail: String) -> String {
-        String.localizedStringWithFormat(localization.string(localized: "vocello.presentation.assemblyFailed",
+        localization.format(localization.string(localized: "vocello.presentation.assemblyFailed",
             defaultValue: "Long-form assembly failed: %1$@",
             comment: "Complete user-facing assemblyFailed message. Preserve substitution identities."), detail)
     }
@@ -156,19 +156,19 @@ struct VocelloPresentationText: Sendable {
     }
 
     func regeneratedQC(_ detail: String) -> String {
-        String.localizedStringWithFormat(localization.string(localized: "vocello.presentation.regeneratedQC",
+        localization.format(localization.string(localized: "vocello.presentation.regeneratedQC",
             defaultValue: "The regenerated take failed audio quality checks; the previous take is unchanged. %1$@",
             comment: "Complete user-facing regeneratedQC message. Preserve substitution identities."), detail)
     }
 
     func regeneratedJoinedQC(_ detail: String) -> String {
-        String.localizedStringWithFormat(localization.string(localized: "vocello.presentation.regeneratedJoinedQC",
+        localization.format(localization.string(localized: "vocello.presentation.regeneratedJoinedQC",
             defaultValue: "The joined long-form output failed audio quality checks after regeneration: %1$@",
             comment: "Complete user-facing regeneratedJoinedQC message. Preserve substitution identities."), detail)
     }
 
     func segmentMissing(_ number: Int) -> String {
-        String.localizedStringWithFormat(localization.string(localized: "vocello.presentation.segmentMissing",
+        localization.format(localization.string(localized: "vocello.presentation.segmentMissing",
             defaultValue: "Segment %1$lld has no generated audio to join.",
             comment: "Complete user-facing segmentMissing message. Preserve substitution identities."), number)
     }
@@ -191,7 +191,7 @@ struct VocelloPresentationText: Sendable {
     }
 
     func recoveryExportFailure(_ count: Int) -> String {
-        String.localizedStringWithFormat(localization.string(localized: "vocello.history.recovery_export_failure",
+        localization.format(localization.string(localized: "vocello.history.recovery_export_failure",
             defaultValue: "%lld recovery files could not be exported.",
             comment: "Number of recovery files that failed a user-directed local export; originals remain retained."), count)
     }
@@ -407,7 +407,7 @@ struct VocelloPresentationText: Sendable {
             defaultValue: "Install “%1$@” in Settings to generate audio.",
             comment: "Studio error. The substitution is the display name of a missing voice model."
         )
-        return String.localizedStringWithFormat(format, modelName)
+        return localization.format(format, modelName)
     }
 
     func longFormPlanningFailed(details: String) -> String {
@@ -415,7 +415,7 @@ struct VocelloPresentationText: Sendable {
             defaultValue: "Long-form planning failed: %1$@",
             comment: "Studio error. The substitution is a localized, non-sensitive planning error."
         )
-        return String.localizedStringWithFormat(format, details)
+        return localization.format(format, details)
     }
 
     var cloningConsentRequired: String {
@@ -437,7 +437,7 @@ struct VocelloPresentationText: Sendable {
             defaultValue: "Cancellation could not finish safely: %1$@",
             comment: "Studio error. The substitution explains why the engine cancellation barrier failed."
         )
-        return String.localizedStringWithFormat(format, details)
+        return localization.format(format, details)
     }
 
     /// Representative plural contract. Product surfaces can adopt the same
@@ -447,7 +447,7 @@ struct VocelloPresentationText: Sendable {
             defaultValue: "%lld models ready",
             comment: "Summary count of installed on-device voice models."
         )
-        return String.localizedStringWithFormat(format, count)
+        return localization.format(format, count)
     }
 }
 

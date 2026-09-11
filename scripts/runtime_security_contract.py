@@ -625,6 +625,24 @@ def tsan_contract_errors(
         or len(excluded["Qwen3RuntimeTests"].strip()) < 40
     ):
         errors.append("TSan policy must justify the MLX/Metal runtime exclusion")
+    # Individual tests may skip under the sanitizer only by name, with a reason, and only
+    # when the test really exists; the ordinary lane still runs them on every checkpoint.
+    skipped = policy.get("skippedUnderSanitizer", {})
+    if not isinstance(skipped, dict):
+        errors.append("TSan policy skippedUnderSanitizer must be an object of test id to reason")
+    else:
+        test_sources = "\n".join(
+            path.read_text(encoding="utf-8") for path in sorted((ROOT / "Tests").rglob("*.swift"))
+        ) if (ROOT / "Tests").is_dir() else ""
+        for test_id, reason in skipped.items():
+            if not re.fullmatch(r"[A-Za-z0-9_.]+/test[A-Za-z0-9_]+", str(test_id)):
+                errors.append(f"TSan skippedUnderSanitizer key {test_id!r} must be Suite/testMethod")
+                continue
+            if not isinstance(reason, str) or len(reason.strip()) < 40:
+                errors.append(f"TSan skippedUnderSanitizer {test_id} needs a justification of at least 40 characters")
+            method = test_id.rsplit("/", 1)[1]
+            if test_sources and f"func {method}(" not in test_sources:
+                errors.append(f"TSan skippedUnderSanitizer names a test that does not exist: {test_id}")
 
     characterization = policy.get("characterization")
     if not isinstance(characterization, dict):

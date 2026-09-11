@@ -81,6 +81,25 @@ class RuntimeSecurityContractTests(unittest.TestCase):
             [],
         )
 
+    def test_tsan_skipped_tests_are_named_justified_and_real(self) -> None:
+        policy = MODULE.load_json(ROOT / "config/tsan-policy.json")
+        workflow = (ROOT / ".github/workflows/tsan.yml").read_text(encoding="utf-8")
+        macos_test = (ROOT / "scripts/macos_test.sh").read_text(encoding="utf-8")
+        self.assertIn(
+            "VocelloCoreTests.CLIExecutionTests/testRealSignalsReachNativeSupervisorAndAwaitCleanup",
+            policy["skippedUnderSanitizer"],
+        )
+        broken = dict(policy)
+        broken["skippedUnderSanitizer"] = {
+            "VocelloCoreTests.CLIExecutionTests/testDoesNotExist": "x" * 50,
+            "not a test id": "y" * 50,
+            "VocelloCoreTests.CLIExecutionTests/testRealSignalsReachNativeSupervisorAndAwaitCleanup": "short",
+        }
+        errors = MODULE.tsan_contract_errors(broken, workflow=workflow, macos_test=macos_test, today=date(2026, 9, 11))
+        self.assertTrue(any("does not exist" in error for error in errors), errors)
+        self.assertTrue(any("must be Suite/testMethod" in error for error in errors), errors)
+        self.assertTrue(any("at least 40 characters" in error for error in errors), errors)
+
     def test_tsan_non_blocking_characterization_cannot_outlive_deadline(self) -> None:
         policy = MODULE.load_json(ROOT / "config/tsan-policy.json")
         workflow = (ROOT / ".github/workflows/tsan.yml").read_text(encoding="utf-8")

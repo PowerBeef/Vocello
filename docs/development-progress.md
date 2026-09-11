@@ -57,9 +57,11 @@ red since the previous day). The StoreKit audit found the export unlock clean ag
 (one low note on generic error copy). The concurrency audit found no unregistered unsafe declaration and no
 confirmed race; the registry text for the engine service host now describes the per-method MainActor
 discipline the code really uses, the performance gate model is class-isolated (F-24), and the unchecked
-Sendable budget sits at its ceiling. The TSan lane failure was not a race: the two subprocess tests
-launched their helper through `xcrun`, which strips the sanitizer insertion, so the child aborted and the
-bundle later crashed on an unguarded index (AV-12). The accessibility audit named a credible root cause for
+Sendable budget sits at its ceiling. The TSan lane failure was not a race: every helper xctest child spawned
+from the instrumented parent aborts at load on this toolchain (three launch variants tried), and the bundle
+then crashed on an unguarded index; the two helper-process tests now skip under the sanitizer with the
+exclusion recorded, the lane runs to completion with zero reports, and the scheduled workflow gains the
+pinned numpy its toolchain step verifies (AV-12). The accessibility audit named a credible root cause for
 ISU-4: the tab dock had no Dynamic Type ceiling and grew into the scroll-gesture zone at AX-XXXL; the dock
 is now capped at the first accessibility size, the compact toggles regain the switch role, the tab icon is
 hidden from VoiceOver and the App Language rows adapt their layout (ISU-5, source landed; the physical

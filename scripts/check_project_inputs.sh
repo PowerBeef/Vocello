@@ -38,7 +38,7 @@ REQUIRED_SURFACES=(
     "scripts/generate_ios_logic_scheme.py"
     "scripts/build_foundation_targets.sh"
     "scripts/build_output_policy.py"
-    "scripts/codex_session_storage.py"
+    "scripts/claude_config_contract.py"
     "scripts/cli_version_contract.py"
     "scripts/localization_contract.py"
     "scripts/support_contact_contract.py"
@@ -96,8 +96,8 @@ REQUIRED_SURFACES=(
     "scripts/clone_speaker_similarity.py"
     "scripts/test_clone_speaker_similarity.py"
     "scripts/tests/test_build_output_policy.py"
-    "scripts/tests/test_codex_session_storage.py"
-    "scripts/tests/test_codex_hook_contract.py"
+    "scripts/tests/test_claude_config_contract.py"
+    "scripts/tests/test_claude_hook_contract.py"
     "scripts/tests/test_documentation_contract.py"
     "scripts/tests/test_model_catalog_contract.py"
     "scripts/tests/test_evidence_impact.py"
@@ -226,7 +226,6 @@ REQUIRED_SURFACES=(
     "docs/ROADMAP.md"
     "config/public-product-facts.json"
     "docs/INDEX.json"
-    "config/codex-session-storage-policy.json"
     "config/documentation-contract.json"
     "config/evidence-impact.json"
     "config/quality-promotion-contract.json"
@@ -270,10 +269,10 @@ REQUIRED_SURFACES=(
     "Tests/VocelloiOSLogicTests"
     "scripts/check_ios_model_management.py"
     "scripts/tests/test_check_ios_model_management.py"
-    "AGENTS.md"
-    ".agents/rules"
-    "website/AGENTS.md"
-    ".codex/hooks.json"
+    "CLAUDE.md"
+    ".claude/rules"
+    ".claude/settings.json"
+    "website/CLAUDE.md"
     "project.yml"
 )
 
@@ -292,7 +291,7 @@ fi
 # Validate the machine-readable generated-output contract before any producer,
 # cleanup, or higher-level workflow check can rely on its paths.
 python3 "$SCRIPT_DIR/build_output_policy.py" validate
-python3 "$SCRIPT_DIR/codex_session_storage.py" validate
+python3 "$SCRIPT_DIR/claude_config_contract.py" validate
 python3 "$SCRIPT_DIR/generate_cli_scheme.py" --check
 python3 "$SCRIPT_DIR/generate_ios_logic_scheme.py" --check
 python3 "$SCRIPT_DIR/cli_version_contract.py" validate

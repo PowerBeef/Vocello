@@ -102,7 +102,7 @@ for retired in \
   [[ ! -e "$retired" ]] || fail "retired UI harness artifact still exists: $retired"
 done
 
-active=(AGENTS.md README.md .gitignore .agents .codex benchmarks docs scripts config .github project.yml QwenVoice.xcodeproj/project.pbxproj Sources Tests website Packages/VocelloQwen3Core)
+active=(CLAUDE.md README.md .gitignore .claude benchmarks docs scripts config .github project.yml QwenVoice.xcodeproj/project.pbxproj Sources Tests website Packages/VocelloQwen3Core)
 excludes=(
   --glob '!scripts/check_test_workflows.sh'
   --glob '!scripts/clean_build_caches.sh'
@@ -131,7 +131,7 @@ out="$(rg -n --pcre2 "$retired_alias_pattern" "${active[@]}" "${excludes[@]}" 2>
 
 # UI acceptance is explicit and independent; packaging/readiness may not reacquire a UI-result gate.
 release_ui_gate_pattern='(?i:gated by fresh (?:macOS|iOS|frontend|UI)|requires fresh .*XCUITest|XCUITest .* prerequisite.*(?:release|packag|archive)|(?:release|packag|archive).*(?:requires|required).*XCUITest)'
-out="$(rg -n --pcre2 "$release_ui_gate_pattern" AGENTS.md README.md .agents .codex docs scripts .github \
+out="$(rg -n --pcre2 "$release_ui_gate_pattern" CLAUDE.md README.md .claude docs scripts .github \
   "${excludes[@]}" 2>/dev/null || true)"
 [[ -z "$out" ]] || fail "release packaging must remain independent of XCUITest evidence:\n$out"
 
@@ -151,13 +151,13 @@ from pathlib import Path
 import re
 
 files = [
-    Path("AGENTS.md"),
+    Path("CLAUDE.md"),
     Path("README.md"),
     Path("benchmarks/README.md"),
     Path("docs/project-map.html"),
     Path("Sources/VocelloCLI/BenchCommand.swift"),  # built-in `vocello bench --help`
 ]
-files.extend(Path(".agents/rules").rglob("*.md"))
+files.extend(Path(".claude/rules").rglob("*.md"))
 files.extend(
     path
     for path in Path("docs").rglob("*.md")
@@ -462,7 +462,7 @@ rg -q 'CODE_SIGNING_ALLOWED=NO' .github/workflows/ci.yml \
 
 # No simulator destination is supported for Vocello app UI automation.
 out="$(rg -n -i 'platform=iOS Simulator|build_run_sim|test_sim|launch_sim' \
-  AGENTS.md README.md .agents .codex docs scripts project.yml .github \
+  CLAUDE.md README.md .claude docs scripts project.yml .github \
   --glob '!scripts/check_test_workflows.sh' 2>/dev/null || true)"
 [[ -z "$out" ]] || fail "active Simulator workflow returned:\n$out"
 

@@ -12,6 +12,13 @@ sourceOfTruth:
   - config/localization-unlocalized-baseline.json
   - Sources/SharedSupport/Services/ReferenceTranscriptionReviewState.swift
   - Sources/SharedSupport/Services/VoiceClipTranscriber.swift
+paths:
+  - "Sources/iOS/**"
+  - "Sources/iOSSupport/**"
+  - "Tests/VocelloiOS*/**"
+  - "scripts/ios_*"
+  - "config/ios-*.json"
+  - "Sources/Resources/Localizable.xcstrings"
 ---
 # iOS domain rule
 
@@ -27,14 +34,14 @@ sourceOfTruth:
 - iOS entitlements, Info.plist, App Store submission materials
 
 **Does NOT own:**
-- macOS app / XPC service (`.agents/rules/macos.md`)
-- Engine core / MLX internals (`.agents/rules/backend-mlx.md`)
-- Build scripts / CI / release (`.agents/rules/release-qa.md`)
+- macOS app / XPC service (`.claude/rules/macos.md`)
+- Engine core / MLX internals (`.claude/rules/backend-mlx.md`)
+- Build scripts / CI / release (`.claude/rules/release-qa.md`)
 
 **Consults:**
 - `docs/ARCHITECTURE.md` §6 (iOS request lifecycle)
 - `docs/reference/{ios-app-guide,ios-device-testing,ios-engine-optimization,ios-appstore-submission,ios-increased-memory-entitlement-request}.md`
-- Root `AGENTS.md` (Hard invariants) + [`docs/project-map.html`](../../docs/project-map.html)
+- Root `CLAUDE.md` (Hard invariants) + [`docs/project-map.html`](../../docs/project-map.html)
 
 ## Required pre-read
 
@@ -68,7 +75,7 @@ Before changing iOS UI or behavior, read:
   crash proof.
 - Generated output must use `config/build-output-policy.json`. Do not add an iOS DerivedData,
   package, evidence, symbol, or archive root outside the manifest; route policy changes through
-  `.agents/rules/release-qa.md`.
+  `.claude/rules/release-qa.md`.
 - Built-in Voice startup plans, retained results, and the tracked control sentence are governed by
   `config/ios-startup-reliability-plan-schema-v1.json`,
   `config/ios-startup-reliability-result-schema-v1.json`,

@@ -385,7 +385,7 @@ targets:
   VocelloiOS:
     type: application
     platform: iOS
-    # XcodeGen 2.45.4 gotcha (see .agents/rules/ios.md "XcodeGen iOS-resource gotcha" + commit
+    # XcodeGen 2.45.4 gotcha (see .claude/rules/ios.md "XcodeGen iOS-resource gotcha" + commit
     # 287c969): the bundled resources below MUST be listed under `sources:` with an
     # explicit `buildPhase: resources` override. Listing them under `resources:`
     # silently drops them from the VocelloiOS Resources phase, so iOS builds compile

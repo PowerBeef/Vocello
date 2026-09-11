@@ -10,6 +10,12 @@ sourceOfTruth:
   - config/build-output-policy.json
   - config/support-contact.json
   - config/third-party-attribution-policy.json
+paths:
+  - "scripts/**"
+  - ".github/**"
+  - "config/**"
+  - "benchmarks/**"
+  - "docs/releases/**"
 ---
 # Release / QA domain rule
 
@@ -24,7 +30,6 @@ sourceOfTruth:
   `.github/workflows/promote-release.yml`, and
   `.github/workflows/security.yml`
 - `config/build-output-policy.json`, `config/documentation-contract.json`,
-  `config/codex-session-storage-policy.json`,
   `config/public-product-facts.json`, `config/toolchain.json`,
   `config/orchestration-contract.json`, `config/evidence-impact.json`,
   `config/project-health-contract.json`, `config/release-evidence-contract.json`,
@@ -46,9 +51,10 @@ sourceOfTruth:
   scripts (`scripts/verify_*.sh`, `scripts/release_evidence.py`, `scripts/required_step_ledger.py`,
   `scripts/quality_promotion.py`, `scripts/project_health.py`, `scripts/supply_chain_contract.py`,
   `scripts/create_dmg.sh`, etc.)
-- Codex task/session storage governance: `scripts/codex_session_storage.py`, its synthetic test,
-  and `docs/reference/codex-session-storage.md`. Live user state remains operator-owned and outside
-  repository evidence.
+- Claude Code configuration governance: `.claude/settings.json` (hooks, permissions), the project
+  skills and subagents under `.claude/`, the `paths:` scoping of `.claude/rules/*.md`, and their validator
+  `scripts/claude_config_contract.py` with `scripts/tests/test_claude_config_contract.py` and
+  `scripts/tests/test_claude_hook_contract.py`. Personal `.claude/settings.local.json` stays untracked.
 - Release-candidate evidence, SBOM/checksum generation, immutable Actions pins, and repository
   security/governance files
 - Production-model-catalog reproducibility and activation gating. Backend owns artifact meaning and
@@ -56,13 +62,13 @@ sourceOfTruth:
   deterministic validation, and explicit delivery evidence pass.
 
 **Does NOT own:**
-- App source code (`.agents/rules/backend-mlx.md`, `.agents/rules/ios.md`, `.agents/rules/macos.md`)
-- Marketing site (`website/AGENTS.md`)
+- App source code (`.claude/rules/backend-mlx.md`, `.claude/rules/ios.md`, `.claude/rules/macos.md`)
+- Marketing site (`website/CLAUDE.md`)
 
 **Consults:**
 - `docs/reference/{macos-release-qa,telemetry-and-benchmarking,cli,macos-testing,ios-device-testing}.md`
 - `docs/ARCHITECTURE.md` §12 (telemetry)
-- Root `AGENTS.md` (Verification tiers) + [`docs/project-map.html`](../../docs/project-map.html)
+- Root `CLAUDE.md` (Verification tiers) + [`docs/project-map.html`](../../docs/project-map.html)
 
 ## Required pre-read
 
@@ -120,12 +126,10 @@ Read for the task at hand; unrelated runbooks are not prerequisites:
   ad hoc build root or allow an Xcode/SwiftPM invocation to choose its own cache. XcodeBuildMCP
   scratch trees (`build/scratch/derived-data/xcodebuildmcp/{macos,ios-device}`) stay scratch-class
   under that policy; they never become a third persistent cache or a release gate.
-- **Codex task/session storage:** the separate `config/codex-session-storage-policy.json` governs
-  an optional operator-local workflow. CI validates the contract and temporary fixtures only; it
-  never reads or changes a real Codex home. Use the plain/compressed metadata-only inventory,
-  temporary checksummed plan, exact approval, evolving non-target preservation baseline, supported
-  CLI deletion, and verification sequence in
-  `docs/reference/codex-session-storage.md`. This state is not repository build output.
+- **Claude Code session state:** Claude Code keeps transcripts, auto-memory and personal settings
+  under the user's home (`~/.claude/`). None of it is repository build output or evidence; nothing in
+  the repository reads, edits or prunes it. The retired Codex storage runbook is pinned in
+  `docs/reference/codex-session-storage.md` as history only.
 - **Evidence artifacts:** `build/artifacts/ui-tests/` owns `.xcresult` bundles and exported
   screenshots; `build/artifacts/diagnostics/` owns pulled/headless generation telemetry and crashes;
   platform gate/profile outputs remain below `build/artifacts/{macos,ios}/`; current dSYMs live
@@ -189,7 +193,7 @@ Do not duplicate their command catalogs here.
 | `check_qwen3_backend_only.sh`, `check_backend_resource_contract.sh` | MLX-only and native resource wiring |
 | `check_test_workflows.sh` | one UI stack, retired-harness exclusion, and script self-tests |
 | `python_test_contract.py` | discovery-complete Python inventory, runner compatibility, and zero-test rejection |
-| `benchmark_history.py`, `supply_chain_contract.py`, `required_step_ledger.py`, `codex_session_storage.py`, `check_release_notes.py` | history, supply chain, release steps, task storage, and release-note contracts |
+| `benchmark_history.py`, `supply_chain_contract.py`, `required_step_ledger.py`, `claude_config_contract.py`, `check_release_notes.py` | history, supply chain, release steps, Claude Code configuration, and release-note contracts |
 
 Exemptions require a reason in `config/surface-coverage-exemptions.json`. Read
 `docs/reference/repository-self-verification.md` before adding or weakening a gate.
@@ -225,7 +229,7 @@ Exemptions require a reason in `config/surface-coverage-exemptions.json`. Read
   doc-metadata, surface-coverage, and roadmap validators), so a docs-only push can never green
   `CI required` without the contract suite — the T1 commit-gate hook
   (`scripts/hooks/precommit_gate.sh`, owned here) requires the local checkpoint receipt but is
-  Codex-session tooling, not a universal git hook. Both heavy macOS jobs cache SwiftPM checkouts.
+  Claude Code session tooling, not a universal git hook. Both heavy macOS jobs cache SwiftPM checkouts.
 - **Security timing is path-relevant and release-bound.** `security.yml` routes native and website
   changes on pushes and pull requests, runs CodeQL for either relevant surface and npm advisory
   audit for website changes, and always publishes the stable `Security required` aggregate. The
@@ -272,11 +276,10 @@ Exemptions require a reason in `config/surface-coverage-exemptions.json`. Read
   scratch. Release files live only under `build/dist/` and routine cleanup never removes them.
   Heavy lanes use the manifest-owned free-space preflight before work starts. Prefer one selective
   `--cache` target over `--aggressive`; successful ordinary builds remain non-destructive.
-- **Codex user state remains external.** The repository tracks only the policy, helper, runbook,
-  and synthetic tests. A live manifest/journal stays mode 0600 in a system temporary directory and
-  never enters Git, CI, release evidence, or benchmark history. Unknown and unrelated tasks are
-  protected; no subagent may select or approve deletion; no workflow edits Codex SQLite or removes
-  rollout JSONL directly.
+- **Claude Code user state remains external.** Sessions, auto-memory and `settings.local.json`
+  never enter Git, CI, release evidence, or benchmark history; the repository tracks only
+  `.claude/settings.json`, rules, skills, subagents and their validator. No workflow reads or
+  prunes `~/.claude/`.
 - **Memory-qualified publication is strict.** New generation/profile records require telemetry v8
   and evidence manifest v2, exact sidecar digests, ≥95% sampler coverage, zero capture failures,
   and no critical pressure, memory warning/exit, `hardTrim`, or `fullUnload`. A 95–<100% coverage

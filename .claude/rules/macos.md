@@ -10,6 +10,17 @@ sourceOfTruth:
   - Sources/SharedSupport/Services/ReferenceTranscriptionReviewState.swift
   - Sources/SharedSupport/Services/VoiceClipTranscriber.swift
   - Sources/Services/MacStudioGenerationRequestFactory.swift
+paths:
+  - "Sources/Views/**"
+  - "Sources/ViewModels/**"
+  - "Sources/Services/**"
+  - "Sources/Models/**"
+  - "Sources/QwenVoiceNative/**"
+  - "Sources/QwenVoiceEngine*/**"
+  - "Sources/*.swift"
+  - "Tests/VocelloMacUITests/**"
+  - "Tests/VocelloEngineIntegrationTests/**"
+  - "scripts/macos_test.sh"
 ---
 # macOS domain rule
 
@@ -29,14 +40,14 @@ sourceOfTruth:
 - macOS entitlements and `Sources/Info.plist`
 
 **Does NOT own:**
-- Engine core / MLX internals (`.agents/rules/backend-mlx.md`)
-- iOS app (`.agents/rules/ios.md`)
-- Build scripts / CI / release (`.agents/rules/release-qa.md`)
+- Engine core / MLX internals (`.claude/rules/backend-mlx.md`)
+- iOS app (`.claude/rules/ios.md`)
+- Build scripts / CI / release (`.claude/rules/release-qa.md`)
 
 **Consults:**
 - `docs/ARCHITECTURE.md` §3 (runtime architecture), §5 (macOS request lifecycle), §8 (macOS app surfaces)
 - `docs/reference/{macos-app-guide,macos-testing,macos-release-qa,macos-permissions,privacy-storage}.md`
-- Root `AGENTS.md` (Hard invariants) + [`docs/project-map.html`](../../docs/project-map.html)
+- Root `CLAUDE.md` (Hard invariants) + [`docs/project-map.html`](../../docs/project-map.html)
 
 ## Required pre-read
 
@@ -72,7 +83,7 @@ Before changing macOS app or XPC code, read:
   [`docs/reference/interactive-ui-qa.md`](../../docs/reference/interactive-ui-qa.md).
 - Generated output must use `config/build-output-policy.json`. Do not add a macOS DerivedData,
   package, evidence, symbol, or distribution root outside the manifest; route policy changes
-  through `.agents/rules/release-qa.md`.
+  through `.claude/rules/release-qa.md`.
 - Use authoritative Apple documentation (docs MCP when callable) where current framework behavior
   matters, and a GitHub integration or `gh` for repository/CI context.
 - XCUITest is the sole autonomous macOS app UI driver. Run the smoke and benchmark lanes

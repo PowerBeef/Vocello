@@ -25,9 +25,9 @@ from check_surface_coverage import (  # noqa: E402
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent.parent
 
 ASSISTS = """
-<!-- BEGIN OPTIONAL ASSISTS -->
-### Optional assists
-no gate can validate this table; no entry is ever a prerequisite.
+<!-- BEGIN CLAUDE TOOLING -->
+### Claude Code tooling
+repo-owned config is validated; user tooling is never a prerequisite; scripts remain the gates.
 
 | Task | Reach for |
 | --- | --- |
@@ -36,7 +36,7 @@ no gate can validate this table; no entry is ever a prerequisite.
 | c | three |
 | d | four |
 | e | five |
-<!-- END OPTIONAL ASSISTS -->
+<!-- END CLAUDE TOOLING -->
 """
 
 
@@ -52,11 +52,11 @@ class Harness(unittest.TestCase):
         root = pathlib.Path(tempfile.mkdtemp())
         (root / "scripts").mkdir()
         (root / "config").mkdir()
-        (root / ".agents" / "rules").mkdir(parents=True)
+        (root / ".claude" / "rules").mkdir(parents=True)
         (root / "website").mkdir()
         (root / "scripts" / "check_project_inputs.sh").write_text(gate)
-        (root / "AGENTS.md").write_text(agents_text + ASSISTS)
-        (root / "website" / "AGENTS.md").write_text("# Website guidance\n")
+        (root / "CLAUDE.md").write_text(agents_text + ASSISTS)
+        (root / "website" / "CLAUDE.md").write_text("# Website guidance\n")
         for name in contracts:
             (root / "config" / name).write_text("{}")
         if exemptions is not None:
@@ -91,13 +91,13 @@ class CoverageTests(Harness):
 
     def test_a_domain_rule_counts_as_documentation(self):
         root = self.build("scripts/documented_gate.py and config/kept.json")
-        (root / ".agents" / "rules" / "backend.md").write_text(
+        (root / ".claude" / "rules" / "backend.md").write_text(
             "the gate is scripts/undocumented_gate.py"
         )
         self.assertTrue(evaluate(root)["ok"])
 
     def test_a_glob_documents_a_whole_family(self):
-        # AGENTS.md names `config/language-bench-*.json` for three real files.
+        # CLAUDE.md names `config/language-bench-*.json` for three real files.
         root = self.build(
             "gates: documented_gate.py undocumented_gate.py; data: `config/bench-*.json`",
             contracts=("bench-corpus.json", "bench-matrix.json"),
@@ -144,18 +144,18 @@ class SafetyTests(Harness):
 
     def test_missing_guidance_is_an_error(self):
         root = self.build("x")
-        (root / "AGENTS.md").unlink()
+        (root / "CLAUDE.md").unlink()
         with self.assertRaises(CoverageError):
             evaluate(root)
 
 
 class AssistsSectionTests(unittest.TestCase):
-    """The optional-assists table is unverifiable by design, which makes it the
+    """The tooling table is partly unverifiable by design, which makes it the
     section most likely to be deleted by something acting in good faith."""
 
     def write(self, body):
         root = pathlib.Path(tempfile.mkdtemp())
-        (root / "AGENTS.md").write_text(body)
+        (root / "CLAUDE.md").write_text(body)
         return root
 
     def test_a_complete_section_passes(self):
@@ -166,21 +166,21 @@ class AssistsSectionTests(unittest.TestCase):
         self.assertTrue(any("markers are missing" in f for f in findings))
 
     def test_stripping_the_markers_fails(self):
-        body = ASSISTS.replace("<!-- BEGIN OPTIONAL ASSISTS -->", "").replace(
-            "<!-- END OPTIONAL ASSISTS -->", "")
+        body = ASSISTS.replace("<!-- BEGIN CLAUDE TOOLING -->", "").replace(
+            "<!-- END CLAUDE TOOLING -->", "")
         self.assertTrue(assists_findings(self.write(body)))
 
     def test_duplicated_markers_fail(self):
         self.assertTrue(assists_findings(self.write(ASSISTS + ASSISTS)))
 
-    def test_losing_the_unverifiability_disclaimer_fails(self):
-        body = ASSISTS.replace("no gate can validate this table",
-                               "this table is fully checked")
+    def test_losing_the_scripts_remain_the_gates_statement_fails(self):
+        body = ASSISTS.replace("scripts remain the gates",
+                               "tooling replaces the gates")
         findings = assists_findings(self.write(body))
-        self.assertTrue(any("unverifiable" in f for f in findings))
+        self.assertTrue(any("scripts remain the gates" in f for f in findings))
 
     def test_losing_the_optional_framing_fails(self):
-        body = ASSISTS.replace("no entry is ever a prerequisite", "every entry is required")
+        body = ASSISTS.replace("never a prerequisite", "always required")
         findings = assists_findings(self.write(body))
         self.assertTrue(any("prerequisite" in f for f in findings))
 
@@ -200,17 +200,17 @@ class GuidanceSizeTests(Harness):
         root = self.build("documented_gate.py undocumented_gate.py kept.json")
         findings, sizes = guidance_size_findings(root)
         self.assertEqual(findings, [])
-        self.assertIn("website/AGENTS.md", sizes)
+        self.assertIn("website/CLAUDE.md", sizes)
 
     def test_combined_root_and_nested_guidance_above_budget_fails(self):
         root = self.build("documented_gate.py undocumented_gate.py kept.json")
-        (root / "website" / "AGENTS.md").write_text("x" * (30 * 1024))
+        (root / "website" / "CLAUDE.md").write_text("x" * (30 * 1024))
         findings, _ = guidance_size_findings(root)
         self.assertTrue(any("exceeding" in finding for finding in findings))
 
     def test_missing_nested_guidance_fails(self):
         root = self.build("documented_gate.py undocumented_gate.py kept.json")
-        (root / "website" / "AGENTS.md").unlink()
+        (root / "website" / "CLAUDE.md").unlink()
         findings, _ = guidance_size_findings(root)
         self.assertTrue(any("missing nested" in finding for finding in findings))
 

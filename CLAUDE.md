@@ -1,4 +1,4 @@
-# AGENTS.md — Vocello (QwenVoice)
+# CLAUDE.md — Vocello (QwenVoice)
 
 > Durable repository guidance. Code and machine-readable contracts win; repository scripts are
 > the gates; optional assists, devices, and models never are.
@@ -7,7 +7,7 @@
 > [`docs/development-progress.md`](docs/development-progress.md) · **Architecture:**
 > [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) · **Project map:**
 > [`docs/project-map.html`](docs/project-map.html) · **Domain rules:**
-> [`.agents/rules/`](.agents/rules/)
+> [`.claude/rules/`](.claude/rules/)
 
 ## Product and authority
 
@@ -35,7 +35,7 @@ Offer only complete bundled locales; catalog completeness does not replace physi
 Source-of-truth order:
 
 `Sources/` → `project.yml` → machine-readable `config/` contracts → `scripts/` →
-`.github/workflows/` → `AGENTS.md` and `.agents/rules/` → other prose.
+`.github/workflows/` → `CLAUDE.md` and `.claude/rules/` → other prose.
 
 The model/speaker schema is `Sources/Resources/qwenvoice_contract.json`. The complete fail-closed
 delivery source for all six Speed/Quality artifacts is
@@ -56,7 +56,7 @@ machine-readable contract invalidates documentation, update the documentation in
 7. Update affected instructions/contracts when behavior changes. Refresh derived documents and
    update roadmap/narrative once per coherent checkpoint, not after each edit or diagnostic.
 
-Codex is the development environment; agent/model selection is not a quality gate. Proceed
+Claude Code is the development environment and scripts remain the gates; agent/model selection is not a quality gate. Proceed
 autonomously with bounded, reversible implementation and relevant verification within the requested
 scope. Do not simulate separate team-role approvals. Ask only for missing authority, consequential
 product choices, external dependencies or unsafe ambiguity; preserve explicit release/device consent.
@@ -124,28 +124,30 @@ Details for runtime, lifecycle, and event-channel invariants live in `docs/ARCHI
 
 | Work | Read first | Canonical route |
 | --- | --- | --- |
-| MLX, engine, downloads, model catalog | `.agents/rules/backend-mlx.md`, `docs/reference/mlx-guide.md` | Owned runtime and backend contract scripts |
-| Delivery/emotion measurement | `.agents/rules/backend-mlx.md`, `docs/reference/delivery-harness.md` | Fixed protocol, provenance, statistics, and ledger |
-| iOS app or support code | `.agents/rules/ios.md`, `docs/reference/ios-app-guide.md` | Generic device SDK compile; physical-device XCUITest only when requested |
+| MLX, engine, downloads, model catalog | `.claude/rules/backend-mlx.md`, `docs/reference/mlx-guide.md` | Owned runtime and backend contract scripts |
+| Delivery/emotion measurement | `.claude/rules/backend-mlx.md`, `docs/reference/delivery-harness.md` | Fixed protocol, provenance, statistics, and ledger |
+| iOS app or support code | `.claude/rules/ios.md`, `docs/reference/ios-app-guide.md` | Generic device SDK compile; physical-device XCUITest only when requested |
 | UI localization | `docs/reference/localization.md` and the platform rule | Typed String Catalog copy; UI locale stays separate from generated-speech language, model instructions and stored user content |
-| macOS app or XPC stack | `.agents/rules/macos.md`, `docs/reference/macos-app-guide.md` | macOS deterministic tests/build; native XCUITest only when requested |
-| Scripts, CI, packaging, benchmarks | `.agents/rules/release-qa.md` | Repository scripts and workflows |
-| Generated inventories | `.agents/rules/derived-artifacts.md` | `scripts/refresh_derived_artifacts.py` |
-| Website | `website/AGENTS.md`, `website/PRODUCT.md`, `website/DESIGN.md` | Node contracts, Vite build, browser verification |
+| macOS app or XPC stack | `.claude/rules/macos.md`, `docs/reference/macos-app-guide.md` | macOS deterministic tests/build; native XCUITest only when requested |
+| Scripts, CI, packaging, benchmarks | `.claude/rules/release-qa.md` | Repository scripts and workflows |
+| Generated inventories | `.claude/rules/derived-artifacts.md` | `scripts/refresh_derived_artifacts.py` |
+| Website | `website/CLAUDE.md`, `website/PRODUCT.md`, `website/DESIGN.md` | Node contracts, Vite build, browser verification |
 | Current external APIs | Relevant skill plus primary vendor docs | Sosumi/Apple docs, Context7, GitHub, or Hugging Face when callable |
 
 ### Deterministic gate map
 
 `./scripts/check_project_inputs.sh` owns T1/T2. The complete enforced-surface catalog is in
-[the release/QA rule](.agents/rules/release-qa.md#deterministic-gate-map).
+[the release/QA rule](.claude/rules/release-qa.md#deterministic-gate-map).
 Read [repository self-verification](docs/reference/repository-self-verification.md) before adding
 or weakening a gate. Exemptions need reasons in `config/surface-coverage-exemptions.json`.
 
-<!-- BEGIN OPTIONAL ASSISTS -->
+<!-- BEGIN CLAUDE TOOLING -->
 
-## Optional assists (user-scoped; verify before relying)
+## Claude Code tooling (optional assists; verify before relying)
 
-No gate can validate optional assists; they are never prerequisites.
+Repository-owned `.claude/` configuration (hooks, skills, subagents, rules) is validated by
+`scripts/claude_config_contract.py`. User-scoped skills, plugins, MCP servers and devices are
+never a prerequisite: scripts remain the gates.
 
 | Task | Optional capability |
 | --- | --- |
@@ -153,28 +155,28 @@ No gate can validate optional assists; they are never prerequisites.
 | Swift design, concurrency, data, networking, security, media, accessibility, testing | `axiom-swift`, `axiom-concurrency`, `axiom-data`, `axiom-networking`, `axiom-security`, `axiom-media`, `axiom-accessibility`, `axiom-testing` |
 | Build/environment diagnosis | `axiom-build`; diagnose environment before source and never apply generic Simulator/cache-clean advice against repository policy |
 | MLX/Qwen runtime | `swift-mlx`, `swift-mlx-lm`; exact checked-in catalogs and pins still win |
-| Xcode inner loop | `axiom-xcode-mcp`; physical-device/macOS profiles only, see below |
+| Xcode inner loop | `xcodebuildmcp` skill with the shared XcodeBuildMCP server; `macos`/`ios-device` profiles only, see below |
 | macOS / iOS implementation | Applicable `build-macos-apps:*` / `build-ios-apps:swiftui-*` skills; no Simulator routes |
 | GitHub context | Available GitHub connector or `gh`; verify capabilities first |
 | Model source research | Hugging Face connector or `hugging-face:hf-cli`; catalog identity still wins |
 | Website inspection | Available browser tool; signed-in Chrome only when needed; never Vocello UI |
 | App Store Connect | `app-store-connect-cli`; exact IDs, paginated JSON, read-only default, explicit mutation authorization |
-| Codex instructions, hooks, skills, or settings | `openai-docs` and current official OpenAI documentation |
+| Claude Code hooks, skills, subagents, or settings | `.claude/settings.json` and the project skills/subagents under `.claude/`; current official Claude Code documentation |
 | Current third-party library APIs | Context7, then primary vendor documentation |
 
 Discover assists only when needed.
 
-<!-- END OPTIONAL ASSISTS -->
+<!-- END CLAUDE TOOLING -->
 
-## Codex and Xcode workflow
+## Claude Code hooks and Xcode workflow
 
-Review and trust `.codex/hooks.json` with `/hooks`. Its Bash hook runs
+`.claude/settings.json` wires a `PreToolUse` Bash hook to
 `scripts/hooks/precommit_gate.sh`; commits require `main` and a completed, matching local checkpoint.
 The hook only checks that receipt; missing/stale receipts block with exit 2. Run long checks through
 `scripts/dev.sh checkpoint`, never inside the hook or its host timeout.
 `QVOICE_SKIP_COMMIT_GATE=1` bypasses validation once, never the `main` requirement or full CI.
 
-With XcodeBuildMCP, read `axiom-xcode-mcp`, call `session_show_defaults`, use profile `macos`
+With XcodeBuildMCP, read the `xcodebuildmcp` skill, call `session_show_defaults`, use profile `macos`
 for `QwenVoice` or `ios-device` for `VocelloiOS`, and resolve physical-device IDs only at runtime.
 Never use its Simulator, preview, or UI routes; repository scripts remain authoritative.
 `scripts/dev.sh assists` is the opt-in configuration check. Optional configurations and installed

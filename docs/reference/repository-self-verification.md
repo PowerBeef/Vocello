@@ -22,7 +22,7 @@ and a security workflow that never completed were all live at once, and every ga
 were the same class of failure, and no check in the repository could see that class at all.
 
 Architecture and gate tiers live in [`../ARCHITECTURE.md`](../ARCHITECTURE.md) and the root
-[`AGENTS.md`](../../AGENTS.md). This file is about the verification system itself.
+[`CLAUDE.md`](../../CLAUDE.md). This file is about the verification system itself.
 
 The project-input gate also executes localization, entitlement, support-contact and deterministic
 attribution-manifest contracts. `scripts/python_test_contract.py` discovers Python tests, rejects
@@ -127,7 +127,7 @@ None of these deterministic checks needs a model, a device, or XCUITest.
 | `build_output_policy.py validate` | omission + integrity | Every directory under `build/` is governed at any depth; heavy-lane free-space floors |
 | `localization_contract.py validate` | omission + contradiction | String Catalog settings/context/plurals, typed dynamic presentation use, pseudo-localization coverage, and content-addressed rejection of new direct UI literals |
 | `documentation_contract.py` | contradiction | Frontmatter-resolved lifecycle inventory, link/anchor resolution and public-fact consistency; groups are taxonomy/legacy defaults, not a second status |
-| `doc_metadata.py validate` | contradiction + drift + integrity | Per-file status, pinned bodies, derived-fact contradictions in docs, `AGENTS.md`, and `README.md` |
+| `doc_metadata.py validate` | contradiction + drift + integrity | Per-file status, pinned bodies, derived-fact contradictions in docs, `CLAUDE.md`, and `README.md` |
 | `check_surface_coverage.py` | omission | Every enforced gate and contract is named in guidance; the optional-assists section survives |
 | `roadmap.py validate` | evidence + contradiction | Plans and items; every evidence reference resolved against the repository; an optional primary execution plan must exist and remain active |
 | `check_delivery_instructions.py` | contradiction | Delivery-copy tier parity, repeated intensifiers, direction conflicts |
@@ -193,9 +193,11 @@ confidence becomes misplaced.
   measured on one host. Gates protect behavior and cache routing, not a permanent wall-clock SLA.
 - **Delivery and audio quality.** These need models, seeds, and audio. The text-level contract
   checks what is deterministic about the instruction copy and says nothing about how a take sounds.
-- **User-scoped tooling.** Skills and MCP servers live outside the repository, so the optional-assists
-  table in `AGENTS.md` cannot be validated. It is marked unverifiable in place, and the guard
-  protects its *presence*, not the accuracy of its rows.
+- **User-scoped tooling.** Repository-owned Claude Code configuration under `.claude/` is validated by
+  `claude_config_contract.py` (hook wiring, deny-list shape, skill and subagent frontmatter, rule
+  path scopes, no Simulator destinations). User-scoped skills, plugins and MCP servers still live
+  outside the repository, so the tooling table in `CLAUDE.md` is only partly verifiable; the guard
+  protects its *presence* and its optional framing, not the accuracy of user-scoped rows.
 - **Whether a document is simply wrong** about something the machine does not know. Fact scanning
   catches contradictions with derived truth; it cannot check an assertion no fact covers.
 
@@ -213,7 +215,7 @@ confidence becomes misplaced.
    with an `env` field span the manifest, `scripts/lib/build_paths.sh`, and the test's
    `REQUIRED_EXPORTS`. Landing a partial set leaves the tree green locally while CI fails from a
    clean checkout — that exact split broke `main` on 2026-08-02.
-5. **Name it in `AGENTS.md` or a domain rule**, or `check_surface_coverage.py` will fail —
+5. **Name it in `CLAUDE.md` or a domain rule**, or `check_surface_coverage.py` will fail —
    deliberately, since a gate no guidance mentions is invisible to anyone reading the docs.
 
 The local checkpoint cache follows the same rule. `tree_fingerprint.py` retains unchanged full-tree
@@ -229,7 +231,7 @@ authorizes a pin change.
 
 ## Related
 
-- [`../../AGENTS.md`](../../AGENTS.md) — hard invariants and domain routing; the release/QA rule owns the enforced-surface catalog
+- [`../../CLAUDE.md`](../../CLAUDE.md) — hard invariants and domain routing; the release/QA rule owns the enforced-surface catalog
 - [`macos-release-qa.md`](macos-release-qa.md) — the release-evidence chain, a separate and stricter system
-- [`../../.agents/rules/derived-artifacts.md`](../../.agents/rules/derived-artifacts.md) — generated-inventory freshness
+- [`../../.claude/rules/derived-artifacts.md`](../../.claude/rules/derived-artifacts.md) — generated-inventory freshness
 - [`privacy-storage.md`](privacy-storage.md) — the build-output ownership table

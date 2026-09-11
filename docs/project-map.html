@@ -1601,7 +1601,7 @@ scripts/macos_test.sh test
           <h4>Where to go deeper</h4>
           <p class="reading-links">
             <a href="ARCHITECTURE.md">Architecture</a>
-            <a href="../AGENTS.md">Agent onboarding</a>
+            <a href="../CLAUDE.md">Agent onboarding</a>
             <a href="reference/macos-app-guide.md">macOS app</a>
             <a href="reference/ios-app-guide.md">iOS app</a>
             <a href="reference/cli.md">CLI</a>
@@ -2059,7 +2059,7 @@ scripts/macos_test.sh test
       {"cmd":"python3 scripts/build_output_policy.py status|validate","desc":"Inventory and enforce the two-cache classified output contract"},
       {"cmd":"python3 scripts/roadmap.py status|validate|render","desc":"Plans, items, and progress; validate resolves every evidence reference against the repository"},
       {"cmd":"python3 scripts/doc_metadata.py validate","desc":"Per-file doc status, pinned-body digests, and contradictions against facts derived from code"},
-      {"cmd":"python3 scripts/check_surface_coverage.py","desc":"Every enforced gate and contract is named in AGENTS.md or a domain rule"},
+      {"cmd":"python3 scripts/check_surface_coverage.py","desc":"Every enforced gate and contract is named in CLAUDE.md or a .claude/rules domain rule"},
       {"cmd":"python3 scripts/check_delivery_instructions.py","desc":"Delivery-copy tier parity, repeated intensifiers, and direction conflicts"}
     ],
     "macOS test":[
@@ -2101,8 +2101,8 @@ scripts/macos_test.sh test
       {"cmd":".github/workflows/release.yml · compile-ios|archive-ios","desc":"iOS compile safety and optional manual signed archive"}
     ],
     "Agent workflow":[
-      {"cmd":"AGENTS.md → .agents/rules/<domain>.md","desc":"Durable repo rules first, then the domain rule"},
-      {"cmd":".codex/hooks.json","desc":"Project tool permissions; MCP servers (XcodeBuildMCP, Axiom, sosumi) are user-scoped"},
+      {"cmd":"CLAUDE.md → .claude/rules/<domain>.md","desc":"Durable repo rules first, then the domain rule"},
+      {"cmd":".claude/settings.json","desc":"Claude Code hooks and permissions, validated by claude_config_contract.py; MCP servers (XcodeBuildMCP, GitHub, sosumi) are user-scoped"},
       {"cmd":"Optional Axiom / docs MCP","desc":"Read selected skill instructions completely before acting; never a packaging prerequisite"},
       {"cmd":"Optional shared XcodeBuildMCP","desc":"When installed and callable, one server for macOS and physical-device iOS profiles; repository scripts remain authoritative"},
       {"cmd":"scripts/ui_test.sh macos|ios smoke|benchmark","desc":"Sole autonomous app UI stack; iOS requires the paired physical phone"},

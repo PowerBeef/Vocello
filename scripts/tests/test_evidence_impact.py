@@ -162,17 +162,19 @@ class EvidenceImpactTests(unittest.TestCase):
         self.assertIn("release-and-ci", result["classes"])
         self.assertNotIn("repository-other", result["classes"])
 
-    def test_codex_session_storage_surfaces_require_hermetic_policy_fixtures(self) -> None:
+    def test_claude_code_configuration_surfaces_require_project_inputs_and_docs(self) -> None:
         paths = (
-            "config/codex-session-storage-policy.json",
-            "docs/reference/codex-session-storage.md",
-            "scripts/codex_session_storage.py",
-            "scripts/tests/test_codex_session_storage.py",
+            ".claude/settings.json",
+            ".claude/skills/checkpoint/SKILL.md",
+            ".claude/agents/gate-runner.md",
+            "scripts/claude_config_contract.py",
+            "scripts/hooks/precommit_gate.sh",
+            "scripts/tests/test_claude_config_contract.py",
         )
         for path in paths:
             with self.subTest(path=path):
                 result = IMPACT.classify(self.contract, [path])
-                self.assertIn("codex-session-storage-governance", result["classes"])
+                self.assertIn("claude-code-governance", result["classes"])
                 self.assertIn("project-inputs", result["mergeRequiredEvidence"])
                 self.assertIn("documentation-contract", result["mergeRequiredEvidence"])
                 self.assertIn("project-inputs", result["releaseRequiredEvidence"])

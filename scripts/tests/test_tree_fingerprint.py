@@ -48,7 +48,7 @@ class TreeFingerprintTests(unittest.TestCase):
         tree = self.fingerprint()
         with mock.patch.object(MODULE.shutil, "which", return_value=None):
             initial = MODULE.checkpoint_fingerprint(self.root)
-            self.assertTrue(initial.startswith("local-v2:"))
+            self.assertTrue(initial.startswith("local-v3:"))
             with mock.patch.dict(MODULE.os.environ, {"QWENVOICE_ENABLE_TSAN": "1"}):
                 self.assertNotEqual(initial, MODULE.checkpoint_fingerprint(self.root))
             (self.root / "tracked.txt").write_text("changed\n")
@@ -61,7 +61,7 @@ class TreeFingerprintTests(unittest.TestCase):
         (self.root / "tracked.txt").write_text("second edit\n", encoding="utf-8")
         self.assertNotEqual(first, self.fingerprint())
 
-    def test_local_receipt_reuses_reordered_path_only_with_same_resolved_tools(self):
+    def test_local_receipt_binds_resolved_tools_not_path_membership_or_order(self):
         first_tool = self.root / "tool-a"
         second_tool = self.root / "tool-b"
         first_tool.write_text("first executable\n")
@@ -76,7 +76,11 @@ class TreeFingerprintTests(unittest.TestCase):
                 which.return_value = str(second_tool)
                 self.assertNotEqual(initial, MODULE.checkpoint_fingerprint(self.root))
                 which.return_value = str(first_tool)
+            # A hook or login shell that sees extra PATH directories but resolves the
+            # same tools must reuse the receipt; a different resolved tool must not.
             with mock.patch.dict(MODULE.os.environ, {"PATH": "/fixture/a:/fixture/b:/fixture/c"}):
+                self.assertEqual(initial, MODULE.checkpoint_fingerprint(self.root))
+                which.return_value = str(second_tool)
                 self.assertNotEqual(initial, MODULE.checkpoint_fingerprint(self.root))
 
     def test_staging_does_not_change_content_identity(self) -> None:

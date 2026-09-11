@@ -1,22 +1,22 @@
 #!/usr/bin/env python3
 """Every enforced surface must be discoverable from the guidance that routes to it.
 
-AGENTS.md states its own completeness rule: "Every active invariant must live
+CLAUDE.md states its own completeness rule: "Every active invariant must live
 here, in a domain rule, in an authoritative reference document, or in a
 machine-readable contract named by one of those surfaces." Nothing checked it.
 
 On 2026-08-02 three gates, three contracts, and two generated artifacts were
 added and wired into check_project_inputs.sh without being named anywhere in
-AGENTS.md or the domain rules. They fired on every commit while being invisible
-to any agent reading the guidance. The same omission hit docs/project-map.html,
-which AGENTS.md calls the canonical component map.
+the root guidance or the domain rules. They fired on every commit while being
+invisible to any agent reading the guidance. The same omission hit
+docs/project-map.html, which the root guidance calls the canonical component map.
 
 This is an *omission* check, and that is the point. Every other gate in this
 repository catches contradiction or drift -- a claim that disagrees with the
 tree, or a document that fell behind its sources. None of them can see a surface
 that was never mentioned at all, because there is no claim to contradict.
 
-Covered means named in AGENTS.md or in any .agents/rules/*.md, matching the
+Covered means named in CLAUDE.md or in any .claude/rules/*.md, matching the
 completeness rule's own wording. Surfaces that are deliberately internal are
 exempted by name in config/surface-coverage-exemptions.json, each with a reason,
 so an exemption is a recorded decision rather than an oversight.
@@ -35,9 +35,9 @@ import sys
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 GATE_SCRIPT = "scripts/check_project_inputs.sh"
 EXEMPTIONS_PATH = "config/surface-coverage-exemptions.json"
-GUIDANCE = ("AGENTS.md",)
-GUIDANCE_GLOBS = (".agents/rules/*.md",)
-NESTED_GUIDANCE = ("website/AGENTS.md",)
+GUIDANCE = ("CLAUDE.md",)
+GUIDANCE_GLOBS = (".claude/rules/*.md",)
+NESTED_GUIDANCE = ("website/CLAUDE.md",)
 MAX_DISCOVERED_GUIDANCE_BYTES = 30 * 1024
 
 
@@ -117,60 +117,62 @@ def load_exemptions(root: pathlib.Path) -> dict[str, str]:
     return out
 
 
-ASSISTS_BEGIN = "<!-- BEGIN OPTIONAL ASSISTS -->"
-ASSISTS_END = "<!-- END OPTIONAL ASSISTS -->"
+ASSISTS_BEGIN = "<!-- BEGIN CLAUDE TOOLING -->"
+ASSISTS_END = "<!-- END CLAUDE TOOLING -->"
 # Phrases that carry the section's meaning, not its wording. Each one exists
 # because losing it would change what the section claims, not merely how it reads.
 ASSISTS_REQUIRED = (
-    ("no gate can validate", "the admission that the table is unverifiable"),
     # "optional" alone is too weak -- the heading itself contains it, so the
     # phrase survives even when the framing is inverted to "every entry is
-    # required". "prerequisite" appears only in the sentence that matters.
-    ("prerequisite", "the statement that no entry is a prerequisite"),
+    # required". These two phrases appear only in the sentences that matter.
+    ("never a prerequisite", "the statement that no entry is a prerequisite"),
+    ("scripts remain the gates", "the statement that scripts remain the gates"),
 )
 ASSISTS_MIN_ROWS = 5
 
 
 def assists_findings(root: pathlib.Path) -> list[str]:
-    """Guard the one AGENTS.md section that no other check can defend.
+    """Guard the one CLAUDE.md section that no other check fully defends.
 
-    Everything else in AGENTS.md is machine-checked: paths resolve, gates are
-    named, facts are derived from code. The optional-assists table is the
-    deliberate exception -- it routes work to skills and MCP servers that live in
-    user configuration, outside the repository, where no gate can reach.
+    Everything else in CLAUDE.md is machine-checked: paths resolve, gates are
+    named, facts are derived from code. The tooling table is the partial
+    exception -- repo-owned `.claude/` configuration is validated by
+    scripts/claude_config_contract.py, but the rows that route work to
+    user-scoped skills, plugins and MCP servers point outside the repository,
+    where no gate can reach.
 
     That makes it the section most likely to be removed by something acting in
-    good faith. An AGENTS.md-improving agent evaluating against a template, or a
+    good faith. A CLAUDE.md-improving agent evaluating against a template, or a
     currency pass tidying unverifiable prose, would both have a reasonable case
     for deleting it. This turns that from an incidental edit into a failing build.
 
-    Rows are free to change as user tooling changes. The section, its
-    unverifiability disclaimer, and its optional framing are not.
+    Rows are free to change as tooling changes. The section, its optional
+    framing, and the statement that scripts remain the gates are not.
     """
     findings: list[str] = []
-    agents = root / "AGENTS.md"
+    agents = root / "CLAUDE.md"
     if not agents.exists():
-        return [f"missing guidance file: AGENTS.md"]
+        return [f"missing guidance file: CLAUDE.md"]
     text = agents.read_text(encoding="utf-8")
 
     if text.count(ASSISTS_BEGIN) != 1 or text.count(ASSISTS_END) != 1:
         return [
-            "AGENTS.md: the optional-assists section markers are missing or duplicated. "
-            "This section is unverifiable by design and must not be deleted as untidy; "
+            "CLAUDE.md: the tooling section markers are missing or duplicated. "
+            "This section is partly unverifiable by design and must not be deleted as untidy; "
             f"restore {ASSISTS_BEGIN} … {ASSISTS_END}"
         ]
 
     start = text.index(ASSISTS_BEGIN)
     end = text.index(ASSISTS_END)
     if end < start:
-        return ["AGENTS.md: optional-assists END marker precedes BEGIN"]
+        return ["CLAUDE.md: tooling END marker precedes BEGIN"]
     block = text[start:end]
 
     lowered = block.lower()
     for phrase, why in ASSISTS_REQUIRED:
         if phrase not in lowered:
             findings.append(
-                f"AGENTS.md: the optional-assists section lost {why} "
+                f"CLAUDE.md: the tooling section lost {why} "
                 f"(expected the phrase {phrase!r})"
             )
 
@@ -179,24 +181,26 @@ def assists_findings(root: pathlib.Path) -> list[str]:
     # Header plus content rows; a gutted stub is as bad as a deleted section.
     if len(rows) - 1 < ASSISTS_MIN_ROWS:
         findings.append(
-            f"AGENTS.md: the optional-assists table has {max(len(rows) - 1, 0)} rows, "
+            f"CLAUDE.md: the tooling table has {max(len(rows) - 1, 0)} rows, "
             f"fewer than the {ASSISTS_MIN_ROWS} expected; it appears gutted rather than curated"
         )
     return findings
 
 
 def guidance_size_findings(root: pathlib.Path) -> tuple[list[str], dict[str, int]]:
-    """Keep every automatically discovered root-to-subdirectory chain below 30 KiB.
+    """Keep every automatically discovered root-to-subdirectory chain below the budget.
 
-    Codex combines the root AGENTS.md with the closest nested AGENTS.md. Its default
-    project_doc_max_bytes limit is 32 KiB, so the repository reserves 2 KiB of
-    headroom instead of relying on truncation behavior.
+    Claude Code loads the root CLAUDE.md every session and the closest nested
+    CLAUDE.md when it works under that directory. It has no small truncation cap
+    (the hard limit is 4 MiB), so this budget is context hygiene, not a platform
+    limit: root guidance is read on every turn, domain detail belongs in
+    .claude/rules/*.md, which load only for matching paths.
     """
-    root_guidance = root / "AGENTS.md"
+    root_guidance = root / "CLAUDE.md"
     if not root_guidance.is_file():
-        return ["missing guidance file: AGENTS.md"], {}
+        return ["missing guidance file: CLAUDE.md"], {}
 
-    sizes = {"AGENTS.md": root_guidance.stat().st_size}
+    sizes = {"CLAUDE.md": root_guidance.stat().st_size}
     findings: list[str] = []
     for relative in NESTED_GUIDANCE:
         nested = root / relative
@@ -204,10 +208,10 @@ def guidance_size_findings(root: pathlib.Path) -> tuple[list[str], dict[str, int
             findings.append(f"missing nested guidance file: {relative}")
             continue
         sizes[relative] = nested.stat().st_size
-        combined = sizes["AGENTS.md"] + sizes[relative]
+        combined = sizes["CLAUDE.md"] + sizes[relative]
         if combined > MAX_DISCOVERED_GUIDANCE_BYTES:
             findings.append(
-                f"AGENTS.md + {relative} total {combined} bytes, exceeding the "
+                f"CLAUDE.md + {relative} total {combined} bytes, exceeding the "
                 f"{MAX_DISCOVERED_GUIDANCE_BYTES}-byte repository guidance budget"
             )
     return findings, sizes
@@ -223,7 +227,7 @@ def evaluate(root: pathlib.Path) -> dict:
     for surface in sorted(contracts(root)):
         surfaces.append(("contract", surface))
 
-    # Guidance legitimately documents a family with one glob -- AGENTS.md's key-paths
+    # Guidance legitimately documents a family with one glob -- CLAUDE.md's key-paths
     # table names `config/language-bench-*.json` for three real files. Treating that
     # as undocumented would push correctly-documented surfaces into exemptions, which
     # is the opposite of what this check is for.
@@ -281,7 +285,7 @@ def main(argv=None) -> int:
     for entry in report["missing"]:
         print(
             f"surface-coverage error: {entry['kind']} {entry['surface']} is enforced but "
-            "named in neither AGENTS.md nor any .agents/rules/*.md",
+            "named in neither CLAUDE.md nor any .claude/rules/*.md",
             file=sys.stderr,
         )
     for surface in report["staleExemptions"]:

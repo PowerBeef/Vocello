@@ -52,7 +52,7 @@ class DocumentationContractTests(unittest.TestCase):
         return path
 
     def test_active_inventory_includes_nested_guidance_and_excludes_history(self) -> None:
-        active = self.write("website/AGENTS.md", "# Current\n")
+        active = self.write("website/CLAUDE.md", "# Current\n")
         release = self.write("docs/releases/v2.0.0.md", "retired harness instructions\n")
         legacy = self.write("benchmarks/LEGACY_HISTORY.md", "retired harness instructions\n")
         paths = DOCUMENTATION.active_markdown_paths(self.root)
@@ -167,7 +167,7 @@ class DocumentationContractTests(unittest.TestCase):
 
     def test_transient_plugin_installation_cannot_be_claimed(self) -> None:
         source = self.write(
-            "AGENTS.md",
+            "CLAUDE.md",
             "Use the installed GitHub integration. OpenAI Build iOS Apps supplies the server.\n",
         )
         errors = DOCUMENTATION.validate_optional_capabilities(self.root, [source])
@@ -208,9 +208,9 @@ class DocumentationContractTests(unittest.TestCase):
             json.dumps({"activationState": "complete", "missingArtifactIdentities": []}),
         )
         for relative in (
-            "AGENTS.md",
-            ".agents/rules/backend-mlx.md",
-            ".agents/rules/release-qa.md",
+            "CLAUDE.md",
+            ".claude/rules/backend-mlx.md",
+            ".claude/rules/release-qa.md",
             "docs/ARCHITECTURE.md",
             "docs/development-progress.md",
             "docs/reference/model-delivery.md",
@@ -231,7 +231,7 @@ class DocumentationContractTests(unittest.TestCase):
             "ProductionModelCatalog.shared.downloadRepo()\n",
             encoding="utf-8",
         )
-        (self.root / "AGENTS.md").write_text(
+        (self.root / "CLAUDE.md").write_text(
             "The production model catalog is staged and Quality remains pending.\n",
             encoding="utf-8",
         )

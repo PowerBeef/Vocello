@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/scripts/hooks/precommit_gate.sh",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "defaultMode": "default",
+    "allow": [
+      "Bash(git status*)",
+      "Bash(git log*)",
+      "Bash(git diff*)",
+      "Bash(git show*)",
+      "Bash(scripts/dev.sh *)",
+      "Bash(./scripts/dev.sh *)",
+      "Bash(python3 scripts/roadmap.py status*)",
+      "Bash(python3 scripts/roadmap.py validate*)",
+      "Bash(python3 scripts/refresh_derived_artifacts.py *)",
+      "Bash(python3 scripts/doc_metadata.py *)",
+      "Bash(python3 scripts/documentation_contract.py *)",
+      "Bash(python3 scripts/check_surface_coverage.py*)",
+      "Bash(python3 scripts/claude_config_contract.py *)",
+      "Bash(scripts/regenerate_project.sh*)",
+      "Bash(./scripts/regenerate_project.sh*)",
+      "Bash(./scripts/check_project_inputs.sh*)",
+      "Bash(python3 -m unittest *)",
+      "Bash(xcrun xcresulttool *)",
+      "Bash(xcrun xccov *)",
+      "Bash(xcrun devicectl list *)",
+      "Bash(python3 scripts/lib/ios_coredevice_probe.py probe)",
+      "Bash(scripts/macos_test.sh core-test*)",
+      "Bash(scripts/macos_test.sh test)",
+      "Bash(./scripts/build_foundation_targets.sh *)",
+      "Bash(npm --prefix website run check)"
+    ],
+    "ask": [
+      "Bash(scripts/ui_test.sh *)",
+      "Bash(scripts/ios_device.sh *)",
+      "Bash(scripts/macos_test.sh memory*)",
+      "Bash(scripts/macos_test.sh lang-bench*)",
+      "Bash(scripts/clean_build_caches.sh *)",
+      "Bash(git commit*)",
+      "Bash(git push*)",
+      "mcp__XcodeBuildMCP__test_device",
+      "mcp__XcodeBuildMCP__build_run_device",
+      "mcp__XcodeBuildMCP__install_app_device"
+    ],
+    "deny": [
+      "Bash(git push --force*)",
+      "Bash(git push -f*)",
+      "Bash(git checkout -b*)",
+      "Bash(git switch -c*)",
+      "Bash(git worktree add*)",
+      "Bash(xcrun simctl boot*)",
+      "Bash(xcrun simctl create*)",
+      "Bash(rm -rf build/cache*)",
+      "Bash(rm -rf build)",
+      "Bash(scripts/release.sh*)",
+      "Bash(gh release create*)",
+      "Bash(gh release edit*)",
+      "Edit(QwenVoice.xcodeproj/**)",
+      "Write(QwenVoice.xcodeproj/**)",
+      "Edit(QwenVoice.xcodeproj/project.pbxproj)",
+      "Write(QwenVoice.xcodeproj/project.pbxproj)"
+    ]
+  }
+}

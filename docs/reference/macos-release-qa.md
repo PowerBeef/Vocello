@@ -96,7 +96,7 @@ upload depend on deterministic release-readiness and artifact checks.
    Successful in-repository benchmarks publish a privacy-safe `engine-generation` record and
    regenerate `benchmarks/HISTORY.md`; do not append to that generated file manually. An optional
    subjective listening note may be added later with `scripts/benchmark_history.py annotate`.
-4. **Static audits** (release-sized changesets): use the relevant installed Codex macOS skills
+4. **Static audits** (release-sized changesets): use the relevant installed Claude Code macOS skills
    plus direct code review for SwiftUI architecture/performance, memory, concurrency, signing,
    and security/privacy. Scope findings to changed surfaces; fix or explicitly defer them.
 5. **Version bump**: `MARKETING_VERSION` + `CURRENT_PROJECT_VERSION` in `project.yml` (shared by

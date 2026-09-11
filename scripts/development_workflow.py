@@ -150,7 +150,7 @@ def python_test_selection(paths: list[str], *, root: Path | None = None) -> dict
     """
     root = root or ROOT
     policy = local_policy()
-    inputs = [p for p in paths if p.startswith(("scripts/", "config/", ".github/", ".codex/")) or p in {"project.yml", "Package.resolved"}]
+    inputs = [p for p in paths if p.startswith(("scripts/", "config/", ".github/", ".claude/")) or p in {"project.yml", "Package.resolved"}]
     if any(matches_any(p, policy["fullTestPatterns"]) for p in paths):
         return {"mode": "full", "tests": [], "reason": "verification/build authority changed"}
     modules = sorted([*root.glob("scripts/test_*.py"), *root.glob("scripts/tests/test_*.py")])

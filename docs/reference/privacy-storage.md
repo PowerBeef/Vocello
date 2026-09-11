@@ -244,10 +244,10 @@ Repository-local build and QA state lives under the ignored `build/` tree. Its m
 contract is `config/build-output-policy.json`; `scripts/build_output_policy.py validate` rejects an
 unowned root or a tracked command that bypasses the contract.
 
-Persisted Codex task/session state is separate user-scoped developer-tool data, not Vocello app
-data or repository build output. Its optional inventory and explicitly approved cleanup process is
-documented in [`codex-session-storage.md`](codex-session-storage.md); live manifests, identifiers,
-and journals remain temporary and untracked.
+Claude Code session transcripts, auto-memory and personal settings are separate user-scoped
+developer-tool data under `~/.claude/`, not Vocello app data or repository build output. Nothing in
+the repository reads, edits or prunes them; the retired Codex storage runbook is pinned in
+[`codex-session-storage.md`](codex-session-storage.md) as history only.
 
 The table below is rendered from the manifest by
 `python3 scripts/build_output_policy.py status --markdown`. Policy validation compares the marked

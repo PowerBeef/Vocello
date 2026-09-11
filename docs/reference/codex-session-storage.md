@@ -1,11 +1,14 @@
 ---
-status: active
+status: historical
 owner: release-qa
-summary: Operator runbook for the optional Codex task/session storage workflow — inventory, checksummed plan, exact approval, supported deletion, verification; live user state never enters the repository.
-sourceOfTruth:
-  - scripts/codex_session_storage.py
-  - config/codex-session-storage-policy.json
+summary: Retired operator runbook for the Codex task/session storage workflow (helper and policy removed 2026-09-11); pinned as provenance.
+contentDigest: sha256:8ee42ac0f609d0f0248d796e49e9c00aa82e977a4adedf03603cbbcbc337cc31
 ---
+> **Historical snapshot (2026-09-11).** Codex was retired as the development environment; the
+> helper `scripts/codex_session_storage.py` and its policy no longer exist. This runbook is
+> retained as provenance only. Claude Code session state lives under `~/.claude/` and is never
+> read, edited or pruned by repository tooling.
+
 # Codex Task And Session Storage
 
 This is the operator runbook for keeping QwenVoice Codex work bounded without making private Codex

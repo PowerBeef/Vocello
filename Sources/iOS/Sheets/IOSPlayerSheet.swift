@@ -197,7 +197,7 @@ struct IOSPlayerSheet: View {
             seed: item.waveformSeed,
             tint: item.modeTint,
             duration: controller.duration,
-            // Honor Reduce Motion (AGENTS.md): freeze the perpetual waveform when on.
+            // Honor Reduce Motion (CLAUDE.md, .claude/rules/ios.md): freeze the perpetual waveform when on.
             isAnimating: controller.isPlaying && !reduceMotion
         )
     }

@@ -290,14 +290,14 @@ class BenchmarkHistoryTests(unittest.TestCase):
 
     def test_git_status_paths_preserve_leading_dot_on_first_entry(self) -> None:
         raw = (
-            " M .agents/rules/backend-mlx.md\0"
-            " M AGENTS.md\0"
+            " M .claude/rules/backend-mlx.md\0"
+            " M CLAUDE.md\0"
             "?? benchmarks/runs/example.json\0"
             "?? .local-fixture\0"
         )
         self.assertEqual(
             history.parse_git_status_paths(raw),
-            [".agents/rules/backend-mlx.md", ".local-fixture", "AGENTS.md"],
+            [".claude/rules/backend-mlx.md", ".local-fixture", "CLAUDE.md"],
         )
 
     def test_record_is_atomic_valid_and_idempotent(self) -> None:

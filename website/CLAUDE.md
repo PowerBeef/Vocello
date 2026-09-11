@@ -1,6 +1,6 @@
-# AGENTS.md — Vocello website
+# CLAUDE.md — Vocello website
 
-This file adds website-specific guidance to the root `../AGENTS.md`. The website is a React/Vite
+This file adds website-specific guidance to the root `../CLAUDE.md`. The website is a React/Vite
 marketing surface deployed by Vercel with `website/` as the project root. It is a non-native zone:
 do not run Swift, iOS, macOS, Xcode, or native-app UI workflows for website-only changes.
 
@@ -66,7 +66,7 @@ Existing copy is not evidence. Verify every product claim against the parent rep
 | Delivery presets and measured-best tiers | `../Sources/QwenVoiceCore/EmotionPreset.swift` |
 | Canonical performance hardware | `../benchmarks/hardware-profiles.json` |
 | Performance statements | compatible clean records under `../benchmarks/runs/` and generated `../benchmarks/HISTORY.md` |
-| Architecture, privacy, distribution | `../AGENTS.md`, `../docs/ARCHITECTURE.md`, and machine-readable contracts |
+| Architecture, privacy, distribution | `../CLAUDE.md`, `../docs/ARCHITECTURE.md`, and machine-readable contracts |
 
 Voice Cloning has no instruction channel. Its delivery banks select verified reference clips,
 not engine emotion/intensity instructions. Keep public language aligned with

@@ -86,7 +86,7 @@ class FactScanTests(unittest.TestCase):
 
 
 class ReleaseFactTests(unittest.TestCase):
-    """AGENTS.md and README.md are fact-scanned; these are the claims that drift."""
+    """CLAUDE.md and README.md are fact-scanned; these are the claims that drift."""
 
     def test_derived_stable_version_does_not_advertise_unpublished_build(self):
         with tempfile.TemporaryDirectory() as temporary:

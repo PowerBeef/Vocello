@@ -155,6 +155,15 @@
       "adopted": "2026-08-30",
       "goal": "Causally localize the reported saved-reference pitch/fidelity variance, typed enrollment-transcription failure, and French Voice Design regression with source-bound private diagnostics; separate target language from reference metadata; and apply only tokenizer, reference-quality, or prompt remediation proven by fixed-seed evidence without weakening QC or exposing personal audio and transcript data.",
       "authority": "docs/reference/delivery-harness.md"
+    },
+    {
+      "id": "claude-code-adoption-2026-09",
+      "title": "Adopt Claude Code as the development environment",
+      "status": "active",
+      "owner": "release-qa",
+      "adopted": "2026-09-11",
+      "goal": "Replace the Codex-shaped governance (AGENTS.md, .agents rules, .codex hook, session-storage tooling) with repository-owned, gate-validated Claude Code configuration (CLAUDE.md, path-scoped .claude/rules, hooks, skills, subagents), route the testing workflow through XcodeBuildMCP, Axiom and project subagents without weakening any invariant, and modernize the macOS unit lane (xcresult, coverage) and the Python test roots through the replace-and-retire procedure.",
+      "authority": "docs/reference/development-workflow.md"
     }
   ],
   "items": [
@@ -3471,6 +3480,119 @@
       ],
       "updated": "2026-09-06",
       "notes": "September 6 project-wide policy extension: AGENTS.md and the testing router now direct all tests/harnesses to the existing self-verification reference's replacement/retirement procedure. Each scoped migration states its claim, independent evidence, replacement, remaining consumers and retirement condition. Known-wrong baselines have no automatic authority; temporary comparisons must end in one current route or an explicit unresolved decision. Preserve necessary readers and original evidence, not redundant execution paths. This records guidance adoption only, not a completed suite-wide audit or relaxation of the 201-take, data-preservation, QC or release requirements. Concrete corrections remain with existing subsystem owners; no new audit programme or blocker was created. Earlier workflow checkpoint: implementation and focused routing/negative fixtures completed. Commit-hook validation is receipt-only: absent, stale or unreadable receipts block without starting another checkpoint; long checks run directly outside the host hook timeout. The interrupted 7887bfda hook recheck is not a completed PASS. A direct coherent full deterministic checkpoint remains required for the follow-up; results stay in the existing gate artifacts. This is workflow implementation, not product/candidate acceptance. Release-first remains primary; the phone and product investigations remain paused."
+    },
+    {
+      "id": "CCA-01",
+      "plan": "claude-code-adoption-2026-09",
+      "title": "Rewire guidance gates from AGENTS.md/.agents to CLAUDE.md/.claude/rules",
+      "status": "done",
+      "gate": "check_project_inputs.sh required surfaces, check_surface_coverage.py, doc_metadata.py, documentation_contract.py, check_test_workflows.sh and the config registries name CLAUDE.md, .claude/rules and website/CLAUDE.md; the full deterministic checkpoint passes.",
+      "updated": "2026-09-11",
+      "evidence": [
+        "file:scripts/check_surface_coverage.py",
+        "file:scripts/check_project_inputs.sh",
+        "file:config/documentation-contract.json"
+      ]
+    },
+    {
+      "id": "CCA-02",
+      "plan": "claude-code-adoption-2026-09",
+      "title": "Rewrite root CLAUDE.md (≤ 200 lines) and nested website/CLAUDE.md",
+      "status": "planned",
+      "gate": "Root guidance under 16 KiB with commands, compressed invariants, domain routing to path-scoped rules and the Claude Code tooling block; the surface-coverage and documentation contracts pass.",
+      "updated": "2026-09-11"
+    },
+    {
+      "id": "CCA-03",
+      "plan": "claude-code-adoption-2026-09",
+      "title": "Port the commit gate to .claude/settings.json with a contract test",
+      "status": "done",
+      "gate": "PreToolUse Bash hook runs scripts/hooks/precommit_gate.sh unchanged; test_claude_hook_contract.py pins the wiring and the receipt/branch behaviour.",
+      "updated": "2026-09-11",
+      "evidence": [
+        "file:.claude/settings.json",
+        "file:scripts/tests/test_claude_hook_contract.py"
+      ]
+    },
+    {
+      "id": "CCA-04",
+      "plan": "claude-code-adoption-2026-09",
+      "title": "Add the claude_config_contract.py gate",
+      "status": "done",
+      "gate": "check_project_inputs.sh validates hook wiring, deny-list shape, skill/subagent frontmatter, rule path scopes and the absence of Simulator destinations under .claude/.",
+      "updated": "2026-09-11",
+      "evidence": [
+        "file:scripts/claude_config_contract.py",
+        "file:scripts/tests/test_claude_config_contract.py"
+      ]
+    },
+    {
+      "id": "CCA-05",
+      "plan": "claude-code-adoption-2026-09",
+      "title": "Retire Codex session-storage governance",
+      "status": "done",
+      "gate": "codex_session_storage.py, its policy, test and hook config are removed from the tree and every registry; the runbook is pinned historical.",
+      "updated": "2026-09-11",
+      "evidence": [
+        "file:config/evidence-impact.json",
+        "doc:docs/reference/codex-session-storage.md"
+      ]
+    },
+    {
+      "id": "CCA-06",
+      "plan": "claude-code-adoption-2026-09",
+      "title": "Project skills for checkpoint, device lanes, docs refresh, roadmap checkpoint and release evidence",
+      "status": "planned",
+      "gate": "Skills under .claude/skills route to existing scripts and docs; device, model and release lanes are user-invoked only (disable-model-invocation).",
+      "updated": "2026-09-11"
+    },
+    {
+      "id": "CCA-07",
+      "plan": "claude-code-adoption-2026-09",
+      "title": "Project subagents for gate summarisation, xcresult triage, doc governance and Swift review",
+      "status": "planned",
+      "gate": "Agents under .claude/agents declare explicit tool allowlists and pass claude_config_contract.py; policy and generated-file guard hooks are wired and tested.",
+      "updated": "2026-09-11"
+    },
+    {
+      "id": "CCA-08",
+      "plan": "claude-code-adoption-2026-09",
+      "title": "Update testing, development-workflow and self-verification docs for Claude Code routes",
+      "status": "planned",
+      "gate": "testing-runbook.md maps each lane to its skill and triage agent; development-workflow.md describes the .claude hook; repository-self-verification.md describes the validated configuration.",
+      "updated": "2026-09-11"
+    },
+    {
+      "id": "CCA-09",
+      "plan": "claude-code-adoption-2026-09",
+      "title": "Structured test-results.json and .xcresult for the macOS unit lane",
+      "status": "planned",
+      "gate": "macos_test.sh full runs produce per-bundle .xcresult and schemaVersion-1 summaries; old and new paths agree over three runs; TSan and core-test --only keep xcrun xctest.",
+      "updated": "2026-09-11"
+    },
+    {
+      "id": "CCA-10",
+      "plan": "claude-code-adoption-2026-09",
+      "title": "Code coverage export for VocelloCoreTests and Qwen3RuntimeTests",
+      "status": "planned",
+      "gate": "coverage.json and the SwiftPM codecov export land in the run directory with a non-blocking verdict line; verdicts are unchanged by instrumentation.",
+      "updated": "2026-09-11"
+    },
+    {
+      "id": "CCA-11",
+      "plan": "claude-code-adoption-2026-09",
+      "title": "Consolidate the Python test roots and record closure of the omitted-tests finding",
+      "status": "planned",
+      "gate": "scripts/test_*.py modules live under scripts/tests; single-root discovery reports the same total; python_test_contract.py counts are recorded as evidence.",
+      "updated": "2026-09-11"
+    },
+    {
+      "id": "CCA-12",
+      "plan": "claude-code-adoption-2026-09",
+      "title": "Roadmap and progress checkpoint for the adoption track",
+      "status": "planned",
+      "gate": "Every CCA item cites commit evidence on main; development-progress.md names the adoption track and the product critical path.",
+      "updated": "2026-09-11"
     }
   ]
 }

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Codex PreToolUse hook: the fast T1 receipt check.
+# Claude Code PreToolUse hook (wired in .claude/settings.json): the fast T1 receipt check.
 #
 # Fired for every Bash tool call; exits instantly unless the command contains
 # `git commit`. For commits it first requires the symbolic branch to be exactly

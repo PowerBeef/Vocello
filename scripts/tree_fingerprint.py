@@ -88,10 +88,12 @@ def checkpoint_fingerprint(root: Path) -> str:
             tools[name] = None
     environment = {
         "python": sys.version, "platform": platform.platform(), "tools": tools,
-        # Login shells and Codex hooks can reorder the same PATH entries without
-        # changing any verification tool. Bind membership plus actual tool
-        # resolution, not that harmless ordering difference.
-        "pathEntries": sorted(set(os.environ.get("PATH", "").split(os.pathsep))),
+        # PATH itself is deliberately not bound. The Bash tool, a login shell and a
+        # Claude Code hook see the same tools through different PATH lists (the
+        # tool shell appends plugin bin directories that hooks never receive), and
+        # that difference changes no verification result. What matters is which
+        # executable each tool name resolves to, and `tools` above binds exactly
+        # that: a shadowing PATH entry shows up as a different resolved path.
         "environment": {key: os.environ.get(key) for key in (
             "DEVELOPER_DIR", "SDKROOT", "PYTHONPATH", "VIRTUAL_ENV",
             "QWENVOICE_ENABLE_TSAN", "SWIFT_EXEC", "TOOLCHAINS",
@@ -100,7 +102,7 @@ def checkpoint_fingerprint(root: Path) -> str:
     if shutil.which("xcode-select"):
         environment["developer"] = _git_command_output(["xcode-select", "-p"])
         environment["xcode"] = _git_command_output(["xcodebuild", "-version"])
-    return "local-v2:" + hashlib.sha256(
+    return "local-v3:" + hashlib.sha256(
         worktree_fingerprint(root).encode() + json.dumps(environment, sort_keys=True).encode()
     ).hexdigest()
 

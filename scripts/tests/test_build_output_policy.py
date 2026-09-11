@@ -464,11 +464,11 @@ class BuildOutputPolicyTests(unittest.TestCase):
 
     def test_validate_rejects_retired_tracked_reference_and_absolute_build_path(self) -> None:
         self.initialize_git()
-        agents = self.root / "AGENTS.md"
+        agents = self.root / "CLAUDE.md"
         agents.write_text(
             f"legacy build/DerivedData and {self.root}/build/private\n", encoding="utf-8"
         )
-        subprocess.run(["git", "-C", str(self.root), "add", "AGENTS.md"], check=True)
+        subprocess.run(["git", "-C", str(self.root), "add", "CLAUDE.md"], check=True)
         result = self.command("validate", "--json")
         self.assertEqual(result.returncode, 1)
         violations = json.loads(result.stdout)["violations"]
@@ -498,20 +498,20 @@ class BuildOutputPolicyTests(unittest.TestCase):
     def test_reference_validation_covers_benchmark_and_website_guidance(self) -> None:
         self.initialize_git()
         benchmark = self.root / "benchmarks/README.md"
-        website = self.root / "website/AGENTS.md"
+        website = self.root / "website/CLAUDE.md"
         benchmark.parent.mkdir(parents=True)
         website.parent.mkdir(parents=True)
         benchmark.write_text("legacy build/DerivedData benchmark path\n", encoding="utf-8")
         website.write_text("legacy build/ios/Build website path\n", encoding="utf-8")
         subprocess.run(
-            ["git", "-C", str(self.root), "add", "benchmarks/README.md", "website/AGENTS.md"],
+            ["git", "-C", str(self.root), "add", "benchmarks/README.md", "website/CLAUDE.md"],
             check=True,
         )
         result = self.command("validate", "--json")
         self.assertEqual(result.returncode, 1)
         violations = "\n".join(json.loads(result.stdout)["violations"])
         self.assertIn("benchmarks/README.md", violations)
-        self.assertIn("website/AGENTS.md", violations)
+        self.assertIn("website/CLAUDE.md", violations)
 
     def test_reference_validation_excludes_immutable_benchmark_records(self) -> None:
         self.initialize_git()

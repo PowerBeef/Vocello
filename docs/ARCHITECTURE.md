@@ -45,7 +45,7 @@ stable macOS release is **Vocello 2.4.0** and iOS build 23 (v2.4.0) is live as a
 **public TestFlight beta** (both distribution groups).
 
 > Start with the canonical interactive [`project map`](project-map.html). For repo conventions,
-> build commands, engine invariants, and release process, read [`AGENTS.md`](../AGENTS.md).
+> build commands, engine invariants, and release process, read [`CLAUDE.md`](../CLAUDE.md).
 > This document provides the deeper architecture narrative.
 
 ---
@@ -1134,8 +1134,8 @@ Most-frequent imports across `Sources/**/*.swift`:
 ## 17. Related documents
 
 - [`development-progress.md`](development-progress.md) — active checkpoint: deterministic development status, the completed XCUITest stack, and the agent resume route.
-- [`project-map.html`](project-map.html) — canonical interactive project map: product features, build graph, runtime flows, source ownership, dependencies, contracts, and Codex routes.
-- [`AGENTS.md`](../AGENTS.md) — repo operating manual: build, conventions, engine invariants, dependency pinning, release/QA.
+- [`project-map.html`](project-map.html) — canonical interactive project map: product features, build graph, runtime flows, source ownership, dependencies, contracts, and agent routes.
+- [`CLAUDE.md`](../CLAUDE.md) — repo operating manual: build, conventions, engine invariants, dependency pinning, release/QA.
 - [`README.md`](../README.md) — product overview + install.
 - [`PRODUCT.md`](../PRODUCT.md) — product/brand guidance.
 - Per-subsystem deep-dives in `docs/reference/`:

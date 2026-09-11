@@ -4,12 +4,16 @@ owner: release-qa
 summary: Domain rule for generated-inventory freshness — which paths require refresh_derived_artifacts.py in the same change, and the manual narrative-sync exception.
 sourceOfTruth:
   - scripts/refresh_derived_artifacts.py
+paths:
+  - "config/**"
+  - "docs/**"
+  - "Packages/VocelloQwen3Core/*.json"
 ---
 # Derived artifacts freshness
 
 CI fail-closes on stale generated inventories. Refresh them in the **same change** as the source
 edit. Update narrative progress deliberately at the coherent checkpoint described in root
-`AGENTS.md` (Start and resume work); do not create a separate routine documentation commit.
+`CLAUDE.md` (Start and resume work); do not create a separate routine documentation commit.
 During a frozen acceptance campaign, keep progress untracked until a deliberate source checkpoint.
 Finalize intended tracked-file membership before refreshing inventories: project-health counts
 tracked files, so adding files to the index after refresh can make that output stale even when
@@ -34,4 +38,4 @@ python3 scripts/refresh_derived_artifacts.py refresh   # stale only
 python3 scripts/refresh_derived_artifacts.py validate
 ```
 
-Authority: `AGENTS.md` hard invariant **Fresh derived artifacts**. Scripts win over this rule.
+Authority: `CLAUDE.md` hard invariant **Fresh derived artifacts**. Scripts win over this rule.

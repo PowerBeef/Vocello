@@ -36,7 +36,7 @@ If anything here disagrees with the code, the code wins — fix this file.
 ## 1. Principles
 
 1. **Runtime‑gated, never compiled out.** There is one shippable config; dev and
-   release run identical code (see root `AGENTS.md`). Telemetry is switched on at
+   release run identical code (see root `CLAUDE.md`). Telemetry is switched on at
    runtime by `TelemetryGate`, not by `#if DEBUG`. When the gate is off, every probe
    is a no‑op and nothing is written.
 2. **Correlated by `generationID`.** The app mints a `UUID` per generation and threads
@@ -68,7 +68,7 @@ resolved once per process:
 | `QWENVOICE_NATIVE_TELEMETRY_MODE=lightweight\|verbose` (aliases: `light`, `full`, `deep`) | Forces sampling/persistence on regardless of the gate. |
 
 The engine runs **out of process on macOS** (XPC service) and **in process on iOS**
-(the ExtensionKit extension was removed; see `AGENTS.md` / commit `aed617c`). The
+(the ExtensionKit extension was removed; see `CLAUDE.md` / commit `aed617c`). The
 separate process does not automatically inherit the app's resolved mode; the initialize handshake
 carries it. Telemetry opt-in is distinct from production-affecting overrides, which additionally
 require the registered internal-diagnostics build capability and debug gate. Do not claim that
@@ -668,4 +668,4 @@ committed bounded quality summaries and baselines remain permitted.
 
 - [`mlx-audio-swift-patching.md`](mlx-audio-swift-patching.md) — owned core runtime procedure and validation gates.
 - [`privacy-storage.md`](privacy-storage.md) — where diagnostics live; deletion paths.
-- [`.agents/rules/backend-mlx.md`](../../.agents/rules/backend-mlx.md) — telemetry summary + engine invariants (bounded measured event delivery, typed cancellation, prewarm reentrancy, per-tier memory).
+- [`.claude/rules/backend-mlx.md`](../../.claude/rules/backend-mlx.md) — telemetry summary + engine invariants (bounded measured event delivery, typed cancellation, prewarm reentrancy, per-tier memory).

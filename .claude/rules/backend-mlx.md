@@ -29,6 +29,14 @@ sourceOfTruth:
   - scripts/run_local_delivery_cascade.py
   - scripts/delivery_promotion_decision.py
   - scripts/audio_cadence_qc.py
+paths:
+  - "Sources/QwenVoiceCore/**"
+  - "Sources/QwenVoiceBackendCore/**"
+  - "Packages/VocelloQwen3Core/**"
+  - "Sources/Resources/qwenvoice_*.json"
+  - "config/delivery-*.json"
+  - "scripts/delivery_*.py"
+  - "scripts/prosody_*.py"
 ---
 # Backend / MLX domain rule
 
@@ -54,14 +62,14 @@ sourceOfTruth:
   overrides and explicit concurrency-safety exceptions
 
 **Does NOT own:**
-- macOS SwiftUI / XPC client wiring (`.agents/rules/macos.md`)
-- iOS app UI / on-device coordination (`.agents/rules/ios.md`)
-- Build scripts, CI, signing, release packaging (`.agents/rules/release-qa.md`)
+- macOS SwiftUI / XPC client wiring (`.claude/rules/macos.md`)
+- iOS app UI / on-device coordination (`.claude/rules/ios.md`)
+- Build scripts, CI, signing, release packaging (`.claude/rules/release-qa.md`)
 
 **Consults:**
 - `docs/ARCHITECTURE.md` §4 (engine core), §11 (model management), §12 (telemetry)
 - `docs/reference/{mlx-guide,qwen3-tts-guide,mimi-codec-guide,metal-guide,swift-performance-guide,ios-engine-optimization,telemetry-and-benchmarking}.md`
-- Root `AGENTS.md` (Hard invariants) + [`docs/ARCHITECTURE.md`](../../docs/ARCHITECTURE.md) (engine invariants)
+- Root `CLAUDE.md` (Hard invariants) + [`docs/ARCHITECTURE.md`](../../docs/ARCHITECTURE.md) (engine invariants)
 - Delivery/emotion quality measurement: [`docs/reference/delivery-harness.md`](../../docs/reference/delivery-harness.md)
   (tools, `bench --delivery` protocol, multilingual experiment compiler/runner, layered evaluator,
   instruction-receipt provenance, statistics semantics, automated measured-claim authority,
@@ -106,7 +114,7 @@ Before changing anything in this layer, read:
 - Generated output must use `config/build-output-policy.json`. Backend work may consume the
   canonical macOS/iOS caches and the dedicated owned-runtime SwiftPM scratch path, but must not create
   another DerivedData root or a `.build` directory below `Packages/VocelloQwen3Core/`. Route policy
-  changes through `.agents/rules/release-qa.md`.
+  changes through `.claude/rules/release-qa.md`.
 - XCUITest is the sole autonomous app UI driver. Smoke and benchmark UI lanes are explicit
   frontend acceptance only and never a prerequisite for a commit, push, pull request, ordinary
   merge, ordinary CI, or release package. Frontend observations do not prove backend completion;

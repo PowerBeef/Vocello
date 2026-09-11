@@ -723,7 +723,7 @@ def parse_git_status_paths(raw: str) -> list[str]:
     """Return exact repository-relative paths from porcelain-v1 ``-z`` output.
 
     The leading space in an unstaged status record is structural.  Callers must
-    pass the untrimmed Git output or a first pathname such as ``.agents/...``
+    pass the untrimmed Git output or a first pathname such as ``.claude/...``
     can lose its leading dot when the status prefix is sliced off.
     """
     entries = [entry for entry in raw.split("\0") if entry]

@@ -15,7 +15,6 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 | --- | --- | --- | --- |
 | `release-first-3-0-2026-09` | active | release-qa | 5/13 (38%) |
 | `autonomous-validation-remediation-2026-08` | active | release-qa | 8/11 (73%) |
-| `claude-code-adoption-2026-09` | active | release-qa | 4/12 (33%) |
 | `delivery-prompting-2026-08` | active | backend-mlx | 29/34 (85%) |
 | `engineering-review-remediation-2026-08` | active | backend-and-platform | 11/23 (48%) |
 | `ios-app-store-readiness-2026-08` | active | release-qa | 2/12 (17%) |
@@ -23,6 +22,7 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 | `ios-generation-startup-reliability-2026-08` | active | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | active | ios | 3/4 (75%) |
 | `voice-identity-language-reliability-2026-08` | active | backend-and-platform | 9/10 (90%) |
+| `claude-code-adoption-2026-09` | complete | release-qa | 12/12 (100%) |
 | `compliance-2026-08` | complete | release-qa | 2/2 (100%) |
 | `convergence-metal4-stage4-2026-08` | complete | backend-and-platform | 7/7 (100%) |
 | `development-workflow-performance-2026-08` | complete | release-qa | 6/6 (100%) |
@@ -114,55 +114,6 @@ Narrative authority: [`docs/reference/autonomous-validation-audit-2026-08-21.md`
 
 - **`AV-09`** (in-flight) — P2 — make stateful physical-device lanes independently repeatable.
   gate: Each stateful iOS UI lane must declare and preflight exact prerequisites, use a non-destructive test-owned run namespace, and keep fixture-dependent journeys separate from generic smoke; download scheduling unit tests must use a controllable clock while retaining one real-throttle integration proof. Required closure evidence: missing/present/stale prerequisite fixtures, isolated reruns without residual-state failures, unchanged fail-closed no-retry policy, and physical-device XCUITest evidence for affected lanes.
-
-## Adopt Claude Code as the development environment
-
-`claude-code-adoption-2026-09` · **active** · release-qa · adopted 2026-09-11
-
-Replace the Codex-shaped governance (AGENTS.md, .agents rules, .codex hook, session-storage tooling) with repository-owned, gate-validated Claude Code configuration (CLAUDE.md, path-scoped .claude/rules, hooks, skills, subagents), route the testing workflow through XcodeBuildMCP, Axiom and project subagents without weakening any invariant, and modernize the macOS unit lane (xcresult, coverage) and the Python test roots through the replace-and-retire procedure.
-
-Narrative authority: [`docs/reference/development-workflow.md`](reference/development-workflow.md)
-
-| Item | Status | Title | Evidence |
-| --- | --- | --- | --- |
-| `CCA-01` | done | Rewire guidance gates from AGENTS.md/.agents to CLAUDE.md/.claude/rules | `file:scripts/check_surface_coverage.py`, `file:scripts/check_project_inputs.sh`, `file:config/documentation-contract.json` |
-| `CCA-02` | planned | Rewrite root CLAUDE.md (≤ 200 lines) and nested website/CLAUDE.md | — |
-| `CCA-03` | done | Port the commit gate to .claude/settings.json with a contract test | `file:.claude/settings.json`, `file:scripts/tests/test_claude_hook_contract.py` |
-| `CCA-04` | done | Add the claude_config_contract.py gate | `file:scripts/claude_config_contract.py`, `file:scripts/tests/test_claude_config_contract.py` |
-| `CCA-05` | done | Retire Codex session-storage governance | `file:config/evidence-impact.json`, `doc:docs/reference/codex-session-storage.md` |
-| `CCA-06` | planned | Project skills for checkpoint, device lanes, docs refresh, roadmap checkpoint and release evidence | — |
-| `CCA-07` | planned | Project subagents for gate summarisation, xcresult triage, doc governance and Swift review | — |
-| `CCA-08` | planned | Update testing, development-workflow and self-verification docs for Claude Code routes | — |
-| `CCA-09` | planned | Structured test-results.json and .xcresult for the macOS unit lane | — |
-| `CCA-10` | planned | Code coverage export for VocelloCoreTests and Qwen3RuntimeTests | — |
-| `CCA-11` | planned | Consolidate the Python test roots and record closure of the omitted-tests finding | — |
-| `CCA-12` | planned | Roadmap and progress checkpoint for the adoption track | — |
-
-### Open items in detail
-
-- **`CCA-02`** (planned) — Rewrite root CLAUDE.md (≤ 200 lines) and nested website/CLAUDE.md.
-  gate: Root guidance under 16 KiB with commands, compressed invariants, domain routing to path-scoped rules and the Claude Code tooling block; the surface-coverage and documentation contracts pass.
-
-- **`CCA-06`** (planned) — Project skills for checkpoint, device lanes, docs refresh, roadmap checkpoint and release evidence.
-  gate: Skills under .claude/skills route to existing scripts and docs; device, model and release lanes are user-invoked only (disable-model-invocation).
-
-- **`CCA-07`** (planned) — Project subagents for gate summarisation, xcresult triage, doc governance and Swift review.
-  gate: Agents under .claude/agents declare explicit tool allowlists and pass claude_config_contract.py; policy and generated-file guard hooks are wired and tested.
-
-- **`CCA-08`** (planned) — Update testing, development-workflow and self-verification docs for Claude Code routes.
-  gate: testing-runbook.md maps each lane to its skill and triage agent; development-workflow.md describes the .claude hook; repository-self-verification.md describes the validated configuration.
-
-- **`CCA-09`** (planned) — Structured test-results.json and .xcresult for the macOS unit lane.
-  gate: macos_test.sh full runs produce per-bundle .xcresult and schemaVersion-1 summaries; old and new paths agree over three runs; TSan and core-test --only keep xcrun xctest.
-
-- **`CCA-10`** (planned) — Code coverage export for VocelloCoreTests and Qwen3RuntimeTests.
-  gate: coverage.json and the SwiftPM codecov export land in the run directory with a non-blocking verdict line; verdicts are unchanged by instrumentation.
-
-- **`CCA-11`** (planned) — Consolidate the Python test roots and record closure of the omitted-tests finding.
-  gate: scripts/test_*.py modules live under scripts/tests; single-root discovery reports the same total; python_test_contract.py counts are recorded as evidence.
-
-- **`CCA-12`** (planned) — Roadmap and progress checkpoint for the adoption track.
-  gate: Every CCA item cites commit evidence on main; development-progress.md names the adoption track and the product critical path.
 
 ## Delivery instruction quality and Qwen3-TTS prompting
 
@@ -467,6 +418,29 @@ Narrative authority: [`docs/reference/delivery-harness.md`](reference/delivery-h
 
 - **`VLR-07`** (in-flight) — Complete physical-device closure and publish the privacy-safe report.
   gate: After Mac/CLI localization, complete two consecutive no-retry 14-row closure physical-iPhone passes plus one 122-row characterization using new source-bound private maps and exact current source. Require typed transcription classification, correct short/medium/long French output, exact receipt parity, zero unexplained hard QC failures, WER/CER delta <= 0.01, speaker-similarity delta >= -0.02, governed Clone prosody fidelity or explicit reference rejection, and green Built-in/English Design/enrollment/Clone controls. Publish only a digest-pinned privacy-safe physical-device report; keep audio, text, names, paths, raw diagnostics, and device evidence untracked. Before RF-09 freeze, new live verification must refuse absent, unreadable, zero or non-finite source duration instead of silently bypassing timing checks. Preserve legacy evidence decoding separately. Describe the current min-start/max-end predicate as edge coverage only, add an interior-omission counterexample alongside WER checks, and do not claim complete speech-interval coverage without independent evidence.
+
+## Adopt Claude Code as the development environment
+
+`claude-code-adoption-2026-09` · **complete** · release-qa · adopted 2026-09-11
+
+Replace the Codex-shaped governance (AGENTS.md, .agents rules, .codex hook, session-storage tooling) with repository-owned, gate-validated Claude Code configuration (CLAUDE.md, path-scoped .claude/rules, hooks, skills, subagents), route the testing workflow through XcodeBuildMCP, Axiom and project subagents without weakening any invariant, and modernize the macOS unit lane (xcresult, coverage) and the Python test roots through the replace-and-retire procedure.
+
+Narrative authority: [`docs/reference/development-workflow.md`](reference/development-workflow.md)
+
+| Item | Status | Title | Evidence |
+| --- | --- | --- | --- |
+| `CCA-01` | done | Rewire guidance gates from AGENTS.md/.agents to CLAUDE.md/.claude/rules | `commit:152273a4f8a9`, `file:config/documentation-contract.json`, `file:scripts/check_project_inputs.sh`, `file:scripts/check_surface_coverage.py` |
+| `CCA-02` | done | Rewrite root CLAUDE.md (≤ 200 lines) and nested website/CLAUDE.md | `commit:86260ce15275`, `file:.claude/rules/claude-tooling.md`, `file:CLAUDE.md`, `file:website/CLAUDE.md` |
+| `CCA-03` | done | Port the commit gate to .claude/settings.json with a contract test | `commit:152273a4f8a9`, `commit:462ca1f94fff`, `file:.claude/settings.json`, `file:scripts/tests/test_claude_hook_contract.py` |
+| `CCA-04` | done | Add the claude_config_contract.py gate | `commit:152273a4f8a9`, `commit:462ca1f94fff`, `file:scripts/claude_config_contract.py`, `file:scripts/tests/test_claude_config_contract.py` |
+| `CCA-05` | done | Retire Codex session-storage governance | `commit:152273a4f8a9`, `doc:docs/reference/codex-session-storage.md`, `file:config/evidence-impact.json` |
+| `CCA-06` | done | Project skills for checkpoint, device lanes, docs refresh, roadmap checkpoint and release evidence | `commit:86260ce15275`, `file:.claude/skills/checkpoint/SKILL.md`, `file:.claude/skills/ios-lane/SKILL.md`, `file:.claude/skills/release-evidence/SKILL.md` |
+| `CCA-07` | done | Project subagents for gate summarisation, xcresult triage, doc governance and Swift review | `commit:462ca1f94fff`, `commit:86260ce15275`, `file:.claude/agents/gate-runner.md`, `file:.claude/agents/xcresult-triage.md`, `file:scripts/hooks/generated_file_guard.sh`, `file:scripts/hooks/policy_guard.sh`, `file:scripts/tests/test_claude_hooks.py` |
+| `CCA-08` | done | Update testing, development-workflow and self-verification docs for Claude Code routes | `commit:152273a4f8a9`, `commit:462ca1f94fff`, `doc:docs/reference/development-workflow.md`, `doc:docs/reference/repository-self-verification.md`, `doc:docs/reference/testing-runbook.md#claude-code-routes` |
+| `CCA-09` | done | Structured test-results.json and .xcresult for the macOS unit lane | `commit:08ce0e634474`, `doc:docs/reference/macos-testing.md#ordinary-development`, `file:scripts/lib/xctest_summary.py`, `file:scripts/tests/test_xctest_summary.py` |
+| `CCA-10` | done | Code coverage export for VocelloCoreTests and Qwen3RuntimeTests | `commit:08ce0e634474`, `doc:docs/reference/macos-testing.md#ordinary-development` |
+| `CCA-11` | done | Consolidate the Python test roots and record closure of the omitted-tests finding | `commit:a15354d7316f`, `file:scripts/python_test_contract.py` |
+| `CCA-12` | done | Roadmap and progress checkpoint for the adoption track | `commit:152273a4f8a9`, `commit:a15354d7316f`, `doc:docs/development-progress.md#claude-code-adoption-september-11` |
 
 ## EU AI Act Article 50 readiness
 

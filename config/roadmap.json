@@ -159,7 +159,7 @@
     {
       "id": "claude-code-adoption-2026-09",
       "title": "Adopt Claude Code as the development environment",
-      "status": "active",
+      "status": "complete",
       "owner": "release-qa",
       "adopted": "2026-09-11",
       "goal": "Replace the Codex-shaped governance (AGENTS.md, .agents rules, .codex hook, session-storage tooling) with repository-owned, gate-validated Claude Code configuration (CLAUDE.md, path-scoped .claude/rules, hooks, skills, subagents), route the testing workflow through XcodeBuildMCP, Axiom and project subagents without weakening any invariant, and modernize the macOS unit lane (xcresult, coverage) and the Python test roots through the replace-and-retire procedure.",
@@ -3489,18 +3489,25 @@
       "gate": "check_project_inputs.sh required surfaces, check_surface_coverage.py, doc_metadata.py, documentation_contract.py, check_test_workflows.sh and the config registries name CLAUDE.md, .claude/rules and website/CLAUDE.md; the full deterministic checkpoint passes.",
       "updated": "2026-09-11",
       "evidence": [
-        "file:scripts/check_surface_coverage.py",
+        "commit:152273a4f8a9",
+        "file:config/documentation-contract.json",
         "file:scripts/check_project_inputs.sh",
-        "file:config/documentation-contract.json"
+        "file:scripts/check_surface_coverage.py"
       ]
     },
     {
       "id": "CCA-02",
       "plan": "claude-code-adoption-2026-09",
       "title": "Rewrite root CLAUDE.md (≤ 200 lines) and nested website/CLAUDE.md",
-      "status": "planned",
+      "status": "done",
       "gate": "Root guidance under 16 KiB with commands, compressed invariants, domain routing to path-scoped rules and the Claude Code tooling block; the surface-coverage and documentation contracts pass.",
-      "updated": "2026-09-11"
+      "updated": "2026-09-11",
+      "evidence": [
+        "commit:86260ce15275",
+        "file:.claude/rules/claude-tooling.md",
+        "file:CLAUDE.md",
+        "file:website/CLAUDE.md"
+      ]
     },
     {
       "id": "CCA-03",
@@ -3510,9 +3517,12 @@
       "gate": "PreToolUse Bash hook runs scripts/hooks/precommit_gate.sh unchanged; test_claude_hook_contract.py pins the wiring and the receipt/branch behaviour.",
       "updated": "2026-09-11",
       "evidence": [
+        "commit:152273a4f8a9",
+        "commit:462ca1f94fff",
         "file:.claude/settings.json",
         "file:scripts/tests/test_claude_hook_contract.py"
-      ]
+      ],
+      "notes": "The hook environment lacks the plugin bin PATH entries the tool shell has; the receipt fingerprint now binds resolved tool identities only (local-v3)."
     },
     {
       "id": "CCA-04",
@@ -3522,6 +3532,8 @@
       "gate": "check_project_inputs.sh validates hook wiring, deny-list shape, skill/subagent frontmatter, rule path scopes and the absence of Simulator destinations under .claude/.",
       "updated": "2026-09-11",
       "evidence": [
+        "commit:152273a4f8a9",
+        "commit:462ca1f94fff",
         "file:scripts/claude_config_contract.py",
         "file:scripts/tests/test_claude_config_contract.py"
       ]
@@ -3534,65 +3546,110 @@
       "gate": "codex_session_storage.py, its policy, test and hook config are removed from the tree and every registry; the runbook is pinned historical.",
       "updated": "2026-09-11",
       "evidence": [
-        "file:config/evidence-impact.json",
-        "doc:docs/reference/codex-session-storage.md"
+        "commit:152273a4f8a9",
+        "doc:docs/reference/codex-session-storage.md",
+        "file:config/evidence-impact.json"
       ]
     },
     {
       "id": "CCA-06",
       "plan": "claude-code-adoption-2026-09",
       "title": "Project skills for checkpoint, device lanes, docs refresh, roadmap checkpoint and release evidence",
-      "status": "planned",
+      "status": "done",
       "gate": "Skills under .claude/skills route to existing scripts and docs; device, model and release lanes are user-invoked only (disable-model-invocation).",
-      "updated": "2026-09-11"
+      "updated": "2026-09-11",
+      "evidence": [
+        "commit:86260ce15275",
+        "file:.claude/skills/checkpoint/SKILL.md",
+        "file:.claude/skills/ios-lane/SKILL.md",
+        "file:.claude/skills/release-evidence/SKILL.md"
+      ]
     },
     {
       "id": "CCA-07",
       "plan": "claude-code-adoption-2026-09",
       "title": "Project subagents for gate summarisation, xcresult triage, doc governance and Swift review",
-      "status": "planned",
+      "status": "done",
       "gate": "Agents under .claude/agents declare explicit tool allowlists and pass claude_config_contract.py; policy and generated-file guard hooks are wired and tested.",
-      "updated": "2026-09-11"
+      "updated": "2026-09-11",
+      "evidence": [
+        "commit:462ca1f94fff",
+        "commit:86260ce15275",
+        "file:.claude/agents/gate-runner.md",
+        "file:.claude/agents/xcresult-triage.md",
+        "file:scripts/hooks/generated_file_guard.sh",
+        "file:scripts/hooks/policy_guard.sh",
+        "file:scripts/tests/test_claude_hooks.py"
+      ]
     },
     {
       "id": "CCA-08",
       "plan": "claude-code-adoption-2026-09",
       "title": "Update testing, development-workflow and self-verification docs for Claude Code routes",
-      "status": "planned",
+      "status": "done",
       "gate": "testing-runbook.md maps each lane to its skill and triage agent; development-workflow.md describes the .claude hook; repository-self-verification.md describes the validated configuration.",
-      "updated": "2026-09-11"
+      "updated": "2026-09-11",
+      "evidence": [
+        "commit:152273a4f8a9",
+        "commit:462ca1f94fff",
+        "doc:docs/reference/development-workflow.md",
+        "doc:docs/reference/repository-self-verification.md",
+        "doc:docs/reference/testing-runbook.md#claude-code-routes"
+      ]
     },
     {
       "id": "CCA-09",
       "plan": "claude-code-adoption-2026-09",
       "title": "Structured test-results.json and .xcresult for the macOS unit lane",
-      "status": "planned",
+      "status": "done",
       "gate": "macos_test.sh full runs produce per-bundle .xcresult and schemaVersion-1 summaries; old and new paths agree over three runs; TSan and core-test --only keep xcrun xctest.",
-      "updated": "2026-09-11"
+      "updated": "2026-09-11",
+      "evidence": [
+        "commit:08ce0e634474",
+        "doc:docs/reference/macos-testing.md#ordinary-development",
+        "file:scripts/lib/xctest_summary.py",
+        "file:scripts/tests/test_xctest_summary.py"
+      ],
+      "notes": "Disposition: keep the direct xcrun xctest runner. Exercised 2026-09-11 with bounded xcodebuild test-without-building trials on the same xctestrun: one class (14 tests) passed in 4 s, but the full bundles (645 tests) took 95 s and failed 2 tests that pass under the direct runner every checkpoint (CLIExecutionTests.testRealSignalsReachNativeSupervisorAndAwaitCleanup 31.4 s, PreparedVoiceRepositoryTests.testTwoNativeProcessesExcludePreparationReplacementAndDeletion 45.2 s: real native subprocess signal and cross-process repository boundaries time out under the xcodebuild test host). A route that changes verdicts at real producer/consumer boundaries is not a replacement. Structured per-bundle test-results.json (scripts/lib/xctest_summary.py, shared with the XCUITest lanes) closes the plain-log gap; no .xcresult for this lane."
     },
     {
       "id": "CCA-10",
       "plan": "claude-code-adoption-2026-09",
       "title": "Code coverage export for VocelloCoreTests and Qwen3RuntimeTests",
-      "status": "planned",
+      "status": "done",
       "gate": "coverage.json and the SwiftPM codecov export land in the run directory with a non-blocking verdict line; verdicts are unchanged by instrumentation.",
-      "updated": "2026-09-11"
+      "updated": "2026-09-11",
+      "evidence": [
+        "commit:08ce0e634474",
+        "doc:docs/reference/macos-testing.md#ordinary-development"
+      ],
+      "notes": "Opt-in scripts/macos_test.sh test --coverage; llvm-cov over the directly run bundles plus the SwiftPM codecov export; non-blocking verdict line, no threshold."
     },
     {
       "id": "CCA-11",
       "plan": "claude-code-adoption-2026-09",
       "title": "Consolidate the Python test roots and record closure of the omitted-tests finding",
-      "status": "planned",
+      "status": "done",
       "gate": "scripts/test_*.py modules live under scripts/tests; single-root discovery reports the same total; python_test_contract.py counts are recorded as evidence.",
-      "updated": "2026-09-11"
+      "updated": "2026-09-11",
+      "evidence": [
+        "commit:a15354d7316f",
+        "file:scripts/python_test_contract.py"
+      ],
+      "notes": "The 2026-08-21 omitted-tests finding was already closed: python_test_contract.py validate reports every module and full discovery runs them all; counts recorded in the narrative checkpoint. Measured after consolidation: Python test contract: PASS (130 modules, 1736 declared tests); single-root discovery 'Ran 1736 tests in 302.029s'."
     },
     {
       "id": "CCA-12",
       "plan": "claude-code-adoption-2026-09",
       "title": "Roadmap and progress checkpoint for the adoption track",
-      "status": "planned",
+      "status": "done",
       "gate": "Every CCA item cites commit evidence on main; development-progress.md names the adoption track and the product critical path.",
-      "updated": "2026-09-11"
+      "updated": "2026-09-11",
+      "evidence": [
+        "commit:152273a4f8a9",
+        "commit:a15354d7316f",
+        "doc:docs/development-progress.md#claude-code-adoption-september-11"
+      ]
     }
   ]
 }

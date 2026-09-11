@@ -15,6 +15,42 @@ This is a narrative, not a second work ledger. Product source, contracts and scr
 
 ## Resume now
 
+### Claude Code adoption (September 11)
+
+Claude Code replaced Codex as the development environment in six checkpointed commits on `main`
+(roadmap plan `claude-code-adoption-2026-09`, CCA-01 to CCA-12, all done and the plan complete). `AGENTS.md` became a
+177-line `CLAUDE.md`; the five domain rules moved to path-scoped `.claude/rules/` with a new
+always-loaded `claude-tooling.md`; the nested website guidance became `website/CLAUDE.md`. Every gate that
+named the old files was rewired in the same commit, the Codex hook config and session-storage tooling
+were retired (runbook pinned historical), and `scripts/claude_config_contract.py` now validates the
+repository-owned configuration inside the project gate. `.claude/settings.json` wires the unchanged
+commit gate plus `policy_guard.sh` (Simulator destinations, whole-cache deletion, force pushes, new
+branches, `project.pbxproj` writes, unacknowledged gate skips), `generated_file_guard.sh` (generated
+and frozen files, pinned bodies ask first), a `project.yml` regeneration reminder and a session-start
+ritual; `scripts/dev.sh status` reports branch, verification class, receipt state and primary plan.
+Seven project skills and four read-mostly subagents route to the existing scripts and documents;
+device, model and release lanes stay user-invoked only.
+
+Two harness findings were recorded with evidence rather than assumed. The checkpoint receipt no longer
+binds PATH membership (`local-v3`): the hook environment lacks the plugin `bin` entries the tool shell
+appends, which made a fresh receipt read as stale. For CCA-09 the direct `xcrun xctest` runner stays:
+bounded `xcodebuild test-without-building` trials on the same xctestrun passed one class in 4 s but
+took 95 s for the full bundles and failed two tests that pass under the direct runner on every
+checkpoint (`CLIExecutionTests.testRealSignalsReachNativeSupervisorAndAwaitCleanup` at 31.4 s and
+`PreparedVoiceRepositoryTests.testTwoNativeProcessesExcludePreparationReplacementAndDeletion` at
+45.2 s, both real native-process boundaries timing out under the xcodebuild test host). The lane now
+writes `core`, `transport` and `runtime` `test-results.json` summaries through the shared
+`scripts/lib/xctest_summary.py`, and `scripts/macos_test.sh test --coverage` is an opt-in,
+non-blocking llvm-cov export. The Python test roots are one root (`scripts/tests/`); the
+2026-08-21 omitted-tests finding was already closed, and full discovery runs every module (130 modules, 1736 declared tests; discovery ran 1736 tests in 302.029s).
+
+Follow-ups scheduled, not started: TSan characterization before its 2026-09-30 deadline
+(`config/tsan-policy.json`, one of three consecutive passes recorded) with `axiom:concurrency-auditor`
+first; an `axiom:iap-auditor` pass over the iOS export unlock before RF-13; an
+`axiom:accessibility-auditor` pass for ISU-4; the optional `swift-lsp` build-server setup. Product
+critical path is unchanged: ISU-4 localization qualification and RF-13 remain next; the adoption track
+is closed.
+
 ### September 10 bounded Settings scrolling correction
 
 App-language run `ios-xcui-localization-20260910-165027-fa2f0c10` passed its English/French

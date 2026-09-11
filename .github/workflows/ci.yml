@@ -97,17 +97,21 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Install pinned numpy
+      - name: Install pinned numpy, pytest and ripgrep
         run: |
           set -euo pipefail
           NUMPY_PIN="$(python3 -c "import json; print(json.load(open('config/toolchain.json'))['native']['numpy']['version'])")"
-          python3 -m pip install --quiet --break-system-packages "numpy==${NUMPY_PIN}"
+          PYTEST_PIN="$(python3 -c "import json; print(json.load(open('config/toolchain.json'))['native']['pytest']['version'])")"
+          XDIST_PIN="$(python3 -c "import json; print(json.load(open('config/toolchain.json'))['native']['pytest-xdist']['version'])")"
+          python3 -m pip install --quiet --break-system-packages "numpy==${NUMPY_PIN}" "pytest==${PYTEST_PIN}" "pytest-xdist==${XDIST_PIN}"
           sudo apt-get install -y --no-install-recommends ripgrep
 
-      - name: Run the Python suite
-        run: |
-          set -euo pipefail
-          python3 -m unittest discover -s scripts/tests -p 'test_*.py'
+      - name: Product and tooling tests
+        run: python3 -m pytest -n auto -m "not research and not darwin_only"
+
+      - name: Research tooling tests
+        if: needs.changes.outputs.research == 'true' || needs.changes.outputs.workflows == 'true'
+        run: python3 -m pytest -n auto -m research
 
   macos-tests:
     name: macOS deterministic tests
@@ -150,8 +154,8 @@ jobs:
       - name: Regenerate Xcode project
         run: ./scripts/regenerate_project.sh --fast
 
-      - name: Check project inputs
-        run: ./scripts/check_project_inputs.sh
+      - name: Check project inputs (darwin-only Python modules)
+        run: ./scripts/check_project_inputs.sh --python darwin-only
 
       - name: Run deterministic macOS tests
         run: scripts/macos_test.sh test

@@ -25,8 +25,10 @@ runs:
         # artifacts (mixed runner image pools make brew's formula index
         # nondeterministic mid-roll); numpy pip-pins to the manifest version.
         NUMPY_PIN="$(python3 -c "import json; print(json.load(open('config/toolchain.json'))['native']['numpy']['version'])")"
-        python3 -m pip install --quiet --break-system-packages "numpy==${NUMPY_PIN}" \
-          || python3 -m pip install --quiet "numpy==${NUMPY_PIN}"
+        PYTEST_PIN="$(python3 -c "import json; print(json.load(open('config/toolchain.json'))['native']['pytest']['version'])")"
+        XDIST_PIN="$(python3 -c "import json; print(json.load(open('config/toolchain.json'))['native']['pytest-xdist']['version'])")"
+        python3 -m pip install --quiet --break-system-packages "numpy==${NUMPY_PIN}" "pytest==${PYTEST_PIN}" "pytest-xdist==${XDIST_PIN}" \
+          || python3 -m pip install --quiet "numpy==${NUMPY_PIN}" "pytest==${PYTEST_PIN}" "pytest-xdist==${XDIST_PIN}"
         ./scripts/install_pinned_tools.sh
         echo "$HOME/.qwenvoice-pinned-tools/bin" >> "$GITHUB_PATH"
         export PATH="$HOME/.qwenvoice-pinned-tools/bin:$PATH"

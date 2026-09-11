@@ -54,17 +54,17 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Install pinned numpy and ripgrep
+      - name: Install pinned numpy, pytest and ripgrep
         run: |
           set -euo pipefail
           NUMPY_PIN="$(python3 -c "import json; print(json.load(open('config/toolchain.json'))['native']['numpy']['version'])")"
-          python3 -m pip install --quiet --break-system-packages "numpy==${NUMPY_PIN}"
+          PYTEST_PIN="$(python3 -c "import json; print(json.load(open('config/toolchain.json'))['native']['pytest']['version'])")"
+          XDIST_PIN="$(python3 -c "import json; print(json.load(open('config/toolchain.json'))['native']['pytest-xdist']['version'])")"
+          python3 -m pip install --quiet --break-system-packages "numpy==${NUMPY_PIN}" "pytest==${PYTEST_PIN}" "pytest-xdist==${XDIST_PIN}"
           sudo apt-get install -y --no-install-recommends ripgrep
 
       - name: Run the complete Python suite
-        run: |
-          set -euo pipefail
-          python3 -m unittest discover -s scripts/tests -p 'test_*.py'
+        run: python3 -m pytest -n auto
 
   foundation-cold:
     name: Cold foundation compile (macOS + iOS)

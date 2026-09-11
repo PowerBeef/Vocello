@@ -222,7 +222,7 @@ needs no model, phone or UI:
 | `check_delivery_instructions.py`, `audio_cadence_qc.py`, `delivery_experiment.py`, `delivery_evaluator.py`, `prosody_holdout_validation.py`, `check_convergence_promotion_gate.py` | text-level delivery and research contracts |
 | `roadmap.py` | work authority schema, blockers and a fresh render |
 | `repo_invariants.sh`, `privacy_scan.py` | exact greps for product invariants; no private path or credential in tracked files |
-| the Python suite | `scripts/tests/`, complete in CI, selected by the dirty tree locally |
+| the Python suite | `scripts/tests/` under pytest with `-n auto`; lanes by marker (`research`, `darwin_only`); complete in CI across the Linux job and the macOS gate, selected by the dirty tree locally |
 
 
 ## Invariants (do not regress)

@@ -50,6 +50,22 @@
         "-c",
         "import numpy; print(numpy.__version__)"
       ]
+    },
+    "pytest": {
+      "version": "9.1.1",
+      "versionCommand": [
+        "python3",
+        "-c",
+        "import pytest; print(pytest.__version__)"
+      ]
+    },
+    "pytest-xdist": {
+      "version": "3.8.0",
+      "versionCommand": [
+        "python3",
+        "-c",
+        "import xdist; print(xdist.__version__)"
+      ]
     }
   },
   "artifactPins": {

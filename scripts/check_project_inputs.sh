@@ -2,8 +2,10 @@
 # Repository contract gate (T1 locally, T2 in CI): product and release contracts,
 # exact product-invariant greps, the privacy scan, and the Python suite.
 #
-#   ./scripts/check_project_inputs.sh          complete gate (CI, release, scripts/dev.sh ci)
-#   ./scripts/check_project_inputs.sh --local  same contracts; Python tests selected by the dirty tree
+#   ./scripts/check_project_inputs.sh                       complete gate (release, scripts/dev.sh ci)
+#   ./scripts/check_project_inputs.sh --local               same contracts; Python tests selected by the dirty tree
+#   ./scripts/check_project_inputs.sh --python darwin-only  same contracts; only the macOS-bound Python modules
+#                                                            (CI runs the rest on Linux)
 #
 # Every check here is deterministic and needs no model, phone or UI. Anything
 # that asserts the wording of another script or workflow does not belong here.
@@ -15,11 +17,14 @@ PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$PROJECT_DIR"
 
 LOCAL_MODE=0
-for arg in "$@"; do
-    case "$arg" in
-        --local) LOCAL_MODE=1 ;;
-        *) echo "usage: ./scripts/check_project_inputs.sh [--local]" >&2; exit 2 ;;
+PYTHON_LANE=all
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --local) LOCAL_MODE=1; PYTHON_LANE=selected ;;
+        --python) PYTHON_LANE="${2:-}"; shift ;;
+        *) echo "usage: ./scripts/check_project_inputs.sh [--local] [--python all|darwin-only|selected|none]" >&2; exit 2 ;;
     esac
+    shift
 done
 if [[ "$LOCAL_MODE" == 1 && -n "${CI:-}${GITHUB_ACTIONS:-}" ]]; then
     echo "error: local test selection is prohibited in CI" >&2
@@ -86,15 +91,20 @@ python3 "$SCRIPT_DIR/roadmap.py" render --check
 "$SCRIPT_DIR/repo_invariants.sh"
 python3 "$SCRIPT_DIR/privacy_scan.py"
 
-# Python suite: --local selects the modules the dirty tree affects; CI and
-# scripts/dev.sh ci run the complete suite once, here and nowhere else.
-if [[ "$LOCAL_MODE" == 1 ]]; then
-    python3 "$SCRIPT_DIR/development_workflow.py" py
-elif [[ "${QVOICE_GATES:-}" == "quick" && -z "${CI:-}${GITHUB_ACTIONS:-}" ]] \
-    && [[ -z "$(git -C "$PROJECT_DIR" status --porcelain -- scripts config 2>/dev/null)" ]]; then
-    echo "==> quick gate mode: scripts/config unchanged — skipping script self-tests" >&2
-else
-    (cd "$PROJECT_DIR" && python3 -m unittest discover -s scripts/tests -p 'test_*.py')
-fi
+# Python suite (pytest, parallel). selected: the modules the dirty tree affects;
+# darwin-only: the macOS-bound modules (push CI runs the rest on Linux); all: everything.
+case "$PYTHON_LANE" in
+    selected) python3 "$SCRIPT_DIR/development_workflow.py" py ;;
+    darwin-only) python3 -m pytest -n auto -m darwin_only ;;
+    none) echo "==> Python suite skipped by request" >&2 ;;
+    all)
+        if [[ "${QVOICE_GATES:-}" == "quick" && -z "${CI:-}${GITHUB_ACTIONS:-}" ]] \
+            && [[ -z "$(git -C "$PROJECT_DIR" status --porcelain -- scripts config 2>/dev/null)" ]]; then
+            echo "==> quick gate mode: scripts/config unchanged — skipping the Python suite" >&2
+        else
+            python3 -m pytest -n auto
+        fi ;;
+    *) echo "error: unknown --python lane: $PYTHON_LANE" >&2; exit 2 ;;
+esac
 
 echo "==> Project inputs are clean."

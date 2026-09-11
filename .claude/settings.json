@@ -80,7 +80,8 @@
       "Bash(python3 scripts/privacy_scan.py *)",
       "Bash(python3 scripts/ci/*)",
       "Bash(pytest *)",
-      "Bash(gh run *)"
+      "Bash(gh run *)",
+      "Bash(python3 -m pytest *)"
     ],
     "ask": [
       "Bash(scripts/ui_test.sh *)",

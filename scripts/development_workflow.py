@@ -68,10 +68,6 @@ def lanes_for(paths: list[str]) -> dict[str, bool]:
     return _load("scripts/ci/classify_changes.py").classify(paths)
 
 
-def _python_module(path: str) -> str:
-    return path[:-3].replace("/", ".")
-
-
 def python_test_selection(paths: list[str], *, root: Path | None = None) -> dict:
     """Reverse literal dependencies (imports, subprocess paths, config names), transitively.
 
@@ -107,12 +103,15 @@ def python_test_selection(paths: list[str], *, root: Path | None = None) -> dict
     return {"mode": "selected", "tests": sorted(selected), "reason": "transitive local test consumers"}
 
 
+PYTEST = ["python3", "-m", "pytest", "-n", "auto"]
+
+
 def python_test_commands(selection: dict) -> list[list[str]]:
     if selection["mode"] == "full":
-        return [["python3", "-m", "unittest", "discover", "-s", "scripts/tests", "-p", "test_*.py"]]
+        return [[*PYTEST]]
     if not selection["tests"]:
         return []
-    return [["python3", "-m", "unittest", *map(_python_module, selection["tests"])]]
+    return [[*PYTEST, *selection["tests"]]]
 
 
 def changed_swift_test_classes(paths: list[str]) -> list[str]:
@@ -234,8 +233,9 @@ def main(argv: list[str] | None = None) -> int:
     check.add_argument("--paths", nargs="+", help="plan for these paths instead of the dirty tree")
     sub.add_parser("lint", help="git diff --check, privacy scan, shellcheck on changed shell")
     sub.add_parser("contracts", help="product and repository contracts (check_project_inputs.sh --local)")
-    py = sub.add_parser("py", help="Python tests: --changed (default), --all, or explicit test modules")
+    py = sub.add_parser("py", help="Python tests: changed consumers (default), --all, --lane, or explicit modules")
     py.add_argument("--all", action="store_true")
+    py.add_argument("--lane", choices=("product", "research", "darwin"), help="product = not research and not darwin_only")
     py.add_argument("tests", nargs="*")
     test = sub.add_parser("test", help="macOS XCTest bundles: changed classes, --only, or --all")
     test.add_argument("--only", help="comma-separated XCTestCase classes")
@@ -276,8 +276,11 @@ def main(argv: list[str] | None = None) -> int:
         elif command == "py":
             if args.all:
                 run_commands(python_test_commands({"mode": "full", "tests": []}))
+            elif args.lane:
+                marker = {"product": "not research and not darwin_only", "research": "research", "darwin": "darwin_only"}[args.lane]
+                run_commands([[*PYTEST, "-m", marker]])
             elif args.tests:
-                run_commands([["python3", "-m", "unittest", *(_python_module(t) if t.endswith(".py") else t for t in args.tests)]])
+                run_commands([[*PYTEST, *args.tests]])
             else:
                 selection = python_test_selection(changed_paths())
                 print(f"==> Python tests: {selection['mode']} ({selection['reason']})", flush=True)

@@ -58,7 +58,10 @@ code. New/unreviewed resource documentation and license/NOTICE files remain cons
 Python selection walks literal import/helper/config references transitively and deliberately
 over-selects on shared basenames; an input without a known test consumer, or a change to shared
 tooling, runs the whole suite. Selection is local feedback, not a proof of complete dependency
-coverage; CI runs every test.
+coverage; CI runs every test. The runner is pytest with `pytest-xdist` (`-n auto`, pinned in
+`config/toolchain.json`); `scripts/tests/conftest.py` marks modules `research` (audio, delivery,
+prosody and device-analysis tooling, run when those paths change and nightly) and `darwin_only`
+(run inside the macOS gate). `--durations` prints the slowest tests on every run.
 
 `check_project_inputs.sh` without arguments is the full gate. `--local` selects local Python feedback
 and is rejected in CI. `repo_invariants.sh` holds the exact product-invariant greps, `privacy_scan.py`

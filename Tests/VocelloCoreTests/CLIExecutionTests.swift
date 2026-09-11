@@ -101,9 +101,8 @@ final class CLIExecutionTests: XCTestCase {
             let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
             try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
             defer { try? FileManager.default.removeItem(at: root) }
-            let child = Process()
-            child.executableURL = URL(fileURLWithPath: "/usr/bin/xcrun")
-            child.arguments = ["xctest", "-XCTest", "VocelloCoreTests.CLIExecutionTests/testNativeSignalWorker", Bundle(for: Self.self).bundleURL.path]
+            let child = try NativeHelperProcess.xctest(
+                running: "VocelloCoreTests.CLIExecutionTests/testNativeSignalWorker", in: Bundle(for: Self.self))
             var environment = ProcessInfo.processInfo.environment
             environment["VOCELLO_TEST_SIGNAL_ROOT"] = root.path
             child.environment = environment

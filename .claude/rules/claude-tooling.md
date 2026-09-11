@@ -24,7 +24,7 @@ scripts remain the gates, and this configuration only makes the scripted routes 
 | `.claude/rules/*.md` | by `paths:` frontmatter; this file always | Domain rules; each keeps the repository frontmatter (`status`, `owner`, `summary`, `sourceOfTruth`) so `scripts/doc_metadata.py` governs it like any other doc |
 | `website/CLAUDE.md` | when working under `website/` | Nested website guidance |
 | `.claude/settings.json` | always | Hooks and permission defaults (tracked) |
-| `.claude/settings.local.json` | always | Personal overrides (untracked, never validated) |
+| `settings.local.json` (untracked, under `.claude/`) | always | Personal overrides (untracked, never validated) |
 | `.claude/skills/<name>/SKILL.md` | on `/name` or when relevant | Procedures that route to existing scripts and docs |
 | `.claude/agents/<name>.md` | on delegation | Read-mostly subagents that keep long outputs out of the main context |
 | `.xcodebuildmcp/config.yaml` | by the XcodeBuildMCP server | Shared macOS and physical-device profiles; validated by `scripts/dev.sh assists` |
@@ -95,8 +95,11 @@ Every project agent declares an explicit tool allowlist and none uses worktree i
   Axiom's `xcui` and `simulator-tester` are Simulator-only and are not used.
 - **Built-ins**: `/code-review` before each checkpoint commit, `/simplify` on Swift-only diffs,
   `/security-review` on entitlement, plist or StoreKit changes.
-- **swift-lsp** (optional): needs `sourcekit-lsp` plus a build server for the `.xcodeproj`
-  (`buildServer.json`, untracked). Verify one definition lookup before relying on it; never a gate.
+- **swift-lsp** (optional): needs `sourcekit-lsp` plus `xcode-build-server` (Homebrew) configured
+  against the repository's persistent macOS cache, which already holds a full build and index:
+  `xcode-build-server config -project QwenVoice.xcodeproj -scheme QwenVoice --build_root "$PWD/build/cache/xcode/macos"`
+  writes the untracked `buildServer.json`. Xcode's default DerivedData has no build, so without
+  `--build_root` SourceKit reports missing modules. Verify one symbol lookup before relying on it; never a gate.
 
 ## What the contract checks
 

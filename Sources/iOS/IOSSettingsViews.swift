@@ -166,6 +166,7 @@ private struct IOSSettingsCompactToggleStyle: ToggleStyle {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityAddTraits(.isToggle)
     }
 }
 

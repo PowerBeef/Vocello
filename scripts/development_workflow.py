@@ -178,8 +178,7 @@ def python_test_selection(paths: list[str], *, root: Path | None = None) -> dict
 
 def python_test_commands(selection: dict) -> list[list[str]]:
     if selection["mode"] == "full":
-        return [["python3", "-m", "unittest", "discover", "-s", root, "-p", "test_*.py"]
-                for root in ("scripts", "scripts/tests")]
+        return [["python3", "-m", "unittest", "discover", "-s", "scripts/tests", "-p", "test_*.py"]]
     if not selection["tests"]:
         return []
     return [["python3", "-m", "unittest", *map(_python_module, selection["tests"])]]

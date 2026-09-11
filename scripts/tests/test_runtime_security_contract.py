@@ -27,7 +27,7 @@ class RuntimeSecurityContractTests(unittest.TestCase):
                 contract,
                 observed_unchecked_count=41,
                 observed_unsafe_count=9,
-                today=date(2026, 8, 29),
+                today=date(2026, 9, 11),
             ),
             [],
         )

@@ -462,6 +462,7 @@ private struct IOSSettingsDetailPage<Content: View>: View {
 /// Compact Settings hub using the existing tab shell and grouped destinations.
 struct SettingsScreen: View {
     @Environment(\.iosDockHeight) private var dockHeight
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(AppModel.self) private var appModel
     @EnvironmentObject private var modelManager: ModelManagerViewModel
     @Environment(\.openURL) private var openURL
@@ -591,8 +592,11 @@ struct SettingsScreen: View {
 
     private func appLanguageOption(_ identifier: String, name: String) -> some View {
         let selected = IOSAppLanguage.shared.selection == identifier
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 6))
+            : AnyLayout(HStackLayout())
         return Button { IOSAppLanguage.shared.select(identifier) } label: {
-            HStack {
+            layout {
                 Text(verbatim: name)
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: Theme.Spacing.sm)

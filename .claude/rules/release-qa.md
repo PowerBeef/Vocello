@@ -55,7 +55,7 @@ paths:
 - Claude Code configuration governance: `.claude/settings.json` (hooks, permissions), the project
   skills and subagents under `.claude/`, the `paths:` scoping of `.claude/rules/*.md`, and their validator
   `scripts/claude_config_contract.py` with `scripts/tests/test_claude_config_contract.py` and
-  `scripts/tests/test_claude_hook_contract.py`. Personal `.claude/settings.local.json` stays untracked.
+  `scripts/tests/test_claude_hook_contract.py`. Personal `settings.local.json` (untracked, under `.claude/`) stays untracked.
 - Release-candidate evidence, SBOM/checksum generation, immutable Actions pins, and repository
   security/governance files
 - Production-model-catalog reproducibility and activation gating. Backend owns artifact meaning and

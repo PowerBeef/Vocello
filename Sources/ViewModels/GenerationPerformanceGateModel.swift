@@ -9,10 +9,10 @@ import QwenVoiceNative
 /// windows (measured 158 ms/s hitch while generating with glass already
 /// off). This model republishes only the boolean *flips*: the shell now
 /// invalidates at generation start/stop instead of per event.
+@MainActor
 final class GenerationPerformanceGateModel: ObservableObject {
     @Published private(set) var isActive = false
 
-    @MainActor
     init(store: TTSEngineStore) {
         isActive = store.hasActiveGeneration || store.hasSustainedPerformanceActivity
         store.performanceActivityUpdates

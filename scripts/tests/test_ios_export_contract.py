@@ -25,11 +25,21 @@ class IOSExportContractTests(unittest.TestCase):
         policy = self.read("Sources/iOSSupport/Services/IOSExportAccessPolicy.swift")
         self.assertIn('static let productID = "' + product["productID"] + '"', policy)
         self.assertIn("TEST", product["localizations"][0]["displayName"])
-        import yaml
-        project = yaml.safe_load(self.read("project.yml"))
-        owners = [name for name, target in project["targets"].items()
-                  if any(isinstance(source, dict) and source.get("path") == "Tests/Fixtures/VocelloExports.storekit"
-                         for source in target.get("sources", []))]
+        # Dependency-free read of project.yml (CI runners carry no PyYAML): a target is a
+        # two-space-indented key under `targets:`; the fixture must appear under exactly one.
+        owners, current, in_targets = [], None, False
+        for line in self.read("project.yml").splitlines():
+            if line.startswith("targets:"):
+                in_targets = True
+                continue
+            if in_targets and line and not line[0].isspace() and line.rstrip().endswith(":"):
+                in_targets = False  # another top-level key
+            if not in_targets:
+                continue
+            if line.startswith("  ") and not line.startswith("   ") and line.rstrip().endswith(":"):
+                current = line.strip()[:-1]
+            elif "path: Tests/Fixtures/VocelloExports.storekit" in line and current:
+                owners.append(current)
         self.assertEqual(owners, ["VocelloiOSUITests"])
         for scheme in (ROOT / "QwenVoice.xcodeproj/xcshareddata/xcschemes").glob("*.xcscheme"):
             self.assertNotIn("VocelloExports.storekit", scheme.read_text())

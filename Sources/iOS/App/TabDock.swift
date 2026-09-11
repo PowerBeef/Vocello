@@ -46,6 +46,11 @@ struct TabDock: View {
             .padding(.top, 6)
             .padding(.bottom, 24)
         }
+        // Persistent chrome is capped at the first accessibility size (HIG tab-bar practice):
+        // an uncapped dock grew upward at AX-XXXL and swallowed the region where a Settings
+        // scroll gesture starts, which is why the App Language row was unreachable there.
+        // Content keeps scaling to AX5; only the dock stops growing.
+        .dynamicTypeSize(...DynamicTypeSize.accessibility1)
         .background(
             LinearGradient(
                 colors: [
@@ -147,6 +152,7 @@ private struct TabDockButton: View {
     private var tabIcon: some View {
         Image(systemName: tab.systemImage)
             .font(.system(size: 22, weight: .semibold))
+            .accessibilityHidden(true)
     }
 
     private var tabTitle: some View {

@@ -128,7 +128,8 @@ class DevelopmentWorkflowTests(unittest.TestCase):
     def test_routing_changes_select_full_python_discovery(self):
         selection = MODULE.python_test_selection(["config/evidence-impact.json"])
         self.assertEqual(selection["mode"], "full")
-        self.assertEqual(len(MODULE.python_test_commands(selection)), 2)
+        # One test root since 2026-09-11: full mode is a single discovery over scripts/tests.
+        self.assertEqual(len(MODULE.python_test_commands(selection)), 1)
 
     def test_reverse_dependency_selection_and_unknown_fallback(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -51,6 +51,20 @@ first; an `axiom:iap-auditor` pass over the iOS export unlock before RF-13; an
 critical path is unchanged: ISU-4 localization qualification and RF-13 remain next; the adoption track
 is closed.
 
+Later the same day the follow-up audits ran through Axiom and the first two CI runs after the push were
+repaired (a gitignored path quoted in prose, and a PyYAML import the runner cannot satisfy; main had been
+red since the previous day). The StoreKit audit found the export unlock clean against every invariant
+(one low note on generic error copy). The concurrency audit found no unregistered unsafe declaration and no
+confirmed race; the registry text for the engine service host now describes the per-method MainActor
+discipline the code really uses, the performance gate model is class-isolated (F-24), and the unchecked
+Sendable budget sits at its ceiling. The TSan lane failure was not a race: the two subprocess tests
+launched their helper through `xcrun`, which strips the sanitizer insertion, so the child aborted and the
+bundle later crashed on an unguarded index (AV-12). The accessibility audit named a credible root cause for
+ISU-4: the tab dock had no Dynamic Type ceiling and grew into the scroll-gesture zone at AX-XXXL; the dock
+is now capped at the first accessibility size, the compact toggles regain the switch role, the tab icon is
+hidden from VoiceOver and the App Language rows adapt their layout (ISU-5, source landed; the physical
+English/French AX-XXXL and pseudo-localization walks remain the explicit qualification step).
+
 ### September 10 bounded Settings scrolling correction
 
 App-language run `ios-xcui-localization-20260910-165027-fa2f0c10` passed its English/French

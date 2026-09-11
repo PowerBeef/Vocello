@@ -157,7 +157,7 @@ policy and generated-file guards block Simulator destinations, whole-cache delet
 branches, direct `project.pbxproj` writes and hand edits of generated files. Hooks only check; they never
 build. Run long checks through `scripts/dev.sh checkpoint`. `QVOICE_SKIP_COMMIT_GATE=1` skips validation
 once and only on an explicit user instruction; it never bypasses `main` or CI. Personal overrides live in
-the untracked `.claude/settings.local.json`.
+the untracked `settings.local.json` (untracked, under `.claude/`).
 
 ## Explicit frontend acceptance
 

@@ -48,9 +48,8 @@ final class PreparedVoiceRepositoryTests: XCTestCase {
         for phase in ["prepare", "replace", "delete"] {
             let shared = root.appendingPathComponent(phase)
             try FileManager.default.createDirectory(at: shared, withIntermediateDirectories: true)
-            let child = Process()
-            child.executableURL = URL(fileURLWithPath: "/usr/bin/xcrun")
-            child.arguments = ["xctest", "-XCTest", "VocelloCoreTests.PreparedVoiceRepositoryTests/testNativeStoreWorker", Bundle(for: Self.self).bundleURL.path]
+            let child = try NativeHelperProcess.xctest(
+                running: "VocelloCoreTests.PreparedVoiceRepositoryTests/testNativeStoreWorker", in: Bundle(for: Self.self))
             var environment = ProcessInfo.processInfo.environment
             environment["VOCELLO_TEST_STORE_ROOT"] = shared.path
             environment["VOCELLO_TEST_STORE_PHASE"] = phase
@@ -77,7 +76,7 @@ final class PreparedVoiceRepositoryTests: XCTestCase {
             let voices = try await competing.list()
             XCTAssertEqual(voices.map(\.id), phase == "replace" ? ["Same"] : [])
             if phase == "replace" {
-                XCTAssertEqual(try Data(contentsOf: voices[0].audioURL), Data([1, 2, 3]))
+                XCTAssertEqual(try Data(contentsOf: XCTUnwrap(voices.first).audioURL), Data([1, 2, 3]))
                 XCTAssertEqual(try String(contentsOf: shared.appendingPathComponent("voices/Same.txt"), encoding: .utf8), "new")
             }
         }

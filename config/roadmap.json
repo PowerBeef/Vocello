@@ -3650,6 +3650,60 @@
         "commit:a15354d7316f",
         "doc:docs/development-progress.md#claude-code-adoption-september-11"
       ]
+    },
+    {
+      "id": "AV-12",
+      "plan": "autonomous-validation-remediation-2026-08",
+      "title": "TSan lane: launch helper xctest processes with the sanitizer preloaded and guard the two-process assertions",
+      "status": "done",
+      "updated": "2026-09-11",
+      "gate": "scripts/macos_test.sh tsan runs both subsets to completion with zero ThreadSanitizer reports; the scheduled tsan.yml run passes.",
+      "notes": "Diagnosed 2026-09-11: the CLI signal and prepared-voice two-process tests spawned their helper through /usr/bin/xcrun, which strips DYLD_INSERT_LIBRARIES; the instrumented child aborted in VerifyInterceptorsWorking, the parent timed out, and an unguarded voices[0] then crashed the bundle (SIGTRAP), so only 447 of 626 core cases ran. The scheduled lane had failed on 2026-09-02 and 2026-09-09 for the same reason. No data race was reported.",
+      "evidence": [
+        "file:Tests/VocelloCoreTests/NativeHelperProcessSupport.swift",
+        "file:Tests/VocelloCoreTests/CLIExecutionTests.swift",
+        "file:Tests/VocelloCoreTests/PreparedVoiceRepositoryTests.swift"
+      ],
+      "sourceOfTruth": [
+        "scripts/macos_test.sh",
+        "config/tsan-policy.json"
+      ]
+    },
+    {
+      "id": "ISU-5",
+      "plan": "ios-settings-2026-08",
+      "title": "AX-XXXL reachability: cap the tab dock's Dynamic Type growth, restore the switch role and adapt the App Language rows",
+      "status": "in-flight",
+      "updated": "2026-09-11",
+      "gate": "Physical iPhone English/French AX-XXXL and pseudo-localization Settings walks reach and mutate App Language with the existing identifiers; VoiceOver announces the accessibility toggles as switches; no new identifiers or copy.",
+      "notes": "Source fix landed 2026-09-11 from the accessibility audit: the persistent dock had no Dynamic Type ceiling and grew upward at AX-XXXL into the region a Settings scroll gesture starts in (the two earlier test-layer swipe experiments treated the symptom). Also: compact toggle style lost the switch trait, the tab icon was announced twice, and the App Language rows kept a horizontal layout at accessibility sizes. Physical qualification is a separate explicit lane (scripts/ui_test.sh ios localization).",
+      "evidence": [
+        "file:Sources/iOS/App/TabDock.swift",
+        "file:Sources/iOS/IOSSettingsViews.swift",
+        "file:Sources/iOS/Settings/SettingsScreen.swift"
+      ],
+      "sourceOfTruth": [
+        "Sources/iOS/App/TabDock.swift",
+        "Sources/iOS/Settings/SettingsScreen.swift",
+        "scripts/ui_test.sh"
+      ]
+    },
+    {
+      "id": "F-24",
+      "plan": "engineering-review-remediation-2026-08",
+      "title": "Concurrency registry accuracy and class-level MainActor isolation for the performance gate model",
+      "status": "done",
+      "updated": "2026-09-11",
+      "gate": "config/concurrency-safety.json describes the mechanism the code actually uses for EngineServiceHost; GenerationPerformanceGateModel is isolated at the class level; runtime_security_contract.py passes with the budget unchanged (41/41 unchecked Sendable, 7/9 nonisolated(unsafe)).",
+      "notes": "From the 2026-09-11 concurrency audit: no unregistered unsafe declaration and no confirmed race; the engine-service-host entry claimed an actor that does not exist (the class relies on per-method @MainActor annotations), and the gate model isolated only its initializer. The @unchecked Sendable budget has zero headroom; raising it is a deliberate maintainer decision, not a side effect.",
+      "evidence": [
+        "file:config/concurrency-safety.json",
+        "file:Sources/ViewModels/GenerationPerformanceGateModel.swift"
+      ],
+      "sourceOfTruth": [
+        "config/concurrency-safety.json",
+        "Sources/QwenVoiceEngineService/EngineServiceHost.swift"
+      ]
     }
   ]
 }

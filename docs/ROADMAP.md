@@ -14,13 +14,13 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
 | `release-first-3-0-2026-09` | active | release-qa | 5/13 (38%) |
-| `autonomous-validation-remediation-2026-08` | active | release-qa | 8/11 (73%) |
+| `autonomous-validation-remediation-2026-08` | active | release-qa | 9/12 (75%) |
 | `delivery-prompting-2026-08` | active | backend-mlx | 29/34 (85%) |
-| `engineering-review-remediation-2026-08` | active | backend-and-platform | 11/23 (48%) |
+| `engineering-review-remediation-2026-08` | active | backend-and-platform | 12/24 (50%) |
 | `ios-app-store-readiness-2026-08` | active | release-qa | 2/12 (17%) |
 | `ios-control-audit-2026-08` | active | ios | 15/19 (79%) |
 | `ios-generation-startup-reliability-2026-08` | active | backend-and-platform | 4/6 (67%) |
-| `ios-settings-2026-08` | active | ios | 3/4 (75%) |
+| `ios-settings-2026-08` | active | ios | 3/5 (60%) |
 | `voice-identity-language-reliability-2026-08` | active | backend-and-platform | 9/10 (90%) |
 | `claude-code-adoption-2026-09` | complete | release-qa | 12/12 (100%) |
 | `compliance-2026-08` | complete | release-qa | 2/2 (100%) |
@@ -103,6 +103,7 @@ Narrative authority: [`docs/reference/autonomous-validation-audit-2026-08-21.md`
 | `AV-09` | in-flight | P2 — make stateful physical-device lanes independently repeatable | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md`, `doc:docs/development-progress.md#september-6-phase-4-chinese-cadence-diagnostic` |
 | `AV-10` | done | P3 — add deterministic real-browser website smoke | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md` |
 | `AV-11` | done | P3 — make marking-equality resource hygiene enforceable | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md`, `file:scripts/check_marking_peak_equality.py`, `file:scripts/tests/test_check_marking_peak_equality.py` |
+| `AV-12` | done | TSan lane: launch helper xctest processes with the sanitizer preloaded and guard the two-process assertions | `file:Tests/VocelloCoreTests/NativeHelperProcessSupport.swift`, `file:Tests/VocelloCoreTests/CLIExecutionTests.swift`, `file:Tests/VocelloCoreTests/PreparedVoiceRepositoryTests.swift` |
 
 ### Open items in detail
 
@@ -210,6 +211,7 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
 | `F-21` | in-flight | P1 — restore CLI batch admission and preserve partial outcomes | `file:Tests/VocelloCoreTests/CLIExecutionTests.swift`, `file:Sources/VocelloCLI/BatchCommand.swift` |
 | `F-22` | in-flight | P1 risk — qualify shared Saved Voice transactions across app and CLI processes | `file:Tests/VocelloCoreTests/PreparedVoiceRepositoryTests.swift` |
 | `F-23` | in-flight | P2 — preserve explicit Play intent across live-to-file finalization | `file:Tests/VocelloCoreTests/AudioPlaybackResumePolicyTests.swift` |
+| `F-24` | done | Concurrency registry accuracy and class-level MainActor isolation for the performance gate model | `file:config/concurrency-safety.json`, `file:Sources/ViewModels/GenerationPerformanceGateModel.swift` |
 
 ### Open items in detail
 
@@ -387,11 +389,15 @@ Narrative authority: [`docs/reference/ios-ui-reference.md`](reference/ios-ui-ref
 | `ISU-2` | done | Compact visual alignment and physical-device accessibility acceptance | `file:Sources/iOS/IOSSettingsViews.swift`, `file:Tests/VocelloiOSUITests/VocelloiOSSmokeUITests.swift`, `doc:docs/development-progress.md`, `doc:docs/reference/ios-ui-reference.md` |
 | `ISU-3` | done | Make model status and lifecycle actions immediately discoverable | `file:Sources/iOS/IOSSettingsViews.swift`, `file:Sources/iOS/Settings/VoiceModelsScreen.swift`, `file:Tests/VocelloiOSUITests/VocelloiOSModelDownloadUITests.swift`, `file:scripts/tests/test_check_ios_smoke_acceptance.py`, `doc:docs/reference/ios-app-guide.md`, `doc:docs/reference/ios-ui-reference.md` |
 | `ISU-4` | in-flight | Refine Settings hub and shared purchase sheet; qualify the new navigation | `file:scripts/tests/test_check_ios_smoke_acceptance.py`, `file:scripts/tests/test_ios_export_contract.py`, `doc:docs/reference/ios-app-guide.md`, `doc:docs/reference/ios-ui-reference.md` |
+| `ISU-5` | in-flight | AX-XXXL reachability: cap the tab dock's Dynamic Type growth, restore the switch role and adapt the App Language rows | `file:Sources/iOS/App/TabDock.swift`, `file:Sources/iOS/IOSSettingsViews.swift`, `file:Sources/iOS/Settings/SettingsScreen.swift` |
 
 ### Open items in detail
 
 - **`ISU-4`** (in-flight) — Refine Settings hub and shared purchase sheet; qualify the new navigation.
   gate: Six-entry hub with compact localized title in three flat groups; five pushed detail pages retain every original setting, key, default, consent, model/folder route and tab dock. Shared purchase sheet uses live localized StoreKit price, full-width action, truthful states and explicit export retry without purchase-policy changes. Bilingual typed copy, source-bound navigation/control tests and deterministic checkpoint pass. Separate authorization precedes current-source physical English/French, Default/AX-L/AX-XXXL, VoiceOver/reduced-effects, navigation and local purchase acceptance; historical runs cannot substitute.
+
+- **`ISU-5`** (in-flight) — AX-XXXL reachability: cap the tab dock's Dynamic Type growth, restore the switch role and adapt the App Language rows.
+  gate: Physical iPhone English/French AX-XXXL and pseudo-localization Settings walks reach and mutate App Language with the existing identifiers; VoiceOver announces the accessibility toggles as switches; no new identifiers or copy.
 
 ## Clone identity, enrollment transcription, and French Voice Design reliability
 

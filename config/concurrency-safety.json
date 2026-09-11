@@ -151,9 +151,9 @@
         "RuntimeContext",
         "EngineServiceHost"
       ],
-      "owner": "EngineServiceHost actor and lock-protected request registries",
-      "invariant": "XPC callback boxes are single-resume and runtime access is serialized by the service actor.",
-      "reviewedAt": "2026-08-26",
+      "owner": "EngineServiceHost (a final class, not an actor): MainActor-annotated methods and lock-protected request registries",
+      "invariant": "XPC callback boxes are single-resume. Every access to runtimeContext/activeSession happens in a @MainActor method or after an explicit hop to MainActor; this is enforced by convention on each method, not by the type, which is why the class stays @unchecked Sendable.",
+      "reviewedAt": "2026-09-11",
       "removalCondition": "Remove unchecked types as XPC reply ownership and runtime context become expressible with checked Sendable values fully confined to the service actor.",
       "tests": [
         "Tests/VocelloEngineIntegrationTests/EngineServiceTransportAccumulatorTests.swift"

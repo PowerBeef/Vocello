@@ -1,7 +1,7 @@
 ---
 status: active
 owner: macos
-reviewed: 2026-09-02
+reviewed: 2026-09-11
 summary: macOS test lanes — deterministic development verification, the platform gate, model fixtures, explicit XCUITest smoke/benchmark/perf acceptance with the ui-perf baseline protocol (copy reports out between runs; discard-and-replace on concurrent use), and crash/profile evidence.
 sourceOfTruth:
   - scripts/macos_test.sh
@@ -32,6 +32,21 @@ scripts/macos_test.sh test
 These checks are sufficient to commit, push, open a pull request, merge ordinary development, and
 run ordinary CI. They do not require UI execution, installed generation models, or release
 evidence.
+
+`scripts/macos_test.sh test` writes each bundle's raw log plus a structured summary next to it
+(`core.test-results.json`, `transport.test-results.json`, `runtime.test-results.json`, produced by
+`scripts/lib/xctest_summary.py`, the same writer the XCUITest lanes use) and `verdict.txt` under
+`build/artifacts/macos/tests/<run>/`. The bundles run through the direct `xcrun xctest` runner on
+purpose: Xcode 26.6 can compile and then wait indefinitely before spawning `xctest` for these
+hostless bundles through `xcodebuild`, so no `.xcresult` is produced for this lane.
+
+`scripts/macos_test.sh test --coverage` is opt-in and non-blocking: it builds the bundles with
+`-enableCodeCoverage YES` (which flips the shared macOS cache and forces a rebuild, so it is never
+part of an ordinary checkpoint), runs them with `LLVM_PROFILE_FILE` under the run directory, and
+exports `coverage.json` (llvm-cov, summary only), `coverage-summary.txt` (line coverage per source
+root) and `coverage-runtime.json` (SwiftPM export for `Qwen3RuntimeTests`). The verdict gains a
+`coverage=` line; no threshold exists yet. A future floor belongs in a dedicated policy file named in
+the release-qa gate map, not in this lane.
 
 ## Scheduled ThreadSanitizer characterization
 

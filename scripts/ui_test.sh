@@ -496,25 +496,10 @@ mac_ui_preflight() {
 # Per-test verdict summary parsed from the xcodebuild log into a compact
 # sidecar next to run.json (run.json's schema stays untouched).
 write_test_summary() {
+  # One writer for every lane (scripts/lib/xctest_summary.py); the macOS unit lane
+  # uses the same module, so triage reads a single test-results.json shape.
   [[ -f "$out/xcodebuild.log" ]] || return 0
-  python3 - "$out/xcodebuild.log" "$out/test-results.json" <<'SUMMARY'
-import json, pathlib, re, sys
-
-log = pathlib.Path(sys.argv[1]).read_text(encoding="utf-8", errors="replace")
-pattern = re.compile(
-    r"Test Case '-\[[\w.]+ (\w+)\]' (passed|failed) \((\d+\.\d+) seconds\)"
-)
-results = [
-    {"test": m.group(1), "verdict": m.group(2), "seconds": float(m.group(3))}
-    for m in pattern.finditer(log)
-]
-payload = {"schemaVersion": 1, "tests": results}
-pathlib.Path(sys.argv[2]).write_text(
-    json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-)
-for r in results:
-    print(f"  {r['verdict']:>6}  {r['seconds']:8.1f}s  {r['test']}")
-SUMMARY
+  python3 "$ROOT_DIR/scripts/lib/xctest_summary.py" "$out/xcodebuild.log" "$out/test-results.json"
 }
 
 mac_crash_marker="$out/.mac-crash-marker"

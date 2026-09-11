@@ -13,7 +13,8 @@
 #   scripts/macos_test.sh tsan                      # scheduled core + injectable XPC transport TSan subset
 #   scripts/macos_test.sh lang-bench [--subset quick|full] [--label RUN_ID]
 #                                                 # headless macOS language-hint matrix (vocello CLI)
-#   scripts/macos_test.sh test                      # Core + XPC transport + Qwen3 runtime tests (no UI)
+#   scripts/macos_test.sh test [--coverage]         # Core + XPC transport + Qwen3 runtime tests (no UI)
+#                                                    # --coverage: llvm-cov line coverage (rebuilds instrumented; opt-in)
 #   scripts/macos_test.sh telemetry-overhead        # seeded PCM + RTF/TTFC (explicit, model-dependent)
 #   scripts/macos_test.sh crashes [--test]          # collect + xcsym-symbolicate .ips (app + XPC service)
 #   scripts/macos_test.sh debug                     # LLDB attach guidance (app + XPC service PID)
@@ -137,9 +138,14 @@ ensure_app() { [[ -d "$APP_BUNDLE" ]] || "$SCRIPT_DIR/build.sh" build; }
 # Xcode 26.6 can finish compilation and then wait indefinitely before spawning
 # `xctest` for hostless macOS bundles. Keep Xcode responsible for compilation,
 # then execute the built deterministic bundles directly through the native runner.
+# (Re-verified 2026-09-11 for CCA-09: `xcodebuild test-without-building` is not the
+# route; structured results come from scripts/lib/xctest_summary.py and coverage
+# from llvm-cov over the directly run bundles when --coverage is requested.)
 build_mac_test_bundles() {
   local log_path="$1"
   local tsan="${QWENVOICE_ENABLE_TSAN:-0}"
+  local coverage_setting="NO"
+  [[ "${QVOICE_COVERAGE:-0}" != "1" || "$tsan" == "1" ]] || coverage_setting="YES"
   [[ "$tsan" == "0" || "$tsan" == "1" ]] \
     || die "QWENVOICE_ENABLE_TSAN must be 0 or 1"
   local sanitizer_setting="NO"
@@ -169,6 +175,7 @@ build_mac_test_bundles() {
     -clonedSourcePackagesDirPath "$QVOICE_XCODE_SOURCE_PACKAGES" \
     -disableAutomaticPackageResolution -onlyUsePackageVersionsFromResolvedFile \
     -enableThreadSanitizer "$sanitizer_setting" \
+    -enableCodeCoverage "$coverage_setting" \
     ARCHS=arm64 ONLY_ACTIVE_ARCH=YES CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="-" \
     CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION=YES \
     QVOICE_INTERNAL_DIAGNOSTICS_SWIFT_FLAG=-DVOCELLO_INTERNAL_DIAGNOSTICS \
@@ -229,6 +236,69 @@ run_mac_test_bundle() {
   else
     DYLD_FRAMEWORK_PATH="$products" xcrun xctest "$bundle" > "$log_path" 2>&1
   fi
+}
+
+# Structured per-bundle summary next to the raw log: <log>.test-results.json.
+write_mac_test_summary() {
+  local log_path="$1"
+  [[ -f "$log_path" ]] || return 0
+  python3 "$SCRIPT_DIR/lib/xctest_summary.py" "$log_path" "${log_path%.log}.test-results.json" --quiet \
+    || warn "test summary inconsistent or unparsable for $log_path"
+}
+
+# Opt-in llvm-cov export for the directly run bundles. The build must have used
+# -enableCodeCoverage YES (QVOICE_COVERAGE=1); each bundle run sets LLVM_PROFILE_FILE
+# under <artifacts>/profraw. Writes coverage.json (llvm-cov export, summary only)
+# and coverage-summary.txt (per source root), and prints the total line coverage.
+write_mac_coverage() {
+  local artifacts="$1" products="$2"
+  local profdata="$artifacts/coverage.profdata"
+  local raw_count
+  raw_count="$(find "$artifacts/profraw" -name '*.profraw' 2>/dev/null | wc -l | tr -d ' ')"
+  if [[ "$raw_count" == "0" ]]; then
+    warn "coverage: no .profraw produced; was the build instrumented?"
+    return 1
+  fi
+  xcrun llvm-profdata merge -sparse "$artifacts"/profraw/*.profraw -o "$profdata" || return 1
+  local objects=()
+  local bundle
+  for bundle in VocelloCoreTests VocelloEngineIntegrationTests; do
+    [[ -x "$products/$bundle.xctest/Contents/MacOS/$bundle" ]] \
+      && objects+=(-object "$products/$bundle.xctest/Contents/MacOS/$bundle")
+  done
+  (( ${#objects[@]} > 0 )) || { warn "coverage: no instrumented test binaries found"; return 1; }
+  xcrun llvm-cov export -format=text -summary-only -instr-profile "$profdata" \
+    -ignore-filename-regex='(/Tests/|/\.build/|/SourcePackages/|/DerivedData/|/build/|/Packages/VocelloQwen3Core/Tests/)' \
+    "${objects[@]:1}" "${objects[1]}" > "$artifacts/coverage.json" 2>"$artifacts/coverage.err" || {
+      warn "coverage: llvm-cov export failed (see $artifacts/coverage.err)"; return 1; }
+  python3 - "$artifacts/coverage.json" "$artifacts/coverage-summary.txt" "$ROOT_DIR" <<'PY'
+import json, pathlib, sys
+data = json.loads(pathlib.Path(sys.argv[1]).read_text())
+root = sys.argv[3].rstrip("/") + "/"
+groups = {}
+total_covered = total_count = 0
+for item in data.get("data", []):
+    for f in item.get("files", []):
+        name = f["filename"]
+        if not name.startswith(root):
+            continue
+        rel = name[len(root):]
+        if rel.startswith("build/"):
+            continue  # SwiftPM checkouts and DerivedData are not repository sources
+        top = "/".join(rel.split("/")[:2]) if rel.startswith(("Sources/", "Packages/")) else rel.split("/")[0]
+        lines = f["summary"]["lines"]
+        g = groups.setdefault(top, [0, 0])
+        g[0] += lines["covered"]; g[1] += lines["count"]
+        total_covered += lines["covered"]; total_count += lines["count"]
+out = []
+for top, (cov, cnt) in sorted(groups.items()):
+    pct = (100.0 * cov / cnt) if cnt else 0.0
+    out.append(f"{pct:6.1f}%  {cov:7d}/{cnt:<7d}  {top}")
+pct = (100.0 * total_covered / total_count) if total_count else 0.0
+out.append(f"{pct:6.1f}%  {total_covered:7d}/{total_count:<7d}  TOTAL (lines, repository sources)")
+pathlib.Path(sys.argv[2]).write_text("\n".join(out) + "\n")
+print(f"coverage={pct:.1f}% lines ({total_covered}/{total_count})")
+PY
 }
 
 # Xcode embeds its universal ThreadSanitizer runtime in instrumented products even
@@ -769,6 +839,7 @@ cmd_core_test() {
   build_mac_test_bundles "$build_log" || build_st=$?
   if (( build_st == 0 )); then
     run_mac_test_bundle VocelloCoreTests "$test_log" 0 "$test_filter" || st=$?
+    write_mac_test_summary "$test_log"
   else
     st="$build_st"
   fi
@@ -801,7 +872,9 @@ cmd_tsan() {
   QWENVOICE_ENABLE_TSAN=1 build_mac_test_bundles "$artifacts/build.log" || build_st=$?
   if (( build_st == 0 )); then
     run_mac_test_bundle VocelloCoreTests "$artifacts/core.log" 1 || core_st=$?
+    write_mac_test_summary "$artifacts/core.log"
     run_mac_test_bundle VocelloEngineIntegrationTests "$artifacts/transport.log" 1 || transport_st=$?
+    write_mac_test_summary "$artifacts/transport.log"
   else
     core_st="$build_st"
     transport_st="$build_st"
@@ -953,21 +1026,41 @@ PY
 # test: deterministic Core, XPC transport, and owned Qwen3 runtime tests. No UI
 # process is launched and no frontend action is synthesized.
 cmd_test() {
+  local coverage=0
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --coverage) coverage=1; shift ;;
+      *) die "unknown test argument '$1' (try --coverage)" ;;
+    esac
+  done
   local run_id="mac-test-$(date +%Y%m%d-%H%M%S)"
   local artifacts="$QVOICE_ARTIFACTS_MACOS/tests/$run_id"
   mkdir -p "$artifacts"
-  local test_build_st=0 core_st=0 transport_st=0 runtime_st=0
+  local test_build_st=0 core_st=0 transport_st=0 runtime_st=0 coverage_st=0
+  local products="$QVOICE_XCODE_MACOS_DERIVED/Build/Products/Release"
 
+  if (( coverage )); then
+    note "test: coverage requested — instrumented build (opt-in; flips the shared cache, expect a rebuild)"
+    export QVOICE_COVERAGE=1
+    mkdir -p "$artifacts/profraw"
+  fi
   note "test: compile deterministic macOS test bundles"
   set +e
   build_mac_test_bundles "$artifacts/xcode-test-build.log" || test_build_st=$?
 
   if (( test_build_st == 0 )); then
     note "test: VocelloCoreTests"
-    run_mac_test_bundle VocelloCoreTests "$artifacts/core.log" || core_st=$?
+    LLVM_PROFILE_FILE="$artifacts/profraw/core-%p.profraw" \
+      run_mac_test_bundle VocelloCoreTests "$artifacts/core.log" || core_st=$?
+    write_mac_test_summary "$artifacts/core.log"
 
     note "test: VocelloEngineIntegrationTests (injectable XPC transport)"
-    run_mac_test_bundle VocelloEngineIntegrationTests "$artifacts/transport.log" || transport_st=$?
+    LLVM_PROFILE_FILE="$artifacts/profraw/transport-%p.profraw" \
+      run_mac_test_bundle VocelloEngineIntegrationTests "$artifacts/transport.log" || transport_st=$?
+    write_mac_test_summary "$artifacts/transport.log"
+    if (( coverage )); then
+      write_mac_coverage "$artifacts" "$products" || coverage_st=$?
+    fi
   else
     core_st="$test_build_st"
     transport_st="$test_build_st"
@@ -981,6 +1074,7 @@ cmd_test() {
       --scratch-path "$QVOICE_SWIFTPM_RUNTIME_CACHE" --configuration debug \
       --force-resolved-versions \
       --build-tests \
+      ${coverage:+--enable-code-coverage} \
       > "$artifacts/runtime-build.log" 2>&1; then
     local runtime_bin runtime_resources
     runtime_bin="$(swift build --package-path "$runtime_package" \
@@ -1003,8 +1097,22 @@ cmd_test() {
           --scratch-path "$QVOICE_SWIFTPM_RUNTIME_CACHE" --configuration debug \
           --force-resolved-versions \
           --skip-build \
+          ${coverage:+--enable-code-coverage} \
           --filter Qwen3RuntimeTests \
           > "$artifacts/runtime.log" 2>&1 || runtime_st=$?
+        write_mac_test_summary "$artifacts/runtime.log"
+        if (( coverage )); then
+          local codecov_path
+          codecov_path="$(swift test --package-path "$runtime_package" \
+            --scratch-path "$QVOICE_SWIFTPM_RUNTIME_CACHE" --configuration debug \
+            --force-resolved-versions --show-codecov-path 2>/dev/null || true)"
+          if [[ -n "$codecov_path" && -f "$codecov_path" ]]; then
+            cp "$codecov_path" "$artifacts/coverage-runtime.json"
+          else
+            warn "coverage: SwiftPM codecov export not found"
+            coverage_st=1
+          fi
+        fi
       else
         runtime_st=1
       fi
@@ -1028,6 +1136,14 @@ cmd_test() {
   printf 'test_build=%s\ncore=%s\ntransport=%s\nruntime=%s\n' \
     "$test_build_st" "$core_st" "$transport_st" "$runtime_st" \
     > "$artifacts/verdict.txt"
+  if (( coverage )); then
+    # Non-blocking in this pass: coverage is measured and retained, never a verdict input.
+    if (( coverage_st == 0 )) && [[ -f "$artifacts/coverage-summary.txt" ]]; then
+      tail -n 1 "$artifacts/coverage-summary.txt" | sed 's/^/coverage=/' >> "$artifacts/verdict.txt"
+    else
+      printf 'coverage=unavailable (status %s)\n' "$coverage_st" >> "$artifacts/verdict.txt"
+    fi
+  fi
   cat "$artifacts/verdict.txt" >&2
   if (( core_st == 0 && transport_st == 0 && runtime_st == 0 )); then
     note "test verdict: PASS · artifacts → $artifacts"

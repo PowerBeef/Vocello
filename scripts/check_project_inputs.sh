@@ -99,6 +99,8 @@ REQUIRED_SURFACES=(
     "scripts/tests/test_claude_config_contract.py"
     "scripts/tests/test_claude_hook_contract.py"
     "scripts/tests/test_claude_hooks.py"
+    "scripts/lib/xctest_summary.py"
+    "scripts/tests/test_xctest_summary.py"
     "scripts/hooks/policy_guard.sh"
     "scripts/hooks/generated_file_guard.sh"
     "scripts/hooks/project_yml_reminder.sh"

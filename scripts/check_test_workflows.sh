@@ -455,6 +455,10 @@ rg -q -- '-scheme VocelloiOSLogic' .github/workflows/ci.yml \
   || fail "ordinary CI must compile the standalone iOS logic-test bundle"
 rg -q -- 'scripts/macos_test.sh test' .github/workflows/ci.yml \
   || fail "ordinary CI must execute the host-runnable iOS policy assertions"
+rg -q -- 'xcrun xctest' scripts/macos_test.sh \
+  || fail "macOS deterministic bundles must keep the direct xctest runner (Xcode 26.6 hostless test-without-building hang)"
+rg -q -- 'lib/xctest_summary.py' scripts/macos_test.sh && rg -q -- 'lib/xctest_summary.py' scripts/ui_test.sh \
+  || fail "every native lane must write test-results.json through scripts/lib/xctest_summary.py"
 rg -q -- 'run_mac_test_bundle VocelloCoreTests' scripts/macos_test.sh \
   || fail "macOS deterministic tests must execute VocelloCoreTests"
 rg -q 'CODE_SIGNING_ALLOWED=NO' .github/workflows/ci.yml \

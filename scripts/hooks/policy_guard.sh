@@ -21,13 +21,18 @@
 
 set -euo pipefail
 
+# Heredoc bodies are data, not commands: a commit message or a generated file that
+# merely mentions a guarded pattern must not trip the guard. They are stripped
+# before matching; everything else in the command line is inspected verbatim.
 payload="$(cat 2>/dev/null || true)"
 command_text="$(printf '%s' "$payload" \
-  | python3 -c 'import json,sys
+  | python3 -c 'import json,re,sys
 try:
-    print(json.load(sys.stdin).get("tool_input", {}).get("command", ""))
+    text = json.load(sys.stdin).get("tool_input", {}).get("command", "")
 except Exception:
-    print("")' 2>/dev/null || true)"
+    text = ""
+text = re.sub(r"<<-?\s*[\x27\"]?([A-Za-z_][A-Za-z0-9_]*)[\x27\"]?[^\n]*\n.*?\n[ \t]*\1[ \t]*(?=\n|$)", "<<HEREDOC", text, flags=re.S)
+print(text)' 2>/dev/null || true)"
 
 [[ -n "$command_text" ]] || exit 0
 

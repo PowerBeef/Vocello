@@ -102,6 +102,14 @@ class PolicyGuardTests(unittest.TestCase):
         allowed = self.guard("QVOICE_SKIP_COMMIT_GATE_ACK=user QVOICE_SKIP_COMMIT_GATE=1 git com" "mit -m x")
         self.assertEqual(allowed.returncode, 0, allowed.stderr)
 
+    def test_heredoc_bodies_are_data_not_commands(self):
+        # A commit message or generated file may mention guarded patterns.
+        heredoc = ("git com" "mit -F - <<'EOF'\nExplain QVOICE_SKIP_COMMIT_GATE=1 and git push --force\n"
+                   f"and platform=iOS {SIM} in prose.\nEOF\n")
+        self.assertEqual(self.guard(heredoc).returncode, 0)
+        # But a real command after the heredoc is still inspected.
+        self.assertEqual(self.guard(heredoc + "git push --force").returncode, 2)
+
     def test_unparsable_payload_is_allowed(self):
         result = subprocess.run([str(HOOKS / "policy_guard.sh")], input="not json", text=True,
                                 capture_output=True, check=False, timeout=20)

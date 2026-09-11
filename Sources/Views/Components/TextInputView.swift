@@ -186,7 +186,7 @@ struct ScriptTextEditor: NSViewRepresentable {
     var accessibilityIdentifier: String = "textInput_textEditor"
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(self)
+        Coordinator(self, initialText: text)
     }
 
     func makeNSView(context: Context) -> NSScrollView {
@@ -249,9 +249,9 @@ struct ScriptTextEditor: NSViewRepresentable {
         var parent: ScriptTextEditor
         var textState: ScriptTextState
 
-        init(_ parent: ScriptTextEditor) {
+        init(_ parent: ScriptTextEditor, initialText: String) {
             self.parent = parent
-            textState = ScriptTextState(parent.text)
+            textState = ScriptTextState(initialText)
         }
 
         func textDidChange(_ notification: Notification) {

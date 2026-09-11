@@ -19,6 +19,9 @@ MATRIX_PATH="$ROOT_DIR/config/apple-platform-capability-matrix.json"
 # shellcheck source=lib/build_cache.sh
 . "$ROOT_DIR/scripts/lib/build_cache.sh"
 FOUNDATION_BUILD_ROOT="$QVOICE_ARTIFACTS_FOUNDATION"
+# QVOICE_FOUNDATION_SWIFT_OPTIMIZATION=-O compiles the macOS foundation target optimized (the
+# nightly lane uses it so -O-only warnings surface before a release build does).
+MACOS_OPTIMIZATION="${QVOICE_FOUNDATION_SWIFT_OPTIMIZATION:--Onone}"
 FOUNDATION_DERIVED_ROOT="$QVOICE_SCRATCH_FOUNDATION"
 SOURCE_PACKAGES_DIR="$QVOICE_XCODE_SOURCE_PACKAGES"
 
@@ -113,12 +116,12 @@ build_macos() {
     CODE_SIGN_STYLE=Manual \
     CODE_SIGN_IDENTITY="-" \
     CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION=YES \
-    SWIFT_OPTIMIZATION_LEVEL="-Onone" \
+    SWIFT_OPTIMIZATION_LEVEL="$MACOS_OPTIMIZATION" \
     SWIFT_COMPILATION_MODE="incremental" \
     build
   write_build_provenance "$FOUNDATION_BUILD_ROOT/last-build.json" \
     "scripts/build_foundation_targets.sh macos" QwenVoice Release \
-    "platform=macOS,arch=arm64" arm64 Onone ad-hoc \
+    "platform=macOS,arch=arm64" arm64 "${MACOS_OPTIMIZATION#-}" ad-hoc \
     "$derived_data_path" "$SOURCE_PACKAGES_DIR"
 }
 

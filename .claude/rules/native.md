@@ -117,6 +117,16 @@ Verification: `scripts/dev.sh test` (macOS unit, XPC and owned-runtime tests), `
 - **Device campaigns are source-bound.** Pause only between completed scenarios; never merge a prior
   failure with a later pass or resume across a source, build, device or plan identity change.
 
+## Build hygiene
+
+- **Warnings are errors** for every owned target (`SWIFT_TREAT_WARNINGS_AS_ERRORS` in `project.yml`); the
+  owned MLX package keeps its own settings. Fix the warning, do not silence it with a pragma.
+- **Flaky tests are quarantined, not deleted or retried.** List the test in `config/test-quarantine.json`
+  and call `try TestQuarantine.skipIfListed(self)`; push CI skips it, nightly still runs it, and the entry
+  expires after 30 days.
+- `scripts/dev.sh lint` runs the advisory SwiftLint rules in `.swiftlint.yml` on changed files when
+  SwiftLint is installed; formatting stays Xcode's.
+
 ## Common mistakes
 
 - Editing `project.pbxproj`; adding a generic `#if DEBUG` fork; touching the Simulator.

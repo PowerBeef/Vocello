@@ -64,7 +64,7 @@ enum GenerateCommand {
                 var count = 0
                 for await event in events {
                     switch event {
-                    case .chunk(let chunk):
+                    case .chunk:
                         if firstChunkMS == nil { firstChunkMS = Date().timeIntervalSince(submitWall) * 1000 }
                         count += 1
                     case .completed, .cancelled, .failed:

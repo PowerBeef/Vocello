@@ -107,10 +107,14 @@ jobs:
           sudo apt-get install -y --no-install-recommends ripgrep
 
       - name: Product and tooling tests
+        env:
+          VOCELLO_QUARANTINE: "1"
         run: python3 -m pytest -n auto -m "not research and not darwin_only"
 
       - name: Research tooling tests
         if: needs.changes.outputs.research == 'true' || needs.changes.outputs.workflows == 'true'
+        env:
+          VOCELLO_QUARANTINE: "1"
         run: python3 -m pytest -n auto -m research
 
   macos-tests:
@@ -155,9 +159,13 @@ jobs:
         run: ./scripts/regenerate_project.sh --fast
 
       - name: Check project inputs (darwin-only Python modules)
+        env:
+          VOCELLO_QUARANTINE: "1"
         run: ./scripts/check_project_inputs.sh --python darwin-only
 
       - name: Run deterministic macOS tests
+        env:
+          VOCELLO_QUARANTINE: "1"
         run: scripts/macos_test.sh test
 
       - name: Verify source-built CLI version identity

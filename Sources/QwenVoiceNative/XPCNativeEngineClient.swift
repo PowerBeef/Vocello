@@ -419,7 +419,7 @@ actor XPCNativeEngineCoordinator {
                         } catch {
                             return
                         }
-                        await self.handleTimeout(for: requestID)
+                        self.handleTimeout(for: requestID)
                     }
                 }
                 pendingRequests[requestEnvelope.id] = pendingRequest

@@ -1,0 +1,5 @@
+{
+  "schemaVersion": 1,
+  "description": "Tests skipped on push CI while a proven flake is fixed. Ids are `Suite/testMethod` for XCTest (Tests/VocelloCoreTests/TestQuarantine.swift) or a pytest node id. Nightly still runs them; scripts/repo_invariants.sh fails once an entry is older than 30 days.",
+  "entries": []
+}

@@ -81,6 +81,24 @@ out="$(rg -n 'matching\s*\(\s*NSPredicate\s*\(\s*format:\s*"label|buttons\s*\[\s
   Tests/UIAutomationSupport Tests/VocelloMacUITests Tests/VocelloiOSUITests 2>/dev/null || true)"
 [[ -z "$out" ]] || fail "UI tests must use stable accessibility identifiers, not visible-label fallbacks:\n$out"
 
+# Flaky-test quarantine buys time, never permanence: entries older than 30 days fail.
+python3 - <<'PY'
+import datetime, json, pathlib
+document = json.loads(pathlib.Path("config/test-quarantine.json").read_text(encoding="utf-8"))
+today = datetime.date.today()
+errors = []
+for entry in document.get("entries", []):
+    identifier, since, note = entry.get("id"), entry.get("since"), entry.get("note")
+    if not identifier or not since or not note:
+        errors.append(f"quarantine entry needs id, since and note: {entry}")
+        continue
+    age = (today - datetime.date.fromisoformat(since)).days
+    if age > 30:
+        errors.append(f"quarantine entry {identifier} is {age} days old; fix or delete the test")
+if errors:
+    raise SystemExit("\n".join(errors))
+PY
+
 # MLX facade boundary: the owned package carries exactly one test suite.
 for entry in Packages/VocelloQwen3Core/Tests/*/; do
   [[ "$(basename "$entry")" == "Qwen3RuntimeTests" ]] \

@@ -85,6 +85,11 @@ jobs:
       - name: Compile every foundation target from a clean tree
         run: ./scripts/build_foundation_targets.sh all
 
+      - name: Compile the macOS app optimized (warnings are errors)
+        env:
+          QVOICE_FOUNDATION_SWIFT_OPTIMIZATION: "-O"
+        run: ./scripts/build_foundation_targets.sh macos
+
       - name: Upload compile results on failure
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

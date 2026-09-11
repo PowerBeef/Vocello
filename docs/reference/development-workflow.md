@@ -44,6 +44,16 @@ product-invariant greps in `scripts/repo_invariants.sh`, the privacy scan, and t
 `--local` selects Python tests by the dirty tree; `--python darwin-only` runs only the modules that need
 the macOS host (CI runs the rest on Linux); the default runs everything.
 
+## Lint and warnings
+
+`scripts/dev.sh lint` runs `git diff --check`, the privacy scan, shellcheck on changed shell and, when
+SwiftLint is installed, the low-noise rules in `.swiftlint.yml` on changed Swift files under `Sources/`
+and `Tests/` (advisory; formatting stays Xcode's). Owned Xcode targets compile with
+`SWIFT_TREAT_WARNINGS_AS_ERRORS`, so a new warning fails the local build before it reaches CI. Flaky
+tests go into `config/test-quarantine.json` (`Tests/VocelloCoreTests/TestQuarantine.swift` for XCTest,
+the pytest node id for Python); push CI sets `VOCELLO_QUARANTINE=1` and skips them, nightly runs them,
+and `scripts/repo_invariants.sh` fails once an entry is 30 days old.
+
 ## Python tests
 
 pytest with `pytest-xdist` (`-n auto`), both pinned in `config/toolchain.json`. The whole suite runs in

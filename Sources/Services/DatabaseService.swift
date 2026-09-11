@@ -23,7 +23,7 @@ final class DatabaseService: @unchecked Sendable {
     )
 
     private init() {
-        let dbPath = QwenVoiceApp.appSupportDir.appendingPathComponent("history.sqlite").path
+        let dbPath = AppPaths.appSupportDir.appendingPathComponent("history.sqlite").path
         self.store = RecoverableStoreCoordinator(
             openStore: { try Self.openQueue(at: dbPath) },
             classify: { HistoryPersistenceError.classify($0, operation: .initialize) }

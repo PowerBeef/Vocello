@@ -194,8 +194,7 @@ final class UIPerfFrameProbe: NSObject {
               let writer else {
             return
         }
-        var line = data
-        line.append(0x0A)
+        let line = data + Data([0x0A])
         writerQueue.async {
             try? writer.write(contentsOf: line)
         }

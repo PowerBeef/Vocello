@@ -1,0 +1,16 @@
+# Advisory lint on changed Swift files (scripts/dev.sh lint). Low-noise correctness rules only;
+# formatting is left to Xcode. Never a gate: CI compiles with warnings as errors instead.
+only_rules:
+  - duplicate_imports
+  - empty_count
+  - legacy_constructor
+  - redundant_void_return
+  - unneeded_break_in_switch
+  - unused_closure_parameter
+  - unused_optional_binding
+  - trailing_whitespace
+excluded:
+  - Packages
+  - build
+  - website
+  - QwenVoice.xcodeproj

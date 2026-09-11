@@ -133,6 +133,10 @@ def lint_commands(paths: list[str]) -> list[list[str]]:
     shell = [p for p in paths if p.endswith(".sh") and (ROOT / p).is_file()]
     if shell and _which("shellcheck"):
         commands.append(["shellcheck", "-x", "-S", "warning", *shell])
+    swift = [p for p in paths if p.endswith(".swift") and (ROOT / p).is_file()
+             and p.startswith(("Sources/", "Tests/"))]
+    if swift and _which("swiftlint"):
+        commands.append(["swiftlint", "lint", "--quiet", "--strict", "--config", ".swiftlint.yml", *swift])
     return commands
 
 

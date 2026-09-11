@@ -38,8 +38,14 @@ notes capped at 1,200 characters); `docs/ROADMAP.md` lists open items with their
 
 Product invariants kept an executable check throughout: `scripts/repo_invariants.sh` (exact greps),
 `scripts/privacy_scan.py`, `scripts/public_facts_contract.py`, and the product contracts in
-`./scripts/check_project_inputs.sh`. Still to do from the plan: swift-format and warnings-as-errors
-(nightly first), the flaky-test quarantine helper, and a second push to measure the warm cache.
+`./scripts/check_project_inputs.sh`. The quality additions landed in the seventh commit: owned Xcode
+targets compile with warnings as errors (five real warnings fixed, one of them visible only at `-O`; the
+nightly lane now also compiles the macOS app optimized), flaky tests have a 30-day quarantine
+(`config/test-quarantine.json`), and `scripts/dev.sh lint` runs the low-noise SwiftLint rules in
+`.swiftlint.yml` on changed files. swift-format was measured and not adopted: with a four-space
+configuration it still rewrote 310 files and 23,500 lines of a codebase that already follows one
+consistent Xcode style, for no correctness gain. Next measurement: the warm-cache time of the macOS
+CI job on the second push after the cache save.
 
 ### Claude Code adoption (September 11)
 

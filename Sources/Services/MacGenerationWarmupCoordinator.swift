@@ -325,7 +325,6 @@ final class MacGenerationWarmupCoordinator: ObservableObject {
             completedContext = nil
         case .starting, .running:
             completedContext = nil
-            break
         }
     }
 

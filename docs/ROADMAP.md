@@ -92,8 +92,8 @@ Narrative authority: [`docs/reference/autonomous-validation-audit-2026-08-21.md`
 
 | Item | Status | Title | Evidence |
 | --- | --- | --- | --- |
-| `AV-01` | done | P1 — make Python test execution discovery-complete | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md`, `file:scripts/python_test_contract.py`, `file:scripts/tests/test_python_test_contract.py`, `file:scripts/repo_invariants.sh` |
-| `AV-02` | done | P1 — close evidence-impact critical-path fallbacks | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md`, `file:config/evidence-impact.json`, `file:docs/project-health.md` |
+| `AV-01` | done | P1 — make Python test execution discovery-complete | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md`, `file:scripts/repo_invariants.sh` |
+| `AV-02` | done | P1 — close evidence-impact critical-path fallbacks | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md`, `file:config/evidence-impact.json` |
 | `AV-03` | done | P1 — make promotion evidence capability-complete | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md`, `file:config/quality-promotion-contract.json`, `file:docs/reference/quality-promotion.md` |
 | `AV-04` | done | P2 — make baseline coverage changes fail closed | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md`, `file:config/benchmark-baseline-migrations.json`, `file:scripts/tests/test_compare_baseline.py` |
 | `AV-05` | done | P2 — bind engine performance evidence to shipping optimization | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md`, `file:scripts/build.sh`, `file:scripts/publish_benchmark_history.py`, `file:benchmarks/runs/engine-generation/mac-gate-bench-20260901-223657-866ddfb3.json` |
@@ -437,7 +437,7 @@ Narrative authority: [`docs/reference/development-workflow.md`](reference/develo
 
 | Item | Status | Title | Evidence |
 | --- | --- | --- | --- |
-| `CCA-01` | done | Rewire guidance gates from AGENTS.md/.agents to CLAUDE.md/.claude/rules | `commit:152273a4f8a9`, `file:config/documentation-contract.json`, `file:scripts/check_project_inputs.sh`, `file:scripts/check_surface_coverage.py` |
+| `CCA-01` | done | Rewire guidance gates from AGENTS.md/.agents to CLAUDE.md/.claude/rules | `commit:152273a4f8a9`, `file:scripts/check_project_inputs.sh` |
 | `CCA-02` | done | Rewrite root CLAUDE.md (≤ 200 lines) and nested website/CLAUDE.md | `commit:86260ce15275`, `file:.claude/rules/claude-tooling.md`, `file:CLAUDE.md`, `file:website/CLAUDE.md` |
 | `CCA-03` | done | Port the commit gate to .claude/settings.json with a contract test | `commit:152273a4f8a9`, `commit:462ca1f94fff`, `file:.claude/settings.json` |
 | `CCA-04` | done | Add the claude_config_contract.py gate | `commit:152273a4f8a9`, `commit:462ca1f94fff` |
@@ -447,7 +447,7 @@ Narrative authority: [`docs/reference/development-workflow.md`](reference/develo
 | `CCA-08` | done | Update testing, development-workflow and self-verification docs for Claude Code routes | `commit:152273a4f8a9`, `commit:462ca1f94fff`, `doc:docs/reference/development-workflow.md`, `doc:docs/reference/repository-self-verification.md`, `doc:docs/reference/testing-runbook.md#claude-code-routes` |
 | `CCA-09` | done | Structured test-results.json and .xcresult for the macOS unit lane | `commit:08ce0e634474`, `doc:docs/reference/macos-testing.md#ordinary-development`, `file:scripts/lib/xctest_summary.py`, `file:scripts/tests/test_xctest_summary.py` |
 | `CCA-10` | done | Code coverage export for VocelloCoreTests and Qwen3RuntimeTests | `commit:08ce0e634474`, `doc:docs/reference/macos-testing.md#ordinary-development` |
-| `CCA-11` | done | Consolidate the Python test roots and record closure of the omitted-tests finding | `commit:a15354d7316f`, `file:scripts/python_test_contract.py` |
+| `CCA-11` | done | Consolidate the Python test roots and record closure of the omitted-tests finding | `commit:a15354d7316f` |
 | `CCA-12` | done | Roadmap and progress checkpoint for the adoption track | `commit:152273a4f8a9`, `commit:a15354d7316f`, `doc:docs/development-progress.md#claude-code-adoption-september-11` |
 
 ## EU AI Act Article 50 readiness
@@ -493,7 +493,7 @@ Narrative authority: [`docs/reference/development-workflow.md`](reference/develo
 | --- | --- | --- | --- |
 | `DWF-01` | done | Measure development-loop latency and cache invalidation | `doc:docs/reference/development-workflow.md` |
 | `DWF-02` | done | Separate fast generation and focused edit loops from checkpoints | `file:scripts/dev.sh`, `file:scripts/development_workflow.py`, `file:scripts/tests/test_development_workflow.py` |
-| `DWF-03` | done | Preserve valid Xcode and package caches | `file:scripts/build_foundation_targets.sh`, `file:scripts/lib/build_cache.sh`, `file:project.yml`, `file:scripts/tests/test_build_routing_contract.py` |
+| `DWF-03` | done | Preserve valid Xcode and package caches | `file:scripts/build_foundation_targets.sh`, `file:scripts/lib/build_cache.sh`, `file:project.yml` |
 | `DWF-04` | done | Make checkpoint reuse content-complete and fail-closed | `file:scripts/tree_fingerprint.py`, `file:scripts/tests/test_tree_fingerprint.py`, `file:scripts/hooks/commit_lint.sh` |
 | `DWF-05` | done | Validate and adopt the new development workflow | `doc:docs/reference/development-workflow.md`, `doc:docs/development-progress.md` |
 | `DWF-06` | done | Streamline Codex local gates without weakening CI or release evidence | `file:scripts/development_workflow.py`, `file:scripts/tests/test_development_workflow.py`, `file:scripts/tests/test_evidence_impact.py`, `doc:docs/reference/development-workflow.md`, `doc:docs/development-progress.md#codex-workflow-streamlining`, `doc:docs/reference/repository-self-verification.md#replace-and-retire-tests-and-harnesses`, `doc:docs/development-progress.md#project-wide-test-and-harness-evolution--september-6` |
@@ -508,13 +508,13 @@ Narrative authority: [`docs/reference/repository-self-verification.md`](referenc
 
 | Item | Status | Title | Evidence |
 | --- | --- | --- | --- |
-| `DG-1` | done | Per-file documentation metadata with derived-fact scanning | `commit:3ed09cb`, `file:scripts/doc_metadata.py` |
-| `DG-2` | done | Phase 1 — pin every historical document | `commit:3ed09cb`, `file:docs/INDEX.json` |
+| `DG-1` | done | Per-file documentation metadata with derived-fact scanning | `commit:3ed09cb` |
+| `DG-2` | done | Phase 1 — pin every historical document | `commit:3ed09cb` |
 | `DG-3` | done | Phase 2 — reclassify the nine misfiled point-in-time reports | `file:docs/reference/backend-optimization-research-report.md`, `file:docs/reference/metal4-tensor-feasibility-2026-07-31.md`, `file:docs/reference/optimization-report-review-2026-07-25.md`, `file:docs/reference/qwen3-apple-silicon-roadmap-review.md`, `file:docs/reference/runtime-refactor-status-report.md`, `file:docs/reference/codex-storage-ballooning-incident.md` |
-| `DG-4` | done | Phase 3 — source bindings on active documents | `file:docs/INDEX.json`, `file:scripts/doc_metadata.py` |
+| `DG-4` | done | Phase 3 — source bindings on active documents | `commit:3ed09cbe` |
 | `DG-5` | done | Single-source-of-truth roadmap system | `commit:346dba7`, `file:scripts/roadmap.py`, `file:docs/ROADMAP.md` |
 | `DG-6` | done | Security workflow starvation on main | `commit:6e8f8b2`, `file:.github/workflows/security.yml` |
-| `DG-7` | done | Surface-coverage omission gate and the optional-assists guard | `commit:6283e65`, `commit:ca1eafd`, `file:scripts/check_surface_coverage.py` |
+| `DG-7` | done | Surface-coverage omission gate and the optional-assists guard | `commit:6283e65`, `commit:ca1eafd` |
 | `DG-8` | done | Deep build-output ownership and storage remediation | `commit:e83ebef`, `file:scripts/build_output_policy.py` |
 | `DG-9` | done | Document the self-verification system and its failure classes | `doc:docs/reference/repository-self-verification.md` |
 

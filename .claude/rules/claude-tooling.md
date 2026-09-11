@@ -20,7 +20,7 @@ scripts remain the gates, and this configuration only makes the scripted routes 
 | Path | Loaded | Purpose |
 | --- | --- | --- |
 | `CLAUDE.md` | every session | Product, commands, hard invariants, routing, verification tiers |
-| `.claude/rules/*.md` | by `paths:` frontmatter; this file always | Domain rules; each keeps the repository frontmatter (`status`, `owner`, `summary`, `sourceOfTruth`) so `scripts/doc_metadata.py` governs it like any other doc |
+| `.claude/rules/*.md` | by `paths:` frontmatter; this file always | Domain rules |
 | `website/CLAUDE.md` | when working under `website/` | Nested website guidance |
 | `.claude/settings.json` | always | Hooks and permission defaults (tracked) |
 | `settings.local.json` (untracked, under `.claude/`) | always | Personal overrides (untracked, never validated) |
@@ -51,7 +51,6 @@ enforce policy; the deny entries for Simulator boot, `project.pbxproj` writes, f
 | Skill | Invocation | Routes to |
 | --- | --- | --- |
 | `/checkpoint` | Claude or user | `scripts/dev.sh check`, then the commit (no receipt; CI on push is the gate) |
-| `/refresh-docs` | Claude or user | `scripts/refresh_derived_artifacts.py`, `scripts/doc_metadata.py validate`, contentDigest re-pins |
 | `/roadmap-checkpoint` | Claude or user | `config/roadmap.json` item update, narrative block, `scripts/roadmap.py validate` and `render` |
 | `/ios-lane` | user only | `scripts/ui_test.sh ios <lane>` with probe, storage floor and consent statement; triage afterwards |
 | `/macos-ui-lane` | user only | `scripts/ui_test.sh macos <lane>` |
@@ -65,9 +64,8 @@ the contract rejects one that does not. That is the "explicit QA scope" invarian
 
 | Agent | Tools | Use for |
 | --- | --- | --- |
-| `gate-runner` | Bash, Read, Grep | Running `scripts/dev.sh checkpoint` or `./scripts/check_project_inputs.sh` and returning only failures and the next command |
+| `gate-runner` | Bash, Read, Grep | Running `scripts/dev.sh check` or `./scripts/check_project_inputs.sh` and returning only failures and the next command |
 | `xcresult-triage` | Bash, Read, Grep, Glob | Classifying a finished run under `build/artifacts/ui-tests/` or `build/artifacts/macos/tests/` from its xcresult, ledger and classifiers; never reruns a lane |
-| `doc-governance-reviewer` | Bash, Read, Grep | Listing docs that need regeneration, re-pin or frontmatter fixes |
 | `swift-review` | Read, Grep, Glob | Reviewing a Swift diff against the domain rules before a checkpoint |
 
 Every project agent declares an explicit tool allowlist and none uses worktree isolation (main-only).

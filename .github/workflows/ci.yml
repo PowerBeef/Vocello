@@ -53,27 +53,6 @@ jobs:
           HEAD_SHA: ${{ github.sha }}
         run: python3 scripts/ci/classify_changes.py
 
-  # Documentation, roadmap and surface validators shell repository scripts'
-  # --help surfaces, which today assume a macOS host; they move to ubuntu when
-  # the documentation governance is retired.
-  docs-contracts:
-    name: Documentation contracts
-    runs-on: macos-26
-    timeout-minutes: 10
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-
-      - name: Validate documentation, roadmap, and surface contracts
-        run: |
-          set -euo pipefail
-          python3 scripts/documentation_contract.py validate
-          python3 scripts/doc_metadata.py validate
-          python3 scripts/check_surface_coverage.py
-          python3 scripts/roadmap.py validate
-
   contracts:
     name: Repository contracts
     runs-on: ubuntu-latest
@@ -81,6 +60,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # roadmap.py resolves evidence commits against history.
+          fetch-depth: 0
 
       - name: Install ripgrep
         run: sudo apt-get install -y --no-install-recommends ripgrep
@@ -88,19 +70,27 @@ jobs:
       - name: Pinned actions, Dependabot coverage, website scripts
         run: python3 scripts/supply_chain_contract.py
 
-      - name: Product invariants
-        run: scripts/repo_invariants.sh
+      - name: Product invariants and privacy scan
+        run: |
+          set -euo pipefail
+          scripts/repo_invariants.sh
+          python3 scripts/privacy_scan.py
 
-  # Discovery run: the Python suite on Linux. Non-blocking until the darwin-only
-  # modules carry explicit skips; then this job replaces the suite's run inside
-  # the macOS gate.
+      - name: Work authority
+        run: |
+          set -euo pipefail
+          python3 scripts/roadmap.py validate
+          python3 scripts/roadmap.py render --check
+
+  # The Python suite on Linux. Modules that need the macOS host (benchmark
+  # record publication binds Mac hardware) carry explicit skips and still run
+  # inside the macOS gate.
   python:
     name: Python tests (linux)
     needs: changes
     if: needs.changes.outputs.python == 'true' || needs.changes.outputs.workflows == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    continue-on-error: true
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -117,7 +107,6 @@ jobs:
       - name: Run the Python suite
         run: |
           set -euo pipefail
-          python3 scripts/python_test_contract.py validate
           python3 -m unittest discover -s scripts/tests -p 'test_*.py'
 
   macos-tests:
@@ -335,7 +324,7 @@ jobs:
 
   ci-required:
     name: CI required
-    needs: [changes, docs-contracts, contracts, python, macos-tests, ios-compile, website, dependency-submission]
+    needs: [changes, contracts, python, macos-tests, ios-compile, website, dependency-submission]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5

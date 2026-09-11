@@ -64,7 +64,6 @@ jobs:
       - name: Run the complete Python suite
         run: |
           set -euo pipefail
-          python3 scripts/python_test_contract.py validate
           python3 -m unittest discover -s scripts/tests -p 'test_*.py'
 
   foundation-cold:

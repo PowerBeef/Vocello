@@ -256,6 +256,7 @@ def prosody_take(run_id: str) -> dict:
     }
 
 
+@unittest.skipUnless(sys.platform == "darwin", "publishing a record binds the macOS host hardware (mac_runtime_hardware)")
 class BenchmarkHistoryTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()

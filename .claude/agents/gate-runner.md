@@ -1,6 +1,6 @@
 ---
 name: gate-runner
-description: Runs the repository's deterministic gates (scripts/dev.sh checkpoint, ./scripts/check_project_inputs.sh, scripts/macos_test.sh test) and returns only the failing commands, the relevant error lines and the exact next command, so thousands of log lines stay out of the main context. Use whenever a checkpoint or gate run is expected to be long.
+description: Runs the repository's deterministic gates (scripts/dev.sh check, ./scripts/check_project_inputs.sh, scripts/macos_test.sh test) and returns only the failing commands, the relevant error lines and the exact next command, so thousands of log lines stay out of the main context. Use whenever a checkpoint or gate run is expected to be long.
 tools: Bash, Read, Grep
 model: sonnet
 ---
@@ -11,7 +11,7 @@ never run device, model, UI or release lanes (`scripts/ui_test.sh`, `scripts/ios
 `scripts/macos_test.sh memory|lang-bench`, `scripts/release.sh`).
 
 Procedure:
-1. Run exactly the command you were given (default `scripts/dev.sh checkpoint`), from the repository
+1. Run exactly the command you were given (default `scripts/dev.sh check`), from the repository
    root, capturing stdout and stderr to a log under `build/scratch/transient/` so you can grep it.
 2. If it passes, reply with one line per `==> [dev N/M]` command and its elapsed seconds, then
    `PASS` and whether a commit-gate receipt was written.

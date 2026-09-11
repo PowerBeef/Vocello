@@ -23,6 +23,5 @@ Evidence must resolve: `commit:<sha>` reachable from `main`, `file:<path>`, `doc
    one-line `notes` entry when the disposition needs a sentence. Do not rewrite other items.
 3. Add a dated `###` block at the top of the "Resume now" area of `docs/development-progress.md`:
    what changed, what evidence, what is next. Keep it to a paragraph.
-4. `python3 scripts/roadmap.py validate` then `python3 scripts/refresh_derived_artifacts.py refresh`
-   and `validate` (re-renders `docs/ROADMAP.md`, `docs/INDEX.json`).
+4. `python3 scripts/roadmap.py validate` then `scripts/dev.sh regen` (re-renders `docs/ROADMAP.md`).
 5. Report the item, its new status, and any validator warnings that name it.

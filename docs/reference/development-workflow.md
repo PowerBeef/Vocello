@@ -54,34 +54,17 @@ section of its existing contract controls local scheduling; release/promotion re
 separate. Exact reviewed prose exclusions prevent a package README from being treated as engine
 code. New/unreviewed resource documentation and license/NOTICE files remain conservative.
 
-| Change | Local checkpoint |
-| --- | --- |
-| Classified prose, generated docs or roadmap state | Derived refresh/validation, links, lifecycle/digests, facts, roadmap evidence and surface coverage |
-| Python/configuration tooling | All static project contracts plus reverse-dependency-selected Python tests |
-| macOS-only source | Static contracts, applicable Python fixtures, macOS deterministic tests and app build |
-| iOS source/policy | Static contracts, host-executed policy tests and generic iOS compile |
-| Shared runtime/resources or build/verification authority | Both platforms; routing/build-authority edits require full Python discovery |
-| Unknown/deleted tooling input or unknown dependencies | Full Python discovery; unknown repository classes also broaden native checks |
+`scripts/dev.sh check --dry-run` prints the lanes and commands for the dirty tree; `check` runs them.
+Python selection walks literal import/helper/config references transitively and deliberately
+over-selects on shared basenames; an input without a known test consumer, or a change to shared
+tooling, runs the whole suite. Selection is local feedback, not a proof of complete dependency
+coverage; CI runs every test.
 
-Python selection walks literal import/helper/config references transitively; it deliberately
-over-selects on shared basenames. A changed input without a known test consumer falls back to full
-discovery. Selection is local feedback, not a proof of complete dependency coverage; CI/release
-retain discovery of every test. Dynamic or unusual dependencies warrant `checkpoint --full`.
-Native applicability also consults iOS/shared source membership in `project.yml`; a path list cannot
-silently omit a newly shared source. Unknown project syntax broadens to both platforms.
-
-`scripts/dev.sh plan --json --paths docs/development-progress.md` previews representative changes
-without executing anything or recording PASS. Executable checkpoints always derive their actual
-changed paths from Git and reclassify after derived refresh. `scripts/dev.sh assists` checks optional
-Xcode configuration only; it neither requires installation nor contacts devices/accounts.
-
-`check_project_inputs.sh` without arguments remains the full gate. `--local` selects local Python
-feedback and is rejected in CI. `repo_invariants.sh` holds the exact product-invariant greps and
-the Python suite runs once, inside the parent gate. Documentation link/path/command checks
-live in `documentation_contract.py`, with negative fixtures, rather than duplicate inline scripts.
-
-The helper never schedules XCUITest, a model download, generated audio, a benchmark, signing,
-notarization, App Store work, or a release. Run those canonical scripts only when the task
+`check_project_inputs.sh` without arguments is the full gate. `--local` selects local Python feedback
+and is rejected in CI. `repo_invariants.sh` holds the exact product-invariant greps, `privacy_scan.py`
+the private-path and credential scan, and `public_facts_contract.py` the release-identity and public
+copy checks. Nothing local schedules XCUITest, a model download, generated audio, a benchmark,
+signing, notarization, App Store work, or a release; run those canonical scripts only when the task
 explicitly asks for their evidence.
 
 ## Cache and generation policy

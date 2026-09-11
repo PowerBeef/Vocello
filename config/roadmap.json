@@ -1117,8 +1117,7 @@
       "status": "done",
       "gate": "Catches the 2026-08-01 stale tier count, which a git co-change check provably would not; pinned bodies fail the gate on accidental modification.",
       "evidence": [
-        "commit:3ed09cb",
-        "file:scripts/doc_metadata.py"
+        "commit:3ed09cb"
       ],
       "updated": "2026-08-02"
     },
@@ -1129,8 +1128,7 @@
       "status": "done",
       "gate": "docs/research, docs/audits/archive, and docs/releases sealed by body digest.",
       "evidence": [
-        "commit:3ed09cb",
-        "file:docs/INDEX.json"
+        "commit:3ed09cb"
       ],
       "updated": "2026-08-02"
     },
@@ -1163,10 +1161,9 @@
         "DG-1"
       ],
       "updated": "2026-08-15",
-      "notes": "Closed 2026-08-15 in one maintainer-directed sweep executed per the gate's quality bar: every one of the 39 remaining documents was read before annotation (5 domain rules, 8 ADRs, 26 reference/narrative docs). Standing policies and living authorities are active with honest sourceOfTruth bindings; decided ADRs and completed experiment records are sealed historical; the completed 2026-08 working order is superseded -> docs/ROADMAP.md. Coverage: 88 annotated, 0 unannotated. The sweep also cleared the two live freshness warnings by fixing real drift (benchmarking-procedure.md still described the iOS perf lane as local-only pre-IUI-6; macos-testing.md gained the platform-aware ui-perf note).",
+      "notes": "Closed 2026-08-15 in one maintainer-directed sweep executed per the gate's quality bar: every one of the 39 remaining documents was read before annotation (5 domain rules, 8 ADRs, 26 reference/narrative docs). Standing policies and living authorities are active with honest sourceOfTruth bindings; decided ADRs and completed experiment records are sealed historical; the completed 2026-08 working order is superseded -> docs/ROADMAP.md. Coverage: 88 annotated, 0 unannotated. The sweep also cleared the two live freshness warnings by fixing real drift (benchmarking-procedure.md still described the iOS perf lane as local-only pre-IUI-6; macos-testing.md gained the platform-aware ui-perf note). 2026-09-11: the doc_metadata.py source-binding validator this item delivered was retired with the documentation governance layer; the commit that introduced it stays as evidence.",
       "evidence": [
-        "file:docs/INDEX.json",
-        "file:scripts/doc_metadata.py"
+        "commit:3ed09cbe"
       ]
     },
     {
@@ -1206,8 +1203,7 @@
       "gate": "Every enforced gate and contract is named in guidance; the unverifiable assists section cannot be deleted incidentally.",
       "evidence": [
         "commit:6283e65",
-        "commit:ca1eafd",
-        "file:scripts/check_surface_coverage.py"
+        "commit:ca1eafd"
       ],
       "updated": "2026-08-02"
     },
@@ -2300,8 +2296,7 @@
       "evidence": [
         "file:scripts/build_foundation_targets.sh",
         "file:scripts/lib/build_cache.sh",
-        "file:project.yml",
-        "file:scripts/tests/test_build_routing_contract.py"
+        "file:project.yml"
       ],
       "sourceOfTruth": [
         "config/build-output-policy.json",
@@ -2357,15 +2352,12 @@
       "gate": "T1/T2 must execute every tracked Python test through its actual runner or an explicit machine-readable classification, reject unexpected zero-test discovery, and mechanically detect an unlisted module. Required closure evidence: full unittest discovery, the pytest baseline module, a synthetic unlisted-module negative fixture, and ./scripts/check_project_inputs.sh all pass with one reconciled inventory and no silently omitted tests.",
       "evidence": [
         "doc:docs/reference/autonomous-validation-audit-2026-08-21.md",
-        "file:scripts/python_test_contract.py",
-        "file:scripts/tests/test_python_test_contract.py",
         "file:scripts/repo_invariants.sh"
       ],
       "sourceOfTruth": [
         "scripts/repo_invariants.sh",
         "scripts/check_project_inputs.sh",
-        "scripts/tests/test_compare_baseline.py",
-        "scripts/python_test_contract.py"
+        "scripts/tests/test_compare_baseline.py"
       ],
       "notes": "On 2026-08-25 Xcode reported a pre-test automation-session timeout as totalTestCount=1 because xcresult counted the generated UI-test runner error as a failed test. The fail-closed classifier now recognizes only that exact runner-level shape—no test identifier URL, no passed/skipped case, and an allowlisted automation-mode failure—while still rejecting every launched test or product assertion. The failed xcresult remains separate evidence and no automatic retry was added. A distinct operator-started run entered the real test and produced a genuine audio-QC failure, which the classifier correctly refused to downgrade. AV-09 remains open for its broader stateful-lane repeatability gate.",
       "updated": "2026-08-29"
@@ -2378,14 +2370,12 @@
       "gate": "Every production UI, engine, audio-quality, analyzer, benchmark, evidence, and promotion-authority path must resolve to an explicit evidence class; designated critical roots must reject unexplained repository-other fallback. Required closure evidence: representative source/config/script positive and negative fixtures, a zero-unexplained-critical-fallback inventory, evidence-impact contract PASS, and project-health reporting of residual fallback counts.",
       "evidence": [
         "doc:docs/reference/autonomous-validation-audit-2026-08-21.md",
-        "file:config/evidence-impact.json",
-        "file:docs/project-health.md"
+        "file:config/evidence-impact.json"
       ],
       "sourceOfTruth": [
         "config/evidence-impact.json",
         "scripts/evidence_impact.py",
-        "scripts/tests/test_evidence_impact.py",
-        "scripts/project_health.py"
+        "scripts/tests/test_evidence_impact.py"
       ],
       "notes": "Closed 2026-08-21. Designated critical roots fail if they reach repository-other; the tracked inventory reports zero critical fallbacks. UI, audio/evaluation, benchmark/promotion authority, product source, and validation surfaces now have explicit classes, with residual counts surfaced in project health.",
       "updated": "2026-08-27"
@@ -3529,9 +3519,7 @@
       "updated": "2026-09-11",
       "evidence": [
         "commit:152273a4f8a9",
-        "file:config/documentation-contract.json",
-        "file:scripts/check_project_inputs.sh",
-        "file:scripts/check_surface_coverage.py"
+        "file:scripts/check_project_inputs.sh"
       ]
     },
     {
@@ -3669,8 +3657,7 @@
       "gate": "scripts/test_*.py modules live under scripts/tests; single-root discovery reports the same total; python_test_contract.py counts are recorded as evidence.",
       "updated": "2026-09-11",
       "evidence": [
-        "commit:a15354d7316f",
-        "file:scripts/python_test_contract.py"
+        "commit:a15354d7316f"
       ],
       "notes": "The 2026-08-21 omitted-tests finding was already closed: python_test_contract.py validate reports every module and full discovery runs them all; counts recorded in the narrative checkpoint. Measured after consolidation: Python test contract: PASS (130 modules, 1736 declared tests); single-root discovery 'Ran 1736 tests in 302.029s'."
     },

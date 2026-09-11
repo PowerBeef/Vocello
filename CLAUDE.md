@@ -37,7 +37,7 @@ scripts/dev.sh test | py | lint | ios        # one lane at a time while editing
 scripts/dev.sh ci                            # exactly what push CI runs, serially
 ./scripts/regenerate_project.sh --fast       # after editing project.yml (never edit the .xcodeproj)
 python3 scripts/roadmap.py status            # work authority: plans, items, primary plan
-python3 scripts/refresh_derived_artifacts.py refresh   # then `validate`; regenerates indexes/catalog
+scripts/dev.sh regen                          # regenerate roadmap render, catalog, inventories, charts
 scripts/macos_test.sh test                   # macOS unit + XPC + owned-runtime tests (no UI, no model)
 ./scripts/build_foundation_targets.sh ios --incremental  # generic device-SDK compile, no phone
 npm --prefix website run check               # website lint + tests + build + browser smoke
@@ -91,8 +91,7 @@ and the [programme posture](.claude/rules/release-qa.md#programme-posture-and-ha
 | **Ephemeral profiles** | Hash, validate and publish exact-PID summaries before deleting raw traces. Never treat current apps, canonical caches, dSYMs, models, source or tracked history as scratch. |
 | **Qualified memory** | `config/memory-qualification-policy.json` owns thresholds: telemetry v8/manifest v2, sidecars, zero capture failures, ≥95% coverage, no critical-pressure or forced-unload event. |
 | **Autonomous audio QA** | Listening is optional, never a gate. Fixed seeds, byte-bound PCM QC, locale-locked full-WAV ASR and prosody/delivery evidence are required; one ASR family repeated is not consensus. Prompt comparisons use a run-time frozen holdout judged by `scripts/delivery_promotion_decision.py` under `config/delivery-experiment-contract.json` guardrails; the `config/delivery-acoustic-reference-base.json` panel (pinned by `config/delivery-evaluator-v2-contract.json`) is context, not a verdict. |
-| **Governed documentation** | `scripts/doc_metadata.py validate` checks frontmatter and pinned historical bodies; active facts derive from `config/derived-doc-facts.json`, delivery copy from `config/delivery-instruction-contract.json`. Every enforced surface is named here or in a domain rule. |
-| **Fresh derived artifacts** | `scripts/refresh_derived_artifacts.py refresh` then `validate` after changing registered inputs. Indexes, roadmap render, health, catalog, facts and README charts are generated, never hand-edited. |
+| **Fresh derived artifacts** | `scripts/dev.sh regen` after changing their inputs. `docs/ROADMAP.md`, the production model catalog, the owned-package inventories and the README charts are generated, never hand-edited. |
 
 ## Domain routing
 
@@ -102,7 +101,7 @@ and the [programme posture](.claude/rules/release-qa.md#programme-posture-and-ha
 | iOS app and support code, localization | `.claude/rules/ios.md` | `docs/reference/ios-app-guide.md`, `docs/reference/localization.md` | Generic device-SDK compile; physical-device XCUITest only when requested |
 | macOS app and XPC stack | `.claude/rules/macos.md` | `docs/reference/macos-app-guide.md` | `scripts/macos_test.sh`; native XCUITest only when requested |
 | Scripts, CI, packaging, benchmarks, release | `.claude/rules/release-qa.md` | `docs/reference/repository-self-verification.md` | Repository scripts and workflows; the complete [gate map](.claude/rules/release-qa.md#deterministic-gate-map) |
-| Generated inventories and indexes | `.claude/rules/derived-artifacts.md` | — | `scripts/refresh_derived_artifacts.py` |
+| Generated inventories | `.claude/rules/derived-artifacts.md` | — | `scripts/dev.sh regen` |
 | Hooks, skills, subagents, MCP routing | `.claude/rules/claude-tooling.md` | `docs/reference/development-workflow.md` | `scripts/repo_invariants.sh` |
 | Website | `website/CLAUDE.md` | `website/PRODUCT.md`, `website/DESIGN.md` | Node contracts, Vite build, browser verification |
 
@@ -134,7 +133,7 @@ never a prerequisite: scripts remain the gates. Details and routing: `.claude/ru
 
 | Task | Optional capability |
 | --- | --- |
-| Verify and commit, docs refresh, roadmap checkpoint | Project skills `/checkpoint`, `/refresh-docs`, `/roadmap-checkpoint`; long gate output via the `gate-runner` subagent |
+| Verify and commit, roadmap checkpoint | Project skills `/checkpoint`, `/roadmap-checkpoint`; long gate output via the `gate-runner` subagent |
 | Device, macOS UI and release lanes | User-invoked skills `/ios-lane`, `/macos-ui-lane`, `/device-diagnostics`, `/release-evidence`; triage via `xcresult-triage` |
 | Xcode inner loop | `xcodebuildmcp` skill with the shared XcodeBuildMCP server: `session_show_defaults`, then profile `macos` or `ios-device`; device id at runtime only; scratch builds; never Simulator, preview or UI routes |
 | Apple frameworks and compiler behavior | `axiom-apple-docs`, Sosumi MCP, Xcode documentation |

@@ -117,11 +117,7 @@ class GeneratedFileGuardTests(unittest.TestCase):
 
     def test_generated_files_are_blocked_with_their_generator(self):
         cases = {
-            "docs/INDEX.md": "rebuild-index",
-            "docs/INDEX.json": "rebuild-index",
             "docs/ROADMAP.md": "roadmap.py render",
-            "docs/project-health.md": "project_health.py",
-            "config/derived-doc-facts.json": "derive-facts",
             "Sources/Resources/qwenvoice_production_model_catalog.json": "model_catalog_contract.py rebuild",
             "docs/charts/architecture-dark.svg": "generate_readme_charts.py",
             "benchmarks/HISTORY.md": "benchmark_history.py",
@@ -143,20 +139,6 @@ class GeneratedFileGuardTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertEqual(result.stdout.strip(), "")
 
-    def test_pinned_documents_ask_for_confirmation(self):
-        with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp)
-            (root / "docs").mkdir()
-            pinned = root / "docs" / "old.md"
-            pinned.write_text("---\nstatus: historical\nowner: release-qa\nsummary: s\ncontentDigest: sha256:x\n---\nbody\n")
-            live = root / "docs" / "live.md"
-            live.write_text("---\nstatus: active\nowner: release-qa\nsummary: s\n---\nbody\n")
-            asked = self.guard("docs/old.md", root)
-            self.assertEqual(asked.returncode, 0, asked.stderr)
-            decision = json.loads(asked.stdout)["hookSpecificOutput"]
-            self.assertEqual(decision["permissionDecision"], "ask")
-            self.assertIn("contentDigest", decision["permissionDecisionReason"])
-            self.assertEqual(self.guard("docs/live.md", root).stdout.strip(), "")
 
 
 class ProjectYmlReminderTests(unittest.TestCase):

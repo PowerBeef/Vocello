@@ -1,7 +1,7 @@
 ---
 status: active
 owner: release-qa
-summary: Domain rule for generated-inventory freshness — which paths require refresh_derived_artifacts.py in the same change, and the manual narrative-sync exception.
+summary: Domain rule for generated files — which paths are generated, and the one command that regenerates them.
 sourceOfTruth:
   - scripts/refresh_derived_artifacts.py
 paths:
@@ -9,33 +9,21 @@ paths:
   - "docs/**"
   - "Packages/VocelloQwen3Core/*.json"
 ---
-# Derived artifacts freshness
+# Generated files
 
-CI fail-closes on stale generated inventories. Refresh them in the **same change** as the source
-edit. Update narrative progress deliberately at the coherent checkpoint described in root
-`CLAUDE.md` (Start and resume work); do not create a separate routine documentation commit.
-During a frozen acceptance campaign, keep progress untracked until a deliberate source checkpoint.
-Finalize intended tracked-file membership before refreshing inventories: project-health counts
-tracked files, so adding files to the index after refresh can make that output stale even when
-the content fingerprint has not changed. Never change index membership during a running gate.
-
-## Before commit/push after touching these paths
-
-| Changed paths | Refresh |
-| --- | --- |
-| `Packages/VocelloQwen3Core/**` | `python3 scripts/refresh_derived_artifacts.py refresh` (or vendor rebuilds + project-health) |
-| `config/project-health-contract.json`, evidence/benchmarks that feed health | `python3 scripts/project_health.py rebuild-summary` |
-| `config/documentation-contract.json`, docs group membership | `python3 scripts/documentation_contract.py rebuild-index` |
-| Model catalog sources / receipts | `python3 scripts/model_catalog_contract.py rebuild` |
-| Benchmark records named in `scripts/generate_readme_charts.py`, or the generator itself | `python3 scripts/generate_readme_charts.py` (README `docs/charts/*.svg`) |
-| `config/runtime-refactor-contract.json` phase/status tokens | Sync the current checkpoint and applicable active references in the same change; never rewrite pinned historical ADR/status-report bodies |
-
-## Preferred one-shot
+CI fails on a stale generated file. Regenerate in the **same change** as the source edit:
 
 ```sh
-python3 scripts/refresh_derived_artifacts.py status
-python3 scripts/refresh_derived_artifacts.py refresh   # stale only
-python3 scripts/refresh_derived_artifacts.py validate
+scripts/dev.sh regen        # refresh_derived_artifacts.py refresh + validate
 ```
 
-Authority: `CLAUDE.md` hard invariant **Fresh derived artifacts**. Scripts win over this rule.
+| Generated file | Source | Generator |
+| --- | --- | --- |
+| `docs/ROADMAP.md` | `config/roadmap.json` | `scripts/roadmap.py render` |
+| `Sources/Resources/qwenvoice_production_model_catalog.json` | `config/model-artifact-receipts.json` | `scripts/model_catalog_contract.py rebuild` |
+| `Packages/VocelloQwen3Core/CURRENT_INVENTORY.json`, `FACADE_API_BASELINE.json` | the owned package sources | `scripts/vendor_runtime_contract.py rebuild-*` |
+| `docs/charts/*.svg` | benchmark records named in the generator | `scripts/generate_readme_charts.py` |
+| `benchmarks/HISTORY.md` | `benchmarks/runs/` | `scripts/benchmark_history.py` |
+
+The generated-file guard hook refuses hand edits of these paths and names the generator.
+Narrative documents (`docs/development-progress.md`, decisions) are deliberate edits, never generated.

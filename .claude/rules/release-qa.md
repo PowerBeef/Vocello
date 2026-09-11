@@ -30,10 +30,8 @@ paths:
 - `.github/workflows/ci.yml`, `.github/workflows/release.yml`,
   `.github/workflows/promote-release.yml`, and
   `.github/workflows/security.yml`
-- `config/build-output-policy.json`, `config/documentation-contract.json`,
-  `config/public-product-facts.json`, `config/toolchain.json`,
-  `config/orchestration-contract.json`, `config/evidence-impact.json`,
-  `config/project-health-contract.json`, `config/release-evidence-contract.json`,
+- `config/build-output-policy.json`, `config/public-product-facts.json`, `config/toolchain.json`,
+  `config/orchestration-contract.json`, `config/evidence-impact.json`, `config/release-evidence-contract.json`,
   `config/quality-promotion-contract.json`,
   `config/benchmark-baseline-migrations.json`, and `config/marking-peak-equality.json`
 - App Store support, attribution, storage, account-readiness, build-collision, and model-host governance:
@@ -48,9 +46,9 @@ paths:
 - `benchmarks/` schema-v1 compatibility, schema-v2 memory-qualified, and schema-v3
   quality-identity records, generated history, and preserved reference baselines
 - `docs/releases/`
-- Release verification, evidence-impact, quality-promotion, required-step, project-health, supply-chain, and packaging
+- Release verification, evidence-impact, quality-promotion, required-step, supply-chain, and packaging
   scripts (`scripts/verify_*.sh`, `scripts/release_evidence.py`, `scripts/required_step_ledger.py`,
-  `scripts/quality_promotion.py`, `scripts/project_health.py`, `scripts/supply_chain_contract.py`,
+  `scripts/quality_promotion.py`, `scripts/supply_chain_contract.py`,
   `scripts/create_dmg.sh`, etc.)
 - Claude Code configuration: `.claude/settings.json` (hooks, permissions), the project skills and
   subagents under `.claude/`, the `paths:` scoping of `.claude/rules/*.md`, with the hook behaviour
@@ -144,8 +142,8 @@ Read for the task at hand; unrelated runbooks are not prerequisites:
   never stages, commits, or pushes. Successful profiles are summary-only by default: the runner
   publishes the trace digest/settings/extracted evidence before deleting the raw trace. Use
   `--keep-trace` only when the raw Instruments document must be reopened.
-- **Documentation and public facts:** this role owns lifecycle/index validation and public release,
-  platform, support, and canonical-hardware references. Model implementation facts remain backend-owned.
+- **Public facts:** this role owns `config/public-product-facts.json` and `scripts/public_facts_contract.py`
+  (release identity, README and website copy). Model implementation facts remain backend-owned.
 - **Schema review:** for telemetry/benchmark changes, inspect the backend producer, affected
   platform consumer and release validator together. This is a technical cross-boundary review,
   not a requirement to obtain simulated approvals from separate agents or roles.
@@ -163,7 +161,7 @@ Read for the task at hand; unrelated runbooks are not prerequisites:
 ## Procedure routing
 
 Use [development-workflow.md](../../docs/reference/development-workflow.md) for the
-`scripts/dev.sh plan` → `focused` → `checkpoint` loop and index/refresh ordering.
+`scripts/dev.sh check` loop and the regeneration order.
 [testing-runbook.md](../../docs/reference/testing-runbook.md) selects the platform or research
 procedure; it never authorizes UI/model work implicitly. Consult
 [benchmarking-procedure.md](../../docs/reference/benchmarking-procedure.md) only for benchmark
@@ -206,28 +204,25 @@ owns reference comparison and update instructions.
 
 ## Deterministic gate map
 
-`./scripts/check_project_inputs.sh` is the T1/T2 repository gate. Its enforced surfaces include:
+`./scripts/check_project_inputs.sh` is the T1/T2 repository gate. Every check is deterministic and
+needs no model, phone or UI:
 
 | Check | Contract |
 | --- | --- |
 | `build_output_policy.py` | output ownership and storage floors |
 | `cli_version_contract.py`, `cli_package.py` | CLI identity, resources and packaged smoke |
+| `localization_contract.py` | String Catalog completeness and typed presentation copy |
 | `saved_voice_lifecycle_contract.py` | transactional review, deletion, XPC, cache, and iOS accessibility surfaces |
-| `documentation_contract.py`, `doc_metadata.py`, `check_surface_coverage.py` | links, lifecycle, facts, pinned bodies, and guidance completeness |
-| `roadmap.py`, `project_health.py`, `evidence_impact.py` | work authority, health, and change-to-evidence mapping |
-| `check_delivery_instructions.py` | delivery-copy parity and conflicts |
-| `model_catalog_contract.py`, `vendor_runtime_contract.py` | production artifacts, owned-runtime inventory, and facade baseline |
-| `runtime_security_contract.py`, `validate_backend_risk_spine.py` | debug/concurrency registries and backend risks |
-| `scripts/support_contact_contract.py`, `config/support-contact.json` | public support identity |
-| `scripts/attribution_manifest.py`, `config/third-party-attribution-policy.json` | bundled license/NOTICE coverage |
-| `check_convergence_promotion_gate.py` | convergence promotion preconditions |
+| `entitlement_contract.py`, `support_contact_contract.py`, `public_facts_contract.py`, `attribution_manifest.py` | entitlement allowlist, public support identity, release identity and public copy, bundled license/NOTICE coverage |
+| `runtime_security_contract.py`, `validate_backend_risk_spine.py` | debug/concurrency registries, TSan policy and backend risks |
+| `model_catalog_contract.py`, `vendor_runtime_contract.py`, `model_host_availability.py` | production artifacts, owned-runtime inventory and facade baseline, model-host evidence |
 | `check_qwen3_backend_only.sh`, `check_backend_resource_contract.sh` | MLX-only and native resource wiring |
-| `repo_invariants.sh` | exact greps for product invariants: no Simulator route, no UI execution in CI, no `DEBUG` branch, no hidden test hooks, condition-based UI tests, one owned-package suite |
-| `python_test_contract.py` | discovery-complete Python inventory, runner compatibility, and zero-test rejection |
-| `benchmark_history.py`, `supply_chain_contract.py`, `required_step_ledger.py`, `privacy_scan.py`, `check_release_notes.py` | history, supply chain, release steps, private-path and credential scan, and release-note contracts |
-
-Exemptions require a reason in `config/surface-coverage-exemptions.json`. Read
-`docs/reference/repository-self-verification.md` before adding or weakening a gate.
+| `supply_chain_contract.py`, `required_step_ledger.py`, `evidence_impact.py`, `quality_promotion.py` | action pins, release steps, release-tier evidence classes |
+| `benchmark_history.py`, `generate_readme_charts.py`, `check_release_notes.py` | history, README charts, release notes |
+| `check_delivery_instructions.py`, `audio_cadence_qc.py`, `delivery_experiment.py`, `delivery_evaluator.py`, `prosody_holdout_validation.py`, `check_convergence_promotion_gate.py` | text-level delivery and research contracts |
+| `roadmap.py` | work authority schema, blockers and a fresh render |
+| `repo_invariants.sh`, `privacy_scan.py` | exact greps for product invariants; no private path or credential in tracked files |
+| the Python suite | `scripts/tests/`, complete in CI, selected by the dirty tree locally |
 
 
 ## Invariants (do not regress)
@@ -246,19 +241,18 @@ Exemptions require a reason in `config/surface-coverage-exemptions.json`. Read
   (verified unchanged through 2.46.0).
 - **Developer ID signing + notarization.** macOS release uses Developer ID Application cert,
   hardened runtime, and `notarytool` stapling. CI uses App Store Connect API key auth.
-- **Local verification is selective; CI/release are complete.** `scripts/dev.sh checkpoint`
-  chooses documentation checks or `check_project_inputs.sh --local`, with affected Python tests
-  and source-relevant native evidence. Unknown dependencies, deletions and routing-authority
-  changes select full discovery. The default project gate and `checkpoint --full` retain the
-  complete suite; CI refuses local selection. Legacy `QVOICE_GATES=quick` remains compatible only
-  for a local unchanged scripts/config tree. Local PASS markers never authorize promotion.
+- **Local verification is selective; CI/release are complete.** `scripts/dev.sh check` runs
+  `check_project_inputs.sh --local` (contracts plus the Python tests the dirty tree affects) and the
+  native lanes the changed paths touch; nothing local blocks a commit. The default project gate and
+  CI run the complete suite; CI refuses local selection. `QVOICE_GATES=quick` skips the Python suite
+  only for a local unchanged scripts/config tree.
 - **CI topology.** `ci.yml`: `scripts/ci/classify_changes.py` routes pushed paths into lanes
   (`swift`, `ios`, `python`, `research`, `website`, `workflows`; an unknowable diff runs
   everything). `macos-tests` and `ios-compile` restore the persistent DerivedData caches from
   `config/build-output-policy.json` (`scripts/ci/restore_mtimes.py` gives tracked files their
   commit mtimes first so Xcode's task signatures hit), `contracts` runs the pin and invariant
-  checks on ubuntu, the linux `python` job is a discovery run until darwin-only modules carry
-  skips, `docs-contracts` still runs on macos-26, and `CI required` (the sole branch-protection
+  checks, the privacy scan and the roadmap validator on ubuntu, the linux `python` job is a
+  discovery run until darwin-only modules carry skips, and `CI required` (the sole branch-protection
   context) passes when jobs are path-skipped. The shared toolchain step is the composite
   `.github/actions/native-toolchain`. Dispatch with `cold: true` to skip cache restore.
 - **Slow lanes are scheduled, not per push.** `nightly.yml` runs the TSan subset, the complete

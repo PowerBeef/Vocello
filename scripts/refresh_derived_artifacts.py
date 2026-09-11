@@ -28,7 +28,6 @@ class DerivedArtifact:
     stale_markers: tuple[str, ...]
 
 
-# Order matters: owned-runtime inventories feed project-health digests.
 ARTIFACTS: tuple[DerivedArtifact, ...] = (
     DerivedArtifact(
         artifact_id="vendor-current-inventory",
@@ -45,20 +44,6 @@ ARTIFACTS: tuple[DerivedArtifact, ...] = (
         stale_markers=("FACADE_API_BASELINE is stale",),
     ),
     DerivedArtifact(
-        artifact_id="project-health-summary",
-        description="docs/project-health.md",
-        check=("python3", "scripts/project_health.py", "rebuild-summary", "--check"),
-        rebuild=("python3", "scripts/project_health.py", "rebuild-summary"),
-        stale_markers=("project-health summary is stale",),
-    ),
-    DerivedArtifact(
-        artifact_id="documentation-index",
-        description="docs/INDEX.md",
-        check=("python3", "scripts/documentation_contract.py", "rebuild-index", "--check"),
-        rebuild=("python3", "scripts/documentation_contract.py", "rebuild-index"),
-        stale_markers=("documentation index is stale", "generated documentation index is stale"),
-    ),
-    DerivedArtifact(
         artifact_id="model-catalog",
         description="Sources/Resources/qwenvoice_production_model_catalog.json",
         check=("python3", "scripts/model_catalog_contract.py", "rebuild", "--check"),
@@ -71,20 +56,6 @@ ARTIFACTS: tuple[DerivedArtifact, ...] = (
         check=("python3", "scripts/generate_readme_charts.py", "--check"),
         rebuild=("python3", "scripts/generate_readme_charts.py"),
         stale_markers=("README charts are stale",),
-    ),
-    DerivedArtifact(
-        artifact_id="derived-doc-facts",
-        description="config/derived-doc-facts.json",
-        check=("python3", "scripts/doc_metadata.py", "derive-facts", "--check"),
-        rebuild=("python3", "scripts/doc_metadata.py", "derive-facts"),
-        stale_markers=("derived-doc-facts.json is stale",),
-    ),
-    DerivedArtifact(
-        artifact_id="documentation-metadata-index",
-        description="docs/INDEX.json",
-        check=("python3", "scripts/doc_metadata.py", "rebuild-index", "--check"),
-        rebuild=("python3", "scripts/doc_metadata.py", "rebuild-index"),
-        stale_markers=("docs/INDEX.json is stale",),
     ),
     DerivedArtifact(
         artifact_id="roadmap-render",
@@ -195,11 +166,7 @@ def print_status(root: Path) -> int:
 def validate_all(root: Path) -> int:
     commands = (
         ("python3", "scripts/vendor_runtime_contract.py", "validate"),
-        ("python3", "scripts/project_health.py", "rebuild-summary", "--check"),
-        ("python3", "scripts/documentation_contract.py", "rebuild-index", "--check"),
         ("python3", "scripts/model_catalog_contract.py", "rebuild", "--check"),
-        ("python3", "scripts/doc_metadata.py", "derive-facts", "--check"),
-        ("python3", "scripts/doc_metadata.py", "rebuild-index", "--check"),
         ("python3", "scripts/roadmap.py", "render", "--check"),
     )
     for command in commands:

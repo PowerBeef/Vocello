@@ -555,49 +555,5 @@
     ],
     "qualityEvidence": [],
     "promotionRequiredEvidence": []
-  },
-  "localVerification": {
-    "version": 1,
-    "documentationOnlyPatterns": [
-      "*.md",
-      "docs/*.html",
-      "docs/charts/*.svg",
-      "docs/INDEX.json",
-      "config/roadmap.json",
-      "config/derived-doc-facts.json"
-    ],
-    "fullTestPatterns": [
-      "scripts/development_workflow.py",
-      "scripts/python_test_contract.py",
-      "scripts/evidence_impact.py",
-      "scripts/tree_fingerprint.py",
-      "scripts/check_project_inputs.sh",
-      "scripts/repo_invariants.sh",
-      "scripts/hooks/**",
-      "scripts/lib/**",
-      "config/evidence-impact.json",
-      "config/orchestration-contract.json",
-      "config/toolchain.json",
-      "config/build-output-policy.json",
-      "config/documentation-contract.json",
-      ".github/**",
-      ".claude/**",
-      "project.yml",
-      "Package.resolved",
-      "QwenVoice.xcodeproj/**"
-    ],
-    "macosOnlyPatterns": [
-      "Sources/Views/**",
-      "Sources/ViewModels/**",
-      "Sources/Models/**",
-      "Sources/Services/**",
-      "Sources/App/**",
-      "Sources/VocelloCLI/**",
-      "Sources/QwenVoiceNative/**",
-      "Sources/QwenVoiceEngineService/**",
-      "Sources/QwenVoiceEngineSupport/**",
-      "Tests/VocelloMacUITests/**",
-      "Tests/VocelloEngineIntegrationTests/**"
-    ]
   }
 }

@@ -262,10 +262,7 @@ class ProfileCaptureContractTests(unittest.TestCase):
         for forbidden in ("resolve_device", "devicectl", "xctrace", "cmd_pull"):
             self.assertNotIn(forbidden, report)
 
-    def test_memory_contract_surfaces_are_required_and_fingerprinted(self) -> None:
-        project_check = (REPO / "scripts" / "check_project_inputs.sh").read_text(
-            encoding="utf-8"
-        )
+    def test_memory_contract_surfaces_are_fingerprinted(self) -> None:
         history = (REPO / "scripts" / "benchmark_history.py").read_text(encoding="utf-8")
         for relative_path in (
             "benchmarks/schema-v2.json",
@@ -274,7 +271,6 @@ class ProfileCaptureContractTests(unittest.TestCase):
             "scripts/ios_memory_field_report.py",
         ):
             with self.subTest(relative_path=relative_path):
-                self.assertIn(f'"{relative_path}"', project_check)
                 path_parts = relative_path.split("/")
                 history_expression = " / ".join(f'"{part}"' for part in path_parts)
                 self.assertIn(history_expression, history)

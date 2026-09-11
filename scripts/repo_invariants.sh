@@ -87,4 +87,72 @@ for entry in Packages/VocelloQwen3Core/Tests/*/; do
     || fail "unexpected test directory in the owned runtime package: $entry"
 done
 
+# No Python variant of a shell gate, no stale product names (the .sh scripts are canonical).
+for removed_pattern in \
+  'Packages/VocelloQwen3Core/Tests/(MLXAudioTTSTests|MLXAudioCodecsTests)' \
+  'QwenVoice-macos15.dmg' \
+  'build/QwenVoice.app' \
+  'scripts/check_qwen3_backend_only\.py' \
+  'scripts/check_ios_catalog\.py' \
+  'scripts/refresh_readme_screenshots\.py'; do
+  out="$(rg -n -e "$removed_pattern" . --hidden \
+    --glob '!.git/**' --glob '!build/**' --glob '!scratch/**' --glob '!scripts/repo_invariants.sh' 2>/dev/null || true)"
+  [[ -z "$out" ]] || fail "removed test/benchmark reference is still present:\n$out"
+done
+
+# One lifecycle authority: generation views never start model prewarm themselves.
+out="$(rg -n 'prewarmModelIfNeeded' Sources/Views/Generate --glob '*.swift' 2>/dev/null || true)"
+[[ -z "$out" ]] || fail "generation views must not start model prewarm directly:\n$out"
+
+# Routing views observe the player through their owners, not directly.
+python3 - <<'PY'
+from pathlib import Path
+import re
+
+regions = (
+    ("Sources/ContentView.swift", r"struct ContentView: View", r"private struct CustomVoiceScreenHost"),
+    ("Sources/Views/Sidebar/SidebarView.swift", r"struct SidebarView: View", r"private struct SidebarFooterRegion"),
+)
+errors = []
+for relative, start, end in regions:
+    path = Path(relative)
+    if not path.is_file():
+        continue
+    text = path.read_text(encoding="utf-8")
+    begin = re.search(start, text)
+    stop = re.search(end, text)
+    region = text[begin.start(): stop.start()] if begin and stop else text
+    if re.search(r"@EnvironmentObject.*AudioPlayerViewModel", region):
+        errors.append(f"{relative}: routing must not observe AudioPlayerViewModel directly")
+if errors:
+    raise SystemExit("\n".join(errors))
+PY
+
+# Generated project: one shippable project, no test-support flags, no local cache references.
+! grep -q "QW_TEST_SUPPORT" project.yml || fail "QW_TEST_SUPPORT must not be configured in the single shippable project"
+! grep -qE 'path = .*(__pycache__|\.pyc)' QwenVoice.xcodeproj/project.pbxproj \
+  || fail "project references local-only Python cache files; regenerate with ./scripts/regenerate_project.sh --fast"
+[[ ! -d Assets.xcassets ]] || fail "retired repo-root Assets.xcassets directory is present; the catalog lives under Sources/"
+
+# Evidence retention: benchmarks/ holds compact summaries only, each at most 256 KB.
+if [[ -d benchmarks ]]; then
+  raw="$(find benchmarks \
+    \( -type f \( \
+      -iname '*.jsonl' -o -iname '*.ndjson' -o -iname '*.jsonlines' \
+      -o -iname '*.log' -o -iname '*.ips' -o -iname '*.tracev3' \
+      -o -iname '*.wav' -o -iname '*.wave' -o -iname '*.aif' -o -iname '*.aiff' \
+      -o -iname '*.caf' -o -iname '*.flac' -o -iname '*.mp3' -o -iname '*.m4a' \
+      -o -iname '*.ogg' -o -iname '*.opus' \
+      -o -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.gif' \
+      -o -iname '*.heic' -o -iname '*.heif' -o -iname '*.tif' -o -iname '*.tiff' \
+      -o -iname '*.webp' -o -iname '*.bmp' \
+      -o -iname '*.xcresult' -o -iname '*.trace' -o -iname '*.xcarchive' -o -iname '*.dsym' \
+    \) -o -type d \( \
+      -iname '*.xcresult' -o -iname '*.trace' -o -iname '*.xcarchive' -o -iname '*.dsym' \
+    \) \) -print)"
+  [[ -z "$raw" ]] || fail "raw benchmark telemetry, audio, screenshots, logs and bundles must stay untracked:\n$raw"
+  oversized="$(find benchmarks -type f -size +262144c -print)"
+  [[ -z "$oversized" ]] || fail "committed benchmark file exceeds the 256 KB cap:\n$oversized"
+fi
+
 echo "==> Repository invariants hold" >&2

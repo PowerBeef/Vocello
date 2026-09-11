@@ -79,7 +79,7 @@ class ReleaseSourceAuthorityTests(unittest.TestCase):
         self.assertEqual(result["status"], "passed")
         encoded = json.dumps(result)
         self.assertNotIn("private-to-runner", encoded)
-        self.assertEqual(set(result["checks"]), {"CI required", "Security required"})
+        self.assertEqual(set(result["checks"]), {"CI required"})
 
     def test_lightweight_tag_fails_closed(self) -> None:
         tag_ref, tag_object, checks = self.fixtures()
@@ -110,8 +110,8 @@ class ReleaseSourceAuthorityTests(unittest.TestCase):
 
     def test_missing_or_cross_sha_check_fails_closed(self) -> None:
         tag_ref, tag_object, checks = self.fixtures()
-        checks["check_runs"][1]["head_sha"] = "d" * 40
-        with self.assertRaisesRegex(ValueError, "Security required"):
+        checks["check_runs"][0]["head_sha"] = "d" * 40
+        with self.assertRaisesRegex(ValueError, "CI required"):
             module.validate(
                 tag=self.tag, commit=self.commit, tag_ref=tag_ref,
                 tag_object=tag_object, check_runs=checks,

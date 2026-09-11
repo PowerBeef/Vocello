@@ -26,9 +26,9 @@ usage() {
   cat >&2 <<'EOF'
 usage: ./scripts/build_foundation_targets.sh [macos|ios|all] [--incremental]
 
-  --incremental  Local iOS checkpoint only: reuse the governed ios-device
-                 DerivedData and Release optimization settings. CI/default
-                 verification retains the disposable clean foundation tree.
+  --incremental  iOS only: reuse the governed ios-device DerivedData and
+                 Release optimization settings (local checkpoint and the
+                 cached CI lane). The default keeps a disposable clean tree.
 EOF
 }
 

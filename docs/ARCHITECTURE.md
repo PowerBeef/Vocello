@@ -1044,13 +1044,13 @@ All generation, recording, transcription, and model storage happen locally.
 `Sources/PrivacyInfo.xcprivacy` declares no tracking and no collected data types.
 
 Repository supply-chain and publication controls are also security boundaries. External GitHub
-Actions are pinned by full SHA through `config/toolchain.json`; CI performs dependency review,
-path-relevant CodeQL and npm advisory analysis on pull requests/main, plus deterministic
-website/native checks. `Security required` is the stable exact-SHA security aggregate. Direct
+Actions are pinned by full SHA through `config/toolchain.json`; CodeQL and npm advisory analysis
+run weekly and on the exact tagged commit inside the release workflow, while push CI runs the
+deterministic website/native checks. `Security required` is the stable security aggregate. Direct
 administrator development on `main` remains an explicit workflow residual, so release authority
 begins only when `scripts/release_source_authority.py` proves a GitHub-verified annotated tag,
-containment in `origin/main`, and successful latest `CI required` plus `Security required` runs on
-the tagged commit. Release candidates produce SPDX and
+containment in `origin/main`, a successful latest `CI required` run on the tagged commit, and the
+release workflow's own Security job. Release candidates produce SPDX and
 CycloneDX SBOMs, checksums, provenance/attestation, and a validated
 `config/release-evidence-contract.json` evidence set before a draft Release is created. The emitted
 schema-v2 `release-evidence.json` binds the clean tracked-and-untracked source identity, required

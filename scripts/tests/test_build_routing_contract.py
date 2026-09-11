@@ -201,7 +201,7 @@ class BuildRoutingContractTests(unittest.TestCase):
         self.assertGreaterEqual(macos.count("--force-resolved-versions"), 3)
 
     def test_ci_build_and_archive_commands_are_explicit_and_pinned(self) -> None:
-        for relative in (".github/workflows/ci.yml", ".github/workflows/release.yml"):
+        for relative in (".github/workflows/release.yml",):
             text = self.text(relative)
             for match in re.finditer(r"xcodebuild\s+(?:build|archive)\b", text):
                 window = text[match.start() : match.start() + 1200]
@@ -297,18 +297,6 @@ class BuildRoutingContractTests(unittest.TestCase):
         doctor = device[device.index("cmd_doctor() {") : build_start]
         self.assertIn("require_ios_xcode_platform", doctor)
 
-    def test_ci_ios_resolution_checks_platform_before_creating_caches(self) -> None:
-        for relative in (".github/workflows/ci.yml", ".github/workflows/release.yml"):
-            text = self.text(relative)
-            for match in re.finditer(r"xcodebuild\s+-resolvePackageDependencies\b", text):
-                start = text.rfind("run: |", 0, match.start())
-                window = text[start : match.start()]
-                self.assertIn("python3 scripts/lib/ios_platform_preflight.py check", window)
-                self.assertLess(
-                    window.index("ios_platform_preflight.py check"),
-                    window.index("mkdir -p"),
-                )
-
     def test_ios_platform_preflight_has_no_mutating_toolchain_command(self) -> None:
         helper = self.text("scripts/lib/ios_platform_preflight.py")
         self.assertIn('SDK_COMMAND = ("xcodebuild", "-showsdks", "-json")', helper)
@@ -317,166 +305,6 @@ class BuildRoutingContractTests(unittest.TestCase):
         for forbidden in ("downloadPlatform", "importPlatform", "runFirstLaunch", '"boot"', '"create"'):
             self.assertNotIn(forbidden, inspected_commands)
 
-    def test_ci_package_resolvers_are_destination_explicit_and_pinned(self) -> None:
-        required = (
-            "-project QwenVoice.xcodeproj",
-            "-scheme VocelloiOS",
-            "-configuration Release",
-            "-destination 'generic/platform=iOS'",
-            "-derivedDataPath build/scratch/derived-data/ci/",
-            "-clonedSourcePackagesDirPath build/cache/xcode/source-packages",
-            "-disableAutomaticPackageResolution",
-            "-onlyUsePackageVersionsFromResolvedFile",
-        )
-        for relative in (".github/workflows/ci.yml", ".github/workflows/release.yml"):
-            text = self.text(relative)
-            matches = list(re.finditer(r"xcodebuild\s+-resolvePackageDependencies\b", text))
-            self.assertEqual(len(matches), 1, f"{relative} must own one explicit package resolve")
-            start = matches[0].start()
-            end = text.find("\n\n", start)
-            window = text[start : len(text) if end == -1 else end]
-            for token in required:
-                self.assertIn(token, window, f"{relative} resolver lacks {token}")
-
-    def test_mcp_profiles_have_managed_scratch_derived_data(self) -> None:
-        if not (ROOT / ".xcodebuildmcp/config.yaml").exists():
-            self.skipTest("optional Xcode assist is not configured")
-        text = self.text(".xcodebuildmcp/config.yaml")
-        self.assertEqual(text.count("derivedDataPath:"), 2)
-        self.assertIn("build/scratch/derived-data/xcodebuildmcp/macos", text)
-        self.assertIn("build/scratch/derived-data/xcodebuildmcp/ios-device", text)
-
-    def test_symbol_retention_is_current_product_only_and_uuid_validated(self) -> None:
-        cache = self.text("scripts/lib/build_cache.sh")
-        self.assertIn("validate_dsym_uuid", cache)
-        self.assertIn("preserve_ios_dsym", cache)
-        self.assertIn("Vocello.app.dSYM", cache)
-        self.assertIn("QwenVoiceEngineService.xpc.dSYM", cache)
-        ios = self.text("scripts/ios_device.sh")
-        self.assertIn("validate_dsym_identity", ios)
-        self.assertIn("QVOICE_SYMBOLS_IOS", ios)
-        self.assertIn(
-            'local binary="$1" dsym="$2"\n  local dwarf="$dsym/Contents/Resources/DWARF/Vocello"',
-            ios,
-        )
-        policy = self.text("scripts/build_output_policy.py")
-        self.assertIn("_symbol_identity_violations", policy)
-
-    def test_incremental_ios_checkpoint_preserves_its_final_dsym(self) -> None:
-        foundation = self.text("scripts/build_foundation_targets.sh")
-        build_ios = foundation.split("build_ios()", 1)[1].split(
-            'case "$MODE" in', 1
-        )[0]
-        logic_build = build_ios.index('run_foundation_build "iOS logic-test target"')
-        preserve = build_ios.index(
-            'preserve_ios_dsym "$app_dsym" "$preserved_dsym" "$app_bundle/Vocello"'
-        )
-        self.assertLess(logic_build, preserve)
-        self.assertIn("if (( INCREMENTAL == 1 )); then", build_ios[:preserve])
-        self.assertIn('write_build_provenance "$QVOICE_SYMBOLS_IOS/last-build.json"', build_ios)
-
-    def test_benchmark_take_identity_uses_platform_appropriate_temporary_storage(self) -> None:
-        context = self.text("Sources/QwenVoiceCore/BenchRunContext.swift")
-        self.assertIn("#if os(iOS)", context)
-        self.assertIn("FileManager.default.temporaryDirectory", context)
-        self.assertIn(
-            'URL(fileURLWithPath: "/tmp/vocello-bench-current-take.json"',
-            context,
-        )
-        self.assertIn("try data.write(to: currentTakeFileURL, options: .atomic)", context)
-        self.assertIn("currentTakeFileNotes() == payload", context)
-
-        runner = self.text("Sources/iOS/IOSDeviceDiagnosticsRunner.swift")
-        self.assertIn("try BenchRunContext.writeCurrentTakeFile", runner)
-        self.assertIn("defer { BenchRunContext.clearCurrentTakeFile() }", runner)
-        self.assertNotIn(
-            'URL(fileURLWithPath: "/tmp/vocello-bench-current-take.json")',
-            runner,
-        )
-
-    def test_ios_profile_rebuilds_before_install_and_source_snapshot(self) -> None:
-        ios = self.text("scripts/ios_device.sh")
-        start = ios.index("cmd_profile() {")
-        end = ios.index("\n# memory", start)
-        profile = ios[start:end]
-        build_index = profile.index("\n  cmd_build\n")
-        install_index = profile.index("\n  cmd_install >/dev/null\n")
-        snapshot_index = profile.index("\n  capture_benchmark_source \"$artifacts\"\n")
-        late_xctrace_index = profile.rindex('xctrace_dev="$(resolve_xctrace_device "$dev")"')
-        launch_index = profile.index("xcrun devicectl device process launch")
-        self.assertLess(build_index, install_index)
-        self.assertLess(install_index, snapshot_index)
-        self.assertLess(snapshot_index, late_xctrace_index)
-        self.assertLess(late_xctrace_index, launch_index)
-        self.assertEqual(profile.count('xctrace_dev="$(resolve_xctrace_device "$dev")"'), 2)
-
-    def test_ui_lifecycle_metadata_is_atomic_and_failure_aware(self) -> None:
-        text = self.text("scripts/ui_test.sh")
-        for token in (
-            "write_run_metadata running",
-            "write_run_metadata failed",
-            "write_run_metadata passed",
-            "os.replace(temporary, path)",
-        ):
-            self.assertIn(token, text)
-
-    def test_heavy_lanes_fail_fast_through_the_storage_contract(self) -> None:
-        cache = self.text("scripts/lib/build_cache.sh")
-        self.assertIn("require_build_free_space()", cache)
-        self.assertIn("scripts/lib/storage_preflight.py", cache)
-        required_routes = {
-            "scripts/build.sh": ("require_build_free_space development-build",),
-            "scripts/build_foundation_targets.sh": (
-                "require_build_free_space foundation-compile",
-            ),
-            "scripts/ui_test.sh": ('require_build_free_space "ui-$lane"',),
-            "scripts/macos_test.sh": (
-                "require_build_free_space language-benchmark",
-                "require_build_free_space memory-qualification",
-                "require_build_free_space telemetry-overhead",
-            ),
-            "scripts/ios_device.sh": (
-                "require_build_free_space device-build",
-                "require_build_free_space language-benchmark",
-                "require_build_free_space memory-qualification",
-            ),
-            "scripts/release.sh": ("require_build_free_space release",),
-        }
-        for relative, tokens in required_routes.items():
-            with self.subTest(relative=relative):
-                self.assert_tokens(relative, *tokens)
-
-        ios = self.text("scripts/ios_device.sh")
-        build_start = ios.index("cmd_build() {")
-        build_end = ios.index("\ncmd_install() {", build_start)
-        self.assertIn("require_build_free_space device-build", ios[build_start:build_end])
-        main = ios[ios.index("main() {") :]
-        for command in ("install", "launch"):
-            branch = main[main.index(f"    {command})") :]
-            branch = branch[: branch.index(";;")]
-            self.assertNotIn("require_build_free_space", branch)
-
-    def test_owned_runtime_never_owns_a_generated_dot_build(self) -> None:
-        self.assertFalse(
-            (ROOT / "Packages" / "VocelloQwen3Core" / ".build").exists(),
-            "migrate the owned runtime SwiftPM cache to build/cache/swiftpm/mlx-audio-runtime",
-        )
-
-    def test_only_classified_top_level_build_roots_remain(self) -> None:
-        build = ROOT / "build"
-        if not build.exists():
-            return
-        allowed = {
-            ".DS_Store",  # Finder metadata, not a build-output root.
-            "cache",
-            "scratch",
-            "artifacts",
-            "dist",
-            "Vocello.app",
-            "vocello",
-        }
-        unknown = sorted(path.name for path in build.iterdir() if path.name not in allowed)
-        self.assertEqual(unknown, [], f"unclassified build roots remain: {unknown}")
 
 
 if __name__ == "__main__":

@@ -253,23 +253,24 @@ Exemptions require a reason in `config/surface-coverage-exemptions.json`. Read
   changes select full discovery. The default project gate and `checkpoint --full` retain the
   complete suite; CI refuses local selection. Legacy `QVOICE_GATES=quick` remains compatible only
   for a local unchanged scripts/config tree. Local PASS markers never authorize promotion.
-- **CI topology.** `ci.yml`: a cheap `changes` router classifies pushed paths; the two heavy
-  macos-26 jobs run only for native-surface changes (Sources/Tests/Packages/config/scripts/
-  benchmarks/project files/.github), the website job for `website/` changes, and the `CI required`
-  aggregator (the sole branch-protection context) passes when jobs are path-skipped. The
-  lightweight `docs-contracts` job runs unconditionally on every push/PR (documentation,
-  doc-metadata, surface-coverage, and roadmap validators), so a docs-only push can never green
-  `CI required` without the contract suite — the T1 commit-gate hook
-  (`scripts/hooks/precommit_gate.sh`, owned here) requires the local checkpoint receipt but is
-  Claude Code session tooling, not a universal git hook. Both heavy macOS jobs cache SwiftPM checkouts.
-- **Security timing is path-relevant and release-bound.** `security.yml` routes native and website
-  changes on pushes and pull requests, runs CodeQL for either relevant surface and npm advisory
-  audit for website changes, and always publishes the stable `Security required` aggregate. The
-  repository deliberately retains direct-to-`main` administrator development, so live
+- **CI topology.** `ci.yml`: `scripts/ci/classify_changes.py` routes pushed paths into lanes
+  (`swift`, `ios`, `python`, `research`, `website`, `workflows`; an unknowable diff runs
+  everything). `macos-tests` and `ios-compile` restore the persistent DerivedData caches from
+  `config/build-output-policy.json` (`scripts/ci/restore_mtimes.py` gives tracked files their
+  commit mtimes first so Xcode's task signatures hit), `contracts` runs the pin and invariant
+  checks on ubuntu, the linux `python` job is a discovery run until darwin-only modules carry
+  skips, `docs-contracts` still runs on macos-26, and `CI required` (the sole branch-protection
+  context) passes when jobs are path-skipped. The shared toolchain step is the composite
+  `.github/actions/native-toolchain`. Dispatch with `cold: true` to skip cache restore.
+- **Slow lanes are scheduled, not per push.** `nightly.yml` runs the TSan subset, the complete
+  Python suite and cold foundation compiles of both platforms and files one `nightly` issue on
+  failure. `security.yml` (CodeQL, npm audit, `Security required` aggregate) runs weekly, on
+  dispatch, and inside `release.yml` on the exact tagged commit before any candidate is built.
+  The repository deliberately retains direct-to-`main` administrator development, so live
   `enforce_admins=false` and branch-level `required_signatures=false` are an explicit residual—not
   release authority. Candidate and promotion workflows compensate by requiring a GitHub-verified
-  annotated tag, containment in `origin/main`, and successful latest `CI required` plus
-  `Security required` runs on the exact tagged commit.
+  annotated tag, containment in `origin/main`, a successful latest `CI required` run on the exact
+  tagged commit, and the in-workflow Security job.
 - **Ordinary CI is deterministic-only.** GitHub CI executes the platform-neutral iOS policy
   assertions inside macOS `VocelloCoreTests`, compiles the `VocelloiOS` app and duplicate standalone
   `VocelloiOSLogicTests` bundle with `generic/platform=iOS`, and never executes XCUITest. Xcode 26

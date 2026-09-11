@@ -86,8 +86,19 @@ env:
   RELEASE_TAG: ${{ github.event_name == 'push' && github.ref_name || inputs.tag }}
 
 jobs:
+  # Security analysis (CodeQL, npm audit) runs on the exact tagged commit before
+  # any candidate is built; it no longer runs on every trunk push.
+  security:
+    name: Security
+    uses: ./.github/workflows/security.yml
+    permissions:
+      contents: read
+      security-events: write
+      packages: read
+
   source-authority:
     name: Authorize signed release source
+    needs: security
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -100,7 +111,7 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.event_name == 'push' && github.ref || inputs.tag }}
 
-      - name: Require signed tag and exact-SHA CI + security verdicts
+      - name: Require signed tag and exact-SHA CI verdict
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

@@ -21,7 +21,7 @@ App Store release require a validated iOS promotion manifest.
 
 Before either platform can promote, release-source authority also requires the exact candidate
 commit to be contained in `origin/main`, an annotated GitHub-verified tag, and successful latest
-`CI required` plus `Security required` check runs on that exact SHA. Quality evidence cannot repair
+`CI required` check run on that exact SHA plus the release workflow's own Security job. Quality evidence cannot repair
 an untrusted or unverified release source.
 
 ## What the manifest binds

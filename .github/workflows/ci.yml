@@ -1,20 +1,24 @@
 name: CI
 
-# Pre-merge CI for Vocello (QwenVoice).
+# Push CI for Vocello (QwenVoice). Trunk-based: every push to main runs here and
+# `CI required` is the single branch-protection context (skipped counts as pass).
 #
-# iOS: compile the app and standalone pure-logic XCTest bundle against the physical-device SDK.
-# Neither bundle executes in ordinary CI; XCUITest remains explicit local work.
+# Lanes are routed by scripts/ci/classify_changes.py; an unknowable diff runs
+# everything. Native jobs restore the persistent DerivedData caches the local
+# scripts already use (config/build-output-policy.json), so a warm push
+# recompiles only what changed. Dispatch with `cold: true` to skip the restore.
 #
-# Ordinary CI remains UI-free: project inputs, macOS Core/XPC/runtime tests, and compile checks.
-#
-# Toolchain identities are locked in config/toolchain.json. Installed tools are
-# accepted only when their observed versions match the relevant manifest group.
+# Ordinary CI is UI-free: no XCUITest, no Simulator, no device, no model.
 
 on:
   push:
     branches: [main]
-  pull_request:
   workflow_dispatch:
+    inputs:
+      cold:
+        description: Skip the DerivedData cache restore (full rebuild)
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -24,20 +28,17 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Cheap path router: computes which surfaces changed so heavy macos-26 jobs
-  # skip for docs-only pushes. Any native change re-runs the full suite here,
-  # and `docs-contracts` below runs unconditionally so a docs-only push can
-  # never green `CI required` without the documentation/link/roadmap
-  # contracts (the local T1 hook is Claude Code session tooling, not a universal
-  # git hook). `ci-required` aggregates results (skipped counts as pass) and
-  # is the single branch-protection context.
   changes:
     name: Change routing
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
-      native: ${{ steps.classify.outputs.native }}
+      swift: ${{ steps.classify.outputs.swift }}
+      ios: ${{ steps.classify.outputs.ios }}
+      python: ${{ steps.classify.outputs.python }}
+      research: ${{ steps.classify.outputs.research }}
       website: ${{ steps.classify.outputs.website }}
+      workflows: ${{ steps.classify.outputs.workflows }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -50,40 +51,11 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           BEFORE_SHA: ${{ github.event.before }}
           HEAD_SHA: ${{ github.sha }}
-          BASE_REF: ${{ github.base_ref }}
-        run: |
-          set -euo pipefail
-          native=true
-          website=true
-          changed=""
-          if [[ "$EVENT_NAME" == "pull_request" && -n "$BASE_REF" ]]; then
-            git fetch --quiet origin "$BASE_REF"
-            changed="$(git diff --name-only "origin/$BASE_REF...HEAD")"
-          elif [[ "$EVENT_NAME" == "push" && -n "$BEFORE_SHA"               && "$BEFORE_SHA" != "0000000000000000000000000000000000000000"               && "$(git cat-file -t "$BEFORE_SHA" 2>/dev/null || true)" == "commit" ]]; then
-            changed="$(git diff --name-only "$BEFORE_SHA..$HEAD_SHA")"
-          fi
-          if [[ -n "$changed" ]]; then
-            native=false
-            website=false
-            while IFS= read -r path; do
-              case "$path" in
-                Sources/*|Tests/*|Packages/*|config/*|scripts/*|benchmarks/*|project.yml|QwenVoice.xcodeproj/*|.github/*|Package.resolved)
-                  native=true ;;
-              esac
-              case "$path" in
-                website/*) website=true ;;
-              esac
-            done <<<"$changed"
-          fi
-          echo "native=$native" >>"$GITHUB_OUTPUT"
-          echo "website=$website" >>"$GITHUB_OUTPUT"
-          echo "routing: native=$native website=$website (empty diff ⇒ run everything)"
+        run: python3 scripts/ci/classify_changes.py
 
-  # Always-on lightweight contract gate: documentation, doc metadata,
-  # surface coverage, and roadmap validators run on every push/PR regardless
-  # of path routing. Runs on macos-26 deliberately — these validators shell
-  # repository scripts' --help surfaces, which are exercised on macOS hosts
-  # only (T1 runs the same set locally).
+  # Documentation, roadmap and surface validators shell repository scripts'
+  # --help surfaces, which today assume a macOS host; they move to ubuntu when
+  # the documentation governance is retired.
   docs-contracts:
     name: Documentation contracts
     runs-on: macos-26
@@ -92,7 +64,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # roadmap.py validate resolves evidence commits against history.
           fetch-depth: 0
 
       - name: Validate documentation, roadmap, and surface contracts
@@ -103,146 +74,89 @@ jobs:
           python3 scripts/check_surface_coverage.py
           python3 scripts/roadmap.py validate
 
-  ios-compile-check:
-    name: iOS compile check (device SDK)
+  contracts:
+    name: Repository contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install ripgrep
+        run: sudo apt-get install -y --no-install-recommends ripgrep
+
+      - name: Pinned actions, Dependabot coverage, website scripts
+        run: python3 scripts/supply_chain_contract.py
+
+      - name: Product invariants
+        run: scripts/repo_invariants.sh
+
+  # Discovery run: the Python suite on Linux. Non-blocking until the darwin-only
+  # modules carry explicit skips; then this job replaces the suite's run inside
+  # the macOS gate.
+  python:
+    name: Python tests (linux)
     needs: changes
-    if: needs.changes.outputs.native == 'true'
-    runs-on: macos-26
-    timeout-minutes: 30
+    if: needs.changes.outputs.python == 'true' || needs.changes.outputs.workflows == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    continue-on-error: true
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # Project-input validation verifies historical evidence commits.
           fetch-depth: 0
 
-      - name: Select Xcode 26.6
+      - name: Install pinned numpy
         run: |
-          sudo xcode-select -s /Applications/Xcode_26.6.app
-          xcodebuild -version
-          swift --version
-
-      - name: Install deterministic tooling
-        run: |
-          # xcodegen, ripgrep, xcbeautify, and shellcheck are SHA-pinned
-          # release artifacts (mixed runner image pools make brew's formula
-          # index nondeterministic mid-roll); numpy pip-pins to the
-          # config/toolchain.json version for the same reason.
+          set -euo pipefail
           NUMPY_PIN="$(python3 -c "import json; print(json.load(open('config/toolchain.json'))['native']['numpy']['version'])")"
-          python3 -m pip install --quiet --break-system-packages "numpy==${NUMPY_PIN}" \
-            || python3 -m pip install --quiet "numpy==${NUMPY_PIN}"
-          ./scripts/install_pinned_tools.sh
-          export PATH="$HOME/.qwenvoice-pinned-tools/bin:$PATH"
-          xcodegen --version
-          xcbeautify --version
-          rg --version
-          shellcheck --version
-          python3 -c 'import numpy; print(numpy.__version__)'
-          python3 scripts/supply_chain_contract.py --installed native
+          python3 -m pip install --quiet --break-system-packages "numpy==${NUMPY_PIN}"
+          sudo apt-get install -y --no-install-recommends ripgrep
 
-      - name: Cache SwiftPM dependencies
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: build/cache/xcode/source-packages
-          key: spm-ios-compile-${{ runner.os }}-xcode26-${{ hashFiles('QwenVoice.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
-          restore-keys: |
-            spm-ios-compile-${{ runner.os }}-xcode26-
-
-      - name: Regenerate Xcode project
-        run: ./scripts/regenerate_project.sh --fast
-
-      - name: Resolve SwiftPM dependencies
+      - name: Run the Python suite
         run: |
           set -euo pipefail
-          python3 scripts/lib/ios_platform_preflight.py check
-          mkdir -p build/cache/xcode/source-packages build/scratch/derived-data/ci/ios-compile
-          xcodebuild -resolvePackageDependencies \
-            -project QwenVoice.xcodeproj \
-            -scheme VocelloiOS \
-            -configuration Release \
-            -destination 'generic/platform=iOS' \
-            -clonedSourcePackagesDirPath build/cache/xcode/source-packages \
-            -derivedDataPath build/scratch/derived-data/ci/ios-compile \
-            -disableAutomaticPackageResolution \
-            -onlyUsePackageVersionsFromResolvedFile
+          python3 scripts/python_test_contract.py validate
+          python3 -m unittest discover -s scripts/tests -p 'test_*.py'
 
-      - name: Compile VocelloiOS for the device SDK
-        run: |
-          set -euo pipefail
-          xcodebuild build \
-            -project QwenVoice.xcodeproj \
-            -scheme VocelloiOS \
-            -configuration Release \
-            -destination 'generic/platform=iOS' \
-            -derivedDataPath build/scratch/derived-data/ci/ios-compile \
-            -clonedSourcePackagesDirPath build/cache/xcode/source-packages \
-            -disableAutomaticPackageResolution \
-            -onlyUsePackageVersionsFromResolvedFile \
-            -skipPackagePluginValidation \
-            ARCHS=arm64 \
-            ONLY_ACTIVE_ARCH=YES \
-            CODE_SIGNING_ALLOWED=NO | xcbeautify
-
-      - name: Compile host-executed iOS policy tests for the device SDK
-        run: |
-          set -euo pipefail
-          xcodebuild build \
-            -project QwenVoice.xcodeproj \
-            -scheme VocelloiOSLogic \
-            -configuration Release \
-            -destination 'generic/platform=iOS' \
-            -derivedDataPath build/scratch/derived-data/ci/ios-compile \
-            -clonedSourcePackagesDirPath build/cache/xcode/source-packages \
-            -disableAutomaticPackageResolution \
-            -onlyUsePackageVersionsFromResolvedFile \
-            -skipPackagePluginValidation \
-            ARCHS=arm64 \
-            ONLY_ACTIVE_ARCH=YES \
-            CODE_SIGNING_ALLOWED=NO | xcbeautify
-
-  macos-deterministic-tests:
+  macos-tests:
     name: macOS deterministic tests
     needs: changes
-    if: needs.changes.outputs.native == 'true'
+    if: needs.changes.outputs.swift == 'true' || needs.changes.outputs.workflows == 'true'
     runs-on: macos-26
-    timeout-minutes: 60
+    timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
-      - name: Select Xcode 26.6
-        run: |
-          sudo xcode-select -s /Applications/Xcode_26.6.app
-          xcodebuild -version
-          swift --version
+      - name: Native toolchain
+        uses: ./.github/actions/native-toolchain
 
-      - name: Install deterministic tooling
+      - name: Compute cache key
+        id: key
         run: |
-          # xcodegen, ripgrep, xcbeautify, and shellcheck are SHA-pinned
-          # release artifacts (mixed runner image pools make brew's formula
-          # index nondeterministic mid-roll); numpy pip-pins to the
-          # config/toolchain.json version for the same reason.
-          NUMPY_PIN="$(python3 -c "import json; print(json.load(open('config/toolchain.json'))['native']['numpy']['version'])")"
-          python3 -m pip install --quiet --break-system-packages "numpy==${NUMPY_PIN}" \
-            || python3 -m pip install --quiet "numpy==${NUMPY_PIN}"
-          ./scripts/install_pinned_tools.sh
-          export PATH="$HOME/.qwenvoice-pinned-tools/bin:$PATH"
-          xcodegen --version
-          xcbeautify --version
-          rg --version
-          shellcheck --version
-          python3 -c 'import numpy; print(numpy.__version__)'
-          python3 scripts/supply_chain_contract.py --installed native
+          echo "value=macos-xcode26.6-${{ hashFiles('QwenVoice.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved', 'Packages/VocelloQwen3Core/Package.resolved', 'Packages/VocelloQwen3Core/Package.swift', 'project.yml') }}-${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          echo "graph=macos-xcode26.6-${{ hashFiles('QwenVoice.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved', 'Packages/VocelloQwen3Core/Package.resolved', 'Packages/VocelloQwen3Core/Package.swift', 'project.yml') }}-" >> "$GITHUB_OUTPUT"
 
-      - name: Cache SwiftPM dependencies
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      - name: Restore build caches
+        id: cache
+        if: ${{ !inputs.cold }}
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: build/cache/xcode/source-packages
-          key: spm-macos-tests-${{ runner.os }}-xcode26-${{ hashFiles('QwenVoice.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
+          path: |
+            build/cache/xcode/macos
+            build/cache/xcode/source-packages
+            build/cache/swiftpm/mlx-audio-runtime
+          key: ${{ steps.key.outputs.value }}
           restore-keys: |
-            spm-macos-tests-${{ runner.os }}-xcode26-
+            ${{ steps.key.outputs.graph }}
+            macos-xcode26.6-
+
+      - name: Restore tracked-file mtimes from history
+        run: python3 scripts/ci/restore_mtimes.py
 
       - name: Regenerate Xcode project
         run: ./scripts/regenerate_project.sh --fast
@@ -256,16 +170,105 @@ jobs:
       - name: Verify source-built CLI version identity
         run: ./scripts/build.sh cli --version
 
-      - name: Upload xcresult on failure
+      - name: Upload test artifacts on failure
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: macos-deterministic-test-artifacts
           path: build/artifacts/macos/tests/
           if-no-files-found: warn
-          retention-days: 14
+          retention-days: 7
 
-  website-deterministic:
+      - name: Prune caches before save
+        if: always()
+        run: |
+          rm -rf build/cache/xcode/macos/Logs build/cache/xcode/macos/Index.noindex
+          find build/cache/xcode/macos -name '*.xcactivitylog' -delete 2>/dev/null || true
+          du -sh build/cache/xcode/macos build/cache/xcode/source-packages build/cache/swiftpm/mlx-audio-runtime 2>/dev/null || true
+          echo "restored from: ${{ steps.cache.outputs.cache-matched-key || 'nothing (cold)' }}"
+
+      - name: Save build caches
+        if: always()
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            build/cache/xcode/macos
+            build/cache/xcode/source-packages
+            build/cache/swiftpm/mlx-audio-runtime
+          key: ${{ steps.key.outputs.value }}
+
+  ios-compile:
+    name: iOS compile check (device SDK)
+    needs: changes
+    if: needs.changes.outputs.ios == 'true' || needs.changes.outputs.workflows == 'true'
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Native toolchain
+        uses: ./.github/actions/native-toolchain
+
+      - name: Compute cache key
+        id: key
+        run: |
+          echo "value=ios-xcode26.6-${{ hashFiles('QwenVoice.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved', 'Packages/VocelloQwen3Core/Package.resolved', 'Packages/VocelloQwen3Core/Package.swift', 'project.yml') }}-${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          echo "graph=ios-xcode26.6-${{ hashFiles('QwenVoice.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved', 'Packages/VocelloQwen3Core/Package.resolved', 'Packages/VocelloQwen3Core/Package.swift', 'project.yml') }}-" >> "$GITHUB_OUTPUT"
+
+      - name: Restore build caches
+        id: cache
+        if: ${{ !inputs.cold }}
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            build/cache/xcode/ios-device
+            build/cache/xcode/source-packages
+          key: ${{ steps.key.outputs.value }}
+          restore-keys: |
+            ${{ steps.key.outputs.graph }}
+            ios-xcode26.6-
+
+      - name: Restore tracked-file mtimes from history
+        run: python3 scripts/ci/restore_mtimes.py
+
+      - name: Regenerate Xcode project
+        run: ./scripts/regenerate_project.sh --fast
+
+      - name: Compile VocelloiOS and the iOS policy tests for the device SDK
+        # Same script and same persistent DerivedData as the local checkpoint;
+        # CODE_SIGNING_ALLOWED=NO inside the script. Compile only, no phone.
+        run: ./scripts/build_foundation_targets.sh ios --incremental
+
+      - name: Upload compile results on failure
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ios-compile-artifacts
+          path: build/artifacts/foundation/
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Prune caches before save
+        if: always()
+        run: |
+          rm -rf build/cache/xcode/ios-device/Logs build/cache/xcode/ios-device/Index.noindex
+          find build/cache/xcode/ios-device -name '*.xcactivitylog' -delete 2>/dev/null || true
+          du -sh build/cache/xcode/ios-device build/cache/xcode/source-packages 2>/dev/null || true
+          echo "restored from: ${{ steps.cache.outputs.cache-matched-key || 'nothing (cold)' }}"
+
+      - name: Save build caches
+        if: always()
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            build/cache/xcode/ios-device
+            build/cache/xcode/source-packages
+          key: ${{ steps.key.outputs.value }}
+
+  website:
     name: Website deterministic checks
     needs: changes
     if: needs.changes.outputs.website == 'true'
@@ -297,9 +300,42 @@ jobs:
       - name: Lint, test, and build website
         run: npm --prefix website run check
 
+  dependency-submission:
+    name: Submit Swift dependency graph
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Generate deterministic Swift dependency snapshot
+        run: |
+          set -euo pipefail
+          python3 scripts/swift_dependency_snapshot.py \
+            --sha "$GITHUB_SHA" \
+            --ref "$GITHUB_REF" \
+            --job-id "${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            --job-url "https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
+            > "$RUNNER_TEMP/swift-dependency-snapshot.json"
+
+      - name: Submit Swift dependency snapshot
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2026-03-10" \
+            "repos/${GITHUB_REPOSITORY}/dependency-graph/snapshots" \
+            --input "$RUNNER_TEMP/swift-dependency-snapshot.json"
+
   ci-required:
     name: CI required
-    needs: [changes, docs-contracts, ios-compile-check, macos-deterministic-tests, website-deterministic]
+    needs: [changes, docs-contracts, contracts, python, macos-tests, ios-compile, website, dependency-submission]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5

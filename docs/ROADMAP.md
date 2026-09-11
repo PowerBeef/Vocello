@@ -103,7 +103,7 @@ Narrative authority: [`docs/reference/autonomous-validation-audit-2026-08-21.md`
 | `AV-09` | in-flight | P2 — make stateful physical-device lanes independently repeatable | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md`, `doc:docs/development-history-2026-09-06.md#september-6-phase-4-chinese-cadence-diagnostic` |
 | `AV-10` | done | P3 — add deterministic real-browser website smoke | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md` |
 | `AV-11` | done | P3 — make marking-equality resource hygiene enforceable | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md`, `file:scripts/check_marking_peak_equality.py`, `file:scripts/tests/test_check_marking_peak_equality.py` |
-| `AV-12` | done | TSan lane: run to completion with the two helper-process tests skipped under the sanitizer and their exclusion recorded | `file:.github/workflows/tsan.yml`, `file:Tests/VocelloCoreTests/CLIExecutionTests.swift`, `file:Tests/VocelloCoreTests/NativeHelperProcessSupport.swift`, `file:Tests/VocelloCoreTests/PreparedVoiceRepositoryTests.swift`, `file:config/tsan-policy.json` |
+| `AV-12` | done | TSan lane: run to completion with the two helper-process tests skipped under the sanitizer and their exclusion recorded | `file:.github/workflows/nightly.yml`, `file:Tests/VocelloCoreTests/CLIExecutionTests.swift`, `file:Tests/VocelloCoreTests/NativeHelperProcessSupport.swift`, `file:Tests/VocelloCoreTests/PreparedVoiceRepositoryTests.swift`, `file:config/tsan-policy.json` |
 
 ### Open items in detail
 

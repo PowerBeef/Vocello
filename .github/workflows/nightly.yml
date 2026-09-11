@@ -1,0 +1,122 @@
+name: Nightly
+
+# The slow lanes that never belonged on every push: the Thread Sanitizer
+# subset, the complete Python suite, and cold foundation compiles of both
+# platforms. Failure opens (or refreshes) one issue labelled `nightly`; nothing
+# here blocks a commit or a push, and no retry is automatic.
+on:
+  schedule:
+    - cron: '0 4 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly
+  cancel-in-progress: false
+
+jobs:
+  tsan:
+    name: Core and XPC TSan subset
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Native toolchain
+        uses: ./.github/actions/native-toolchain
+        with:
+          metal: "true"
+
+      - name: Run the Thread Sanitizer subset
+        run: scripts/macos_test.sh tsan
+
+      - name: Retain sanitizer evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: tsan-${{ github.run_id }}-${{ github.run_attempt }}
+          path: build/artifacts/macos/tests/tsan-*/
+          if-no-files-found: warn
+          retention-days: 14
+
+  python-full:
+    name: Python suite (complete)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Install pinned numpy and ripgrep
+        run: |
+          set -euo pipefail
+          NUMPY_PIN="$(python3 -c "import json; print(json.load(open('config/toolchain.json'))['native']['numpy']['version'])")"
+          python3 -m pip install --quiet --break-system-packages "numpy==${NUMPY_PIN}"
+          sudo apt-get install -y --no-install-recommends ripgrep
+
+      - name: Run the complete Python suite
+        run: |
+          set -euo pipefail
+          python3 scripts/python_test_contract.py validate
+          python3 -m unittest discover -s scripts/tests -p 'test_*.py'
+
+  foundation-cold:
+    name: Cold foundation compile (macOS + iOS)
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Native toolchain
+        uses: ./.github/actions/native-toolchain
+
+      - name: Regenerate Xcode project
+        run: ./scripts/regenerate_project.sh --fast
+
+      - name: Compile every foundation target from a clean tree
+        run: ./scripts/build_foundation_targets.sh all
+
+      - name: Upload compile results on failure
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: foundation-cold-artifacts
+          path: build/artifacts/foundation/
+          if-no-files-found: warn
+          retention-days: 7
+
+  report:
+    name: Open or refresh the nightly issue
+    needs: [tsan, python-full, foundation-cold]
+    if: failure()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: File one issue per open nightly failure
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESULTS: ${{ toJSON(needs) }}
+          RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          body="Nightly run failed: ${RUN_URL}"$'\n\n'"Job results:"$'\n'"$(printf '%s' "$RESULTS" | python3 -c 'import json,sys; print("\n".join(f"- {k}: {v[\"result\"]}" for k, v in json.load(sys.stdin).items()))')"
+          existing="$(gh issue list --repo "$GITHUB_REPOSITORY" --label nightly --state open --json number --jq '.[0].number // empty')"
+          if [[ -n "$existing" ]]; then
+            gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body "$body"
+          else
+            gh label create nightly --repo "$GITHUB_REPOSITORY" --color B60205 --description "Nightly lane failure" 2>/dev/null || true
+            gh issue create --repo "$GITHUB_REPOSITORY" --label nightly --title "Nightly lane failing" --body "$body"
+          fi

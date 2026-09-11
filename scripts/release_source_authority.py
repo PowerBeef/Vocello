@@ -19,7 +19,9 @@ from typing import Any
 
 SHA = re.compile(r"[0-9a-f]{40}")
 TAG = re.compile(r"v[0-9]+\.[0-9]+\.[0-9]+(?:[+-][0-9A-Za-z.-]+)?")
-DEFAULT_REQUIRED_CHECKS = ("CI required", "Security required")
+# `CI required` is the only per-push aggregate. Security analysis runs inside the
+# release workflow on the tagged commit and gates it by job dependency.
+DEFAULT_REQUIRED_CHECKS = ("CI required",)
 
 
 def _load_json(path: Path) -> Any:

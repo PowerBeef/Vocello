@@ -1,131 +1,28 @@
 name: Security
 
-# Pull requests receive dependency review plus path-relevant security analysis.
-# Main pushes, the weekly schedule, and manual dispatch retain the same coverage.
+# Weekly and on-demand security analysis, and the exact-tag run release.yml
+# calls before it authorizes a candidate. Not per push: Swift CodeQL rebuilds
+# the whole graph and takes about an hour on a macos-26 runner, which is not a
+# useful signal on every trunk commit. `Security required` remains the stable
+# aggregate name.
 on:
-  pull_request:
-  push:
-    branches: [main]
   schedule:
     - cron: '23 8 * * 2'
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
 
-# Superseding a run is right for PR iteration and wrong for main. CodeQL's Swift
-# job needs 24-58 min against CI's 13-15, so on a trunk-based cadence every main
-# run was cancelled by the next push before it could finish: between 2026-07-31
-# and 2026-08-02 no Security run on main completed at all, and the gap was
-# invisible because a cancelled run is not a red one. Main now runs to
-# completion; branches still supersede.
 concurrency:
   group: security-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  cancel-in-progress: false
 
 jobs:
-  changes:
-    name: Security path routing
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    outputs:
-      native: ${{ steps.classify.outputs.native }}
-      website: ${{ steps.classify.outputs.website }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-
-      - name: Classify security-relevant paths
-        id: classify
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          BEFORE_SHA: ${{ github.event.before }}
-          HEAD_SHA: ${{ github.sha }}
-          BASE_REF: ${{ github.base_ref }}
-        run: |
-          set -euo pipefail
-          native=true
-          website=true
-          changed=""
-          if [[ "$EVENT_NAME" == "pull_request" && -n "$BASE_REF" ]]; then
-            git fetch --quiet origin "$BASE_REF"
-            changed="$(git diff --name-only "origin/$BASE_REF...HEAD")"
-          elif [[ "$EVENT_NAME" == "push" && -n "$BEFORE_SHA" \
-              && "$BEFORE_SHA" != "0000000000000000000000000000000000000000" \
-              && "$(git cat-file -t "$BEFORE_SHA" 2>/dev/null || true)" == "commit" ]]; then
-            changed="$(git diff --name-only "$BEFORE_SHA..$HEAD_SHA")"
-          fi
-          if [[ -n "$changed" ]]; then
-            native=false
-            website=false
-            while IFS= read -r path; do
-              case "$path" in
-                Sources/*|Tests/*|Packages/*|config/*|scripts/*|benchmarks/*|project.yml|QwenVoice.xcodeproj/*|.github/*|Package.resolved)
-                  native=true ;;
-              esac
-              case "$path" in
-                website/*) website=true ;;
-              esac
-            done <<<"$changed"
-          fi
-          echo "native=$native" >>"$GITHUB_OUTPUT"
-          echo "website=$website" >>"$GITHUB_OUTPUT"
-          echo "security routing: native=$native website=$website"
-
-  dependency-review:
-    name: Dependency review
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: read
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Reject newly introduced vulnerable dependencies
-        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
-        with:
-          fail-on-severity: high
-
-  swift-dependency-submission:
-    name: Submit Swift dependency graph
-    if: github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Generate deterministic Swift dependency snapshot
-        run: |
-          set -euo pipefail
-          python3 scripts/swift_dependency_snapshot.py \
-            --sha "$GITHUB_SHA" \
-            --ref "$GITHUB_REF" \
-            --job-id "${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
-            --job-url "https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
-            > "$RUNNER_TEMP/swift-dependency-snapshot.json"
-
-      - name: Submit Swift dependency snapshot
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          gh api \
-            --method POST \
-            -H "Accept: application/vnd.github+json" \
-            -H "X-GitHub-Api-Version: 2026-03-10" \
-            "repos/${GITHUB_REPOSITORY}/dependency-graph/snapshots" \
-            --input "$RUNNER_TEMP/swift-dependency-snapshot.json"
-
   npm-advisory-audit:
     name: npm advisory audit
-    needs: changes
-    if: needs.changes.outputs.website == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: read
     steps:
@@ -147,8 +44,6 @@ jobs:
 
   codeql:
     name: CodeQL (${{ matrix.language }})
-    needs: changes
-    if: needs.changes.outputs.native == 'true' || needs.changes.outputs.website == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -171,27 +66,11 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Select and validate native toolchain
+      - name: Native toolchain
         if: matrix.language == 'swift'
-        run: |
-          sudo xcode-select -s /Applications/Xcode_26.6.app
-          # xcodegen, ripgrep, xcbeautify, and shellcheck are SHA-pinned
-          # release artifacts (mixed runner image pools make brew's formula
-          # index nondeterministic mid-roll); numpy pip-pins to the
-          # config/toolchain.json version for the same reason.
-          NUMPY_PIN="$(python3 -c "import json; print(json.load(open('config/toolchain.json'))['native']['numpy']['version'])")"
-          python3 -m pip install --quiet --break-system-packages "numpy==${NUMPY_PIN}" \
-            || python3 -m pip install --quiet "numpy==${NUMPY_PIN}"
-          ./scripts/install_pinned_tools.sh
-          export PATH="$HOME/.qwenvoice-pinned-tools/bin:$PATH"
-          # Xcode 26 ships Metal as an optional component, and GitHub's fresh
-          # macos-26 images do not consistently include it. MLX compiles Metal
-          # sources, so install the component before CodeQL starts tracing.
-          if ! xcrun metal --version >/dev/null 2>&1; then
-            xcodebuild -downloadComponent metalToolchain
-          fi
-          xcrun metal --version
-          python3 scripts/supply_chain_contract.py --installed native
+        uses: ./.github/actions/native-toolchain
+        with:
+          metal: "true"
 
       - name: Prepare Swift CodeQL build inputs
         if: matrix.language == 'swift'
@@ -215,10 +94,8 @@ jobs:
           # CodeQL's tracing shell currently runs through Rosetta on the ARM
           # macos-26 image. Keep the owned-Swift rebuild inside that shell so
           # the extractor sees it, while reusing native Metal/dependency outputs
-          # and emitting only arm64 products through ARCHS=arm64. The traced
-          # scratch product is analysis-only because Xcode removes the excluded
-          # Metal resource; codeql-prepare already validated the complete app in
-          # the same isolated scratch root. Neither command stages public output.
+          # and emitting only arm64 products through ARCHS=arm64. Neither
+          # command stages public output.
           ./scripts/build.sh codeql
 
       - name: Analyze
@@ -226,19 +103,19 @@ jobs:
 
   security-required:
     name: Security required
-    needs: [changes, dependency-review, swift-dependency-submission, npm-advisory-audit, codeql]
+    needs: [npm-advisory-audit, codeql]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Aggregate exact-SHA security results
+      - name: Aggregate security results
         env:
           RESULTS: ${{ toJSON(needs) }}
         run: |
           set -euo pipefail
           echo "$RESULTS"
           if printf '%s' "$RESULTS" | grep -Eq '"result": *"(failure|cancelled)"'; then
-            echo "::error::a path-relevant security job failed or was cancelled"
+            echo "::error::a security job failed or was cancelled"
             exit 1
           fi
-          echo "all path-relevant security jobs succeeded or were skipped"
+          echo "all security jobs succeeded"

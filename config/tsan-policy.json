@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "status": "characterizing-non-blocking",
-  "workflow": ".github/workflows/tsan.yml",
+  "workflow": ".github/workflows/nightly.yml",
   "command": "scripts/macos_test.sh tsan",
   "derivedDataEntry": "xcode-macos-tsan-derived-data",
   "subset": [

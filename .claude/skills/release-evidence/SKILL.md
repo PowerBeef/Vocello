@@ -18,7 +18,7 @@ dispatch.
 1. Require a tag as the argument. `git tag -l "$0" -n1` and `git log -1 "$0"` to confirm it exists and
    which commit it targets.
 2. `python3 scripts/release_source_authority.py --help` then run its validation for the tag: the tag must
-   be annotated, on `origin/main`, with the latest exact-SHA `CI required` and `Security required` green.
+   be annotated, on `origin/main`, with the latest exact-SHA `CI required` green.
 3. `python3 scripts/check_release_notes.py "$0"` for curated notes.
 4. `python3 scripts/quality_promotion.py validate` for the exact-tag `quality-promotion.json` if one
    exists; list which platform lanes and evidence ages block promotion.

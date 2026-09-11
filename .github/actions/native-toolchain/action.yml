@@ -1,0 +1,38 @@
+name: Native toolchain
+description: >-
+  Select the pinned Xcode, install the SHA-pinned xcodegen/ripgrep/xcbeautify/shellcheck
+  release artifacts and the pinned numpy, put them on PATH and verify every version
+  against config/toolchain.json.
+inputs:
+  metal:
+    description: Install Xcode's optional Metal toolchain when it is absent (CodeQL, TSan)
+    required: false
+    default: "false"
+runs:
+  using: composite
+  steps:
+    - name: Select and validate native toolchain
+      shell: bash
+      env:
+        INSTALL_METAL: ${{ inputs.metal }}
+      run: |
+        set -euo pipefail
+        XCODE_PIN="$(python3 -c "import json; print(json.load(open('config/toolchain.json'))['native']['xcode']['version'])")"
+        sudo xcode-select -s "/Applications/Xcode_${XCODE_PIN}.app"
+        xcodebuild -version
+        swift --version
+        # xcodegen, ripgrep, xcbeautify and shellcheck are SHA-pinned release
+        # artifacts (mixed runner image pools make brew's formula index
+        # nondeterministic mid-roll); numpy pip-pins to the manifest version.
+        NUMPY_PIN="$(python3 -c "import json; print(json.load(open('config/toolchain.json'))['native']['numpy']['version'])")"
+        python3 -m pip install --quiet --break-system-packages "numpy==${NUMPY_PIN}" \
+          || python3 -m pip install --quiet "numpy==${NUMPY_PIN}"
+        ./scripts/install_pinned_tools.sh
+        echo "$HOME/.qwenvoice-pinned-tools/bin" >> "$GITHUB_PATH"
+        export PATH="$HOME/.qwenvoice-pinned-tools/bin:$PATH"
+        if [[ "$INSTALL_METAL" == "true" ]] && ! xcrun metal --version >/dev/null 2>&1; then
+          # Xcode 26 ships Metal as an optional component and fresh runner
+          # images do not consistently include it; MLX compiles Metal sources.
+          xcodebuild -downloadComponent metalToolchain
+        fi
+        python3 scripts/supply_chain_contract.py --installed native

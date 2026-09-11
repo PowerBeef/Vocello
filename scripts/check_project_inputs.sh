@@ -268,7 +268,7 @@ REQUIRED_SURFACES=(
     ".github/CODEOWNERS"
     ".github/workflows/promote-release.yml"
     ".github/workflows/swift-dependency-watch.yml"
-    ".github/workflows/tsan.yml"
+    ".github/workflows/nightly.yml"
     ".github/dependabot.yml"
     "Tests/UIAutomationSupport"
     "Tests/VocelloMacUITests"

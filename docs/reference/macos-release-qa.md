@@ -117,7 +117,7 @@ upload depend on deterministic release-readiness and artifact checks.
    part of the packaging gate.
    (No `--notarize` locally unless the API key env vars are present.)
 7. **Atomic Release candidate**: first push the release commit to `main` and wait for its latest
-   `CI required` and `Security required` check runs to complete successfully. Create an annotated,
+   `CI required` check run to complete successfully (Security runs inside `release.yml`). Create an annotated,
    cryptographically signed version tag at that exact commit (for example
    `git tag -s vX.Y.Z <commit>`), push the tag, or dispatch `release.yml` with that exact existing
    tag. GitHub must report the annotated tag object's signature as verified with reason `valid`;

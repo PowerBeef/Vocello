@@ -215,7 +215,7 @@
       "id": "runtime-hardening",
       "owner": "backend-release-qa",
       "productionGlobs": [
-        ".github/workflows/tsan.yml",
+        ".github/workflows/nightly.yml",
         "Sources/QwenVoice.entitlements",
         "Sources/QwenVoiceEmbeddedRuntime.entitlements",
         "config/macos-entitlement-policy.json",

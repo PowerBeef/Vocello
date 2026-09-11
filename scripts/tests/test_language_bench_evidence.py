@@ -13,7 +13,7 @@ import tempfile
 import unittest
 import wave
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from language_bench_evidence import (
     EvidenceError,
     build_plan,
@@ -24,7 +24,7 @@ from language_bench_evidence import (
 )
 
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[2]
 MATRIX = ROOT / "config" / "language-bench-matrix.json"
 CORPUS = ROOT / "config" / "language-bench-corpus.json"
 COHORT = ROOT / "config" / "language-bench-diagnostic-cohort.json"

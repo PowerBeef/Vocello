@@ -11,14 +11,14 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from language_bench_evidence import build_plan, write_json_atomic
 from check_language_output import (
     CHINESE_SCRIPT_CONVERTER, ChineseScriptDiagnosticError, chinese_script_diagnostic,
     _pinned_chinese_script_transform, recomputed_accuracy, validate_structured_verification,
 )
 
-ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 CHECK = os.path.join(ROOT, "scripts", "check_language_output.py")
 MATRIX = os.path.join(ROOT, "config", "language-bench-matrix.json")
 CORPUS = os.path.join(ROOT, "config", "language-bench-corpus.json")

@@ -15,7 +15,7 @@ class PythonTestContractTests(unittest.TestCase):
     def test_accepts_unittest_and_function_adapter_modules(self):
         temporary, root = self._root()
         self.addCleanup(temporary.cleanup)
-        (root / "scripts/test_unit.py").write_text(
+        (root / "scripts/tests/test_unit.py").write_text(
             "import unittest\n"
             "class UnitTests(unittest.TestCase):\n"
             "    def test_value(self):\n"
@@ -34,6 +34,21 @@ class PythonTestContractTests(unittest.TestCase):
 
         self.assertEqual(2, len(inventory))
         self.assertEqual(2, sum(item.declared_tests for item in inventory))
+
+    def test_rejects_a_test_module_left_beside_the_scripts(self):
+        temporary, root = self._root()
+        self.addCleanup(temporary.cleanup)
+        (root / "scripts/tests/test_unit.py").write_text(
+            "import unittest\n"
+            "class UnitTests(unittest.TestCase):\n"
+            "    def test_value(self):\n"
+            "        self.assertEqual(1, 1)\n",
+            encoding="utf-8",
+        )
+        (root / "scripts/test_stray.py").write_text("import unittest\n", encoding="utf-8")
+        with self.assertRaises(ValueError) as raised:
+            python_test_contract.validate(root)
+        self.assertIn("scripts/test_stray.py: test modules live under scripts/tests/", str(raised.exception))
 
     def test_rejects_unexpected_zero_test_module(self):
         temporary, root = self._root()

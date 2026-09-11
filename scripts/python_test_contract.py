@@ -16,8 +16,9 @@ from pathlib import Path
 from typing import Iterable
 
 
+# One root. The former split between scripts/test_*.py and scripts/tests/test_*.py was
+# historical; discovery, selection and the required-surface list all point here.
 TEST_ROOTS = (
-    (Path("scripts"), False),
     (Path("scripts/tests"), False),
 )
 
@@ -82,8 +83,12 @@ def iter_test_modules(project_root: Path) -> Iterable[Path]:
 def validate(project_root: Path) -> list[ModuleInventory]:
     inventories = [inventory_module(path) for path in iter_test_modules(project_root)]
     errors: list[str] = []
+    # The roots were consolidated on 2026-09-11; a test module dropped beside the
+    # scripts it covers would be invisible to discovery, so it is rejected outright.
+    for stray in sorted((project_root / "scripts").glob("test_*.py")):
+        errors.append(f"{stray.relative_to(project_root)}: test modules live under scripts/tests/, not scripts/")
     if not inventories:
-        errors.append("no Python test modules found under scripts/ or scripts/tests/")
+        errors.append("no Python test modules found under scripts/tests/")
 
     for inventory in inventories:
         relative = inventory.path.relative_to(project_root)

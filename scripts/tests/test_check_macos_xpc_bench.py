@@ -11,7 +11,7 @@ import tempfile
 import unittest
 
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 TEST_HELPERS = ROOT / "scripts" / "tests"
 if str(TEST_HELPERS) not in sys.path:
     sys.path.insert(0, str(TEST_HELPERS))

@@ -208,9 +208,9 @@ macOS hint-only evidence is therefore explicitly `partial` in benchmark history.
 ## Offline gate tests
 
 ```sh
-python3 -m unittest scripts.test_check_ios_speech_assets
-python3 scripts/test_check_language_hints.py
-python3 scripts/test_check_language_output.py
+python3 -m unittest scripts.tests.test_check_ios_speech_assets
+python3 -m unittest scripts.tests.test_check_language_hints
+python3 -m unittest scripts.tests.test_check_language_output
 ```
 
 ## Related

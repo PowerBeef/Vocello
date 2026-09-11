@@ -493,7 +493,6 @@ elif [[ "${QVOICE_GATES:-}" == "quick" && -z "${CI:-}${GITHUB_ACTIONS:-}" ]] \
     && [[ -z "$(git status --porcelain -- scripts config 2>/dev/null)" ]]; then
   echo "==> quick gate mode: scripts/config unchanged — skipping script self-tests" >&2
 else
-python3 -m unittest discover -s scripts -p 'test_*.py'
 python3 -m unittest discover -s scripts/tests -p 'test_*.py'
 fi
 

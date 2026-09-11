@@ -11,7 +11,7 @@ import tempfile
 import unittest
 
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 CHECKER = ROOT / "scripts" / "check_ios_speech_assets.py"
 RUNNER = ROOT / "Sources" / "iOS" / "IOSDeviceDiagnosticsRunner.swift"
 DEVICE_SCRIPT = ROOT / "scripts" / "ios_device.sh"

@@ -10,11 +10,11 @@ import sys
 import tempfile
 import unittest
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from language_bench_evidence import build_plan, write_json_atomic
 
 
-ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 CHECK = os.path.join(ROOT, "scripts", "check_language_hints.py")
 MATRIX = os.path.join(ROOT, "config", "language-bench-matrix.json")
 CORPUS = os.path.join(ROOT, "config", "language-bench-corpus.json")

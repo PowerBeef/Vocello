@@ -92,12 +92,9 @@ def adjacent_python_tests(paths: list[str]) -> list[str]:
         if not (relative.startswith("scripts/") and relative.endswith(".py")):
             continue
         stem = path.stem
-        for candidate in (
-            ROOT / "scripts" / f"test_{stem}.py",
-            ROOT / "scripts" / "tests" / f"test_{stem}.py",
-        ):
-            if candidate.is_file():
-                tests.add(candidate.relative_to(ROOT).as_posix())
+        candidate = ROOT / "scripts" / "tests" / f"test_{stem}.py"
+        if candidate.is_file():
+            tests.add(candidate.relative_to(ROOT).as_posix())
     return sorted(tests)
 
 
@@ -153,7 +150,7 @@ def python_test_selection(paths: list[str], *, root: Path | None = None) -> dict
     inputs = [p for p in paths if p.startswith(("scripts/", "config/", ".github/", ".claude/")) or p in {"project.yml", "Package.resolved"}]
     if any(matches_any(p, policy["fullTestPatterns"]) for p in paths):
         return {"mode": "full", "tests": [], "reason": "verification/build authority changed"}
-    modules = sorted([*root.glob("scripts/test_*.py"), *root.glob("scripts/tests/test_*.py")])
+    modules = sorted(root.glob("scripts/tests/test_*.py"))
     test_paths = {p.relative_to(root).as_posix() for p in modules}
     texts = {
         p.relative_to(root).as_posix(): p.read_text(encoding="utf-8")

@@ -11,7 +11,7 @@ unchanged.
 The embedding backend (SpeechBrain ECAPA-TDNN) is a heavy operator-local
 dependency loaded lazily, exactly like the NumPy prosody analyzer: this script
 must import and its verdict logic must be testable with no torch installed.
-`scripts/test_clone_speaker_similarity.py` exercises everything below the
+`scripts/tests/test_clone_speaker_similarity.py` exercises everything below the
 backend boundary with injected embeddings.
 
 Usage:
